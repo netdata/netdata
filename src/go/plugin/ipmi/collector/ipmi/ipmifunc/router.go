@@ -41,7 +41,7 @@ func Methods(updateEvery int) []funcapi.FunctionConfig {
 			ID:           methodSensors,
 			FunctionName: FunctionName,
 			Name:         "IPMI Sensors",
-			Help:         "IPMI sensor readings and health states",
+			Help:         "IPMI sensor readings, thresholds and health states",
 			UpdateEvery:  updateEvery,
 			ResponseType: "table",
 		},
@@ -114,12 +114,18 @@ func sensorColumns() []funcapi.ColumnMeta {
 			Visible:       true,
 			Sortable:      true,
 			Sort:          funcapi.FieldSortDescending,
-			Summary:       funcapi.FieldSummarySum,
+			Summary:       funcapi.FieldSummaryCount, // grouped rows mix units (Celsius, RPM, Volts)
 			Transform:     funcapi.FieldTransformNumber,
 			DecimalPoints: 2,
 		},
 		textColumn("Units", "Reading units"),
 		textColumn("State", "Default FreeIPMI health interpretation"),
+		thresholdColumn("LNR", "Lower non-recoverable"),
+		thresholdColumn("LCR", "Lower critical"),
+		thresholdColumn("LNC", "Lower non-critical"),
+		thresholdColumn("UNC", "Upper non-critical"),
+		thresholdColumn("UCR", "Upper critical"),
+		thresholdColumn("UNR", "Upper non-recoverable"),
 		{
 			Name:      "Key",
 			Tooltip:   "Stable sensor identity within this collection job",
@@ -129,24 +135,51 @@ func sensorColumns() []funcapi.ColumnMeta {
 	}
 }
 
-func sensorRow(s bmc.Sensor) []any {
-	var value, units any
-	if s.Value != nil {
-		value = *s.Value
+// thresholdColumn is one threshold in the units of the row's reading.
+func thresholdColumn(name, threshold string) funcapi.ColumnMeta {
+	return funcapi.ColumnMeta{
+		Name:     name,
+		Tooltip:  threshold + " threshold the BMC uses, in the reading's units; blank when the sensor has none",
+		Type:     funcapi.FieldTypeFloat,
+		Visible:  true,
+		Sortable: true,
+		// Grouped rows mix units.
+		Summary:       funcapi.FieldSummaryCount,
+		Transform:     funcapi.FieldTransformNumber,
+		DecimalPoints: 2,
 	}
+}
+
+func sensorRow(s bmc.Sensor) []any {
+	var units any
 	if s.Unit != "" {
 		units = s.Unit
 	}
+	t := s.Thresholds
 	return []any{
 		s.Name,
 		s.Type,
 		s.Component,
-		value,
+		number(s.Value),
 		units,
 		s.State,
+		number(t.LowerNonRecoverable),
+		number(t.LowerCritical),
+		number(t.LowerNonCritical),
+		number(t.UpperNonCritical),
+		number(t.UpperCritical),
+		number(t.UpperNonRecoverable),
 		s.Key,
 		map[string]string{"severity": rowSeverity(s.State)},
 	}
+}
+
+// number returns a cell value; nil renders blank.
+func number(v *float64) any {
+	if v == nil {
+		return nil
+	}
+	return *v
 }
 
 // rowSeverity styles warning and critical rows; unknown keeps normal styling, as in the C plugin.

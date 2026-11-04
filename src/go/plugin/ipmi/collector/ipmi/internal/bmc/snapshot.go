@@ -48,4 +48,18 @@ type Sensor struct {
 	State string
 	// Value is nil when the reading is unavailable, unsupported or invalid.
 	Value *float64
+	// Thresholds are read with the inventory, not with each reading.
+	Thresholds Thresholds
+}
+
+// Thresholds are the threshold values the BMC uses for a threshold sensor, in
+// the units of its reading. A nil value is a threshold the sensor does not
+// have, or one that could not be read or converted.
+type Thresholds struct {
+	LowerNonRecoverable *float64
+	LowerCritical       *float64
+	LowerNonCritical    *float64
+	UpperNonCritical    *float64
+	UpperCritical       *float64
+	UpperNonRecoverable *float64
 }

@@ -6,6 +6,9 @@ artifacts only. Publication is a separate, manually requested protected-environm
 job on `netdata/netdata` master. It is not ready for production until the release
 environment, target qualification and publication infrastructure below are confirmed.
 
+This runbook owns the DEM release sequence and infrastructure settings referenced by the
+`packaging-component-releases` developer skill.
+
 ## Release sequence
 
 1. Update the runtime-owned component/lock inputs and `inputs.json` version. Use a

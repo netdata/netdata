@@ -41,8 +41,7 @@ func TestIntegrationArtifacts(t *testing.T) {
 }
 
 func TestMetadataDocumentsEmittedLabels(t *testing.T) {
-	_, server := newFixtureAPI(t)
-	c := newTestCollector(t, server)
+	_, c, _ := newTrafficFixture(t)
 	require.NoError(t, collectCycle(t.Context(), c))
 
 	var orgLabels []string
@@ -54,6 +53,14 @@ func TestMetadataDocumentsEmittedLabels(t *testing.T) {
 	emitted := map[string][]string{
 		"organization": orgLabels,
 		"device":       slices.Sorted(maps.Keys(readDevices(c)["S1"].Labels)),
+	}
+	for scope, metric := range map[string]string{
+		"switch port":      metricSwitchPortTrafficSent,
+		"appliance uplink": metricApplianceUplinkTrafficSent,
+	} {
+		points := trafficPoints(c, metric)
+		require.NotEmpty(t, points)
+		emitted[scope] = slices.Sorted(maps.Keys(points[0].Labels))
 	}
 
 	var metadata struct {

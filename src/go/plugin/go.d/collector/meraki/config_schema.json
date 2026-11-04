@@ -29,6 +29,24 @@
         "type": "string",
         "default": ""
       },
+      "collect_switch_port_traffic": {
+        "title": "Collect switch port traffic",
+        "description": "Collect the average traffic of every switch port, shown on its switch's node.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_switch_port_packets": {
+        "title": "Collect switch port packets",
+        "description": "Collect the packet rates of every switch port, at one API request per switch per collection.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_appliance_uplink_traffic": {
+        "title": "Collect appliance uplink traffic",
+        "description": "Collect the average traffic of each uplink of every MX and Z network, shown on the job's node or its virtual node.",
+        "type": "boolean",
+        "default": false
+      },
       "update_every": {
         "title": "Update every",
         "description": "Data collection interval, in seconds.",
@@ -52,7 +70,7 @@
       },
       "vnode": {
         "title": "Virtual node",
-        "description": "Associates the organization summary with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
+        "description": "Associates the organization and appliance uplink charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
         "type": "string",
         "default": ""
       },
@@ -140,6 +158,14 @@
           ]
         },
         {
+          "title": "Traffic",
+          "fields": [
+            "collect_switch_port_traffic",
+            "collect_switch_port_packets",
+            "collect_appliance_uplink_traffic"
+          ]
+        },
+        {
           "title": "Collection",
           "fields": [
             "update_every",
@@ -164,7 +190,16 @@
       "ui:widget": "password"
     },
     "timeout": {
-      "ui:help": "This budget covers a whole collection, including authentication-file reads, pagination and pacing. Increase it if a large organization cannot finish within the budget."
+      "ui:help": "This budget covers a whole collection, including authentication-file reads, pagination and pacing. Increase it if a large organization cannot finish within the budget. Collecting switch port packets adds one request per switch."
+    },
+    "collect_switch_port_traffic": {
+      "ui:help": "Uses the latest interval Meraki has reported within the last 15 minutes, usually five minutes long; a port without a usable interval in that time has a gap. A second chart shows how old the interval is. Costs one API request per 50 switches."
+    },
+    "collect_switch_port_packets": {
+      "ui:help": "Requests are paced at 10 per second, so 1,000 switches add about 100 seconds to every collection, more than the default Timeout of 60 seconds. A collection that runs past Timeout updates no chart, availability included. Increase Timeout with it, or leave it off for large fleets.\n\nRates cover the last five minutes, which Meraki may not have finished reporting."
+    },
+    "collect_appliance_uplink_traffic": {
+      "ui:help": "Shows the bytes each uplink moved in the five minutes that ended five minutes ago, leaving Meraki time to count them, as average kilobits per second. When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface, so the charts belong to the network, not to an appliance."
     }
   }
 }

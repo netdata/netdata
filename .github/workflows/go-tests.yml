@@ -32,11 +32,15 @@ jobs:
             CMakeLists.txt
             **/CMakeLists.txt
             .github/workflows/go-tests.yml
+            .github/scripts/get-go-version.py
+            .github/scripts/normalize-go-test-json.py
+            .github/scripts/test-go-build-matrix.py
             packaging/cmake/
             src/go/**
             src/health/notifications/alarm-notify/**
             src/collectors/cgroups.plugin/cgroup-name/**
             src/collectors/ebpf.plugin/ebpfgo.plugin/**
+            src/web/mcp/bridges/stdio-golang/**
           files_ignore: |
             **/*.md
             src/go/**/metadata.yaml
@@ -68,16 +72,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install dependencies
-        run: |
-          sudo apt-get update || true
-          sudo apt-get install -y python3-packaging
+      - name: Test Go build matrix
+        run: python3 .github/scripts/test-go-build-matrix.py
       - name: Get Go version and modules
         id: get-version
         run: .github/scripts/get-go-version.py
 
   tests:
-    name: Go toolchain tests
+    name: Go toolchain tests (${{ matrix.module }})
     runs-on: ubuntu-latest
     needs:
       - file-check
@@ -111,9 +113,12 @@ jobs:
           sudo apt-get install -y unixodbc-dev
       - name: Compile
         if: needs.file-check.outputs.run == 'true'
+        env:
+          TARGETS: ${{ matrix.targets }}
         run: |
-          CGO_ENABLED=0 go build -o /tmp/go-test-build ${{ matrix.build_target }}
-          /tmp/go-test-build --help || true
+          read -ra targets <<< "${TARGETS}"
+          mkdir -p "${RUNNER_TEMP}/go-test-build"
+          CGO_ENABLED=0 go build -o "${RUNNER_TEMP}/go-test-build/" "${targets[@]}"
         working-directory: ${{ matrix.module }}
       - name: Go fmt
         if: needs.file-check.outputs.run == 'true'
@@ -212,7 +217,7 @@ jobs:
         working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin
 
   build-tests:
-    name: Go build tests
+    name: Go build tests (${{ matrix.module }}, ${{ matrix.platform }})
     runs-on: ubuntu-latest
     needs:
       - file-check
@@ -220,13 +225,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platforms:
-          - linux/386
-          - linux/amd64
-          - linux/arm
-          - linux/arm64
-          - linux/ppc64le
-          - windows/amd64
         include: ${{ fromJson(needs.matrix.outputs.build_matrix) }}
     steps:
       - name: Skip Check
@@ -242,16 +240,20 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
-      - name: Set GOOS and GOARCH
-        run: |
-          echo "GOOS=$(echo "${{ matrix.platform }}" | cut -f 1 -d '/')" >> "${GITHUB_ENV}"
-          echo "GOARCH=$(echo "${{ matrix.platform }}" | cut -f 2 -d '/')" >> "${GITHUB_ENV}"
       - name: Go mod download
         if: needs.file-check.outputs.run == 'true'
         run: go mod download
         working-directory: ${{ matrix.module }}
       - name: Compile
         if: needs.file-check.outputs.run == 'true'
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          TARGETS: ${{ matrix.targets }}
         run: |
-          CGO_ENABLED=0 go build -o /tmp/go-test-build ${{ matrix.build_target }}
+          : "${GOOS:?}" "${GOARCH:?}" "${TARGETS:?}"
+          go env GOOS GOARCH
+          read -ra targets <<< "${TARGETS}"
+          mkdir -p "${RUNNER_TEMP}/go-test-build"
+          CGO_ENABLED=0 go build -o "${RUNNER_TEMP}/go-test-build/" "${targets[@]}"
         working-directory: ${{ matrix.module }}

@@ -56,7 +56,7 @@ Resource usage depends on accepted browser traffic and the configured measuremen
 
 #### Install the DEM plugin
 
-DEM is experimental and opt-in. Build Netdata with `-DENABLE_PLUGIN_DEM=ON`, or use `--enable-plugin-dem` with the source installer. Install the resulting DEM plugin package.
+Linux builds include DEM by default. Native installations include the `netdata-plugin-dem` package. RUM does not require the optional browser runtime.
 
 #### Expose the receiver
 

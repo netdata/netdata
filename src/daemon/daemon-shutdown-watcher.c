@@ -161,6 +161,7 @@ void watcher_main(void *arg)
     netdata_log_info("Shutdown process ended in %s", shutdown_timing);
 
     daemon_status_file_shutdown_step(NULL, buffer_tostring(steps_timings));
+    daemon_status_file_set_shutdown_duration_ut(shutdown_duration);
     daemon_status_file_update_status(DAEMON_STATUS_EXITED);
 }
 

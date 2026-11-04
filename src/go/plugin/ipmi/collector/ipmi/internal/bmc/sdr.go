@@ -39,8 +39,8 @@ const (
 	recordLengthOffset = 4
 )
 
-// refreshInventory rediscovers the SDR repository when it changed or the cached
-// inventory is older than inventoryMaxAge.
+// refreshInventory rediscovers the SDR repository, with sensor thresholds, when
+// it changed or the cached inventory is older than inventoryMaxAge.
 func (r *Reader) refreshInventory(ctx context.Context) error {
 	var repo storage.GetSDRRepoInfoResponse
 	if err := r.exchange(ctx, &storage.GetSDRRepoInfoRequest{}, &repo); err != nil {
@@ -64,6 +64,7 @@ func (r *Reader) refreshInventory(ctx context.Context) error {
 	if !sameRepository(repo, after) {
 		return errors.New("SDR repository changed during discovery")
 	}
+	r.inventoryThresholdsUnavailable = r.readThresholds(ctx, inventory)
 
 	r.inventory = inventory
 	r.inventoryRepo = after

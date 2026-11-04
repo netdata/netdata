@@ -4,45 +4,79 @@ package merakiapi
 
 import (
 	"errors"
+	"maps"
 	"net"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Meraki paginates with Link headers (RFC 8288): the server owns the cursor, and
 // the last page is the one without rel="next". The client never builds a cursor
 // itself or infers the end from a short page.
 
-// pageKey checks that a page URL stays on a trusted host, on the operation's
-// path, with only documented pagination parameters. It returns the URL in a
-// canonical form, used to detect pagination cycles.
-func (c *Client) pageKey(u *url.URL, operationPath string, maxPageSize int) (string, error) {
+// pageURL checks that a page URL stays on a trusted host, on the operation's
+// path, with only documented pagination parameters and an unchanged win. It
+// returns the URL to request, with a canonical query that carries win even
+// where the link left it out, and a canonical key of it to detect cycles.
+func (c *Client) pageURL(u *url.URL, operationPath string, maxPageSize int, win *window) (*url.URL, string, error) {
 	if !c.trustedTarget(u) || u.EscapedPath() != operationPath {
-		return "", errors.New("unsafe pagination scope")
+		return nil, "", errors.New("unsafe pagination scope")
 	}
 	query, err := url.ParseQuery(u.RawQuery)
 	if err != nil {
-		return "", errors.New("invalid pagination query")
+		return nil, "", errors.New("invalid pagination query")
 	}
 	for name, values := range query {
 		if len(values) != 1 {
-			return "", errors.New("ambiguous pagination query")
+			return nil, "", errors.New("ambiguous pagination query")
 		}
 		switch name {
 		case "startingAfter", "endingBefore":
 		case "perPage":
 			n, err := strconv.Atoi(values[0])
 			if err != nil || n < minPageSize || n > maxPageSize {
-				return "", errors.New("invalid pagination page size")
+				return nil, "", errors.New("invalid pagination page size")
 			}
 			query.Set(name, strconv.Itoa(n))
+		case "t0", "t1":
+			// A link may spell the window's instants differently, but never move them.
+			if win == nil || !sameInstant(values[0], win.instant(name)) {
+				return nil, "", errors.New("changed pagination time window")
+			}
+		case "interval":
+			// Meraki derives the interval from the window and can echo it. The
+			// echo is dropped, so every page lets the same window decide it.
+			if win == nil {
+				return nil, "", errors.New("unexpected pagination query parameter")
+			}
+			query.Del(name)
 		default:
-			return "", errors.New("unexpected pagination query parameter")
+			return nil, "", errors.New("unexpected pagination query parameter")
 		}
 	}
+	if win != nil {
+		maps.Copy(query, win.query())
+	}
+	canonical := *u
+	canonical.RawQuery = query.Encode()
 	host := net.JoinHostPort(strings.ToLower(u.Hostname()), effectivePort(u))
-	return u.Scheme + "://" + host + operationPath + "?" + query.Encode(), nil
+	return &canonical, u.Scheme + "://" + host + operationPath + "?" + canonical.RawQuery, nil
+}
+
+// instant returns the window's value of the t0 or t1 parameter.
+func (w window) instant(param string) time.Time {
+	if param == "t0" {
+		return w.start
+	}
+	return w.end
+}
+
+// sameInstant reports whether value is an RFC 3339 spelling of t.
+func sameInstant(value string, t time.Time) bool {
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	return err == nil && parsed.Equal(t)
 }
 
 // nextLink returns the rel="next" target from Link header values. Targets and

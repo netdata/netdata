@@ -29,6 +29,8 @@ func TestPaginationRejectsUnsafeOrMalformedLinks(t *testing.T) {
 		"other operation":      `</api/v1/organizations/org/networks?startingAfter=2>; rel=next`,
 		"dot path":             `</api/v1/organizations/org/../devices?startingAfter=2>; rel=next`,
 		"unexpected filter":    `<?startingAfter=2&statuses[]=online>; rel=next`,
+		"time window":          `<?startingAfter=2&t0=2026-10-01T10%3A00%3A00Z>; rel=next`,
+		"interval":             `<?startingAfter=2&interval=300>; rel=next`,
 		"invalid query":        `<?startingAfter=2;private=SYNTHETIC_PRIVATE_BODY>; rel=next`,
 		"duplicate cursor":     `<?startingAfter=2&startingAfter=3>; rel=next`,
 		"duplicate page size":  `<?perPage=3&perPage=4>; rel=next`,
