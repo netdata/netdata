@@ -291,8 +291,12 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     service_wait_exit(~0, 20 * USEC_PER_SEC);
 
     // after every service that can issue a weights request (web, websockets/MCP, ACLK) has stopped,
-    // and before dbengine stops: accepted chunks finish, later requests run their chunks inline
-    if(!weights_parallel_shutdown()) {
+    // and before dbengine stops: accepted chunks finish, later requests run their chunks inline.
+    // Not waited for on an abnormal exit, like the dbengine drain: the fatal may be on a WEIGHTS thread (which
+    // would wait for itself) or hold the weights lock. Chunks may then still be running: skip the ASAN teardown.
+    if(abnormal)
+        weights_drained = false;
+    else if(!weights_parallel_shutdown()) {
         weights_drained = false;
         __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
         daemon_status_file_shutdown_gave_up("WEIGHTS ", "parallel weights work may still be running");
