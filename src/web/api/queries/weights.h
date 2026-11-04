@@ -68,7 +68,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr);
 
 WEIGHTS_METHOD weights_string_to_method(const char *method);
 void query_weights_worker_thread(void *arg);
-void weights_parallel_shutdown(void);
+bool weights_parallel_shutdown(void);
 const char *weights_method_to_string(WEIGHTS_METHOD method);
 int mc_unittest(void);
 

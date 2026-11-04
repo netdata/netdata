@@ -195,6 +195,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     // false when dbengine work may still be running after its event loop stopped
     bool dbengine_drained __maybe_unused = true;
+    bool weights_drained __maybe_unused = true;
 
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
@@ -290,7 +291,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     // after every service that can issue a weights request (web, websockets/MCP, ACLK) has stopped,
     // and before dbengine stops: accepted chunks finish, later requests run their chunks inline
-    weights_parallel_shutdown();
+    if(!weights_parallel_shutdown()) {
+        weights_drained = false;
+        daemon_status_file_shutdown_gave_up("WEIGHTS ", "parallel weights work may still be running");
+    }
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
 
     cancel_main_threads();
@@ -456,8 +460,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
 #if defined(FSANITIZE_ADDRESS)
     // a worker still running would use what the teardown frees
-    if(!dbengine_drained)
-        fprintf(stderr, "\nWARNING: dbengine work may still be running, skipping the teardown.\n");
+    if(!dbengine_drained || !weights_drained)
+        fprintf(stderr, "\nWARNING: dbengine or weights work may still be running, skipping the teardown.\n");
     else {
         fprintf(stderr, "\n");
 

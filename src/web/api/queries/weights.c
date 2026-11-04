@@ -592,9 +592,11 @@ void query_weights_worker_thread(void *arg)
     for (size_t i = 0; i < thread_data->host_count; i++) {
         RRDHOST *host = thread_data->hosts[i];
 
-        // Check for timeout/interruption
+        // Check for timeout/interruption, and stop between hosts once the agent is exiting:
+        // shutdown waits for the chunks (weights_parallel_shutdown())
         if (__atomic_load_n(&main_qwd->timed_out, __ATOMIC_RELAXED) ||
-            __atomic_load_n(&main_qwd->interrupted, __ATOMIC_RELAXED)) {
+            __atomic_load_n(&main_qwd->interrupted, __ATOMIC_RELAXED) ||
+            exit_initiated_get()) {
             break;
         }
 
@@ -2429,14 +2431,19 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
 // which wait on dbengine query preparation and extent reads that run on that pool. Enough chunks
 // occupying pool threads leave nothing to run what they wait for, and the agent freezes.
 static struct {
-    SPINLOCK spinlock;      // held across submit, so shutdown cannot free the queue under a submitter
+    SPINLOCK spinlock;      // protects the fields below; never held across a submit (it may create a thread)
     ND_WORK_QUEUE *queue;   // created on first use
+    size_t submitters;      // submits in progress: shutdown waits for them before it frees the queue
     bool stopped;
 } weights_parallel = {
     .spinlock = SPINLOCK_INITIALIZER,
     .queue = NULL,
+    .submitters = 0,
     .stopped = false,
 };
+
+// as long as dbengine's shutdown drain waited for these chunks when they were dbengine jobs
+#define WEIGHTS_PARALLEL_SHUTDOWN_TIMEOUT_UT (10 * USEC_PER_SEC)
 
 static void weights_parallel_thread_init(void *data __maybe_unused)
 {
@@ -2458,21 +2465,31 @@ static void weights_parallel_job(void *data)
 
 static bool weights_parallel_submit(struct query_weights_thread_data *thread_data)
 {
-    bool submitted = false;
-
     spinlock_lock(&weights_parallel.spinlock);
-    if (!weights_parallel.queue && !weights_parallel.stopped)
+    if (weights_parallel.stopped) {
+        spinlock_unlock(&weights_parallel.spinlock);
+        return false;
+    }
+
+    if (!weights_parallel.queue)
         weights_parallel.queue = nd_work_queue_create(
             "WEIGHTS", netdata_conf_cpus(), weights_parallel_thread_init, NULL);
 
-    if (weights_parallel.queue)
-        submitted = nd_work_queue_submit(weights_parallel.queue, weights_parallel_job, thread_data);
+    ND_WORK_QUEUE *wq = weights_parallel.queue;
+    weights_parallel.submitters++;
+    spinlock_unlock(&weights_parallel.spinlock);
+
+    bool submitted = nd_work_queue_submit(wq, weights_parallel_job, thread_data);
+
+    spinlock_lock(&weights_parallel.spinlock);
+    weights_parallel.submitters--;
     spinlock_unlock(&weights_parallel.spinlock);
 
     return submitted;
 }
 
-void weights_parallel_shutdown(void)
+// Returns false when a chunk was still running at the deadline: it may still use hosts and dbengine.
+bool weights_parallel_shutdown(void)
 {
     spinlock_lock(&weights_parallel.spinlock);
     ND_WORK_QUEUE *wq = weights_parallel.queue;
@@ -2480,8 +2497,18 @@ void weights_parallel_shutdown(void)
     weights_parallel.stopped = true;
     spinlock_unlock(&weights_parallel.spinlock);
 
+    // a submitter that took the queue before it was stopped may still be inside nd_work_queue_submit()
+    while (true) {
+        spinlock_lock(&weights_parallel.spinlock);
+        size_t submitters = weights_parallel.submitters;
+        spinlock_unlock(&weights_parallel.spinlock);
+        if (!submitters)
+            break;
+        sleep_usec(USEC_PER_MS);
+    }
+
     // Accepted chunks still run (their callers wait for them); later requests run their chunks inline.
-    (void) nd_work_queue_stop_and_free(wq, 5 * USEC_PER_SEC);
+    return nd_work_queue_stop_and_free(wq, WEIGHTS_PARALLEL_SHUTDOWN_TIMEOUT_UT);
 }
 
 static void weights_foreach_host_parallel(struct query_weights_data *qwd, size_t num_threads)
@@ -2527,7 +2554,7 @@ static void weights_foreach_host_parallel(struct query_weights_data *qwd, size_t
     freez(thread_data);
 }
 #else
-void weights_parallel_shutdown(void) { ; }
+bool weights_parallel_shutdown(void) { return true; }
 #endif
 
 // Runs the query on the hosts pinned in qwd->hosts, in parallel when there are several
