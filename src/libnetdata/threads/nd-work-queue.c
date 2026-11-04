@@ -25,9 +25,20 @@ struct nd_work_queue {
     bool stopping;
 
     size_t max_threads;
-    size_t threads_created;
-    ND_THREAD **threads;
+    usec_t idle_timeout_ut;         // an idle thread exits after this long without a job (0 = never)
+    size_t spawned;                 // threads created so far, for naming them
+
+    // The thread that exited last, not joined yet. Each exiting thread joins the one before it, so
+    // at most one exited thread is ever left unjoined; submit and stop_and_free join that one.
+    ND_THREAD *exited;
 };
+
+// called with the mutex held: returns the exited thread for the caller to join after unlocking
+static ND_THREAD *nd_work_queue_take_exited_unsafe(ND_WORK_QUEUE *wq) {
+    ND_THREAD *t = wq->exited;
+    wq->exited = NULL;
+    return t;
+}
 
 static void nd_work_queue_worker(void *arg) {
     ND_WORK_QUEUE *wq = arg;
@@ -37,15 +48,19 @@ static void nd_work_queue_worker(void *arg) {
 
     netdata_mutex_lock(&wq->mutex);
     while(true) {
-        while(!wq->jobs && !wq->stopping) {
+        bool timed_out = false;
+        while(!wq->jobs && !wq->stopping && !timed_out) {
             wq->idle++;
-            netdata_cond_wait(&wq->job_cond, &wq->mutex);
+            if(wq->idle_timeout_ut)
+                timed_out = netdata_cond_timedwait(&wq->job_cond, &wq->mutex, wq->idle_timeout_ut * NSEC_PER_USEC) == UV_ETIMEDOUT;
+            else
+                netdata_cond_wait(&wq->job_cond, &wq->mutex);
             wq->idle--;
         }
 
         struct nd_work_queue_job *job = wq->jobs;
         if(!job)
-            break; // stopping and nothing left to run
+            break; // stopping or idle for too long, and nothing to run
 
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->jobs, job, prev, next);
         wq->queued--;
@@ -57,19 +72,25 @@ static void nd_work_queue_worker(void *arg) {
         netdata_mutex_lock(&wq->mutex);
     }
 
+    ND_THREAD *previous = nd_work_queue_take_exited_unsafe(wq);
+    wq->exited = nd_thread_self();
     wq->alive--;
     netdata_cond_broadcast(&wq->exit_cond);
     netdata_mutex_unlock(&wq->mutex);
+
+    // wq is not touched after the unlock: once alive is 0 stop_and_free may free it
+    if(previous)
+        nd_thread_join(previous);
 }
 
-ND_WORK_QUEUE *nd_work_queue_create(const char *tag, size_t max_threads,
+ND_WORK_QUEUE *nd_work_queue_create(const char *tag, size_t max_threads, usec_t idle_timeout_ut,
                                     nd_work_queue_thread_init_cb thread_init, void *thread_init_data) {
     ND_WORK_QUEUE *wq = callocz(1, sizeof(*wq));
     strncpyz(wq->tag, tag, sizeof(wq->tag) - 1);
     wq->thread_init = thread_init;
     wq->thread_init_data = thread_init_data;
     wq->max_threads = max_threads ? max_threads : 1;
-    wq->threads = callocz(wq->max_threads, sizeof(*wq->threads));
+    wq->idle_timeout_ut = idle_timeout_ut;
     netdata_mutex_init(&wq->mutex);
     netdata_cond_init(&wq->job_cond);
     netdata_cond_init(&wq->exit_cond);
@@ -80,7 +101,7 @@ ND_WORK_QUEUE *nd_work_queue_create(const char *tag, size_t max_threads,
 // submit at once instead of sleeping here; the submitter decides what to do with the job then
 static void nd_work_queue_spawn_thread_unsafe(ND_WORK_QUEUE *wq) {
     char name[ND_THREAD_TAG_MAX + 1];
-    snprintfz(name, sizeof(name) - 1, "%s[%zu]", wq->tag, wq->threads_created);
+    snprintfz(name, sizeof(name) - 1, "%s[%zu]", wq->tag, wq->spawned);
 
     ND_THREAD *t = nd_thread_create(name, NETDATA_THREAD_OPTION_MANUAL_JOIN | NETDATA_THREAD_OPTION_DONT_LOG |
                                     NETDATA_THREAD_OPTION_NO_RETRY,
@@ -88,7 +109,7 @@ static void nd_work_queue_spawn_thread_unsafe(ND_WORK_QUEUE *wq) {
     if(!t)
         return;
 
-    wq->threads[wq->threads_created++] = t;
+    wq->spawned++;
     wq->alive++;
 }
 
@@ -113,21 +134,30 @@ bool nd_work_queue_submit(ND_WORK_QUEUE *wq, nd_work_queue_job_cb cb, void *data
     wq->queued++;
 
     // every queued job needs a thread of its own: add one when the idle ones cannot cover them
-    if(wq->queued > wq->idle && wq->threads_created < wq->max_threads)
+    if(wq->queued > wq->idle && wq->alive < wq->max_threads)
         nd_work_queue_spawn_thread_unsafe(wq);
 
+    bool accepted = true;
     if(!wq->alive) {
         // no thread exists and none could be created: nothing would ever run this job
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->jobs, job, prev, next);
         wq->queued--;
-        netdata_mutex_unlock(&wq->mutex);
-        freez(job);
-        return false;
+        accepted = false;
     }
+    else
+        netdata_cond_signal(&wq->job_cond);
 
-    netdata_cond_signal(&wq->job_cond);
+    ND_THREAD *exited = nd_work_queue_take_exited_unsafe(wq);
     netdata_mutex_unlock(&wq->mutex);
-    return true;
+
+    // it has already left the queue; joining only reaps it
+    if(exited)
+        nd_thread_join(exited);
+
+    if(!accepted)
+        freez(job);
+
+    return accepted;
 }
 
 void nd_work_queue_stop(ND_WORK_QUEUE *wq) {
@@ -157,6 +187,7 @@ bool nd_work_queue_stop_and_free(ND_WORK_QUEUE *wq, usec_t timeout_ut) {
         netdata_cond_timedwait(&wq->exit_cond, &wq->mutex, (deadline_ut - now_ut) * NSEC_PER_USEC);
     }
     size_t alive = wq->alive;
+    ND_THREAD *exited = alive ? NULL : nd_work_queue_take_exited_unsafe(wq);
     netdata_mutex_unlock(&wq->mutex);
 
     if(alive) {
@@ -166,14 +197,14 @@ bool nd_work_queue_stop_and_free(ND_WORK_QUEUE *wq, usec_t timeout_ut) {
         return false;
     }
 
-    // every thread has left its loop; the joins only reap them
-    for(size_t i = 0; i < wq->threads_created; i++)
-        nd_thread_join(wq->threads[i]);
+    // every thread has left the queue; each one joined the one that exited before it, so joining
+    // the last one reaps them all
+    if(exited)
+        nd_thread_join(exited);
 
     netdata_cond_destroy(&wq->exit_cond);
     netdata_cond_destroy(&wq->job_cond);
     netdata_mutex_destroy(&wq->mutex);
-    freez(wq->threads);
     freez(wq);
     return true;
 }
@@ -228,7 +259,7 @@ int nd_work_queue_unittest(void) {
     {
         struct nd_work_queue_ut ut = { .block = true };
         completion_init(&ut.release);
-        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 4, nd_work_queue_ut_init, &ut);
+        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 4, 0, nd_work_queue_ut_init, &ut);
 
         for(size_t i = 0; i < 10; i++) {
             if(!nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut)) {
@@ -269,7 +300,7 @@ int nd_work_queue_unittest(void) {
     // 2. threads are created on demand: one job at a time needs one thread
     {
         struct nd_work_queue_ut ut = { 0 };
-        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 8, nd_work_queue_ut_init, &ut);
+        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 8, 0, nd_work_queue_ut_init, &ut);
         for(size_t i = 0; i < 5; i++) {
             nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut);
             if(!nd_work_queue_ut_wait_for(&ut.ran, i + 1, 10 * USEC_PER_SEC)) {
@@ -299,7 +330,7 @@ int nd_work_queue_unittest(void) {
     {
         struct nd_work_queue_ut ut = { .block = true };
         completion_init(&ut.release);
-        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 1, NULL, NULL);
+        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 1, 0, NULL, NULL);
         for(size_t i = 0; i < 3; i++)
             nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut);
 
@@ -328,6 +359,46 @@ int nd_work_queue_unittest(void) {
             errors++;
         }
         completion_destroy(&ut.release);
+    }
+
+    // 4. idle threads exit after the idle timeout; the next submit creates a new one
+    {
+        struct nd_work_queue_ut ut = { 0 };
+        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 4, 50 * USEC_PER_MS, nd_work_queue_ut_init, &ut);
+        for(size_t round = 1; round <= 3; round++) {
+            for(size_t i = 0; i < 3; i++)
+                nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut);
+
+            if(!nd_work_queue_ut_wait_for(&ut.ran, round * 3, 10 * USEC_PER_SEC)) {
+                fprintf(stderr, "  FAILED: round %zu: jobs did not run\n", round);
+                errors++;
+            }
+
+            usec_t deadline_ut = now_monotonic_usec() + 10 * USEC_PER_SEC;
+            size_t alive;
+            while(true) {
+                netdata_mutex_lock(&wq->mutex);
+                alive = wq->alive;
+                netdata_mutex_unlock(&wq->mutex);
+                if(!alive || now_monotonic_usec() >= deadline_ut)
+                    break;
+                sleep_usec(10 * USEC_PER_MS);
+            }
+            if(alive) {
+                fprintf(stderr, "  FAILED: round %zu: %zu idle thread(s) did not exit\n", round, alive);
+                errors++;
+            }
+        }
+
+        if(ut.init_calls < 3) {
+            fprintf(stderr, "  FAILED: expected new threads after the idle ones exited, got %zu thread starts\n", ut.init_calls);
+            errors++;
+        }
+
+        if(!nd_work_queue_stop_and_free(wq, 10 * USEC_PER_SEC)) {
+            fprintf(stderr, "  FAILED: the queue did not stop\n");
+            errors++;
+        }
     }
 
     fprintf(stderr, "Work queue tests: %s\n", errors ? "FAILED" : "OK");

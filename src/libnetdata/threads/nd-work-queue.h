@@ -12,7 +12,8 @@
 // run what it waits for (the agent freezes). Data queries are the case in point: they wait on dbengine
 // query preparation and extent reads, which run on the libuv threadpool.
 //
-// - Threads are created on demand, up to max_threads, and stay until the queue is stopped.
+// - Threads are created on demand, up to max_threads. A thread idle for idle_timeout_ut exits (0 = never),
+//   and a later submit creates a new one when needed.
 // - Every accepted job runs exactly once, also after nd_work_queue_stop(): stopping only refuses new jobs,
 //   so a caller waiting on a submitted job is never left waiting forever.
 // - The queue does not own the job data; the job callback does.
@@ -21,10 +22,10 @@ typedef struct nd_work_queue ND_WORK_QUEUE;
 
 typedef void (*nd_work_queue_job_cb)(void *data);
 
-// called once on each worker thread before it runs its first job (worker registration, job names)
+// called on each new worker thread before it runs its first job (worker registration, job names)
 typedef void (*nd_work_queue_thread_init_cb)(void *data);
 
-ND_WORK_QUEUE *nd_work_queue_create(const char *tag, size_t max_threads,
+ND_WORK_QUEUE *nd_work_queue_create(const char *tag, size_t max_threads, usec_t idle_timeout_ut,
                                     nd_work_queue_thread_init_cb thread_init, void *thread_init_data);
 
 // Returns false when the job was not accepted (the queue is stopped, or no worker thread could be

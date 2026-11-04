@@ -2473,7 +2473,7 @@ static bool weights_parallel_submit(struct query_weights_thread_data *thread_dat
 
     if (!weights_parallel.queue)
         weights_parallel.queue = nd_work_queue_create(
-            "WEIGHTS", netdata_conf_cpus(), weights_parallel_thread_init, NULL);
+            "WEIGHTS", netdata_conf_cpus(), 60 * USEC_PER_SEC, weights_parallel_thread_init, NULL);
 
     ND_WORK_QUEUE *wq = weights_parallel.queue;
     weights_parallel.submitters++;

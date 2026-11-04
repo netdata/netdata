@@ -749,7 +749,7 @@ static void aclk_synchronization_event_loop(void *arg)
 
     int query_thread_count = (int) netdata_conf_cloud_query_threads();
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
-    config->query_queue = nd_work_queue_create("ACLKQRY", (size_t)query_thread_count, aclk_query_thread_init, NULL);
+    config->query_queue = nd_work_queue_create("ACLKQRY", (size_t)query_thread_count, 60 * USEC_PER_SEC, aclk_query_thread_init, NULL);
 
     // This holds queries that need to be executed one by one
     struct judy_list_t *aclk_query_batch = NULL;
