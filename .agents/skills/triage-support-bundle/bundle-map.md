@@ -16,8 +16,8 @@ present".
 
 Three top-level fields decide how you read everything else:
 
-- `agent_api_reachable` false means the whole runtime area is a single marker file, not evidence of
-  a dead agent. See `./false-signals.md`.
+- `agent_api_reachable` false means the API captures in the runtime area are replaced by a single marker
+  file (a `netdatacli` capture such as `dyncfg-tree.json` can still be there), not evidence of a dead agent. See `./false-signals.md`.
 - `is_container` true changes where logs live and which host facts are visible.
 - `tool_version` ending in `-windows` means the Windows implementation produced this bundle, so the
   POSIX-only rows below are absent by construction, not by failure.
@@ -160,14 +160,14 @@ There is no updater log and no coredump metadata on Windows.
 
 **go.d job state is not in this area.** go.d stopped writing job state to disk when its job manager
 moved to a single-owner command kernel; it now lives in the dynamic configuration tree, captured in
-the runtime area. A bundle taken while the API was down therefore carries no go.d job state at all.
+the runtime area. A bundle taken while the API was down carries go.d job state only if its `netdatacli` capture succeeded.
 Older bundles may contain a `go.d-job-statuses.json` path whose contents are actually python.d state
 - treat that path in any older bundle as python.d, not go.d.
 
 ## `07-runtime/` - live agent state
 
 The API captures here are present only when the agent's API answered; otherwise a single marker file
-replaces them, and its own text lists three causes - see `./false-signals.md`. The binary-derived
+replaces them (the `netdatacli` captures do not depend on the API and can still be present), and its own text lists three causes - see `./false-signals.md`. The binary-derived
 captures are the exception: build information and the build cache run the binary rather than the API,
 so they survive a dead daemon and are the fallback identity evidence when everything else here is
 missing.
@@ -179,7 +179,7 @@ missing.
 | `stream-info.json`, `aclk.json` | Streaming and cloud-connection diagnostics |
 | `alerts-active.json`, `alerts-all.json` | Current alert state - a snapshot, never a history |
 | `functions.json` | Which plugins expose what |
-| `dyncfg-tree.json` | **The authoritative collector job state**: every go.d and scripts.d job with its status (`accepted`, `running`, `failed`, `disabled`, `orphan`, `incomplete`, `none`), plus service discovery, vnodes, secret stores and alert prototypes. Added by the collector change that removed the dead on-disk job-state file, so bundles produced before it do not carry this path. Read the manifest origin: `netdatacli dyncfg-tree` (the local command pipe, answered as a member of the agent's Space) is preferred; `/api/v3/config?action=tree` is the fallback for older agents or a bundle not run as root or the `netdata` user. Agents that require a signed-in Space member to list the tree refuse that fallback, and older bundle scripts only had the API, so the file can hold the failure marker - not evidence that no jobs exist |
+| `dyncfg-tree.json` | **The authoritative collector job state**: every go.d and scripts.d job with its status (`accepted`, `running`, `failed`, `disabled`, `orphan`, `incomplete`, `none`), plus service discovery, vnodes, secret stores and alert prototypes. Added by the collector change that removed the dead on-disk job-state file, so bundles produced before it do not carry this path. Read the manifest origin: `netdatacli dyncfg-tree` (the local command pipe, answered as a member of the agent's Space) is preferred; `/api/v3/config?action=tree` is the fallback for older agents, or for a bundle run without access to the command pipe (not as root or the `netdata` user; on Windows, not from an elevated Administrator shell). The CLI capture does not need the API, so this file can sit next to `AGENT-WAS-DOWN.txt`; when both sources fail with the API down, only that marker explains the absence. Agents that require a signed-in Space member to list the tree refuse that fallback, and older bundle scripts only had the API, so the file can hold the failure marker - not evidence that no jobs exist |
 | `ml-info.json` | Machine-learning status only; model state is never collected |
 | `self-cpu.csv`, `self-memory.csv`, `self-api-clients.csv` | The agent's own bounded resource windows |
 | `buildinfo.txt`, `buildinfo.json` | Required by the bug template; **works with the daemon down**, because it runs the binary |

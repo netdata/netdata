@@ -395,7 +395,8 @@ Parameters:
 This returns a JSON structure of all configurations, organized by path, with their status, commands, access controls, and other metadata.
 
 On the Agent host, root and the `netdata` user can print the whole tree with `netdatacli dyncfg-tree`. The Agent answers
-it as a signed-in member of its own Space, so source paths are hidden. The support bundle uses this command.
+it as a signed-in member of its own Space without sensitive-data access, so the user details of configurations changed
+through the UI or API are hidden. The support bundle uses this command.
 
 ### Configuration Actions API
 

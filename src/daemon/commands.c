@@ -105,7 +105,7 @@ static command_info_t command_info_array[] = {
     {"aclk-state", "[json]",  "Returns current state of ACLK and Netdata Cloud connection. (optionally in json).", cmd_aclk_state, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"version", "", "Returns the netdata version.", cmd_version, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_INIT},
     {"dumpconfig", "", "Returns the current netdata.conf on stdout.", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
-    {"dyncfg-tree", "", "Returns the dynamic configuration tree of this agent as JSON (collector jobs and their status).", cmd_dyncfg_tree, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
+    {"dyncfg-tree", "", "Returns the dynamic configuration tree of this agent as JSON (all configurations and their status).", cmd_dyncfg_tree, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"mark-stale-nodes-ephemeral", "<node_id | machine_guid | hostname | ALL_NODES>",
         "Marks one or all disconnected nodes as ephemeral, while keeping their retention\n      available for queries on both this Netdata Agent dashboard and Netdata Cloud", cmd_mark_stale_nodes_ephemeral, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"remove-stale-node", "<node_id | machine_guid | hostname | ALL_NODES>",
@@ -392,7 +392,8 @@ static cmd_status_t cmd_dyncfg_tree(char *args, char **message)
 
     // The same call GET /api/v3/config?action=tree makes. Only root and the netdata user can reach the
     // command pipe, so the caller counts as a signed-in member of this agent's space. SENSITIVE_DATA is
-    // left out, so source paths stay hidden, as they are for any member without that permission.
+    // left out, so the tree is what any member without that permission sees: the user details of
+    // configurations changed through the UI or API are hidden.
     //
     // This runs on the libuv threadpool; the tree branch of the config handler answers inline, on this
     // thread, and queues nothing on that pool, so waiting here cannot starve it.
@@ -776,7 +777,9 @@ cmd_status_t execute_command(cmd_t idx, char *args, char **message)
     else {
         if (message)
             *message = strdupz("Agent is initializing");
-        status = CMD_STATUS_SUCCESS;
+        // dyncfg-tree prints JSON that callers (the support bundle) consume, so a reply without it must
+        // fail and let them fall back; the other commands keep their historical exit code
+        status = (idx == CMD_DYNCFG_TREE) ? CMD_STATUS_FAILURE : CMD_STATUS_SUCCESS;
     }
     cmd_unlock_by_type[type](idx);
 

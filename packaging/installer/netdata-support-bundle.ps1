@@ -844,7 +844,8 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
     }
     if ($result -and $result.Trim().Length -gt 0) {
         # a truncated JSON document is worse than none: fail closed
-        if ($result.Length -gt 2MB) { $result = '{"error":"output exceeded the cap and was withheld"}' }
+        # measure the UTF-8 bytes written, not UTF-16 code units (see Save-Api)
+        if ([System.Text.Encoding]::UTF8.GetByteCount($result) -gt 2MB) { $result = '{"error":"output exceeded the cap and was withheld"}' }
         Write-Utf8 $full $result
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'cmd' $originText $title

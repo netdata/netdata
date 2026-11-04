@@ -152,7 +152,9 @@ write_manifest
         self.stub('netdatacli', 'exit 255\n')
         self.stub('curl', 'case "$*" in *action=tree*) exit 22;; esac\nprintf \'{"api":true}\\n\'\n')
         tree = self.run_runtime()
-        self.assertIn('netdatacli dyncfg-tree', json.loads(tree.read_text())['hint'])
+        hint = json.loads(tree.read_text())['hint']
+        self.assertIn('netdatacli dyncfg-tree', hint)
+        self.assertIn('/api/v3/config', hint)
         rows = self.dyncfg_rows()
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]['bytes'], tree.stat().st_size)
