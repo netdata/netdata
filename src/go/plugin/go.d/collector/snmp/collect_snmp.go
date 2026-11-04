@@ -61,9 +61,13 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 			continue
 		}
 
-		if c.seenScalarMetrics[m.Name] != c.chartMetadataVersion {
-			c.seenScalarMetrics[m.Name] = c.chartMetadataVersion
-			c.addProfileScalarMetricChart(m)
+		state := c.seenScalarMetrics[m.Name]
+		if state == nil || state.metadataVersion != c.chartMetadataVersion {
+			state = &metricChartState{
+				metadataVersion: c.chartMetadataVersion,
+				chart:           c.addProfileScalarMetricChart(m),
+			}
+			c.seenScalarMetrics[m.Name] = state
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -76,6 +80,7 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 		var ids []string
 		for k, v := range m.MultiValue {
 			id := metricIDFromName(m.Name, k)
+			state.observeDimension(id, k, dimAlgoFromDdSnmpType(m))
 			mx[id] = v
 			ids = append(ids, id)
 		}
@@ -107,12 +112,16 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 
 		seen[key] = true
 
-		if c.seenTableMetrics[key].metadataVersion != c.chartMetadataVersion {
-			c.seenTableMetrics[key] = tableMetricState{
-				metadataVersion: c.chartMetadataVersion,
-				profile:         m.Profile.Source,
+		state := c.seenTableMetrics[key]
+		if state.metricChartState == nil || state.metadataVersion != c.chartMetadataVersion {
+			state = tableMetricState{
+				metricChartState: &metricChartState{
+					metadataVersion: c.chartMetadataVersion,
+					chart:           c.addProfileTableMetricChart(m),
+				},
+				profile: m.Profile.Source,
 			}
-			c.addProfileTableMetricChart(m)
+			c.seenTableMetrics[key] = state
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -123,6 +132,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			var ids []string
 			for k, v := range m.MultiValue {
 				id := metricIDFromKey(key, k)
+				state.observeDimension(id, k, dimAlgoFromDdSnmpType(m))
 				mx[id] = v
 				ids = append(ids, id)
 			}

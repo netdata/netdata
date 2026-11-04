@@ -111,9 +111,10 @@ func TestRefreshProfileInputsPreservesPollingState(t *testing.T) {
 				ContextID: 2,
 			}
 			collector.SetSNMPClient(second.Wrap(handler))
-			changed, refreshErr := collector.RefreshProfileInputs([]string{"." + nameOID})
+			revision := collector.ProfileInputRevision()
+			refreshErr := collector.RefreshProfileInputs([]string{"." + nameOID})
 			require.NoError(t, refreshErr)
-			assert.True(t, changed)
+			assert.Greater(t, collector.ProfileInputRevision(), revision)
 			assert.False(t, collector.NeedsProfileInputRefresh([]string{nameOID}))
 			require.Equal(t, []string{nameOID, nameOID}, requested)
 			second.Finish()
@@ -237,9 +238,15 @@ func TestRefreshProfileInputsRetainsFailedProfiles(t *testing.T) {
 				ContextID: 2,
 			}
 			collector.SetSNMPClient(second.Wrap(handler))
-			changed, refreshErr := collector.RefreshProfileInputs(nil)
+			revision := collector.ProfileInputRevision()
+			refreshErr := collector.RefreshProfileInputs(nil)
 			require.ErrorContains(t, refreshErr, "a.yaml")
-			assert.True(t, changed, "successful profile snapshots change even when another profile fails")
+			assert.Greater(
+				t,
+				collector.ProfileInputRevision(),
+				revision,
+				"successful profile snapshots change even when another profile fails",
+			)
 			second.Finish()
 			assert.Equal(t, previous, collector.profiles[bad.SourceFile].cache)
 			assert.Equal(t, "new", collector.profiles[good.SourceFile].cache.deviceMetadata["name"].Value)
@@ -301,7 +308,7 @@ func TestRefreshProfileInputsDoesNotTightenStartup(t *testing.T) {
 			require.Len(t, metrics, 1)
 			assert.Equal(t, "present", metrics[0].Tags["static"])
 			assert.Equal(t, "fixture", metrics[0].DeviceMetadata["vendor"].Value)
-			_, refreshErr := collector.RefreshProfileInputs(nil)
+			refreshErr := collector.RefreshProfileInputs(nil)
 			require.Error(t, refreshErr)
 			metrics, err = collector.Collect()
 			require.NoError(t, err)
@@ -344,16 +351,17 @@ func TestRefreshProfileInputsRetainsUnansweredSnapshots(t *testing.T) {
 			_, err := collector.Collect()
 			require.NoError(t, err)
 			value, requests, omit = "new", 0, omittedRequest
-			changed, refreshErr := collector.RefreshProfileInputs(nil)
+			revision := collector.ProfileInputRevision()
+			refreshErr := collector.RefreshProfileInputs(nil)
 			require.ErrorContains(t, refreshErr, "omitted requested profile input")
-			assert.False(t, changed)
+			assert.Equal(t, revision, collector.ProfileInputRevision())
 			assert.Equal(t, "old", collector.PreparedDeviceMetadata()["name"].Value)
 			assert.Equal(t, "old", collector.profiles[profile.SourceFile].cache.globalTags["snmp_host"])
 			assert.NotContains(t, collector.missingOIDs, oid)
 			omit = 0
-			changed, refreshErr = collector.RefreshProfileInputs(nil)
+			refreshErr = collector.RefreshProfileInputs(nil)
 			require.NoError(t, refreshErr)
-			assert.True(t, changed)
+			assert.Greater(t, collector.ProfileInputRevision(), revision)
 			assert.Equal(t, "new", collector.PreparedDeviceMetadata()["name"].Value)
 			assert.Equal(t, "new", collector.profiles[profile.SourceFile].cache.globalTags["snmp_host"])
 		})
@@ -379,7 +387,7 @@ func TestRefreshProfileInputsKeepsUnansweredStartupPolicy(t *testing.T) {
 	require.Len(t, metrics, 1)
 	assert.Equal(t, "present", metrics[0].Tags["static"])
 	assert.Equal(t, "fixture", collector.PreparedDeviceMetadata()["vendor"].Value)
-	_, refreshErr := collector.RefreshProfileInputs(nil)
+	refreshErr := collector.RefreshProfileInputs(nil)
 	require.Error(t, refreshErr)
 	_, err = CollectDeviceMetadata(handler, []*ddsnmp.Profile{profile}, "", logger.New())
 	require.NoError(t, err, "standalone metadata acquisition retains its existing response policy")
@@ -414,7 +422,7 @@ func TestRefreshProfileInputsAcceptsSNMPv1MissingRecovery(t *testing.T) {
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
-	_, refreshErr := collector.RefreshProfileInputs(nil)
+	refreshErr := collector.RefreshProfileInputs(nil)
 	require.NoError(t, refreshErr)
 	assert.Equal(t, "fallback", collector.PreparedDeviceMetadata()["name"].Value)
 	assert.True(t, collector.missingOIDs[primary])
@@ -445,7 +453,7 @@ func TestProfileInputMetadataFailureClassification(t *testing.T) {
 			})
 			var err error
 			if refresh {
-				_, err = collector.RefreshProfileInputs(nil)
+				err = collector.RefreshProfileInputs(nil)
 			} else {
 				_, err = collector.Collect()
 			}
@@ -494,7 +502,7 @@ func TestRefreshProfileInputsAcceptsMetadataFallbackAndAbsence(t *testing.T) {
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),
 			})
-			_, refreshErr := collector.RefreshProfileInputs(nil)
+			refreshErr := collector.RefreshProfileInputs(nil)
 			require.NoError(t, refreshErr)
 			metadata := collector.PreparedDeviceMetadata()
 			assert.Equal(t, "fixture", metadata["vendor"].Value)

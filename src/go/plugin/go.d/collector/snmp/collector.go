@@ -83,7 +83,7 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 		now:    time.Now,
 
 		charts:               &collectorapi.Charts{},
-		seenScalarMetrics:    make(map[string]uint64),
+		seenScalarMetrics:    make(map[string]*metricChartState),
 		seenTableMetrics:     make(map[string]tableMetricState),
 		seenProfiles:         make(map[string]uint64),
 		failedProfiles:       make(map[string]bool),
@@ -119,7 +119,7 @@ type (
 		configuredVnode *vnodes.VirtualNode
 
 		charts                   *collectorapi.Charts
-		seenScalarMetrics        map[string]uint64
+		seenScalarMetrics        map[string]*metricChartState
 		seenTableMetrics         map[string]tableMetricState
 		seenProfiles             map[string]uint64
 		failedProfiles           map[string]bool
@@ -150,14 +150,14 @@ type (
 		ddSnmpColl    ddCollector
 		newDdSnmpColl func(ddsnmpcollector.Config) ddCollector
 
-		sysInfo              *snmputils.SysInfo
-		snmpProfiles         []*ddsnmp.Profile
-		initialized          bool
-		deviceMetadataSynced bool
-		now                  func() time.Time
-		nextSysInfoCheck     time.Time
-		pendingMetadata      *snmputils.SysInfo
-		rebuildPending       bool
+		sysInfo                       *snmputils.SysInfo
+		snmpProfiles                  []*ddsnmp.Profile
+		initialized                   bool
+		publishedProfileInputRevision uint64
+		now                           func() time.Time
+		nextSysInfoCheck              time.Time
+		pendingMetadata               *snmputils.SysInfo
+		rebuildPending                bool
 
 		adjMaxRepetitions uint32
 
@@ -168,11 +168,17 @@ type (
 		CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error)
 		PreparedDeviceMetadata() map[string]ddsnmp.MetaTag
 		NeedsProfileInputRefresh(observedOIDs []string) bool
-		RefreshProfileInputs(observedOIDs []string) (changed bool, err error)
+		ProfileInputRevision() uint64
+		RefreshProfileInputs(observedOIDs []string) error
+	}
+	metricChartState struct {
+		metadataVersion uint64
+		chart           *collectorapi.Chart
+		dimensions      map[string]bool
 	}
 	tableMetricState struct {
-		metadataVersion uint64
-		profile         string
+		*metricChartState
+		profile string
 	}
 )
 

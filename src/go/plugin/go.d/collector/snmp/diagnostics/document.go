@@ -79,19 +79,32 @@ type Sweep struct {
 	Removed       []Removed `json:"removed_devices,omitempty"`
 }
 
+// DevicePresentation records current registration metadata separately from the
+// retained acquisition input. Historical documents omit it.
+type DevicePresentation struct {
+	SysName     string            `json:"sys_name"`
+	SysDescr    string            `json:"sys_descr"`
+	SysContact  string            `json:"sys_contact"`
+	SysLocation string            `json:"sys_location"`
+	Vendor      string            `json:"vendor"`
+	Model       string            `json:"model"`
+	Labels      map[string]string `json:"labels,omitempty"`
+}
+
 type Device struct {
-	RegistrationID  uint64       `json:"registration_id"`
-	Selected        bool         `json:"selected"`
-	Outcome         string       `json:"outcome"`
-	LastAttempt     time.Time    `json:"last_attempt"`
-	LastSuccess     time.Time    `json:"last_success"`
-	NextRetry       time.Time    `json:"next_retry"`
-	RetainedSuccess *EvidenceRef `json:"retained_success,omitempty"`
-	Captures        []Capture    `json:"captures,omitempty"`
-	HasObservation  bool         `json:"has_observation"`
-	ExpiresAt       time.Time    `json:"expires_at"`
-	Renderable      bool         `json:"renderable"`
-	Expired         bool         `json:"expired"`
+	Presentation    *DevicePresentation `json:"presentation,omitempty"`
+	RegistrationID  uint64              `json:"registration_id"`
+	Selected        bool                `json:"selected"`
+	Outcome         string              `json:"outcome"`
+	LastAttempt     time.Time           `json:"last_attempt"`
+	LastSuccess     time.Time           `json:"last_success"`
+	NextRetry       time.Time           `json:"next_retry"`
+	RetainedSuccess *EvidenceRef        `json:"retained_success,omitempty"`
+	Captures        []Capture           `json:"captures,omitempty"`
+	HasObservation  bool                `json:"has_observation"`
+	ExpiresAt       time.Time           `json:"expires_at"`
+	Renderable      bool                `json:"renderable"`
+	Expired         bool                `json:"expired"`
 }
 
 type Removed struct {

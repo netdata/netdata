@@ -845,6 +845,14 @@ and retained device-generation state; they are not the topology payload.
   `topologyDeviceSnapshot`. A completed sweep activates successful snapshots as
   `topologyDeviceGeneration` values at one shared publication time. A failed
   collection retains the prior successful device generation and deadline.
+- Retained acquisition and retry state belong to the observed sysObjectID, independently of the accepted job's
+  registration lifetime. A changed registered classification discards incompatible state before its next attempt;
+  failed or unsupported replacement setup cannot retain the prior device's topology. Cancellation still leaves
+  the entire prior committed cut visible.
+- Registered presentation changes project onto retained observations and trap enrichment at the completed-sweep
+  boundary without extra SNMP acquisition or extending freshness. Diagnostics record that presentation separately
+  from immutable acquisition input and replay the same projection; historical archives without it retain
+  collected presentation.
 - A completed sweep fixes renderable membership and publishes one immutable
   `topologyGeneration` through an atomic pointer. Cancellation or panic leaves
   the previous generation visible.

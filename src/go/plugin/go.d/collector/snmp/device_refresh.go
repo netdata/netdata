@@ -57,9 +57,8 @@ func (c *Collector) refreshDeviceState() error {
 	}
 
 	c.pendingMetadata = next
-	var inputsChanged bool
 	if c.ddSnmpColl != nil {
-		inputsChanged, err = c.ddSnmpColl.RefreshProfileInputs(observedOIDs)
+		err = c.ddSnmpColl.RefreshProfileInputs(observedOIDs)
 		c.captureCollectionFailures()
 		if err != nil {
 			c.Limit("snmp:metadata", 1, sysInfoCheckEvery).Warningf("failed to refresh profile metadata: %v", err)
@@ -72,9 +71,6 @@ func (c *Collector) refreshDeviceState() error {
 	if err := c.applyDeviceMetadata(next, metadata); err != nil {
 		c.Limit("snmp:metadata", 1, sysInfoCheckEvery).Warningf("failed to update device metadata: %v", err)
 		return nil
-	}
-	if inputsChanged && !systemChanged {
-		c.chartMetadataVersion++
 	}
 	if err == nil {
 		c.pendingMetadata = nil
@@ -172,6 +168,11 @@ func (c *Collector) applyDeviceMetadata(si *snmputils.SysInfo, metadata map[stri
 		}
 	}
 	changed := !sameSystemMetadata(c.sysInfo, si)
+	var inputRevision uint64
+	if c.ddSnmpColl != nil {
+		inputRevision = c.ddSnmpColl.ProfileInputRevision()
+		changed = changed || inputRevision != c.publishedProfileInputRevision
+	}
 	c.sysInfo = si
 	if vnode != nil {
 		c.vnode = vnode
@@ -181,7 +182,7 @@ func (c *Collector) applyDeviceMetadata(si *snmputils.SysInfo, metadata map[stri
 		c.refreshAuxiliaryChartLabels()
 	}
 	c.registerDeviceState(si, metadata)
-	c.deviceMetadataSynced = true
+	c.publishedProfileInputRevision = inputRevision
 	return nil
 }
 
@@ -217,7 +218,7 @@ func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	}
 	c.recordProfileContext(profileContext)
 	c.pendingMetadata, c.rebuildPending = nil, false
-	c.deviceMetadataSynced = false
+	c.publishedProfileInputRevision = 0
 	c.resetDevicePresentation()
 	if profilesHaveBGP(profiles) {
 		c.enableBGPIntegration()
@@ -225,9 +226,6 @@ func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	_ = previous.Close()
 	if err := c.applyDeviceMetadata(si, nil); err != nil {
 		return err
-	}
-	if !c.PingOnly && c.ddSnmpColl != nil {
-		c.deviceMetadataSynced = false
 	}
 	return nil
 }

@@ -1742,8 +1742,14 @@ func (m *mockDdSnmpCollector) PreparedDeviceMetadata() map[string]ddsnmp.MetaTag
 	return meta
 }
 
-func (m *mockDdSnmpCollector) NeedsProfileInputRefresh([]string) bool      { return false }
-func (m *mockDdSnmpCollector) RefreshProfileInputs([]string) (bool, error) { return false, nil }
+func (m *mockDdSnmpCollector) NeedsProfileInputRefresh([]string) bool { return false }
+func (m *mockDdSnmpCollector) RefreshProfileInputs([]string) error    { return nil }
+func (m *mockDdSnmpCollector) ProfileInputRevision() uint64 {
+	if m.collectCalls > 0 {
+		return 1
+	}
+	return 0
+}
 
 func prepareV3Config() Config {
 	cfg := prepareV2Config()

@@ -49,8 +49,9 @@ successful observation. `ping_only` keeps its setup-only SNMP behavior.
 changes refresh scalar profile tags/device metadata on the existing DD collector/client, then update the generated
 vnode, chart labels and DeviceStore. `RefreshProfileInputs` stages per-profile inputs, retaining usable snapshots on
 failed/incomplete acquisition without suppressing healthy metric profiles. Usable system and successful profile
-updates publish even when another profile's inputs fail; failed inputs remain pending for the next check. Changed
-profile tags refresh chart labels even when the raw system fields are unchanged. Only system-OID negative decisions
+updates publish even when another profile's inputs fail; failed inputs remain pending for the next check. DD's
+prepared-input revision covers normal lazy preparation and explicit refresh, so recovered profile metadata publishes
+without requiring a system-field change. Changed profile tags refresh chart labels even when raw system fields are unchanged. Only system-OID negative decisions
 contradicted by authoritative observed values are reconciled, including observations whose value has not changed.
 Existing row caches, connections and Function rate baselines remain intact. Authored `Config`, including local vnode overrides, never receives acquired identity values.
 
@@ -82,7 +83,10 @@ mapped dimensions use assignment instead. A captured row can therefore be presen
 series, and a final sample can combine several rows.
 
 A failed profile acquisition does not establish row removal. Its existing table charts remain defined while current
-measurements are unavailable; successful source observations can retire rows that are actually absent.
+measurements are unavailable; successful source observations can retire rows that are actually absent. Metadata
+redraw preserves live dimensions missing from partial observations. Newly observed composite dimensions are added,
+and current-profile dimensions can revive pending incumbent removals after replacement. The chart owner indexes live
+dimensions so steady collection remains O(observed values), without scanning all retained charts.
 
 `collect_snmp.go` owns these emission decisions; `normal_diagnostics.go` records their relationship to captured samples.
 Profile authoring details remain in the [table metric guide](/src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows).

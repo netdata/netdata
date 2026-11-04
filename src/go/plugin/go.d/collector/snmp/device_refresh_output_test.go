@@ -13,6 +13,7 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/assert"
@@ -50,49 +51,7 @@ func (s *refreshOutputSink) CommitJobOutput(payload []byte, state jobruntime.Out
 
 func TestCollectorRuntimeMetadataNativeOutputRetries(t *testing.T) {
 	c, device, now := newRefreshTestCollector(t)
-	sink := &refreshOutputSink{
-		frames: make(chan refreshOutputFrame),
-	}
-	job := jobruntime.NewJob(jobruntime.JobConfig{
-		PluginName:  "go.d",
-		ModuleName:  "snmp",
-		Name:        "refresh",
-		FullName:    "snmp_refresh",
-		Module:      c,
-		Out:         sink,
-		CleanupOut:  io.Discard,
-		UpdateEvery: 1,
-	})
-	require.NoError(t, job.AutoDetectionManaged(context.Background()))
-	job.Mute()
-	run := jobruntime.NewManagedRun(context.Background(), nil)
-	done := make(chan struct{})
-	go func() { defer close(done); job.StartManaged(run) }()
-	<-run.StartupDone()
-	var stopped sync.Once
-	cleanup := func() {
-		stopped.Do(func() {
-			run.Stop(nil)
-			job.Stop()
-			<-done
-			job.Cleanup()
-		})
-	}
-	t.Cleanup(cleanup)
-	collect := func(tick int) refreshOutputFrame {
-		t.Helper()
-		var frame refreshOutputFrame
-		require.Eventually(t, func() bool {
-			job.Tick(tick)
-			select {
-			case frame = <-sink.frames:
-				return true
-			default:
-				return false
-			}
-		}, 5*time.Second, time.Millisecond)
-		return frame
-	}
+	sink, collect, cleanup := startRefreshOutputJob(t, c)
 	first := collect(1)
 	require.True(t, first.committed)
 	guid := c.VirtualNode().GUID
@@ -143,4 +102,95 @@ func TestCollectorRuntimeMetadataNativeOutputRetries(t *testing.T) {
 		2,
 		"accepted output prunes the retired dimension",
 	)
+}
+
+func startRefreshOutputJob(t *testing.T, c *Collector) (*refreshOutputSink, func(int) refreshOutputFrame, func()) {
+	t.Helper()
+	sink := &refreshOutputSink{
+		frames: make(chan refreshOutputFrame),
+	}
+	job := jobruntime.NewJob(jobruntime.JobConfig{
+		PluginName:  "go.d",
+		ModuleName:  "snmp",
+		Name:        "refresh",
+		FullName:    "snmp_refresh",
+		Module:      c,
+		Out:         sink,
+		CleanupOut:  io.Discard,
+		UpdateEvery: 1,
+	})
+	require.NoError(t, job.AutoDetectionManaged(context.Background()))
+	job.Mute()
+	run := jobruntime.NewManagedRun(context.Background(), nil)
+	done := make(chan struct{})
+	go func() { defer close(done); job.StartManaged(run) }()
+	<-run.StartupDone()
+	var stopped sync.Once
+	cleanup := func() {
+		stopped.Do(func() {
+			run.Stop(nil)
+			job.Stop()
+			<-done
+			job.Cleanup()
+		})
+	}
+	t.Cleanup(cleanup)
+	collect := func(tick int) refreshOutputFrame {
+		t.Helper()
+		var frame refreshOutputFrame
+		require.Eventually(t, func() bool {
+			job.Tick(tick)
+			select {
+			case frame = <-sink.frames:
+				return true
+			default:
+				return false
+			}
+		}, 5*time.Second, time.Millisecond)
+		return frame
+	}
+	return sink, collect, cleanup
+}
+
+func TestCollectorRuntimeReplacementDimensionsOutputRetries(t *testing.T) {
+	c, device, now := newRefreshTestCollector(t)
+	profile, key, outOID := compositeRefreshTestProfile(device, false)
+	c.snmpProfiles = []*ddsnmp.Profile{profile}
+	sink, collect, cleanup := startRefreshOutputJob(t, c)
+	require.True(t, collect(1).committed)
+	client, _ := newReplacementTestClient(t, device, nil)
+	t.Cleanup(cleanup)
+	c.newSnmpClient = func() gosnmp.Handler { return client }
+	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
+		cfg.Profiles = []*ddsnmp.Profile{profile}
+		return ddsnmpcollector.New(cfg)
+	}
+	device.omittedOID = outOID
+	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+		Name:  snmputils.OidSysObject,
+		Type:  gosnmp.ObjectIdentifier,
+		Value: replacementTestObjectID,
+	}
+	*now = now.Add(time.Minute)
+	sink.reject.Store(true)
+	assert.False(t, collect(2).committed)
+	replaced := collect(3)
+	require.True(t, replaced.committed)
+	assert.Contains(t, replaced.payload, "DIMENSION 'out' 'out' 'incremental' '1' '1' 'obsolete'")
+	chart := c.Charts().Get(chartIDFromKey(key))
+	require.NotNil(t, chart)
+	assert.Nil(
+		t,
+		chart.GetDim(metricIDFromKey(key, "out")),
+		"accepted replacement output prunes the incumbent dimension",
+	)
+	device.omittedOID = ""
+	recovered := collect(4)
+	require.True(t, recovered.committed)
+	assert.Contains(t, recovered.payload, "DIMENSION 'out' 'out' 'incremental' '1' '1' ''")
+	assert.Contains(t, recovered.payload, "SET 'out' = 34")
+	assert.NotContains(t, recovered.payload, "obsolete")
+	unchanged := collect(5)
+	assert.True(t, unchanged.committed)
+	assert.NotContains(t, unchanged.payload, "CHART '")
 }

@@ -197,18 +197,22 @@ func (c *Collector) addProfileStatsCharts(name string) {
 	}
 }
 
-func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
-	c.addProfileMetricChart(m, m.Name, chartIDFromName(m.Name), collectorapi.ChartType(m.ChartType))
+func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) *collectorapi.Chart {
+	return c.addProfileMetricChart(m, m.Name, chartIDFromName(m.Name), collectorapi.ChartType(m.ChartType))
 }
 
-func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
+func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) *collectorapi.Chart {
 	key := tableMetricKey(m)
-	c.addProfileMetricChart(m, key, chartIDFromKey(key), "")
+	return c.addProfileMetricChart(m, key, chartIDFromKey(key), "")
 }
 
-func (c *Collector) addProfileMetricChart(m ddsnmp.Metric, key, id string, chartType collectorapi.ChartType) {
+func (c *Collector) addProfileMetricChart(
+	m ddsnmp.Metric,
+	key, id string,
+	chartType collectorapi.ChartType,
+) *collectorapi.Chart {
 	if m.Name == "" {
-		return
+		return nil
 	}
 	chart := &collectorapi.Chart{
 		ID:       id,
@@ -252,29 +256,66 @@ func (c *Collector) addProfileMetricChart(m ddsnmp.Metric, key, id string, chart
 	} else {
 		chart.Dims = collectorapi.Dims{{ID: metricIDFromKey(key), Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)}}
 	}
-	c.installChart(chart)
+	return c.installChart(chart)
 }
 
 // Reuse a chart object for an updated definition, including a replacement that
 // supersedes an uncommitted removal. The runtime retains the Charts collection.
-func (c *Collector) installChart(chart *collectorapi.Chart) {
+func (c *Collector) installChart(chart *collectorapi.Chart) *collectorapi.Chart {
 	if err := collectorapi.CheckCharts(chart); err != nil {
 		c.Warning(err)
-		return
+		return nil
 	}
 	if existing := c.charts.Get(chart.ID); existing != nil {
 		for _, dim := range existing.Dims {
-			if !chart.HasDim(dim.ID) && (existing.IsRemoved() || dim.IsRemoved()) {
-				_ = existing.MarkDimRemove(dim.ID, false)
-				chart.Dims = append(chart.Dims, dim)
+			if chart.HasDim(dim.ID) {
+				continue
 			}
+			if existing.IsRemoved() || dim.IsRemoved() {
+				_ = existing.MarkDimRemove(dim.ID, false)
+			}
+			// A metadata redraw cannot infer schema removal from current samples.
+			chart.Dims = append(chart.Dims, dim)
 		}
 		*existing = *chart
-		return
+		return existing
 	}
 	if err := c.charts.Add(chart); err != nil {
 		c.Warning(err)
+		return nil
 	}
+	return chart
+}
+
+// Composite inputs may be partial, including the first replacement sample.
+// Keep an index of live declared dimensions so steady collection stays O(values).
+func (s *metricChartState) observeDimension(id, name string, algo collectorapi.DimAlgo) {
+	if s.chart == nil {
+		return
+	}
+	if s.dimensions == nil {
+		s.dimensions = make(map[string]bool, len(s.chart.Dims))
+		for _, dim := range s.chart.Dims {
+			if !dim.IsRemoved() {
+				s.dimensions[dim.ID] = true
+			}
+		}
+	}
+	if s.dimensions[id] {
+		return
+	}
+	dim := s.chart.GetDim(id)
+	if dim == nil {
+		dim = &collectorapi.Dim{}
+		s.chart.Dims = append(s.chart.Dims, dim)
+	}
+	*dim = collectorapi.Dim{
+		ID:   id,
+		Name: name,
+		Algo: algo,
+	}
+	s.dimensions[id] = true
+	s.chart.MarkNotCreated()
 }
 
 func (c *Collector) refreshAuxiliaryChartLabels() {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
 type LifecycleCut struct {
@@ -15,6 +16,7 @@ type LifecycleCut struct {
 }
 
 type SweepDevice struct {
+	Presentation   *topologymodel.DevicePresentation
 	RegistrationID ddsnmp.DeviceRegistrationID
 	Selected       bool
 	Outcome        RefreshOutcome
