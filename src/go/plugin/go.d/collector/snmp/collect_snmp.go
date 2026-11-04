@@ -130,6 +130,11 @@ func (c *Collector) collectProfileTableMetrics(
 				table:   m.Table,
 			}
 			c.seenTableMetrics[key] = state
+		} else if state.profile != m.Profile.Source || state.table != m.Table {
+			// Retirement follows the row's latest source, such as a virtual
+			// metric's current winning table.
+			state.profile, state.table = m.Profile.Source, m.Table
+			c.seenTableMetrics[key] = state
 		}
 
 		if len(m.MultiValue) == 0 {

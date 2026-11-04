@@ -236,6 +236,38 @@ func TestCollectorRuntimeTableRetirementFollowsSourceAvailability(t *testing.T) 
 	}
 }
 
+func TestCollectorTableRetirementFollowsLatestRowSource(t *testing.T) {
+	// A grouped virtual metric can switch its winning table while a row keeps its key.
+	const source = "grouped.yaml"
+	pm := func(table string, unavailable ...string) []*ddsnmp.ProfileMetrics {
+		profile := &ddsnmp.ProfileMetrics{Source: source, UnavailableTables: unavailable}
+		if table != "" {
+			profile.Metrics = []ddsnmp.Metric{{
+				Profile: profile,
+				Name:    "ifTotal",
+				IsTable: true,
+				Table:   table,
+				Tags:    map[string]string{"interface": "eth0"},
+				Value:   1,
+			}}
+		}
+		return []*ddsnmp.ProfileMetrics{profile}
+	}
+	c := newTestSNMPCollector()
+	c.sysInfo = &snmputils.SysInfo{}
+
+	c.ddSnmpColl = &mockDdSnmpCollector{pms: pm("ifXTable")}
+	require.NoError(t, c.collectSNMP(map[string]int64{}))
+	chart := c.Charts().Get("snmp_device_prof_ifTotal_eth0")
+	require.NotNil(t, chart)
+	c.ddSnmpColl = &mockDdSnmpCollector{pms: pm("ifTable", "ifXTable")}
+	require.NoError(t, c.collectSNMP(map[string]int64{}))
+	c.ddSnmpColl = &mockDdSnmpCollector{pms: pm("", "ifXTable")}
+	require.NoError(t, c.collectSNMP(map[string]int64{}))
+
+	assert.True(t, chart.IsRemoved(), "the row is absent from a successful walk of its current source")
+}
+
 func (d *refreshTestDevice) setText(oid, text string) {
 	d.values[oid] = gosnmp.SnmpPDU{
 		Name:  oid,
