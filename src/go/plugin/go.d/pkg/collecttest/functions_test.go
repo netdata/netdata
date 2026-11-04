@@ -197,6 +197,25 @@ func TestCheckMetadataFunctionsMatch(t *testing.T) {
 				return f
 			}()},
 		},
+		"accepted parameter documented": {
+			documented: documented(func(f *MetadataFunction) {
+				f.Parameters = append(f.Parameters, MetadataFunctionParameter{ID: "after", Name: "After", Type: "integer"})
+			}),
+			implemented: []ImplementedFunction{func() ImplementedFunction {
+				f := testImplementedFunction()
+				f.AcceptedParams = []string{"after"}
+				return f
+			}()},
+		},
+		"accepted parameter not documented": {
+			documented: []MetadataFunction{testDocumentedFunction()},
+			implemented: []ImplementedFunction{func() ImplementedFunction {
+				f := testImplementedFunction()
+				f.AcceptedParams = []string{"after"}
+				return f
+			}()},
+			wantErr: "inventory: parameter after accepted but not documented",
+		},
 		"job selector name drift": {
 			documented: documented(func(f *MetadataFunction) {
 				p := jobParam
@@ -233,6 +252,13 @@ func TestCheckMetadataFunctionsMatch(t *testing.T) {
 type testFunctionHandler struct {
 	params  []funcapi.ParamConfig
 	columns []funcapi.ColumnMeta
+}
+
+// testRawFunctionHandler answers raw requests with the same table.
+type testRawFunctionHandler struct{ testFunctionHandler }
+
+func (h testRawFunctionHandler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
+	return h.Handle(ctx, req.Method, nil)
 }
 
 func (h testFunctionHandler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
@@ -306,4 +332,15 @@ modules:
 	extra := append(methods, funcapi.FunctionConfig{ID: "logs"})
 	err = CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: extra, Handler: handler})
 	require.ErrorContains(t, err, "logs: implemented but not documented")
+
+	// Raw-request columns are compared only on request, through HandleRaw.
+	raw := []funcapi.FunctionConfig{{ID: "inventory", RawRequest: true, RequiredParams: testImplementedFunction().Parameters}}
+	rawHandler := testRawFunctionHandler{noDynamic}
+	require.NoError(t, CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: raw, Handler: rawHandler, RawTables: true}))
+	rawHandler.columns = rawHandler.columns[1:]
+	require.NoError(t, CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: raw, Handler: rawHandler}))
+	err = CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: raw, Handler: rawHandler, RawTables: true})
+	require.ErrorContains(t, err, "inventory: 3 columns documented, 2 returned")
+	err = CheckMetadataDocumentsFunctions([]byte(metadata), MetadataFunctionsCheck{Methods: raw, Handler: noDynamic, RawTables: true})
+	require.ErrorContains(t, err, "inventory: raw-request method without a raw handler")
 }

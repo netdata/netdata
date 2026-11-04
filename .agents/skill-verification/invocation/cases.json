@@ -258,7 +258,8 @@
       ],
       "optional": [],
       "not_selected_by_prompt": [
-        "repo-pr-reviews"
+        "repo-pr-reviews",
+        "packaging-native-packages"
       ],
       "expect": [
         "Use architecture/cache/artifact contracts and existing evidence.",
@@ -273,7 +274,8 @@
       ],
       "optional": [],
       "not_selected_by_prompt": [
-        "query-netdata-agents"
+        "query-netdata-agents",
+        "packaging-native-packages"
       ],
       "expect": [
         "Check actual build preconditions and architecture policy.",
@@ -565,6 +567,101 @@
       "expect": [
         "Inspect the candidate design entry and reachable cache/lifecycle dependencies to resolve relevance.",
         "If ownership/lifecycle contracts change, expand the applicable design rules; uncertainty is not an automatic exemption or a reason to load all references."
+      ]
+    },
+    {
+      "id": "INV-35",
+      "prompt": "Review a CPack change that makes an optional hardware plugin the preferred collector and adds its package to the main DEB and RPM hard dependencies. Do not edit or build.",
+      "required": [
+        "packaging-native-packages"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "packaging-static-installer",
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "Separate build inclusion and preferred runtime selection from the established native installation policy; inspect main-to-plugin dependency strength in both package families.",
+        "Check optional suggestions and weak-dependency tiers without running a build or package transaction."
+      ]
+    },
+    {
+      "id": "INV-36",
+      "prompt": "The EL10 RPM build passed, but package installation reports that group netdata does not exist and uses root. Investigate the existing logs and source only; do not install anything.",
+      "required": [
+        "packaging-native-packages"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "packaging-static-installer"
+      ],
+      "expect": [
+        "Trace account creation, distro-specific RPM hook policy, payload ordering and final ownership; an upstream RPM version or installed sysusers command does not establish automatic hook support.",
+        "Read-only diagnosis does not authorize a real package transaction, service changes or weaker runtime assertions."
+      ]
+    },
+    {
+      "id": "INV-37",
+      "prompt": "Review the static installer check after adding a new executable: should it parse CMakeCache to decide which binaries to inspect? Use source and existing evidence only.",
+      "required": [
+        "packaging-static-installer"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "packaging-native-packages"
+      ],
+      "expect": [
+        "Use the installed executable ELF scan for linkage and runtime-check.sh for required executables with the static job skip policy.",
+        "Do not duplicate presence checks, infer official static opt-outs from source flags, or run a build merely for this review."
+      ]
+    },
+    {
+      "id": "INV-38",
+      "prompt": "Review how an independent runtime gets to native package users on each channel and how the matching signed archive is promoted in R2. Use existing evidence only.",
+      "required": [
+        "packaging-component-releases"
+      ],
+      "optional": [
+        "packaging-native-packages"
+      ],
+      "not_selected_by_prompt": [
+        "packaging-static-installer"
+      ],
+      "expect": [
+        "Check the active package catalog, architecture mapping, both independent hosts, all release channels and isolated uploader staging.",
+        "Trace signing, matching sources, immutable read-back, retry and per-architecture promotion. Review does not authorize signing, uploading or installing."
+      ]
+    },
+    {
+      "id": "INV-39",
+      "prompt": "Draft the packaging/SRE handoff for a release PR. CI built the artifacts, an RPM was installed from a local file, and the public download route is still proposed. What do reviewers need to answer before merge and before the first release?",
+      "required": [
+        "packaging-component-releases"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "repo-pr-reviews",
+        "packaging-static-installer"
+      ],
+      "expect": [
+        "Distinguish artifact build, actual local transaction, repository ingestion/install and public route verification. Keep the proposed route visibly unconfirmed.",
+        "Identify owners and decision deadlines for trust, destinations, environment protections and release acceptance. Drafting a handoff does not authorize sending it or using credentials."
+      ]
+    },
+    {
+      "id": "INV-40",
+      "prompt": "Review the CPack relationships for an optional runtime with its own version. The plugin must remain useful without that runtime, and its hooks need a compatible installed helper during replacement and removal.",
+      "required": [
+        "packaging-native-packages"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "packaging-component-releases",
+        "packaging-static-installer"
+      ],
+      "expect": [
+        "Check the main-to-plugin and plugin-to-runtime weak relationships separately from the reverse versioned helper capability and its transaction-phase dependencies.",
+        "Check staged identity versus package version, weak-dependency support and the service-user readiness result. Package metadata review alone does not request publication."
       ]
     }
   ]

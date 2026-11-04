@@ -64,12 +64,16 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 		return inv, err
 	}
 	inv.generationErrors = make(map[string]error)
-	inv.selected, err = s.readSelection()
+	record, err := s.readSelectionRecord()
 	if err != nil {
 		if !isMetadataDamage(err) {
 			return inv, err
 		}
 		inv.selectionError = err
+	} else {
+		inv.selected = record.Manifest
+		inv.release = record.Release
+		inv.automaticUpdates = record.AutomaticUpdates
 	}
 	names, err := s.childDirectories("generations")
 	if err != nil {

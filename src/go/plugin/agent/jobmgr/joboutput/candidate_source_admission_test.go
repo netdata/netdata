@@ -35,7 +35,7 @@ func sourceRevisionTestTrial(t *testing.T) (*candidateController, *candidateBind
 	configs := sourceRevisionTestConfigs(t, candidateTestConfig("source", "endpoint"))
 	inv := candidateTestInventory(1, true, configs[:2]...)
 	first := candidateInventory(t, c, inv, 0).Decision.Work
-	second := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0).Decision.Work
+	second := candidateResult(t, c, first, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0).Decision.Work
 	require.NotNil(t, second)
 	binding := c.snapshot(inv.FullName).Binding
 
@@ -56,10 +56,10 @@ func sourceRevisionTestTrial(t *testing.T) (*candidateController, *candidateBind
 
 func TestCandidatePrivateSourceRevisionPreservesBinding(t *testing.T) {
 	for name, outcome := range map[string]candidateOutcome{
-		"failed":          {Kind: candidateFailed, Listed: true, RetryAfter: 5},
+		"failed":          {Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 5}},
 		"dependency wait": {Kind: candidateWaiting, Listed: true, AdmitWaiting: true},
 		"framework wait":  {Kind: candidateFrameworkBlocked, Listed: true, Block: candidateBlockAcceptedWait},
-		"framework retry": {Kind: candidateFrameworkBlocked, Listed: true, Block: candidateBlockFailedRetry, RetryAfter: 5},
+		"framework retry": {Kind: candidateFrameworkBlocked, Listed: true, Block: candidateBlockFailedRetry, Retry: candidateRetryPolicy{cadence: 5}},
 		"quarantined":     {Kind: candidateFrameworkBlocked, Listed: true, Block: candidateBlockQuarantined},
 	} {
 		t.Run(name, func(t *testing.T) {

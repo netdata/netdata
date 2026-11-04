@@ -51,5 +51,6 @@ struct parser;
 void pluginsd_process_cleanup(struct parser *parser);
 
 size_t pluginsd_initialize_plugin_directories();
+int pluginsd_ipmi_unittest(void);
 
 #endif /* NETDATA_PLUGINS_D_H */

@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 ROOT = Path(__file__).resolve().parents[2]
 REVIEW_WORKFLOW = ROOT / ".github/workflows/review.yml"
 GO_TESTS_WORKFLOW = ROOT / ".github/workflows/go-tests.yml"
+CODEQL_WORKFLOW = ROOT / ".github/workflows/codeql.yml"
 SOW_WORKFLOW = ROOT / ".github/workflows/sow.yml"
 BUILD_WORKFLOW_STEPS = (
     (ROOT / ".github/workflows/build.yml", "Check build files"),
@@ -79,6 +80,31 @@ def literal_block(step: list[str], key: str) -> set[str]:
 
 
 class WorkflowFileSelectionTest(unittest.TestCase):
+    def test_codeql_go_and_rust_source_selection(self) -> None:
+        workflow = CODEQL_WORKFLOW.read_text(encoding="utf-8")
+        cases = {
+            "Go": (
+                ("src/go/main.go", "src/go/plugin/ipmi/collector/ipmi/config.go",
+                 "src/go/go.mod", "src/go/go.sum"),
+                ("src/go/README.md", "src/go/plugin/example.go.md", "docs/src/go/main.go", "src/crates/main.rs"),
+            ),
+            "Rust": (
+                ("src/crates/main.rs", "src/crates/netflow-plugin/src/main.rs",
+                 "src/crates/Cargo.toml", "src/crates/Cargo.lock", "src/crates/netflow-plugin/Cargo.toml"),
+                ("src/crates/README.md", "src/crates/main.rs.md", "docs/src/crates/main.rs", "src/go/main.go"),
+            ),
+        }
+        for language, (accepted, rejected) in cases.items():
+            step = "\n".join(workflow_step(workflow, f"Check for {language} changes"))
+            match = re.search(r"grep -Eq '([^']+)'", step)
+            self.assertIsNotNone(match)
+            for paths, expected in ((accepted, 0), (rejected, 1)):
+                for path in paths:
+                    with self.subTest(language=language, path=path):
+                        result = subprocess.run(["grep", "-Eq", match.group(1)], input=path + "\n",
+                                                text=True, capture_output=True)
+                        self.assertEqual(result.returncode, expected, result.stderr)
+
     def test_public_skill_changes_trigger_sow_workflow(self) -> None:
         workflow = SOW_WORKFLOW.read_text(encoding="utf-8")
         paths_block = workflow.split("    paths:\n", 1)[1].split("\n\n", 1)[0]
@@ -203,6 +229,7 @@ class WorkflowFileSelectionTest(unittest.TestCase):
 
         self.assertTrue(
             {
+                ".github/scripts/test-go-build-matrix.py",
                 "src/go/**",
                 "src/collectors/cgroups.plugin/cgroup-name/**",
                 "src/collectors/ebpf.plugin/ebpfgo.plugin/**",

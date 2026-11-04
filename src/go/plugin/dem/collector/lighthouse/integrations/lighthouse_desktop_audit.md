@@ -57,22 +57,37 @@ Each attempt starts a fresh browser and consumes CPU, memory and target website 
 
 ### Prerequisites
 
+#### Prepare the browser sandbox policy
+
+Managed bundles and preloads on Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04,
+require administrator-prepared AppArmor policy. DEM does not automatically allow service-writable
+browser paths. The native runtime package supplies its own profile for its root-owned browser.
+Containers also require compatible host and container namespace, AppArmor and seccomp policies.
+Follow the [runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
+and keep Chromium's sandbox enabled when qualifying the actual service deployment.
+
+
 #### Set up the browser runtime
 
-Browser runtime delivery is experimental; released bundles and automatic manifest installation are not
-provided. Supply a trusted runtime manifest and its matching bundle before enabling browser monitors.
-Run Chromium with its sandbox enabled as the unprivileged Netdata service account on Linux amd64 or arm64.
-Managed mode prepares the exact runtime when a browser monitor is enabled, using an administrator-installed
-runtime manifest. For offline setup, install the trusted manifest and import its matching archive, or select
-`runtime.mode: preloaded` in `dem.conf` with the final `preload_path` produced by `dem.plugin runtime preload`.
-Both modes require the trusted manifest and its matching bundle. Preloads stay outside automatic cleanup;
-stop every consumer before replacing or removing them. Separately installed runtime components are unsupported.
+Browser monitoring requires an explicitly installed runtime on Linux amd64 or arm64, running as the
+unprivileged Netdata service account with Chromium sandboxing enabled. Native installations use the optional
+`netdata-dem-runtime` package on live systemd hosts; package hooks may restart the Agent. Other installation
+methods use managed bundles or protected preloads. Production publication still requires release and platform qualification.
 
-Run `dem.plugin runtime status` to inspect preparation and `dem.plugin runtime qualify` as the service
-account to check a local sandboxed browser run. Follow the
-[DEM runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
-for manifests, downloads, offline imports, retention and protected preloads. Restart the plugin after changing
-runtime configuration.
+For offline managed installation, set `runtime.offline_keyring` in `dem.conf` to the path of an
+administrator-provisioned public OpenPGP keyring. Obtain a signed release descriptor and matching archive,
+then run as the service account:
+
+```sh
+dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
+dem.plugin runtime status
+```
+
+Restart DEM to activate the installation. Explicit install enables automatic update preparation; add
+--manual-updates for manual control. Enabling a monitor never downloads a runtime.
+Use `dem.plugin runtime qualify` under the service's execution policy to check both journeys and Lighthouse.
+See the [runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
+for updates, explicit downloads, installation paths and protected preloads.
 
 
 

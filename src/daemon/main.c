@@ -233,7 +233,10 @@ int pagecache_flush_drop_unittest(void);
 int pluginsd_parser_unittest(void);
 int pluginsd_vnodes_unittest(void);
 int websocket_compression_unittest(void);
+int web_client_registry_cookie_unittest(void);
+int web_client_header_parsing_unittest(void);
 int web_client_request_size_unittest(void);
+int web_client_forwarded_for_unittest(void);
 int rrdhost_machine_guid_unittest(void);
 void replication_initialize(void);
 void bearer_tokens_init(void);
@@ -518,7 +521,10 @@ int netdata_main(int argc, char **argv) {
                             if (threads_unittest()) return 1;
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
+                            if (web_client_registry_cookie_unittest()) return 1;
+                            if (web_client_header_parsing_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
+                            if (web_client_forwarded_for_unittest()) return 1;
                             if (rrdhost_machine_guid_unittest()) return 1;
                             if (stream_conf_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
@@ -526,6 +532,7 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
                             if (url_unittest()) return 1;
+                            if (command_argument_sanitization_tests()) return 1;
                             if (api_v1_allmetrics_json_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_graphite_unittest()) return 1;
@@ -580,6 +587,7 @@ int netdata_main(int argc, char **argv) {
                             if (nrpc_registry_unittest()) return 1;
                             if (pluginsd_functions_unittest()) return 1;
                             if (pluginsd_vnodes_unittest()) return 1;
+                            if (pluginsd_ipmi_unittest()) return 1;
                             if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
                             if (mcp_jsonrpc_batch_unittest()) return 1;
@@ -751,6 +759,10 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "pluginsd-vnodes") == 0)
                             return unittest_run_with_rrd(pluginsd_vnodes_unittest);
+                        else if(strcmp(optarg, "pluginsd-ipmi") == 0) {
+                            unittest_running = true;
+                            return pluginsd_ipmi_unittest();
+                        }
                         else if(strcmp(optarg, "sqlite-lease-test") == 0) {
                             unittest_running = true;
                             // the same SQLite setup as -W unittest; the teardown test runs the real teardown,
@@ -1434,6 +1446,13 @@ int netdata_main(int argc, char **argv) {
     delta_startup_time("static threads");
 
     nd_log_limits_reset();
+
+    // the previous session's shutdown duration is kept in the status file (shutdown does not write SQLite);
+    // import it before the medians are cached
+    usec_t last_shutdown_ut = daemon_status_file_last_shutdown_duration_ut();
+    if(last_shutdown_ut)
+        add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)last_shutdown_ut);
+
     get_agent_event_time_median_init();
 
     netdata_conf_section_web();

@@ -57,6 +57,9 @@ type descriptor struct {
 	factors       types.ReadingFactors
 	linearization types.LinearizationFunc
 	analog        bool
+	// thresholdAccess and sdrThresholds come from full records only.
+	thresholdAccess types.SensorThresholdAccess
+	sdrThresholds   rawThresholds
 	// supported is false for records that cannot be addressed or named correctly.
 	// They are published with unknown state and never queried.
 	supported bool
@@ -84,14 +87,16 @@ func describeSDR(sdr *types.SDR) []descriptor {
 	case sdr.Full != nil:
 		f := sdr.Full
 		d = descriptor{
-			number:        uint8(f.SensorNumber),
-			owner:         f.GeneratorID,
-			sensorType:    uint8(f.SensorType),
-			eventType:     uint8(f.SensorEventReadingType),
-			unit:          f.SensorUnit,
-			factors:       f.ReadingFactors,
-			linearization: f.LinearizationFunc,
-			analog:        f.SensorUnit.IsAnalog(),
+			number:          uint8(f.SensorNumber),
+			owner:           f.GeneratorID,
+			sensorType:      uint8(f.SensorType),
+			eventType:       uint8(f.SensorEventReadingType),
+			unit:            f.SensorUnit,
+			factors:         f.ReadingFactors,
+			linearization:   f.LinearizationFunc,
+			analog:          f.SensorUnit.IsAnalog(),
+			thresholdAccess: f.SensorCapabilities.ThresholdAccess,
+			sdrThresholds:   sdrThresholds(f),
 		}
 		idBytes, idEncoding = f.IDStringBytes, f.IDStringTypeLength
 	case sdr.Compact != nil:

@@ -24,6 +24,8 @@ func (d *fakeDeps) CurrentSnapshot() *bmc.Snapshot { return d.snapshot }
 
 func TestRouter_SensorTable(t *testing.T) {
 	temperature, voltage, fan, current := 25.125, 0.987, 1234.0, 14.42
+	lowerCritical, lowerNonCritical, upperNonCritical, upperCritical := 0.0, 5.0, 97.0, 100.0
+	fanCritical, fanNonCritical := 150.0, 300.0
 	deps := &fakeDeps{
 		snapshot: &bmc.Snapshot{
 			CollectedAt: time.Unix(1700000000, 0),
@@ -36,6 +38,12 @@ func TestRouter_SensorTable(t *testing.T) {
 					Unit:      bmc.UnitCelsius,
 					State:     bmc.StateNominal,
 					Value:     &temperature,
+					Thresholds: bmc.Thresholds{
+						LowerCritical:    &lowerCritical,
+						LowerNonCritical: &lowerNonCritical,
+						UpperNonCritical: &upperNonCritical,
+						UpperCritical:    &upperCritical,
+					},
 				},
 				{
 					Key:       "temp2",
@@ -63,6 +71,10 @@ func TestRouter_SensorTable(t *testing.T) {
 					Unit:      bmc.UnitRPM,
 					State:     bmc.StateNominal,
 					Value:     &fan,
+					Thresholds: bmc.Thresholds{
+						LowerCritical:    &fanCritical,
+						LowerNonCritical: &fanNonCritical,
+					},
 				},
 				{
 					Key:       "current",
@@ -97,8 +109,38 @@ func TestRouter_SensorTable(t *testing.T) {
 
 	normal := map[string]string{"severity": "normal"}
 	assert.Equal(t, [][]any{
-		{"CPU Temp", "Temperature", "Processor", 25.125, "Celsius", "nominal", "temp1", normal},
-		{"CPU Temp", "Temperature", "Processor", 25.125, "Celsius", "nominal", "temp2", normal},
+		{
+			"CPU Temp",
+			"Temperature",
+			"Processor",
+			25.125,
+			"Celsius",
+			"nominal",
+			nil,
+			0.0,
+			5.0,
+			97.0,
+			100.0,
+			nil,
+			"temp1",
+			normal,
+		},
+		{
+			"CPU Temp",
+			"Temperature",
+			"Processor",
+			25.125,
+			"Celsius",
+			"nominal",
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			"temp2",
+			normal,
+		},
 		{
 			"CPU Voltage",
 			"Voltage",
@@ -106,10 +148,11 @@ func TestRouter_SensorTable(t *testing.T) {
 			0.987,
 			"Volts",
 			"warning",
+			nil, nil, nil, nil, nil, nil,
 			"voltage",
 			map[string]string{"severity": "warning"},
 		},
-		{"Fan", "Fan", "System", 1234.0, "RPM", "nominal", "fan", normal},
+		{"Fan", "Fan", "System", 1234.0, "RPM", "nominal", nil, 150.0, 300.0, nil, nil, nil, "fan", normal},
 		{
 			"Current",
 			"Current",
@@ -117,11 +160,42 @@ func TestRouter_SensorTable(t *testing.T) {
 			14.42,
 			"Amps",
 			"critical",
+			nil, nil, nil, nil, nil, nil,
 			"current",
 			map[string]string{"severity": "critical"},
 		},
-		{"PSU Status", "Power Supply", "Power Supply", nil, nil, "nominal", "presence", normal},
-		{"PSU Temp", "Temperature", "Power Supply", nil, "Celsius", "unknown", "unavailable", normal},
+		{
+			"PSU Status",
+			"Power Supply",
+			"Power Supply",
+			nil,
+			nil,
+			"nominal",
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			"presence",
+			normal,
+		},
+		{
+			"PSU Temp",
+			"Temperature",
+			"Power Supply",
+			nil,
+			"Celsius",
+			"unknown",
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			"unavailable",
+			normal,
+		},
 	}, response.Data)
 	assert.Equal(t, "Type", response.DefaultSortColumn)
 	assert.Equal(t, funcapi.ChartingConfig{
@@ -152,13 +226,22 @@ func TestRouter_SensorTable(t *testing.T) {
 			"type":          "float",
 			"visible":       true,
 			"sort":          "descending",
-			"summary":       "sum",
+			"summary":       "count",
 			"value_options": map[string]any{"transform": "number", "decimal_points": 2, "default_value": nil},
 		},
 		"Units":      {"index": 4, "type": "string", "visible": true, "summary": "count", "filter": "multiselect"},
 		"State":      {"index": 5, "type": "string", "visible": true, "summary": "count", "filter": "multiselect"},
-		"Key":        {"index": 6, "type": "string", "visible": false},
-		"rowOptions": {"index": 7, "type": "none", "visible": false, "visualization": "rowOptions", "dummy": true},
+		"Key":        {"index": 12, "type": "string", "visible": false},
+		"rowOptions": {"index": 13, "type": "none", "visible": false, "visualization": "rowOptions", "dummy": true},
+	}
+	for i, name := range []string{"LNR", "LCR", "LNC", "UNC", "UCR", "UNR"} {
+		wantColumns[name] = map[string]any{
+			"index":         6 + i,
+			"type":          "float",
+			"visible":       true,
+			"summary":       "count",
+			"value_options": map[string]any{"transform": "number", "decimal_points": 2, "default_value": nil},
+		}
 	}
 	require.Len(t, response.Columns, len(wantColumns))
 	for name, want := range wantColumns {
@@ -175,7 +258,7 @@ func TestRouter_SensorIdentityAcrossSnapshots(t *testing.T) {
 	const (
 		readingIndex = 3
 		stateIndex   = 5
-		keyIndex     = 6
+		keyIndex     = 12
 	)
 	value := 42.5
 	first := bmc.Sensor{
@@ -266,7 +349,7 @@ func TestRouter_MethodParams(t *testing.T) {
 // serializes, including charting, against the Function UI schema.
 func assertMatchesFunctionSchema(t *testing.T, response *funcapi.FunctionResponse) {
 	t.Helper()
-	payload := map[string]any{
+	validateFunctionPayload(t, map[string]any{
 		"status":              response.Status,
 		"type":                "table",
 		"columns":             response.Columns,
@@ -275,7 +358,12 @@ func assertMatchesFunctionSchema(t *testing.T, response *funcapi.FunctionRespons
 		"help":                response.Help,
 		"charts":              response.Charts,
 		"default_charts":      response.DefaultCharts.Build(),
-	}
+	})
+}
+
+// validateFunctionPayload validates a serialized Function response against the Function UI schema.
+func validateFunctionPayload(t *testing.T, payload map[string]any) {
+	t.Helper()
 	raw, err := json.Marshal(payload)
 	require.NoError(t, err)
 	var decoded any

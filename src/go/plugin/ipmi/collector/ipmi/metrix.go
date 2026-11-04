@@ -11,6 +11,15 @@ import (
 
 var sensorStates = []string{bmc.StateNominal, bmc.StateWarning, bmc.StateCritical, bmc.StateUnknown}
 
+// SEL event types of the new-records chart. Threshold events also change the
+// state of their sensor; every other record is discrete.
+const (
+	selEventThreshold = "threshold"
+	selEventDiscrete  = "discrete"
+)
+
+var selEventTypes = []string{selEventThreshold, selEventDiscrete}
+
 // readingMetrics names the reading metric of each unit with numeric samples.
 var readingMetrics = map[string]string{
 	bmc.UnitCelsius:    "temperature_c",
@@ -27,6 +36,8 @@ type collectorMetrics struct {
 	readings   map[string]metrix.SnapshotGauge // by unit
 	state      metrix.StateSetInstrument
 	selEntries metrix.SnapshotGauge
+	// selNew counts the SEL records new since the previous sample.
+	selNew metrix.SnapshotGauge
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
@@ -40,6 +51,7 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			metrix.WithStateSetStates(sensorStates...),
 		),
 		selEntries: meter.Gauge("sel_events"),
+		selNew:     meter.Gauge("sel_new_records"),
 	}
 	for unit, name := range readingMetrics {
 		m.readings[unit] = meter.Gauge(name, metrix.WithFloat(true))

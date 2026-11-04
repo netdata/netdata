@@ -120,6 +120,7 @@ void finalize_all_prepared_sql_statements();
 // sqlite_functions.c.
 void sqlite_mark_teardown_unsafe(const char *reason);
 bool sqlite_teardown_is_unsafe(void);
+const char *sqlite_teardown_unsafe_reason(void);
 
 int execute_insert(sqlite3_stmt *res);
 int db_execute(sqlite3 *database, const char *cmd, int *sqlite_rc);

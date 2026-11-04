@@ -287,6 +287,7 @@ struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafi
 int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, struct wal *wal);
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_unlink(struct rrdengine_journalfile *journalfile);
+int journalfile_v2_unlink(struct rrdengine_journalfile *journalfile);
 #define JOURNALFILE_DELETED_V1  (1u << 0) // .njf was deleted
 #define JOURNALFILE_DELETED_V2  (1u << 1) // .njfv2 was deleted
 #define JOURNALFILE_DELETED_ALL (JOURNALFILE_DELETED_V1 | JOURNALFILE_DELETED_V2)

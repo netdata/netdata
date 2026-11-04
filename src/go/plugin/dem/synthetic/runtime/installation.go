@@ -26,7 +26,9 @@ func (e *SelectionError) Error() string {
 func (e *SelectionError) Unwrap() error { return e.Err }
 
 type selection struct {
-	Manifest *Manifest `json:"manifest"`
+	Manifest         *Manifest `json:"manifest"`
+	Release          *Release  `json:"release,omitempty"`
+	AutomaticUpdates bool      `json:"automatic_updates,omitempty"`
 }
 
 func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
@@ -56,30 +58,43 @@ func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
 }
 
 func (s *Store) readSelection() (*Manifest, error) {
+	record, err := s.readSelectionRecord()
+	if err != nil {
+		return nil, err
+	}
+	return record.Manifest, err
+}
+
+func (s *Store) readSelectionRecord() (selection, error) {
 	// Only an explicit null means uninstalled. Missing fields or a missing
 	// record must not silently discard an installed release's protection.
 	record := selection{
 		Manifest: &Manifest{},
 	}
 	if err := readJSON(s.root, "selection.json", &record); errors.Is(err, os.ErrNotExist) {
-		return nil, damagedMetadata("selection.json", err)
+		return record, damagedMetadata("selection.json", err)
 	} else if err != nil {
-		return nil, err
+		return record, err
 	}
 	if record.Manifest != nil {
 		if err := record.Manifest.Validate(); err != nil {
-			return nil, damagedMetadata("selection.json", err)
+			return record, damagedMetadata("selection.json", err)
 		}
 	}
-	return record.Manifest, nil
+	if err := record.validateRelease(); err != nil {
+		return record, damagedMetadata("selection.json", err)
+	}
+	return record, nil
 }
 
 func (s *Store) selectLocked(m *Manifest) error {
+	return s.selectRecordLocked(selection{Manifest: m})
+}
+
+func (s *Store) selectRecordLocked(record selection) error {
 	// Split publication from directory sync so the caller can distinguish a failed
 	// write from a visible selection whose durability is not yet known.
-	if err := publishJSON(s.root, "selection.json", selection{
-		Manifest: m,
-	}); err != nil {
+	if err := publishJSON(s.root, "selection.json", record); err != nil {
 		return err
 	}
 	if err := s.syncSelection(); err != nil {
@@ -113,7 +128,7 @@ func (c *Consumer) Close() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.closed = true
-	return c.claim.Close()
+	return c.store.closeClaim(c.claim)
 }
 
 func (s *Store) AcquireSelected() (*Consumer, error) {
@@ -147,16 +162,17 @@ func (s *Store) AcquireSelected() (*Consumer, error) {
 // selected release unless Select has already published it.
 type Candidate struct {
 	*Consumer
-	operation *flock.Flock
-	sealed    bool
-	finished  bool
+	operation   *flock.Flock
+	sealed      bool
+	finished    bool
+	publication *selection
 }
 
 func (s *Store) lockInstallation(ctx context.Context) (*flock.Flock, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	lock := flock.New(filepath.Join(s.path, "installation.lock"))
+	lock := flock.New(filepath.Join(s.path, "installation.lock"), flock.SetFlag(os.O_RDWR))
 	locked, err := lock.TryLockContext(ctx, 50*time.Millisecond)
 	if !locked || err != nil {
 		return nil, errors.Join(err, ctx.Err(), lock.Close())
@@ -183,8 +199,13 @@ func (s *Store) beginCandidate(ctx context.Context, m Manifest, repair bool) (*C
 	if err != nil {
 		return nil, err
 	}
+	return s.candidateWithOperation(operation, m, repair)
+}
+
+// Ownership of operation transfers to the candidate, or is released on error.
+func (s *Store) candidateWithOperation(operation *flock.Flock, m Manifest, repair bool) (*Candidate, error) {
 	var consumer *Consumer
-	err = s.withLock(func() error {
+	err := s.withLock(func() error {
 		if repair {
 			if err := s.repairLocked(m); err != nil {
 				return err
@@ -246,6 +267,9 @@ func (c *Candidate) Select() error {
 		if _, err := c.store.prepared(c.manifest); err != nil {
 			return err
 		}
+		if c.publication != nil {
+			return c.store.selectRecordLocked(*c.publication)
+		}
 		return c.store.selectLocked(&c.manifest)
 	})
 }
@@ -261,7 +285,7 @@ func (c *Candidate) Close() error {
 	if c.sealed {
 		err = c.store.releaseOwner(c.claim.lock)
 	} else {
-		err = c.claim.Close()
+		err = c.store.closeClaim(c.claim)
 	}
 	// Failed releases remain in Store's retry list, independently of the caller.
 	err = errors.Join(err, c.store.releaseOwner(c.operation))
@@ -328,5 +352,5 @@ func (s *Store) repairLocked(m Manifest) error {
 }
 
 func (inv inventory) inUse() bool {
-	return len(inv.processes) > 0 || len(inv.candidates) > 0 || len(inv.uses) > 0 || len(inv.reservations) > 0
+	return inv.ownershipInventory.inUse() || len(inv.reservations) > 0
 }

@@ -20,7 +20,8 @@ typedef enum __attribute__((packed)) {
     HTTP_VALIDATION_MALFORMED_URL,
     HTTP_VALIDATION_INCOMPLETE,
     HTTP_VALIDATION_REDIRECT,
-    HTTP_VALIDATION_URI_TOO_LONG
+    HTTP_VALIDATION_URI_TOO_LONG,
+    HTTP_VALIDATION_MALFORMED_HEADER,
 } HTTP_VALIDATION;
 
 typedef enum __attribute__((packed)) {
@@ -241,6 +242,7 @@ struct web_client {
 
     struct {
         nd_uuid_t bearer_token;
+        char registry_person_guid[UUID_STR_LEN]; // the netdata_registry_id cookie (if sent)
     } auth;
 
     struct {                            // A callback to check if the query should be interrupted / stopped

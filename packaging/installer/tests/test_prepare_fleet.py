@@ -97,6 +97,50 @@ class PrepareFleetTests(unittest.TestCase):
         result = self.run_script(*args, success=options.get('success', True))
         return target, result
 
+    def test_ipmi_capability_keeps_both_implementations_and_go_config(self):
+        paths = ('usr/libexec/netdata/plugins.d/ipmi.plugin',
+                 'usr/libexec/netdata/plugins.d/freeipmi.plugin',
+                 'usr/lib/netdata/conf.d/ipmi.conf',
+                 'usr/lib/netdata/conf.d/ipmi/ipmi.conf')
+        for path in paths:
+            self.put(path, 'stock IPMI')
+        target, _ = self.prepare('ipmi')
+        for path in paths:
+            self.assertTrue((target / path).is_file(), path)
+
+    def test_ipmi_capability_accepts_either_implementation(self):
+        for implementation in ('ipmi.plugin', 'freeipmi.plugin'):
+            binary = 'usr/libexec/netdata/plugins.d/' + implementation
+            self.put(binary, 'stock IPMI')
+            for keep in ('ipmi', 'all', 'none'):
+                with self.subTest(implementation=implementation, keep=keep):
+                    target = self.root / (implementation + '-' + keep)
+                    result = self.run_script('--source', self.source, '--keep', keep,
+                                             '--strip-mode', 'none', '--apply', '--output', target)
+                    manifest = json.loads((target / 'usr/share/netdata/fleet-manifest.json').read_text())
+                    self.assertEqual('ipmi' in manifest['resolved'], keep != 'none')
+                    self.assertEqual((target / binary).exists(), keep != 'none')
+                    if keep == 'none':
+                        self.assertIn('ipmi', next(line for line in result.stdout.splitlines()
+                                                   if line.startswith('Remove:')))
+            (self.source / binary).unlink()
+
+    def test_ipmi_config_alone_does_not_provide_capability(self):
+        self.put('usr/lib/netdata/conf.d/ipmi.conf', 'stock config')
+        result = self.run_script('--source', self.source, '--keep', 'ipmi', success=False)
+        self.assertIn('requested capability ipmi is absent', result.stderr)
+
+    def test_omitted_ipmi_removes_both_implementations_and_go_config(self):
+        paths = ('usr/libexec/netdata/plugins.d/ipmi.plugin',
+                 'usr/libexec/netdata/plugins.d/freeipmi.plugin',
+                 'usr/lib/netdata/conf.d/ipmi.conf',
+                 'usr/lib/netdata/conf.d/ipmi/ipmi.conf')
+        for path in paths:
+            self.put(path, 'stock IPMI')
+        target, _ = self.prepare('none')
+        for path in paths:
+            self.assertFalse((target / path).exists(), path)
+
     def test_dependency_and_shared_user_unknown_preservation(self):
         target, _ = self.prepare('network')
         for name in ('apps.plugin', 'network-viewer.plugin', 'ndsudo', 'loopsleepms.sh.inc'):
@@ -112,7 +156,8 @@ class PrepareFleetTests(unittest.TestCase):
 
     def test_package_path_inventory_tracks_retained_content(self):
         inventory = 'system/package-manifest'
-        original = '.\n./system\n./bin/netdata\n./usr/lib/netdata/conf.d/go.d\n./usr/lib/netdata/conf.d/go.d/custom.conf\n./usr/share/netdata/web\n'
+        original = ('.\n./system\n./bin/netdata\n./usr/lib/netdata/conf.d/go.d\n'
+                    './usr/lib/netdata/conf.d/go.d/custom.conf\n./usr/share/netdata/web\n')
         self.put(inventory, original)
         target, _ = self.prepare('none')
         self.assertEqual((target / inventory).read_text(), '.\n./system\n./bin/netdata\n./usr/share/netdata/web\n')

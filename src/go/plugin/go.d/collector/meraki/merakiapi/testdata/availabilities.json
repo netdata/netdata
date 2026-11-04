@@ -1,0 +1,8 @@
+[
+  {"serial":"Q234-ABCD-5678","network":{"id":"N_EXAMPLE"},"name":"Example switch","productType":"switch","mac":"00:11:22:33:44:55","status":"online","tags":["test"]},
+  {"serial":"Q234-ABCD-5679","status":"alerting"},
+  {"serial":"Q234-ABCD-5680","status":"offline"},
+  {"serial":"Q234-ABCD-5681","status":"dormant"},
+  {"serial":"Q234-ABCD-5682","status":"future-provider-state"},
+  {"serial":"Q234-ABCD-5683","status":null}
+]

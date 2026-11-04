@@ -347,8 +347,20 @@ static void dsf_json_agent(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         {
             buffer_json_member_add_time_t(wb, "init", ds->timings.init);
             buffer_json_member_add_time_t(wb, "exit", ds->timings.exit);
+
+            if(ds->v >= 30)
+                buffer_json_member_add_uint64(wb, "exit_ut", ds->timings.exit_ut);
         }
         buffer_json_object_close(wb);
+
+        if(ds->v >= 30) {
+            buffer_json_member_add_object(wb, "shutdown");
+            {
+                buffer_json_member_add_string(wb, "abandoned", ds->shutdown.abandoned);
+                buffer_json_member_add_string(wb, "sqlite_unsafe", ds->shutdown.sqlite_unsafe);
+            }
+            buffer_json_object_close(wb);
+        }
     }
     buffer_json_object_close(wb);
 }
@@ -618,6 +630,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     unsigned required_v26 = version >= 26 ? strict : JSONC_OPTIONAL;
     unsigned required_v27 = version >= 27 ? strict : JSONC_OPTIONAL;
     unsigned required_v29 = version >= 29 ? strict : JSONC_OPTIONAL;
+    unsigned required_v30 = version >= 30 ? strict : JSONC_OPTIONAL;
 
     // Parse timestamp
     JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
@@ -656,6 +669,12 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         JSONC_PARSE_SUBOBJECT(jobj, path, timings_key, error, required_v1, {
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "init", ds->timings.init, error, required_v1);
             JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit", ds->timings.exit, error, required_v1);
+            JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "exit_ut", ds->timings.exit_ut, error, required_v30);
+        });
+
+        JSONC_PARSE_SUBOBJECT(jobj, path, "shutdown", error, required_v30, {
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "abandoned", ds->shutdown.abandoned, error, required_v30);
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "sqlite_unsafe", ds->shutdown.sqlite_unsafe, error, required_v30);
         });
 
         if(version >= 4)
@@ -946,6 +965,13 @@ static void daemon_status_file_migrate_once(void) {
     daemon_status_file_session_status_writer_leave();
 }
 
+// call with the session status writer held
+static void dsf_capture_sqlite_unsafe_reason(void) {
+    const char *reason = sqlite_teardown_unsafe_reason();
+    if(reason && !session_status.shutdown.sqlite_unsafe[0])
+        safecpy(session_status.shutdown.sqlite_unsafe, reason);
+}
+
 static void daemon_status_file_refresh(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
 
@@ -1075,6 +1101,9 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         simple_pattern_free(dbengine_pattern);
         simple_pattern_free(sqlite_pattern);
     }
+
+    if(status == DAEMON_STATUS_EXITING || status == DAEMON_STATUS_EXITED)
+        dsf_capture_sqlite_unsafe_reason();
 
     dsf_release(session_status);
     daemon_status_file_session_status_writer_leave();
@@ -1882,6 +1911,7 @@ void daemon_status_file_shutdown_timeout(const char *step, BUFFER *trace) {
                   "shutdown timed out at step: %s", step);
 
     safecpy(session_status.fatal.function, "shutdown_timeout");
+    dsf_capture_sqlite_unsafe_reason();
     dsf_release(session_status);
     daemon_status_file_publish_fatal_snapshot(&session_status);
     daemon_status_file_session_status_writer_leave();
@@ -1926,6 +1956,52 @@ bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds) {
 
 bool daemon_status_file_was_incomplete_shutdown(void) {
     return last_session_status.status == DAEMON_STATUS_EXITING;
+}
+
+// The shutdown watcher records how long a completed shutdown took, right before it saves DAEMON_STATUS_EXITED.
+// The next start imports it into the agent event log (see daemon_status_file_last_shutdown_duration_ut()).
+// Shutdown itself must not write it to SQLite: by then threads that shutdown gave up on may still hold db_meta,
+// and a write would wait for them until the shutdown watchdog aborts the agent.
+void daemon_status_file_set_shutdown_duration_ut(usec_t duration_ut) {
+    daemon_status_file_session_status_writer_enter();
+    session_status.timings.exit_ut = duration_ut;
+    daemon_status_file_session_status_writer_leave();
+}
+
+// A bounded shutdown wait gave up on still-running services (service_wait_exit()). Appended in step order, so the
+// status file says which threads were left behind when a later step stalls or the watchdog fires.
+void daemon_status_file_shutdown_gave_up(const char *services, const char *threads) {
+    daemon_status_file_session_status_writer_enter();
+    dsf_acquire(session_status);
+
+    // cap each give-up, so a long early one cannot crowd out the later ones; mark any cut with "..."
+    char entry[160];
+    if(!services) services = "";
+    if(!threads) threads = "";
+    snprintfz(entry, sizeof(entry), "[ %s] %s", services, threads);
+    if(strlen(services) + strlen(threads) + 4 >= sizeof(entry))
+        memcpy(&entry[sizeof(entry) - 4], "...", 4);
+
+    char *dst = session_status.shutdown.abandoned;
+    size_t size = sizeof(session_status.shutdown.abandoned);
+    size_t used = strlen(dst);
+    // appends keep the last 3 bytes free (used <= size - 4), so the "..." for a dropped give-up always fits
+    if(used + 2 + strlen(entry) < size - 3)
+        snprintfz(&dst[used], size - used, "%s%s", used ? "; " : "", entry);
+    else if(used < 3 || strcmp(&dst[used - 3], "...") != 0)
+        memcpy(&dst[used], "...", 4);
+
+    dsf_release(session_status);
+    daemon_status_file_session_status_writer_leave();
+}
+
+// Zero for a crash, a fatal, a watchdog abort (it never reaches the watcher's final save), or a file
+// written by an agent that did not record it.
+usec_t daemon_status_file_last_shutdown_duration_ut(void) {
+    if(last_session_status.status != DAEMON_STATUS_EXITED || daemon_status_file_has_last_crashed(&last_session_status))
+        return 0;
+
+    return last_session_status.timings.exit_ut;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

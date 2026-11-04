@@ -488,19 +488,19 @@ func TestRestartContinuationDeferredInvalidResolvedConfig(t *testing.T) {
 
 func TestRestartContinuationDeadlineRetainsRecoveryAuthority(t *testing.T) {
 	var fixture *restartContinuationFixture
-	var cut atomic.Bool
+	cutResult := make(chan bool, 1)
 	fixture = restartContinuationNew(t, func(ordinal int32) *runtimeTestCollector {
 		collector := restartContinuationCollector()
 		if ordinal == 2 {
 			collector.factoryTestV2 = &factoryTestV2{
 				check: func(ctx context.Context) error {
-					cut.Store(fixture.controller.factory.config.Attempts.CutProcessAttempt(
+					cutResult <- fixture.controller.factory.config.Attempts.CutProcessAttempt(
 						jobAttemptIdentity(
 							jobmgr.ProcessAttemptJob,
 							fixture.config.FullName(),
 						),
 						jobmgr.ErrProcessAttemptDeadline,
-					))
+					)
 					<-ctx.Done()
 					return context.Cause(ctx)
 				},
@@ -516,7 +516,12 @@ func TestRestartContinuationDeadlineRetainsRecoveryAuthority(t *testing.T) {
 	fixture.current = applyActivationTestSubmission(t, activation, nil, 2)
 	fixture.apply(t, "internal/jobs/candidate-resume", 0)
 	fixture.apply(t, "internal/jobs/accepted-activation", 3)
-	require.True(t, cut.Load(), "the actual contained construction was cut at its deadline")
+	select {
+	case cut := <-cutResult:
+		require.True(t, cut, "the actual contained construction was cut at its deadline")
+	case <-time.After(time.Second):
+		t.Fatal("collector check did not report the deadline cut")
+	}
 	require.Nil(t, fixture.current)
 	state := fixture.controller.candidates.view(fixture.config.FullName())
 	require.True(t, state.FrameworkBlocked)

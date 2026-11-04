@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	dnsKernelMask uint32 = (1 << 12) - 1
+	dnsKernelMask uint32 = (1 << 14) - 1
 	// dnsDefaultUpdateEvery is intentionally half of dnsDefaultFlowTTL so the SHM
 	// stays fresh mid-window; NV_DNS_UPDATE_EVERY must equal the TTL to keep
 	// consecutive NV snapshots non-overlapping (each query counted once).
@@ -19,8 +19,8 @@ const (
 	// this value or records expire in the kernel ring before Go collects them.
 	dnsDefaultFlowTTL      = 20
 	dnsDefaultObjectFlavor = "buffer"
-	// dnsMaxBaseSelector is the highest SelectKernelName index for which a
-	// base-flavor (no suffix) dns object file is shipped.
+	// dnsMaxBaseSelector is the base-flavor cap before the complete 6.12 family.
+	// Newer generic kernels use that complete family as their walk-down target.
 	dnsMaxBaseSelector = 7 // 5.14
 )
 
@@ -131,13 +131,15 @@ func resolveDNSLegacyConfig() (DNSLegacyConfig, error) {
 func BuildDNSLegacyPlan(cfg DNSLegacyConfig) LoadPlan {
 	flavor := selectConfiguredObjectFlavor(cfg.ObjectFlavor, cfg.KernelVersion, cfg.IsDebian)
 	selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-	// Base-flavor DNS objects are not built beyond 5.14; cap the selector so we
-	// never construct a path that does not exist.
-	if flavor == ObjectFlavorBase && int(selector) > dnsMaxBaseSelector {
-		selector = uint32(dnsMaxBaseSelector)
+	// DNS base objects stop at 6.12; buffer and arena artifacts exist at newer
+	// generic selectors and should retain the kernel-matched primary object.
+	maxBase := effectiveMaxBaseSelectorForModule(dnsMaxBaseSelector, "dns", cfg.IsRHF, cfg.KernelVersion)
+	if flavor == ObjectFlavorBase {
+		selector = selectHighestIndexAtOrBelow(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion, maxBase, "dns")
 	}
 	return LoadPlan{
 		KernelVersion: cfg.KernelVersion,
+		Kernels:       cfg.Kernels,
 		IsRHF:         cfg.IsRHF,
 		Selector:      selector,
 		Flavor:        flavor,

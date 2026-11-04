@@ -750,6 +750,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - Also relevant: `integrations-lifecycle` (the pipeline that turns `metadata.yaml` into pages) and
     `health-alert-authoring` (alerts on a collector's contexts).
   - Also relevant: `triage-snmp-diagnostics` (offline SNMP evidence investigations).
+  - Also relevant: `packaging-native-packages` when adding or changing a separately packaged collector.
 - Integrations.
   - `integrations-lifecycle`: implementation/review of metadata validation and integrations pipeline; `integrations/`
     generators, templates, generated outputs, `COLLECTORS.md`/`SECRETS.md`/`SERVICE-DISCOVERY.md`; ibm.d
@@ -768,6 +769,10 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `tests-query-corpus`: running, extending or reviewing `tests/query-corpus/`; fixtures, oracles, red/green cases for
     query-engine bugs, formatter byte-pins, validating a fix branch
 - Packaging.
+  - `packaging-component-releases`: independent component release workflows, native repository coverage, managed
+    archive signing and promotion, platform qualification and SRE review handoff
+  - `packaging-native-packages`: native DEB/RPM component dependencies, account creation, transaction ordering and
+    installed ownership; CPack metadata and native packaging validation
   - `packaging-static-installer`: building, testing, reviewing or troubleshooting the static self-extracting installer
     (`netdata-<arch>-latest.gz.run`) under `packaging/makeself/`
 - Docs.
@@ -881,6 +886,8 @@ renames:
 | `repo-pr-reviews` | `pr-reviews/` | per-PR comment and review caches |
 | `collectors-prometheus-profiles` | `prometheus-profiles/` | captured exposition dumps |
 | `collectors-snmp-trap-profiles` | `snmp-trap-profiles/` | private generator artifacts and selected classification caches |
+| `packaging-component-releases` | `component-releases/` | artifact identities, distribution checks and release handoff evidence |
+| `packaging-native-packages` | `native-packages/` | native package metadata, transaction logs and scoped validation evidence |
 | `repo-skill-authoring` | `<subject>/` | inventory, staleness, preservation map, review reports, and throwaway tooling of a skill change |
 | `query-netdata-agents` (public) | `query-netdata-agents/` | output of the agent-query wrappers and the bearer cache |
 | `query-netdata-cloud` (public) | `query-netdata-cloud/` | saved Cloud API responses from its how-tos |

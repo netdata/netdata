@@ -2,7 +2,11 @@
 
 package panos
 
-import "github.com/netdata/netdata/go/plugins/pkg/metrix"
+import (
+	"math"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+)
 
 type collectorMetrics struct {
 	system systemMetrics
@@ -47,6 +51,8 @@ type licenseMetricInstruments struct {
 type ipsecMetricInstruments struct {
 	tunnelsActive metrix.SnapshotGauge
 	saLifetime    metrix.SnapshotGaugeVec
+	tunnelState   metrix.SnapshotMeasureSetGauge
+	gatewayState  metrix.SnapshotMeasureSetGauge
 }
 
 type bgpMetricInstruments struct {
@@ -76,6 +82,8 @@ var haStatusStates = []string{"enabled", "disabled"}
 var licenseStatusStates = []string{"valid", "expired"}
 var operationalModeStates = []string{"normal", "other"}
 var upDownStates = []string{"up", "down", "unknown"}
+var ipsecTunnelStates = []string{"active", "inactive", "init", "unknown"}
+var ipsecGatewayStates = []string{"up", "down"}
 var haSyncStates = []string{"synchronized", "not_synchronized", "unknown"}
 var alarmStates = []string{"clear", "alarm"}
 var presenceStates = []string{"present", "absent"}
@@ -122,6 +130,8 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 		ipsec: ipsecMetricInstruments{
 			tunnelsActive: meter.Gauge("ipsec_tunnels_active"),
 			saLifetime:    ipsecTunnels.Gauge("ipsec_tunnel_sa_lifetime"),
+			tunnelState:   newIPSecStateGauge(meter, "ipsec_tunnel_state", ipsecTunnelStates),
+			gatewayState:  newIPSecStateGauge(meter, "ipsec_gateway_state", ipsecGatewayStates),
 		},
 		bgp: bgpMetricInstruments{
 			peerState:                  newStateSetVec(bgpPeer, "bgp_peer_state", bgpStates),
@@ -142,6 +152,33 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 			vrPeersConfigured:  bgpVR.Gauge("bgp_vr_peers_total_configured"),
 			vrPeersEstablished: bgpVR.Gauge("bgp_vr_peers_total_established"),
 		},
+	}
+}
+
+func newIPSecStateGauge(meter metrix.SnapshotMeter, name string, states []string) metrix.SnapshotMeasureSetGauge {
+	fields := make([]metrix.MeasureFieldSpec, len(states))
+	for i, state := range states {
+		fields[i] = metrix.MeasureFieldSpec{Name: state}
+	}
+	return meter.MeasureSetGauge(name, metrix.WithMeasureSetFields(fields...))
+}
+
+// Empty state means unavailable telemetry, distinct from the provider's unknown state.
+func observeIPSecState(metric metrix.SnapshotMeasureSetGauge, states []string, active string, labels metrix.LabelSet) {
+	values := make([]metrix.SampleValue, len(states))
+	for i, state := range states {
+		if active == "" {
+			values[i] = math.NaN()
+		} else if state == active {
+			values[i] = 1
+		}
+	}
+	metric.ObservePoint(metrix.MeasureSetPoint{Values: values}, labels)
+}
+
+func observeIPSecUnavailable(metric metrix.SnapshotMeasureSetGauge, states []string, inventory map[[2]string]metrix.LabelSet) {
+	for _, labels := range inventory {
+		observeIPSecState(metric, states, "", labels)
 	}
 }
 

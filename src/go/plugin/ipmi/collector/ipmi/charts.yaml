@@ -1,5 +1,5 @@
 version: v1
-context_namespace: ipmi_go
+context_namespace: ipmi
 groups:
   - family: Sensors
     chart_defaults:
@@ -86,13 +86,34 @@ groups:
             type: stacked
             dimensions:
               - selector: sensor_state
+  # SEL read failures leave gaps in these charts; they never expire them.
   - family: System Event Log
-    metrics: [sel_events]
+    metrics: [sel_events, sel_new_records]
     charts:
       - id: events
         context: sel
         title: IPMI System Event Log Entries
         units: events
+        lifecycle:
+          expire_after_cycles: 0
         dimensions:
           - selector: sel_events
             name: events
+      - id: sel_new_records
+        context: sel_new_records
+        title: IPMI System Event Log New Records
+        units: records
+        type: stacked
+        instances:
+          by_labels: [event_type]
+        lifecycle:
+          expire_after_cycles: 0
+        dimensions:
+          - selector: sel_new_records{state="nominal"}
+            name: nominal
+          - selector: sel_new_records{state="warning"}
+            name: warning
+          - selector: sel_new_records{state="critical"}
+            name: critical
+          - selector: sel_new_records{state="unknown"}
+            name: unknown
