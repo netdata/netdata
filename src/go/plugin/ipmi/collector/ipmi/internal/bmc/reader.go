@@ -46,6 +46,9 @@ type Reader struct {
 	inventory       []descriptor
 	inventoryRepo   storage.GetSDRRepoInfoResponse
 	inventoryReadAt time.Time
+	// inventoryThresholdsUnavailable counts the inventory's threshold sensors
+	// whose thresholds could not be read; each collection reports it.
+	inventoryThresholdsUnavailable int
 	// inventoryGeneration counts inventory replacements; cached SEL records
 	// resolve their sensor names against the inventory again when it changes.
 	inventoryGeneration uint64
@@ -84,10 +87,10 @@ func (r *Reader) Check(ctx context.Context) error {
 }
 
 // Collect reads every inventory sensor and, when requested, the SEL. A
-// completion-code error or an unusable reading of one sensor, and any SEL
-// failure, degrade only that data and are summarized in Snapshot.Warnings.
-// Inventory failures, other sensor command failures and cancellation fail the
-// collection and close the connection.
+// completion-code error or an unusable reading of one sensor, any threshold
+// read failure and any SEL failure degrade only that data and are summarized
+// in Snapshot.Warnings. Inventory failures, other sensor reading failures and
+// cancellation fail the collection and close the connection.
 func (r *Reader) Collect(ctx context.Context, collectSEL bool) (_ *Snapshot, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -105,7 +108,9 @@ func (r *Reader) Collect(ctx context.Context, collectSEL bool) (_ *Snapshot, err
 		return nil, fmt.Errorf("read IPMI inventory: %w", err)
 	}
 
-	var warnings collectionWarnings
+	warnings := collectionWarnings{
+		thresholds: r.inventoryThresholdsUnavailable,
+	}
 	snapshot := &Snapshot{
 		Sensors:     make([]Sensor, 0, len(r.inventory)),
 		CollectedAt: r.now(),
