@@ -5,6 +5,7 @@ package meraki
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -103,6 +104,7 @@ func TestCheckIsOneOrganizationScopedPage(t *testing.T) {
 			path:          "/organizations/org/devices",
 			pageSize:      "3",
 			authorization: "Bearer test-key",
+			query:         url.Values{"perPage": {"3"}},
 			at:            calls[0].at,
 		},
 		calls[0],

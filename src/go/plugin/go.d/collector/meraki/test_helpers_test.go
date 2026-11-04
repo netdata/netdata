@@ -4,8 +4,10 @@ package meraki
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +25,7 @@ type fixtureResponse struct {
 type fixtureRequest struct {
 	path, cursor, pageSize, authorization string
 	at                                    time.Time
+	query                                 url.Values
 }
 
 type fixtureAPI struct {
@@ -57,6 +60,7 @@ func newFixtureAPI(t *testing.T) (*fixtureAPI, *httptest.Server) {
 				pageSize:      r.URL.Query().Get("perPage"),
 				authorization: r.Header.Get("Authorization"),
 				at:            time.Now(),
+				query:         r.URL.Query(),
 			},
 		)
 		response, ok := f.responses[path+":"+cursor]
@@ -85,6 +89,12 @@ func (f *fixtureAPI) set(path string, response fixtureResponse) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.responses[path+":"] = response
+}
+
+func (f *fixtureAPI) response(path string) fixtureResponse {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.responses[path+":"]
 }
 
 func (f *fixtureAPI) calls() []fixtureRequest {
@@ -171,4 +181,114 @@ func wantStatus(status string) map[string]metrix.SampleValue {
 	}
 	want["device_availability_status:"+status] = 1
 	return want
+}
+
+const (
+	switchUsageHistoryPath   = "/organizations/org/switch/ports/usage/history/byDevice/byInterval"
+	applianceUplinkUsagePath = "/organizations/org/appliance/uplinks/usage/byNetwork"
+	switchPacketsPath        = "/devices/S1/switch/ports/statuses/packets"
+)
+
+// newTrafficFixture returns a collector with every traffic family enabled, over
+// an organization with one switch (S1, port 1/0) and an MX pair (A, B) in N1. Its
+// clock is fixed at the returned time.
+func newTrafficFixture(t *testing.T) (*fixtureAPI, *Collector, time.Time) {
+	t.Helper()
+	f, server := newFixtureAPI(t)
+	f.set("/organizations/org/devices", fixtureResponse{
+		body: `[{"serial":"S1","networkId":"N1","name":"Switch","model":"MS120","productType":"switch"},` +
+			`{"serial":"A","networkId":"N1","productType":"appliance"},` +
+			`{"serial":"B","networkId":"N1","productType":"appliance"}]`,
+	})
+	f.set("/organizations/org/devices/availabilities", fixtureResponse{
+		body: `[{"serial":"S1","status":"online","network":{"id":"N1"}},` +
+			`{"serial":"A","status":"online"},{"serial":"B","status":"dormant"}]`,
+	})
+	now := time.Date(2026, 10, 1, 10, 5, 0, 0, time.UTC)
+	f.set(switchUsageHistoryPath, fixtureResponse{
+		body: usageHistoryBody(
+			"S1",
+			"N1",
+			"1/0",
+			usageInterval(now.Add(-time.Minute), 300, `{"upstream":10.5,"downstream":20.25}`),
+		),
+	})
+	f.set(switchPacketsPath, fixtureResponse{
+		body: `[{"portId":"1/0","packets":[` +
+			`{"desc":"Total","sent":99999999,"recv":88888888,"ratePerSec":{"sent":2.5,"recv":3.25}},` +
+			`{"desc":"Broadcast","ratePerSec":{"sent":999,"recv":999}}]}]`,
+	})
+	f.set(applianceUplinkUsagePath, fixtureResponse{
+		body: `[{"networkId":"N1","byUplink":[{"interface":"wan1","serial":"A","sent":300000,"received":600000}]}]`,
+	})
+
+	c := newTestCollector(t, server)
+	c.now = func() time.Time { return now }
+	c.CollectSwitchPortTraffic = true
+	c.CollectSwitchPortPackets = true
+	c.CollectApplianceUplinkTraffic = true
+	return f, c, now
+}
+
+// usageInterval is one switch port usage interval that ended at end.
+func usageInterval(end time.Time, seconds int, usage string) string {
+	start := end.Add(-time.Duration(seconds) * time.Second)
+	return fmt.Sprintf(
+		`{"startTs":%q,"endTs":%q,"bandwidth":{"usage":%s}}`,
+		start.Format(time.RFC3339),
+		end.Format(time.RFC3339),
+		usage,
+	)
+}
+
+func usageHistoryBody(serial, network, port, intervals string) string {
+	return fmt.Sprintf(
+		`{"items":[{"serial":%q,"network":{"id":%q},"ports":[{"portId":%q,"intervals":[%s]}]}]}`,
+		serial,
+		network,
+		port,
+		intervals,
+	)
+}
+
+type trafficPoint struct {
+	Scope  metrix.HostScope
+	Labels map[string]string
+	Value  metrix.SampleValue
+}
+
+// trafficPoints returns every series of the metric, from every host scope.
+func trafficPoints(c *Collector, metric string) []trafficPoint {
+	var points []trafficPoint
+	read := func(scope metrix.HostScope) {
+		opts := []metrix.ReadOption{metrix.ReadFlatten()}
+		if !scope.IsDefault() {
+			opts = append(opts, metrix.ReadHostScope(scope.ScopeKey))
+		}
+		c.store.Read(opts...).ForEachSeries(func(name string, labels metrix.LabelView, value metrix.SampleValue) {
+			if name == metric {
+				points = append(points, trafficPoint{
+					Scope:  scope,
+					Labels: labels.CloneMap(),
+					Value:  value,
+				})
+			}
+		})
+	}
+	read(metrix.HostScope{})
+	for _, scope := range c.store.Read().HostScopes() {
+		if !scope.IsDefault() {
+			read(scope)
+		}
+	}
+	return points
+}
+
+// trafficValues returns the values of every series of the metric.
+func trafficValues(c *Collector, metric string) []metrix.SampleValue {
+	values := []metrix.SampleValue{}
+	for _, p := range trafficPoints(c, metric) {
+		values = append(values, p.Value)
+	}
+	return values
 }
