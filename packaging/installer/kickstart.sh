@@ -218,7 +218,8 @@ USAGE: kickstart.sh [options]
   --offline-install-source         Specify a folder to use as installation source when working offline. Use --prepare-offline-install-source first to set up this folder.
 
 --install-dem-runtime uses the installed Agent's normal configuration. Custom service
--c/-u arguments or environment overrides require direct runtime CLI setup. Native
+-c/-u arguments or environment overrides require direct runtime CLI setup after
+administrator preparation of any required host policy. Native
 runtime packages require the named netdata service account. Managed setup downloads
 the browser archive and enables daily preparation; restart the Agent to activate it.
 
@@ -1807,13 +1808,7 @@ setup_dem_runtime() {
     ndprefix=
     detect_existing_install
     if [ -z "${ndpath}" ] || [ ! -x "${ndpath}" ]; then
-      warning "Cannot find the installed Agent to read its runtime paths. Use dem.plugin runtime directly with the installation's configuration and service user."
-      return 1
-    fi
-    dem_user=$(dem_runtime_config global 'run as user') || return $?
-    dem_uid=$(id -u "${dem_user}") || return $?
-    if [ -z "${dem_user}" ] || [ "${dem_uid}" = 0 ]; then
-      warning "DEM runtime setup requires a configured nonroot Netdata service user."
+      warning "Cannot find the installed Agent to read its runtime paths. For static/source setup, use netdata-dem-runtime.sh with the correct --agent path; custom deployments require explicit host policy and runtime setup."
       return 1
     fi
   fi
@@ -1824,9 +1819,13 @@ setup_dem_runtime() {
   fi
   case "${dem_install_type}" in
     native|binpkg-deb|binpkg-rpm)
-      if [ "${DRY_RUN}" -ne 1 ] && [ "${dem_user}" != netdata ]; then
-        warning "Native runtime packages require the named netdata service account. Use the runtime CLI for an explicitly configured managed installation under another account."
-        return 1
+      if [ "${DRY_RUN}" -ne 1 ]; then
+        dem_user=$(dem_runtime_config global 'run as user') || return $?
+        dem_uid=$(id -u "${dem_user}") || return $?
+        if [ "${dem_user}" != netdata ] || [ "${dem_uid}" = 0 ]; then
+          warning "Native runtime packages require the named netdata service account with a nonroot UID. A separately configured managed installation under another account requires administrator-prepared host policy and runtime CLI setup."
+          return 1
+        fi
       fi
       progress "Installing optional netdata-dem-runtime through the system package manager; package hooks may restart the Agent."
       configure_native_package_manager || return $?
@@ -1836,18 +1835,35 @@ setup_dem_runtime() {
       dem_action=status
       ;;
     kickstart-static|manual-static|legacy-static|kickstart-build|legacy-build)
-      progress "Explicit DEM setup downloads signed release metadata and the browser archive, then enables daily automatic preparation. Activation requires an operator Agent restart."
+      progress "Explicit DEM setup prepares host browser policy, downloads signed release metadata and the browser archive, then enables daily automatic preparation. Activation requires an operator Agent restart."
       dem_action=install
       ;;
     *)
-      warning "Cannot determine a supported DEM runtime installation method. Use the optional native package for package-managed Agents, or the installed dem.plugin runtime CLI as the service user."
+      warning "Cannot determine a supported DEM runtime installation method. Use the optional native package for package-managed Agents, or the installed netdata-dem-runtime.sh helper for static/source setup."
       return 1
       ;;
   esac
 
   if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would run dem.plugin runtime ${dem_action} as the configured nonroot service user, using the installed Agent's directories and DEM runtime configuration."
+    progress "Would run explicit DEM ${dem_action}; managed setup uses the administrator host helper and executes the runtime CLI as the configured nonroot service user."
     return 0
+  fi
+  if [ "${dem_action}" = install ]; then
+    # detect_existing_install has canonicalized the Agent and its actual prefix.
+    # The installed helper owns policy and service-identity discovery together.
+    dem_helper="${ndprefix%/}/usr/libexec/netdata/netdata-dem-runtime.sh"
+    if ! run_as_root test -x "${dem_helper}"; then
+      warning "The installed DEM host setup helper is unavailable. Install an Agent with DEM support; runtime setup was not attempted."
+      return 1
+    fi
+    if run_as_root "${dem_helper}" install --agent "${ndpath}" --allow-download; then
+      progress "DEM runtime prepared with daily automatic preparation enabled. Restart the Agent explicitly to activate it; kickstart does not restart it for managed runtime activation."
+      return 0
+    else
+      dem_cli_status=$?
+      warning "Managed runtime installation failed. Check the host setup error and the dem.conf runtime.release_url setting; kickstart does not bypass host policy or qualification. Use the installed host helper for offline inputs or --manual-updates."
+      return "${dem_cli_status}"
+    fi
   fi
   dem_config=$(dem_runtime_config directories config) || return $?
   dem_stock_config=$(dem_runtime_config directories 'stock config') || return $?
@@ -1860,15 +1876,7 @@ setup_dem_runtime() {
     warning "Cannot locate dem.plugin in the configured plugin directories. Install an Agent with DEM support, or run the correct installed runtime CLI explicitly for custom plugin layouts."
     return 1
   fi
-  if [ "${dem_action}" = install ]; then
-    if dem_runtime_cli install --allow-download; then
-      progress "DEM runtime prepared with daily automatic preparation enabled. Restart the Agent explicitly to activate it; kickstart does not restart it for managed runtime activation."
-    else
-      dem_cli_status=$?
-      warning "Managed runtime installation failed. Check the CLI error and the dem.conf runtime.release_url setting; kickstart does not invent trust or bypass qualification. For manual updates, use runtime install --allow-download --manual-updates as the service user."
-      return "${dem_cli_status}"
-    fi
-  else
+  if [ "${dem_action}" = status ]; then
     # RPM can report success despite a failed posttrans hook. Ready admission,
     # observed by the actual service identity, is required before success.
     if dem_native_status=$(dem_runtime_cli status); then
@@ -3049,10 +3057,10 @@ validate_args() {
   if [ "${NETDATA_INSTALL_DEM_RUNTIME}" -eq 1 ]; then
     case "${ACTION}" in
       uninstall|claim|repositories-only|prepare-offline)
-        fatal "--install-dem-runtime cannot be combined with this action. Use an ordinary install/update, or the installed runtime CLI for explicit offline setup." F052F ;;
+        fatal "--install-dem-runtime cannot be combined with this action. Use an ordinary install/update. Offline runtime setup uses the installed host helper for static/source installations, or the package manager for native installations." F052F ;;
     esac
     if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-      fatal "--install-dem-runtime requires online acquisition. For offline setup, use dem.plugin runtime install --release /absolute/release.json --archive /absolute/runtime.tar.zst as the Netdata service user." F052F
+      fatal "--install-dem-runtime requires online acquisition. For offline static/source setup, run netdata-dem-runtime.sh install --agent /path/to/netdata --release /absolute/release.json --archive /absolute/runtime.tar.zst as root with the configured offline keyring. Native installations use offline package provisioning." F052F
     fi
   fi
 

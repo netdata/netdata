@@ -16,7 +16,9 @@ on:
       - 'packaging/dem-runtime/**'
       - 'packaging/cmake/pkg-files/deb/netdata/prerm'
       - 'packaging/installer/kickstart.sh'
-      - 'packaging/installer/tests/test_dem_runtime.py'
+      - 'packaging/installer/netdata-dem-runtime.sh'
+      - 'packaging/installer/tests/test_dem_runtime*.py'
+      - 'packaging/cmake/Modules/NetdataPluginDem.cmake'
       - 'src/dem-runtime/**'
       - 'src/go/tools/dem-runtime-release/**'
       - 'src/go/internal/pgptest/**'
@@ -43,7 +45,9 @@ on:
       - 'packaging/dem-runtime/**'
       - 'packaging/cmake/pkg-files/deb/netdata/prerm'
       - 'packaging/installer/kickstart.sh'
-      - 'packaging/installer/tests/test_dem_runtime.py'
+      - 'packaging/installer/netdata-dem-runtime.sh'
+      - 'packaging/installer/tests/test_dem_runtime*.py'
+      - 'packaging/cmake/Modules/NetdataPluginDem.cmake'
       - 'src/dem-runtime/**'
       - 'src/go/tools/dem-runtime-release/**'
       - 'src/go/internal/pgptest/**'
@@ -107,4 +111,4 @@ jobs:
           docker run --rm --network none \
             -e NETDATA_TEST_PRIVILEGED_CONTAINER=1 \
             -v "$PWD:/workspace:ro" -w /workspace python:3.13-bookworm \
-            sh -ec 'useradd --system netdata; exec python3 -B -m unittest discover -s packaging/installer/tests -p test_dem_runtime.py -v'
+            sh -ec 'useradd --system netdata; exec python3 -B -m unittest discover -s packaging/installer/tests -p "test_dem_runtime*.py" -v'

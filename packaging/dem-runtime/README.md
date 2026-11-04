@@ -240,8 +240,10 @@ The native package supplies an AppArmor namespace allowance attached only to its
 root-owned Chromium executable. Qualification must pass with the host's normal
 restrictions and browser sandbox enabled, including after reboot. This named
 unconfined profile permits sandbox setup; it is not extra browser confinement.
-Managed/static bundles and preloads have a different ownership boundary: their
-executable files are service-owned. On restricted Ubuntu hosts, administrator
-policy preparation is an explicit prerequisite; the installer MUST NOT grant a
-generic exception to those writable paths. Container policy is also a separate
-host/deployment prerequisite. See the [operator guidance](../../src/go/plugin/dem/README.md#runtime-setup-and-retirement).
+Managed/static bundles and preloads have service-owned executable files. Explicit
+host setup uses `netdata-dem-runtime.sh` to register a launcher allowance for the
+deployment-visible root; compatible runtime updates require no recurring privileged
+action. This is namespace eligibility,
+not exclusive authorization of signed bytes: service-owned replacement, profile
+adoption and matching paths in other mount namespaces remain possible. No automatic
+fallback disables sandboxing or host restrictions. See the [host setup guide](../installer/DEM-RUNTIME.md).

@@ -61,12 +61,10 @@ modules:
         list:
           - title: Prepare the browser sandbox policy
             description: |
-              Managed bundles and preloads on Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04,
-              require administrator-prepared AppArmor policy. DEM does not automatically allow service-writable
-              browser paths. The native runtime package supplies its own profile for its root-owned browser.
-              Containers also require compatible host and container namespace, AppArmor and seccomp policies.
-              Follow the [runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
-              and keep Chromium's sandbox enabled when qualifying the actual service deployment.
+              On Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04, run kickstart with
+              `--install-dem-runtime` for a static or source installation. The native runtime package supplies its own policy.
+              Follow the [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md)
+              for commands, offline setup and removal. Keep Chromium's sandbox enabled and qualify the actual service deployment.
           - title: Set up the browser runtime
             description: |
               Browser monitoring requires an explicitly installed runtime on Linux amd64 or arm64, running as the

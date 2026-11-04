@@ -26,6 +26,10 @@ if(ENABLE_PLUGIN_DEM)
     netdata_add_deb_copyright(plugin-dem netdata-plugin-dem)
     install(PROGRAMS ${CMAKE_BINARY_DIR}/${DEM_PLUGIN_BIN}
             COMPONENT plugin-dem DESTINATION ${PLUGINS_DEST})
+    if(OS_LINUX)
+        install(PROGRAMS packaging/installer/netdata-dem-runtime.sh
+                COMPONENT plugin-dem DESTINATION ${LIBEXEC_DEST})
+    endif()
     install(FILES src/go/plugin/dem/config/dem.conf
             COMPONENT plugin-dem DESTINATION ${LIBCONFIG_DEST})
     install(DIRECTORY src/go/plugin/dem/config/dem
