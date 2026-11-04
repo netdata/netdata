@@ -102,7 +102,7 @@ type (
 		cache       struct {
 			globalTags                 map[string]string
 			tagProcessingFailures      map[int]bool
-			metadataProcessingFailures map[string]bool
+			metadataProcessingFailures map[metadataProcessingInput]bool
 			deviceMetadata             map[string]ddsnmp.MetaTag
 			tagEvidence                *AcquisitionCacheInput
 			metadataEvidence           *AcquisitionCacheInput
@@ -422,7 +422,11 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 	return err
 }
 
-func (c *Collector) prepareProfileInputsWithStrictness(prepared *preparedProfileCollection, strict bool, previous *profileState) error {
+func (c *Collector) prepareProfileInputsWithStrictness(
+	prepared *preparedProfileCollection,
+	strict bool,
+	previous *profileState,
+) error {
 	ps, pm := prepared.state, prepared.metrics
 	started := time.Now()
 	defer func() {

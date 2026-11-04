@@ -600,3 +600,88 @@ func refreshInputProfile(name, oid string) *ddsnmp.Profile {
 	}
 	return profile
 }
+
+func TestRefreshProfileInputsTracksDuplicateMetadataSources(t *testing.T) {
+	const badOID, nameOID, fallbackOID = "1.2.3.0", "1.2.4.0", "1.2.5.0"
+	profile := refreshInputProfile("fallback.yaml", nameOID)
+	profile.Definition.MetricTags[0].Symbol.Name = "sysName"
+	nameField := profile.Definition.Metadata["device"].Fields["name"]
+	nameField.Symbol.Name = "sysName"
+	profile.Definition.Metadata["device"].Fields["name"] = nameField
+	profile.Definition.Metadata["device"].Fields["model"] = ddprofiledefinition.MetadataField{
+		Symbol: ddprofiledefinition.SymbolConfig{
+			OID:    fallbackOID,
+			Name:   "fallbackModel",
+			Format: "uint32",
+		},
+	}
+	profile.Definition.SysobjectIDMetadata = []ddprofiledefinition.SysobjectIDMetadataEntryConfig{{
+		SysobjectID: "1.2.3", Metadata: map[string]ddprofiledefinition.MetadataField{
+			"model": {Symbol: ddprofiledefinition.SymbolConfig{
+				OID:    badOID,
+				Name:   "badModel",
+				Format: "hex",
+			}},
+			"vendor": {Value: "fixture"},
+		},
+	}}
+	require.NoError(t, ddprofiledefinition.ValidateEnrichProfile(profile.Definition))
+	value, broken, fallbackBroken := "old", true, false
+	handler := &sourceTestHandler{
+		get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+			packet := &gosnmp.SnmpPacket{}
+			for _, oid := range oids {
+				pdu := createStringPDU(oid, value)
+				if oid == badOID && broken {
+					pdu = createIntegerPDU(oid, 42)
+				}
+				if oid == fallbackOID {
+					pdu = createIntegerPDU(oid, 7)
+					if fallbackBroken {
+						pdu = createStringPDU(oid, "invalid")
+					}
+				}
+				packet.Variables = append(packet.Variables, pdu)
+			}
+			return packet, nil
+		},
+	}
+	collector := New(
+		Config{
+			SnmpClient:  handler,
+			Profiles:    []*ddsnmp.Profile{profile},
+			Log:         logger.New(),
+			SysObjectID: "1.2.3",
+		},
+	)
+	_, err := collector.Collect()
+	require.NoError(t, err)
+	require.Equal(t, "7", collector.PreparedDeviceMetadata()["model"].Value)
+	value = "renamed"
+	require.NoError(
+		t,
+		collector.RefreshProfileInputs(nil),
+		"the unchanged bad source was never usable, while its fallback and healthy name remain available",
+	)
+	require.Equal(t, "renamed", collector.PreparedDeviceMetadata()["name"].Value)
+
+	previous := collector.profiles[profile.SourceFile].cache
+	fallbackBroken = true
+	require.Error(
+		t,
+		collector.RefreshProfileInputs(nil),
+		"failure tolerance belongs to its source, not another source with the same field name",
+	)
+	assert.Equal(t, previous, collector.profiles[profile.SourceFile].cache)
+	fallbackBroken = false
+	broken = false
+	require.NoError(t, collector.RefreshProfileInputs(nil), "the failed source itself recovers")
+	previous = collector.profiles[profile.SourceFile].cache
+	broken, value = true, "later"
+	require.Error(
+		t,
+		collector.RefreshProfileInputs(nil),
+		"a newly failed source must retain its usable snapshot even with a healthy same-name fallback",
+	)
+	assert.Equal(t, previous, collector.profiles[profile.SourceFile].cache)
+}

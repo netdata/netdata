@@ -23,8 +23,15 @@ type deviceMetadataCollector struct {
 	sysobjectid               string
 	strict                    bool
 	requireComplete           bool
-	failedProcessing          map[string]bool
-	allowedProcessingFailures map[string]bool
+	processingSource          int
+	failedProcessing          map[metadataProcessingInput]bool
+	allowedProcessingFailures map[metadataProcessingInput]bool
+}
+
+// Field names can be supplied by several independent metadata definitions.
+type metadataProcessingInput struct {
+	source int // device fields: 0; sysobjectid_metadata entries: index + 1
+	field  string
 }
 
 func newDeviceMetadataCollector(
@@ -58,10 +65,12 @@ func (dc *deviceMetadataCollector) collectObserved(
 	cfg := prof.Definition.Metadata[resName]
 
 	meta := make(map[string]ddsnmp.MetaTag)
+	dc.processingSource = 0
 
 	if dc.sysobjectid != "" {
 		for i, entry := range prof.Definition.SysobjectIDMetadata {
 			if ddprofiledefinition.SelectorOidMatches(dc.sysobjectid, entry.SysobjectID) {
+				dc.processingSource = i + 1
 				err := dc.processMetadataFieldsObserved(
 					entry.Metadata,
 					meta,
@@ -84,6 +93,7 @@ func (dc *deviceMetadataCollector) collectObserved(
 		}
 	}
 
+	dc.processingSource = 0
 	if err := dc.processMetadataFieldsObserved(
 		cfg.Fields,
 		meta,
@@ -102,11 +112,6 @@ func (dc *deviceMetadataCollector) collectObserved(
 			)
 	}
 
-	for name := range dc.failedProcessing {
-		if meta[name].Value != "" {
-			delete(dc.failedProcessing, name)
-		}
-	}
 	return meta, nil
 }
 
@@ -220,6 +225,10 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 
 	for name, field := range fields {
 		fieldErrStart := len(errs)
+		input := metadataProcessingInput{
+			source: dc.processingSource,
+			field:  name,
+		}
 		switch {
 		case field.Symbol.OID != "":
 			// Single symbol
@@ -228,10 +237,10 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 				stats.Errors.Processing.Preparation++
 				observer.rejected(name)
 				if dc.failedProcessing == nil {
-					dc.failedProcessing = make(map[string]bool)
+					dc.failedProcessing = make(map[metadataProcessingInput]bool)
 				}
-				dc.failedProcessing[name] = true
-				if dc.strict && dc.allowedProcessingFailures[name] {
+				dc.failedProcessing[input] = true
+				if dc.strict && dc.allowedProcessingFailures[input] {
 					continue
 				}
 				errs = append(errs, fmt.Errorf("failed to process metadata field '%s': %w", name, err))
@@ -278,10 +287,10 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 		}
 		if len(errs) > fieldErrStart {
 			if dc.failedProcessing == nil {
-				dc.failedProcessing = make(map[string]bool)
+				dc.failedProcessing = make(map[metadataProcessingInput]bool)
 			}
-			dc.failedProcessing[name] = true
-			if dc.strict && dc.allowedProcessingFailures[name] {
+			dc.failedProcessing[input] = true
+			if dc.strict && dc.allowedProcessingFailures[input] {
 				errs = errs[:fieldErrStart]
 			}
 		}
