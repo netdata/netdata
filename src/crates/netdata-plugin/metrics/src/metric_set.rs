@@ -72,7 +72,8 @@ pub trait Dimensions: Copy + 'static {
 
 /// Declares an enum whose variants are the dimensions of an instrument, each
 /// with its dimension id, in chart order. The enum derives `Debug`, `Clone`,
-/// `Copy`, `PartialEq`, `Eq` and `Hash`.
+/// `Copy`, `PartialEq`, `Eq` and `Hash`. An instrument with a single value
+/// gets a single variant, which names its one dimension.
 ///
 /// ```
 /// netdata_plugin_metrics::dimensions! {
@@ -80,6 +81,12 @@ pub trait Dimensions: Copy + 'static {
 ///     pub enum Outcome {
 ///         Success = "success",
 ///         Error = "error",
+///     }
+/// }
+///
+/// netdata_plugin_metrics::dimensions! {
+///     pub enum Queued {
+///         Jobs = "jobs",
 ///     }
 /// }
 /// ```
@@ -108,7 +115,8 @@ macro_rules! dimensions {
 }
 
 /// Counts events, split by `D`, for example requests by outcome. Charted as
-/// events per second; a slot without events shows 0.
+/// events per second (a slot's count divided by its length); a slot without
+/// events shows 0.
 #[derive(Debug)]
 pub struct Counter<D> {
     pub(crate) set_id: u32,
@@ -117,15 +125,16 @@ pub struct Counter<D> {
 }
 
 /// For a source that keeps its own running totals, split by `D`, for example
-/// a store's statistics: record the current totals, and the chart shows how
-/// much they grew per second.
+/// a store's statistics: record the current totals at the time you read
+/// them, and the chart shows how much they grew per second.
 ///
 /// - Until an instance's first total, and in the slot of that total (its
 ///   baseline), the chart shows a gap.
 /// - A total lower than the previous one is a reset: the increase is the new
 ///   total.
 /// - After the baseline, a slot without a new total shows 0.
-/// - Within a slot, the total merged last wins.
+/// - Within a slot, the total set last wins: the later record in a batch,
+///   the later merged batch across batches.
 #[derive(Debug)]
 pub struct CumulativeCounter<D> {
     pub(crate) set_id: u32,
@@ -133,10 +142,11 @@ pub struct CumulativeCounter<D> {
     _dimensions: PhantomData<fn() -> D>,
 }
 
-/// A current value, split by `D`, for example open connections per state.
-/// Charted as is.
+/// A current value, split by `D`, for example open connections per state,
+/// recorded at the time you read it. Charted as is.
 ///
-/// - Each record sets the value; within a slot, the value merged last wins.
+/// - Each record sets the value; within a slot, the value set last wins: the
+///   later record in a batch, the later merged batch across batches.
 /// - A slot without a value shows a gap.
 #[derive(Debug)]
 pub struct Gauge<D> {
@@ -217,8 +227,9 @@ impl Dimension {
     }
 }
 
-/// How an instrument's chart is presented; the fields map to the CHART line.
-/// Every instance gets a copy.
+/// How an instrument's chart is presented; the fields map to the CHART line
+/// of the plugins.d protocol (`src/plugins.d/README.md` in the agent). Every
+/// instance gets a copy.
 #[derive(Debug, Clone, Copy)]
 pub struct Chart {
     /// The chart id within the set: letters, digits, `_`, `-` and `.`, not
@@ -303,6 +314,10 @@ impl Labels {
 
 /// A declared set of metrics and their charts, which every instance (label
 /// set) gets a copy of. Cheap to clone; batches and the store share it.
+///
+/// A plugin may have several sets, each with its own [`Store`](crate::Store).
+/// Sets may share a type prefix, but their chart ids must then differ; this
+/// is not checked.
 #[derive(Debug, Clone)]
 pub struct MetricSet(pub(crate) Arc<MetricSetInner>);
 
@@ -337,9 +352,9 @@ pub struct Settings {
     pub lateness: u64,
     /// A timeout: an instance with no records for this many seconds has its
     /// charts marked obsolete (the agent stops collecting them and later
-    /// removes them) and its state dropped. Because it counts emitted slots,
-    /// it fires `lateness` seconds later than the wall-clock time. Default 15
-    /// minutes.
+    /// removes them) and its state dropped. It counts emitted slots, which
+    /// lag by `lateness`: with expiry 900 and lateness 10, an instance last
+    /// recorded at second 0 expires at second 911. Default 15 minutes.
     pub expiry: u64,
     /// The instance cap; default none.
     pub cap: Option<Cap>,
@@ -356,10 +371,11 @@ impl Default for Settings {
     }
 }
 
-/// A limit on the number of instances. A new label set beyond it has its
-/// records counted in one overflow instance; once an instance expires, the
-/// next new label set (one from the overflow too) gets its own instance
-/// again.
+/// A limit on the number of instances. While the store is full, the records
+/// of a label set without an instance go to one overflow instance. As
+/// instances expire, room returns: the next record of such a label set,
+/// including one whose records went to the overflow instance so far, gets
+/// its own instance.
 #[derive(Debug, Clone)]
 pub struct Cap {
     /// Instances tracked at most (the label-less instance counts, the
@@ -473,8 +489,8 @@ impl MetricSetBuilder {
     }
 
     /// Adds a [`Histogram`] over `bounds`, with two charts:
-    /// - `chart`: the mean (`avg`) and largest (`max`) observed value per
-    ///   slot, in `chart.units`;
+    /// - `chart`: two dimensions, `avg` and `max`, the mean and largest
+    ///   observed value per slot, in `chart.units`;
     /// - a heatmap, `<id>_histogram`: observations per second in each
     ///   bucket, in `heatmap_units`, one dimension per bucket named by its
     ///   upper bound as Rust prints the `f64` (`0.005`, `1`, `1048576`;

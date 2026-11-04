@@ -23,7 +23,7 @@ pub(crate) struct PendingInstance {
     last: usize,
 }
 
-/// The records of one unit of work (for example one export request) for one
+/// The records of one unit of work (for example one request) for one
 /// [`MetricSet`], kept apart from the store until the work succeeds: drop
 /// the batch when the work fails, and merge it with
 /// [`Store::merge`](crate::Store::merge) once the work is done for good (for
@@ -48,9 +48,9 @@ impl Batch {
     }
 
     /// The instance with these labels, added on first use, to record into.
-    /// Look an instance up once per group of records (for example once per
-    /// OTLP resource), not per record; while the returned handle lives, the
-    /// batch is borrowed.
+    /// Look an instance up once per group of records that share labels, not
+    /// per record; while the returned handle lives, the batch is borrowed, so
+    /// finish one instance before taking the next.
     pub fn instance(&mut self, labels: Labels) -> BatchInstance<'_> {
         let index = match self.index.get(&labels) {
             Some(&index) => index,
@@ -87,9 +87,9 @@ pub struct BatchInstance<'a> {
 impl BatchInstance<'_> {
     /// One record at `unix_seconds` (the event's own time); write its
     /// measurements through the returned [`Measurements`]. Every call is one
-    /// record, even with no measurement: it counts in the store's late,
-    /// future and overflow counts, and it starts the instance or keeps it
-    /// from expiring.
+    /// record, even with no measurement: it counts in whichever of the
+    /// store's late, future and overflow counts applies, and it starts the
+    /// instance or keeps it from expiring.
     pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
         let set = self.set;
         let slot = unix_seconds / set.update_every;

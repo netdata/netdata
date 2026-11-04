@@ -140,7 +140,7 @@ impl Store {
     }
 
     /// Merge a batch; `now`, the current Unix time, decides which slots are
-    /// still open. Merge before the `emit` of the same tick: a record whose
+    /// still open. Merge before an `emit` with the same `now`: a record whose
     /// slot that `emit` closes would otherwise count as late, in the next
     /// slot.
     ///
@@ -195,7 +195,8 @@ impl Store {
     /// (a plugin's stdout). It comes in chunks of at most `max_chunk` bytes,
     /// split only between whole charts, so each chunk can be written on its
     /// own, for example as one message over a size-limited channel; a single
-    /// chart larger than `max_chunk` gets a chunk of its own.
+    /// chart larger than `max_chunk` gets a chunk of its own. Pass that
+    /// channel's limit, or `usize::MAX` when writing straight to stdout.
     pub fn emit(&mut self, now: u64, max_chunk: usize) -> Vec<Vec<u8>> {
         let mut out = Chunker::new(max_chunk);
         let mut next_emit = self.advance_window(now);
