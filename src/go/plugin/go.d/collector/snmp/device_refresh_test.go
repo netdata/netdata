@@ -87,7 +87,7 @@ func TestCollectorRuntimeMetadataRetryKeepsPollingState(t *testing.T) {
 	require.NotEmpty(t, c.Collect(context.Background()))
 	assert.Equal(t, "after", c.VirtualNode().Hostname, "usable system metadata can publish while profile inputs retry")
 	assert.Equal(t, "before", c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value)
-	assert.NotNil(t, c.pendingMetadata)
+	assert.NotNil(t, c.pendingSysInfo)
 	assert.Same(t, dd, c.ddSnmpColl)
 	device.inputErr = nil
 	*now = now.Add(time.Minute)
@@ -98,7 +98,7 @@ func TestCollectorRuntimeMetadataRetryKeepsPollingState(t *testing.T) {
 		c.VirtualNode().Hostname,
 		"unchanged subsequent sysinfo must retry pending derived metadata",
 	)
-	assert.Nil(t, c.pendingMetadata)
+	assert.Nil(t, c.pendingSysInfo)
 	assert.Equal(t, "after", c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value)
 	assert.Same(t, dd, c.ddSnmpColl)
 	assert.Zero(t, device.closes)
@@ -562,7 +562,7 @@ func TestCollectorRuntimePartialMetadataRefresh(t *testing.T) {
 	assert.Equal(t, "after", c.VirtualNode().Hostname, "failed unrelated inputs cannot block healthy identity updates")
 	assert.Equal(t, "after", labels("snmp_device_prof_ifTraffic_1")["snmp_host"])
 	assert.Equal(t, "before accessory", labels(chartIDFromName("accessoryMetric"))["accessory"])
-	require.NotNil(t, c.pendingMetadata, "failed profile input refresh must remain retryable")
+	require.NotNil(t, c.pendingSysInfo, "failed profile input refresh must remain retryable")
 	entries := c.deviceStore.Entries()
 	require.Len(t, entries, 1)
 	assert.Equal(t, "after", entries[0].Info.SysName)
@@ -579,7 +579,7 @@ func TestCollectorRuntimePartialMetadataRefresh(t *testing.T) {
 	transport.fail = false
 	*now = now.Add(time.Minute)
 	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.Nil(t, c.pendingMetadata)
+	assert.Nil(t, c.pendingSysInfo)
 	assert.Equal(
 		t,
 		"after accessory",

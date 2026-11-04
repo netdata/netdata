@@ -4,6 +4,7 @@ package snmptopology
 
 import (
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
@@ -13,10 +14,13 @@ import (
 func sameTopologyDeviceInput(a, b topologydiag.DeviceInput) bool {
 	return a.Hostname == b.Hostname && a.SysObjectID == b.SysObjectID && a.SysName == b.SysName &&
 		a.SysDescr == b.SysDescr && a.SysContact == b.SysContact && a.SysLocation == b.SysLocation &&
-		a.Vendor == b.Vendor && a.Model == b.Model && a.VnodeGUID == b.VnodeGUID && maps.Equal(a.VnodeLabels, b.VnodeLabels)
+		a.Vendor == b.Vendor && a.Model == b.Model && a.VnodeGUID == b.VnodeGUID &&
+		maps.Equal(a.VnodeLabels, b.VnodeLabels)
 }
 
-func (g *topologyDeviceGeneration) withRegisteredPresentation(input topologydiag.DeviceInput) *topologyDeviceGeneration {
+func (g *topologyDeviceGeneration) withRegisteredPresentation(
+	input topologydiag.DeviceInput,
+) *topologyDeviceGeneration {
 	if g == nil || g.sourceInput == nil || sameTopologyDeviceInput(g.presentedInput, input) {
 		return g
 	}
@@ -49,26 +53,7 @@ func (g *topologyDeviceGeneration) withRegisteredPresentation(input topologydiag
 			}
 		}
 		if !maps.Equal(old.Labels, current.Labels) {
-			local.Labels = maps.Clone(local.Labels)
-			if local.Labels == nil {
-				local.Labels = make(map[string]string)
-			}
-			for key, previous := range old.Labels {
-				if !topologyPresentationLabel(key) {
-					continue
-				}
-				if _, exists := current.Labels[key]; !exists && local.Labels[key] == previous {
-					delete(local.Labels, key)
-				}
-			}
-			for key, value := range current.Labels {
-				if !topologyPresentationLabel(key) {
-					continue
-				}
-				if previous, exists := old.Labels[key]; !exists || previous != value {
-					local.Labels[key] = value
-				}
-			}
+			local.Labels = projectPresentationLabels(local.Labels, old.Labels, current.Labels)
 		}
 		next.presentation = &topologymodel.DevicePresentation{
 			SysName:         local.SysName,
@@ -91,6 +76,43 @@ func (g *topologyDeviceGeneration) withRegisteredPresentation(input topologydiag
 	return &next
 }
 
+// projectPresentationLabels applies registration label changes to a copy of the
+// acquired labels, which stay shared with the published observation. Labels the
+// registration did not change keep their acquired values.
+func projectPresentationLabels(acquired, old, current map[string]string) map[string]string {
+	labels := maps.Clone(acquired)
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	for key, previous := range old {
+		if !topologyPresentationLabel(key) {
+			continue
+		}
+		if _, exists := current[key]; !exists && labels[key] == previous {
+			delete(labels, key)
+		}
+	}
+	for key, value := range current {
+		if !topologyPresentationLabel(key) {
+			continue
+		}
+		if previous, exists := old[key]; !exists || previous != value {
+			labels[key] = value
+		}
+	}
+	return labels
+}
+
+func topologyPresentationLogicalBytes(p *topologymodel.DevicePresentation) uint64 {
+	n := uint64(len(p.SysName) + len(p.SysDescr) + len(p.SysContact) + len(p.SysLocation) + len(p.Vendor) + len(p.Model))
+	for _, value := range []*string{p.SerialNumber, p.SoftwareVersion, p.FirmwareVersion, p.HardwareVersion} {
+		if value != nil {
+			n += uint64(len(*value))
+		}
+	}
+	return n + topologySemanticStringMapBytes(p.Labels)
+}
+
 // These labels describe acquired identity or clocks, rather than registration
 // presentation. Keep their labels and typed facts in the same acquisition.
 func topologyPresentationLabel(key string) bool {
@@ -98,10 +120,5 @@ func topologyPresentationLabel(key string) bool {
 	if key == "sys_object_id" || key == "sysobjectid" || key == tagOSPFRouterID {
 		return false
 	}
-	for _, alias := range topologyMetadataAliasSysUptime {
-		if key == alias {
-			return false
-		}
-	}
-	return true
+	return !slices.Contains(topologyMetadataAliasSysUptime, key)
 }

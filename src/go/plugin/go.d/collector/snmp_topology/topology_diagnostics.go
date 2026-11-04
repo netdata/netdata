@@ -95,14 +95,8 @@ func projectTopologyDiagnosticCut(input topologyDiagnosticCutInput) (*topologydi
 	for _, entry := range input.entries {
 		state := input.states[entry.RegistrationID]
 		if g := state.generation; g != nil && g.presentation != nil {
-			p := g.presentation
 			records++
-			for _, value := range []*string{p.SerialNumber, p.SoftwareVersion, p.FirmwareVersion, p.HardwareVersion} {
-				if value != nil {
-					logicalBytes += uint64(len(*value))
-				}
-			}
-			logicalBytes += uint64(len(p.SysName)+len(p.SysDescr)+len(p.SysContact)+len(p.SysLocation)+len(p.Vendor)+len(p.Model)) + topologySemanticStringMapBytes(p.Labels)
+			logicalBytes += topologyPresentationLogicalBytes(g.presentation)
 		}
 		for _, capture := range stateAcquisitionCaptures(state) {
 			if capture == nil || capture.State != topologydiag.CaptureAvailable || countedCaptures[capture] {

@@ -156,7 +156,7 @@ type (
 		publishedProfileInputRevision uint64
 		now                           func() time.Time
 		nextSysInfoCheck              time.Time
-		pendingMetadata               *snmputils.SysInfo
+		pendingSysInfo                *snmputils.SysInfo
 		rebuildPending                bool
 
 		adjMaxRepetitions uint32

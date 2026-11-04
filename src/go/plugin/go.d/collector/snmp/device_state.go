@@ -142,12 +142,3 @@ func (c *Collector) withdrawDeviceState() {
 	}
 	c.deviceStore.WithdrawDevice(c.deviceStoreOwnerKey())
 }
-
-func (c *Collector) syncDeviceMetadata() {
-	if c.sysInfo == nil || c.publishedProfileInputRevision == c.ddSnmpColl.ProfileInputRevision() {
-		return
-	}
-	if err := c.applyDeviceMetadata(c.sysInfo, c.ddSnmpColl.PreparedDeviceMetadata()); err != nil {
-		c.Limit("snmp:metadata", 1, sysInfoCheckEvery).Warningf("failed to update device metadata: %v", err)
-	}
-}
