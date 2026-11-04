@@ -1,13 +1,14 @@
-//! Request-local recording: records land in partial slots keyed by instance
-//! and by the slot their own time falls in; the store decides at merge time
-//! whether a slot is still open.
+//! Request-local recording: each record adds into the batch's cells for its
+//! instance and the slot its own time falls in; the store decides at merge
+//! time whether that slot is still open.
 
 use crate::metric_set::{
     Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet, MetricSetInner,
 };
 use std::collections::HashMap;
 
-pub(crate) struct PartialSlot {
+/// A batch's cells for one instance and one slot.
+pub(crate) struct BatchCells {
     pub(crate) slot: u64,
     pub(crate) records: u64,
     pub(crate) cells: Box<[f64]>,
@@ -16,8 +17,8 @@ pub(crate) struct PartialSlot {
 /// One instance's records within a batch.
 pub(crate) struct PendingInstance {
     pub(crate) labels: Labels,
-    pub(crate) slots: Vec<PartialSlot>,
-    /// Slot number → index in `slots`; records mostly arrive in time order,
+    pub(crate) per_slot: Vec<BatchCells>,
+    /// Slot number → index in `per_slot`; records mostly arrive in time order,
     /// so `last` answers most lookups without hashing.
     index: HashMap<u64, usize>,
     last: usize,
@@ -59,7 +60,7 @@ impl Batch {
                 self.index.insert(labels.clone(), index);
                 self.instances.push(PendingInstance {
                     labels,
-                    slots: Vec::new(),
+                    per_slot: Vec::new(),
                     index: HashMap::new(),
                     last: 0,
                 });
@@ -74,7 +75,7 @@ impl Batch {
 
     /// True when the batch holds no record.
     pub fn is_empty(&self) -> bool {
-        self.instances.iter().all(|i| i.slots.is_empty())
+        self.instances.iter().all(|i| i.per_slot.is_empty())
     }
 }
 
@@ -92,31 +93,31 @@ impl BatchInstance<'_> {
     /// instance or keeps it from expiring.
     pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
         let set = self.set;
-        let slot = unix_seconds / set.update_every;
+        let slot = unix_seconds / set.interval_secs;
         let instance = &mut *self.instance;
         let index = if instance
-            .slots
+            .per_slot
             .get(instance.last)
             .is_some_and(|s| s.slot == slot)
         {
             instance.last
         } else {
-            let slots = &mut instance.slots;
+            let per_slot = &mut instance.per_slot;
             *instance.index.entry(slot).or_insert_with(|| {
-                slots.push(PartialSlot {
+                per_slot.push(BatchCells {
                     slot,
                     records: 0,
                     cells: set.initial_cells.clone().into_boxed_slice(),
                 });
-                slots.len() - 1
+                per_slot.len() - 1
             })
         };
         instance.last = index;
-        let partial = &mut instance.slots[index];
-        partial.records += 1;
+        let batch_cells = &mut instance.per_slot[index];
+        batch_cells.records += 1;
         Measurements {
             set_id: set.id,
-            cells: &mut partial.cells,
+            cells: &mut batch_cells.cells,
         }
     }
 }

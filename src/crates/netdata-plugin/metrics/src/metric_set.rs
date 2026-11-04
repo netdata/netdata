@@ -1,16 +1,18 @@
 //! Metric set declarations: cells, instruments and their charts.
 //!
-//! A slot of an instance is a flat array of `f64` cells. Each cell has a merge
-//! rule, so two partial slots (two requests, or a request and the store)
-//! combine by cell: sums add, maxima keep the larger value, last-value cells
-//! keep the value merged last. Instruments are typed handles to ranges of
-//! cells, one cell per value of their [`Dimensions`]; each chart dimension
-//! reads its cells when a slot is emitted.
+//! For each instance and slot the store keeps an array of `f64` cells: a
+//! counter has one cell per dimension value, a histogram one per bucket plus
+//! its sum, count and maximum. A batch collects its own cells for the slots
+//! its records fall in, and merging combines them cell by cell with each
+//! cell's rule: sums add, maxima keep the larger value, last-value cells keep
+//! the value set last. Instruments are typed handles to ranges of cells; each
+//! chart dimension reads its cells when a slot is emitted.
 
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
 
 /// The agent keeps at most this many bytes of a label value
 /// (`RRDLABELS_MAX_VALUE_LENGTH`, `src/database/rrdlabels.h`).
@@ -20,7 +22,8 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 /// (`RRDLABELS_MAX_NAME_LENGTH`).
 const MAX_LABEL_KEY_BYTES: usize = 200;
 
-/// How a cell combines two partial values of the same slot.
+/// How a cell combines two values for the same instance and slot (from two
+/// batches, or a batch and the store).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Merge {
     /// Sum; starts at 0.
@@ -329,7 +332,8 @@ pub(crate) struct MetricSetInner {
     /// Unique per set in the process; instruments carry it, so one used on
     /// another set's record is caught.
     pub(crate) id: u32,
-    pub(crate) update_every: u64,
+    /// The collection interval in whole seconds.
+    pub(crate) interval_secs: u64,
     pub(crate) lateness_slots: u64,
     pub(crate) expiry_slots: u64,
     pub(crate) max_instances: usize,
@@ -342,22 +346,24 @@ pub(crate) struct MetricSetInner {
     pub(crate) charts: Vec<ChartDef>,
 }
 
-/// The time and lifecycle settings of a metric set. Lateness and expiry are
-/// rounded up to whole slots.
+/// The time and lifecycle settings of a metric set.
 #[derive(Debug, Clone)]
 pub struct Settings {
-    /// Slot length in seconds: the set's collection interval. Default 1.
-    pub update_every: u64,
-    /// A delay: how long after its end, in seconds, a slot stays open for
-    /// late records; older records are counted in the oldest open slot.
-    /// Default 0.
-    pub lateness: u64,
-    /// A timeout: an instance with no records for this many seconds has its
-    /// charts marked obsolete (the agent stops collecting them and later
-    /// removes them) and its state dropped. It counts emitted slots, which
-    /// lag by `lateness`: with expiry 900 and lateness 10, an instance last
-    /// recorded at second 0 expires at second 911. Default 15 minutes.
-    pub expiry: u64,
+    /// How often the set's charts get a point: each slot is one collection
+    /// interval long. Whole seconds, at least 1 (the agent's resolution);
+    /// sent as the CHART line's `update_every`. Default 1 s.
+    pub collection_interval: Duration,
+    /// A delay: how long after its end a slot stays open for late records;
+    /// older records are counted in the oldest open slot. Rounded up to whole
+    /// collection intervals. Default 0.
+    pub lateness: Duration,
+    /// A timeout: an instance with no records for this long has its charts
+    /// marked obsolete (the agent stops collecting them and later removes
+    /// them) and its state dropped. Rounded up to whole collection intervals.
+    /// It counts emitted slots, which lag by `lateness`: with expiry 900 s and
+    /// lateness 10 s, an instance last recorded at second 0 expires at second
+    /// 911. Default 15 minutes.
+    pub expiry: Duration,
     /// The instance cap; default none.
     pub cap: Option<Cap>,
 }
@@ -365,9 +371,9 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            update_every: 1,
-            lateness: 0,
-            expiry: 15 * 60,
+            collection_interval: Duration::from_secs(1),
+            lateness: Duration::ZERO,
+            expiry: Duration::from_secs(15 * 60),
             cap: None,
         }
     }
@@ -404,11 +410,16 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If `update_every` or `expiry` is 0, or if the cap's `max` is 0 or its
-    /// overflow labels are empty.
+    /// If the collection interval is not a whole number of seconds of at
+    /// least 1, if `expiry` is 0, or if the cap's `max` is 0 or its overflow
+    /// labels are empty.
     pub fn new(settings: Settings) -> Self {
-        assert!(settings.update_every > 0, "update_every must be positive");
-        assert!(settings.expiry > 0, "expiry must be positive");
+        let interval = settings.collection_interval;
+        assert!(
+            interval.as_secs() >= 1 && interval.subsec_nanos() == 0,
+            "the collection interval must be whole seconds, at least 1: {interval:?}"
+        );
+        assert!(!settings.expiry.is_zero(), "expiry must be positive");
         if let Some(cap) = &settings.cap {
             assert!(cap.max > 0, "the instance cap must be positive");
             assert!(
@@ -546,7 +557,8 @@ impl MetricSetBuilder {
     pub fn build(self) -> MetricSet {
         assert!(!self.charts.is_empty(), "metric set has no charts");
         let settings = self.settings;
-        let slots = |seconds: u64| seconds.div_ceil(settings.update_every);
+        let interval = settings.collection_interval;
+        let slots = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
         let (max_instances, overflow_labels) = match settings.cap {
             Some(cap) => (cap.max, cap.overflow_labels),
             None => (usize::MAX, Labels::new()),
@@ -556,7 +568,7 @@ impl MetricSetBuilder {
             lateness_slots: slots(settings.lateness),
             expiry_slots: slots(settings.expiry),
             initial_cells: self.merges.iter().map(|m| m.initial()).collect(),
-            update_every: settings.update_every,
+            interval_secs: interval.as_secs(),
             max_instances,
             overflow_labels,
             merges: self.merges,

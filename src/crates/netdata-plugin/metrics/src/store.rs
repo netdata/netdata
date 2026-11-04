@@ -46,8 +46,9 @@ struct Instance {
     first_slot: u64,
     /// Latest slot with records; drives expiry.
     last_slot: u64,
-    /// Open slots from `next_emit` onwards; missing ones are empty.
-    slots: VecDeque<Box<[f64]>>,
+    /// The cells of each open slot from `next_emit` onwards, oldest first;
+    /// missing ones are empty.
+    open_cells: VecDeque<Box<[f64]>>,
     /// The last emitted total of each cumulative cell, in set order; NaN
     /// until the first one.
     previous_totals: Box<[f64]>,
@@ -66,10 +67,10 @@ struct Instance {
 /// records until its [`Settings::lateness`](crate::Settings::lateness) has
 /// passed after its end; then the next `emit` emits it, once.
 ///
-/// With `update_every` 1 and lateness 10, the slot of second 100 is emitted
-/// by the first `emit` at or after second 111. Until then, records of second
-/// 100 still count in it. The agent stores its point at second 101, the
-/// slot's end, however late it is sent.
+/// With a 1 s collection interval and 10 s lateness, the slot `[100, 101)` is
+/// emitted by the first `emit` at or after second 111. Until then, records of
+/// second 100 still count in it. The agent stores its point at second 101,
+/// the slot's end, however late it is sent.
 ///
 /// # Records outside the open slots
 ///
@@ -123,7 +124,7 @@ impl Store {
     /// [`MAX_BACKLOG_SLOTS`] behind the lateness window.
     fn advance_window(&mut self, now: u64) -> u64 {
         let set = std::sync::Arc::clone(&self.set.0);
-        let now_slot = now / set.update_every;
+        let now_slot = now / set.interval_secs;
         let next_emit = *self
             .next_emit
             .get_or_insert(now_slot.saturating_sub(set.lateness_slots));
@@ -154,35 +155,33 @@ impl Store {
         );
         let next_emit = self.advance_window(now);
         let set = std::sync::Arc::clone(&self.set.0);
-        let newest = (now / set.update_every).max(next_emit);
-        for batch_instance in batch.instances {
-            if batch_instance.slots.is_empty() {
+        let newest = (now / set.interval_secs).max(next_emit);
+        for pending in batch.instances {
+            if pending.per_slot.is_empty() {
                 continue;
             }
-            let records: u64 = batch_instance.slots.iter().map(|s| s.records).sum();
-            let instance = if let Some(instance) = self.instances.get_mut(&batch_instance.labels) {
+            let records: u64 = pending.per_slot.iter().map(|s| s.records).sum();
+            let instance = if let Some(instance) = self.instances.get_mut(&pending.labels) {
                 instance
             } else if self.instances.len() < set.max_instances {
-                let instance = new_instance(&set, batch_instance.labels.clone(), false);
-                self.instances
-                    .entry(batch_instance.labels)
-                    .or_insert(instance)
+                let instance = new_instance(&set, pending.labels.clone(), false);
+                self.instances.entry(pending.labels).or_insert(instance)
             } else {
                 self.stats.overflowed_records += records;
                 self.overflow
                     .get_or_insert_with(|| new_instance(&set, set.overflow_labels.clone(), true))
             };
-            for partial in batch_instance.slots {
-                let slot = if partial.slot < next_emit {
-                    self.stats.late_records += partial.records;
+            for batch_cells in pending.per_slot {
+                let slot = if batch_cells.slot < next_emit {
+                    self.stats.late_records += batch_cells.records;
                     next_emit
-                } else if partial.slot > newest {
-                    self.stats.future_records += partial.records;
+                } else if batch_cells.slot > newest {
+                    self.stats.future_records += batch_cells.records;
                     newest
                 } else {
-                    partial.slot
+                    batch_cells.slot
                 };
-                merge_slot(&set, instance, next_emit, slot, &partial.cells);
+                merge_slot(&set, instance, next_emit, slot, &batch_cells.cells);
             }
         }
     }
@@ -201,7 +200,7 @@ impl Store {
         let mut out = Chunker::new(max_chunk);
         let mut next_emit = self.advance_window(now);
         let set = std::sync::Arc::clone(&self.set.0);
-        let now_slot = now / set.update_every;
+        let now_slot = now / set.interval_secs;
         while next_emit + set.lateness_slots < now_slot {
             let slot = next_emit;
             let mut expired = Vec::new();
@@ -230,17 +229,17 @@ impl Store {
 /// Merge the first `skipped` window slots of `instance` into the slot that
 /// becomes the window's first, `new_first`.
 fn fold_front(set: &MetricSetInner, instance: &mut Instance, skipped: u64, new_first: u64) {
-    let take = (skipped as usize).min(instance.slots.len());
+    let take = (skipped as usize).min(instance.open_cells.len());
     if take == 0 {
         return;
     }
     let mut folded = set.initial_cells.clone().into_boxed_slice();
-    for cells in instance.slots.drain(..take) {
+    for cells in instance.open_cells.drain(..take) {
         merge_cells(set, &mut folded, &cells);
     }
-    match instance.slots.front_mut() {
+    match instance.open_cells.front_mut() {
         Some(front) => merge_cells(set, front, &folded),
-        None => instance.slots.push_back(folded),
+        None => instance.open_cells.push_back(folded),
     }
     instance.first_slot = instance.first_slot.max(new_first);
 }
@@ -269,7 +268,7 @@ fn new_instance(set: &MetricSetInner, labels: Labels, overflow: bool) -> Instanc
         defined: false,
         first_slot: u64::MAX,
         last_slot: 0,
-        slots: VecDeque::new(),
+        open_cells: VecDeque::new(),
         previous_totals: vec![f64::NAN; set.cumulative_cells.len()].into_boxed_slice(),
     }
 }
@@ -295,12 +294,12 @@ fn merge_slot(
     cells: &[f64],
 ) {
     let index = (slot - next_emit) as usize;
-    while instance.slots.len() <= index {
+    while instance.open_cells.len() <= index {
         instance
-            .slots
+            .open_cells
             .push_back(set.initial_cells.clone().into_boxed_slice());
     }
-    merge_cells(set, &mut instance.slots[index], cells);
+    merge_cells(set, &mut instance.open_cells[index], cells);
     instance.first_slot = instance.first_slot.min(slot);
     instance.last_slot = instance.last_slot.max(slot);
 }
@@ -309,7 +308,7 @@ fn merge_slot(
 /// Returns true when the instance has expired; its charts are then already
 /// marked obsolete in `out`.
 fn emit_slot(set: &MetricSetInner, instance: &mut Instance, slot: u64, out: &mut Chunker) -> bool {
-    let cells = instance.slots.pop_front();
+    let cells = instance.open_cells.pop_front();
     if slot >= instance.first_slot {
         if !instance.defined {
             for index in 0..set.charts.len() {
@@ -321,14 +320,14 @@ fn emit_slot(set: &MetricSetInner, instance: &mut Instance, slot: u64, out: &mut
         totals_to_increases(set, instance, &mut cells);
         for (chart, id) in set.charts.iter().zip(&instance.chart_ids) {
             let block = out.block();
-            write_begin(block, id, set.update_every * 1_000_000);
+            write_begin(block, id, set.interval_secs * 1_000_000);
             for dim in &chart.dimensions {
                 match dimension_value(set, &cells, dim.value) {
                     Some(value) => write_set_float(block, &dim.id, value),
                     None => write_set_empty(block, &dim.id),
                 }
             }
-            write_end_timed(block, (slot + 1) * set.update_every);
+            write_end_timed(block, (slot + 1) * set.interval_secs);
             out.commit();
         }
     }
@@ -370,7 +369,7 @@ fn totals_to_increases(set: &MetricSetInner, instance: &mut Instance, cells: &mu
 
 fn dimension_value(set: &MetricSetInner, cells: &[f64], value: Value) -> Option<f64> {
     let value = match value {
-        Value::Rate(cell) => cells[cell] / set.update_every as f64,
+        Value::Rate(cell) => cells[cell] / set.interval_secs as f64,
         Value::Ratio {
             numerator,
             denominator,
@@ -405,7 +404,7 @@ fn define_chart(
             context: &chart.context,
             chart_type: chart.chart_type,
             priority: chart.priority,
-            update_every: set.update_every,
+            update_every: set.interval_secs,
             options: ChartOptions {
                 obsolete,
                 store_first: true,
@@ -484,6 +483,7 @@ mod tests {
     use super::*;
     use crate::{Cap, Chart, ChartType, Counter, Histogram, MetricSetBuilder, Settings};
     use netdata_plugin_protocol::validate_chart_stream;
+    use std::time::Duration;
 
     const BOUNDS: &[f64] = &[0.1, 1.0];
 
@@ -510,8 +510,8 @@ mod tests {
             }
         });
         let mut b = MetricSetBuilder::new(Settings {
-            lateness,
-            expiry,
+            lateness: Duration::from_secs(lateness),
+            expiry: Duration::from_secs(expiry),
             cap,
             ..Settings::default()
         });
@@ -720,7 +720,7 @@ mod tests {
         let mut store = Store::new(f.set.clone());
         record(&f, &mut store, "a", 10, 1, 0, 10);
         record(&f, &mut store, "a", 100_000, 2, 0, 100_000);
-        let window = store.instances.values().next().unwrap().slots.len() as u64;
+        let window = store.instances.values().next().unwrap().open_cells.len() as u64;
         assert!(window <= 10 + MAX_BACKLOG_SLOTS + 1, "{window}");
         let out = text(&store.emit(100_011, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
@@ -811,7 +811,7 @@ mod tests {
             }
         }
         let mut b = MetricSetBuilder::new(Settings {
-            expiry: 3,
+            expiry: Duration::from_secs(3),
             ..Settings::default()
         });
         let totals = b.cumulative_counter::<Events>(Chart {
@@ -888,6 +888,15 @@ mod tests {
         let mut batch = Batch::new(&set);
         let mut inst = batch.instance(Labels::new());
         inst.record(10).add(counter, Broken, 1.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "the collection interval must be whole seconds")]
+    fn a_fractional_collection_interval_is_refused() {
+        MetricSetBuilder::new(Settings {
+            collection_interval: Duration::from_millis(1500),
+            ..Settings::default()
+        });
     }
 
     #[test]

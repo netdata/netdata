@@ -18,6 +18,7 @@ use opentelemetry_proto::tonic::common::v1::any_value::Value;
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
 use opentelemetry_proto::tonic::trace::v1::status::StatusCode;
+use std::time::Duration;
 
 /// Bucket bounds in seconds: the OTel semantic conventions' advice for
 /// `http.server.request.duration`.
@@ -29,7 +30,7 @@ const DURATION_BOUNDS: &[f64] = &[
 /// SDKs and collectors export them in batches every few seconds (5 s by
 /// default for spans), so rendering a second as soon as it ends would show
 /// each batch as one spike.
-const LATENESS_SECONDS: u64 = 10;
+const LATENESS: Duration = Duration::from_secs(10);
 
 dimensions! {
     /// How a request ended.
@@ -135,7 +136,7 @@ pub(crate) fn service_settings(max_services: usize) -> Settings {
     let mut overflow_labels = Labels::new();
     overflow_labels.push("otel.metric.overflow", "true");
     Settings {
-        lateness: LATENESS_SECONDS,
+        lateness: LATENESS,
         cap: Some(Cap {
             max: max_services,
             overflow_labels,
