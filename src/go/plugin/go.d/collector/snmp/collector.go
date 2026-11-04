@@ -80,11 +80,14 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 	c := &Collector{
 		Config: defaultConfig(),
 		normal: &normalDiagnostics{},
+		now:    time.Now,
 
 		charts:               &collectorapi.Charts{},
-		seenScalarMetrics:    make(map[string]bool),
-		tableMetricCharts:    make(map[string]*collectorapi.Chart),
-		seenProfiles:         make(map[string]bool),
+		seenScalarMetrics:    make(map[string]uint64),
+		seenTableMetrics:     make(map[string]tableMetricState),
+		seenProfiles:         make(map[string]uint64),
+		failedProfiles:       make(map[string]bool),
+		chartMetadataVersion: 1,
 		deviceStore:          store,
 		deviceLifecycleStore: store,
 
@@ -116,9 +119,11 @@ type (
 		configuredVnode *vnodes.VirtualNode
 
 		charts                   *collectorapi.Charts
-		seenScalarMetrics        map[string]bool
-		tableMetricCharts        map[string]*collectorapi.Chart
-		seenProfiles             map[string]bool
+		seenScalarMetrics        map[string]uint64
+		seenTableMetrics         map[string]tableMetricState
+		seenProfiles             map[string]uint64
+		failedProfiles           map[string]bool
+		chartMetadataVersion     uint64
 		deviceStore              *ddsnmp.DeviceStore
 		deviceLifecycleStore     deviceLifecycleStore
 		deviceWriter             *ddsnmp.DeviceWriter
@@ -149,6 +154,10 @@ type (
 		snmpProfiles         []*ddsnmp.Profile
 		initialized          bool
 		deviceMetadataSynced bool
+		now                  func() time.Time
+		nextSysInfoCheck     time.Time
+		pendingMetadata      *snmputils.SysInfo
+		rebuildPending       bool
 
 		adjMaxRepetitions uint32
 
@@ -157,6 +166,12 @@ type (
 	ddCollector interface {
 		Collect() ([]*ddsnmp.ProfileMetrics, error)
 		CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error)
+		PreparedDeviceMetadata() map[string]ddsnmp.MetaTag
+		RefreshProfileInputs(observedOIDs []string) error
+	}
+	tableMetricState struct {
+		metadataVersion uint64
+		profile         string
 	}
 )
 
@@ -178,11 +193,21 @@ func (c *Collector) Init(context.Context) (err error) {
 	}()
 
 	if err := c.validateConfig(); err != nil {
-		return lifecycleFailureError(fmt.Errorf("config validation failed: %v", err), err, "configuration", "invalid_configuration")
+		return lifecycleFailureError(
+			fmt.Errorf("config validation failed: %v", err),
+			err,
+			"configuration",
+			"invalid_configuration",
+		)
 	}
 
 	if _, err := c.initSNMPClient(); err != nil {
-		return lifecycleFailureError(fmt.Errorf("failed to initialize SNMP client: %v", err), err, "client", "invalid_configuration")
+		return lifecycleFailureError(
+			fmt.Errorf("failed to initialize SNMP client: %v", err),
+			err,
+			"client",
+			"invalid_configuration",
+		)
 	}
 
 	if c.PingOnly || c.Ping.Enabled {
@@ -201,7 +226,9 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 	defer func() { c.finishNormalAttempt(err, nil) }()
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = snmputils.WithFailureDetail(fmt.Errorf("SNMP check interrupted"), snmputils.Failure{Reason: "panic"})
+			err = snmputils.WithFailureDetail(fmt.Errorf("SNMP check interrupted"), snmputils.Failure{
+				Reason: "panic",
+			})
 			c.recordDeviceLifecycle(
 				ddsnmp.DeviceLifecyclePhaseCheck,
 				ddsnmp.DeviceLifecycleOutcomeFailed,
@@ -214,7 +241,12 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 	if c.snmpClient == nil {
 		snmpClient, err := c.initAndConnectSNMPClient()
 		if err != nil {
-			return lifecycleFailureError(fmt.Errorf("failed to init and connect SNMP client: %v", err), err, "connect", "")
+			return lifecycleFailureError(
+				fmt.Errorf("failed to init and connect SNMP client: %v", err),
+				err,
+				"connect",
+				"",
+			)
 		}
 		c.snmpClient = snmpClient
 		c.wrapNormalClient()
@@ -245,7 +277,15 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			c.recordDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCollect, ddsnmp.DeviceLifecycleOutcomeFailed)
-			c.finishNormalAttempt(snmputils.WithFailureDetail(fmt.Errorf("SNMP collection interrupted"), snmputils.Failure{Reason: "panic"}), nil)
+			c.finishNormalAttempt(
+				snmputils.WithFailureDetail(
+					fmt.Errorf("SNMP collection interrupted"),
+					snmputils.Failure{
+						Reason: "panic",
+					},
+				),
+				nil,
+			)
 			panic(recovered)
 		}
 	}()

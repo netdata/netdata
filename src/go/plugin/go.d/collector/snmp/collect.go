@@ -7,11 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"strconv"
 	"syscall"
 
 	"github.com/gosnmp/gosnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -27,6 +25,11 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	initializing := !c.initialized
 	if err := c.ensureInitialized(); err != nil {
 		return nil, err
+	}
+	if !initializing && !c.PingOnly {
+		if err := c.refreshDeviceState(); err != nil {
+			return nil, err
+		}
 	}
 
 	if initializing && c.normal.recorder != nil {
@@ -109,95 +112,100 @@ func (c *Collector) ensureInitialized() error {
 	}
 	si := c.sysInfo
 
-	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
+	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 && (!c.PingOnly || c.CreateVnode && c.Vnode == "") {
 		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
 			SnmpClient:          c.snmpClient,
 			Profiles:            c.snmpProfiles,
 			Log:                 c.Logger,
 			SysObjectID:         si.SysObjectID,
 			DisableBulkWalk:     c.disableBulkWalk,
-			AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeNormalProfile),
+			AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeProfile),
 		})
-	}
-
-	if c.CreateVnode && c.Vnode == "" {
-		var baseLabels map[string]string
-		if c.UpdateEvery >= 1 && c.VnodeDeviceDownThreshold >= 1 {
-			// Allow for collection and transmission delays.
-			baseLabels = map[string]string{
-				"_node_stale_after_seconds": strconv.Itoa(c.VnodeDeviceDownThreshold*c.UpdateEvery + 2),
-			}
-		}
-		identity, err := ddsnmp.AcquireDeviceIdentity(si, c.ddSnmpColl, ddsnmp.DeviceIdentityOptions{
-			Address:    c.Hostname,
-			GUID:       c.LocalVnode.GUID,
-			Hostname:   c.LocalVnode.Hostname,
-			BaseLabels: baseLabels,
-			Labels:     c.LocalVnode.Labels,
-		})
-		if c.ddSnmpColl != nil {
-			c.captureCollectionFailures()
-		}
-		if err != nil {
-			return err
-		}
-		c.LocalVnode.GUID = identity.GUID
-		c.LocalVnode.Hostname = identity.Hostname
-		c.vnode = &vnodes.VirtualNode{
-			GUID:     identity.GUID,
-			Hostname: identity.Hostname,
-			Labels:   identity.Labels,
-		}
 	}
 
 	if c.PingOnly || c.Ping.Enabled {
 		c.addPingCharts()
 	}
 
-	c.registerDeviceState(si, nil)
+	// Normal collection supplies prepared profile metadata without acquiring it twice.
+	if c.PingOnly || c.ddSnmpColl == nil {
+		var metadata map[string]ddsnmp.MetaTag
+		if c.ddSnmpColl != nil {
+			var err error
+			metadata, err = c.ddSnmpColl.CollectDeviceMetadata()
+			c.captureCollectionFailures()
+			if err != nil {
+				return err
+			}
+		}
+		if err := c.applyDeviceMetadata(si, metadata); err != nil {
+			return err
+		}
+	} else {
+		// Establish routing from system identity before polling. Optional profile
+		// input failures must not send healthy samples to the local Agent.
+		if err := c.applyDeviceMetadata(si, nil); err != nil {
+			return err
+		}
+		c.deviceMetadataSynced = false
+	}
 	c.initialized = true
+	c.nextSysInfoCheck = c.now().Add(sysInfoCheckEvery)
 
 	return nil
 }
 
 func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
+	client, disableBulk, repetitions, err := c.connectSNMPClient()
+	if err == nil {
+		c.disableBulkWalk, c.adjMaxRepetitions = disableBulk, repetitions
+	}
+	return client, err
+}
+
+// connectSNMPClient derives learned transport settings from authored options.
+// A replacement candidate must not alter the incumbent's client or settings.
+func (c *Collector) connectSNMPClient() (client gosnmp.Handler, disableBulk bool, repetitions uint32, err error) {
 	snmpClient, err := c.initSNMPClient()
 	if err != nil {
-		return nil, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
+		return nil, false, 0, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
 	}
 
 	if err := snmpClient.Connect(); err != nil {
-		return nil, snmputils.WithFailure(fmt.Errorf("connect: %w", err), "connect", "")
+		return nil, false, 0, snmputils.WithFailure(fmt.Errorf("connect: %w", err), "connect", "")
 	}
+	defer func() {
+		if err != nil {
+			_ = snmpClient.Close()
+		}
+	}()
 
 	if snmpClient.Version() == gosnmp.Version1 {
-		return snmpClient, nil
+		return snmpClient, false, 0, nil
 	}
 
 	if c.Options.MaxRepetitions == 0 {
-		c.disableBulkWalk = true
-		return snmpClient, nil
+		return snmpClient, true, 0, nil
 	}
 
-	if c.adjMaxRepetitions != 0 {
-		snmpClient.SetMaxRepetitions(c.adjMaxRepetitions)
-	} else {
-		probeClient := snmpClient
-		if c.normal != nil && c.normal.recorder != nil {
-			probeClient = c.normal.recorder.Wrap(snmpClient)
-		}
-		ok, err := c.adjustMaxRepetitions(probeClient)
-		if err != nil {
-			return nil, snmputils.WithFailure(fmt.Errorf("re-adjust max repetitions SNMP client: %w", err), "max_repetitions", "")
-		}
-		if !ok {
-			c.Warningf("SNMP bulk walk disabled (device may not support GETBULK or max-repetitions adjustment failed)")
-			c.disableBulkWalk = true
-		}
-		c.adjMaxRepetitions = snmpClient.MaxRepetitions()
+	probeClient := snmpClient
+	if c.normal != nil && c.normal.recorder != nil {
+		probeClient = c.normal.recorder.Wrap(snmpClient)
+	}
+	ok, err := c.adjustMaxRepetitions(probeClient)
+	if err != nil {
+		return nil, false, 0, snmputils.WithFailure(
+			fmt.Errorf("re-adjust max repetitions SNMP client: %w", err),
+			"max_repetitions",
+			"",
+		)
+	}
+	if !ok {
+		c.Warningf("SNMP bulk walk disabled (device may not support GETBULK or max-repetitions adjustment failed)")
+		disableBulk = true
 	}
 
-	return snmpClient, nil
+	return snmpClient, disableBulk, snmpClient.MaxRepetitions(), nil
 }
 
 func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error) {

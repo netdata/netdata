@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 )
 
 func (c *Collector) collectSNMP(mx map[string]int64) error {
@@ -15,13 +16,14 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 		return nil
 	}
 
+	clear(c.failedProfiles)
 	pms, err := c.ddSnmpColl.Collect()
 	c.captureCollectionFailures()
 	if err != nil {
 		c.markBGPCollectFailed(err)
 		return err
 	}
-	c.syncDeviceMetadata(pms)
+	c.syncDeviceMetadata()
 	if c.bgp == nil && profileMetricsHaveBGP(pms) {
 		c.enableBGPIntegration()
 	}
@@ -41,6 +43,13 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	return nil
 }
 
+func (c *Collector) observeProfile(report ddsnmpcollector.AcquisitionProfileReport, pm *ddsnmp.ProfileMetrics) {
+	if pm != nil && report.HasFailures() {
+		c.failedProfiles[pm.Source] = true
+	}
+	c.observeNormalProfile(report, pm)
+}
+
 func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []ddsnmp.Metric) {
 	for _, m := range metrics {
 		if m.IsTable {
@@ -51,8 +60,8 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 			continue
 		}
 
-		if !c.seenScalarMetrics[m.Name] {
-			c.seenScalarMetrics[m.Name] = true
+		if c.seenScalarMetrics[m.Name] != c.chartMetadataVersion {
+			c.seenScalarMetrics[m.Name] = c.chartMetadataVersion
 			c.addProfileScalarMetricChart(m)
 		}
 
@@ -96,15 +105,14 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			continue
 		}
 
-		if !seen[key] {
-			seen[key] = true
-			// Samples may share a key; the first one owns the chart's metadata.
-			c.profileMetricLabels(labels, m)
-			if chart := c.tableMetricCharts[key]; chart != nil {
-				updateProfileChartLabels(chart, labels)
-			} else if chart := c.addProfileTableMetricChart(m, key, labels); chart != nil {
-				c.tableMetricCharts[key] = chart
+		seen[key] = true
+
+		if c.seenTableMetrics[key].metadataVersion != c.chartMetadataVersion {
+			c.seenTableMetrics[key] = tableMetricState{
+				metadataVersion: c.chartMetadataVersion,
+				profile:         m.Profile.Source,
 			}
+			c.addProfileTableMetricChart(m)
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -126,11 +134,10 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 		}
 	}
 
-	for key, chart := range c.tableMetricCharts {
-		if !seen[key] {
-			delete(c.tableMetricCharts, key)
-			chart.MarkRemove()
-			chart.MarkNotCreated()
+	for key, state := range c.seenTableMetrics {
+		if !seen[key] && !c.failedProfiles[state.profile] {
+			delete(c.seenTableMetrics, key)
+			c.removeProfileTableMetricChart(key)
 		}
 	}
 }
@@ -139,8 +146,8 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 	for _, pm := range pms {
 		name := stripFileNameExt(pm.Source)
 
-		if !c.seenProfiles[name] {
-			c.seenProfiles[name] = true
+		if c.seenProfiles[name] != c.chartMetadataVersion {
+			c.seenProfiles[name] = c.chartMetadataVersion
 			c.addProfileStatsCharts(name)
 		}
 

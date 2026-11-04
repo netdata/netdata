@@ -17,14 +17,20 @@ import (
 
 // deviceMetadataCollector handles collection of device metadata
 type deviceMetadataCollector struct {
-	snmpClient  snmputils.ScalarClient
-	missingOIDs map[string]bool
-	log         *logger.Logger
-	sysobjectid string
-	strict      bool
+	snmpClient      snmputils.ScalarClient
+	missingOIDs     map[string]bool
+	log             *logger.Logger
+	sysobjectid     string
+	strict          bool
+	requireComplete bool
 }
 
-func newDeviceMetadataCollector(snmpClient snmputils.ScalarClient, missingOIDs map[string]bool, log *logger.Logger, sysobjectid string) *deviceMetadataCollector {
+func newDeviceMetadataCollector(
+	snmpClient snmputils.ScalarClient,
+	missingOIDs map[string]bool,
+	log *logger.Logger,
+	sysobjectid string,
+) *deviceMetadataCollector {
 	return &deviceMetadataCollector{
 		snmpClient:  snmpClient,
 		missingOIDs: missingOIDs,
@@ -65,8 +71,12 @@ func (dc *deviceMetadataCollector) collectObserved(
 					if dc.strict {
 						return nil, err
 					}
-					dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
-						i, entry.SysobjectID, err)
+					dc.log.Warningf(
+						"sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
+						i,
+						entry.SysobjectID,
+						err,
+					)
 				}
 			}
 		}
@@ -79,14 +89,26 @@ func (dc *deviceMetadataCollector) collectObserved(
 		stats,
 		acquisition.metadataObserver(cfg.Fields),
 	); err != nil {
-		return ternary(len(meta) > 0, meta, nil), fmt.Errorf("failed to process metadata resource '%s': %w", resName, err)
+		return ternary(
+				len(meta) > 0,
+				meta,
+				nil,
+			), fmt.Errorf(
+				"failed to process metadata resource '%s': %w",
+				resName,
+				err,
+			)
 	}
 
 	return meta, nil
 }
 
 // processMetadataFields processes a single metadata resource
-func (dc *deviceMetadataCollector) processMetadataFields(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) error {
+func (dc *deviceMetadataCollector) processMetadataFields(
+	fields map[string]ddprofiledefinition.MetadataField,
+	metadata map[string]ddsnmp.MetaTag,
+	isExactMatch bool,
+) error {
 	return dc.processMetadataFieldsObserved(fields, metadata, isExactMatch, &ddsnmp.CollectionStats{}, nil)
 }
 
@@ -121,13 +143,21 @@ func (dc *deviceMetadataCollector) processMetadataFieldsObserved(
 }
 
 // collectStaticAndIdentifyOIDs collects static values and returns OIDs to fetch
-func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]ddsnmp.MetaTag, isExactMatch bool, stats *ddsnmp.CollectionStats) []string {
+func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(
+	fields map[string]ddprofiledefinition.MetadataField,
+	metadata map[string]ddsnmp.MetaTag,
+	isExactMatch bool,
+	stats *ddsnmp.CollectionStats,
+) []string {
 	var oids []string
 
 	for name, field := range fields {
 		switch {
 		case field.Value != "":
-			ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: field.Value, IsExactMatch: isExactMatch})
+			ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{
+				Value:        field.Value,
+				IsExactMatch: isExactMatch,
+			})
 		case field.Symbol.OID != "":
 			if !isMissingOID(dc.snmpClient, dc.missingOIDs, trimOID(field.Symbol.OID)) {
 				oids = append(oids, field.Symbol.OID)
@@ -155,11 +185,19 @@ func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[strin
 	return oids
 }
 
-func (dc *deviceMetadataCollector) fetchMetadataValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	return getSNMPValues(dc.snmpClient, oids, dc.missingOIDs, stats)
+func (dc *deviceMetadataCollector) fetchMetadataValues(
+	oids []string,
+	stats *ddsnmp.CollectionStats,
+) (map[string]gosnmp.SnmpPDU, error) {
+	return getProfileInputValues(dc.snmpClient, oids, dc.missingOIDs, stats, dc.requireComplete)
 }
 
-func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprofiledefinition.MetadataField, pdus map[string]gosnmp.SnmpPDU, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) error {
+func (dc *deviceMetadataCollector) processDynamicFields(
+	fields map[string]ddprofiledefinition.MetadataField,
+	pdus map[string]gosnmp.SnmpPDU,
+	metadata map[string]ddsnmp.MetaTag,
+	isExactMatch bool,
+) error {
 	return dc.processDynamicFieldsObserved(fields, pdus, metadata, isExactMatch, &ddsnmp.CollectionStats{}, nil)
 }
 
@@ -185,7 +223,10 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 				continue
 			}
 			if v != "" {
-				ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
+				ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{
+					Value:        v,
+					IsExactMatch: isExactMatch,
+				})
 				observer.value(name)
 			} else {
 				observer.empty(name)
@@ -194,7 +235,13 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 			// Multiple symbols - try each until one succeeds
 			fieldErrStart := len(errs)
 			for i, sym := range field.Symbols {
-				v, err := dc.processSymbolValueObserved(name, sym, pdus, i == len(field.Symbols)-1, observer.processing(name))
+				v, err := dc.processSymbolValueObserved(
+					name,
+					sym,
+					pdus,
+					i == len(field.Symbols)-1,
+					observer.processing(name),
+				)
 				if err != nil {
 					stats.Errors.Processing.Preparation++
 					observer.rejected(name)
@@ -205,7 +252,10 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 				if v != "" {
 					// A usable fallback resolves only this field's earlier failures.
 					errs = errs[:fieldErrStart]
-					ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{Value: v, IsExactMatch: isExactMatch})
+					ddsnmp.MergeMetaTag(metadata, name, ddsnmp.MetaTag{
+						Value:        v,
+						IsExactMatch: isExactMatch,
+					})
 					observer.value(name)
 					break // Use first successful value
 				}
@@ -215,13 +265,23 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 	}
 
 	if len(errs) > 0 && (dc.strict || len(metadata) == 0) {
-		return snmputils.WithFailure(fmt.Errorf("failed to process any metadata fields: %w", errors.Join(errs...)), "metadata", "processing")
+		return snmputils.WithFailure(
+			fmt.Errorf("failed to process any metadata fields: %w", errors.Join(errs...)),
+			"metadata",
+			"processing",
+		)
 	}
 
 	return nil
 }
 
-func (dc *deviceMetadataCollector) processSymbolValueObserved(fieldName string, cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU, lastSymbol bool, processing *processingObserver) (string, error) {
+func (dc *deviceMetadataCollector) processSymbolValueObserved(
+	fieldName string,
+	cfg ddprofiledefinition.SymbolConfig,
+	pdus map[string]gosnmp.SnmpPDU,
+	lastSymbol bool,
+	processing *processingObserver,
+) (string, error) {
 	pdu, ok := pdus[trimOID(cfg.OID)]
 	if !ok {
 		processing.record(fieldName, cfg.OID, "missing_input")

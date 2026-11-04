@@ -53,6 +53,19 @@ func AcquireDeviceIdentity(
 			return nil, err
 		}
 	}
+	return ComposeDeviceIdentity(si, metadata, opts)
+}
+
+// ComposeDeviceIdentity combines acquired observations with authored overrides
+// without issuing SNMP requests or modifying its inputs.
+func ComposeDeviceIdentity(
+	si *snmputils.SysInfo,
+	metadata map[string]MetaTag,
+	opts DeviceIdentityOptions,
+) (*DeviceIdentity, error) {
+	if si == nil {
+		return nil, errors.New("SNMP system identity is required")
+	}
 
 	guid := opts.GUID
 	if guid == "" {

@@ -51,14 +51,21 @@ func New(cfg Config) *Collector {
 	}
 
 	for _, prof := range cfg.Profiles {
-		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
+		coll.profiles[prof.SourceFile] = &profileState{
+			profile: prof,
+		}
 	}
 	if cfg.AcquisitionObserver != nil {
 		coll.acquisitionObserver = cfg.AcquisitionObserver
 	}
 
 	coll.globalTagsCollector = newGlobalTagsCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
-	coll.deviceMetadataCollector = newDeviceMetadataCollector(cfg.SnmpClient, coll.missingOIDs, coll.log, cfg.SysObjectID)
+	coll.deviceMetadataCollector = newDeviceMetadataCollector(
+		cfg.SnmpClient,
+		coll.missingOIDs,
+		coll.log,
+		cfg.SysObjectID,
+	)
 	coll.scalarCollector = newScalarCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
 	coll.tableCollector = newTableCollector(cfg.SnmpClient, coll.missingOIDs, coll.tableCache, coll.log, cfg.DisableBulkWalk)
 	coll.tableCollector.logKeyPrefix = cfg.LogKeyPrefix
@@ -216,7 +223,12 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	// A no-op profile can survive after all requests fail. Do not let its local
 	// statistics turn that failed poll into vnode activity.
 	if !c.requests.responded && c.requests.err != nil {
-		return nil, fmt.Errorf("all SNMP requests failed: %w", c.requests.err)
+		err := c.requests.err
+		if len(errs) > 0 {
+			// Profile preparation adds operation context absent from raw transport errors.
+			err = errors.Join(errs...)
+		}
+		return nil, fmt.Errorf("all SNMP requests failed: %w", err)
 	}
 	if len(metrics) == 0 && len(errs) > 0 {
 		return nil, errors.Join(errs...)
@@ -317,29 +329,19 @@ func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
 }
 
 func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (*preparedProfileCollection, error) {
-	pm := &ddsnmp.ProfileMetrics{Source: ps.profile.SourceFile}
-	prepared := &preparedProfileCollection{
-		state:   ps,
-		metrics: pm,
-	}
-	if c.acquisitionObserver != nil {
-		if ps.identity == nil {
-			identity := buildAcquisitionProfileIdentity(ps.profile, ordinal)
-			ps.identity = &identity
-		}
-		prepared.acquisition = newAcquisitionProfileCollection(
-			*ps.identity,
-			ps.profile,
-			c.deviceMetadataCollector.sysobjectid,
-		)
-	}
+	prepared := c.newProfileCollection(ps, ordinal)
+	pm := prepared.metrics
 
 	if err := c.prepareProfileInputs(prepared); err != nil {
 		return prepared, err
 	}
 
 	now := time.Now()
-	scalarMetrics, err := c.scalarCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition.metricScalarObserver())
+	scalarMetrics, err := c.scalarCollector.collectObserved(
+		ps.profile,
+		&pm.Stats,
+		prepared.acquisition.metricScalarObserver(),
+	)
 	pm.Stats.Timing.Scalar = time.Since(now)
 	if err != nil {
 		return prepared, err
@@ -374,7 +376,32 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 	return prepared, nil
 }
 
+func (c *Collector) newProfileCollection(ps *profileState, ordinal uint32) *preparedProfileCollection {
+	prepared := &preparedProfileCollection{
+		state: ps,
+		metrics: &ddsnmp.ProfileMetrics{
+			Source: ps.profile.SourceFile,
+		},
+	}
+	if c.acquisitionObserver != nil {
+		if ps.identity == nil {
+			identity := buildAcquisitionProfileIdentity(ps.profile, ordinal)
+			ps.identity = &identity
+		}
+		prepared.acquisition = newAcquisitionProfileCollection(
+			*ps.identity,
+			ps.profile,
+			c.deviceMetadataCollector.sysobjectid,
+		)
+	}
+	return prepared
+}
+
 func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) error {
+	return c.prepareProfileInputsWithStrictness(prepared, false)
+}
+
+func (c *Collector) prepareProfileInputsWithStrictness(prepared *preparedProfileCollection, strict bool) error {
 	ps, pm := prepared.state, prepared.metrics
 	started := time.Now()
 	defer func() {
@@ -394,24 +421,43 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 	if ps.initialized {
 		prepared.acquisition.restoreInputRoutes(ps.cache.inputRoutes)
 	} else {
-		recorder := sourceRecorder(c.globalTagsCollector.snmpClient)
+		// Refresh stages a complete replacement without tightening normal startup's
+		// partial-input policy or changing the live processors' behavior.
+		tagsCollector := *c.globalTagsCollector
+		metadataCollector := *c.deviceMetadataCollector
+		tagsCollector.strict = strict
+		metadataCollector.strict = strict
+		tagsCollector.requireComplete = strict
+		metadataCollector.requireComplete = strict
+		recorder := sourceRecorder(tagsCollector.snmpClient)
 		cursor := recorder.Cursor()
-		globalTags, err := c.globalTagsCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
+		globalTags, err := tagsCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
 			return fmt.Errorf("failed to collect global tags: %w", err)
 		}
 		ps.cache.globalTags = globalTags
 		if recorder != nil {
-			ps.cache.tagEvidence = &AcquisitionCacheInput{Kind: "profile_tags", CreatedAt: time.Now().UTC(), Tags: globalTags, Sources: recorder.operationsSince(cursor)}
+			ps.cache.tagEvidence = &AcquisitionCacheInput{
+				Kind:      "profile_tags",
+				CreatedAt: time.Now().UTC(),
+				Tags:      globalTags,
+				Sources:   recorder.operationsSince(cursor),
+			}
 		}
 		cursor = recorder.Cursor()
-		metadata, err := c.deviceMetadataCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
+		metadata, err := metadataCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
+			err = snmputils.WithFailure(err, "metadata", "")
 			return fmt.Errorf("failed to collect device metadata: %w", err)
 		}
 		ps.cache.deviceMetadata = metadata
 		if recorder != nil {
-			ps.cache.metadataEvidence = &AcquisitionCacheInput{Kind: "profile_metadata", CreatedAt: time.Now().UTC(), Metadata: metadata, Sources: recorder.operationsSince(cursor)}
+			ps.cache.metadataEvidence = &AcquisitionCacheInput{
+				Kind:      "profile_metadata",
+				CreatedAt: time.Now().UTC(),
+				Metadata:  metadata,
+				Sources:   recorder.operationsSince(cursor),
+			}
 		}
 		ps.initialized = true
 		ps.cache.inputRoutes = prepared.acquisition.retainInputRoutes(recorder)
