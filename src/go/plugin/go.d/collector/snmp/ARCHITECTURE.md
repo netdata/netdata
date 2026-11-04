@@ -51,8 +51,8 @@ vnode, chart labels and DeviceStore. `RefreshProfileInputs` stages per-profile i
 failed/incomplete acquisition without suppressing healthy metric profiles. Usable system and successful profile updates
 publish even when another profile's inputs fail; failed inputs remain pending for the next check. DD's prepared-input
 revision covers normal lazy preparation and explicit refresh, so recovered profile metadata publishes without requiring
-a system-field change. Changed profile tags refresh chart labels even when raw system fields are unchanged. Only
-negative decisions about standard system scalars are reconciled only when authoritative observations contradict them,
+a system-field change. Changed profile tags refresh chart labels even when raw system fields are unchanged.
+Negative decisions about standard system scalars are reconciled only when authoritative observations contradict them,
 including observations whose value has not changed. Existing row caches, connections and Function rate baselines remain
 intact. Authored `Config`, including local vnode overrides, never receives acquired identity values.
 
@@ -67,9 +67,8 @@ authority; new compatible state makes that registration eligible again. Retries 
 unanswered/invalid object ID cannot resume incompatible profiles. Successful replacement uses fresh
 profile/device/transport state and retires old charts through the legacy collector chart output path.
 `resetDevicePresentation` marks them for removal; the job runtime prunes them after accepted output. Current correctly
-classified profiles retain
-partial-collection availability. System identity establishes vnode routing before optional profile enrichment so healthy
-samples cannot fall back to the local Agent. The GUID and compatible chart identities/history remain stable.
+classified profiles retain partial-collection availability. System identity establishes vnode routing before optional
+profile enrichment so healthy samples cannot fall back to the local Agent. The GUID and compatible chart identities/history remain stable.
 
 Normal initialization and rebuilding compose identity from prepared profile metadata rather than fetching it twice.
 Diagnostic input evidence follows retained or installed snapshots; classified replacement starts a new current
