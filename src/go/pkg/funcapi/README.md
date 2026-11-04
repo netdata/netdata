@@ -85,6 +85,23 @@ only resolved selector values and cannot access these extra inputs. The framewor
 combines those names with required selector IDs without duplicates. These declarations do not implement filtering,
 storage, parsing or validation of extra inputs; the handler owns those semantics.
 
+## Reading raw inputs
+
+`ParseRawParams` reads the named inputs of a `RawMethodRequest`. A name takes its value from the first source that
+has it: `key:value` or `key=value` arguments, then the payload `selections` object, then top-level payload fields.
+A non-empty payload must be a JSON object. The returned `RawParams` provides:
+
+- `String(name)`: one string, or a one-element string array (a single selection); `""` when absent.
+- `TimeRange(now)`: `after` and `before` as Unix seconds, nil when absent. Values are integer seconds in years 1-9999.
+  As in the [query API](../../../web/api/queries/README.md), `before <= 0` is relative to now and a negative `after`
+  is relative to `before` (or to now without `before`).
+  `after` greater than `before` is an error.
+- `QueryMatcher()`: `query` compiled as a [simple pattern](../matcher/README.md), nil when absent or blank.
+
+Errors are client input errors with messages suitable for a 400 response. Handlers keep their own selector
+validation and choose the order of checks. Declare the inputs with `AcceptedParams` using `ParamAfter`,
+`ParamBefore` and `ParamQuery`.
+
 ## Info for structured methods
 
 For a shared Function with a job selector, structured `info` without an explicit `__job` returns declaration metadata

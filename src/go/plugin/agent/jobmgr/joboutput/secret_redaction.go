@@ -83,6 +83,7 @@ func redactResolvedLifecycleError(err error) error {
 	case collectorapi.LifecycleErrorTemporary:
 		safe = collectorapi.TemporaryError(safe)
 	}
+	safe = collectorapi.WithRetryNotBefore(safe, collectorapi.RetryNotBefore(err))
 	var invalid *invalidJobConfigurationError
 	if errors.As(err, &invalid) {
 		safe = invalidJobConfiguration(safe)

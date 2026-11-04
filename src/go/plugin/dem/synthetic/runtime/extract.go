@@ -4,7 +4,6 @@ package runtime
 
 import (
 	"archive/tar"
-	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -13,6 +12,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 // saveArchive verifies the entire bounded archive before extraction. The caller
@@ -35,12 +36,15 @@ func saveArchive(src io.Reader, dst *os.File, a Archive) error {
 }
 
 func extractArchive(src io.Reader, root *os.Root, a Archive) error {
-	gz, err := gzip.NewReader(src)
+	// Match the builder's pinned window without allocating for an arbitrary frame header.
+	decoder, err := zstd.NewReader(src, zstd.WithDecoderConcurrency(1),
+		zstd.WithDecoderLowmem(true), zstd.WithDecoderMaxWindow(8<<20),
+		zstd.WithDecoderMaxMemory(8<<20))
 	if err != nil {
 		return err
 	}
-	defer gz.Close()
-	bounded := &io.LimitedReader{R: gz, N: a.TarBytes + 1}
+	defer decoder.Close()
+	bounded := &io.LimitedReader{R: decoder, N: a.TarBytes + 1}
 	reader := tar.NewReader(bounded)
 	seen := make(map[string]bool)
 	var links []string
@@ -92,7 +96,7 @@ func extractArchive(src io.Reader, root *os.Root, a Archive) error {
 			return err
 		}
 	}
-	// Consume gzip checksum and all declared padding without allowing a bomb.
+	// Consume the zstd checksum and all declared padding without allowing a bomb.
 	if _, err := io.Copy(io.Discard, bounded); err != nil {
 		return err
 	}

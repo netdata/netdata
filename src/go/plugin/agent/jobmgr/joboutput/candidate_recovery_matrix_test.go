@@ -23,13 +23,13 @@ func TestCandidateRecoveryOwnershipMatrix(t *testing.T) {
 				outcome := candidateOutcome{Kind: candidateAdmitted, Listed: true}
 				switch state {
 				case "retry", "disabled":
-					outcome = candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}
+					outcome = candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}
 				case "accepted wait":
 					outcome = candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockAcceptedWait, Listed: true}
 				case "quarantine":
 					outcome = candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockQuarantined, Listed: true}
 				case "framework retry":
-					outcome = candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockFailedRetry, Listed: true, RetryAfter: 10}
+					outcome = candidateOutcome{Kind: candidateFrameworkBlocked, Block: candidateBlockFailedRetry, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}
 				}
 				delta, err := c.prepareOutcome(id, work.Token, outcome, 1)
 				recoveryMatrixCommit(t, controller, delta, err)
@@ -40,7 +40,7 @@ func TestCandidateRecoveryOwnershipMatrix(t *testing.T) {
 				if state == "ready closed" {
 					delta, err = c.prepareReady(id, work.Token)
 					recoveryMatrixCommit(t, controller, delta, err)
-					delta, err = c.prepareOutcome(id, work.Token, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10, AfterReady: true}, 1)
+					delta, err = c.prepareOutcome(id, work.Token, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}, AfterReady: true}, 1)
 					recoveryMatrixCommit(t, controller, delta, err)
 				}
 				before := c.snapshot(id)
@@ -108,7 +108,7 @@ func TestCandidateRecoveryExactValidWithdrawalAndPassiveControl(t *testing.T) {
 			if passive {
 				delta, err = c.prepareExact(work.Config, false, 1)
 			} else {
-				delta, err = c.prepareOutcome(inventory.FullName, work.Token, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 1)
+				delta, err = c.prepareOutcome(inventory.FullName, work.Token, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 1)
 			}
 			recoveryMatrixCommit(t, controller, delta, err)
 			before := c.snapshot(inventory.FullName)
@@ -166,7 +166,7 @@ func recoveryMatrixContinuation(t *testing.T, ownership string) (*DynCfgJobContr
 		work = applyCandidateDelta(t, delta, err).Decision.Work
 		if ownership != "source DynCfg" {
 			require.Nil(t, work, "same-tier observation keeps its active incumbent")
-			delta, err = c.prepareOutcome(inv.FullName, old.Token, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 100}, 0)
+			delta, err = c.prepareOutcome(inv.FullName, old.Token, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 100}}, 0)
 			work = applyCandidateDelta(t, delta, err).Decision.Work
 		}
 	}

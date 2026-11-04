@@ -5,6 +5,10 @@
 #include <string.h>
 #include <strings.h>
 
+static inline bool http_header_is_ows(char c) {
+    return c == ' ' || c == '\t';
+}
+
 static void web_client_enable_deflate(struct web_client *w, bool gzip) {
     if(gzip)
         web_client_flag_set(w, WEB_CLIENT_ENCODING_GZIP);
@@ -134,7 +138,7 @@ static void http_header_cookie(struct web_client *w, const char *v, size_t len _
     const size_t name_len = sizeof(NETDATA_REGISTRY_COOKIE_NAME) - 1;
 
     while(*v) {
-        while(*v == ';' || *v == ' ') v++;
+        while(*v == ';' || http_header_is_ows(*v)) v++;
 
         const char *pair = v;
         while(*v && *v != ';') v++;
@@ -143,6 +147,7 @@ static void http_header_cookie(struct web_client *w, const char *v, size_t len _
             strncmp(pair, NETDATA_REGISTRY_COOKIE_NAME, name_len) == 0) {
             const char *value = &pair[name_len + 1];
             size_t value_len = v - value;
+            while(value_len && http_header_is_ows(value[value_len - 1])) value_len--;
             strncpyz(w->auth.registry_person_guid, value,
                      MIN(value_len, sizeof(w->auth.registry_person_guid) - 1));
             return;
@@ -467,34 +472,70 @@ static inline void supported_headers_init(void) {
     spinlock_unlock(&supported_headers_init_spinlock);
 }
 
+// Checks the syntax of the header line at s. Returns its terminating '\r' and sets *colon, returns the end of the
+// string when the line has not been received completely, or returns NULL when the line is malformed:
+// - it starts with whitespace, an obsolete folded continuation line (RFC 9112 5.2)
+// - it has no colon, an empty name, or whitespace before the colon (RFC 9112 5.1)
+// - it has a CR or LF that is not part of its terminating CRLF (RFC 9110 5.5)
+static const char *http_header_line_check(const char *s, const char **colon) {
+    if(http_header_is_ows(*s))
+        return NULL;
+
+    const char *e = s;
+    while(*e && *e != ':' && *e != '\r' && *e != '\n') e++;
+    if(!*e) return e;
+    if(*e != ':' || e == s || http_header_is_ows(e[-1]))
+        return NULL;
+
+    const char *ve = e + 1;
+    while(*ve && *ve != '\r' && *ve != '\n') ve++;
+    if(!*ve) return ve;
+    if(*ve == '\r' && !ve[1]) return &ve[1];
+    if(*ve != '\r' || ve[1] != '\n')
+        return NULL;
+
+    *colon = e;
+    return ve;
+}
+
+bool http_header_section_is_valid(const char *request) {
+    const char *headers_end = strstr(request, "\r\n\r\n");
+    if(!headers_end)
+        return true;
+
+    // from the end of the request line, one header line at a time
+    const char *s = strstr(request, "\r\n");
+    while(s < headers_end) {
+        const char *colon = NULL;
+        s = http_header_line_check(s + 2, &colon);
+        if(!s)
+            return false;
+    }
+
+    return true;
+}
+
 char *http_header_parse_line(struct web_client *w, char *s) {
     supported_headers_init();
 
-    char *e = s;
-
-    // find the colon
-    while(*e && *e != ':') e++;
-    if(!*e) return e;
+    const char *colon = NULL;
+    char *ve = (char *)http_header_line_check(s, &colon);
+    if(!ve || !*ve)
+        return ve;
 
     // get the name
+    char *e = (char *)colon;
     *e = '\0';
 
-    // find the value
-    char *v = e + 1, *ve;
+    // find the value, without the optional whitespace before it
+    char *v = e + 1;
+    while(http_header_is_ows(*v)) v++;
 
-    // skip leading spaces from value
-    while(*v == ' ') v++;
-    ve = v;
-
-    // find the \r
-    while(*ve && *ve != '\r') ve++;
-    if(!*ve || ve[1] != '\n') {
-        *e = ':';
-        return ve;
-    }
-
-    // terminate the value
-    *ve = '\0';
+    // terminate the value, without the optional whitespace after it
+    char *vt = ve;
+    while(vt > v && http_header_is_ows(vt[-1])) vt--;
+    char saved = *vt;
+    *vt = '\0';
 
     uint32_t hash = simple_uhash(s);
 
@@ -502,11 +543,12 @@ char *http_header_parse_line(struct web_client *w, char *s) {
         if(likely(hash != supported_headers[i].hash || strcasecmp(s, supported_headers[i].key) != 0))
             continue;
 
-        supported_headers[i].cb(w, v, ve - v);
+        supported_headers[i].cb(w, v, vt - v);
         break;
     }
 
+    // restore the request, it may be parsed again
+    *vt = saved;
     *e = ':';
-    *ve = '\r';
     return ve;
 }

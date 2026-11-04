@@ -68,6 +68,7 @@ func (r *Reader) refreshInventory(ctx context.Context) error {
 	r.inventory = inventory
 	r.inventoryRepo = after
 	r.inventoryReadAt = r.now()
+	r.inventoryGeneration++
 	return nil
 }
 

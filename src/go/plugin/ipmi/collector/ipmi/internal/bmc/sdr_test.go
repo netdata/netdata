@@ -51,7 +51,8 @@ func TestReader_InventoryEmpty(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, &Snapshot{
 		Sensors:     []Sensor{},
-		SELEntries:  new(fakeSELEntries),
+		SELEntries:  new(0),
+		SEL:         emptySEL(),
 		CollectedAt: testNow,
 	}, got)
 }

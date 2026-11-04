@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
@@ -26,6 +27,7 @@ type autoDetectionFailure struct {
 	cause              error
 	retry              bool
 	retryAfter         int
+	notBefore          time.Time
 	class              collectorapi.LifecycleErrorClass // collector classification of the failure
 	runtime            bool                             // Run startup failed after the incumbent was stopped
 	afterReady         bool                             // readiness occurred even if Running was not yet published
@@ -391,6 +393,7 @@ func autoDetectionFailureFor(constructed ConstructedJob, err error) *autoDetecti
 	failure := &autoDetectionFailure{
 		diagnosticFailure: jobConfigFailure(err, "autodetection"),
 		cause:             err,
+		notBefore:         collectorapi.RetryNotBefore(err),
 	}
 	if constructed.retryAutoDetection != nil {
 		failure.retry = constructed.retryAutoDetection()

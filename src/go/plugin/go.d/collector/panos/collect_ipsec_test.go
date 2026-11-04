@@ -195,7 +195,7 @@ func TestCollector_CollectIPSec(t *testing.T) {
 			require.NoError(t, err)
 			got := map[string]metrix.SampleValue{}
 			for key, value := range mx {
-				if strings.HasPrefix(key, "ipsec_") {
+				if key == activeKey || strings.HasPrefix(key, "ipsec_tunnel_sa_lifetime{") {
 					got[key] = value
 				}
 			}

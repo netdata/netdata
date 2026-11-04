@@ -62,7 +62,7 @@ func TestInventoryMetadataQuarantineCannotHideTrustWithdrawal(t *testing.T) {
 					delta, err = c.prepareReady(inventory.FullName, old.Token)
 					applyCandidateDelta(t, delta, err)
 				case "retry":
-					delta, err = c.prepareOutcome(inventory.FullName, old.Token, candidateOutcome{Kind: candidateFailed, Listed: true, RetryAfter: 10}, 0)
+					delta, err = c.prepareOutcome(inventory.FullName, old.Token, candidateOutcome{Kind: candidateFailed, Listed: true, Retry: candidateRetryPolicy{cadence: 10}}, 0)
 					applyCandidateDelta(t, delta, err)
 				case "disabled":
 					delta, err = c.prepareDisable(inventory.FullName)
