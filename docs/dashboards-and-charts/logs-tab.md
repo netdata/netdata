@@ -16,6 +16,7 @@ The Logs tab shows entries from the sources available on the node:
 | `windows-events` | Windows | Windows event channels, auto-detected and aggregated, including forwarded-events channels on a Windows Event Collector | [Windows Events Plugin Reference](/src/collectors/windows-events.plugin/README.md) |
 | `macos-logs` | macOS | The native unified log store, through Apple's OSLog framework | [macOS Logs Plugin Reference](/src/collectors/macos-logs.plugin/README.md) |
 | `otel-logs` | Any, via OTLP | Logs received by the OpenTelemetry plugin and stored in Netdata's indexed log store | [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) |
+| `legacy-otel-logs` | Any | Read-only journals kept by the former experimental OpenTelemetry plugin; appears only on nodes that still have them | [Logs from the former experimental plugin](/src/crates/otel-plugin/README.md#logs-from-the-former-experimental-plugin-are-not-visible) |
 | `snmp:traps` | Any | Journal-compatible files Netdata writes for the traps received by its SNMP traps collector | [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) |
 
 Application text files appear under `systemd-journal` when converted with log2journal, or under `otel-logs` when
