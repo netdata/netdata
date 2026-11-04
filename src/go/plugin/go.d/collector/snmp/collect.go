@@ -159,7 +159,7 @@ func (c *Collector) newProfileCollector() ddCollector {
 		Log:                 c.Logger,
 		SysObjectID:         c.sysInfo.SysObjectID,
 		DisableBulkWalk:     c.disableBulkWalk,
-		AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeProfile),
+		AcquisitionObserver: ddsnmpcollector.AcquisitionObserverFunc(c.observeNormalProfile),
 	})
 }
 

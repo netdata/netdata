@@ -164,7 +164,7 @@ func newNormalBenchmarkCollector(tables, rows int, record bool) *Collector {
 		Log:        c.Logger,
 	}
 	if record {
-		cfg.AcquisitionObserver = ddsnmpcollector.AcquisitionObserverFunc(c.observeProfile)
+		cfg.AcquisitionObserver = ddsnmpcollector.AcquisitionObserverFunc(c.observeNormalProfile)
 	}
 	c.ddSnmpColl = ddsnmpcollector.New(cfg)
 	return c

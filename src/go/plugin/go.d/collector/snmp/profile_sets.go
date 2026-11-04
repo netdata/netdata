@@ -24,6 +24,9 @@ func (c *Collector) activateProfiles(profiles []*ddsnmp.Profile, context *ddsnmp
 	c.recordProfileContext(context)
 	if profilesHaveBGP(profiles) {
 		c.enableBGPIntegration()
+	} else if c.bgp != nil {
+		c.bgp = nil
+		c.funcRouter.registerHandler(bgpPeersMethodID, newFuncBGPPeers(nil))
 	}
 }
 

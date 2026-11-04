@@ -5,6 +5,7 @@ package snmp
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -27,7 +28,8 @@ func TestCollectorRuntimeDeviceReplacement(t *testing.T) {
 	c.LocalVnode.GUID = "ba37a531-3724-4fa0-9787-166574eb6f6d"
 	c.LocalVnode.Hostname = "authored-hostname"
 	c.LocalVnode.Labels = map[string]string{"name": "authored name", "contact": ""}
-	authored := c.Configuration()
+	authored := c.Config
+	authored.LocalVnode.Labels = maps.Clone(c.LocalVnode.Labels)
 	device.values[refreshTestTable+".1.2"] = gosnmp.SnmpPDU{
 		Name:  refreshTestTable + ".1.2",
 		Type:  gosnmp.Counter64,
@@ -262,4 +264,75 @@ func newReplacementTestDD(t *testing.T, cfg ddsnmpcollector.Config) *mockDdSnmpC
 			},
 		}},
 	}
+}
+
+func TestCollectorRuntimeReplacementDisablesUnselectedBGP(t *testing.T) {
+	c, device, now := newRefreshTestCollector(t)
+	profile := normalTestProfile()
+	require.NoError(t, ddsnmp.CompileTransforms(profile))
+	c.snmpProfiles = append(c.snmpProfiles, profile)
+	for oid, value := range map[string]int{
+		normalTestRoot + ".1.0": 7, normalTestRoot + ".2.0": 3, normalTestRoot + ".3.0": 1,
+		normalTestRoot + ".4.0": 3600, normalTestRoot + ".5.0": 6,
+	} {
+		device.values[oid] = gosnmp.SnmpPDU{
+			Name:  oid,
+			Type:  gosnmp.Integer,
+			Value: value,
+		}
+	}
+	require.NotEmpty(t, c.Collect(context.Background()))
+	require.NotNil(t, c.bgp)
+	require.True(t, c.normal.latest.document.BGP.Enabled)
+	require.Equal(t, 200, c.funcRouter.Handle(context.Background(), bgpPeersMethodID, nil).Status)
+	client, _ := newReplacementTestClient(t, device, nil)
+	t.Cleanup(func() { c.Cleanup(context.Background()) })
+	c.newSnmpClient = func() gosnmp.Handler { return client }
+	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
+		require.False(t, profilesHaveBGP(cfg.Profiles), "the current catalog selection must not declare BGP")
+		return &mockDdSnmpCollector{
+			pms: []*ddsnmp.ProfileMetrics{
+				{Source: cfg.Profiles[0].SourceFile, Metrics: []ddsnmp.Metric{{Name: "replacementLoad", Value: 7}}},
+			},
+		}
+	}
+	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+		Name:  snmputils.OidSysObject,
+		Type:  gosnmp.ObjectIdentifier,
+		Value: "1.3.6.1.4.1.9.1.1",
+	}
+	*now = now.Add(time.Minute)
+	require.NotEmpty(t, c.Collect(context.Background()))
+	assert.Nil(t, c.bgp)
+	assert.False(t, c.normal.latest.document.BGP.Enabled)
+	params, err := c.funcRouter.MethodParams(context.Background(), bgpPeersMethodID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, params, "BGP remains a registered method returning unavailable")
+	assert.Equal(t, 503, c.funcRouter.Handle(context.Background(), bgpPeersMethodID, nil).Status)
+}
+
+func TestCollectorRuntimeReplacementWithBlankAcquiredName(t *testing.T) {
+	c, device, now := newRefreshTestCollector(t)
+	require.NotEmpty(t, c.Collect(context.Background()))
+	guid := c.VirtualNode().GUID
+	client, _ := newReplacementTestClient(t, device, nil)
+	creations := 0
+	c.newSnmpClient = func() gosnmp.Handler { creations++; return client }
+	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector { return newReplacementTestDD(t, cfg) }
+	t.Cleanup(func() { c.Cleanup(context.Background()) })
+	device.setText(snmputils.OidSysName, " \t\n ")
+	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+		Name:  snmputils.OidSysObject,
+		Type:  gosnmp.ObjectIdentifier,
+		Value: replacementTestObjectID,
+	}
+	*now = now.Add(time.Minute)
+	require.NotEmpty(t, c.Collect(context.Background()))
+	require.Equal(t, "snmp-device", c.VirtualNode().Hostname)
+	require.Equal(t, guid, c.VirtualNode().GUID)
+	require.False(t, c.rebuildPending)
+	require.Len(t, c.deviceStore.Entries(), 1)
+	*now = now.Add(time.Minute)
+	require.NotEmpty(t, c.Collect(context.Background()))
+	require.Equal(t, 1, creations, "blank names must not require repeated client rebuilding")
 }

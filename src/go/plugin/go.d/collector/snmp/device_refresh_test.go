@@ -111,161 +111,12 @@ func (d *refreshTestDevice) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, error) {
 	}
 	var pdus []gosnmp.SnmpPDU
 	for oid, pdu := range d.values {
-		if strings.HasPrefix(oid, root+".") {
+		if strings.HasPrefix(oid, root+".") && oid != d.omittedOID {
 			pdus = append(pdus, pdu)
 		}
 	}
 	slices.SortFunc(pdus, func(a, b gosnmp.SnmpPDU) int { return strings.Compare(a.Name, b.Name) })
 	return pdus, nil
-}
-
-func TestCollectorRuntimePartialTableFailureRetainsCharts(t *testing.T) {
-	c, device, _ := newRefreshTestCollector(t)
-	const healthyOID = "1.3.6.1.4.1.99999.200.0"
-	device.values[healthyOID] = gosnmp.SnmpPDU{
-		Name:  healthyOID,
-		Type:  gosnmp.Integer,
-		Value: 7,
-	}
-	c.snmpProfiles = append(c.snmpProfiles, &ddsnmp.Profile{
-		SourceFile: "healthy.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{
-			Metrics: []ddprofiledefinition.MetricsConfig{
-				{Symbol: ddprofiledefinition.SymbolConfig{
-					OID:  healthyOID,
-					Name: "healthy",
-				}},
-			},
-		},
-	})
-	require.NotEmpty(t, c.Collect(context.Background()))
-	chart := c.Charts().Get("snmp_device_prof_ifTraffic_1")
-	require.NotNil(t, chart)
-	device.tableErr = errors.New("synthetic table timeout")
-	mx := c.Collect(context.Background())
-	assert.Equal(t, int64(7), mx[metricIDFromName("healthy")])
-	assert.NotContains(t, mx, metricIDFromKey("ifTraffic_1"))
-	assert.False(t, chart.IsRemoved(), "a failed table in a partial collection is not an authoritative removal")
-	device.tableErr = nil
-	delete(device.values, refreshTestTable+".1.1")
-	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.True(t, chart.IsRemoved(), "a successful observation can retire an absent row")
-}
-
-func TestCollectorRuntimeTableRetirementFollowsSourceAvailability(t *testing.T) {
-	const (
-		unrelatedOID = "1.3.6.1.4.1.99999.300.0"
-		healthyOID   = "1.3.6.1.4.1.99999.300.1"
-		siblingTable = "1.3.6.1.4.1.99999.101"
-	)
-	tests := map[string]struct {
-		prepare  func(*Collector, *refreshTestDevice)
-		change   func(*refreshTestDevice)
-		retained []string
-		retired  []string
-	}{
-		"unrelated processing failure does not block retirement": {
-			prepare: func(c *Collector, device *refreshTestDevice) {
-				device.setText(unrelatedOID, "N/A")
-				device.values[healthyOID] = gosnmp.SnmpPDU{Name: healthyOID, Type: gosnmp.Integer, Value: 3}
-				def := c.snmpProfiles[0].Definition
-				def.Metrics = append(def.Metrics, ddprofiledefinition.MetricsConfig{
-					Symbol: ddprofiledefinition.SymbolConfig{OID: unrelatedOID, Name: "unrelated"},
-				}, ddprofiledefinition.MetricsConfig{
-					Symbol: ddprofiledefinition.SymbolConfig{OID: healthyOID, Name: "healthy"},
-				})
-			},
-			change: func(device *refreshTestDevice) {
-				delete(device.values, refreshTestTable+".1.2")
-			},
-			retained: []string{"snmp_device_prof_ifTraffic_1"},
-			retired:  []string{"snmp_device_prof_ifTraffic_2"},
-		},
-		"failed table does not block a sibling table": {
-			prepare: func(c *Collector, device *refreshTestDevice) {
-				for _, index := range []string{"1", "2"} {
-					oid := siblingTable + ".1." + index
-					device.values[oid] = gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Counter64, Value: uint64(9)}
-				}
-				def := c.snmpProfiles[0].Definition
-				def.Metrics = append(def.Metrics, ddprofiledefinition.MetricsConfig{
-					Table:      ddprofiledefinition.SymbolConfig{OID: siblingTable, Name: "sessions"},
-					Symbols:    []ddprofiledefinition.SymbolConfig{{OID: siblingTable + ".1", Name: "sessionBytes"}},
-					MetricTags: []ddprofiledefinition.MetricTagConfig{{Tag: "session", Index: 1}},
-				})
-			},
-			change: func(device *refreshTestDevice) {
-				device.tableErr = errors.New("synthetic table timeout")
-				delete(device.values, siblingTable+".1.2")
-			},
-			retained: []string{
-				"snmp_device_prof_ifTraffic_1",
-				"snmp_device_prof_ifTraffic_2",
-				"snmp_device_prof_sessionBytes_1",
-			},
-			retired: []string{"snmp_device_prof_sessionBytes_2"},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			c, device, _ := newRefreshTestCollector(t)
-			device.values[refreshTestTable+".1.2"] = gosnmp.SnmpPDU{
-				Name:  refreshTestTable + ".1.2",
-				Type:  gosnmp.Counter64,
-				Value: uint64(5),
-			}
-			tc.prepare(c, device)
-			require.NotEmpty(t, c.Collect(context.Background()))
-			charts := make(map[string]*collectorapi.Chart)
-			for _, id := range slices.Concat(tc.retained, tc.retired) {
-				charts[id] = c.Charts().Get(id)
-				require.NotNil(t, charts[id], id)
-			}
-
-			tc.change(device)
-			require.NotEmpty(t, c.Collect(context.Background()))
-
-			for _, id := range tc.retained {
-				assert.False(t, charts[id].IsRemoved(), "%s source was not observed", id)
-			}
-			for _, id := range tc.retired {
-				assert.True(t, charts[id].IsRemoved(), "%s is absent from a successful observation", id)
-			}
-		})
-	}
-}
-
-func TestCollectorTableRetirementFollowsLatestRowSource(t *testing.T) {
-	// A grouped virtual metric can switch its winning table while a row keeps its key.
-	const source = "grouped.yaml"
-	pm := func(table string, unavailable ...string) []*ddsnmp.ProfileMetrics {
-		profile := &ddsnmp.ProfileMetrics{Source: source, UnavailableTables: unavailable}
-		if table != "" {
-			profile.Metrics = []ddsnmp.Metric{{
-				Profile: profile,
-				Name:    "ifTotal",
-				IsTable: true,
-				Table:   table,
-				Tags:    map[string]string{"interface": "eth0"},
-				Value:   1,
-			}}
-		}
-		return []*ddsnmp.ProfileMetrics{profile}
-	}
-	c := newTestSNMPCollector()
-	c.sysInfo = &snmputils.SysInfo{}
-
-	c.ddSnmpColl = &mockDdSnmpCollector{pms: pm("ifXTable")}
-	require.NoError(t, c.collectSNMP(map[string]int64{}))
-	chart := c.Charts().Get("snmp_device_prof_ifTotal_eth0")
-	require.NotNil(t, chart)
-	c.ddSnmpColl = &mockDdSnmpCollector{pms: pm("ifTable", "ifXTable")}
-	require.NoError(t, c.collectSNMP(map[string]int64{}))
-	c.ddSnmpColl = &mockDdSnmpCollector{pms: pm("", "ifXTable")}
-	require.NoError(t, c.collectSNMP(map[string]int64{}))
-
-	assert.True(t, chart.IsRemoved(), "the row is absent from a successful walk of its current source")
 }
 
 func (d *refreshTestDevice) setText(oid, text string) {
@@ -693,4 +544,20 @@ func TestCollectorRuntimeInitialProfileMetadataRecovery(t *testing.T) {
 			assert.Same(t, client, c.snmpClient)
 		})
 	}
+}
+
+func TestCollectorPublishesPreparedMetadataWhenMetricsFail(t *testing.T) {
+	c, device, _ := newRefreshTestCollector(t)
+	const modelOID = "1.3.6.1.4.1.99999.95.0"
+	device.setText(modelOID, "observed-model")
+	c.snmpProfiles[0].Definition.Metadata["device"].Fields["model"] = ddprofiledefinition.MetadataField{
+		Symbol: ddprofiledefinition.SymbolConfig{OID: modelOID},
+	}
+	device.tableErr = errors.New("synthetic table failure")
+	require.Empty(t, c.Collect(context.Background()))
+	require.Equal(t, "observed-model", c.ddSnmpColl.PreparedDeviceMetadata()["model"].Value)
+	assert.Equal(t, "observed-model", c.VirtualNode().Labels["model"], "usable metadata is independent of metric-frame success")
+	entries := c.deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "observed-model", entries[0].Info.Model)
 }

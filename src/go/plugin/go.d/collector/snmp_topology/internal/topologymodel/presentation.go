@@ -2,7 +2,10 @@
 
 package topologymodel
 
-import "slices"
+import (
+	"slices"
+	"strings"
+)
 
 // DevicePresentation is the effective current registration metadata for an older
 // acquisition. It does not change collected identity, topology facts or clocks.
@@ -51,7 +54,7 @@ func WithDevicePresentation(snapshot ObservationSnapshot, presentation *DevicePr
 	for i := range snapshot.L2Observations {
 		observation := &snapshot.L2Observations[i]
 		if observation.DeviceID == snapshot.LocalDeviceID && !observation.Inferred {
-			observation.Hostname = presentation.SysName
+			observation.Hostname = strings.TrimSpace(presentation.SysName)
 			observation.Labels = presentation.Labels
 		}
 	}

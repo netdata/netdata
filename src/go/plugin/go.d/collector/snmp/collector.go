@@ -84,9 +84,8 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 
 		charts:               &collectorapi.Charts{},
 		seenScalarMetrics:    make(map[string]*metricChartState),
-		seenTableMetrics:     make(map[string]tableMetricState),
+		seenTableMetrics:     make(map[string]*metricChartState),
 		seenProfiles:         make(map[string]uint64),
-		failedProfiles:       make(map[string]bool),
 		chartMetadataVersion: 1,
 		deviceStore:          store,
 		deviceLifecycleStore: store,
@@ -120,9 +119,8 @@ type (
 
 		charts                   *collectorapi.Charts
 		seenScalarMetrics        map[string]*metricChartState
-		seenTableMetrics         map[string]tableMetricState
+		seenTableMetrics         map[string]*metricChartState
 		seenProfiles             map[string]uint64
-		failedProfiles           map[string]bool
 		chartMetadataVersion     uint64
 		deviceStore              *ddsnmp.DeviceStore
 		deviceLifecycleStore     deviceLifecycleStore
@@ -175,11 +173,6 @@ type (
 		metadataVersion uint64
 		chart           *collectorapi.Chart
 		dimensions      map[string]bool
-	}
-	tableMetricState struct {
-		*metricChartState
-		profile string
-		table   string
 	}
 )
 

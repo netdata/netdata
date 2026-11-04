@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,6 +133,21 @@ func TestCollectorRefreshPresentationKeepsDerivedMetadataCoherent(t *testing.T) 
 			check("")
 			dev.VnodeLabels[tc.alias] = "1.0"
 			check("1.0")
+
+			for _, name := range []string{" updated-switch ", "   "} {
+				dev.SysName = name
+				store.Register("job", dev)
+				now = now.Add(time.Minute)
+				require.Zero(t, coll.refreshTopology(context.Background()).errors)
+				current := coll.topologyRegistry.acquireGeneration()
+				snapshot := current.observationSnapshots()[0]
+				require.Equal(t, name, snapshot.LocalDevice.SysName)
+				require.NotEmpty(t, snapshot.L2Observations)
+				require.Equal(t, strings.TrimSpace(name), snapshot.L2Observations[0].Hostname)
+				require.Equal(t, 1, calls, "name changes must not reacquire topology")
+				require.Same(t, first.devices[0].acquisition, current.devices[0].acquisition)
+				require.Equal(t, original.SysName, first.observationSnapshots()[0].LocalDevice.SysName)
+			}
 		})
 	}
 }

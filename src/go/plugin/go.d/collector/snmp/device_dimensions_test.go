@@ -89,7 +89,14 @@ func TestCollectorRuntimeMetadataRedrawRetainsDimensions(t *testing.T) {
 			device.omittedOID = outOID
 			device.setText(snmputils.OidSysName, "changed")
 			*now = now.Add(time.Minute)
-			require.NotEmpty(t, c.Collect(context.Background()))
+			partial := c.Collect(context.Background())
+			require.Contains(t, partial, metricIDFromKey(key, "in"))
+			require.NotContains(
+				t,
+				partial,
+				metricIDFromKey(key, "out"),
+				"the source must actually omit this dimension during redraw",
+			)
 			assert.True(
 				t,
 				chart.HasDim(metricIDFromKey(key, "out")),
