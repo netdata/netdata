@@ -9,11 +9,18 @@
 //! (`netdata-plugin-protocol` encodes the lines). The crate reads no clock and
 //! does no I/O: callers pass the current time and deliver the bytes.
 //!
+//! Declaring a family:
+//! - each instrument has a fixed set of [`Dimensions`], declared as an enum
+//!   with [`dimensions!`]: one cell and one chart dimension per value;
+//! - each instrument brings its [`Chart`]: a [`Counter`] (rates per second),
+//!   a [`Cumulative`] (running totals, charted as increases per second) and
+//!   a [`Gauge`] get one chart each, a [`Histogram`] its mean/maximum chart
+//!   and a heatmap;
+//! - [`Settings`] hold the slot length, lateness, expiry and instance cap.
+//!
 //! Layers, bottom-up:
 //! - `family`: cells (the numbers a slot accumulates and how two values
-//!   merge), the instruments that allocate them ([`Counter`], [`Cumulative`],
-//!   [`Histogram`], [`Gauge`]), and chart templates ([`ChartSpec`],
-//!   [`Dimension`]);
+//!   merge), the instruments that allocate them and their charts;
 //! - `batch`: request-local recording, so a caller can count a request only
 //!   after it is durable and then merge it under one short lock;
 //! - `store`: instances, the slot window, lateness, the instance cap with its
@@ -37,7 +44,8 @@ mod store;
 
 pub use batch::{Batch, InstanceRef, Record};
 pub use family::{
-    ChartSpec, Counter, Cumulative, Dimension, Family, FamilyBuilder, Gauge, Histogram, Labels,
+    Cap, Chart, Counter, Cumulative, Dimensions, Family, FamilyBuilder, Gauge, Histogram, Labels,
+    Settings,
 };
 pub use netdata_plugin_protocol::ChartType;
 pub use store::{MAX_BACKLOG_SLOTS, Stats, Store};

@@ -6,7 +6,7 @@
 //! keyed by instance and by the slot their own time falls in; the store
 //! decides at merge time whether a slot is still open.
 
-use crate::family::{Counter, Cumulative, Family, Gauge, Histogram, Labels};
+use crate::family::{Counter, Cumulative, Dimensions, Family, Gauge, Histogram, Labels};
 use std::collections::HashMap;
 
 /// A handle to an instance within one [`Batch`].
@@ -94,6 +94,7 @@ impl Batch {
         let partial = &mut batch_instance.slots[index];
         partial.records += 1;
         Record {
+            family: family.id,
             cells: &mut partial.cells,
         }
     }
@@ -103,38 +104,54 @@ impl Batch {
     }
 }
 
-/// One record's measurements. A record may update several instruments.
+/// One record's measurements. A record may update several instruments; each
+/// must belong to the record's family.
 pub struct Record<'a> {
+    family: u32,
     cells: &'a mut [f64],
 }
 
 impl Record<'_> {
-    /// Add `weight` to value `index` of `counter`.
-    pub fn add(&mut self, counter: Counter, index: usize, weight: f64) -> &mut Self {
-        assert!(
-            index < counter.len,
-            "counter index {index} out of {}",
-            counter.len
-        );
-        self.cells[counter.base + index] += weight;
+    fn check(&self, family: u32) {
+        assert_eq!(family, self.family, "instrument of another family");
+    }
+
+    /// Add `weight` to the `dimension` value of `counter`.
+    pub fn add<D: Dimensions>(
+        &mut self,
+        counter: Counter<D>,
+        dimension: D,
+        weight: f64,
+    ) -> &mut Self {
+        self.check(counter.family);
+        self.cells[counter.base + dimension.index()] += weight;
         self
     }
 
-    /// Set total `index` of `cumulative` to `total`; within one slot the total
-    /// merged last wins.
-    pub fn set_total(&mut self, cumulative: Cumulative, index: usize, total: f64) -> &mut Self {
-        assert!(
-            index < cumulative.len,
-            "cumulative index {index} out of {}",
-            cumulative.len
-        );
-        self.cells[cumulative.base + index] = total;
+    /// Set the `dimension` total of `cumulative` to `total`; within one slot
+    /// the total merged last wins.
+    pub fn set_total<D: Dimensions>(
+        &mut self,
+        cumulative: Cumulative<D>,
+        dimension: D,
+        total: f64,
+    ) -> &mut Self {
+        self.check(cumulative.family);
+        self.cells[cumulative.base + dimension.index()] = total;
+        self
+    }
+
+    /// Set the `dimension` value of `gauge` to `value`.
+    pub fn set<D: Dimensions>(&mut self, gauge: Gauge<D>, dimension: D, value: f64) -> &mut Self {
+        self.check(gauge.family);
+        self.cells[gauge.base + dimension.index()] = value;
         self
     }
 
     /// Observe `value` with `weight` (the number of events it stands for).
     /// A non-finite value is ignored.
     pub fn observe(&mut self, histogram: Histogram, value: f64, weight: f64) -> &mut Self {
+        self.check(histogram.family);
         if !value.is_finite() {
             return self;
         }
@@ -146,11 +163,6 @@ impl Record<'_> {
         if max.is_nan() || value > *max {
             *max = value;
         }
-        self
-    }
-
-    pub fn set(&mut self, gauge: Gauge, value: f64) -> &mut Self {
-        self.cells[gauge.cell] = value;
         self
     }
 }

@@ -9,52 +9,48 @@
 //! `unspecified`. A record counts at its resolved time (its own time, else its
 //! observed time).
 
-use crate::services::service_labels;
+use crate::services::{service_labels, service_settings};
 use netdata_plugin_metrics::{
-    Batch, ChartSpec, ChartType, Counter, Family, FamilyBuilder, InstanceRef, Labels,
+    Batch, Chart, ChartType, Counter, Family, FamilyBuilder, InstanceRef, dimensions,
 };
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
-/// As for spans: collectors and SDKs send logs in batches.
-const LATENESS_SECONDS: u64 = 10;
+dimensions! {
+    /// Severity ranges, most severe first.
+    enum Severity {
+        Fatal = "fatal",
+        Error = "error",
+        Warn = "warn",
+        Info = "info",
+        Debug = "debug",
+        Trace = "trace",
+        Unspecified = "unspecified",
+    }
+}
 
-/// Dimension order, most severe first; the index is the counter index.
-const SEVERITIES: [&str; 7] = [
-    "fatal",
-    "error",
-    "warn",
-    "info",
-    "debug",
-    "trace",
-    "unspecified",
-];
-
-fn severity_index(number: i32) -> usize {
-    match number {
-        21..=24 => 0,
-        17..=20 => 1,
-        13..=16 => 2,
-        9..=12 => 3,
-        5..=8 => 4,
-        1..=4 => 5,
-        _ => 6,
+impl Severity {
+    fn from_number(number: i32) -> Self {
+        match number {
+            21..=24 => Severity::Fatal,
+            17..=20 => Severity::Error,
+            13..=16 => Severity::Warn,
+            9..=12 => Severity::Info,
+            5..=8 => Severity::Debug,
+            1..=4 => Severity::Trace,
+            _ => Severity::Unspecified,
+        }
     }
 }
 
 pub(crate) struct ServiceLogs {
     pub(crate) family: Family,
-    records: Counter,
+    records: Counter<Severity>,
 }
 
 impl ServiceLogs {
     pub(crate) fn new(max_services: usize) -> Self {
-        let mut overflow = Labels::new();
-        overflow.push("otel.metric.overflow", "true");
-        let mut b = FamilyBuilder::new("otel_service")
-            .lateness(LATENESS_SECONDS)
-            .max_instances(max_services, overflow);
-        let records = b.counter(SEVERITIES.len());
-        b.chart(ChartSpec {
+        let mut b = FamilyBuilder::new("otel_service", service_settings(max_services));
+        let records = b.counter::<Severity>(Chart {
             id: "log_records",
             title: "Service log records by severity",
             units: "records/s",
@@ -62,11 +58,6 @@ impl ServiceLogs {
             context: "otel_service.log_records",
             chart_type: ChartType::Stacked,
             priority: 60_010,
-            dimensions: SEVERITIES
-                .iter()
-                .enumerate()
-                .map(|(i, name)| records.rate(name, i))
-                .collect(),
         });
         Self {
             family: b.build(),
@@ -90,7 +81,11 @@ impl ServiceLogs {
                     });
                     batch
                         .record(instance, record.time_unix_nano / 1_000_000_000)
-                        .add(self.records, severity_index(record.severity_number), 1.0);
+                        .add(
+                            self.records,
+                            Severity::from_number(record.severity_number),
+                            1.0,
+                        );
                 }
             }
         }
@@ -100,7 +95,7 @@ impl ServiceLogs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netdata_plugin_metrics::Store;
+    use netdata_plugin_metrics::{Dimensions, Store};
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
@@ -123,7 +118,8 @@ mod tests {
             (-1, "unspecified"),
         ];
         for (number, name) in expected {
-            assert_eq!(SEVERITIES[severity_index(number)], name, "{number}");
+            let severity = Severity::from_number(number);
+            assert_eq!(Severity::IDS[severity.index()], name, "{number}");
         }
     }
 

@@ -356,10 +356,10 @@ fn define_chart(
         &ChartLine {
             id: &instance.chart_ids[index],
             name: "",
-            title: chart.title,
+            title: &chart.title,
             units: chart.units,
             family: chart.family,
-            context: chart.context,
+            context: &chart.context,
             chart_type: chart.chart_type,
             priority: chart.priority,
             update_every: family.update_every,
@@ -439,27 +439,43 @@ impl Chunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ChartSpec, ChartType, Counter, FamilyBuilder, Histogram};
+    use crate::{Cap, Chart, ChartType, Counter, FamilyBuilder, Histogram, Settings};
     use netdata_plugin_protocol::validate_chart_stream;
 
     const BOUNDS: &[f64] = &[0.1, 1.0];
 
+    crate::dimensions! {
+        enum Outcome {
+            Ok = "ok",
+            Error = "error",
+        }
+    }
+
     struct Fixture {
         family: Family,
-        requests: Counter,
+        requests: Counter<Outcome>,
         duration: Histogram,
     }
 
     fn fixture(lateness: u64, expiry: u64, max: Option<usize>) -> Fixture {
-        let mut b = FamilyBuilder::new("svc").lateness(lateness).expiry(expiry);
-        if let Some(max) = max {
-            let mut overflow = Labels::new();
-            overflow.push("overflow", "true");
-            b = b.max_instances(max, overflow);
-        }
-        let requests = b.counter(2);
-        let duration = b.histogram(BOUNDS);
-        b.chart(ChartSpec {
+        let cap = max.map(|max| {
+            let mut overflow_labels = Labels::new();
+            overflow_labels.push("overflow", "true");
+            Cap {
+                max,
+                overflow_labels,
+            }
+        });
+        let mut b = FamilyBuilder::new(
+            "svc",
+            Settings {
+                lateness,
+                expiry,
+                cap,
+                ..Settings::default()
+            },
+        );
+        let requests = b.counter::<Outcome>(Chart {
             id: "requests",
             title: "Requests",
             units: "requests/s",
@@ -467,28 +483,20 @@ mod tests {
             context: "svc.requests",
             chart_type: ChartType::Stacked,
             priority: 1,
-            dimensions: vec![requests.rate("ok", 0), requests.rate("error", 1)],
         });
-        b.chart(ChartSpec {
-            id: "duration",
-            title: "Duration",
-            units: "seconds",
-            family: "requests",
-            context: "svc.duration",
-            chart_type: ChartType::Line,
-            priority: 2,
-            dimensions: vec![duration.average("avg"), duration.maximum("max")],
-        });
-        b.chart(ChartSpec {
-            id: "duration_histogram",
-            title: "Duration histogram",
-            units: "requests/s",
-            family: "requests",
-            context: "svc.duration_histogram",
-            chart_type: ChartType::Heatmap,
-            priority: 3,
-            dimensions: duration.bucket_rates(),
-        });
+        let duration = b.histogram(
+            BOUNDS,
+            Chart {
+                id: "duration",
+                title: "Duration",
+                units: "seconds",
+                family: "requests",
+                context: "svc.duration",
+                chart_type: ChartType::Line,
+                priority: 2,
+            },
+            "requests/s",
+        );
         Fixture {
             family: b.build(),
             requests,
@@ -522,7 +530,15 @@ mod tests {
         for i in 0..count {
             batch
                 .record(inst, time)
-                .add(f.requests, usize::from(i < errors), 1.0)
+                .add(
+                    f.requests,
+                    if i < errors {
+                        Outcome::Error
+                    } else {
+                        Outcome::Ok
+                    },
+                    1.0,
+                )
                 .observe(f.duration, 0.5, 1.0);
         }
         store.merge(batch, now);
@@ -688,7 +704,7 @@ mod tests {
         let mut batch = Batch::new(&f.family);
         let inst = batch.instance(labels("a"));
         for time in [995, 996, 995, 997, 996, 999] {
-            batch.record(inst, time).add(f.requests, 0, 1.0);
+            batch.record(inst, time).add(f.requests, Outcome::Ok, 1.0);
         }
         store.merge(batch, 1000);
         let out = text(&store.emit(1011, usize::MAX));
@@ -752,9 +768,19 @@ mod tests {
 
     #[test]
     fn cumulative_totals_render_as_increases() {
-        let mut b = FamilyBuilder::new("src").expiry(3);
-        let totals = b.cumulative(1);
-        b.chart(ChartSpec {
+        crate::dimensions! {
+            enum Events {
+                Events = "events",
+            }
+        }
+        let mut b = FamilyBuilder::new(
+            "src",
+            Settings {
+                expiry: 3,
+                ..Settings::default()
+            },
+        );
+        let totals = b.cumulative::<Events>(Chart {
             id: "events",
             title: "Events",
             units: "events/s",
@@ -762,7 +788,6 @@ mod tests {
             context: "src.events",
             chart_type: ChartType::Line,
             priority: 1,
-            dimensions: vec![totals.rate("events", 0)],
         });
         let family = b.build();
         let mut store = Store::new(family.clone());
@@ -771,7 +796,7 @@ mod tests {
             let inst = batch.instance(Labels::new());
             let mut record = batch.record(inst, time);
             if let Some(total) = total {
-                record.set_total(totals, 0, total);
+                record.set_total(totals, Events::Events, total);
             }
             store.merge(batch, time);
         };
@@ -797,6 +822,16 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "instrument of another family")]
+    fn an_instrument_of_another_family_is_refused() {
+        let f = fixture(0, 900, None);
+        let other = fixture(0, 900, None);
+        let mut batch = Batch::new(&f.family);
+        let inst = batch.instance(labels("a"));
+        batch.record(inst, 10).add(other.requests, Outcome::Ok, 1.0);
+    }
+
+    #[test]
     fn weights_scale_counts_and_histograms() {
         let f = fixture(0, 900, None);
         let mut store = Store::new(f.family.clone());
@@ -804,11 +839,11 @@ mod tests {
         let inst = batch.instance(labels("a"));
         batch
             .record(inst, 10)
-            .add(f.requests, 0, 2.0)
+            .add(f.requests, Outcome::Ok, 2.0)
             .observe(f.duration, 0.25, 2.0);
         batch
             .record(inst, 10)
-            .add(f.requests, 1, 1.0)
+            .add(f.requests, Outcome::Error, 1.0)
             .observe(f.duration, 2.5, 1.0);
         store.merge(batch, 10);
         let out = text(&store.emit(11, usize::MAX));

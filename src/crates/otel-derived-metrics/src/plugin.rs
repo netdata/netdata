@@ -3,30 +3,51 @@
 //! arrival time, so the families have no lateness.
 
 use netdata_plugin_metrics::{
-    Batch, ChartSpec, ChartType, Counter, Cumulative, Family, FamilyBuilder, Gauge, Labels, Stats,
+    Batch, Chart, ChartType, Counter, Cumulative, Family, FamilyBuilder, Gauge, Labels, Settings,
+    Stats, dimensions,
 };
 use otel_bridge::signals::Signal;
 
-const ACCEPTED: usize = 0;
-const REJECTED: usize = 1;
+dimensions! {
+    /// What became of the records of an export.
+    enum Acceptance {
+        Accepted = "accepted",
+        Rejected = "rejected",
+    }
+}
 
-const LATE: usize = 0;
-const FUTURE: usize = 1;
-const OVERFLOWED: usize = 2;
+dimensions! {
+    /// Why a record was counted in another time slot or chart set.
+    enum Adjustment {
+        Late = "late",
+        Future = "future",
+        Overflowed = "overflowed",
+    }
+}
+
+dimensions! {
+    enum Services {
+        Services = "services",
+    }
+}
+
+dimensions! {
+    enum Expired {
+        Expired = "expired",
+    }
+}
 
 /// The plugin's ingest outcomes: one label-less instance.
 pub(crate) struct Plugin {
     pub(crate) family: Family,
-    spans: Counter,
-    log_records: Counter,
+    spans: Counter<Acceptance>,
+    log_records: Counter<Acceptance>,
 }
 
 impl Plugin {
     pub(crate) fn new() -> Self {
-        let mut b = FamilyBuilder::new("otel_plugin");
-        let spans = b.counter(2);
-        let log_records = b.counter(2);
-        b.chart(ChartSpec {
+        let mut b = FamilyBuilder::new("otel_plugin", Settings::default());
+        let spans = b.counter(Chart {
             id: "spans",
             title: "OpenTelemetry spans received",
             units: "spans/s",
@@ -34,12 +55,8 @@ impl Plugin {
             context: "netdata.otel.spans",
             chart_type: ChartType::Stacked,
             priority: 150_000,
-            dimensions: vec![
-                spans.rate("accepted", ACCEPTED),
-                spans.rate("rejected", REJECTED),
-            ],
         });
-        b.chart(ChartSpec {
+        let log_records = b.counter(Chart {
             id: "log_records",
             title: "OpenTelemetry log records received",
             units: "records/s",
@@ -47,10 +64,6 @@ impl Plugin {
             context: "netdata.otel.log_records",
             chart_type: ChartType::Stacked,
             priority: 150_001,
-            dimensions: vec![
-                log_records.rate("accepted", ACCEPTED),
-                log_records.rate("rejected", REJECTED),
-            ],
         });
         Self {
             family: b.build(),
@@ -68,8 +81,8 @@ impl Plugin {
         let instance = batch.instance(Labels::new());
         batch
             .record(instance, now)
-            .add(counter, ACCEPTED, accepted as f64)
-            .add(counter, REJECTED, rejected as f64);
+            .add(counter, Acceptance::Accepted, accepted as f64)
+            .add(counter, Acceptance::Rejected, rejected as f64);
         batch
     }
 
@@ -88,18 +101,15 @@ impl Plugin {
 /// signal, labelled `signal`, fed from its store's statistics every tick.
 pub(crate) struct Derivation {
     pub(crate) family: Family,
-    services: Gauge,
-    adjusted: Cumulative,
-    expired: Cumulative,
+    services: Gauge<Services>,
+    adjusted: Cumulative<Adjustment>,
+    expired: Cumulative<Expired>,
 }
 
 impl Derivation {
     pub(crate) fn new() -> Self {
-        let mut b = FamilyBuilder::new("otel_plugin");
-        let services = b.gauge();
-        let adjusted = b.cumulative(3);
-        let expired = b.cumulative(1);
-        b.chart(ChartSpec {
+        let mut b = FamilyBuilder::new("otel_plugin", Settings::default());
+        let services = b.gauge(Chart {
             id: "derived_services",
             title: "Services with derived charts",
             units: "services",
@@ -107,9 +117,8 @@ impl Derivation {
             context: "netdata.otel.derived_services",
             chart_type: ChartType::Line,
             priority: 150_010,
-            dimensions: vec![services.value("services")],
         });
-        b.chart(ChartSpec {
+        let adjusted = b.cumulative(Chart {
             id: "derived_adjusted_records",
             title: "Records counted in another time slot or chart set",
             units: "records/s",
@@ -118,13 +127,8 @@ impl Derivation {
             // One record can be both late and overflowed.
             chart_type: ChartType::Line,
             priority: 150_011,
-            dimensions: vec![
-                adjusted.rate("late", LATE),
-                adjusted.rate("future", FUTURE),
-                adjusted.rate("overflowed", OVERFLOWED),
-            ],
         });
-        b.chart(ChartSpec {
+        let expired = b.cumulative(Chart {
             id: "derived_expired_services",
             title: "Services removed after 15 minutes without data",
             units: "services/s",
@@ -132,7 +136,6 @@ impl Derivation {
             context: "netdata.otel.derived_expired_services",
             chart_type: ChartType::Line,
             priority: 150_012,
-            dimensions: vec![expired.rate("expired", 0)],
         });
         Self {
             family: b.build(),
@@ -149,11 +152,23 @@ impl Derivation {
         let instance = batch.instance(labels);
         batch
             .record(instance, now)
-            .set(self.services, stats.instances as f64)
-            .set_total(self.adjusted, LATE, stats.late_records as f64)
-            .set_total(self.adjusted, FUTURE, stats.future_records as f64)
-            .set_total(self.adjusted, OVERFLOWED, stats.overflowed_records as f64)
-            .set_total(self.expired, 0, stats.expired_instances as f64);
+            .set(self.services, Services::Services, stats.instances as f64)
+            .set_total(self.adjusted, Adjustment::Late, stats.late_records as f64)
+            .set_total(
+                self.adjusted,
+                Adjustment::Future,
+                stats.future_records as f64,
+            )
+            .set_total(
+                self.adjusted,
+                Adjustment::Overflowed,
+                stats.overflowed_records as f64,
+            )
+            .set_total(
+                self.expired,
+                Expired::Expired,
+                stats.expired_instances as f64,
+            );
     }
 }
 

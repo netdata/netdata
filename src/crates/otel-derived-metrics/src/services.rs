@@ -9,7 +9,8 @@
 //! adjusted count its `ot=th` sampling threshold implies.
 
 use netdata_plugin_metrics::{
-    Batch, ChartSpec, ChartType, Counter, Family, FamilyBuilder, Histogram, InstanceRef, Labels,
+    Batch, Cap, Chart, ChartType, Counter, Family, FamilyBuilder, Histogram, InstanceRef, Labels,
+    Settings, dimensions,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
@@ -24,33 +25,33 @@ const DURATION_BOUNDS: &[f64] = &[
     0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0,
 ];
 
-/// How long a slot stays open for spans that arrive late. SDKs export spans
-/// in batches every few seconds (5 s by default), so rendering a second as
-/// soon as it ends would show each batch as one spike.
+/// How long a slot stays open for spans and log records that arrive late.
+/// SDKs and collectors export them in batches every few seconds (5 s by
+/// default for spans), so rendering a second as soon as it ends would show
+/// each batch as one spike.
 const LATENESS_SECONDS: u64 = 10;
 
-const SUCCESS: usize = 0;
-const ERROR: usize = 1;
+dimensions! {
+    /// How a request ended.
+    enum Outcome {
+        Success = "success",
+        Error = "error",
+    }
+}
 
 /// Value of `service.name` when a resource has none (the SDK default prefix).
 const UNKNOWN_SERVICE: &str = "unknown_service";
 
 pub(crate) struct Services {
     pub(crate) family: Family,
-    requests: Counter,
+    requests: Counter<Outcome>,
     duration: Histogram,
 }
 
 impl Services {
     pub(crate) fn new(max_services: usize) -> Self {
-        let mut overflow = Labels::new();
-        overflow.push("otel.metric.overflow", "true");
-        let mut b = FamilyBuilder::new("otel_service")
-            .lateness(LATENESS_SECONDS)
-            .max_instances(max_services, overflow);
-        let requests = b.counter(2);
-        let duration = b.histogram(DURATION_BOUNDS);
-        b.chart(ChartSpec {
+        let mut b = FamilyBuilder::new("otel_service", service_settings(max_services));
+        let requests = b.counter::<Outcome>(Chart {
             id: "requests",
             title: "Service requests",
             units: "requests/s",
@@ -58,31 +59,21 @@ impl Services {
             context: "otel_service.requests",
             chart_type: ChartType::Stacked,
             priority: 60_000,
-            dimensions: vec![
-                requests.rate("success", SUCCESS),
-                requests.rate("error", ERROR),
-            ],
         });
-        b.chart(ChartSpec {
-            id: "request_duration",
-            title: "Service request duration",
-            units: "seconds",
-            family: "requests",
-            context: "otel_service.request_duration",
-            chart_type: ChartType::Line,
-            priority: 60_001,
-            dimensions: vec![duration.average("avg"), duration.maximum("max")],
-        });
-        b.chart(ChartSpec {
-            id: "request_duration_histogram",
-            title: "Service request duration histogram",
-            units: "requests/s",
-            family: "requests",
-            context: "otel_service.request_duration_histogram",
-            chart_type: ChartType::Heatmap,
-            priority: 60_002,
-            dimensions: duration.bucket_rates(),
-        });
+        // Also charts `request_duration_histogram`.
+        let duration = b.histogram(
+            DURATION_BOUNDS,
+            Chart {
+                id: "request_duration",
+                title: "Service request duration",
+                units: "seconds",
+                family: "requests",
+                context: "otel_service.request_duration",
+                chart_type: ChartType::Line,
+                priority: 60_001,
+            },
+            "requests/s",
+        );
         Self {
             family: b.build(),
             requests,
@@ -119,11 +110,35 @@ impl Services {
                     let weight = adjusted_count(&span.trace_state);
                     batch
                         .record(instance, end / 1_000_000_000)
-                        .add(self.requests, if failed { ERROR } else { SUCCESS }, weight)
+                        .add(
+                            self.requests,
+                            if failed {
+                                Outcome::Error
+                            } else {
+                                Outcome::Success
+                            },
+                            weight,
+                        )
                         .observe(self.duration, (end - start) as f64 / 1e9, weight);
                 }
             }
         }
+    }
+}
+
+/// The settings of a per-service family: late spans and log records still
+/// count in their second, and services over `max_services` share one
+/// overflow chart set.
+pub(crate) fn service_settings(max_services: usize) -> Settings {
+    let mut overflow_labels = Labels::new();
+    overflow_labels.push("otel.metric.overflow", "true");
+    Settings {
+        lateness: LATENESS_SECONDS,
+        cap: Some(Cap {
+            max: max_services,
+            overflow_labels,
+        }),
+        ..Settings::default()
     }
 }
 
