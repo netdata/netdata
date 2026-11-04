@@ -1,11 +1,11 @@
-//! Family declarations: cells, instruments and chart templates.
+//! Metric set declarations: cells, instruments and their charts.
 //!
 //! A slot of an instance is a flat array of `f64` cells. Each cell has a merge
 //! rule, so two partial slots (two requests, or a request and the store)
-//! combine by cell: sums add, maxima keep the larger value, gauges keep the
-//! value merged last. Instruments are typed handles to ranges of cells, one
-//! cell per value of their [`Dimensions`]; each instrument brings its chart,
-//! whose dimensions read those cells when a slot is rendered.
+//! combine by cell: sums add, maxima keep the larger value, last-value cells
+//! keep the value merged last. Instruments are typed handles to ranges of
+//! cells, one cell per value of their [`Dimensions`]; each chart dimension
+//! reads its cells when a slot is emitted.
 
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 use std::marker::PhantomData;
@@ -27,7 +27,7 @@ pub(crate) enum Merge {
     Add,
     /// Larger value; starts unset (NaN).
     Max,
-    /// The value merged last; starts unset (NaN).
+    /// The value merged last (gauges, cumulative totals); starts unset (NaN).
     Last,
 }
 
@@ -51,9 +51,13 @@ impl Merge {
     }
 }
 
-/// A fixed set of dimension values: one cell of an instrument and one
-/// dimension of its chart per value, in [`Dimensions::IDS`] order. Declare
-/// one with [`dimensions!`](crate::dimensions).
+/// The fixed values of an instrument: one chart dimension per value, in
+/// [`Dimensions::IDS`] order.
+///
+/// Implement it with [`dimensions!`](crate::dimensions). A manual
+/// implementation must return each value's position in `IDS` from `index`
+/// (recording a value whose index is out of range panics), and every id must
+/// be a valid dimension id (declaring the instrument panics otherwise).
 pub trait Dimensions: Copy + 'static {
     /// The dimension ids, which are also their names, in chart order.
     const IDS: &'static [&'static str];
@@ -62,8 +66,9 @@ pub trait Dimensions: Copy + 'static {
     fn index(self) -> usize;
 }
 
-/// Declares an enum whose variants are the dimensions of an instrument,
-/// each with its dimension id, in chart order:
+/// Declares an enum whose variants are the dimensions of an instrument, each
+/// with its dimension id, in chart order. The enum derives `Debug`, `Clone`,
+/// `Copy`, `PartialEq`, `Eq` and `Hash`.
 ///
 /// ```
 /// netdata_plugin_metrics::dimensions! {
@@ -98,34 +103,34 @@ macro_rules! dimensions {
     };
 }
 
-/// One counted value per dimension, for example per outcome. Rendered as a
+/// One counted value per dimension, for example per outcome. Charted as a
 /// rate per second.
 #[derive(Debug)]
 pub struct Counter<D> {
-    pub(crate) family: u32,
+    pub(crate) set_id: u32,
     pub(crate) base: usize,
     _dimensions: PhantomData<fn() -> D>,
 }
 
 /// One running total per dimension, read from a source that counts on its
-/// own, for example a store's statistics. Rendered as the increase per
-/// second since the previous slot: an instance's first total is its
-/// baseline (no value yet), a total lower than the previous one is a reset
-/// (the increase is the new total), and a slot without a new total shows no
-/// increase.
+/// own, for example a store's statistics. Charted as the increase per second
+/// since the previous total: an instance's first total is its baseline (no
+/// value yet), a total lower than the previous one is a reset (the increase
+/// is the new total), and a slot without a new total shows 0. Within a slot
+/// the total merged last wins.
 #[derive(Debug)]
 pub struct Cumulative<D> {
-    pub(crate) family: u32,
+    pub(crate) set_id: u32,
     pub(crate) base: usize,
     _dimensions: PhantomData<fn() -> D>,
 }
 
-/// One value per dimension, set (not added) by each record; within a slot
-/// the value merged last wins, and a slot without one shows no value.
-/// Rendered as is.
+/// One value per dimension, set (not added) by each record. Charted as is;
+/// within a slot the value merged last wins, and a slot without one shows no
+/// value.
 #[derive(Debug)]
 pub struct Gauge<D> {
-    pub(crate) family: u32,
+    pub(crate) set_id: u32,
     pub(crate) base: usize,
     _dimensions: PhantomData<fn() -> D>,
 }
@@ -151,7 +156,7 @@ copy_instrument!(Counter, Cumulative, Gauge);
 /// value.
 #[derive(Debug, Clone, Copy)]
 pub struct Histogram {
-    pub(crate) family: u32,
+    pub(crate) set_id: u32,
     pub(crate) base: usize,
     pub(crate) bounds: &'static [f64],
 }
@@ -201,22 +206,28 @@ impl Dimension {
     }
 }
 
-/// How an instrument's chart is presented. Every instance of the family gets
-/// a copy; its full chart id is the family's type prefix, a dot, `id` and the
-/// instance's suffix (see [`FamilyBuilder::new`]).
+/// How an instrument's chart is presented; the fields map to the CHART line.
+/// Every instance gets a copy.
 #[derive(Debug, Clone, Copy)]
 pub struct Chart {
+    /// The chart id within the set: letters, digits, `_`, `-` and `.`, not
+    /// ending in `_overflow` or in `_` and 16 hex digits (the instance
+    /// suffixes; see [`MetricSetBuilder::new`]).
     pub id: &'static str,
     pub title: &'static str,
+    /// Shown as is; counter and cumulative charts are per second, so their
+    /// units say `/s`.
     pub units: &'static str,
+    /// The dashboard family (submenu): the CHART line's `family` field.
     pub family: &'static str,
+    /// The same for every instance.
     pub context: &'static str,
     pub chart_type: ChartType,
     /// Dashboard order; lower comes first.
     pub priority: i32,
 }
 
-/// A chart of the family, with the dimensions its instrument gives it.
+/// A chart of the set, with the dimensions its instrument gives it.
 #[derive(Debug)]
 pub(crate) struct ChartDef {
     pub(crate) id: String,
@@ -270,15 +281,15 @@ impl Labels {
     }
 }
 
-/// A declared family: its cells, charts and lifecycle settings. Cheap to
-/// clone; batches and the store share it.
+/// A declared set of metrics and their charts, which every instance (label
+/// set) gets a copy of. Cheap to clone; batches and the store share it.
 #[derive(Debug, Clone)]
-pub struct Family(pub(crate) Arc<FamilyInner>);
+pub struct MetricSet(pub(crate) Arc<MetricSetInner>);
 
 #[derive(Debug)]
-pub(crate) struct FamilyInner {
-    /// Unique per family in the process; instruments carry it, so one used
-    /// on another family's record is caught.
+pub(crate) struct MetricSetInner {
+    /// Unique per set in the process; instruments carry it, so one used on
+    /// another set's record is caught.
     pub(crate) id: u32,
     pub(crate) type_prefix: String,
     pub(crate) update_every: u64,
@@ -287,24 +298,27 @@ pub(crate) struct FamilyInner {
     pub(crate) max_instances: usize,
     pub(crate) overflow_labels: Labels,
     pub(crate) merges: Vec<Merge>,
-    pub(crate) initial: Vec<f64>,
+    pub(crate) initial_cells: Vec<f64>,
     /// The cells of [`Cumulative`] instruments, which hold totals until a
-    /// slot is rendered as increases.
-    pub(crate) cumulative: Vec<usize>,
+    /// slot is emitted as increases.
+    pub(crate) cumulative_cells: Vec<usize>,
     pub(crate) charts: Vec<ChartDef>,
 }
 
-/// The time and lifecycle settings of a family.
+/// The time and lifecycle settings of a metric set. Lateness and expiry are
+/// rounded up to whole slots.
 #[derive(Debug, Clone)]
 pub struct Settings {
-    /// Slot length in seconds: the family's collection interval. Default 1.
+    /// Slot length in seconds: the set's collection interval. Default 1.
     pub update_every: u64,
-    /// How long after its end, in seconds, a slot stays open for late
-    /// records; older records are counted in the oldest open slot. Default 0.
+    /// A delay: how long after its end, in seconds, a slot stays open for
+    /// late records; older records are counted in the oldest open slot.
+    /// Default 0.
     pub lateness: u64,
-    /// How long, in seconds, an instance may go without records before its
-    /// charts are marked obsolete and its state is dropped. Default 15
-    /// minutes.
+    /// A timeout: how long, in seconds of emitted slots, an instance may go
+    /// without records before its charts are marked obsolete and its state is
+    /// dropped; in wall-clock time that is `expiry` plus `lateness`. Default
+    /// 15 minutes.
     pub expiry: u64,
     /// The instance cap; default none.
     pub cap: Option<Cap>,
@@ -321,33 +335,41 @@ impl Default for Settings {
     }
 }
 
-/// At most `max` instances; records of further instances go to one overflow
-/// instance with `overflow_labels` until others expire.
+/// Records of instances beyond the cap go to one overflow instance until
+/// others expire.
 #[derive(Debug, Clone)]
 pub struct Cap {
+    /// Labelled instances tracked at most, the overflow instance not counted.
     pub max: usize,
+    /// The overflow instance's labels.
     pub overflow_labels: Labels,
 }
 
-static NEXT_FAMILY_ID: AtomicU32 = AtomicU32::new(0);
+static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 
-/// Declares a [`Family`]: each instrument adds its cells and its chart.
+/// Declares a [`MetricSet`]: each instrument adds its chart.
 #[derive(Debug)]
-pub struct FamilyBuilder {
+pub struct MetricSetBuilder {
     id: u32,
     type_prefix: String,
     settings: Settings,
     merges: Vec<Merge>,
-    cumulative: Vec<usize>,
+    cumulative_cells: Vec<usize>,
     charts: Vec<ChartDef>,
 }
 
-impl FamilyBuilder {
-    /// `type_prefix` starts every chart id of the family: an instance without
+impl MetricSetBuilder {
+    /// `type_prefix` starts every chart id of the set: an instance without
     /// labels gets `<type_prefix>.<chart>`, the overflow instance
     /// `<type_prefix>.<chart>_overflow`, any other instance
     /// `<type_prefix>.<chart>_<hash>`, where `<hash>` is 16 hex digits of a
     /// hash of its sorted labels, stable across restarts and releases.
+    ///
+    /// # Panics
+    ///
+    /// If `type_prefix` is empty or has bytes other than letters, digits,
+    /// `_` and `-`; if `update_every` or `expiry` is 0; if the cap's `max`
+    /// is 0 or its overflow labels are empty.
     pub fn new(type_prefix: &str, settings: Settings) -> Self {
         assert!(
             !type_prefix.is_empty() && type_prefix.bytes().all(is_id_byte),
@@ -363,39 +385,51 @@ impl FamilyBuilder {
             );
         }
         Self {
-            id: NEXT_FAMILY_ID.fetch_add(1, Ordering::Relaxed),
+            id: NEXT_SET_ID.fetch_add(1, Ordering::Relaxed),
             type_prefix: type_prefix.to_string(),
             settings,
             merges: Vec::new(),
-            cumulative: Vec::new(),
+            cumulative_cells: Vec::new(),
             charts: Vec::new(),
         }
     }
 
-    /// One counter per value of `D`, charted as rates per second.
+    /// Adds a [`Counter`] and its chart.
+    ///
+    /// # Panics
+    ///
+    /// If the chart's id or a dimension id is invalid or already used.
     pub fn counter<D: Dimensions>(&mut self, chart: Chart) -> Counter<D> {
         let base = self.cells(D::IDS.len(), Merge::Add);
         self.chart(chart, rates::<D>(base));
         Counter {
-            family: self.id,
+            set_id: self.id,
             base,
             _dimensions: PhantomData,
         }
     }
 
-    /// One running total per value of `D`, charted as increases per second.
+    /// Adds a [`Cumulative`] and its chart.
+    ///
+    /// # Panics
+    ///
+    /// As [`MetricSetBuilder::counter`].
     pub fn cumulative<D: Dimensions>(&mut self, chart: Chart) -> Cumulative<D> {
         let base = self.cells(D::IDS.len(), Merge::Last);
-        self.cumulative.extend(base..base + D::IDS.len());
+        self.cumulative_cells.extend(base..base + D::IDS.len());
         self.chart(chart, rates::<D>(base));
         Cumulative {
-            family: self.id,
+            set_id: self.id,
             base,
             _dimensions: PhantomData,
         }
     }
 
-    /// One value per value of `D`, charted as is.
+    /// Adds a [`Gauge`] and its chart.
+    ///
+    /// # Panics
+    ///
+    /// As [`MetricSetBuilder::counter`].
     pub fn gauge<D: Dimensions>(&mut self, chart: Chart) -> Gauge<D> {
         let base = self.cells(D::IDS.len(), Merge::Last);
         let dimensions = D::IDS
@@ -405,23 +439,28 @@ impl FamilyBuilder {
             .collect();
         self.chart(chart, dimensions);
         Gauge {
-            family: self.id,
+            set_id: self.id,
             base,
             _dimensions: PhantomData,
         }
     }
 
-    /// A histogram over `bounds` (finite, strictly increasing) with two
-    /// charts: `chart` shows the mean (`avg`) and largest (`max`) observed
-    /// value in `chart.units`, and the heatmap `<id>_histogram` (context
-    /// `<context>_histogram`, title `<title> histogram`, the next priority)
-    /// shows observations per second per bucket in `rate_units`, named by
+    /// Adds a [`Histogram`] over `bounds` with two charts: `chart` shows the
+    /// mean (`avg`) and largest (`max`) observed value in `chart.units`, and
+    /// the heatmap `<id>_histogram` (context `<context>_histogram`, title
+    /// `<title> histogram`, the next priority, `chart.chart_type` not used)
+    /// shows observations per second per bucket in `heatmap_units`, named by
     /// the bucket's upper bound (`+Inf` last).
+    ///
+    /// # Panics
+    ///
+    /// If `bounds` are not finite and strictly increasing, or either chart id
+    /// is invalid or already used.
     pub fn histogram(
         &mut self,
         bounds: &'static [f64],
         chart: Chart,
-        rate_units: &'static str,
+        heatmap_units: &'static str,
     ) -> Histogram {
         assert!(
             bounds.iter().all(|b| b.is_finite()) && bounds.windows(2).all(|w| w[0] < w[1]),
@@ -431,7 +470,7 @@ impl FamilyBuilder {
         let base = self.cells(bounds.len() + 3, Merge::Add);
         self.cells(1, Merge::Max);
         let histogram = Histogram {
-            family: self.id,
+            set_id: self.id,
             base,
             bounds,
         };
@@ -457,7 +496,7 @@ impl FamilyBuilder {
         self.add_chart(ChartDef {
             id: format!("{}_histogram", chart.id),
             title: format!("{} histogram", chart.title),
-            units: rate_units,
+            units: heatmap_units,
             family: chart.family,
             context: format!("{}_histogram", chart.context),
             chart_type: ChartType::Heatmap,
@@ -467,25 +506,28 @@ impl FamilyBuilder {
         histogram
     }
 
-    pub fn build(self) -> Family {
-        assert!(!self.charts.is_empty(), "family has no charts");
+    /// # Panics
+    ///
+    /// If no instrument was added.
+    pub fn build(self) -> MetricSet {
+        assert!(!self.charts.is_empty(), "metric set has no charts");
         let settings = self.settings;
         let slots = |seconds: u64| seconds.div_ceil(settings.update_every);
         let (max_instances, overflow_labels) = match settings.cap {
             Some(cap) => (cap.max, cap.overflow_labels),
             None => (usize::MAX, Labels::new()),
         };
-        Family(Arc::new(FamilyInner {
+        MetricSet(Arc::new(MetricSetInner {
             id: self.id,
             lateness_slots: slots(settings.lateness),
             expiry_slots: slots(settings.expiry),
-            initial: self.merges.iter().map(|m| m.initial()).collect(),
+            initial_cells: self.merges.iter().map(|m| m.initial()).collect(),
             type_prefix: self.type_prefix,
             update_every: settings.update_every,
             max_instances,
             overflow_labels,
             merges: self.merges,
-            cumulative: self.cumulative,
+            cumulative_cells: self.cumulative_cells,
             charts: self.charts,
         }))
     }

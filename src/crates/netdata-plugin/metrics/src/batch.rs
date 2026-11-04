@@ -1,17 +1,20 @@
-//! Request-local recording.
-//!
-//! A [`Batch`] collects the records of one unit of work (an export request)
-//! without touching the store, so the caller can drop it when the work fails
-//! and merge it only once the work is durable. Records land in partial slots
-//! keyed by instance and by the slot their own time falls in; the store
-//! decides at merge time whether a slot is still open.
+//! Request-local recording: records land in partial slots keyed by instance
+//! and by the slot their own time falls in; the store decides at merge time
+//! whether a slot is still open.
 
-use crate::family::{Counter, Cumulative, Dimensions, Family, Gauge, Histogram, Labels};
+use crate::metric_set::{Counter, Cumulative, Dimensions, Gauge, Histogram, Labels, MetricSet};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-/// A handle to an instance within one [`Batch`].
+static NEXT_BATCH_ID: AtomicU64 = AtomicU64::new(0);
+
+/// A handle to an instance within the [`Batch`] that returned it; using it
+/// with another batch panics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InstanceRef(usize);
+pub struct InstanceRef {
+    batch_id: u64,
+    index: usize,
+}
 
 pub(crate) struct PartialSlot {
     pub(crate) slot: u64,
@@ -28,51 +31,68 @@ pub(crate) struct BatchInstance {
     last: usize,
 }
 
-/// Records of one unit of work, for one family.
+/// The records of one unit of work (for example one export request) for one
+/// [`MetricSet`], kept apart from the store: drop the batch when the work
+/// fails, and merge it with [`Store::merge`](crate::Store::merge) only once
+/// the work is durable, so a retried request is not counted twice.
 pub struct Batch {
-    family: Family,
+    id: u64,
+    set: MetricSet,
     pub(crate) instances: Vec<BatchInstance>,
     index: HashMap<Labels, usize>,
 }
 
 impl Batch {
-    pub fn new(family: &Family) -> Self {
+    pub fn new(set: &MetricSet) -> Self {
         Self {
-            family: family.clone(),
+            id: NEXT_BATCH_ID.fetch_add(1, Ordering::Relaxed),
+            set: set.clone(),
             instances: Vec::new(),
             index: HashMap::new(),
         }
     }
 
-    pub(crate) fn family(&self) -> &Family {
-        &self.family
+    pub(crate) fn set(&self) -> &MetricSet {
+        &self.set
     }
 
     /// The handle for the instance with these labels, added on first use.
     /// Callers look an instance up once per group of records (for example
     /// once per OTLP resource), not per record.
     pub fn instance(&mut self, labels: Labels) -> InstanceRef {
-        if let Some(&i) = self.index.get(&labels) {
-            return InstanceRef(i);
+        if let Some(&index) = self.index.get(&labels) {
+            return InstanceRef {
+                batch_id: self.id,
+                index,
+            };
         }
-        let i = self.instances.len();
-        self.index.insert(labels.clone(), i);
+        let index = self.instances.len();
+        self.index.insert(labels.clone(), index);
         self.instances.push(BatchInstance {
             labels,
             slots: Vec::new(),
             index: HashMap::new(),
             last: 0,
         });
-        InstanceRef(i)
+        InstanceRef {
+            batch_id: self.id,
+            index,
+        }
     }
 
-    /// Start one record of `instance` at `unix_seconds` (the event's own
-    /// time). Every call counts as one record for the store's late, future
-    /// and overflow counts.
+    /// One record of `instance` at `unix_seconds` (the event's own time);
+    /// write its measurements through the returned [`Record`]. Every call
+    /// counts as one record in the store's late, future and overflow counts,
+    /// even with no measurement.
+    ///
+    /// # Panics
+    ///
+    /// If `instance` comes from another batch.
     pub fn record(&mut self, instance: InstanceRef, unix_seconds: u64) -> Record<'_> {
-        let family = &self.family.0;
-        let slot = unix_seconds / family.update_every;
-        let batch_instance = &mut self.instances[instance.0];
+        assert_eq!(instance.batch_id, self.id, "instance of another batch");
+        let set = &self.set.0;
+        let slot = unix_seconds / set.update_every;
+        let batch_instance = &mut self.instances[instance.index];
         let index = if batch_instance
             .slots
             .get(batch_instance.last)
@@ -85,7 +105,7 @@ impl Batch {
                 slots.push(PartialSlot {
                     slot,
                     records: 0,
-                    cells: family.initial.clone().into_boxed_slice(),
+                    cells: set.initial_cells.clone().into_boxed_slice(),
                 });
                 slots.len() - 1
             })
@@ -94,64 +114,77 @@ impl Batch {
         let partial = &mut batch_instance.slots[index];
         partial.records += 1;
         Record {
-            family: family.id,
+            set_id: set.id,
             cells: &mut partial.cells,
         }
     }
 
+    /// True when the batch holds no record.
     pub fn is_empty(&self) -> bool {
-        self.instances.is_empty()
+        self.instances.iter().all(|i| i.slots.is_empty())
     }
 }
 
-/// One record's measurements. A record may update several instruments; each
-/// must belong to the record's family.
+/// One record's measurements. A record may update several instruments.
+///
+/// Every method panics if the instrument belongs to another [`MetricSet`],
+/// or if the dimension's index is out of range (a broken manual
+/// [`Dimensions`] implementation).
 pub struct Record<'a> {
-    family: u32,
+    set_id: u32,
     cells: &'a mut [f64],
 }
 
 impl Record<'_> {
-    fn check(&self, family: u32) {
-        assert_eq!(family, self.family, "instrument of another family");
+    fn cell<D: Dimensions>(&self, set_id: u32, base: usize, dimension: D) -> usize {
+        assert_eq!(set_id, self.set_id, "instrument of another metric set");
+        let index = dimension.index();
+        assert!(
+            index < D::IDS.len(),
+            "dimension index {index} out of {}",
+            D::IDS.len()
+        );
+        base + index
     }
 
-    /// Add `weight` to the `dimension` value of `counter`.
+    /// Add `amount` to the `dimension` value of `counter`.
     pub fn add<D: Dimensions>(
         &mut self,
         counter: Counter<D>,
         dimension: D,
-        weight: f64,
+        amount: f64,
     ) -> &mut Self {
-        self.check(counter.family);
-        self.cells[counter.base + dimension.index()] += weight;
+        let cell = self.cell(counter.set_id, counter.base, dimension);
+        self.cells[cell] += amount;
         self
     }
 
-    /// Set the `dimension` total of `cumulative` to `total`; within one slot
-    /// the total merged last wins.
+    /// Set the `dimension` total of `cumulative` to `total`.
     pub fn set_total<D: Dimensions>(
         &mut self,
         cumulative: Cumulative<D>,
         dimension: D,
         total: f64,
     ) -> &mut Self {
-        self.check(cumulative.family);
-        self.cells[cumulative.base + dimension.index()] = total;
+        let cell = self.cell(cumulative.set_id, cumulative.base, dimension);
+        self.cells[cell] = total;
         self
     }
 
     /// Set the `dimension` value of `gauge` to `value`.
     pub fn set<D: Dimensions>(&mut self, gauge: Gauge<D>, dimension: D, value: f64) -> &mut Self {
-        self.check(gauge.family);
-        self.cells[gauge.base + dimension.index()] = value;
+        let cell = self.cell(gauge.set_id, gauge.base, dimension);
+        self.cells[cell] = value;
         self
     }
 
     /// Observe `value` with `weight` (the number of events it stands for).
     /// A non-finite value is ignored.
     pub fn observe(&mut self, histogram: Histogram, value: f64, weight: f64) -> &mut Self {
-        self.check(histogram.family);
+        assert_eq!(
+            histogram.set_id, self.set_id,
+            "instrument of another metric set"
+        );
         if !value.is_finite() {
             return self;
         }

@@ -1,10 +1,10 @@
 //! Self-monitoring: what the plugin itself receives, stores and rejects, and,
 //! when derived metrics are enabled, how their derivation behaves. Counted at
-//! arrival time, so the families have no lateness.
+//! arrival time, so the metric sets have no lateness.
 
 use netdata_plugin_metrics::{
-    Batch, Chart, ChartType, Counter, Cumulative, Family, FamilyBuilder, Gauge, Labels, Settings,
-    Stats, dimensions,
+    Batch, Chart, ChartType, Counter, Cumulative, Gauge, Labels, MetricSet, MetricSetBuilder,
+    Settings, Stats, dimensions,
 };
 use otel_bridge::signals::Signal;
 
@@ -39,14 +39,14 @@ dimensions! {
 
 /// The plugin's ingest outcomes: one label-less instance.
 pub(crate) struct Plugin {
-    pub(crate) family: Family,
+    pub(crate) metrics: MetricSet,
     spans: Counter<Acceptance>,
     log_records: Counter<Acceptance>,
 }
 
 impl Plugin {
     pub(crate) fn new() -> Self {
-        let mut b = FamilyBuilder::new("otel_plugin", Settings::default());
+        let mut b = MetricSetBuilder::new("otel_plugin", Settings::default());
         let spans = b.counter(Chart {
             id: "spans",
             title: "OpenTelemetry spans received",
@@ -66,7 +66,7 @@ impl Plugin {
             priority: 150_001,
         });
         Self {
-            family: b.build(),
+            metrics: b.build(),
             spans,
             log_records,
         }
@@ -77,7 +77,7 @@ impl Plugin {
             Signal::Traces => self.spans,
             Signal::Logs => self.log_records,
         };
-        let mut batch = Batch::new(&self.family);
+        let mut batch = Batch::new(&self.metrics);
         let instance = batch.instance(Labels::new());
         batch
             .record(instance, now)
@@ -90,7 +90,7 @@ impl Plugin {
     /// charts defined from the first tick and never lets them expire while
     /// the plugin runs.
     pub(crate) fn heartbeat(&self, now: u64) -> Batch {
-        let mut batch = Batch::new(&self.family);
+        let mut batch = Batch::new(&self.metrics);
         let instance = batch.instance(Labels::new());
         batch.record(instance, now);
         batch
@@ -100,7 +100,7 @@ impl Plugin {
 /// How the per-service derivation of each signal behaves: one instance per
 /// signal, labelled `signal`, fed from its store's statistics every tick.
 pub(crate) struct Derivation {
-    pub(crate) family: Family,
+    pub(crate) metrics: MetricSet,
     services: Gauge<Services>,
     adjusted: Cumulative<Adjustment>,
     expired: Cumulative<Expired>,
@@ -108,7 +108,7 @@ pub(crate) struct Derivation {
 
 impl Derivation {
     pub(crate) fn new() -> Self {
-        let mut b = FamilyBuilder::new("otel_plugin", Settings::default());
+        let mut b = MetricSetBuilder::new("otel_plugin", Settings::default());
         let services = b.gauge(Chart {
             id: "derived_services",
             title: "Services with derived charts",
@@ -138,7 +138,7 @@ impl Derivation {
             priority: 150_012,
         });
         Self {
-            family: b.build(),
+            metrics: b.build(),
             services,
             adjusted,
             expired,
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn ingest_outcomes_render_per_signal() {
         let plugin = Plugin::new();
-        let mut store = Store::new(plugin.family.clone());
+        let mut store = Store::new(plugin.metrics.clone());
         store.merge(plugin.ingest(Signal::Traces, 7, 2, 100), 100);
         store.merge(plugin.ingest(Signal::Logs, 3, 0, 100), 100);
         let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn the_heartbeat_keeps_the_charts_defined_without_traffic() {
         let plugin = Plugin::new();
-        let mut store = Store::new(plugin.family.clone());
+        let mut store = Store::new(plugin.metrics.clone());
         store.merge(plugin.heartbeat(100), 100);
         let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
         assert!(out.contains("CHART otel_plugin.spans "));
@@ -214,9 +214,9 @@ mod tests {
     #[test]
     fn derivation_charts_one_instance_per_signal_with_increases() {
         let derivation = Derivation::new();
-        let mut store = Store::new(derivation.family.clone());
+        let mut store = Store::new(derivation.metrics.clone());
         let mut tick = |stats: Stats, now: u64| {
-            let mut batch = Batch::new(&derivation.family);
+            let mut batch = Batch::new(&derivation.metrics);
             derivation.record(&mut batch, Signal::Traces, &stats, now);
             derivation.record(&mut batch, Signal::Logs, &Stats::default(), now);
             store.merge(batch, now);

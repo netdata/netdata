@@ -9,8 +9,8 @@
 //! adjusted count its `ot=th` sampling threshold implies.
 
 use netdata_plugin_metrics::{
-    Batch, Cap, Chart, ChartType, Counter, Family, FamilyBuilder, Histogram, InstanceRef, Labels,
-    Settings, dimensions,
+    Batch, Cap, Chart, ChartType, Counter, Histogram, InstanceRef, Labels, MetricSet,
+    MetricSetBuilder, Settings, dimensions,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
@@ -43,14 +43,14 @@ dimensions! {
 const UNKNOWN_SERVICE: &str = "unknown_service";
 
 pub(crate) struct Services {
-    pub(crate) family: Family,
+    pub(crate) metrics: MetricSet,
     requests: Counter<Outcome>,
     duration: Histogram,
 }
 
 impl Services {
     pub(crate) fn new(max_services: usize) -> Self {
-        let mut b = FamilyBuilder::new("otel_service", service_settings(max_services));
+        let mut b = MetricSetBuilder::new("otel_service", service_settings(max_services));
         let requests = b.counter::<Outcome>(Chart {
             id: "requests",
             title: "Service requests",
@@ -75,7 +75,7 @@ impl Services {
             "requests/s",
         );
         Self {
-            family: b.build(),
+            metrics: b.build(),
             requests,
             duration,
         }
@@ -126,7 +126,7 @@ impl Services {
     }
 }
 
-/// The settings of a per-service family: late spans and log records still
+/// The settings of a per-service metric set: late spans and log records still
 /// count in their second, and services over `max_services` share one
 /// overflow chart set.
 pub(crate) fn service_settings(max_services: usize) -> Settings {
@@ -268,8 +268,8 @@ mod tests {
     }
 
     fn render(services: &Services, request: &ExportTraceServiceRequest) -> String {
-        let mut store = Store::new(services.family.clone());
-        let mut batch = Batch::new(&services.family);
+        let mut store = Store::new(services.metrics.clone());
+        let mut batch = Batch::new(&services.metrics);
         services.record(&mut batch, "default", request);
         store.merge(batch, 100);
         let out = String::from_utf8(store.emit(110, usize::MAX).concat()).unwrap();

@@ -11,7 +11,7 @@
 
 use crate::services::{service_labels, service_settings};
 use netdata_plugin_metrics::{
-    Batch, Chart, ChartType, Counter, Family, FamilyBuilder, InstanceRef, dimensions,
+    Batch, Chart, ChartType, Counter, InstanceRef, MetricSet, MetricSetBuilder, dimensions,
 };
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
@@ -43,13 +43,13 @@ impl Severity {
 }
 
 pub(crate) struct ServiceLogs {
-    pub(crate) family: Family,
+    pub(crate) metrics: MetricSet,
     records: Counter<Severity>,
 }
 
 impl ServiceLogs {
     pub(crate) fn new(max_services: usize) -> Self {
-        let mut b = FamilyBuilder::new("otel_service", service_settings(max_services));
+        let mut b = MetricSetBuilder::new("otel_service", service_settings(max_services));
         let records = b.counter::<Severity>(Chart {
             id: "log_records",
             title: "Service log records by severity",
@@ -60,7 +60,7 @@ impl ServiceLogs {
             priority: 60_010,
         });
         Self {
-            family: b.build(),
+            metrics: b.build(),
             records,
         }
     }
@@ -151,8 +151,8 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let mut store = Store::new(logs.family.clone());
-        let mut batch = Batch::new(&logs.family);
+        let mut store = Store::new(logs.metrics.clone());
+        let mut batch = Batch::new(&logs.metrics);
         logs.record(&mut batch, "default", &request);
         store.merge(batch, 100);
         let out = String::from_utf8(store.emit(106, usize::MAX).concat()).unwrap();

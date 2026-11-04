@@ -1,26 +1,15 @@
 //! The store: instances, the open-slot window, the instance cap, expiry and
-//! rendering.
+//! emitting.
 //!
-//! Slots are numbered `unix_seconds / update_every`; slot `s` covers
-//! `[s * update_every, (s + 1) * update_every)` and its point is stored at
-//! its end. The store keeps every slot from `next_emit` (the oldest slot not
-//! yet rendered) to the current one open. A slot is rendered once the
-//! family's lateness has passed after its end, and never again; a record
-//! older than the window is counted in the oldest open slot and one from the
-//! future in the current slot, so every record is counted exactly once.
-//!
-//! Charts are defined with `store_first` and every update ends with
-//! `END <slot end> 0 1`, so the agent stores each slot's point at the slot's
-//! end, not at the time the store renders it (see
-//! `netdata_plugin_protocol::write_end_timed`).
-//!
-//! After a stall or a forward step of the clock, at most
-//! [`MAX_BACKLOG_SLOTS`] slots beyond the lateness are rendered at once:
-//! pending slots older than that are folded into the oldest one rendered, so
-//! no record is lost and memory stays bounded.
+//! The store keeps every slot from `next_emit` (the oldest slot not yet
+//! emitted) to the current one open; each instance holds those slots as cell
+//! arrays and folds them forward after a stall (`advance_window`). Instances
+//! are created on their first record with data, charts are defined on an
+//! instance's first emitted slot, and an expired instance's state is dropped
+//! (its cumulative baselines with it).
 
 use crate::batch::Batch;
-use crate::family::{Family, FamilyInner, Labels, Value};
+use crate::metric_set::{Labels, MetricSet, MetricSetInner, Value};
 use netdata_plugin_protocol::{
     ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
     write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end_timed,
@@ -28,8 +17,10 @@ use netdata_plugin_protocol::{
 };
 use std::collections::{HashMap, VecDeque};
 
-/// Slots beyond the lateness that one catch-up renders at most.
-pub const MAX_BACKLOG_SLOTS: u64 = 60;
+/// Most slots past the lateness one [`Store::emit`] emits after a stall or a
+/// forward clock step; older pending slots are folded into the oldest one
+/// emitted, so no record is lost and memory stays bounded.
+pub(crate) const MAX_BACKLOG_SLOTS: u64 = 60;
 
 /// Counts since the store was created; `instances` is the current number.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -48,34 +39,51 @@ pub struct Stats {
 
 struct Instance {
     labels: Labels,
-    /// The full id of each of the family's charts, in family order.
+    /// The full id of each of the set's charts, in set order.
     chart_ids: Vec<String>,
     defined: bool,
-    /// Earliest slot with records; nothing is rendered before it.
+    /// Earliest slot with records; nothing is emitted before it.
     first_slot: u64,
     /// Latest slot with records; drives expiry.
     last_slot: u64,
     /// Open slots from `next_emit` onwards; missing ones are empty.
     slots: VecDeque<Box<[f64]>>,
-    /// The last rendered total of each cumulative cell, in family order;
-    /// NaN until the first one.
-    totals: Box<[f64]>,
+    /// The last emitted total of each cumulative cell, in set order; NaN
+    /// until the first one.
+    previous_totals: Box<[f64]>,
 }
 
-/// Accumulates batches of one family and renders them as chart-protocol text.
+/// Accumulates the batches of one [`MetricSet`] and emits them as
+/// chart-protocol text. It reads no clock and does no I/O: the caller passes
+/// the current time (Unix seconds) and delivers the bytes, and calls
+/// [`Store::emit`] at least once per slot. Wrap it in a lock to share it.
+///
+/// Time: slot `s` covers `[s * update_every, (s + 1) * update_every)`, and
+/// the agent stores its point at the slot's end, not at the time it is
+/// emitted. A slot is emitted once the lateness has passed after its end,
+/// and never again. A record older than the open window is counted in the
+/// oldest open slot and one from the future in the current slot (see
+/// [`Stats`]), so every record is counted exactly once. After a stall, at
+/// most 60 slots past the lateness are emitted at once and older pending
+/// slots are folded into the first of them, which then shows the folded
+/// rates as one spike.
+///
+/// Lifecycle: an instance's charts are defined (with its labels) before
+/// their first update; after `expiry` without records they are marked
+/// obsolete, and they are defined again when the instance returns.
 pub struct Store {
-    family: Family,
+    set: MetricSet,
     instances: HashMap<Labels, Instance>,
     overflow: Option<Instance>,
-    /// Oldest slot not yet rendered; set on first use.
+    /// Oldest slot not yet emitted; set on first use.
     next_emit: Option<u64>,
     stats: Stats,
 }
 
 impl Store {
-    pub fn new(family: Family) -> Self {
+    pub fn new(set: MetricSet) -> Self {
         Self {
-            family,
+            set,
             instances: HashMap::new(),
             overflow: None,
             next_emit: None,
@@ -90,36 +98,41 @@ impl Store {
         }
     }
 
-    /// The oldest slot not yet rendered, as of `now`: set on first use, and
-    /// moved forward when it falls more than [`MAX_BACKLOG_SLOTS`] behind the
-    /// lateness window.
-    fn start(&mut self, now: u64) -> u64 {
-        let family = std::sync::Arc::clone(&self.family.0);
-        let now_slot = now / family.update_every;
+    /// The oldest slot not yet emitted, as of `now`: set on first use, and
+    /// moved forward, folding the slots it passes, when it falls more than
+    /// [`MAX_BACKLOG_SLOTS`] behind the lateness window.
+    fn advance_window(&mut self, now: u64) -> u64 {
+        let set = std::sync::Arc::clone(&self.set.0);
+        let now_slot = now / set.update_every;
         let next_emit = *self
             .next_emit
-            .get_or_insert(now_slot.saturating_sub(family.lateness_slots));
-        let oldest_wanted = now_slot.saturating_sub(family.lateness_slots + MAX_BACKLOG_SLOTS);
+            .get_or_insert(now_slot.saturating_sub(set.lateness_slots));
+        let oldest_wanted = now_slot.saturating_sub(set.lateness_slots + MAX_BACKLOG_SLOTS);
         if next_emit >= oldest_wanted {
             return next_emit;
         }
         let skipped = oldest_wanted - next_emit;
         for instance in self.instances.values_mut().chain(self.overflow.as_mut()) {
-            fold_front(&family, instance, skipped, oldest_wanted);
+            fold_front(&set, instance, skipped, oldest_wanted);
         }
         self.next_emit = Some(oldest_wanted);
         oldest_wanted
     }
 
-    /// Merge a batch recorded at or before `now` (Unix seconds).
+    /// Merge a batch; `now` (Unix seconds) decides which slots are still
+    /// open.
+    ///
+    /// # Panics
+    ///
+    /// If the batch is of another metric set.
     pub fn merge(&mut self, batch: Batch, now: u64) {
         assert!(
-            std::sync::Arc::ptr_eq(&batch.family().0, &self.family.0),
-            "batch of another family"
+            std::sync::Arc::ptr_eq(&batch.set().0, &self.set.0),
+            "batch of another metric set"
         );
-        let next_emit = self.start(now);
-        let family = std::sync::Arc::clone(&self.family.0);
-        let newest = (now / family.update_every).max(next_emit);
+        let next_emit = self.advance_window(now);
+        let set = std::sync::Arc::clone(&self.set.0);
+        let newest = (now / set.update_every).max(next_emit);
         for batch_instance in batch.instances {
             if batch_instance.slots.is_empty() {
                 continue;
@@ -127,16 +140,15 @@ impl Store {
             let records: u64 = batch_instance.slots.iter().map(|s| s.records).sum();
             let instance = if let Some(instance) = self.instances.get_mut(&batch_instance.labels) {
                 instance
-            } else if self.instances.len() < family.max_instances {
-                let instance = new_instance(&family, batch_instance.labels.clone(), false);
+            } else if self.instances.len() < set.max_instances {
+                let instance = new_instance(&set, batch_instance.labels.clone(), false);
                 self.instances
                     .entry(batch_instance.labels)
                     .or_insert(instance)
             } else {
                 self.stats.overflowed_records += records;
-                self.overflow.get_or_insert_with(|| {
-                    new_instance(&family, family.overflow_labels.clone(), true)
-                })
+                self.overflow
+                    .get_or_insert_with(|| new_instance(&set, set.overflow_labels.clone(), true))
             };
             for partial in batch_instance.slots {
                 let slot = if partial.slot < next_emit {
@@ -148,26 +160,26 @@ impl Store {
                 } else {
                     partial.slot
                 };
-                merge_slot(&family, instance, next_emit, slot, &partial.cells);
+                merge_slot(&set, instance, next_emit, slot, &partial.cells);
             }
         }
     }
 
-    /// Render every slot whose lateness has passed by `now` (Unix seconds):
+    /// Emit every slot whose lateness has passed by `now` (Unix seconds):
     /// definitions of new instances, one update per chart and slot, and
     /// obsolete charts of expired instances. Returns chunks of at most
     /// `max_chunk` bytes, each a run of whole chart blocks (a single block
     /// larger than `max_chunk` gets a chunk of its own).
     pub fn emit(&mut self, now: u64, max_chunk: usize) -> Vec<Vec<u8>> {
         let mut out = Chunker::new(max_chunk);
-        let mut next_emit = self.start(now);
-        let family = std::sync::Arc::clone(&self.family.0);
-        let now_slot = now / family.update_every;
-        while next_emit + family.lateness_slots < now_slot {
+        let mut next_emit = self.advance_window(now);
+        let set = std::sync::Arc::clone(&self.set.0);
+        let now_slot = now / set.update_every;
+        while next_emit + set.lateness_slots < now_slot {
             let slot = next_emit;
             let mut expired = Vec::new();
             for (labels, instance) in &mut self.instances {
-                if emit_slot(&family, instance, slot, &mut out) {
+                if emit_slot(&set, instance, slot, &mut out) {
                     expired.push(labels.clone());
                 }
             }
@@ -176,7 +188,7 @@ impl Store {
                 self.stats.expired_instances += 1;
             }
             if let Some(instance) = &mut self.overflow {
-                if emit_slot(&family, instance, slot, &mut out) {
+                if emit_slot(&set, instance, slot, &mut out) {
                     self.overflow = None;
                     self.stats.expired_instances += 1;
                 }
@@ -190,29 +202,29 @@ impl Store {
 
 /// Merge the first `skipped` window slots of `instance` into the slot that
 /// becomes the window's first, `new_first`.
-fn fold_front(family: &FamilyInner, instance: &mut Instance, skipped: u64, new_first: u64) {
+fn fold_front(set: &MetricSetInner, instance: &mut Instance, skipped: u64, new_first: u64) {
     let take = (skipped as usize).min(instance.slots.len());
     if take == 0 {
         return;
     }
-    let mut folded = family.initial.clone().into_boxed_slice();
+    let mut folded = set.initial_cells.clone().into_boxed_slice();
     for cells in instance.slots.drain(..take) {
-        merge_cells(family, &mut folded, &cells);
+        merge_cells(set, &mut folded, &cells);
     }
     match instance.slots.front_mut() {
-        Some(front) => merge_cells(family, front, &folded),
+        Some(front) => merge_cells(set, front, &folded),
         None => instance.slots.push_back(folded),
     }
     instance.first_slot = instance.first_slot.max(new_first);
 }
 
-fn merge_cells(family: &FamilyInner, target: &mut [f64], cells: &[f64]) {
-    for ((merge, current), &incoming) in family.merges.iter().zip(target.iter_mut()).zip(cells) {
+fn merge_cells(set: &MetricSetInner, target: &mut [f64], cells: &[f64]) {
+    for ((merge, current), &incoming) in set.merges.iter().zip(target.iter_mut()).zip(cells) {
         *current = merge.apply(*current, incoming);
     }
 }
 
-fn new_instance(family: &FamilyInner, labels: Labels, overflow: bool) -> Instance {
+fn new_instance(set: &MetricSetInner, labels: Labels, overflow: bool) -> Instance {
     let suffix = if overflow {
         "_overflow".to_string()
     } else if labels.is_empty() {
@@ -221,17 +233,17 @@ fn new_instance(family: &FamilyInner, labels: Labels, overflow: bool) -> Instanc
         format!("_{:016x}", label_hash(&labels))
     };
     Instance {
-        chart_ids: family
+        chart_ids: set
             .charts
             .iter()
-            .map(|chart| format!("{}.{}{suffix}", family.type_prefix, chart.id))
+            .map(|chart| format!("{}.{}{suffix}", set.type_prefix, chart.id))
             .collect(),
         labels,
         defined: false,
         first_slot: u64::MAX,
         last_slot: 0,
         slots: VecDeque::new(),
-        totals: vec![f64::NAN; family.cumulative.len()].into_boxed_slice(),
+        previous_totals: vec![f64::NAN; set.cumulative_cells.len()].into_boxed_slice(),
     }
 }
 
@@ -249,7 +261,7 @@ fn label_hash(labels: &Labels) -> u64 {
 }
 
 fn merge_slot(
-    family: &FamilyInner,
+    set: &MetricSetInner,
     instance: &mut Instance,
     next_emit: u64,
     slot: u64,
@@ -259,43 +271,43 @@ fn merge_slot(
     while instance.slots.len() <= index {
         instance
             .slots
-            .push_back(family.initial.clone().into_boxed_slice());
+            .push_back(set.initial_cells.clone().into_boxed_slice());
     }
-    merge_cells(family, &mut instance.slots[index], cells);
+    merge_cells(set, &mut instance.slots[index], cells);
     instance.first_slot = instance.first_slot.min(slot);
     instance.last_slot = instance.last_slot.max(slot);
 }
 
-/// Render `slot` of one instance and drop it from the instance's window.
+/// Emit `slot` of one instance and drop it from the instance's window.
 /// Returns true when the instance has expired; its charts are then already
 /// marked obsolete in `out`.
-fn emit_slot(family: &FamilyInner, instance: &mut Instance, slot: u64, out: &mut Chunker) -> bool {
+fn emit_slot(set: &MetricSetInner, instance: &mut Instance, slot: u64, out: &mut Chunker) -> bool {
     let cells = instance.slots.pop_front();
     if slot >= instance.first_slot {
         if !instance.defined {
-            for index in 0..family.charts.len() {
-                define_chart(family, instance, index, false, out);
+            for index in 0..set.charts.len() {
+                define_chart(set, instance, index, false, out);
             }
             instance.defined = true;
         }
-        let mut cells = cells.unwrap_or_else(|| family.initial.clone().into_boxed_slice());
-        totals_to_increases(family, instance, &mut cells);
-        for (chart, id) in family.charts.iter().zip(&instance.chart_ids) {
+        let mut cells = cells.unwrap_or_else(|| set.initial_cells.clone().into_boxed_slice());
+        totals_to_increases(set, instance, &mut cells);
+        for (chart, id) in set.charts.iter().zip(&instance.chart_ids) {
             let block = out.block();
-            write_begin(block, id, family.update_every * 1_000_000);
+            write_begin(block, id, set.update_every * 1_000_000);
             for dim in &chart.dimensions {
-                match render(family, &cells, dim.value) {
+                match dimension_value(set, &cells, dim.value) {
                     Some(value) => write_set_float(block, &dim.id, value),
                     None => write_set_empty(block, &dim.id),
                 }
             }
-            write_end_timed(block, (slot + 1) * family.update_every);
+            write_end_timed(block, (slot + 1) * set.update_every);
             out.commit();
         }
     }
-    if instance.defined && slot >= instance.last_slot + family.expiry_slots {
-        for index in 0..family.charts.len() {
-            define_chart(family, instance, index, true, out);
+    if instance.defined && slot >= instance.last_slot + set.expiry_slots {
+        for index in 0..set.charts.len() {
+            define_chart(set, instance, index, true, out);
         }
         return true;
     }
@@ -304,8 +316,12 @@ fn emit_slot(family: &FamilyInner, instance: &mut Instance, slot: u64, out: &mut
 
 /// Replace the totals in `cells` with their increase since the instance's
 /// previous total, and remember the new totals.
-fn totals_to_increases(family: &FamilyInner, instance: &mut Instance, cells: &mut [f64]) {
-    for (&cell, previous) in family.cumulative.iter().zip(instance.totals.iter_mut()) {
+fn totals_to_increases(set: &MetricSetInner, instance: &mut Instance, cells: &mut [f64]) {
+    for (&cell, previous) in set
+        .cumulative_cells
+        .iter()
+        .zip(instance.previous_totals.iter_mut())
+    {
         let total = cells[cell];
         cells[cell] = if total.is_nan() {
             // No new total: no increase, once a baseline exists.
@@ -325,9 +341,9 @@ fn totals_to_increases(family: &FamilyInner, instance: &mut Instance, cells: &mu
     }
 }
 
-fn render(family: &FamilyInner, cells: &[f64], value: Value) -> Option<f64> {
+fn dimension_value(set: &MetricSetInner, cells: &[f64], value: Value) -> Option<f64> {
     let value = match value {
-        Value::Rate(cell) => cells[cell] / family.update_every as f64,
+        Value::Rate(cell) => cells[cell] / set.update_every as f64,
         Value::Ratio {
             numerator,
             denominator,
@@ -343,13 +359,13 @@ fn render(family: &FamilyInner, cells: &[f64], value: Value) -> Option<f64> {
 /// clock for the chart to whole seconds and keeps its first point, so every
 /// timed END lands exactly on its slot.
 fn define_chart(
-    family: &FamilyInner,
+    set: &MetricSetInner,
     instance: &Instance,
     index: usize,
     obsolete: bool,
     out: &mut Chunker,
 ) {
-    let chart = &family.charts[index];
+    let chart = &set.charts[index];
     let block = out.block();
     write_chart(
         block,
@@ -362,7 +378,7 @@ fn define_chart(
             context: &chart.context,
             chart_type: chart.chart_type,
             priority: chart.priority,
-            update_every: family.update_every,
+            update_every: set.update_every,
             options: ChartOptions {
                 obsolete,
                 store_first: true,
@@ -439,7 +455,7 @@ impl Chunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Cap, Chart, ChartType, Counter, FamilyBuilder, Histogram, Settings};
+    use crate::{Cap, Chart, ChartType, Counter, Histogram, MetricSetBuilder, Settings};
     use netdata_plugin_protocol::validate_chart_stream;
 
     const BOUNDS: &[f64] = &[0.1, 1.0];
@@ -452,7 +468,7 @@ mod tests {
     }
 
     struct Fixture {
-        family: Family,
+        set: MetricSet,
         requests: Counter<Outcome>,
         duration: Histogram,
     }
@@ -466,7 +482,7 @@ mod tests {
                 overflow_labels,
             }
         });
-        let mut b = FamilyBuilder::new(
+        let mut b = MetricSetBuilder::new(
             "svc",
             Settings {
                 lateness,
@@ -498,7 +514,7 @@ mod tests {
             "requests/s",
         );
         Fixture {
-            family: b.build(),
+            set: b.build(),
             requests,
             duration,
         }
@@ -525,7 +541,7 @@ mod tests {
         errors: u64,
         now: u64,
     ) {
-        let mut batch = Batch::new(&f.family);
+        let mut batch = Batch::new(&f.set);
         let inst = batch.instance(labels(name));
         for i in 0..count {
             batch
@@ -547,7 +563,7 @@ mod tests {
     #[test]
     fn defines_once_then_updates_each_slot() {
         let f = fixture(0, 900, None);
-        let mut store = Store::new(f.family.clone());
+        let mut store = Store::new(f.set.clone());
         record(&f, &mut store, "checkout", 100, 3, 1, 100);
         let first = text(&store.emit(101, usize::MAX));
         let h = format!("{:016x}", label_hash(&labels("checkout")));
@@ -584,14 +600,14 @@ mod tests {
             )
         );
         validate_chart_stream(format!("{first}{second}").as_bytes()).unwrap();
-        // Nothing is rendered twice.
+        // Nothing is emitted twice.
         assert!(store.emit(102, usize::MAX).is_empty());
     }
 
     #[test]
     fn lateness_keeps_slots_open_and_clamps_exactly_once() {
         let f = fixture(10, 900, None);
-        let mut store = Store::new(f.family.clone());
+        let mut store = Store::new(f.set.clone());
         // Window starts at slot 990 (now 1000, lateness 10).
         record(&f, &mut store, "a", 995, 1, 0, 1000);
         // Too late: counted in the oldest open slot.
@@ -623,7 +639,7 @@ mod tests {
     #[test]
     fn expired_instances_are_marked_obsolete_and_revived() {
         let f = fixture(0, 3, None);
-        let mut store = Store::new(f.family.clone());
+        let mut store = Store::new(f.set.clone());
         record(&f, &mut store, "a", 10, 1, 0, 10);
         let mut out = text(&store.emit(13, usize::MAX));
         assert!(!out.contains("obsolete"));
@@ -642,7 +658,7 @@ mod tests {
     #[test]
     fn instances_over_the_cap_share_the_overflow_instance() {
         let f = fixture(0, 3, Some(1));
-        let mut store = Store::new(f.family.clone());
+        let mut store = Store::new(f.set.clone());
         record(&f, &mut store, "a", 10, 1, 0, 10);
         record(&f, &mut store, "b", 10, 2, 0, 10);
         record(&f, &mut store, "c", 10, 3, 0, 10);
@@ -664,8 +680,8 @@ mod tests {
     #[test]
     fn instances_without_records_are_not_created() {
         let f = fixture(0, 3, Some(1));
-        let mut store = Store::new(f.family.clone());
-        let mut batch = Batch::new(&f.family);
+        let mut store = Store::new(f.set.clone());
+        let mut batch = Batch::new(&f.set);
         batch.instance(labels("empty"));
         store.merge(batch, 10);
         assert_eq!(store.stats().instances, 0);
@@ -680,7 +696,7 @@ mod tests {
     #[test]
     fn a_clock_jump_renders_a_bounded_backlog_and_keeps_every_record() {
         let f = fixture(10, 1_000_000, None);
-        let mut store = Store::new(f.family.clone());
+        let mut store = Store::new(f.set.clone());
         record(&f, &mut store, "a", 10, 1, 0, 10);
         record(&f, &mut store, "a", 100_000, 2, 0, 100_000);
         let window = store.instances.values().next().unwrap().slots.len() as u64;
@@ -700,8 +716,8 @@ mod tests {
     #[test]
     fn records_spread_over_many_seconds_land_in_their_slots() {
         let f = fixture(10, 900, None);
-        let mut store = Store::new(f.family.clone());
-        let mut batch = Batch::new(&f.family);
+        let mut store = Store::new(f.set.clone());
+        let mut batch = Batch::new(&f.set);
         let inst = batch.instance(labels("a"));
         for time in [995, 996, 995, 997, 996, 999] {
             batch.record(inst, time).add(f.requests, Outcome::Ok, 1.0);
@@ -718,7 +734,7 @@ mod tests {
     #[test]
     fn chunks_hold_whole_blocks_under_the_budget() {
         let f = fixture(0, 900, None);
-        let mut store = Store::new(f.family.clone());
+        let mut store = Store::new(f.set.clone());
         for name in ["a", "b", "c", "d"] {
             record(&f, &mut store, name, 10, 1, 0, 10);
         }
@@ -744,7 +760,7 @@ mod tests {
         assert_eq!(labels.0.len(), 1);
         assert_eq!(labels.0[0].1.len(), 800);
         let f = fixture(0, 900, None);
-        let instance = new_instance(&f.family.0, labels, false);
+        let instance = new_instance(&f.set.0, labels, false);
         assert!(instance.chart_ids[0].starts_with("svc.requests_"));
         assert!(netdata_plugin_protocol::is_valid_chart_id(
             &instance.chart_ids[0]
@@ -761,7 +777,7 @@ mod tests {
         ba.push("a", "1");
         assert_eq!(ab, ba);
         let f = fixture(0, 900, None);
-        let ids = |labels: Labels| new_instance(&f.family.0, labels, false).chart_ids;
+        let ids = |labels: Labels| new_instance(&f.set.0, labels, false).chart_ids;
         assert_eq!(ids(ab), ids(ba));
         assert_eq!(ids(Labels::new())[0], "svc.requests");
     }
@@ -773,7 +789,7 @@ mod tests {
                 Events = "events",
             }
         }
-        let mut b = FamilyBuilder::new(
+        let mut b = MetricSetBuilder::new(
             "src",
             Settings {
                 expiry: 3,
@@ -789,10 +805,10 @@ mod tests {
             chart_type: ChartType::Line,
             priority: 1,
         });
-        let family = b.build();
-        let mut store = Store::new(family.clone());
+        let set = b.build();
+        let mut store = Store::new(set.clone());
         let set = |store: &mut Store, time: u64, total: Option<f64>| {
-            let mut batch = Batch::new(&family);
+            let mut batch = Batch::new(&set);
             let inst = batch.instance(Labels::new());
             let mut record = batch.record(inst, time);
             if let Some(total) = total {
@@ -822,20 +838,68 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "instrument of another family")]
-    fn an_instrument_of_another_family_is_refused() {
+    #[should_panic(expected = "instrument of another metric set")]
+    fn an_instrument_of_another_metric_set_is_refused() {
         let f = fixture(0, 900, None);
         let other = fixture(0, 900, None);
-        let mut batch = Batch::new(&f.family);
+        let mut batch = Batch::new(&f.set);
         let inst = batch.instance(labels("a"));
         batch.record(inst, 10).add(other.requests, Outcome::Ok, 1.0);
     }
 
     #[test]
+    #[should_panic(expected = "instance of another batch")]
+    fn an_instance_of_another_batch_is_refused() {
+        let f = fixture(0, 900, None);
+        let mut first = Batch::new(&f.set);
+        let mut second = Batch::new(&f.set);
+        let inst = first.instance(labels("a"));
+        second.instance(labels("a"));
+        second.record(inst, 10);
+    }
+
+    #[test]
+    #[should_panic(expected = "dimension index 2 out of 2")]
+    fn a_dimension_index_out_of_range_is_refused() {
+        #[derive(Clone, Copy)]
+        struct Broken;
+        impl crate::Dimensions for Broken {
+            const IDS: &'static [&'static str] = &["a", "b"];
+            fn index(self) -> usize {
+                2
+            }
+        }
+        let mut b = MetricSetBuilder::new("x", Settings::default());
+        let counter = b.counter::<Broken>(Chart {
+            id: "c",
+            title: "C",
+            units: "events/s",
+            family: "c",
+            context: "x.c",
+            chart_type: ChartType::Line,
+            priority: 1,
+        });
+        let set = b.build();
+        let mut batch = Batch::new(&set);
+        let inst = batch.instance(Labels::new());
+        batch.record(inst, 10).add(counter, Broken, 1.0);
+    }
+
+    #[test]
+    fn a_batch_without_records_is_empty() {
+        let f = fixture(0, 900, None);
+        let mut batch = Batch::new(&f.set);
+        let inst = batch.instance(labels("a"));
+        assert!(batch.is_empty());
+        batch.record(inst, 10);
+        assert!(!batch.is_empty());
+    }
+
+    #[test]
     fn weights_scale_counts_and_histograms() {
         let f = fixture(0, 900, None);
-        let mut store = Store::new(f.family.clone());
-        let mut batch = Batch::new(&f.family);
+        let mut store = Store::new(f.set.clone());
+        let mut batch = Batch::new(&f.set);
         let inst = batch.instance(labels("a"));
         batch
             .record(inst, 10)

@@ -3,8 +3,8 @@
 //! records by severity, and the plugin's own ingest outcomes and derivation
 //! health (self-monitoring).
 //!
-//! [`DerivedMetrics`] owns one `netdata_plugin_metrics::Store` per chart
-//! family, each behind its own mutex, so recording from export requests never
+//! [`DerivedMetrics`] owns one `netdata_plugin_metrics::Store` per metric
+//! set, each behind its own mutex, so recording from export requests never
 //! waits on the OTLP metrics `ChartManager` lock. An export request records
 //! into a request-local batch while it prepares its frames and commits the
 //! batch only after its write is durable, so a retried request is not counted
@@ -62,16 +62,16 @@ impl DerivedMetrics {
             let logs = logs::ServiceLogs::new(config.max_services);
             let derivation = plugin::Derivation::new();
             Enabled {
-                service_store: Mutex::new(Store::new(services.family.clone())),
+                service_store: Mutex::new(Store::new(services.metrics.clone())),
                 services,
-                logs_store: Mutex::new(Store::new(logs.family.clone())),
+                logs_store: Mutex::new(Store::new(logs.metrics.clone())),
                 logs,
-                derivation_store: Mutex::new(Store::new(derivation.family.clone())),
+                derivation_store: Mutex::new(Store::new(derivation.metrics.clone())),
                 derivation,
             }
         });
         let plugin = plugin::Plugin::new();
-        let plugin_store = Mutex::new(Store::new(plugin.family.clone()));
+        let plugin_store = Mutex::new(Store::new(plugin.metrics.clone()));
         Self {
             enabled,
             plugin,
@@ -83,7 +83,7 @@ impl DerivedMetrics {
     /// metrics are disabled.
     pub fn spans_batch(&self) -> Option<SpansBatch> {
         let enabled = self.enabled.as_ref()?;
-        Some(SpansBatch(Batch::new(&enabled.services.family)))
+        Some(SpansBatch(Batch::new(&enabled.services.metrics)))
     }
 
     /// Record the requests among the spans of `request`, a normalized group
@@ -110,7 +110,7 @@ impl DerivedMetrics {
     /// derived metrics are disabled.
     pub fn logs_batch(&self) -> Option<LogsBatch> {
         let enabled = self.enabled.as_ref()?;
-        Some(LogsBatch(Batch::new(&enabled.logs.family)))
+        Some(LogsBatch(Batch::new(&enabled.logs.metrics)))
     }
 
     /// Record the log records of `request`, a normalized group of an export
@@ -146,7 +146,7 @@ impl DerivedMetrics {
     pub fn emit(&self, now: u64) -> Vec<Vec<u8>> {
         let mut chunks = Vec::new();
         if let Some(enabled) = &self.enabled {
-            let mut batch = Batch::new(&enabled.derivation.family);
+            let mut batch = Batch::new(&enabled.derivation.metrics);
             for (signal, store) in [
                 (Signal::Traces, &enabled.service_store),
                 (Signal::Logs, &enabled.logs_store),
