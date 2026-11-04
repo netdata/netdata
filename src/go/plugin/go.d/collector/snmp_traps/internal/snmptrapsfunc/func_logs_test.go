@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestLogsFunctionConfigRequiresSignIn(t *testing.T) {
-	// SNMP trap logs follow system logs: a signed-in Space member (access 0x0013) on every plan.
+func TestLogsFunctionConfigRequiresPaidPlan(t *testing.T) {
+	// Viewing SNMP traps requires a paid plan (access 0x0017); reception and storage are not gated.
 	cfg := LogsFunctionConfig(nil)
 	assert.True(t, cfg.RequireCloud)
-	assert.False(t, cfg.RequireCommercial)
+	assert.True(t, cfg.RequireCommercial)
 }

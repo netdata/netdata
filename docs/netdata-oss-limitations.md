@@ -53,7 +53,6 @@ Functions provide on-demand, detailed information beyond standard metrics.
 | **Network Connections** | Active TCP/UDP connections                  |     ✗     |     ✓     |  ✓   |
 | **Systemd Journal**     | System and application logs                 |     ✗     |     ✓     |  ✓   |
 | **Windows Events**      | Windows event logs                          |     ✗     |     ✓     |  ✓   |
-| **SNMP Traps**          | SNMP trap logs received by the Agent        |     ✗     |     ✓     |  ✓   |
 | **BMC Event Logs**      | IPMI SEL and Redfish log services           |     ✗     |     ✓     |  ✓   |
 | **Systemd Units**       | Unit status and configuration               |     ✗     |     ✓     |  ✓   |
 | **Database Queries**    | Top queries, deadlocks, errors              |     ✗     |     ✓     |  ✓   |
@@ -62,6 +61,7 @@ Functions provide on-demand, detailed information beyond standard metrics.
 | **Network Flows**       | NetFlow, IPFIX and sFlow traffic analysis   |     ✗     |     ✗     |  ✓   |
 | **Traces**              | OpenTelemetry traces stored on the Agent    |     ✗     |     ✗     |  ✓   |
 | **OpenTelemetry Logs**  | OpenTelemetry logs stored on the Agent      |     ✗     |     ✗     |  ✓   |
+| **SNMP Traps**          | SNMP trap logs received by the Agent        |     ✗     |     ✗     |  ✓   |
 | **Topology Maps**       | SNMP, network connections, vSphere, Cato    |     ✗     |     ✗     |  ✓   |
 | **RUM**                 | Real User Monitoring: sessions and errors   |     ✗     |     ✗     |  ✓   |
 | **Browser Tests**       | Synthetic Playwright journeys, Lighthouse   |     ✗     |     ✗     |  ✓   |
@@ -116,7 +116,7 @@ For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mc
 2. **Connect your nodes** to your Netdata Cloud Space
 3. **Access the dashboard** through Netdata Cloud
 
-Once signed in, you'll have access to the sensitive functions (processes, logs, network connections, etc.) on nodes within your Space. Network Flows, Traces, OpenTelemetry Logs, topology maps (SNMP, network connections, vSphere and Cato Networks), Real User Monitoring and Synthetic Browser Tests also require a paid plan or an active trial. The Agent collects and stores this data on every plan; only viewing it is plan-gated. System logs, SNMP traps, BMC event logs and the streaming topology need only sign-in; SNMP device metrics and API, uptime and other checks are metrics, available on every plan.
+Once signed in, you'll have access to the sensitive functions (processes, logs, network connections, etc.) on nodes within your Space. Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, topology maps (SNMP, network connections, vSphere and Cato Networks), Real User Monitoring and Synthetic Browser Tests also require a paid plan or an active trial. The Agent collects and stores this data on every plan; only viewing it is plan-gated. System logs, BMC event logs and the streaming topology need only sign-in; SNMP device metrics and API, uptime and other checks are metrics, available on every plan.
 
 ### Enable Dynamic Configuration
 
@@ -170,11 +170,11 @@ Netdata Cloud and each Agent keep separate preferred-node lists. Netdata Cloud s
 | **Alert Notifications**   | Full access | Full access   | Full access |
 | **Public Functions**      | Full access | Full access   | Full access |
 | **Sensitive Functions**   | Blocked     | Full access   | Full access |
-| **Network Flows, Traces, OpenTelemetry Logs, Topology Maps, RUM, Browser Tests** | Blocked     | Blocked       | Full access |
+| **Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, Topology Maps, RUM, Browser Tests** | Blocked     | Blocked       | Full access |
 | **AI Features**           | Blocked     | Not available | Full access |
 | **Dynamic Configuration** | Blocked     | Blocked       | Full access |
 | **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
 | **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
 | **RBAC & SSO**            | N/A         | Not available | Full access |
 
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for Network Flows, Traces, OpenTelemetry Logs, topology maps, Real User Monitoring, synthetic browser tests, full configuration control and unlimited scale.
+Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for Network Flows, Traces, OpenTelemetry Logs, SNMP traps, topology maps, Real User Monitoring, synthetic browser tests, full configuration control and unlimited scale.

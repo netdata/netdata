@@ -53,7 +53,7 @@ Start with these fields before opening large payload fields such as `TRAP_JSON` 
 
 ## Query in Netdata Cloud Logs
 
-Like system logs, the `snmp:traps` Function requires a signed-in member of the node's Netdata Cloud Space, on every plan including the free Community plan.
+The `snmp:traps` Function requires a signed-in member of the node's Netdata Cloud Space on a paid plan or an active trial. Without a paid plan, query the journal files with `journalctl` or a SIEM shipper.
 
 1. Open **SNMP Trap Logs** through Netdata Cloud Logs.
 2. Use the **Trap Jobs** selector to choose one direct-journal job, such as `edge-traps`, or leave all direct-journal jobs selected.
