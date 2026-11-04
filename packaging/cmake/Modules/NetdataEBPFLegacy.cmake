@@ -23,19 +23,19 @@ function(netdata_fetch_legacy_ebpf_code)
     endif()
 
     if(need_static)
-        set(_hash be23d718c79ba15f520062bf048f887cbc95f90bc2449d9c841b4a4a2276088e)
+        set(_hash e25fe47729196089f450c481bfd38cfd8b3a3997f6b1f3a72b6b14cd6b134ce4)
         set(_libc "static")
     elseif(_libc STREQUAL "glibc")
-        set(_hash 613cf0b7a2eec12993b7da61d6177ce32dbc4a4a9b6ef660d764c52c9068391e)
+        set(_hash 7991d17f19fb2779906a4a1cbe1983a881ae989cbaf491c6e05b6a035d4e3635)
     elseif(_libc STREQUAL "musl")
-        set(_hash b217f932d4059f69b401e892d1216aa37179015d09c3fe6371bcec5b6896bc65)
+        set(_hash 1244b369ed9d8f1cfacf6c6bdb73710e77bfbd4231afc4133698c3153260e619)
     else()
         message(FATAL_ERROR "Could not determine libc implementation, unable to install eBPF legacy code.")
     endif()
 
     ExternalProject_Add(
         ebpf-code-legacy
-        URL https://github.com/netdata/kernel-collector/releases/download/v1.7.0.4/netdata-kernel-collector-${_libc}-v1.7.0.4.tar.xz
+        URL https://github.com/netdata/kernel-collector/releases/download/v1.8.0.3/netdata-kernel-collector-${_libc}-v1.8.0.3.tar.xz
         URL_HASH SHA256=${_hash}
         SOURCE_DIR "${ebpf-legacy_SOURCE_DIR}"
         CONFIGURE_COMMAND ""

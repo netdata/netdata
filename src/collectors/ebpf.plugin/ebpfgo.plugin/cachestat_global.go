@@ -219,10 +219,16 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 	}
 
 	createCachestatGlobalCharts(api, updateEvery)
+	if handle.Plan.Flavor == ObjectFlavorArena {
+		createArenaDropsChart(api, cachestatGlobalModule, updateEvery)
+	}
 
 	state := &cachestatGlobalState{}
 	lastCollection := time.Now()
 	collectAndPublish := func(usecSince int) {
+		if handle.Plan.Flavor == ObjectFlavorArena {
+			publishArenaDrops(api, cachestatGlobalModule, handle.Runtime.ArenaDropped(), usecSince)
+		}
 		// Global snapshot — one CGO call.
 		snapshot, err := handle.Runtime.Snapshot(handle.MapsPerCore)
 		if err != nil {

@@ -23,7 +23,7 @@
  */
 #ifndef NETDATA_FD_ARENA_STATE_T_DEFINED
 struct netdata_fd_arena_state_t {
-    unsigned char __pad[49160];
+    unsigned char __pad[sizeof(struct nd_ebpf_arena_state)];
 };
 #endif
 
@@ -101,7 +101,6 @@ struct netdata_ebpf_fd_runtime {
      * directly to tbl_fd_pid, so per-app counters are accumulated here. */
     struct ring_buffer *rb;         /* non-NULL for buffer flavor */
     void              *arena_state; /* mmap'd arena pointer (arena flavor) */
-    uint32_t           arena_tail;  /* last consumed head for arena flavor */
     struct nd_ebpf_acc_table acc;
 #endif
 };
@@ -152,8 +151,7 @@ enum netdata_fd_global_key {
 static const char *fd_open_program_name(int kind, int flavor)
 {
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
-    if (kind == NETDATA_FD_RUNTIME_CORE &&
-        (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA))
+    if (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
         return "netdata_sys_open_buffer";
 #else
     (void)kind;
@@ -172,8 +170,7 @@ static const char *fd_open_program_name(int kind, int flavor)
 static const char *fd_close_program_name(int kind, int flavor)
 {
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
-    if (kind == NETDATA_FD_RUNTIME_CORE &&
-        (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA))
+    if (flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER || flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
         return "netdata_close_buffer";
 #else
     (void)kind;
@@ -336,10 +333,10 @@ struct netdata_ebpf_fd_runtime *netdata_fd_runtime_open_mode(const char *path, i
     /* The buffer/arena flavors accumulate per-TGID counters in userspace; the
      * table has to know the entry layout before the first event arrives. */
     nd_ebpf_acc_init(&rt->acc, sizeof(struct netdata_ebpf_fd_pid_entry), offsetof(struct netdata_ebpf_fd_pid_entry, tgid));
+    rt->flavor = fd_runtime_flavor_from_path(path);
 
     if (use_core) {
         rt->kind = NETDATA_FD_RUNTIME_CORE;
-        rt->flavor = fd_runtime_flavor_from_path(path);
         struct bpf_object_open_opts opts = {
             .sz = sizeof(opts),
             .btf_custom_path = custom_btf_path && *custom_btf_path ? custom_btf_path : NULL,
@@ -476,12 +473,14 @@ static void fd_destroy_ring_buffer(struct netdata_ebpf_fd_runtime *rt)
 }
 
 /* The generated arena skeleton maps the arena data section through `arena`. */
-static void fd_setup_arena(struct netdata_ebpf_fd_runtime *rt)
+static int fd_setup_arena(struct netdata_ebpf_fd_runtime *rt)
 {
     if (!rt->core.arena || !rt->core.arena->arena)
-        return;
+        return -1;
 
     rt->arena_state = (void *)&rt->core.arena->arena->fd_arena_state;
+    return nd_ebpf_arena_state_valid(
+        rt->core.arena->maps.fd_events, rt->arena_state, sizeof(struct nd_ebpf_arena_state));
 }
 
 static void fd_rb_event(void *ctx, const struct nd_ebpf_pid_event *ev)
@@ -526,7 +525,7 @@ static int fd_snapshot_from_acc(
 
 static void fd_drain_arena(struct netdata_ebpf_fd_runtime *rt)
 {
-    rt->arena_tail = nd_ebpf_arena_drain(rt->arena_state, rt->arena_tail, fd_rb_event, rt);
+    nd_ebpf_arena_drain(rt->arena_state, fd_rb_event, rt);
 }
 
 #endif /* NETDATA_FD_LIBBPF_CORE_SUPPORTED */
@@ -543,13 +542,24 @@ int netdata_fd_runtime_load(struct netdata_ebpf_fd_runtime *rt)
             return rc;
         if (rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER && fd_setup_ring_buffer(rt) != 0)
             return -1;
-        else if (rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
-            fd_setup_arena(rt);
+        else if (rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA && fd_setup_arena(rt) != 0)
+            return -1;
         return 0;
     }
 #endif
 
-    return bpf_object__load(rt->obj);
+#ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
+    // Raw arena objects need the generated skeleton's mmap'd data section.
+    if (rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_ARENA)
+        return -1;
+#endif
+
+    int rc = bpf_object__load(rt->obj);
+#ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
+    if (rc == 0 && rt->flavor == NETDATA_FD_RUNTIME_FLAVOR_BUFFER && fd_setup_ring_buffer(rt) != 0)
+        rc = -1;
+#endif
+    return rc;
 }
 
 /* The open and close symbols differ by kernel version (do_sys_openat2 vs
@@ -801,8 +811,8 @@ void netdata_fd_runtime_close(struct netdata_ebpf_fd_runtime *rt)
     freez(rt->items_buf);
     nd_ebpf_key_table_free(&rt->pid_keys);
 #ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
+    fd_destroy_ring_buffer(rt);
     if (rt->kind == NETDATA_FD_RUNTIME_CORE) {
-        fd_destroy_ring_buffer(rt);
         fd_runtime_destroy_core(rt);
     } else if (rt->obj)
         bpf_object__close(rt->obj);
@@ -811,4 +821,13 @@ void netdata_fd_runtime_close(struct netdata_ebpf_fd_runtime *rt)
         bpf_object__close(rt->obj);
 #endif
     freez(rt);
+}
+uint64_t netdata_fd_runtime_arena_drops(struct netdata_ebpf_fd_runtime *rt)
+{
+#ifdef NETDATA_FD_LIBBPF_CORE_SUPPORTED
+    return rt && rt->arena_state ? nd_ebpf_arena_dropped(rt->arena_state) : 0;
+#else
+    (void)rt;
+    return 0;
+#endif
 }
