@@ -111,12 +111,23 @@ docker_cancel() {
     exec 8>&-
     docker_error 'cancellation requested; waiting for runtime cleanup and verified browser drainage'
 }
+docker_close() {
+    if [ -n "$docker_watcher" ]; then
+        # Only signal our own watcher. It may already have reported EOF and exited.
+        if [ "$(awk '/^PPid:/ {print $2}' "/proc/$docker_watcher/status" 2>/dev/null)" = "$$" ]; then
+            kill -TERM "$docker_watcher" 2>/dev/null || :
+            wait "$docker_watcher" 2>/dev/null || :
+        fi
+    fi
+    rm -rf -- "$docker_tmp"
+}
 docker_install() {
-    docker_name=; docker_expected_id=; docker_dry=no
+    docker_name=; docker_expected_id=; docker_dry=no; docker_watch_stdin=no
     while [ "$#" -gt 0 ]; do
         case "$1" in
             --container) [ "$#" -ge 2 ] && [ -z "$docker_name" ] || docker_die 'provide one exact container name'; docker_name=$2; shift 2 ;;
             --container-id) [ "$#" -ge 2 ] || docker_die 'missing container identity'; docker_expected_id=$2; shift 2 ;;
+            --cancel-on-stdin-close) docker_watch_stdin=yes; shift ;;
             --dry-run) docker_dry=yes; shift ;;
             *) docker_die 'unsupported Docker action option' ;;
         esac
@@ -136,8 +147,16 @@ docker_install() {
     [ -S /var/run/docker.sock ] && [ ! -L /var/run/docker.sock ] && [ "$(stat -c %u /var/run/docker.sock)" = 0 ] || docker_die 'a root-owned system Docker Unix socket is required'
     docker_cli=$(host_resolve_executable /usr/bin/docker) || docker_die 'a trusted root-owned /usr/bin/docker CLI is required'
     docker_tmp=$(mktemp -d /run/netdata-dem-docker.XXXXXXXX) || return $?
-    trap 'rm -rf -- "$docker_tmp"' 0
+    docker_watcher=
+    trap docker_close 0
     trap 'exit 1' 1 2 3 15
+    if [ "$docker_watch_stdin" = yes ]; then
+        # Kickstart owns the sole writer. Notify this shell using our own credentials.
+        exec 7<&0
+        (IFS= read -r _ || :; [ ! -d "$docker_tmp" ] || kill -TERM "$$") <&7 7<&- >/dev/null 2>&1 &
+        docker_watcher=$!
+        exec 7<&-
+    fi
     docker_daemon=$(docker_single info --format '{{.ID}}') || return $?
     host_text "$docker_daemon" && [ "${#docker_daemon}" -le 128 ] || docker_die 'invalid daemon identity'
     case "$docker_daemon" in *[!a-zA-Z0-9:_.-]*) docker_die 'invalid daemon identity' ;; esac

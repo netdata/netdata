@@ -19,7 +19,7 @@ import unittest
 INSTALLER = Path(__file__).resolve().parents[1]
 CONTAINER_ID = 'a' * 64
 STUB = r'''#!/usr/bin/env python3
-import fcntl, json, os, shutil, stat, sys, time
+import fcntl, json, os, shutil, signal, stat, sys, time
 from pathlib import Path
 root = Path(__ROOT__)
 settings = json.loads((root / 'settings').read_text())
@@ -107,6 +107,7 @@ elif name == 'docker':
             assert user == '201:202' and args[-1] == 'ensure', args
             (root / 'ensured').write_text('yes')
             if settings.get('block'):
+                signal.alarm(8)
                 sys.stdin.buffer.read()
                 (root / 'cancelled').write_text('yes')
                 time.sleep(0.15)
@@ -304,7 +305,7 @@ class DockerHostTests(unittest.TestCase):
         self.assertOK(result)
         self.assertIn('host-policy=not-required', result.stderr)
 
-    def kickstart(self, *args):
+    def kickstart_process(self, *args, env=None):
         source = (INSTALLER / 'kickstart.sh').read_text()
         for old, new in {
             '  PATH=/usr/sbin:/usr/bin:/sbin:/bin': '  PATH=' + str(self.bin) + ':/usr/sbin:/usr/bin:/sbin:/bin',
@@ -327,7 +328,37 @@ class DockerHostTests(unittest.TestCase):
         artifact = self.root / 'standalone-kickstart'
         artifact.write_text(source)
         (self.root / 'settings').write_text(json.dumps(self.settings))
-        return subprocess.run(['sh', str(artifact), *args], cwd=self.root, capture_output=True, text=True, timeout=30)
+        return subprocess.Popen(['sh', str(artifact), *args], cwd=self.root, env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    def kickstart(self, *args):
+        with self.kickstart_process(*args) as process:
+            stdout, stderr = process.communicate(timeout=30)
+            return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+
+    def test_kickstart_cancellation_reaches_privileged_helper_and_waits_for_drain(self):
+        self.settings['block'] = True
+        # Model a privilege boundary that preserves stdin but cannot forward the caller's signal.
+        wrapper = self.bin / 'privilege-command'
+        wrapper.write_text(f'#!{sys.executable}\nimport os, signal, subprocess, sys\n'
+                           'args = sys.argv[1:]\n'
+                           'if "docker-install" not in args: os.execvp(args[0], args)\n'
+                           'signal.signal(signal.SIGTERM, lambda *_: None)\n'
+                           'sys.exit(subprocess.call(args))\n')
+        wrapper.chmod(0o755)
+        env = dict(os.environ, ROOTCMD=str(wrapper))
+        with self.kickstart_process('--install-dem-runtime', '--docker-container', 'monitor', env=env) as process:
+            deadline = time.monotonic() + 20
+            while not (self.root / 'ensured').exists() and process.poll() is None:
+                if time.monotonic() > deadline:
+                    process.kill()
+                    self.fail('enrollment did not reach the supervised ensure operation')
+                time.sleep(0.02)
+            process.send_signal(signal.SIGTERM)
+            stdout, stderr = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 23, stderr)
+        self.assertTrue((self.root / 'cancelled').is_file())
+        self.assertFalse(list((self.root / 'run').glob('kickstart.*')))
 
     def test_standalone_enrollment_and_retirement_without_image_or_daemon(self):
         self.assertOK(self.kickstart('--install-dem-runtime', '--docker-container', 'monitor'))

@@ -1748,6 +1748,7 @@ dem_docker_cleanup() {
   dem_exit=$?
   trap - EXIT
   dem_remove_scratch || dem_exit=$?
+  if [ -n "$dem_control_dir" ]; then rm -rf -- "$dem_control_dir" || dem_exit=$?; fi
   run_as_root rm -rf -- "$dem_private" || dem_exit=$?
   exit "$dem_exit"
 }
@@ -1809,7 +1810,7 @@ dem_docker_enroll() {
   [ "$(readlink -f -- /var/run)" = /run ] && [ -S /var/run/docker.sock ] && [ ! -L /var/run/docker.sock ] &&
     [ "$(stat -c %u /var/run/docker.sock)" = 0 ] || dem_fail 'a local root-owned system Docker socket is required'
   dem_private=$(run_as_root mktemp -d /run/netdata-dem-kickstart.XXXXXXXX) || return $?
-  dem_scratch=
+  dem_scratch=; dem_control_dir=
   trap dem_docker_cleanup EXIT
   trap 'exit 1' 1 2 3 15
 
@@ -1840,18 +1841,29 @@ dem_docker_enroll() {
   done
   dem_remove_scratch || return $?
 
-  set -- docker-install --container "$dem_container" --container-id "$dem_id"
+  # Open both ends before elevation, then unlink the FIFO. Closing our writer
+  # cancels even when the privilege command execs a process we cannot signal.
+  dem_control_dir=$(mktemp -d /tmp/netdata-dem-control.XXXXXXXX) || return $?
+  mkfifo -m 600 "$dem_control_dir/control" || return $?
+  exec 8<> "$dem_control_dir/control"
+  exec 7< "$dem_control_dir/control"
+  rm -rf -- "$dem_control_dir" || return $?
+  dem_control_dir=
+
+  set -- docker-install --container "$dem_container" --container-id "$dem_id" --cancel-on-stdin-close
   [ "$dem_dry" != yes ] || set -- "$@" --dry-run
-  # Keep the actual privileged process as our child. A background shell-function
-  # wrapper would swallow a targeted cancellation before the browser can drain.
-  confirm_root_support
+  dem_interrupted=no
+  trap 'dem_interrupted=yes; exec 8>&-' 1 2 3 15
+  # Wait on the actual privilege command, without an intermediate shell function.
   progress "Running the Docker setup helper from local image $dem_image for $dem_container"
-  ${ROOTCMD} env -i PATH="$PATH" /bin/sh "$dem_private/netdata-dem-runtime.sh" "$@" &
+  ${ROOTCMD} env -i PATH="$PATH" /bin/sh "$dem_private/netdata-dem-runtime.sh" "$@" <&7 7<&- 8>&- &
   dem_child=$!
-  trap 'kill -TERM "$dem_child" 2>/dev/null || :' 1 2 3 15
+  exec 7<&-
   while :; do
+    dem_interrupted=no
     if wait "$dem_child"; then return 0; else dem_status=$?; fi
-    kill -0 "$dem_child" 2>/dev/null || return "$dem_status"
+    # An interrupted wait does not establish that the privileged helper exited.
+    [ "$dem_interrupted" = yes ] && [ "$dem_status" -gt 128 ] || return "$dem_status"
   done
 }
 
