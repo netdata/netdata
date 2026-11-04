@@ -92,7 +92,7 @@ Administrator-edited files, disable markers and unknown state cause refusal rath
 
 For managed removal, stop the Agent and every standalone runtime consumer, prevent concurrent installation commands,
 then run `uninstall --agent /path/to/netdata`. The existing runtime drain check must succeed before policy cleanup.
-A refused drain preserves the runtime and policy.
+Agent uninstallation uses that same check before erasing files. A refused drain preserves the runtime and policy.
 If policy cleanup fails after runtime removal, the error distinguishes the unfinished cleanup; retry the helper.
 
 Low-level nonroot `dem.plugin runtime uninstall` cannot remove administrator-owned policy. Use the high-level helper
@@ -108,11 +108,17 @@ sudo sh ./netdata-dem-runtime.sh policy-remove \
 ```
 
 This declaration is the administrator's responsibility. The helper does not infer retirement from missing container
-paths or PIDs. Container deletion alone cannot revoke host policy.
+paths or PIDs. Container deletion alone cannot revoke host policy. Registered preloads also prevent implicit Agent
+prefix deletion until their deployment retirement is explicitly handled.
 
 For a preload prepared through the high-level helper, retire its registration with
 `uninstall --agent /path/to/netdata --root /absolute/preload/path --deployments-stopped`.
 This removes the policy registration, retaining the administrator-owned preload files.
+When uninstalling an Agent configured for protected preloads, pass `--dem-deployments-stopped` to
+`netdata-uninstaller.sh` after stopping and retiring every deployment. Neither `--yes` nor `--force` makes that
+declaration. The uninstaller checks managed runtime drainage before both direct file removal and native package
+removal; ordinary package-owned runtime cleanup remains the package manager's responsibility.
+
 ## Security scope
 
 The profile permits user namespaces so Chromium can run its own sandbox; it does **not** add AppArmor confinement or
