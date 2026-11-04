@@ -15,8 +15,11 @@ type ProfileMetrics struct {
 	LicenseRows     []LicenseRow
 	BGPRows         []BGPRow
 	BGPCollectError error
-	HiddenMetrics   []Metric
-	Stats           CollectionStats
+	// UnavailableTables names metric tables whose rows this attempt could not
+	// observe, so their absent rows are not evidence of removal.
+	UnavailableTables []string
+	HiddenMetrics     []Metric
+	Stats             CollectionStats
 }
 
 type Metric struct {

@@ -494,6 +494,7 @@ func (c *Collector) collectPreparedProfileTables(
 	}
 	profile.metrics.Metrics = append(profile.metrics.Metrics, tableMetrics...)
 	profile.metrics.Stats.Metrics.Table += int64(len(tableMetrics))
+	profile.metrics.UnavailableTables = profile.regularScope.unavailableTables
 
 	if profile.topologyScope == nil {
 		return nil

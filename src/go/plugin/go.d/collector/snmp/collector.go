@@ -179,6 +179,7 @@ type (
 	tableMetricState struct {
 		*metricChartState
 		profile string
+		table   string
 	}
 )
 
