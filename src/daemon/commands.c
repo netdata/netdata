@@ -86,6 +86,7 @@ static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
 static cmd_status_t cmd_version(char *args, char **message);
 static cmd_status_t cmd_dumpconfig(char *args, char **message);
+static cmd_status_t cmd_dyncfg_tree(char *args, char **message);
 static cmd_status_t cmd_remove_stale_node(char *args, char **message);
 static cmd_status_t cmd_mark_stale_nodes_ephemeral(char *args, char **message);
 static cmd_status_t cmd_update_node_info(char *args, char **message);
@@ -104,6 +105,7 @@ static command_info_t command_info_array[] = {
     {"aclk-state", "[json]",  "Returns current state of ACLK and Netdata Cloud connection. (optionally in json).", cmd_aclk_state, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"version", "", "Returns the netdata version.", cmd_version, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_INIT},
     {"dumpconfig", "", "Returns the current netdata.conf on stdout.", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
+    {"dyncfg-tree", "", "Returns the dynamic configuration tree of this agent as JSON (collector jobs and their status).", cmd_dyncfg_tree, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"mark-stale-nodes-ephemeral", "<node_id | machine_guid | hostname | ALL_NODES>",
         "Marks one or all disconnected nodes as ephemeral, while keeping their retention\n      available for queries on both this Netdata Agent dashboard and Netdata Cloud", cmd_mark_stale_nodes_ephemeral, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"remove-stale-node", "<node_id | machine_guid | hostname | ALL_NODES>",
@@ -382,6 +384,32 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     *message = strdupz(buffer_tostring(wb));
     buffer_free(wb);
     return CMD_STATUS_SUCCESS;
+}
+
+static cmd_status_t cmd_dyncfg_tree(char *args, char **message)
+{
+    (void)args;
+
+    // The same call GET /api/v3/config?action=tree makes. Only root and the netdata user can reach the
+    // command pipe, so the caller counts as a signed-in member of this agent's space. SENSITIVE_DATA is
+    // left out, so source paths stay hidden, as they are for any member without that permission.
+    //
+    // This runs on the libuv threadpool; the tree branch of the config handler answers inline, on this
+    // thread, and queues nothing on that pool, so waiting here cannot starve it.
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    int code = nrpc_call(&(struct nrpc_call_spec) {
+        .owner = rrdhost_nrpc_owner(localhost),
+        .result_wb = wb,
+        .cmd = PLUGINSD_FUNCTION_CONFIG " tree '/' ''",
+        .source = "netdatacli",
+        .user_access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_ANONYMOUS_DATA,
+        .timeout_s = 60,
+        .wait = true,
+        .allow_restricted = false,
+    });
+
+    *message = strdupz(buffer_tostring(wb));
+    return code == HTTP_RESP_OK ? CMD_STATUS_SUCCESS : CMD_STATUS_FAILURE;
 }
 
 static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool report_error, bool unregister)

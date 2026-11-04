@@ -119,6 +119,44 @@ printf '{"keep":true}\\n'
         self.run_fixture('collect_api api.json fixture /api/v3/info\n')
         self.assertIn('error', json.loads((self.root / 'work/api.json').read_text()))
 
+    def dyncfg_rows(self):
+        manifest = json.loads((self.root / 'work/MANIFEST.json').read_text())
+        return [f for f in manifest['files'] if f['path'] == '07-runtime/dyncfg-tree.json']
+
+    def run_runtime(self):
+        self.run_fixture('''
+NETDATA_PID=1; api_ok=1
+collect_runtime
+write_manifest
+''')
+        return self.root / 'work/07-runtime/dyncfg-tree.json'
+
+    def test_dyncfg_tree_prefers_netdatacli(self):
+        self.stub('netdatacli', '[ "$*" = dyncfg-tree ] || exit 1\nprintf \'{"tree":{}}\\n\'\n')
+        self.stub('curl', 'printf "%s\\n" "$*" >> "$FIXTURE/curl-urls"\nprintf \'{"api":true}\\n\'\n')
+        tree = self.run_runtime()
+        self.assertIn('tree', json.loads(tree.read_text()))
+        self.assertEqual([r['origin'] for r in self.dyncfg_rows()], ['netdatacli dyncfg-tree'])
+        self.assertNotIn('action=tree', (self.root / 'curl-urls').read_text())
+
+    def test_dyncfg_tree_falls_back_to_api(self):
+        # an agent that predates the command answers it with an error and a non-zero exit
+        self.stub('netdatacli', 'echo "Illegal command." >&2\nexit 1\n')
+        self.stub('curl', 'printf \'{"api":true}\\n\'\n')
+        tree = self.run_runtime()
+        self.assertTrue(json.loads(tree.read_text())['api'])
+        self.assertEqual([r['origin'] for r in self.dyncfg_rows()], ['/api/v3/config?action=tree'])
+        self.assertFalse(tree.with_name('dyncfg-tree.json.cli').exists())
+
+    def test_dyncfg_tree_marker_when_both_fail(self):
+        self.stub('netdatacli', 'exit 255\n')
+        self.stub('curl', 'case "$*" in *action=tree*) exit 22;; esac\nprintf \'{"api":true}\\n\'\n')
+        tree = self.run_runtime()
+        self.assertIn('netdatacli dyncfg-tree', json.loads(tree.read_text())['hint'])
+        rows = self.dyncfg_rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['bytes'], tree.stat().st_size)
+
     def test_user_mapping_bound(self):
         (self.root / 'users').write_text(''.join(f'/home/account-{n}/file\n' for n in range(4100)))
         self.run_fixture('''

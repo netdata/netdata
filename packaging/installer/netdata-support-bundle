@@ -1517,7 +1517,33 @@ collect_state() {
 # =============================================================================
 # 07-runtime (only when the agent responds)
 # =============================================================================
+# collect_dyncfg_tree_cli - the dyncfg tree through the local command pipe.
+# The pipe is reachable only by root and the netdata user, and the agent answers
+# it as a member of its own space; the web API needs a signed-in member, which
+# the bundle cannot be. Returns non-zero, leaving no file and no manifest row,
+# when the CLI is missing, the agent predates the command, or the call fails, so
+# the caller can fall back to the API under the same path.
+collect_dyncfg_tree_cli() {
+  command -v netdatacli >/dev/null 2>&1 && [ -n "${NETDATA_PID:-}" ] || return 1
+  deadline_exceeded && return 1
+  _dtc_rel=07-runtime/dyncfg-tree.json
+  _dtc_out="$WORK/$_dtc_rel"
+  mkdir -p "$(dirname "$_dtc_out")"
+  capture_output "$_dtc_out.cli" "$((API_CAP + 1))" 0 run_capped "$CMD_TIMEOUT" netdatacli dyncfg-tree
+  if [ "$CAPTURE_RC" = 0 ] && [ "$CAPTURE_BYTES" -gt 0 ] && [ "$CAPTURE_BYTES" -le "$API_CAP" ] && \
+     mv -f "$_dtc_out.cli" "$_dtc_out"; then
+    sanitize_file "$_dtc_out"
+    manifest_add "$_dtc_rel" cmd "netdatacli dyncfg-tree" "Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state"
+    return 0
+  fi
+  rm -f "$_dtc_out.cli"
+  return 1
+}
+
 collect_runtime() {
+  # the command pipe does not need the web API, so try it whatever api_ok says
+  dyncfg_tree_cli=0
+  collect_dyncfg_tree_cli && dyncfg_tree_cli=1
   if [ "$api_ok" = "1" ]; then
     info "collecting: runtime (agent is up)"
     collect_api 07-runtime/info-v3.json "BEST SINGLE CALL: buildinfo, features, cloud status, per-tier retention (works even under bearer protection)" /api/v3/info
@@ -1528,13 +1554,16 @@ collect_runtime() {
     collect_api 07-runtime/alerts-active.json "Currently raised alerts" "/api/v3/alerts?options=active"
     collect_api 07-runtime/alerts-all.json "All alert instances (summary)" "/api/v1/alarms?all"
     collect_api 07-runtime/functions.json "Registered functions (which plugins expose what)" /api/v1/functions
-    collect_api 07-runtime/dyncfg-tree.json "Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state" "/api/v3/config?action=tree"
+    # agents that predate `netdatacli dyncfg-tree`, or a bundle run as a user
+    # who cannot reach the command pipe, fall back to the API
+    [ "$dyncfg_tree_cli" = "1" ] || \
+      collect_api 07-runtime/dyncfg-tree.json "Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state" "/api/v3/config?action=tree"
     # /api/v3/info answers without any access check, so api_ok can be 1 while
     # this endpoint - which sits behind the dyncfg ACL - refuses us. The bundle
     # cannot authenticate: bearer token FILENAMES are themselves live tokens and
     # are never collected. Say so, rather than leaving a bare exit code, so the
     # reader does not read the absence as "no collector jobs exist".
-    if [ -f "$WORK/07-runtime/dyncfg-tree.json" ] && \
+    if [ "$dyncfg_tree_cli" != "1" ] && [ -f "$WORK/07-runtime/dyncfg-tree.json" ] && \
        grep -q '"error":"capture failed' "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null; then
       # Keep the observed failure rather than asserting a cause: a refusal, a
       # timeout, a transport error and a 5xx all land here identically, and
@@ -1545,7 +1574,7 @@ collect_runtime() {
       _dt_new="$WORK/07-runtime/dyncfg-tree.json.new"
       _dt_ok=0
       if _dt_detail=$(tr -d "\n" < "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null) && [ -n "$_dt_detail" ]; then
-        if printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" > "$_dt_new"; then
+        if printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"netdatacli dyncfg-tree was not usable (the agent predates it, the bundle did not run as root or the netdata user, or the call failed), so the bundle fell back to /api/v3/config, which only signed-in members of the agent's space may list on current agents, and which a bearer-protected API refuses on older ones - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Run 'netdatacli dyncfg-tree' as root, or ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" > "$_dt_new"; then
           if mv -f "$_dt_new" "$WORK/07-runtime/dyncfg-tree.json"; then
             _dt_ok=1
           fi

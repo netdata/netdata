@@ -1140,6 +1140,15 @@ if (Test-Path $CacheDir) {
 # ============================================================================
 # 07-runtime
 # ============================================================================
+# The dyncfg tree through the local command pipe: the agent answers it as a
+# member of its own space, which the web API needs and the bundle cannot be.
+# It does not need the web API, so it is tried whatever $ApiOk says. Save-CmdRaw
+# leaves no file on failure, so the API fallback below can use the same path.
+$DyncfgTreeTitle = 'Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state'
+if ((Test-Path $NetdataCli) -and $NetdataProc) {
+    # netdatacli.exe is MSYS2: native direct-launch, not Start-Job
+    Save-CmdRaw '07-runtime\dyncfg-tree.json' $DyncfgTreeTitle $null 'netdatacli.exe dyncfg-tree' -nativeExe $NetdataCli -nativeArgs 'dyncfg-tree'
+}
 if ($ApiOk) {
     Show-Info 'collecting: runtime (agent is up)'
     Save-Api '07-runtime\info-v3.json' 'BEST SINGLE CALL: buildinfo, features, cloud status, per-tier retention' '/api/v3/info'
@@ -1150,12 +1159,16 @@ if ($ApiOk) {
     Save-Api '07-runtime\alerts-active.json' 'Currently raised alerts' '/api/v3/alerts?options=active'
     Save-Api '07-runtime\alerts-all.json' 'All alert instances (summary)' '/api/v1/alarms?all'
     Save-Api '07-runtime\functions.json' 'Registered functions' '/api/v1/functions'
-    Save-Api '07-runtime\dyncfg-tree.json' 'Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state' '/api/v3/config?action=tree'
+    # Agents that predate `netdatacli dyncfg-tree` (tried above), or a bundle run
+    # by a user who cannot reach the command pipe, fall back to the API.
+    $dyncfgPath = Join-Path $Work '07-runtime\dyncfg-tree.json'
+    if (-not (Test-Path $dyncfgPath)) {
+        Save-Api '07-runtime\dyncfg-tree.json' $DyncfgTreeTitle '/api/v3/config?action=tree'
+    }
     # /api/v3/info answers without any access check, so $ApiOk can be true while
     # this endpoint - behind the dyncfg ACL - refuses us, and Save-Api deletes the
     # file on failure leaving no trace at all. The bundle cannot authenticate:
     # bearer token FILENAMES are themselves live tokens and are never collected.
-    $dyncfgPath = Join-Path $Work '07-runtime\dyncfg-tree.json'
     if (-not (Test-Path $dyncfgPath)) {
         # Every Save-Api in this block returns early once the deadline is past,
         # so 07-runtime may not exist yet and WriteAllText would throw.
@@ -1163,7 +1176,7 @@ if ($ApiOk) {
         if (-not (Test-Path $dyncfgDir)) { New-Item -ItemType Directory -Path $dyncfgDir -Force | Out-Null }
         # State what was observed, not a cause: a refusal, a timeout, a transport
         # error and a deadline all reach this point identically.
-        $marker = '{"error":"dyncfg tree was not collected","hint":"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error, HTTP failure or an exceeded collection deadline is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.","means":"NOT evidence that no collector jobs exist"}'
+        $marker = '{"error":"dyncfg tree was not collected","hint":"netdatacli dyncfg-tree was not usable (the agent predates it, the bundle could not reach the command pipe, or the call failed), so the bundle fell back to /api/v3/config, which only signed-in members of the agent''s space may list on current agents, and which a bearer-protected API refuses on older ones - a timeout, transport error, HTTP failure or an exceeded collection deadline is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Run netdatacli.exe dyncfg-tree as an administrator, or ask for the collector job state separately.","means":"NOT evidence that no collector jobs exist"}'
         Write-Utf8 $dyncfgPath $marker
         Add-Manifest '07-runtime\dyncfg-tree.json' 'file' 'generated' 'Collector job state was unavailable (see hint in the file)'
     }
