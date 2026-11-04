@@ -35,6 +35,8 @@ bool nd_work_queue_submit(ND_WORK_QUEUE *wq, nd_work_queue_job_cb cb, void *data
 void nd_work_queue_stop(ND_WORK_QUEUE *wq);
 
 // Stop the queue, wait up to timeout_ut for its threads to exit, and free it.
+// The caller MUST ensure no nd_work_queue_submit() on this queue is running or can start (the queue
+// is freed under it otherwise); nd_work_queue_stop() alone has no such requirement.
 // Returns false (and frees nothing) when a thread is still running a job at the deadline: the queue
 // and its threads are then deliberately leaked, since a running job may still use them.
 bool nd_work_queue_stop_and_free(ND_WORK_QUEUE *wq, usec_t timeout_ut);

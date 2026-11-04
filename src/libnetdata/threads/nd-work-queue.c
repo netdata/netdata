@@ -76,12 +76,14 @@ ND_WORK_QUEUE *nd_work_queue_create(const char *tag, size_t max_threads,
     return wq;
 }
 
-// called with the mutex held
+// called with the mutex held: a single attempt (NO_RETRY), so a system out of threads fails the
+// submit at once instead of sleeping here; the submitter decides what to do with the job then
 static void nd_work_queue_spawn_thread_unsafe(ND_WORK_QUEUE *wq) {
     char name[ND_THREAD_TAG_MAX + 1];
     snprintfz(name, sizeof(name) - 1, "%s[%zu]", wq->tag, wq->threads_created);
 
-    ND_THREAD *t = nd_thread_create(name, NETDATA_THREAD_OPTION_MANUAL_JOIN | NETDATA_THREAD_OPTION_DONT_LOG,
+    ND_THREAD *t = nd_thread_create(name, NETDATA_THREAD_OPTION_MANUAL_JOIN | NETDATA_THREAD_OPTION_DONT_LOG |
+                                    NETDATA_THREAD_OPTION_NO_RETRY,
                                     nd_work_queue_worker, wq);
     if(!t)
         return;
@@ -270,8 +272,21 @@ int nd_work_queue_unittest(void) {
         ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 8, nd_work_queue_ut_init, &ut);
         for(size_t i = 0; i < 5; i++) {
             nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut);
-            nd_work_queue_ut_wait_for(&ut.ran, i + 1, 10 * USEC_PER_SEC);
-            sleep_usec(10 * USEC_PER_MS); // let the worker go idle before the next submit
+            if(!nd_work_queue_ut_wait_for(&ut.ran, i + 1, 10 * USEC_PER_SEC)) {
+                fprintf(stderr, "  FAILED: sequential job %zu did not run\n", i);
+                errors++;
+            }
+
+            // the worker counts as idle only once it waits for a job again: the next submit must find it so
+            usec_t deadline_ut = now_monotonic_usec() + 10 * USEC_PER_SEC;
+            while(true) {
+                netdata_mutex_lock(&wq->mutex);
+                size_t idle = wq->idle;
+                netdata_mutex_unlock(&wq->mutex);
+                if(idle == 1 || now_monotonic_usec() >= deadline_ut)
+                    break;
+                sleep_usec(1000);
+            }
         }
         nd_work_queue_stop_and_free(wq, 10 * USEC_PER_SEC);
         if(ut.init_calls != 1) {

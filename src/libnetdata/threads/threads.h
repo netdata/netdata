@@ -19,6 +19,11 @@ typedef enum __attribute__((packed)) {
     // nd_thread_join_threads() never joins or frees such a thread, so one the creator
     // never joins stays allocated until the process exits
     NETDATA_THREAD_OPTION_MANUAL_JOIN      = 1 << 5,
+
+    // nd_thread_create() makes a single attempt: it does not sleep and retry when the system
+    // is out of threads (EAGAIN). For callers that hold a lock or run an event loop, and that
+    // have a fallback when no thread can be created.
+    NETDATA_THREAD_OPTION_NO_RETRY         = 1 << 6,
 } NETDATA_THREAD_OPTIONS;
 
 #define NETDATA_THREAD_OPTIONS_ALL (NETDATA_THREAD_OPTION_DONT_LOG_STARTUP | NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP | NETDATA_THREAD_OPTION_MANUAL_JOIN)
