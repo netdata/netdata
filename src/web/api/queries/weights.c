@@ -2425,6 +2425,65 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
 }
 
 #ifdef ENABLE_DBENGINE
+// Parallel weights chunks run on these threads, NEVER on the libuv threadpool: a chunk runs data queries,
+// which wait on dbengine query preparation and extent reads that run on that pool. Enough chunks
+// occupying pool threads leave nothing to run what they wait for, and the agent freezes.
+static struct {
+    SPINLOCK spinlock;      // held across submit, so shutdown cannot free the queue under a submitter
+    ND_WORK_QUEUE *queue;   // created on first use
+    bool stopped;
+} weights_parallel = {
+    .spinlock = SPINLOCK_INITIALIZER,
+    .queue = NULL,
+    .stopped = false,
+};
+
+static void weights_parallel_thread_init(void *data __maybe_unused)
+{
+    worker_register("WEIGHTS");
+    register_libuv_worker_job_names();
+}
+
+static void weights_parallel_job(void *data)
+{
+    struct query_weights_thread_data *thread_data = data;
+
+    worker_is_busy(UV_EVENT_WEIGHTS_CALCULATION);
+    query_weights_worker_thread(thread_data);
+    worker_is_idle();
+
+    // last: the waiting caller frees thread_data once this completes
+    completion_mark_complete(&thread_data->completion);
+}
+
+static bool weights_parallel_submit(struct query_weights_thread_data *thread_data)
+{
+    bool submitted = false;
+
+    spinlock_lock(&weights_parallel.spinlock);
+    if (!weights_parallel.queue && !weights_parallel.stopped)
+        weights_parallel.queue = nd_work_queue_create(
+            "WEIGHTS", netdata_conf_cpus(), weights_parallel_thread_init, NULL);
+
+    if (weights_parallel.queue)
+        submitted = nd_work_queue_submit(weights_parallel.queue, weights_parallel_job, thread_data);
+    spinlock_unlock(&weights_parallel.spinlock);
+
+    return submitted;
+}
+
+void weights_parallel_shutdown(void)
+{
+    spinlock_lock(&weights_parallel.spinlock);
+    ND_WORK_QUEUE *wq = weights_parallel.queue;
+    weights_parallel.queue = NULL;
+    weights_parallel.stopped = true;
+    spinlock_unlock(&weights_parallel.spinlock);
+
+    // Accepted chunks still run (their callers wait for them); later requests run their chunks inline.
+    (void) nd_work_queue_stop_and_free(wq, 5 * USEC_PER_SEC);
+}
+
 static void weights_foreach_host_parallel(struct query_weights_data *qwd, size_t num_threads)
 {
     // Calculate hosts per thread
@@ -2445,7 +2504,8 @@ static void weights_foreach_host_parallel(struct query_weights_data *qwd, size_t
         current_host_idx += thread_data[i].host_count;
 
         completion_init(&thread_data[i].completion);
-        rrdeng_enq_cmd(NULL, RRDENG_OPCODE_PARALLEL_WEIGHT, &thread_data[i], &thread_data[i].completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        if (!weights_parallel_submit(&thread_data[i]))
+            weights_parallel_job(&thread_data[i]); // shutting down, or no thread available: run it here
     }
 
     // Wait for all threads to complete; the pinned hosts are released only after this
@@ -2466,6 +2526,8 @@ static void weights_foreach_host_parallel(struct query_weights_data *qwd, size_t
 
     freez(thread_data);
 }
+#else
+void weights_parallel_shutdown(void) { ; }
 #endif
 
 // Runs the query on the hosts pinned in qwd->hosts, in parallel when there are several
@@ -2478,7 +2540,7 @@ static void weights_foreach_host(struct query_weights_data *qwd)
     if (qwd->hosts_count < num_threads)
         num_threads = qwd->hosts_count;
 
-    // the parallel jobs run on the dbengine event loop, which exists only when a dbengine tier is in use
+    // parallel only when a dbengine tier is in use (unchanged from when the chunks ran as dbengine jobs)
     if (num_threads > 1 && dbengine_enabled) {
         weights_foreach_host_parallel(qwd, num_threads);
         return;

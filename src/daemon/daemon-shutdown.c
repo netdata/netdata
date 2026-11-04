@@ -6,6 +6,7 @@
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
+#include "web/api/queries/weights.h"
 
 #include <curl/curl.h>
 
@@ -286,6 +287,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD);
 
     service_wait_exit(~0, 20 * USEC_PER_SEC);
+
+    // after every service that can issue a weights request (web, websockets/MCP, ACLK) has stopped,
+    // and before dbengine stops: accepted chunks finish, later requests run their chunks inline
+    weights_parallel_shutdown();
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
 
     cancel_main_threads();

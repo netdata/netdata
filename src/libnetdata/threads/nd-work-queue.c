@@ -1,0 +1,320 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "nd-work-queue.h"
+
+struct nd_work_queue_job {
+    nd_work_queue_job_cb cb;
+    void *data;
+    struct nd_work_queue_job *prev, *next;
+};
+
+struct nd_work_queue {
+    char tag[ND_THREAD_TAG_MAX + 1];
+
+    nd_work_queue_thread_init_cb thread_init;
+    void *thread_init_data;
+
+    netdata_mutex_t mutex;
+    netdata_cond_t job_cond;    // a job was queued, or the queue was stopped
+    netdata_cond_t exit_cond;   // a worker thread exited
+
+    struct nd_work_queue_job *jobs; // FIFO, protected by mutex
+    size_t queued;                  // jobs waiting for a thread
+    size_t idle;                    // threads waiting on job_cond
+    size_t alive;                   // threads that have not exited yet
+    bool stopping;
+
+    size_t max_threads;
+    size_t threads_created;
+    ND_THREAD **threads;
+};
+
+static void nd_work_queue_worker(void *arg) {
+    ND_WORK_QUEUE *wq = arg;
+
+    if(wq->thread_init)
+        wq->thread_init(wq->thread_init_data);
+
+    netdata_mutex_lock(&wq->mutex);
+    while(true) {
+        while(!wq->jobs && !wq->stopping) {
+            wq->idle++;
+            netdata_cond_wait(&wq->job_cond, &wq->mutex);
+            wq->idle--;
+        }
+
+        struct nd_work_queue_job *job = wq->jobs;
+        if(!job)
+            break; // stopping and nothing left to run
+
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->jobs, job, prev, next);
+        wq->queued--;
+        netdata_mutex_unlock(&wq->mutex);
+
+        job->cb(job->data);
+        freez(job);
+
+        netdata_mutex_lock(&wq->mutex);
+    }
+
+    wq->alive--;
+    netdata_cond_broadcast(&wq->exit_cond);
+    netdata_mutex_unlock(&wq->mutex);
+}
+
+ND_WORK_QUEUE *nd_work_queue_create(const char *tag, size_t max_threads,
+                                    nd_work_queue_thread_init_cb thread_init, void *thread_init_data) {
+    ND_WORK_QUEUE *wq = callocz(1, sizeof(*wq));
+    strncpyz(wq->tag, tag, sizeof(wq->tag) - 1);
+    wq->thread_init = thread_init;
+    wq->thread_init_data = thread_init_data;
+    wq->max_threads = max_threads ? max_threads : 1;
+    wq->threads = callocz(wq->max_threads, sizeof(*wq->threads));
+    netdata_mutex_init(&wq->mutex);
+    netdata_cond_init(&wq->job_cond);
+    netdata_cond_init(&wq->exit_cond);
+    return wq;
+}
+
+// called with the mutex held
+static void nd_work_queue_spawn_thread_unsafe(ND_WORK_QUEUE *wq) {
+    char name[ND_THREAD_TAG_MAX + 1];
+    snprintfz(name, sizeof(name) - 1, "%s[%zu]", wq->tag, wq->threads_created);
+
+    ND_THREAD *t = nd_thread_create(name, NETDATA_THREAD_OPTION_MANUAL_JOIN | NETDATA_THREAD_OPTION_DONT_LOG,
+                                    nd_work_queue_worker, wq);
+    if(!t)
+        return;
+
+    wq->threads[wq->threads_created++] = t;
+    wq->alive++;
+}
+
+bool nd_work_queue_submit(ND_WORK_QUEUE *wq, nd_work_queue_job_cb cb, void *data) {
+    if(!wq || !cb)
+        return false;
+
+    struct nd_work_queue_job *job = mallocz(sizeof(*job));
+    job->cb = cb;
+    job->data = data;
+    job->prev = job->next = NULL;
+
+    netdata_mutex_lock(&wq->mutex);
+
+    if(wq->stopping) {
+        netdata_mutex_unlock(&wq->mutex);
+        freez(job);
+        return false;
+    }
+
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wq->jobs, job, prev, next);
+    wq->queued++;
+
+    // every queued job needs a thread of its own: add one when the idle ones cannot cover them
+    if(wq->queued > wq->idle && wq->threads_created < wq->max_threads)
+        nd_work_queue_spawn_thread_unsafe(wq);
+
+    if(!wq->alive) {
+        // no thread exists and none could be created: nothing would ever run this job
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->jobs, job, prev, next);
+        wq->queued--;
+        netdata_mutex_unlock(&wq->mutex);
+        freez(job);
+        return false;
+    }
+
+    netdata_cond_signal(&wq->job_cond);
+    netdata_mutex_unlock(&wq->mutex);
+    return true;
+}
+
+void nd_work_queue_stop(ND_WORK_QUEUE *wq) {
+    if(!wq)
+        return;
+
+    netdata_mutex_lock(&wq->mutex);
+    wq->stopping = true;
+    netdata_cond_broadcast(&wq->job_cond);
+    netdata_mutex_unlock(&wq->mutex);
+}
+
+bool nd_work_queue_stop_and_free(ND_WORK_QUEUE *wq, usec_t timeout_ut) {
+    if(!wq)
+        return true;
+
+    nd_work_queue_stop(wq);
+
+    usec_t deadline_ut = now_monotonic_usec() + timeout_ut;
+
+    netdata_mutex_lock(&wq->mutex);
+    while(wq->alive) {
+        usec_t now_ut = now_monotonic_usec();
+        if(now_ut >= deadline_ut)
+            break;
+
+        netdata_cond_timedwait(&wq->exit_cond, &wq->mutex, (deadline_ut - now_ut) * NSEC_PER_USEC);
+    }
+    size_t alive = wq->alive;
+    netdata_mutex_unlock(&wq->mutex);
+
+    if(alive) {
+        nd_log_daemon(NDLP_WARNING,
+                      "WORK QUEUE '%s': %zu thread(s) still running a job after %"PRIu64" ms, not freeing the queue",
+                      wq->tag, alive, (uint64_t)(timeout_ut / USEC_PER_MS));
+        return false;
+    }
+
+    // every thread has left its loop; the joins only reap them
+    for(size_t i = 0; i < wq->threads_created; i++)
+        nd_thread_join(wq->threads[i]);
+
+    netdata_cond_destroy(&wq->exit_cond);
+    netdata_cond_destroy(&wq->job_cond);
+    netdata_mutex_destroy(&wq->mutex);
+    freez(wq->threads);
+    freez(wq);
+    return true;
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// unittest
+
+struct nd_work_queue_ut {
+    size_t ran;
+    size_t running;
+    size_t max_running;
+    size_t init_calls;
+    struct completion release;  // jobs that block wait here
+    bool block;
+};
+
+static void nd_work_queue_ut_init(void *data) {
+    struct nd_work_queue_ut *ut = data;
+    __atomic_add_fetch(&ut->init_calls, 1, __ATOMIC_RELAXED);
+}
+
+static void nd_work_queue_ut_job(void *data) {
+    struct nd_work_queue_ut *ut = data;
+    size_t running = __atomic_add_fetch(&ut->running, 1, __ATOMIC_RELAXED);
+
+    size_t max = __atomic_load_n(&ut->max_running, __ATOMIC_RELAXED);
+    while(running > max && !__atomic_compare_exchange_n(&ut->max_running, &max, running, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        ;
+
+    if(__atomic_load_n(&ut->block, __ATOMIC_RELAXED))
+        completion_wait_for(&ut->release);
+
+    __atomic_sub_fetch(&ut->running, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ut->ran, 1, __ATOMIC_RELAXED);
+}
+
+static bool nd_work_queue_ut_wait_for(size_t *counter, size_t expected, usec_t timeout_ut) {
+    usec_t deadline_ut = now_monotonic_usec() + timeout_ut;
+    while(__atomic_load_n(counter, __ATOMIC_RELAXED) != expected) {
+        if(now_monotonic_usec() >= deadline_ut)
+            return false;
+        sleep_usec(1000);
+    }
+    return true;
+}
+
+int nd_work_queue_unittest(void) {
+    int errors = 0;
+    fprintf(stderr, "\nTesting the work queue...\n");
+
+    // 1. blocking jobs run in parallel up to max_threads, the rest queue; nothing is lost
+    {
+        struct nd_work_queue_ut ut = { .block = true };
+        completion_init(&ut.release);
+        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 4, nd_work_queue_ut_init, &ut);
+
+        for(size_t i = 0; i < 10; i++) {
+            if(!nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut)) {
+                fprintf(stderr, "  FAILED: submit %zu was refused\n", i);
+                errors++;
+            }
+        }
+
+        if(!nd_work_queue_ut_wait_for(&ut.running, 4, 10 * USEC_PER_SEC)) {
+            fprintf(stderr, "  FAILED: expected 4 jobs running in parallel, got %zu\n",
+                    __atomic_load_n(&ut.running, __ATOMIC_RELAXED));
+            errors++;
+        }
+
+        completion_mark_complete(&ut.release);
+        if(!nd_work_queue_ut_wait_for(&ut.ran, 10, 10 * USEC_PER_SEC)) {
+            fprintf(stderr, "  FAILED: expected 10 jobs to run, got %zu\n", __atomic_load_n(&ut.ran, __ATOMIC_RELAXED));
+            errors++;
+        }
+
+        if(ut.max_running > 4) {
+            fprintf(stderr, "  FAILED: %zu jobs ran in parallel, the limit is 4\n", ut.max_running);
+            errors++;
+        }
+
+        if(!nd_work_queue_stop_and_free(wq, 10 * USEC_PER_SEC)) {
+            fprintf(stderr, "  FAILED: the queue did not stop\n");
+            errors++;
+        }
+
+        if(ut.init_calls != 4) {
+            fprintf(stderr, "  FAILED: expected 4 thread init calls, got %zu\n", ut.init_calls);
+            errors++;
+        }
+        completion_destroy(&ut.release);
+    }
+
+    // 2. threads are created on demand: one job at a time needs one thread
+    {
+        struct nd_work_queue_ut ut = { 0 };
+        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 8, nd_work_queue_ut_init, &ut);
+        for(size_t i = 0; i < 5; i++) {
+            nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut);
+            nd_work_queue_ut_wait_for(&ut.ran, i + 1, 10 * USEC_PER_SEC);
+            sleep_usec(10 * USEC_PER_MS); // let the worker go idle before the next submit
+        }
+        nd_work_queue_stop_and_free(wq, 10 * USEC_PER_SEC);
+        if(ut.init_calls != 1) {
+            fprintf(stderr, "  FAILED: sequential jobs created %zu threads, expected 1\n", ut.init_calls);
+            errors++;
+        }
+    }
+
+    // 3. accepted jobs still run after stop; new jobs are refused
+    {
+        struct nd_work_queue_ut ut = { .block = true };
+        completion_init(&ut.release);
+        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 1, NULL, NULL);
+        for(size_t i = 0; i < 3; i++)
+            nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut);
+
+        nd_work_queue_ut_wait_for(&ut.running, 1, 10 * USEC_PER_SEC);
+        nd_work_queue_stop(wq);
+
+        if(nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut)) {
+            fprintf(stderr, "  FAILED: a stopped queue accepted a job\n");
+            errors++;
+        }
+
+        // a job is still running: freeing must time out and leave the queue alone
+        if(nd_work_queue_stop_and_free(wq, 100 * USEC_PER_MS)) {
+            fprintf(stderr, "  FAILED: the queue was freed while a job was running\n");
+            errors++;
+        }
+
+        completion_mark_complete(&ut.release);
+        if(!nd_work_queue_stop_and_free(wq, 10 * USEC_PER_SEC)) {
+            fprintf(stderr, "  FAILED: the queue did not stop after its jobs finished\n");
+            errors++;
+        }
+
+        if(ut.ran != 3) {
+            fprintf(stderr, "  FAILED: expected the 3 accepted jobs to run, got %zu\n", ut.ran);
+            errors++;
+        }
+        completion_destroy(&ut.release);
+    }
+
+    fprintf(stderr, "Work queue tests: %s\n", errors ? "FAILED" : "OK");
+    return errors;
+}

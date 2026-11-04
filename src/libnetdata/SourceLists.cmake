@@ -177,6 +177,8 @@ set(LIBNETDATA_FILES
         string/string.h
         threads/threads.c
         threads/threads.h
+        threads/nd-work-queue.c
+        threads/nd-work-queue.h
         url/url.c
         url/url.h
         uuid/uuid.c
