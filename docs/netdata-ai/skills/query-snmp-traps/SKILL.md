@@ -9,8 +9,8 @@ Use this operator skill for the `snmp:traps` Function provided by the `snmp_trap
 appear in `__logs_sources`, normally by listener job name. OTLP-only jobs (`journal.enabled: false`) create no local
 journal files and do not appear as local log sources.
 
-`snmp:traps` requires a signed-in member of the node's Space on a paid plan or trial. A free Space gets 403 with
-`errorMsgKey: "ErrCommercialRequired"`; the plan, not the role, is the cause.
+`snmp:traps` follows the system-log access rule: a signed-in member of the node's Space with permission to view
+sensitive data, on every plan.
 
 ## Choose The Task
 

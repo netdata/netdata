@@ -41,6 +41,7 @@ func selMethod(updateEvery int) funcapi.FunctionConfig {
 		FunctionName:   SELFunctionName,
 		Name:           "IPMI System Event Log",
 		Help:           selDescription,
+		RequireCloud:   true,
 		UpdateEvery:    updateEvery,
 		ResponseType:   "table",
 		RawRequest:     true,

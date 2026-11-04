@@ -2116,7 +2116,9 @@ int main(int argc, char **argv) {
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
             NETWORK_TOPOLOGY_VIEWER_FUNCTION, 60,
             NETWORK_TOPOLOGY_VIEWER_HELP,
-            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
+            // topology maps are a paid-plan view; the connections table stays available to every signed-in member
+            (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_COMMERCIAL_SPACE |
+                                      HTTP_ACCESS_SENSITIVE_DATA),
             NRPC_PRIORITY_DEFAULT);
 
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
