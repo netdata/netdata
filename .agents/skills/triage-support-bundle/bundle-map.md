@@ -179,7 +179,7 @@ missing.
 | `stream-info.json`, `aclk.json` | Streaming and cloud-connection diagnostics |
 | `alerts-active.json`, `alerts-all.json` | Current alert state - a snapshot, never a history |
 | `functions.json` | Which plugins expose what |
-| `dyncfg-tree.json` | **The authoritative collector job state**: every go.d and scripts.d job with its status (`accepted`, `running`, `failed`, `disabled`, `orphan`, `incomplete`, `none`), plus service discovery, vnodes, secret stores and alert prototypes. Added by the collector change that removed the dead on-disk job-state file, so bundles produced before it do not carry this path |
+| `dyncfg-tree.json` | **The authoritative collector job state**: every go.d and scripts.d job with its status (`accepted`, `running`, `failed`, `disabled`, `orphan`, `incomplete`, `none`), plus service discovery, vnodes, secret stores and alert prototypes. Added by the collector change that removed the dead on-disk job-state file, so bundles produced before it do not carry this path. Agents that require a signed-in Space member to list the tree refuse the bundle's anonymous capture, so the file holds the failure marker - not evidence that no jobs exist |
 | `ml-info.json` | Machine-learning status only; model state is never collected |
 | `self-cpu.csv`, `self-memory.csv`, `self-api-clients.csv` | The agent's own bounded resource windows |
 | `buildinfo.txt`, `buildinfo.json` | Required by the bug template; **works with the daemon down**, because it runs the binary |
