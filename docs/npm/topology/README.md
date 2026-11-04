@@ -36,6 +36,8 @@ When Netdata monitors your SNMP devices, it reads what they already know about t
 
 The result is a live Layer 2 and Layer 3 map, kept current as devices come and go. Each link carries the evidence behind it — how it was discovered and how confident Netdata is in it — so a confirmed link is distinguishable from an inferred one.
 
+Viewing the device topology (`topology:snmp`) requires a signed-in member of the node's Netdata Cloud Space on a paid plan or an active trial. SNMP device metrics are available on every plan, and the other maps in the topology view need only a signed-in Space member.
+
 ## What you can do with it
 
 - **See the real wiring** — device-to-device links across your network.

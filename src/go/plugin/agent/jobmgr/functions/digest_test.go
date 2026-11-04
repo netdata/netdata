@@ -22,7 +22,7 @@ func TestControllerGroupSignatureLayoutGolden(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.EqualValues(t, "8a1dd1efb56c362f31e92db60f18704a8794fc58d06fab80fec03ed535bcb966", controller)
+	require.EqualValues(t, "1430b84e06cf7c778b7afff945c529a185c8ef2cb6d8f620662bdb194291cf8e", controller)
 }
 
 func TestControllerGroupSignatureManagedMetadata(t *testing.T) {
@@ -36,6 +36,7 @@ func TestControllerGroupSignatureManagedMetadata(t *testing.T) {
 		"managed info":    func(method *funcapi.FunctionConfig) { method.ManagedInfo = true },
 		"history":         func(method *funcapi.FunctionConfig) { method.HasHistory = true },
 		"accepted inputs": func(method *funcapi.FunctionConfig) { method.AcceptedParams = []string{"after"} },
+		"commercial":      func(method *funcapi.FunctionConfig) { method.RequireCommercial = true },
 	} {
 		t.Run(name, func(t *testing.T) {
 			method := base

@@ -2,7 +2,8 @@ modules:
   - functions:
         description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live
             activity and retained investigation history. Invoke their public rum-* names; filter by site where
-            supported.
+            supported. Viewing them requires a signed-in member of a Netdata Cloud Space on a paid plan or an active
+            trial; beacons are received and history is stored on every plan.
         list:
           - id: rum-sites
             function_name: rum-sites

@@ -30,6 +30,8 @@ func TestMetadataDocumentsProcessFunctions(t *testing.T) {
 		t.Run(declaration.ID, func(t *testing.T) {
 			// RUM rows carry visitor sessions, locations and errors: sensitive data.
 			require.True(t, declaration.RequireCloud)
+			// Viewing Real User Monitoring requires a paid plan (access 0x0017).
+			require.True(t, declaration.RequireCommercial)
 			doc, ok := documented[declaration.ID]
 			require.True(t, ok, "missing Function documentation")
 			require.Equal(t, funcapi.FunctionName("rum", declaration), doc.FunctionName)

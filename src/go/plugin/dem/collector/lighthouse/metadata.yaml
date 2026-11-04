@@ -192,7 +192,8 @@ modules:
     functions:
       description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse
         jobs. Invoke their public synthetics-* names with the documented filters; no job selector or active
-        browser is required.
+        browser is required. Viewing them requires a signed-in member of a Netdata Cloud Space on a paid plan
+        or an active trial; journeys and audits run and their history is stored on every plan.
       list:
         - id: synthetics-checks
           function_name: synthetics-checks

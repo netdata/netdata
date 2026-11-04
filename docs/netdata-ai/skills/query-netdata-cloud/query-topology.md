@@ -27,6 +27,9 @@ Known producer families:
 | `topology:vsphere` | vSphere collector | inventory and virtualization relationships |
 | `topology:cato_networks` | Cato Networks collector | sites, devices, interface tunnels, PoPs and BGP peers |
 
+`topology:snmp` requires a Space on a paid plan or trial; a free Space gets 403 with
+`errorMsgKey: "ErrCommercialRequired"`. The other topology Functions need a signed-in Space member only.
+
 Always start with an info request to discover the parameters supported by the
 Agent version you are querying.
 
