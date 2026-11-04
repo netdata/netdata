@@ -82,13 +82,17 @@ type Sweep struct {
 // DevicePresentation records current registration metadata separately from the
 // retained acquisition input. Historical documents omit it.
 type DevicePresentation struct {
-	SysName     string            `json:"sys_name"`
-	SysDescr    string            `json:"sys_descr"`
-	SysContact  string            `json:"sys_contact"`
-	SysLocation string            `json:"sys_location"`
-	Vendor      string            `json:"vendor"`
-	Model       string            `json:"model"`
-	Labels      map[string]string `json:"labels,omitempty"`
+	SysName         string            `json:"sys_name"`
+	SysDescr        string            `json:"sys_descr"`
+	SysContact      string            `json:"sys_contact"`
+	SysLocation     string            `json:"sys_location"`
+	Vendor          string            `json:"vendor"`
+	Model           string            `json:"model"`
+	SerialNumber    *string           `json:"serial_number,omitempty"`
+	SoftwareVersion *string           `json:"software_version,omitempty"`
+	FirmwareVersion *string           `json:"firmware_version,omitempty"`
+	HardwareVersion *string           `json:"hardware_version,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
 }
 
 type Device struct {

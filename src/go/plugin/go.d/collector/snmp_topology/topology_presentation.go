@@ -28,48 +28,60 @@ func (g *topologyDeviceGeneration) withRegisteredPresentation(input topologydiag
 	if !sameTopologyDeviceInput(*g.sourceInput, input) {
 		old := buildLocalTopologyDevice(g.sourceInput.ConnectionInfo())
 		current := buildLocalTopologyDevice(input.ConnectionInfo())
-		if old.SysName != current.SysName {
-			local.SysName = current.SysName
+		for _, field := range []struct {
+			target   *string
+			previous string
+			current  string
+		}{
+			{&local.SysName, old.SysName, current.SysName},
+			{&local.SysDescr, old.SysDescr, current.SysDescr},
+			{&local.SysContact, old.SysContact, current.SysContact},
+			{&local.SysLocation, old.SysLocation, current.SysLocation},
+			{&local.Vendor, old.Vendor, current.Vendor},
+			{&local.Model, old.Model, current.Model},
+			{&local.SerialNumber, old.SerialNumber, current.SerialNumber},
+			{&local.SoftwareVersion, old.SoftwareVersion, current.SoftwareVersion},
+			{&local.FirmwareVersion, old.FirmwareVersion, current.FirmwareVersion},
+			{&local.HardwareVersion, old.HardwareVersion, current.HardwareVersion},
+		} {
+			if field.previous != field.current {
+				*field.target = field.current
+			}
 		}
-		if old.SysDescr != current.SysDescr {
-			local.SysDescr = current.SysDescr
-		}
-		if old.SysContact != current.SysContact {
-			local.SysContact = current.SysContact
-		}
-		if old.SysLocation != current.SysLocation {
-			local.SysLocation = current.SysLocation
-		}
-		if old.Vendor != current.Vendor {
-			local.Vendor = current.Vendor
-		}
-		if old.Model != current.Model {
-			local.Model = current.Model
-		}
-		if !maps.Equal(g.sourceInput.VnodeLabels, input.VnodeLabels) {
+		if !maps.Equal(old.Labels, current.Labels) {
 			local.Labels = maps.Clone(local.Labels)
 			if local.Labels == nil {
 				local.Labels = make(map[string]string)
 			}
-			for key, previous := range g.sourceInput.VnodeLabels {
-				if _, exists := input.VnodeLabels[key]; !exists && local.Labels[key] == previous {
+			for key, previous := range old.Labels {
+				if !topologyPresentationLabel(key) {
+					continue
+				}
+				if _, exists := current.Labels[key]; !exists && local.Labels[key] == previous {
 					delete(local.Labels, key)
 				}
 			}
-			for key, value := range input.VnodeLabels {
-				if previous, exists := g.sourceInput.VnodeLabels[key]; !exists || previous != value {
+			for key, value := range current.Labels {
+				if !topologyPresentationLabel(key) {
+					continue
+				}
+				if previous, exists := old.Labels[key]; !exists || previous != value {
 					local.Labels[key] = value
 				}
 			}
 		}
 		next.presentation = &topologymodel.DevicePresentation{
-			SysName:     local.SysName,
-			SysDescr:    local.SysDescr,
-			SysContact:  local.SysContact,
-			SysLocation: local.SysLocation,
-			Vendor:      local.Vendor,
-			Model:       local.Model,
-			Labels:      local.Labels,
+			SysName:         local.SysName,
+			SysDescr:        local.SysDescr,
+			SysContact:      local.SysContact,
+			SysLocation:     local.SysLocation,
+			Vendor:          local.Vendor,
+			Model:           local.Model,
+			Labels:          local.Labels,
+			SerialNumber:    &local.SerialNumber,
+			SoftwareVersion: &local.SoftwareVersion,
+			FirmwareVersion: &local.FirmwareVersion,
+			HardwareVersion: &local.HardwareVersion,
 		}
 		observation := topologymodel.WithDevicePresentation(g.observation, next.presentation)
 		next.presentedObservation = &observation
@@ -77,4 +89,19 @@ func (g *topologyDeviceGeneration) withRegisteredPresentation(input topologydiag
 	next.trap.deviceHostname = strings.TrimSpace(local.SysName)
 	next.trap.deviceVendor = strings.TrimSpace(local.Vendor)
 	return &next
+}
+
+// These labels describe acquired identity or clocks, rather than registration
+// presentation. Keep their labels and typed facts in the same acquisition.
+func topologyPresentationLabel(key string) bool {
+	key = topologyCanonicalMetadataKey(key)
+	if key == "sys_object_id" || key == "sysobjectid" || key == tagOSPFRouterID {
+		return false
+	}
+	for _, alias := range topologyMetadataAliasSysUptime {
+		if key == alias {
+			return false
+		}
+	}
+	return true
 }
