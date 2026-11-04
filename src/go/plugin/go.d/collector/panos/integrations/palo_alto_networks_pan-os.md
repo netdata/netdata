@@ -23,7 +23,7 @@ Module: panos
 ## Overview
 
 This collector monitors Palo Alto Networks PAN-OS firewalls.
-It collects read-only XML API telemetry for BGP, system status, HA, environment sensors, licenses, and IPsec SAs.
+It collects read-only XML API telemetry for BGP, system status, HA, environment sensors, licenses, IPsec SAs, tunnels, and gateways.
 
 
 It gathers metrics by periodically running PAN-OS XML API operational commands through the pango SDK.
@@ -46,6 +46,14 @@ This collector does not auto-detect PAN-OS firewalls. A job must be configured w
 #### Limits
 
 The default collection interval is 60 seconds to keep polling load conservative on the PAN-OS management plane.
+
+IPsec states describe local VPN state, not end-to-end reachability. On-demand VPNs may have no SA until traffic triggers negotiation.
+Gateway `up` means an IKE SA with establishment and expiration times was reported; `down` means no matching SA was reported in a valid response.
+Failed queries and incomplete SA data leave gateway-state gaps.
+Configured tunnel and gateway charts remain visible during telemetry failures. Confirmed inventory removals retire their charts immediately.
+
+Gateway and tunnel states are independent. An IKE gateway can be `up` before its tunnel leaves `init`, and an IKEv1 tunnel can remain `active` after its parent IKE SA is cleared.
+Tunnel flow states `active`, `inactive`, and `init` are preserved; `unknown` means an unrecognized nonempty state, and missing state data leaves a gap.
 
 
 #### Performance Impact
@@ -352,6 +360,42 @@ Metrics:
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
 | panos.ipsec.tunnel.sa_lifetime | IPsec Tunnel SA Remaining Lifetime | remaining_lifetime | seconds |
+
+
+### Per IPsec tunnel state
+
+These metrics refer to one configured PAN-OS IPsec tunnel, whether or not it currently has an established SA.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| tunnel | Tunnel name. |
+| tunnel_id | PAN-OS tunnel identifier. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.ipsec.tunnel.state | IPsec Tunnel State | active, inactive, init, unknown | state |
+
+
+### Per IPsec gateway
+
+These metrics refer to one configured PAN-OS IKE gateway, whether or not it currently has an established IKE SA.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| gateway | Gateway name. |
+| ike_version | IKE version the gateway is configured for (`ikev1`, `ikev2`, or `unknown`). |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| panos.ipsec.gateway.state | IPsec Gateway State | down, up | state |
 
 
 ### Per BGP peer
