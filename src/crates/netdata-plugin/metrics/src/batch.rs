@@ -2,19 +2,10 @@
 //! and by the slot their own time falls in; the store decides at merge time
 //! whether a slot is still open.
 
-use crate::metric_set::{Counter, Cumulative, Dimensions, Gauge, Histogram, Labels, MetricSet};
+use crate::metric_set::{
+    Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet, MetricSetInner,
+};
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-
-static NEXT_BATCH_ID: AtomicU64 = AtomicU64::new(0);
-
-/// A handle to an instance within the [`Batch`] that returned it; using it
-/// with another batch panics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct InstanceRef {
-    batch_id: u64,
-    index: usize,
-}
 
 pub(crate) struct PartialSlot {
     pub(crate) slot: u64,
@@ -22,7 +13,8 @@ pub(crate) struct PartialSlot {
     pub(crate) cells: Box<[f64]>,
 }
 
-pub(crate) struct BatchInstance {
+/// One instance's records within a batch.
+pub(crate) struct PendingInstance {
     pub(crate) labels: Labels,
     pub(crate) slots: Vec<PartialSlot>,
     /// Slot number → index in `slots`; records mostly arrive in time order,
@@ -37,16 +29,14 @@ pub(crate) struct BatchInstance {
 /// [`Store::merge`](crate::Store::merge) once the work is done for good (for
 /// example written to disk), so a retried request is not counted twice.
 pub struct Batch {
-    id: u64,
     set: MetricSet,
-    pub(crate) instances: Vec<BatchInstance>,
+    pub(crate) instances: Vec<PendingInstance>,
     index: HashMap<Labels, usize>,
 }
 
 impl Batch {
     pub fn new(set: &MetricSet) -> Self {
         Self {
-            id: NEXT_BATCH_ID.fetch_add(1, Ordering::Relaxed),
             set: set.clone(),
             instances: Vec::new(),
             index: HashMap::new(),
@@ -57,67 +47,28 @@ impl Batch {
         &self.set
     }
 
-    /// The handle for the instance with these labels, added on first use.
-    /// Callers look an instance up once per group of records (for example
-    /// once per OTLP resource), not per record.
-    pub fn instance(&mut self, labels: Labels) -> InstanceRef {
-        if let Some(&index) = self.index.get(&labels) {
-            return InstanceRef {
-                batch_id: self.id,
-                index,
-            };
-        }
-        let index = self.instances.len();
-        self.index.insert(labels.clone(), index);
-        self.instances.push(BatchInstance {
-            labels,
-            slots: Vec::new(),
-            index: HashMap::new(),
-            last: 0,
-        });
-        InstanceRef {
-            batch_id: self.id,
-            index,
-        }
-    }
-
-    /// One record of `instance` at `unix_seconds` (the event's own time);
-    /// write its measurements through the returned [`Record`]. Every call is
-    /// one record, even with no measurement: it counts in the store's late,
-    /// future and overflow counts, and it starts the instance or keeps it
-    /// from expiring.
-    ///
-    /// # Panics
-    ///
-    /// If `instance` comes from another batch.
-    pub fn record(&mut self, instance: InstanceRef, unix_seconds: u64) -> Record<'_> {
-        assert_eq!(instance.batch_id, self.id, "instance of another batch");
-        let set = &self.set.0;
-        let slot = unix_seconds / set.update_every;
-        let batch_instance = &mut self.instances[instance.index];
-        let index = if batch_instance
-            .slots
-            .get(batch_instance.last)
-            .is_some_and(|s| s.slot == slot)
-        {
-            batch_instance.last
-        } else {
-            let slots = &mut batch_instance.slots;
-            *batch_instance.index.entry(slot).or_insert_with(|| {
-                slots.push(PartialSlot {
-                    slot,
-                    records: 0,
-                    cells: set.initial_cells.clone().into_boxed_slice(),
+    /// The instance with these labels, added on first use, to record into.
+    /// Look an instance up once per group of records (for example once per
+    /// OTLP resource), not per record; while the returned handle lives, the
+    /// batch is borrowed.
+    pub fn instance(&mut self, labels: Labels) -> BatchInstance<'_> {
+        let index = match self.index.get(&labels) {
+            Some(&index) => index,
+            None => {
+                let index = self.instances.len();
+                self.index.insert(labels.clone(), index);
+                self.instances.push(PendingInstance {
+                    labels,
+                    slots: Vec::new(),
+                    index: HashMap::new(),
+                    last: 0,
                 });
-                slots.len() - 1
-            })
+                index
+            }
         };
-        batch_instance.last = index;
-        let partial = &mut batch_instance.slots[index];
-        partial.records += 1;
-        Record {
-            set_id: set.id,
-            cells: &mut partial.cells,
+        BatchInstance {
+            set: &self.set.0,
+            instance: &mut self.instances[index],
         }
     }
 
@@ -127,17 +78,60 @@ impl Batch {
     }
 }
 
+/// One instance of a [`Batch`], from [`Batch::instance`].
+pub struct BatchInstance<'a> {
+    set: &'a MetricSetInner,
+    instance: &'a mut PendingInstance,
+}
+
+impl BatchInstance<'_> {
+    /// One record at `unix_seconds` (the event's own time); write its
+    /// measurements through the returned [`Measurements`]. Every call is one
+    /// record, even with no measurement: it counts in the store's late,
+    /// future and overflow counts, and it starts the instance or keeps it
+    /// from expiring.
+    pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
+        let set = self.set;
+        let slot = unix_seconds / set.update_every;
+        let instance = &mut *self.instance;
+        let index = if instance
+            .slots
+            .get(instance.last)
+            .is_some_and(|s| s.slot == slot)
+        {
+            instance.last
+        } else {
+            let slots = &mut instance.slots;
+            *instance.index.entry(slot).or_insert_with(|| {
+                slots.push(PartialSlot {
+                    slot,
+                    records: 0,
+                    cells: set.initial_cells.clone().into_boxed_slice(),
+                });
+                slots.len() - 1
+            })
+        };
+        instance.last = index;
+        let partial = &mut instance.slots[index];
+        partial.records += 1;
+        Measurements {
+            set_id: set.id,
+            cells: &mut partial.cells,
+        }
+    }
+}
+
 /// One record's measurements. A record may update several instruments.
 ///
 /// Every method panics if the instrument belongs to another [`MetricSet`],
 /// or if the dimension's index is out of range (a broken manual
 /// [`Dimensions`] implementation).
-pub struct Record<'a> {
+pub struct Measurements<'a> {
     set_id: u32,
     cells: &'a mut [f64],
 }
 
-impl Record<'_> {
+impl Measurements<'_> {
     fn cell<D: Dimensions>(&self, set_id: u32, base: usize, dimension: D) -> usize {
         assert_eq!(set_id, self.set_id, "instrument of another metric set");
         let index = dimension.index();
@@ -164,7 +158,7 @@ impl Record<'_> {
     /// Set the `dimension` total of `cumulative` to `total`.
     pub fn set_total<D: Dimensions>(
         &mut self,
-        cumulative: Cumulative<D>,
+        cumulative: CumulativeCounter<D>,
         dimension: D,
         total: f64,
     ) -> &mut Self {

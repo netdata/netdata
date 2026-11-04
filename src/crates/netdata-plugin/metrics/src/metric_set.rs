@@ -127,7 +127,7 @@ pub struct Counter<D> {
 /// - After the baseline, a slot without a new total shows 0.
 /// - Within a slot, the total merged last wins.
 #[derive(Debug)]
-pub struct Cumulative<D> {
+pub struct CumulativeCounter<D> {
     pub(crate) set_id: u32,
     pub(crate) base: usize,
     _dimensions: PhantomData<fn() -> D>,
@@ -158,7 +158,7 @@ macro_rules! copy_instrument {
     )+};
 }
 
-copy_instrument!(Counter, Cumulative, Gauge);
+copy_instrument!(Counter, CumulativeCounter, Gauge);
 
 /// A distribution of observed values, for example request durations, over
 /// fixed bucket bounds; its two charts are described at
@@ -319,7 +319,7 @@ pub(crate) struct MetricSetInner {
     pub(crate) overflow_labels: Labels,
     pub(crate) merges: Vec<Merge>,
     pub(crate) initial_cells: Vec<f64>,
-    /// The cells of [`Cumulative`] instruments, which hold totals until a
+    /// The cells of [`CumulativeCounter`] instruments, which hold totals until a
     /// slot is emitted as increases.
     pub(crate) cumulative_cells: Vec<usize>,
     pub(crate) charts: Vec<ChartDef>,
@@ -436,16 +436,16 @@ impl MetricSetBuilder {
         }
     }
 
-    /// Adds a [`Cumulative`] and its chart.
+    /// Adds a [`CumulativeCounter`] and its chart.
     ///
     /// # Panics
     ///
     /// As [`MetricSetBuilder::counter`].
-    pub fn cumulative<D: Dimensions>(&mut self, chart: Chart) -> Cumulative<D> {
+    pub fn cumulative_counter<D: Dimensions>(&mut self, chart: Chart) -> CumulativeCounter<D> {
         let base = self.cells(D::IDS.len(), Merge::Last);
         self.cumulative_cells.extend(base..base + D::IDS.len());
         self.chart(chart, rates::<D>(base));
-        Cumulative {
+        CumulativeCounter {
             set_id: self.id,
             base,
             _dimensions: PhantomData,

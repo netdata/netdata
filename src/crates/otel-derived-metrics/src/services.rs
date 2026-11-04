@@ -9,7 +9,7 @@
 //! adjusted count its `ot=th` sampling threshold implies.
 
 use netdata_plugin_metrics::{
-    Batch, Cap, Chart, ChartType, Counter, Histogram, InstanceRef, Labels, MetricSet,
+    Batch, BatchInstance, Cap, Chart, ChartType, Counter, Histogram, Labels, MetricSet,
     MetricSetBuilder, Settings, dimensions,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -89,7 +89,7 @@ impl Services {
         request: &ExportTraceServiceRequest,
     ) {
         for resource_spans in &request.resource_spans {
-            let mut instance: Option<InstanceRef> = None;
+            let mut instance: Option<BatchInstance<'_>> = None;
             for scope_spans in &resource_spans.scope_spans {
                 for span in &scope_spans.spans {
                     let is_request = span.parent_span_id.iter().all(|&b| b == 0)
@@ -98,9 +98,13 @@ impl Services {
                     if !is_request {
                         continue;
                     }
-                    let instance = *instance.get_or_insert_with(|| {
-                        batch.instance(service_labels(tenant, resource_spans.resource.as_ref()))
-                    });
+                    if instance.is_none() {
+                        instance = Some(
+                            batch
+                                .instance(service_labels(tenant, resource_spans.resource.as_ref())),
+                        );
+                    }
+                    let instance = instance.as_mut().expect("set above");
                     let start = span.start_time_unix_nano;
                     let end = span.end_time_unix_nano.max(start);
                     let failed = span
@@ -108,8 +112,8 @@ impl Services {
                         .as_ref()
                         .is_some_and(|s| s.code == StatusCode::Error as i32);
                     let weight = adjusted_count(&span.trace_state);
-                    batch
-                        .record(instance, end / 1_000_000_000)
+                    instance
+                        .record(end / 1_000_000_000)
                         .add(
                             self.requests,
                             if failed {

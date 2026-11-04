@@ -32,8 +32,10 @@
 //! let mut labels = Labels::new();
 //! labels.push("service.name", "checkout");
 //! let mut batch = Batch::new(&set);
-//! let checkout = batch.instance(labels);
-//! batch.record(checkout, 100).add(requests, Outcome::Error, 1.0);
+//! batch
+//!     .instance(labels)
+//!     .record(100)
+//!     .add(requests, Outcome::Error, 1.0);
 //! store.merge(batch, 100);
 //!
 //! // Once per second: write the finished slots to the agent.
@@ -42,7 +44,7 @@
 //! ```
 //!
 //! Terms:
-//! - an *instrument* is a [`Counter`], [`Cumulative`], [`Gauge`] or
+//! - an *instrument* is a [`Counter`], [`CumulativeCounter`], [`Gauge`] or
 //!   [`Histogram`]; each brings its chart, and the first three are split by
 //!   the values of their [`Dimensions`];
 //! - an *instance* is one label set, for example one service; it gets its
@@ -55,9 +57,9 @@ mod batch;
 mod metric_set;
 mod store;
 
-pub use batch::{Batch, InstanceRef, Record};
+pub use batch::{Batch, BatchInstance, Measurements};
 pub use metric_set::{
-    Cap, Chart, Counter, Cumulative, Dimensions, Gauge, Histogram, Labels, MetricSet,
+    Cap, Chart, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet,
     MetricSetBuilder, Settings,
 };
 pub use netdata_plugin_protocol::ChartType;

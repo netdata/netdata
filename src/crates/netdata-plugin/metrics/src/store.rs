@@ -568,10 +568,9 @@ mod tests {
         now: u64,
     ) {
         let mut batch = Batch::new(&f.set);
-        let inst = batch.instance(labels(name));
+        let mut inst = batch.instance(labels(name));
         for i in 0..count {
-            batch
-                .record(inst, time)
+            inst.record(time)
                 .add(
                     f.requests,
                     if i < errors {
@@ -744,9 +743,9 @@ mod tests {
         let f = fixture(10, 900, None);
         let mut store = Store::new(f.set.clone());
         let mut batch = Batch::new(&f.set);
-        let inst = batch.instance(labels("a"));
+        let mut inst = batch.instance(labels("a"));
         for time in [995, 996, 995, 997, 996, 999] {
-            batch.record(inst, time).add(f.requests, Outcome::Ok, 1.0);
+            inst.record(time).add(f.requests, Outcome::Ok, 1.0);
         }
         store.merge(batch, 1000);
         let out = text(&store.emit(1011, usize::MAX));
@@ -822,7 +821,7 @@ mod tests {
                 ..Settings::default()
             },
         );
-        let totals = b.cumulative::<Events>(Chart {
+        let totals = b.cumulative_counter::<Events>(Chart {
             id: "events",
             title: "Events",
             units: "events/s",
@@ -835,8 +834,8 @@ mod tests {
         let mut store = Store::new(set.clone());
         let set = |store: &mut Store, time: u64, total: Option<f64>| {
             let mut batch = Batch::new(&set);
-            let inst = batch.instance(Labels::new());
-            let mut record = batch.record(inst, time);
+            let mut inst = batch.instance(Labels::new());
+            let mut record = inst.record(time);
             if let Some(total) = total {
                 record.set_total(totals, Events::Events, total);
             }
@@ -869,19 +868,8 @@ mod tests {
         let f = fixture(0, 900, None);
         let other = fixture(0, 900, None);
         let mut batch = Batch::new(&f.set);
-        let inst = batch.instance(labels("a"));
-        batch.record(inst, 10).add(other.requests, Outcome::Ok, 1.0);
-    }
-
-    #[test]
-    #[should_panic(expected = "instance of another batch")]
-    fn an_instance_of_another_batch_is_refused() {
-        let f = fixture(0, 900, None);
-        let mut first = Batch::new(&f.set);
-        let mut second = Batch::new(&f.set);
-        let inst = first.instance(labels("a"));
-        second.instance(labels("a"));
-        second.record(inst, 10);
+        let mut inst = batch.instance(labels("a"));
+        inst.record(10).add(other.requests, Outcome::Ok, 1.0);
     }
 
     #[test]
@@ -907,17 +895,17 @@ mod tests {
         });
         let set = b.build();
         let mut batch = Batch::new(&set);
-        let inst = batch.instance(Labels::new());
-        batch.record(inst, 10).add(counter, Broken, 1.0);
+        let mut inst = batch.instance(Labels::new());
+        inst.record(10).add(counter, Broken, 1.0);
     }
 
     #[test]
     fn a_batch_without_records_is_empty() {
         let f = fixture(0, 900, None);
         let mut batch = Batch::new(&f.set);
-        let inst = batch.instance(labels("a"));
+        batch.instance(labels("a"));
         assert!(batch.is_empty());
-        batch.record(inst, 10);
+        batch.instance(labels("a")).record(10);
         assert!(!batch.is_empty());
     }
 
@@ -926,13 +914,11 @@ mod tests {
         let f = fixture(0, 900, None);
         let mut store = Store::new(f.set.clone());
         let mut batch = Batch::new(&f.set);
-        let inst = batch.instance(labels("a"));
-        batch
-            .record(inst, 10)
+        let mut inst = batch.instance(labels("a"));
+        inst.record(10)
             .add(f.requests, Outcome::Ok, 2.0)
             .observe(f.duration, 0.25, 2.0);
-        batch
-            .record(inst, 10)
+        inst.record(10)
             .add(f.requests, Outcome::Error, 1.0)
             .observe(f.duration, 2.5, 1.0);
         store.merge(batch, 10);

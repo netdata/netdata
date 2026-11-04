@@ -3,8 +3,8 @@
 //! arrival time, so the metric sets have no lateness.
 
 use netdata_plugin_metrics::{
-    Batch, Chart, ChartType, Counter, Cumulative, Gauge, Labels, MetricSet, MetricSetBuilder,
-    Settings, Stats, dimensions,
+    Batch, Chart, ChartType, Counter, CumulativeCounter, Gauge, Labels, MetricSet,
+    MetricSetBuilder, Settings, Stats, dimensions,
 };
 use otel_bridge::signals::Signal;
 
@@ -78,9 +78,9 @@ impl Plugin {
             Signal::Logs => self.log_records,
         };
         let mut batch = Batch::new(&self.metrics);
-        let instance = batch.instance(Labels::new());
         batch
-            .record(instance, now)
+            .instance(Labels::new())
+            .record(now)
             .add(counter, Acceptance::Accepted, accepted as f64)
             .add(counter, Acceptance::Rejected, rejected as f64);
         batch
@@ -91,8 +91,7 @@ impl Plugin {
     /// the plugin runs.
     pub(crate) fn heartbeat(&self, now: u64) -> Batch {
         let mut batch = Batch::new(&self.metrics);
-        let instance = batch.instance(Labels::new());
-        batch.record(instance, now);
+        batch.instance(Labels::new()).record(now);
         batch
     }
 }
@@ -102,8 +101,8 @@ impl Plugin {
 pub(crate) struct Derivation {
     pub(crate) metrics: MetricSet,
     services: Gauge<Services>,
-    adjusted: Cumulative<Adjustment>,
-    expired: Cumulative<Expired>,
+    adjusted: CumulativeCounter<Adjustment>,
+    expired: CumulativeCounter<Expired>,
 }
 
 impl Derivation {
@@ -118,7 +117,7 @@ impl Derivation {
             chart_type: ChartType::Line,
             priority: 150_010,
         });
-        let adjusted = b.cumulative(Chart {
+        let adjusted = b.cumulative_counter(Chart {
             id: "derived_adjusted_records",
             title: "Records counted in another time slot or chart set",
             units: "records/s",
@@ -128,7 +127,7 @@ impl Derivation {
             chart_type: ChartType::Line,
             priority: 150_011,
         });
-        let expired = b.cumulative(Chart {
+        let expired = b.cumulative_counter(Chart {
             id: "derived_expired_services",
             title: "Services removed after 15 minutes without data",
             units: "services/s",
@@ -149,9 +148,9 @@ impl Derivation {
     pub(crate) fn record(&self, batch: &mut Batch, signal: Signal, stats: &Stats, now: u64) {
         let mut labels = Labels::new();
         labels.push("signal", signal_name(signal));
-        let instance = batch.instance(labels);
         batch
-            .record(instance, now)
+            .instance(labels)
+            .record(now)
             .set(self.services, Services::Services, stats.instances as f64)
             .set_total(self.adjusted, Adjustment::Late, stats.late_records as f64)
             .set_total(
