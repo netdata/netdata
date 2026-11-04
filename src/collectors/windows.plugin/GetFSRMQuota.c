@@ -340,6 +340,9 @@ static bool fsrm_query(struct fsrm_row **rows_out, size_t *count_out, int update
             complete = true;
             break;
         }
+        else if (hr == WBEM_S_TIMEDOUT) {
+            // The provider is still producing rows; keep waiting until the enumeration deadline below.
+        }
         else {
             nd_log_limit_static_thread_var(erl, 3600, 0);
             nd_log_limit(

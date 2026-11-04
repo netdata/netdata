@@ -5406,7 +5406,7 @@ modules:
       supported_platforms:
         include: ["windows"]
         exclude: []
-      multi_instance: true
+      multi_instance: false
       additional_permissions:
         description: |
           The Netdata service account needs read access to the `root\Microsoft\Windows\FSRM` WMI namespace. The
@@ -5429,8 +5429,8 @@ modules:
         list:
           - title: FSRM role installed
             description: |
-              The File Server Resource Manager role service must be installed and the `SrmSvc` service running, with
-              at least one quota configured.
+              The File Server Resource Manager role service must be installed and the `SrmSvc` service running. Quotas
+              are optional: with none configured, the module reports zero quotas.
           - title: Enable the module
             description: |
               Set `GetFSRMQuota = yes` in the `[plugin:windows]` section of `netdata.conf` and restart Netdata.

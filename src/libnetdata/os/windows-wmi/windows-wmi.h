@@ -10,6 +10,7 @@ typedef struct {
     IWbemLocator *pLoc;
     IWbemServices *pSvc;
     bool com_initialized;
+    wchar_t namespace_path[128]; // namespace pSvc is connected to; empty when disconnected
 } ND_WMI;
 
 // Thread-local ROOT\CIMV2 connection used by InitializeWMI()/CleanupWMI().
@@ -19,7 +20,7 @@ HRESULT InitializeWMI(void);
 void CleanupWMI(void);
 
 // Connect a caller-owned handle to any WMI namespace; must be used and disconnected on the same thread.
-// Returns S_OK when already connected. On failure, *failed_step (optional) names the step that failed.
+// Returns S_OK when already connected to the same namespace; a different namespace reconnects. On failure, *failed_step (optional) names the step that failed.
 // ConnectServer() cannot be bounded below ~2 minutes, so never call this from a shared collection loop.
 HRESULT nd_wmi_connect(ND_WMI *wmi, const wchar_t *namespace_path, const char **failed_step);
 void nd_wmi_disconnect(ND_WMI *wmi);

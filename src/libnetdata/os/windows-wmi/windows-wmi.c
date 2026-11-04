@@ -28,7 +28,21 @@ HRESULT nd_wmi_connect(ND_WMI *wmi, const wchar_t *namespace_path, const char **
         failed_step = &step_dummy;
     *failed_step = NULL;
 
-    if(wmi->pLoc && wmi->pSvc) return S_OK;
+    if (!wmi || !namespace_path) {
+        *failed_step = "Invalid WMI connect arguments";
+        return E_POINTER;
+    }
+
+    const size_t namespace_max = sizeof(wmi->namespace_path) / sizeof(wmi->namespace_path[0]);
+    size_t namespace_len = wcsnlen(namespace_path, namespace_max);
+    if (namespace_len >= namespace_max) {
+        *failed_step = "WMI namespace path too long";
+        return E_INVALIDARG;
+    }
+
+    // Reuse the connection only for the namespace it was opened on; otherwise reconnect.
+    if (wmi->pLoc && wmi->pSvc && wcscmp(wmi->namespace_path, namespace_path) == 0)
+        return S_OK;
     nd_wmi_disconnect(wmi);
 
     HRESULT hr;
@@ -117,10 +131,14 @@ HRESULT nd_wmi_connect(ND_WMI *wmi, const wchar_t *namespace_path, const char **
         return hr;
     }
 
+    memcpy(wmi->namespace_path, namespace_path, (namespace_len + 1) * sizeof(wchar_t));
     return S_OK;
 }
 
 void nd_wmi_disconnect(ND_WMI *wmi) {
+    if (!wmi)
+        return;
+
     if (wmi->pSvc)
         wmi->pSvc->lpVtbl->Release(wmi->pSvc);
 
@@ -129,6 +147,7 @@ void nd_wmi_disconnect(ND_WMI *wmi) {
 
     wmi->pLoc = NULL;
     wmi->pSvc = NULL;
+    wmi->namespace_path[0] = L'\0';
 
     // Uninitialize only what this handle initialized, keeping the per-thread COM reference count balanced.
     if (wmi->com_initialized) {
@@ -153,8 +172,11 @@ void CleanupWMI(void) {
 }
 
 HRESULT nd_wmi_exec_query(IWbemServices *svc, const wchar_t *query_text, IEnumWbemClassObject **enumerator) {
+    if (!enumerator)
+        return E_POINTER;
+
     *enumerator = NULL;
-    if (!svc)
+    if (!svc || !query_text)
         return E_POINTER;
 
     BSTR query = SysAllocString(query_text);
