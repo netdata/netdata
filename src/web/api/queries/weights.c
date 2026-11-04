@@ -593,7 +593,7 @@ void query_weights_worker_thread(void *arg)
         RRDHOST *host = thread_data->hosts[i];
 
         // Check for timeout/interruption, and stop between hosts once the agent is exiting:
-        // shutdown waits for the chunks (weights_parallel_shutdown())
+        // a normal shutdown waits for the chunks (weights_parallel_shutdown()), an abnormal one does not
         if (__atomic_load_n(&main_qwd->timed_out, __ATOMIC_RELAXED) ||
             __atomic_load_n(&main_qwd->interrupted, __ATOMIC_RELAXED) ||
             exit_initiated_get()) {
