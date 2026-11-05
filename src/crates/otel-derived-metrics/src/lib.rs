@@ -141,7 +141,7 @@ impl DerivedMetrics {
         self.plugin_aggregator.lock().unwrap().merge(batch, now);
     }
 
-    /// Render every finished slot as of `now` (Unix seconds), in chunks of at
+    /// Render every finished window as of `now` (Unix seconds), in chunks of at
     /// most [`MAX_CHUNK_BYTES`].
     pub fn emit(&self, now: u64) -> Vec<Vec<u8>> {
         let mut chunks = Vec::new();

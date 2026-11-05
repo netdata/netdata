@@ -1,11 +1,11 @@
-//! The aggregator: entities, the open-slot window, the cardinality limit,
+//! The aggregator: entities, the open windows, the cardinality limit,
 //! expiry and emitting.
 //!
-//! The aggregator keeps every slot from `oldest_open` (the oldest slot not yet
-//! emitted) to the current one open; each entity holds those slots as rows
-//! and folds them forward after a stall (`bound_backlog`). Entities
+//! The aggregator keeps every window from `oldest_open` (the oldest window
+//! not yet emitted) to the current one open; each entity holds those windows
+//! as rows and folds them forward after a stall (`bound_backlog`). Entities
 //! are created on their first event, with or without measurements, charts
-//! are defined on an entity's first emitted slot, and an expired entity's
+//! are defined on an entity's first emitted window, and an expired entity's
 //! state is dropped (its cumulative baselines with it).
 
 use crate::batch::Batch;
@@ -20,10 +20,10 @@ use netdata_plugin_protocol::{
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 
-/// Most slots past the lateness one [`Aggregator::emit`] emits after a stall
-/// or a forward clock step; older pending slots are folded into the oldest
+/// Most windows past the lateness one [`Aggregator::emit`] emits after a stall
+/// or a forward clock step; older pending windows are folded into the oldest
 /// one emitted, so no event is lost and memory stays bounded.
-pub(crate) const MAX_BACKLOG_SLOTS: u64 = 60;
+pub(crate) const MAX_BACKLOG_WINDOWS: u64 = 60;
 
 /// Counts since the aggregator was created; `entities` is the current number.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -33,9 +33,9 @@ pub struct Stats {
     /// Events counted in the overflow entity because of the cardinality
     /// limit.
     pub overflowed_events: u64,
-    /// Events older than the oldest open slot, counted in that slot.
+    /// Events older than the oldest open window, counted in that window.
     pub late_events: u64,
-    /// Events newer than the current slot, counted in the current slot.
+    /// Events newer than the current window, counted in the current window.
     pub future_events: u64,
     /// Entities whose charts were marked obsolete after the expiry time.
     pub expired_entities: u64,
@@ -46,11 +46,11 @@ struct Entity {
     /// The full id of each of the set's charts, in set order.
     chart_ids: Vec<String>,
     defined: bool,
-    /// Earliest slot with events; nothing is emitted before it.
-    first_slot: u64,
-    /// Latest slot with events; drives expiry.
-    last_slot: u64,
-    /// The row of each open slot from `oldest_open` onwards, oldest first;
+    /// Earliest window with events; nothing is emitted before it.
+    first_window: u64,
+    /// Latest window with events; drives expiry.
+    last_window: u64,
+    /// The row of each open window from `oldest_open` onwards, oldest first;
     /// missing ones are empty.
     open_rows: VecDeque<Box<[f64]>>,
     /// The last emitted total of each cumulative column, in set order; NaN
@@ -58,36 +58,37 @@ struct Entity {
     previous_totals: Box<[f64]>,
 }
 
-/// Collects the batches of one [`MetricSet`] and turns finished slots into
+/// Collects the batches of one [`MetricSet`] and turns finished windows into
 /// chart-protocol text.
 ///
 /// The aggregator reads no clock and does no I/O. Pass the current Unix time
 /// to [`Aggregator::merge`] and [`Aggregator::emit`], call `emit` at least
-/// once per slot, and write the bytes it returns to the agent. Share it
+/// once per window, and write the bytes it returns to the agent. Share it
 /// behind a lock.
 ///
-/// # When a slot is emitted
+/// # When a window is emitted
 ///
-/// The *current* slot is the one `now` falls in. A slot stays *open* for
-/// events until its [`Settings::lateness`](crate::Settings::lateness) has
+/// The *current* window is the one `now` falls in. A window stays *open* for
+/// events until its
+/// [`Settings::allowed_lateness`](crate::Settings::allowed_lateness) has
 /// passed after its end; then the next `emit` emits it, once.
 ///
-/// With a 1 s collection interval and 10 s lateness, the slot `[100, 101)` is
+/// With a 1 s collection interval and 10 s lateness, the window `[100, 101)` is
 /// emitted by the first `emit` at or after second 111. Until then, events of
 /// second 100 still count in it. The agent stores its point at second 101,
-/// the slot's end, however late it is sent.
+/// the window's end, however late it is sent.
 ///
-/// # Events outside the open slots
+/// # Events outside the open windows
 ///
 /// Every event is counted exactly once:
-/// - one older than the oldest open slot counts in that slot
+/// - one older than the oldest open window counts in that window
 ///   ([`Stats::late_events`]);
-/// - one from the future counts in the current slot
+/// - one from the future counts in the current window
 ///   ([`Stats::future_events`]);
 /// - after a stall (`emit` not called for a while, or the clock jumping
-///   ahead), one `emit` emits at most 60 slots past the lateness. Slots older
-///   than that are not lost: their counts are added into the first slot
-///   emitted, which then shows them as one spike.
+///   ahead), one `emit` emits at most 60 windows past the allowed lateness.
+///   Older windows are not lost: their counts are added into the first
+///   window emitted, which then shows them as one spike.
 ///
 /// # Entities
 ///
@@ -102,7 +103,7 @@ pub struct Aggregator {
     set: MetricSet,
     entities: HashMap<Labels, Entity>,
     overflow: Option<Entity>,
-    /// Oldest slot not yet emitted; set on first use.
+    /// Oldest window not yet emitted; set on first use.
     oldest_open: Option<u64>,
     stats: Stats,
 }
@@ -125,16 +126,16 @@ impl Aggregator {
         }
     }
 
-    /// The oldest slot not yet emitted, as of `now`: set on first use, and
-    /// moved forward, folding the slots it passes, when it falls more than
-    /// [`MAX_BACKLOG_SLOTS`] behind the lateness window.
+    /// The oldest window not yet emitted, as of `now`: set on first use, and
+    /// moved forward, folding the windows it passes, when it falls more than
+    /// [`MAX_BACKLOG_WINDOWS`] behind the allowed lateness.
     fn bound_backlog(&mut self, now: u64) -> u64 {
         let set = &*self.set.0;
-        let now_slot = now / set.interval_secs;
+        let now_window = now / set.interval_secs;
         let oldest_open = *self
             .oldest_open
-            .get_or_insert(now_slot.saturating_sub(set.lateness_slots));
-        let oldest_wanted = now_slot.saturating_sub(set.lateness_slots + MAX_BACKLOG_SLOTS);
+            .get_or_insert(now_window.saturating_sub(set.lateness_windows));
+        let oldest_wanted = now_window.saturating_sub(set.lateness_windows + MAX_BACKLOG_WINDOWS);
         if oldest_open >= oldest_wanted {
             return oldest_open;
         }
@@ -146,10 +147,10 @@ impl Aggregator {
         oldest_wanted
     }
 
-    /// Merge a batch; `now`, the current Unix time, decides which slots are
+    /// Merge a batch; `now`, the current Unix time, decides which windows are
     /// still open. Merge before an `emit` with the same `now`: an event whose
-    /// slot that `emit` closes would otherwise count as late, in the next
-    /// slot.
+    /// window that `emit` closes would otherwise count as late, in the next
+    /// window.
     ///
     /// # Panics
     ///
@@ -184,24 +185,24 @@ impl Aggregator {
                     })
                 }
             };
-            for (slot, batch_row) in batch_entity.rows {
-                let slot = if slot < oldest_open {
+            for (window, batch_row) in batch_entity.rows {
+                let window = if window < oldest_open {
                     self.stats.late_events += batch_row.events;
                     oldest_open
-                } else if slot > newest {
+                } else if window > newest {
                     self.stats.future_events += batch_row.events;
                     newest
                 } else {
-                    slot
+                    window
                 };
-                entity.merge_slot(set, oldest_open, slot, &batch_row.cells);
+                entity.merge_window(set, oldest_open, window, &batch_row.cells);
             }
         }
     }
 
-    /// Emit every slot whose lateness has passed by `now` (Unix seconds):
+    /// Emit every window whose lateness has passed by `now` (Unix seconds):
     /// the definitions of new entities' charts, one update per chart and
-    /// slot, and the obsolete marks of expired entities.
+    /// window, and the obsolete marks of expired entities.
     ///
     /// The text is complete chart-protocol text, to write to the agent as is
     /// (a plugin's stdout). It comes in chunks of at most `max_chunk` bytes,
@@ -213,19 +214,19 @@ impl Aggregator {
         let mut out = Chunker::new(max_chunk);
         let mut oldest_open = self.bound_backlog(now);
         let set = &*self.set.0;
-        let now_slot = now / set.interval_secs;
-        while oldest_open + set.lateness_slots < now_slot {
-            let slot = oldest_open;
+        let now_window = now / set.interval_secs;
+        while oldest_open + set.lateness_windows < now_window {
+            let window = oldest_open;
             let stats = &mut self.stats;
             self.entities.retain(|_, entity| {
-                entity.emit_slot(set, slot, &mut out);
-                let expired = entity.expire_if_idle(set, slot, &mut out);
+                entity.emit_window(set, window, &mut out);
+                let expired = entity.expire_if_idle(set, window, &mut out);
                 stats.expired_entities += u64::from(expired);
                 !expired
             });
             let expired = self.overflow.take_if(|entity| {
-                entity.emit_slot(set, slot, &mut out);
-                entity.expire_if_idle(set, slot, &mut out)
+                entity.emit_window(set, window, &mut out);
+                entity.expire_if_idle(set, window, &mut out)
             });
             if expired.is_some() {
                 self.stats.expired_entities += 1;
@@ -248,26 +249,26 @@ impl Entity {
                 .collect(),
             labels,
             defined: false,
-            first_slot: u64::MAX,
-            last_slot: 0,
+            first_window: u64::MAX,
+            last_window: 0,
             open_rows: VecDeque::new(),
             previous_totals: vec![f64::NAN; set.cumulative_columns.len()].into_boxed_slice(),
         }
     }
 
-    /// Merge `row` into `slot`, an open slot from `oldest_open` onwards.
-    fn merge_slot(&mut self, set: &MetricSetInner, oldest_open: u64, slot: u64, row: &[f64]) {
-        let index = (slot - oldest_open) as usize;
+    /// Merge `row` into `window`, an open window from `oldest_open` onwards.
+    fn merge_window(&mut self, set: &MetricSetInner, oldest_open: u64, window: u64, row: &[f64]) {
+        let index = (window - oldest_open) as usize;
         while self.open_rows.len() <= index {
             self.open_rows.push_back(set.empty_row());
         }
         set.merge_row(&mut self.open_rows[index], row);
-        self.first_slot = self.first_slot.min(slot);
-        self.last_slot = self.last_slot.max(slot);
+        self.first_window = self.first_window.min(window);
+        self.last_window = self.last_window.max(window);
     }
 
-    /// Merge the first `skipped` window slots into the slot that becomes the
-    /// window's first, `new_first`.
+    /// Merge the first `skipped` open windows into the window that becomes the
+    /// oldest open one, `new_first`.
     fn fold_front(&mut self, set: &MetricSetInner, skipped: u64, new_first: u64) {
         let take = (skipped as usize).min(self.open_rows.len());
         if take == 0 {
@@ -281,14 +282,14 @@ impl Entity {
             Some(front) => set.merge_row(front, &folded),
             None => self.open_rows.push_back(folded),
         }
-        self.first_slot = self.first_slot.max(new_first);
+        self.first_window = self.first_window.max(new_first);
     }
 
-    /// Emit `slot`, the window's first, and drop it from the window; nothing
+    /// Emit `window`, the oldest open one, and drop its row; nothing
     /// is written before the entity's first event.
-    fn emit_slot(&mut self, set: &MetricSetInner, slot: u64, out: &mut Chunker) {
+    fn emit_window(&mut self, set: &MetricSetInner, window: u64, out: &mut Chunker) {
         let row = self.open_rows.pop_front();
-        if slot < self.first_slot {
+        if window < self.first_window {
             return;
         }
         if !self.defined {
@@ -308,15 +309,15 @@ impl Entity {
                         None => write_set_empty(block, &dim.id),
                     }
                 }
-                write_end_timed(block, (slot + 1) * set.interval_secs);
+                write_end_timed(block, (window + 1) * set.interval_secs);
             });
         }
     }
 
-    /// When the entity has had no events for the expiry time as of `slot`,
+    /// When the entity has had no events for the expiry time as of `window`,
     /// mark its charts obsolete and return true; the caller drops it.
-    fn expire_if_idle(&self, set: &MetricSetInner, slot: u64, out: &mut Chunker) -> bool {
-        if !self.defined || slot < self.last_slot + set.expiry_slots {
+    fn expire_if_idle(&self, set: &MetricSetInner, window: u64, out: &mut Chunker) -> bool {
+        if !self.defined || window < self.last_window + set.expiry_windows {
             return false;
         }
         for (chart, id) in set.charts.iter().zip(&self.chart_ids) {
@@ -388,7 +389,7 @@ fn define_chart(
 
 /// The CHART line alone marks a chart obsolete. `store_first` aligns the
 /// agent's clock for the chart to whole seconds and keeps its first point, so
-/// every timed END lands exactly on its slot.
+/// every timed END lands exactly on its window.
 fn write_chart_line(
     block: &mut Vec<u8>,
     set: &MetricSetInner,
@@ -487,7 +488,7 @@ mod tests {
             }
         });
         let mut b = MetricSetBuilder::new(Settings {
-            lateness: Duration::from_secs(lateness),
+            allowed_lateness: Duration::from_secs(lateness),
             expiry: Duration::from_secs(expiry),
             cardinality_limit,
             ..Settings::default()
@@ -560,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn defines_once_then_updates_each_slot() {
+    fn defines_once_then_updates_each_window() {
         let f = fixture(0, 900, None);
         let mut aggregator = Aggregator::new(&f.set);
         record(&f, &mut aggregator, "checkout", 100, 3, 1, 100);
@@ -588,7 +589,8 @@ mod tests {
                  BEGIN svc.duration_histogram_{h} 1000000\nSET 0.1 = 0\nSET 1 = 3\nSET +Inf = 0\nEND 101 0 1\n"
             )
         );
-        // The next slot: zero rates, no average or maximum, no new definition.
+        // The next window: zero rates, no average or maximum, no new
+        // definition.
         let second = text(&aggregator.emit(102, usize::MAX));
         assert_eq!(
             second,
@@ -604,18 +606,18 @@ mod tests {
     }
 
     #[test]
-    fn lateness_keeps_slots_open_and_clamps_exactly_once() {
+    fn lateness_keeps_windows_open_and_clamps_exactly_once() {
         let f = fixture(10, 900, None);
         let mut aggregator = Aggregator::new(&f.set);
-        // Window starts at slot 990 (now 1000, lateness 10).
+        // The oldest open window is 990 (now 1000, lateness 10).
         record(&f, &mut aggregator, "a", 995, 1, 0, 1000);
-        // Too late: counted in the oldest open slot.
+        // Too late: counted in the oldest open window.
         record(&f, &mut aggregator, "a", 100, 2, 0, 1000);
-        // From the future: counted in the current slot.
+        // From the future: counted in the current window.
         record(&f, &mut aggregator, "a", 5000, 4, 0, 1000);
         assert_eq!(aggregator.stats().late_events, 2);
         assert_eq!(aggregator.stats().future_events, 4);
-        // Slot 999 is not finished plus lateness until 1010.
+        // Window 999 is not finished plus lateness until 1010.
         let out = text(&aggregator.emit(1009, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
         let ok_values = |out: &str| -> Vec<f64> {
@@ -624,13 +626,13 @@ mod tests {
                 .map(|v| v.parse().unwrap())
                 .collect()
         };
-        // Slots 990..=998: the clamped 2 land in 990, the event at 995.
+        // Windows 990..=998: the clamped 2 land in 990, the event at 995.
         let emitted = ok_values(&out);
         assert_eq!(emitted.len(), 9);
         assert_eq!(emitted[0], 2.0);
         assert_eq!(emitted[5], 1.0);
         let rest = text(&aggregator.emit(1011, usize::MAX));
-        // Slots 999 and 1000: the 4 future events land in slot 1000.
+        // Windows 999 and 1000: the 4 future events land in window 1000.
         assert_eq!(ok_values(&rest), vec![0.0, 4.0]);
         validate_chart_stream(format!("{out}{rest}").as_bytes()).unwrap();
     }
@@ -698,12 +700,12 @@ mod tests {
         let mut aggregator = Aggregator::new(&f.set);
         record(&f, &mut aggregator, "a", 10, 1, 0, 10);
         record(&f, &mut aggregator, "a", 100_000, 2, 0, 100_000);
-        let window = aggregator.entities.values().next().unwrap().open_rows.len() as u64;
-        assert!(window <= 10 + MAX_BACKLOG_SLOTS + 1, "{window}");
+        let open = aggregator.entities.values().next().unwrap().open_rows.len() as u64;
+        assert!(open <= 10 + MAX_BACKLOG_WINDOWS + 1, "{open}");
         let out = text(&aggregator.emit(100_011, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
         let updates = out.matches("BEGIN ").count() as u64 / 3;
-        assert!(updates <= MAX_BACKLOG_SLOTS + 11, "{updates}");
+        assert!(updates <= MAX_BACKLOG_WINDOWS + 11, "{updates}");
         let ok: f64 = out
             .lines()
             .filter_map(|l| l.strip_prefix("SET ok = "))
@@ -713,7 +715,7 @@ mod tests {
     }
 
     #[test]
-    fn records_spread_over_many_seconds_land_in_their_slots() {
+    fn events_spread_over_many_seconds_land_in_their_windows() {
         let f = fixture(10, 900, None);
         let mut aggregator = Aggregator::new(&f.set);
         let mut batch = Batch::new(&f.set);
@@ -811,7 +813,7 @@ mod tests {
             }
             aggregator.merge(batch, time);
         };
-        // Baseline, two totals in one slot (the last wins), no new total, a
+        // Baseline, two totals in one window (the last wins), no new total, a
         // reset, then a return after expiry with a new baseline.
         set(&mut aggregator, 10, Some(100.0));
         set(&mut aggregator, 11, Some(103.0));

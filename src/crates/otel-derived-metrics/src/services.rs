@@ -26,7 +26,7 @@ const DURATION_BOUNDS: &[f64] = &[
     0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0,
 ];
 
-/// How long a slot stays open for spans and log records that arrive late.
+/// How long a window stays open for spans and log records that arrive late.
 /// SDKs and collectors export them in batches every few seconds (5 s by
 /// default for spans), so rendering a second as soon as it ends would show
 /// each batch as one spike.
@@ -135,7 +135,7 @@ pub(crate) fn service_settings(max_services: usize) -> Settings {
     let mut overflow_labels = Labels::new();
     overflow_labels.insert("otel.metric.overflow", "true");
     Settings {
-        lateness: LATENESS,
+        allowed_lateness: LATENESS,
         cardinality_limit: Some(CardinalityLimit {
             max_entities: max_services,
             overflow_labels,
@@ -306,7 +306,7 @@ mod tests {
         );
         let success = values(&out, "success");
         let error = values(&out, "error");
-        // The entity's first emitted slot is the one its spans ended in.
+        // The entity's first emitted window is the one its spans ended in.
         assert!(out.contains("SET success = 2\nSET error = 1\nEND 96 0 1\n"));
         assert_eq!(success[0], "2");
         assert_eq!(error[0], "1");
@@ -315,7 +315,7 @@ mod tests {
         assert_eq!(values(&out, "0.25")[0], "1");
         assert_eq!(values(&out, "0.5")[0], "1");
         assert_eq!(values(&out, "0.75")[0], "1");
-        // Later slots of the same service: true zeros, no duration.
+        // Later windows of the same service: true zeros, no duration.
         assert_eq!(success[1], "0");
         assert_eq!(values(&out, "avg")[1], "");
     }

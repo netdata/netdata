@@ -1,6 +1,6 @@
 //! Request-local recording: each event adds into the batch's row for its
-//! entity and the slot its own time falls in; the aggregator decides at merge
-//! time whether that slot is still open.
+//! entity and the window its own time falls in; the aggregator decides at merge
+//! time whether that window is still open.
 
 use crate::metric_set::{
     ColumnRange, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet,
@@ -8,7 +8,7 @@ use crate::metric_set::{
 };
 use indexmap::IndexMap;
 
-/// A batch's row for one entity and one slot: its event count and its
+/// A batch's row for one entity and one window: its event count and its
 /// cells, one per column of the set's layout.
 pub(crate) struct BatchRow {
     pub(crate) events: u64,
@@ -18,10 +18,10 @@ pub(crate) struct BatchRow {
 /// One entity's rows within a batch.
 #[derive(Default)]
 pub(crate) struct EntityRows {
-    /// By slot number, in first-event order: the aggregator merges late slots
-    /// into one, and gauges and totals keep the value merged last.
+    /// By window number, in first-event order: the aggregator merges late
+    /// windows into one, and gauges and totals keep the value merged last.
     pub(crate) rows: IndexMap<u64, BatchRow>,
-    /// Position in `rows` of the slot recorded into last; events mostly
+    /// Position in `rows` of the window recorded into last; events mostly
     /// arrive in time order, so it answers most lookups without hashing.
     last: usize,
 }
@@ -89,12 +89,12 @@ impl BatchEntity<'_> {
     /// entity or keeps it from expiring.
     pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
         let set = self.set;
-        let slot = unix_seconds / set.interval_secs;
+        let window = unix_seconds / set.interval_secs;
         let entity = &mut *self.entity;
         let index = match entity.rows.get_index(entity.last) {
-            Some((&last_slot, _)) if last_slot == slot => entity.last,
+            Some((&last_window, _)) if last_window == window => entity.last,
             _ => {
-                let entry = entity.rows.entry(slot);
+                let entry = entity.rows.entry(window);
                 let index = entry.index();
                 entry.or_insert_with(|| BatchRow {
                     events: 0,
@@ -141,8 +141,8 @@ impl Measurements<'_> {
         columns.base + index
     }
 
-    /// Count `amount` for `dimension` of `counter` in this event's slot; the
-    /// chart shows the slot's count per second. A non-finite amount is
+    /// Count `amount` for `dimension` of `counter` in this event's window; the
+    /// chart shows the window's count per second. A non-finite amount is
     /// ignored.
     pub fn add<D: Dimensions>(
         &mut self,
@@ -159,7 +159,7 @@ impl Measurements<'_> {
 
     /// Record `total`, the source's running total for `dimension` of
     /// `cumulative`; the chart shows how much it grew per second. Within a
-    /// slot, the total recorded last counts. A non-finite total is ignored.
+    /// window, the total recorded last counts. A non-finite total is ignored.
     pub fn set_total<D: Dimensions>(
         &mut self,
         cumulative: CumulativeCounter<D>,
@@ -174,7 +174,7 @@ impl Measurements<'_> {
     }
 
     /// Record `value` for `dimension` of `gauge`; the chart shows it as is.
-    /// Within a slot, the value recorded last counts. A non-finite value is
+    /// Within a window, the value recorded last counts. A non-finite value is
     /// ignored.
     pub fn set_value<D: Dimensions>(
         &mut self,

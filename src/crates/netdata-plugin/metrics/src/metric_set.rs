@@ -1,8 +1,8 @@
 //! Metric set declarations: the row layout, instruments and their charts.
 //!
-//! Batches and the aggregator hold a table: one row per entity and slot, with
+//! Batches and the aggregator hold a table: one row per entity and window, with
 //! the columns the set's layout fixes. A row aggregates all events of one
-//! entity in one slot; each of its cells is one `f64`. A counter has one
+//! entity in one window; each of its cells is one `f64`. A counter has one
 //! column per dimension value, a histogram one per bucket plus its sum, count
 //! and maximum. Merging combines two rows column by column with each column's
 //! aggregation: sums add, maxima keep the larger value, last-value columns
@@ -10,7 +10,7 @@
 //! columns.
 //!
 //! Columns are not dimensions: each chart dimension reads one or two columns
-//! through its [`Readout`] when a slot is emitted.
+//! through its [`Readout`] when a window is emitted.
 
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 use std::marker::PhantomData;
@@ -27,7 +27,7 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 const MAX_LABEL_KEY_BYTES: usize = 200;
 
 /// A column's aggregation: how it combines two values for the same entity,
-/// from two batches, a batch and the aggregator, or two slots folded into one
+/// from two batches, a batch and the aggregator, or two windows folded into one
 /// after a stall.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Aggregation {
@@ -123,7 +123,7 @@ macro_rules! dimensions {
 }
 
 /// Counts events, split by `D`, for example requests by outcome. Charted as
-/// events per second (a slot's count divided by its length); a slot without
+/// events per second (a window's count divided by its length); a window without
 /// events shows 0.
 #[derive(Debug, Clone, Copy)]
 pub struct Counter<D>(pub(crate) ColumnRange<D>);
@@ -132,12 +132,12 @@ pub struct Counter<D>(pub(crate) ColumnRange<D>);
 /// an aggregator's statistics: record the current totals at the time you read
 /// them, and the chart shows how much they grew per second.
 ///
-/// - Until an entity's first total, and in the slot of that total (its
+/// - Until an entity's first total, and in the window of that total (its
 ///   baseline), the chart shows a gap.
 /// - A total lower than the previous one is a reset: the increase is the new
 ///   total.
-/// - After the baseline, a slot without a new total shows 0.
-/// - Within a slot, the total set last wins: the later event in a batch,
+/// - After the baseline, a window without a new total shows 0.
+/// - Within a window, the total set last wins: the later event in a batch,
 ///   the later merged batch across batches.
 #[derive(Debug, Clone, Copy)]
 pub struct CumulativeCounter<D>(pub(crate) ColumnRange<D>);
@@ -145,9 +145,9 @@ pub struct CumulativeCounter<D>(pub(crate) ColumnRange<D>);
 /// A current value, split by `D`, for example open connections per state,
 /// recorded at the time you read it. Charted as is.
 ///
-/// - Each event sets the value; within a slot, the value set last wins: the
+/// - Each event sets the value; within a window, the value set last wins: the
 ///   later event in a batch, the later merged batch across batches.
-/// - A slot without a value shows a gap.
+/// - A window without a value shows a gap.
 #[derive(Debug, Clone, Copy)]
 pub struct Gauge<D>(pub(crate) ColumnRange<D>);
 
@@ -172,7 +172,7 @@ impl<D> Copy for ColumnRange<D> {}
 /// A distribution of observed values, for example request durations, over
 /// fixed bucket bounds; its two charts are described at
 /// [`MetricSetBuilder::histogram`]. An observation counts in the first
-/// bucket whose bound it does not exceed, else in `+Inf`. A slot without
+/// bucket whose bound it does not exceed, else in `+Inf`. A window without
 /// observations shows 0 in every bucket and a gap for the mean and maximum.
 #[derive(Debug, Clone, Copy)]
 pub struct Histogram {
@@ -201,10 +201,10 @@ impl Histogram {
     }
 }
 
-/// How a dimension reads a row's columns: what it shows for one slot.
+/// How a dimension reads a row's columns: what it shows for one window.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Readout {
-    /// The column divided by the slot length in seconds.
+    /// The column divided by the window length in seconds.
     Rate(usize),
     /// `numerator / denominator`; no value when the denominator is 0.
     Ratio {
@@ -243,7 +243,8 @@ pub struct Chart {
     /// - `<context>` for an entity without labels;
     /// - `<context>_<hash>` for any other entity, where `<hash>` is 16 hex
     ///   digits of a hash of its labels, stable across restarts and releases;
-    /// - `<context>_overflow` for the overflow entity (see [`CardinalityLimit`]).
+    /// - `<context>_overflow` for the overflow entity (see
+    ///   [`CardinalityLimit`]).
     ///
     /// It must contain a dot (the agent's `type.id`), use only letters,
     /// digits, `_`, `-` and `.`, and not end in `_overflow` or in `_` and 16
@@ -363,20 +364,20 @@ pub(crate) struct MetricSetInner {
     pub(crate) id: u32,
     /// The collection interval in whole seconds.
     pub(crate) interval_secs: u64,
-    pub(crate) lateness_slots: u64,
-    pub(crate) expiry_slots: u64,
+    pub(crate) lateness_windows: u64,
+    pub(crate) expiry_windows: u64,
     pub(crate) cardinality_limit: Option<CardinalityLimit>,
     // The row layout: each column's aggregation, and a row without events.
     aggregations: Vec<Aggregation>,
     initial_row: Box<[f64]>,
-    /// The columns of [`CumulativeCounter`] instruments, which hold totals until a
-    /// slot is emitted as increases.
+    /// The columns of [`CumulativeCounter`] instruments, which hold totals
+    /// until a window is emitted as increases.
     pub(crate) cumulative_columns: Vec<usize>,
     pub(crate) charts: Vec<ChartTemplate>,
 }
 
 impl MetricSetInner {
-    /// The row of a slot without events.
+    /// The row of a window without events.
     pub(crate) fn empty_row(&self) -> Box<[f64]> {
         self.initial_row.clone()
     }
@@ -393,7 +394,7 @@ impl MetricSetInner {
         }
     }
 
-    /// What a dimension shows for a slot with this row; none for a gap.
+    /// What a dimension shows for a window with this row; none for a gap.
     pub(crate) fn read(&self, row: &[f64], readout: Readout) -> Option<f64> {
         let value = match readout {
             Readout::Rate(column) => row[column] / self.interval_secs as f64,
@@ -411,20 +412,20 @@ impl MetricSetInner {
 /// The time and lifecycle settings of a metric set.
 #[derive(Debug, Clone)]
 pub struct Settings {
-    /// How often the set's charts get a point: each slot is one collection
+    /// How often the set's charts get a point: each window is one collection
     /// interval long. Whole seconds, at least 1 (the agent's resolution);
     /// sent as the CHART line's `update_every`. Default 1 s.
     pub collection_interval: Duration,
-    /// A delay: how long after its end a slot stays open for late events;
-    /// older events are counted in the oldest open slot. Rounded up to whole
+    /// A delay: how long after its end a window stays open for late events;
+    /// older events are counted in the oldest open window. Rounded up to whole
     /// collection intervals. Default 0.
-    pub lateness: Duration,
+    pub allowed_lateness: Duration,
     /// A timeout: an entity with no events for this long has its charts
     /// marked obsolete (the agent stops collecting them and later removes
     /// them) and its state dropped. Rounded up to whole collection intervals.
-    /// It counts emitted slots, which lag by `lateness`: with expiry 900 s and
-    /// lateness 10 s, an entity last recorded at second 0 expires at second
-    /// 911. Default 15 minutes.
+    /// It counts emitted windows, which lag by `allowed_lateness`: with expiry
+    /// 900 s and an allowed lateness of 10 s, an entity last recorded at
+    /// second 0 expires at second 911. Default 15 minutes.
     pub expiry: Duration,
     /// The limit on the number of entities; default none.
     pub cardinality_limit: Option<CardinalityLimit>,
@@ -434,7 +435,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             collection_interval: Duration::from_secs(1),
-            lateness: Duration::ZERO,
+            allowed_lateness: Duration::ZERO,
             expiry: Duration::from_secs(15 * 60),
             cardinality_limit: None,
         }
@@ -473,8 +474,8 @@ impl MetricSetBuilder {
     /// # Panics
     ///
     /// If the collection interval is not a whole number of seconds of at
-    /// least 1, if `expiry` is 0, or if the cardinality limit's `max_entities` is 0 or its overflow
-    /// labels are empty.
+    /// least 1, if `expiry` is 0, or if the cardinality limit's
+    /// `max_entities` is 0 or its overflow labels are empty.
     pub fn new(settings: Settings) -> Self {
         let interval = settings.collection_interval;
         assert!(
@@ -538,7 +539,7 @@ impl MetricSetBuilder {
 
     /// Adds a [`Histogram`] over `bounds`, with two charts:
     /// - `chart`: two dimensions, `avg` and `max`, the mean and largest
-    ///   observed value per slot, in `chart.units`;
+    ///   observed value per window, in `chart.units`;
     /// - a heatmap, `<context>_histogram`: observations per second in each
     ///   bucket, in `heatmap_units`, one dimension per bucket named by its
     ///   upper bound as Rust prints the `f64` (`0.005`, `1`, `1048576`;
@@ -617,11 +618,11 @@ impl MetricSetBuilder {
         assert!(!self.charts.is_empty(), "metric set has no charts");
         let settings = self.settings;
         let interval = settings.collection_interval;
-        let slots = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
+        let windows = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
         MetricSet(Arc::new(MetricSetInner {
             id: self.id,
-            lateness_slots: slots(settings.lateness),
-            expiry_slots: slots(settings.expiry),
+            lateness_windows: windows(settings.allowed_lateness),
+            expiry_windows: windows(settings.expiry),
             initial_row: self.aggregations.iter().map(|m| m.initial()).collect(),
             interval_secs: interval.as_secs(),
             cardinality_limit: settings.cardinality_limit,

@@ -45,7 +45,7 @@
 //!
 //! aggregator.merge(batch, 100);
 //!
-//! // Once per second: write the finished slots to the agent.
+//! // Once per second: write the finished windows to the agent.
 //! let text = String::from_utf8(aggregator.emit(101, 1 << 20).concat()).unwrap();
 //! assert!(text.contains("SET success = 1\nSET error = 1\n"));
 //! ```
@@ -60,14 +60,14 @@
 //!   different labels (per service, process-wide) belong in different metric
 //!   sets. There is no explicit create: recording with a new label set is a
 //!   new entity;
-//! - a *slot* is one collection interval `I` (see [`Settings`]): slot `n`
+//! - a *window* is one collection interval `I` (see [`Settings`]): window `n`
 //!   covers `[n × I, (n + 1) × I)` and holds the events whose time falls in
 //!   it; it becomes one point per dimension, stored at its end,
 //!   `(n + 1) × I`;
 //! - an *event* is one occurrence of an entity at its own time, recorded
 //!   with [`BatchEntity::record`] and its measurements (`add`, `set_value`,
-//!   `set_total`, `observe`); the events of one entity in one slot combine
-//!   into that slot's point.
+//!   `set_total`, `observe`); the events of one entity in one window combine
+//!   into that window's point.
 
 mod aggregator;
 mod batch;

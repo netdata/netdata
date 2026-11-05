@@ -17,7 +17,7 @@ dimensions! {
 }
 
 dimensions! {
-    /// Why a record was counted in another time slot or chart set.
+    /// Why a record was counted in another window or chart set.
     enum Adjustment {
         Late = "late",
         Future = "future",
