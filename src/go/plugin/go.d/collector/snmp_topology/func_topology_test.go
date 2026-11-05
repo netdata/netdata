@@ -404,6 +404,10 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	assert.Empty(t, portColumns[2].Visibility)
 	assert.Equal(t, "actor_link", portColumn("neighbor_actor").Cell)
 	assert.Equal(t, "expanded", portColumn("neighbor_actor").Visibility)
+	ifAliasExpanded := portColumn("if_alias_mib")
+	assert.Equal(t, []string{"ifAlias", "if_alias", "expanded"},
+		[]string{ifAliasExpanded.Label, ifAliasExpanded.Projection.Column, ifAliasExpanded.Visibility},
+		"the expanded row shows the full alias")
 	assert.Equal(t, "port_neighbors", deviceType.Presentation.Modal.Sections[1].ID)
 	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[1].Source.Kind)
 	assert.Equal(t, "actor_port_links", deviceType.Presentation.Modal.Sections[1].Source.Table)
