@@ -9,13 +9,9 @@
 //! entity is dropped with its rows and cumulative baselines.
 
 use crate::batch::Batch;
-use crate::chart::{ChartTemplate, EntityKind, chart_ids};
+use crate::chart::{EntityKind, chart_ids};
+use crate::emit::{Chunker, write_definition, write_obsolete, write_update};
 use crate::metric_set::{Labels, MetricSet, MetricSetInner};
-use netdata_plugin_protocol::{
-    ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
-    write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end_timed,
-    write_set_empty, write_set_float,
-};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 
@@ -295,23 +291,16 @@ impl Entity {
         }
         if !self.defined {
             for (chart, id) in set.charts.iter().zip(&self.chart_ids) {
-                out.block(|block| define_chart(block, set, chart, id, &self.labels));
+                out.block(|block| {
+                    write_definition(block, chart, id, &self.labels, set.interval_secs)
+                });
             }
             self.defined = true;
         }
         let mut row = row.unwrap_or_else(|| set.layout.empty_row());
         self.totals_to_increases(set, &mut row);
         for (chart, id) in set.charts.iter().zip(&self.chart_ids) {
-            out.block(|block| {
-                write_begin(block, id, set.interval_secs * 1_000_000);
-                for dim in &chart.dimensions {
-                    match dim.readout.value(&row, set.interval_secs) {
-                        Some(value) => write_set_float(block, &dim.id, value),
-                        None => write_set_empty(block, &dim.id),
-                    }
-                }
-                write_end_timed(block, (window + 1) * set.interval_secs);
-            });
+            out.block(|block| write_update(block, chart, id, &row, window, set.interval_secs));
         }
     }
 
@@ -323,7 +312,7 @@ impl Entity {
             return false;
         }
         for (chart, id) in set.charts.iter().zip(&self.chart_ids) {
-            out.block(|block| write_chart_line(block, set, chart, id, true));
+            out.block(|block| write_obsolete(block, chart, id, set.interval_secs));
         }
         true
     }
@@ -354,106 +343,6 @@ impl Entity {
                 *previous = total;
             }
         }
-    }
-}
-
-/// A chart instance's definition: the CHART line, its labels and dimensions.
-fn define_chart(
-    block: &mut Vec<u8>,
-    set: &MetricSetInner,
-    chart: &ChartTemplate,
-    id: &str,
-    labels: &Labels,
-) {
-    write_chart_line(block, set, chart, id, false);
-    if !labels.is_empty() {
-        for (key, value) in labels.iter() {
-            write_clabel(block, key, value, LabelSource::Auto);
-        }
-        write_clabel_commit(block);
-    }
-    for dim in &chart.dimensions {
-        write_dimension(
-            block,
-            &DimensionLine {
-                id: &dim.id,
-                name: &dim.id,
-                algorithm: DimensionAlgorithm::Absolute,
-                multiplier: 1,
-                divisor: 1,
-                options: DimensionOptions {
-                    float: true,
-                    ..DimensionOptions::default()
-                },
-            },
-        );
-    }
-}
-
-/// The CHART line alone marks a chart instance obsolete. `store_first` aligns
-/// the agent's clock for the chart to whole seconds and keeps its first point,
-/// so every timed END lands exactly on its window.
-fn write_chart_line(
-    block: &mut Vec<u8>,
-    set: &MetricSetInner,
-    chart: &ChartTemplate,
-    id: &str,
-    obsolete: bool,
-) {
-    write_chart(
-        block,
-        &ChartLine {
-            id,
-            name: "",
-            title: &chart.title,
-            units: chart.units,
-            family: chart.family,
-            context: &chart.context,
-            chart_type: chart.chart_type,
-            priority: chart.priority,
-            update_every: set.interval_secs,
-            options: ChartOptions {
-                obsolete,
-                store_first: true,
-                hidden: false,
-            },
-        },
-    );
-}
-
-/// Packs chart blocks into chunks under a byte budget.
-struct Chunker {
-    max_chunk: usize,
-    chunks: Vec<Vec<u8>>,
-    current: Vec<u8>,
-    block: Vec<u8>,
-}
-
-impl Chunker {
-    fn new(max_chunk: usize) -> Self {
-        Self {
-            max_chunk,
-            chunks: Vec::new(),
-            current: Vec::new(),
-            block: Vec::new(),
-        }
-    }
-
-    /// Add one block, written by `write`; a chunk never splits a block.
-    fn block(&mut self, write: impl FnOnce(&mut Vec<u8>)) {
-        self.block.clear();
-        write(&mut self.block);
-        if !self.current.is_empty() && self.current.len() + self.block.len() > self.max_chunk {
-            self.chunks.push(std::mem::take(&mut self.current));
-        }
-        self.current.extend_from_slice(&self.block);
-    }
-
-    fn finish(mut self) -> Vec<Vec<u8>> {
-        if !self.current.is_empty() {
-            self.chunks.push(self.current);
-        }
-        self.chunks
     }
 }
 

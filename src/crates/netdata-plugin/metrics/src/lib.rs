@@ -79,6 +79,7 @@
 mod aggregator;
 mod batch;
 mod chart;
+mod emit;
 mod layout;
 mod metric_set;
 
