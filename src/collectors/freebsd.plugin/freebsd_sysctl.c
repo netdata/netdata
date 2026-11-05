@@ -1040,7 +1040,7 @@ int do_system_ram(int update_every, usec_t dt) {
 int do_vm_swap_reserved(int update_every, usec_t dt) {
     (void)dt;
     static int mib[2] = {0, 0};
-    uint64_t swap_reserved;
+    uint64_t swap_reserved = 0;
 
     // Anonymous memory reserved against swap, in bytes; the same accounting as Linux Committed_AS.
     if (unlikely(GETSYSCTL_SIMPLE("vm.swap_reserved", mib, swap_reserved))) {

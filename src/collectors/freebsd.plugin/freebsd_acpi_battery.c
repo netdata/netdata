@@ -19,7 +19,7 @@ int do_hw_acpi_battery(int update_every, usec_t dt) {
     static char name[] = "acpi_battery";
     static struct simple_property capacity = { 0 };
     static struct power_supply ps = { .name = name, .capacity = &capacity };
-    int units, life;
+    int units = 0, life = ACPI_BATTERY_UNKNOWN;
 
     // The node exists only when the ACPI battery driver attached; without it there is nothing to collect.
     if (unlikely(GETSYSCTL_SIMPLE("hw.acpi.battery.units", mib_units, units) ||
