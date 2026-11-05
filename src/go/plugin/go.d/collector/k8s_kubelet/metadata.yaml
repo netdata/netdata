@@ -222,40 +222,40 @@ modules:
               unit: observes/s
               chart_type: stacked
               dimensions:
-                - name: 5_µs
-                - name: 10_µs
-                - name: 20_µs
-                - name: 40_µs
-                - name: 80_µs
-                - name: 160_µs
-                - name: 320_µs
-                - name: 640_µs
-                - name: 1280_µs
-                - name: 2560_µs
-                - name: 5120_µs
-                - name: 10240_µs
-                - name: 20480_µs
-                - name: 40960_µs
+                - name: "5 µs"
+                - name: "10 µs"
+                - name: "20 µs"
+                - name: "40 µs"
+                - name: "80 µs"
+                - name: "160 µs"
+                - name: "320 µs"
+                - name: "640 µs"
+                - name: "1280 µs"
+                - name: "2560 µs"
+                - name: "5120 µs"
+                - name: "10240 µs"
+                - name: "20480 µs"
+                - name: "40960 µs"
                 - name: +Inf
             - name: k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent
               description: API Server Latencies Of Data Encryption Key(DEK) Generation Operations Percentage
-              unit: percentage
+              unit: "%"
               chart_type: stacked
               dimensions:
-                - name: 5_µs
-                - name: 10_µs
-                - name: 20_µs
-                - name: 40_µs
-                - name: 80_µs
-                - name: 160_µs
-                - name: 320_µs
-                - name: 640_µs
-                - name: 1280_µs
-                - name: 2560_µs
-                - name: 5120_µs
-                - name: 10240_µs
-                - name: 20480_µs
-                - name: 40960_µs
+                - name: "5 µs"
+                - name: "10 µs"
+                - name: "20 µs"
+                - name: "40 µs"
+                - name: "80 µs"
+                - name: "160 µs"
+                - name: "320 µs"
+                - name: "640 µs"
+                - name: "1280 µs"
+                - name: "2560 µs"
+                - name: "5120 µs"
+                - name: "10240 µs"
+                - name: "20480 µs"
+                - name: "40960 µs"
                 - name: +Inf
             - name: k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses
               description: API Server Storage Envelope Transformation Cache Misses
@@ -265,13 +265,13 @@ modules:
                 - name: cache misses
             - name: k8s_kubelet.kubelet_containers_running
               description: Number Of Containers Currently Running
-              unit: running_containers
+              unit: running containers
               chart_type: line
               dimensions:
                 - name: total
             - name: k8s_kubelet.kubelet_pods_running
               description: Number Of Pods Currently Running
-              unit: running_pods
+              unit: running pods
               chart_type: line
               dimensions:
                 - name: total
@@ -329,7 +329,7 @@ modules:
                 - name: "0.99"
             - name: k8s_kubelet.kubelet_token_requests
               description: Token() Requests To The Alternate Token Source
-              unit: token_requests/s
+              unit: token requests/s
               chart_type: line
               dimensions:
                 - name: total
@@ -357,3 +357,40 @@ modules:
               dimensions:
                 - name: actual
                 - name: desired
+        - name: persistent volume claim
+          description: |
+            These metrics refer to a PersistentVolumeClaim mounted on this node, one instance per PVC.
+
+            - A chart is created only while the kubelet reports real data for it. The kubelet reports 0 for values a volume does not provide, so volumes without filesystem statistics (for example block volumes) have no PVC charts, and volumes without inode accounting (for example SMB shares) have no inode chart.
+            - `reserved` is the space or inodes the filesystem holds back (capacity minus used minus available, usually root-reserved blocks). It is never negative: if a storage driver reports more used and available space than capacity, `reserved` is 0.
+            - Space utilization is used / (used + available), like `df`.
+            - A PVC mounted on several nodes (for example ReadWriteMany or ReadOnlyMany) is reported by each of them. Aggregate PVC charts across nodes with `max`, not `sum`.
+            - `hostPath` volumes (the default type of the upstream `local-path` provisioner) report no usage, so they get no PVC charts. `local` volumes (for example the bundled `local-path` class of k3s) report the usage of the whole host filesystem that holds them, so they show the same values on a node.
+          labels:
+            - name: k8s_namespace
+              description: Namespace of the PersistentVolumeClaim.
+            - name: k8s_pvc_name
+              description: PersistentVolumeClaim name.
+          metrics:
+            - name: k8s_kubelet.pvc_space_usage
+              description: PVC Space Usage
+              unit: B
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+                - name: reserved
+            - name: k8s_kubelet.pvc_space_utilization
+              description: PVC Space Utilization
+              unit: "%"
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: k8s_kubelet.pvc_inodes_usage
+              description: PVC Inodes Usage
+              unit: inodes
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+                - name: reserved

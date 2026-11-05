@@ -3,6 +3,7 @@
 package k8s_state
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +20,7 @@ func newKubeState() *kubeState {
 		deployments: make(map[string]*deploymentState),
 		cronJobs:    make(map[string]*cronJobState),
 		jobs:        make(map[string]*jobState),
+		pvcs:        make(map[string]*pvcState),
 	}
 }
 
@@ -62,6 +64,12 @@ func newJobState() *jobState {
 	}
 }
 
+func newPVCState() *pvcState {
+	return &pvcState{
+		new: true,
+	}
+}
+
 type kubeState struct {
 	*sync.Mutex
 	nodes       map[string]*nodeState
@@ -69,6 +77,7 @@ type kubeState struct {
 	deployments map[string]*deploymentState
 	cronJobs    map[string]*cronJobState
 	jobs        map[string]*jobState
+	pvcs        map[string]*pvcState
 }
 
 type (
@@ -230,4 +239,32 @@ type jobState struct {
 	startTime      *time.Time
 	completionTime *time.Time
 	active         int32
+}
+
+type pvcState struct {
+	new     bool
+	deleted bool
+
+	name      string
+	namespace string
+
+	// A quantity that is not set is not reported, a Pending PVC has no capacity yet.
+	hasRequested bool
+	requested    int64 // bytes
+	hasCapacity  bool
+	capacity     int64 // bytes
+}
+
+func (ps pvcState) id() string { return ps.namespace + "_" + ps.name }
+
+// chartID is the PVC part of the chart ID. Dots become underscores, which Kubernetes names never contain, so
+// "data.0" and "data-0" get different charts (replaceDots would map both to "data-0").
+func (ps pvcState) chartID() string {
+	return ps.namespace + "_" + strings.ReplaceAll(ps.name, ".", "_")
+}
+
+// requestedCapacityDiff returns requested - capacity, and false if either quantity is not set. It is signed and not
+// clamped: negative means the volume is larger than requested.
+func (ps pvcState) requestedCapacityDiff() (int64, bool) {
+	return ps.requested - ps.capacity, ps.hasRequested && ps.hasCapacity
 }

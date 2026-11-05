@@ -32,14 +32,31 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Kubernetes Nodes, Pods and Containers.
+          This collector monitors Kubernetes Nodes, Pods, Containers, Deployments, CronJobs and PersistentVolumeClaims.
         method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: false
       additional_permissions:
-        description: ""
+        description: |
+          The collector reads cluster state from the Kubernetes API with the permissions below, granted cluster-wide (all namespaces). It only reads cluster objects; the access review is a query that stores nothing.
+
+          | Resource | API group | Verbs | Used for |
+          |:---------|:----------|:------|:---------|
+          | `nodes` | core (`""`) | `list`, `watch` | Node metrics. |
+          | `pods` | core (`""`) | `list`, `watch` | Pod and container metrics, and the pod and container counts of each Node. |
+          | `deployments` | `apps` | `list`, `watch` | Deployment metrics. |
+          | `cronjobs` | `batch` | `list`, `watch` | CronJob metrics. |
+          | `jobs` | `batch` | `list`, `watch` | The Job runs behind the CronJob metrics (status, failure reason, duration). |
+          | `persistentvolumeclaims` | core (`""`) | `list`, `watch` | PVC metrics. Optional, see below. |
+          | `namespaces` | core (`""`) | `get` | The UID of the `kube-system` Namespace, used as the `k8s_cluster_id` label. Without it the label is empty and a warning is logged. |
+          | `selfsubjectaccessreviews` | `authorization.k8s.io` | `create` | A check at startup that the `persistentvolumeclaims` permissions are granted. The default `system:basic-user` ClusterRole gives it to every authenticated account. |
+          | `/version` (non-resource URL) | n/a | `get` | The connection check when the job starts. The default `system:public-info-viewer` ClusterRole gives it to every account. |
+
+          The official Netdata Helm chart grants every row down to `namespaces` (`persistentvolumeclaims` from the release that adds PVC metrics). With your own ClusterRole, add those rows; the last two are allowed by the default Kubernetes ClusterRoles.
+
+          Without the `persistentvolumeclaims` permissions the PVC metrics are skipped with one warning and all other metrics work. They are checked once, at startup, so permissions granted later take effect after the collector is restarted.
       default_behavior:
         auto_detection:
           description: ""
@@ -171,7 +188,7 @@ modules:
             - name: k8s_state.node_pods_readiness_state
               description: Pods readiness state
               unit: pods
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: ready
                 - name: unready
@@ -493,3 +510,26 @@ modules:
                 - name: Evicted
                 - name: OOMKilled
                 - name: Other
+        - name: persistent volume claim
+          description: |
+            These metrics refer to the PersistentVolumeClaim.
+
+            `requested` is the storage the PVC asks for and `capacity` is the size of the volume it got. `requested_capacity_diff` is `requested` minus `capacity`: positive while the volume is smaller than requested (an expansion is pending or failed), 0 when the sizes are equal, negative when the volume is larger than requested. A value that is not known is a gap, not 0: a Pending PVC has no `capacity` yet, so it has no `requested_capacity_diff` either.
+          labels:
+            - name: k8s_cluster_id
+              description: Cluster ID. This is equal to the kube-system namespace UID.
+            - name: k8s_cluster_name
+              description: Cluster name. Cluster name discovery only works in GKE.
+            - name: k8s_namespace
+              description: Namespace.
+            - name: k8s_pvc_name
+              description: PersistentVolumeClaim name.
+          metrics:
+            - name: k8s_state.pvc_capacity
+              description: PVC Capacity Request Difference
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: requested
+                - name: capacity
+                - name: requested_capacity_diff
