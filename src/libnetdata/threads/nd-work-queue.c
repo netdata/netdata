@@ -8,6 +8,16 @@ struct nd_work_queue_job {
     struct nd_work_queue_job *prev, *next;
 };
 
+// An idle worker, waiting on its own condition variable. Idle workers are kept most-recent-first and a
+// new job wakes the most recent one: under a steady trickle of jobs the same few threads keep working
+// and the rest stay idle long enough to exit, so the pool shrinks to what the load needs. (With one
+// shared condition variable every idle thread got a job now and then, and none ever timed out.)
+struct nd_work_queue_waiter {
+    netdata_cond_t cond;
+    bool woken;     // set (under the mutex) by the waker, which also unlinks it
+    struct nd_work_queue_waiter *prev, *next;
+};
+
 struct nd_work_queue {
     char tag[ND_THREAD_TAG_MAX + 1];
 
@@ -15,12 +25,12 @@ struct nd_work_queue {
     void *thread_init_data;
 
     netdata_mutex_t mutex;
-    netdata_cond_t job_cond;    // a job was queued, or the queue was stopped
     netdata_cond_t exit_cond;   // a worker thread exited
 
     struct nd_work_queue_job *jobs; // FIFO, protected by mutex
     size_t queued;                  // jobs waiting for a thread
-    size_t idle;                    // threads waiting on job_cond
+    struct nd_work_queue_waiter *waiters; // idle threads, most recent first, protected by mutex
+    size_t idle;                    // threads in waiters
     size_t alive;                   // threads that have not exited yet
     bool stopping;
 
@@ -48,28 +58,54 @@ static void nd_work_queue_worker(void *arg) {
 
     netdata_mutex_lock(&wq->mutex);
     while(true) {
-        bool timed_out = false;
-        while(!wq->jobs && !wq->stopping && !timed_out) {
-            wq->idle++;
-            if(wq->idle_timeout_ut)
-                timed_out = netdata_cond_timedwait(&wq->job_cond, &wq->mutex, wq->idle_timeout_ut * NSEC_PER_USEC) == UV_ETIMEDOUT;
-            else
-                netdata_cond_wait(&wq->job_cond, &wq->mutex);
-            wq->idle--;
+        struct nd_work_queue_job *job = wq->jobs;
+        if(job) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->jobs, job, prev, next);
+            wq->queued--;
+            netdata_mutex_unlock(&wq->mutex);
+
+            job->cb(job->data);
+            freez(job);
+
+            netdata_mutex_lock(&wq->mutex);
+            continue;
         }
 
-        struct nd_work_queue_job *job = wq->jobs;
-        if(!job)
-            break; // stopping or idle for too long, and nothing to run
+        if(wq->stopping)
+            break;
 
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->jobs, job, prev, next);
-        wq->queued--;
-        netdata_mutex_unlock(&wq->mutex);
+        // idle: wait to be woken for a job, or until the idle timeout
+        struct nd_work_queue_waiter waiter = { .woken = false };
+        netdata_cond_init(&waiter.cond);
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(wq->waiters, &waiter, prev, next);
+        wq->idle++;
 
-        job->cb(job->data);
-        freez(job);
+        usec_t deadline_ut = wq->idle_timeout_ut ? now_monotonic_usec() + wq->idle_timeout_ut : 0;
+        while(!waiter.woken) {
+            if(!deadline_ut) {
+                netdata_cond_wait(&waiter.cond, &wq->mutex);
+                continue;
+            }
 
-        netdata_mutex_lock(&wq->mutex);
+            usec_t now_ut = now_monotonic_usec();
+            if(now_ut >= deadline_ut)
+                break;
+
+            netdata_cond_timedwait(&waiter.cond, &wq->mutex, (deadline_ut - now_ut) * NSEC_PER_USEC);
+        }
+
+        bool timed_out = !waiter.woken;
+        if(timed_out) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->waiters, &waiter, prev, next);
+            wq->idle--;
+        }
+        netdata_cond_destroy(&waiter.cond);
+
+        // idle for too long, and nothing to run
+        if(timed_out && !wq->jobs)
+            break;
+
+        // woken: run a job if there is one; another worker may have taken it, then wait again
     }
 
     ND_THREAD *previous = nd_work_queue_take_exited_unsafe(wq);
@@ -92,7 +128,6 @@ ND_WORK_QUEUE *nd_work_queue_create(const char *tag, size_t max_threads, usec_t 
     wq->max_threads = max_threads ? max_threads : 1;
     wq->idle_timeout_ut = idle_timeout_ut;
     netdata_mutex_init(&wq->mutex);
-    netdata_cond_init(&wq->job_cond);
     netdata_cond_init(&wq->exit_cond);
     return wq;
 }
@@ -133,8 +168,17 @@ bool nd_work_queue_submit(ND_WORK_QUEUE *wq, nd_work_queue_job_cb cb, void *data
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wq->jobs, job, prev, next);
     wq->queued++;
 
-    // every queued job needs a thread of its own: add one when the idle ones cannot cover them
-    if(wq->queued > wq->idle && wq->alive < wq->max_threads)
+    // every queued job needs a thread of its own: wake the most recently idle one, or add one.
+    // With neither (all threads busy, at max_threads), a busy thread takes it when it finishes:
+    // a thread checks the queue before it goes idle.
+    struct nd_work_queue_waiter *waiter = wq->waiters;
+    if(waiter) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->waiters, waiter, prev, next);
+        wq->idle--;
+        waiter->woken = true;
+        netdata_cond_signal(&waiter->cond);
+    }
+    else if(wq->alive < wq->max_threads)
         nd_work_queue_spawn_thread_unsafe(wq);
 
     bool accepted = true;
@@ -144,8 +188,6 @@ bool nd_work_queue_submit(ND_WORK_QUEUE *wq, nd_work_queue_job_cb cb, void *data
         wq->queued--;
         accepted = false;
     }
-    else
-        netdata_cond_signal(&wq->job_cond);
 
     ND_THREAD *exited = nd_work_queue_take_exited_unsafe(wq);
     netdata_mutex_unlock(&wq->mutex);
@@ -166,7 +208,15 @@ void nd_work_queue_stop(ND_WORK_QUEUE *wq) {
 
     netdata_mutex_lock(&wq->mutex);
     wq->stopping = true;
-    netdata_cond_broadcast(&wq->job_cond);
+
+    // wake every idle thread: each runs what is still queued, then exits
+    while(wq->waiters) {
+        struct nd_work_queue_waiter *waiter = wq->waiters;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->waiters, waiter, prev, next);
+        wq->idle--;
+        waiter->woken = true;
+        netdata_cond_signal(&waiter->cond);
+    }
     netdata_mutex_unlock(&wq->mutex);
 }
 
@@ -203,7 +253,6 @@ bool nd_work_queue_stop_and_free(ND_WORK_QUEUE *wq, usec_t timeout_ut) {
         nd_thread_join(exited);
 
     netdata_cond_destroy(&wq->exit_cond);
-    netdata_cond_destroy(&wq->job_cond);
     netdata_mutex_destroy(&wq->mutex);
     freez(wq);
     return true;
@@ -399,6 +448,67 @@ int nd_work_queue_unittest(void) {
             fprintf(stderr, "  FAILED: the queue did not stop\n");
             errors++;
         }
+    }
+
+    // 5. under a steady trickle of jobs the pool shrinks to what the load needs: the most recently idle
+    //    thread gets each job, the others stay idle and exit
+    {
+        struct nd_work_queue_ut ut = { .block = true };
+        completion_init(&ut.release);
+        ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 4, 200 * USEC_PER_MS, nd_work_queue_ut_init, &ut);
+
+        // occupy 4 threads at once, then let them all go idle
+        for(size_t i = 0; i < 4; i++)
+            nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut);
+        if(!nd_work_queue_ut_wait_for(&ut.running, 4, 10 * USEC_PER_SEC)) {
+            fprintf(stderr, "  FAILED: expected 4 jobs running in parallel, got %zu\n",
+                    __atomic_load_n(&ut.running, __ATOMIC_RELAXED));
+            errors++;
+        }
+        __atomic_store_n(&ut.block, false, __ATOMIC_RELAXED);
+        completion_mark_complete(&ut.release);
+
+        usec_t deadline_ut = now_monotonic_usec() + 10 * USEC_PER_SEC;
+        while(true) {
+            netdata_mutex_lock(&wq->mutex);
+            size_t idle = wq->idle;
+            netdata_mutex_unlock(&wq->mutex);
+            if(idle == 4 || now_monotonic_usec() >= deadline_ut)
+                break;
+            sleep_usec(1000);
+        }
+
+        // one short job at a time, every 20 ms - more often than the idle timeout - for up to 10 s
+        size_t expected = 4, alive = 4;
+        deadline_ut = now_monotonic_usec() + 10 * USEC_PER_SEC;
+        while(now_monotonic_usec() < deadline_ut) {
+            nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut);
+            expected++;
+            if(!nd_work_queue_ut_wait_for(&ut.ran, expected, 10 * USEC_PER_SEC)) {
+                fprintf(stderr, "  FAILED: trickle job %zu did not run\n", expected);
+                errors++;
+                break;
+            }
+
+            netdata_mutex_lock(&wq->mutex);
+            alive = wq->alive;
+            netdata_mutex_unlock(&wq->mutex);
+            if(alive == 1)
+                break;
+
+            sleep_usec(20 * USEC_PER_MS);
+        }
+
+        if(alive != 1) {
+            fprintf(stderr, "  FAILED: under a trickle of jobs %zu threads stayed alive, expected 1\n", alive);
+            errors++;
+        }
+
+        if(!nd_work_queue_stop_and_free(wq, 10 * USEC_PER_SEC)) {
+            fprintf(stderr, "  FAILED: the queue did not stop\n");
+            errors++;
+        }
+        completion_destroy(&ut.release);
     }
 
     fprintf(stderr, "Work queue tests: %s\n", errors ? "FAILED" : "OK");

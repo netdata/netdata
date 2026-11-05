@@ -14,6 +14,8 @@
 //
 // - Threads are created on demand, up to max_threads. A thread idle for idle_timeout_ut exits (0 = never),
 //   and a later submit creates a new one when needed.
+// - A new job goes to the most recently idle thread, so under a steady trickle of jobs the extra threads
+//   stay idle and exit: the pool shrinks to the concurrency the load needs.
 // - Every accepted job runs exactly once, also after nd_work_queue_stop(): stopping only refuses new jobs,
 //   so a caller waiting on a submitted job is never left waiting forever.
 // - The queue does not own the job data; the job callback does.
