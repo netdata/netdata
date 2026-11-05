@@ -1033,6 +1033,49 @@ int do_system_ram(int update_every, usec_t dt) {
     return 0;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// vm.swap_reserved
+
+int do_vm_swap_reserved(int update_every, usec_t dt) {
+    (void)dt;
+    static int mib[2] = {0, 0};
+    uint64_t swap_reserved;
+
+    // Anonymous memory reserved against swap, in bytes; the same accounting as Linux Committed_AS.
+    if (unlikely(GETSYSCTL_SIMPLE("vm.swap_reserved", mib, swap_reserved))) {
+        collector_error("DISABLED: mem.committed chart");
+        collector_error("DISABLED: vm.swap_reserved module");
+        return 1;
+    }
+
+    static RRDSET *st = NULL;
+    static RRDDIM *rd_committed = NULL;
+
+    if (unlikely(!st)) {
+        st = rrdset_create_localhost(
+                "mem",
+                "committed",
+                NULL,
+                "overview",
+                NULL,
+                "Committed (Allocated) Memory",
+                "MiB",
+                "freebsd.plugin",
+                "vm.swap_reserved",
+                NETDATA_CHART_PRIO_MEM_SYSTEM_COMMITTED,
+                update_every,
+                RRDSET_TYPE_AREA
+        );
+
+        rd_committed = rrddim_add(st, "Committed_AS", NULL, 1, MEGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(st, rd_committed, (collected_number)swap_reserved);
+    rrdset_done(st);
+
+    return 0;
+}
+
 // vm.stats.vm.v_swappgs
 
 int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {

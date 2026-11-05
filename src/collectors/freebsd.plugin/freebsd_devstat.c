@@ -2,6 +2,10 @@
 
 #include "plugin_freebsd.h"
 
+#define _COMMON_PLUGIN_NAME "freebsd.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "devstat"
+#include "../common-contexts/common-contexts.h"
+
 #include <sys/devicestat.h>
 
 struct disk {
@@ -18,6 +22,7 @@ struct disk {
     int do_ops;
     int do_qops;
     int do_util;
+    int do_backlog;
     int do_iotime;
     int do_await;
     int do_avagsz;
@@ -60,6 +65,11 @@ struct disk {
     RRDSET *st_util;
     RRDDIM *rd_util;
 
+    ND_DISK_BUSY disk_busy;
+
+    RRDSET *st_backlog;
+    RRDDIM *rd_backlog;
+
     RRDSET *st_iotime;
     RRDDIM *rd_iotime_in;
     RRDDIM *rd_iotime_out;
@@ -96,6 +106,10 @@ static void disk_free(struct disk *dm) {
         rrdset_is_obsolete___safe_from_collector_thread(dm->st_qops);
     if (likely(dm->st_util))
         rrdset_is_obsolete___safe_from_collector_thread(dm->st_util);
+    if (likely(dm->disk_busy.st_busy))
+        rrdset_is_obsolete___safe_from_collector_thread(dm->disk_busy.st_busy);
+    if (likely(dm->st_backlog))
+        rrdset_is_obsolete___safe_from_collector_thread(dm->st_backlog);
     if (likely(dm->st_iotime))
         rrdset_is_obsolete___safe_from_collector_thread(dm->st_iotime);
     if (likely(dm->st_await))
@@ -183,6 +197,10 @@ static struct disk *get_disk(const char *name) {
 // --------------------------------------------------------------------------------------------------------------------
 // kern.devstat
 
+static void freebsd_disk_labels_cb(RRDSET *st, void *data) {
+    rrdlabels_add(st->rrdlabels, "device", (const char *)data, RRDLABEL_SRC_AUTO);
+}
+
 int do_kern_devstat(int update_every, usec_t dt) {
 
 #define DEFAULT_EXCLUDED_DISKS ""
@@ -191,7 +209,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
     static int enable_new_disks = -1;
     static int enable_pass_devices = -1, do_system_io = -1, do_io = -1, do_ops = -1, do_qops = -1, do_util = -1,
-            do_iotime = -1, do_await = -1, do_avagsz = -1, do_svctm = -1;
+            do_backlog = -1, do_iotime = -1, do_await = -1, do_avagsz = -1, do_svctm = -1;
     static SIMPLE_PATTERN *excluded_disks = NULL;
 
     if (unlikely(enable_new_disks == -1)) {
@@ -212,6 +230,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                 CONFIG_BOOLEAN_AUTO);
         do_util   = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "utilization percentage for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
+        do_backlog = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "backlog for all disks",
+                                                 CONFIG_BOOLEAN_AUTO);
         do_iotime = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "i/o time for all disks",
                                                 CONFIG_BOOLEAN_AUTO);
         do_await  = inicfg_get_boolean_ondemand(&netdata_config, CONFIG_SECTION_KERN_DEVSTAT, "average completed i/o time for all disks",
@@ -228,7 +248,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
             true);
     }
 
-    if (likely(do_system_io || do_io || do_ops || do_qops || do_util || do_iotime || do_await || do_avagsz || do_svctm)) {
+    if (likely(do_system_io || do_io || do_ops || do_qops || do_util || do_backlog || do_iotime || do_await || do_avagsz || do_svctm)) {
         static int mib_numdevs[3] = {0, 0, 0};
         int numdevs;
         int common_error = 0;
@@ -308,6 +328,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                             dm->do_ops    = inicfg_get_boolean_ondemand(&netdata_config, var_name, "operations",              do_ops);
                             dm->do_qops   = inicfg_get_boolean_ondemand(&netdata_config, var_name, "queued operations",       do_qops);
                             dm->do_util   = inicfg_get_boolean_ondemand(&netdata_config, var_name, "utilization percentage",  do_util);
+                            dm->do_backlog = inicfg_get_boolean_ondemand(&netdata_config, var_name, "backlog",               do_backlog);
                             dm->do_iotime = inicfg_get_boolean_ondemand(&netdata_config, var_name, "i/o time",                do_iotime);
                             dm->do_await  = inicfg_get_boolean_ondemand(&netdata_config, var_name, "average completed i/o time",
                                                                         do_await);
@@ -335,6 +356,10 @@ int do_kern_devstat(int update_every, usec_t dt) {
                             dm->prev_dstat.busy_time_ms      = dstat[i].busy_time.sec * 1000
                                                                + dstat[i].busy_time.frac * BINTIME_SCALE;
                         }
+
+                        // a disabled disk stays tracked (so cleanup does not churn it) but gets no charts
+                        if (unlikely(!dm->enabled))
+                            continue;
 
                         cur_dstat.duration_read_ms  = dstat[i].duration[DEVSTAT_READ].sec * 1000
                                                       + dstat[i].duration[DEVSTAT_READ].frac * BINTIME_SCALE;
@@ -459,6 +484,39 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                             rrddim_set_by_pointer(dm->st_util, dm->rd_util, cur_dstat.busy_time_ms);
                             rrdset_done(dm->st_util);
+
+                            // busy_time accumulates while at least one transaction is in flight, like Linux io_ticks
+                            common_disk_busy(&dm->disk_busy, disk, NULL, (uint64_t)cur_dstat.busy_time_ms, update_every,
+                                             freebsd_disk_labels_cb, disk);
+                        }
+
+                        if (dm->do_backlog == CONFIG_BOOLEAN_YES || dm->do_backlog == CONFIG_BOOLEAN_AUTO) {
+                            if (unlikely(!dm->st_backlog)) {
+                                dm->st_backlog = rrdset_create_localhost("disk_backlog",
+                                                                         disk,
+                                                                         NULL,
+                                                                         "io",
+                                                                         "disk.backlog",
+                                                                         "Disk Backlog",
+                                                                         "milliseconds",
+                                                                         "freebsd.plugin",
+                                                                         "devstat",
+                                                                         NETDATA_CHART_PRIO_DISK_BACKLOG,
+                                                                         update_every,
+                                                                         RRDSET_TYPE_AREA
+                                );
+
+                                dm->rd_backlog = rrddim_add(dm->st_backlog, "backlog", NULL, 1, 1,
+                                                            RRD_ALGORITHM_INCREMENTAL);
+                                rrdlabels_add(dm->st_backlog->rrdlabels, "device", disk, RRDLABEL_SRC_AUTO);
+                            }
+
+                            // devstat adds a transaction's duration when it completes, so long requests appear late;
+                            // Linux >= 5.0 time_in_queue is also the sum of completed request times
+                            rrddim_set_by_pointer(dm->st_backlog, dm->rd_backlog,
+                                                  cur_dstat.duration_read_ms + cur_dstat.duration_write_ms +
+                                                  cur_dstat.duration_other_ms + cur_dstat.duration_free_ms);
+                            rrdset_done(dm->st_backlog);
                         }
 
                         if (dm->do_iotime == CONFIG_BOOLEAN_YES || dm->do_iotime == CONFIG_BOOLEAN_AUTO) {
@@ -698,6 +756,9 @@ int do_kern_devstat(int update_every, usec_t dt) {
             collector_error("DISABLED: disk_qops.* charts");
             do_util = 0;
             collector_error("DISABLED: disk_util.* charts");
+            collector_error("DISABLED: disk_busy.* charts");
+            do_backlog = 0;
+            collector_error("DISABLED: disk_backlog.* charts");
             do_iotime = 0;
             collector_error("DISABLED: disk_iotime.* charts");
             do_await = 0;
