@@ -1535,11 +1535,12 @@ collect_state() {
 # whenever the agent runs and netdatacli was found)
 # =============================================================================
 # collect_dyncfg_tree_cli - the dyncfg tree through the local command pipe.
-# The pipe is reachable only by root and the netdata user, and the agent answers
-# it as a member of its own space; the web API needs a signed-in member, which
-# the bundle cannot be. Returns non-zero, leaving no file and no manifest row,
-# when netdatacli was not found, the agent predates the command, or the call fails, so
-# the caller can fall back to the API under the same path.
+# The pipe is reachable only by root, the netdata user and the netdata group,
+# and the agent answers it as a member of its own space; the web API needs a
+# signed-in member, which the bundle cannot be. Returns non-zero, leaving no
+# file and no manifest row, when netdatacli was not found, the agent predates
+# the command, or the call fails, so the caller can fall back to the API under
+# the same path.
 collect_dyncfg_tree_cli() {
   [ -n "${NETDATACLI:-}" ] && [ -n "${NETDATA_PID:-}" ] || return 1
   deadline_exceeded && return 1
@@ -1591,7 +1592,7 @@ collect_runtime() {
       _dt_new="$WORK/07-runtime/dyncfg-tree.json.new"
       _dt_ok=0
       if _dt_detail=$(tr -d "\n" < "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null) && [ -n "$_dt_detail" ]; then
-        if printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"netdatacli dyncfg-tree was not usable (netdatacli was not found, the agent predates the command, the bundle did not run as root or the netdata user, or the call failed), so the bundle fell back to /api/v3/config, which only signed-in members of the agent's space may list on current agents, and which a bearer-protected API refuses on older ones - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Run 'netdatacli dyncfg-tree' as root, or ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" > "$_dt_new"; then
+        if printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"netdatacli dyncfg-tree was not usable (netdatacli was not found, the agent predates the command, the bundle did not run as root, the netdata user or a member of the netdata group, or the call failed), so the bundle fell back to /api/v3/config, which only signed-in members of the agent's space may list on current agents, and which a bearer-protected API refuses on older ones - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Run 'netdatacli dyncfg-tree' as root, or ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" > "$_dt_new"; then
           if mv -f "$_dt_new" "$WORK/07-runtime/dyncfg-tree.json"; then
             _dt_ok=1
           fi

@@ -390,10 +390,10 @@ static cmd_status_t cmd_dyncfg_tree(char *args, char **message)
 {
     (void)args;
 
-    // The same call GET /api/v3/config?action=tree makes. Only root and the netdata user can reach the
-    // command pipe, so the caller counts as a signed-in member of this agent's space. SENSITIVE_DATA is
-    // left out, so the tree is what any member without that permission sees: the user details of
-    // configurations changed through the UI or API are hidden.
+    // The same call GET /api/v3/config?action=tree makes. Only root, the netdata user and members of the
+    // netdata group can reach the command pipe, so the caller counts as a signed-in member of this agent's
+    // space. SENSITIVE_DATA is left out, so the tree is what any member without that permission sees: the
+    // user details of configurations changed through the UI or API are hidden.
     //
     // This runs on the libuv threadpool; the tree branch of the config handler answers inline, on this
     // thread, and queues nothing on that pool, so waiting here cannot starve it.
