@@ -149,6 +149,48 @@ func TestCollector_TableChartLabelPrecedence(t *testing.T) {
 	assert.Equal(t, want, chartLabels(chart))
 }
 
+func TestCollector_TableChartLabelsSharedKey(t *testing.T) {
+	c := newTestSNMPCollector()
+	c.sysInfo = &snmputils.SysInfo{
+		Name: "switch",
+	}
+	metrics := []ddsnmp.Metric{
+		{
+			Name:    "power",
+			IsTable: true,
+			Value:   3,
+			Profile: &ddsnmp.ProfileMetrics{},
+			Tags:    map[string]string{"group": "1", "_if_alias": "first"},
+		},
+		{
+			Name:    "power",
+			IsTable: true,
+			Value:   4,
+			Profile: &ddsnmp.ProfileMetrics{},
+			Tags:    map[string]string{"group": "1", "_if_alias": "second"},
+		},
+	}
+	for _, step := range []struct {
+		alias  string
+		redraw bool
+	}{
+		{alias: "first", redraw: true},
+		{alias: "first"},
+		{alias: "changed", redraw: true},
+		{alias: "changed"},
+	} {
+		metrics[0].Tags["_if_alias"] = step.alias
+		samples := make(map[string]int64)
+		c.collectProfileTableMetrics(samples, metrics)
+		require.Len(t, *c.Charts(), 1)
+		chart := (*c.Charts())[0]
+		assert.Equal(t, step.alias, chartLabels(chart)["if_alias"], "the first sample for a key owns its chart labels")
+		assert.Equal(t, map[string]int64{"snmp_device_prof_power_1": 7}, samples)
+		assert.Equal(t, step.redraw, !chart.IsCreated())
+		chart.SetCreated(true)
+	}
+}
+
 type chartLabelOutput struct {
 	mu  sync.Mutex
 	buf bytes.Buffer

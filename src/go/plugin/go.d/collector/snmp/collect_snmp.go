@@ -97,13 +97,15 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			continue
 		}
 
-		seen[key] = true
-
-		c.profileMetricLabels(labels, m)
-		if chart := c.tableMetricCharts[key]; chart != nil {
-			updateProfileChartLabels(chart, labels)
-		} else if chart := c.addProfileTableMetricChart(m, key, labels); chart != nil {
-			c.tableMetricCharts[key] = chart
+		if !seen[key] {
+			seen[key] = true
+			// Samples may share a key; the first one owns the chart's metadata.
+			c.profileMetricLabels(labels, m)
+			if chart := c.tableMetricCharts[key]; chart != nil {
+				updateProfileChartLabels(chart, labels)
+			} else if chart := c.addProfileTableMetricChart(m, key, labels); chart != nil {
+				c.tableMetricCharts[key] = chart
+			}
 		}
 
 		if len(m.MultiValue) == 0 {
