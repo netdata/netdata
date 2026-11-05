@@ -1,7 +1,7 @@
 //! The store: entities, the open-slot window, the entity cap, expiry and
 //! emitting.
 //!
-//! The store keeps every slot from `next_emit` (the oldest slot not yet
+//! The store keeps every slot from `oldest_open` (the oldest slot not yet
 //! emitted) to the current one open; each entity holds those slots as cell
 //! arrays and folds them forward after a stall (`advance_window`). Entities
 //! are created on their first record, with or without measurements, charts
@@ -47,7 +47,7 @@ struct Entity {
     first_slot: u64,
     /// Latest slot with records; drives expiry.
     last_slot: u64,
-    /// The cells of each open slot from `next_emit` onwards, oldest first;
+    /// The cells of each open slot from `oldest_open` onwards, oldest first;
     /// missing ones are empty.
     open_cells: VecDeque<Box<[f64]>>,
     /// The last emitted total of each cumulative cell, in set order; NaN
@@ -98,7 +98,7 @@ pub struct Store {
     entities: HashMap<Labels, Entity>,
     overflow: Option<Entity>,
     /// Oldest slot not yet emitted; set on first use.
-    next_emit: Option<u64>,
+    oldest_open: Option<u64>,
     stats: Stats,
 }
 
@@ -108,7 +108,7 @@ impl Store {
             set,
             entities: HashMap::new(),
             overflow: None,
-            next_emit: None,
+            oldest_open: None,
             stats: Stats::default(),
         }
     }
@@ -126,18 +126,18 @@ impl Store {
     fn advance_window(&mut self, now: u64) -> u64 {
         let set = &*self.set.0;
         let now_slot = now / set.interval_secs;
-        let next_emit = *self
-            .next_emit
+        let oldest_open = *self
+            .oldest_open
             .get_or_insert(now_slot.saturating_sub(set.lateness_slots));
         let oldest_wanted = now_slot.saturating_sub(set.lateness_slots + MAX_BACKLOG_SLOTS);
-        if next_emit >= oldest_wanted {
-            return next_emit;
+        if oldest_open >= oldest_wanted {
+            return oldest_open;
         }
-        let skipped = oldest_wanted - next_emit;
+        let skipped = oldest_wanted - oldest_open;
         for entity in self.entities.values_mut().chain(self.overflow.as_mut()) {
             entity.fold_front(set, skipped, oldest_wanted);
         }
-        self.next_emit = Some(oldest_wanted);
+        self.oldest_open = Some(oldest_wanted);
         oldest_wanted
     }
 
@@ -154,14 +154,14 @@ impl Store {
             std::sync::Arc::ptr_eq(&batch.set().0, &self.set.0),
             "batch of another metric set"
         );
-        let next_emit = self.advance_window(now);
+        let oldest_open = self.advance_window(now);
         let set = &*self.set.0;
-        let newest = (now / set.interval_secs).max(next_emit);
-        for (labels, pending) in batch.entities {
-            if pending.per_slot.is_empty() {
+        let newest = (now / set.interval_secs).max(oldest_open);
+        for (labels, batch_entity) in batch.entities {
+            if batch_entity.slots.is_empty() {
                 continue;
             }
-            let records: u64 = pending.per_slot.values().map(|s| s.records).sum();
+            let records: u64 = batch_entity.slots.values().map(|s| s.records).sum();
             let full = set
                 .cap
                 .as_ref()
@@ -179,17 +179,17 @@ impl Store {
                     })
                 }
             };
-            for (slot, batch_cells) in pending.per_slot {
-                let slot = if slot < next_emit {
-                    self.stats.late_records += batch_cells.records;
-                    next_emit
+            for (slot, batch_slot) in batch_entity.slots {
+                let slot = if slot < oldest_open {
+                    self.stats.late_records += batch_slot.records;
+                    oldest_open
                 } else if slot > newest {
-                    self.stats.future_records += batch_cells.records;
+                    self.stats.future_records += batch_slot.records;
                     newest
                 } else {
                     slot
                 };
-                entity.merge_slot(set, next_emit, slot, &batch_cells.cells);
+                entity.merge_slot(set, oldest_open, slot, &batch_slot.cells);
             }
         }
     }
@@ -206,11 +206,11 @@ impl Store {
     /// channel's limit, or `usize::MAX` when writing straight to stdout.
     pub fn emit(&mut self, now: u64, max_chunk: usize) -> Vec<Vec<u8>> {
         let mut out = Chunker::new(max_chunk);
-        let mut next_emit = self.advance_window(now);
+        let mut oldest_open = self.advance_window(now);
         let set = &*self.set.0;
         let now_slot = now / set.interval_secs;
-        while next_emit + set.lateness_slots < now_slot {
-            let slot = next_emit;
+        while oldest_open + set.lateness_slots < now_slot {
+            let slot = oldest_open;
             let stats = &mut self.stats;
             self.entities.retain(|_, entity| {
                 entity.emit_slot(set, slot, &mut out);
@@ -225,9 +225,9 @@ impl Store {
             if expired.is_some() {
                 self.stats.expired_entities += 1;
             }
-            next_emit += 1;
+            oldest_open += 1;
         }
-        self.next_emit = Some(next_emit);
+        self.oldest_open = Some(oldest_open);
         out.finish()
     }
 }
@@ -250,9 +250,9 @@ impl Entity {
         }
     }
 
-    /// Merge `cells` into `slot`, an open slot from `next_emit` onwards.
-    fn merge_slot(&mut self, set: &MetricSetInner, next_emit: u64, slot: u64, cells: &[f64]) {
-        let index = (slot - next_emit) as usize;
+    /// Merge `cells` into `slot`, an open slot from `oldest_open` onwards.
+    fn merge_slot(&mut self, set: &MetricSetInner, oldest_open: u64, slot: u64, cells: &[f64]) {
+        let index = (slot - oldest_open) as usize;
         while self.open_cells.len() <= index {
             self.open_cells.push_back(set.empty_cells());
         }
@@ -298,7 +298,7 @@ impl Entity {
             out.block(|block| {
                 write_begin(block, id, set.interval_secs * 1_000_000);
                 for dim in &chart.dimensions {
-                    match set.read(&cells, dim.value) {
+                    match set.read(&cells, dim.readout) {
                         Some(value) => write_set_float(block, &dim.id, value),
                         None => write_set_empty(block, &dim.id),
                     }
@@ -358,7 +358,7 @@ fn define_chart(
 ) {
     write_chart_line(block, set, chart, id, false);
     if !labels.is_empty() {
-        for (key, value) in &labels.0 {
+        for (key, value) in labels.iter() {
             write_clabel(block, key, value, LabelSource::Auto);
         }
         write_clabel_commit(block);

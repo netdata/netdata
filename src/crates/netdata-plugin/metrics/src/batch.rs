@@ -9,18 +9,18 @@ use crate::metric_set::{
 use indexmap::IndexMap;
 
 /// A batch's cells for one entity and one slot.
-pub(crate) struct BatchCells {
+pub(crate) struct BatchSlot {
     pub(crate) records: u64,
     pub(crate) cells: Box<[f64]>,
 }
 
 /// One entity's records within a batch.
 #[derive(Default)]
-pub(crate) struct PendingEntity {
+pub(crate) struct EntitySlots {
     /// By slot number, in first-record order: the store merges late slots
     /// into one, and gauges and totals keep the value merged last.
-    pub(crate) per_slot: IndexMap<u64, BatchCells>,
-    /// Position in `per_slot` of the slot recorded into last; records mostly
+    pub(crate) slots: IndexMap<u64, BatchSlot>,
+    /// Position in `slots` of the slot recorded into last; records mostly
     /// arrive in time order, so it answers most lookups without hashing.
     last: usize,
 }
@@ -34,7 +34,7 @@ pub struct Batch {
     set: MetricSet,
     /// By labels, in first-record order: the store admits new entities in
     /// this order until its cap is reached.
-    pub(crate) entities: IndexMap<Labels, PendingEntity>,
+    pub(crate) entities: IndexMap<Labels, EntitySlots>,
 }
 
 impl Batch {
@@ -67,14 +67,14 @@ impl Batch {
 
     /// True when the batch holds no record.
     pub fn is_empty(&self) -> bool {
-        self.entities.values().all(|e| e.per_slot.is_empty())
+        self.entities.values().all(|e| e.slots.is_empty())
     }
 }
 
 /// One entity of a [`Batch`], from [`Batch::entity`].
 pub struct BatchEntity<'a> {
     set: &'a MetricSetInner,
-    entity: &'a mut PendingEntity,
+    entity: &'a mut EntitySlots,
 }
 
 impl BatchEntity<'_> {
@@ -87,12 +87,12 @@ impl BatchEntity<'_> {
         let set = self.set;
         let slot = unix_seconds / set.interval_secs;
         let entity = &mut *self.entity;
-        let index = match entity.per_slot.get_index(entity.last) {
+        let index = match entity.slots.get_index(entity.last) {
             Some((&last_slot, _)) if last_slot == slot => entity.last,
             _ => {
-                let entry = entity.per_slot.entry(slot);
+                let entry = entity.slots.entry(slot);
                 let index = entry.index();
-                entry.or_insert_with(|| BatchCells {
+                entry.or_insert_with(|| BatchSlot {
                     records: 0,
                     cells: set.empty_cells(),
                 });
@@ -100,11 +100,11 @@ impl BatchEntity<'_> {
             }
         };
         entity.last = index;
-        let batch_cells = &mut entity.per_slot[index];
-        batch_cells.records += 1;
+        let batch_slot = &mut entity.slots[index];
+        batch_slot.records += 1;
         Measurements {
             set_id: set.id,
-            cells: &mut batch_cells.cells,
+            cells: &mut batch_slot.cells,
         }
     }
 }

@@ -196,9 +196,9 @@ impl Histogram {
     }
 }
 
-/// What a dimension shows for one slot.
+/// How a dimension reads its cells: what it shows for one slot.
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum Value {
+pub(crate) enum Readout {
     /// The cell divided by the slot length in seconds.
     Rate(usize),
     /// `numerator / denominator`; no value when the denominator is 0.
@@ -214,15 +214,15 @@ pub(crate) enum Value {
 #[derive(Debug, Clone)]
 pub(crate) struct Dimension {
     pub(crate) id: String,
-    pub(crate) value: Value,
+    pub(crate) readout: Readout,
 }
 
 impl Dimension {
-    fn new(id: &str, value: Value) -> Self {
+    fn new(id: &str, readout: Readout) -> Self {
         assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
         Self {
             id: id.to_string(),
-            value,
+            readout,
         }
     }
 }
@@ -280,7 +280,11 @@ pub(crate) struct ChartDef {
 /// - An empty list is an entity too: the single entity of a set whose
 ///   charts need no labels.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub struct Labels(pub(crate) Vec<(String, String)>);
+pub struct Labels(
+    /// Sorted by key, keys unique: the order the hash and the CLABEL lines
+    /// rely on.
+    pub(crate) Vec<(String, String)>,
+);
 
 impl Labels {
     pub fn new() -> Self {
@@ -316,12 +320,19 @@ impl Labels {
         self.0.is_empty()
     }
 
+    /// The pairs, sorted by key.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.0
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+    }
+
     /// FNV-1a over the labels, which are sorted by key: stable across
     /// processes and releases, so an entity keeps its chart ids over
     /// restarts.
     pub(crate) fn stable_hash(&self) -> u64 {
         let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-        for (key, value) in &self.0 {
+        for (key, value) in self.iter() {
             for b in key.bytes().chain([0]).chain(value.bytes()).chain([0]) {
                 hash ^= u64::from(b);
                 hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
@@ -371,15 +382,15 @@ impl MetricSetInner {
     }
 
     /// What a dimension shows for a slot with these cells; none for a gap.
-    pub(crate) fn read(&self, cells: &[f64], value: Value) -> Option<f64> {
-        let value = match value {
-            Value::Rate(cell) => cells[cell] / self.interval_secs as f64,
-            Value::Ratio {
+    pub(crate) fn read(&self, cells: &[f64], readout: Readout) -> Option<f64> {
+        let value = match readout {
+            Readout::Rate(cell) => cells[cell] / self.interval_secs as f64,
+            Readout::Ratio {
                 numerator,
                 denominator,
             } if cells[denominator] > 0.0 => cells[numerator] / cells[denominator],
-            Value::Ratio { .. } => return None,
-            Value::Cell(cell) => cells[cell],
+            Readout::Ratio { .. } => return None,
+            Readout::Cell(cell) => cells[cell],
         };
         value.is_finite().then_some(value)
     }
@@ -482,7 +493,7 @@ impl MetricSetBuilder {
     /// If the chart's context or a dimension id is invalid or already used.
     pub fn counter<D: Dimensions>(&mut self, chart: Chart) -> Counter<D> {
         let cells = self.cell_range::<D>(Merge::Add);
-        self.chart(chart, per_dimension(cells, Value::Rate));
+        self.chart(chart, per_dimension(cells, Readout::Rate));
         Counter(cells)
     }
 
@@ -495,7 +506,7 @@ impl MetricSetBuilder {
         let cells = self.cell_range::<D>(Merge::Last);
         self.cumulative_cells
             .extend(cells.base..cells.base + D::IDS.len());
-        self.chart(chart, per_dimension(cells, Value::Rate));
+        self.chart(chart, per_dimension(cells, Readout::Rate));
         CumulativeCounter(cells)
     }
 
@@ -506,7 +517,7 @@ impl MetricSetBuilder {
     /// As [`MetricSetBuilder::counter`].
     pub fn gauge<D: Dimensions>(&mut self, chart: Chart) -> Gauge<D> {
         let cells = self.cell_range::<D>(Merge::Last);
-        self.chart(chart, per_dimension(cells, Value::Cell));
+        self.chart(chart, per_dimension(cells, Readout::Cell));
         Gauge(cells)
     }
 
@@ -548,24 +559,24 @@ impl MetricSetBuilder {
             vec![
                 Dimension::new(
                     "avg",
-                    Value::Ratio {
+                    Readout::Ratio {
                         numerator: histogram.sum_cell(),
                         denominator: histogram.count_cell(),
                     },
                 ),
-                Dimension::new("max", Value::Cell(histogram.max_cell())),
+                Dimension::new("max", Readout::Cell(histogram.max_cell())),
             ],
         );
         let mut buckets: Vec<Dimension> = bounds
             .iter()
             .enumerate()
             .map(|(i, bound)| {
-                Dimension::new(&bound.to_string(), Value::Rate(histogram.bucket_cell(i)))
+                Dimension::new(&bound.to_string(), Readout::Rate(histogram.bucket_cell(i)))
             })
             .collect();
         buckets.push(Dimension::new(
             "+Inf",
-            Value::Rate(histogram.bucket_cell(bounds.len())),
+            Readout::Rate(histogram.bucket_cell(bounds.len())),
         ));
         self.add_chart(ChartDef {
             title: format!("{} histogram", chart.title),
@@ -664,7 +675,7 @@ impl MetricSetBuilder {
 }
 
 /// One dimension per value of `D`, each reading its own cell with `read`.
-fn per_dimension<D: Dimensions>(cells: CellRange<D>, read: fn(usize) -> Value) -> Vec<Dimension> {
+fn per_dimension<D: Dimensions>(cells: CellRange<D>, read: fn(usize) -> Readout) -> Vec<Dimension> {
     D::IDS
         .iter()
         .enumerate()
@@ -672,7 +683,7 @@ fn per_dimension<D: Dimensions>(cells: CellRange<D>, read: fn(usize) -> Value) -
         .collect()
 }
 
-pub(crate) fn is_id_byte(b: u8) -> bool {
+fn is_id_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'-'
 }
 
