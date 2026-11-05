@@ -135,7 +135,8 @@ impl Measurements<'_> {
         cells.base + index
     }
 
-    /// Add `amount` to the `dimension` value of `counter`.
+    /// Add `amount` to the `dimension` value of `counter`. A non-finite
+    /// amount is ignored.
     pub fn add<D: Dimensions>(
         &mut self,
         counter: Counter<D>,
@@ -143,11 +144,14 @@ impl Measurements<'_> {
         amount: f64,
     ) -> &mut Self {
         let cell = self.cell(counter.0, dimension);
-        self.cells[cell] += amount;
+        if amount.is_finite() {
+            self.cells[cell] += amount;
+        }
         self
     }
 
-    /// Set the `dimension` total of `cumulative` to `total`.
+    /// Set the `dimension` total of `cumulative` to `total`. A non-finite
+    /// total is ignored.
     pub fn set_total<D: Dimensions>(
         &mut self,
         cumulative: CumulativeCounter<D>,
@@ -155,23 +159,28 @@ impl Measurements<'_> {
         total: f64,
     ) -> &mut Self {
         let cell = self.cell(cumulative.0, dimension);
-        self.cells[cell] = total;
+        if total.is_finite() {
+            self.cells[cell] = total;
+        }
         self
     }
 
-    /// Set the `dimension` value of `gauge` to `value`.
+    /// Set the `dimension` value of `gauge` to `value`. A non-finite value
+    /// is ignored.
     pub fn set<D: Dimensions>(&mut self, gauge: Gauge<D>, dimension: D, value: f64) -> &mut Self {
         let cell = self.cell(gauge.0, dimension);
-        self.cells[cell] = value;
+        if value.is_finite() {
+            self.cells[cell] = value;
+        }
         self
     }
 
     /// Observe `value` with `weight`, the number of events it stands for:
-    /// the buckets and the mean are weighted, the maximum is not. A
-    /// non-finite value is ignored.
+    /// the buckets and the mean are weighted, the maximum is not. An
+    /// observation with a non-finite value or weight is ignored.
     pub fn observe(&mut self, histogram: Histogram, value: f64, weight: f64) -> &mut Self {
         self.check_set(histogram.set_id);
-        if !value.is_finite() {
+        if !value.is_finite() || !weight.is_finite() {
             return self;
         }
         let bucket = histogram.bounds.partition_point(|&bound| bound < value);

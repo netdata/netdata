@@ -881,6 +881,61 @@ mod tests {
     }
 
     #[test]
+    fn non_finite_measurements_are_ignored() {
+        crate::dimensions! {
+            enum Queued {
+                Jobs = "jobs",
+            }
+        }
+        crate::dimensions! {
+            enum Events {
+                Events = "events",
+            }
+        }
+        let mut b = MetricSetBuilder::new(Settings::default());
+        let chart = |context| Chart {
+            title: "T",
+            units: "u",
+            family: "f",
+            context,
+            chart_type: ChartType::Line,
+            priority: 1,
+        };
+        let requests = b.counter::<Outcome>(chart("svc.requests"));
+        let queued = b.gauge::<Queued>(chart("svc.queued"));
+        let totals = b.cumulative_counter::<Events>(chart("svc.events"));
+        let duration = b.histogram(BOUNDS, chart("svc.duration"), "requests/s");
+        let set = b.build();
+        let mut store = Store::new(set.clone());
+        let mut batch = Batch::new(&set);
+        let mut entity = batch.entity(Labels::new());
+        entity
+            .record(10)
+            .add(requests, Outcome::Ok, 1.0)
+            .add(requests, Outcome::Ok, f64::NAN)
+            .add(requests, Outcome::Ok, f64::INFINITY)
+            .set(queued, Queued::Jobs, 5.0)
+            .set(queued, Queued::Jobs, f64::NAN)
+            .set_total(totals, Events::Events, 10.0)
+            .observe(duration, 0.5, 1.0)
+            .observe(duration, 0.5, f64::NAN);
+        store.merge(batch, 10);
+        let mut batch = Batch::new(&set);
+        batch
+            .entity(Labels::new())
+            .record(11)
+            .set_total(totals, Events::Events, 13.0)
+            .set_total(totals, Events::Events, f64::NAN);
+        store.merge(batch, 11);
+        let out = text(&store.emit(13, usize::MAX));
+        assert!(out.contains("SET ok = 1\nSET error = 0\n"));
+        assert!(out.contains("SET jobs = 5\n"));
+        assert!(out.contains("SET events = 3\n"));
+        assert!(out.contains("SET avg = 0.5\nSET max = 0.5\n"));
+        assert!(out.contains("SET 0.1 = 0\nSET 1 = 1\nSET +Inf = 0\n"));
+    }
+
+    #[test]
     fn weights_scale_counts_and_histograms() {
         let f = fixture(0, 900, None);
         let mut store = Store::new(f.set.clone());
