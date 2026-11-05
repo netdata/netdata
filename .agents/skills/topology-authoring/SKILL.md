@@ -82,9 +82,10 @@ summary alone; distinguish intended contract from what the checked implementatio
   gates, so an actor-only payload passes; nothing in `pkg/topology` caps row counts.
 - Not checked by the Go validator although the contract states them: `actor_labels` key, value, source, and kind
   column types (only `actor_column` is type-checked), `search.label_keys[]` against any label registry (string shape
-  only), correlation `key_space` values (schema-required, never read), unknown optional column ids on `actor_table`
-  port sources, and the owner of a detail table named as an `actor_table` source by port bullets, modal sections, or
-  modal labels (a link- or evidence-owned table is accepted there).
+  only), correlation `key_space` values (schema-required, never read), unknown optional enrichment column ids on
+  `actor_table` port sources (`label_column` and `value_column` are checked on every source), and the owner of a
+  detail table named as an `actor_table` source by port bullets, modal sections, or modal labels (a link- or
+  evidence-owned table is accepted there).
 - The network-connections 64 MiB budget is a producer-side hard stop (a `413` Function error), not a validator check
   (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#network-connections-shape`).
 - The SNMP scenario golden suite skips, not fails, without the external fixture checkout
