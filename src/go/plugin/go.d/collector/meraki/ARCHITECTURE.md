@@ -2,8 +2,8 @@
 
 This is a maintainer guide to the `meraki` collector, written to be read top to bottom. It starts with what the
 collector is and where it sits, follows one collection cycle from start to commit (inventory first, then the optional
-telemetry), then covers the machinery around it (device nodes, startup, the request budget, the API client) and ends with
-reference tables for coming back later.
+telemetry), then covers the machinery around it (device nodes, startup, the request budget, the API client) and ends
+with reference tables for coming back later.
 
 **Place in the documentation set.** This file is the one record of the collector's design: the reasons behind limits,
 join rules and trust boundaries that the code alone does not explain. A change to collector behavior updates it in the
@@ -65,14 +65,15 @@ Every `update_every` (300 seconds by default, matching Meraki's availability ref
    ago), switch port packet rates (the last 5 minutes), and appliance uplink health (latest MX ICMP samples from
    seven to two minutes ago, plus appliance uplink states and device report age).
 4. **Writes** the organization gauge and uplink traffic on the job's node, and for every assigned device an inventory
-   gauge, an availability stateset and optional switch port traffic or appliance health on that device's own **virtual node**.
+   gauge, an availability stateset and optional switch port traffic or appliance health on that device's own **virtual
+   node**.
 
 Four properties shape everything else:
 
-- **All or nothing for inventory, gaps for optional telemetry.** No metric is written until every list has been read and joined
-  and the enabled telemetry has been read. A failed list or an invalid inventory aborts the cycle, so a partial read can
-  never look like removed devices. A failed optional read only leaves gaps in its own charts, except a 429, which also
-  skips every remaining optional read. A timeout or cancellation aborts the whole cycle.
+- **All or nothing for inventory, gaps for optional telemetry.** No metric is written until every list has been read and
+  joined and the enabled telemetry has been read. A failed list or an invalid inventory aborts the cycle, so a partial
+  read can never look like removed devices. A failed optional read only leaves gaps in its own charts, except a 429,
+  which also skips every remaining optional read. A timeout or cancellation aborts the whole cycle.
 - **Inventory decides membership; availability only decorates.** A missing, unknown or contradictory status leaves a
   gap. It is never turned into an offline observation, and an old status is never replayed as fresh.
 - **Traffic is what Meraki reported, or nothing.** Values are averages Meraki reports for a window, written as gauges. A
@@ -153,9 +154,10 @@ A useful mental split for the rest of this document:
 - **`merakiapi`** decides *how to talk to Meraki safely*: URLs, authentication, pagination, redirects, decoding and
   error text. It knows nothing about metrics and interprets nothing.
 - **`transport.go`** decides *how fast*; **`retry_after.go`** decides *when not to talk at all*.
-- **`normalize.go`**, **`normalize_traffic.go`** and **`normalize_health.go`** decide *what the data means*: which devices exist, which statuses
-  are trustworthy, which traffic interval counts and which values are unambiguous. **`collect_telemetry.go`** decides
-  which optional families to read and when to stop: one flow, so a 429 in any family skips every later request.
+- **`normalize.go`**, **`normalize_traffic.go`** and **`normalize_health.go`** decide *what the data means*: which
+  devices exist, which statuses are trustworthy, which traffic interval counts and which values are unambiguous.
+  **`collect_telemetry.go`** decides which optional families to read and when to stop: one flow, so a 429 in any family
+  skips every later request.
 - **`write_metrics.go`** and **`host_scope.go`** decide *where it lands*: labels, virtual nodes and identities.
 - The **framework** owns everything after the write: cycle commit or abort, chart materialization, host publication
   and retirement.
@@ -301,10 +303,10 @@ active, Meraki adds up their uplink bytes per interface, and the serial it repor
 the traffic, so uplinks belong to the network.
 
 A failed read goes through `stopTelemetry`: it records a usable `Retry-After` at once (the cycle itself can still
-succeed), logs at most one warning per family per hour, and leaves that family's gaps, or one switch's gaps for a
-failed packet request. Two cases skip every remaining optional request: a 429, even without a usable `Retry-After`, and
-the end of the context. `collect` checks the context again before writing, so a timeout or cancellation during optional telemetry
-still aborts the whole cycle, inventory included.
+succeed), logs at most one warning per family per hour, and leaves that family's gaps, or one switch's gaps for a failed
+packet request. Two cases skip every remaining optional request: a 429, even without a usable `Retry-After`, and the end
+of the context. `collect` checks the context again before writing, so a timeout or cancellation during optional
+telemetry still aborts the whole cycle, inventory included.
 
 ### Appliance uplink health
 
@@ -319,21 +321,22 @@ Health joins by assigned serial, and an appliance with a row naming another netw
 (`trustedSerials`, the rule switch port traffic uses). Both responses report per serial, so each appliance of a warm
 spare pair keeps its own node; only uplink traffic is added up per network. An interface status is one of `active`,
 `connecting`, `failed`, `not connected` (normalized to `not_connected`) and `ready`. Unknown states and duplicates that
-disagree gap; `ready` is usable standby, never a failure. `lastReportedAt` describes the device, not an interface transition:
-`meraki.appliance_report_age` is one nonnegative age in seconds on the device scope, with no interface label.
-Repeated device rows use the latest valid nonfuture report time; that does not resolve contradictory interface states.
+disagree gap; `ready` is usable standby, never a failure. `lastReportedAt` describes the device, not an interface
+transition: `meraki.appliance_report_age` is one nonnegative age in seconds on the device scope, with no interface
+label. Repeated device rows use the latest valid nonfuture report time; that does not resolve contradictory interface
+states.
 
 Probe requests use their own window, `t0 = now - 7 minutes` and `t1 = now - 2 minutes` (`probeWindow`, `probeDelay`),
-the longest and latest one Cisco allows. Per assigned serial, interface and destination IP, normalization chooses the latest sample
-timestamp inside the inclusive window. Loss and latency preserve presence independently at that timestamp; missing
-or null latest fields do not fall back to older samples. Identical duplicates collapse; conflicting observations gap
-rather than sum, average or choose a last writer. Valid loss is finite 0–100 percent, valid latency is finite and
-nonnegative milliseconds, and zero is a measurement. Sample age is `now - ts`, in seconds; no interval length or
-refresh cadence is inferred from `ts`. There is no cross-destination, temporal or HA average.
+the longest and latest one Cisco allows. Per assigned serial, interface and destination IP, normalization chooses the
+latest sample timestamp inside the inclusive window. Loss and latency preserve presence independently at that timestamp;
+missing or null latest fields do not fall back to older samples. Identical duplicates collapse; conflicting observations
+gap rather than sum, average or choose a last writer. Valid loss is finite 0–100 percent, valid latency is finite and
+nonnegative milliseconds, and zero is a measurement. Sample age is `now - ts`, in seconds; no interval length or refresh
+cadence is inferred from `ts`. There is no cross-destination, temporal or HA average.
 
-The response describes `ip` as an uplink address, while the query's `ip` filter and Cisco's ICMP monitoring documentation
-identify the probe destination. The collector deliberately uses `destination_ip` and does not substitute status
-public/private interface addresses. An ICMP-blocking destination can yield 100% loss while internet access works;
+The response describes `ip` as an uplink address, while the query's `ip` filter and Cisco's ICMP monitoring
+documentation identify the probe destination. The collector deliberately uses `destination_ip` and does not substitute
+status public/private interface addresses. An ICMP-blocking destination can yield 100% loss while internet access works;
 integrated cellular may supply no ICMP statistics by default. Neither is grounds for synthesizing an outage.
 
 Optional failures gap their own observations, except cancellation or deadline expiry, which abort the whole cycle.
@@ -466,10 +469,10 @@ sequenceDiagram
   schedule collections; the framework's rules for manual and fresh activations still apply
   (`src/go/plugin/go.d/docs/how-to-write-a-collector.md#registration-and-lifecycle`).
 
-**Traffic cost.** For `S` switches, the three traffic options add `ceil(S / 50) + S + 1` requests per cycle
-before redirects; the usage history pages count every switch Meraki lists for the organization, the packet requests
-only the assigned ones. At 1,000 switches that is 1,021 requests, about 102 seconds of pacing, beyond the default
-60-second `timeout`. The collector adds no cap or tuning option for it; `metadata.yaml` tells operators to raise `timeout` with
+**Traffic cost.** For `S` switches, the three traffic options add `ceil(S / 50) + S + 1` requests per cycle before
+redirects; the usage history pages count every switch Meraki lists for the organization, the packet requests only the
+assigned ones. At 1,000 switches that is 1,021 requests, about 102 seconds of pacing, beyond the default 60-second
+`timeout`. The collector adds no cap or tuning option for it; `metadata.yaml` tells operators to raise `timeout` with
 `collect_switch_port_packets` or leave it off.
 
 Health adds one page per 1,000 returned appliance status rows plus one unpaginated organization-wide probe read,
@@ -661,8 +664,8 @@ the form has no hidden branch state.
 
 **Cycle**
 
-- No metric is written before the four lists are read and joined and enabled optional telemetry is read. List, inventory and
-  context errors abort the cycle; optional errors leave only their own gaps and never change membership.
+- No metric is written before the four lists are read and joined and enabled optional telemetry is read. List, inventory
+  and context errors abort the cycle; optional errors leave only their own gaps and never change membership.
 - A failed cycle never retires a device; only a complete successful inventory can.
 - An empty organization is a valid inventory and reports `0`.
 
