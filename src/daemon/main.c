@@ -268,6 +268,7 @@ int perflib_processor_unittest(void);
 #endif
 int query_plan_unittest(void);
 int api_v1_allmetrics_json_unittest(void);
+int rrdr2csv_unittest(void);
 int exporting_json_connector_unittest(void);
 int exporting_graphite_unittest(void);
 int exporting_opentsdb_http_unittest(void);
@@ -534,6 +535,7 @@ int netdata_main(int argc, char **argv) {
                             if (url_unittest()) return 1;
                             if (command_argument_sanitization_tests()) return 1;
                             if (api_v1_allmetrics_json_unittest()) return 1;
+                            if (rrdr2csv_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_graphite_unittest()) return 1;
                             if (exporting_opentsdb_http_unittest()) return 1;
