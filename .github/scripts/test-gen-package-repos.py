@@ -56,28 +56,36 @@ class PackageReposTest(unittest.TestCase):
             self.generate('2.12.2', 'invalid')
 
     def test_workflow_channels(self):
-        for channel, expected in (
-            ('release', 'netdata/netdata netdata/netdata-preview'),
-            ('nightly', 'netdata/netdata-edge'),
-            ('devel', 'netdata/netdata-devel'),
+        for channel, version, expected in (
+            ('release', '2.12.1', 'netdata/netdata'),
+            ('release', '2.12.2', 'netdata/netdata netdata/netdata-preview'),
+            ('release', '2.12.3', 'netdata/netdata netdata/netdata-preview'),
+            ('nightly', '2.12.2', 'netdata/netdata-edge'),
+            ('devel', '2.12.2', 'netdata/netdata-devel'),
         ):
             script = step_script('Check Version')
             script = script.replace('${{ github.event_name }}', 'workflow_dispatch')
             script = script.replace('${{ github.event.inputs.type }}', channel)
-            script = script.replace('${{ github.event.inputs.version }}', '2.12.2')
-            with tempfile.TemporaryDirectory() as directory:
+            script = script.replace('${{ github.event.inputs.version }}', version)
+            with self.subTest(channel=channel, version=version), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 (root / 'packaging').mkdir()
                 (root / 'packaging/version').write_text('v2.12.2-1-nightly')
-                # Only release selection may invoke the Python repository generator.
-                command = "python3 .github/scripts/gen-package-repos.py"
-                self.assertIn(command, script)
-                script = script.replace(command, "select_repos")
-                script = "select_repos() { printf '%s\\n' 'netdata/netdata netdata/netdata-preview'; }\n" + script
+                (root / '.github').mkdir()
+                (root / '.github/scripts').symlink_to(SCRIPTS, target_is_directory=True)
+                preview = root / 'Version'
+                preview.write_text('v2.12.2\n')
+                # Keep the real workflow command and eligibility logic; redirect only
+                # the child Python process's preview lookup to fixed local metadata.
+                (root / 'sitecustomize.py').write_text(
+                    'from modules import release_versions\n'
+                    f'release_versions.PREVIEW_VERSION_URL = {preview.as_uri()!r}\n'
+                )
                 output = root / 'output'
                 subprocess.run(['bash', '-eu', '-c', script], cwd=root, check=True,
                                env={**os.environ, 'GITHUB_OUTPUT': str(output),
-                                    'REPO_PREFIX': 'netdata/netdata', 'RELEASE_VERSION': '2.12.2',
+                                    'PYTHONPATH': os.pathsep.join((str(root), str(SCRIPTS))),
+                                    'REPO_PREFIX': 'netdata/netdata', 'RELEASE_VERSION': version,
                                     'GITHUB_SHA': 'abcdef'})
                 result = dict(line.split('=', 1) for line in output.read_text().splitlines())
                 self.assertEqual(result['repos'], expected)
