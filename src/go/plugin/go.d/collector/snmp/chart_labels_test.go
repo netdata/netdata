@@ -243,17 +243,9 @@ func TestCollector_TableChartLabelOutput(t *testing.T) {
 	go func() { defer close(done); job.StartManaged(run) }()
 	t.Cleanup(func() {
 		run.Stop(nil)
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			t.Error("managed job did not stop")
-		}
+		assert.True(t, waitForChartJobSignal(done), "managed job did not stop")
 	})
-	select {
-	case <-run.StartupDone():
-	case <-time.After(5 * time.Second):
-		t.Fatal("managed startup blocked")
-	}
+	require.True(t, waitForChartJobSignal(run.StartupDone()), "managed startup blocked")
 	require.NoError(t, run.StartupErr())
 
 	for _, step := range []struct {
@@ -311,5 +303,14 @@ func TestCollector_TableChartLabelOutput(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func waitForChartJobSignal(signal <-chan struct{}) bool {
+	select {
+	case <-signal:
+		return true
+	case <-time.After(5 * time.Second):
+		return false
 	}
 }
