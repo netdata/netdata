@@ -78,6 +78,7 @@
 
 mod aggregator;
 mod batch;
+mod layout;
 mod metric_set;
 
 pub use aggregator::{Aggregator, Stats};

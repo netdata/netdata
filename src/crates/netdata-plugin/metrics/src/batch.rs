@@ -2,9 +2,9 @@
 //! window its event time falls in; the aggregator decides at merge time
 //! whether that window is still open.
 
+use crate::layout::ColumnRange;
 use crate::metric_set::{
-    ColumnRange, Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels, MetricSet,
-    MetricSetInner,
+    Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels, MetricSet, MetricSetInner,
 };
 use indexmap::IndexMap;
 

@@ -1,22 +1,8 @@
-//! Metric set declarations: the row layout, instruments and their chart
-//! templates.
-//!
-//! Batches and the aggregator hold a table: one row per entity and window,
-//! with the columns the set's layout fixes. A row aggregates the events of one
-//! entity counted in one window (see [`Aggregator`](crate::Aggregator) for
-//! events outside the open windows); each of its cells is one `f64`. A
-//! counter has one column per dimension, a histogram one per bucket plus
-//! its sum, count and maximum. Merging combines two rows column by column
-//! with each column's aggregation: sums add, maxima keep the larger value,
-//! last-value columns keep the value set last. Instruments are typed handles
-//! to ranges of columns.
-//!
-//! Columns are not dimensions: each chart dimension reads one or two columns
-//! through its [`Readout`] when a window is emitted.
+//! Metric set declarations: instruments, their chart templates, labels and
+//! settings.
 
+use crate::layout::{Aggregation, ColumnRange, Readout};
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
-use std::marker::PhantomData;
-use std::ops::Range;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -28,39 +14,6 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 /// The agent keeps at most this many bytes of a label key
 /// (`RRDLABELS_MAX_NAME_LENGTH`).
 const MAX_LABEL_KEY_BYTES: usize = 200;
-
-/// A column's aggregation: how it combines two values for the same entity,
-/// from two batches, a batch and the aggregator, or two windows folded into one
-/// after a stall.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Aggregation {
-    /// Sum; starts at 0.
-    Sum,
-    /// Larger value; starts unset (NaN).
-    Max,
-    /// The value merged last (gauges, cumulative totals); starts unset (NaN).
-    LastValue,
-}
-
-impl Aggregation {
-    pub(crate) fn initial(self) -> f64 {
-        match self {
-            Aggregation::Sum => 0.0,
-            Aggregation::Max | Aggregation::LastValue => f64::NAN,
-        }
-    }
-
-    pub(crate) fn apply(self, current: f64, incoming: f64) -> f64 {
-        match self {
-            Aggregation::Sum => current + incoming,
-            Aggregation::Max if current.is_nan() => incoming,
-            Aggregation::Max if incoming.is_nan() => current,
-            Aggregation::Max => current.max(incoming),
-            Aggregation::LastValue if incoming.is_nan() => current,
-            Aggregation::LastValue => incoming,
-        }
-    }
-}
 
 /// One dimension of an instrument's chart: one line on the chart.
 ///
@@ -171,36 +124,6 @@ pub struct CumulativeCounter<D>(pub(crate) ColumnRange<D>);
 #[derive(Debug, Clone, Copy)]
 pub struct Gauge<D>(pub(crate) ColumnRange<D>);
 
-/// The columns of one instrument split by `D`, one per dimension from
-/// `base`, in the set `set_id`: what every such instrument is.
-#[derive(Debug)]
-pub(crate) struct ColumnRange<D> {
-    pub(crate) set_id: u32,
-    base: usize,
-    _dimension: PhantomData<fn() -> D>,
-}
-
-impl<D: Dimension> ColumnRange<D> {
-    /// All the columns, one per value of `D`.
-    pub(crate) fn range(self) -> Range<usize> {
-        self.base..self.base + D::IDS.len()
-    }
-
-    /// The column of the dimension with index `i`.
-    pub(crate) fn column(self, i: usize) -> usize {
-        self.base + i
-    }
-}
-
-// A handle: copyable whatever its dimension type.
-impl<D> Clone for ColumnRange<D> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<D> Copy for ColumnRange<D> {}
-
 /// A distribution of observed values, for example request durations, over
 /// fixed bucket bounds; its two chart templates are described at
 /// [`MetricSetBuilder::histogram`]. An observation counts in the first
@@ -233,22 +156,8 @@ impl Histogram {
     }
 }
 
-/// How a dimension reads a row's columns: what it shows for one window.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum Readout {
-    /// The column divided by the window length in seconds.
-    Rate(usize),
-    /// `numerator / denominator`; no value when the denominator is 0.
-    Ratio {
-        numerator: usize,
-        denominator: usize,
-    },
-    /// The column as is; no value while it is unset.
-    Column(usize),
-}
-
-/// One dimension of a chart as emitted: its id, which is also its display
-/// name, and how it reads its columns.
+/// One dimension of a chart template: its id, which is also its name on the
+/// chart, and its readout.
 #[derive(Debug, Clone)]
 pub(crate) struct ChartDimension {
     pub(crate) id: String,
@@ -685,11 +594,7 @@ impl MetricSetBuilder {
 
     /// Add one column with `aggregation` per value of `D`.
     fn column_range<D: Dimension>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
-        ColumnRange {
-            set_id: self.id,
-            base: self.columns(D::IDS.len(), aggregation),
-            _dimension: PhantomData,
-        }
+        ColumnRange::new(self.id, self.columns(D::IDS.len(), aggregation))
     }
 
     fn chart(&mut self, chart: Chart, dimensions: Vec<ChartDimension>) {
