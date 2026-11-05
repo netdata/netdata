@@ -6,6 +6,7 @@
 package ddprofiledefinition
 
 import (
+	"iter"
 	"maps"
 	"regexp"
 	"slices"
@@ -148,6 +149,9 @@ type MetricTagConfig struct {
 	// from the matched row in that table.
 	LookupSymbol SymbolConfigCompat `yaml:"lookup_symbol,omitempty" json:"lookup_symbol"`
 
+	// IndexFrom reads each column in order, using its processed value as the next row key.
+	IndexFrom []MetricTagIndexSource `yaml:"index_from,omitempty" json:"index_from,omitempty"`
+
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
 	MappingRef string        `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
@@ -166,10 +170,49 @@ func (m MetricTagConfig) Clone() MetricTagConfig {
 	m2.Column = m.Column.Clone()
 	m2.Symbol = m.Symbol.Clone()
 	m2.LookupSymbol = m.LookupSymbol.Clone()
+	m2.IndexFrom = cloneSlice(m.IndexFrom)
 	m2.IndexTransform = slices.Clone(m.IndexTransform)
 	m2.Mapping = m.Mapping.Clone()
 	m2.Tags = maps.Clone(m.Tags)
 	return m2
+}
+
+// MetricTagIndexSource identifies one column supplying the next lookup key.
+type MetricTagIndexSource struct {
+	Table  string       `yaml:"table"  json:"table"`
+	Symbol SymbolConfig `yaml:"symbol" json:"symbol"`
+}
+
+func (s MetricTagIndexSource) Clone() MetricTagIndexSource {
+	s.Symbol = s.Symbol.Clone()
+	return s
+}
+
+// TableSources yields each hop, the final symbol and the optional lookup symbol
+// when table-backed. It describes acquisition dependencies, not value evaluation.
+func (m MetricTagConfig) TableSources() iter.Seq[MetricTagIndexSource] {
+	return func(yield func(MetricTagIndexSource) bool) {
+		for _, source := range m.IndexFrom {
+			if source.Table != "" && source.Symbol.OID != "" && !yield(source) {
+				return
+			}
+		}
+		if m.Table == "" {
+			return
+		}
+		if m.Symbol.OID != "" && !yield(MetricTagIndexSource{
+			Table:  m.Table,
+			Symbol: SymbolConfig(m.Symbol),
+		}) {
+			return
+		}
+		if m.LookupSymbol.OID != "" {
+			yield(MetricTagIndexSource{
+				Table:  m.Table,
+				Symbol: SymbolConfig(m.LookupSymbol),
+			})
+		}
+	}
 }
 
 type GlobalMetricTagConfig struct {
@@ -198,6 +241,10 @@ type MetricIndexTransform struct {
 
 // IsIndexTag reports whether a normalized tag reads the row index instead of a column.
 func (tagCfg MetricTagConfig) IsIndexTag() bool {
+	if len(tagCfg.IndexFrom) > 0 {
+		return false
+	}
+
 	if tagCfg.Index != 0 {
 		return true
 	}
