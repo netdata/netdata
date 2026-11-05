@@ -604,6 +604,9 @@ See [**Tag Transformation**](#tag-transformation) for supported transformations 
 
 Tag names that start with an underscore (e.g., `_if_type`) are **emitted as labels** but are **ignored for chart-ID composition** by the SNMP collector that consumes these metrics. Use underscore tags to keep chart IDs short when another tag already guarantees uniqueness (for example, `interface`). (You still get the underscore-tag value as a chart label.)
 
+Table chart labels follow the tags returned by collection, including changes and removals, without changing the chart
+or its dimensions when the identifying tags stay the same. Cached table tags retain their configured refresh interval.
+
 ```yaml
 metrics:
   - MIB: IF-MIB
