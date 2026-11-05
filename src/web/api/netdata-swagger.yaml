@@ -5748,6 +5748,7 @@ paths:
         - name: file
           in: query
           required: false
+          allowEmptyValue: true
           description: |
             Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty
             value) selects `default`. Any other value returns 400 Bad Request.
@@ -5872,6 +5873,7 @@ paths:
         - name: file
           in: query
           required: false
+          allowEmptyValue: true
           description: |
             Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty
             value) selects `default`. Any other value returns 400 Bad Request.
