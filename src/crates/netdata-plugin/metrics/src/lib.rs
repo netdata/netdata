@@ -53,21 +53,28 @@
 //!
 //! Terms:
 //! - an *instrument* is a [`Counter`], [`CumulativeCounter`], [`Gauge`] or
-//!   [`Histogram`]; each brings its chart template, and the first three are
-//!   split into dimensions, one per value of their [`Dimension`] type;
+//!   [`Histogram`]; each brings its *chart template* (a [`Chart`] and its
+//!   dimensions), and the first three are split into dimensions, one per
+//!   value of their [`Dimension`] type;
 //! - an *entity* is the thing being monitored, for example one service,
-//!   identified by its [`Labels`]; it gets one chart instance of every chart
-//!   template of the set, so instruments that need different labels (per
-//!   service, process-wide) belong in different metric sets. There is no
-//!   explicit create: recording with a new label set is a new entity;
+//!   identified by its [`Labels`]; it gets one *chart instance* (in Netdata's
+//!   sense: one chart with its own chart id) of every chart template of the
+//!   set, so instruments that need different labels (per service,
+//!   process-wide) belong in different metric sets. There is no explicit
+//!   create: recording with a new label set is a new entity;
 //! - a *window* is one collection interval `I` (see [`Settings`]): window `n`
 //!   covers `[n × I, (n + 1) × I)` and holds the events whose time falls in
 //!   it; it becomes one point per dimension, stored at its end,
-//!   `(n + 1) × I`;
-//! - an *event* is one occurrence of an entity at its own time, recorded
-//!   with [`BatchEntity::record`] and its measurements (`add`, `set_value`,
-//!   `set_total`, `observe`); the events of one entity in one window combine
-//!   into that window's point.
+//!   `(n + 1) × I`. A window is *open*, taking events, until
+//!   [`Aggregator::emit`] emits it, once;
+//! - an *event* is one occurrence of an entity at a time of its own (its
+//!   *event time*), recorded with [`BatchEntity::record`] and its
+//!   measurements (`add`, `set_value`, `set_total`, `observe`); the events of
+//!   one entity in one window combine into that window's point.
+//!
+//! Where OpenTelemetry splits a metric by attributes, Netdata and this crate
+//! split a chart template two ways: by entity (one chart instance per label
+//! set) and by dimension (one line per value of a [`Dimension`] type).
 
 mod aggregator;
 mod batch;
