@@ -9,9 +9,8 @@
 //! entity is dropped with its rows and cumulative baselines.
 
 use crate::batch::Batch;
-use crate::metric_set::{
-    ChartTemplate, EntityKind, Labels, MetricSet, MetricSetInner, entity_suffix,
-};
+use crate::chart::{ChartTemplate, EntityKind, chart_ids};
+use crate::metric_set::{Labels, MetricSet, MetricSetInner};
 use netdata_plugin_protocol::{
     ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
     write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end_timed,
@@ -245,13 +244,8 @@ impl Aggregator {
 
 impl Entity {
     fn new(set: &MetricSetInner, labels: Labels, kind: EntityKind) -> Self {
-        let suffix = entity_suffix(&labels, kind);
         Self {
-            chart_ids: set
-                .charts
-                .iter()
-                .map(|chart| format!("{}{suffix}", chart.context))
-                .collect(),
+            chart_ids: chart_ids(&set.charts, &labels, kind),
             labels,
             defined: false,
             first_window: u64::MAX,

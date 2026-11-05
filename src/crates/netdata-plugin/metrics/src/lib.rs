@@ -78,13 +78,15 @@
 
 mod aggregator;
 mod batch;
+mod chart;
 mod layout;
 mod metric_set;
 
 pub use aggregator::{Aggregator, Stats};
 pub use batch::{Batch, BatchEntity, Measurements};
+pub use chart::Chart;
 pub use metric_set::{
-    CardinalityLimit, Chart, Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels,
-    MetricSet, MetricSetBuilder, Settings,
+    CardinalityLimit, Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels, MetricSet,
+    MetricSetBuilder, Settings,
 };
 pub use netdata_plugin_protocol::ChartType;
