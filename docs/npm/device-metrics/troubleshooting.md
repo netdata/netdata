@@ -51,6 +51,8 @@ The problems below are the ones that actually come up when polling network devic
 
 **Symptom.** Netdata flags the device down; it pings fine and serves traffic.
 
+Alerts disappear while the device's virtual node is stale. They are recreated and evaluated when collection resumes.
+
 **Likely causes and fixes.**
 
 - **The poller fell behind.** If the hub is overloaded, polls queue and time out, and devices can appear down when the problem is the hub, not the network. Check whether many devices went "down" together (hub-side) or just one (device-side), and relieve the hub per [Sizing and Scaling](/docs/npm/device-metrics/sizing-and-scaling.md).

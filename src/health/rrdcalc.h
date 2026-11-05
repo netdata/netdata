@@ -279,6 +279,12 @@ void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock
 #define RRDCALC_VAR_LABEL "${label:"
 #define RRDCALC_VAR_LABEL_LEN (sizeof(RRDCALC_VAR_LABEL)-1)
 
-void rrdcalc_child_disconnected(RRDHOST *host);
+typedef enum {
+    RRDCALC_DISCONNECT_CHILD,
+    RRDCALC_DISCONNECT_VNODE,
+} RRDCALC_DISCONNECT_REASON;
+
+// Caller has stopped collection and keeps the host alive until cleanup finishes.
+void rrdcalc_host_disconnected(RRDHOST *host, RRDCALC_DISCONNECT_REASON reason);
 
 #endif //NETDATA_RRDCALC_H

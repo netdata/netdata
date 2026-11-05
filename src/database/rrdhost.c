@@ -518,6 +518,7 @@ RRDHOST *rrdhost_create(
 
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
     host->state_id = OBJECT_STATE_INIT_DEACTIVATED;
+    netdata_mutex_init(&host->vnode_transition_mutex);
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
@@ -737,7 +738,6 @@ static void rrdhost_update(RRDHOST *host
                            , int update_every
                            , long history
                            , RRD_DB_MODE mode
-                           , bool health
                            , bool stream
                            , STRING *parents
                            , STRING *api_key
@@ -758,7 +758,8 @@ static void rrdhost_update(RRDHOST *host
 
     spinlock_lock(&host->rrdhost_update_lock);
 
-    host->health.enabled = (mode == RRD_DB_MODE_NONE) ? 0 : health;
+    // Existing-host health belongs to successful collector admission, not metadata preparation.
+    // A connection that is refused must not re-enable an offline host (or change a live owner's policy).
 
     rrdhost_system_info_swap(host->system_info, system_info);
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
@@ -982,7 +983,6 @@ RRDHOST *rrdhost_find_or_create(
                 , update_every
                 , history
                 , mode
-                , health
                 , stream
                 , parents
                 , api_key
@@ -1353,6 +1353,7 @@ static void rrdhost_free_unlinked(RRDHOST *host) {
     string_freez(host->registry_hostname);
     string_freez(host->stream.snd.api_key);
     string_freez(host->stream.snd.destination);
+    netdata_mutex_destroy(&host->vnode_transition_mutex);
     freez(host);
 }
 

@@ -15,6 +15,7 @@ typedef enum __attribute__((packed)) {
     HEALTH_ENTRY_RUN_ONCE                   = 0x00000020,
     HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS      = 0x00000040,
     HEALTH_ENTRY_FLAG_IS_REPEATING          = 0x00000080,
+    HEALTH_ENTRY_FLAG_CHILD_DISCONNECTED    = 0x00000100, // REMOVED because the child disconnected; may come back
     HEALTH_ENTRY_FLAG_SAVED                 = 0x10000000, // Saved to SQL
     HEALTH_ENTRY_FLAG_ACLK_QUEUED           = 0x20000000, // Sent to Netdata Cloud
     HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION = 0x80000000,

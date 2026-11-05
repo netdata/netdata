@@ -114,6 +114,9 @@ Static virtual nodes use the existing YAML format (`mode: static` is optional):
 | `labels`   | No       | Key-value pairs for filtering and organization  |
 | `stale_after` | No | Host inactivity timeout as whole seconds or a duration such as `5m`. Zero disables the timeout. |
 
+When a virtual node becomes stale or its collector stops, its alerts are removed. Collection resuming recreates
+and evaluates the alerts. A stale node's last alert state is therefore not an indication of its current health.
+
 :::warning
 
 **GUID Uniqueness**
