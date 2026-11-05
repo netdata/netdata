@@ -23,8 +23,10 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	store, err := artifacts.Open(t.TempDir())
 	require.NoError(t, err)
 	defer store.Close()
+	// Ascending suffixes keep run-ID order equal to publication order, which the page assertions rely on.
+	prefix := fixtureRunID()[:31]
 	for i, jobID := range []string{"journey:retired", "lighthouse:renamed", "journey:retired"} {
-		runID := fmt.Sprintf("%032x", i+1)
+		runID := fmt.Sprintf("%s%x", prefix, i+1)
 		work, err := store.Begin(runID, jobID)
 		require.NoError(t, err)
 		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
@@ -49,7 +51,7 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	)
 	rows := responseData(t, response)
 	require.Len(t, rows, 2)
-	assert.Equal(t, "00000000000000000000000000000003", rowValues(t, response, rows[0])["run_id"])
+	assert.Equal(t, prefix+"3", rowValues(t, response, rows[0])["run_id"])
 	assert.Equal(t, true, response.RawResponse["truncated"])
 	next, ok := response.RawResponse["next"].(string)
 	require.True(t, ok)
@@ -68,7 +70,7 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	page2 := call(h, "synthetics-artifacts", "limit:2", "before:"+next)
 	rows = responseData(t, page2)
 	require.Len(t, rows, 1)
-	assert.Equal(t, "00000000000000000000000000000001", rowValues(t, page2, rows[0])["run_id"])
+	assert.Equal(t, prefix+"1", rowValues(t, page2, rows[0])["run_id"])
 	assert.Equal(t, false, page2.RawResponse["truncated"])
 	assert.NotContains(t, page2.RawResponse, "next")
 	validate(t, page2)
