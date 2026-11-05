@@ -160,8 +160,14 @@ discovery continue using `Init()` and `Check()`; they never call `Test()`.
 
 `Test()` MUST honor its caller's context and release resources it acquires. It MUST NOT assume `Run()` or `Collect()`
 has run. Return an error when the operation fails or cannot be performed; a Test error does not fall back to Check.
-Existing configuration-secret sanitization applies to errors and logs, so implementations MUST NOT log submitted
-or resolved credentials. This capability does not extend the caller's request deadline or add a structured result.
+Collectors retain the existing lifecycle error policy. Without secret references, error text is returned as-is, so
+`Test()` MUST return response-safe errors and MUST NOT include credentials or sensitive endpoint/configuration values.
+`dyncfg.NewPublicError` can separate a static public explanation from a private cause. With secret references, the
+framework replaces error text with a generic redacted message, including `NewPublicError` explanations.
+`dyncfg.ErrTestUnsupported` still fails the test, but that redaction does not preserve its sentinel identity.
+
+Implementations MUST NOT log submitted or resolved credentials; reference-bearing configurations also receive
+framework log redaction. This capability does not extend the caller's request deadline or add a structured result.
 
 The framework waits for readiness before collecting. Startup errors follow the candidate recovery policy below; a
 `collectorapi.PermanentError`, unexpected nil return and recovered panic do not automatically retry the same config.
