@@ -22,6 +22,7 @@ func snmpTopologyV1PortModalColumns() []topologyapi.ModalColumn {
 	return []topologyapi.ModalColumn{
 		modalDirectColumn("if_index", "Port ID", "if_index", "number"),
 		modalDirectColumn("name", "Port", "name", "text"),
+		modalDirectColumn("if_alias", "Alias", "if_alias", "text"),
 		modalDirectColumn("oper_status", "Status", "oper_status", "badge"),
 		modalDirectColumn("admin_status", "Admin", "admin_status", "badge"),
 		modalDirectColumn("port_type", "Type", "port_type", "badge"),
@@ -35,7 +36,6 @@ func snmpTopologyV1PortModalColumns() []topologyapi.ModalColumn {
 		modalDirectColumnWithVisibility("neighbor_port_name", "Neighbor Port", "neighbor_port_name", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_name", "ifName", "if_name", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_descr", "ifDescr", "if_descr", "text", "expanded"),
-		modalDirectColumnWithVisibility("if_alias", "Alias", "if_alias", "text", "expanded"),
 		modalDirectColumnWithVisibility("port_id", "Source Port ID", "port_id", "text", "expanded"),
 		modalDirectColumnWithVisibility("mac", "MAC", "mac", "text", "expanded"),
 		modalDirectColumnWithVisibility("speed", "Speed", "speed", "number", "expanded"),
