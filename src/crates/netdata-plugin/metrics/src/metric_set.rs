@@ -1,13 +1,14 @@
 //! Metric set declarations: the row layout, instruments and their charts.
 //!
-//! Batches and the aggregator hold a table: one row per entity and window, with
-//! the columns the set's layout fixes. A row aggregates all events of one
-//! entity in one window; each of its cells is one `f64`. A counter has one
-//! column per dimension value, a histogram one per bucket plus its sum, count
-//! and maximum. Merging combines two rows column by column with each column's
-//! aggregation: sums add, maxima keep the larger value, last-value columns
-//! keep the value set last. Instruments are typed handles to ranges of
-//! columns.
+//! Batches and the aggregator hold a table: one row per entity and window,
+//! with the columns the set's layout fixes. A row aggregates the events of one
+//! entity counted in one window (see [`Aggregator`](crate::Aggregator) for
+//! events outside the open windows); each of its cells is one `f64`. A
+//! counter has one column per dimension value, a histogram one per bucket plus
+//! its sum, count and maximum. Merging combines two rows column by column
+//! with each column's aggregation: sums add, maxima keep the larger value,
+//! last-value columns keep the value set last. Instruments are typed handles
+//! to ranges of columns.
 //!
 //! Columns are not dimensions: each chart dimension reads one or two columns
 //! through its [`Readout`] when a window is emitted.
@@ -442,11 +443,11 @@ impl Default for Settings {
     }
 }
 
-/// A limit on the number of entities: the cardinality limit.
-/// While the aggregator is full, the events of a label set without an entity go
-/// to one overflow entity. As entities expire, room returns: the next event
-/// of such a label set, including one whose events went to the overflow
-/// entity so far, gets its own entity.
+/// The cardinality limit: the most entities the aggregator holds. While it is
+/// full, the events of a label set without an entity go to one overflow
+/// entity. As entities expire, room returns: the next event of such a label
+/// set, including one whose events went to the overflow entity so far, gets
+/// its own entity.
 #[derive(Debug, Clone)]
 pub struct CardinalityLimit {
     /// Entities held at most. The label-less entity counts; the overflow
@@ -623,7 +624,11 @@ impl MetricSetBuilder {
             id: self.id,
             lateness_windows: windows(settings.allowed_lateness),
             expiry_windows: windows(settings.expiry),
-            initial_row: self.aggregations.iter().map(|m| m.initial()).collect(),
+            initial_row: self
+                .aggregations
+                .iter()
+                .map(|aggregation| aggregation.initial())
+                .collect(),
             interval_secs: interval.as_secs(),
             cardinality_limit: settings.cardinality_limit,
             aggregations: self.aggregations,

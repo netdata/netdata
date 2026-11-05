@@ -30,7 +30,7 @@ const DURATION_BOUNDS: &[f64] = &[
 /// SDKs and collectors export them in batches every few seconds (5 s by
 /// default for spans), so rendering a second as soon as it ends would show
 /// each batch as one spike.
-const LATENESS: Duration = Duration::from_secs(10);
+const ALLOWED_LATENESS: Duration = Duration::from_secs(10);
 
 dimensions! {
     /// How a request ended.
@@ -135,7 +135,7 @@ pub(crate) fn service_settings(max_services: usize) -> Settings {
     let mut overflow_labels = Labels::new();
     overflow_labels.insert("otel.metric.overflow", "true");
     Settings {
-        allowed_lateness: LATENESS,
+        allowed_lateness: ALLOWED_LATENESS,
         cardinality_limit: Some(CardinalityLimit {
             max_entities: max_services,
             overflow_labels,

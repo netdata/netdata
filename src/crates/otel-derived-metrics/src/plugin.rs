@@ -84,7 +84,7 @@ impl Plugin {
         batch
     }
 
-    /// An empty record at `now`: rendered as zeros, it keeps the ingest
+    /// An empty event at `now`: rendered as zeros, it keeps the ingest
     /// charts defined from the first tick and never lets them expire while
     /// the plugin runs.
     pub(crate) fn heartbeat(&self, now: u64) -> Batch {

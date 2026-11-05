@@ -20,15 +20,15 @@ use netdata_plugin_protocol::{
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 
-/// Most windows past the lateness one [`Aggregator::emit`] emits after a stall
-/// or a forward clock step; older pending windows are folded into the oldest
-/// one emitted, so no event is lost and memory stays bounded.
+/// Most windows past the allowed lateness that one [`Aggregator::emit`] emits
+/// after a stall or a forward clock step; older pending windows are folded
+/// into the oldest one emitted, so no event is lost and memory stays bounded.
 pub(crate) const MAX_BACKLOG_WINDOWS: u64 = 60;
 
 /// Counts since the aggregator was created; `entities` is the current number.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Stats {
-    /// Entities currently tracked, the overflow entity included.
+    /// Entities currently held, the overflow entity included.
     pub entities: usize,
     /// Events counted in the overflow entity because of the cardinality
     /// limit.
@@ -73,10 +73,10 @@ struct Entity {
 /// [`Settings::allowed_lateness`](crate::Settings::allowed_lateness) has
 /// passed after its end; then the next `emit` emits it, once.
 ///
-/// With a 1 s collection interval and 10 s lateness, the window `[100, 101)` is
-/// emitted by the first `emit` at or after second 111. Until then, events of
-/// second 100 still count in it. The agent stores its point at second 101,
-/// the window's end, however late it is sent.
+/// With a 1 s collection interval and an allowed lateness of 10 s, the window
+/// `[100, 101)` is emitted by the first `emit` at or after second 111. Until
+/// then, events of second 100 still count in it. The agent stores its point at
+/// second 101, the window's end, however late it is sent.
 ///
 /// # Events outside the open windows
 ///
@@ -200,9 +200,9 @@ impl Aggregator {
         }
     }
 
-    /// Emit every window whose lateness has passed by `now` (Unix seconds):
-    /// the definitions of new entities' charts, one update per chart and
-    /// window, and the obsolete marks of expired entities.
+    /// Emit every window whose allowed lateness has passed by `now` (Unix
+    /// seconds): the definitions of new entities' charts, one update per chart
+    /// and window, and the obsolete marks of expired entities.
     ///
     /// The text is complete chart-protocol text, to write to the agent as is
     /// (a plugin's stdout). It comes in chunks of at most `max_chunk` bytes,
