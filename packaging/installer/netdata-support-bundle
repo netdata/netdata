@@ -1559,9 +1559,11 @@ collect_dyncfg_tree_cli() {
 }
 
 collect_runtime() {
-  # the command pipe does not need the web API, so try it whatever api_ok says
+  # The command pipe does not need the web API, so the tree is tried through it
+  # whatever api_ok says - but at the tree's own place in the order: sanitizing
+  # a large tree can take minutes, and done first it would spend the global
+  # deadline that the smaller runtime captures before it need.
   _rt_dyncfg_cli=0
-  collect_dyncfg_tree_cli && _rt_dyncfg_cli=1
   if [ "$api_ok" = "1" ]; then
     info "collecting: runtime (agent is up)"
     collect_api 07-runtime/info-v3.json "BEST SINGLE CALL: buildinfo, features, cloud status, per-tier retention (works even under bearer protection)" /api/v3/info
@@ -1572,6 +1574,7 @@ collect_runtime() {
     collect_api 07-runtime/alerts-active.json "Currently raised alerts" "/api/v3/alerts?options=active"
     collect_api 07-runtime/alerts-all.json "All alert instances (summary)" "/api/v1/alarms?all"
     collect_api 07-runtime/functions.json "Registered functions (which plugins expose what)" /api/v1/functions
+    collect_dyncfg_tree_cli && _rt_dyncfg_cli=1
     # agents that predate `netdatacli dyncfg-tree`, or a bundle run as a user
     # who cannot reach the command pipe, fall back to the API
     [ "$_rt_dyncfg_cli" = "1" ] || \
@@ -1617,6 +1620,7 @@ collect_runtime() {
     mkdir -p "$WORK/07-runtime"
     echo "Agent API at 127.0.0.1:$NDPORT was unreachable when this bundle was created. See 05-logs and 06-state/status-file.json for why." > "$WORK/07-runtime/AGENT-WAS-DOWN.txt"
     manifest_add 07-runtime/AGENT-WAS-DOWN.txt "file" "generated" "Marker: agent API unreachable at collection time"
+    collect_dyncfg_tree_cli || :
   fi
   if [ -n "${NETDATA_BIN:-}" ]; then
     collect_cmd 07-runtime/buildinfo.txt "netdata -W buildinfo (verbatim - paths section matters; works with daemon down)" "$NETDATA_BIN" -W buildinfo

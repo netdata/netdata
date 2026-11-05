@@ -18,7 +18,7 @@ Three top-level fields decide how you read everything else:
 
 - `agent_api_reachable` false means the API captures in the runtime area are replaced by a single marker
   file (a `netdatacli` capture such as `dyncfg-tree.json` can still be there), not evidence of a dead
-  agent. See `./false-signals.md`.
+  agent. See `./false-signals.md#the-runtime-area-being-empty`.
 - `is_container` true changes where logs live and which host facts are visible.
 - `tool_version` ending in `-windows` means the Windows implementation produced this bundle, so the
   POSIX-only rows below are absent by construction, not by failure.

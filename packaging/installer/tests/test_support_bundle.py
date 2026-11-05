@@ -156,6 +156,17 @@ write_manifest
         self.assertTrue(tree.with_name('AGENT-WAS-DOWN.txt').exists())
         self.assertEqual([r['origin'] for r in self.dyncfg_rows()], ['netdatacli dyncfg-tree'])
 
+    def test_dyncfg_tree_cli_does_not_spend_the_deadline_of_earlier_captures(self):
+        # a large tree takes minutes to sanitize; captured first, it left no time for the smaller runtime captures
+        self.stub('netdatacli', 'sleep 3\nprintf \'{"tree":{}}\\n\'\n')
+        self.stub('curl', 'printf \'{"api":true}\\n\'\n')
+        self.run_runtime(setup='GLOBAL_DEADLINE=2; CMD_TIMEOUT=10\n')
+        runtime = self.root / 'work/07-runtime'
+        for name in ('info-v3.json', 'alerts-active.json', 'functions.json', 'dyncfg-tree.json'):
+            self.assertTrue((runtime / name).exists(), name)
+        paths = [f['path'] for f in json.loads((self.root / 'work/MANIFEST.json').read_text())['files']]
+        self.assertLess(paths.index('07-runtime/functions.json'), paths.index('07-runtime/dyncfg-tree.json'))
+
     def test_dyncfg_tree_unusable_cli_output_falls_back(self):
         cases = {
             'empty': 'exit 0\n',

@@ -824,10 +824,11 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
     Add-Manifest $rel 'cmd' $originText $title
 }
 
-function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @()) {
+function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @(), [switch]$dropOverCap) {
     # like Save-Cmd but with NO header/trailer, for commands whose output must
     # stay parseable (JSON). Provenance lives in MANIFEST.json only. The file is
-    # removed if the command produced nothing.
+    # removed if the command produced nothing, and with -dropOverCap also if the
+    # output exceeds the cap, so a caller with a fallback source can still try it.
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
@@ -850,7 +851,13 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
     if ($result -and $result.Trim().Length -gt 0) {
         # a truncated JSON document is worse than none: fail closed
         # measure the UTF-8 bytes written, not UTF-16 code units (see Save-Api)
-        if ([System.Text.Encoding]::UTF8.GetByteCount($result) -gt 2MB) { $result = '{"error":"output exceeded the cap and was withheld"}' }
+        if ([System.Text.Encoding]::UTF8.GetByteCount($result) -gt 2MB) {
+            if ($dropOverCap) {
+                if (Test-Path $full) { Remove-Item $full -Force }
+                return
+            }
+            $result = '{"error":"output exceeded the cap and was withheld"}'
+        }
         Write-Utf8 $full $result
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'cmd' $originText $title
@@ -1148,12 +1155,17 @@ if (Test-Path $CacheDir) {
 # ============================================================================
 # The dyncfg tree through the local command pipe: the agent answers it as a
 # member of its own space, which the web API needs and the bundle cannot be.
-# It does not need the web API, so it is tried whatever $ApiOk says. Save-CmdRaw
-# leaves no file on failure, so the API fallback below can use the same path.
+# It does not need the web API, so it is tried whatever $ApiOk says - but at the
+# tree's own place in the order: sanitizing a large tree can take minutes, and
+# done first it would spend the deadline the smaller runtime captures need.
+# With -dropOverCap Save-CmdRaw leaves no file on any failure, so the API
+# fallback can use the same path.
 $DyncfgTreeTitle = 'Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state'
-if ((Test-Path $NetdataCli) -and $NetdataProc) {
-    # netdatacli.exe is MSYS2: native direct-launch, not Start-Job
-    Save-CmdRaw '07-runtime\dyncfg-tree.json' $DyncfgTreeTitle $null 'netdatacli.exe dyncfg-tree' -nativeExe $NetdataCli -nativeArgs 'dyncfg-tree'
+function Save-DyncfgTreeCli {
+    if ((Test-Path $NetdataCli) -and $NetdataProc) {
+        # netdatacli.exe is MSYS2: native direct-launch, not Start-Job
+        Save-CmdRaw '07-runtime\dyncfg-tree.json' $DyncfgTreeTitle $null 'netdatacli.exe dyncfg-tree' -nativeExe $NetdataCli -nativeArgs 'dyncfg-tree' -dropOverCap
+    }
 }
 if ($ApiOk) {
     Show-Info 'collecting: runtime (agent is up)'
@@ -1165,7 +1177,8 @@ if ($ApiOk) {
     Save-Api '07-runtime\alerts-active.json' 'Currently raised alerts' '/api/v3/alerts?options=active'
     Save-Api '07-runtime\alerts-all.json' 'All alert instances (summary)' '/api/v1/alarms?all'
     Save-Api '07-runtime\functions.json' 'Registered functions' '/api/v1/functions'
-    # Agents that predate `netdatacli dyncfg-tree` (tried above), or a bundle run
+    Save-DyncfgTreeCli
+    # Agents that predate `netdatacli dyncfg-tree` (tried just above), or a bundle run
     # by a user who cannot reach the command pipe, fall back to the API.
     $dyncfgPath = Join-Path $Work '07-runtime\dyncfg-tree.json'
     if (-not (Test-Path $dyncfgPath)) {
@@ -1196,6 +1209,7 @@ if ($ApiOk) {
     New-Item -ItemType Directory -Path $marker -Force | Out-Null
     Write-Utf8 (Join-Path $marker 'AGENT-WAS-DOWN.txt') "Agent API at 127.0.0.1:$NdPort was unreachable when this bundle was created. See 05-logs and 06-state\status-file.json for why."
     Add-Manifest '07-runtime\AGENT-WAS-DOWN.txt' 'file' 'generated' 'Marker: agent was not running'
+    Save-DyncfgTreeCli
 }
 # Elevation state: the perflib dump needs an elevated session, and the summary
 # reports it too. Computed once here (after the self-test path has already
