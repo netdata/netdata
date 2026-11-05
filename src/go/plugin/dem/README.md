@@ -16,6 +16,11 @@ Expose the receiver through HTTPS, configure its public URL and actual trusted p
 reverse-proxy path prefix. The receiver serves the pinned Faro 2.11.0 SDK and optional tracing bundle; visitors need no
 SDK CDN connection. Client IP addresses are used for rate limiting/geolocation and are not stored.
 
+While DEM is in development, all its Functions, including `dem-history-status`, are tagged `hidden`. The Agent leaves
+them out of user-facing Function catalogs, including Netdata Cloud, and rejects user calls through its HTTP API and MCP.
+The plugin still serves Function requests sent directly over its protocol and trusted internal Agent calls, subject to
+existing permissions.
+
 RUM and synthetic Function providers are independent of collector selection. Disabling `rum` or `journey`, selecting
 only `lighthouse`, or disabling all collectors preserves investigation of retained history while the plugin is enabled.
 Setting `enabled: no` disables the whole plugin. Handler instances belong to each framework run generation; the command

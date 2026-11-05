@@ -192,9 +192,10 @@ modules:
               dimensions:
                 - name: cls
     functions:
-      description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse
-        jobs. Invoke their public synthetics-* names with the documented filters; no job selector or active
-        browser is required.
+      description: These process-wide Functions cover both journey and Lighthouse jobs. While DEM is in development
+        they are hidden, so the Agent and Netdata Cloud do not list them and the Agent rejects user calls to them.
+        Invoke their public synthetics-* names with the documented filters; no job selector or active browser is
+        required.
       list:
         - id: synthetics-checks
           function_name: synthetics-checks

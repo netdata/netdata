@@ -1,8 +1,8 @@
 modules:
   - functions:
-        description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live
-            activity and retained investigation history. Invoke their public rum-* names; filter by site where
-            supported.
+        description: These process-wide Functions inspect RUM setup, live activity and retained investigation history.
+            While DEM is in development they are hidden, so the Agent and Netdata Cloud do not list them and the
+            Agent rejects user calls to them. Invoke their public rum-* names; filter by site where supported.
         list:
           - id: rum-sites
             function_name: rum-sites
