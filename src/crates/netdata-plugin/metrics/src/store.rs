@@ -162,10 +162,10 @@ impl Store {
         let set = &*self.set.0;
         let newest = (now / set.interval_secs).max(oldest_open);
         for (labels, batch_entity) in batch.entities {
-            if batch_entity.slots.is_empty() {
+            if batch_entity.rows.is_empty() {
                 continue;
             }
-            let records: u64 = batch_entity.slots.values().map(|s| s.records).sum();
+            let records: u64 = batch_entity.rows.values().map(|s| s.records).sum();
             let full = set
                 .cardinality_limit
                 .as_ref()
@@ -183,7 +183,7 @@ impl Store {
                     })
                 }
             };
-            for (slot, batch_row) in batch_entity.slots {
+            for (slot, batch_row) in batch_entity.rows {
                 let slot = if slot < oldest_open {
                     self.stats.late_records += batch_row.records;
                     oldest_open

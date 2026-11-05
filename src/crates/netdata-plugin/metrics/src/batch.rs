@@ -18,10 +18,10 @@ pub(crate) struct BatchRow {
 /// One entity's records within a batch.
 #[derive(Default)]
 pub(crate) struct EntityRows {
-    /// By slot number, in first-record order: the store aggregations late slots
+    /// By slot number, in first-record order: the store merges late slots
     /// into one, and gauges and totals keep the value merged last.
-    pub(crate) slots: IndexMap<u64, BatchRow>,
-    /// Position in `slots` of the slot recorded into last; records mostly
+    pub(crate) rows: IndexMap<u64, BatchRow>,
+    /// Position in `rows` of the slot recorded into last; records mostly
     /// arrive in time order, so it answers most lookups without hashing.
     last: usize,
 }
@@ -68,7 +68,7 @@ impl Batch {
 
     /// True when the batch holds no record.
     pub fn is_empty(&self) -> bool {
-        self.entities.values().all(|e| e.slots.is_empty())
+        self.entities.values().all(|e| e.rows.is_empty())
     }
 }
 
@@ -88,10 +88,10 @@ impl BatchEntity<'_> {
         let set = self.set;
         let slot = unix_seconds / set.interval_secs;
         let entity = &mut *self.entity;
-        let index = match entity.slots.get_index(entity.last) {
+        let index = match entity.rows.get_index(entity.last) {
             Some((&last_slot, _)) if last_slot == slot => entity.last,
             _ => {
-                let entry = entity.slots.entry(slot);
+                let entry = entity.rows.entry(slot);
                 let index = entry.index();
                 entry.or_insert_with(|| BatchRow {
                     records: 0,
@@ -101,7 +101,7 @@ impl BatchEntity<'_> {
             }
         };
         entity.last = index;
-        let batch_row = &mut entity.slots[index];
+        let batch_row = &mut entity.rows[index];
         batch_row.records += 1;
         Measurements {
             set_id: set.id,
