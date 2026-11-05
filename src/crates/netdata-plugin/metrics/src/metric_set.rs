@@ -120,12 +120,8 @@ macro_rules! dimensions {
 /// Counts events, split by `D`, for example requests by outcome. Charted as
 /// events per second (a slot's count divided by its length); a slot without
 /// events shows 0.
-#[derive(Debug)]
-pub struct Counter<D> {
-    pub(crate) set_id: u32,
-    pub(crate) base: usize,
-    _dimensions: PhantomData<fn() -> D>,
-}
+#[derive(Debug, Clone, Copy)]
+pub struct Counter<D>(pub(crate) CellRange<D>);
 
 /// For a source that keeps its own running totals, split by `D`, for example
 /// a store's statistics: record the current totals at the time you read
@@ -138,12 +134,8 @@ pub struct Counter<D> {
 /// - After the baseline, a slot without a new total shows 0.
 /// - Within a slot, the total set last wins: the later record in a batch,
 ///   the later merged batch across batches.
-#[derive(Debug)]
-pub struct CumulativeCounter<D> {
-    pub(crate) set_id: u32,
-    pub(crate) base: usize,
-    _dimensions: PhantomData<fn() -> D>,
-}
+#[derive(Debug, Clone, Copy)]
+pub struct CumulativeCounter<D>(pub(crate) CellRange<D>);
 
 /// A current value, split by `D`, for example open connections per state,
 /// recorded at the time you read it. Charted as is.
@@ -151,27 +143,26 @@ pub struct CumulativeCounter<D> {
 /// - Each record sets the value; within a slot, the value set last wins: the
 ///   later record in a batch, the later merged batch across batches.
 /// - A slot without a value shows a gap.
+#[derive(Debug, Clone, Copy)]
+pub struct Gauge<D>(pub(crate) CellRange<D>);
+
+/// The cells of one instrument with dimensions `D`, one per dimension
+/// value from `base`, in the set `set_id`: what every such instrument is.
 #[derive(Debug)]
-pub struct Gauge<D> {
+pub(crate) struct CellRange<D> {
     pub(crate) set_id: u32,
     pub(crate) base: usize,
     _dimensions: PhantomData<fn() -> D>,
 }
 
-// Instruments are handles: copyable whatever their dimension type.
-macro_rules! copy_instrument {
-    ($($instrument:ident),+) => {$(
-        impl<D> Clone for $instrument<D> {
-            fn clone(&self) -> Self {
-                *self
-            }
-        }
-
-        impl<D> Copy for $instrument<D> {}
-    )+};
+// A handle: copyable whatever its dimension type.
+impl<D> Clone for CellRange<D> {
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
-copy_instrument!(Counter, CumulativeCounter, Gauge);
+impl<D> Copy for CellRange<D> {}
 
 /// A distribution of observed values, for example request durations, over
 /// fixed bucket bounds; its two charts are described at
@@ -186,8 +177,14 @@ pub struct Histogram {
 }
 
 impl Histogram {
+    /// The cell of bucket `bucket`; the last bucket, `bounds.len()`, is
+    /// `+Inf`.
+    pub(crate) fn bucket_cell(&self, bucket: usize) -> usize {
+        self.base + bucket
+    }
+
     pub(crate) fn sum_cell(&self) -> usize {
-        self.base + self.bounds.len() + 1
+        self.bucket_cell(self.bounds.len()) + 1
     }
 
     pub(crate) fn count_cell(&self) -> usize {
@@ -484,13 +481,9 @@ impl MetricSetBuilder {
     ///
     /// If the chart's context or a dimension id is invalid or already used.
     pub fn counter<D: Dimensions>(&mut self, chart: Chart) -> Counter<D> {
-        let base = self.cells(D::IDS.len(), Merge::Add);
-        self.chart(chart, rates::<D>(base));
-        Counter {
-            set_id: self.id,
-            base,
-            _dimensions: PhantomData,
-        }
+        let cells = self.cell_range::<D>(Merge::Add);
+        self.chart(chart, per_dimension(cells, Value::Rate));
+        Counter(cells)
     }
 
     /// Adds a [`CumulativeCounter`] and its chart.
@@ -499,14 +492,11 @@ impl MetricSetBuilder {
     ///
     /// As [`MetricSetBuilder::counter`].
     pub fn cumulative_counter<D: Dimensions>(&mut self, chart: Chart) -> CumulativeCounter<D> {
-        let base = self.cells(D::IDS.len(), Merge::Last);
-        self.cumulative_cells.extend(base..base + D::IDS.len());
-        self.chart(chart, rates::<D>(base));
-        CumulativeCounter {
-            set_id: self.id,
-            base,
-            _dimensions: PhantomData,
-        }
+        let cells = self.cell_range::<D>(Merge::Last);
+        self.cumulative_cells
+            .extend(cells.base..cells.base + D::IDS.len());
+        self.chart(chart, per_dimension(cells, Value::Rate));
+        CumulativeCounter(cells)
     }
 
     /// Adds a [`Gauge`] and its chart.
@@ -515,18 +505,9 @@ impl MetricSetBuilder {
     ///
     /// As [`MetricSetBuilder::counter`].
     pub fn gauge<D: Dimensions>(&mut self, chart: Chart) -> Gauge<D> {
-        let base = self.cells(D::IDS.len(), Merge::Last);
-        let dimensions = D::IDS
-            .iter()
-            .enumerate()
-            .map(|(i, id)| Dimension::new(id, Value::Cell(base + i)))
-            .collect();
-        self.chart(chart, dimensions);
-        Gauge {
-            set_id: self.id,
-            base,
-            _dimensions: PhantomData,
-        }
+        let cells = self.cell_range::<D>(Merge::Last);
+        self.chart(chart, per_dimension(cells, Value::Cell));
+        Gauge(cells)
     }
 
     /// Adds a [`Histogram`] over `bounds`, with two charts:
@@ -552,8 +533,10 @@ impl MetricSetBuilder {
             bounds.iter().all(|b| b.is_finite()) && bounds.windows(2).all(|w| w[0] < w[1]),
             "histogram bounds must be finite and increasing"
         );
-        // Buckets including +Inf, then sum and count, then the maximum.
-        let base = self.cells(bounds.len() + 3, Merge::Add);
+        // Buckets including +Inf, then sum and count, then the maximum: the
+        // order of the Histogram cell accessors.
+        let base = self.cells(bounds.len() + 1, Merge::Add);
+        self.cells(2, Merge::Add);
         self.cells(1, Merge::Max);
         let histogram = Histogram {
             set_id: self.id,
@@ -576,9 +559,14 @@ impl MetricSetBuilder {
         let mut buckets: Vec<Dimension> = bounds
             .iter()
             .enumerate()
-            .map(|(i, bound)| Dimension::new(&bound.to_string(), Value::Rate(base + i)))
+            .map(|(i, bound)| {
+                Dimension::new(&bound.to_string(), Value::Rate(histogram.bucket_cell(i)))
+            })
             .collect();
-        buckets.push(Dimension::new("+Inf", Value::Rate(base + bounds.len())));
+        buckets.push(Dimension::new(
+            "+Inf",
+            Value::Rate(histogram.bucket_cell(bounds.len())),
+        ));
         self.add_chart(ChartDef {
             title: format!("{} histogram", chart.title),
             units: heatmap_units,
@@ -619,6 +607,15 @@ impl MetricSetBuilder {
         let base = self.merges.len();
         self.merges.extend(std::iter::repeat_n(merge, len));
         base
+    }
+
+    /// Allocate one cell with `merge` per value of `D`.
+    fn cell_range<D: Dimensions>(&mut self, merge: Merge) -> CellRange<D> {
+        CellRange {
+            set_id: self.id,
+            base: self.cells(D::IDS.len(), merge),
+            _dimensions: PhantomData,
+        }
     }
 
     fn chart(&mut self, chart: Chart, dimensions: Vec<Dimension>) {
@@ -666,12 +663,12 @@ impl MetricSetBuilder {
     }
 }
 
-/// One rate dimension per value of `D`, reading the cells from `base`.
-fn rates<D: Dimensions>(base: usize) -> Vec<Dimension> {
+/// One dimension per value of `D`, each reading its own cell with `read`.
+fn per_dimension<D: Dimensions>(cells: CellRange<D>, read: fn(usize) -> Value) -> Vec<Dimension> {
     D::IDS
         .iter()
         .enumerate()
-        .map(|(i, id)| Dimension::new(id, Value::Rate(base + i)))
+        .map(|(i, id)| Dimension::new(id, read(cells.base + i)))
         .collect()
 }
 

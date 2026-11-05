@@ -3,7 +3,8 @@
 //! time whether that slot is still open.
 
 use crate::metric_set::{
-    Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet, MetricSetInner,
+    CellRange, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet,
+    MetricSetInner,
 };
 use indexmap::IndexMap;
 
@@ -119,15 +120,19 @@ pub struct Measurements<'a> {
 }
 
 impl Measurements<'_> {
-    fn cell<D: Dimensions>(&self, set_id: u32, base: usize, dimension: D) -> usize {
+    fn check_set(&self, set_id: u32) {
         assert_eq!(set_id, self.set_id, "instrument of another metric set");
+    }
+
+    fn cell<D: Dimensions>(&self, cells: CellRange<D>, dimension: D) -> usize {
+        self.check_set(cells.set_id);
         let index = dimension.index();
         assert!(
             index < D::IDS.len(),
             "dimension index {index} out of {}",
             D::IDS.len()
         );
-        base + index
+        cells.base + index
     }
 
     /// Add `amount` to the `dimension` value of `counter`.
@@ -137,7 +142,7 @@ impl Measurements<'_> {
         dimension: D,
         amount: f64,
     ) -> &mut Self {
-        let cell = self.cell(counter.set_id, counter.base, dimension);
+        let cell = self.cell(counter.0, dimension);
         self.cells[cell] += amount;
         self
     }
@@ -149,14 +154,14 @@ impl Measurements<'_> {
         dimension: D,
         total: f64,
     ) -> &mut Self {
-        let cell = self.cell(cumulative.set_id, cumulative.base, dimension);
+        let cell = self.cell(cumulative.0, dimension);
         self.cells[cell] = total;
         self
     }
 
     /// Set the `dimension` value of `gauge` to `value`.
     pub fn set<D: Dimensions>(&mut self, gauge: Gauge<D>, dimension: D, value: f64) -> &mut Self {
-        let cell = self.cell(gauge.set_id, gauge.base, dimension);
+        let cell = self.cell(gauge.0, dimension);
         self.cells[cell] = value;
         self
     }
@@ -165,15 +170,12 @@ impl Measurements<'_> {
     /// the buckets and the mean are weighted, the maximum is not. A
     /// non-finite value is ignored.
     pub fn observe(&mut self, histogram: Histogram, value: f64, weight: f64) -> &mut Self {
-        assert_eq!(
-            histogram.set_id, self.set_id,
-            "instrument of another metric set"
-        );
+        self.check_set(histogram.set_id);
         if !value.is_finite() {
             return self;
         }
         let bucket = histogram.bounds.partition_point(|&bound| bound < value);
-        self.cells[histogram.base + bucket] += weight;
+        self.cells[histogram.bucket_cell(bucket)] += weight;
         self.cells[histogram.sum_cell()] += value * weight;
         self.cells[histogram.count_cell()] += weight;
         let max = &mut self.cells[histogram.max_cell()];
