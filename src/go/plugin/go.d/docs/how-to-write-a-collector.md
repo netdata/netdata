@@ -136,6 +136,7 @@ Public lifecycle and framework-contract methods MUST stay in `collector.go`:
 - `Configuration() any`
 - `Init(context.Context) error`
 - `Check(context.Context) error`
+- `Test(context.Context) error`, when the optional `dyncfg.Testable` capability is needed
 - `Collect(context.Context) error`
 - `Cleanup(context.Context)`
 - `MetricStore() metrix.CollectorStore`
@@ -150,6 +151,17 @@ Collectors that need a receiver or long-running background loop MAY implement `c
 then call `ready()` once all fallible startup prerequisites succeed and state is safe for concurrent `Collect()`.
 Readiness MUST NOT wait for a first packet or remote observation. `Init()` and `Check()` still run during configuration
 validation while an incumbent may own the endpoint; DynCfg `test` never calls `Run()`.
+
+V1 and V2 collectors MAY implement `dyncfg.Testable.Test(ctx context.Context) error` when an explicit DynCfg test
+needs a different operation from activation `Check()`. The framework resolves the submitted configuration and
+secrets, checks named dependencies, calls `Init()`, then calls `Test()` if implemented or `Check()` otherwise.
+The throwaway collector is cleaned up when the operation returns, including after failure. Activation and automatic
+discovery continue using `Init()` and `Check()`; they never call `Test()`.
+
+`Test()` MUST honor its caller's context and release resources it acquires. It MUST NOT assume `Run()` or `Collect()`
+has run. Return an error when the operation fails or cannot be performed; a Test error does not fall back to Check.
+Existing configuration-secret sanitization applies to errors and logs, so implementations MUST NOT log submitted
+or resolved credentials. This capability does not extend the caller's request deadline or add a structured result.
 
 The framework waits for readiness before collecting. Startup errors follow the candidate recovery policy below; a
 `collectorapi.PermanentError`, unexpected nil return and recovered panic do not automatically retry the same config.
