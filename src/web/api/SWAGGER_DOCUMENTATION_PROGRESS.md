@@ -2956,7 +2956,7 @@ Per dimension:
 
 ### SPECIAL BEHAVIORS
 1. ✅ **Version Auto-Increment** - Netdata increments version on successful PUT
-2. ✅ **Default Settings** - Returns `{"version": 1}` if the object doesn't exist, cannot be parsed, or its version is not a positive integer
+2. ✅ **Default Settings** - Returns `{"version": 1}` if the object doesn't exist, cannot be parsed, or its version is not an integer from 1 to 9223372036854775806
 3. ✅ **Single Shared Object** - Every caller (anonymous or bearer) reads and writes the same `default` object
 4. ✅ **Host Restriction** - API only works on localhost (agent node), not child nodes
 5. ✅ **Optimistic Locking** - PUT requires current version to prevent concurrent modification conflicts

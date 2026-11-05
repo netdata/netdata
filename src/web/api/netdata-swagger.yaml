@@ -5725,7 +5725,7 @@ paths:
         ```
 
         **New Object:**
-        If the object doesn't exist (or its stored `version` is not a positive integer), returns the initial version:
+        If the object doesn't exist (or its stored `version` is not an integer from 1 to 9223372036854775806), returns the initial version:
         ```json
         {
           "version": 1
@@ -5755,6 +5755,7 @@ paths:
             type: string
             enum:
               - default
+              - ""
             default: "default"
           example: "default"
       responses:
@@ -5878,6 +5879,7 @@ paths:
             type: string
             enum:
               - default
+              - ""
             default: "default"
           example: "default"
       requestBody:

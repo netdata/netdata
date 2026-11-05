@@ -4176,7 +4176,7 @@
           "settings"
         ],
         "summary": "Retrieve the agent-wide dashboard settings (GET)",
-        "description": "**V3 SPECIFIC ENDPOINT**\n\nRetrieves the agent's dashboard settings object.\n\n**Settings System:**\n- **One object per agent**: there is a single settings object, `default`. It is shared by every caller\n  admitted to this API, anonymous or authenticated; it is not scoped to a user.\n- **Persistent storage**: stored as `settings/default` in Netdata's var/lib directory; survives restarts\n- **Version-controlled**: each update increments `version` for conflict detection\n- **JSON format**: a JSON object with a mandatory integer `version` field\n\nThe dashboard keeps agent-wide preferences here, such as the preferred nodes of the agent's local space.\nDo not store per-user or sensitive data in it.\n\n**Version Control:**\n- A missing object reads as version 1\n- Auto-incremented on each PUT operation\n- Used for optimistic locking to prevent conflicts\n\n**Usage:**\n```\nGET /api/v3/settings?file=default\n```\n\n**Response Structure:**\n```json\n{\n  \"version\": 3,\n  \"value\": {\n    \"preferred_node_ids\": [\"...\"]\n  }\n}\n```\n\n**New Object:**\nIf the object doesn't exist (or its stored `version` is not a positive integer), returns the initial version:\n```json\n{\n  \"version\": 1\n}\n```\n\n**Size Limit:**\nMaximum settings file size: 20 MiB\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
+        "description": "**V3 SPECIFIC ENDPOINT**\n\nRetrieves the agent's dashboard settings object.\n\n**Settings System:**\n- **One object per agent**: there is a single settings object, `default`. It is shared by every caller\n  admitted to this API, anonymous or authenticated; it is not scoped to a user.\n- **Persistent storage**: stored as `settings/default` in Netdata's var/lib directory; survives restarts\n- **Version-controlled**: each update increments `version` for conflict detection\n- **JSON format**: a JSON object with a mandatory integer `version` field\n\nThe dashboard keeps agent-wide preferences here, such as the preferred nodes of the agent's local space.\nDo not store per-user or sensitive data in it.\n\n**Version Control:**\n- A missing object reads as version 1\n- Auto-incremented on each PUT operation\n- Used for optimistic locking to prevent conflicts\n\n**Usage:**\n```\nGET /api/v3/settings?file=default\n```\n\n**Response Structure:**\n```json\n{\n  \"version\": 3,\n  \"value\": {\n    \"preferred_node_ids\": [\"...\"]\n  }\n}\n```\n\n**New Object:**\nIf the object doesn't exist (or its stored `version` is not an integer from 1 to 9223372036854775806), returns the initial version:\n```json\n{\n  \"version\": 1\n}\n```\n\n**Size Limit:**\nMaximum settings file size: 20 MiB\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
         "security": [
           {},
           {
@@ -4192,7 +4192,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "default"
+                "default",
+                ""
               ],
               "default": "default"
             },
@@ -4271,7 +4272,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "default"
+                "default",
+                ""
               ],
               "default": "default"
             },
