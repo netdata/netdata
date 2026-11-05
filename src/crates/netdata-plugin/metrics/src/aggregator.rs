@@ -60,8 +60,8 @@ struct Entity {
     previous_totals: Box<[f64]>,
 }
 
-/// Collects the batches of one [`MetricSet`] and turns finished windows into
-/// chart-protocol text.
+/// Collects the batches of one [`MetricSet`] and emits each window, once its
+/// allowed lateness has passed, as chart-protocol text.
 ///
 /// The aggregator reads no clock and does no I/O. Pass the current Unix time
 /// to [`Aggregator::merge`] and [`Aggregator::emit`], call `emit` at least
@@ -70,10 +70,10 @@ struct Entity {
 ///
 /// # When a window is emitted
 ///
-/// The *current* window is the one `now` falls in. A window stays *open* for
-/// events until its
-/// [`Settings::allowed_lateness`](crate::Settings::allowed_lateness) has
-/// passed after its end; then the next `emit` emits it, once.
+/// The *current* window is the one `now` falls in. A window is *open*, taking
+/// events, until it is emitted: the first `emit` at or after its end plus the
+/// [`Settings::allowed_lateness`](crate::Settings::allowed_lateness) emits it,
+/// once.
 ///
 /// With a 1 s collection interval and an allowed lateness of 10 s, the window
 /// `[100, 101)` is emitted by the first `emit` at or after second 111. Until
@@ -261,7 +261,8 @@ impl Entity {
         }
     }
 
-    /// Merge `row` into `window`, an open window from `oldest_open` onwards.
+    /// Merge one batch row into this entity's row of `window`, an open window
+    /// from `oldest_open` onwards.
     fn merge_window(&mut self, set: &MetricSetInner, oldest_open: u64, window: u64, row: &[f64]) {
         let index = (window - oldest_open) as usize;
         while self.open_rows.len() <= index {
@@ -623,7 +624,7 @@ mod tests {
         record(&f, &mut aggregator, "a", 5000, 4, 0, 1000);
         assert_eq!(aggregator.stats().late_events, 2);
         assert_eq!(aggregator.stats().future_events, 4);
-        // Window 999 is not finished plus lateness until 1010.
+        // Window 999 is not emitted before its end plus the lateness, 1010.
         let out = text(&aggregator.emit(1009, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
         let ok_values = |out: &str| -> Vec<f64> {

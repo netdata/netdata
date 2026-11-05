@@ -26,10 +26,10 @@ const DURATION_BOUNDS: &[f64] = &[
     0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0,
 ];
 
-/// How long a window stays open for spans and log records that arrive late.
-/// SDKs and collectors export them in batches every few seconds (5 s by
-/// default for spans), so rendering a second as soon as it ends would show
-/// each batch as one spike.
+/// How long after its end a window waits before it is emitted, so spans and
+/// log records that arrive late still count in it. SDKs and collectors export
+/// them in batches every few seconds (5 s by default for spans), so emitting a
+/// second as soon as it ends would show each batch as one spike.
 const ALLOWED_LATENESS: Duration = Duration::from_secs(10);
 
 dimensions! {

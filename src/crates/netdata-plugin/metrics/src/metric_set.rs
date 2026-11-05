@@ -452,9 +452,10 @@ pub struct Settings {
     /// interval long. Whole seconds, at least 1 (the agent's resolution);
     /// sent as the CHART line's `update_every`. Default 1 s.
     pub collection_interval: Duration,
-    /// A delay: how long after its end a window stays open for late events;
-    /// older events are counted in the oldest open window. Rounded up to whole
-    /// collection intervals. Default 0.
+    /// A delay: how long after its end a window waits before it is emitted;
+    /// until then it takes the events whose time falls in it, and older events
+    /// are counted in the oldest open window. Rounded up to whole collection
+    /// intervals. Default 0.
     pub allowed_lateness: Duration,
     /// A timeout: an entity with no events for this long has its chart
     /// instances marked obsolete (the agent stops collecting them and later

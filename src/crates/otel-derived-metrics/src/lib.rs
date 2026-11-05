@@ -141,8 +141,8 @@ impl DerivedMetrics {
         self.plugin_aggregator.lock().unwrap().merge(batch, now);
     }
 
-    /// Render every finished window as of `now` (Unix seconds), in chunks of at
-    /// most [`MAX_CHUNK_BYTES`].
+    /// Emit every window whose allowed lateness has passed by `now` (Unix
+    /// seconds), in chunks of at most [`MAX_CHUNK_BYTES`].
     pub fn emit(&self, now: u64) -> Vec<Vec<u8>> {
         let mut chunks = Vec::new();
         if let Some(enabled) = &self.enabled {
