@@ -432,6 +432,9 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item, void *r
 
     rrdcalc_name_index_add(host, rc, item);
 
+    // at least the sequence of any re-match that started before this insert, so its sweep keeps this alert
+    rc->rematch_seq = __atomic_load_n(&health_globals.prototypes.rematch_seq, __ATOMIC_SEQ_CST);
+
     ctr->react_action = RRDCALC_REACT_NEW;
 }
 
@@ -721,6 +724,80 @@ void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock
     thread_having_ll_wrlock = having_ll_wrlock;
     dictionary_del_advanced(host->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key));
     thread_having_ll_wrlock = false;
+}
+
+// ----------------------------------------------------------------------------
+// RRDCALC re-matching (see health_prototype_rematch_rrdset())
+
+// The alert named `alert_name` on `st` survives a re-match only when `winner` (the rule that attaches to the chart
+// now, or NULL) is the rule it was created from: the rule hash covers the whole rule, match included. Otherwise it is
+// deleted, which records its REMOVED transition. A kept alert keeps its status, values and history, takes the
+// winner's provenance (not part of the hash) and the re-match sequence. Returns true when the alert was kept.
+// The caller holds the winner's prototype read lock.
+bool rrdcalc_rematch_keep(RRDSET *st, STRING *alert_name, RRD_ALERT_PROTOTYPE *winner, uint64_t seq) {
+    RRDHOST *host = st->rrdhost;
+    char key[RRDCALC_MAX_KEY_SIZE + 1];
+    size_t key_len = rrdcalc_key(key, RRDCALC_MAX_KEY_SIZE, string2str(st->id), string2str(alert_name));
+
+    bool kept = false;
+
+    dictionary_write_lock(host->rrdcalc_root_index);
+
+    RRDCALC *rc = dictionary_get_advanced(host->rrdcalc_root_index, key, (ssize_t)key_len);
+    if(rc) {
+        if(winner && rc->rrdset == st && uuid_eq(rc->config.hash_id, winner->config.hash_id)) {
+            if(rc->config.source != winner->config.source || rc->config.source_type != winner->config.source_type) {
+                // readers of the provenance hold this dictionary's read lock or the chart's alerts read lock
+                STRING *old_source = rc->config.source;
+                STRING *new_source = string_dup(winner->config.source);
+
+                rw_spinlock_write_lock(&st->alerts.spinlock);
+                rc->config.source = new_source;
+                rc->config.source_type = winner->config.source_type;
+                rw_spinlock_write_unlock(&st->alerts.spinlock);
+
+                string_freez(old_source);
+            }
+
+            // a concurrent re-match with a larger sequence may have stamped it already
+            if(rc->rematch_seq < seq)
+                rc->rematch_seq = seq;
+
+            kept = true;
+        }
+        else
+            rrdcalc_unlink_and_delete(host, rc, false);
+    }
+
+    dictionary_write_unlock(host->rrdcalc_root_index);
+
+    return kept;
+}
+
+// Deletes the alerts of `st` that the re-match with sequence `seq` neither kept nor created: their rule is gone.
+void rrdcalc_rematch_sweep_rrdset(RRDSET *st, uint64_t seq) {
+    RRDHOST *host = st->rrdhost;
+
+    dictionary_write_lock(host->rrdcalc_root_index);
+    rw_spinlock_write_lock(&st->alerts.spinlock);
+
+    RRDCALC *rc = st->alerts.base, *last = NULL;
+    while(rc) {
+        if(last == rc) {
+            netdata_log_error("RRDCALC: malformed list of alerts linked to chart - cannot re-match - giving up.");
+            break;
+        }
+        last = rc;
+
+        RRDCALC *next = rc->next;
+        if(rc->rematch_seq < seq)
+            rrdcalc_unlink_and_delete(host, rc, true);
+
+        rc = next;
+    }
+
+    rw_spinlock_write_unlock(&st->alerts.spinlock);
+    dictionary_write_unlock(host->rrdcalc_root_index);
 }
 
 // ----------------------------------------------------------------------------

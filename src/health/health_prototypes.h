@@ -134,6 +134,6 @@ struct rrd_alert_config;
 struct rrd_alert_match;
 void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert_config *src);
 void health_prototype_copy_match_without_patterns(struct rrd_alert_match *dst, struct rrd_alert_match *src);
-void health_prototype_reset_alerts_for_rrdset(RRDSET *st);
+void health_prototype_rematch_rrdset(RRDSET *st);
 
 #endif //NETDATA_HEALTH_PROTOTYPES_H

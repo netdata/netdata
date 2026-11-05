@@ -259,6 +259,7 @@ int eval_unittest(void);
 int duration_unittest(void);
 int statistical_unittest(void);
 int health_config_unittest(void);
+int health_rematch_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
@@ -337,6 +338,14 @@ static int health_config_unittest_with_dyncfg(void) {
     nrpc_inflight_calls_create();
     dyncfg_init(false);
     int rc = health_config_unittest();
+    dyncfg_shutdown();
+    return rc;
+}
+
+static int health_rematch_unittest_with_dyncfg(void) {
+    nrpc_inflight_calls_create();
+    dyncfg_init(false);
+    int rc = health_rematch_unittest();
     dyncfg_shutdown();
     return rc;
 }
@@ -600,6 +609,7 @@ int netdata_main(int argc, char **argv) {
                             if (statistical_unittest()) return 1;
                             if (utf8_sanitizer_unittest()) return 1;
                             if (health_config_unittest()) return 1;
+                            if (health_rematch_unittest()) return 1;
                             if (yaml_unittest()) return 1;
                             if (json_c_parser_unittest()) return 1;
                             if (stream_path_json_unittest())
@@ -874,6 +884,8 @@ int netdata_main(int argc, char **argv) {
                         }
                         else if(strcmp(optarg, "healthconfigtest") == 0)
                             return unittest_run_with_rrd(health_config_unittest_with_dyncfg);
+                        else if(strcmp(optarg, "healthrematchtest") == 0)
+                            return unittest_run_with_rrd(health_rematch_unittest_with_dyncfg);
                         else if(strcmp(optarg, "dyncfgtest") == 0)
                             return unittest_run_with_rrd(dyncfg_unittest);
                         else if(strcmp(optarg, "functionsaccesstest") == 0)

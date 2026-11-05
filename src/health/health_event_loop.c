@@ -241,11 +241,10 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
 
-        // recheck path subsumes init: reset detaches all current alerts on the
-        // chart and reattaches by re-evaluating every prototype against the
-        // current labels, which also picks up first-attach matches.
+        // recheck path subsumes init: the re-match re-evaluates every prototype against the current labels,
+        // keeps the alerts whose rule did not change, and also picks up first-attach matches.
         if (needs_recheck)
-            health_prototype_reset_alerts_for_rrdset(st);
+            health_prototype_rematch_rrdset(st);
         else
             health_prototype_alerts_for_rrdset_incrementally(st);
 
@@ -274,6 +273,15 @@ static void health_initialize_rrdhost(RRDHOST *host) {
 
     rw_spinlock_init(&host->health_log.spinlock);
     sql_health_alarm_log_load(host);
+
+    // the entries just loaded are history: supersede them, so that they are not notified again
+    rw_spinlock_write_lock(&host->health_log.spinlock);
+    for(ALARM_ENTRY *t = host->health_log.alarms ; t ; t = t->next) {
+        if(t->new_status != RRDCALC_STATUS_REMOVED)
+            t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
+    }
+    rw_spinlock_write_unlock(&host->health_log.spinlock);
+
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
 
 
