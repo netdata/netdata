@@ -381,6 +381,8 @@ set(LIBNETDATA_FILES
         os/boottime.h
         os/boot_id.c
         os/boot_id.h
+        os/privileged_dir.c
+        os/privileged_dir.h
         os/run_dir.c
         os/run_dir.h
         os/file_lock.c
