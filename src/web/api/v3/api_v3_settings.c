@@ -58,7 +58,8 @@ static inline bool settings_ensure_path_exists(void) {
     return filename_is_dir(path, true);
 }
 
-// a valid version is a JSON integer from 1 to INT64_MAX - 1, so that it can always be incremented
+// a valid version is a JSON integer from 1 to INT64_MAX - 1; settings_put() refuses to increment
+// INT64_MAX - 1, so a stored version always stays valid
 // returns 0 when the version is missing or invalid
 static inline int64_t settings_json_object_version(struct json_object *jobj) {
     struct json_object *version_obj;
