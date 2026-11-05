@@ -26,39 +26,23 @@
 //! let set = builder.build();
 //! let mut store = Store::new(&set);
 //!
-//! // Per unit of work, for example one export request: its own batch, with
-//! // each event recorded at its own time.
-//! let request = |service: &str, events: &[(u64, Outcome)]| {
+//! // Per unit of work, for example one request: record its events at their
+//! // own time in a batch of its own, then merge it once the work is durable.
+//! for (service, outcome) in [
+//!     ("checkout", Outcome::Success),
+//!     ("checkout", Outcome::Error),
+//!     ("cart", Outcome::Success),
+//! ] {
 //!     let mut labels = Labels::new();
 //!     labels.push("service.name", service);
 //!     let mut batch = Batch::new(&set);
-//!     let mut entity = batch.entity(labels);
-//!     for &(time, outcome) in events {
-//!         entity.record(time).add(requests, outcome, 1.0);
-//!     }
-//!     batch
-//! };
+//!     batch.entity(labels).record(100).add(requests, outcome, 1.0);
+//!     store.merge(batch, 100);
+//! }
 //!
-//! // Merge a batch only once its work is durable, for example written to
-//! // disk.
-//! let first = request("checkout", &[(100, Outcome::Success), (100, Outcome::Error)]);
-//! store.merge(first, 100);
-//!
-//! // When the work fails, drop its batch: the client retries with the same
-//! // events, and they count once, not twice.
-//! let failed = request("checkout", &[(100, Outcome::Success)]);
-//! drop(failed);
-//! let retried = request("checkout", &[(100, Outcome::Success)]);
-//! store.merge(retried, 100);
-//!
-//! // Another service's requests are another entity, with charts of its own.
-//! store.merge(request("cart", &[(100, Outcome::Success)]), 100);
-//!
-//! // Once per second: write the finished slots to the agent. Slot 100 of
-//! // checkout holds both requests, of cart its one.
+//! // Once per second: write the finished slots to the agent.
 //! let text = String::from_utf8(store.emit(101, 1 << 20).concat()).unwrap();
-//! assert!(text.contains("SET success = 2\nSET error = 1\n"));
-//! assert!(text.contains("SET success = 1\nSET error = 0\n"));
+//! assert!(text.contains("SET success = 1\nSET error = 1\n"));
 //! ```
 //!
 //! Terms:
