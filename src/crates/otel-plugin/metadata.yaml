@@ -480,13 +480,13 @@ modules:
                 - name: success
                 - name: error
             - name: otel_service.request_duration
-              description: Average request duration.
+              description: Service request duration
               unit: seconds
               chart_type: line
               dimensions:
                 - name: avg
             - name: otel_service.request_duration_max
-              description: Maximum request duration. To combine services or time, use the maximum, not the average.
+              description: Service request duration maximum
               unit: seconds
               chart_type: line
               dimensions:
