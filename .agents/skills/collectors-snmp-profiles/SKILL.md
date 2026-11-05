@@ -234,6 +234,10 @@ When adding a new topology kind, update all three parts together:
 Verify that topology rows are delivered through `ProfileMetrics.TopologyMetrics`,
 not through underscore-prefixed `HiddenMetrics`.
 
+Several kinds can feed one record: `if_name`, `if_status` and `if_duplex` rows all update one interface per ifIndex and
+arrive separately. A handler MUST store only the fields its row carries. Derive a value that combines columns from
+different rows (port speed from `ifHighSpeed` and `ifSpeed`) after ingest, so row order cannot change it.
+
 When adding or migrating licensing profile coverage, update all related parts
 together:
 
