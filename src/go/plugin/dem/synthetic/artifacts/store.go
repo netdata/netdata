@@ -156,6 +156,8 @@ func Open(name string) (_ *Store, retErr error) {
 	return s, nil
 }
 
+// Close reports incomplete temporary cleanup while preserving uncertain work.
+// Persistent stores leave their files for the next owner.
 func (s *Store) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -189,6 +191,8 @@ func (s *Store) Close() error {
 		}
 		if removable {
 			err = errors.Join(err, s.root.RemoveAll("runs"))
+		} else {
+			err = errors.Join(err, errors.New("temporary artifact store cleanup is incomplete"))
 		}
 		if removable && err == nil {
 			err = errors.Join(err, os.RemoveAll(s.path))

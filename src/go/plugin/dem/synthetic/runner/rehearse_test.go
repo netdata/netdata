@@ -76,6 +76,50 @@ func TestRehearseRejectsFailureAndIncompleteCoverage(t *testing.T) {
 	}
 }
 
+func TestRehearseReportsWorkspaceCleanupFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires unprivileged filesystem permissions")
+	}
+	t.Setenv("TMPDIR", t.TempDir())
+	e, history, _ := testEngine(t)
+	var locked, alias string
+	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
+		var wire wireRequest
+		if err := json.Unmarshal(raw, &wire); err != nil {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
+		alias = wire.WorkDir
+		work, err := filepath.EvalSymlinks(alias)
+		if err != nil {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
+		locked = filepath.Join(work, "locked")
+		if err := os.Mkdir(locked, 0700); err != nil {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
+		if err := os.WriteFile(filepath.Join(locked, "script-output"), []byte("synthetic data"), 0600); err != nil {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
+		if err := os.Chmod(locked, 0); err != nil {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
+		return resultPayload(success())(ctx, args, raw, out, stderr)
+	})
+	t.Cleanup(func() {
+		if locked != "" {
+			require.NoError(t, os.Chmod(locked, 0700))
+		}
+		if alias != "" {
+			if err := os.Remove(alias); !errors.Is(err, os.ErrNotExist) {
+				require.NoError(t, err)
+			}
+		}
+	})
+	err := e.Rehearse(t.Context(), journey())
+	require.ErrorContains(t, err, "temporary artifact store cleanup is incomplete")
+	assert.Empty(t, history.runs)
+}
+
 func TestRehearseSharesAdmissionAndHonorsCancellation(t *testing.T) {
 	e, history, _ := testEngine(t)
 	started, release := make(chan struct{}), make(chan struct{})
