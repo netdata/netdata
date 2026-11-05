@@ -13,7 +13,8 @@
 //!     }
 //! }
 //!
-//! // Once, at startup: declare the instruments and their charts.
+//! // Once, at startup: declare the instruments and their charts, and create
+//! // the store.
 //! let mut builder = MetricSetBuilder::new(Settings::default());
 //! let requests = builder.counter::<Outcome>(Chart {
 //!     title: "Requests",
@@ -29,6 +30,7 @@
 //! // Per unit of work, for example one export request: record its events at
 //! // their own time in one batch, then merge it once the work is durable.
 //! let mut batch = Batch::new(&set);
+//!
 //! for (service, outcomes) in [
 //!     ("checkout", &[Outcome::Success, Outcome::Error][..]),
 //!     ("cart", &[Outcome::Success]),
@@ -40,6 +42,7 @@
 //!         entity.record(100).add(requests, outcome, 1.0);
 //!     }
 //! }
+//!
 //! store.merge(batch, 100);
 //!
 //! // Once per second: write the finished slots to the agent.
