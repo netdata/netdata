@@ -13,7 +13,8 @@ import (
 )
 
 // Rehearse executes a draft through the process's ordinary admission and runtime.
-// It publishes no monitoring history or captures and joins cleanup before returning.
+// It publishes no monitoring history or captures. Unverified drainage preserves work
+// and triggers fail-stop through the shared owner.
 func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error {
 	if err := ctx.Err(); err != nil {
 		return err

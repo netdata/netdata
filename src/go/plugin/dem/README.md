@@ -667,8 +667,9 @@ are not rolled back. Activation still checks runtime preparation without executi
 
 Test shares the browser slot with monitoring and may wait for another attempt or delay a later one. The caller's
 request deadline covers waiting and execution, so it may expire before the configured workflow timeout. Cancellation
-stops the attempt and drains its processes; a timed-out caller may not receive the final diagnosis. There is no retained
-result to retrieve later. Existing secret-reference redaction can replace detailed errors with a generic failure.
+requests process-tree shutdown. If drainage cannot be verified, DEM exits and preserves uncertain work instead of
+claiming cleanup. A timed-out caller may not receive the final diagnosis, and there is no retained result to retrieve
+later. Existing secret-reference redaction can replace detailed errors with a generic failure.
 
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
 observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native

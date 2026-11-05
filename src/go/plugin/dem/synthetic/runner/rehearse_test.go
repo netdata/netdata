@@ -142,8 +142,11 @@ func TestRehearseSharesAdmissionAndHonorsCancellation(t *testing.T) {
 	assert.Equal(t, synthetic.Cancelled, queued.Run.Outcome)
 	assert.Zero(t, queued.Run.StartedUS)
 	assert.Equal(t, int32(1), calls.Load())
-	// A second draft also uses the occupied slot and must not start after expiry.
-	require.ErrorIs(t, e.Rehearse(ctx, journey()), context.DeadlineExceeded)
+	// A second draft waits on the occupied slot and must not start after expiry.
+	waitCtx, waitCancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
+	defer waitCancel()
+	require.ErrorIs(t, e.Rehearse(waitCtx, journey()), context.DeadlineExceeded)
+	assert.Equal(t, int32(1), calls.Load())
 	close(release)
 	require.NoError(t, <-done)
 	request := journey()

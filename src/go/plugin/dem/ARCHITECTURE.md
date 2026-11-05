@@ -919,7 +919,8 @@ Draft rehearsal:
   an explicitly unrecorded view, as runtime qualification does, and a private temporary artifact store with capture
   disabled. A missing history owner remains an error for ordinary monitoring.
 - Rehearsal never calls collector `Run` or `Collect`, registers an observation generation, or writes metrics.
-  It returns only an error/pass result after drainage and temporary cleanup; no result registry or polling API exists.
+  After verified drainage, it closes the temporary store and returns only an error/pass result; no result registry
+  or polling API exists.
 - Caller deadlines include admission waiting. Unverified drainage signals the shared fatal owner and preserves
   uncertain live work, even if the configuration request has already timed out.
 
