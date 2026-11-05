@@ -5,22 +5,22 @@
 use crate::metric_set::{
     Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet, MetricSetInner,
 };
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 /// A batch's cells for one entity and one slot.
 pub(crate) struct BatchCells {
-    pub(crate) slot: u64,
     pub(crate) records: u64,
     pub(crate) cells: Box<[f64]>,
 }
 
 /// One entity's records within a batch.
+#[derive(Default)]
 pub(crate) struct PendingEntity {
-    pub(crate) labels: Labels,
-    pub(crate) per_slot: Vec<BatchCells>,
-    /// Slot number → index in `per_slot`; records mostly arrive in time order,
-    /// so `last` answers most lookups without hashing.
-    index: HashMap<u64, usize>,
+    /// By slot number, in first-record order: the store merges late slots
+    /// into one, and gauges and totals keep the value merged last.
+    pub(crate) per_slot: IndexMap<u64, BatchCells>,
+    /// Position in `per_slot` of the slot recorded into last; records mostly
+    /// arrive in time order, so it answers most lookups without hashing.
     last: usize,
 }
 
@@ -31,16 +31,16 @@ pub(crate) struct PendingEntity {
 /// example written to disk), so a retried request is not counted twice.
 pub struct Batch {
     set: MetricSet,
-    pub(crate) entities: Vec<PendingEntity>,
-    index: HashMap<Labels, usize>,
+    /// By labels, in first-record order: the store admits new entities in
+    /// this order until its cap is reached.
+    pub(crate) entities: IndexMap<Labels, PendingEntity>,
 }
 
 impl Batch {
     pub fn new(set: &MetricSet) -> Self {
         Self {
             set: set.clone(),
-            entities: Vec::new(),
-            index: HashMap::new(),
+            entities: IndexMap::new(),
         }
     }
 
@@ -56,29 +56,15 @@ impl Batch {
     /// per record; while the returned handle lives, the batch is borrowed, so
     /// finish one entity before taking the next.
     pub fn entity(&mut self, labels: Labels) -> BatchEntity<'_> {
-        let index = match self.index.get(&labels) {
-            Some(&index) => index,
-            None => {
-                let index = self.entities.len();
-                self.index.insert(labels.clone(), index);
-                self.entities.push(PendingEntity {
-                    labels,
-                    per_slot: Vec::new(),
-                    index: HashMap::new(),
-                    last: 0,
-                });
-                index
-            }
-        };
         BatchEntity {
             set: &self.set.0,
-            entity: &mut self.entities[index],
+            entity: self.entities.entry(labels).or_default(),
         }
     }
 
     /// True when the batch holds no record.
     pub fn is_empty(&self) -> bool {
-        self.entities.iter().all(|i| i.per_slot.is_empty())
+        self.entities.values().all(|e| e.per_slot.is_empty())
     }
 }
 
@@ -98,22 +84,17 @@ impl BatchEntity<'_> {
         let set = self.set;
         let slot = unix_seconds / set.interval_secs;
         let entity = &mut *self.entity;
-        let index = if entity
-            .per_slot
-            .get(entity.last)
-            .is_some_and(|s| s.slot == slot)
-        {
-            entity.last
-        } else {
-            let per_slot = &mut entity.per_slot;
-            *entity.index.entry(slot).or_insert_with(|| {
-                per_slot.push(BatchCells {
-                    slot,
+        let index = match entity.per_slot.get_index(entity.last) {
+            Some((&last_slot, _)) if last_slot == slot => entity.last,
+            _ => {
+                let entry = entity.per_slot.entry(slot);
+                let index = entry.index();
+                entry.or_insert_with(|| BatchCells {
                     records: 0,
                     cells: set.initial_cells.clone().into_boxed_slice(),
                 });
-                per_slot.len() - 1
-            })
+                index
+            }
         };
         entity.last = index;
         let batch_cells = &mut entity.per_slot[index];

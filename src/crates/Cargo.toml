@@ -161,6 +161,7 @@ zerocopy = { version = "0.9.0-alpha.0" }
 # External crates: shared Rust plugin SDK only.
 atoi = "2.0"
 futures-util = { version = "0.3", features = ["sink"] }
+indexmap = "2"
 phf = { version = "0.12", default-features = false }
 phf_codegen = "0.12"
 proc-macro2 = "1.0"

@@ -156,30 +156,30 @@ impl Store {
         let next_emit = self.advance_window(now);
         let set = std::sync::Arc::clone(&self.set.0);
         let newest = (now / set.interval_secs).max(next_emit);
-        for pending in batch.entities {
+        for (labels, pending) in batch.entities {
             if pending.per_slot.is_empty() {
                 continue;
             }
-            let records: u64 = pending.per_slot.iter().map(|s| s.records).sum();
-            let entity = if let Some(entity) = self.entities.get_mut(&pending.labels) {
+            let records: u64 = pending.per_slot.values().map(|s| s.records).sum();
+            let entity = if let Some(entity) = self.entities.get_mut(&labels) {
                 entity
             } else if self.entities.len() < set.max_entities {
-                let entity = new_entity(&set, pending.labels.clone(), false);
-                self.entities.entry(pending.labels).or_insert(entity)
+                let entity = new_entity(&set, labels.clone(), false);
+                self.entities.entry(labels).or_insert(entity)
             } else {
                 self.stats.overflowed_records += records;
                 self.overflow
                     .get_or_insert_with(|| new_entity(&set, set.overflow_labels.clone(), true))
             };
-            for batch_cells in pending.per_slot {
-                let slot = if batch_cells.slot < next_emit {
+            for (slot, batch_cells) in pending.per_slot {
+                let slot = if slot < next_emit {
                     self.stats.late_records += batch_cells.records;
                     next_emit
-                } else if batch_cells.slot > newest {
+                } else if slot > newest {
                     self.stats.future_records += batch_cells.records;
                     newest
                 } else {
-                    batch_cells.slot
+                    slot
                 };
                 merge_slot(&set, entity, next_emit, slot, &batch_cells.cells);
             }

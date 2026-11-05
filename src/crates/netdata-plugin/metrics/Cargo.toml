@@ -8,6 +8,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+indexmap = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
 
 [dev-dependencies]
