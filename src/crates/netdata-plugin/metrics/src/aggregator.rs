@@ -68,7 +68,13 @@ struct Entity {
 /// The *current* window is the one `now` falls in. A window is *open*, taking
 /// events, until it is emitted: the first `emit` at or after its end plus the
 /// [`Settings::allowed_lateness`](crate::Settings::allowed_lateness) emits it,
-/// once.
+/// once. (After a stall, a window may instead be folded into a later one; see
+/// below.)
+///
+/// Apart from a stall, only `emit` closes windows: a batch merged after the
+/// `emit` that emitted its windows counts as late. A plugin that merges from
+/// other threads, or some time after its events, needs an allowed lateness
+/// that covers that delay.
 ///
 /// With a 1 s collection interval and an allowed lateness of 10 s, the window
 /// `[100, 101)` is emitted by the first `emit` at or after second 111. Until
@@ -145,10 +151,10 @@ impl Aggregator {
         oldest_wanted
     }
 
-    /// Merge a batch; `now`, the current Unix time, decides which windows are
-    /// still open. Merge before an `emit` with the same `now`: an event whose
-    /// window that `emit` closes would otherwise count as late, in the next
-    /// window.
+    /// Merge a batch. `now`, the current Unix time, picks the current window:
+    /// newer events count in it ([`Stats::future_events`]). Merge before an
+    /// `emit` with the same `now`: an event whose window that `emit` emits
+    /// would otherwise count as late, in the next open window.
     ///
     /// # Panics
     ///
@@ -208,8 +214,8 @@ impl Aggregator {
     /// split only between whole definitions, updates and obsolete marks, so
     /// each chunk can be written on its own, for example as one message over
     /// a size-limited channel; one larger than `max_chunk` gets a chunk of
-    /// its own. Pass that
-    /// channel's limit, or `usize::MAX` when writing straight to stdout.
+    /// its own. Pass that channel's limit, or `usize::MAX` when writing
+    /// straight to stdout.
     pub fn emit(&mut self, now: u64, max_chunk: usize) -> Vec<Vec<u8>> {
         let mut out = Chunker::new(max_chunk);
         let mut oldest_open = self.bound_backlog(now);

@@ -59,8 +59,9 @@ impl Batch {
     /// the overflow entity); its chart instances are defined on the next
     /// [`Aggregator::emit`](crate::Aggregator::emit).
     ///
-    /// Look an entity up once per group of events that share labels, not
-    /// per event; while the returned handle lives, the batch is borrowed, so
+    /// Looking the same labels up again in one batch is correct but slower,
+    /// so look an entity up once per group of events that share labels, not
+    /// per event. While the returned handle lives, the batch is borrowed, so
     /// finish one entity before taking the next.
     pub fn entity(&mut self, labels: Labels) -> BatchEntity<'_> {
         BatchEntity {

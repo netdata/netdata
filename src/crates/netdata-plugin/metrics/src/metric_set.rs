@@ -110,7 +110,9 @@ pub struct Counter<D>(pub(crate) ColumnRange<D>);
 ///   baseline), the chart shows a gap.
 /// - A total lower than the previous one is a reset: the increase is the new
 ///   total.
-/// - After the baseline, a window without a new total shows 0.
+/// - After the baseline, a window without a new total shows 0, and the next
+///   total shows the whole increase since the last one: set the totals at
+///   least once per window.
 /// - Within a window, the total set last wins: the later event in a batch,
 ///   the later merged batch across batches.
 #[derive(Debug, Clone, Copy)]
@@ -179,7 +181,8 @@ impl Labels {
         Self::default()
     }
 
-    /// Insert a label in key order, unless `value` is blank.
+    /// Insert a label, unless `value` is blank. The labels stay sorted by key,
+    /// whatever the insertion order.
     ///
     /// # Panics
     ///
@@ -256,9 +259,9 @@ pub(crate) struct MetricSetInner {
 /// The time and lifecycle settings of a metric set.
 #[derive(Debug, Clone)]
 pub struct Settings {
-    /// How often the set's charts get a point: each window is one collection
-    /// interval long. Whole seconds, at least 1 (the agent's resolution);
-    /// sent as the CHART line's `update_every`. Default 1 s.
+    /// How often the set's chart instances get a point: each window is one
+    /// collection interval long. Whole seconds, at least 1 (the agent's
+    /// resolution); sent as the CHART line's `update_every`. Default 1 s.
     pub collection_interval: Duration,
     /// A delay: how long after its end a window waits before it is emitted;
     /// until then it takes the events whose time falls in it, and older events
@@ -298,13 +301,16 @@ pub struct CardinalityLimit {
     /// Entities held at most. The label-less entity counts; the overflow
     /// entity does not, so the aggregator holds at most `max_entities + 1`.
     pub max_entities: usize,
-    /// The overflow entity's labels.
+    /// The overflow entity's labels. Use a key that real entities do not
+    /// have, for example `overflow=true`, so the dashboard tells the overflow
+    /// entity apart.
     pub overflow_labels: Labels,
 }
 
 static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 
-/// Declares a [`MetricSet`]: each instrument adds its chart template.
+/// Declares a [`MetricSet`]: each instrument adds its chart template (a
+/// histogram two).
 #[derive(Debug)]
 pub struct MetricSetBuilder {
     id: u32,
@@ -388,8 +394,9 @@ impl MetricSetBuilder {
     /// - a heatmap, `<context>_histogram`: observations per second in each
     ///   bucket, in `heatmap_units`, one dimension per bucket named by its
     ///   upper bound as Rust prints the `f64` (`0.005`, `1`, `1048576`;
-    ///   `+Inf` last). Its title is `<title> histogram` and its priority
-    ///   `chart.priority + 1`; `chart.chart_type` does not apply to it.
+    ///   `+Inf` last). Its title is `<title> histogram`, its priority
+    ///   `chart.priority + 1` and its chart type a heatmap; `chart.chart_type`
+    ///   does not apply to it.
     ///
     /// # Panics
     ///

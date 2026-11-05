@@ -5,9 +5,10 @@ use crate::layout::Readout;
 use crate::metric_set::Labels;
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 
-/// A chart template: the presentation that all its chart instances share,
-/// one instance per entity. The fields map to the CHART line of the
-/// plugins.d protocol (`src/plugins.d/README.md` in the agent).
+/// How a chart template is presented: the fields that all its chart
+/// instances share, one instance per entity. They map to the CHART line of the
+/// plugins.d protocol (`src/plugins.d/README.md` in the Netdata repository);
+/// the crate sets the CHART line's other fields itself.
 #[derive(Debug, Clone, Copy)]
 pub struct Chart {
     /// The Netdata context, for example `svc.requests`: every entity's chart
@@ -26,6 +27,7 @@ pub struct Chart {
     /// in `_` and 16 hex digits. Contexts must be unique: within a set this
     /// is checked, across sets it is not.
     pub context: &'static str,
+    /// Shown above the chart on the dashboard.
     pub title: &'static str,
     /// Shown as is; the crate adds nothing. Counter and cumulative charts are
     /// per second, so give them units that say so, for example
@@ -33,6 +35,8 @@ pub struct Chart {
     pub units: &'static str,
     /// The dashboard family (submenu): the CHART line's `family` field.
     pub family: &'static str,
+    /// How the dashboard draws the chart, for example as lines or stacked
+    /// areas.
     pub chart_type: ChartType,
     /// Dashboard order; lower comes first.
     pub priority: i32,
