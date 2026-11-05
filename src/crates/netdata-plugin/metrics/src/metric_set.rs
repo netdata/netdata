@@ -61,29 +61,35 @@ impl Aggregation {
     }
 }
 
-/// A type whose values are the dimensions an instrument is split by, for
-/// example a request's outcome: each value is one dimension of the
-/// instrument's chart, in [`Dimension::IDS`] order.
+/// One dimension of an instrument's chart: one line on the chart.
 ///
-/// Implement it with [`dimensions!`](crate::dimensions). A manual
-/// implementation must:
-/// - return each value's position in `IDS` from `index` (recording a value
-///   whose index is out of range panics);
-/// - use valid dimension ids: not empty, no spaces, control characters,
-///   quotes, `\` or `=`, and not starting with `SLOT:` (declaring the
-///   instrument panics otherwise).
+/// Each value of the type is one dimension. For example, `Outcome::Success`
+/// and `Outcome::Error` are the two lines of a requests chart. The
+/// instrument names the type, as in `Counter<Outcome>`, and each
+/// measurement names the value.
+///
+/// Declare the type with [`dimensions!`](crate::dimensions).
+///
+/// # Manual implementations
+///
+/// - `IDS` must hold at least one id, and each id once.
+/// - Each id must be a valid dimension id: not empty, and without spaces,
+///   control characters, quotes, `\` or `=`. It must not start with `SLOT:`.
+/// - Declaring an instrument with a bad `IDS` panics.
+/// - `index` must return the value's position in `IDS`. Recording a value
+///   whose index is out of range panics.
 pub trait Dimension: Copy + 'static {
-    /// The dimension ids, which are also their names, in chart order.
+    /// The ids of all the dimensions, in chart order. An id is also the
+    /// dimension's name on the chart.
     const IDS: &'static [&'static str];
 
-    /// The position of this value in [`Dimension::IDS`].
+    /// This dimension's position in [`IDS`](Dimension::IDS).
     fn index(self) -> usize;
 }
 
-/// Declares an enum whose variants are the dimensions of an instrument, each
-/// with its dimension id, in chart order. The enum derives `Debug`, `Clone`,
-/// `Copy`, `PartialEq`, `Eq` and `Hash`. An instrument with a single value
-/// gets a single variant, which names its one dimension.
+/// Declares an enum whose variants are dimensions, each with its id, in
+/// chart order. The enum derives `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`
+/// and `Hash`. A chart with one line gets a one-variant enum.
 ///
 /// ```
 /// netdata_plugin_metrics::dimensions! {
