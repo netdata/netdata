@@ -71,6 +71,7 @@ class PackageReposTest(unittest.TestCase):
                 (root / 'packaging/version').write_text('v2.12.2-1-nightly')
                 # Only release selection may invoke the Python repository generator.
                 command = "python3 .github/scripts/gen-package-repos.py"
+                self.assertIn(command, script)
                 script = script.replace(command, "select_repos")
                 script = "select_repos() { printf '%s\\n' 'netdata/netdata netdata/netdata-preview'; }\n" + script
                 output = root / 'output'
