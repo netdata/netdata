@@ -1,4 +1,4 @@
-//! Request-local recording: each record adds into the batch's row for its
+//! Request-local recording: each event adds into the batch's row for its
 //! entity and the slot its own time falls in; the store decides at merge
 //! time whether that slot is still open.
 
@@ -8,32 +8,32 @@ use crate::metric_set::{
 };
 use indexmap::IndexMap;
 
-/// A batch's row for one entity and one slot: its record count and its
+/// A batch's row for one entity and one slot: its event count and its
 /// cells, one per column of the set's layout.
 pub(crate) struct BatchRow {
-    pub(crate) records: u64,
+    pub(crate) events: u64,
     pub(crate) cells: Box<[f64]>,
 }
 
-/// One entity's records within a batch.
+/// One entity's rows within a batch.
 #[derive(Default)]
 pub(crate) struct EntityRows {
-    /// By slot number, in first-record order: the store merges late slots
+    /// By slot number, in first-event order: the store merges late slots
     /// into one, and gauges and totals keep the value merged last.
     pub(crate) rows: IndexMap<u64, BatchRow>,
-    /// Position in `rows` of the slot recorded into last; records mostly
+    /// Position in `rows` of the slot recorded into last; events mostly
     /// arrive in time order, so it answers most lookups without hashing.
     last: usize,
 }
 
-/// The records of one unit of work (for example one request) for one
+/// The events of one unit of work (for example one request) for one
 /// [`MetricSet`], kept apart from the store until the work succeeds: drop
 /// the batch when the work fails, and merge it with
 /// [`Store::merge`](crate::Store::merge) once the work is done for good (for
 /// example written to disk), so a retried request is not counted twice.
 pub struct Batch {
     set: MetricSet,
-    /// By labels, in first-record order: the store admits new entities in
+    /// By labels, in first-event order: the store admits new entities in
     /// this order until its cardinality limit is reached.
     pub(crate) entities: IndexMap<Labels, EntityRows>,
 }
@@ -53,11 +53,11 @@ impl Batch {
     /// The entity with these labels, to record into. A label set the store
     /// has not seen becomes a new entity when the batch is merged, if it got
     /// at least one [`record`](BatchEntity::record) and the store is not at
-    /// its [`CardinalityLimit`](crate::CardinalityLimit) (else its records go to the overflow entity);
+    /// its [`CardinalityLimit`](crate::CardinalityLimit) (else its events go to the overflow entity);
     /// its charts are defined on the next [`Store::emit`](crate::Store::emit).
     ///
-    /// Look an entity up once per group of records that share labels, not
-    /// per record; while the returned handle lives, the batch is borrowed, so
+    /// Look an entity up once per group of events that share labels, not
+    /// per event; while the returned handle lives, the batch is borrowed, so
     /// finish one entity before taking the next.
     pub fn entity(&mut self, labels: Labels) -> BatchEntity<'_> {
         BatchEntity {
@@ -66,7 +66,7 @@ impl Batch {
         }
     }
 
-    /// True when the batch holds no record.
+    /// True when the batch holds no event.
     pub fn is_empty(&self) -> bool {
         self.entities.values().all(|e| e.rows.is_empty())
     }
@@ -79,9 +79,9 @@ pub struct BatchEntity<'a> {
 }
 
 impl BatchEntity<'_> {
-    /// One record at `unix_seconds` (the event's own time); write its
+    /// Record one event at `unix_seconds`, its own time; write its
     /// measurements through the returned [`Measurements`]. Every call is one
-    /// record, even with no measurement: it counts in whichever of the
+    /// event, even with no measurement: it counts in whichever of the
     /// store's late, future and overflow counts applies, and it starts the
     /// entity or keeps it from expiring.
     pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
@@ -94,7 +94,7 @@ impl BatchEntity<'_> {
                 let entry = entity.rows.entry(slot);
                 let index = entry.index();
                 entry.or_insert_with(|| BatchRow {
-                    records: 0,
+                    events: 0,
                     cells: set.empty_row(),
                 });
                 index
@@ -102,7 +102,7 @@ impl BatchEntity<'_> {
         };
         entity.last = index;
         let batch_row = &mut entity.rows[index];
-        batch_row.records += 1;
+        batch_row.events += 1;
         Measurements {
             set_id: set.id,
             row: &mut batch_row.cells,
@@ -110,8 +110,8 @@ impl BatchEntity<'_> {
     }
 }
 
-/// One record's measurements: each method call is one measurement of one
-/// instrument, for one of its dimensions (a histogram has none). A record may
+/// One event's measurements: each method call is one measurement of one
+/// instrument, for one of its dimensions (a histogram has none). An event may
 /// hold measurements of several instruments.
 ///
 /// Every method panics if the instrument belongs to another [`MetricSet`],
@@ -138,7 +138,7 @@ impl Measurements<'_> {
         columns.base + index
     }
 
-    /// Count `amount` for `dimension` of `counter` in this record's slot; the
+    /// Count `amount` for `dimension` of `counter` in this event's slot; the
     /// chart shows the slot's count per second. A non-finite amount is
     /// ignored.
     pub fn add<D: Dimensions>(

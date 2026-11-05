@@ -61,12 +61,13 @@
 //!   sets. There is no explicit create: recording with a new label set is a
 //!   new entity;
 //! - a *slot* is one collection interval `I` (see [`Settings`]): slot `n`
-//!   covers `[n × I, (n + 1) × I)` and holds the records whose time falls in
+//!   covers `[n × I, (n + 1) × I)` and holds the events whose time falls in
 //!   it; it becomes one point per dimension, stored at its end,
 //!   `(n + 1) × I`;
-//! - a *record* is one event of an entity at its own time, with its
-//!   measurements (`add`, `set_value`, `set_total`, `observe`); the records
-//!   of one entity in one slot combine into that slot's point.
+//! - an *event* is one occurrence of an entity at its own time, recorded
+//!   with [`BatchEntity::record`] and its measurements (`add`, `set_value`,
+//!   `set_total`, `observe`); the events of one entity in one slot combine
+//!   into that slot's point.
 
 mod batch;
 mod metric_set;

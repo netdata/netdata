@@ -1,7 +1,7 @@
 //! Metric set declarations: the row layout, instruments and their charts.
 //!
 //! Batches and the store hold a table: one row per entity and slot, with
-//! the columns the set's layout fixes. A row aggregates all records of one
+//! the columns the set's layout fixes. A row aggregates all events of one
 //! entity in one slot; each of its cells is one `f64`. A counter has one
 //! column per dimension value, a histogram one per bucket plus its sum, count
 //! and maximum. Merging combines two rows column by column with each column's
@@ -137,7 +137,7 @@ pub struct Counter<D>(pub(crate) ColumnRange<D>);
 /// - A total lower than the previous one is a reset: the increase is the new
 ///   total.
 /// - After the baseline, a slot without a new total shows 0.
-/// - Within a slot, the total set last wins: the later record in a batch,
+/// - Within a slot, the total set last wins: the later event in a batch,
 ///   the later merged batch across batches.
 #[derive(Debug, Clone, Copy)]
 pub struct CumulativeCounter<D>(pub(crate) ColumnRange<D>);
@@ -145,8 +145,8 @@ pub struct CumulativeCounter<D>(pub(crate) ColumnRange<D>);
 /// A current value, split by `D`, for example open connections per state,
 /// recorded at the time you read it. Charted as is.
 ///
-/// - Each record sets the value; within a slot, the value set last wins: the
-///   later record in a batch, the later merged batch across batches.
+/// - Each event sets the value; within a slot, the value set last wins: the
+///   later event in a batch, the later merged batch across batches.
 /// - A slot without a value shows a gap.
 #[derive(Debug, Clone, Copy)]
 pub struct Gauge<D>(pub(crate) ColumnRange<D>);
@@ -358,14 +358,14 @@ pub struct MetricSet(pub(crate) Arc<MetricSetInner>);
 #[derive(Debug)]
 pub(crate) struct MetricSetInner {
     /// Unique per set in the process; instruments carry it, so one used on
-    /// another set's record is caught.
+    /// another set's event is caught.
     pub(crate) id: u32,
     /// The collection interval in whole seconds.
     pub(crate) interval_secs: u64,
     pub(crate) lateness_slots: u64,
     pub(crate) expiry_slots: u64,
     pub(crate) cardinality_limit: Option<CardinalityLimit>,
-    // The row layout: each column's aggregation, and a row without records.
+    // The row layout: each column's aggregation, and a row without events.
     aggregations: Vec<Aggregation>,
     initial_row: Box<[f64]>,
     /// The columns of [`CumulativeCounter`] instruments, which hold totals until a
@@ -375,7 +375,7 @@ pub(crate) struct MetricSetInner {
 }
 
 impl MetricSetInner {
-    /// The row of a slot without records.
+    /// The row of a slot without events.
     pub(crate) fn empty_row(&self) -> Box<[f64]> {
         self.initial_row.clone()
     }
@@ -414,11 +414,11 @@ pub struct Settings {
     /// interval long. Whole seconds, at least 1 (the agent's resolution);
     /// sent as the CHART line's `update_every`. Default 1 s.
     pub collection_interval: Duration,
-    /// A delay: how long after its end a slot stays open for late records;
-    /// older records are counted in the oldest open slot. Rounded up to whole
+    /// A delay: how long after its end a slot stays open for late events;
+    /// older events are counted in the oldest open slot. Rounded up to whole
     /// collection intervals. Default 0.
     pub lateness: Duration,
-    /// A timeout: an entity with no records for this long has its charts
+    /// A timeout: an entity with no events for this long has its charts
     /// marked obsolete (the agent stops collecting them and later removes
     /// them) and its state dropped. Rounded up to whole collection intervals.
     /// It counts emitted slots, which lag by `lateness`: with expiry 900 s and
@@ -441,9 +441,9 @@ impl Default for Settings {
 }
 
 /// A limit on the number of entities: the cardinality limit.
-/// While the store is full, the records of a label set without an entity go
-/// to one overflow entity. As entities expire, room returns: the next record
-/// of such a label set, including one whose records went to the overflow
+/// While the store is full, the events of a label set without an entity go
+/// to one overflow entity. As entities expire, room returns: the next event
+/// of such a label set, including one whose events went to the overflow
 /// entity so far, gets its own entity.
 #[derive(Debug, Clone)]
 pub struct CardinalityLimit {
@@ -713,7 +713,7 @@ fn is_id_byte(b: u8) -> bool {
 pub(crate) enum EntityKind {
     /// The entity of one label set.
     Own,
-    /// The entity of the records beyond the cardinality limit.
+    /// The entity of the events beyond the cardinality limit.
     Overflow,
 }
 

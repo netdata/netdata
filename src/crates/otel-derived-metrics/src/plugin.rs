@@ -147,16 +147,16 @@ impl Derivation {
             .entity(labels)
             .record(now)
             .set_value(self.services, Services::Services, stats.entities as f64)
-            .set_total(self.adjusted, Adjustment::Late, stats.late_records as f64)
+            .set_total(self.adjusted, Adjustment::Late, stats.late_events as f64)
             .set_total(
                 self.adjusted,
                 Adjustment::Future,
-                stats.future_records as f64,
+                stats.future_events as f64,
             )
             .set_total(
                 self.adjusted,
                 Adjustment::Overflowed,
-                stats.overflowed_records as f64,
+                stats.overflowed_events as f64,
             )
             .set_total(
                 self.expired,
@@ -218,7 +218,7 @@ mod tests {
         };
         let first = tick(
             Stats {
-                late_records: 5,
+                late_events: 5,
                 ..Stats::default()
             },
             100,
@@ -226,9 +226,9 @@ mod tests {
         let second = tick(
             Stats {
                 entities: 3,
-                late_records: 7,
-                future_records: 1,
-                overflowed_records: 4,
+                late_events: 7,
+                future_events: 1,
+                overflowed_events: 4,
                 expired_entities: 1,
             },
             101,

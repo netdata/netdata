@@ -4,7 +4,7 @@
 //! The store keeps every slot from `oldest_open` (the oldest slot not yet
 //! emitted) to the current one open; each entity holds those slots as rows
 //! and folds them forward after a stall (`bound_backlog`). Entities
-//! are created on their first record, with or without measurements, charts
+//! are created on their first event, with or without measurements, charts
 //! are defined on an entity's first emitted slot, and an expired entity's
 //! state is dropped (its cumulative baselines with it).
 
@@ -22,7 +22,7 @@ use std::collections::{HashMap, VecDeque};
 
 /// Most slots past the lateness one [`Store::emit`] emits after a stall or a
 /// forward clock step; older pending slots are folded into the oldest one
-/// emitted, so no record is lost and memory stays bounded.
+/// emitted, so no event is lost and memory stays bounded.
 pub(crate) const MAX_BACKLOG_SLOTS: u64 = 60;
 
 /// Counts since the store was created; `entities` is the current number.
@@ -30,13 +30,13 @@ pub(crate) const MAX_BACKLOG_SLOTS: u64 = 60;
 pub struct Stats {
     /// Entities currently tracked, the overflow entity included.
     pub entities: usize,
-    /// Records counted in the overflow entity because of the cardinality
+    /// Events counted in the overflow entity because of the cardinality
     /// limit.
-    pub overflowed_records: u64,
-    /// Records older than the oldest open slot, counted in that slot.
-    pub late_records: u64,
-    /// Records newer than the current slot, counted in the current slot.
-    pub future_records: u64,
+    pub overflowed_events: u64,
+    /// Events older than the oldest open slot, counted in that slot.
+    pub late_events: u64,
+    /// Events newer than the current slot, counted in the current slot.
+    pub future_events: u64,
     /// Entities whose charts were marked obsolete after the expiry time.
     pub expired_entities: u64,
 }
@@ -46,9 +46,9 @@ struct Entity {
     /// The full id of each of the set's charts, in set order.
     chart_ids: Vec<String>,
     defined: bool,
-    /// Earliest slot with records; nothing is emitted before it.
+    /// Earliest slot with events; nothing is emitted before it.
     first_slot: u64,
-    /// Latest slot with records; drives expiry.
+    /// Latest slot with events; drives expiry.
     last_slot: u64,
     /// The row of each open slot from `oldest_open` onwards, oldest first;
     /// missing ones are empty.
@@ -68,21 +68,21 @@ struct Entity {
 /// # When a slot is emitted
 ///
 /// The *current* slot is the one `now` falls in. A slot stays *open* for
-/// records until its [`Settings::lateness`](crate::Settings::lateness) has
+/// events until its [`Settings::lateness`](crate::Settings::lateness) has
 /// passed after its end; then the next `emit` emits it, once.
 ///
 /// With a 1 s collection interval and 10 s lateness, the slot `[100, 101)` is
-/// emitted by the first `emit` at or after second 111. Until then, records of
+/// emitted by the first `emit` at or after second 111. Until then, events of
 /// second 100 still count in it. The agent stores its point at second 101,
 /// the slot's end, however late it is sent.
 ///
-/// # Records outside the open slots
+/// # Events outside the open slots
 ///
-/// Every record is counted exactly once:
+/// Every event is counted exactly once:
 /// - one older than the oldest open slot counts in that slot
-///   ([`Stats::late_records`]);
+///   ([`Stats::late_events`]);
 /// - one from the future counts in the current slot
-///   ([`Stats::future_records`]);
+///   ([`Stats::future_events`]);
 /// - after a stall (`emit` not called for a while, or the clock jumping
 ///   ahead), one `emit` emits at most 60 slots past the lateness. Slots older
 ///   than that are not lost: their counts are added into the first slot
@@ -90,13 +90,13 @@ struct Entity {
 ///
 /// # Entities
 ///
-/// - An entity starts with its first record. Its charts are defined, with
+/// - An entity starts with its first event. Its charts are defined, with
 ///   its labels, before their first update.
-/// - After `expiry` without records its charts are marked obsolete and its
+/// - After `expiry` without events its charts are marked obsolete and its
 ///   state is dropped; if it returns, its charts are defined again.
-/// - Beyond the cardinality limit, records go to the overflow entity (see
+/// - Beyond the cardinality limit, events go to the overflow entity (see
 ///   [`CardinalityLimit`](crate::CardinalityLimit);
-///   [`Stats::overflowed_records`]).
+///   [`Stats::overflowed_events`]).
 pub struct Store {
     set: MetricSet,
     entities: HashMap<Labels, Entity>,
@@ -146,7 +146,7 @@ impl Store {
     }
 
     /// Merge a batch; `now`, the current Unix time, decides which slots are
-    /// still open. Merge before an `emit` with the same `now`: a record whose
+    /// still open. Merge before an `emit` with the same `now`: an event whose
     /// slot that `emit` closes would otherwise count as late, in the next
     /// slot.
     ///
@@ -165,7 +165,7 @@ impl Store {
             if batch_entity.rows.is_empty() {
                 continue;
             }
-            let records: u64 = batch_entity.rows.values().map(|s| s.records).sum();
+            let events: u64 = batch_entity.rows.values().map(|row| row.events).sum();
             let full = set
                 .cardinality_limit
                 .as_ref()
@@ -177,7 +177,7 @@ impl Store {
                     entry.insert(entity)
                 }
                 (Entry::Vacant(_), Some(limit)) => {
-                    self.stats.overflowed_records += records;
+                    self.stats.overflowed_events += events;
                     self.overflow.get_or_insert_with(|| {
                         Entity::new(set, limit.overflow_labels.clone(), EntityKind::Overflow)
                     })
@@ -185,10 +185,10 @@ impl Store {
             };
             for (slot, batch_row) in batch_entity.rows {
                 let slot = if slot < oldest_open {
-                    self.stats.late_records += batch_row.records;
+                    self.stats.late_events += batch_row.events;
                     oldest_open
                 } else if slot > newest {
-                    self.stats.future_records += batch_row.records;
+                    self.stats.future_events += batch_row.events;
                     newest
                 } else {
                     slot
@@ -284,7 +284,7 @@ impl Entity {
     }
 
     /// Emit `slot`, the window's first, and drop it from the window; nothing
-    /// is written before the entity's first record.
+    /// is written before the entity's first event.
     fn emit_slot(&mut self, set: &MetricSetInner, slot: u64, out: &mut Chunker) {
         let row = self.open_rows.pop_front();
         if slot < self.first_slot {
@@ -312,7 +312,7 @@ impl Entity {
         }
     }
 
-    /// When the entity has had no records for the expiry time as of `slot`,
+    /// When the entity has had no events for the expiry time as of `slot`,
     /// mark its charts obsolete and return true; the caller drops it.
     fn expire_if_idle(&self, set: &MetricSetInner, slot: u64, out: &mut Chunker) -> bool {
         if !self.defined || slot < self.last_slot + set.expiry_slots {
@@ -612,8 +612,8 @@ mod tests {
         record(&f, &mut store, "a", 100, 2, 0, 1000);
         // From the future: counted in the current slot.
         record(&f, &mut store, "a", 5000, 4, 0, 1000);
-        assert_eq!(store.stats().late_records, 2);
-        assert_eq!(store.stats().future_records, 4);
+        assert_eq!(store.stats().late_events, 2);
+        assert_eq!(store.stats().future_events, 4);
         // Slot 999 is not finished plus lateness until 1010.
         let out = text(&store.emit(1009, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
@@ -623,13 +623,13 @@ mod tests {
                 .map(|v| v.parse().unwrap())
                 .collect()
         };
-        // Slots 990..=998: the clamped 2 land in 990, the record at 995.
+        // Slots 990..=998: the clamped 2 land in 990, the event at 995.
         let emitted = ok_values(&out);
         assert_eq!(emitted.len(), 9);
         assert_eq!(emitted[0], 2.0);
         assert_eq!(emitted[5], 1.0);
         let rest = text(&store.emit(1011, usize::MAX));
-        // Slots 999 and 1000: the 4 future records land in slot 1000.
+        // Slots 999 and 1000: the 4 future events land in slot 1000.
         assert_eq!(ok_values(&rest), vec![0.0, 4.0]);
         validate_chart_stream(format!("{out}{rest}").as_bytes()).unwrap();
     }
@@ -662,7 +662,7 @@ mod tests {
         record(&f, &mut store, "c", 10, 3, 0, 10);
         let stats = store.stats();
         assert_eq!(stats.entities, 2);
-        assert_eq!(stats.overflowed_records, 5);
+        assert_eq!(stats.overflowed_events, 5);
         let out = text(&store.emit(11, usize::MAX));
         assert!(out.contains("BEGIN svc.requests_overflow 1000000\nSET ok = 5\n"));
         assert!(out.contains("CLABEL 'overflow' 'true' 1\n"));
@@ -676,23 +676,23 @@ mod tests {
     }
 
     #[test]
-    fn entities_without_records_are_not_created() {
+    fn entities_without_events_are_not_created() {
         let f = fixture(0, 3, Some(1));
         let mut store = Store::new(&f.set);
         let mut batch = Batch::new(&f.set);
         batch.entity(labels("empty"));
         store.merge(batch, 10);
         assert_eq!(store.stats().entities, 0);
-        // The limit still has room for an entity with records.
+        // The limit still has room for an entity with events.
         record(&f, &mut store, "a", 10, 1, 0, 10);
-        assert_eq!(store.stats().overflowed_records, 0);
+        assert_eq!(store.stats().overflowed_events, 0);
         let out = text(&store.emit(11, usize::MAX));
         assert!(out.contains("CLABEL 'service.name' 'a' 1"));
         assert!(!out.contains("'empty'"));
     }
 
     #[test]
-    fn a_clock_jump_renders_a_bounded_backlog_and_keeps_every_record() {
+    fn a_clock_jump_renders_a_bounded_backlog_and_keeps_every_event() {
         let f = fixture(10, 1_000_000, None);
         let mut store = Store::new(&f.set);
         record(&f, &mut store, "a", 10, 1, 0, 10);
@@ -877,7 +877,7 @@ mod tests {
     }
 
     #[test]
-    fn a_batch_without_records_is_empty() {
+    fn a_batch_without_events_is_empty() {
         let f = fixture(0, 900, None);
         let mut batch = Batch::new(&f.set);
         batch.entity(labels("a"));
