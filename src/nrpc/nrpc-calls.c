@@ -545,22 +545,34 @@ static int nrpc_method_authorize_acquire(NRPC_OWNER owner, BUFFER *result_wb, co
         return code;
     }
 
-    if(!http_access_user_has_enough_access_level_for_endpoint(user_access, method->access)) {
+    HTTP_ACCESS required = method->access;
 
-        if((method->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
+    // Listing the dyncfg tree is for signed-in members of the agent's space, on
+    // any plan, with a role that can view node data (the method's own access;
+    // Billing has none). The `config` method itself stays anonymous, because it
+    // also carries per-entry actions that check each entry's own view/edit
+    // access. The rule is applied here because every route reaches the tree
+    // through this check, including a parent forwarding to a child that
+    // advertised `config` without it.
+    if((method->options & NRPC_METHOD_FLAG_DYNCFG) && nrpc_cmd_is_dyncfg_tree(sanitized_cmd))
+        required |= HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE;
+
+    if(!http_access_user_has_enough_access_level_for_endpoint(user_access, required)) {
+
+        if((required & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
             code = nrpc_call_error(result_wb,
                                            "You need to be authenticated via Netdata Cloud Single-Sign-On (SSO) "
                                            "to access this feature. Sign-in on this dashboard, "
                                            "or access your Netdata via https://app.netdata.cloud.",
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
-        else if((method->access & HTTP_ACCESS_SAME_SPACE) && !(user_access & HTTP_ACCESS_SAME_SPACE))
+        else if((required & HTTP_ACCESS_SAME_SPACE) && !(user_access & HTTP_ACCESS_SAME_SPACE))
             code = nrpc_call_error(result_wb,
                                            "You need to login to the Netdata Cloud space this agent is claimed to, "
                                            "to access this feature.",
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
-        else if((method->access & HTTP_ACCESS_COMMERCIAL_SPACE) && !(user_access & HTTP_ACCESS_COMMERCIAL_SPACE))
+        else if((required & HTTP_ACCESS_COMMERCIAL_SPACE) && !(user_access & HTTP_ACCESS_COMMERCIAL_SPACE))
             code = nrpc_call_error_with_key(result_wb,
                                            "This feature is only available for commercial users and supporters "
                                            "of Netdata. To use it, please upgrade your space. "
@@ -571,7 +583,7 @@ static int nrpc_method_authorize_acquire(NRPC_OWNER owner, BUFFER *result_wb, co
                                            HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
 
         else {
-            HTTP_ACCESS missing_access = (~user_access) & method->access;
+            HTTP_ACCESS missing_access = (~user_access) & required;
             char perms_str[1024];
             http_access2txt(perms_str, sizeof(perms_str), ", ", missing_access);
 

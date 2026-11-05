@@ -198,22 +198,10 @@ static int dyncfg_config_execute_cb(struct nrpc_request *req, void *data) {
     }
 
     if(strcmp(action, "tree") == 0) {
-        // listing is for signed-in members of the agent's space, on any plan and role;
-        // viewing and editing an entry are checked per entry, against its view/edit access
-        if(!(req->user_access & HTTP_ACCESS_SIGNED_ID)) {
-            code = dyncfg_default_response(
-                req->result.wb, HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(req->user_access),
-                "dyncfg: sign in to Netdata to list configurations");
-            goto cleanup;
-        }
-
-        if(!(req->user_access & HTTP_ACCESS_SAME_SPACE)) {
-            code = dyncfg_default_response(
-                req->result.wb, HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(req->user_access),
-                "dyncfg: sign in to the Netdata space this agent is claimed to, to list configurations");
-            goto cleanup;
-        }
-
+        // who may list is checked before this runs, in nrpc_method_authorize_acquire()
+        // (signed-in members of the agent's space, on any plan, with a role that can
+        // view node data); viewing and editing an entry are checked per entry,
+        // against its view/edit access
         if(!path || !*path)
             path = "/";
 

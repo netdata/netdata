@@ -505,6 +505,25 @@ bool nrpc_method_name_is_dyncfg(const char *name) {
     return false;
 }
 
+// Reports whether a command is the dyncfg tree listing ("config tree ...").
+// The words are split exactly as the tree handler splits them
+// (dyncfg_config_execute_cb), so every spelling the handler serves as a
+// listing - quoted, extra whitespace - is classified as one here.
+bool nrpc_cmd_is_dyncfg_tree(const char *cmd) {
+    if(!nrpc_method_name_is_dyncfg(cmd))
+        return false;
+
+    CLEAN_CHAR_P *buf = strdupz(cmd);
+    char *words[3];
+    size_t num_words = quoted_strings_splitter_whitespace(buf, words, _countof(words));
+
+    const char *config = get_word(words, num_words, 0);
+    const char *action = get_word(words, num_words, 1);
+
+    return config && strcmp(config, PLUGINSD_FUNCTION_CONFIG) == 0 &&
+           action && strcmp(action, "tree") == 0;
+}
+
 static inline NRPC_METHOD_FLAGS nrpc_method_flags_for(const char *name, const char *tags) {
     if(nrpc_method_name_is_dyncfg(name))
         return NRPC_METHOD_FLAG_DYNCFG;

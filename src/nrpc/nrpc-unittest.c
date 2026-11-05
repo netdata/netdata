@@ -86,6 +86,102 @@ static bool nrpc_ut_owner_wants_del(NRPC_OWNER id) {
     return probe->wants_del;
 }
 
+// Listing the dyncfg tree requires a signed-in member of the agent's space,
+// enforced in authorize, not in the tree handler. The `config` method here
+// belongs to a fake owner and is advertised ANONYMOUS_DATA, exactly as a
+// streaming child (old or new) advertises it to its parent: the parent MUST
+// still refuse to forward an anonymous or other-space listing, while every
+// other `config` action keeps the method's own access (the child checks those
+// per entry). A fake owner is used because the bare "config" name is the live
+// dyncfg method on localhost.
+static int nrpc_dyncfg_tree_access_unittest(void) {
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    int errors = 0;
+
+    struct nrpc_ut_owner_probe probe = { 0 };
+    NRPC_OWNER synth = { .ptr = &probe };
+
+    struct nrpc_registry_owner fake = {
+        .id = synth,
+        .name = "fake-child",
+        .epoch = &probe.epoch,
+        .changed = nrpc_ut_owner_changed,
+        .wants_del_journal = nrpc_ut_owner_wants_del,
+    };
+    nrpc_registry_init(&fake);
+
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .owner = synth,
+        .name = PLUGINSD_FUNCTION_CONFIG,
+        .help = "Dynamic configuration",
+        .tags = "config",
+        .timeout_s = 120,
+        .priority = 1000,
+        .version = 1,
+        .access = HTTP_ACCESS_ANONYMOUS_DATA,
+        .sync = true,
+        .source = NRPC_SOURCE_STREAM,
+        .handler = nrpc_unittest_noop_cb,
+    });
+
+    const HTTP_ACCESS member = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_ANONYMOUS_DATA;
+
+    struct {
+        const char *cmd;
+        HTTP_ACCESS user_access;
+        int expect_code;
+    } cases[] = {
+        // the listing: anonymous -> 412, signed in to another space -> 403, space member -> allowed
+        { "config tree '/' ''",       HTTP_ACCESS_ANONYMOUS_DATA,                             HTTP_RESP_PRECOND_FAIL },
+        { "config tree '/' ''",       HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_ANONYMOUS_DATA,     HTTP_RESP_FORBIDDEN },
+        // a same-space role without node data access (Billing) -> 403, as for every other action
+        { "config tree '/' ''",       HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE,         HTTP_RESP_FORBIDDEN },
+        { "config tree '/' ''",       member,                                                 HTTP_RESP_OK },
+
+        // every spelling the handler serves as a listing is gated the same way
+        { "config tree",              HTTP_ACCESS_ANONYMOUS_DATA,                             HTTP_RESP_PRECOND_FAIL },
+        { "config 'tree' /",          HTTP_ACCESS_ANONYMOUS_DATA,                             HTTP_RESP_PRECOND_FAIL },
+        { "config \"tree\" /",        HTTP_ACCESS_ANONYMOUS_DATA,                             HTTP_RESP_PRECOND_FAIL },
+        { "  config    tree   /  ",   HTTP_ACCESS_ANONYMOUS_DATA,                             HTTP_RESP_PRECOND_FAIL },
+        { "config\ttree /",           HTTP_ACCESS_ANONYMOUS_DATA,                             HTTP_RESP_PRECOND_FAIL },
+
+        // not a listing: the method's own (anonymous) access applies; per-entry checks run later
+        { "config get test:job",      HTTP_ACCESS_ANONYMOUS_DATA,                             HTTP_RESP_OK },
+        { "config treex /",           HTTP_ACCESS_ANONYMOUS_DATA,                             HTTP_RESP_OK },
+        { "config",                   HTTP_ACCESS_ANONYMOUS_DATA,                             HTTP_RESP_OK },
+    };
+
+    for(size_t i = 0; i < _countof(cases); i++) {
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        NRPC_METHOD_ACQUIRED *item = NULL;
+
+        int code = nrpc_method_authorize(synth, wb, cases[i].cmd, cases[i].user_access, false, &item);
+
+        bool expect_item = (cases[i].expect_code == HTTP_RESP_OK);
+        if(code != cases[i].expect_code || (item != NULL) != expect_item ||
+           (!expect_item && buffer_strlen(wb) == 0)) {
+            fprintf(stderr, "  FAILED case %zu ('%s', access 0x%x): got code %d (item %s, body %zu bytes), expected %d\n",
+                    i, cases[i].cmd, (unsigned)cases[i].user_access, code,
+                    item ? "set" : "NULL", buffer_strlen(wb), cases[i].expect_code);
+            errors++;
+        }
+        else
+            fprintf(stderr, "  OK case %zu: '%s' (access 0x%x) -> %d\n",
+                    i, cases[i].cmd, (unsigned)cases[i].user_access, code);
+
+        if(item)
+            nrpc_method_acquired_release(item);
+    }
+
+    nrpc_registry_destroy(synth);
+
+    fprintf(stderr, "%s() %s (%d error%s)\n\n",
+            __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
+
+    return errors;
+}
+
 int nrpc_access_unittest(void) {
     fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
 
@@ -276,6 +372,8 @@ int nrpc_access_unittest(void) {
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",
             __FUNCTION__, errors ? "FAILED" : "passed", errors, errors == 1 ? "" : "s");
+
+    errors += nrpc_dyncfg_tree_access_unittest();
 
     return errors;
 }
