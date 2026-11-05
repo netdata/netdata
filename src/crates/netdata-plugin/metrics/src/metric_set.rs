@@ -392,7 +392,8 @@ impl MetricSetBuilder {
     }
 
     /// Adds a [`Histogram`] over `bounds`, with three chart templates. Each
-    /// adds a suffix to the context of `chart` and a word to its title:
+    /// template's context is `chart.context` plus a suffix, and its title
+    /// `chart.title` plus a word:
     /// - `<context>_avg`: one dimension, `avg`, the mean observed value per
     ///   window, in `chart.units`. Its title is `<title> average`, its priority
     ///   `chart.priority` and its chart type `chart.chart_type`;
@@ -402,7 +403,7 @@ impl MetricSetBuilder {
     ///   chart of its own because the dashboard combines every dimension of a
     ///   chart the same way, across chart instances and over time: a maximum
     ///   needs max, a mean is averaged;
-    /// - a heatmap, `<context>_histogram`: observations per second in each
+    /// - `<context>_histogram`: a heatmap of observations per second in each
     ///   bucket, in `heatmap_units`, one dimension per bucket named by its
     ///   upper bound as Rust prints the `f64` (`0.005`, `1`, `1048576`;
     ///   `+Inf` last). Its title is `<title> histogram`, its priority
@@ -411,8 +412,8 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If `bounds` are not finite and strictly increasing, or any of the three
-    /// contexts is invalid or already used.
+    /// If `bounds` are not finite and strictly increasing, if `chart.context`
+    /// is invalid, or if any of the three contexts is already used.
     pub fn histogram(
         &mut self,
         bounds: &'static [f64],
@@ -423,6 +424,7 @@ impl MetricSetBuilder {
             bounds.iter().all(|b| b.is_finite()) && bounds.windows(2).all(|w| w[0] < w[1]),
             "histogram bounds must be finite and increasing"
         );
+        check_context(chart.context);
         // Buckets including +Inf, then sum and count, then the maximum: the
         // order of the Histogram column accessors.
         let base = self.layout.add_columns(bounds.len() + 1, Aggregation::Sum);

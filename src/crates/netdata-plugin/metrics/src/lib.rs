@@ -54,8 +54,9 @@
 //! Terms:
 //! - an *instrument* is a [`Counter`], [`CumulativeCounter`], [`Gauge`] or
 //!   [`Histogram`]; each brings its *chart template* (a [`Chart`] and its
-//!   dimensions; a histogram brings three), and the other instruments are
-//!   split into dimensions, one per value of their [`Dimension`] type;
+//!   dimensions; a histogram brings three, derived from its [`Chart`]), and
+//!   the other instruments are split into dimensions, one per value of their
+//!   [`Dimension`] type;
 //! - an *entity* is the thing being monitored, for example one service,
 //!   identified by its [`Labels`]; it gets one *chart instance* (in Netdata's
 //!   sense: one chart with its own chart id) of every chart template of the

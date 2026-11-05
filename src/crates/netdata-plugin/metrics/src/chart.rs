@@ -8,13 +8,16 @@ use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 /// How a chart template is presented: the fields that all its chart
 /// instances share, one instance per entity. They map to the CHART line of the
 /// plugins.d protocol (`src/plugins.d/README.md` in the Netdata repository);
-/// the crate sets the CHART line's other fields itself.
+/// the crate sets the CHART line's other fields itself. A histogram derives
+/// its three chart templates from one `Chart` (see
+/// [`MetricSetBuilder::histogram`](crate::MetricSetBuilder::histogram)).
 #[derive(Debug, Clone, Copy)]
 pub struct Chart {
-    /// The Netdata context, for example `svc.requests`: every entity's chart
-    /// instance of this template has it, and alerts, queries and the
-    /// dashboard use it to group the instances. Each entity's chart id is
-    /// built from it:
+    /// The Netdata context, for example `svc.requests`, of every entity's
+    /// chart instance; a histogram's three charts have it plus a suffix
+    /// (`_avg`, `_max`, `_histogram`). Alerts, queries and the dashboard use
+    /// the context to group the instances. Each entity's chart id is built
+    /// from the chart's context:
     /// - `<context>` for an entity without labels;
     /// - `<context>_<hash>` for any other entity, where `<hash>` is 16 hex
     ///   digits of a hash of its labels, stable across restarts and releases;
@@ -26,12 +29,9 @@ pub struct Chart {
     /// only letters, digits, `_`, `-` and `.`, and not end in `_overflow` or
     /// in `_` and 16 hex digits. Contexts must be unique: within a set this
     /// is checked, across sets it is not.
-    ///
-    /// A histogram's charts add a suffix to it (see
-    /// [`MetricSetBuilder::histogram`](crate::MetricSetBuilder::histogram)).
     pub context: &'static str,
     /// Shown above the chart on the dashboard. A histogram's charts add a word
-    /// to it.
+    /// to it (`average`, `maximum`, `histogram`).
     pub title: &'static str,
     /// Shown as is; the crate adds nothing. Counter and cumulative charts are
     /// per second, so give them units that say so, for example

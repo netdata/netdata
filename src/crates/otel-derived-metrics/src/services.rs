@@ -60,8 +60,9 @@ impl Services {
             chart_type: ChartType::Stacked,
             priority: 60_000,
         });
-        // Charts `request_duration_avg`, `request_duration_max` and
-        // `request_duration_histogram`.
+        // Charts `otel_service.request_duration_avg`,
+        // `otel_service.request_duration_max` and
+        // `otel_service.request_duration_histogram`.
         let duration = b.histogram(
             DURATION_BOUNDS,
             Chart {
