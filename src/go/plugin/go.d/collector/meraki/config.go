@@ -18,7 +18,6 @@ const (
 )
 
 type Config struct {
-	CollectApplianceUplinkHealth  bool             `yaml:"collect_appliance_uplink_health,omitempty" json:"collect_appliance_uplink_health"`
 	Vnode                         string           `yaml:"vnode,omitempty"                            json:"vnode"`
 	UpdateEvery                   int              `yaml:"update_every,omitempty"                     json:"update_every"`
 	AutoDetectionRetry            int              `yaml:"autodetection_retry,omitempty"              json:"autodetection_retry"`
@@ -31,6 +30,7 @@ type Config struct {
 	CollectSwitchPortTraffic      bool             `yaml:"collect_switch_port_traffic,omitempty"      json:"collect_switch_port_traffic"`
 	CollectSwitchPortPackets      bool             `yaml:"collect_switch_port_packets,omitempty"      json:"collect_switch_port_packets"`
 	CollectApplianceUplinkTraffic bool             `yaml:"collect_appliance_uplink_traffic,omitempty" json:"collect_appliance_uplink_traffic"`
+	CollectApplianceUplinkHealth  bool             `yaml:"collect_appliance_uplink_health,omitempty"  json:"collect_appliance_uplink_health"`
 	tlscfg.TLSConfig              `yaml:",inline" json:""`
 }
 

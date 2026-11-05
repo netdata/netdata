@@ -21,7 +21,7 @@ with `src/go/`, which are repo-relative.
 > the 5 minutes that ended **5 minutes** ago (`uplinkDelay`), both in `collect_telemetry.go`. Both values are informed
 > guesses. If the real delay is longer, switch port traffic gaps and uplink traffic reads low.
 >
-> Live timing validation is tracked in [issue #24614](https://github.com/netdata/netdata/issues/24614) and requires a requester trial.
+> The live measurement is tracked in [issue #24614](https://github.com/netdata/netdata/issues/24614).
 >
 > Measure on a real organization, then set both constants and the matching `metadata.yaml` and `config_schema.json`
 > text from the result:
@@ -93,7 +93,7 @@ flowchart LR
 
     Devices -.->|"report to Meraki, not Netdata"| Cloud
     Job -->|"HTTPS GET, API key"| Cloud
-    Job -->|"organization · uplinks"| JobNode
+    Job -->|"organization · uplink traffic"| JobNode
     Job -->|"inventory · availability · switch ports · appliance health"| DevNodes
 
     classDef ext fill:#dbeafe,stroke:#2563eb,color:#0b1021;
@@ -155,7 +155,7 @@ A useful mental split for the rest of this document:
 - **`transport.go`** decides *how fast*; **`retry_after.go`** decides *when not to talk at all*.
 - **`normalize.go`**, **`normalize_traffic.go`** and **`normalize_health.go`** decide *what the data means*: which devices exist, which statuses
   are trustworthy, which traffic interval counts and which values are unambiguous. **`collect_telemetry.go`** decides
-  which optional telemetry to read and when to stop, using one flow so a 429 cannot leak across helpers.
+  which optional families to read and when to stop: one flow, so a 429 in any family skips every later request.
 - **`write_metrics.go`** and **`host_scope.go`** decide *where it lands*: labels, virtual nodes and identities.
 - The **framework** owns everything after the write: cycle commit or abort, chart materialization, host publication
   and retirement.
@@ -250,10 +250,11 @@ never become identity.
 
 ### Stage 4 — Read the enabled telemetry
 
-`collectTelemetry` (`collect_telemetry.go`) runs after the join and before any write, and only when at least one optional
-option is on. Every family has its own window, measured from the current time truncated to the second: switch port
-usage the last 15 minutes, uplink usage the 5 minutes that ended 5 minutes ago, packets the last 300 seconds.
-`update_every` changes how often traffic is read, not the windows.
+`collectTelemetry` (`collect_telemetry.go`) runs after the join and before any write, and only when at least one
+optional family is enabled. Every family has its own window, measured from the current time truncated to the second:
+appliance ICMP samples the 5 minutes that ended 2 minutes ago, switch port usage the last 15 minutes, uplink usage the
+5 minutes that ended 5 minutes ago, packets the last 300 seconds. `update_every` changes how often they are read, not
+the windows.
 
 > [!WARNING]
 > The 15-minute lookback and the 5-minute uplink delay are not measured against a live organization. See the open item
@@ -265,12 +266,13 @@ usage the last 15 minutes, uplink usage the 5 minutes that ended 5 minutes ago, 
 | Uplink traffic | `collect_appliance_uplink_traffic` | `getOrganizationApplianceUplinksUsageByNetwork` with `t0`/`t1` for the 5 minutes that ended 5 minutes ago | Per network and interface, sent/received bytes × 8 / 300 / 1000 as kilobits/s |
 | Switch port packets | `collect_switch_port_packets` | `getDeviceSwitchPortsStatusesPackets` with `timespan=300`, one per assigned switch in serial order | Per port, `ratePerSec.sent`/`recv` of the `Total` category |
 
-Appliance status and probe reads run first; the traffic families retain their relative order, keeping packet fanout last.
-A 429 stops all remaining optional reads even when Retry-After is absent or invalid; a valid delay also gates later cycles. Only
-assigned switches (`productType` `switch`) get port traffic, and only networks in the organization's network list get
-uplink traffic.
+The appliance status and probe reads ([Appliance uplink health](#appliance-uplink-health)) run first, then the families
+in this table in table order, so packets, the one family that costs a request per switch, runs last. Only assigned
+switches (`productType` `switch`) get port traffic, and only networks in the organization's network list get uplink
+traffic.
 
-`normalize_traffic.go` turns the responses into values with one rule set:
+`normalize_traffic.go` turns the responses into values with one rule set; the network and duplicate rules are the
+shared `trustedSerials` and `observations` of `normalize.go`:
 
 | Evidence | Result |
 | --- | --- |
@@ -309,18 +311,20 @@ still aborts the whole cycle, inventory included.
 `collect_appliance_uplink_health` is one boolean, off by default. It adds two reads before the traffic families:
 `getOrganizationApplianceUplinkStatuses` (paginated, 1,000 appliances per page) and
 `getOrganizationDevicesUplinksLossAndLatency` (one organization-wide unpaginated GET). Both are skipped without
-assigned devices whose `productType` is `appliance`. Neither response creates device membership. Status is documented
-for MX, Z and Secure Router; ICMP loss and latency are documented for MX only.
+assigned devices whose `productType` is `appliance`. Neither response creates device membership. Meraki documents
+status for MX, Z and Secure Router, but only devices listed with product type `appliance` are read; whether Secure
+Routers are listed that way is not verified. ICMP loss and latency are documented for MX only.
 
-Health joins by assigned serial and rejects explicit network mismatches. HA serials remain separate device vnodes;
-network aggregation belongs only to the existing uplink traffic API. An interface status is one of `active`,
-`connecting`, `failed`, `not connected` (normalized to `not_connected`) and `ready`. Unknown or ambiguous states gap;
-`ready` is usable standby, never a failure. `lastReportedAt` describes the device, not an interface transition:
+Health joins by assigned serial, and an appliance with a row naming another network gets nothing from that response
+(`trustedSerials`, the rule switch port traffic uses). Both responses report per serial, so each appliance of a warm
+spare pair keeps its own node; only uplink traffic is added up per network. An interface status is one of `active`,
+`connecting`, `failed`, `not connected` (normalized to `not_connected`) and `ready`. Unknown states and duplicates that
+disagree gap; `ready` is usable standby, never a failure. `lastReportedAt` describes the device, not an interface transition:
 `meraki.appliance_report_age` is one nonnegative age in seconds on the device scope, with no interface label.
 Repeated device rows use the latest valid nonfuture report time; that does not resolve contradictory interface states.
 
-Probe requests use an independent explicit `t0 = now - 7 minutes`, `t1 = now - 2 minutes` window, never the traffic
-lookback or uplink delay. Per assigned serial, interface and destination IP, normalization chooses the latest sample
+Probe requests use their own window, `t0 = now - 7 minutes` and `t1 = now - 2 minutes` (`probeWindow`, `probeDelay`),
+the longest and latest one Cisco allows. Per assigned serial, interface and destination IP, normalization chooses the latest sample
 timestamp inside the inclusive window. Loss and latency preserve presence independently at that timestamp; missing
 or null latest fields do not fall back to older samples. Identical duplicates collapse; conflicting observations gap
 rather than sum, average or choose a last writer. Valid loss is finite 0–100 percent, valid latency is finite and
@@ -334,9 +338,9 @@ integrated cellular may supply no ICMP statistics by default. Neither is grounds
 
 Optional failures gap their own observations, except cancellation or deadline expiry, which abort the whole cycle.
 No last-good health is replayed. Status cardinality is appliances × uplinks; probe cardinality additionally multiplies
-by configured ICMP destinations, with no fixed destination cap claimed. `trafficSnapshot` stays nested in the telemetry
-snapshot so traffic's existing windows, keys and normalization rules remain unchanged. No live organization has
-validated sample cadence, API publication timing or cellular behavior.
+by configured ICMP destinations, with no fixed destination cap claimed. No live organization has validated the sample
+cadence, publication timing, cellular behavior, or how Meraki treats a `t1` that a host clock running ahead of Meraki's
+puts just inside the two-minute limit.
 
 ### Stage 5 — Write metrics
 
@@ -359,9 +363,9 @@ Chart labels: `organization_id` and `organization_name` on every series; `serial
 `product_type`, `network_id` and `network_name` on device series, which switch port series extend with `port_id`;
 `network_id`, `network_name` and `interface` on uplink traffic series, which carry no device label. Appliance health
 uses device labels, with `interface` for states and `interface` plus `destination_ip` for probes; report age has no
-interface label. Traffic values are float
-gauges. A port whose accepted interval would end after the write time (a clock step backwards) is skipped. The number
-of devices without a usable status is logged at debug level, once per cycle.
+interface label. Traffic and health measurements are float gauges. A port interval, report or sample time after the
+write time (a clock step backwards) is skipped. The number of devices without a usable status is logged at debug
+level, once per cycle.
 
 ### Stage 6 — Commit or abort
 
@@ -618,7 +622,7 @@ Every option maps to an operator decision; implementation tuning (page sizes, pa
 | `collect_switch_port_traffic` | Switch port traffic, at one request per 50 switches | false | YAML/JSON boolean |
 | `collect_switch_port_packets` | Switch port packet rates, at one request per switch | false | YAML/JSON boolean |
 | `collect_appliance_uplink_traffic` | MX/Z uplink traffic, at one request | false | YAML/JSON boolean |
-| `collect_appliance_uplink_health` | Appliance states/report age and MX ICMP loss/latency, on existing device nodes | false | YAML/JSON boolean |
+| `collect_appliance_uplink_health` | Appliance uplink status and report age, and MX ICMP loss and latency, on each appliance's node | false | YAML/JSON boolean |
 | `vnode` | Placement of organization and uplink traffic charts; device nodes are unaffected | empty | framework |
 | `proxy_url` | Egress route | environment | `pkg/web` |
 | `tls_ca`, `tls_cert`, `tls_key`, `tls_skip_verify` | Trust and client identity for a proxy or private endpoint | empty, `no` | `validateConfig` (cert and key together), `pkg/tlscfg` |
@@ -636,12 +640,12 @@ the form has no hidden branch state.
 | `config.go` | `Config`, defaults, `validateConfig` |
 | `init.go` | HTTP client and API client construction |
 | `collect.go` | One cycle: read the four lists, join, read optional telemetry, write |
-| `normalize.go` | `findOrganization`, `networkNamesByID`, `buildInventory` and the status trust rule |
+| `normalize.go` | `findOrganization`, `networkNamesByID`, `buildInventory` and the status trust rule; the shared network rule (`trustedSerials`) and duplicate rule (`observations`) |
 | `collect_telemetry.go` | The traffic and probe windows, the enabled optional reads in order, `stopTelemetry` |
-| `normalize_traffic.go` | Rate validity, interval selection, the duplicate rule (`rateObservations`) |
+| `normalize_traffic.go` | Rate validity, interval selection |
 | `normalize_health.go` | Appliance joins, uplink states, device report time, latest per-destination probe selection |
 | `write_health.go` | Device-scoped report age, uplink states and ICMP probe observations |
-| `metrix.go` | Metric names, the availability vocabulary, the organization instrument |
+| `metrix.go` | Metric names, the availability and uplink state vocabularies, the organization instrument |
 | `write_metrics.go` | Organization, device, switch port and uplink observations; debug count of unknown statuses |
 | `host_scope.go` | Device virtual node identity, hostname and labels |
 | `retry_after.go` | The 429 Retry-After gate and its framework annotation |
@@ -690,7 +694,7 @@ the form has no hidden branch state.
 | --- | --- | --- |
 | Add a metric from data already read | `merakiapi/types.go` (field), `normalize.go`, `metrix.go`, `write_metrics.go`, `charts.yaml`, `metadata.yaml` | Label documentation is checked against emitted series (`TestMetadataDocumentsEmittedLabels`) |
 | Add an API operation | `merakiapi/client.go` (new `operation`, method), `collect.go` | Its page-size range, its effect on request count in `metadata.yaml`, and whether its failure must fail the cycle |
-| Add a traffic family | `merakiapi/client.go` and `types.go`, `collect_telemetry.go` (order, `stopTelemetry`), `normalize_traffic.go`, `metrix.go`, `write_metrics.go`, `charts.yaml`, `config.go`, `config_schema.json`, `metadata.yaml` | One option per family with its request cost; which node it belongs on; the gap and duplicate rules |
+| Add an optional family | `merakiapi/client.go` and `types.go`, `collect_telemetry.go` (order, `stopTelemetry`), a `normalize_*.go` and a `write_*.go` file, `metrix.go`, `charts.yaml`, `config.go`, `config_schema.json` (the Optional metrics tab), `metadata.yaml` | One option per family with its request cost; which node it belongs on; the gap and duplicate rules (`trustedSerials`, `observations`) |
 | Trust a new shard host form | `isShardName` / `trustedTarget` in `merakiapi/redirect.go` | Needs published evidence; add accept and reject cases to `merakiapi/redirect_test.go` |
 | Add a region | `regionalRoots` in `merakiapi/redirect.go`, the `url` option text in `metadata.yaml` | Shard hosts follow automatically |
 | Change the status trust rule | `availabilityStatus.trusted` in `normalize.go` | The truth table above and `TestMissingOrAmbiguousAvailability` |
@@ -711,12 +715,12 @@ the form has no hidden branch state.
 | `TestIntegrationArtifacts`, `TestMetadataDocumentsEmittedLabels` | Chart template, metadata, schema and label drift |
 | `TestTrafficCollection`, `TestTrafficOptionsAreIndependent`, `TestManagedTrafficPlacementAndFloatValues` | Values, labels, exact traffic requests, independent options, real `JobV2` placement and float output |
 | `TestTrafficZeroIsAValueAndMissingIsAGap`, `TestSwitchPortTrafficIntervalSelection`, `TestSwitchPortPacketsDuplicates`, `TestApplianceUplinkTrafficAttribution` | The traffic rule set: zero versus gap, interval selection, duplicates, network attribution |
-| `TestTrafficFailureLeavesOnlyItsGaps`, `TestTraffic429StopsTrafficRequests`, `TestTrafficDeadlineAbortsCycle`, `TestCollectAbortsCancellationDuringMetricWrites` | Per-family failure and recovery, the 429 stop and deadline, whole-cycle abort |
+| `TestTrafficFailureLeavesOnlyItsGaps`, `TestTraffic429StopsTrafficRequests`, `TestTrafficDeadlineAbortsCycle`, `TestCollectAbortsCancellationDuringMetricWrites` | Per-family failure and recovery, the 429 stop and deadline, whole-cycle abort, including cancellation while health is written |
 | `TestTrafficMethods`, `TestSwitchUsagePagination`, `TestSwitchUsageLatePageFailure`, `TestSwitchUsageHTTPPolicy`, `TestTrafficDecodeFailures` | Traffic queries, windowed next links, complete-history reads, the `items` object |
 | `TestHealthCollection`, `TestHealthOptionAndEligibility`, `TestHealthManagedPublicationAndPlacement` | Exact health queries, opt-in API cost, assigned-node placement, chart coverage and float output |
 | `TestHealthStatesAndReportMeaning`, `TestHealthLatestSamplesAndBounds`, `TestHealthIdentityDestinationsAndDuplicates` | States, distinct source ages, latest samples, null/zero/bounds, destination and HA identity, duplicate trust |
 | `TestHealthOptionalFailureAndRecovery`, `TestHealth429StopsAllOptionalRequests`, `TestHealthMalformedProbeAndContextAbort` | Optional gaps/recovery, every health/traffic 429 position, invalid numbers and whole-cycle cancellation |
-| `TestUplinkHealthMethods`, `TestUplinkStatusesPagination`, `TestUplinkStatusesLatePageFailure` | Typed health client queries, pagination and failure guarantees; see the client health test file for detailed cases |
+| `TestUplinkHealthMethods`, `TestUplinkStatusesPagination`, `TestUplinkStatusesLatePageFailure` | Typed health client queries, pagination and failure guarantees; `merakiapi/uplink_health_test.go` also covers decode, size, cancellation and ID failures |
 | `merakiapi` tests | Construction, credentials (through the shipped credential-file path with a subprocess peer), pagination, trusted redirects, gzip and body limits, cancellation, status and Retry-After errors, transport error text |
 
 Run from `src/go`:

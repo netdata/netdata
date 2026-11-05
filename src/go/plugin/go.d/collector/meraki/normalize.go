@@ -4,6 +4,7 @@ package meraki
 
 import (
 	"errors"
+	"iter"
 	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/meraki/merakiapi"
@@ -134,4 +135,64 @@ func statusesBySerial(availabilities []merakiapi.DeviceAvailability) map[string]
 func (s availabilityStatus) trusted(networkID string) bool {
 	return !s.ambiguous && slices.Contains(availabilityStates, s.status) &&
 		(networkID == "" || s.networkID == "" || networkID == s.networkID)
+}
+
+// trustedSerials reports, for each assigned device the rows mention, whether
+// the rows can describe it. A device with any row naming a network other than
+// its assigned one gets nothing from these rows; a blank network ID on either
+// side does not count as a mismatch. Other serials are absent, so they read as
+// untrusted.
+func trustedSerials[R any](
+	rows []R,
+	devices map[string]device,
+	ids func(R) (serial, networkID string),
+) map[string]bool {
+	trusted := make(map[string]bool)
+	for _, row := range rows {
+		serial, networkID := ids(row)
+		dev, ok := devices[serial]
+		if !ok {
+			continue
+		}
+		if prev, seen := trusted[serial]; !seen || prev {
+			trusted[serial] = dev.networkID == "" || networkID == "" || dev.networkID == networkID
+		}
+	}
+	return trusted
+}
+
+// observable is a value that can hold nothing worth publishing.
+type observable interface {
+	comparable
+	present() bool
+}
+
+// observations collects the values seen for each key. Identical duplicates
+// collapse into one; a key whose duplicates disagree has no value, because
+// summing them would double count and picking one would be a guess.
+type observations[K comparable, V observable] map[K]observation[V]
+
+type observation[V observable] struct {
+	value     V
+	disagreed bool
+}
+
+func (o observations[K, V]) add(key K, value V) {
+	prev, seen := o[key]
+	o[key] = observation[V]{
+		value:     value,
+		disagreed: seen && (prev.disagreed || prev.value != value),
+	}
+}
+
+// agreed yields the value of every key whose observations agree and hold
+// something to publish.
+func (o observations[K, V]) agreed() iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		for key, obs := range o {
+			if !obs.disagreed && obs.value.present() && !yield(key, obs.value) {
+				return
+			}
+		}
+	}
 }

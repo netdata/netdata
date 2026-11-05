@@ -31,7 +31,7 @@ modules:
           - **Inventory**: how many devices are assigned to the organization's networks, and which ones.
           - **Switch ports** (two opt-in options): sent and received kilobits/s, and packets/s, of every switch port, on the switch's node.
           - **Uplink traffic** (opt-in): sent and received kilobits/s of each WAN and cellular uplink of every MX security appliance and Z teleworker gateway network.
-          - **Uplink health** (opt-in): uplink status and device last report age on each assigned appliance's node; MX ICMP packet loss, latency and sample age per uplink and destination IP. Status covers MX, Z and Secure Router appliances reported by Meraki.
+          - **Uplink health** (opt-in): on the node of each assigned device of product type `appliance`, such as MX and Z, the status of every uplink and how long ago the appliance last reported; for MX, ICMP packet loss, latency and sample age per uplink and destination IP.
           - **Fleet filtering**: device nodes and charts carry organization, network, model and product type labels, so a large fleet can be grouped and filtered.
 
           Every device type Meraki reports availability for is covered, including security appliances (MX), switches (MS), wireless access points (MR), cameras (MV), sensors (MT) and cellular gateways (MG).
@@ -49,10 +49,10 @@ modules:
           | `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` | Switch port traffic | With `collect_switch_port_traffic` |
           | `getDeviceSwitchPortsStatusesPackets` | Switch port packet rates, one request per switch | With `collect_switch_port_packets` |
           | `getOrganizationApplianceUplinksUsageByNetwork` | Uplink traffic | With `collect_appliance_uplink_traffic` |
+          | `getOrganizationApplianceUplinkStatuses` | Appliance uplink status and last report time | With `collect_appliance_uplink_health`, when an appliance is assigned |
+          | `getOrganizationDevicesUplinksLossAndLatency` | MX ICMP packet loss and latency, one request for the organization | With `collect_appliance_uplink_health`, when an appliance is assigned |
 
-          With `collect_appliance_uplink_health`, `getOrganizationApplianceUplinkStatuses` reads appliance uplink states page by page and `getOrganizationDevicesUplinksLossAndLatency` reads MX ICMP measurements in one organization-wide request. Both are skipped when no appliance is assigned. Probe samples come from the five-minute window ending two minutes before collection; each destination chart shows the latest sample in that window.
-
-          Whatever `update_every` is, switch port traffic is looked up in the last 15 minutes, uplink traffic is read for the 5 minutes that ended 5 minutes ago, and packet rates for the last 5 minutes.
+          Whatever `update_every` is, switch port traffic is looked up in the last 15 minutes, uplink traffic is read for the 5 minutes that ended 5 minutes ago, and packet rates for the last 5 minutes. ICMP samples are read for the 5 minutes that ended 2 minutes ago, and each uplink and destination shows the latest one.
 
           When a job starts, one small `getOrganizationDevices` request checks that the API key can reach the organization.
       supported_platforms:
@@ -86,7 +86,7 @@ modules:
 
             An organization with 2,500 devices in 40 networks takes 1 + 1 + 3 + 3 = 8 requests per collection. Increase `update_every` to make fewer requests; increase `timeout` if a very large organization cannot finish within it.
 
-            Each optional collection adds requests to every collection:
+            Each opt-in option adds requests to every collection:
 
             | Option | Requests | Charts |
             |:-------|:---------|:-------|
@@ -169,32 +169,30 @@ modules:
               description: Collect the average traffic of every switch port, shown on its switch's node.
               default_value: false
               required: false
-              group: Traffic
+              group: Optional metrics
               detailed_description: |
                 Adds two charts per port to each switch's node: sent and received kilobits/s from the latest interval Meraki has reported within the last 15 minutes, usually 5 minutes long, or a gap when it has reported none, and how old that interval is.
             - name: collect_switch_port_packets
               description: Collect the packet rates of every switch port, at one API request per switch per collection.
               default_value: false
               required: false
-              group: Traffic
+              group: Optional metrics
               detailed_description: |
                 Adds a chart of the sent and received packets/s of each port, counting every packet type, to each switch's node. Because it costs a request per switch, it is the option that decides `timeout` on large fleets; see Performance Impact.
             - name: collect_appliance_uplink_traffic
               description: Collect the average traffic of each uplink of every MX and Z network, shown on the job's node or its virtual node.
               default_value: false
               required: false
-              group: Traffic
+              group: Optional metrics
               detailed_description: |
                 Adds a chart per network and uplink interface (for example `wan1`, `wan2` or `cellular`) with the sent and received kilobits/s of the 5 minutes that ended 5 minutes earlier, on the job's node or `vnode`.
             - name: collect_appliance_uplink_health
-              description: Collect appliance uplink status and MX ICMP loss and latency, shown on each appliance's node. Disabled by default.
+              description: Collect appliance uplink status and MX ICMP loss and latency, shown on each appliance's node.
               default_value: false
               required: false
-              group: Collection
+              group: Optional metrics
               detailed_description: |
-                Adds the five reported uplink states (`active`, `connecting`, `failed`, `not_connected` and `ready`) and the device's last report age. MX ICMP charts show packet loss percentage, latency in milliseconds and sample age in seconds for each uplink and destination IP. Warm spare appliances remain separate nodes; health is never averaged across appliances or destinations.
-
-                Missing, unknown or conflicting data produces gaps. Loss and latency are taken independently from the latest sample in the five-minute window ending two minutes before collection, without substituting older values. The sample age chart shows the sample's age; collection time is not its timestamp.
+                Adds to each appliance's node a status chart per uplink (`active`, `connecting`, `failed`, `not_connected` or `ready`) and a chart of how long ago the appliance last reported. For MX, it also adds packet loss, latency and sample age charts per uplink and ICMP destination IP. Each appliance of a warm spare pair keeps its own node, nothing is averaged across appliances or destinations, and a missing, unknown or conflicting value is a gap, never an older value.
             - name: update_every
               description: Data collection interval, in seconds.
               default_value: 300
@@ -444,7 +442,7 @@ modules:
               dimensions:
                 - name: latency
             - name: meraki.appliance_uplink_sample_age
-              description: Meraki Appliance Uplink Health Sample Age
+              description: Meraki Appliance Uplink ICMP Sample Age
               unit: seconds
               chart_type: line
               dimensions:
@@ -619,4 +617,4 @@ modules:
             fix: Follow the corresponding HTTP or transport error on this page. For HTTP 403 or 404, verify the API key's access to appliance telemetry; the successful inventory read does not prove access to every optional API.
           - error: Appliance uplink health charts are missing
             cause: The health option is off, no appliance is assigned, the optional API request failed, or Meraki reported no usable data. ICMP loss and latency are documented for MX only; cellular may have no samples by default.
-            fix: Enable `collect_appliance_uplink_health`, check the collector warning and Meraki Dashboard, and confirm that ICMP monitoring destinations answer probes. Missing samples do not establish an outage; `ready` indicates standby.
+            fix: Enable `collect_appliance_uplink_health`, check the collector warning and Meraki Dashboard, and confirm that ICMP monitoring destinations answer probes.

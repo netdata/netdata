@@ -81,7 +81,6 @@ groups:
             name: sent
             options:
               multiplier: -1
-
   - family: Appliance Health
     groups:
       - family: Device Reports
@@ -93,7 +92,7 @@ groups:
             dimensions:
               - selector: appliance_report_age
                 name: age
-      - family: Uplinks
+      - family: Uplink Status
         metrics: [appliance_uplink_status]
         charts:
           - title: Meraki Appliance Uplink Status
@@ -122,7 +121,7 @@ groups:
             dimensions:
               - selector: appliance_uplink_latency
                 name: latency
-          - title: Meraki Appliance Uplink Health Sample Age
+          - title: Meraki Appliance Uplink ICMP Sample Age
             context: appliance_uplink_sample_age
             units: seconds
             dimensions:

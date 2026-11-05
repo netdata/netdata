@@ -20,8 +20,6 @@ import (
 // usage is searched further back and uplink bytes are read from a window
 // intended to allow Meraki to finish counting; the delay remains unverified.
 const (
-	// Cisco requires loss/latency windows to end at least two minutes ago.
-	healthReportDelay = 2 * time.Minute
 	// trafficWindow is the length of the packet and uplink windows and the
 	// shortest switch port usage interval.
 	trafficWindow = 5 * time.Minute
@@ -32,7 +30,16 @@ const (
 	uplinkDelay = 5 * time.Minute
 )
 
-// telemetrySnapshot holds only the optional observations of this cycle.
+// Cisco allows a loss and latency window of at most five minutes, ending at
+// least two minutes ago.
+const (
+	// probeWindow is the length of the loss and latency window.
+	probeWindow = 5 * time.Minute
+	// probeDelay is how long before now the loss and latency window ends.
+	probeDelay = 2 * time.Minute
+)
+
+// telemetrySnapshot holds the optional observations of one cycle.
 type telemetrySnapshot struct {
 	traffic trafficSnapshot
 	health  applianceHealthSnapshot
@@ -44,20 +51,23 @@ type trafficSnapshot struct {
 	uplinks []uplinkTraffic
 }
 
-func (c *Collector) trafficEnabled() bool {
-	return c.CollectSwitchPortTraffic || c.CollectSwitchPortPackets || c.CollectApplianceUplinkTraffic
+func (c *Collector) telemetryEnabled() bool {
+	return c.CollectSwitchPortTraffic || c.CollectSwitchPortPackets || c.CollectApplianceUplinkTraffic ||
+		c.CollectApplianceUplinkHealth
 }
 
-// collectTelemetry reads the enabled health and traffic before any writes.
-// One return boundary stops all remaining optional reads on cancellation or a 429.
-// Packet fanout stays last; other failures leave only the affected gaps.
+// collectTelemetry reads the enabled optional families before anything is
+// written: appliance uplink status and probes, switch port traffic, uplink
+// traffic, then switch port packets, the one family that costs a request per
+// switch. A failed read leaves that family's gaps; a 429 or the end of ctx
+// skips every remaining request. The caller still checks ctx before writing.
 func (c *Collector) collectTelemetry(
 	ctx context.Context,
 	inventory []device,
 	networkNames map[string]string,
 ) telemetrySnapshot {
 	var result telemetrySnapshot
-	if !c.trafficEnabled() && !c.CollectApplianceUplinkHealth {
+	if !c.telemetryEnabled() {
 		return result
 	}
 	now := c.now().UTC().Truncate(time.Second)
@@ -66,15 +76,16 @@ func (c *Collector) collectTelemetry(
 	if c.CollectApplianceUplinkHealth {
 		appliances = devicesByProductType(inventory, "appliance")
 	}
-	if c.CollectApplianceUplinkHealth && len(appliances) > 0 {
+
+	if len(appliances) > 0 {
 		rows, err := c.client.ListApplianceUplinkStatuses(ctx, c.OrganizationID)
 		if err == nil {
 			result.health.states, result.health.reports = applianceStatusObservations(rows, appliances, now)
 		} else if c.stopTelemetry(ctx, "appliance uplink status", err) {
 			return result
 		}
-		end := now.Add(-healthReportDelay)
-		start := end.Add(-trafficWindow)
+		end := now.Add(-probeDelay)
+		start := end.Add(-probeWindow)
 		probes, err := c.client.ListUplinkLossAndLatency(ctx, c.OrganizationID, start, end)
 		if err == nil {
 			result.health.probes = latestUplinkProbes(probes, appliances, start, end)

@@ -30,41 +30,75 @@ func TestUplinkHealthMethods(t *testing.T) {
 		assert.Equal(t, "Bearer "+syntheticKey, r.Header.Get("Authorization"))
 		if call == 1 {
 			assert.Equal(t, "/api/v1/organizations/opaque%2Forg/appliance/uplink/statuses", r.URL.EscapedPath())
-			assert.Equal(t, url.Values{"perPage": {"1000"}}, r.URL.Query())
-			fmt.Fprint(w, `[{"serial":"MX-A","networkId":"NETWORK","model":"MX68C","lastReportedAt":"2026-11-05T09:00:00Z","highAvailability":{"enabled":true,"role":"primary"},"uplinks":[{"interface":"wan3","status":"ready","ip":"192.0.2.1"},{"interface":"cellular","status":"future-state"}]}]`)
+			assert.Equal(t, url.Values{
+				"perPage": {"1000"},
+			}, r.URL.Query())
+			fmt.Fprint(w, `[{"serial":"MX-A","networkId":"NETWORK","model":"MX68C",`+
+				`"lastReportedAt":"2026-11-05T09:00:00Z","highAvailability":{"enabled":true,"role":"primary"},`+
+				`"uplinks":[{"interface":"wan3","status":"ready","ip":"192.0.2.1"},`+
+				`{"interface":"cellular","status":"future-state"}]}]`)
 			return
 		}
 		assert.Equal(t, "/api/v1/organizations/opaque%2Forg/devices/uplinksLossAndLatency", r.URL.EscapedPath())
-		assert.Equal(t, url.Values{"t0": {"2026-11-05T09:00:00.000000123Z"}, "t1": {"2026-11-05T09:05:00.000000123Z"}}, r.URL.Query())
+		assert.Equal(t, url.Values{
+			"t0": {"2026-11-05T09:00:00.000000123Z"},
+			"t1": {"2026-11-05T09:05:00.000000123Z"},
+		}, r.URL.Query())
 		// This operation has no pagination, even if a response supplies a Link.
 		w.Header().Set("Link", `<?startingAfter=unexpected>; rel="next"`)
-		fmt.Fprint(w, `[{"serial":"MX-A","networkId":"NETWORK","uplink":"wan3","ip":"198.51.100.1","timeSeries":[{"ts":"2026-11-05T09:04:00Z","lossPercent":0,"latencyMs":0},{"ts":"2026-11-05T09:03:00Z","lossPercent":null,"latencyMs":12.25},{"ts":"2026-11-05T09:02:00Z","lossPercent":5.3}]}]`)
+		fmt.Fprint(w, `[{"serial":"MX-A","networkId":"NETWORK","uplink":"wan3","ip":"198.51.100.1","timeSeries":[`+
+			`{"ts":"2026-11-05T09:04:00Z","lossPercent":0,"latencyMs":0},`+
+			`{"ts":"2026-11-05T09:03:00Z","lossPercent":null,"latencyMs":12.25},`+
+			`{"ts":"2026-11-05T09:02:00Z","lossPercent":5.3}]}]`)
 	}))
 	defer server.Close()
 	c := clientForServer(t, server)
+
 	statuses, err := c.ListApplianceUplinkStatuses(t.Context(), "opaque/org")
 	require.NoError(t, err)
-	require.Len(t, statuses, 1)
-	assert.Equal(t, merakiapi.ApplianceUplinkStatus{Serial: "MX-A", NetworkID: "NETWORK", LastReportedAt: "2026-11-05T09:00:00Z", Uplinks: []merakiapi.ApplianceUplinkState{{Interface: "wan3", Status: "ready"}, {Interface: "cellular", Status: "future-state"}}}, statuses[0])
+	assert.Equal(t, []merakiapi.ApplianceUplinkStatus{
+		{
+			Serial:         "MX-A",
+			NetworkID:      "NETWORK",
+			LastReportedAt: "2026-11-05T09:00:00Z",
+			Uplinks: []merakiapi.ApplianceUplinkState{
+				{
+					Interface: "wan3",
+					Status:    "ready",
+				},
+				{
+					Interface: "cellular",
+					Status:    "future-state",
+				},
+			},
+		},
+	}, statuses)
+
 	rows, err := c.ListUplinkLossAndLatency(t.Context(), "opaque/org", start, end)
 	require.NoError(t, err)
-	require.Len(t, rows, 1)
-	assert.Equal(t, "MX-A", rows[0].Serial)
-	assert.Equal(t, "NETWORK", rows[0].NetworkID)
-	assert.Equal(t, "wan3", rows[0].Uplink)
-	assert.Equal(t, "198.51.100.1", rows[0].DestinationIP)
-	require.Len(t, rows[0].Samples, 3)
-	assert.Equal(t, "2026-11-05T09:04:00Z", rows[0].Samples[0].Timestamp)
-	require.NotNil(t, rows[0].Samples[0].LossPercent)
-	require.NotNil(t, rows[0].Samples[0].LatencyMS)
-	assert.Zero(t, *rows[0].Samples[0].LossPercent)
-	assert.Zero(t, *rows[0].Samples[0].LatencyMS)
-	assert.Nil(t, rows[0].Samples[1].LossPercent)
-	require.NotNil(t, rows[0].Samples[1].LatencyMS)
-	assert.Equal(t, 12.25, *rows[0].Samples[1].LatencyMS)
-	assert.Nil(t, rows[0].Samples[2].LatencyMS)
-	require.NotNil(t, rows[0].Samples[2].LossPercent)
-	assert.Equal(t, 5.3, *rows[0].Samples[2].LossPercent)
+	assert.Equal(t, []merakiapi.UplinkLossAndLatency{
+		{
+			Serial:        "MX-A",
+			NetworkID:     "NETWORK",
+			Uplink:        "wan3",
+			DestinationIP: "198.51.100.1",
+			Samples: []merakiapi.UplinkHealthSample{
+				{
+					Timestamp:   "2026-11-05T09:04:00Z",
+					LossPercent: new(0.0),
+					LatencyMS:   new(0.0),
+				},
+				{
+					Timestamp: "2026-11-05T09:03:00Z",
+					LatencyMS: new(12.25),
+				},
+				{
+					Timestamp:   "2026-11-05T09:02:00Z",
+					LossPercent: new(5.3),
+				},
+			},
+		},
+	}, rows)
 	assert.EqualValues(t, 2, calls.Load())
 }
 
@@ -83,7 +117,9 @@ func TestUplinkStatusesPagination(t *testing.T) {
 		"unknown parameter":  {link: "?startingAfter=second&api_key=SECRET"},
 		"unexpected window":  {link: "?startingAfter=second&t0=2026-11-05T09:00:00Z"},
 		"duplicate cursor":   {link: "?startingAfter=second&startingAfter=third"},
-		"wrong host":         {link: "https://example.invalid/api/v1/organizations/ORG/appliance/uplink/statuses?startingAfter=second"},
+		"wrong host": {
+			link: "https://example.invalid/api/v1/organizations/ORG/appliance/uplink/statuses?startingAfter=second",
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -173,15 +209,25 @@ func TestUplinkHealthResponseFailures(t *testing.T) {
 	for operation, read := range healthReads {
 		for name, tc := range tests {
 			t.Run(operation+"/"+name, func(t *testing.T) {
-				c, err := merakiapi.New(merakiapi.Config{APIKey: syntheticKey}, &http.Client{Transport: advertisedLimitTransport{
-					limit: 64, roundTripFunc: func(r *http.Request) (*http.Response, error) {
-						status := tc.status
-						if status == 0 {
-							status = http.StatusOK
-						}
-						return response(r, status, http.Header{"Retry-After": {"30"}}, tc.body), nil
+				c, err := merakiapi.New(
+					merakiapi.Config{
+						APIKey: syntheticKey,
 					},
-				}})
+					&http.Client{
+						Transport: advertisedLimitTransport{
+							limit: 64,
+							roundTripFunc: func(r *http.Request) (*http.Response, error) {
+								status := tc.status
+								if status == 0 {
+									status = http.StatusOK
+								}
+								return response(r, status, http.Header{
+									"Retry-After": {"30"},
+								}, tc.body), nil
+							},
+						},
+					},
+				)
 				require.NoError(t, err)
 				got, err := read(t.Context(), c, "ORG")
 				require.Error(t, err)
@@ -205,7 +251,9 @@ func TestUplinkHealthCancellationAndIDs(t *testing.T) {
 	for operation, read := range healthReads {
 		t.Run(operation, func(t *testing.T) {
 			var calls atomic.Int32
-			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); fmt.Fprint(w, `[]`) }))
+			server := httptest.NewTLSServer(
+				http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); fmt.Fprint(w, `[]`) }),
+			)
 			defer server.Close()
 			c := clientForServer(t, server)
 			for _, id := range []string{"", ".", ".."} {
@@ -229,11 +277,24 @@ func TestUplinkHealthRejectsCancellationAfterBufferedResponse(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			closed := false
-			c, err := merakiapi.New(merakiapi.Config{APIKey: syntheticKey}, &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-				resp := response(r, http.StatusOK, nil, "")
-				resp.Body = trackedBody{Reader: cancelAtEOF{Reader: strings.NewReader(`[]`), cancel: cancel}, closed: &closed}
-				return resp, nil
-			})})
+			c, err := merakiapi.New(
+				merakiapi.Config{
+					APIKey: syntheticKey,
+				},
+				&http.Client{
+					Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+						resp := response(r, http.StatusOK, nil, "")
+						resp.Body = trackedBody{
+							Reader: cancelAtEOF{
+								Reader: strings.NewReader(`[]`),
+								cancel: cancel,
+							},
+							closed: &closed,
+						}
+						return resp, nil
+					}),
+				},
+			)
 			require.NoError(t, err)
 			got, err := read(ctx, c, "ORG")
 			require.ErrorIs(t, err, context.Canceled)

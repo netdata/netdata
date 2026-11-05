@@ -60,7 +60,7 @@ func TestMetadataDocumentsEmittedLabels(t *testing.T) {
 		"appliance uplink health": metricApplianceUplinkStatus,
 		"appliance uplink probe":  metricApplianceUplinkLatency,
 	} {
-		points := trafficPoints(c, metric)
+		points := metricPoints(c, metric)
 		require.NotEmpty(t, points)
 		labels := points[0].Labels
 		delete(labels, metricApplianceUplinkStatus) // The flattened state is a dimension, not a chart label.

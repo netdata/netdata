@@ -3,7 +3,6 @@
 package meraki
 
 import (
-	"iter"
 	"math"
 	"slices"
 	"time"
@@ -96,13 +95,9 @@ func latestPortTraffic(
 	switches map[string]device,
 	start, end time.Time,
 ) []portTraffic {
-	misplaced := make(map[string]bool)
-	for _, row := range rows {
-		dev, ok := switches[row.Serial]
-		if ok && dev.networkID != "" && row.Network.ID != "" && dev.networkID != row.Network.ID {
-			misplaced[row.Serial] = true
-		}
-	}
+	trusted := trustedSerials(rows, switches, func(r merakiapi.SwitchPortUsageHistory) (string, string) {
+		return r.Serial, r.Network.ID
+	})
 
 	type sample struct {
 		key   portKey
@@ -112,7 +107,7 @@ func latestPortTraffic(
 	var samples []sample
 	latest := make(map[portKey]time.Time)
 	for _, row := range rows {
-		if _, ok := switches[row.Serial]; !ok || misplaced[row.Serial] {
+		if !trusted[row.Serial] {
 			continue
 		}
 		for _, port := range row.Ports {
@@ -145,7 +140,7 @@ func latestPortTraffic(
 		}
 	}
 
-	observed := make(rateObservations[portKey])
+	observed := make(observations[portKey, directionalRate])
 	for _, s := range samples {
 		if s.end.Equal(latest[s.key]) {
 			observed.add(s.key, s.rates)
@@ -166,7 +161,7 @@ func latestPortTraffic(
 // totalPacketRates returns the "Total" packet rates of each port of a switch.
 // The other categories are parts of the total.
 func totalPacketRates(serial string, ports []merakiapi.SwitchPortPackets) []portPackets {
-	observed := make(rateObservations[string])
+	observed := make(observations[string, directionalRate])
 	for _, port := range ports {
 		if port.PortID == "" {
 			continue
@@ -195,7 +190,7 @@ func totalPacketRates(serial string, ports []merakiapi.SwitchPortPackets) []port
 // organization's networks. A network missing from the network list cannot be
 // named, so its uplinks are dropped.
 func uplinkTrafficRates(rows []merakiapi.ApplianceUplinkUsage, networkNames map[string]string) []uplinkTraffic {
-	observed := make(rateObservations[uplinkKey])
+	observed := make(observations[uplinkKey, directionalRate])
 	for _, row := range rows {
 		if _, ok := networkNames[row.NetworkID]; !ok {
 			continue
@@ -220,34 +215,4 @@ func uplinkTrafficRates(rows []merakiapi.ApplianceUplinkUsage, networkNames map[
 		})
 	}
 	return uplinks
-}
-
-// rateObservations collects the rates seen for each key. Identical duplicates
-// collapse into one; a key whose duplicates disagree has no value, because
-// summing them would double count and picking one would be a guess.
-type rateObservations[K comparable] map[K]rateObservation
-
-type rateObservation struct {
-	rates     directionalRate
-	disagreed bool
-}
-
-func (o rateObservations[K]) add(key K, rates directionalRate) {
-	prev, seen := o[key]
-	o[key] = rateObservation{
-		rates:     rates,
-		disagreed: seen && (prev.disagreed || prev.rates != rates),
-	}
-}
-
-// agreed yields the rates of every key whose observations agree and hold at
-// least one value.
-func (o rateObservations[K]) agreed() iter.Seq2[K, directionalRate] {
-	return func(yield func(K, directionalRate) bool) {
-		for key, obs := range o {
-			if !obs.disagreed && obs.rates.present() && !yield(key, obs.rates) {
-				return
-			}
-		}
-	}
 }

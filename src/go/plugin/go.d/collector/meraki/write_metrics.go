@@ -18,7 +18,7 @@ func (c *Collector) writeMetrics(organizationName string, inventory []device, te
 	)
 	m.organizationAssigned.Observe(metrix.SampleValue(len(inventory)), orgLabels)
 
-	deviceMeters := make(map[string]metrix.SnapshotMeter)
+	deviceMeters := make(map[string]metrix.SnapshotMeter, len(inventory))
 	unknownStatus := 0
 	for _, dev := range inventory {
 		devLabels := m.meter.LabelSet(
@@ -48,9 +48,7 @@ func (c *Collector) writeMetrics(organizationName string, inventory []device, te
 			},
 		)
 		meter := m.meter.WithHostScope(deviceHostScope(c.OrganizationID, dev)).WithLabelSet(orgLabels, devLabels)
-		if dev.productType == "switch" || c.CollectApplianceUplinkHealth && dev.productType == "appliance" {
-			deviceMeters[dev.serial] = meter
-		}
+		deviceMeters[dev.serial] = meter
 
 		// Always written, so the device node exists even without a status.
 		meter.Gauge(metricDeviceAssigned).Observe(1)
@@ -76,12 +74,12 @@ func (c *Collector) writeMetrics(organizationName string, inventory []device, te
 // can come from more than one appliance.
 func (c *Collector) writeTrafficMetrics(
 	orgLabels metrix.LabelSet,
-	switchMeters map[string]metrix.SnapshotMeter,
+	deviceMeters map[string]metrix.SnapshotMeter,
 	traffic trafficSnapshot,
 ) {
 	now := c.now()
 	for _, port := range traffic.ports {
-		meter, ok := switchMeters[port.serial]
+		meter, ok := deviceMeters[port.serial]
 		age := now.Sub(port.end)
 		if !ok || age < 0 {
 			continue
@@ -95,7 +93,7 @@ func (c *Collector) writeTrafficMetrics(
 			Observe(metrix.SampleValue(age.Seconds()))
 	}
 	for _, port := range traffic.packets {
-		meter, ok := switchMeters[port.serial]
+		meter, ok := deviceMeters[port.serial]
 		if !ok {
 			continue
 		}
