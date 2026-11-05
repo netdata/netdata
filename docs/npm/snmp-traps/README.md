@@ -68,7 +68,7 @@ A count tells you the receiver saw activity, not whether it matters. Use the res
 
 Trap data can carry sensitive operational values (hostnames, locations, usernames, vendor text); treat it as sensitive when querying and forwarding.
 
-Viewing trap logs in the Netdata Logs UI (the `snmp:traps` Function) requires a signed-in member of the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial. The listener receives, decodes, stores, and forwards traps on every plan, and `journalctl` and SIEM shippers read the journal files directly.
+Viewing trap logs in the Netdata Logs UI (the `snmp:traps` Function) requires a signed-in member of the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial. The listener receives, decodes, stores, and forwards traps on every plan. Local storage, the `snmp:traps` Function, and direct `journalctl` and SIEM access to the journal files need journal output enabled (the default); an OTLP-only job forwards traps without storing them locally.
 
 ## Where to start
 

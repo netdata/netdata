@@ -116,7 +116,7 @@ For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mc
 2. **Connect your nodes** to your Netdata Cloud Space
 3. **Access the dashboard** through Netdata Cloud
 
-Once signed in, you'll have access to the sensitive functions (processes, logs, network connections, etc.) on nodes within your Space. Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, topology maps (SNMP, application dependencies, vSphere and Cato Networks), Real User Monitoring and Synthetic Browser Tests also require a paid plan or an active trial. The Agent collects and stores this data on every plan; only viewing it is plan-gated. System logs, BMC event logs and the streaming topology need a signed-in member of the node's Space with sensitive-data permission, on every plan; SNMP device metrics and API, uptime and other checks are metrics, available on every plan.
+Once signed in, you'll have access to the sensitive functions (processes, logs, network connections, etc.) on nodes within your Space. Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, topology maps (SNMP, application dependencies, vSphere and Cato Networks), Real User Monitoring and Synthetic Browser Tests require a signed-in member of the node's Space with permission to view sensitive data, on a paid plan or an active trial. The Agent collects and stores this data on every plan; only viewing it is plan-gated. System logs, BMC event logs and the streaming topology need a signed-in member of the node's Space with sensitive-data permission, on every plan; SNMP device metrics and API, uptime and other checks are metrics, available on every plan.
 
 ### Enable Dynamic Configuration
 

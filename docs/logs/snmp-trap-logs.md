@@ -14,7 +14,7 @@ full-text search, histograms, and live tail as every other source.
 - **Forwarding:** traps can also be sent over OTLP to any OpenTelemetry backend.
 - **Viewing:** the **SNMP Trap Logs** view requires a signed-in member of the node's Netdata Cloud Space with permission
   to view sensitive data, on a paid plan or an active trial. Reception, storage, `journalctl` access, and forwarding
-  work on every plan.
+  work on every plan; local storage, the view and `journalctl` access need journal output enabled (the default).
 
 The collector, its configuration, the trap fields, and the query workflows are documented under Network Performance
 Monitoring:

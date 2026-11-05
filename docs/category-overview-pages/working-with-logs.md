@@ -67,8 +67,9 @@ reading production logs does not require shell access to production systems. See
 
 Log content stays in your infrastructure. Viewing logs requires signing in with Netdata Cloud, which is free for
 community use. Viewing OpenTelemetry logs (`otel-logs`, and `legacy-otel-logs` for logs kept by the former experimental
-plugin) and SNMP trap logs (`snmp:traps`) also requires a paid plan or an active trial; the Agent receives and stores
-them on all plans. The content is transmitted encrypted to your browser and is not stored in
+plugin) and SNMP trap logs (`snmp:traps`) requires a signed-in member of the node's Space with permission to view
+sensitive data, on a paid plan or an active trial. The Agent receives and stores OpenTelemetry logs and SNMP trap logs
+on all plans; `legacy-otel-logs` shows the journals the former plugin left on the node. The content is transmitted encrypted to your browser and is not stored in
 Netdata Cloud. For full data sovereignty, [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)
 runs the same service inside your own infrastructure.
 

@@ -138,7 +138,8 @@ The OS-native sources and the OpenTelemetry log store use different query engine
 ## Prerequisites
 
 - Sign in with Netdata Cloud, which is free for community use. The `otel-logs`, `legacy-otel-logs` (logs retained by the
-  former OpenTelemetry plugin) and `snmp:traps` sources also require a Space on a paid plan or an active trial. Log content is transmitted encrypted to your browser
+  former OpenTelemetry plugin) and `snmp:traps` sources require a signed-in member of the node's Space with permission to
+  view sensitive data, on a paid plan or an active trial. Log content is transmitted encrypted to your browser
   and is not stored in Netdata Cloud; for full data sovereignty, run
   [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md).
 - Platform requirements, packages, and container settings are documented in each plugin's reference:
