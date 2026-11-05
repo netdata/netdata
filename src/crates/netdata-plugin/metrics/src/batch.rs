@@ -3,7 +3,7 @@
 //! time whether that window is still open.
 
 use crate::metric_set::{
-    ColumnRange, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet,
+    ColumnRange, Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels, MetricSet,
     MetricSetInner,
 };
 use indexmap::IndexMap;
@@ -119,7 +119,7 @@ impl BatchEntity<'_> {
 ///
 /// Every method panics if the instrument belongs to another [`MetricSet`],
 /// or if the dimension's index is out of range (a broken manual
-/// [`Dimensions`] implementation).
+/// [`Dimension`] implementation).
 pub struct Measurements<'a> {
     set_id: u32,
     row: &'a mut [f64],
@@ -130,7 +130,7 @@ impl Measurements<'_> {
         assert_eq!(set_id, self.set_id, "instrument of another metric set");
     }
 
-    fn column<D: Dimensions>(&self, columns: ColumnRange<D>, dimension: D) -> usize {
+    fn column<D: Dimension>(&self, columns: ColumnRange<D>, dimension: D) -> usize {
         self.check_set(columns.set_id);
         let index = dimension.index();
         assert!(
@@ -144,7 +144,7 @@ impl Measurements<'_> {
     /// Count `amount` for `dimension` of `counter` in this event's window; the
     /// chart shows the window's count per second. A non-finite amount is
     /// ignored.
-    pub fn add<D: Dimensions>(
+    pub fn add<D: Dimension>(
         &mut self,
         counter: Counter<D>,
         dimension: D,
@@ -160,7 +160,7 @@ impl Measurements<'_> {
     /// Record `total`, the source's running total for `dimension` of
     /// `cumulative`; the chart shows how much it grew per second. Within a
     /// window, the total recorded last counts. A non-finite total is ignored.
-    pub fn set_total<D: Dimensions>(
+    pub fn set_total<D: Dimension>(
         &mut self,
         cumulative: CumulativeCounter<D>,
         dimension: D,
@@ -176,7 +176,7 @@ impl Measurements<'_> {
     /// Record `value` for `dimension` of `gauge`; the chart shows it as is.
     /// Within a window, the value recorded last counts. A non-finite value is
     /// ignored.
-    pub fn set_value<D: Dimensions>(
+    pub fn set_value<D: Dimension>(
         &mut self,
         gauge: Gauge<D>,
         dimension: D,

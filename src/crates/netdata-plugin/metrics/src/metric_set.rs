@@ -4,7 +4,7 @@
 //! with the columns the set's layout fixes. A row aggregates the events of one
 //! entity counted in one window (see [`Aggregator`](crate::Aggregator) for
 //! events outside the open windows); each of its cells is one `f64`. A
-//! counter has one column per dimension value, a histogram one per bucket plus
+//! counter has one column per dimension, a histogram one per bucket plus
 //! its sum, count and maximum. Merging combines two rows column by column
 //! with each column's aggregation: sums add, maxima keep the larger value,
 //! last-value columns keep the value set last. Instruments are typed handles
@@ -61,9 +61,9 @@ impl Aggregation {
     }
 }
 
-/// The values an instrument is split by, for example a request's outcome.
-/// Each value is one dimension of the instrument's chart, in
-/// [`Dimensions::IDS`] order.
+/// A type whose values are the dimensions an instrument is split by, for
+/// example a request's outcome: each value is one dimension of the
+/// instrument's chart, in [`Dimension::IDS`] order.
 ///
 /// Implement it with [`dimensions!`](crate::dimensions). A manual
 /// implementation must:
@@ -72,11 +72,11 @@ impl Aggregation {
 /// - use valid dimension ids: not empty, no spaces, control characters,
 ///   quotes, `\` or `=`, and not starting with `SLOT:` (declaring the
 ///   instrument panics otherwise).
-pub trait Dimensions: Copy + 'static {
+pub trait Dimension: Copy + 'static {
     /// The dimension ids, which are also their names, in chart order.
     const IDS: &'static [&'static str];
 
-    /// The position of this value in [`Dimensions::IDS`].
+    /// The position of this value in [`Dimension::IDS`].
     fn index(self) -> usize;
 }
 
@@ -114,7 +114,7 @@ macro_rules! dimensions {
             $($(#[$variant_meta])* $variant),+
         }
 
-        impl $crate::Dimensions for $name {
+        impl $crate::Dimension for $name {
             const IDS: &'static [&'static str] = &[$($id),+];
 
             fn index(self) -> usize {
@@ -153,22 +153,22 @@ pub struct CumulativeCounter<D>(pub(crate) ColumnRange<D>);
 #[derive(Debug, Clone, Copy)]
 pub struct Gauge<D>(pub(crate) ColumnRange<D>);
 
-/// The columns of one instrument with dimensions `D`, one per dimension
-/// value from `base`, in the set `set_id`: what every such instrument is.
+/// The columns of one instrument split by `D`, one per dimension from
+/// `base`, in the set `set_id`: what every such instrument is.
 #[derive(Debug)]
 pub(crate) struct ColumnRange<D> {
     pub(crate) set_id: u32,
     base: usize,
-    _dimensions: PhantomData<fn() -> D>,
+    _dimension: PhantomData<fn() -> D>,
 }
 
-impl<D: Dimensions> ColumnRange<D> {
+impl<D: Dimension> ColumnRange<D> {
     /// All the columns, one per value of `D`.
     pub(crate) fn range(self) -> Range<usize> {
         self.base..self.base + D::IDS.len()
     }
 
-    /// The column of the dimension value with index `i`.
+    /// The column of the dimension with index `i`.
     pub(crate) fn column(self, i: usize) -> usize {
         self.base + i
     }
@@ -229,14 +229,15 @@ pub(crate) enum Readout {
     Column(usize),
 }
 
-/// One dimension of a chart. Its id is also its display name.
+/// One dimension of a chart as emitted: its id, which is also its display
+/// name, and how it reads its columns.
 #[derive(Debug, Clone)]
-pub(crate) struct Dimension {
+pub(crate) struct ChartDimension {
     pub(crate) id: String,
     pub(crate) readout: Readout,
 }
 
-impl Dimension {
+impl ChartDimension {
     fn new(id: &str, readout: Readout) -> Self {
         assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
         Self {
@@ -287,7 +288,7 @@ pub(crate) struct ChartTemplate {
     pub(crate) context: String,
     pub(crate) chart_type: ChartType,
     pub(crate) priority: i32,
-    pub(crate) dimensions: Vec<Dimension>,
+    pub(crate) dimensions: Vec<ChartDimension>,
 }
 
 /// The labels that identify an entity; its charts carry them.
@@ -521,7 +522,7 @@ impl MetricSetBuilder {
     /// # Panics
     ///
     /// If the chart's context or a dimension id is invalid or already used.
-    pub fn counter<D: Dimensions>(&mut self, chart: Chart) -> Counter<D> {
+    pub fn counter<D: Dimension>(&mut self, chart: Chart) -> Counter<D> {
         let columns = self.column_range::<D>(Aggregation::Sum);
         self.chart(chart, per_dimension(columns, Readout::Rate));
         Counter(columns)
@@ -532,7 +533,7 @@ impl MetricSetBuilder {
     /// # Panics
     ///
     /// As [`MetricSetBuilder::counter`].
-    pub fn cumulative_counter<D: Dimensions>(&mut self, chart: Chart) -> CumulativeCounter<D> {
+    pub fn cumulative_counter<D: Dimension>(&mut self, chart: Chart) -> CumulativeCounter<D> {
         let columns = self.column_range::<D>(Aggregation::LastValue);
         self.cumulative_columns.extend(columns.range());
         self.chart(chart, per_dimension(columns, Readout::Rate));
@@ -544,7 +545,7 @@ impl MetricSetBuilder {
     /// # Panics
     ///
     /// As [`MetricSetBuilder::counter`].
-    pub fn gauge<D: Dimensions>(&mut self, chart: Chart) -> Gauge<D> {
+    pub fn gauge<D: Dimension>(&mut self, chart: Chart) -> Gauge<D> {
         let columns = self.column_range::<D>(Aggregation::LastValue);
         self.chart(chart, per_dimension(columns, Readout::Column));
         Gauge(columns)
@@ -586,27 +587,27 @@ impl MetricSetBuilder {
         self.chart(
             chart,
             vec![
-                Dimension::new(
+                ChartDimension::new(
                     "avg",
                     Readout::Ratio {
                         numerator: histogram.sum_column(),
                         denominator: histogram.count_column(),
                     },
                 ),
-                Dimension::new("max", Readout::Column(histogram.max_column())),
+                ChartDimension::new("max", Readout::Column(histogram.max_column())),
             ],
         );
-        let mut buckets: Vec<Dimension> = bounds
+        let mut buckets: Vec<ChartDimension> = bounds
             .iter()
             .enumerate()
             .map(|(i, bound)| {
-                Dimension::new(
+                ChartDimension::new(
                     &bound.to_string(),
                     Readout::Rate(histogram.bucket_column(i)),
                 )
             })
             .collect();
-        buckets.push(Dimension::new(
+        buckets.push(ChartDimension::new(
             "+Inf",
             Readout::Rate(histogram.bucket_column(bounds.len())),
         ));
@@ -658,15 +659,15 @@ impl MetricSetBuilder {
     }
 
     /// Add one column with `aggregation` per value of `D`.
-    fn column_range<D: Dimensions>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
+    fn column_range<D: Dimension>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
         ColumnRange {
             set_id: self.id,
             base: self.columns(D::IDS.len(), aggregation),
-            _dimensions: PhantomData,
+            _dimension: PhantomData,
         }
     }
 
-    fn chart(&mut self, chart: Chart, dimensions: Vec<Dimension>) {
+    fn chart(&mut self, chart: Chart, dimensions: Vec<ChartDimension>) {
         self.add_chart(ChartTemplate {
             title: chart.title.to_string(),
             units: chart.units,
@@ -712,14 +713,14 @@ impl MetricSetBuilder {
 }
 
 /// One dimension per value of `D`, each reading its own column with `read`.
-fn per_dimension<D: Dimensions>(
+fn per_dimension<D: Dimension>(
     columns: ColumnRange<D>,
     read: fn(usize) -> Readout,
-) -> Vec<Dimension> {
+) -> Vec<ChartDimension> {
     D::IDS
         .iter()
         .enumerate()
-        .map(|(i, id)| Dimension::new(id, read(columns.column(i))))
+        .map(|(i, id)| ChartDimension::new(id, read(columns.column(i))))
         .collect()
 }
 

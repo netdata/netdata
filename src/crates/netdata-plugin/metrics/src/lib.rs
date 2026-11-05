@@ -52,8 +52,8 @@
 //!
 //! Terms:
 //! - an *instrument* is a [`Counter`], [`CumulativeCounter`], [`Gauge`] or
-//!   [`Histogram`]; each brings its chart, and the first three are split by
-//!   the values of their [`Dimensions`];
+//!   [`Histogram`]; each brings its chart, and the first three are split
+//!   into dimensions, one per value of their [`Dimension`] type;
 //! - an *entity* is the thing being monitored, for example one service,
 //!   identified by its [`Labels`]; it gets its own instance (in Netdata's
 //!   sense: one chart) of every chart of the set, so instruments that need
@@ -76,7 +76,7 @@ mod metric_set;
 pub use aggregator::{Aggregator, Stats};
 pub use batch::{Batch, BatchEntity, Measurements};
 pub use metric_set::{
-    CardinalityLimit, Chart, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels,
+    CardinalityLimit, Chart, Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels,
     MetricSet, MetricSetBuilder, Settings,
 };
 pub use netdata_plugin_protocol::ChartType;

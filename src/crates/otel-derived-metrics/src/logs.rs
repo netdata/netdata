@@ -95,7 +95,7 @@ impl ServiceLogs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netdata_plugin_metrics::{Aggregator, Dimensions};
+    use netdata_plugin_metrics::{Aggregator, Dimension};
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};

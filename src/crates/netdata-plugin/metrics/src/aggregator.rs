@@ -849,7 +849,7 @@ mod tests {
     fn a_dimension_index_out_of_range_is_refused() {
         #[derive(Clone, Copy)]
         struct Broken;
-        impl crate::Dimensions for Broken {
+        impl crate::Dimension for Broken {
             const IDS: &'static [&'static str] = &["a", "b"];
             fn index(self) -> usize {
                 2
