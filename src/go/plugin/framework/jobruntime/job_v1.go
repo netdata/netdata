@@ -616,10 +616,3 @@ func cleanPluginName(name string) string {
 	r := strings.NewReplacer(" ", "_", ".", "_")
 	return r.Replace(name)
 }
-
-var lblValueReplacer = strings.NewReplacer(
-	"'", "",
-	"\n", " ",
-	"\r", " ",
-	"\x00", "",
-)
