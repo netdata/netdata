@@ -49,8 +49,10 @@ impl Batch {
     }
 
     /// The entity with these labels, to record into. A label set the store
-    /// has not seen becomes a new entity when the batch is merged, and its
-    /// charts are defined on the next [`Store::emit`](crate::Store::emit).
+    /// has not seen becomes a new entity when the batch is merged, if it got
+    /// at least one [`record`](BatchEntity::record) and the store is not at
+    /// its [`Cap`](crate::Cap) (else its records go to the overflow entity);
+    /// its charts are defined on the next [`Store::emit`](crate::Store::emit).
     ///
     /// Look an entity up once per group of records that share labels, not
     /// per record; while the returned handle lives, the batch is borrowed, so

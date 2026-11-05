@@ -22,8 +22,8 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 /// (`RRDLABELS_MAX_NAME_LENGTH`).
 const MAX_LABEL_KEY_BYTES: usize = 200;
 
-/// How a cell combines two values for the same entity and slot (from two
-/// batches, or a batch and the store).
+/// How a cell combines two values for the same entity: from two batches, a
+/// batch and the store, or two slots folded into one after a stall.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Merge {
     /// Sum; starts at 0.

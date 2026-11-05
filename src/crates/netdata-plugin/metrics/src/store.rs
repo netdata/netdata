@@ -4,8 +4,8 @@
 //! The store keeps every slot from `next_emit` (the oldest slot not yet
 //! emitted) to the current one open; each entity holds those slots as cell
 //! arrays and folds them forward after a stall (`advance_window`). Entities
-//! are created on their first record with data, charts are defined on an
-//! entity's first emitted slot, and an expired entity's state is dropped
+//! are created on their first record, with or without measurements, charts
+//! are defined on an entity's first emitted slot, and an expired entity's state is dropped
 //! (its cumulative baselines with it).
 
 use crate::batch::Batch;
@@ -558,9 +558,10 @@ mod tests {
         now: u64,
     ) {
         let mut batch = Batch::new(&f.set);
-        let mut inst = batch.entity(labels(name));
+        let mut entity = batch.entity(labels(name));
         for i in 0..count {
-            inst.record(time)
+            entity
+                .record(time)
                 .add(
                     f.requests,
                     if i < errors {
@@ -733,9 +734,9 @@ mod tests {
         let f = fixture(10, 900, None);
         let mut store = Store::new(f.set.clone());
         let mut batch = Batch::new(&f.set);
-        let mut inst = batch.entity(labels("a"));
+        let mut entity = batch.entity(labels("a"));
         for time in [995, 996, 995, 997, 996, 999] {
-            inst.record(time).add(f.requests, Outcome::Ok, 1.0);
+            entity.record(time).add(f.requests, Outcome::Ok, 1.0);
         }
         store.merge(batch, 1000);
         let out = text(&store.emit(1011, usize::MAX));
@@ -820,8 +821,8 @@ mod tests {
         let mut store = Store::new(set.clone());
         let set = |store: &mut Store, time: u64, total: Option<f64>| {
             let mut batch = Batch::new(&set);
-            let mut inst = batch.entity(Labels::new());
-            let mut record = inst.record(time);
+            let mut entity = batch.entity(Labels::new());
+            let mut record = entity.record(time);
             if let Some(total) = total {
                 record.set_total(totals, Events::Events, total);
             }
@@ -854,8 +855,8 @@ mod tests {
         let f = fixture(0, 900, None);
         let other = fixture(0, 900, None);
         let mut batch = Batch::new(&f.set);
-        let mut inst = batch.entity(labels("a"));
-        inst.record(10).add(other.requests, Outcome::Ok, 1.0);
+        let mut entity = batch.entity(labels("a"));
+        entity.record(10).add(other.requests, Outcome::Ok, 1.0);
     }
 
     #[test]
@@ -880,8 +881,8 @@ mod tests {
         });
         let set = b.build();
         let mut batch = Batch::new(&set);
-        let mut inst = batch.entity(Labels::new());
-        inst.record(10).add(counter, Broken, 1.0);
+        let mut entity = batch.entity(Labels::new());
+        entity.record(10).add(counter, Broken, 1.0);
     }
 
     #[test]
@@ -908,11 +909,13 @@ mod tests {
         let f = fixture(0, 900, None);
         let mut store = Store::new(f.set.clone());
         let mut batch = Batch::new(&f.set);
-        let mut inst = batch.entity(labels("a"));
-        inst.record(10)
+        let mut entity = batch.entity(labels("a"));
+        entity
+            .record(10)
             .add(f.requests, Outcome::Ok, 2.0)
             .observe(f.duration, 0.25, 2.0);
-        inst.record(10)
+        entity
+            .record(10)
             .add(f.requests, Outcome::Error, 1.0)
             .observe(f.duration, 2.5, 1.0);
         store.merge(batch, 10);
