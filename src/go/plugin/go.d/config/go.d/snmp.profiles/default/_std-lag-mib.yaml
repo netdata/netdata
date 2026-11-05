@@ -10,7 +10,7 @@ metrics:
       name: dot3adAggPortStatsTable
     symbols:
       - {OID: 1.2.840.10006.300.43.1.2.2.1.1, name: _dot3adAggPortStatsLACPDUsRx}
-      - {OID: 1.2.840.10006.300.43.1.2.2.1.2, name: _dot3adAggPortStatsLACPDUsTx}
+      - {OID: 1.2.840.10006.300.43.1.2.2.1.6, name: _dot3adAggPortStatsLACPDUsTx}
       - {OID: 1.2.840.10006.300.43.1.2.2.1.5, name: _dot3adAggPortStatsIllegalRx}
     metric_tags:
       - tag: lag_port_index

@@ -157,7 +157,7 @@ metrics:
         tag: e_pdu_outlet_status_outlet_name
   - MIB: CPS-MIB
     symbol:
-      OID: 1.3.6.1.4.1.3808.1.1.3.4.1.1
+      OID: 1.3.6.1.4.1.3808.1.1.3.4.1.1.0
       name: ePDUPowerSupply1Status
       chart_meta:
         description: Power Supply 1 Status
@@ -168,7 +168,7 @@ metrics:
         2: powerSupplyOneFailed
   - MIB: CPS-MIB
     symbol:
-      OID: 1.3.6.1.4.1.3808.1.1.3.4.1.2
+      OID: 1.3.6.1.4.1.3808.1.1.3.4.1.2.0
       name: ePDUPowerSupply2Status
       chart_meta:
         description: Power Supply 2 Status
@@ -180,7 +180,7 @@ metrics:
         3: powerSupplyTwoNotPresent
   - MIB: CPS-MIB
     symbol:
-      OID: 1.3.6.1.4.1.3808.1.1.3.4.1.3
+      OID: 1.3.6.1.4.1.3808.1.1.3.4.1.3.0
       name: ePDUPowerSupplyAlarm
       chart_meta:
         description: Power Supply Alarm
@@ -268,7 +268,7 @@ metrics:
         tag: e_pdu_status_outlet_number
   - MIB: CPS-MIB
     symbol:
-      OID: 1.3.6.1.4.1.3808.1.1.3.5.7
+      OID: 1.3.6.1.4.1.3808.1.1.3.5.7.0
       name: cyberpower.ePDUStatusInputVoltage
       chart_meta:
         description: "Input voltage"
@@ -276,7 +276,7 @@ metrics:
         unit: "dV"
   - MIB: CPS-MIB
     symbol:
-      OID: 1.3.6.1.4.1.3808.1.1.3.5.8
+      OID: 1.3.6.1.4.1.3808.1.1.3.5.8.0
       name: cyberpower.ePDUStatusInputFrequency
       chart_meta:
         description: "Input frequency"

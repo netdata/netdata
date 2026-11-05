@@ -98,24 +98,27 @@ metrics:
           description: Overall CPU busy percentage in the last 5 minute period
           family: 'System/CPU/Usage'
           unit: "%"
-      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.25
+      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.24
         name: cpmCPULoadAvg1min
         chart_meta:
           description: CPU load average over the last 1 minute
           family: 'System/CPU/LoadAvg'
           unit: "{load_average}"
-      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.26
+        scale_factor: 0.01 # hundredths of processes
+      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.25
         name: cpmCPULoadAvg5min
         chart_meta:
           description: CPU load average over the last 5 minutes
           family: 'System/CPU/LoadAvg'
           unit: "{load_average}"
-      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.27
+        scale_factor: 0.01 # hundredths of processes
+      - OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.26
         name: cpmCPULoadAvg15min
         chart_meta:
           description: CPU load average over the last 15 minutes
           family: 'System/CPU/LoadAvg'
           unit: "{load_average}"
+        scale_factor: 0.01 # hundredths of processes
       - {OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.12, name: _cpmCPUMemoryUsed}
       - {OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.13, name: _cpmCPUMemoryFree}
       - {OID: 1.3.6.1.4.1.9.9.109.1.1.1.1.17, name: _cpmCPUMemoryHCUsed}
