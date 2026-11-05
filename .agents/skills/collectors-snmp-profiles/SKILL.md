@@ -34,7 +34,9 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
 
 ## Required Checks
 
-1. Identify the source MIB object for every profile field being added or changed.
+1. Identify the source MIB object for every profile field being added or changed, and confirm the configured OID is
+   that object's OID: `<entry>.<column>`, where the entry is `<table>.1`. A row that sets `table.OID` to the entry
+   still parses with the entry arc doubled in every column, so only the MIB check catches it.
 2. Check the object's `MAX-ACCESS` (SMIv2) or `ACCESS` (SMIv1).
 3. If the object is `not-accessible`, do not configure it as a readable `symbol.OID` unless it satisfies every
    device-scoped MIB-deviation requirement below.
@@ -43,36 +45,41 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
    - use `index` for one index component;
    - use `index_transform` for multiple components;
    - use `symbol.format` only for final formatting such as `ip_address`, `mac_address`, or `hex`.
-6. Put SNMP topology rows under top-level `topology:` with a required closed
+6. Resolve a cross-table tag through a row-index component (for example `ifXTable` via `index_transform`) only when
+   the MIB defines that component as the target table's index, such as an `InterfaceIndex`. A port number scoped to
+   a group, module or stack member (for example POWER-ETHERNET-MIB `pethPsePortIndex`) is not an ifIndex: identify
+   those rows by their own index tags and leave interface labels absent unless a MIB mapping such as ENTITY-MIB
+   `entAliasMappingTable` can be followed.
+7. Put SNMP topology rows under top-level `topology:` with a required closed
    `kind`. Do not mark topology rows by naming metrics `_topology_*`.
-7. Do not use chart/export-only value fields on topology row anchor symbols:
+8. Do not use chart/export-only value fields on topology row anchor symbols:
    `chart_meta`, `metric_type`, `mapping`, `transform`, `scale_factor`,
    or `format`.
-8. Keep regular `systemUptime` rows under `metrics:`. Do not model uptime as a
+9. Keep regular `systemUptime` rows under `metrics:`. Do not model uptime as a
    topology row kind; topology-specific uptime acquisition belongs in collector
    code, not profile topology schema.
-9. Put SNMP licensing rows under top-level `licensing:`. Do not model licensing
+10. Put SNMP licensing rows under top-level `licensing:`. Do not model licensing
    telemetry as underscore-prefixed hidden metrics or `_license_*` tag
    protocols.
-10. Licensing row value symbols may use `format` and exact `mapping`, but must
+11. Licensing row value symbols may use `format` and exact `mapping`, but must
    not use chart/export fields, transforms, scale factors, or
    underscore-prefixed generated names.
-11. For scalar licensing rows that combine multiple scalar signal OIDs into one
+12. For scalar licensing rows that combine multiple scalar signal OIDs into one
    license row, declare an explicit stable `id:`. For table licensing rows,
    keep every effective OID source (`symbol.OID`, `from`, or legacy `OID`) inside the same table OID and derive
    `not-accessible` INDEX values from the row index.
-12. Put SNMP BGP rows under top-level `bgp:`. Do not model BGP telemetry as
+13. Put SNMP BGP rows under top-level `bgp:`. Do not model BGP telemetry as
    vendor-specific raw metrics, `virtual_metrics`, or underscore-prefixed tag
    protocols when adding or migrating BGP coverage.
-13. BGP peer-state mappings must use the six RFC 4271 canonical states
+14. BGP peer-state mappings must use the six RFC 4271 canonical states
    (`idle`, `connect`, `active`, `opensent`, `openconfirm`, `established`).
    Use `partial: true` plus `partial_states` only when the source MIB is
    intentionally partial.
-14. For BGP table rows, derive `not-accessible` INDEX objects with exactly one
+15. For BGP table rows, derive `not-accessible` INDEX objects with exactly one
    row-index selector: `index`, `index_from_end`, or `index_transform`. Use
    `index_from_end` for trailing AFI/SAFI-like components after variable-length
    indexes such as `InetAddress`.
-15. To constrain a topology table to a fixed structural index prefix, use one
+16. To constrain a topology table to a fixed structural index prefix, use one
     readable anchor symbol and set `table.OID` to `<anchor-column>.<prefix>`.
     A simple same-index cross-table dependency inherits that prefix and is
     anchor-gated only when its target table has no symbol-bearing producer.
