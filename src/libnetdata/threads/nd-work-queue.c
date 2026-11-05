@@ -56,6 +56,10 @@ static void nd_work_queue_worker(void *arg) {
     if(wq->thread_init)
         wq->thread_init(wq->thread_init_data);
 
+    // linked into wq->waiters only while this thread is idle; its cond is reused for every idle period
+    struct nd_work_queue_waiter waiter = { 0 };
+    netdata_cond_init(&waiter.cond);
+
     netdata_mutex_lock(&wq->mutex);
     while(true) {
         struct nd_work_queue_job *job = wq->jobs;
@@ -75,8 +79,7 @@ static void nd_work_queue_worker(void *arg) {
             break;
 
         // idle: wait to be woken for a job, or until the idle timeout
-        struct nd_work_queue_waiter waiter = { .woken = false };
-        netdata_cond_init(&waiter.cond);
+        waiter.woken = false;
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(wq->waiters, &waiter, prev, next);
         wq->idle++;
 
@@ -99,7 +102,6 @@ static void nd_work_queue_worker(void *arg) {
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wq->waiters, &waiter, prev, next);
             wq->idle--;
         }
-        netdata_cond_destroy(&waiter.cond);
 
         // idle for too long, and nothing to run
         if(timed_out && !wq->jobs)
@@ -107,6 +109,9 @@ static void nd_work_queue_worker(void *arg) {
 
         // woken: run a job if there is one; another worker may have taken it, then wait again
     }
+
+    // unlinked: a waker signals it only under the mutex, while it is linked
+    netdata_cond_destroy(&waiter.cond);
 
     ND_THREAD *previous = nd_work_queue_take_exited_unsafe(wq);
     wq->exited = nd_thread_self();
