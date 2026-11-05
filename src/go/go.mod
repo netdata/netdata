@@ -15,7 +15,7 @@ require (
 	github.com/DataDog/sketches-go v1.4.8
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/PaloAltoNetworks/pango v0.10.2
-	github.com/ProtonMail/go-crypto v1.5.1
+	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/Wing924/ltsv v0.4.0
 	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
