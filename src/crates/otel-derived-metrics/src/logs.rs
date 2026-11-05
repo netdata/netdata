@@ -151,7 +151,7 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let mut store = Store::new(logs.metrics.clone());
+        let mut store = Store::new(&logs.metrics);
         let mut batch = Batch::new(&logs.metrics);
         logs.record(&mut batch, "default", &request);
         store.merge(batch, 100);

@@ -270,7 +270,7 @@ mod tests {
     }
 
     fn render(services: &Services, request: &ExportTraceServiceRequest) -> String {
-        let mut store = Store::new(services.metrics.clone());
+        let mut store = Store::new(&services.metrics);
         let mut batch = Batch::new(&services.metrics);
         services.record(&mut batch, "default", request);
         store.merge(batch, 100);

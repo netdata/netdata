@@ -24,7 +24,7 @@
 //!     priority: 1000,
 //! });
 //! let set = builder.build();
-//! let mut store = Store::new(set.clone());
+//! let mut store = Store::new(&set);
 //!
 //! // Per unit of work, for example one request: record its events at their
 //! // own time, then merge once the work is durable.

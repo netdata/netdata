@@ -62,16 +62,16 @@ impl DerivedMetrics {
             let logs = logs::ServiceLogs::new(config.max_services);
             let derivation = plugin::Derivation::new();
             Enabled {
-                service_store: Mutex::new(Store::new(services.metrics.clone())),
+                service_store: Mutex::new(Store::new(&services.metrics)),
                 services,
-                logs_store: Mutex::new(Store::new(logs.metrics.clone())),
+                logs_store: Mutex::new(Store::new(&logs.metrics)),
                 logs,
-                derivation_store: Mutex::new(Store::new(derivation.metrics.clone())),
+                derivation_store: Mutex::new(Store::new(&derivation.metrics)),
                 derivation,
             }
         });
         let plugin = plugin::Plugin::new();
-        let plugin_store = Mutex::new(Store::new(plugin.metrics.clone()));
+        let plugin_store = Mutex::new(Store::new(&plugin.metrics));
         Self {
             enabled,
             plugin,

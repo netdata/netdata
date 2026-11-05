@@ -103,9 +103,9 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn new(set: MetricSet) -> Self {
+    pub fn new(set: &MetricSet) -> Self {
         Self {
-            set,
+            set: set.clone(),
             entities: HashMap::new(),
             overflow: None,
             oldest_open: None,
@@ -555,7 +555,7 @@ mod tests {
     #[test]
     fn defines_once_then_updates_each_slot() {
         let f = fixture(0, 900, None);
-        let mut store = Store::new(f.set.clone());
+        let mut store = Store::new(&f.set);
         record(&f, &mut store, "checkout", 100, 3, 1, 100);
         let first = text(&store.emit(101, usize::MAX));
         let h = format!("{:016x}", labels("checkout").stable_hash());
@@ -599,7 +599,7 @@ mod tests {
     #[test]
     fn lateness_keeps_slots_open_and_clamps_exactly_once() {
         let f = fixture(10, 900, None);
-        let mut store = Store::new(f.set.clone());
+        let mut store = Store::new(&f.set);
         // Window starts at slot 990 (now 1000, lateness 10).
         record(&f, &mut store, "a", 995, 1, 0, 1000);
         // Too late: counted in the oldest open slot.
@@ -631,7 +631,7 @@ mod tests {
     #[test]
     fn expired_entities_are_marked_obsolete_and_revived() {
         let f = fixture(0, 3, None);
-        let mut store = Store::new(f.set.clone());
+        let mut store = Store::new(&f.set);
         record(&f, &mut store, "a", 10, 1, 0, 10);
         let mut out = text(&store.emit(13, usize::MAX));
         assert!(!out.contains("obsolete"));
@@ -650,7 +650,7 @@ mod tests {
     #[test]
     fn entities_over_the_cap_share_the_overflow_entity() {
         let f = fixture(0, 3, Some(1));
-        let mut store = Store::new(f.set.clone());
+        let mut store = Store::new(&f.set);
         record(&f, &mut store, "a", 10, 1, 0, 10);
         record(&f, &mut store, "b", 10, 2, 0, 10);
         record(&f, &mut store, "c", 10, 3, 0, 10);
@@ -672,7 +672,7 @@ mod tests {
     #[test]
     fn entities_without_records_are_not_created() {
         let f = fixture(0, 3, Some(1));
-        let mut store = Store::new(f.set.clone());
+        let mut store = Store::new(&f.set);
         let mut batch = Batch::new(&f.set);
         batch.entity(labels("empty"));
         store.merge(batch, 10);
@@ -688,7 +688,7 @@ mod tests {
     #[test]
     fn a_clock_jump_renders_a_bounded_backlog_and_keeps_every_record() {
         let f = fixture(10, 1_000_000, None);
-        let mut store = Store::new(f.set.clone());
+        let mut store = Store::new(&f.set);
         record(&f, &mut store, "a", 10, 1, 0, 10);
         record(&f, &mut store, "a", 100_000, 2, 0, 100_000);
         let window = store.entities.values().next().unwrap().open_cells.len() as u64;
@@ -708,7 +708,7 @@ mod tests {
     #[test]
     fn records_spread_over_many_seconds_land_in_their_slots() {
         let f = fixture(10, 900, None);
-        let mut store = Store::new(f.set.clone());
+        let mut store = Store::new(&f.set);
         let mut batch = Batch::new(&f.set);
         let mut entity = batch.entity(labels("a"));
         for time in [995, 996, 995, 997, 996, 999] {
@@ -726,7 +726,7 @@ mod tests {
     #[test]
     fn chunks_hold_whole_blocks_under_the_budget() {
         let f = fixture(0, 900, None);
-        let mut store = Store::new(f.set.clone());
+        let mut store = Store::new(&f.set);
         for name in ["a", "b", "c", "d"] {
             record(&f, &mut store, name, 10, 1, 0, 10);
         }
@@ -794,7 +794,7 @@ mod tests {
             priority: 1,
         });
         let set = b.build();
-        let mut store = Store::new(set.clone());
+        let mut store = Store::new(&set);
         let set = |store: &mut Store, time: u64, total: Option<f64>| {
             let mut batch = Batch::new(&set);
             let mut entity = batch.entity(Labels::new());
@@ -906,7 +906,7 @@ mod tests {
         let totals = b.cumulative_counter::<Events>(chart("svc.events"));
         let duration = b.histogram(BOUNDS, chart("svc.duration"), "requests/s");
         let set = b.build();
-        let mut store = Store::new(set.clone());
+        let mut store = Store::new(&set);
         let mut batch = Batch::new(&set);
         let mut entity = batch.entity(Labels::new());
         entity
@@ -938,7 +938,7 @@ mod tests {
     #[test]
     fn weights_scale_counts_and_histograms() {
         let f = fixture(0, 900, None);
-        let mut store = Store::new(f.set.clone());
+        let mut store = Store::new(&f.set);
         let mut batch = Batch::new(&f.set);
         let mut entity = batch.entity(labels("a"));
         entity
