@@ -26,34 +26,35 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 /// (`RRDLABELS_MAX_NAME_LENGTH`).
 const MAX_LABEL_KEY_BYTES: usize = 200;
 
-/// How a column combines two values for the same entity: from two batches, a
-/// batch and the store, or two slots folded into one after a stall.
+/// A column's aggregation: how it combines two values for the same entity,
+/// from two batches, a batch and the store, or two slots folded into one
+/// after a stall.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Merge {
+pub(crate) enum Aggregation {
     /// Sum; starts at 0.
-    Add,
+    Sum,
     /// Larger value; starts unset (NaN).
     Max,
     /// The value merged last (gauges, cumulative totals); starts unset (NaN).
-    Last,
+    LastValue,
 }
 
-impl Merge {
+impl Aggregation {
     pub(crate) fn initial(self) -> f64 {
         match self {
-            Merge::Add => 0.0,
-            Merge::Max | Merge::Last => f64::NAN,
+            Aggregation::Sum => 0.0,
+            Aggregation::Max | Aggregation::LastValue => f64::NAN,
         }
     }
 
     pub(crate) fn apply(self, current: f64, incoming: f64) -> f64 {
         match self {
-            Merge::Add => current + incoming,
-            Merge::Max if current.is_nan() => incoming,
-            Merge::Max if incoming.is_nan() => current,
-            Merge::Max => current.max(incoming),
-            Merge::Last if incoming.is_nan() => current,
-            Merge::Last => incoming,
+            Aggregation::Sum => current + incoming,
+            Aggregation::Max if current.is_nan() => incoming,
+            Aggregation::Max if incoming.is_nan() => current,
+            Aggregation::Max => current.max(incoming),
+            Aggregation::LastValue if incoming.is_nan() => current,
+            Aggregation::LastValue => incoming,
         }
     }
 }
@@ -261,9 +262,10 @@ pub struct Chart {
     pub priority: i32,
 }
 
-/// A chart of the set, with the dimensions its instrument gives it.
+/// A chart of the set, with the dimensions its instrument gives it; every
+/// entity gets one chart from it.
 #[derive(Debug)]
-pub(crate) struct ChartDef {
+pub(crate) struct ChartTemplate {
     pub(crate) title: String,
     pub(crate) units: &'static str,
     pub(crate) family: &'static str,
@@ -364,12 +366,12 @@ pub(crate) struct MetricSetInner {
     pub(crate) expiry_slots: u64,
     pub(crate) cap: Option<Cap>,
     // The row layout: each column's aggregation, and a row without records.
-    merges: Vec<Merge>,
+    aggregations: Vec<Aggregation>,
     initial_row: Box<[f64]>,
     /// The columns of [`CumulativeCounter`] instruments, which hold totals until a
     /// slot is emitted as increases.
     pub(crate) cumulative_columns: Vec<usize>,
-    pub(crate) charts: Vec<ChartDef>,
+    pub(crate) charts: Vec<ChartTemplate>,
 }
 
 impl MetricSetInner {
@@ -378,11 +380,15 @@ impl MetricSetInner {
         self.initial_row.clone()
     }
 
-    /// Combine `incoming` into `target`, each column by its [`Merge`] rule.
+    /// Combine `incoming` into `target`, each column by its [`Aggregation`].
     pub(crate) fn merge_row(&self, target: &mut [f64], incoming: &[f64]) {
-        for ((merge, current), &incoming) in self.merges.iter().zip(target.iter_mut()).zip(incoming)
+        for ((aggregation, current), &incoming) in self
+            .aggregations
+            .iter()
+            .zip(target.iter_mut())
+            .zip(incoming)
         {
-            *current = merge.apply(*current, incoming);
+            *current = aggregation.apply(*current, incoming);
         }
     }
 
@@ -455,9 +461,9 @@ static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 pub struct MetricSetBuilder {
     id: u32,
     settings: Settings,
-    merges: Vec<Merge>,
+    aggregations: Vec<Aggregation>,
     cumulative_columns: Vec<usize>,
-    charts: Vec<ChartDef>,
+    charts: Vec<ChartTemplate>,
 }
 
 impl MetricSetBuilder {
@@ -485,7 +491,7 @@ impl MetricSetBuilder {
         Self {
             id: NEXT_SET_ID.fetch_add(1, Ordering::Relaxed),
             settings,
-            merges: Vec::new(),
+            aggregations: Vec::new(),
             cumulative_columns: Vec::new(),
             charts: Vec::new(),
         }
@@ -497,7 +503,7 @@ impl MetricSetBuilder {
     ///
     /// If the chart's context or a dimension id is invalid or already used.
     pub fn counter<D: Dimensions>(&mut self, chart: Chart) -> Counter<D> {
-        let columns = self.column_range::<D>(Merge::Add);
+        let columns = self.column_range::<D>(Aggregation::Sum);
         self.chart(chart, per_dimension(columns, Readout::Rate));
         Counter(columns)
     }
@@ -508,7 +514,7 @@ impl MetricSetBuilder {
     ///
     /// As [`MetricSetBuilder::counter`].
     pub fn cumulative_counter<D: Dimensions>(&mut self, chart: Chart) -> CumulativeCounter<D> {
-        let columns = self.column_range::<D>(Merge::Last);
+        let columns = self.column_range::<D>(Aggregation::LastValue);
         self.cumulative_columns
             .extend(columns.base..columns.base + D::IDS.len());
         self.chart(chart, per_dimension(columns, Readout::Rate));
@@ -521,7 +527,7 @@ impl MetricSetBuilder {
     ///
     /// As [`MetricSetBuilder::counter`].
     pub fn gauge<D: Dimensions>(&mut self, chart: Chart) -> Gauge<D> {
-        let columns = self.column_range::<D>(Merge::Last);
+        let columns = self.column_range::<D>(Aggregation::LastValue);
         self.chart(chart, per_dimension(columns, Readout::Column));
         Gauge(columns)
     }
@@ -551,9 +557,9 @@ impl MetricSetBuilder {
         );
         // Buckets including +Inf, then sum and count, then the maximum: the
         // order of the Histogram column accessors.
-        let base = self.columns(bounds.len() + 1, Merge::Add);
-        self.columns(2, Merge::Add);
-        self.columns(1, Merge::Max);
+        let base = self.columns(bounds.len() + 1, Aggregation::Sum);
+        self.columns(2, Aggregation::Sum);
+        self.columns(1, Aggregation::Max);
         let histogram = Histogram {
             set_id: self.id,
             base,
@@ -586,7 +592,7 @@ impl MetricSetBuilder {
             "+Inf",
             Readout::Rate(histogram.bucket_column(bounds.len())),
         ));
-        self.add_chart(ChartDef {
+        self.add_chart(ChartTemplate {
             title: format!("{} histogram", chart.title),
             units: heatmap_units,
             family: chart.family,
@@ -612,33 +618,34 @@ impl MetricSetBuilder {
             id: self.id,
             lateness_slots: slots(settings.lateness),
             expiry_slots: slots(settings.expiry),
-            initial_row: self.merges.iter().map(|m| m.initial()).collect(),
+            initial_row: self.aggregations.iter().map(|m| m.initial()).collect(),
             interval_secs: interval.as_secs(),
             cap: settings.cap,
-            merges: self.merges,
+            aggregations: self.aggregations,
             cumulative_columns: self.cumulative_columns,
             charts: self.charts,
         }))
     }
 
-    /// Add `len` columns with `merge` to the layout; returns the first.
-    fn columns(&mut self, len: usize, merge: Merge) -> usize {
-        let base = self.merges.len();
-        self.merges.extend(std::iter::repeat_n(merge, len));
+    /// Add `len` columns with `aggregation` to the layout; returns the first.
+    fn columns(&mut self, len: usize, aggregation: Aggregation) -> usize {
+        let base = self.aggregations.len();
+        self.aggregations
+            .extend(std::iter::repeat_n(aggregation, len));
         base
     }
 
-    /// Add one column with `merge` per value of `D`.
-    fn column_range<D: Dimensions>(&mut self, merge: Merge) -> ColumnRange<D> {
+    /// Add one column with `aggregation` per value of `D`.
+    fn column_range<D: Dimensions>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
         ColumnRange {
             set_id: self.id,
-            base: self.columns(D::IDS.len(), merge),
+            base: self.columns(D::IDS.len(), aggregation),
             _dimensions: PhantomData,
         }
     }
 
     fn chart(&mut self, chart: Chart, dimensions: Vec<Dimension>) {
-        self.add_chart(ChartDef {
+        self.add_chart(ChartTemplate {
             title: chart.title.to_string(),
             units: chart.units,
             family: chart.family,
@@ -649,7 +656,7 @@ impl MetricSetBuilder {
         });
     }
 
-    fn add_chart(&mut self, chart: ChartDef) {
+    fn add_chart(&mut self, chart: ChartTemplate) {
         let context = &chart.context;
         assert!(
             context.bytes().all(|b| is_id_byte(b) || b == b'.')
@@ -702,7 +709,7 @@ fn is_id_byte(b: u8) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EntityKind {
     /// The entity of one label set.
-    Tracked,
+    Own,
     /// The entity of the records beyond the cap.
     Overflow,
 }
@@ -717,8 +724,8 @@ const HASH_DIGITS: usize = 16;
 pub(crate) fn entity_suffix(labels: &Labels, kind: EntityKind) -> String {
     match kind {
         EntityKind::Overflow => OVERFLOW_SUFFIX.to_string(),
-        EntityKind::Tracked if labels.is_empty() => String::new(),
-        EntityKind::Tracked => format!("_{:0HASH_DIGITS$x}", labels.stable_hash()),
+        EntityKind::Own if labels.is_empty() => String::new(),
+        EntityKind::Own => format!("_{:0HASH_DIGITS$x}", labels.stable_hash()),
     }
 }
 

@@ -18,7 +18,7 @@ pub(crate) struct BatchRow {
 /// One entity's records within a batch.
 #[derive(Default)]
 pub(crate) struct EntityRows {
-    /// By slot number, in first-record order: the store merges late slots
+    /// By slot number, in first-record order: the store aggregations late slots
     /// into one, and gauges and totals keep the value merged last.
     pub(crate) slots: IndexMap<u64, BatchRow>,
     /// Position in `slots` of the slot recorded into last; records mostly

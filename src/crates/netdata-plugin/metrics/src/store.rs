@@ -3,13 +3,15 @@
 //!
 //! The store keeps every slot from `oldest_open` (the oldest slot not yet
 //! emitted) to the current one open; each entity holds those slots as rows
-//! arrays and folds them forward after a stall (`advance_window`). Entities
+//! and folds them forward after a stall (`bound_backlog`). Entities
 //! are created on their first record, with or without measurements, charts
 //! are defined on an entity's first emitted slot, and an expired entity's
 //! state is dropped (its cumulative baselines with it).
 
 use crate::batch::Batch;
-use crate::metric_set::{ChartDef, EntityKind, Labels, MetricSet, MetricSetInner, entity_suffix};
+use crate::metric_set::{
+    ChartTemplate, EntityKind, Labels, MetricSet, MetricSetInner, entity_suffix,
+};
 use netdata_plugin_protocol::{
     ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
     write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end_timed,
@@ -123,7 +125,7 @@ impl Store {
     /// The oldest slot not yet emitted, as of `now`: set on first use, and
     /// moved forward, folding the slots it passes, when it falls more than
     /// [`MAX_BACKLOG_SLOTS`] behind the lateness window.
-    fn advance_window(&mut self, now: u64) -> u64 {
+    fn bound_backlog(&mut self, now: u64) -> u64 {
         let set = &*self.set.0;
         let now_slot = now / set.interval_secs;
         let oldest_open = *self
@@ -154,7 +156,7 @@ impl Store {
             std::sync::Arc::ptr_eq(&batch.set().0, &self.set.0),
             "batch of another metric set"
         );
-        let oldest_open = self.advance_window(now);
+        let oldest_open = self.bound_backlog(now);
         let set = &*self.set.0;
         let newest = (now / set.interval_secs).max(oldest_open);
         for (labels, batch_entity) in batch.entities {
@@ -169,7 +171,7 @@ impl Store {
             let entity = match (self.entities.entry(labels), full) {
                 (Entry::Occupied(entry), _) => entry.into_mut(),
                 (Entry::Vacant(entry), None) => {
-                    let entity = Entity::new(set, entry.key().clone(), EntityKind::Tracked);
+                    let entity = Entity::new(set, entry.key().clone(), EntityKind::Own);
                     entry.insert(entity)
                 }
                 (Entry::Vacant(_), Some(cap)) => {
@@ -206,7 +208,7 @@ impl Store {
     /// channel's limit, or `usize::MAX` when writing straight to stdout.
     pub fn emit(&mut self, now: u64, max_chunk: usize) -> Vec<Vec<u8>> {
         let mut out = Chunker::new(max_chunk);
-        let mut oldest_open = self.advance_window(now);
+        let mut oldest_open = self.bound_backlog(now);
         let set = &*self.set.0;
         let now_slot = now / set.interval_secs;
         while oldest_open + set.lateness_slots < now_slot {
@@ -352,7 +354,7 @@ impl Entity {
 fn define_chart(
     block: &mut Vec<u8>,
     set: &MetricSetInner,
-    chart: &ChartDef,
+    chart: &ChartTemplate,
     id: &str,
     labels: &Labels,
 ) {
@@ -387,7 +389,7 @@ fn define_chart(
 fn write_chart_line(
     block: &mut Vec<u8>,
     set: &MetricSetInner,
-    chart: &ChartDef,
+    chart: &ChartTemplate,
     id: &str,
     obsolete: bool,
 ) {
@@ -752,7 +754,7 @@ mod tests {
         assert_eq!(labels.0.len(), 1);
         assert_eq!(labels.0[0].1.len(), 800);
         let f = fixture(0, 900, None);
-        let entity = Entity::new(&f.set.0, labels, EntityKind::Tracked);
+        let entity = Entity::new(&f.set.0, labels, EntityKind::Own);
         assert!(entity.chart_ids[0].starts_with("svc.requests_"));
         assert!(netdata_plugin_protocol::is_valid_chart_id(
             &entity.chart_ids[0]
@@ -769,7 +771,7 @@ mod tests {
         ba.push("a", "1");
         assert_eq!(ab, ba);
         let f = fixture(0, 900, None);
-        let ids = |labels: Labels| Entity::new(&f.set.0, labels, EntityKind::Tracked).chart_ids;
+        let ids = |labels: Labels| Entity::new(&f.set.0, labels, EntityKind::Own).chart_ids;
         assert_eq!(ids(ab), ids(ba));
         assert_eq!(ids(Labels::new())[0], "svc.requests");
     }
