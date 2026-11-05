@@ -23,7 +23,8 @@ keeps shared stores open until a clean shutdown.
 
 Six process Functions use the regular Netdata Function transport: `rum-sites`, `rum-pages`, `rum-live`, `rum-sessions`,
 `rum-errors`, and `rum-session-events`. Viewing them, and the `synthetics-*` Functions, requires a signed-in member of
-the node's Netdata Cloud Space on a paid plan or an active trial; collection and history storage are not restricted.
+the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial; collection and
+history storage are not restricted.
 Runtime observations include only admitted site jobs. Consumers join native
 DynCfg state to show disabled or failed configurations. Journal history remains queryable after a site stops. History range
 arguments select when the Agent originally received an observation, using inclusive Unix seconds: both endpoints include
