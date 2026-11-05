@@ -557,8 +557,7 @@ fn encode_identity_or_drop(
 impl NetdataLogsService {
     /// The transport-agnostic OTLP logs export entry point: runs
     /// [`Self::export_logs_core`] and counts its outcome (records stored and
-    /// records rejected) for self-monitoring. A failed export counts nothing:
-    /// the sender retries it.
+    /// records rejected) for self-monitoring. A failed export counts nothing.
     pub(crate) async fn export_logs(
         &self,
         tenant_id: &TenantId,

@@ -305,8 +305,7 @@ impl NetdataTracesService {
 impl NetdataTracesService {
     /// The transport-agnostic OTLP traces export entry point: runs
     /// [`Self::export_traces_core`] and counts its outcome (spans stored and
-    /// spans rejected) for self-monitoring. A failed export counts nothing:
-    /// the sender retries it.
+    /// spans rejected) for self-monitoring. A failed export counts nothing.
     pub(crate) async fn export_traces(
         &self,
         tenant_id: &TenantId,

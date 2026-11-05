@@ -411,7 +411,7 @@ modules:
       description: |
         Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
 
-        The plugin also makes charts about the data it receives, listed below. These charts count the records of an export only when the export succeeds, because the sender sends a failed export again.
+        The plugin also makes charts about the data it receives, listed below. These charts count the records of an export only when the plugin accepts the export, even when it rejects some of its records. An export that fails does not show on these charts.
       availability: []
       dynamic_context_prefixes:
         - prefix: otel.
