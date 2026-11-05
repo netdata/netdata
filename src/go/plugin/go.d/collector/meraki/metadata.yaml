@@ -611,8 +611,11 @@ modules:
           - error: Switch port or uplink traffic charts are missing
             cause: The traffic option is off, the organization has no switches or no MX or Z networks, or Meraki reported no usable value. Switch port traffic also has gaps while Meraki has reported no interval that ended in the last 15 minutes.
             fix: Enable `collect_switch_port_traffic`, `collect_switch_port_packets` or `collect_appliance_uplink_traffic`. If they are on, look for the traffic warning above in the logs, and compare with the traffic Meraki Dashboard shows for the switch or network.
-          - error: 'Meraki appliance uplink status or probes unavailable: `error`'
-            cause: The optional appliance status or ICMP probe request failed, leaving gaps for that data while inventory and availability still update. An HTTP 429 also skips all remaining optional reads in this collection.
+          - error: 'Meraki appliance uplink status unavailable: `error`'
+            cause: The appliance uplink status request failed, leaving gaps in uplink status and device report age while inventory, availability and independent telemetry can still update. An HTTP 429 also skips all remaining optional reads in this collection.
+            fix: Follow the corresponding HTTP or transport error on this page. For HTTP 403 or 404, verify the API key's access to appliance telemetry; the successful inventory read does not prove access to every optional API.
+          - error: 'Meraki appliance uplink probes unavailable: `error`'
+            cause: The MX ICMP probe request failed, leaving gaps in packet loss, latency and sample age while inventory, availability and independent telemetry can still update. An HTTP 429 also skips all remaining optional reads in this collection.
             fix: Follow the corresponding HTTP or transport error on this page. For HTTP 403 or 404, verify the API key's access to appliance telemetry; the successful inventory read does not prove access to every optional API.
           - error: Appliance uplink health charts are missing
             cause: The health option is off, no appliance is assigned, the optional API request failed, or Meraki reported no usable data. ICMP loss and latency are documented for MX only; cellular may have no samples by default.
