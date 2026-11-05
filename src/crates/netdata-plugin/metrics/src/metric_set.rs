@@ -8,13 +8,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-/// The agent keeps at most this many bytes of a label value
-/// (`RRDLABELS_MAX_VALUE_LENGTH`, `src/database/rrdlabels.h`).
-const MAX_LABEL_VALUE_BYTES: usize = 800;
-
-/// The agent keeps at most this many bytes of a label key
-/// (`RRDLABELS_MAX_NAME_LENGTH`).
+/// The agent keeps at most this many bytes of a label key.
 const MAX_LABEL_KEY_BYTES: usize = 200;
+
+/// The agent keeps at most this many bytes of a label value.
+const MAX_LABEL_VALUE_BYTES: usize = 800;
 
 /// One dimension of an instrument's chart: one line on the chart.
 ///
@@ -133,7 +131,7 @@ pub struct CumulativeCounter<D>(pub(crate) ColumnRange<D>);
 pub struct Gauge<D>(pub(crate) ColumnRange<D>);
 
 /// A distribution of observed values, for example request durations, over
-/// fixed bucket bounds; its two chart templates are described at
+/// fixed bucket bounds; its three chart templates are described at
 /// [`MetricSetBuilder::histogram`]. An observation counts in the first
 /// bucket whose bound it does not exceed, else in `+Inf`. A window without
 /// observations shows 0 in every bucket and a gap for the mean and maximum.
@@ -315,7 +313,7 @@ pub struct CardinalityLimit {
 static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 
 /// Declares a [`MetricSet`]: each instrument adds its chart template (a
-/// histogram two).
+/// histogram three).
 #[derive(Debug)]
 pub struct MetricSetBuilder {
     id: u32,
@@ -393,20 +391,26 @@ impl MetricSetBuilder {
         Gauge(columns)
     }
 
-    /// Adds a [`Histogram`] over `bounds`, with two chart templates:
-    /// - `chart`: two dimensions, `avg` and `max`, the mean and largest
-    ///   observed value per window, in `chart.units`;
+    /// Adds a [`Histogram`] over `bounds`, with three chart templates:
+    /// - `chart`: one dimension, `avg`, the mean observed value per window, in
+    ///   `chart.units`;
+    /// - `<context>_max`: one dimension, `max`, the largest observed value per
+    ///   window, in `chart.units`. Its title is `<title> maximum`, its priority
+    ///   `chart.priority + 1` and its chart type `chart.chart_type`. It is a
+    ///   chart of its own because the dashboard combines every dimension of a
+    ///   chart the same way, across chart instances and over time: a maximum
+    ///   needs max, a mean is averaged;
     /// - a heatmap, `<context>_histogram`: observations per second in each
     ///   bucket, in `heatmap_units`, one dimension per bucket named by its
     ///   upper bound as Rust prints the `f64` (`0.005`, `1`, `1048576`;
     ///   `+Inf` last). Its title is `<title> histogram`, its priority
-    ///   `chart.priority + 1` and its chart type a heatmap; `chart.chart_type`
+    ///   `chart.priority + 2` and its chart type a heatmap; `chart.chart_type`
     ///   does not apply to it.
     ///
     /// # Panics
     ///
-    /// If `bounds` are not finite and strictly increasing, or either context
-    /// is invalid or already used.
+    /// If `bounds` are not finite and strictly increasing, or any of the three
+    /// contexts is invalid or already used.
     pub fn histogram(
         &mut self,
         bounds: &'static [f64],
@@ -429,17 +433,26 @@ impl MetricSetBuilder {
         };
         self.chart(
             chart,
-            vec![
-                ChartDimension::new(
-                    "avg",
-                    Readout::Ratio {
-                        numerator: histogram.sum_column(),
-                        denominator: histogram.count_column(),
-                    },
-                ),
-                ChartDimension::new("max", Readout::Column(histogram.max_column())),
-            ],
+            vec![ChartDimension::new(
+                "avg",
+                Readout::Ratio {
+                    numerator: histogram.sum_column(),
+                    denominator: histogram.count_column(),
+                },
+            )],
         );
+        self.add_chart(ChartTemplate {
+            title: format!("{} maximum", chart.title),
+            units: chart.units,
+            family: chart.family,
+            context: format!("{}_max", chart.context),
+            chart_type: chart.chart_type,
+            priority: chart.priority + 1,
+            dimensions: vec![ChartDimension::new(
+                "max",
+                Readout::Column(histogram.max_column()),
+            )],
+        });
         let mut buckets: Vec<ChartDimension> = bounds
             .iter()
             .enumerate()
@@ -460,7 +473,7 @@ impl MetricSetBuilder {
             family: chart.family,
             context: format!("{}_histogram", chart.context),
             chart_type: ChartType::Heatmap,
-            priority: chart.priority + 1,
+            priority: chart.priority + 2,
             dimensions: buckets,
         });
         histogram

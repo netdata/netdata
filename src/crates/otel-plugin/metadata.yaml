@@ -480,11 +480,16 @@ modules:
                 - name: success
                 - name: error
             - name: otel_service.request_duration
-              description: Average and maximum request duration.
+              description: Average request duration.
               unit: seconds
               chart_type: line
               dimensions:
                 - name: avg
+            - name: otel_service.request_duration_max
+              description: Maximum request duration. To combine services or time, use the maximum, not the average.
+              unit: seconds
+              chart_type: line
+              dimensions:
                 - name: max
             - name: otel_service.request_duration_histogram
               description: Requests by duration. Each dimension is the upper limit of a duration bucket, in seconds.

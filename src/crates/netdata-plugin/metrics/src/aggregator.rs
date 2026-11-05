@@ -483,15 +483,19 @@ mod tests {
                  CHART svc.duration_{h} '' 'Duration' 'seconds' 'requests' 'svc.duration' line 2 1 'store_first'\n\
                  CLABEL 'service.name' 'checkout' 1\nCLABEL_COMMIT\n\
                  DIMENSION avg 'avg' absolute 1 1 'type=float'\n\
+                 CHART svc.duration_max_{h} '' 'Duration maximum' 'seconds' 'requests' 'svc.duration_max' line 3 1 \
+                 'store_first'\n\
+                 CLABEL 'service.name' 'checkout' 1\nCLABEL_COMMIT\n\
                  DIMENSION max 'max' absolute 1 1 'type=float'\n\
                  CHART svc.duration_histogram_{h} '' 'Duration histogram' 'requests/s' 'requests' \
-                 'svc.duration_histogram' heatmap 3 1 'store_first'\n\
+                 'svc.duration_histogram' heatmap 4 1 'store_first'\n\
                  CLABEL 'service.name' 'checkout' 1\nCLABEL_COMMIT\n\
                  DIMENSION 0.1 '0.1' absolute 1 1 'type=float'\n\
                  DIMENSION 1 '1' absolute 1 1 'type=float'\n\
                  DIMENSION +Inf '+Inf' absolute 1 1 'type=float'\n\
                  BEGIN svc.requests_{h} 1000000\nSET ok = 2\nSET error = 1\nEND 101 0 1\n\
-                 BEGIN svc.duration_{h} 1000000\nSET avg = 0.5\nSET max = 0.5\nEND 101 0 1\n\
+                 BEGIN svc.duration_{h} 1000000\nSET avg = 0.5\nEND 101 0 1\n\
+                 BEGIN svc.duration_max_{h} 1000000\nSET max = 0.5\nEND 101 0 1\n\
                  BEGIN svc.duration_histogram_{h} 1000000\nSET 0.1 = 0\nSET 1 = 3\nSET +Inf = 0\nEND 101 0 1\n"
             )
         );
@@ -502,7 +506,8 @@ mod tests {
             second,
             format!(
                 "BEGIN svc.requests_{h} 1000000\nSET ok = 0\nSET error = 0\nEND 102 0 1\n\
-                 BEGIN svc.duration_{h} 1000000\nSET avg =\nSET max =\nEND 102 0 1\n\
+                 BEGIN svc.duration_{h} 1000000\nSET avg =\nEND 102 0 1\n\
+                 BEGIN svc.duration_max_{h} 1000000\nSET max =\nEND 102 0 1\n\
                  BEGIN svc.duration_histogram_{h} 1000000\nSET 0.1 = 0\nSET 1 = 0\nSET +Inf = 0\nEND 102 0 1\n"
             )
         );
@@ -551,14 +556,14 @@ mod tests {
         let mut out = text(&aggregator.emit(13, usize::MAX));
         assert!(!out.contains("obsolete"));
         out += &text(&aggregator.emit(14, usize::MAX));
-        assert_eq!(out.matches("'obsolete store_first'").count(), 3);
+        assert_eq!(out.matches("'obsolete store_first'").count(), 4);
         assert_eq!(aggregator.stats().entities, 0);
         assert_eq!(aggregator.stats().expired_entities, 1);
         record(&f, &mut aggregator, "a", 20, 1, 0, 20);
         let again = text(&aggregator.emit(21, usize::MAX));
-        assert_eq!(again.matches("CHART ").count(), 3);
+        assert_eq!(again.matches("CHART ").count(), 4);
         assert!(!again.contains("obsolete"));
-        assert_eq!(again.matches("CLABEL_COMMIT").count(), 3);
+        assert_eq!(again.matches("CLABEL_COMMIT").count(), 4);
         validate_chart_stream(format!("{out}{again}").as_bytes()).unwrap();
     }
 
@@ -610,7 +615,7 @@ mod tests {
         assert!(open <= 10 + MAX_BACKLOG_WINDOWS + 1, "{open}");
         let out = text(&aggregator.emit(100_011, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
-        let updates = out.matches("BEGIN ").count() as u64 / 3;
+        let updates = out.matches("BEGIN ").count() as u64 / 4;
         assert!(updates <= MAX_BACKLOG_WINDOWS + 11, "{updates}");
         let ok: f64 = out
             .lines()
@@ -846,7 +851,8 @@ mod tests {
         assert!(out.contains("SET ok = 1\nSET error = 0\n"));
         assert!(out.contains("SET jobs = 5\n"));
         assert!(out.contains("SET events = 3\n"));
-        assert!(out.contains("SET avg = 0.5\nSET max = 0.5\n"));
+        assert!(out.contains("SET avg = 0.5\nEND"));
+        assert!(out.contains("SET max = 0.5\nEND"));
         assert!(out.contains("SET 0.1 = 0\nSET 1 = 1\nSET +Inf = 0\n"));
     }
 
@@ -867,7 +873,8 @@ mod tests {
         aggregator.merge(batch, 10);
         let out = text(&aggregator.emit(11, usize::MAX));
         assert!(out.contains("SET ok = 2\nSET error = 1\n"));
-        assert!(out.contains("SET avg = 1\nSET max = 2.5\n"));
+        assert!(out.contains("SET avg = 1\nEND"));
+        assert!(out.contains("SET max = 2.5\nEND"));
         assert!(out.contains("SET 0.1 = 0\nSET 1 = 2\nSET +Inf = 1\n"));
     }
 }

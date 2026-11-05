@@ -60,7 +60,7 @@ impl Services {
             chart_type: ChartType::Stacked,
             priority: 60_000,
         });
-        // Also charts `request_duration_histogram`.
+        // Also charts `request_duration_max` and `request_duration_histogram`.
         let duration = b.histogram(
             DURATION_BOUNDS,
             Chart {
