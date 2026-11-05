@@ -153,6 +153,10 @@ struct health_plugin_globals {
         // every re-match of a chart takes the next value; alerts it keeps or creates carry at least that value,
         // so the alerts it did not account for (their rule is gone) are the ones left with a smaller one
         uint64_t rematch_seq;
+
+        // a reload empties the dictionary and loads the rules one by one: re-matching against that partial set
+        // would remove alerts whose rules are about to return. Reload holds it for writing, re-matches for reading.
+        netdata_rwlock_t reload_rwlock;
     } prototypes;
 };
 

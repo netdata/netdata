@@ -117,6 +117,8 @@ int health_rematch_unittest(void) {
     rematch_check(rematch_dyncfg(DYNCFG_CMD_ADD, "health:alert:prototype", "rematch_b", REMATCH_PAYLOAD_B) == DYNCFG_RESP_ACCEPTED,
                   "DynCfg add of rematch_b");
     rematch_check(rematch_alert(st, "rematch_a") && rematch_alert(st, "rematch_b"), "both alerts attached");
+    if(!rematch_alert(st, "rematch_a") || !rematch_alert(st, "rematch_b"))
+        goto cleanup;
 
     uint64_t before;
     rematch_raise(rematch_alert(st, "rematch_a"));
@@ -131,7 +133,7 @@ int health_rematch_unittest(void) {
 
     // AC2: another rule of A wins - A is replaced, B is kept
     nd_uuid_t hash_one;
-    uuid_copy(hash_one, rematch_alert(st, "rematch_a")->config.hash_id);
+    uuid_copy(hash_one, rematch_alert(st, "rematch_a")->config.hash_id); // attached, checked above
     rematch_set_mode(st, "two");
     before = rematch_transitions();
     health_prototype_rematch_rrdset(st);
@@ -151,7 +153,7 @@ int health_rematch_unittest(void) {
     rematch_raise(rematch_alert(st, "rematch_a"));
 
     // AC3: reload with unchanged rules writes nothing, keeps the alerts and their pending notifications
-    ALARM_ENTRY *pending = rematch_latest_entry(rematch_alert(st, "rematch_a"));
+    ALARM_ENTRY *pending = rematch_alert(st, "rematch_a") ? rematch_latest_entry(rematch_alert(st, "rematch_a")) : NULL;
     rematch_check(pending && !(pending->flags & HEALTH_ENTRY_FLAG_UPDATED), "AC3 setup: latest entry not superseded");
     before = rematch_transitions();
     health_apply_prototypes_to_host(localhost);
@@ -224,8 +226,12 @@ int health_rematch_unittest(void) {
     health_apply_prototypes_to_host(localhost);
     rematch_check(!rematch_alert(st, "rematch_b") && rematch_kept(st, "rematch_a"), "AC3 reload without a rule: its alert removed");
 
-    // cleanup
+cleanup:
     rematch_dyncfg(DYNCFG_CMD_REMOVE, "health:alert:prototype:rematch_a", NULL, NULL);
+    if(dictionary_get(health_globals.prototypes.dict, "rematch_b"))
+        rematch_dyncfg(DYNCFG_CMD_REMOVE, "health:alert:prototype:rematch_b", NULL, NULL);
+    else
+        dyncfg_del(localhost, "health:alert:prototype:rematch_b"); // taken out of the dictionary directly above
     rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
     localhost->health.enabled = saved_enabled;
     if(!saved_initialized)

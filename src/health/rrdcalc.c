@@ -491,9 +491,9 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
 // so the key is stable for the lifetime of the RRDCALC.
 //
 // Locking: this index has its own spinlock rather than relying on the alert
-// dictionary lock, because rrdcalc_unlink_and_delete() is reached with only the
-// dictionary READ lock held from health_prototype_apply_to_all_hosts(), which
-// iterates reentrantly.
+// dictionary lock, because readers (alert variable lookups) take it without the
+// dictionary lock, and deletes can reach it from a reentrant traversal of the
+// alert dictionary.
 
 static void rrdcalc_name_index_add(RRDHOST *host, RRDCALC *rc, const DICTIONARY_ITEM *item) {
     if(unlikely(!rc->config.name || !item))
@@ -704,8 +704,12 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
 
     bool ret = true;
 
+    // the react callback links the new alert and records its first transition, reading its configuration after
+    // the insert made it visible: holding the write lock (recursive) keeps re-matches and deletes out until then
+    dictionary_write_lock(host->rrdcalc_root_index);
     dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)key_len,
                             NULL, sizeof(RRDCALC), &tmp);
+    dictionary_write_unlock(host->rrdcalc_root_index);
 
     if(tmp.react_action != RRDCALC_REACT_NEW)
         ret = false;
@@ -787,13 +791,15 @@ void rrdcalc_rematch_sweep_rrdset(RRDSET *st, uint64_t seq) {
     dictionary_write_lock(host->rrdcalc_root_index);
     rw_spinlock_write_lock(&st->alerts.spinlock);
 
-    RRDCALC *rc = st->alerts.base, *last = NULL;
+    // a chart cannot link more alerts than the host has: walking further means the list is malformed (a cycle)
+    size_t budget = dictionary_entries(host->rrdcalc_root_index) + 1;
+
+    RRDCALC *rc = st->alerts.base;
     while(rc) {
-        if(last == rc) {
+        if(!budget--) {
             netdata_log_error("RRDCALC: malformed list of alerts linked to chart - cannot re-match - giving up.");
             break;
         }
-        last = rc;
 
         RRDCALC *next = rc->next;
         if(rc->rematch_seq < seq)

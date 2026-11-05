@@ -279,6 +279,12 @@ void health_prototype_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void
 }
 
 void health_init_prototypes(void) {
+    static bool reload_rwlock_initialized = false;
+    if(!reload_rwlock_initialized) {
+        netdata_rwlock_init(&health_globals.prototypes.reload_rwlock);
+        reload_rwlock_initialized = true;
+    }
+
     if(health_globals.prototypes.dict)
         return;
 
@@ -502,16 +508,16 @@ void health_reload_prototypes(void) {
     // remove all dyncfg related to prototypes
     health_dyncfg_unregister_all_prototypes();
 
-    // clear old prototypes from memory
+    // clear old prototypes from memory and load the prototypes from disk; re-matches wait for the complete set
+    netdata_rwlock_wrlock(&health_globals.prototypes.reload_rwlock);
     dictionary_flush(health_globals.prototypes.dict);
-
-    // load the prototypes from disk
     recursive_config_double_dir_load(
         health_user_config_dir(),
         health_globals.config.stock_enabled ? health_stock_config_dir() : NULL,
         NULL,
         health_readfile,
         NULL, 0);
+    netdata_rwlock_wrunlock(&health_globals.prototypes.reload_rwlock);
 
     // register all loaded prototypes
     __atomic_store_n(&health_globals.prototypes.registering, true, __ATOMIC_RELAXED);
@@ -690,6 +696,9 @@ void health_prototype_alerts_for_rrdset_incrementally(RRDSET *st) {
 // did not change: a label change, a health reload or a re-registered prototype must not remove and re-raise them.
 // Alerts whose rule changed are replaced, alerts whose rule is gone are removed, newly matching rules are added.
 void health_prototype_rematch_rrdset(RRDSET *st) {
+    // the whole walk sees one complete set of prototypes, not one a reload is still loading
+    netdata_rwlock_rdlock(&health_globals.prototypes.reload_rwlock);
+
     uint64_t seq = health_prototype_rematch_seq_next();
     bool complete = true;
 
@@ -706,6 +715,8 @@ void health_prototype_rematch_rrdset(RRDSET *st) {
     // an interrupted walk did not visit every prototype, so it cannot tell which alerts lost theirs
     if(complete)
         rrdcalc_rematch_sweep_rrdset(st, seq);
+
+    netdata_rwlock_rdunlock(&health_globals.prototypes.reload_rwlock);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

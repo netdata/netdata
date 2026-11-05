@@ -747,6 +747,9 @@ static size_t dyncfg_health_remove_all_rrdcalc_of_prototype(STRING *alert_name) 
         if(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
             continue;
 
+        // deleting records a REMOVED transition from the alert's configuration, which a concurrent re-match may be
+        // updating under this (recursive) lock
+        dictionary_write_lock(host->rrdcalc_root_index);
         RRDCALC *rc;
         foreach_rrdcalc_in_rrdhost_reentrant(host, rc) {
             if(rc->config.name != alert_name)
@@ -756,6 +759,7 @@ static size_t dyncfg_health_remove_all_rrdcalc_of_prototype(STRING *alert_name) 
             removed++;
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
+        dictionary_write_unlock(host->rrdcalc_root_index);
         dictionary_garbage_collect(host->rrdcalc_root_index);
     }
     dfe_done(host);
@@ -882,13 +886,14 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
             code = HTTP_RESP_OK;
             break;
 
-        case DYNCFG_CMD_DISABLE:
-            if(ap->_internal.enabled) {
-                // the re-match reads it under this lock
-                rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
-                ap->_internal.enabled = false;
-                rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
+        case DYNCFG_CMD_DISABLE: {
+            // the re-match reads it under this lock
+            rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
+            bool was_enabled = ap->_internal.enabled;
+            ap->_internal.enabled = false;
+            rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
 
+            if(was_enabled) {
                 dyncfg_health_prototype_reapply(ap);
                 dyncfg_status(localhost, alert_name_dyncfg, DYNCFG_STATUS_DISABLED);
                 code = dyncfg_default_response(result, HTTP_RESP_OK, "disabled");
@@ -896,22 +901,26 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
             else
                 code = dyncfg_default_response(result, HTTP_RESP_OK, "already disabled");
             break;
+        }
 
-        case DYNCFG_CMD_ENABLE:
-            if(ap->_internal.enabled)
-                code = dyncfg_default_response(result, HTTP_RESP_OK, "already enabled");
-            else {
-                size_t matches_enabled = 0;
-                rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
+        case DYNCFG_CMD_ENABLE: {
+            // the re-match reads it under this lock
+            size_t matches_enabled = 0;
+            rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
+            bool was_enabled = ap->_internal.enabled;
+            if(!was_enabled) {
                 for(RRD_ALERT_PROTOTYPE *t = ap; t ;t = t->_internal.next)
                     if(t->match.enabled)
                         matches_enabled++;
 
-                // the re-match reads it under this lock
                 if(matches_enabled)
                     ap->_internal.enabled = true;
-                rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
+            }
+            rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
 
+            if(was_enabled)
+                code = dyncfg_default_response(result, HTTP_RESP_OK, "already enabled");
+            else {
                 if(!matches_enabled) {
                     code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "all rules in this alert are disabled, so enabling the alert has no effect");
                 }
@@ -922,6 +931,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                 }
             }
             break;
+        }
 
         case DYNCFG_CMD_UPDATE: {
                 CLEAN_BUFFER *error = buffer_create(0, NULL);
