@@ -39,7 +39,7 @@ Disk space can be monitored further using the following other integrations:
 
 #### Auto-Detection
 
-The plugin reads data from `/proc/self/mountinfo` and `/proc/diskstats file`.
+The plugin reads data from `/proc/self/mountinfo` and `/proc/diskstats file`. A filesystem mounted at several mount points (bind mounts, subvolumes of one btrfs volume) is charted once, on the mount with the shortest root inside the filesystem. When that mount is excluded or disabled, it is charted on another of its mounts that is not.
 
 
 #### Performance Impact
@@ -68,8 +68,8 @@ You can also specify per mount point `[plugin:proc:diskspace:mountpoint]`
 | update every | Data collection frequency. | 1 | no |
 | remove charts of unmounted disks | Remove chart when a device is unmounted on host. | yes | no |
 | check for new mount points every | Parse proc files frequency. | 15s | no |
-| exclude space metrics on paths | Do not show metrics (charts) for listed paths. This option accepts netdata simple pattern. | /proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/* | no |
-| exclude space metrics on filesystems | Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern. | *gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs | no |
+| exclude space metrics on paths | Do not show metrics (charts) for listed paths. This option accepts netdata simple pattern. | /dev /dev/shm /proc/* /sys/* /var/run/user/* /run/lock /run/user/* /snap/* /var/lib/docker/* /var/lib/containers/storage/* /run/credentials/* /run/containerd/* /rpool /rpool/* | no |
+| exclude space metrics on filesystems | Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern. | *gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs cgroup cgroup2 hugetlbfs devtmpfs fuse.lxcfs | no |
 | exclude inode metrics on filesystems | Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern. | msdosfs msdos vfat overlayfs aufs* *unionfs | no |
 | space usage for all disks | Define if plugin will show metrics for space usage. When value is set to `auto` plugin will try to access information to display if filesystem or path was not discarded with previous option. | auto | no |
 | inodes usage for all disks | Define if plugin will show metrics for inode usage. When value is set to `auto` plugin will try to access information to display if filesystem or path was not discarded with previous option. | auto | no |

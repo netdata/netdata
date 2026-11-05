@@ -189,8 +189,8 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | `snmp.device_prof_pethMainPseOperStatus` | `{status}` | per pse_group_index | Operational status of the main PSE |
 | `snmp.device_prof_pethMainPsePower` | `W` | per pse_group_index | Total inline power available from the PSE |
 | `snmp.device_prof_pethMainPseUsageThreshold` | `%` | per pse_group_index | Usage threshold expressed in percent for comparing the measured power |
-| `snmp.device_prof_pethPsePortDetectionStatus` | `{status}` | per pse_port_index, interface | Detection status of the PSE port |
-| `snmp.device_prof_pethPsePortPowerClassifications` | `{class}` | per pse_port_index, interface | Power class of the detected powered device |
+| `snmp.device_prof_pethPsePortDetectionStatus` | `{status}` | per pse_group_index, pse_port_index | Detection status of the PSE port |
+| `snmp.device_prof_pethPsePortPowerClassifications` | `{class}` | per pse_group_index, pse_port_index | Power class of the detected powered device |
 
 ### Hardware / PowerSupply
 

@@ -59,12 +59,14 @@ Each attempt starts a fresh browser and consumes CPU, memory and target website 
 
 #### Prepare the browser sandbox policy
 
-Managed bundles and preloads on Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04,
-require administrator-prepared AppArmor policy. DEM does not automatically allow service-writable
-browser paths. The native runtime package supplies its own profile for its root-owned browser.
-Containers also require compatible host and container namespace, AppArmor and seccomp policies.
-Follow the [runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
-and keep Chromium's sandbox enabled when qualifying the actual service deployment.
+On Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04, run kickstart with
+`--install-dem-runtime` for a static or source installation. The native runtime package supplies its own policy.
+For local, rootful Docker on Linux, use the documented Netdata container configuration, including
+`apparmor=unconfined` on AppArmor hosts. Run kickstart with `--install-dem-runtime --docker-container NAME`
+on the daemon host, then run `docker restart NAME` after the first installation succeeds.
+Rootless, nested and remote Docker require separate administrator setup.
+Follow the [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md)
+for commands, offline setup and removal. Keep Chromium's sandbox enabled and qualify the actual service deployment.
 
 
 #### Set up the browser runtime

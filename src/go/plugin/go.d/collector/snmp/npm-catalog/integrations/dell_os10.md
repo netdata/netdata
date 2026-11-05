@@ -155,7 +155,7 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_dell_os10ChassisTemp` | `Cel` | device | Temperature of the chassis |
+| `snmp.device_prof_dell_os10ChassisTemp` | `Cel` | per dell_os10_chassis_index | Temperature of the chassis |
 
 ### Hardware / Fan
 
