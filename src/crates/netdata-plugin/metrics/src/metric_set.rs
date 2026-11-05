@@ -70,12 +70,20 @@ impl Aggregation {
 ///
 /// Declare the type with [`dimensions!`](crate::dimensions).
 ///
-/// # Manual implementations
+/// # Ids
 ///
-/// - `IDS` must hold at least one id, and each id once.
+/// These rules hold for every type, also one declared with
+/// [`dimensions!`](crate::dimensions). Declaring an instrument with a bad id
+/// panics.
+///
 /// - Each id must be a valid dimension id: not empty, and without spaces,
 ///   control characters, quotes, `\` or `=`. It must not start with `SLOT:`.
-/// - Declaring an instrument with a bad `IDS` panics.
+/// - Each id must appear once.
+///
+/// # Manual implementations
+///
+/// - `IDS` must hold at least one id. Declaring an instrument with an empty
+///   `IDS` panics.
 /// - `index` must return the value's position in `IDS`. Recording a value
 ///   whose index is out of range panics.
 pub trait Dimension: Copy + 'static {
@@ -527,7 +535,8 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If the chart's context or a dimension id is invalid or already used.
+    /// If the chart's context or a dimension id is invalid or already used,
+    /// or `D` has no dimensions.
     pub fn counter<D: Dimension>(&mut self, chart: Chart) -> Counter<D> {
         let columns = self.column_range::<D>(Aggregation::Sum);
         self.chart(chart, per_dimension(columns, Readout::Rate));
