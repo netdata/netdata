@@ -1155,7 +1155,11 @@
         },
         "name_column": {
           "$ref": "#/$defs/id",
-          "description": "Column in the source table used as the bullet key or label."
+          "description": "Column in the source table used as the bullet key, and as its label unless label_column provides one."
+        },
+        "label_column": {
+          "$ref": "#/$defs/id",
+          "description": "Optional display column shown as the bullet label; consumers fall back to name_column when the row value is null or empty. Never used as the bullet key."
         },
         "value_column": {
           "$ref": "#/$defs/id",
