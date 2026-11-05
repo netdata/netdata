@@ -150,13 +150,13 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_cpu_usage` | `%` | device | The current CPU utilization |
+| `snmp.device_prof_cpu_usage` | `%` | per stack_unit_index | The current CPU utilization |
 
 ### System / Memory
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_memory_usage` | `%` | device | Total memory usage in percentage. |
+| `snmp.device_prof_memory_usage` | `%` | per stack_unit_index | Total memory usage in percentage. |
 
 ### System / Uptime
 
