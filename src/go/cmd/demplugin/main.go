@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
@@ -41,8 +43,15 @@ func init() {
 }
 func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
-	if handled, err := runRuntimeCommand(context.Background(), os.Args[1:], os.Stdout, os.Stderr); handled {
-		if err != nil {
+	runtimeContext := context.Background()
+	stopRuntimeSignals := func() {}
+	if len(os.Args) > 1 && os.Args[1] == "runtime" {
+		runtimeContext, stopRuntimeSignals = signal.NotifyContext(runtimeContext, os.Interrupt, syscall.SIGTERM)
+	}
+	handled, runtimeError := runRuntimeCommandWithInput(runtimeContext, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	stopRuntimeSignals()
+	if handled {
+		if err := runtimeError; err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

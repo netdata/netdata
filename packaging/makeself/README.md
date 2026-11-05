@@ -17,6 +17,13 @@ installer-owned, including when a package directory is relocated through a symli
 not recursively change file owners. The eBPF ownership adjustment also targets exact shipped entries. Fleet preparation
 filters the inventory to match retained package content. The source installer's fallback directory setup uses the same
 ownership boundary.
+
+New root source installations create implicit executable directories without group/world write access. Existing shared
+source-install parents keep their administrator-selected permissions. Static installation and updates remove
+group/world write only from shipped executable directories identified by the package inventory, including parents
+recreated during extraction. This includes the private prefix, `bin`, `usr`, `usr/libexec` and
+`system` paths, not external parents or unlisted application descendants. This directory repair preserves plugin
+file modes, setuid bits and capabilities; the installer's existing per-plugin ownership and permission rules still apply.
 Explicit systemd-tmpfiles policies for database/claiming files and the historical static OTEL ownership repair still
 apply; an update is not a general recursive permission repair. Modes or owners changed by earlier updates are not
 automatically restored: recovery requires the affected application's intended permissions, which the installer cannot
@@ -27,10 +34,13 @@ The isolated regression suite exercises both directory-setup paths and actual ma
 ```sh
 python3 packaging/installer/tests/test_install_state.py -v
 sudo python3 packaging/installer/tests/test_install_state.py -v
+sudo python3 packaging/installer/tests/test_source_install_permissions.py -v
 ```
 
 The Linux root run additionally verifies distinct state owners and the historical ownership repair. It tests
 systemd-tmpfiles only when that command is available; otherwise that case is reported as skipped.
+The source creation tests require CMake and make and exercise a real minimal install through the source installer's
+installation function, including preservation of existing shared directories and nonroot creation behavior.
 All fixtures live in temporary directories; the tests do not install services or change host Netdata directories.
 
 ## Supported Architectures

@@ -2006,6 +2006,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -2128,8 +2137,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -2982,6 +2991,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -3134,6 +3144,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -3256,8 +3275,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -4110,6 +4129,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -4413,6 +4433,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -4535,8 +4564,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -5389,6 +5418,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -5714,6 +5744,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -5836,8 +5875,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -6690,6 +6729,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -7003,6 +7043,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -7125,8 +7174,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -7979,6 +8028,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -8131,6 +8181,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -8253,8 +8312,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -9107,6 +9166,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -9259,6 +9319,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -9381,8 +9450,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -10235,6 +10304,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -10387,6 +10457,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -10509,8 +10588,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -11363,6 +11442,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -11674,6 +11754,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -11796,8 +11885,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -12650,6 +12739,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -12802,6 +12892,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -12924,8 +13023,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -13778,6 +13877,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -13930,6 +14030,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -14052,8 +14161,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -14906,6 +15015,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -15058,6 +15168,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -15180,8 +15299,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -16034,6 +16153,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -19143,6 +19263,15 @@
               }
             },
             {
+              "cell": "text",
+              "id": "if_alias",
+              "label": "Alias",
+              "projection": {
+                "column": "if_alias",
+                "kind": "direct"
+              }
+            },
+            {
               "cell": "badge",
               "id": "oper_status",
               "label": "Status",
@@ -19265,8 +19394,8 @@
             },
             {
               "cell": "text",
-              "id": "if_alias",
-              "label": "Alias",
+              "id": "if_alias_mib",
+              "label": "ifAlias",
               "projection": {
                 "column": "if_alias",
                 "kind": "direct"

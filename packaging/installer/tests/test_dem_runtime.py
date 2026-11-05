@@ -47,6 +47,9 @@ elif name == 'dem.plugin':
         print('fixture: missing publisher trust or failed qualification', file=sys.stderr)
         sys.exit(settings['cli_exit'])
     print(json.dumps({'mode': settings.get('mode', 'native'), 'state': 'installed'}, indent=2))
+elif name == 'netdata-dem-runtime.sh':
+    assert args == ['install', '--agent', str(root / 'bin/netdata'), '--allow-download'], args
+    sys.exit(settings.get('cli_exit', 0))
 elif name in ('apt-get', 'dnf', 'yum', 'zypper'):
     sys.exit(settings.get('pm_exit', 0))
 elif name != 'event':
@@ -63,6 +66,9 @@ class DemRuntimeTests(unittest.TestCase):
         self.bin.mkdir()
         self.plugins = self.root / 'plugins $(not-executed)'
         self.plugins.mkdir()
+        self.host_helper = self.root / 'usr/libexec/netdata/netdata-dem-runtime.sh'
+        self.host_helper.parent.mkdir(parents=True)
+        self.executable(self.host_helper)
         for name in ('id', 'netdata', 'runuser', 'apt-get', 'dnf', 'event'):
             self.executable(self.bin / name)
         self.executable(self.plugins / 'dem.plugin')
@@ -141,38 +147,44 @@ claim() { return "${FIXTURE_CLAIM_STATUS:-0}"; }
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, '1')
 
-    def test_fresh_and_existing_managed_install_use_service_identity_and_paths(self):
+    def test_fresh_and_existing_managed_install_delegate_complete_host_setup(self):
         for installed in (0, 1):
             with self.subTest(installed=installed):
                 result = self.invoke('main', FIXTURE_INSTALLED=installed)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                call = self.calls('dem.plugin')[-1]
-                self.assertEqual(call['args'], ['runtime', 'install', '--allow-download', '--config-dir',
-                                                self.settings['config']['directories/config']])
-                self.assertEqual(call['uid'], '999')
-                for field, key in [('lib', 'lib'), ('config', 'config'), ('stock', 'stock config')]:
-                    self.assertEqual(call[field], self.settings['config']['directories/' + key])
+                call = self.calls('netdata-dem-runtime.sh')[-1]
+                self.assertEqual(call['args'], ['install', '--agent', str(self.bin / 'netdata'),
+                                                '--allow-download'])
+                self.assertEqual(self.calls('dem.plugin'), [])
                 self.assertIn('Restart the Agent explicitly', result.stderr)
         self.assertEqual([call['args'] for call in self.calls('event')], [['agent-install'], ['agent-update']])
 
     def test_existing_claim_failure_is_not_hidden_by_runtime_success(self):
         result = self.invoke('handle_existing_install', NETDATA_CLAIM_TOKEN='fixture', FIXTURE_CLAIM_STATUS=19)
         self.assertEqual(result.returncode, 19, result.stderr)
-        self.assertEqual(len(self.calls('dem.plugin')), 1)
+        self.assertEqual(len(self.calls('netdata-dem-runtime.sh')), 1)
 
-    def test_static_install_as_existing_service_user_needs_no_privilege_switch(self):
-        result = self.invoke(FIXTURE_TYPE='manual-static', SYSARCH='aarch64', FIXTURE_UID='999')
+    def test_static_install_uses_same_host_setup_helper(self):
+        result = self.invoke(FIXTURE_TYPE='manual-static', SYSARCH='aarch64')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.calls('runuser'), [])
-        self.assertEqual(self.calls('dem.plugin')[0]['args'][1:3], ['install', '--allow-download'])
+        self.assertEqual(self.calls('netdata-dem-runtime.sh')[0]['args'][0], 'install')
+
+    def test_missing_host_helper_does_not_bypass_policy_setup(self):
+        self.host_helper.unlink()
+        result = self.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('host setup helper', result.stderr)
+        self.assertEqual(self.calls('dem.plugin'), [])
 
     def test_plugin_search_keeps_quoted_paths_as_data_and_rejects_escaping(self):
+        self.settings['config']['global/run as user'] = 'netdata'
         self.settings['config']['directories/plugins'] = '\t"/missing path"  "' + str(self.plugins) + '"'
-        result = self.invoke()
+        result = self.invoke(FIXTURE_TYPE='binpkg-deb')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(self.calls('dem.plugin')), 1)
         self.settings['config']['directories/plugins'] = '"/escaped\\path"'
-        result = self.invoke()
+        result = self.invoke(FIXTURE_TYPE='binpkg-deb')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(len(self.calls('dem.plugin')), 1)
 
@@ -245,17 +257,18 @@ claim() { return "${FIXTURE_CLAIM_STATUS:-0}"; }
         self.assertNotIn('Successfully installed', result.stderr)
 
     def test_root_account_missing_plugin_and_bad_config_refuse(self):
+        self.settings['config']['global/run as user'] = 'netdata'
         self.settings['service_uid'] = '0'
-        result = self.invoke()
+        result = self.invoke(FIXTURE_TYPE='binpkg-deb')
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.calls('dem.plugin'), [])
         self.settings['service_uid'] = '999'
         self.settings['config']['directories/plugins'] = '"/missing/plugin path"'
-        result = self.invoke()
+        result = self.invoke(FIXTURE_TYPE='binpkg-deb')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Install an Agent with DEM support', result.stderr)
         self.settings['query_exit'] = 31
-        result = self.invoke()
+        result = self.invoke(FIXTURE_TYPE='binpkg-deb')
         self.assertEqual(result.returncode, 31, result.stderr)
 
     def test_unsupported_platform_and_conflicting_actions_do_not_acquire(self):

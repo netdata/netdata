@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/require"
 
+	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -133,6 +135,48 @@ func TestTopologyProductionPath_CatalogFixtureKeepsModernInventoryWithoutPrefix(
 		Address: ip, AddressType: "ipv4", Source: "ip_mib",
 	})
 	require.Equal(t, "management_address", cache.trapMatchMethodByIP[ip])
+}
+
+func TestTopologyProductionPath_CatalogFixturePortSpeedPrefersIfHighSpeed(t *testing.T) {
+	for _, fixtureName := range []string{"gam.snmprec", "iosxe_c9800.snmprec"} {
+		t.Run(fixtureName, func(t *testing.T) {
+			fixture := loadTopologySNMPRecHandler(t, filepath.Join("../../../../testdata/snmp/snmprec", fixtureName))
+			dev, profileMetrics := collectCatalogFixtureTopology(t, fixture)
+
+			wantSpeedByIfIndex := make(map[int]int64)
+			var saturated int
+			for _, pm := range profileMetrics {
+				for _, metric := range pm.TopologyMetrics {
+					switch metric.TopologyKind {
+					case ddsnmp.KindIfName:
+						if highSpeed := topologyutil.ParsePositiveInt64(metric.Tags[tagTopoIfHigh]); highSpeed > 0 {
+							ifIndex := topologyutil.ParseIndex(metric.Tags[tagTopoIfIndex])
+							wantSpeedByIfIndex[ifIndex] = highSpeed * 1_000_000
+						}
+					case ddsnmp.KindIfStatus:
+						if metric.Tags[tagTopoIfSpeed] == "4294967295" {
+							saturated++
+						}
+					}
+				}
+			}
+			require.Positive(t, saturated, "fixture should report the saturated 32-bit ifSpeed")
+
+			cache := newTestTopologyCache(dev)
+			cache.ingestTopologyProfileMetrics(profileMetrics)
+			var observation topologyengine.L2Observation
+			cache.appendObservedInterfaces(&observation)
+
+			gotSpeedByIfIndex := make(map[int]int64)
+			for _, iface := range observation.Interfaces {
+				require.NotEqualf(t, int64(math.MaxUint32), iface.SpeedBps, "interface %s", iface.IfName)
+				if _, ok := wantSpeedByIfIndex[iface.IfIndex]; ok {
+					gotSpeedByIfIndex[iface.IfIndex] = iface.SpeedBps
+				}
+			}
+			require.Equal(t, wantSpeedByIfIndex, gotSpeedByIfIndex)
+		})
+	}
 }
 
 func TestTopologyProductionPath_CatalogFixtureRejectsMalformedModernIPv4Indexes(t *testing.T) {

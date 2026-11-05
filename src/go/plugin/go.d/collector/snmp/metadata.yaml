@@ -670,6 +670,10 @@ modules:
                 type: string
                 unit: ""
                 description: Network interface name or identifier (e.g., eth0, GigabitEthernet1/0/1, Vlan100)
+              - name: Alias
+                type: string
+                unit: ""
+                description: Interface alias (IF-MIB ifAlias), the description an administrator assigns to a port (e.g., "Uplink to core switch"). Empty when the device reports no alias. A change on the device appears within about an hour, when the collector re-reads the interface table.
               - name: Type
                 type: string
                 unit: ""
@@ -753,7 +757,7 @@ modules:
           performance: |
             Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many interfaces may return many rows
           security: |
-            Exposes interface names, operational status, and traffic counters only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed
+            Exposes interface names, aliases, operational status, and traffic counters only:<br/>• Aliases are free text set by device administrators and may describe sites, circuits, or connected equipment<br/>• No packet payloads or authentication credentials are exposed<br/>• No other device configuration is exposed
           availability: |
             Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet
 
@@ -1117,6 +1121,8 @@ modules:
         enabled: false
       description: |
         Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
+
+        Stock profiles that identify interfaces by IF-MIB `ifName` also attach the interface alias (IF-MIB `ifAlias`, the description an administrator assigns to a port) as the `if_alias` label, so you can filter and group interfaces by it. An interface without an alias shows `[none]`. The alias is read when the chart is created, so a change on the device appears after the collector restarts.
 
         Supported licensing profiles also emit a small set of shared **device-level licensing contexts**:
 

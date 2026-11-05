@@ -50,6 +50,20 @@ Both methods create a [volume](https://docs.docker.com/storage/volumes/) for Net
 _within the container_ at `/etc/netdata`.
 See the [configure section](#configure-agent-containers) for details. If you want to access the configuration files from your _host_ machine, see [host-editable configuration](#with-host-editable-configuration).
 
+DEM journeys and Lighthouse require a browser runtime. For local, rootful Docker on Linux, start the container
+with the configuration below, including persistent storage at `/var/lib/netdata` and, on AppArmor hosts,
+`--security-opt apparmor=unconfined`. Currently, you must also set `runtime.release_url` in the container's
+`dem.conf` to the signed release metadata URL for its architecture. Then run this command on the daemon host:
+
+```sh
+sudo sh ./kickstart.sh --install-dem-runtime --docker-container netdata
+```
+
+Keep the Agent running while kickstart downloads and qualifies the runtime. After the command succeeds,
+run `docker restart netdata` to activate it. Replace `netdata` with your container name.
+RUM works without the runtime. For qualification results, rootless, nested or remote deployments, and removal,
+see [Docker browser runtime setup](/packaging/installer/DEM-RUNTIME.md#docker-host-preparation).
+
 :::info If you remove `pid: host`
 If you choose **not** to use `pid: host`, you **must** add [`--init`](https://docs.docker.com/reference/cli/docker/container/run/#init) (or [`init: true`](https://docs.docker.com/reference/compose-file/services/#init) in Compose).
 

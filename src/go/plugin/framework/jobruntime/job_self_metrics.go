@@ -94,9 +94,9 @@ func (m *jobSelfMetrics) prepare(
 func (m *jobSelfMetrics) createChart(api *netdataapi.API, chart netdataapi.ChartOpts, dimensions ...string) {
 	api.CHART(chart)
 	for key, value := range m.labels {
-		api.CLABEL(key, lblValueReplacer.Replace(value), collectorapi.LabelSourceConf)
+		api.CLABEL(netdataapi.SanitizeWireValue(key), netdataapi.SanitizeWireValue(value), collectorapi.LabelSourceConf)
 	}
-	api.CLABEL("_collect_job", lblValueReplacer.Replace(m.name), collectorapi.LabelSourceAuto)
+	api.CLABEL("_collect_job", netdataapi.SanitizeWireValue(m.name), collectorapi.LabelSourceAuto)
 	api.CLABELCOMMIT()
 	for _, id := range dimensions {
 		api.DIMENSION(netdataapi.DimensionOpts{

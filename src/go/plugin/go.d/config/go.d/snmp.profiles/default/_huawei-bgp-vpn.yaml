@@ -15,11 +15,11 @@ bgp:
     kind: device
     device_counts:
       peers:
-        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.4.1, name: huawei.hwBgpPeerSessionNum }
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.4.1.0, name: huawei.hwBgpPeerSessionNum }
       ibgp_peers:
-        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.4.2, name: huawei.hwIBgpPeerSessionNum }
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.4.2.0, name: huawei.hwIBgpPeerSessionNum }
       ebgp_peers:
-        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.4.3, name: huawei.hwEBgpPeerSessionNum }
+        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.4.3.0, name: huawei.hwEBgpPeerSessionNum }
 
   - id: huawei-bgp-peer-family
     MIB: HUAWEI-BGP-VPN-MIB
