@@ -35,8 +35,10 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
 ## Required Checks
 
 1. Identify the source MIB object for every profile field being added or changed, and confirm the configured OID is
-   that object's OID: `<entry>.<column>`, where the entry is `<table>.1`. A row that sets `table.OID` to the entry
-   still parses with the entry arc doubled in every column, so only the MIB check catches it.
+   that object's OID: a column `<entry>.<column>` (the entry is `<table>.1`) under its row's `table.OID`, or a scalar
+   with its `.0` instance. Profiles with these mistakes still load (an OID outside `table.OID` only logs a warning),
+   and a row whose columns double the entry arc still parses, so run the opt-in MIB check under Validation
+   (`src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows`).
 2. Check the object's `MAX-ACCESS` (SMIv2) or `ACCESS` (SMIv1).
 3. If the object is `not-accessible`, do not configure it as a readable `symbol.OID` unless it satisfies every
    device-scoped MIB-deviation requirement below.
@@ -273,10 +275,20 @@ run local checks when needed to verify a claim, without treating review as a req
 ```bash
 # Profile schema, parsing and validation
 go test ./plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition
+# Stock profile loading and stock-wide rules (table scope, interface aliases)
+go test ./plugin/go.d/collector/snmp/ddsnmp
 # Acquisition, index decoding and typed row delivery
 go test ./plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector
 # Topology consumption of profile observations
 go test ./plugin/go.d/collector/snmp_topology
 ```
 
-See `src/go/plugin/go.d/collector/snmp/profile-format.md` for the full profile syntax and the "Field accessibility" section.
+When adding or changing profile OIDs, also run the opt-in MIB check (rules in its doc comment; skips when unset). Stock
+was verified against `librenms/librenms @ b787b2e9d38a87f39d95a6a077c9382261262336` `mibs/`; OIDs whose MIB is absent
+are counted, not failed.
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/librenms/librenms <dir> &&
+  git -C <dir> sparse-checkout set mibs
+NETDATA_SNMP_MIB_DIRS=<dir>/mibs go test -run TestStockProfiles_OIDsResolveAgainstMIBs ./plugin/go.d/collector/snmp/ddsnmp
+```

@@ -266,6 +266,10 @@ func prepareLoadedProfile(profile *Profile) error {
 	if err := profile.validate(); err != nil {
 		return err
 	}
+	// Warn instead of rejecting: these OIDs were never collected, and a rejected profile would lose its other metrics.
+	for _, issue := range ddprofiledefinition.OutOfTableOIDs(profile.Definition) {
+		log.Warningf("profile '%s': %s", profile.SourceFile, issue)
+	}
 	if err := CompileTransforms(profile); err != nil {
 		return err
 	}
