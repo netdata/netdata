@@ -744,8 +744,14 @@ bool rrdcalc_rematch_keep(RRDSET *st, STRING *alert_name, RRD_ALERT_PROTOTYPE *w
     dictionary_write_lock(host->rrdcalc_root_index);
 
     RRDCALC *rc = dictionary_get_advanced(host->rrdcalc_root_index, key, (ssize_t)key_len);
+
+    // keys are truncated, so a chart whose id differs from another's only past the key length shares its key:
+    // that alert belongs to the other chart and is not this re-match's to keep or delete
+    if(rc && rc->rrdset != st)
+        rc = NULL;
+
     if(rc) {
-        if(winner && rc->rrdset == st && uuid_eq(rc->config.hash_id, winner->config.hash_id)) {
+        if(winner && uuid_eq(rc->config.hash_id, winner->config.hash_id)) {
             if(rc->config.source != winner->config.source || rc->config.source_type != winner->config.source_type) {
                 // readers of the provenance hold this dictionary's read lock or the chart's alerts read lock
                 STRING *old_source = rc->config.source;

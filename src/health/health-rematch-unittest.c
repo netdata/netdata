@@ -198,6 +198,27 @@ int health_rematch_unittest(void) {
                       "AC7 kept alert takes the rule's source");
     }
 
+    // a chart id longer than the alert key: two ids that differ only past the key length share a key, and
+    // re-matching one chart must not delete the alert linked to the other
+    {
+        char id_a[1101], id_b[1101];
+        memset(id_a, 'x', sizeof(id_a) - 2); id_a[sizeof(id_a) - 2] = 'a'; id_a[sizeof(id_a) - 1] = '\0';
+        memset(id_b, 'x', sizeof(id_b) - 2); id_b[sizeof(id_b) - 2] = 'b'; id_b[sizeof(id_b) - 1] = '\0';
+
+        RRDSET *sa = rrdset_create_localhost(REMATCH_CHART_TYPE, id_a, NULL, "rematch", REMATCH_CONTEXT,
+                                             "Re-match test", "value", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
+        RRDSET *sb = rrdset_create_localhost(REMATCH_CHART_TYPE, id_b, NULL, "rematch", REMATCH_CONTEXT,
+                                             "Re-match test", "value", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
+        rematch_set_mode(sa, "one");
+        rematch_set_mode(sb, "none");
+        health_prototype_rematch_rrdset(sa);
+        rematch_raise(rematch_alert(sa, "rematch_a"));
+        health_prototype_rematch_rrdset(sb);
+        rematch_check(rematch_kept(sa, "rematch_a"), "long chart ids: re-matching a chart keeps the other chart's alert");
+        rrdcalc_unlink_and_delete_all_rrdset_alerts(sa);
+        rrdcalc_unlink_and_delete_all_rrdset_alerts(sb);
+    }
+
     // AC3: a rule gone from the prototypes (as after a reload without it) loses its alert, the others are kept
     dictionary_del(health_globals.prototypes.dict, "rematch_b");
     health_apply_prototypes_to_host(localhost);
