@@ -1,5 +1,5 @@
 //! Request-local recording: each event adds into the batch's row for its
-//! entity and the slot its own time falls in; the store decides at merge
+//! entity and the slot its own time falls in; the aggregator decides at merge
 //! time whether that slot is still open.
 
 use crate::metric_set::{
@@ -18,7 +18,7 @@ pub(crate) struct BatchRow {
 /// One entity's rows within a batch.
 #[derive(Default)]
 pub(crate) struct EntityRows {
-    /// By slot number, in first-event order: the store merges late slots
+    /// By slot number, in first-event order: the aggregator merges late slots
     /// into one, and gauges and totals keep the value merged last.
     pub(crate) rows: IndexMap<u64, BatchRow>,
     /// Position in `rows` of the slot recorded into last; events mostly
@@ -27,13 +27,14 @@ pub(crate) struct EntityRows {
 }
 
 /// The events of one unit of work (for example one request) for one
-/// [`MetricSet`], kept apart from the store until the work succeeds: drop
-/// the batch when the work fails, and merge it with
-/// [`Store::merge`](crate::Store::merge) once the work is done for good (for
-/// example written to disk), so a retried request is not counted twice.
+/// [`MetricSet`], kept apart from the aggregator until the work succeeds:
+/// drop the batch when the work fails, and merge it with
+/// [`Aggregator::merge`](crate::Aggregator::merge) once the work is done for
+/// good (for example written to disk), so a retried request is not counted
+/// twice.
 pub struct Batch {
     set: MetricSet,
-    /// By labels, in first-event order: the store admits new entities in
+    /// By labels, in first-event order: the aggregator admits new entities in
     /// this order until its cardinality limit is reached.
     pub(crate) entities: IndexMap<Labels, EntityRows>,
 }
@@ -50,11 +51,13 @@ impl Batch {
         &self.set
     }
 
-    /// The entity with these labels, to record into. A label set the store
-    /// has not seen becomes a new entity when the batch is merged, if it got
-    /// at least one [`record`](BatchEntity::record) and the store is not at
-    /// its [`CardinalityLimit`](crate::CardinalityLimit) (else its events go to the overflow entity);
-    /// its charts are defined on the next [`Store::emit`](crate::Store::emit).
+    /// The entity with these labels, to record into. A label set the
+    /// aggregator has not seen becomes a new entity when the batch is merged,
+    /// if it got at least one [`record`](BatchEntity::record) and the
+    /// aggregator is not at its
+    /// [`CardinalityLimit`](crate::CardinalityLimit) (else its events go to
+    /// the overflow entity); its charts are defined on the next
+    /// [`Aggregator::emit`](crate::Aggregator::emit).
     ///
     /// Look an entity up once per group of events that share labels, not
     /// per event; while the returned handle lives, the batch is borrowed, so
@@ -82,7 +85,7 @@ impl BatchEntity<'_> {
     /// Record one event at `unix_seconds`, its own time; write its
     /// measurements through the returned [`Measurements`]. Every call is one
     /// event, even with no measurement: it counts in whichever of the
-    /// store's late, future and overflow counts applies, and it starts the
+    /// aggregator's late, future and overflow counts applies, and it starts the
     /// entity or keeps it from expiring.
     pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
         let set = self.set;

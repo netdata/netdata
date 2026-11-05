@@ -95,7 +95,7 @@ impl ServiceLogs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netdata_plugin_metrics::{Dimensions, Store};
+    use netdata_plugin_metrics::{Aggregator, Dimensions};
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
@@ -151,11 +151,11 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let mut store = Store::new(&logs.metrics);
+        let mut aggregator = Aggregator::new(&logs.metrics);
         let mut batch = Batch::new(&logs.metrics);
         logs.record(&mut batch, "default", &request);
-        store.merge(batch, 100);
-        let out = String::from_utf8(store.emit(106, usize::MAX).concat()).unwrap();
+        aggregator.merge(batch, 100);
+        let out = String::from_utf8(aggregator.emit(106, usize::MAX).concat()).unwrap();
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'checkout' 1\n"));
         assert!(out.contains(

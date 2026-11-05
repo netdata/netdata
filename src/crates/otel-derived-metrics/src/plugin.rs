@@ -95,7 +95,7 @@ impl Plugin {
 }
 
 /// How the per-service derivation of each signal behaves: one entity per
-/// signal, labelled `signal`, fed from its store's statistics every tick.
+/// signal, labelled `signal`, fed from its aggregator's statistics every tick.
 pub(crate) struct Derivation {
     pub(crate) metrics: MetricSet,
     services: Gauge<Services>,
@@ -139,7 +139,7 @@ impl Derivation {
         }
     }
 
-    /// Record the statistics of `signal`'s store at `now` into `batch`.
+    /// Record the statistics of `signal`'s aggregator at `now` into `batch`.
     pub(crate) fn record(&self, batch: &mut Batch, signal: Signal, stats: &Stats, now: u64) {
         let mut labels = Labels::new();
         labels.insert("signal", signal_name(signal));
@@ -176,15 +176,15 @@ fn signal_name(signal: Signal) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netdata_plugin_metrics::Store;
+    use netdata_plugin_metrics::Aggregator;
 
     #[test]
     fn ingest_outcomes_render_per_signal() {
         let plugin = Plugin::new();
-        let mut store = Store::new(&plugin.metrics);
-        store.merge(plugin.ingest(Signal::Traces, 7, 2, 100), 100);
-        store.merge(plugin.ingest(Signal::Logs, 3, 0, 100), 100);
-        let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
+        let mut aggregator = Aggregator::new(&plugin.metrics);
+        aggregator.merge(plugin.ingest(Signal::Traces, 7, 2, 100), 100);
+        aggregator.merge(plugin.ingest(Signal::Logs, 3, 0, 100), 100);
+        let out = String::from_utf8(aggregator.emit(101, usize::MAX).concat()).unwrap();
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains(
             "BEGIN netdata.otel.spans 1000000\nSET accepted = 7\nSET rejected = 2\nEND 101 0 1\n"
@@ -198,9 +198,9 @@ mod tests {
     #[test]
     fn the_heartbeat_keeps_the_charts_defined_without_traffic() {
         let plugin = Plugin::new();
-        let mut store = Store::new(&plugin.metrics);
-        store.merge(plugin.heartbeat(100), 100);
-        let out = String::from_utf8(store.emit(101, usize::MAX).concat()).unwrap();
+        let mut aggregator = Aggregator::new(&plugin.metrics);
+        aggregator.merge(plugin.heartbeat(100), 100);
+        let out = String::from_utf8(aggregator.emit(101, usize::MAX).concat()).unwrap();
         assert!(out.contains("CHART netdata.otel.spans "));
         assert!(out.contains("SET accepted = 0\nSET rejected = 0\n"));
     }
@@ -208,13 +208,13 @@ mod tests {
     #[test]
     fn derivation_charts_one_entity_per_signal_with_increases() {
         let derivation = Derivation::new();
-        let mut store = Store::new(&derivation.metrics);
+        let mut aggregator = Aggregator::new(&derivation.metrics);
         let mut tick = |stats: Stats, now: u64| {
             let mut batch = Batch::new(&derivation.metrics);
             derivation.record(&mut batch, Signal::Traces, &stats, now);
             derivation.record(&mut batch, Signal::Logs, &Stats::default(), now);
-            store.merge(batch, now);
-            String::from_utf8(store.emit(now + 1, usize::MAX).concat()).unwrap()
+            aggregator.merge(batch, now);
+            String::from_utf8(aggregator.emit(now + 1, usize::MAX).concat()).unwrap()
         };
         let first = tick(
             Stats {

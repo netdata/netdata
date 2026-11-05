@@ -3,7 +3,7 @@
 //! records by severity, and the plugin's own ingest outcomes and derivation
 //! health (self-monitoring).
 //!
-//! [`DerivedMetrics`] owns one `netdata_plugin_metrics::Store` per metric
+//! [`DerivedMetrics`] owns one `netdata_plugin_metrics::Aggregator` per metric
 //! set, each behind its own mutex, so recording from export requests never
 //! waits on the OTLP metrics `ChartManager` lock. An export request records
 //! into a request-local batch while it prepares its frames and commits the
@@ -15,7 +15,7 @@ mod logs;
 mod plugin;
 mod services;
 
-use netdata_plugin_metrics::{Batch, Store};
+use netdata_plugin_metrics::{Aggregator, Batch};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use otel_bridge::config::DerivedMetricsConfig;
@@ -34,25 +34,25 @@ pub struct SpansBatch(Batch);
 pub struct LogsBatch(Batch);
 
 /// Merge a batch whose records are durable.
-fn commit(store: &Mutex<Store>, batch: Batch) {
+fn commit(aggregator: &Mutex<Aggregator>, batch: Batch) {
     if !batch.is_empty() {
-        store.lock().unwrap().merge(batch, unix_now());
+        aggregator.lock().unwrap().merge(batch, unix_now());
     }
 }
 
 struct Enabled {
     services: services::Services,
-    service_store: Mutex<Store>,
+    service_aggregator: Mutex<Aggregator>,
     logs: logs::ServiceLogs,
-    logs_store: Mutex<Store>,
+    logs_aggregator: Mutex<Aggregator>,
     derivation: plugin::Derivation,
-    derivation_store: Mutex<Store>,
+    derivation_aggregator: Mutex<Aggregator>,
 }
 
 pub struct DerivedMetrics {
     enabled: Option<Enabled>,
     plugin: plugin::Plugin,
-    plugin_store: Mutex<Store>,
+    plugin_aggregator: Mutex<Aggregator>,
 }
 
 impl DerivedMetrics {
@@ -62,20 +62,20 @@ impl DerivedMetrics {
             let logs = logs::ServiceLogs::new(config.max_services);
             let derivation = plugin::Derivation::new();
             Enabled {
-                service_store: Mutex::new(Store::new(&services.metrics)),
+                service_aggregator: Mutex::new(Aggregator::new(&services.metrics)),
                 services,
-                logs_store: Mutex::new(Store::new(&logs.metrics)),
+                logs_aggregator: Mutex::new(Aggregator::new(&logs.metrics)),
                 logs,
-                derivation_store: Mutex::new(Store::new(&derivation.metrics)),
+                derivation_aggregator: Mutex::new(Aggregator::new(&derivation.metrics)),
                 derivation,
             }
         });
         let plugin = plugin::Plugin::new();
-        let plugin_store = Mutex::new(Store::new(&plugin.metrics));
+        let plugin_aggregator = Mutex::new(Aggregator::new(&plugin.metrics));
         Self {
             enabled,
             plugin,
-            plugin_store,
+            plugin_aggregator,
         }
     }
 
@@ -102,7 +102,7 @@ impl DerivedMetrics {
     /// Count a batch once its spans are durable.
     pub fn commit_spans(&self, batch: SpansBatch) {
         if let Some(enabled) = &self.enabled {
-            commit(&enabled.service_store, batch.0);
+            commit(&enabled.service_aggregator, batch.0);
         }
     }
 
@@ -129,7 +129,7 @@ impl DerivedMetrics {
     /// Count a batch once its log records are durable.
     pub fn commit_logs(&self, batch: LogsBatch) {
         if let Some(enabled) = &self.enabled {
-            commit(&enabled.logs_store, batch.0);
+            commit(&enabled.logs_aggregator, batch.0);
         }
     }
 
@@ -138,7 +138,7 @@ impl DerivedMetrics {
     pub fn record_ingest(&self, signal: Signal, accepted: u64, rejected: u64) {
         let now = unix_now();
         let batch = self.plugin.ingest(signal, accepted, rejected, now);
-        self.plugin_store.lock().unwrap().merge(batch, now);
+        self.plugin_aggregator.lock().unwrap().merge(batch, now);
     }
 
     /// Render every finished slot as of `now` (Unix seconds), in chunks of at
@@ -147,23 +147,23 @@ impl DerivedMetrics {
         let mut chunks = Vec::new();
         if let Some(enabled) = &self.enabled {
             let mut batch = Batch::new(&enabled.derivation.metrics);
-            for (signal, store) in [
-                (Signal::Traces, &enabled.service_store),
-                (Signal::Logs, &enabled.logs_store),
+            for (signal, aggregator) in [
+                (Signal::Traces, &enabled.service_aggregator),
+                (Signal::Logs, &enabled.logs_aggregator),
             ] {
-                let mut store = store.lock().unwrap();
-                chunks.extend(store.emit(now, MAX_CHUNK_BYTES));
+                let mut aggregator = aggregator.lock().unwrap();
+                chunks.extend(aggregator.emit(now, MAX_CHUNK_BYTES));
                 enabled
                     .derivation
-                    .record(&mut batch, signal, &store.stats(), now);
+                    .record(&mut batch, signal, &aggregator.stats(), now);
             }
-            let mut derivation_store = enabled.derivation_store.lock().unwrap();
-            derivation_store.merge(batch, now);
-            chunks.extend(derivation_store.emit(now, MAX_CHUNK_BYTES));
+            let mut derivation_aggregator = enabled.derivation_aggregator.lock().unwrap();
+            derivation_aggregator.merge(batch, now);
+            chunks.extend(derivation_aggregator.emit(now, MAX_CHUNK_BYTES));
         }
-        let mut plugin_store = self.plugin_store.lock().unwrap();
-        plugin_store.merge(self.plugin.heartbeat(now), now);
-        chunks.extend(plugin_store.emit(now, MAX_CHUNK_BYTES));
+        let mut plugin_aggregator = self.plugin_aggregator.lock().unwrap();
+        plugin_aggregator.merge(self.plugin.heartbeat(now), now);
+        chunks.extend(plugin_aggregator.emit(now, MAX_CHUNK_BYTES));
         chunks
     }
 }

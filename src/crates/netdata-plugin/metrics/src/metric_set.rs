@@ -1,6 +1,6 @@
 //! Metric set declarations: the row layout, instruments and their charts.
 //!
-//! Batches and the store hold a table: one row per entity and slot, with
+//! Batches and the aggregator hold a table: one row per entity and slot, with
 //! the columns the set's layout fixes. A row aggregates all events of one
 //! entity in one slot; each of its cells is one `f64`. A counter has one
 //! column per dimension value, a histogram one per bucket plus its sum, count
@@ -27,7 +27,7 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 const MAX_LABEL_KEY_BYTES: usize = 200;
 
 /// A column's aggregation: how it combines two values for the same entity,
-/// from two batches, a batch and the store, or two slots folded into one
+/// from two batches, a batch and the aggregator, or two slots folded into one
 /// after a stall.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Aggregation {
@@ -129,7 +129,7 @@ macro_rules! dimensions {
 pub struct Counter<D>(pub(crate) ColumnRange<D>);
 
 /// For a source that keeps its own running totals, split by `D`, for example
-/// a store's statistics: record the current totals at the time you read
+/// an aggregator's statistics: record the current totals at the time you read
 /// them, and the chart shows how much they grew per second.
 ///
 /// - Until an entity's first total, and in the slot of that total (its
@@ -349,9 +349,10 @@ impl Labels {
 }
 
 /// A declared set of metrics and their charts; every entity gets its own
-/// instance of each chart. Cheap to clone; batches and the store share it.
+/// instance of each chart. Cheap to clone; batches and the aggregator share it.
 ///
-/// A plugin may have several sets, each with its own [`Store`](crate::Store).
+/// A plugin may have several sets, each with its own
+/// [`Aggregator`](crate::Aggregator).
 #[derive(Debug, Clone)]
 pub struct MetricSet(pub(crate) Arc<MetricSetInner>);
 
@@ -441,14 +442,14 @@ impl Default for Settings {
 }
 
 /// A limit on the number of entities: the cardinality limit.
-/// While the store is full, the events of a label set without an entity go
+/// While the aggregator is full, the events of a label set without an entity go
 /// to one overflow entity. As entities expire, room returns: the next event
 /// of such a label set, including one whose events went to the overflow
 /// entity so far, gets its own entity.
 #[derive(Debug, Clone)]
 pub struct CardinalityLimit {
     /// Entities held at most. The label-less entity counts; the overflow
-    /// entity does not, so the store holds at most `max_entities + 1`.
+    /// entity does not, so the aggregator holds at most `max_entities + 1`.
     pub max_entities: usize,
     /// The overflow entity's labels.
     pub overflow_labels: Labels,

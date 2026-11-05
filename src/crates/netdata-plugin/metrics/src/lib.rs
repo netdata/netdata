@@ -3,7 +3,7 @@
 //!
 //! ```
 //! use netdata_plugin_metrics::{
-//!     Batch, Chart, ChartType, Labels, MetricSetBuilder, Settings, Store, dimensions,
+//!     Aggregator, Batch, Chart, ChartType, Labels, MetricSetBuilder, Settings, dimensions,
 //! };
 //!
 //! dimensions! {
@@ -14,7 +14,7 @@
 //! }
 //!
 //! // Once, at startup: declare the instruments and their charts, and create
-//! // the store.
+//! // the aggregator.
 //! let mut builder = MetricSetBuilder::new(Settings::default());
 //! let requests = builder.counter::<Outcome>(Chart {
 //!     title: "Requests",
@@ -25,7 +25,7 @@
 //!     priority: 1000,
 //! });
 //! let set = builder.build();
-//! let mut store = Store::new(&set);
+//! let mut aggregator = Aggregator::new(&set);
 //!
 //! // Per unit of work, for example one export request: record its events at
 //! // their own time in one batch, then merge it once the work is durable.
@@ -43,10 +43,10 @@
 //!     }
 //! }
 //!
-//! store.merge(batch, 100);
+//! aggregator.merge(batch, 100);
 //!
 //! // Once per second: write the finished slots to the agent.
-//! let text = String::from_utf8(store.emit(101, 1 << 20).concat()).unwrap();
+//! let text = String::from_utf8(aggregator.emit(101, 1 << 20).concat()).unwrap();
 //! assert!(text.contains("SET success = 1\nSET error = 1\n"));
 //! ```
 //!
@@ -69,14 +69,14 @@
 //!   `set_total`, `observe`); the events of one entity in one slot combine
 //!   into that slot's point.
 
+mod aggregator;
 mod batch;
 mod metric_set;
-mod store;
 
+pub use aggregator::{Aggregator, Stats};
 pub use batch::{Batch, BatchEntity, Measurements};
 pub use metric_set::{
     CardinalityLimit, Chart, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels,
     MetricSet, MetricSetBuilder, Settings,
 };
 pub use netdata_plugin_protocol::ChartType;
-pub use store::{Stats, Store};

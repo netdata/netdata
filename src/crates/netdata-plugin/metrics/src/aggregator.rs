@@ -1,7 +1,7 @@
-//! The store: entities, the open-slot window, the cardinality limit, expiry and
-//! emitting.
+//! The aggregator: entities, the open-slot window, the cardinality limit,
+//! expiry and emitting.
 //!
-//! The store keeps every slot from `oldest_open` (the oldest slot not yet
+//! The aggregator keeps every slot from `oldest_open` (the oldest slot not yet
 //! emitted) to the current one open; each entity holds those slots as rows
 //! and folds them forward after a stall (`bound_backlog`). Entities
 //! are created on their first event, with or without measurements, charts
@@ -20,12 +20,12 @@ use netdata_plugin_protocol::{
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 
-/// Most slots past the lateness one [`Store::emit`] emits after a stall or a
-/// forward clock step; older pending slots are folded into the oldest one
-/// emitted, so no event is lost and memory stays bounded.
+/// Most slots past the lateness one [`Aggregator::emit`] emits after a stall
+/// or a forward clock step; older pending slots are folded into the oldest
+/// one emitted, so no event is lost and memory stays bounded.
 pub(crate) const MAX_BACKLOG_SLOTS: u64 = 60;
 
-/// Counts since the store was created; `entities` is the current number.
+/// Counts since the aggregator was created; `entities` is the current number.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Stats {
     /// Entities currently tracked, the overflow entity included.
@@ -61,9 +61,10 @@ struct Entity {
 /// Collects the batches of one [`MetricSet`] and turns finished slots into
 /// chart-protocol text.
 ///
-/// The store reads no clock and does no I/O. Pass the current Unix time to
-/// [`Store::merge`] and [`Store::emit`], call `emit` at least once per slot,
-/// and write the bytes it returns to the agent. Share it behind a lock.
+/// The aggregator reads no clock and does no I/O. Pass the current Unix time
+/// to [`Aggregator::merge`] and [`Aggregator::emit`], call `emit` at least
+/// once per slot, and write the bytes it returns to the agent. Share it
+/// behind a lock.
 ///
 /// # When a slot is emitted
 ///
@@ -97,7 +98,7 @@ struct Entity {
 /// - Beyond the cardinality limit, events go to the overflow entity (see
 ///   [`CardinalityLimit`](crate::CardinalityLimit);
 ///   [`Stats::overflowed_events`]).
-pub struct Store {
+pub struct Aggregator {
     set: MetricSet,
     entities: HashMap<Labels, Entity>,
     overflow: Option<Entity>,
@@ -106,7 +107,7 @@ pub struct Store {
     stats: Stats,
 }
 
-impl Store {
+impl Aggregator {
     pub fn new(set: &MetricSet) -> Self {
         Self {
             set: set.clone(),
@@ -532,7 +533,7 @@ mod tests {
     /// failed, each taking half a second.
     fn record(
         f: &Fixture,
-        store: &mut Store,
+        aggregator: &mut Aggregator,
         name: &str,
         time: u64,
         count: u64,
@@ -555,15 +556,15 @@ mod tests {
                 )
                 .observe(f.duration, 0.5, 1.0);
         }
-        store.merge(batch, now);
+        aggregator.merge(batch, now);
     }
 
     #[test]
     fn defines_once_then_updates_each_slot() {
         let f = fixture(0, 900, None);
-        let mut store = Store::new(&f.set);
-        record(&f, &mut store, "checkout", 100, 3, 1, 100);
-        let first = text(&store.emit(101, usize::MAX));
+        let mut aggregator = Aggregator::new(&f.set);
+        record(&f, &mut aggregator, "checkout", 100, 3, 1, 100);
+        let first = text(&aggregator.emit(101, usize::MAX));
         let h = format!("{:016x}", labels("checkout").stable_hash());
         assert_eq!(
             first,
@@ -588,7 +589,7 @@ mod tests {
             )
         );
         // The next slot: zero rates, no average or maximum, no new definition.
-        let second = text(&store.emit(102, usize::MAX));
+        let second = text(&aggregator.emit(102, usize::MAX));
         assert_eq!(
             second,
             format!(
@@ -599,23 +600,23 @@ mod tests {
         );
         validate_chart_stream(format!("{first}{second}").as_bytes()).unwrap();
         // Nothing is emitted twice.
-        assert!(store.emit(102, usize::MAX).is_empty());
+        assert!(aggregator.emit(102, usize::MAX).is_empty());
     }
 
     #[test]
     fn lateness_keeps_slots_open_and_clamps_exactly_once() {
         let f = fixture(10, 900, None);
-        let mut store = Store::new(&f.set);
+        let mut aggregator = Aggregator::new(&f.set);
         // Window starts at slot 990 (now 1000, lateness 10).
-        record(&f, &mut store, "a", 995, 1, 0, 1000);
+        record(&f, &mut aggregator, "a", 995, 1, 0, 1000);
         // Too late: counted in the oldest open slot.
-        record(&f, &mut store, "a", 100, 2, 0, 1000);
+        record(&f, &mut aggregator, "a", 100, 2, 0, 1000);
         // From the future: counted in the current slot.
-        record(&f, &mut store, "a", 5000, 4, 0, 1000);
-        assert_eq!(store.stats().late_events, 2);
-        assert_eq!(store.stats().future_events, 4);
+        record(&f, &mut aggregator, "a", 5000, 4, 0, 1000);
+        assert_eq!(aggregator.stats().late_events, 2);
+        assert_eq!(aggregator.stats().future_events, 4);
         // Slot 999 is not finished plus lateness until 1010.
-        let out = text(&store.emit(1009, usize::MAX));
+        let out = text(&aggregator.emit(1009, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
         let ok_values = |out: &str| -> Vec<f64> {
             out.lines()
@@ -628,7 +629,7 @@ mod tests {
         assert_eq!(emitted.len(), 9);
         assert_eq!(emitted[0], 2.0);
         assert_eq!(emitted[5], 1.0);
-        let rest = text(&store.emit(1011, usize::MAX));
+        let rest = text(&aggregator.emit(1011, usize::MAX));
         // Slots 999 and 1000: the 4 future events land in slot 1000.
         assert_eq!(ok_values(&rest), vec![0.0, 4.0]);
         validate_chart_stream(format!("{out}{rest}").as_bytes()).unwrap();
@@ -637,16 +638,16 @@ mod tests {
     #[test]
     fn expired_entities_are_marked_obsolete_and_revived() {
         let f = fixture(0, 3, None);
-        let mut store = Store::new(&f.set);
-        record(&f, &mut store, "a", 10, 1, 0, 10);
-        let mut out = text(&store.emit(13, usize::MAX));
+        let mut aggregator = Aggregator::new(&f.set);
+        record(&f, &mut aggregator, "a", 10, 1, 0, 10);
+        let mut out = text(&aggregator.emit(13, usize::MAX));
         assert!(!out.contains("obsolete"));
-        out += &text(&store.emit(14, usize::MAX));
+        out += &text(&aggregator.emit(14, usize::MAX));
         assert_eq!(out.matches("'obsolete store_first'").count(), 3);
-        assert_eq!(store.stats().entities, 0);
-        assert_eq!(store.stats().expired_entities, 1);
-        record(&f, &mut store, "a", 20, 1, 0, 20);
-        let again = text(&store.emit(21, usize::MAX));
+        assert_eq!(aggregator.stats().entities, 0);
+        assert_eq!(aggregator.stats().expired_entities, 1);
+        record(&f, &mut aggregator, "a", 20, 1, 0, 20);
+        let again = text(&aggregator.emit(21, usize::MAX));
         assert_eq!(again.matches("CHART ").count(), 3);
         assert!(!again.contains("obsolete"));
         assert_eq!(again.matches("CLABEL_COMMIT").count(), 3);
@@ -656,21 +657,21 @@ mod tests {
     #[test]
     fn entities_over_the_limit_share_the_overflow_entity() {
         let f = fixture(0, 3, Some(1));
-        let mut store = Store::new(&f.set);
-        record(&f, &mut store, "a", 10, 1, 0, 10);
-        record(&f, &mut store, "b", 10, 2, 0, 10);
-        record(&f, &mut store, "c", 10, 3, 0, 10);
-        let stats = store.stats();
+        let mut aggregator = Aggregator::new(&f.set);
+        record(&f, &mut aggregator, "a", 10, 1, 0, 10);
+        record(&f, &mut aggregator, "b", 10, 2, 0, 10);
+        record(&f, &mut aggregator, "c", 10, 3, 0, 10);
+        let stats = aggregator.stats();
         assert_eq!(stats.entities, 2);
         assert_eq!(stats.overflowed_events, 5);
-        let out = text(&store.emit(11, usize::MAX));
+        let out = text(&aggregator.emit(11, usize::MAX));
         assert!(out.contains("BEGIN svc.requests_overflow 1000000\nSET ok = 5\n"));
         assert!(out.contains("CLABEL 'overflow' 'true' 1\n"));
         // Once "a" and the overflow entity expire, "b" gets its own charts.
-        let expired = text(&store.emit(14, usize::MAX));
-        assert_eq!(store.stats().entities, 0);
-        record(&f, &mut store, "b", 20, 1, 0, 20);
-        let b = text(&store.emit(21, usize::MAX));
+        let expired = text(&aggregator.emit(14, usize::MAX));
+        assert_eq!(aggregator.stats().entities, 0);
+        record(&f, &mut aggregator, "b", 20, 1, 0, 20);
+        let b = text(&aggregator.emit(21, usize::MAX));
         assert!(b.contains("CLABEL 'service.name' 'b' 1"));
         validate_chart_stream(format!("{out}{expired}{b}").as_bytes()).unwrap();
     }
@@ -678,15 +679,15 @@ mod tests {
     #[test]
     fn entities_without_events_are_not_created() {
         let f = fixture(0, 3, Some(1));
-        let mut store = Store::new(&f.set);
+        let mut aggregator = Aggregator::new(&f.set);
         let mut batch = Batch::new(&f.set);
         batch.entity(labels("empty"));
-        store.merge(batch, 10);
-        assert_eq!(store.stats().entities, 0);
+        aggregator.merge(batch, 10);
+        assert_eq!(aggregator.stats().entities, 0);
         // The limit still has room for an entity with events.
-        record(&f, &mut store, "a", 10, 1, 0, 10);
-        assert_eq!(store.stats().overflowed_events, 0);
-        let out = text(&store.emit(11, usize::MAX));
+        record(&f, &mut aggregator, "a", 10, 1, 0, 10);
+        assert_eq!(aggregator.stats().overflowed_events, 0);
+        let out = text(&aggregator.emit(11, usize::MAX));
         assert!(out.contains("CLABEL 'service.name' 'a' 1"));
         assert!(!out.contains("'empty'"));
     }
@@ -694,12 +695,12 @@ mod tests {
     #[test]
     fn a_clock_jump_renders_a_bounded_backlog_and_keeps_every_event() {
         let f = fixture(10, 1_000_000, None);
-        let mut store = Store::new(&f.set);
-        record(&f, &mut store, "a", 10, 1, 0, 10);
-        record(&f, &mut store, "a", 100_000, 2, 0, 100_000);
-        let window = store.entities.values().next().unwrap().open_rows.len() as u64;
+        let mut aggregator = Aggregator::new(&f.set);
+        record(&f, &mut aggregator, "a", 10, 1, 0, 10);
+        record(&f, &mut aggregator, "a", 100_000, 2, 0, 100_000);
+        let window = aggregator.entities.values().next().unwrap().open_rows.len() as u64;
         assert!(window <= 10 + MAX_BACKLOG_SLOTS + 1, "{window}");
-        let out = text(&store.emit(100_011, usize::MAX));
+        let out = text(&aggregator.emit(100_011, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
         let updates = out.matches("BEGIN ").count() as u64 / 3;
         assert!(updates <= MAX_BACKLOG_SLOTS + 11, "{updates}");
@@ -714,14 +715,14 @@ mod tests {
     #[test]
     fn records_spread_over_many_seconds_land_in_their_slots() {
         let f = fixture(10, 900, None);
-        let mut store = Store::new(&f.set);
+        let mut aggregator = Aggregator::new(&f.set);
         let mut batch = Batch::new(&f.set);
         let mut entity = batch.entity(labels("a"));
         for time in [995, 996, 995, 997, 996, 999] {
             entity.record(time).add(f.requests, Outcome::Ok, 1.0);
         }
-        store.merge(batch, 1000);
-        let out = text(&store.emit(1011, usize::MAX));
+        aggregator.merge(batch, 1000);
+        let out = text(&aggregator.emit(1011, usize::MAX));
         let ok: Vec<&str> = out
             .lines()
             .filter_map(|l| l.strip_prefix("SET ok = "))
@@ -732,11 +733,11 @@ mod tests {
     #[test]
     fn chunks_hold_whole_blocks_under_the_budget() {
         let f = fixture(0, 900, None);
-        let mut store = Store::new(&f.set);
+        let mut aggregator = Aggregator::new(&f.set);
         for name in ["a", "b", "c", "d"] {
-            record(&f, &mut store, name, 10, 1, 0, 10);
+            record(&f, &mut aggregator, name, 10, 1, 0, 10);
         }
-        let chunks = store.emit(12, 400);
+        let chunks = aggregator.emit(12, 400);
         assert!(chunks.len() > 1);
         for chunk in &chunks {
             let text = std::str::from_utf8(chunk).unwrap();
@@ -800,28 +801,28 @@ mod tests {
             priority: 1,
         });
         let set = b.build();
-        let mut store = Store::new(&set);
-        let set = |store: &mut Store, time: u64, total: Option<f64>| {
+        let mut aggregator = Aggregator::new(&set);
+        let set = |aggregator: &mut Aggregator, time: u64, total: Option<f64>| {
             let mut batch = Batch::new(&set);
             let mut entity = batch.entity(Labels::new());
             let mut record = entity.record(time);
             if let Some(total) = total {
                 record.set_total(totals, Events::Events, total);
             }
-            store.merge(batch, time);
+            aggregator.merge(batch, time);
         };
         // Baseline, two totals in one slot (the last wins), no new total, a
         // reset, then a return after expiry with a new baseline.
-        set(&mut store, 10, Some(100.0));
-        set(&mut store, 11, Some(103.0));
-        set(&mut store, 11, Some(107.0));
-        set(&mut store, 12, None);
-        set(&mut store, 13, Some(5.0));
-        let mut out = text(&store.emit(14, usize::MAX));
-        out += &text(&store.emit(18, usize::MAX));
-        set(&mut store, 20, Some(50.0));
-        set(&mut store, 21, Some(52.0));
-        out += &text(&store.emit(22, usize::MAX));
+        set(&mut aggregator, 10, Some(100.0));
+        set(&mut aggregator, 11, Some(103.0));
+        set(&mut aggregator, 11, Some(107.0));
+        set(&mut aggregator, 12, None);
+        set(&mut aggregator, 13, Some(5.0));
+        let mut out = text(&aggregator.emit(14, usize::MAX));
+        out += &text(&aggregator.emit(18, usize::MAX));
+        set(&mut aggregator, 20, Some(50.0));
+        set(&mut aggregator, 21, Some(52.0));
+        out += &text(&aggregator.emit(22, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
         let values: Vec<&str> = out
             .lines()
@@ -912,7 +913,7 @@ mod tests {
         let totals = b.cumulative_counter::<Events>(chart("svc.events"));
         let duration = b.histogram(BOUNDS, chart("svc.duration"), "requests/s");
         let set = b.build();
-        let mut store = Store::new(&set);
+        let mut aggregator = Aggregator::new(&set);
         let mut batch = Batch::new(&set);
         let mut entity = batch.entity(Labels::new());
         entity
@@ -925,15 +926,15 @@ mod tests {
             .set_total(totals, Events::Events, 10.0)
             .observe(duration, 0.5, 1.0)
             .observe(duration, 0.5, f64::NAN);
-        store.merge(batch, 10);
+        aggregator.merge(batch, 10);
         let mut batch = Batch::new(&set);
         batch
             .entity(Labels::new())
             .record(11)
             .set_total(totals, Events::Events, 13.0)
             .set_total(totals, Events::Events, f64::NAN);
-        store.merge(batch, 11);
-        let out = text(&store.emit(13, usize::MAX));
+        aggregator.merge(batch, 11);
+        let out = text(&aggregator.emit(13, usize::MAX));
         assert!(out.contains("SET ok = 1\nSET error = 0\n"));
         assert!(out.contains("SET jobs = 5\n"));
         assert!(out.contains("SET events = 3\n"));
@@ -944,7 +945,7 @@ mod tests {
     #[test]
     fn weights_scale_counts_and_histograms() {
         let f = fixture(0, 900, None);
-        let mut store = Store::new(&f.set);
+        let mut aggregator = Aggregator::new(&f.set);
         let mut batch = Batch::new(&f.set);
         let mut entity = batch.entity(labels("a"));
         entity
@@ -955,8 +956,8 @@ mod tests {
             .record(10)
             .add(f.requests, Outcome::Error, 1.0)
             .observe(f.duration, 2.5, 1.0);
-        store.merge(batch, 10);
-        let out = text(&store.emit(11, usize::MAX));
+        aggregator.merge(batch, 10);
+        let out = text(&aggregator.emit(11, usize::MAX));
         assert!(out.contains("SET ok = 2\nSET error = 1\n"));
         assert!(out.contains("SET avg = 1\nSET max = 2.5\n"));
         assert!(out.contains("SET 0.1 = 0\nSET 1 = 2\nSET +Inf = 1\n"));

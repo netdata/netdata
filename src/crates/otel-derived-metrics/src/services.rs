@@ -216,7 +216,7 @@ fn adjusted_count(trace_state: &str) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netdata_plugin_metrics::Store;
+    use netdata_plugin_metrics::Aggregator;
     use opentelemetry_proto::tonic::common::v1::AnyValue;
     use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
 
@@ -270,11 +270,11 @@ mod tests {
     }
 
     fn render(services: &Services, request: &ExportTraceServiceRequest) -> String {
-        let mut store = Store::new(&services.metrics);
+        let mut aggregator = Aggregator::new(&services.metrics);
         let mut batch = Batch::new(&services.metrics);
         services.record(&mut batch, "default", request);
-        store.merge(batch, 100);
-        let out = String::from_utf8(store.emit(110, usize::MAX).concat()).unwrap();
+        aggregator.merge(batch, 100);
+        let out = String::from_utf8(aggregator.emit(110, usize::MAX).concat()).unwrap();
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         out
     }
