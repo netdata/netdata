@@ -6,6 +6,14 @@
 
 static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap);
 
+// re-matches read the flag under the prototype lock, and DynCfg writes it under it
+static bool health_dyncfg_prototype_enabled(RRD_ALERT_PROTOTYPE *ap) {
+    rw_spinlock_read_lock(&ap->_internal.rw_spinlock);
+    bool enabled = ap->_internal.enabled;
+    rw_spinlock_read_unlock(&ap->_internal.rw_spinlock);
+    return enabled;
+}
+
 static char *health_dyncfg_alert_prototype_id_strdupz(const char *alert_name) {
     size_t prefix_len = strlen(DYNCFG_HEALTH_ALERT_PROTOTYPE_PREFIX);
     size_t alert_name_len = strlen(alert_name);
@@ -821,7 +829,7 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
 
                 dyncfg_health_prototype_reapply(ap);
                 health_dyncfg_register_prototype(ap);
-                code = ap->_internal.enabled ? DYNCFG_RESP_ACCEPTED : DYNCFG_RESP_ACCEPTED_DISABLED;
+                code = health_dyncfg_prototype_enabled(ap) ? DYNCFG_RESP_ACCEPTED : DYNCFG_RESP_ACCEPTED_DISABLED;
                 dictionary_acquired_item_release(health_globals.prototypes.dict, item);
 
                 code = dyncfg_default_response(result, code, "accepted");
@@ -953,7 +961,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
                         freez(nap);
 
                     dyncfg_health_prototype_reapply(ap);
-                    code = ap->_internal.enabled ? DYNCFG_RESP_ACCEPTED : DYNCFG_RESP_ACCEPTED_DISABLED;
+                    code = health_dyncfg_prototype_enabled(ap) ? DYNCFG_RESP_ACCEPTED : DYNCFG_RESP_ACCEPTED_DISABLED;
                     code = dyncfg_default_response(result, code, "updated");
                 }
             }
@@ -1057,7 +1065,7 @@ static void health_dyncfg_register_prototype(RRD_ALERT_PROTOTYPE *ap) {
         .host = localhost,
         .id = key,
         .path = "/health/alerts/prototypes",
-        .status = ap->_internal.enabled ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED,
+        .status = health_dyncfg_prototype_enabled(ap) ? DYNCFG_STATUS_ACCEPTED : DYNCFG_STATUS_DISABLED,
         .type = DYNCFG_TYPE_JOB,
         .source_type = ap->config.source_type,
         .source = string2str(ap->config.source),

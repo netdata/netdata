@@ -683,6 +683,10 @@ static uint64_t health_prototype_rematch_seq_next(void) {
 extern __thread bool is_health_thread;
 
 void health_prototype_alerts_for_rrdset_incrementally(RRDSET *st) {
+    // attaching from a set a reload is still loading would pick partial rule chains, which the re-match after the
+    // reload would then replace
+    netdata_rwlock_rdlock(&health_globals.prototypes.reload_rwlock);
+
     RRD_ALERT_PROTOTYPE *ap;
     dfe_start_read(health_globals.prototypes.dict, ap) {
         if (is_health_thread && !service_running(SERVICE_HEALTH))
@@ -690,6 +694,8 @@ void health_prototype_alerts_for_rrdset_incrementally(RRDSET *st) {
         health_prototype_apply_to_rrdset(st, ap);
     }
     dfe_done(ap);
+
+    netdata_rwlock_rdunlock(&health_globals.prototypes.reload_rwlock);
 }
 
 // Brings the alerts of `st` in line with the current labels and prototypes without touching the alerts whose rule
