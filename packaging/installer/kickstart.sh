@@ -192,6 +192,9 @@ USAGE: kickstart.sh [options]
   --non-interactive                Do not prompt for user input. (default: prompt if there is a controlling terminal)
   --interactive                    Prompt for user input even if there is no controlling terminal.
   --dont-start-it                  Do not start the agent by default (only for static installs or local builds)
+  --docker-container NAME         Target a running local Docker deployment (with --install-dem-runtime).
+  --dem-docker-policy-status TOKEN Inspect a Docker host policy registration without a container.
+  --dem-docker-policy-remove TOKEN Retire that registration; requires --deployments-stopped.
   --install-dem-runtime            Explicitly install the optional browser runtime for DEM synthetic monitoring.
   --dry-run                        Report what we would do with the given options on this system, but don’t actually do anything.
   --release-channel                Specify the release channel to use for the install (default: ${DEFAULT_RELEASE_CHANNEL})
@@ -218,7 +221,8 @@ USAGE: kickstart.sh [options]
   --offline-install-source         Specify a folder to use as installation source when working offline. Use --prepare-offline-install-source first to set up this folder.
 
 --install-dem-runtime uses the installed Agent's normal configuration. Custom service
--c/-u arguments or environment overrides require direct runtime CLI setup. Native
+-c/-u arguments or environment overrides require direct runtime CLI setup after
+administrator preparation of any required host policy. Native
 runtime packages require the named netdata service account. Managed setup downloads
 the browser archive and enables daily preparation; restart the Agent to activate it.
 
@@ -1716,6 +1720,195 @@ claim() {
 
 # ======================================================================
 # Explicit DEM browser runtime setup.
+dem_fail() { printf 'kickstart Docker setup: %s\n' "$*" >&2; exit 1; }
+
+dem_docker_id() {
+  [ "${#1}" = 64 ] || return 1
+  case "$1" in *[!0-9a-f]*) return 1 ;; esac
+}
+
+dem_image_docker() {
+  run_as_root env -i PATH="$PATH" "$dem_cli" --host unix:///var/run/docker.sock --config "$dem_private" "$@"
+}
+
+dem_remove_scratch() {
+  # Docker also records the ID on disk if creation succeeds as the caller is interrupted.
+  if [ -z "$dem_scratch" ]; then
+    dem_file_meta=$(dem_path_stat "$dem_private/cid") || return $?
+    [ "$dem_file_meta" != absent ] || return 0
+    dem_scratch=$(run_as_root cat "$dem_private/cid") || return $?
+  fi
+  dem_docker_id "$dem_scratch" || { printf '%s\n' 'Cannot verify temporary container ID for cleanup' >&2; return 1; }
+  dem_image_docker rm -v "$dem_scratch" >/dev/null || return $?
+  dem_scratch=
+  run_as_root rm -f -- "$dem_private/cid"
+}
+
+dem_docker_cleanup() {
+  dem_exit=$?
+  trap - EXIT
+  dem_remove_scratch || dem_exit=$?
+  if [ -n "$dem_control_dir" ]; then rm -rf -- "$dem_control_dir" || dem_exit=$?; fi
+  run_as_root rm -rf -- "$dem_private" || dem_exit=$?
+  exit "$dem_exit"
+}
+
+dem_trusted_dir() {
+  dem_dir_meta=$(LC_ALL=C stat -c '%F:%u:%a' -- "$1") || return $?
+  case "$dem_dir_meta" in directory:0:*) ;; *) dem_fail "unsafe directory: $1" ;; esac
+  dem_mode=${dem_dir_meta##*:}
+  [ $((0$dem_mode & 022)) -eq 0 ] || dem_fail "writable directory: $1"
+}
+
+dem_path_stat() {
+  # An absent path is ordinary. Preserve privilege or stat failures separately.
+  run_as_root env -i PATH="$PATH" LC_ALL=C /bin/sh -c '
+    if [ -L "$1" ] || [ -e "$1" ]; then exec stat -c "%F:%u:%a" -- "$1"; fi
+    echo absent
+  ' sh "$1"
+}
+
+dem_docker_policy() {
+  # The last registration must be removable after both container and image deletion.
+  dem_state=/var/lib/netdata-dem-runtime-host-policy
+  dem_recovery=$dem_state/docker-helpers
+  dem_helper=$dem_recovery/deployment-$dem_token
+  for dem_dir in / /var /var/lib; do dem_trusted_dir "$dem_dir" || return $?; done
+  for dem_dir in "$dem_state" "$dem_recovery"; do
+    dem_meta=$(dem_path_stat "$dem_dir") || return $?
+    case "$dem_meta" in directory:0:700|absent) ;; *) dem_fail "unsafe Docker policy directory: $dem_dir" ;; esac
+  done
+  dem_meta=$(dem_path_stat "$dem_helper") || return $?
+  case "$dem_meta" in
+    'regular file:0:600')
+      set -- "$dem_action" --deployment "$dem_token"
+      [ "$dem_stopped" != yes ] || set -- "$@" --deployments-stopped
+      run_as_root env -i PATH="$PATH" /bin/sh "$dem_helper" "$@" ;;
+    absent)
+      dem_record=$(dem_path_stat "$dem_state/registrations/deployment-$dem_token") || return $?
+      [ "$dem_record" = absent ] || dem_fail 'registration exists without its recovery helper; use a trusted netdata-dem-runtime.sh to inspect or retire it'
+      printf '%s\n' 'registration=absent' ;;
+    *) dem_fail 'unsafe Docker policy recovery helper' ;;
+  esac
+}
+
+dem_docker_enroll() {
+  case "$dem_container" in [a-zA-Z0-9]*) ;; *) dem_fail 'container name must start with a letter or digit' ;; esac
+  [ ! -e /.dockerenv ] && [ ! -e /run/.containerenv ] || dem_fail 'run kickstart on the Docker daemon host'
+  dem_trusted_dir /run || return $?
+  # Invoke the verified canonical CLI even when the packaged path is a symlink.
+  dem_cli=$(readlink -f -- /usr/bin/docker) || dem_fail 'the system Docker CLI is required'
+  dem_dir=${dem_cli%/*}
+  while [ -n "$dem_dir" ]; do
+    dem_trusted_dir "$dem_dir" || return $?
+    dem_dir=${dem_dir%/*}
+  done
+  dem_meta=$(LC_ALL=C stat -c '%F:%u:%a' -- "$dem_cli") || return $?
+  case "$dem_meta" in 'regular file:0:'*) ;; *) dem_fail 'unsafe system Docker CLI' ;; esac
+  dem_mode=${dem_meta##*:}
+  [ $((0$dem_mode & 022)) -eq 0 ] && [ -x "$dem_cli" ] || dem_fail 'unsafe system Docker CLI'
+  [ "$(readlink -f -- /var/run)" = /run ] && [ -S /var/run/docker.sock ] && [ ! -L /var/run/docker.sock ] &&
+    [ "$(stat -c %u /var/run/docker.sock)" = 0 ] || dem_fail 'a local root-owned system Docker socket is required'
+  dem_private=$(run_as_root mktemp -d /run/netdata-dem-kickstart.XXXXXXXX) || return $?
+  dem_scratch=; dem_control_dir=
+  trap dem_docker_cleanup EXIT
+  trap 'exit 1' 1 2 3 15
+
+  dem_security=$(dem_image_docker info --format '{{json .SecurityOptions}}|{{.OperatingSystem}}') || return $?
+  case "$dem_security" in *rootless*|*userns*|*Desktop*|*desktop*) dem_fail 'requires the local rootful system daemon' ;; esac
+  dem_snapshot=$(dem_image_docker inspect --type container --format '{{.Id}}|{{.Image}}|{{.Name}}|{{.State.Running}}|{{.State.Pid}}' "$dem_container") || return $?
+  dem_id=${dem_snapshot%%|*}
+  dem_image=${dem_snapshot#*|}; dem_image=${dem_image%%|*}
+  dem_pid=${dem_snapshot##*|}
+  case "$dem_pid" in ''|*[!0-9]*|0) dem_fail 'invalid container task PID' ;; esac
+  dem_docker_id "$dem_id" && dem_docker_id "${dem_image#sha256:}" &&
+    [ "$dem_snapshot" = "$dem_id|sha256:${dem_image#sha256:}|/$dem_container|true|$dem_pid" ] || dem_fail 'expected the exact running container and its local image ID'
+
+  run_as_root grep -Eq "(^|[/:.-])$dem_id([/.:-]|$)" "/proc/$dem_pid/cgroup" || dem_fail 'the target must be running on this daemon host'
+
+  # Only the operator-trusted image may supply host code. Never start this container or inherit deployment mounts.
+  dem_image_docker create --pull=never --network=none --cidfile "$dem_private/cid" "$dem_image" >/dev/null || return $?
+  dem_scratch=$(run_as_root cat "$dem_private/cid") || return $?
+  dem_docker_id "$dem_scratch" || { dem_scratch=; dem_fail 'invalid scratch container ID'; }
+  for dem_file in netdata-dem-runtime.sh netdata-dem-docker-host.sh; do
+    dem_image_docker cp "$dem_scratch:/usr/libexec/netdata/$dem_file" "$dem_private/$dem_file" || {
+      dem_copy_rc=$?
+      printf 'kickstart Docker setup: image %s must ship %s; update the Netdata image and retry\n' "$dem_image" "$dem_file" >&2
+      return "$dem_copy_rc"
+    }
+    dem_meta=$(run_as_root env LC_ALL=C stat -c '%F:%u' -- "$dem_private/$dem_file") || return $?
+    [ "$dem_meta" = 'regular file:0' ] || dem_fail 'image helper must be a plain root-owned file'
+  done
+  dem_remove_scratch || return $?
+
+  # Open both ends before elevation, then unlink the FIFO. Closing our writer
+  # cancels even when the privilege command execs a process we cannot signal.
+  dem_control_dir=$(mktemp -d /tmp/netdata-dem-control.XXXXXXXX) || return $?
+  mkfifo -m 600 "$dem_control_dir/control" || return $?
+  exec 8<> "$dem_control_dir/control"
+  exec 7< "$dem_control_dir/control"
+  rm -rf -- "$dem_control_dir" || return $?
+  dem_control_dir=
+
+  set -- docker-install --container "$dem_container" --container-id "$dem_id" --cancel-on-stdin-close
+  [ "$dem_dry" != yes ] || set -- "$@" --dry-run
+  dem_interrupted=no
+  trap 'dem_interrupted=yes; exec 8>&-' 1 2 3 15
+  # Wait on the actual privilege command, without an intermediate shell function.
+  progress "Running the Docker setup helper from local image $dem_image for $dem_container"
+  ${ROOTCMD} env -i PATH="$PATH" /bin/sh "$dem_private/netdata-dem-runtime.sh" "$@" <&7 7<&- 8>&- &
+  dem_child=$!
+  exec 7<&-
+  while :; do
+    dem_interrupted=no
+    if wait "$dem_child"; then return 0; else dem_status=$?; fi
+    # An interrupted wait does not establish that the privileged helper exited.
+    [ "$dem_interrupted" = yes ] && [ "$dem_status" -gt 128 ] || return "$dem_status"
+  done
+}
+
+dem_docker_dispatch() {
+  PATH=/usr/sbin:/usr/bin:/sbin:/bin
+  export PATH
+  LC_ALL=C
+  export LC_ALL
+  umask 077
+  dem_action=; dem_container=; dem_token=; dem_install=no; dem_dry=no; dem_stopped=no
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --install-dem-runtime) [ "$dem_install" = no ] || dem_fail 'duplicate install action'; dem_install=yes; shift ;;
+      --docker-container|--dem-docker-policy-status|--dem-docker-policy-remove)
+        [ "$#" -ge 2 ] && [ -n "$2" ] && [ -z "$dem_action" ] || dem_fail 'provide exactly one Docker action with its value'
+        case "$1" in
+          --docker-container) dem_action=docker-install; dem_container=$2 ;;
+          --dem-docker-policy-status) dem_action=policy-status; dem_token=$2 ;;
+          --dem-docker-policy-remove) dem_action=policy-remove; dem_token=$2 ;;
+        esac
+        shift 2 ;;
+      --dry-run) dem_dry=yes; shift ;;
+      --deployments-stopped) dem_stopped=yes; shift ;;
+      --non-interactive) INTERACTIVE=0; shift ;;
+      *) dem_fail 'Docker actions cannot be combined with host installation, claiming, update or other options' ;;
+    esac
+  done
+  case "$dem_action:$dem_install:$dem_stopped" in
+    docker-install:yes:no|policy-status:no:no|policy-remove:no:yes) ;;
+    *) dem_fail 'container enrollment requires --install-dem-runtime; policy removal requires --deployments-stopped; these are separate terminal actions' ;;
+  esac
+  for dem_redirect in "${DOCKER_HOST-}" "${DOCKER_CONTEXT-}" "${DOCKER_TLS_VERIFY-}" "${DOCKER_CERT_PATH-}" "${DOCKER_CONFIG-}" "${DOCKER_API_VERSION-}"; do
+    [ -z "$dem_redirect" ] || dem_fail 'Docker client overrides are unsupported; use a clean environment on the daemon host'
+  done
+  [ "$(uname -s)" = Linux ] || dem_fail 'Docker host actions require Linux'
+  case "$dem_container$dem_token" in ''|*[!a-zA-Z0-9_.-]*) dem_fail 'invalid container name or registration token' ;; esac
+  [ "${#dem_container}" -le 128 ] && [ "${#dem_token}" -le 128 ] || dem_fail 'container name or token is too long'
+  if [ "$dem_dry:$dem_action" = yes:policy-status ] || [ "$dem_dry:$dem_action" = yes:policy-remove ]; then
+    printf 'kickstart Docker setup: dry-run: would run %s for registration %s; no policy was changed\n' "$dem_action" "$dem_token" >&2
+    exit 0
+  fi
+  confirm_root_support
+  if [ "$dem_action" = docker-install ]; then dem_docker_enroll; else dem_docker_policy; fi
+}
+
 install_dem_runtime() {
   [ "${NETDATA_INSTALL_DEM_RUNTIME}" -eq 1 ] || return 0
 
@@ -1807,13 +2000,7 @@ setup_dem_runtime() {
     ndprefix=
     detect_existing_install
     if [ -z "${ndpath}" ] || [ ! -x "${ndpath}" ]; then
-      warning "Cannot find the installed Agent to read its runtime paths. Use dem.plugin runtime directly with the installation's configuration and service user."
-      return 1
-    fi
-    dem_user=$(dem_runtime_config global 'run as user') || return $?
-    dem_uid=$(id -u "${dem_user}") || return $?
-    if [ -z "${dem_user}" ] || [ "${dem_uid}" = 0 ]; then
-      warning "DEM runtime setup requires a configured nonroot Netdata service user."
+      warning "Cannot find the installed Agent to read its runtime paths. For static/source setup, use netdata-dem-runtime.sh with the correct --agent path; custom deployments require explicit host policy and runtime setup."
       return 1
     fi
   fi
@@ -1824,9 +2011,13 @@ setup_dem_runtime() {
   fi
   case "${dem_install_type}" in
     native|binpkg-deb|binpkg-rpm)
-      if [ "${DRY_RUN}" -ne 1 ] && [ "${dem_user}" != netdata ]; then
-        warning "Native runtime packages require the named netdata service account. Use the runtime CLI for an explicitly configured managed installation under another account."
-        return 1
+      if [ "${DRY_RUN}" -ne 1 ]; then
+        dem_user=$(dem_runtime_config global 'run as user') || return $?
+        dem_uid=$(id -u "${dem_user}") || return $?
+        if [ "${dem_user}" != netdata ] || [ "${dem_uid}" = 0 ]; then
+          warning "Native runtime packages require the named netdata service account with a nonroot UID. A separately configured managed installation under another account requires administrator-prepared host policy and runtime CLI setup."
+          return 1
+        fi
       fi
       progress "Installing optional netdata-dem-runtime through the system package manager; package hooks may restart the Agent."
       configure_native_package_manager || return $?
@@ -1836,18 +2027,35 @@ setup_dem_runtime() {
       dem_action=status
       ;;
     kickstart-static|manual-static|legacy-static|kickstart-build|legacy-build)
-      progress "Explicit DEM setup downloads signed release metadata and the browser archive, then enables daily automatic preparation. Activation requires an operator Agent restart."
+      progress "Explicit DEM setup prepares host browser policy, downloads signed release metadata and the browser archive, then enables daily automatic preparation. Activation requires an operator Agent restart."
       dem_action=install
       ;;
     *)
-      warning "Cannot determine a supported DEM runtime installation method. Use the optional native package for package-managed Agents, or the installed dem.plugin runtime CLI as the service user."
+      warning "Cannot determine a supported DEM runtime installation method. Use the optional native package for package-managed Agents, or the installed netdata-dem-runtime.sh helper for static/source setup."
       return 1
       ;;
   esac
 
   if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would run dem.plugin runtime ${dem_action} as the configured nonroot service user, using the installed Agent's directories and DEM runtime configuration."
+    progress "Would run explicit DEM ${dem_action}; managed setup uses the administrator host helper and executes the runtime CLI as the configured nonroot service user."
     return 0
+  fi
+  if [ "${dem_action}" = install ]; then
+    # detect_existing_install has canonicalized the Agent and its actual prefix.
+    # The installed helper owns policy and service-identity discovery together.
+    dem_helper="${ndprefix%/}/usr/libexec/netdata/netdata-dem-runtime.sh"
+    if ! run_as_root test -x "${dem_helper}"; then
+      warning "The installed DEM host setup helper is unavailable. Install an Agent with DEM support; runtime setup was not attempted."
+      return 1
+    fi
+    if run_as_root "${dem_helper}" install --agent "${ndpath}" --allow-download; then
+      progress "DEM runtime prepared with daily automatic preparation enabled. Restart the Agent explicitly to activate it; kickstart does not restart it for managed runtime activation."
+      return 0
+    else
+      dem_cli_status=$?
+      warning "Managed runtime installation failed. Check the host setup error and the dem.conf runtime.release_url setting; kickstart does not bypass host policy or qualification. Use the installed host helper for offline inputs or --manual-updates."
+      return "${dem_cli_status}"
+    fi
   fi
   dem_config=$(dem_runtime_config directories config) || return $?
   dem_stock_config=$(dem_runtime_config directories 'stock config') || return $?
@@ -1860,15 +2068,7 @@ setup_dem_runtime() {
     warning "Cannot locate dem.plugin in the configured plugin directories. Install an Agent with DEM support, or run the correct installed runtime CLI explicitly for custom plugin layouts."
     return 1
   fi
-  if [ "${dem_action}" = install ]; then
-    if dem_runtime_cli install --allow-download; then
-      progress "DEM runtime prepared with daily automatic preparation enabled. Restart the Agent explicitly to activate it; kickstart does not restart it for managed runtime activation."
-    else
-      dem_cli_status=$?
-      warning "Managed runtime installation failed. Check the CLI error and the dem.conf runtime.release_url setting; kickstart does not invent trust or bypass qualification. For manual updates, use runtime install --allow-download --manual-updates as the service user."
-      return "${dem_cli_status}"
-    fi
-  else
+  if [ "${dem_action}" = status ]; then
     # RPM can report success despite a failed posttrans hook. Ready admission,
     # observed by the actual service identity, is required before success.
     if dem_native_status=$(dem_runtime_cli status); then
@@ -3049,10 +3249,10 @@ validate_args() {
   if [ "${NETDATA_INSTALL_DEM_RUNTIME}" -eq 1 ]; then
     case "${ACTION}" in
       uninstall|claim|repositories-only|prepare-offline)
-        fatal "--install-dem-runtime cannot be combined with this action. Use an ordinary install/update, or the installed runtime CLI for explicit offline setup." F052F ;;
+        fatal "--install-dem-runtime cannot be combined with this action. Use an ordinary install/update. Offline runtime setup uses the installed host helper for static/source installations, or the package manager for native installations." F052F ;;
     esac
     if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-      fatal "--install-dem-runtime requires online acquisition. For offline setup, use dem.plugin runtime install --release /absolute/release.json --archive /absolute/runtime.tar.zst as the Netdata service user." F052F
+      fatal "--install-dem-runtime requires online acquisition. For offline static/source setup, run netdata-dem-runtime.sh install --agent /path/to/netdata --release /absolute/release.json --archive /absolute/runtime.tar.zst as root with the configured offline keyring. Native installations use offline package provisioning." F052F
     fi
   fi
 
@@ -3325,6 +3525,17 @@ parse_args() {
 
 # ======================================================================
 # Main program
+
+# Docker enrollment is terminal and must never enter host Agent discovery or installation.
+for dem_option do
+  case "$dem_option" in
+    --docker-container|--dem-docker-policy-status|--dem-docker-policy-remove)
+      trap - EXIT HUP INT QUIT PIPE TERM
+      dem_docker_dispatch "$@"
+      exit $?
+      ;;
+  esac
+done
 
 setup_terminal || echo > /dev/null
 

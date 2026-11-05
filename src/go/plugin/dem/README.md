@@ -470,20 +470,27 @@ the user namespaces Chromium needs for its sandbox; it does not add browser conf
 profile before qualification. Administrator policy remains authoritative, and a policy or qualification failure keeps
 browser admission closed while restoring eligible non-browser monitoring.
 
-**Managed/static bundles and preloads on restricted Ubuntu hosts require administrator-prepared AppArmor policy.**
-Ubuntu 24.04 restricts unprivileged user namespaces by default. DEM does not automatically grant an exception to
-service-writable runtime paths: the service account could replace executable bytes at those paths. The administrator
-must review the deployment's executable ownership, actual browser path and service policy before permitting namespace
-creation. A policy tied to one generation must be updated before a new generation can qualify. A native package's
-profile does not cover a managed cache, a preload or a container. Containers also need compatible host and container
-AppArmor/seccomp policies. Do not disable Chromium's sandbox or global host restrictions to make qualification pass.
+For static/source installations, use the installed `netdata-dem-runtime.sh` helper or kickstart's explicit
+`--install-dem-runtime` option. The administrator-run helper prepares the necessary AppArmor launcher allowance,
+then runs signed runtime installation and qualification as the configured nonroot service account. For Docker, run
+`sudo sh ./kickstart.sh --install-dem-runtime --docker-container NAME` on the local daemon host while the Agent is
+running. After setup succeeds, activate the runtime with `docker restart NAME`. No host Agent is required. See
+[browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md) for online/offline commands, preloads,
+custom paths, status and removal.
+
+Ubuntu 24.04 restricts unprivileged user namespaces by default. The generated allowance covers the registered root's
+stable browser launchers, including future runtime generations. It enables Chromium's sandbox without adding AppArmor
+confinement or exclusive signed-byte eligibility: service-owned files can be replaced, and other unconfined processes
+may adopt profiles. Administrator edits and disable markers remain authoritative. Containers still need compatible
+namespace/seccomp settings. Do not disable Chromium's sandbox or global host restrictions to make qualification pass.
 
 If qualification reports a Chromium sandbox error, inspect the host's kernel audit messages, for example
 `sudo journalctl -k --since '10 minutes ago'`, for AppArmor namespace denials. Correct the administrator-owned policy,
 then retry the failed installation or qualification. Successful CLI qualification must still be followed by a check
 through the actual Agent service; a terminal and a service can have different security policies.
 
-For managed installations, install the runtime explicitly as the consuming service account. Enabling a browser monitor does not download it.
+The low-level managed commands below run as the consuming service account, after any required host policy is prepared
+through the helper described above. Enabling a browser monitor does not download the runtime.
 A missing installation leaves browser monitors waiting for their dependency; it does not create website failures.
 RUM does not need the browser runtime.
 
@@ -502,6 +509,12 @@ Lighthouse audit before selecting the release. Online operations fetch the packa
 `https://repository.netdata.cloud/netdatabot.gpg.key`; offline operations require `runtime.offline_keyring` to name
 an administrator-provisioned OpenPGP public keyring. `qualify` repeats these checks for the selected release.
 It tests the calling account and environment, not a different service's AppArmor, SELinux or container policy.
+
+Ctrl-C or SIGTERM asks the runtime CLI to cancel at the next point where it can stop safely. If qualification
+launched a browser, the CLI waits for its supervisor to confirm that the browser and its descendants have exited.
+A process stuck in uninterruptible kernel I/O can keep this wait open. Further interrupts do not bypass it.
+Forcing the CLI to exit with SIGKILL leaves drainage unverified. Preserve the execution's files and investigate
+the stuck process before retrying removal or repair.
 
 **Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
 acquired at startup. A process started without a runtime stays unavailable until restarted. Runtime releases can
@@ -531,6 +544,12 @@ Uninstall refuses while any generation has a running consumer or unresolved exec
 intact. If child completion cannot be proved, execution protection remains; neither a timeout nor a missing PID allows
 removal. A failed selection write after publication reports uncertainty; inspection/reconciliation establishes the
 selected state before cleanup proceeds. A successful update does not replace files used by running processes.
+The low-level command removes runtime state only. For a managed runtime with an Agent-linked policy registration, use the
+administrator-owned `netdata-dem-runtime.sh uninstall --agent /path/to/netdata` to complete policy cleanup after
+drainage. Protected preloads additionally require `--root /absolute/preload/path --deployments-stopped`;
+For Docker, use the host retirement command printed at setup. Other explicit policy-only
+registrations use `policy-remove --deployment TOKEN --deployments-stopped` on the host.
+See [runtime and host-policy removal](../../../../packaging/installer/DEM-RUNTIME.md#status-retry-and-removal) for the retirement steps.
 
 If selection or generation metadata is damaged, `status` still reports the available inventory and identifies the
 metadata errors, with a nonzero exit status. A healthy selected release remains identified even when an older release
