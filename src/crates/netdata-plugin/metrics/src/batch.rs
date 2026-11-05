@@ -114,8 +114,8 @@ impl BatchEntity<'_> {
 }
 
 /// One event's measurements: each method call is one measurement of one
-/// instrument, for one of its dimensions (a histogram has none). An event may
-/// hold measurements of several instruments.
+/// instrument, for one value of its [`Dimension`] type (a histogram has
+/// none). An event may hold measurements of several instruments.
 ///
 /// Every method panics if the instrument belongs to another [`MetricSet`],
 /// or if the dimension's index is out of range (a broken manual

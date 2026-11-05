@@ -63,8 +63,9 @@ impl Aggregation {
 
 /// One dimension of an instrument's chart: one line on the chart.
 ///
-/// Each value of the type is one dimension. For example, `Outcome::Success`
-/// and `Outcome::Error` are the two lines of a requests chart. The
+/// Each value of the type is one dimension. For example, with `Outcome` from
+/// the [`dimensions!`](crate::dimensions) example, `Outcome::Success` and
+/// `Outcome::Error` are the two lines of a requests chart. The
 /// instrument names the type, as in `Counter<Outcome>`, and each
 /// measurement names the value.
 ///
@@ -72,13 +73,14 @@ impl Aggregation {
 ///
 /// # Ids
 ///
-/// These rules hold for every type, also one declared with
+/// These rules hold for every type, including one declared with
 /// [`dimensions!`](crate::dimensions). Declaring an instrument with a bad id
 /// panics.
 ///
 /// - Each id must be a valid dimension id: not empty, and without spaces,
-///   control characters, quotes, `\` or `=`. It must not start with `SLOT:`.
-/// - Each id must appear once.
+///   ASCII control characters, quotes, `\` or `=`. It must not start with
+///   `SLOT:`.
+/// - Each id must appear once in `IDS`.
 ///
 /// # Manual implementations
 ///
@@ -535,8 +537,9 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If the chart's context or a dimension id is invalid or already used,
-    /// or `D` has no dimensions.
+    /// If the chart's context is invalid or already used in the set, if a
+    /// dimension id is invalid or repeats in `D::IDS`, or if `D::IDS` is
+    /// empty.
     pub fn counter<D: Dimension>(&mut self, chart: Chart) -> Counter<D> {
         let columns = self.column_range::<D>(Aggregation::Sum);
         self.chart(chart, per_dimension(columns, Readout::Rate));
