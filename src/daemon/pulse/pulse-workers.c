@@ -313,13 +313,14 @@ static void workers_total_memory_calls_chart(void) {
 }
 
 static void workers_total_cpu_utilization_chart(void) {
+    static RRDSET *st = NULL;
+
     size_t i, cpu_enabled = 0;
     for(i = 0; all_workers_utilization[i].name ;i++)
         if(all_workers_utilization[i].workers_cpu_registered) cpu_enabled++;
 
-    if(!cpu_enabled) return;
-
-    static RRDSET *st = NULL;
+    // once the chart exists it keeps being updated: a group without threads uses no cpu
+    if(!cpu_enabled && !st) return;
 
     if(!st) {
         st = rrdset_create_localhost(
@@ -339,7 +340,12 @@ static void workers_total_cpu_utilization_chart(void) {
 
     for(i = 0; all_workers_utilization[i].name ;i++) {
         struct worker_utilization *wu = &all_workers_utilization[i];
-        if(!wu->workers_cpu_registered) continue;
+        if(!wu->workers_cpu_registered) {
+            // its threads have exited: zero, like its other activity charts
+            if(wu->rd_total_cpu_utilizaton)
+                rrddim_set_by_pointer(st, wu->rd_total_cpu_utilizaton, 0);
+            continue;
+        }
 
         if(!wu->rd_total_cpu_utilizaton)
             wu->rd_total_cpu_utilizaton = rrddim_add(st, wu->name_lowercase, NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
