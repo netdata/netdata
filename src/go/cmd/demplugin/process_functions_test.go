@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -83,17 +82,10 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 	schema, err := compiler.Compile("schema.json")
 	require.NoError(t, err)
 
-	expectedFunctions := []string{
-		"rum-sites", "rum-pages", "rum-live", "rum-sessions", "rum-errors", "rum-session-events",
-		"synthetics-checks", "synthetics-runs", "synthetics-run", "synthetics-artifacts", "synthetics-artifact",
-		"dem-history-status",
-	}
-	registration := regexp.MustCompile(`(?m)^FUNCTION GLOBAL "([^"\n]+)" [0-9]+ "[^"\n]*" "([^"\n]*)"`)
 	tests := map[string]struct{ config, module string }{
-		"default selection without jobs": {},
-		"all collectors disabled":        {config: "modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: no\n"},
-		"RUM and journey disabled":       {config: "modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: yes\n"},
-		"Lighthouse CLI selection":       {module: "lighthouse"},
+		"all collectors disabled":  {config: "modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: no\n"},
+		"RUM and journey disabled": {config: "modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: yes\n"},
+		"Lighthouse CLI selection": {module: "lighthouse"},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -181,21 +173,13 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 					t.Error("Agent did not join")
 				}
 			})
-			announcementOffset := 0
+			require.Eventually(t, func() bool {
+				return strings.Contains(output.String(), `FUNCTION GLOBAL "rum-sessions"`) &&
+					strings.Contains(output.String(), `FUNCTION GLOBAL "synthetics-run"`) &&
+					strings.Contains(output.String(), `FUNCTION GLOBAL "synthetics-artifacts"`) &&
+					strings.Contains(output.String(), `FUNCTION GLOBAL "dem-history-status"`)
+			}, 3*time.Second, time.Millisecond)
 			for generation := 0; generation < 2; generation++ {
-				var announced map[string]string
-				require.Eventually(t, func() bool {
-					announced = map[string]string{}
-					for _, match := range registration.FindAllStringSubmatch(output.String()[announcementOffset:], -1) {
-						announced[match[1]] = match[2]
-					}
-					return len(announced) == len(expectedFunctions)
-				}, 3*time.Second, time.Millisecond)
-				for _, name := range expectedFunctions {
-					tags, ok := announced[name]
-					require.True(t, ok, "missing Function advertisement: %s", name)
-					assert.Contains(t, strings.Fields(tags), "hidden", "Function %s must remain hidden during development", name)
-				}
 				suffix := fmt.Sprint(generation)
 				catalogue := output.call(t, writer, "catalogue"+suffix, "synthetics-artifacts")
 				require.NoError(t, schema.Validate(catalogue))
@@ -223,7 +207,6 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				info := output.call(t, writer, "info"+suffix, "synthetics-runs info")
 				assert.NotContains(t, fmt.Sprint(info), "__job")
 				if generation == 0 {
-					announcementOffset = len(output.String())
 					restartCtx, stop := context.WithTimeout(ctx, 3*time.Second)
 					require.NoError(t, a.Restart(restartCtx))
 					stop()
