@@ -341,8 +341,9 @@ static void workers_total_cpu_utilization_chart(void) {
     for(i = 0; all_workers_utilization[i].name ;i++) {
         struct worker_utilization *wu = &all_workers_utilization[i];
         if(!wu->workers_cpu_registered) {
-            // its threads have exited: zero, like its other activity charts
-            if(wu->rd_total_cpu_utilizaton)
+            // no threads left: zero, like its other activity charts; threads whose cpu could not be read
+            // leave a gap
+            if(wu->rd_total_cpu_utilizaton && !wu->workers_registered)
                 rrddim_set_by_pointer(st, wu->rd_total_cpu_utilizaton, 0);
             continue;
         }
