@@ -426,6 +426,10 @@ template: ram_avail_now
 
 ### Configuration Line Details
 
+Quotes in values: for `class`, `type`, `component`, `units`, `summary`, `info` and `exec`, quotes that wrap the whole
+value are removed, single quotes inside it are kept, and double quotes inside it become spaces. In `to`, every quote
+becomes a space.
+
 #### Alert Line `alarm` or `template`
 
 **Purpose:** This line starts an alert or template based on the [entity type](#entity-types-overview) you want to create.
