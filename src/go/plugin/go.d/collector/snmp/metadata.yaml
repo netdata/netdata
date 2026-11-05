@@ -1118,7 +1118,7 @@ modules:
       description: |
         Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
 
-        Per-interface charts are identified by the `interface` label (IF-MIB `ifName`, falling back to `ifDescr`). When the device reports an interface alias (IF-MIB `ifAlias`, the description an administrator assigns to a port), the chart also carries it as the `if_alias` label, so you can filter and group interfaces by their alias. The label value is read when the chart is created; an alias changed on the device is picked up after the collector restarts.
+        Stock profiles that identify interfaces by IF-MIB `ifName` also attach the interface alias (IF-MIB `ifAlias`, the description an administrator assigns to a port) as the `if_alias` label, so you can filter and group interfaces by it. An interface without an alias shows `[none]`. The alias is read when the chart is created, so a change on the device appears after the collector restarts.
 
         Supported licensing profiles also emit a small set of shared **device-level licensing contexts**:
 

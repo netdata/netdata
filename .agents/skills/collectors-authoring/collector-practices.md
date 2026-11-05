@@ -322,8 +322,11 @@ mechanism that matches your collector and *learn how it shapes the result*.
 
 **N**odes, **I**nstances, **D**imensions, **L**abels. This is the conceptual model every other mechanism feeds into.
 Read `docs/NIDL-Framework.md` before designing metrics. Group dimensions into charts that answer *one operational
-question*. Use labels for instance and context annotations. Pick the right chart type (`line`, `area`, `stacked`,
-`heatmap` — see `src/database/rrdset-type.h`) and dimension algorithm (`absolute`, `incremental`,
+question*. Use labels for instance and context annotations. Free-text label values (descriptions, aliases) need no
+collector-side content sanitization: the Agent normalizes every chart label value on ingest (`rrdlabels_sanitize_value`
+in `src/libnetdata/sanitizers/sanitizers-labels.c`), replacing control characters, quotes and several symbols, mapping
+`\` to `/`, capping the length, and storing an empty value as `[none]`. Pick the right chart type (`line`, `area`,
+`stacked`, `heatmap` — see `src/database/rrdset-type.h`) and dimension algorithm (`absolute`, `incremental`,
 `percentage-of-incremental-row`, `percentage-of-absolute-row` — see `src/database/rrd-algorithm.h`, documented in
 `src/plugins.d/README.md`).
 
