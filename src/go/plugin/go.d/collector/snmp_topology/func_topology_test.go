@@ -388,11 +388,26 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	assert.Equal(t, "management_ip", deviceType.Presentation.Modal.Labels.Identification.Fields[1].Key)
 	require.Len(t, deviceType.Presentation.Modal.Sections, 6)
 	assert.Equal(t, "ports", deviceType.Presentation.Modal.Sections[0].ID)
-	assert.Equal(t, "if_index", deviceType.Presentation.Modal.Sections[0].Columns[0].ID)
-	assert.Equal(t, "Port ID", deviceType.Presentation.Modal.Sections[0].Columns[0].Label)
-	assert.Equal(t, "neighbor_actor", deviceType.Presentation.Modal.Sections[0].Columns[11].ID)
-	assert.Equal(t, "actor_link", deviceType.Presentation.Modal.Sections[0].Columns[11].Cell)
-	assert.Equal(t, "expanded", deviceType.Presentation.Modal.Sections[0].Columns[11].Visibility)
+	portColumns := deviceType.Presentation.Modal.Sections[0].Columns
+	portColumn := func(id string) topologyv1.ModalColumn {
+		for _, column := range portColumns {
+			if column.ID == id {
+				return column
+			}
+		}
+		t.Fatalf("ports section has no column %q", id)
+		return topologyv1.ModalColumn{}
+	}
+	assert.Equal(t, "if_index", portColumns[0].ID)
+	assert.Equal(t, "Port ID", portColumns[0].Label)
+	assert.Equal(t, []string{"name", "if_alias"}, []string{portColumns[1].ID, portColumns[2].ID}, "Alias is shown next to Port")
+	assert.Empty(t, portColumns[2].Visibility)
+	assert.Equal(t, "actor_link", portColumn("neighbor_actor").Cell)
+	assert.Equal(t, "expanded", portColumn("neighbor_actor").Visibility)
+	ifAliasExpanded := portColumn("if_alias_mib")
+	assert.Equal(t, []string{"ifAlias", "if_alias", "expanded"},
+		[]string{ifAliasExpanded.Label, ifAliasExpanded.Projection.Column, ifAliasExpanded.Visibility},
+		"the expanded row shows the full alias")
 	assert.Equal(t, "port_neighbors", deviceType.Presentation.Modal.Sections[1].ID)
 	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[1].Source.Kind)
 	assert.Equal(t, "actor_port_links", deviceType.Presentation.Modal.Sections[1].Source.Table)

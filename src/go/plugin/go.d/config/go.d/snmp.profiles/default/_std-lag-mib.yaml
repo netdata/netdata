@@ -10,7 +10,7 @@ metrics:
       name: dot3adAggPortStatsTable
     symbols:
       - {OID: 1.2.840.10006.300.43.1.2.2.1.1, name: _dot3adAggPortStatsLACPDUsRx}
-      - {OID: 1.2.840.10006.300.43.1.2.2.1.2, name: _dot3adAggPortStatsLACPDUsTx}
+      - {OID: 1.2.840.10006.300.43.1.2.2.1.6, name: _dot3adAggPortStatsLACPDUsTx}
       - {OID: 1.2.840.10006.300.43.1.2.2.1.5, name: _dot3adAggPortStatsIllegalRx}
     metric_tags:
       - tag: lag_port_index
@@ -21,6 +21,12 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
+      - tag: _if_alias
+        table: ifXTable
+        MIB: IF-MIB
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
 
   # TODO: LACP operational state (dot3adAggPortActorOperState / PartnerOperState)
   # These are bitfield (BITS/OCTET STRING) values that encode 8 boolean flags

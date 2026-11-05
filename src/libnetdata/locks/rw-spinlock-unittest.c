@@ -90,7 +90,7 @@ int rw_spinlock_unittest(void) {
     {
         RW_SPINLOCK lock = RW_SPINLOCK_INITIALIZER;
         RW_TEST(rw_spinlock_trywrite_lock(&lock) == true, "trywrite succeeds on free lock");
-        RW_TEST(lock.writer == gettid_cached(), "trywrite records the writer tid");
+        RW_TEST(lock.writer == (uint32_t)gettid_cached(), "trywrite records the writer tid");
         rw_spinlock_write_unlock(&lock);
         RW_TEST(lock.writer == 0, "write_unlock clears writer");
         RW_TEST(lock.counter == 0, "write_unlock restores free state");

@@ -60,7 +60,7 @@ func Declarations() []funcapi.FunctionConfig {
 				Name:           m.title,
 				UpdateEvery:    10,
 				Help:           m.help,
-				Tags:           "synthetics",
+				Tags:           "synthetics hidden",
 				RawRequest:     true,
 				ManagedInfo:    true,
 				HasHistory:     m.history,

@@ -40,13 +40,13 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 		createStringPDU("1.3.6.1.4.1.2011.5.25.31.6.5.0", "NetEngine"),
 	})
 	expectSNMPGet(mockHandler, []string{
-		"1.3.6.1.4.1.2011.5.25.177.1.4.1",
-		"1.3.6.1.4.1.2011.5.25.177.1.4.2",
-		"1.3.6.1.4.1.2011.5.25.177.1.4.3",
+		"1.3.6.1.4.1.2011.5.25.177.1.4.1.0",
+		"1.3.6.1.4.1.2011.5.25.177.1.4.2.0",
+		"1.3.6.1.4.1.2011.5.25.177.1.4.3.0",
 	}, []gosnmp.SnmpPDU{
-		createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.4.1", 12),
-		createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.4.2", 4),
-		createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.4.3", 8),
+		createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.4.1.0", 12),
+		createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.4.2.0", 4),
+		createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.4.3.0", 8),
 	})
 	expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 

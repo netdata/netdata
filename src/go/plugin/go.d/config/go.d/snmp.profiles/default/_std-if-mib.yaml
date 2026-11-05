@@ -61,6 +61,11 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
+      - tag: _if_alias
+        table: ifXTable
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
       - tag: interface
         symbol:
           OID: 1.3.6.1.2.1.2.2.1.2
@@ -105,6 +110,10 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
+      - tag: _if_alias
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
       - tag: interface
         table: ifTable
         symbol:

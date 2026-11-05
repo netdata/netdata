@@ -27,7 +27,7 @@ metrics:
   - MIB: CISCOSB-rndMng
     symbol:
       name: cpu.usage
-      OID: 1.3.6.1.4.1.9.6.1.101.1.8
+      OID: 1.3.6.1.4.1.9.6.1.101.1.8.0
       chart_meta:
         description: The current CPU utilization
         family: 'System/CPU/Usage'

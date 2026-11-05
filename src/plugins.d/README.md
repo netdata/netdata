@@ -174,6 +174,12 @@ a single program can produce any number of charts with any number of dimensions 
 
 Charts can be added any time (not just the beginning).
 
+Parameters are separated by spaces. A parameter that contains spaces must be enclosed in single or double quotes and
+must not contain its own quote character. Inside a quoted parameter, a backslash makes Netdata skip the next character
+without removing the backslash, so a parameter must not end with an odd number of backslashes: the last one consumes
+the closing quote and shifts the rest of the line. Netdata already converts `\` to `/` in label names and values, chart
+titles, units, families, contexts and dimension names, so plugins can send `/` in those fields instead.
+
 Netdata may send the following commands to the plugin's `stdin`:
 
 -    `FUNCTION` - to call a specific function, with all parameters inline
@@ -505,7 +511,7 @@ Name and value accept characters according to the following table:
 |---------------------|:------:|:----------:|:-----------:|
 | UTF-8 character     | UTF-8  |     _      |    keep     |
 | Lower case letter   | [a-z]  |    keep    |    keep     |
-| Upper case letter   | [A-Z]  |    keep    |    [a-z]    |
+| Upper case letter   | [A-Z]  |    keep    |    keep     |
 | Digit               | [0-9]  |    keep    |    keep     |
 | Underscore          |   _    |    keep    |    keep     |
 | Minus               |   -    |    keep    |    keep     |

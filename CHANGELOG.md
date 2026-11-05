@@ -369,6 +369,22 @@
 - Docs(skills): capture native and static packaging review guidance ([#24546](https://github.com/netdata/netdata/issues/24546))
 - Web: trim header whitespace, reject malformed header lines, anchor Content-Length ([#24543](https://github.com/netdata/netdata/issues/24543))
 - Feat(go.d/panos): add IPSec tunnel and IKE gateway state ([#24386](https://github.com/netdata/netdata/issues/24386))
+- Fix(ipmi): stop summing sensor readings in the ipmi-sensors Function ([#24571](https://github.com/netdata/netdata/issues/24571))
+- Feat(ipmi): show live sensor thresholds in the ipmi-sensors Function ([#24573](https://github.com/netdata/netdata/issues/24573))
+- Feat(go.d): add Meraki switch-port and uplink traffic ([#24572](https://github.com/netdata/netdata/issues/24572))
+- Regenerate integrations docs ([#24549](https://github.com/netdata/netdata/issues/24549))
+- Shutdown: record the shutdown duration in the status file, not SQLite ([#24534](https://github.com/netdata/netdata/issues/24534))
+- Docs(skills): capture independent component releases and SRE handoffs ([#24577](https://github.com/netdata/netdata/issues/24577))
+- Fix(go.d): refresh V1 generated vnode metadata ([#24576](https://github.com/netdata/netdata/issues/24576))
+- Ci: cross-compile every Go program for every platform and test each Go module once ([#24570](https://github.com/netdata/netdata/issues/24570))
+- Add Fedora 45 to CI jobs and package builds. ([#24565](https://github.com/netdata/netdata/issues/24565))
+- Add Ubuntu 26.10 to CI jobs and package builds. ([#24566](https://github.com/netdata/netdata/issues/24566))
+- Docs(api): match the /api/v3/claim response docs to the handler ([#24574](https://github.com/netdata/netdata/issues/24574))
+- Docs: add on-prem HA and disaster recovery page to docs map ([#24579](https://github.com/netdata/netdata/issues/24579))
+- Sync eBPF branches ([#24355](https://github.com/netdata/netdata/issues/24355))
+- Locks: keep the rw-spinlock writer tid at 32 bits ([#24578](https://github.com/netdata/netdata/issues/24578))
+- Keep the client address of X-Forwarded-For entries that carry a port ([#24545](https://github.com/netdata/netdata/issues/24545))
+- Health: restrict the dyncfg alert notification program to the configured default ([#24585](https://github.com/netdata/netdata/issues/24585))
 
 ## [2.12.0] - 2026-09-30
 

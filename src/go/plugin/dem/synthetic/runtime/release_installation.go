@@ -5,6 +5,10 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"syscall"
 )
 
 // ReleaseOperation distinguishes an explicit installation/repair decision from
@@ -14,6 +18,7 @@ type ReleaseOperation string
 
 const (
 	InstallRelease         ReleaseOperation = "install"
+	ensureRelease          ReleaseOperation = "ensure"
 	UpdateRelease          ReleaseOperation = "update"
 	AutomaticReleaseUpdate ReleaseOperation = "automatic-update"
 	RepairRelease          ReleaseOperation = "repair"
@@ -57,25 +62,39 @@ func (s selection) validateRelease() error {
 // The returned candidate owns installer exclusion through qualification and
 // publication. A nil candidate is a successful no-op: disabled automatic updates
 // or an unchanged release. No download can resurrect an uninstalled selection.
-func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (Release, error)) (_ *Candidate, result error) {
+func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (Release, error)) (*Candidate, error) {
+	candidate, _, err := s.beginPublishedInstall(ctx, options, load)
+	return candidate, err
+}
+
+// BeginPublishedEnsure enrolls only a proven absent selection. A usable selected
+// generation is checked under installer exclusion without discovery, inventory,
+// qualification or changing its update policy. The returned manifest is a
+// snapshot; exclusion is released before return. Damage requires explicit repair.
+// A new candidate enables automatic preparation only when successfully selected.
+func (s *Store) BeginPublishedEnsure(ctx context.Context, load func(context.Context) (Release, error)) (*Candidate, *Manifest, error) {
+	return s.beginPublishedInstall(ctx, ReleaseInstallOptions{Operation: ensureRelease, Updates: AutomaticUpdates}, load)
+}
+
+func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (Release, error)) (_ *Candidate, _ *Manifest, result error) {
 	switch options.Operation {
-	case InstallRelease, RepairRelease:
+	case InstallRelease, RepairRelease, ensureRelease:
 		if options.Updates != AutomaticUpdates && options.Updates != ManualUpdates {
-			return nil, errors.New("runtime installation requires an explicit update policy")
+			return nil, nil, errors.New("runtime installation requires an explicit update policy")
 		}
 	case UpdateRelease, AutomaticReleaseUpdate:
 		if options.Updates != "" {
-			return nil, errors.New("runtime update preserves the installed update policy")
+			return nil, nil, errors.New("runtime update preserves the installed update policy")
 		}
 	default:
-		return nil, errors.New("invalid published runtime operation")
+		return nil, nil, errors.New("invalid published runtime operation")
 	}
 	if load == nil {
-		return nil, errors.New("runtime release loader is unavailable")
+		return nil, nil, errors.New("runtime release loader is unavailable")
 	}
 	operation, err := s.lockInstallation(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	transferred := false
 	defer func() {
@@ -95,32 +114,38 @@ func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstal
 		}
 		var err error
 		current, err = s.readSelectionRecord()
+		if err == nil && options.Operation == ensureRelease && current.Manifest != nil {
+			err = s.validateEnsureSelection(*current.Manifest)
+		}
 		return err
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	if options.Operation == ensureRelease && current.Manifest != nil {
+		return nil, current.Manifest, nil
 	}
 	if options.Operation == AutomaticReleaseUpdate && !current.AutomaticUpdates {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if options.Operation == UpdateRelease && current.Release == nil {
-		return nil, errors.New("install an authenticated runtime release before checking updates")
+		return nil, nil, errors.New("install an authenticated runtime release before checking updates")
 	}
 	release, err := load(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := release.Validate(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	next := selection{Manifest: &release.Manifest, Release: &release, AutomaticUpdates: current.AutomaticUpdates}
-	if options.Operation == InstallRelease || options.Operation == RepairRelease {
+	if options.Operation == InstallRelease || options.Operation == RepairRelease || options.Operation == ensureRelease {
 		next.AutomaticUpdates = options.Updates == AutomaticUpdates
 	}
 	if current.Release != nil {
 		changed, err := ReleaseUpdate(*current.Release, release)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if !changed {
 			// Reinstalling the exact release can explicitly change consent
@@ -128,15 +153,46 @@ func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstal
 			if current.AutomaticUpdates != next.AutomaticUpdates {
 				err = s.withLock(func() error { return s.selectRecordLocked(next) })
 			}
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	// candidateWithOperation owns releasing operation even on failure.
 	transferred = true
 	candidate, err := s.candidateWithOperation(operation, release.Manifest, options.Operation == RepairRelease)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	candidate.publication = &next
-	return candidate, nil
+	return candidate, nil, nil
+}
+
+func (s *Store) validateEnsureSelection(m Manifest) (result error) {
+	root, err := s.root.OpenRoot(filepath.Join("generations", m.Archive.SHA256))
+	if err != nil {
+		return selectedPayloadError(err)
+	}
+	defer func() { result = errors.Join(result, root.Close()) }()
+	if err := validatePayloadLayout(root, m); err != nil {
+		return selectedPayloadError(err)
+	}
+	for _, name := range []string{"chrome", "fonts.conf"} {
+		info, err := root.Lstat(name)
+		if err != nil {
+			return selectedPayloadError(err)
+		}
+		if !info.Mode().IsRegular() || (name == "chrome" && info.Mode()&0100 == 0) {
+			return fmt.Errorf("%w: selected runtime bound file is missing or invalid: %s", ErrDamaged, name)
+		}
+	}
+	return nil
+}
+
+func selectedPayloadError(err error) error {
+	// Only confirmed absence or structural violations prove damage. Access, I/O
+	// and other inconclusive failures retain their cause for diagnosis or retry.
+	var invalid payloadLayoutError
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) || errors.As(err, &invalid) {
+		return fmt.Errorf("%w: selected runtime payload: %v", ErrDamaged, err)
+	}
+	return fmt.Errorf("selected runtime payload: %w", err)
 }

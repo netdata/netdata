@@ -114,6 +114,75 @@ run() {
         self.assertEqual(self.snapshot(paths), before)
         self.assertEqual(stat.S_IMODE(package_dir.stat().st_mode) & 0o055, 0o055)
 
+    def test_update_secures_only_shipped_executable_directories(self):
+        package = self.base / 'package'
+        executable_dirs = ('.', 'bin', 'bin/srv', 'usr', 'usr/libexec',
+                           'usr/libexec/netdata', 'usr/libexec/netdata/plugins.d', 'system')
+        for relative in executable_dirs:
+            (package / relative).mkdir(parents=True, exist_ok=True)
+            target = self.prefix / relative
+            target.mkdir(parents=True, exist_ok=True)
+            target.chmod(0o2775)
+        plugins = self.prefix / 'usr/libexec/netdata/plugins.d'
+        files = []
+        for name, mode in (('ordinary', 0o755), ('restricted', 0o750), ('privileged', 0o4750)):
+            target = plugins / name
+            target.write_text('shipped plugin fixture\n')
+            target.chmod(mode)
+            (package / target.relative_to(self.prefix)).write_text('shipped plugin fixture\n')
+            files.append(target)
+        external = self.base / 'administrator-executable-directory'
+        external.mkdir(mode=0o775)
+        external.chmod(0o775)
+        for tree in (package, self.prefix):
+            os.symlink(external, tree / 'usr/libexec/external')
+        self.generate_inventory(package)
+        shutil.copyfile(package / 'system/package-manifest', self.prefix / 'system/package-manifest')
+        state = self.state_fixture()
+        # The installer ensures /opt traversal; use an already traversable shared
+        # parent so preservation is independent of the test runner's umask.
+        (self.base / 'opt').chmod(0o775)
+        before = self.snapshot(files + state + [external, self.base / 'opt'])
+        self.run_setup()
+        self.assertEqual(self.snapshot(files + state + [external, self.base / 'opt']), before)
+        for relative in executable_dirs:
+            self.assertEqual(stat.S_IMODE((self.prefix / relative).stat().st_mode), 0o2755, relative)
+
+    @unittest.skipUnless(os.geteuid() == 0 and shutil.which('setcap'), 'root and setcap required')
+    def test_directory_repair_preserves_plugin_capabilities(self):
+        plugin = self.prefix / 'usr/libexec/netdata/plugins.d/capability-plugin'
+        plugin.parent.mkdir(parents=True, exist_ok=True)
+        plugin.write_text('capability fixture\n')
+        plugin.chmod(0o750)
+        result = subprocess.run(['setcap', 'cap_net_admin=ep', str(plugin)], capture_output=True, text=True)
+        if result.returncode != 0:
+            self.skipTest('test filesystem cannot set capabilities: ' + result.stderr.strip())
+        before = os.getxattr(plugin, 'security.capability')
+        plugin.parent.chmod(0o775)
+        self.run_setup()
+        self.assertEqual(os.getxattr(plugin, 'security.capability'), before)
+        self.assertEqual(stat.S_IMODE(plugin.stat().st_mode), 0o750)
+
+    def test_static_builder_creates_safe_executable_directories(self):
+        tree = self.base / 'fresh-package'
+        environment = dict(os.environ, NETDATA_INSTALL_PATH=str(tree), NETDATA_SOURCE_PATH=str(ROOT),
+                           NETDATA_MAKESELF_PATH=str(ROOT / 'packaging/makeself'), GITHUB_ACTIONS='false')
+
+        def run_job(name):
+            job = ROOT / 'packaging/makeself/jobs' / name
+            result = subprocess.run(['bash', '-c', 'umask 002; exec bash "$1"', 'job', str(job)],
+                                    env=environment, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        run_job('00-prepare-destination.install.sh')
+        executable = tree / 'bin/netdata'
+        executable.write_text('original Agent fixture\n')
+        executable.chmod(0o750)
+        run_job('90-prepare-archive-source.sh')
+        for relative in ('.', 'bin', 'bin/srv', 'usr', 'system'):
+            self.assertEqual(stat.S_IMODE((tree / relative).stat().st_mode), 0o755, relative)
+        self.assertEqual(stat.S_IMODE((tree / 'bin/srv/netdata').stat().st_mode), 0o750)
+
     @unittest.skipUnless(os.geteuid() == 0, 'root is required for package ownership')
     def test_ebpf_ownership_applies_only_to_shipped_entries(self):
         relative = Path('usr/libexec/netdata/plugins.d/ebpf.d')
