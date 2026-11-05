@@ -9,7 +9,7 @@
 //! adjusted count its `ot=th` sampling threshold implies.
 
 use netdata_plugin_metrics::{
-    Batch, BatchEntity, Cap, Chart, ChartType, Counter, Histogram, Labels, MetricSet,
+    Batch, BatchEntity, CardinalityLimit, Chart, ChartType, Counter, Histogram, Labels, MetricSet,
     MetricSetBuilder, Settings, dimensions,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
@@ -136,8 +136,8 @@ pub(crate) fn service_settings(max_services: usize) -> Settings {
     overflow_labels.push("otel.metric.overflow", "true");
     Settings {
         lateness: LATENESS,
-        cap: Some(Cap {
-            max: max_services,
+        cardinality_limit: Some(CardinalityLimit {
+            max_entities: max_services,
             overflow_labels,
         }),
         ..Settings::default()

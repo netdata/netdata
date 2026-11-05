@@ -1,4 +1,4 @@
-//! The store: entities, the open-slot window, the entity cap, expiry and
+//! The store: entities, the open-slot window, the cardinality limit, expiry and
 //! emitting.
 //!
 //! The store keeps every slot from `oldest_open` (the oldest slot not yet
@@ -30,7 +30,8 @@ pub(crate) const MAX_BACKLOG_SLOTS: u64 = 60;
 pub struct Stats {
     /// Entities currently tracked, the overflow entity included.
     pub entities: usize,
-    /// Records counted in the overflow entity because of the cap.
+    /// Records counted in the overflow entity because of the cardinality
+    /// limit.
     pub overflowed_records: u64,
     /// Records older than the oldest open slot, counted in that slot.
     pub late_records: u64,
@@ -93,8 +94,9 @@ struct Entity {
 ///   its labels, before their first update.
 /// - After `expiry` without records its charts are marked obsolete and its
 ///   state is dropped; if it returns, its charts are defined again.
-/// - Beyond the cap, records go to the overflow entity (see
-///   [`Cap`](crate::Cap); [`Stats::overflowed_records`]).
+/// - Beyond the cardinality limit, records go to the overflow entity (see
+///   [`CardinalityLimit`](crate::CardinalityLimit);
+///   [`Stats::overflowed_records`]).
 pub struct Store {
     set: MetricSet,
     entities: HashMap<Labels, Entity>,
@@ -165,19 +167,19 @@ impl Store {
             }
             let records: u64 = batch_entity.slots.values().map(|s| s.records).sum();
             let full = set
-                .cap
+                .cardinality_limit
                 .as_ref()
-                .filter(|cap| self.entities.len() >= cap.max);
+                .filter(|limit| self.entities.len() >= limit.max_entities);
             let entity = match (self.entities.entry(labels), full) {
                 (Entry::Occupied(entry), _) => entry.into_mut(),
                 (Entry::Vacant(entry), None) => {
                     let entity = Entity::new(set, entry.key().clone(), EntityKind::Own);
                     entry.insert(entity)
                 }
-                (Entry::Vacant(_), Some(cap)) => {
+                (Entry::Vacant(_), Some(limit)) => {
                     self.stats.overflowed_records += records;
                     self.overflow.get_or_insert_with(|| {
-                        Entity::new(set, cap.overflow_labels.clone(), EntityKind::Overflow)
+                        Entity::new(set, limit.overflow_labels.clone(), EntityKind::Overflow)
                     })
                 }
             };
@@ -453,7 +455,9 @@ impl Chunker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Cap, Chart, ChartType, Counter, Histogram, MetricSetBuilder, Settings};
+    use crate::{
+        CardinalityLimit, Chart, ChartType, Counter, Histogram, MetricSetBuilder, Settings,
+    };
     use netdata_plugin_protocol::validate_chart_stream;
     use std::time::Duration;
 
@@ -473,18 +477,18 @@ mod tests {
     }
 
     fn fixture(lateness: u64, expiry: u64, max: Option<usize>) -> Fixture {
-        let cap = max.map(|max| {
+        let cardinality_limit = max.map(|max_entities| {
             let mut overflow_labels = Labels::new();
             overflow_labels.push("overflow", "true");
-            Cap {
-                max,
+            CardinalityLimit {
+                max_entities,
                 overflow_labels,
             }
         });
         let mut b = MetricSetBuilder::new(Settings {
             lateness: Duration::from_secs(lateness),
             expiry: Duration::from_secs(expiry),
-            cap,
+            cardinality_limit,
             ..Settings::default()
         });
         let requests = b.counter::<Outcome>(Chart {
@@ -650,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    fn entities_over_the_cap_share_the_overflow_entity() {
+    fn entities_over_the_limit_share_the_overflow_entity() {
         let f = fixture(0, 3, Some(1));
         let mut store = Store::new(&f.set);
         record(&f, &mut store, "a", 10, 1, 0, 10);
@@ -679,7 +683,7 @@ mod tests {
         batch.entity(labels("empty"));
         store.merge(batch, 10);
         assert_eq!(store.stats().entities, 0);
-        // The cap is still free for an entity with records.
+        // The limit still has room for an entity with records.
         record(&f, &mut store, "a", 10, 1, 0, 10);
         assert_eq!(store.stats().overflowed_records, 0);
         let out = text(&store.emit(11, usize::MAX));

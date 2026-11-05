@@ -243,7 +243,7 @@ pub struct Chart {
     /// - `<context>` for an entity without labels;
     /// - `<context>_<hash>` for any other entity, where `<hash>` is 16 hex
     ///   digits of a hash of its labels, stable across restarts and releases;
-    /// - `<context>_overflow` for the overflow entity (see [`Cap`]).
+    /// - `<context>_overflow` for the overflow entity (see [`CardinalityLimit`]).
     ///
     /// It must contain a dot (the agent's `type.id`), use only letters,
     /// digits, `_`, `-` and `.`, and not end in `_overflow` or in `_` and 16
@@ -364,7 +364,7 @@ pub(crate) struct MetricSetInner {
     pub(crate) interval_secs: u64,
     pub(crate) lateness_slots: u64,
     pub(crate) expiry_slots: u64,
-    pub(crate) cap: Option<Cap>,
+    pub(crate) cardinality_limit: Option<CardinalityLimit>,
     // The row layout: each column's aggregation, and a row without records.
     aggregations: Vec<Aggregation>,
     initial_row: Box<[f64]>,
@@ -425,8 +425,8 @@ pub struct Settings {
     /// lateness 10 s, an entity last recorded at second 0 expires at second
     /// 911. Default 15 minutes.
     pub expiry: Duration,
-    /// The entity cap; default none.
-    pub cap: Option<Cap>,
+    /// The limit on the number of entities; default none.
+    pub cardinality_limit: Option<CardinalityLimit>,
 }
 
 impl Default for Settings {
@@ -435,21 +435,21 @@ impl Default for Settings {
             collection_interval: Duration::from_secs(1),
             lateness: Duration::ZERO,
             expiry: Duration::from_secs(15 * 60),
-            cap: None,
+            cardinality_limit: None,
         }
     }
 }
 
-/// A limit on the number of entities. While the store is full, the records
-/// of a label set without an entity go to one overflow entity. As
-/// entities expire, room returns: the next record of such a label set,
-/// including one whose records went to the overflow entity so far, gets
-/// its own entity.
+/// A limit on the number of entities: the cardinality limit.
+/// While the store is full, the records of a label set without an entity go
+/// to one overflow entity. As entities expire, room returns: the next record
+/// of such a label set, including one whose records went to the overflow
+/// entity so far, gets its own entity.
 #[derive(Debug, Clone)]
-pub struct Cap {
-    /// Entities tracked at most (the label-less entity counts, the
-    /// overflow entity does not).
-    pub max: usize,
+pub struct CardinalityLimit {
+    /// Entities held at most. The label-less entity counts; the overflow
+    /// entity does not, so the store holds at most `max_entities + 1`.
+    pub max_entities: usize,
     /// The overflow entity's labels.
     pub overflow_labels: Labels,
 }
@@ -472,7 +472,7 @@ impl MetricSetBuilder {
     /// # Panics
     ///
     /// If the collection interval is not a whole number of seconds of at
-    /// least 1, if `expiry` is 0, or if the cap's `max` is 0 or its overflow
+    /// least 1, if `expiry` is 0, or if the cardinality limit's `max_entities` is 0 or its overflow
     /// labels are empty.
     pub fn new(settings: Settings) -> Self {
         let interval = settings.collection_interval;
@@ -481,10 +481,13 @@ impl MetricSetBuilder {
             "the collection interval must be whole seconds, at least 1: {interval:?}"
         );
         assert!(!settings.expiry.is_zero(), "expiry must be positive");
-        if let Some(cap) = &settings.cap {
-            assert!(cap.max > 0, "the entity cap must be positive");
+        if let Some(limit) = &settings.cardinality_limit {
             assert!(
-                !cap.overflow_labels.is_empty(),
+                limit.max_entities > 0,
+                "the cardinality limit must be positive"
+            );
+            assert!(
+                !limit.overflow_labels.is_empty(),
                 "overflow labels are required"
             );
         }
@@ -620,7 +623,7 @@ impl MetricSetBuilder {
             expiry_slots: slots(settings.expiry),
             initial_row: self.aggregations.iter().map(|m| m.initial()).collect(),
             interval_secs: interval.as_secs(),
-            cap: settings.cap,
+            cardinality_limit: settings.cardinality_limit,
             aggregations: self.aggregations,
             cumulative_columns: self.cumulative_columns,
             charts: self.charts,
@@ -710,7 +713,7 @@ fn is_id_byte(b: u8) -> bool {
 pub(crate) enum EntityKind {
     /// The entity of one label set.
     Own,
-    /// The entity of the records beyond the cap.
+    /// The entity of the records beyond the cardinality limit.
     Overflow,
 }
 

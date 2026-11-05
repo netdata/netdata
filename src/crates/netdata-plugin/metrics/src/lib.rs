@@ -74,8 +74,8 @@ mod store;
 
 pub use batch::{Batch, BatchEntity, Measurements};
 pub use metric_set::{
-    Cap, Chart, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet,
-    MetricSetBuilder, Settings,
+    CardinalityLimit, Chart, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels,
+    MetricSet, MetricSetBuilder, Settings,
 };
 pub use netdata_plugin_protocol::ChartType;
 pub use store::{Stats, Store};
