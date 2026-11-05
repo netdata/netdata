@@ -4216,7 +4216,8 @@
                       "type": "integer",
                       "format": "int64",
                       "description": "Current version number (auto-incremented on updates)",
-                      "minimum": 1
+                      "minimum": 1,
+                      "maximum": 9223372036854775806
                     }
                   },
                   "additionalProperties": true
@@ -4297,7 +4298,8 @@
                     "type": "integer",
                     "format": "int64",
                     "description": "Current version from GET request",
-                    "minimum": 1
+                    "minimum": 1,
+                    "maximum": 9223372036854775806
                   }
                 },
                 "additionalProperties": true

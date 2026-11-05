@@ -116,6 +116,7 @@ static int settings_test_default_object(void) {
 
     errors += settings_test_stored("a missing object reads as version 1", 1, NULL);
     errors += settings_test_code("GET without file is the default object", HTTP_REQUEST_MODE_GET, false, "", NULL, HTTP_RESP_OK);
+    errors += settings_test_code("GET with an empty file is the default object", HTTP_REQUEST_MODE_GET, false, "file=", NULL, HTTP_RESP_OK);
     errors += settings_test_code("anonymous PUT of default", HTTP_REQUEST_MODE_PUT, false, "file=default",
                                  "{\"version\":1,\"marker\":\"a\"}", HTTP_RESP_OK);
     errors += settings_test_stored("PUT increments the version", 2, "a");
@@ -196,7 +197,8 @@ int main(void) {
     memset(&test_host, 0, sizeof(test_host));
     localhost = &test_host;
 
-    char root_template[] = "/tmp/netdata-api-v3-settings-test-XXXXXX";
+    // created in the current directory, not in a shared temporary directory
+    char root_template[] = "netdata-api-v3-settings-test-XXXXXX";
     char *root = mkdtemp(root_template);
     if(!root) {
         fprintf(stderr, "cannot create a temporary directory\n");

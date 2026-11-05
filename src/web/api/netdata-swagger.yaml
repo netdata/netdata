@@ -5778,6 +5778,7 @@ paths:
                     format: int64
                     description: Current version number (auto-incremented on updates)
                     minimum: 1
+                    maximum: 9223372036854775806
                 additionalProperties: true
               examples:
                 new_object:
@@ -5916,6 +5917,7 @@ paths:
                   format: int64
                   description: Current version from GET request
                   minimum: 1
+                  maximum: 9223372036854775806
               additionalProperties: true
             examples:
               create_new:
