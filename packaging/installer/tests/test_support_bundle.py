@@ -156,18 +156,18 @@ write_manifest
         self.assertTrue(tree.with_name('AGENT-WAS-DOWN.txt').exists())
         self.assertEqual([r['origin'] for r in self.dyncfg_rows()], ['netdatacli dyncfg-tree'])
 
-    def test_dyncfg_tree_cli_does_not_spend_the_deadline_of_earlier_captures(self):
-        # a large tree takes minutes to sanitize; captured first, it left no time for the smaller runtime captures
-        # the deadline leaves the stubbed captures before the tree ample time even on a slow runner, and the
-        # CLI alone outlasts it, so a tree captured first leaves them none
-        self.stub('netdatacli', 'sleep 10\nprintf \'{"tree":{}}\\n\'\n')
-        self.stub('curl', 'printf \'{"api":true}\\n\'\n')
-        self.run_runtime(setup='GLOBAL_DEADLINE=8; CMD_TIMEOUT=20\n')
-        runtime = self.root / 'work/07-runtime'
-        for name in ('info-v3.json', 'alerts-active.json', 'functions.json', 'dyncfg-tree.json'):
-            self.assertTrue((runtime / name).exists(), name)
-        paths = [f['path'] for f in json.loads((self.root / 'work/MANIFEST.json').read_text())['files']]
-        self.assertLess(paths.index('07-runtime/functions.json'), paths.index('07-runtime/dyncfg-tree.json'))
+    def test_dyncfg_tree_cli_runs_after_the_earlier_runtime_captures(self):
+        # a large tree takes minutes to sanitize; captured first, it spent the global deadline the smaller runtime
+        # captures need, so the CLI attempt must run in the tree's own place, after them
+        self.stub('netdatacli', 'printf "cli %s\\n" "$*" >> "$FIXTURE/calls"\nprintf \'{"tree":{}}\\n\'\n')
+        self.stub('curl', 'printf "api %s\\n" "$*" >> "$FIXTURE/calls"\nprintf \'{"api":true}\\n\'\n')
+        self.run_runtime()
+        calls = (self.root / 'calls').read_text().splitlines()
+        cli = next(i for i, c in enumerate(calls) if c.startswith('cli dyncfg-tree'))
+        earlier = ('/api/v3/info', '/api/v3/alerts', '/api/v1/functions')
+        for url in earlier:
+            api = next(i for i, c in enumerate(calls) if c.startswith('api ') and url in c)
+            self.assertLess(api, cli, url)
 
     def test_dyncfg_tree_unusable_cli_output_falls_back(self):
         cases = {
