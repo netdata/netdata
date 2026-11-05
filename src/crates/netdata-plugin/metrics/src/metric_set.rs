@@ -336,8 +336,7 @@ pub(crate) struct MetricSetInner {
     pub(crate) interval_secs: u64,
     pub(crate) lateness_slots: u64,
     pub(crate) expiry_slots: u64,
-    pub(crate) max_entities: usize,
-    pub(crate) overflow_labels: Labels,
+    pub(crate) cap: Option<Cap>,
     merges: Vec<Merge>,
     initial_cells: Box<[f64]>,
     /// The cells of [`CumulativeCounter`] instruments, which hold totals until a
@@ -588,18 +587,13 @@ impl MetricSetBuilder {
         let settings = self.settings;
         let interval = settings.collection_interval;
         let slots = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
-        let (max_entities, overflow_labels) = match settings.cap {
-            Some(cap) => (cap.max, cap.overflow_labels),
-            None => (usize::MAX, Labels::new()),
-        };
         MetricSet(Arc::new(MetricSetInner {
             id: self.id,
             lateness_slots: slots(settings.lateness),
             expiry_slots: slots(settings.expiry),
             initial_cells: self.merges.iter().map(|m| m.initial()).collect(),
             interval_secs: interval.as_secs(),
-            max_entities,
-            overflow_labels,
+            cap: settings.cap,
             merges: self.merges,
             cumulative_cells: self.cumulative_cells,
             charts: self.charts,

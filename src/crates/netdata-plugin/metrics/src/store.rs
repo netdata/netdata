@@ -162,17 +162,20 @@ impl Store {
                 continue;
             }
             let records: u64 = pending.per_slot.values().map(|s| s.records).sum();
-            let tracked = self.entities.len();
-            let entity = match self.entities.entry(labels) {
-                Entry::Occupied(entry) => entry.into_mut(),
-                Entry::Vacant(entry) if tracked < set.max_entities => {
+            let full = set
+                .cap
+                .as_ref()
+                .filter(|cap| self.entities.len() >= cap.max);
+            let entity = match (self.entities.entry(labels), full) {
+                (Entry::Occupied(entry), _) => entry.into_mut(),
+                (Entry::Vacant(entry), None) => {
                     let entity = Entity::new(set, entry.key().clone(), false);
                     entry.insert(entity)
                 }
-                Entry::Vacant(_) => {
+                (Entry::Vacant(_), Some(cap)) => {
                     self.stats.overflowed_records += records;
                     self.overflow
-                        .get_or_insert_with(|| Entity::new(set, set.overflow_labels.clone(), true))
+                        .get_or_insert_with(|| Entity::new(set, cap.overflow_labels.clone(), true))
                 }
             };
             for (slot, batch_cells) in pending.per_slot {
