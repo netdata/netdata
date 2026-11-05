@@ -57,7 +57,7 @@
 //!   it; it becomes one point per dimension, stored at its end,
 //!   `(n + 1) × I`;
 //! - a *record* is one event of an entity at its own time, with its
-//!   measurements (`add`, `observe`, `set`, `set_total`); the records of one
+//!   measurements (`add`, `set_value`, `set_total`, `observe`); the records of one
 //!   entity in one slot combine into that slot's point.
 
 mod batch;

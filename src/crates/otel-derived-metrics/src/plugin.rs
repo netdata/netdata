@@ -146,7 +146,7 @@ impl Derivation {
         batch
             .entity(labels)
             .record(now)
-            .set(self.services, Services::Services, stats.entities as f64)
+            .set_value(self.services, Services::Services, stats.entities as f64)
             .set_total(self.adjusted, Adjustment::Late, stats.late_records as f64)
             .set_total(
                 self.adjusted,

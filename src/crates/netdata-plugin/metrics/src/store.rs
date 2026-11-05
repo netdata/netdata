@@ -914,8 +914,8 @@ mod tests {
             .add(requests, Outcome::Ok, 1.0)
             .add(requests, Outcome::Ok, f64::NAN)
             .add(requests, Outcome::Ok, f64::INFINITY)
-            .set(queued, Queued::Jobs, 5.0)
-            .set(queued, Queued::Jobs, f64::NAN)
+            .set_value(queued, Queued::Jobs, 5.0)
+            .set_value(queued, Queued::Jobs, f64::NAN)
             .set_total(totals, Events::Events, 10.0)
             .observe(duration, 0.5, 1.0)
             .observe(duration, 0.5, f64::NAN);

@@ -109,7 +109,9 @@ impl BatchEntity<'_> {
     }
 }
 
-/// One record's measurements. A record may update several instruments.
+/// One record's measurements: each method call is one measurement of one
+/// instrument, for one of its dimensions (a histogram has none). A record may
+/// hold measurements of several instruments.
 ///
 /// Every method panics if the instrument belongs to another [`MetricSet`],
 /// or if the dimension's index is out of range (a broken manual
@@ -135,8 +137,9 @@ impl Measurements<'_> {
         cells.base + index
     }
 
-    /// Add `amount` to the `dimension` value of `counter`. A non-finite
-    /// amount is ignored.
+    /// Count `amount` for `dimension` of `counter` in this record's slot; the
+    /// chart shows the slot's count per second. A non-finite amount is
+    /// ignored.
     pub fn add<D: Dimensions>(
         &mut self,
         counter: Counter<D>,
@@ -150,8 +153,9 @@ impl Measurements<'_> {
         self
     }
 
-    /// Set the `dimension` total of `cumulative` to `total`. A non-finite
-    /// total is ignored.
+    /// Record `total`, the source's running total for `dimension` of
+    /// `cumulative`; the chart shows how much it grew per second. Within a
+    /// slot, the total recorded last counts. A non-finite total is ignored.
     pub fn set_total<D: Dimensions>(
         &mut self,
         cumulative: CumulativeCounter<D>,
@@ -165,9 +169,15 @@ impl Measurements<'_> {
         self
     }
 
-    /// Set the `dimension` value of `gauge` to `value`. A non-finite value
-    /// is ignored.
-    pub fn set<D: Dimensions>(&mut self, gauge: Gauge<D>, dimension: D, value: f64) -> &mut Self {
+    /// Record `value` for `dimension` of `gauge`; the chart shows it as is.
+    /// Within a slot, the value recorded last counts. A non-finite value is
+    /// ignored.
+    pub fn set_value<D: Dimensions>(
+        &mut self,
+        gauge: Gauge<D>,
+        dimension: D,
+        value: f64,
+    ) -> &mut Self {
         let cell = self.cell(gauge.0, dimension);
         if value.is_finite() {
             self.cells[cell] = value;
@@ -175,8 +185,9 @@ impl Measurements<'_> {
         self
     }
 
-    /// Observe `value` with `weight`, the number of events it stands for:
-    /// the buckets and the mean are weighted, the maximum is not. An
+    /// Record one observation of `value` for `histogram`, standing for
+    /// `weight` events: the buckets and the mean are weighted, the maximum is
+    /// not. An
     /// observation with a non-finite value or weight is ignored.
     pub fn observe(&mut self, histogram: Histogram, value: f64, weight: f64) -> &mut Self {
         self.check_set(histogram.set_id);
