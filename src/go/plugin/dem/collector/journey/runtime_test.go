@@ -23,8 +23,9 @@ import (
 )
 
 type executor struct {
-	check   func(context.Context, model.Kind) error
-	execute func(context.Context, model.Request, func(string)) model.Execution
+	check    func(context.Context, model.Kind) error
+	execute  func(context.Context, model.Request, func(string)) model.Execution
+	rehearse func(context.Context, model.Request) error
 }
 
 func (e executor) Check(ctx context.Context, kind model.Kind) error {
@@ -36,7 +37,8 @@ func (e executor) Check(ctx context.Context, kind model.Kind) error {
 func (e executor) Execute(ctx context.Context, r model.Request, state func(string)) model.Execution {
 	return e.execute(ctx, r, state)
 }
-func ptr(v float64) *float64 { return &v }
+func (e executor) Rehearse(ctx context.Context, r model.Request) error { return e.rehearse(ctx, r) }
+func ptr(v float64) *float64                                           { return &v }
 func newJourney(e journey.Executor, hub *syntheticregistry.Registry) *journey.Collector {
 	c := journey.New(journey.Dependencies{
 		Executor: e,

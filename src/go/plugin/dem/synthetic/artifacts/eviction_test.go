@@ -171,7 +171,7 @@ func TestDeletionCollisionAndUnknownEntriesArePreserved(t *testing.T) {
 	}
 	_, err = s.Begin(id, "lighthouse:test")
 	require.ErrorIs(t, err, ErrExists)
-	require.NoError(t, s.Close())
+	require.ErrorContains(t, s.Close(), "temporary artifact store cleanup is incomplete")
 	_, err = os.Stat(root)
 	require.NoError(t, err, "Close must honor preservation promised by maintenance")
 }

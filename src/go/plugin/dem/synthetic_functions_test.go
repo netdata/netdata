@@ -76,6 +76,9 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 type inventoryExecutor struct{}
 
 func (inventoryExecutor) Check(context.Context, synthetic.Kind) error { return nil }
+func (inventoryExecutor) Rehearse(context.Context, synthetic.Request) error {
+	panic("inventory must not rehearse a browser")
+}
 func (inventoryExecutor) Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution {
 	panic("inventory must not execute a browser")
 }
