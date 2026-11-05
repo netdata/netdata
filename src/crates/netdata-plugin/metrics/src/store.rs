@@ -479,7 +479,7 @@ mod tests {
     fn fixture(lateness: u64, expiry: u64, max: Option<usize>) -> Fixture {
         let cardinality_limit = max.map(|max_entities| {
             let mut overflow_labels = Labels::new();
-            overflow_labels.push("overflow", "true");
+            overflow_labels.insert("overflow", "true");
             CardinalityLimit {
                 max_entities,
                 overflow_labels,
@@ -520,7 +520,7 @@ mod tests {
 
     fn labels(name: &str) -> Labels {
         let mut labels = Labels::new();
-        labels.push("service.name", name);
+        labels.insert("service.name", name);
         labels
     }
 
@@ -752,9 +752,9 @@ mod tests {
     #[test]
     fn labels_drop_empty_values_and_cut_long_ones_on_a_character() {
         let mut labels = Labels::new();
-        labels.push("empty", "");
-        labels.push("blank", " \t\n");
-        labels.push("long", &"é".repeat(500));
+        labels.insert("empty", "");
+        labels.insert("blank", " \t\n");
+        labels.insert("long", &"é".repeat(500));
         assert_eq!(labels.0.len(), 1);
         assert_eq!(labels.0[0].1.len(), 800);
         let f = fixture(0, 900, None);
@@ -766,13 +766,13 @@ mod tests {
     }
 
     #[test]
-    fn push_order_does_not_change_the_entity_or_its_chart_ids() {
+    fn insert_order_does_not_change_the_entity_or_its_chart_ids() {
         let mut ab = Labels::new();
-        ab.push("a", "1");
-        ab.push("b", "2");
+        ab.insert("a", "1");
+        ab.insert("b", "2");
         let mut ba = Labels::new();
-        ba.push("b", "2");
-        ba.push("a", "1");
+        ba.insert("b", "2");
+        ba.insert("a", "1");
         assert_eq!(ab, ba);
         let f = fixture(0, 900, None);
         let ids = |labels: Labels| Entity::new(&f.set.0, labels, EntityKind::Own).chart_ids;

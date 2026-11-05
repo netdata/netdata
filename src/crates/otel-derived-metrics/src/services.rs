@@ -133,7 +133,7 @@ impl Services {
 /// overflow chart set.
 pub(crate) fn service_settings(max_services: usize) -> Settings {
     let mut overflow_labels = Labels::new();
-    overflow_labels.push("otel.metric.overflow", "true");
+    overflow_labels.insert("otel.metric.overflow", "true");
     Settings {
         lateness: LATENESS,
         cardinality_limit: Some(CardinalityLimit {
@@ -164,22 +164,22 @@ pub(crate) fn service_labels(tenant: &str, resource: Option<&Resource>) -> Label
         }
     }
     let mut labels = Labels::new();
-    labels.push(
+    labels.insert(
         "resource.attributes.service.name",
         name.filter(|n| !is_blank(n)).unwrap_or(UNKNOWN_SERVICE),
     );
-    labels.push(
+    labels.insert(
         "resource.attributes.service.namespace",
         namespace.unwrap_or_default(),
     );
-    labels.push(
+    labels.insert(
         "resource.attributes.deployment.environment.name",
         environment
             .filter(|e| !is_blank(e))
             .or(deprecated_environment)
             .unwrap_or_default(),
     );
-    labels.push("tenant", tenant);
+    labels.insert("tenant", tenant);
     labels
 }
 

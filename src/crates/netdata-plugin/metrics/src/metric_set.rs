@@ -278,7 +278,7 @@ pub(crate) struct ChartTemplate {
 /// The labels that identify an entity; its charts carry them.
 ///
 /// - Two label lists with the same pairs are the same entity, whatever
-///   order they were pushed in.
+///   order they were inserted in.
 /// - A blank value (only whitespace or control characters) is left out,
 ///   because the agent would store it as `[none]`.
 /// - A value is cut to the agent's limit of 800 bytes, at a character
@@ -297,13 +297,13 @@ impl Labels {
         Self::default()
     }
 
-    /// Add a label, unless `value` is blank.
+    /// Insert a label in key order, unless `value` is blank.
     ///
     /// # Panics
     ///
     /// If `key` is empty, longer than the agent's limit of 200 bytes, or
     /// already present.
-    pub fn push(&mut self, key: &str, value: &str) {
+    pub fn insert(&mut self, key: &str, value: &str) {
         assert!(
             !key.is_empty() && key.len() <= MAX_LABEL_KEY_BYTES,
             "invalid label key {key:?}"

@@ -36,7 +36,7 @@
 //!     ("cart", &[Outcome::Success]),
 //! ] {
 //!     let mut labels = Labels::new();
-//!     labels.push("service.name", service);
+//!     labels.insert("service.name", service);
 //!     let mut entity = batch.entity(labels);
 //!     for &outcome in outcomes {
 //!         entity.record(100).add(requests, outcome, 1.0);

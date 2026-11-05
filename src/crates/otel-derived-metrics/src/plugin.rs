@@ -142,7 +142,7 @@ impl Derivation {
     /// Record the statistics of `signal`'s store at `now` into `batch`.
     pub(crate) fn record(&self, batch: &mut Batch, signal: Signal, stats: &Stats, now: u64) {
         let mut labels = Labels::new();
-        labels.push("signal", signal_name(signal));
+        labels.insert("signal", signal_name(signal));
         batch
             .entity(labels)
             .record(now)
