@@ -480,7 +480,8 @@ mod tests {
                  CLABEL 'service.name' 'checkout' 1\nCLABEL_COMMIT\n\
                  DIMENSION ok 'ok' absolute 1 1 'type=float'\n\
                  DIMENSION error 'error' absolute 1 1 'type=float'\n\
-                 CHART svc.duration_{h} '' 'Duration' 'seconds' 'requests' 'svc.duration' line 2 1 'store_first'\n\
+                 CHART svc.duration_avg_{h} '' 'Duration average' 'seconds' 'requests' 'svc.duration_avg' line 2 1 \
+                 'store_first'\n\
                  CLABEL 'service.name' 'checkout' 1\nCLABEL_COMMIT\n\
                  DIMENSION avg 'avg' absolute 1 1 'type=float'\n\
                  CHART svc.duration_max_{h} '' 'Duration maximum' 'seconds' 'requests' 'svc.duration_max' line 3 1 \
@@ -494,7 +495,7 @@ mod tests {
                  DIMENSION 1 '1' absolute 1 1 'type=float'\n\
                  DIMENSION +Inf '+Inf' absolute 1 1 'type=float'\n\
                  BEGIN svc.requests_{h} 1000000\nSET ok = 2\nSET error = 1\nEND 101 0 1\n\
-                 BEGIN svc.duration_{h} 1000000\nSET avg = 0.5\nEND 101 0 1\n\
+                 BEGIN svc.duration_avg_{h} 1000000\nSET avg = 0.5\nEND 101 0 1\n\
                  BEGIN svc.duration_max_{h} 1000000\nSET max = 0.5\nEND 101 0 1\n\
                  BEGIN svc.duration_histogram_{h} 1000000\nSET 0.1 = 0\nSET 1 = 3\nSET +Inf = 0\nEND 101 0 1\n"
             )
@@ -506,7 +507,7 @@ mod tests {
             second,
             format!(
                 "BEGIN svc.requests_{h} 1000000\nSET ok = 0\nSET error = 0\nEND 102 0 1\n\
-                 BEGIN svc.duration_{h} 1000000\nSET avg =\nEND 102 0 1\n\
+                 BEGIN svc.duration_avg_{h} 1000000\nSET avg =\nEND 102 0 1\n\
                  BEGIN svc.duration_max_{h} 1000000\nSET max =\nEND 102 0 1\n\
                  BEGIN svc.duration_histogram_{h} 1000000\nSET 0.1 = 0\nSET 1 = 0\nSET +Inf = 0\nEND 102 0 1\n"
             )

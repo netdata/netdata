@@ -391,9 +391,11 @@ impl MetricSetBuilder {
         Gauge(columns)
     }
 
-    /// Adds a [`Histogram`] over `bounds`, with three chart templates:
-    /// - `chart`: one dimension, `avg`, the mean observed value per window, in
-    ///   `chart.units`;
+    /// Adds a [`Histogram`] over `bounds`, with three chart templates. Each
+    /// adds a suffix to the context of `chart` and a word to its title:
+    /// - `<context>_avg`: one dimension, `avg`, the mean observed value per
+    ///   window, in `chart.units`. Its title is `<title> average`, its priority
+    ///   `chart.priority` and its chart type `chart.chart_type`;
     /// - `<context>_max`: one dimension, `max`, the largest observed value per
     ///   window, in `chart.units`. Its title is `<title> maximum`, its priority
     ///   `chart.priority + 1` and its chart type `chart.chart_type`. It is a
@@ -431,16 +433,21 @@ impl MetricSetBuilder {
             base,
             bounds,
         };
-        self.chart(
-            chart,
-            vec![ChartDimension::new(
+        self.add_chart(ChartTemplate {
+            title: format!("{} average", chart.title),
+            units: chart.units,
+            family: chart.family,
+            context: format!("{}_avg", chart.context),
+            chart_type: chart.chart_type,
+            priority: chart.priority,
+            dimensions: vec![ChartDimension::new(
                 "avg",
                 Readout::Ratio {
                     numerator: histogram.sum_column(),
                     denominator: histogram.count_column(),
                 },
             )],
-        );
+        });
         self.add_chart(ChartTemplate {
             title: format!("{} maximum", chart.title),
             units: chart.units,

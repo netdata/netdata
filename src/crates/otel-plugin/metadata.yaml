@@ -479,8 +479,8 @@ modules:
               dimensions:
                 - name: success
                 - name: error
-            - name: otel_service.request_duration
-              description: Service request duration
+            - name: otel_service.request_duration_avg
+              description: Service request duration average
               unit: seconds
               chart_type: line
               dimensions:

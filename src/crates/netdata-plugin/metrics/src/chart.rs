@@ -26,8 +26,12 @@ pub struct Chart {
     /// only letters, digits, `_`, `-` and `.`, and not end in `_overflow` or
     /// in `_` and 16 hex digits. Contexts must be unique: within a set this
     /// is checked, across sets it is not.
+    ///
+    /// A histogram's charts add a suffix to it (see
+    /// [`MetricSetBuilder::histogram`](crate::MetricSetBuilder::histogram)).
     pub context: &'static str,
-    /// Shown above the chart on the dashboard.
+    /// Shown above the chart on the dashboard. A histogram's charts add a word
+    /// to it.
     pub title: &'static str,
     /// Shown as is; the crate adds nothing. Counter and cumulative charts are
     /// per second, so give them units that say so, for example
