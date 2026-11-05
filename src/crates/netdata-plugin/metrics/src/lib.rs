@@ -29,14 +29,16 @@
 //! // Per unit of work, for example one export request: record its events at
 //! // their own time in one batch, then merge it once the work is durable.
 //! let mut batch = Batch::new(&set);
-//! for (service, outcome) in [
-//!     ("checkout", Outcome::Success),
-//!     ("checkout", Outcome::Error),
-//!     ("cart", Outcome::Success),
+//! for (service, outcomes) in [
+//!     ("checkout", &[Outcome::Success, Outcome::Error][..]),
+//!     ("cart", &[Outcome::Success]),
 //! ] {
 //!     let mut labels = Labels::new();
 //!     labels.push("service.name", service);
-//!     batch.entity(labels).record(100).add(requests, outcome, 1.0);
+//!     let mut entity = batch.entity(labels);
+//!     for &outcome in outcomes {
+//!         entity.record(100).add(requests, outcome, 1.0);
+//!     }
 //! }
 //! store.merge(batch, 100);
 //!
