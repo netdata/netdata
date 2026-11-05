@@ -197,6 +197,7 @@ static struct disk *get_disk(const char *name) {
 // --------------------------------------------------------------------------------------------------------------------
 // kern.devstat
 
+// Labels callback for common-context disk charts; data is the devstat disk name.
 static void freebsd_disk_labels_cb(RRDSET *st, void *data) {
     rrdlabels_add(st->rrdlabels, "device", (const char *)data, RRDLABEL_SRC_AUTO);
 }
@@ -487,7 +488,8 @@ int do_kern_devstat(int update_every, usec_t dt) {
                             rrddim_set_by_pointer(dm->st_util, dm->rd_util, cur_dstat.busy_time_ms);
                             rrdset_done(dm->st_util);
 
-                            // busy_time accumulates while at least one transaction is in flight, like Linux io_ticks
+                            // Same busy_time_ms as disk.util, so the same limitation applies: devstat adds busy time
+                            // only when a transaction completes, so a stalled request shows no busy time, then a spike.
                             common_disk_busy(&dm->disk_busy, disk, NULL, (uint64_t)cur_dstat.busy_time_ms, update_every,
                                              freebsd_disk_labels_cb, disk);
                         }

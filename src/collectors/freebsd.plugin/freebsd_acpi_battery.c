@@ -12,6 +12,7 @@
 // The kernel aggregates every ACPI battery into these sysctls and reports -1 when no battery has valid data.
 #define ACPI_BATTERY_UNKNOWN (-1)
 
+// Charts aggregate ACPI battery capacity; returns 1 to disable the module when the battery driver is absent.
 int do_hw_acpi_battery(int update_every, usec_t dt) {
     (void)dt;
     static int mib_units[4] = {0, 0, 0, 0}, mib_life[4] = {0, 0, 0, 0};

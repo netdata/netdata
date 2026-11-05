@@ -1036,6 +1036,7 @@ int do_system_ram(int update_every, usec_t dt) {
 // --------------------------------------------------------------------------------------------------------------------
 // vm.swap_reserved
 
+// Charts committed anonymous memory (mem.committed); returns 1 to disable the module if the sysctl is unreadable.
 int do_vm_swap_reserved(int update_every, usec_t dt) {
     (void)dt;
     static int mib[2] = {0, 0};
