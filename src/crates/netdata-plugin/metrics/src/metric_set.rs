@@ -318,6 +318,20 @@ impl Labels {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    /// FNV-1a over the labels, which are sorted by key: stable across
+    /// processes and releases, so an entity keeps its chart ids over
+    /// restarts.
+    pub(crate) fn stable_hash(&self) -> u64 {
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for (key, value) in &self.0 {
+            for b in key.bytes().chain([0]).chain(value.bytes()).chain([0]) {
+                hash ^= u64::from(b);
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+        }
+        hash
+    }
 }
 
 /// A declared set of metrics and their charts; every entity gets its own
@@ -630,7 +644,7 @@ impl MetricSetBuilder {
         );
         // Entity suffixes must not be mistaken for part of a context.
         assert!(
-            !context.ends_with("_overflow") && !ends_with_hash_suffix(context),
+            !ends_like_entity_suffix(context),
             "context {context:?} ends like an entity suffix"
         );
         assert!(
@@ -665,11 +679,38 @@ pub(crate) fn is_id_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'-'
 }
 
-/// Whether `id` ends in `_` and 16 hex digits, the shape of a labelled
-/// entity's suffix.
-fn ends_with_hash_suffix(id: &str) -> bool {
-    let bytes = id.as_bytes();
-    bytes.len() >= 17
-        && bytes[bytes.len() - 17] == b'_'
-        && bytes[bytes.len() - 16..].iter().all(u8::is_ascii_hexdigit)
+/// Which kind of entity a chart id is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EntityKind {
+    /// The entity of one label set.
+    Tracked,
+    /// The entity of the records beyond the cap.
+    Overflow,
+}
+
+const OVERFLOW_SUFFIX: &str = "_overflow";
+
+/// Hex digits of the labels' hash in a labelled entity's chart ids.
+const HASH_DIGITS: usize = 16;
+
+/// What follows the context in an entity's chart ids; the scheme is
+/// documented at [`Chart::context`].
+pub(crate) fn entity_suffix(labels: &Labels, kind: EntityKind) -> String {
+    match kind {
+        EntityKind::Overflow => OVERFLOW_SUFFIX.to_string(),
+        EntityKind::Tracked if labels.is_empty() => String::new(),
+        EntityKind::Tracked => format!("_{:0HASH_DIGITS$x}", labels.stable_hash()),
+    }
+}
+
+/// Whether `context` ends like an entity suffix, which would make a chart id
+/// read as another context's.
+fn ends_like_entity_suffix(context: &str) -> bool {
+    let bytes = context.as_bytes();
+    let hashed = bytes.len() > HASH_DIGITS
+        && bytes[bytes.len() - HASH_DIGITS - 1] == b'_'
+        && bytes[bytes.len() - HASH_DIGITS..]
+            .iter()
+            .all(u8::is_ascii_hexdigit);
+    hashed || context.ends_with(OVERFLOW_SUFFIX)
 }

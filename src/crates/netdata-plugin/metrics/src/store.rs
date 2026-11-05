@@ -9,7 +9,7 @@
 //! state is dropped (its cumulative baselines with it).
 
 use crate::batch::Batch;
-use crate::metric_set::{ChartDef, Labels, MetricSet, MetricSetInner};
+use crate::metric_set::{ChartDef, EntityKind, Labels, MetricSet, MetricSetInner, entity_suffix};
 use netdata_plugin_protocol::{
     ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
     write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end_timed,
@@ -169,13 +169,14 @@ impl Store {
             let entity = match (self.entities.entry(labels), full) {
                 (Entry::Occupied(entry), _) => entry.into_mut(),
                 (Entry::Vacant(entry), None) => {
-                    let entity = Entity::new(set, entry.key().clone(), false);
+                    let entity = Entity::new(set, entry.key().clone(), EntityKind::Tracked);
                     entry.insert(entity)
                 }
                 (Entry::Vacant(_), Some(cap)) => {
                     self.stats.overflowed_records += records;
-                    self.overflow
-                        .get_or_insert_with(|| Entity::new(set, cap.overflow_labels.clone(), true))
+                    self.overflow.get_or_insert_with(|| {
+                        Entity::new(set, cap.overflow_labels.clone(), EntityKind::Overflow)
+                    })
                 }
             };
             for (slot, batch_cells) in pending.per_slot {
@@ -232,14 +233,8 @@ impl Store {
 }
 
 impl Entity {
-    fn new(set: &MetricSetInner, labels: Labels, overflow: bool) -> Self {
-        let suffix = if overflow {
-            "_overflow".to_string()
-        } else if labels.is_empty() {
-            String::new()
-        } else {
-            format!("_{:016x}", label_hash(&labels))
-        };
+    fn new(set: &MetricSetInner, labels: Labels, kind: EntityKind) -> Self {
+        let suffix = entity_suffix(&labels, kind);
         Self {
             chart_ids: set
                 .charts
@@ -351,19 +346,6 @@ impl Entity {
             }
         }
     }
-}
-
-/// FNV-1a over the labels, which are sorted by key: stable across processes
-/// and releases, so an entity keeps its chart ids over restarts.
-fn label_hash(labels: &Labels) -> u64 {
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for (key, value) in &labels.0 {
-        for b in key.bytes().chain([0]).chain(value.bytes()).chain([0]) {
-            hash ^= u64::from(b);
-            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-        }
-    }
-    hash
 }
 
 /// A chart's definition: the CHART line, its labels and dimensions.
@@ -576,7 +558,7 @@ mod tests {
         let mut store = Store::new(f.set.clone());
         record(&f, &mut store, "checkout", 100, 3, 1, 100);
         let first = text(&store.emit(101, usize::MAX));
-        let h = format!("{:016x}", label_hash(&labels("checkout")));
+        let h = format!("{:016x}", labels("checkout").stable_hash());
         assert_eq!(
             first,
             format!(
@@ -770,7 +752,7 @@ mod tests {
         assert_eq!(labels.0.len(), 1);
         assert_eq!(labels.0[0].1.len(), 800);
         let f = fixture(0, 900, None);
-        let entity = Entity::new(&f.set.0, labels, false);
+        let entity = Entity::new(&f.set.0, labels, EntityKind::Tracked);
         assert!(entity.chart_ids[0].starts_with("svc.requests_"));
         assert!(netdata_plugin_protocol::is_valid_chart_id(
             &entity.chart_ids[0]
@@ -787,7 +769,7 @@ mod tests {
         ba.push("a", "1");
         assert_eq!(ab, ba);
         let f = fixture(0, 900, None);
-        let ids = |labels: Labels| Entity::new(&f.set.0, labels, false).chart_ids;
+        let ids = |labels: Labels| Entity::new(&f.set.0, labels, EntityKind::Tracked).chart_ids;
         assert_eq!(ids(ab), ids(ba));
         assert_eq!(ids(Labels::new())[0], "svc.requests");
     }
