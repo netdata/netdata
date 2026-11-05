@@ -190,9 +190,10 @@ modules:
               dimensions:
                 - name: cls
     functions:
-      description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse
-        jobs. Invoke their public synthetics-* names with the documented filters; no job selector or active
-        browser is required.
+      description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse jobs.
+        Invoke their public synthetics-* names with the documented filters; no job selector or active browser is
+        required. Viewing them requires a signed-in member of a Netdata Cloud Space with permission to view sensitive
+        data, on a paid plan or an active trial; journeys and audits run and their history is stored on every plan.
       list:
         - id: synthetics-checks
           function_name: synthetics-checks
@@ -291,7 +292,7 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-runs
@@ -409,7 +410,7 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-run
@@ -481,7 +482,7 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-artifacts
@@ -549,7 +550,7 @@ modules:
           security: Requires member-equivalent access. Exposes monitor identities and capture metadata, not capture contents.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse jobs
             and retained run history. Captures can expire under age or size limits.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-artifact
@@ -618,6 +619,6 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []

@@ -2,7 +2,9 @@ modules:
   - functions:
         description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live
             activity and retained investigation history. Invoke their public rum-* names; filter by site where
-            supported.
+            supported. Viewing them requires a signed-in member of a Netdata Cloud Space with permission to view
+            sensitive data, on a paid plan or an active trial; beacons are received and history is stored on every
+            plan.
         list:
           - id: rum-sites
             function_name: rum-sites
@@ -124,7 +126,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-pages
@@ -234,7 +236,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-live
@@ -362,7 +364,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-sessions
@@ -482,7 +484,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running. History results require retained investigation data.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-errors
@@ -582,7 +584,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running. History results require retained investigation data.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-session-events
@@ -660,7 +662,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running. History results require retained investigation data.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
     meta:
