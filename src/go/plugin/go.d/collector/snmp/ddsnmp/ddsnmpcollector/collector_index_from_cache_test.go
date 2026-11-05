@@ -416,3 +416,161 @@ func TestCollector_IndexFromTypedTableTags(t *testing.T) {
 		})
 	}
 }
+
+func TestCollector_IndexFromTypedLookupTargetsDoNotCreateRows(t *testing.T) {
+	const root = "1.3.6.1.4.1.99999.999"
+	for _, consumer := range []string{"licensing", "bgp"} {
+		t.Run(consumer, func(t *testing.T) {
+			for name, tc := range map[string]struct{ missingLink, legacy bool }{
+				"complete chain":          {},
+				"missing link":            {missingLink: true},
+				"legacy tag anchors rows": {legacy: true},
+			} {
+				t.Run(name, func(t *testing.T) {
+					profile := &ddsnmp.Profile{
+						SourceFile: "same-table-chain.yaml",
+						Definition: &ddprofiledefinition.ProfileDefinition{},
+					}
+					table := ddprofiledefinition.SymbolConfig{
+						OID:  root,
+						Name: "source",
+					}
+					anchor := ddprofiledefinition.SymbolConfig{
+						OID:  root + ".1",
+						Name: "description",
+					}
+					tags := []ddprofiledefinition.MetricTagConfig{{
+						Tag: "_label", Table: "source",
+						Symbol: ddprofiledefinition.SymbolConfigCompat{
+							OID:  root + ".3",
+							Name: "label",
+						},
+						IndexFrom: []ddprofiledefinition.MetricTagIndexSource{{
+							Table: "source", Symbol: ddprofiledefinition.SymbolConfig{
+								OID:  root + ".2",
+								Name: "key",
+							},
+						}},
+					}}
+					if tc.legacy {
+						tags[0].IndexFrom = nil
+					}
+					switch consumer {
+					case "licensing":
+						profile.Definition.Licensing = []ddprofiledefinition.LicensingConfig{{
+							ID: "licenses", Table: table, MetricTags: tags,
+							Identity: ddprofiledefinition.LicenseIdentityConfig{
+								ID: ddprofiledefinition.LicenseValueConfig{
+									Index: 1,
+								},
+								Name: ddprofiledefinition.LicenseValueConfig{
+									Symbol: anchor,
+								},
+							},
+							State: ddprofiledefinition.LicenseStateConfig{
+								LicenseValueConfig: ddprofiledefinition.LicenseValueConfig{
+									Value: "0",
+								},
+							},
+						}}
+					case "bgp":
+						profile.Definition.BGP = []ddprofiledefinition.BGPConfig{{
+							ID: "peers", Kind: ddprofiledefinition.BGPRowKindPeer, Table: table, MetricTags: tags,
+							Identity: ddprofiledefinition.BGPIdentityConfig{
+								Neighbor: ddprofiledefinition.BGPValueConfig{
+									Index: 1,
+								},
+								RemoteAS: ddprofiledefinition.BGPValueConfig{
+									Value: "65001",
+								},
+							},
+							Descriptors: ddprofiledefinition.BGPDescriptorsConfig{
+								Description: ddprofiledefinition.BGPValueConfig{
+									Symbol: anchor,
+								},
+							},
+							State: ddprofiledefinition.BGPStateConfig{
+								BGPValueConfig: ddprofiledefinition.BGPValueConfig{
+									Value: "1",
+									Mapping: ddprofiledefinition.NewExactMapping(map[string]string{
+										"1": "idle", "2": "connect", "3": "active", "4": "opensent", "5": "openconfirm", "6": "established",
+									}),
+								},
+							},
+						}}
+					}
+					require.NoError(t, ddprofiledefinition.ValidateEnrichProfile(profile.Definition))
+					handler := &sourceTestHandler{
+						walk: func(oid string) ([]gosnmp.SnmpPDU, error) {
+							assert.Equal(t, root, oid)
+							pdus := []gosnmp.SnmpPDU{createStringPDU(root+".1.1", "source-row"), createStringPDU(root+".3.9", "target-label")}
+							if !tc.missingLink {
+								pdus = append(pdus, createIntegerPDU(root+".2.1", 9))
+							}
+							return pdus, nil
+						},
+					}
+					collector := New(Config{
+						SnmpClient: handler,
+						Profiles:   []*ddsnmp.Profile{profile},
+						Log:        logger.New(),
+					})
+					results, err := collector.Collect()
+					require.NoError(t, err)
+					require.Len(t, results, 1)
+					rows := make(map[string]map[string]string)
+					for _, row := range results[0].LicenseRows {
+						rows[row.RowKey] = row.Tags
+					}
+					for _, row := range results[0].BGPRows {
+						rows[row.RowKey] = row.Tags
+					}
+					wantTags := map[string]string{}
+					if !tc.missingLink {
+						wantTags["_label"] = "target-label"
+					}
+					wantRows := map[string]map[string]string{"1": wantTags}
+					if tc.legacy {
+						wantRows = map[string]map[string]string{"1": {}, "9": {"_label": "target-label"}}
+					}
+					assert.Equal(t, wantRows, rows)
+					assert.Equal(t, 1, handler.walks)
+				})
+			}
+		})
+	}
+}
+
+// Typed row preparation is O(fields + tags), with no cost proportional to table
+// rows or chain length. ns/op is a local trend; allocations are the regression gate.
+func BenchmarkTypedRowConfig(b *testing.B) {
+	for _, chained := range []bool{false, true} {
+		tags := indexFromCacheTags()
+		if !chained {
+			for i := range tags {
+				tags[i].IndexFrom = nil
+			}
+		}
+		mode := "legacy"
+		if chained {
+			mode = "chain"
+		}
+		license := ddprofiledefinition.LicensingConfig{
+			MetricTags: tags,
+		}
+		bgp := ddprofiledefinition.BGPConfig{
+			MetricTags: tags,
+		}
+		for consumer, prepare := range map[string]func() ddprofiledefinition.MetricsConfig{
+			"licensing": func() ddprofiledefinition.MetricsConfig { return licensingConfigAsMetricsConfig(license) },
+			"bgp":       func() ddprofiledefinition.MetricsConfig { return bgpConfigAsMetricsConfig(bgp) },
+		} {
+			b.Run(consumer+"/"+mode, func(b *testing.B) {
+				b.ReportAllocs()
+				for b.Loop() {
+					prepare()
+				}
+			})
+		}
+	}
+}

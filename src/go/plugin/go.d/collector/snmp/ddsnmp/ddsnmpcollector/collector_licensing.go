@@ -787,11 +787,7 @@ func licensingConfigAsMetricsConfig(cfg ddprofiledefinition.LicensingConfig) ddp
 	}
 
 	forEachLicenseValue(cfg, addColumn)
-	for _, tagCfg := range cfg.MetricTags {
-		if tagCfg.Symbol.OID != "" {
-			columns[trimOID(tagCfg.Symbol.OID)] = ddprofiledefinition.SymbolConfig(tagCfg.Symbol)
-		}
-	}
+	addTypedRowTagColumns(columns, cfg.MetricTags)
 
 	symbols := make([]ddprofiledefinition.SymbolConfig, 0, len(columns))
 	for _, sym := range columns {

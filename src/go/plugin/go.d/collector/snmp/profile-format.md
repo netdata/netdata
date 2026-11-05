@@ -1360,6 +1360,7 @@ Resolution proceeds in order:
 Every entry requires `table`, `symbol.OID`, and `symbol.name`. A nonempty chain also requires the final table and
 symbol, and cannot be combined with `index`. Scalar/global tags and typed BGP value fields do not accept `index_from`.
 An empty list preserves ordinary tag behavior.
+Chained lookup columns do not establish source rows, even when they refer back to the source table at another index.
 
 Hop symbols accept `format`, `extract_value`, `match_pattern` with a nonempty `match_value`, and exact `mapping`.
 They do not accept metric types, scale factors, chart metadata, numeric transforms, or bitmask mappings.
@@ -1417,6 +1418,8 @@ hop from the collected columns. A chain does not make a network request per row.
 the common OID prefix of their referenced columns; a declared table producer retains its own scope. Fixed source
 index prefixes are not propagated through value-derived keys. Cached tags keep their configured refresh interval;
 a refreshed missing chain removes the corresponding labels from surviving table charts.
+Existing acquisition-error handling is unchanged: a failed dependency walk suppresses the affected licensing or BGP
+row set; a successfully walked table with a missing instance only omits that tag.
 
 ### Index-Based
 
