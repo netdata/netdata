@@ -659,6 +659,17 @@ incomplete coverage. Skipped, expected-failure, empty or incomplete suites are i
 unexpected failure/timeout. Errors loading/running the monitor are execution inability. Cancellation and an interrupted
 start are distinct from a failed target. A workflow failure means a declared check failed, not proof of a service-wide outage.
 
+Use the journey configuration's **Test** action to execute an unsaved draft on the selected Agent with its resolved
+secrets and installed browser runtime. Test returns pass/fail; failed, skipped/incomplete, interrupted or unavailable
+execution is not success. It does not save the draft, change monitoring observations, publish metrics or alerts, or
+retain captures. `screenshot_on_failure` applies to monitoring only. Test actions against the website are real and
+are not rolled back. Activation still checks runtime preparation without executing the workflow.
+
+Test shares the browser slot with monitoring and may wait for another attempt or delay a later one. The caller's
+request deadline covers waiting and execution, so it may expire before the configured workflow timeout. Cancellation
+stops the attempt and drains its processes; a timed-out caller may not receive the final diagnosis. There is no retained
+result to retrieve later. Existing secret-reference redaction can replace detailed errors with a generic failure.
+
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
 observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation

@@ -912,6 +912,17 @@ Job ownership:
 - They share an executor, pure request validation and the common outcome/duration instrument helper.
 - Framework scheduling owns cadence. The command owns the execution admission slot, artifact store and journal.
 
+Draft rehearsal:
+
+- Explicit journey DynCfg `Test` uses resolved submitted configuration after `Init`; activation still uses `Check`.
+- `Engine.Rehearse` shares the installed source, admission and fail-stop owner with scheduled execution. It uses
+  an explicitly unrecorded view, as runtime qualification does, and a private temporary artifact store with capture
+  disabled. A missing history owner remains an error for ordinary monitoring.
+- Rehearsal never calls collector `Run` or `Collect`, registers an observation generation, or writes metrics.
+  It returns only an error/pass result after drainage and temporary cleanup; no result registry or polling API exists.
+- Caller deadlines include admission waiting. Unverified drainage signals the shared fatal owner and preserves
+  uncertain live work, even if the configuration request has already timed out.
+
 Registration:
 
 - `Run` registers one observation generation before readiness.

@@ -20,7 +20,8 @@ import (
 
 type prepared struct{}
 
-func (prepared) Check(context.Context, model.Kind) error { return nil }
+func (prepared) Check(context.Context, model.Kind) error       { return nil }
+func (prepared) Rehearse(context.Context, model.Request) error { panic("unexpected rehearsal") }
 func (prepared) Execute(context.Context, model.Request, func(string)) model.Execution {
 	panic("unexpected execution during config validation")
 }
