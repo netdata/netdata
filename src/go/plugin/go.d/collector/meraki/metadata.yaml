@@ -31,7 +31,7 @@ modules:
           - **Inventory**: how many devices are assigned to the organization's networks, and which ones.
           - **Switch ports** (two opt-in options): sent and received kilobits/s, and packets/s, of every switch port, on the switch's node.
           - **Uplink traffic** (opt-in): sent and received kilobits/s of each WAN and cellular uplink of every MX security appliance and Z teleworker gateway network.
-          - **Uplink health** (opt-in): on the node of each assigned device of product type `appliance`, such as MX and Z, the status of every uplink and how long ago the appliance last reported; for MX, ICMP packet loss, latency and sample age per uplink and destination IP.
+          - **Uplink health** (opt-in): on the node of each assigned device of product type `appliance`, such as MX and Z, the status of every uplink and how long ago the appliance last reported, plus ICMP packet loss, latency and sample age per uplink and destination IP, which Meraki documents for MX.
           - **Fleet filtering**: device nodes and charts carry organization, network, model and product type labels, so a large fleet can be grouped and filtered.
 
           Every device type Meraki reports availability for is covered, including security appliances (MX), switches (MS), wireless access points (MR), cameras (MV), sensors (MT) and cellular gateways (MG).
@@ -192,7 +192,7 @@ modules:
               required: false
               group: Optional metrics
               detailed_description: |
-                Adds to each appliance's node a status chart per uplink (`active`, `connecting`, `failed`, `not_connected` or `ready`) and a chart of how long ago the appliance last reported. For MX, it also adds packet loss, latency and sample age charts per uplink and ICMP destination IP. Each appliance of a warm spare pair keeps its own node, nothing is averaged across appliances or destinations, and a missing, unknown or conflicting value is a gap, never an older value.
+                Adds to each appliance's node a status chart per uplink (`active`, `connecting`, `failed`, `not_connected` or `ready`) and a chart of how long ago the appliance last reported. Where Meraki reports ICMP measurements, which it documents for MX, it also adds packet loss, latency and sample age charts per uplink and ICMP destination IP. Each appliance of a warm spare pair keeps its own node, nothing is averaged across appliances or destinations, and a missing, unknown or conflicting status or ICMP value is a gap, never an older value.
             - name: update_every
               description: Data collection interval, in seconds.
               default_value: 300
