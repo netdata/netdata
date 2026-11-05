@@ -751,7 +751,8 @@ Each OID uniquely identifies a value on a device — similar to a file path in a
 
 Scalar metrics represent a **single value for the entire device**.
 
-Their OIDs always end with `.0`, which denotes the **instance number** for a scalar object.
+Their OIDs always end with `.0`, which denotes the **instance number** for a scalar object. The collector GETs the
+OID exactly as written and does not append `.0`, so a scalar OID without its instance suffix returns no data.
 
 ```yaml
 metrics:
@@ -785,6 +786,9 @@ ifHCInOctets.2 = 2048
 
 - `.1`, `.2`, … are `row indexes` that identify the instance (e.g., interface #1, interface #2).
 - Each column (symbol) in the table has its own OID pattern but shares the same row indexes.
+- The collector walks only `table.OID`. Every symbol and same-table tag OID MUST be a column under it
+  (`<entry>.<column>`; `table.OID` may name the table or its entry). A same-table OID outside `table.OID` is never
+  collected and no error is reported; read another table through a cross-table tag (`table:`).
 
 Table metrics need at least one resolved tag to be emitted; without tags, they are skipped. Use non-empty identifying
 tags to distinguish rows, such as an interface name or a tag derived from the row index. The SNMP row index is not
@@ -1812,7 +1816,7 @@ These transformations are typically used to:
 | `mapping`                       | Convert numeric or string codes into state dimensions.                                 | `1 → up`, `2 → down`, `3 → testing` |
 | `extract_value`                 | Extract a numeric substring via regex.                                                 | `"23.8 °C" → "23"`                  |
 | `format`                        | Decode raw SNMP data into a value shape before other processing.                       | DateAndTime bytes → unix timestamp  |
-| `scale_factor`                  | Multiply values by a constant to adjust units.                                         | `"1.5" (MBps) × 8 → 12 (Mbps)`      |
+| `scale_factor`                  | Multiply values by a constant to adjust units.                                         | `5 (MBps) × 8 → 40 (Mbps)`          |
 | `match_pattern` + `match_value` | Replace string metric values using regex groups or static text before numeric parsing. | `"state=2" → "2"`                   |
 
 **Combination & Behavior**:
@@ -1823,7 +1827,7 @@ These transformations are typically used to:
 | **Order of application**  | For string-decoded metric values: 1️⃣ `format` (if present) → 2️⃣ `extract_value` (if present) → 3️⃣ `match_pattern` + `match_value` (if present) → 4️⃣ `mapping` → 5️⃣ numeric parsing → 6️⃣ `scale_factor`. Ordinary numeric PDUs skip the string-only `extract_value` and `match_pattern` steps and use numeric parsing → `mapping` → `scale_factor`. |
 | **Scale factor position** | `scale_factor` is always applied **last**, after all other metric value transformations. It cannot be combined with `mapping.mode: bitmask`.                                                                                                                                                                                                             |
 | **String base parsing**   | String-like values are parsed as base-10 by default. If `format: hex` is set, extracted values are parsed as base-16.                                                                                                                                                                                                                                    |
-| **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.                                                                                                                                                                                                                                            |
+| **Data type handling**    | Metric values are integers, including multi-value dimensions: float PDUs and scaled results are truncated toward zero (`scale_factor: 0.01` turns `119` into `1`).                                                                                                                                                                                       |
 | **Error handling**        | `extract_value` keeps the original value when it does not match; `match_pattern` fails the metric value when it does not match; no-value `format` sentinels are treated as missing.                                                                                                                                                                      |
 | **Applicability**         | Metric value transformations affect metric values only; `format` also decodes tag and metadata symbol values.                                                                                                                                                                                                                                            |
 | **Mapping syntax**        | `mapping.items` defines the lookup table. `mapping.mode` is optional and defaults to exact. Legacy flat-map syntax remains supported for backward compatibility.                                                                                                                                                                                         |
@@ -2045,8 +2049,8 @@ This transformation is typically used to convert between units (for example, byt
 **The collector**:
 
 - Multiplies the raw SNMP value by the specified factor.
-- Applies to both integer and floating-point values.
-- Keeps the result in the same numeric type (integer or float).
+- Applies to integer and floating-point SNMP values. The result is stored as an integer, truncated toward zero
+  (`scale_factor: 0.1` turns `225` into `22`).
 - Works for **metric values only** (not for tags or metadata).
 - Applies **after all other transformations** on the same metric (such as `extract_value`).
 

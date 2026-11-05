@@ -35,8 +35,10 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
 ## Required Checks
 
 1. Identify the source MIB object for every profile field being added or changed, and confirm the configured OID is
-   that object's OID: `<entry>.<column>`, where the entry is `<table>.1`. A row that sets `table.OID` to the entry
-   still parses with the entry arc doubled in every column, so only the MIB check catches it.
+   that object's OID: a column `<entry>.<column>` (the entry is `<table>.1`) under its row's `table.OID`, or a scalar
+   with its `.0` instance. Profiles with these mistakes still load, and a row whose columns double the entry arc still
+   parses, so only a MIB check catches them
+   (`src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows`).
 2. Check the object's `MAX-ACCESS` (SMIv2) or `ACCESS` (SMIv1).
 3. If the object is `not-accessible`, do not configure it as a readable `symbol.OID` unless it satisfies every
    device-scoped MIB-deviation requirement below.
@@ -278,5 +280,3 @@ go test ./plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector
 # Topology consumption of profile observations
 go test ./plugin/go.d/collector/snmp_topology
 ```
-
-See `src/go/plugin/go.d/collector/snmp/profile-format.md` for the full profile syntax and the "Field accessibility" section.
