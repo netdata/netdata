@@ -2433,7 +2433,8 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
 static struct {
     SPINLOCK spinlock;      // protects the fields below; never held across a submit (it may create a thread)
     ND_WORK_QUEUE *queue;   // created on first use
-    size_t submitters;      // submits in progress: shutdown waits for them before it frees the queue
+    size_t submitters;      // submits in progress, and chunks running inline after a refused submit:
+                            // shutdown waits for them before it frees the queue
     bool stopped;
 } weights_parallel = {
     .spinlock = SPINLOCK_INITIALIZER,
@@ -2463,6 +2464,9 @@ static void weights_parallel_job(void *data)
     completion_mark_complete(&thread_data->completion);
 }
 
+// Returns false only once shutdown has stopped the queue: the caller then runs the chunk itself, and it
+// processes no host (the agent is exiting). A chunk the queue refuses for any other reason (no thread
+// could be created) runs here, still counted in submitters, so shutdown waits for it too.
 static bool weights_parallel_submit(struct query_weights_thread_data *thread_data)
 {
     spinlock_lock(&weights_parallel.spinlock);
@@ -2479,36 +2483,46 @@ static bool weights_parallel_submit(struct query_weights_thread_data *thread_dat
     weights_parallel.submitters++;
     spinlock_unlock(&weights_parallel.spinlock);
 
-    bool submitted = nd_work_queue_submit(wq, weights_parallel_job, thread_data);
+    if (!nd_work_queue_submit(wq, weights_parallel_job, thread_data))
+        weights_parallel_job(thread_data); // no thread available: run it here
 
     spinlock_lock(&weights_parallel.spinlock);
     weights_parallel.submitters--;
     spinlock_unlock(&weights_parallel.spinlock);
 
-    return submitted;
+    return true;
 }
 
 // Returns false when a chunk was still running at the deadline: it may still use hosts and dbengine.
 bool weights_parallel_shutdown(void)
 {
+    usec_t deadline_ut = now_monotonic_usec() + WEIGHTS_PARALLEL_SHUTDOWN_TIMEOUT_UT;
+
     spinlock_lock(&weights_parallel.spinlock);
     ND_WORK_QUEUE *wq = weights_parallel.queue;
     weights_parallel.queue = NULL;
     weights_parallel.stopped = true;
     spinlock_unlock(&weights_parallel.spinlock);
 
-    // a submitter that took the queue before it was stopped may still be inside nd_work_queue_submit()
+    // a submitter that took the queue before it was stopped may still be submitting, or running its chunk inline
     while (true) {
         spinlock_lock(&weights_parallel.spinlock);
         size_t submitters = weights_parallel.submitters;
         spinlock_unlock(&weights_parallel.spinlock);
         if (!submitters)
             break;
+
+        // the queue cannot be freed under a submitter: leave it, like a chunk still running at the deadline
+        if (now_monotonic_usec() >= deadline_ut) {
+            nd_log_daemon(NDLP_WARNING, "WEIGHTS: %zu submitter(s) still running at shutdown, not freeing the queue", submitters);
+            return false;
+        }
         sleep_usec(USEC_PER_MS);
     }
 
     // Accepted chunks still run (their callers wait for them); later requests run their chunks inline.
-    return nd_work_queue_stop_and_free(wq, WEIGHTS_PARALLEL_SHUTDOWN_TIMEOUT_UT);
+    usec_t now_ut = now_monotonic_usec();
+    return nd_work_queue_stop_and_free(wq, deadline_ut > now_ut ? deadline_ut - now_ut : 0);
 }
 
 static void weights_foreach_host_parallel(struct query_weights_data *qwd, size_t num_threads)
@@ -2532,7 +2546,7 @@ static void weights_foreach_host_parallel(struct query_weights_data *qwd, size_t
 
         completion_init(&thread_data[i].completion);
         if (!weights_parallel_submit(&thread_data[i]))
-            weights_parallel_job(&thread_data[i]); // shutting down, or no thread available: run it here
+            weights_parallel_job(&thread_data[i]); // shutting down: it stops before its first host
     }
 
     // Wait for all threads to complete; the pinned hosts are released only after this
