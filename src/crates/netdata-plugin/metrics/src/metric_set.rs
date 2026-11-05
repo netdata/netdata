@@ -86,8 +86,8 @@ impl Aggregation {
 ///
 /// - `IDS` must hold at least one id. Declaring an instrument with an empty
 ///   `IDS` panics.
-/// - `index` must return the value's position in `IDS`. Recording a value
-///   whose index is out of range panics.
+/// - `index` must return the value's position in `IDS`. A measurement of a
+///   value whose index is out of range panics.
 pub trait Dimension: Copy + 'static {
     /// The ids of all the dimensions, in chart order. An id is also the
     /// dimension's name on the chart.
@@ -140,15 +140,16 @@ macro_rules! dimensions {
     };
 }
 
-/// Counts events, split by `D`, for example requests by outcome. Charted as
-/// events per second (a window's count divided by its length); a window without
-/// events shows 0.
+/// Sums the amounts added, split by `D`, for example requests by outcome.
+/// Amounts are expected to be non-negative; this is not checked. Charted per
+/// second: a window's sum divided by the collection interval (the crate
+/// computes the rate itself). A window with nothing added shows 0.
 #[derive(Debug, Clone, Copy)]
 pub struct Counter<D>(pub(crate) ColumnRange<D>);
 
 /// For a source that keeps its own running totals, split by `D`, for example
-/// an aggregator's statistics: record the current totals at the time you read
-/// them, and the chart shows how much they grew per second.
+/// an aggregator's statistics: set the current totals in an event timed when
+/// you read them, and the chart shows how much they grew per second.
 ///
 /// - Until an entity's first total, and in the window of that total (its
 ///   baseline), the chart shows a gap.
@@ -161,7 +162,7 @@ pub struct Counter<D>(pub(crate) ColumnRange<D>);
 pub struct CumulativeCounter<D>(pub(crate) ColumnRange<D>);
 
 /// A current value, split by `D`, for example open connections per state,
-/// recorded at the time you read it. Charted as is.
+/// set in an event timed when you read it. Charted as is.
 ///
 /// - Each event sets the value; within a window, the value set last wins: the
 ///   later event in a batch, the later merged batch across batches.

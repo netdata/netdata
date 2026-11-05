@@ -1,6 +1,6 @@
-//! Request-local recording: each event adds into the batch's row for its
-//! entity and the window its own time falls in; the aggregator decides at merge
-//! time whether that window is still open.
+//! Batches: each event adds into the batch's row for its entity and the
+//! window its event time falls in; the aggregator decides at merge time
+//! whether that window is still open.
 
 use crate::metric_set::{
     ColumnRange, Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels, MetricSet,
@@ -82,7 +82,7 @@ pub struct BatchEntity<'a> {
 }
 
 impl BatchEntity<'_> {
-    /// Record one event at `unix_seconds`, its own time; write its
+    /// Record one event at `unix_seconds`, its event time; write its
     /// measurements through the returned [`Measurements`]. Every call is one
     /// event, even with no measurement: it counts in whichever of the
     /// aggregator's late, future and overflow counts applies, and it starts the
@@ -141,8 +141,8 @@ impl Measurements<'_> {
         columns.column(index)
     }
 
-    /// Count `amount` for `dimension` of `counter` in this event's window; the
-    /// chart shows the window's count per second. A non-finite amount is
+    /// Add `amount` to `dimension` of `counter` in this event's window; the
+    /// chart shows the window's sum per second. A non-finite amount is
     /// ignored.
     pub fn add<D: Dimension>(
         &mut self,
@@ -157,9 +157,9 @@ impl Measurements<'_> {
         self
     }
 
-    /// Record `total`, the source's running total for `dimension` of
+    /// Set `total`, the source's running total for `dimension` of
     /// `cumulative`; the chart shows how much it grew per second. Within a
-    /// window, the total recorded last counts. A non-finite total is ignored.
+    /// window, the total set last counts. A non-finite total is ignored.
     pub fn set_total<D: Dimension>(
         &mut self,
         cumulative: CumulativeCounter<D>,
@@ -173,8 +173,8 @@ impl Measurements<'_> {
         self
     }
 
-    /// Record `value` for `dimension` of `gauge`; the chart shows it as is.
-    /// Within a window, the value recorded last counts. A non-finite value is
+    /// Set `value` for `dimension` of `gauge`; the chart shows it as is.
+    /// Within a window, the value set last counts. A non-finite value is
     /// ignored.
     pub fn set_value<D: Dimension>(
         &mut self,
@@ -189,10 +189,9 @@ impl Measurements<'_> {
         self
     }
 
-    /// Record one observation of `value` for `histogram`, standing for
-    /// `weight` events: the buckets and the mean are weighted, the maximum is
-    /// not. An
-    /// observation with a non-finite value or weight is ignored.
+    /// Add one observation of `value` to `histogram`, standing for `weight`
+    /// observations: the buckets and the mean are weighted, the maximum is
+    /// not. An observation with a non-finite value or weight is ignored.
     pub fn observe(&mut self, histogram: Histogram, value: f64, weight: f64) -> &mut Self {
         self.check_set(histogram.set_id);
         if !value.is_finite() || !weight.is_finite() {
