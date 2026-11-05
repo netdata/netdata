@@ -32,7 +32,7 @@ require (
 	github.com/blang/semver/v4 v4.0.0
 	github.com/bmatcuk/doublestar/v4 v4.10.4
 	github.com/bougou/go-ipmi v0.9.2-0.20261103040914-5691311a9607
-	github.com/catonetworks/cato-go-sdk v1.1.3
+	github.com/catonetworks/cato-go-sdk v1.1.4
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.7.1
