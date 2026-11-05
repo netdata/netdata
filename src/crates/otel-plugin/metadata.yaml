@@ -194,13 +194,20 @@ modules:
             - name: derived_metrics.enabled
               description: Make per-service charts from the received logs and traces.
               detailed_description: |
-                For each service, the plugin makes charts of requests, failed requests and request durations from traces, and charts of log records by severity from logs.
+                For each service, the plugin makes charts of requests, failed requests and request durations from traces, and charts of log records by severity from logs. These charts count as follows:
+
+                - A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends.
+                - Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent.
+                - A log record counts at its time (its own time, else its observed time, else the time it arrived), in the severity range of its severity number. A record without a severity number counts as `unspecified`.
+                - The charts show data with a delay of 10 seconds, so that data that arrives late still counts in the correct second. Data that arrives later than that counts in the oldest second that is still open, and data with a time in the future counts in the current second. The "Records counted in another time slot or chart set" chart shows these records as `late` and `future`.
               default_value: true
               required: false
             - name: derived_metrics.max_services
               description: Maximum number of services with their own charts, for traces and for logs separately.
               detailed_description: |
                 The records of more services go to one shared overflow chart set. When a service sends no data for 15 minutes, its charts are removed and its place becomes free.
+
+                The "Services with derived charts" chart counts the overflow chart set as one service. The "Records counted in another time slot or chart set" chart shows the records that go to the overflow chart set as `overflowed`. One record can count as both `late` and `overflowed`.
               default_value: 500
               required: false
             - name: base_dir
@@ -390,10 +397,10 @@ modules:
               The plugin rejects an export request larger than 4 MiB as a whole, and the Collector drops that batch. Make the batches smaller. On the exporter, cap them by size with `sending_queue: { batch: { sizer: bytes, max_size: 3000000 } }`. Alternatively, lower `send_batch_max_size` on the `batch` processor; it counts items (spans, data points, log records), not bytes.
           - name: Some exported logs are missing
             description: |
-              By default, the plugin rejects log records timestamped more than 24 hours in the past or more than 10 minutes in the future. The Collector logs a `Partial success response` warning for rejected records. Check the clock of the host that produced the logs, how old the backfilled records are, the Collector log, and the Agent journal.
+              By default, the plugin rejects log records timestamped more than 24 hours in the past or more than 10 minutes in the future. The Collector logs a `Partial success response` warning for rejected records, and the `rejected` dimension of the "OpenTelemetry log records received" chart counts them. Check the clock of the host that produced the logs, how old the backfilled records are, the Collector log, and the Agent journal.
           - name: Some exported spans are missing
             description: |
-              By default, the plugin rejects a span that started more than 24 hours ago or ends more than 10 minutes in the future; a span without an end time is judged by its start. The Collector logs a `Partial success response` warning for rejected spans, and the plugin logs a warning in the Agent journal. Check the clock of the instrumented application's host, how old the backfilled spans are, the Collector log, and the Agent journal.
+              By default, the plugin rejects a span that started more than 24 hours ago or ends more than 10 minutes in the future; a span without an end time is judged by its start. The Collector logs a `Partial success response` warning for rejected spans, the plugin logs a warning in the Agent journal, and the `rejected` dimension of the "OpenTelemetry spans received" chart counts them. Check the clock of the instrumented application's host, how old the backfilled spans are, the Collector log, and the Agent journal.
           - name: Logs from the former experimental plugin are not visible
             description: |
               A former-schema `otel.yaml` stops the current plugin and prints a migration guide. Replace it with a partial configuration based on the current stock file. The legacy `logs.journal_dir` key is accepted only to locate the former plugin's read-only journals; it is not part of the current storage layout.
@@ -404,7 +411,7 @@ modules:
       description: |
         Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
 
-        The plugin also makes charts about the data it receives.
+        The plugin also makes charts about the data it receives, listed below. These charts count the records of an export only when the export succeeds, because the sender sends a failed export again.
       availability: []
       dynamic_context_prefixes:
         - prefix: otel.
@@ -413,38 +420,37 @@ modules:
             otel.<metric name>.
       scopes:
         - name: global
-          description: These metrics show the logs and traces the plugin receives.
+          description: The plugin itself, with charts of the spans and log records that it receives.
           labels: []
           metrics:
             - name: netdata.otel.spans
-              description: Spans of each export that the plugin accepted, stored or rejected (outside the accepted time window). Exports that fail are not counted, because the sender sends them again.
+              description: OpenTelemetry spans received
               unit: spans/s
               chart_type: stacked
               dimensions:
                 - name: accepted
                 - name: rejected
             - name: netdata.otel.log_records
-              description: Log records of each export that the plugin accepted, stored or rejected (outside the accepted time window, or not storable). Exports that fail are not counted, because the sender sends them again.
+              description: OpenTelemetry log records received
               unit: records/s
               chart_type: stacked
               dimensions:
                 - name: accepted
                 - name: rejected
         - name: signal
-          description: These metrics show how the plugin makes the per-service metrics from each signal (traces or logs). They are present only when derived metrics are enabled.
+          description: One signal, traces or logs, that the per-service charts are made from, when `derived_metrics.enabled` is `true`.
           labels:
             - name: signal
               description: The signal that the per-service metrics are made from, `traces` or `logs`.
           metrics:
             - name: netdata.otel.derived_services
-              description: Services that have their own derived charts, the overflow chart set included.
+              description: Services with derived charts
               unit: services
               chart_type: line
               dimensions:
                 - name: services
             - name: netdata.otel.derived_adjusted_records
-              description: |
-                Records counted in a different time slot or chart set: late (older than the open time slots), future (newer than the current time), or overflowed (from a service over the maximum number of services). One record can be both late and overflowed.
+              description: Records counted in another time slot or chart set
               unit: records/s
               chart_type: line
               dimensions:
@@ -452,14 +458,13 @@ modules:
                 - name: future
                 - name: overflowed
             - name: netdata.otel.derived_expired_services
-              description: Services whose derived charts were removed after 15 minutes without data.
+              description: Services removed after 15 minutes without data
               unit: services/s
               chart_type: line
               dimensions:
                 - name: expired
         - name: service
-          description: |
-            These metrics are made from the spans and log records of each service. A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends. Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent. A log record counts at its time (its own time, else its observed time, else the time it arrived), in the severity range of its severity number; a record without a severity number counts as `unspecified`. The charts show data with a delay of 10 seconds, so that data that arrives late is still counted in the correct second.
+          description: One service, identified by its resource attributes and tenant, when `derived_metrics.enabled` is `true`; the services over `derived_metrics.max_services` share one overflow chart set.
           labels:
             - name: resource.attributes.service.name
               description: The `service.name` resource attribute, or `unknown_service` when it is not set. Not present on the overflow chart set.
