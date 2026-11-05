@@ -48,21 +48,29 @@ struct netdata_static_thread cgroup_integration_thread = {
     .init_routine = NULL,
     .start_routine = NULL};
 
+/* Process accounting is owned by ebpf-go.plugin.  Keep the historical module
+ * slot for index/ABI compatibility, but never start the legacy collector. */
+static void ebpf_process_disabled_thread(void *ptr)
+{
+	if (ptr)
+		ebpf_module_enabled_set((ebpf_module_t *)ptr, NETDATA_THREAD_EBPF_STOPPING);
+}
+
 ebpf_module_t ebpf_modules[] = {
     {.info =
          {.thread_name = "process", .config_name = "process", .thread_description = NETDATA_EBPF_MODULE_PROCESS_DESC},
      .functions =
-         {.start_routine = ebpf_process_thread,
-          .apps_routine = ebpf_process_create_apps_charts,
-          .bpf_unload = ebpf_unload_legacy_bpf},
+         {.start_routine = ebpf_process_disabled_thread,
+          .apps_routine = NULL,
+          .bpf_unload = NULL},
      .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
      .update_every = EBPF_DEFAULT_UPDATE_EVERY,
-     .global_charts = 1,
+     .global_charts = 0,
      .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
      .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT,
      .cgroup_charts = CONFIG_BOOLEAN_NO,
      .mode = MODE_ENTRY,
-     .optional = 0,
+     .optional = 1,
      .maps = NULL,
      .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE,
      .names = NULL,
