@@ -33,7 +33,7 @@ modules:
         description: ""
       default_behavior:
         auto_detection:
-          description: "The plugin reads data from `/proc/self/mountinfo` and `/proc/diskstats file`."
+          description: "The plugin reads data from `/proc/self/mountinfo` and `/proc/diskstats file`. A filesystem mounted at several mount points (bind mounts, subvolumes of one btrfs volume) is charted once, on the mount with the shortest root inside the filesystem. When that mount is excluded or disabled, it is charted on another of its mounts that is not."
         limits:
           description: ""
         performance_impact:
@@ -66,11 +66,11 @@ modules:
               required: false
             - name: exclude space metrics on paths
               description: Do not show metrics (charts) for listed paths. This option accepts netdata simple pattern.
-              default_value: /proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*
+              default_value: "/dev /dev/shm /proc/* /sys/* /var/run/user/* /run/lock /run/user/* /snap/* /var/lib/docker/* /var/lib/containers/storage/* /run/credentials/* /run/containerd/* /rpool /rpool/*"
               required: false
             - name: exclude space metrics on filesystems
               description: Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern.
-              default_value: "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
+              default_value: "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs cgroup cgroup2 hugetlbfs devtmpfs fuse.lxcfs"
               required: false
             - name: exclude inode metrics on filesystems
               description: Do not show metrics (charts) for listed filesystems. This option accepts netdata simple pattern.
