@@ -15,6 +15,11 @@ const (
 	metricSwitchPortPacketsReceived      = "switch_port_packets_received"
 	metricApplianceUplinkTrafficSent     = "appliance_uplink_traffic_sent"
 	metricApplianceUplinkTrafficReceived = "appliance_uplink_traffic_received"
+	metricApplianceReportAge             = "appliance_report_age"
+	metricApplianceUplinkStatus          = "appliance_uplink_status"
+	metricApplianceUplinkPacketLoss      = "appliance_uplink_packet_loss"
+	metricApplianceUplinkLatency         = "appliance_uplink_latency"
+	metricApplianceUplinkSampleAge       = "appliance_uplink_sample_age"
 )
 
 // availabilityStates are the device states Meraki documents.
@@ -23,6 +28,15 @@ var availabilityStates = []string{"alerting", "dormant", "offline", "online"}
 var availabilityStateSet = []metrix.InstrumentOption{
 	metrix.WithStateSetMode(metrix.ModeEnum),
 	metrix.WithStateSetStates(availabilityStates...),
+}
+
+// uplinkStates are the uplink states Meraki documents, with "not connected"
+// written as not_connected.
+var uplinkStates = []string{"active", "connecting", "failed", "not_connected", "ready"}
+
+var uplinkStateSet = []metrix.InstrumentOption{
+	metrix.WithStateSetMode(metrix.ModeEnum),
+	metrix.WithStateSetStates(uplinkStates...),
 }
 
 // collectorMetrics holds the organization instrument. Device, port and uplink

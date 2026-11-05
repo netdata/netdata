@@ -251,15 +251,15 @@ func usageHistoryBody(serial, network, port, intervals string) string {
 	)
 }
 
-type trafficPoint struct {
+type metricPoint struct {
 	Scope  metrix.HostScope
 	Labels map[string]string
 	Value  metrix.SampleValue
 }
 
-// trafficPoints returns every series of the metric, from every host scope.
-func trafficPoints(c *Collector, metric string) []trafficPoint {
-	var points []trafficPoint
+// metricPoints returns every series of the metric, from every host scope.
+func metricPoints(c *Collector, metric string) []metricPoint {
+	var points []metricPoint
 	read := func(scope metrix.HostScope) {
 		opts := []metrix.ReadOption{metrix.ReadFlatten()}
 		if !scope.IsDefault() {
@@ -267,7 +267,7 @@ func trafficPoints(c *Collector, metric string) []trafficPoint {
 		}
 		c.store.Read(opts...).ForEachSeries(func(name string, labels metrix.LabelView, value metrix.SampleValue) {
 			if name == metric {
-				points = append(points, trafficPoint{
+				points = append(points, metricPoint{
 					Scope:  scope,
 					Labels: labels.CloneMap(),
 					Value:  value,
@@ -284,10 +284,10 @@ func trafficPoints(c *Collector, metric string) []trafficPoint {
 	return points
 }
 
-// trafficValues returns the values of every series of the metric.
-func trafficValues(c *Collector, metric string) []metrix.SampleValue {
+// metricValues returns the values of every series of the metric.
+func metricValues(c *Collector, metric string) []metrix.SampleValue {
 	values := []metrix.SampleValue{}
-	for _, p := range trafficPoints(c, metric) {
+	for _, p := range metricPoints(c, metric) {
 		values = append(values, p.Value)
 	}
 	return values

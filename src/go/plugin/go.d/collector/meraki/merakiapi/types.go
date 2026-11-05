@@ -103,3 +103,38 @@ type UplinkUsage struct {
 	Sent      *float64 `json:"sent"`
 	Received  *float64 `json:"received"`
 }
+
+// ApplianceUplinkStatus reports one appliance's uplinks. LastReportedAt is the
+// device's last report time, not the time an interface changed state.
+type ApplianceUplinkStatus struct {
+	Serial         string                 `json:"serial"`
+	NetworkID      string                 `json:"networkId"`
+	LastReportedAt string                 `json:"lastReportedAt"`
+	Uplinks        []ApplianceUplinkState `json:"uplinks"`
+}
+
+// ApplianceUplinkState keeps the provider's interface and status strings,
+// including unknown values, for the collector's trust checks.
+type ApplianceUplinkState struct {
+	Interface string `json:"interface"`
+	Status    string `json:"status"`
+}
+
+// UplinkLossAndLatency is one MX uplink's ICMP measurements to a destination.
+// The API's ip query filter identifies a destination, despite its response
+// schema describing that same field as the uplink IP.
+type UplinkLossAndLatency struct {
+	Serial        string               `json:"serial"`
+	NetworkID     string               `json:"networkId"`
+	Uplink        string               `json:"uplink"`
+	DestinationIP string               `json:"ip"`
+	Samples       []UplinkHealthSample `json:"timeSeries"`
+}
+
+// UplinkHealthSample is one provider-timestamped observation, with no supplied
+// packet counts or interval duration from which to derive weighted averages.
+type UplinkHealthSample struct {
+	Timestamp   string   `json:"ts"`
+	LossPercent *float64 `json:"lossPercent"`
+	LatencyMS   *float64 `json:"latencyMs"`
+}
