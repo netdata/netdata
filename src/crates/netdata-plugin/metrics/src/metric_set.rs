@@ -338,12 +338,41 @@ pub(crate) struct MetricSetInner {
     pub(crate) expiry_slots: u64,
     pub(crate) max_entities: usize,
     pub(crate) overflow_labels: Labels,
-    pub(crate) merges: Vec<Merge>,
-    pub(crate) initial_cells: Vec<f64>,
+    merges: Vec<Merge>,
+    initial_cells: Box<[f64]>,
     /// The cells of [`CumulativeCounter`] instruments, which hold totals until a
     /// slot is emitted as increases.
     pub(crate) cumulative_cells: Vec<usize>,
     pub(crate) charts: Vec<ChartDef>,
+}
+
+impl MetricSetInner {
+    /// The cells of a slot without records.
+    pub(crate) fn empty_cells(&self) -> Box<[f64]> {
+        self.initial_cells.clone()
+    }
+
+    /// Combine `incoming` into `target`, each cell by its [`Merge`] rule.
+    pub(crate) fn merge_cells(&self, target: &mut [f64], incoming: &[f64]) {
+        for ((merge, current), &incoming) in self.merges.iter().zip(target.iter_mut()).zip(incoming)
+        {
+            *current = merge.apply(*current, incoming);
+        }
+    }
+
+    /// What a dimension shows for a slot with these cells; none for a gap.
+    pub(crate) fn read(&self, cells: &[f64], value: Value) -> Option<f64> {
+        let value = match value {
+            Value::Rate(cell) => cells[cell] / self.interval_secs as f64,
+            Value::Ratio {
+                numerator,
+                denominator,
+            } if cells[denominator] > 0.0 => cells[numerator] / cells[denominator],
+            Value::Ratio { .. } => return None,
+            Value::Cell(cell) => cells[cell],
+        };
+        value.is_finite().then_some(value)
+    }
 }
 
 /// The time and lifecycle settings of a metric set.

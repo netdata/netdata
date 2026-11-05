@@ -5,16 +5,17 @@
 //! emitted) to the current one open; each entity holds those slots as cell
 //! arrays and folds them forward after a stall (`advance_window`). Entities
 //! are created on their first record, with or without measurements, charts
-//! are defined on an entity's first emitted slot, and an expired entity's state is dropped
-//! (its cumulative baselines with it).
+//! are defined on an entity's first emitted slot, and an expired entity's
+//! state is dropped (its cumulative baselines with it).
 
 use crate::batch::Batch;
-use crate::metric_set::{Labels, MetricSet, MetricSetInner, Value};
+use crate::metric_set::{ChartDef, Labels, MetricSet, MetricSetInner};
 use netdata_plugin_protocol::{
     ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
     write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end_timed,
     write_set_empty, write_set_float,
 };
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 
 /// Most slots past the lateness one [`Store::emit`] emits after a stall or a
@@ -123,7 +124,7 @@ impl Store {
     /// moved forward, folding the slots it passes, when it falls more than
     /// [`MAX_BACKLOG_SLOTS`] behind the lateness window.
     fn advance_window(&mut self, now: u64) -> u64 {
-        let set = std::sync::Arc::clone(&self.set.0);
+        let set = &*self.set.0;
         let now_slot = now / set.interval_secs;
         let next_emit = *self
             .next_emit
@@ -134,7 +135,7 @@ impl Store {
         }
         let skipped = oldest_wanted - next_emit;
         for entity in self.entities.values_mut().chain(self.overflow.as_mut()) {
-            fold_front(&set, entity, skipped, oldest_wanted);
+            entity.fold_front(set, skipped, oldest_wanted);
         }
         self.next_emit = Some(oldest_wanted);
         oldest_wanted
@@ -154,22 +155,25 @@ impl Store {
             "batch of another metric set"
         );
         let next_emit = self.advance_window(now);
-        let set = std::sync::Arc::clone(&self.set.0);
+        let set = &*self.set.0;
         let newest = (now / set.interval_secs).max(next_emit);
         for (labels, pending) in batch.entities {
             if pending.per_slot.is_empty() {
                 continue;
             }
             let records: u64 = pending.per_slot.values().map(|s| s.records).sum();
-            let entity = if let Some(entity) = self.entities.get_mut(&labels) {
-                entity
-            } else if self.entities.len() < set.max_entities {
-                let entity = new_entity(&set, labels.clone(), false);
-                self.entities.entry(labels).or_insert(entity)
-            } else {
-                self.stats.overflowed_records += records;
-                self.overflow
-                    .get_or_insert_with(|| new_entity(&set, set.overflow_labels.clone(), true))
+            let tracked = self.entities.len();
+            let entity = match self.entities.entry(labels) {
+                Entry::Occupied(entry) => entry.into_mut(),
+                Entry::Vacant(entry) if tracked < set.max_entities => {
+                    let entity = Entity::new(set, entry.key().clone(), false);
+                    entry.insert(entity)
+                }
+                Entry::Vacant(_) => {
+                    self.stats.overflowed_records += records;
+                    self.overflow
+                        .get_or_insert_with(|| Entity::new(set, set.overflow_labels.clone(), true))
+                }
             };
             for (slot, batch_cells) in pending.per_slot {
                 let slot = if slot < next_emit {
@@ -181,7 +185,7 @@ impl Store {
                 } else {
                     slot
                 };
-                merge_slot(&set, entity, next_emit, slot, &batch_cells.cells);
+                entity.merge_slot(set, next_emit, slot, &batch_cells.cells);
             }
         }
     }
@@ -199,25 +203,23 @@ impl Store {
     pub fn emit(&mut self, now: u64, max_chunk: usize) -> Vec<Vec<u8>> {
         let mut out = Chunker::new(max_chunk);
         let mut next_emit = self.advance_window(now);
-        let set = std::sync::Arc::clone(&self.set.0);
+        let set = &*self.set.0;
         let now_slot = now / set.interval_secs;
         while next_emit + set.lateness_slots < now_slot {
             let slot = next_emit;
-            let mut expired = Vec::new();
-            for (labels, entity) in &mut self.entities {
-                if emit_slot(&set, entity, slot, &mut out) {
-                    expired.push(labels.clone());
-                }
-            }
-            for labels in expired {
-                self.entities.remove(&labels);
+            let stats = &mut self.stats;
+            self.entities.retain(|_, entity| {
+                entity.emit_slot(set, slot, &mut out);
+                let expired = entity.expire_if_idle(set, slot, &mut out);
+                stats.expired_entities += u64::from(expired);
+                !expired
+            });
+            let expired = self.overflow.take_if(|entity| {
+                entity.emit_slot(set, slot, &mut out);
+                entity.expire_if_idle(set, slot, &mut out)
+            });
+            if expired.is_some() {
                 self.stats.expired_entities += 1;
-            }
-            if let Some(entity) = &mut self.overflow {
-                if emit_slot(&set, entity, slot, &mut out) {
-                    self.overflow = None;
-                    self.stats.expired_entities += 1;
-                }
             }
             next_emit += 1;
         }
@@ -226,50 +228,125 @@ impl Store {
     }
 }
 
-/// Merge the first `skipped` window slots of `entity` into the slot that
-/// becomes the window's first, `new_first`.
-fn fold_front(set: &MetricSetInner, entity: &mut Entity, skipped: u64, new_first: u64) {
-    let take = (skipped as usize).min(entity.open_cells.len());
-    if take == 0 {
-        return;
+impl Entity {
+    fn new(set: &MetricSetInner, labels: Labels, overflow: bool) -> Self {
+        let suffix = if overflow {
+            "_overflow".to_string()
+        } else if labels.is_empty() {
+            String::new()
+        } else {
+            format!("_{:016x}", label_hash(&labels))
+        };
+        Self {
+            chart_ids: set
+                .charts
+                .iter()
+                .map(|chart| format!("{}{suffix}", chart.context))
+                .collect(),
+            labels,
+            defined: false,
+            first_slot: u64::MAX,
+            last_slot: 0,
+            open_cells: VecDeque::new(),
+            previous_totals: vec![f64::NAN; set.cumulative_cells.len()].into_boxed_slice(),
+        }
     }
-    let mut folded = set.initial_cells.clone().into_boxed_slice();
-    for cells in entity.open_cells.drain(..take) {
-        merge_cells(set, &mut folded, &cells);
-    }
-    match entity.open_cells.front_mut() {
-        Some(front) => merge_cells(set, front, &folded),
-        None => entity.open_cells.push_back(folded),
-    }
-    entity.first_slot = entity.first_slot.max(new_first);
-}
 
-fn merge_cells(set: &MetricSetInner, target: &mut [f64], cells: &[f64]) {
-    for ((merge, current), &incoming) in set.merges.iter().zip(target.iter_mut()).zip(cells) {
-        *current = merge.apply(*current, incoming);
+    /// Merge `cells` into `slot`, an open slot from `next_emit` onwards.
+    fn merge_slot(&mut self, set: &MetricSetInner, next_emit: u64, slot: u64, cells: &[f64]) {
+        let index = (slot - next_emit) as usize;
+        while self.open_cells.len() <= index {
+            self.open_cells.push_back(set.empty_cells());
+        }
+        set.merge_cells(&mut self.open_cells[index], cells);
+        self.first_slot = self.first_slot.min(slot);
+        self.last_slot = self.last_slot.max(slot);
     }
-}
 
-fn new_entity(set: &MetricSetInner, labels: Labels, overflow: bool) -> Entity {
-    let suffix = if overflow {
-        "_overflow".to_string()
-    } else if labels.is_empty() {
-        String::new()
-    } else {
-        format!("_{:016x}", label_hash(&labels))
-    };
-    Entity {
-        chart_ids: set
-            .charts
+    /// Merge the first `skipped` window slots into the slot that becomes the
+    /// window's first, `new_first`.
+    fn fold_front(&mut self, set: &MetricSetInner, skipped: u64, new_first: u64) {
+        let take = (skipped as usize).min(self.open_cells.len());
+        if take == 0 {
+            return;
+        }
+        let mut folded = set.empty_cells();
+        for cells in self.open_cells.drain(..take) {
+            set.merge_cells(&mut folded, &cells);
+        }
+        match self.open_cells.front_mut() {
+            Some(front) => set.merge_cells(front, &folded),
+            None => self.open_cells.push_back(folded),
+        }
+        self.first_slot = self.first_slot.max(new_first);
+    }
+
+    /// Emit `slot`, the window's first, and drop it from the window; nothing
+    /// is written before the entity's first record.
+    fn emit_slot(&mut self, set: &MetricSetInner, slot: u64, out: &mut Chunker) {
+        let cells = self.open_cells.pop_front();
+        if slot < self.first_slot {
+            return;
+        }
+        if !self.defined {
+            for (chart, id) in set.charts.iter().zip(&self.chart_ids) {
+                out.block(|block| define_chart(block, set, chart, id, &self.labels));
+            }
+            self.defined = true;
+        }
+        let mut cells = cells.unwrap_or_else(|| set.empty_cells());
+        self.totals_to_increases(set, &mut cells);
+        for (chart, id) in set.charts.iter().zip(&self.chart_ids) {
+            out.block(|block| {
+                write_begin(block, id, set.interval_secs * 1_000_000);
+                for dim in &chart.dimensions {
+                    match set.read(&cells, dim.value) {
+                        Some(value) => write_set_float(block, &dim.id, value),
+                        None => write_set_empty(block, &dim.id),
+                    }
+                }
+                write_end_timed(block, (slot + 1) * set.interval_secs);
+            });
+        }
+    }
+
+    /// When the entity has had no records for the expiry time as of `slot`,
+    /// mark its charts obsolete and return true; the caller drops it.
+    fn expire_if_idle(&self, set: &MetricSetInner, slot: u64, out: &mut Chunker) -> bool {
+        if !self.defined || slot < self.last_slot + set.expiry_slots {
+            return false;
+        }
+        for (chart, id) in set.charts.iter().zip(&self.chart_ids) {
+            out.block(|block| write_chart_line(block, set, chart, id, true));
+        }
+        true
+    }
+
+    /// Replace the totals in `cells` with their increase since the entity's
+    /// previous total, and remember the new totals.
+    fn totals_to_increases(&mut self, set: &MetricSetInner, cells: &mut [f64]) {
+        for (&cell, previous) in set
+            .cumulative_cells
             .iter()
-            .map(|chart| format!("{}{suffix}", chart.context))
-            .collect(),
-        labels,
-        defined: false,
-        first_slot: u64::MAX,
-        last_slot: 0,
-        open_cells: VecDeque::new(),
-        previous_totals: vec![f64::NAN; set.cumulative_cells.len()].into_boxed_slice(),
+            .zip(self.previous_totals.iter_mut())
+        {
+            let total = cells[cell];
+            cells[cell] = if total.is_nan() {
+                // No new total: no increase, once a baseline exists.
+                if previous.is_nan() { f64::NAN } else { 0.0 }
+            } else if previous.is_nan() {
+                // The first total is the baseline.
+                f64::NAN
+            } else if total < *previous {
+                // The source restarted from zero.
+                total
+            } else {
+                total - *previous
+            };
+            if !total.is_nan() {
+                *previous = total;
+            }
+        }
     }
 }
 
@@ -286,111 +363,53 @@ fn label_hash(labels: &Labels) -> u64 {
     hash
 }
 
-fn merge_slot(set: &MetricSetInner, entity: &mut Entity, next_emit: u64, slot: u64, cells: &[f64]) {
-    let index = (slot - next_emit) as usize;
-    while entity.open_cells.len() <= index {
-        entity
-            .open_cells
-            .push_back(set.initial_cells.clone().into_boxed_slice());
-    }
-    merge_cells(set, &mut entity.open_cells[index], cells);
-    entity.first_slot = entity.first_slot.min(slot);
-    entity.last_slot = entity.last_slot.max(slot);
-}
-
-/// Emit `slot` of one entity and drop it from the entity's window.
-/// Returns true when the entity has expired; its charts are then already
-/// marked obsolete in `out`.
-fn emit_slot(set: &MetricSetInner, entity: &mut Entity, slot: u64, out: &mut Chunker) -> bool {
-    let cells = entity.open_cells.pop_front();
-    if slot >= entity.first_slot {
-        if !entity.defined {
-            for index in 0..set.charts.len() {
-                define_chart(set, entity, index, false, out);
-            }
-            entity.defined = true;
-        }
-        let mut cells = cells.unwrap_or_else(|| set.initial_cells.clone().into_boxed_slice());
-        totals_to_increases(set, entity, &mut cells);
-        for (chart, id) in set.charts.iter().zip(&entity.chart_ids) {
-            let block = out.block();
-            write_begin(block, id, set.interval_secs * 1_000_000);
-            for dim in &chart.dimensions {
-                match dimension_value(set, &cells, dim.value) {
-                    Some(value) => write_set_float(block, &dim.id, value),
-                    None => write_set_empty(block, &dim.id),
-                }
-            }
-            write_end_timed(block, (slot + 1) * set.interval_secs);
-            out.commit();
-        }
-    }
-    if entity.defined && slot >= entity.last_slot + set.expiry_slots {
-        for index in 0..set.charts.len() {
-            define_chart(set, entity, index, true, out);
-        }
-        return true;
-    }
-    false
-}
-
-/// Replace the totals in `cells` with their increase since the entity's
-/// previous total, and remember the new totals.
-fn totals_to_increases(set: &MetricSetInner, entity: &mut Entity, cells: &mut [f64]) {
-    for (&cell, previous) in set
-        .cumulative_cells
-        .iter()
-        .zip(entity.previous_totals.iter_mut())
-    {
-        let total = cells[cell];
-        cells[cell] = if total.is_nan() {
-            // No new total: no increase, once a baseline exists.
-            if previous.is_nan() { f64::NAN } else { 0.0 }
-        } else if previous.is_nan() {
-            // The first total is the baseline.
-            f64::NAN
-        } else if total < *previous {
-            // The source restarted from zero.
-            total
-        } else {
-            total - *previous
-        };
-        if !total.is_nan() {
-            *previous = total;
-        }
-    }
-}
-
-fn dimension_value(set: &MetricSetInner, cells: &[f64], value: Value) -> Option<f64> {
-    let value = match value {
-        Value::Rate(cell) => cells[cell] / set.interval_secs as f64,
-        Value::Ratio {
-            numerator,
-            denominator,
-        } if cells[denominator] > 0.0 => cells[numerator] / cells[denominator],
-        Value::Ratio { .. } => return None,
-        Value::Cell(cell) => cells[cell],
-    };
-    value.is_finite().then_some(value)
-}
-
-/// One chart block: the CHART line and, unless the chart is being marked
-/// obsolete, its labels and dimensions. `store_first` aligns the agent's
-/// clock for the chart to whole seconds and keeps its first point, so every
-/// timed END lands exactly on its slot.
+/// A chart's definition: the CHART line, its labels and dimensions.
 fn define_chart(
+    block: &mut Vec<u8>,
     set: &MetricSetInner,
-    entity: &Entity,
-    index: usize,
-    obsolete: bool,
-    out: &mut Chunker,
+    chart: &ChartDef,
+    id: &str,
+    labels: &Labels,
 ) {
-    let chart = &set.charts[index];
-    let block = out.block();
+    write_chart_line(block, set, chart, id, false);
+    if !labels.is_empty() {
+        for (key, value) in &labels.0 {
+            write_clabel(block, key, value, LabelSource::Auto);
+        }
+        write_clabel_commit(block);
+    }
+    for dim in &chart.dimensions {
+        write_dimension(
+            block,
+            &DimensionLine {
+                id: &dim.id,
+                name: &dim.id,
+                algorithm: DimensionAlgorithm::Absolute,
+                multiplier: 1,
+                divisor: 1,
+                options: DimensionOptions {
+                    float: true,
+                    ..DimensionOptions::default()
+                },
+            },
+        );
+    }
+}
+
+/// The CHART line alone marks a chart obsolete. `store_first` aligns the
+/// agent's clock for the chart to whole seconds and keeps its first point, so
+/// every timed END lands exactly on its slot.
+fn write_chart_line(
+    block: &mut Vec<u8>,
+    set: &MetricSetInner,
+    chart: &ChartDef,
+    id: &str,
+    obsolete: bool,
+) {
     write_chart(
         block,
         &ChartLine {
-            id: &entity.chart_ids[index],
+            id,
             name: "",
             title: &chart.title,
             units: chart.units,
@@ -406,31 +425,6 @@ fn define_chart(
             },
         },
     );
-    if !obsolete {
-        if !entity.labels.is_empty() {
-            for (key, value) in &entity.labels.0 {
-                write_clabel(block, key, value, LabelSource::Auto);
-            }
-            write_clabel_commit(block);
-        }
-        for dim in &chart.dimensions {
-            write_dimension(
-                block,
-                &DimensionLine {
-                    id: &dim.id,
-                    name: &dim.id,
-                    algorithm: DimensionAlgorithm::Absolute,
-                    multiplier: 1,
-                    divisor: 1,
-                    options: DimensionOptions {
-                        float: true,
-                        ..DimensionOptions::default()
-                    },
-                },
-            );
-        }
-    }
-    out.commit();
 }
 
 /// Packs chart blocks into chunks under a byte budget.
@@ -451,13 +445,10 @@ impl Chunker {
         }
     }
 
-    /// The buffer for the next block; [`Chunker::commit`] files it.
-    fn block(&mut self) -> &mut Vec<u8> {
+    /// Add one block, written by `write`; a chunk never splits a block.
+    fn block(&mut self, write: impl FnOnce(&mut Vec<u8>)) {
         self.block.clear();
-        &mut self.block
-    }
-
-    fn commit(&mut self) {
+        write(&mut self.block);
         if !self.current.is_empty() && self.current.len() + self.block.len() > self.max_chunk {
             self.chunks.push(std::mem::take(&mut self.current));
         }
@@ -776,7 +767,7 @@ mod tests {
         assert_eq!(labels.0.len(), 1);
         assert_eq!(labels.0[0].1.len(), 800);
         let f = fixture(0, 900, None);
-        let entity = new_entity(&f.set.0, labels, false);
+        let entity = Entity::new(&f.set.0, labels, false);
         assert!(entity.chart_ids[0].starts_with("svc.requests_"));
         assert!(netdata_plugin_protocol::is_valid_chart_id(
             &entity.chart_ids[0]
@@ -793,7 +784,7 @@ mod tests {
         ba.push("a", "1");
         assert_eq!(ab, ba);
         let f = fixture(0, 900, None);
-        let ids = |labels: Labels| new_entity(&f.set.0, labels, false).chart_ids;
+        let ids = |labels: Labels| Entity::new(&f.set.0, labels, false).chart_ids;
         assert_eq!(ids(ab), ids(ba));
         assert_eq!(ids(Labels::new())[0], "svc.requests");
     }

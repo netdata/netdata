@@ -93,7 +93,7 @@ impl BatchEntity<'_> {
                 let index = entry.index();
                 entry.or_insert_with(|| BatchCells {
                     records: 0,
-                    cells: set.initial_cells.clone().into_boxed_slice(),
+                    cells: set.empty_cells(),
                 });
                 index
             }
