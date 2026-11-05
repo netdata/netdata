@@ -1,0 +1,62 @@
+# yamllint disable rule:line-length
+---
+- id: 'notify-pushmark'
+  meta:
+    name: 'pushmark'
+    link: 'https://pushmark.app/'
+    categories:
+      - notify.agent
+    icon_filename: 'pushmark.svg'
+  keywords:
+    - pushmark
+  overview:
+    notification_description: |
+      Send instant push notifications to your iPhone with our simple API designed for developers. Perfect for personal reminders, project alerts, and real-time updates that matter most to you.
+    notification_limitations: ''
+  setup:
+    configuration:
+      file:
+        name: 'health_alarm_notify.conf'
+      options:
+        description: 'The following options can be defined for this notification'
+        folding:
+          title: 'Config Options'
+          enabled: true
+        list:
+          - name: 'SEND_PUSHMARK'
+            default_value: 'YES'
+            description: "Set `SEND_PUSHMARK` to YES"
+            required: true
+          - name: 'DEFAULT_PUSHMARK_URL'
+            default_value: ''
+            description: "URL formed by the server-topic combination you want the alert notifications to be sent to. Unless hosting your own server, the server should always be set to https://pushmark.app."
+            required: true
+            detailed_description: |
+              You can define multiple recipient URLs like this: `https://api.pushmark.app/KEY1` `https://api.pushmark.app/KEY2`
+
+              All roles will default to this variable if left unconfigured.
+
+              You can then have different servers and/or topics per role, by editing DEFAULT_PUSHMARK_URL with the server-topic combination you want, in the following entries at the bottom of the same file:
+              ```text
+              role_recipients_pushmark[sysadmin]="https://api.pushmark.app/KEY1"
+              role_recipients_pushmark[domainadmin]="https://api.pushmark.app/KEY2"
+              role_recipients_pushmark[dba]="https://api.pushmark.app/KEY3"
+              role_recipients_pushmark[webmaster]="https://api.pushmark.app/KEY4"
+              role_recipients_pushmark[proxyadmin]="https://api.pushmark.app/KEY5"
+              role_recipients_pushmark[sitemgr]="https://api.pushmark.app/KEY6"
+              ```
+      examples:
+        folding:
+          enabled: true
+          title: ''
+        list:
+          - name: 'Basic Configuration'
+            folding:
+              enabled: false
+            description: ''
+            config: |
+              SEND_PUSHMARK="YES"
+              DEFAULT_PUSHMARK_URL="https://api.pushmark.app/yEaqXswTg https://api.pushmark.app/yEaqXswYg"
+  troubleshooting:
+    problems:
+      list: []
