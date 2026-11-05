@@ -17,7 +17,7 @@ dimensions! {
 }
 
 dimensions! {
-    /// Why a record was counted in another window or chart set.
+    /// Why a record was counted in another window or in the overflow entity.
     enum Adjustment {
         Late = "late",
         Future = "future",

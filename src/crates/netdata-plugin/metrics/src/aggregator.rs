@@ -4,9 +4,9 @@
 //! The aggregator keeps every window from `oldest_open` (the oldest window
 //! not yet emitted) to the current one open; each entity holds those windows
 //! as rows and folds them forward after a stall (`bound_backlog`). Entities
-//! are created on their first event, with or without measurements, charts
-//! are defined on an entity's first emitted window, and an expired entity's
-//! state is dropped (its cumulative baselines with it).
+//! are created on their first event, with or without measurements, chart
+//! instances are defined on an entity's first emitted window, and an expired
+//! entity is dropped with its rows and cumulative baselines.
 
 use crate::batch::Batch;
 use crate::metric_set::{
@@ -37,13 +37,15 @@ pub struct Stats {
     pub late_events: u64,
     /// Events newer than the current window, counted in the current window.
     pub future_events: u64,
-    /// Entities whose charts were marked obsolete after the expiry time.
+    /// Entities whose chart instances were marked obsolete after the expiry
+    /// time.
     pub expired_entities: u64,
 }
 
 struct Entity {
     labels: Labels,
-    /// The full id of each of the set's charts, in set order.
+    /// The chart id of each of the entity's chart instances, in template
+    /// order.
     chart_ids: Vec<String>,
     defined: bool,
     /// Earliest window with events; nothing is emitted before it.
@@ -92,10 +94,11 @@ struct Entity {
 ///
 /// # Entities
 ///
-/// - An entity starts with its first event. Its charts are defined, with
-///   its labels, before their first update.
-/// - After `expiry` without events its charts are marked obsolete and its
-///   state is dropped; if it returns, its charts are defined again.
+/// - An entity starts with its first event. Its chart instances are
+///   defined, with its labels, before their first update.
+/// - After `expiry` without events its chart instances are marked obsolete
+///   and the aggregator forgets it; if it returns, its chart instances are
+///   defined again.
 /// - Beyond the cardinality limit, events go to the overflow entity (see
 ///   [`CardinalityLimit`](crate::CardinalityLimit);
 ///   [`Stats::overflowed_events`]).
@@ -201,14 +204,16 @@ impl Aggregator {
     }
 
     /// Emit every window whose allowed lateness has passed by `now` (Unix
-    /// seconds): the definitions of new entities' charts, one update per chart
-    /// and window, and the obsolete marks of expired entities.
+    /// seconds): the definitions of new entities' chart instances, one update
+    /// per chart instance and window, and the obsolete marks of expired
+    /// entities.
     ///
     /// The text is complete chart-protocol text, to write to the agent as is
     /// (a plugin's stdout). It comes in chunks of at most `max_chunk` bytes,
-    /// split only between whole charts, so each chunk can be written on its
-    /// own, for example as one message over a size-limited channel; a single
-    /// chart larger than `max_chunk` gets a chunk of its own. Pass that
+    /// split only between whole definitions, updates and obsolete marks, so
+    /// each chunk can be written on its own, for example as one message over
+    /// a size-limited channel; one larger than `max_chunk` gets a chunk of
+    /// its own. Pass that
     /// channel's limit, or `usize::MAX` when writing straight to stdout.
     pub fn emit(&mut self, now: u64, max_chunk: usize) -> Vec<Vec<u8>> {
         let mut out = Chunker::new(max_chunk);
@@ -315,7 +320,8 @@ impl Entity {
     }
 
     /// When the entity has had no events for the expiry time as of `window`,
-    /// mark its charts obsolete and return true; the caller drops it.
+    /// mark its chart instances obsolete and return true; the caller drops
+    /// it.
     fn expire_if_idle(&self, set: &MetricSetInner, window: u64, out: &mut Chunker) -> bool {
         if !self.defined || window < self.last_window + set.expiry_windows {
             return false;
@@ -354,7 +360,7 @@ impl Entity {
     }
 }
 
-/// A chart's definition: the CHART line, its labels and dimensions.
+/// A chart instance's definition: the CHART line, its labels and dimensions.
 fn define_chart(
     block: &mut Vec<u8>,
     set: &MetricSetInner,
@@ -387,9 +393,9 @@ fn define_chart(
     }
 }
 
-/// The CHART line alone marks a chart obsolete. `store_first` aligns the
-/// agent's clock for the chart to whole seconds and keeps its first point, so
-/// every timed END lands exactly on its window.
+/// The CHART line alone marks a chart instance obsolete. `store_first` aligns
+/// the agent's clock for the chart to whole seconds and keeps its first point,
+/// so every timed END lands exactly on its window.
 fn write_chart_line(
     block: &mut Vec<u8>,
     set: &MetricSetInner,

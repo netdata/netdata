@@ -13,8 +13,8 @@
 //!     }
 //! }
 //!
-//! // Once, at startup: declare the instruments and their charts, and create
-//! // the aggregator.
+//! // Once, at startup: declare the instruments and their chart templates, and
+//! // create the aggregator.
 //! let mut builder = MetricSetBuilder::new(Settings::default());
 //! let requests = builder.counter::<Outcome>(Chart {
 //!     title: "Requests",
@@ -52,14 +52,13 @@
 //!
 //! Terms:
 //! - an *instrument* is a [`Counter`], [`CumulativeCounter`], [`Gauge`] or
-//!   [`Histogram`]; each brings its chart, and the first three are split
-//!   into dimensions, one per value of their [`Dimension`] type;
+//!   [`Histogram`]; each brings its chart template, and the first three are
+//!   split into dimensions, one per value of their [`Dimension`] type;
 //! - an *entity* is the thing being monitored, for example one service,
-//!   identified by its [`Labels`]; it gets its own instance (in Netdata's
-//!   sense: one chart) of every chart of the set, so instruments that need
-//!   different labels (per service, process-wide) belong in different metric
-//!   sets. There is no explicit create: recording with a new label set is a
-//!   new entity;
+//!   identified by its [`Labels`]; it gets one chart instance of every chart
+//!   template of the set, so instruments that need different labels (per
+//!   service, process-wide) belong in different metric sets. There is no
+//!   explicit create: recording with a new label set is a new entity;
 //! - a *window* is one collection interval `I` (see [`Settings`]): window `n`
 //!   covers `[n × I, (n + 1) × I)` and holds the events whose time falls in
 //!   it; it becomes one point per dimension, stored at its end,

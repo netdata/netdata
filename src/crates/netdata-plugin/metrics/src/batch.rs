@@ -56,7 +56,7 @@ impl Batch {
     /// if it got at least one [`record`](BatchEntity::record) and the
     /// aggregator is not at its
     /// [`CardinalityLimit`](crate::CardinalityLimit) (else its events go to
-    /// the overflow entity); its charts are defined on the next
+    /// the overflow entity); its chart instances are defined on the next
     /// [`Aggregator::emit`](crate::Aggregator::emit).
     ///
     /// Look an entity up once per group of events that share labels, not

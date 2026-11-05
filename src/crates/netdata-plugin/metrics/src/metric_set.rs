@@ -1,4 +1,5 @@
-//! Metric set declarations: the row layout, instruments and their charts.
+//! Metric set declarations: the row layout, instruments and their chart
+//! templates.
 //!
 //! Batches and the aggregator hold a table: one row per entity and window,
 //! with the columns the set's layout fixes. A row aggregates the events of one
@@ -201,7 +202,7 @@ impl<D> Clone for ColumnRange<D> {
 impl<D> Copy for ColumnRange<D> {}
 
 /// A distribution of observed values, for example request durations, over
-/// fixed bucket bounds; its two charts are described at
+/// fixed bucket bounds; its two chart templates are described at
 /// [`MetricSetBuilder::histogram`]. An observation counts in the first
 /// bucket whose bound it does not exceed, else in `+Inf`. A window without
 /// observations shows 0 in every bucket and a gap for the mean and maximum.
@@ -264,24 +265,26 @@ impl ChartDimension {
     }
 }
 
-/// How an instrument's chart is presented; the fields map to the CHART line
-/// of the plugins.d protocol (`src/plugins.d/README.md` in the agent). Every
-/// entity gets its own instance of the chart.
+/// A chart template: the presentation that all its chart instances share,
+/// one instance per entity. The fields map to the CHART line of the
+/// plugins.d protocol (`src/plugins.d/README.md` in the agent).
 #[derive(Debug, Clone, Copy)]
 pub struct Chart {
-    /// The chart's identity, the same for every entity, for example
-    /// `svc.requests`: alerts, queries and the dashboard know the chart by
-    /// it. Each entity's chart id is derived from it:
+    /// The Netdata context, for example `svc.requests`: every entity's chart
+    /// instance of this template has it, and alerts, queries and the
+    /// dashboard use it to group the instances. Each entity's chart id is
+    /// built from it:
     /// - `<context>` for an entity without labels;
     /// - `<context>_<hash>` for any other entity, where `<hash>` is 16 hex
     ///   digits of a hash of its labels, stable across restarts and releases;
     /// - `<context>_overflow` for the overflow entity (see
     ///   [`CardinalityLimit`]).
     ///
-    /// It must contain a dot (the agent's `type.id`), use only letters,
-    /// digits, `_`, `-` and `.`, and not end in `_overflow` or in `_` and 16
-    /// hex digits. Contexts must be unique: within a set this is checked,
-    /// across sets it is not.
+    /// It must contain a dot (a chart id is the agent's `type.id`, and an
+    /// entity without labels has the context itself as its chart id), use
+    /// only letters, digits, `_`, `-` and `.`, and not end in `_overflow` or
+    /// in `_` and 16 hex digits. Contexts must be unique: within a set this
+    /// is checked, across sets it is not.
     pub context: &'static str,
     pub title: &'static str,
     /// Shown as is; the crate adds nothing. Counter and cumulative charts are
@@ -295,8 +298,8 @@ pub struct Chart {
     pub priority: i32,
 }
 
-/// A chart of the set, with the dimensions its instrument gives it; every
-/// entity gets one chart from it.
+/// One chart template of the set: its [`Chart`] fields and the dimensions its
+/// instrument gives it. Every entity gets one chart instance of it.
 #[derive(Debug)]
 pub(crate) struct ChartTemplate {
     pub(crate) title: String,
@@ -308,16 +311,16 @@ pub(crate) struct ChartTemplate {
     pub(crate) dimensions: Vec<ChartDimension>,
 }
 
-/// The labels that identify an entity; its charts carry them.
+/// The labels that identify an entity; its chart instances carry them.
 ///
-/// - Two label lists with the same pairs are the same entity, whatever
+/// - Two label sets with the same pairs are the same entity, whatever
 ///   order they were inserted in.
 /// - A blank value (only whitespace or control characters) is left out,
 ///   because the agent would store it as `[none]`.
 /// - A value is cut to the agent's limit of 800 bytes, at a character
 ///   boundary.
-/// - An empty list is an entity too: the single entity of a set whose
-///   charts need no labels.
+/// - An empty label set is an entity too: the single entity of a set that
+///   needs no labels.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Labels(
     /// Sorted by key, keys unique: the order the hash and the CLABEL lines
@@ -381,8 +384,9 @@ impl Labels {
     }
 }
 
-/// A declared set of metrics and their charts; every entity gets its own
-/// instance of each chart. Cheap to clone; batches and the aggregator share it.
+/// A declared set of instruments, with their chart templates and settings;
+/// every entity gets one chart instance of each template. Cheap to clone;
+/// batches and the aggregator share it.
 ///
 /// A plugin may have several sets, each with its own
 /// [`Aggregator`](crate::Aggregator).
@@ -452,12 +456,13 @@ pub struct Settings {
     /// older events are counted in the oldest open window. Rounded up to whole
     /// collection intervals. Default 0.
     pub allowed_lateness: Duration,
-    /// A timeout: an entity with no events for this long has its charts
-    /// marked obsolete (the agent stops collecting them and later removes
-    /// them) and its state dropped. Rounded up to whole collection intervals.
-    /// It counts emitted windows, which lag by `allowed_lateness`: with expiry
-    /// 900 s and an allowed lateness of 10 s, an entity last recorded at
-    /// second 0 expires at second 911. Default 15 minutes.
+    /// A timeout: an entity with no events for this long has its chart
+    /// instances marked obsolete (the agent stops collecting them and later
+    /// removes them), and the aggregator forgets it. Rounded up to whole
+    /// collection intervals. It counts emitted windows, which lag by
+    /// `allowed_lateness`: with expiry 900 s and an allowed lateness of 10 s,
+    /// an entity last recorded at second 0 expires at second 911. Default 15
+    /// minutes.
     pub expiry: Duration,
     /// The limit on the number of entities; default none.
     pub cardinality_limit: Option<CardinalityLimit>,
@@ -490,7 +495,7 @@ pub struct CardinalityLimit {
 
 static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 
-/// Declares a [`MetricSet`]: each instrument adds its chart.
+/// Declares a [`MetricSet`]: each instrument adds its chart template.
 #[derive(Debug)]
 pub struct MetricSetBuilder {
     id: u32,
@@ -534,11 +539,11 @@ impl MetricSetBuilder {
         }
     }
 
-    /// Adds a [`Counter`] and its chart.
+    /// Adds a [`Counter`] and its chart template.
     ///
     /// # Panics
     ///
-    /// If the chart's context is invalid or already used in the set, if a
+    /// If `chart`'s context is invalid or already used in the set, if a
     /// dimension id is invalid or repeats in `D::IDS`, or if `D::IDS` is
     /// empty.
     pub fn counter<D: Dimension>(&mut self, chart: Chart) -> Counter<D> {
@@ -547,7 +552,7 @@ impl MetricSetBuilder {
         Counter(columns)
     }
 
-    /// Adds a [`CumulativeCounter`] and its chart.
+    /// Adds a [`CumulativeCounter`] and its chart template.
     ///
     /// # Panics
     ///
@@ -559,7 +564,7 @@ impl MetricSetBuilder {
         CumulativeCounter(columns)
     }
 
-    /// Adds a [`Gauge`] and its chart.
+    /// Adds a [`Gauge`] and its chart template.
     ///
     /// # Panics
     ///
@@ -570,7 +575,7 @@ impl MetricSetBuilder {
         Gauge(columns)
     }
 
-    /// Adds a [`Histogram`] over `bounds`, with two charts:
+    /// Adds a [`Histogram`] over `bounds`, with two chart templates:
     /// - `chart`: two dimensions, `avg` and `max`, the mean and largest
     ///   observed value per window, in `chart.units`;
     /// - a heatmap, `<context>_histogram`: observations per second in each

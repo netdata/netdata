@@ -129,8 +129,8 @@ impl Services {
 }
 
 /// The settings of a per-service metric set: late spans and log records still
-/// count in their second, and services over `max_services` share one
-/// overflow chart set.
+/// count in their second, and services over `max_services` share the
+/// overflow entity.
 pub(crate) fn service_settings(max_services: usize) -> Settings {
     let mut overflow_labels = Labels::new();
     overflow_labels.insert("otel.metric.overflow", "true");
