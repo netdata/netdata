@@ -138,7 +138,7 @@ impl Measurements<'_> {
             "dimension index {index} out of {}",
             D::IDS.len()
         );
-        columns.base + index
+        columns.column(index)
     }
 
     /// Count `amount` for `dimension` of `counter` in this event's window; the

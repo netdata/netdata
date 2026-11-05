@@ -15,6 +15,7 @@
 
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 use std::marker::PhantomData;
+use std::ops::Range;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -157,8 +158,20 @@ pub struct Gauge<D>(pub(crate) ColumnRange<D>);
 #[derive(Debug)]
 pub(crate) struct ColumnRange<D> {
     pub(crate) set_id: u32,
-    pub(crate) base: usize,
+    base: usize,
     _dimensions: PhantomData<fn() -> D>,
+}
+
+impl<D: Dimensions> ColumnRange<D> {
+    /// All the columns, one per value of `D`.
+    pub(crate) fn range(self) -> Range<usize> {
+        self.base..self.base + D::IDS.len()
+    }
+
+    /// The column of the dimension value with index `i`.
+    pub(crate) fn column(self, i: usize) -> usize {
+        self.base + i
+    }
 }
 
 // A handle: copyable whatever its dimension type.
@@ -521,8 +534,7 @@ impl MetricSetBuilder {
     /// As [`MetricSetBuilder::counter`].
     pub fn cumulative_counter<D: Dimensions>(&mut self, chart: Chart) -> CumulativeCounter<D> {
         let columns = self.column_range::<D>(Aggregation::LastValue);
-        self.cumulative_columns
-            .extend(columns.base..columns.base + D::IDS.len());
+        self.cumulative_columns.extend(columns.range());
         self.chart(chart, per_dimension(columns, Readout::Rate));
         CumulativeCounter(columns)
     }
@@ -707,7 +719,7 @@ fn per_dimension<D: Dimensions>(
     D::IDS
         .iter()
         .enumerate()
-        .map(|(i, id)| Dimension::new(id, read(columns.base + i)))
+        .map(|(i, id)| Dimension::new(id, read(columns.column(i))))
         .collect()
 }
 
