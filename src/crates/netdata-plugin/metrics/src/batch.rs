@@ -1,25 +1,26 @@
-//! Request-local recording: each record adds into the batch's cells for its
+//! Request-local recording: each record adds into the batch's row for its
 //! entity and the slot its own time falls in; the store decides at merge
 //! time whether that slot is still open.
 
 use crate::metric_set::{
-    CellRange, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet,
+    ColumnRange, Counter, CumulativeCounter, Dimensions, Gauge, Histogram, Labels, MetricSet,
     MetricSetInner,
 };
 use indexmap::IndexMap;
 
-/// A batch's cells for one entity and one slot.
-pub(crate) struct BatchSlot {
+/// A batch's row for one entity and one slot: its record count and its
+/// cells, one per column of the set's layout.
+pub(crate) struct BatchRow {
     pub(crate) records: u64,
     pub(crate) cells: Box<[f64]>,
 }
 
 /// One entity's records within a batch.
 #[derive(Default)]
-pub(crate) struct EntitySlots {
+pub(crate) struct EntityRows {
     /// By slot number, in first-record order: the store merges late slots
     /// into one, and gauges and totals keep the value merged last.
-    pub(crate) slots: IndexMap<u64, BatchSlot>,
+    pub(crate) slots: IndexMap<u64, BatchRow>,
     /// Position in `slots` of the slot recorded into last; records mostly
     /// arrive in time order, so it answers most lookups without hashing.
     last: usize,
@@ -34,7 +35,7 @@ pub struct Batch {
     set: MetricSet,
     /// By labels, in first-record order: the store admits new entities in
     /// this order until its cap is reached.
-    pub(crate) entities: IndexMap<Labels, EntitySlots>,
+    pub(crate) entities: IndexMap<Labels, EntityRows>,
 }
 
 impl Batch {
@@ -74,7 +75,7 @@ impl Batch {
 /// One entity of a [`Batch`], from [`Batch::entity`].
 pub struct BatchEntity<'a> {
     set: &'a MetricSetInner,
-    entity: &'a mut EntitySlots,
+    entity: &'a mut EntityRows,
 }
 
 impl BatchEntity<'_> {
@@ -92,19 +93,19 @@ impl BatchEntity<'_> {
             _ => {
                 let entry = entity.slots.entry(slot);
                 let index = entry.index();
-                entry.or_insert_with(|| BatchSlot {
+                entry.or_insert_with(|| BatchRow {
                     records: 0,
-                    cells: set.empty_cells(),
+                    cells: set.empty_row(),
                 });
                 index
             }
         };
         entity.last = index;
-        let batch_slot = &mut entity.slots[index];
-        batch_slot.records += 1;
+        let batch_row = &mut entity.slots[index];
+        batch_row.records += 1;
         Measurements {
             set_id: set.id,
-            cells: &mut batch_slot.cells,
+            row: &mut batch_row.cells,
         }
     }
 }
@@ -118,7 +119,7 @@ impl BatchEntity<'_> {
 /// [`Dimensions`] implementation).
 pub struct Measurements<'a> {
     set_id: u32,
-    cells: &'a mut [f64],
+    row: &'a mut [f64],
 }
 
 impl Measurements<'_> {
@@ -126,15 +127,15 @@ impl Measurements<'_> {
         assert_eq!(set_id, self.set_id, "instrument of another metric set");
     }
 
-    fn cell<D: Dimensions>(&self, cells: CellRange<D>, dimension: D) -> usize {
-        self.check_set(cells.set_id);
+    fn column<D: Dimensions>(&self, columns: ColumnRange<D>, dimension: D) -> usize {
+        self.check_set(columns.set_id);
         let index = dimension.index();
         assert!(
             index < D::IDS.len(),
             "dimension index {index} out of {}",
             D::IDS.len()
         );
-        cells.base + index
+        columns.base + index
     }
 
     /// Count `amount` for `dimension` of `counter` in this record's slot; the
@@ -146,9 +147,9 @@ impl Measurements<'_> {
         dimension: D,
         amount: f64,
     ) -> &mut Self {
-        let cell = self.cell(counter.0, dimension);
+        let column = self.column(counter.0, dimension);
         if amount.is_finite() {
-            self.cells[cell] += amount;
+            self.row[column] += amount;
         }
         self
     }
@@ -162,9 +163,9 @@ impl Measurements<'_> {
         dimension: D,
         total: f64,
     ) -> &mut Self {
-        let cell = self.cell(cumulative.0, dimension);
+        let column = self.column(cumulative.0, dimension);
         if total.is_finite() {
-            self.cells[cell] = total;
+            self.row[column] = total;
         }
         self
     }
@@ -178,9 +179,9 @@ impl Measurements<'_> {
         dimension: D,
         value: f64,
     ) -> &mut Self {
-        let cell = self.cell(gauge.0, dimension);
+        let column = self.column(gauge.0, dimension);
         if value.is_finite() {
-            self.cells[cell] = value;
+            self.row[column] = value;
         }
         self
     }
@@ -195,10 +196,10 @@ impl Measurements<'_> {
             return self;
         }
         let bucket = histogram.bounds.partition_point(|&bound| bound < value);
-        self.cells[histogram.bucket_cell(bucket)] += weight;
-        self.cells[histogram.sum_cell()] += value * weight;
-        self.cells[histogram.count_cell()] += weight;
-        let max = &mut self.cells[histogram.max_cell()];
+        self.row[histogram.bucket_column(bucket)] += weight;
+        self.row[histogram.sum_column()] += value * weight;
+        self.row[histogram.count_column()] += weight;
+        let max = &mut self.row[histogram.max_column()];
         if max.is_nan() || value > *max {
             *max = value;
         }

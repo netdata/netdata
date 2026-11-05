@@ -2,7 +2,7 @@
 //! emitting.
 //!
 //! The store keeps every slot from `oldest_open` (the oldest slot not yet
-//! emitted) to the current one open; each entity holds those slots as cell
+//! emitted) to the current one open; each entity holds those slots as rows
 //! arrays and folds them forward after a stall (`advance_window`). Entities
 //! are created on their first record, with or without measurements, charts
 //! are defined on an entity's first emitted slot, and an expired entity's
@@ -47,10 +47,10 @@ struct Entity {
     first_slot: u64,
     /// Latest slot with records; drives expiry.
     last_slot: u64,
-    /// The cells of each open slot from `oldest_open` onwards, oldest first;
+    /// The row of each open slot from `oldest_open` onwards, oldest first;
     /// missing ones are empty.
-    open_cells: VecDeque<Box<[f64]>>,
-    /// The last emitted total of each cumulative cell, in set order; NaN
+    open_rows: VecDeque<Box<[f64]>>,
+    /// The last emitted total of each cumulative column, in set order; NaN
     /// until the first one.
     previous_totals: Box<[f64]>,
 }
@@ -179,17 +179,17 @@ impl Store {
                     })
                 }
             };
-            for (slot, batch_slot) in batch_entity.slots {
+            for (slot, batch_row) in batch_entity.slots {
                 let slot = if slot < oldest_open {
-                    self.stats.late_records += batch_slot.records;
+                    self.stats.late_records += batch_row.records;
                     oldest_open
                 } else if slot > newest {
-                    self.stats.future_records += batch_slot.records;
+                    self.stats.future_records += batch_row.records;
                     newest
                 } else {
                     slot
                 };
-                entity.merge_slot(set, oldest_open, slot, &batch_slot.cells);
+                entity.merge_slot(set, oldest_open, slot, &batch_row.cells);
             }
         }
     }
@@ -245,18 +245,18 @@ impl Entity {
             defined: false,
             first_slot: u64::MAX,
             last_slot: 0,
-            open_cells: VecDeque::new(),
-            previous_totals: vec![f64::NAN; set.cumulative_cells.len()].into_boxed_slice(),
+            open_rows: VecDeque::new(),
+            previous_totals: vec![f64::NAN; set.cumulative_columns.len()].into_boxed_slice(),
         }
     }
 
-    /// Merge `cells` into `slot`, an open slot from `oldest_open` onwards.
-    fn merge_slot(&mut self, set: &MetricSetInner, oldest_open: u64, slot: u64, cells: &[f64]) {
+    /// Merge `row` into `slot`, an open slot from `oldest_open` onwards.
+    fn merge_slot(&mut self, set: &MetricSetInner, oldest_open: u64, slot: u64, row: &[f64]) {
         let index = (slot - oldest_open) as usize;
-        while self.open_cells.len() <= index {
-            self.open_cells.push_back(set.empty_cells());
+        while self.open_rows.len() <= index {
+            self.open_rows.push_back(set.empty_row());
         }
-        set.merge_cells(&mut self.open_cells[index], cells);
+        set.merge_row(&mut self.open_rows[index], row);
         self.first_slot = self.first_slot.min(slot);
         self.last_slot = self.last_slot.max(slot);
     }
@@ -264,17 +264,17 @@ impl Entity {
     /// Merge the first `skipped` window slots into the slot that becomes the
     /// window's first, `new_first`.
     fn fold_front(&mut self, set: &MetricSetInner, skipped: u64, new_first: u64) {
-        let take = (skipped as usize).min(self.open_cells.len());
+        let take = (skipped as usize).min(self.open_rows.len());
         if take == 0 {
             return;
         }
-        let mut folded = set.empty_cells();
-        for cells in self.open_cells.drain(..take) {
-            set.merge_cells(&mut folded, &cells);
+        let mut folded = set.empty_row();
+        for row in self.open_rows.drain(..take) {
+            set.merge_row(&mut folded, &row);
         }
-        match self.open_cells.front_mut() {
-            Some(front) => set.merge_cells(front, &folded),
-            None => self.open_cells.push_back(folded),
+        match self.open_rows.front_mut() {
+            Some(front) => set.merge_row(front, &folded),
+            None => self.open_rows.push_back(folded),
         }
         self.first_slot = self.first_slot.max(new_first);
     }
@@ -282,7 +282,7 @@ impl Entity {
     /// Emit `slot`, the window's first, and drop it from the window; nothing
     /// is written before the entity's first record.
     fn emit_slot(&mut self, set: &MetricSetInner, slot: u64, out: &mut Chunker) {
-        let cells = self.open_cells.pop_front();
+        let row = self.open_rows.pop_front();
         if slot < self.first_slot {
             return;
         }
@@ -292,13 +292,13 @@ impl Entity {
             }
             self.defined = true;
         }
-        let mut cells = cells.unwrap_or_else(|| set.empty_cells());
-        self.totals_to_increases(set, &mut cells);
+        let mut row = row.unwrap_or_else(|| set.empty_row());
+        self.totals_to_increases(set, &mut row);
         for (chart, id) in set.charts.iter().zip(&self.chart_ids) {
             out.block(|block| {
                 write_begin(block, id, set.interval_secs * 1_000_000);
                 for dim in &chart.dimensions {
-                    match set.read(&cells, dim.readout) {
+                    match set.read(&row, dim.readout) {
                         Some(value) => write_set_float(block, &dim.id, value),
                         None => write_set_empty(block, &dim.id),
                     }
@@ -320,16 +320,16 @@ impl Entity {
         true
     }
 
-    /// Replace the totals in `cells` with their increase since the entity's
+    /// Replace the totals in `row` with their increase since the entity's
     /// previous total, and remember the new totals.
-    fn totals_to_increases(&mut self, set: &MetricSetInner, cells: &mut [f64]) {
-        for (&cell, previous) in set
-            .cumulative_cells
+    fn totals_to_increases(&mut self, set: &MetricSetInner, row: &mut [f64]) {
+        for (&column, previous) in set
+            .cumulative_columns
             .iter()
             .zip(self.previous_totals.iter_mut())
         {
-            let total = cells[cell];
-            cells[cell] = if total.is_nan() {
+            let total = row[column];
+            row[column] = if total.is_nan() {
                 // No new total: no increase, once a baseline exists.
                 if previous.is_nan() { f64::NAN } else { 0.0 }
             } else if previous.is_nan() {
@@ -691,7 +691,7 @@ mod tests {
         let mut store = Store::new(&f.set);
         record(&f, &mut store, "a", 10, 1, 0, 10);
         record(&f, &mut store, "a", 100_000, 2, 0, 100_000);
-        let window = store.entities.values().next().unwrap().open_cells.len() as u64;
+        let window = store.entities.values().next().unwrap().open_rows.len() as u64;
         assert!(window <= 10 + MAX_BACKLOG_SLOTS + 1, "{window}");
         let out = text(&store.emit(100_011, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
