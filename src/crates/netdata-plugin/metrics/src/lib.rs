@@ -26,8 +26,9 @@
 //! let set = builder.build();
 //! let mut store = Store::new(&set);
 //!
-//! // Per unit of work, for example one request: record its events at their
-//! // own time in a batch of its own, then merge it once the work is durable.
+//! // Per unit of work, for example one export request: record its events at
+//! // their own time in one batch, then merge it once the work is durable.
+//! let mut batch = Batch::new(&set);
 //! for (service, outcome) in [
 //!     ("checkout", Outcome::Success),
 //!     ("checkout", Outcome::Error),
@@ -35,10 +36,9 @@
 //! ] {
 //!     let mut labels = Labels::new();
 //!     labels.push("service.name", service);
-//!     let mut batch = Batch::new(&set);
 //!     batch.entity(labels).record(100).add(requests, outcome, 1.0);
-//!     store.merge(batch, 100);
 //! }
+//! store.merge(batch, 100);
 //!
 //! // Once per second: write the finished slots to the agent.
 //! let text = String::from_utf8(store.emit(101, 1 << 20).concat()).unwrap();
