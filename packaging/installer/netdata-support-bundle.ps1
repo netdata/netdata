@@ -824,6 +824,34 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
     Add-Manifest $rel 'cmd' $originText $title
 }
 
+function Get-RawCmdOutput([scriptblock]$cmd, [string]$nativeExe, [string[]]$nativeArgs) {
+    if ($nativeExe) {
+        # MSYS2 binary: direct launch, never Start-Job (see Invoke-NativeProcess).
+        # JSON output, so keep stdout ONLY (merging stderr would corrupt it); a
+        # failed/empty run returns nothing.
+        $np = Invoke-NativeProcess $nativeExe $nativeArgs $TimeoutSeconds
+        if (-not $np.TimedOut -and -not $np.LaunchError -and $np.ExitCode -eq 0) { return $np.StdOut }
+        return ''
+    }
+    $result = ''
+    try {
+        $job = Start-Job -ScriptBlock $cmd
+        $done = Wait-Job $job -Timeout $TimeoutSeconds
+        if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String }
+        Stop-Job $job -ErrorAction SilentlyContinue
+        Remove-Job $job -Force
+    } catch { Write-Verbose "collector failed: $_" }
+    return $result
+}
+
+function Limit-RawCmdOutput([string]$result, [bool]$dropOverCap) {
+    # a truncated JSON document is worse than none: fail closed
+    # measure the UTF-8 bytes written, not UTF-16 code units (see Save-Api)
+    if ([System.Text.Encoding]::UTF8.GetByteCount($result) -le 2MB) { return $result }
+    if ($dropOverCap) { return '' }
+    return '{"error":"output exceeded the cap and was withheld"}'
+}
+
 function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @(), [switch]$dropOverCap) {
     # like Save-Cmd but with NO header/trailer, for commands whose output must
     # stay parseable (JSON). Provenance lives in MANIFEST.json only. The file is
@@ -832,32 +860,9 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
-    $result = ''
-    if ($nativeExe) {
-        # MSYS2 binary: direct launch, never Start-Job (see Invoke-NativeProcess).
-        # JSON output, so keep stdout ONLY (merging stderr would corrupt it); a
-        # failed/empty run leaves nothing and the file is dropped below.
-        $np = Invoke-NativeProcess $nativeExe $nativeArgs $TimeoutSeconds
-        if (-not $np.TimedOut -and -not $np.LaunchError -and $np.ExitCode -eq 0) { $result = $np.StdOut }
-    } else {
-        try {
-            $job = Start-Job -ScriptBlock $cmd
-            $done = Wait-Job $job -Timeout $TimeoutSeconds
-            if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String }
-            Stop-Job $job -ErrorAction SilentlyContinue
-            Remove-Job $job -Force
-        } catch { Write-Verbose "collector failed: $_" }
-    }
+    $result = Get-RawCmdOutput $cmd $nativeExe $nativeArgs
+    if ($result -and $result.Trim().Length -gt 0) { $result = Limit-RawCmdOutput $result $dropOverCap.IsPresent }
     if ($result -and $result.Trim().Length -gt 0) {
-        # a truncated JSON document is worse than none: fail closed
-        # measure the UTF-8 bytes written, not UTF-16 code units (see Save-Api)
-        if ([System.Text.Encoding]::UTF8.GetByteCount($result) -gt 2MB) {
-            if ($dropOverCap) {
-                if (Test-Path $full) { Remove-Item $full -Force }
-                return
-            }
-            $result = '{"error":"output exceeded the cap and was withheld"}'
-        }
         Write-Utf8 $full $result
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'cmd' $originText $title

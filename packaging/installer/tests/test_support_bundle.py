@@ -158,9 +158,11 @@ write_manifest
 
     def test_dyncfg_tree_cli_does_not_spend_the_deadline_of_earlier_captures(self):
         # a large tree takes minutes to sanitize; captured first, it left no time for the smaller runtime captures
-        self.stub('netdatacli', 'sleep 3\nprintf \'{"tree":{}}\\n\'\n')
+        # the deadline leaves the stubbed captures before the tree ample time even on a slow runner, and the
+        # CLI alone outlasts it, so a tree captured first leaves them none
+        self.stub('netdatacli', 'sleep 10\nprintf \'{"tree":{}}\\n\'\n')
         self.stub('curl', 'printf \'{"api":true}\\n\'\n')
-        self.run_runtime(setup='GLOBAL_DEADLINE=2; CMD_TIMEOUT=10\n')
+        self.run_runtime(setup='GLOBAL_DEADLINE=8; CMD_TIMEOUT=20\n')
         runtime = self.root / 'work/07-runtime'
         for name in ('info-v3.json', 'alerts-active.json', 'functions.json', 'dyncfg-tree.json'):
             self.assertTrue((runtime / name).exists(), name)
