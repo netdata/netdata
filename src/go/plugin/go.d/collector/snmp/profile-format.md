@@ -788,7 +788,8 @@ ifHCInOctets.2 = 2048
 - Each column (symbol) in the table has its own OID pattern but shares the same row indexes.
 - The collector walks only `table.OID`. Every symbol and same-table tag OID MUST be a column under it
   (`<entry>.<column>`; `table.OID` may name the table or its entry). A same-table OID outside `table.OID` is never
-  collected and no error is reported; read another table through a cross-table tag (`table:`).
+  collected; the profile still loads, with a warning naming the row and OID. Read another table through a cross-table
+  tag (`table:`).
 
 Table metrics need at least one resolved tag to be emitted; without tags, they are skipped. Use non-empty identifying
 tags to distinguish rows, such as an interface name or a tag derived from the row index. The SNMP row index is not
