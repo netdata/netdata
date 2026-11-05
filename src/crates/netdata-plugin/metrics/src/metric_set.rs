@@ -1,7 +1,7 @@
 //! Metric set declarations: instruments, their chart templates, labels and
 //! settings.
 
-use crate::layout::{Aggregation, ColumnRange, Readout};
+use crate::layout::{Aggregation, ColumnRange, Readout, RowLayout};
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -312,46 +312,8 @@ pub(crate) struct MetricSetInner {
     pub(crate) lateness_windows: u64,
     pub(crate) expiry_windows: u64,
     pub(crate) cardinality_limit: Option<CardinalityLimit>,
-    // The row layout: each column's aggregation, and a row without events.
-    aggregations: Vec<Aggregation>,
-    initial_row: Box<[f64]>,
-    /// The columns of [`CumulativeCounter`] instruments, which hold totals
-    /// until a window is emitted as increases.
-    pub(crate) cumulative_columns: Vec<usize>,
+    pub(crate) layout: RowLayout,
     pub(crate) charts: Vec<ChartTemplate>,
-}
-
-impl MetricSetInner {
-    /// The row of a window without events.
-    pub(crate) fn empty_row(&self) -> Box<[f64]> {
-        self.initial_row.clone()
-    }
-
-    /// Combine `incoming` into `target`, each column by its [`Aggregation`].
-    pub(crate) fn merge_row(&self, target: &mut [f64], incoming: &[f64]) {
-        for ((aggregation, current), &incoming) in self
-            .aggregations
-            .iter()
-            .zip(target.iter_mut())
-            .zip(incoming)
-        {
-            *current = aggregation.apply(*current, incoming);
-        }
-    }
-
-    /// What a dimension shows for a window with this row; none for a gap.
-    pub(crate) fn read(&self, row: &[f64], readout: Readout) -> Option<f64> {
-        let value = match readout {
-            Readout::Rate(column) => row[column] / self.interval_secs as f64,
-            Readout::Ratio {
-                numerator,
-                denominator,
-            } if row[denominator] > 0.0 => row[numerator] / row[denominator],
-            Readout::Ratio { .. } => return None,
-            Readout::Column(column) => row[column],
-        };
-        value.is_finite().then_some(value)
-    }
 }
 
 /// The time and lifecycle settings of a metric set.
@@ -410,8 +372,7 @@ static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 pub struct MetricSetBuilder {
     id: u32,
     settings: Settings,
-    aggregations: Vec<Aggregation>,
-    cumulative_columns: Vec<usize>,
+    layout: RowLayout,
     charts: Vec<ChartTemplate>,
 }
 
@@ -443,8 +404,7 @@ impl MetricSetBuilder {
         Self {
             id: NEXT_SET_ID.fetch_add(1, Ordering::Relaxed),
             settings,
-            aggregations: Vec::new(),
-            cumulative_columns: Vec::new(),
+            layout: RowLayout::default(),
             charts: Vec::new(),
         }
     }
@@ -469,7 +429,7 @@ impl MetricSetBuilder {
     /// As [`MetricSetBuilder::counter`].
     pub fn cumulative_counter<D: Dimension>(&mut self, chart: Chart) -> CumulativeCounter<D> {
         let columns = self.column_range::<D>(Aggregation::LastValue);
-        self.cumulative_columns.extend(columns.range());
+        self.layout.mark_cumulative(columns.range());
         self.chart(chart, per_dimension(columns, Readout::Rate));
         CumulativeCounter(columns)
     }
@@ -510,9 +470,9 @@ impl MetricSetBuilder {
         );
         // Buckets including +Inf, then sum and count, then the maximum: the
         // order of the Histogram column accessors.
-        let base = self.columns(bounds.len() + 1, Aggregation::Sum);
-        self.columns(2, Aggregation::Sum);
-        self.columns(1, Aggregation::Max);
+        let base = self.layout.add_columns(bounds.len() + 1, Aggregation::Sum);
+        self.layout.add_columns(2, Aggregation::Sum);
+        self.layout.add_columns(1, Aggregation::Max);
         let histogram = Histogram {
             set_id: self.id,
             base,
@@ -571,30 +531,16 @@ impl MetricSetBuilder {
             id: self.id,
             lateness_windows: windows(settings.allowed_lateness),
             expiry_windows: windows(settings.expiry),
-            initial_row: self
-                .aggregations
-                .iter()
-                .map(|aggregation| aggregation.initial())
-                .collect(),
             interval_secs: interval.as_secs(),
             cardinality_limit: settings.cardinality_limit,
-            aggregations: self.aggregations,
-            cumulative_columns: self.cumulative_columns,
+            layout: self.layout,
             charts: self.charts,
         }))
     }
 
-    /// Add `len` columns with `aggregation` to the layout; returns the first.
-    fn columns(&mut self, len: usize, aggregation: Aggregation) -> usize {
-        let base = self.aggregations.len();
-        self.aggregations
-            .extend(std::iter::repeat_n(aggregation, len));
-        base
-    }
-
     /// Add one column with `aggregation` per value of `D`.
     fn column_range<D: Dimension>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
-        ColumnRange::new(self.id, self.columns(D::IDS.len(), aggregation))
+        ColumnRange::new(self.id, self.layout.add_columns(D::IDS.len(), aggregation))
     }
 
     fn chart(&mut self, chart: Chart, dimensions: Vec<ChartDimension>) {

@@ -98,7 +98,7 @@ impl BatchEntity<'_> {
                 let index = entry.index();
                 entry.or_insert_with(|| BatchRow {
                     events: 0,
-                    cells: set.empty_row(),
+                    cells: set.layout.empty_row(),
                 });
                 index
             }

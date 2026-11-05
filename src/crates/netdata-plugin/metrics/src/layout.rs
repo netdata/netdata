@@ -108,3 +108,68 @@ pub(crate) enum Readout {
     /// histogram maximum.
     Column(usize),
 }
+
+impl Readout {
+    /// The value for a window with this row; none for a gap.
+    pub(crate) fn value(self, row: &[f64], interval_secs: u64) -> Option<f64> {
+        let value = match self {
+            Readout::Rate(column) => row[column] / interval_secs as f64,
+            Readout::Ratio {
+                numerator,
+                denominator,
+            } if row[denominator] > 0.0 => row[numerator] / row[denominator],
+            Readout::Ratio { .. } => return None,
+            Readout::Column(column) => row[column],
+        };
+        value.is_finite().then_some(value)
+    }
+}
+
+/// The set's columns: each column's aggregation, its value in a row without
+/// events, and which columns hold cumulative totals.
+#[derive(Debug, Default)]
+pub(crate) struct RowLayout {
+    aggregations: Vec<Aggregation>,
+    initial_row: Vec<f64>,
+    /// The columns of [`CumulativeCounter`](crate::CumulativeCounter)
+    /// instruments, which hold totals until a window is emitted as increases.
+    cumulative_columns: Vec<usize>,
+}
+
+impl RowLayout {
+    /// Add `len` columns with `aggregation`; returns the first.
+    pub(crate) fn add_columns(&mut self, len: usize, aggregation: Aggregation) -> usize {
+        let base = self.aggregations.len();
+        self.aggregations
+            .extend(std::iter::repeat_n(aggregation, len));
+        self.initial_row
+            .extend(std::iter::repeat_n(aggregation.initial(), len));
+        base
+    }
+
+    /// Mark `columns` as holding a cumulative counter's totals.
+    pub(crate) fn mark_cumulative(&mut self, columns: Range<usize>) {
+        self.cumulative_columns.extend(columns);
+    }
+
+    pub(crate) fn cumulative_columns(&self) -> &[usize] {
+        &self.cumulative_columns
+    }
+
+    /// The row of a window without events.
+    pub(crate) fn empty_row(&self) -> Box<[f64]> {
+        self.initial_row.as_slice().into()
+    }
+
+    /// Combine `incoming` into `target`, each column by its [`Aggregation`].
+    pub(crate) fn combine(&self, target: &mut [f64], incoming: &[f64]) {
+        for ((aggregation, current), &incoming) in self
+            .aggregations
+            .iter()
+            .zip(target.iter_mut())
+            .zip(incoming)
+        {
+            *current = aggregation.apply(*current, incoming);
+        }
+    }
+}

@@ -257,7 +257,8 @@ impl Entity {
             first_window: u64::MAX,
             last_window: 0,
             open_rows: VecDeque::new(),
-            previous_totals: vec![f64::NAN; set.cumulative_columns.len()].into_boxed_slice(),
+            previous_totals: vec![f64::NAN; set.layout.cumulative_columns().len()]
+                .into_boxed_slice(),
         }
     }
 
@@ -266,26 +267,26 @@ impl Entity {
     fn merge_window(&mut self, set: &MetricSetInner, oldest_open: u64, window: u64, row: &[f64]) {
         let index = (window - oldest_open) as usize;
         while self.open_rows.len() <= index {
-            self.open_rows.push_back(set.empty_row());
+            self.open_rows.push_back(set.layout.empty_row());
         }
-        set.merge_row(&mut self.open_rows[index], row);
+        set.layout.combine(&mut self.open_rows[index], row);
         self.first_window = self.first_window.min(window);
         self.last_window = self.last_window.max(window);
     }
 
-    /// Merge the first `skipped` open windows into the window that becomes the
+    /// Fold the first `skipped` open windows into the window that becomes the
     /// oldest open one, `new_first`.
     fn fold_front(&mut self, set: &MetricSetInner, skipped: u64, new_first: u64) {
         let take = (skipped as usize).min(self.open_rows.len());
         if take == 0 {
             return;
         }
-        let mut folded = set.empty_row();
+        let mut folded = set.layout.empty_row();
         for row in self.open_rows.drain(..take) {
-            set.merge_row(&mut folded, &row);
+            set.layout.combine(&mut folded, &row);
         }
         match self.open_rows.front_mut() {
-            Some(front) => set.merge_row(front, &folded),
+            Some(front) => set.layout.combine(front, &folded),
             None => self.open_rows.push_back(folded),
         }
         self.first_window = self.first_window.max(new_first);
@@ -304,13 +305,13 @@ impl Entity {
             }
             self.defined = true;
         }
-        let mut row = row.unwrap_or_else(|| set.empty_row());
+        let mut row = row.unwrap_or_else(|| set.layout.empty_row());
         self.totals_to_increases(set, &mut row);
         for (chart, id) in set.charts.iter().zip(&self.chart_ids) {
             out.block(|block| {
                 write_begin(block, id, set.interval_secs * 1_000_000);
                 for dim in &chart.dimensions {
-                    match set.read(&row, dim.readout) {
+                    match dim.readout.value(&row, set.interval_secs) {
                         Some(value) => write_set_float(block, &dim.id, value),
                         None => write_set_empty(block, &dim.id),
                     }
@@ -337,7 +338,8 @@ impl Entity {
     /// previous total, and remember the new totals.
     fn totals_to_increases(&mut self, set: &MetricSetInner, row: &mut [f64]) {
         for (&column, previous) in set
-            .cumulative_columns
+            .layout
+            .cumulative_columns()
             .iter()
             .zip(self.previous_totals.iter_mut())
         {
