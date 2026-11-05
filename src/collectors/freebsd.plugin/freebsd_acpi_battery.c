@@ -38,9 +38,13 @@ int do_hw_acpi_battery(int update_every, usec_t dt) {
         return 0;
     }
 
-    // An unknown reading is a gap, not 0%.
-    if (unlikely(life == ACPI_BATTERY_UNKNOWN))
+    // An unknown reading is a gap, not 0%: finish the iteration without setting the dimension so an empty point is
+    // stored, instead of skipping it and letting a short outage be interpolated from the last value.
+    if (unlikely(life == ACPI_BATTERY_UNKNOWN)) {
+        if (capacity.st)
+            rrdset_done(capacity.st);
         return 0;
+    }
 
     capacity.value = (unsigned long long)life;
     rrdset_create_simple_prop(

@@ -248,7 +248,9 @@ int do_kern_devstat(int update_every, usec_t dt) {
             true);
     }
 
-    if (likely(do_system_io || do_io || do_ops || do_qops || do_util || do_backlog || do_iotime || do_await || do_avagsz || do_svctm)) {
+    // Always scan devstat: per-disk sections can enable a chart even when every "... for all disks" default is off.
+    // Operators disable the whole module with "kern.devstat = no" under [plugin:freebsd].
+    {
         static int mib_numdevs[3] = {0, 0, 0};
         int numdevs;
         int common_error = 0;
@@ -770,9 +772,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
             collector_error("DISABLED: kern.devstat module");
             return 1;
         }
-    } else {
-        collector_error("DISABLED: kern.devstat module");
-        return 1;
     }
 
     disks_cleanup();
