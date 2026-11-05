@@ -28,7 +28,7 @@ func TestIntegrationArtifacts(t *testing.T) {
 		t,
 		metadata,
 		chartTemplateYAML,
-		map[string][]string{metricDeviceAvailabilityStatus: availabilityStates},
+		map[string][]string{metricDeviceAvailabilityStatus: availabilityStates, metricApplianceUplinkStatus: uplinkStates},
 	)
 	collecttest.AssertConfigSchemaMatchesMetadataWith(
 		t,
@@ -41,7 +41,7 @@ func TestIntegrationArtifacts(t *testing.T) {
 }
 
 func TestMetadataDocumentsEmittedLabels(t *testing.T) {
-	_, c, _ := newTrafficFixture(t)
+	_, c, _ := newHealthFixture(t)
 	require.NoError(t, collectCycle(t.Context(), c))
 
 	var orgLabels []string
@@ -55,12 +55,16 @@ func TestMetadataDocumentsEmittedLabels(t *testing.T) {
 		"device":       slices.Sorted(maps.Keys(readDevices(c)["S1"].Labels)),
 	}
 	for scope, metric := range map[string]string{
-		"switch port":      metricSwitchPortTrafficSent,
-		"appliance uplink": metricApplianceUplinkTrafficSent,
+		"switch port":             metricSwitchPortTrafficSent,
+		"appliance uplink":        metricApplianceUplinkTrafficSent,
+		"appliance uplink health": metricApplianceUplinkStatus,
+		"appliance uplink probe":  metricApplianceUplinkLatency,
 	} {
 		points := trafficPoints(c, metric)
 		require.NotEmpty(t, points)
-		emitted[scope] = slices.Sorted(maps.Keys(points[0].Labels))
+		labels := points[0].Labels
+		delete(labels, metricApplianceUplinkStatus) // The flattened state is a dimension, not a chart label.
+		emitted[scope] = slices.Sorted(maps.Keys(labels))
 	}
 
 	var metadata struct {

@@ -18,6 +18,7 @@ const (
 )
 
 type Config struct {
+	CollectApplianceUplinkHealth  bool             `yaml:"collect_appliance_uplink_health,omitempty" json:"collect_appliance_uplink_health"`
 	Vnode                         string           `yaml:"vnode,omitempty"                            json:"vnode"`
 	UpdateEvery                   int              `yaml:"update_every,omitempty"                     json:"update_every"`
 	AutoDetectionRetry            int              `yaml:"autodetection_retry,omitempty"              json:"autodetection_retry"`

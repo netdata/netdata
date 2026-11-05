@@ -5,6 +5,11 @@ package meraki
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 const (
+	metricApplianceUplinkStatus          = "appliance_uplink_status"
+	metricApplianceReportAge             = "appliance_report_age"
+	metricApplianceUplinkPacketLoss      = "appliance_uplink_packet_loss"
+	metricApplianceUplinkLatency         = "appliance_uplink_latency"
+	metricApplianceUplinkSampleAge       = "appliance_uplink_sample_age"
 	metricOrganizationAssignedDevices    = "organization_assigned_devices"
 	metricDeviceAssigned                 = "device_assigned"
 	metricDeviceAvailabilityStatus       = "device_availability_status"
@@ -40,4 +45,11 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 		meter:                meter,
 		organizationAssigned: meter.Gauge(metricOrganizationAssignedDevices),
 	}
+}
+
+var uplinkStates = []string{"active", "connecting", "failed", "not_connected", "ready"}
+
+var uplinkStateSet = []metrix.InstrumentOption{
+	metrix.WithStateSetMode(metrix.ModeEnum),
+	metrix.WithStateSetStates(uplinkStates...),
 }

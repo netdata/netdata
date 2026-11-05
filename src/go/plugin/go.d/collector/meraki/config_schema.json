@@ -47,6 +47,12 @@
         "type": "boolean",
         "default": false
       },
+      "collect_appliance_uplink_health": {
+        "title": "Collect appliance uplink health",
+        "description": "Collect appliance uplink status and MX ICMP loss and latency, shown on each appliance's node. Disabled by default.",
+        "type": "boolean",
+        "default": false
+      },
       "update_every": {
         "title": "Update every",
         "description": "Data collection interval, in seconds.",
@@ -70,7 +76,7 @@
       },
       "vnode": {
         "title": "Virtual node",
-        "description": "Associates the organization and appliance uplink charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
+        "description": "Associates the organization and appliance uplink traffic charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
         "type": "string",
         "default": ""
       },
@@ -168,6 +174,7 @@
         {
           "title": "Collection",
           "fields": [
+            "collect_appliance_uplink_health",
             "update_every",
             "autodetection_retry",
             "timeout",
@@ -200,6 +207,9 @@
     },
     "collect_appliance_uplink_traffic": {
       "ui:help": "Shows the bytes each uplink moved in the five minutes that ended five minutes ago, leaving Meraki time to count them, as average kilobits per second. When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface, so the charts belong to the network, not to an appliance."
+    },
+    "collect_appliance_uplink_health": {
+      "ui:help": "Status covers assigned appliances reported by Meraki, including MX, Z and Secure Router. ICMP measurements are documented for MX only, per uplink and destination IP, from the latest sample in the five-minute window ending two minutes ago. Adds one status request per 1,000 appliances plus one organization-wide probe request; both are skipped when no appliance is assigned.\n\nA ready uplink is standby. Blocked ICMP can report 100% loss while internet access works, and missing cellular samples do not establish an outage."
     }
   }
 }

@@ -25,12 +25,13 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor device availability, switch port traffic and uplink traffic in a Cisco Meraki organization, with each device shown as its own Netdata node.
+          Monitor Cisco Meraki device availability, switch port traffic and appliance uplink traffic and health, with a Netdata node per assigned device.
 
           - **Device availability**: the status Meraki Dashboard reports for each device: `online`, `alerting`, `offline` or `dormant`.
           - **Inventory**: how many devices are assigned to the organization's networks, and which ones.
           - **Switch ports** (two opt-in options): sent and received kilobits/s, and packets/s, of every switch port, on the switch's node.
           - **Uplink traffic** (opt-in): sent and received kilobits/s of each WAN and cellular uplink of every MX security appliance and Z teleworker gateway network.
+          - **Uplink health** (opt-in): uplink status and device last report age on each assigned appliance's node; MX ICMP packet loss, latency and sample age per uplink and destination IP. Status covers MX, Z and Secure Router appliances reported by Meraki.
           - **Fleet filtering**: device nodes and charts carry organization, network, model and product type labels, so a large fleet can be grouped and filtered.
 
           Every device type Meraki reports availability for is covered, including security appliances (MX), switches (MS), wireless access points (MR), cameras (MV), sensors (MT) and cellular gateways (MG).
@@ -48,6 +49,8 @@ modules:
           | `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` | Switch port traffic | With `collect_switch_port_traffic` |
           | `getDeviceSwitchPortsStatusesPackets` | Switch port packet rates, one request per switch | With `collect_switch_port_packets` |
           | `getOrganizationApplianceUplinksUsageByNetwork` | Uplink traffic | With `collect_appliance_uplink_traffic` |
+
+          With `collect_appliance_uplink_health`, `getOrganizationApplianceUplinkStatuses` reads appliance uplink states page by page and `getOrganizationDevicesUplinksLossAndLatency` reads MX ICMP measurements in one organization-wide request. Both are skipped when no appliance is assigned. Probe samples come from the five-minute window ending two minutes before collection; each destination chart shows the latest sample in that window.
 
           Whatever `update_every` is, switch port traffic is looked up in the last 15 minutes, uplink traffic is read for the 5 minutes that ended 5 minutes ago, and packet rates for the last 5 minutes.
 
@@ -67,7 +70,8 @@ modules:
           description: |
             - **Five-minute data.** Meraki refreshes device availability every 5 minutes without a sample time, and traffic values are averages over at least 5 minutes, so an `update_every` below 300 seconds adds requests, not detail. Above 300 seconds, each traffic value still covers only one Meraki window, usually 5 minutes, not the whole collection interval.
             - **Traffic lags behind.** Meraki publishes traffic some minutes after it happens. Switch port traffic is the latest interval Meraki has reported within the last 15 minutes, so it can be up to 15 minutes old; the interval age chart shows how old it is, and the chart has a gap when Meraki has reported no usable interval in that time. Uplink traffic covers the 5 minutes that ended 5 minutes earlier, to give Meraki time to count the bytes. Packet rates cover the last 5 minutes, which Meraki may not have finished reporting. Missed collections are not backfilled.
-            - **Uplinks belong to the network.** When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface. Uplink charts are therefore per network and interface, on the job's node or its virtual node, not on an appliance's node.
+            - **Health is per appliance and destination.** A `ready` uplink is standby, not failed. ICMP packet loss can reach 100% when a destination blocks probes while internet access still works. Integrated cellular may have no probe statistics by default; missing statistics do not establish an outage. Device last report age is not an interface transition age.
+            - **Uplinks belong to the network.** When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface. Uplink traffic charts are therefore per network and interface, on the job's node or its virtual node, not on an appliance's node.
             - **Shared API budget.** Meraki allows 10 requests per second per organization and 100 per source IP address, shared with every other application using them. The collector sends at most 10 requests per second per job, and after a `429 Too Many Requests` answer it sends nothing until the `Retry-After` wait Meraki requested has passed. See [Meraki API rate limits](https://developer.cisco.com/meraki/api-v1/rate-limit/).
         performance_impact:
           description: |
@@ -82,15 +86,18 @@ modules:
 
             An organization with 2,500 devices in 40 networks takes 1 + 1 + 3 + 3 = 8 requests per collection. Increase `update_every` to make fewer requests; increase `timeout` if a very large organization cannot finish within it.
 
-            Each traffic option adds requests to every collection:
+            Each optional collection adds requests to every collection:
 
             | Option | Requests | Charts |
             |:-------|:---------|:-------|
             | `collect_switch_port_traffic` | 1 per 50 switches Meraki lists for the organization | 2 per switch port |
             | `collect_switch_port_packets` | 1 per assigned switch | 1 per switch port |
-            | `collect_appliance_uplink_traffic` | 1 | 1 per uplink |
+            | `collect_appliance_uplink_traffic` | 1 | 1 per network uplink |
+            | `collect_appliance_uplink_health` | 1 per 1,000 appliances plus 1 probe request; none without assigned appliances | 1 per appliance plus 1 per uplink and 3 per uplink/destination with samples |
 
             Requests are paced at 10 per second, so packet rates for 1,000 switches add about 100 seconds to every collection, more than the default `timeout` of 60 seconds. A collection that runs past `timeout` updates no chart, availability included. For a large fleet, raise `timeout` with `collect_switch_port_packets`, or leave it off.
+
+            Health chart count grows with assigned appliances, uplinks and configured ICMP destinations; Meraki documents no fixed destination count for this API.
 
             Every assigned device becomes a Netdata node: an organization with 2,000 devices adds 2,000 nodes.
     setup:
@@ -179,6 +186,15 @@ modules:
               group: Traffic
               detailed_description: |
                 Adds a chart per network and uplink interface (for example `wan1`, `wan2` or `cellular`) with the sent and received kilobits/s of the 5 minutes that ended 5 minutes earlier, on the job's node or `vnode`.
+            - name: collect_appliance_uplink_health
+              description: Collect appliance uplink status and MX ICMP loss and latency, shown on each appliance's node. Disabled by default.
+              default_value: false
+              required: false
+              group: Collection
+              detailed_description: |
+                Adds the five reported uplink states (`active`, `connecting`, `failed`, `not_connected` and `ready`) and the device's last report age. MX ICMP charts show packet loss percentage, latency in milliseconds and sample age in seconds for each uplink and destination IP. Warm spare appliances remain separate nodes; health is never averaged across appliances or destinations.
+
+                Missing, unknown or conflicting data produces gaps. Loss and latency are taken independently from the latest sample in the five-minute window ending two minutes before collection, without substituting older values. The sample age chart shows the sample's age; collection time is not its timestamp.
             - name: update_every
               description: Data collection interval, in seconds.
               default_value: 300
@@ -195,7 +211,7 @@ modules:
               required: false
               group: Collection
             - name: vnode
-              description: Associates the organization and appliance uplink charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.
+              description: Associates the organization and appliance uplink traffic charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.
               default_value: ''
               required: false
               group: Collection
@@ -255,6 +271,14 @@ modules:
                     api_key: ${env:MERAKI_API_KEY}
                     collect_switch_port_packets: yes
                     timeout: 180
+            - name: Appliance uplink health
+              description: Also collect appliance uplink status and MX ICMP measurements on the existing device nodes.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+                    collect_appliance_uplink_health: yes
             - name: API key in a rotated file
               description: Read the key from a file that a secret manager rotates. The file is read again for every request.
               config: |
@@ -291,9 +315,9 @@ modules:
                     api_key: ${env:MERAKI_API_KEY}
     metrics:
       description: |
-        - **Where charts appear.** The organization and uplink charts are on the node that runs the job, or on its virtual node when `vnode` is set. Device charts, switch port charts included, are on each device's own node, named after the device; `meraki-` followed by the serial when the device has no name; or `meraki-` followed by a generated ID when the name contains an apostrophe, backslash or line break.
+        - **Where charts appear.** The organization and uplink traffic charts are on the node that runs the job, or on its virtual node when `vnode` is set. Device charts, switch port charts included, are on each device's own node, named after the device; `meraki-` followed by the serial when the device has no name; or `meraki-` followed by a generated ID when the name contains an apostrophe, backslash or line break.
         - **Gaps, not offline or zero.** A device whose status is missing, unknown or reported for another network has no availability value for that collection; it is never reported offline because of missing data. Its inventory chart stays at 1 while the device is assigned. Likewise, a traffic value Meraki leaves out, or reports twice with different values, is a gap, not a zero.
-        - **Failed collections.** A failed inventory request, a timeout or a cancellation updates no chart. A failed traffic request leaves gaps only in its own charts, except an HTTP 429, after which no more traffic is requested in that collection.
+        - **Failed collections.** A failed inventory request, a timeout or a cancellation updates no chart. A failed optional traffic or health request leaves gaps only in its own charts, except an HTTP 429, after which no more optional telemetry is requested in that collection.
         - **Removed devices.** When a device leaves the inventory, its charts stop updating and become obsolete. Netdata keeps the node and its history.
       scopes:
         - name: organization
@@ -345,6 +369,86 @@ modules:
                 - name: dormant
                 - name: offline
                 - name: online
+            - name: meraki.appliance_report_age
+              description: Meraki Appliance Last Report Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+        - name: appliance uplink health
+          description: One uplink of an assigned appliance on its device node, when collect_appliance_uplink_health is enabled.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: serial
+              description: Device serial number, for example `Q2XX-XXXX-XXXX`.
+            - name: device_name
+              description: Device name in Dashboard; empty when unnamed.
+            - name: model
+              description: Device model, for example `MS120-8`.
+            - name: product_type
+              description: Meraki product type, for example `appliance`, `switch`, `wireless`, `camera`, `sensor` or `cellularGateway`.
+            - name: network_id
+              description: ID of the network the device is assigned to.
+            - name: network_name
+              description: Name of the network the device is assigned to.
+            - name: interface
+              description: Uplink interface as Meraki reports it, for example wan1, wan2 or cellular.
+          metrics:
+            - name: meraki.appliance_uplink_status
+              description: Meraki Appliance Uplink Status
+              unit: status
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: connecting
+                - name: failed
+                - name: not_connected
+                - name: ready
+        - name: appliance uplink probe
+          description: The latest MX ICMP sample per appliance, uplink and destination IP, on the device node, when collect_appliance_uplink_health is enabled.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: serial
+              description: Device serial number, for example `Q2XX-XXXX-XXXX`.
+            - name: device_name
+              description: Device name in Dashboard; empty when unnamed.
+            - name: model
+              description: Device model, for example `MS120-8`.
+            - name: product_type
+              description: Meraki product type, for example `appliance`, `switch`, `wireless`, `camera`, `sensor` or `cellularGateway`.
+            - name: network_id
+              description: ID of the network the device is assigned to.
+            - name: network_name
+              description: Name of the network the device is assigned to.
+            - name: interface
+              description: Uplink interface as Meraki reports it, for example wan1, wan2 or cellular.
+            - name: destination_ip
+              description: Destination IP address of the ICMP probe.
+          metrics:
+            - name: meraki.appliance_uplink_packet_loss
+              description: Meraki Appliance Uplink ICMP Packet Loss
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: loss
+            - name: meraki.appliance_uplink_latency
+              description: Meraki Appliance Uplink ICMP Latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: meraki.appliance_uplink_sample_age
+              description: Meraki Appliance Uplink Health Sample Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
         - name: switch port
           description: One port of an assigned switch, on the switch's node, when `collect_switch_port_traffic` or `collect_switch_port_packets` is enabled.
           labels:
@@ -502,8 +606,14 @@ modules:
             cause: Meraki did not report a usable status for the device in the last collection. Availability can lag a new assignment or a network move by one refresh.
             fix: Check the device's status in Dashboard and wait for the next 5-minute refresh. Run the collector in debug mode (see Diagnostics) to see how many devices had no usable status.
           - error: 'Meraki `traffic` unavailable: `error`'
-            cause: A switch port traffic, switch port packets or appliance uplink traffic request failed. That traffic has gaps for this collection (for packets, only the ports of that switch); inventory, availability and the other traffic options still update. After an HTTP 429, no more traffic requests are sent in this collection. The warning is logged at most once an hour per kind of traffic.
+            cause: A switch port traffic, switch port packets or appliance uplink traffic request failed. That traffic has gaps for this collection (for packets, only the ports of that switch); inventory, availability and the other traffic options still update. After an HTTP 429, no more optional telemetry requests are sent in this collection. The warning is logged at most once an hour per kind of traffic.
             fix: 'Most messages continue with another error on this page, such as `getDeviceSwitchPortsStatusesPackets: HTTP status 403`; follow that entry. Inventory worked in the same collection, so an HTTP 403 or 404 here is about that traffic data, not about `organization_id`: check in Meraki Dashboard that the API key''s administrator can see the switch or network and that it reports this data.'
           - error: Switch port or uplink traffic charts are missing
             cause: The traffic option is off, the organization has no switches or no MX or Z networks, or Meraki reported no usable value. Switch port traffic also has gaps while Meraki has reported no interval that ended in the last 15 minutes.
             fix: Enable `collect_switch_port_traffic`, `collect_switch_port_packets` or `collect_appliance_uplink_traffic`. If they are on, look for the traffic warning above in the logs, and compare with the traffic Meraki Dashboard shows for the switch or network.
+          - error: 'Meraki appliance uplink status or probes unavailable: `error`'
+            cause: The optional appliance status or ICMP probe request failed, leaving gaps for that data while inventory and availability still update. An HTTP 429 also skips all remaining optional reads in this collection.
+            fix: Follow the corresponding HTTP or transport error on this page. For HTTP 403 or 404, verify the API key's access to appliance telemetry; the successful inventory read does not prove access to every optional API.
+          - error: Appliance uplink health charts are missing
+            cause: The health option is off, no appliance is assigned, the optional API request failed, or Meraki reported no usable data. ICMP loss and latency are documented for MX only; cellular may have no samples by default.
+            fix: Enable `collect_appliance_uplink_health`, check the collector warning and Meraki Dashboard, and confirm that ICMP monitoring destinations answer probes. Missing samples do not establish an outage; `ready` indicates standby.

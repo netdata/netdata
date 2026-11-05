@@ -81,3 +81,50 @@ groups:
             name: sent
             options:
               multiplier: -1
+
+  - family: Appliance Health
+    groups:
+      - family: Device Reports
+        metrics: [appliance_report_age]
+        charts:
+          - title: Meraki Appliance Last Report Age
+            context: appliance_report_age
+            units: seconds
+            dimensions:
+              - selector: appliance_report_age
+                name: age
+      - family: Uplinks
+        metrics: [appliance_uplink_status]
+        charts:
+          - title: Meraki Appliance Uplink Status
+            context: appliance_uplink_status
+            units: status
+            type: stacked
+            instances:
+              by_labels: [interface]
+            dimensions:
+              - selector: appliance_uplink_status
+      - family: ICMP Probes
+        metrics: [appliance_uplink_packet_loss, appliance_uplink_latency, appliance_uplink_sample_age]
+        chart_defaults:
+          instances:
+            by_labels: [interface, destination_ip]
+        charts:
+          - title: Meraki Appliance Uplink ICMP Packet Loss
+            context: appliance_uplink_packet_loss
+            units: percentage
+            dimensions:
+              - selector: appliance_uplink_packet_loss
+                name: loss
+          - title: Meraki Appliance Uplink ICMP Latency
+            context: appliance_uplink_latency
+            units: milliseconds
+            dimensions:
+              - selector: appliance_uplink_latency
+                name: latency
+          - title: Meraki Appliance Uplink Health Sample Age
+            context: appliance_uplink_sample_age
+            units: seconds
+            dimensions:
+              - selector: appliance_uplink_sample_age
+                name: age
