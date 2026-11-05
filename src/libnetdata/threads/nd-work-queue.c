@@ -468,14 +468,20 @@ int nd_work_queue_unittest(void) {
         __atomic_store_n(&ut.block, false, __ATOMIC_RELAXED);
         completion_mark_complete(&ut.release);
 
+        // the 4 threads must be seen idle before they time out, or the trickle below would not test the wake order
         usec_t deadline_ut = now_monotonic_usec() + 10 * USEC_PER_SEC;
+        size_t idle;
         while(true) {
             netdata_mutex_lock(&wq->mutex);
-            size_t idle = wq->idle;
+            idle = wq->idle;
             netdata_mutex_unlock(&wq->mutex);
             if(idle == 4 || now_monotonic_usec() >= deadline_ut)
                 break;
             sleep_usec(1000);
+        }
+        if(idle != 4) {
+            fprintf(stderr, "  FAILED: expected 4 idle threads before the trickle, saw %zu\n", idle);
+            errors++;
         }
 
         // one short job at a time, every 20 ms - more often than the idle timeout - for up to 10 s
