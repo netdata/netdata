@@ -1665,7 +1665,9 @@ Managed SNMP device actor modals are port-centric:
 - expose real port identity columns, including SNMP `if_index` as the visible
   numeric port ID when known, display `name` with a visible `if_alias` (Alias)
   column next to it, source `port_id`, `if_name`, `if_descr`, MAC, speed,
-  status, mode, role, VLAN, FDB, link, and neighbor counts;
+  status, mode, role, VLAN, FDB, link, and neighbor counts; the expanded row
+  repeats `if_alias` as `ifAlias` next to `ifName` and `ifDescr`, so the full
+  value is visible when the grid cell is truncated;
 - never invent numeric port IDs. Do not use row order or any generated sequence;
   `if_index` must come from the device/SNMP facts and must align with
   `actor_port_links.if_index`, so local port identity never contradicts the

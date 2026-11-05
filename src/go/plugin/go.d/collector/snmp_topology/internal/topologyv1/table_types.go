@@ -36,6 +36,9 @@ func snmpTopologyV1PortModalColumns() []topologyapi.ModalColumn {
 		modalDirectColumnWithVisibility("neighbor_port_name", "Neighbor Port", "neighbor_port_name", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_name", "ifName", "if_name", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_descr", "ifDescr", "if_descr", "text", "expanded"),
+		// The full alias, which the visible Alias column may truncate; it stays after Alias so
+		// consumers that resolve a column label by its source column still find "Alias" first.
+		modalDirectColumnWithVisibility("if_alias_mib", "ifAlias", "if_alias", "text", "expanded"),
 		modalDirectColumnWithVisibility("port_id", "Source Port ID", "port_id", "text", "expanded"),
 		modalDirectColumnWithVisibility("mac", "MAC", "mac", "text", "expanded"),
 		modalDirectColumnWithVisibility("speed", "Speed", "speed", "number", "expanded"),

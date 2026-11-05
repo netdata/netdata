@@ -2137,6 +2137,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "port_id",
                     "label": "Source Port ID",
                     "projection": {
@@ -3259,6 +3269,16 @@
                     "label": "ifDescr",
                     "projection": {
                       "column": "if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
                       "kind": "direct"
                     },
                     "visibility": "expanded"
@@ -4538,6 +4558,16 @@
                     "label": "ifDescr",
                     "projection": {
                       "column": "if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
                       "kind": "direct"
                     },
                     "visibility": "expanded"
@@ -5845,6 +5875,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "port_id",
                     "label": "Source Port ID",
                     "projection": {
@@ -7134,6 +7174,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "port_id",
                     "label": "Source Port ID",
                     "projection": {
@@ -8256,6 +8306,16 @@
                     "label": "ifDescr",
                     "projection": {
                       "column": "if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
                       "kind": "direct"
                     },
                     "visibility": "expanded"
@@ -9390,6 +9450,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "port_id",
                     "label": "Source Port ID",
                     "projection": {
@@ -10512,6 +10582,16 @@
                     "label": "ifDescr",
                     "projection": {
                       "column": "if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
                       "kind": "direct"
                     },
                     "visibility": "expanded"
@@ -11805,6 +11885,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "port_id",
                     "label": "Source Port ID",
                     "projection": {
@@ -12927,6 +13017,16 @@
                     "label": "ifDescr",
                     "projection": {
                       "column": "if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
                       "kind": "direct"
                     },
                     "visibility": "expanded"
@@ -14061,6 +14161,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "port_id",
                     "label": "Source Port ID",
                     "projection": {
@@ -15183,6 +15293,16 @@
                     "label": "ifDescr",
                     "projection": {
                       "column": "if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
+                    "projection": {
+                      "column": "if_alias",
                       "kind": "direct"
                     },
                     "visibility": "expanded"
@@ -19268,6 +19388,16 @@
               "label": "ifDescr",
               "projection": {
                 "column": "if_descr",
+                "kind": "direct"
+              },
+              "visibility": "expanded"
+            },
+            {
+              "cell": "text",
+              "id": "if_alias_mib",
+              "label": "ifAlias",
+              "projection": {
+                "column": "if_alias",
                 "kind": "direct"
               },
               "visibility": "expanded"
