@@ -93,6 +93,14 @@ struct Entity {
 ///   Older windows are not lost: their counts are added into the first
 ///   window emitted, which then shows them as one spike.
 ///
+/// Gauge values and cumulative totals moved into another window do not keep
+/// their event-time order:
+/// - when a batch's late events from several windows land in one window, the
+///   value kept comes from the window the batch first recorded into last (of
+///   those that have a value), not from the latest event time;
+/// - an older total merged after a newer one was emitted reads as a reset
+///   when it is lower: the chart shows its whole value as one increase.
+///
 /// # Entities
 ///
 /// - An entity starts with its first event. Its chart instances are

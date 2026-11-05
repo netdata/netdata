@@ -113,16 +113,21 @@ pub struct Counter<D>(pub(crate) ColumnRange<D>);
 /// - After the baseline, a window without a new total shows 0, and the next
 ///   total shows the whole increase since the last one: set the totals at
 ///   least once per window.
-/// - Within a window, the total set last wins: the later event in a batch,
-///   the later merged batch across batches.
+/// - Within a window, the total set last wins: in a batch, the later call
+///   for that window; across batches, the later merge. Event times do not
+///   order totals (for late events, see [`Aggregator`](crate::Aggregator)),
+///   so set totals at the time you read them and merge them in that order.
 #[derive(Debug, Clone, Copy)]
 pub struct CumulativeCounter<D>(pub(crate) ColumnRange<D>);
 
 /// A current value, split by `D`, for example open connections per state,
 /// set in an event timed when you read it. Charted as is.
 ///
-/// - Each event sets the value; within a window, the value set last wins: the
-///   later event in a batch, the later merged batch across batches.
+/// - Each event sets the value. Within a window, the value set last wins: in
+///   a batch, the later call for that window; across batches, the later
+///   merge. Event times do not order values (for late events, see
+///   [`Aggregator`](crate::Aggregator)), so set values at the time you read
+///   them and merge them in that order.
 /// - A window without a value shows a gap.
 #[derive(Debug, Clone, Copy)]
 pub struct Gauge<D>(pub(crate) ColumnRange<D>);

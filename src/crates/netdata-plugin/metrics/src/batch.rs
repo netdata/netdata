@@ -18,8 +18,10 @@ pub(crate) struct BatchRow {
 /// One entity's rows within a batch.
 #[derive(Default)]
 pub(crate) struct EntityRows {
-    /// By window number, in first-event order: the aggregator merges late
-    /// windows into one, and gauges and totals keep the value merged last.
+    /// By window number, in first-event order: the aggregator moves late
+    /// windows into the oldest open one and combines them in this order, so
+    /// gauges and totals keep the value of the last window here that has one,
+    /// whatever the event times.
     pub(crate) rows: IndexMap<u64, BatchRow>,
     /// Position in `rows` of the window recorded into last; events mostly
     /// arrive in time order, so it answers most lookups without hashing.
