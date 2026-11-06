@@ -263,6 +263,36 @@ func TestCollector_Collect(t *testing.T) {
 	}
 }
 
+func TestCollector_CollectHonorsCancellationDuringRevocationCheck(t *testing.T) {
+	c := New()
+	c.Source = "https://example.org:443"
+	c.CheckRevocation = true
+	c.provider = &mockProvider{certs: []*x509.Certificate{{NotAfter: time.Now().Add(time.Hour)}}}
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	c.revocationStatus = func(*x509.Certificate) (bool, bool, error) {
+		<-release
+		return false, true, nil
+	}
+	store, ok := metrix.AsCycleManagedStore(c.MetricStore())
+	require.True(t, ok)
+	cc := store.CycleController()
+	cc.BeginCycle()
+	defer cc.AbortCycle()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	time.AfterFunc(100*time.Millisecond, cancel)
+	done := make(chan error, 1)
+	go func() { done <- c.Collect(ctx) }()
+
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Collect is still waiting for a revocation check after cancellation")
+	}
+}
+
 func TestCollector_CollectAbort(t *testing.T) {
 	for name, provider := range map[string]*mockProvider{
 		"provider error": {err: true},
