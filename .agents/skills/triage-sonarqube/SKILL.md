@@ -48,6 +48,12 @@ The token is used as **HTTP Basic auth username with empty password**:
 
 No browser tab is required for token-based auth. Tokens can expire or be revoked; verify access when executing.
 
+For a public project, read-only API calls may work anonymously when local credentials are absent. Verify complete,
+PR-scoped results from `/api/issues/search?componentKeys=<project>&pullRequest=<pr>` and
+`/api/hotspots/search?projectKey=<project>&pullRequest=<pr>`, paging through each reported total. Check
+`/api/qualitygates/project_status?projectKey=<project>&pullRequest=<pr>` separately. An HTTP error is a coverage gap,
+not an empty result; this fallback does not authorize remote changes or require credential setup.
+
 ## Triage decision matrix
 
 ### Issues (Bug, Vulnerability, Code Smell)

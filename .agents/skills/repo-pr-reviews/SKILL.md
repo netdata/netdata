@@ -188,7 +188,8 @@ This script fetches the full SonarCloud finding set, including findings absent f
 
 Requires the same `.env` config the `triage-sonarqube` skill uses
 (`SONAR_TOKEN`, `SONAR_HOST_URL`, `SONAR_PROJECT`). If `.env` is missing,
-the script prints what's needed and exits.
+the script prints what's needed and exits. For public-project read-only fallback, see
+[Sonar setup](../triage-sonarqube/SKILL.md#setup).
 
 An empty issue/hotspot list does not prove the quality gate passed. Inspect
 `/api/qualitygates/project_status?projectKey=<project>&pullRequest=<PR>` for

@@ -59,19 +59,18 @@ var (
 )
 
 func (c *Collector) addPingCharts() {
-	charts := pingCharts.Copy()
-
-	labels := c.chartBaseLabels()
-
-	for _, chart := range *charts {
-		for k, v := range labels {
-			chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
-		}
+	for _, chart := range *pingCharts.Copy() {
+		chart.Labels = c.pingChartLabels()
+		c.installChart(chart)
 	}
+}
 
-	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warningf("failed to add ping charts: %v", err)
-	}
+func (c *Collector) pingChartLabels() []collectorapi.Label {
+	return toChartLabels(c.chartBaseLabels())
+}
+
+func isPingChart(chart *collectorapi.Chart) bool {
+	return chart.ID == pingRTTChart.ID || chart.ID == pingRTTStdDevChart.ID
 }
 
 var (
@@ -181,82 +180,35 @@ func (c *Collector) addProfileStatsCharts(name string) {
 		for _, dim := range chart.Dims {
 			dim.ID = fmt.Sprintf(dim.ID, name)
 		}
-		for k, v := range labels {
-			chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
-		}
+		chart.Labels = toChartLabels(labels)
 	}
 
-	if err := c.Charts().Add(*charts...); err != nil {
-		c.Warningf("failed to add profile stats charts for %s: %v", name, err)
+	for _, chart := range *charts {
+		c.installChart(chart)
 	}
 }
 
-func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
-	if m.Name == "" {
-		return
-	}
-
-	chart := &collectorapi.Chart{
-		ID:       chartIDFromName(m.Name),
-		Title:    m.Description,
-		Type:     collectorapi.ChartType(m.ChartType),
-		Units:    m.Unit,
-		Fam:      m.Family,
-		Ctx:      chartContextID(m.Name),
-		Priority: prioProfileChart,
-	}
-	if chart.Title == "" {
-		chart.Title = fmt.Sprintf("SNMP metric %s", m.Name)
-	}
-	if chart.Units == "" {
-		chart.Units = "1"
-	}
-	if chart.Fam == "" {
-		chart.Fam = m.Name
-	}
-	if chart.Units == "bit/s" {
-		chart.Type = collectorapi.Area
-	}
-
-	tags := c.chartBaseLabels()
-
-	maps.Copy(tags, m.Profile.Tags)
-	addMetricTagLabels(tags, m.Tags)
-	for k, v := range tags {
-		chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
-	}
-
-	if len(m.MultiValue) > 0 {
-		seen := make(map[string]bool)
-		for k := range m.MultiValue {
-			if !seen[k] {
-				seen[k] = true
-				id := metricIDFromName(m.Name, k)
-				chart.Dims = append(chart.Dims, &collectorapi.Dim{ID: id, Name: k, Algo: dimAlgoFromDdSnmpType(m)})
-			}
-		}
-	} else {
-		id := metricIDFromName(m.Name)
-		chart.Dims = collectorapi.Dims{
-			{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)},
-		}
-	}
-
-	if err := c.Charts().Add(chart); err != nil {
-		c.Warning(err)
-	}
+func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) *collectorapi.Chart {
+	return c.addProfileMetricChart(m, m.Name, chartIDFromName(m.Name), collectorapi.ChartType(m.ChartType))
 }
 
-func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
-	if m.Name == "" {
-		return
-	}
-
+func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) *collectorapi.Chart {
 	key := tableMetricKey(m)
+	return c.addProfileMetricChart(m, key, chartIDFromKey(key), "")
+}
 
+func (c *Collector) addProfileMetricChart(
+	m ddsnmp.Metric,
+	key, id string,
+	chartType collectorapi.ChartType,
+) *collectorapi.Chart {
+	if m.Name == "" {
+		return nil
+	}
 	chart := &collectorapi.Chart{
-		ID:       chartIDFromKey(key),
+		ID:       id,
 		Title:    m.Description,
+		Type:     chartType,
 		Units:    m.Unit,
 		Fam:      m.Family,
 		Ctx:      chartContextID(m.Name),
@@ -276,33 +228,107 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 	}
 
 	tags := c.chartBaseLabels()
-
 	maps.Copy(tags, m.Profile.Tags)
 	addMetricTagLabels(tags, m.Tags)
-
-	for k, v := range tags {
-		chart.Labels = append(chart.Labels, collectorapi.Label{Key: k, Value: v})
-	}
-
+	chart.Labels = toChartLabels(tags)
 	if len(m.MultiValue) > 0 {
-		seen := make(map[string]bool)
-		for k := range m.MultiValue {
-			if !seen[k] {
-				seen[k] = true
-				id := metricIDFromKey(key, k)
-				chart.Dims = append(chart.Dims, &collectorapi.Dim{ID: id, Name: k, Algo: dimAlgoFromDdSnmpType(m)})
-			}
+		for name := range m.MultiValue {
+			chart.Dims = append(chart.Dims, &collectorapi.Dim{
+				ID:   metricIDFromKey(key, name),
+				Name: name,
+				Algo: dimAlgoFromDdSnmpType(m),
+			})
 		}
 	} else {
-		id := metricIDFromKey(key)
-		chart.Dims = collectorapi.Dims{
-			{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)},
+		chart.Dims = collectorapi.Dims{{ID: metricIDFromKey(key), Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)}}
+	}
+	return c.installChart(chart)
+}
+
+// Reuse a chart object for an updated definition, including a replacement that
+// supersedes an uncommitted removal. The runtime retains the Charts collection.
+func (c *Collector) installChart(chart *collectorapi.Chart) *collectorapi.Chart {
+	if err := collectorapi.CheckCharts(chart); err != nil {
+		c.Warning(err)
+		return nil
+	}
+	if existing := c.charts.Get(chart.ID); existing != nil {
+		for _, dim := range existing.Dims {
+			if chart.HasDim(dim.ID) {
+				continue
+			}
+			if existing.IsRemoved() || dim.IsRemoved() {
+				_ = existing.MarkDimRemove(dim.ID, false)
+			}
+			// A metadata redraw cannot infer schema removal from current samples.
+			chart.Dims = append(chart.Dims, dim)
+		}
+		*existing = *chart
+		return existing
+	}
+	if err := c.charts.Add(chart); err != nil {
+		c.Warning(err)
+		return nil
+	}
+	return chart
+}
+
+// Composite inputs may be partial, including the first replacement sample.
+// Keep an index of live declared dimensions so steady collection stays O(values).
+func (s *metricChartState) observeDimension(id, name string, algo collectorapi.DimAlgo) {
+	if s.chart == nil {
+		return
+	}
+	if s.dimensions == nil {
+		s.dimensions = make(map[string]bool, len(s.chart.Dims))
+		for _, dim := range s.chart.Dims {
+			if !dim.IsRemoved() {
+				s.dimensions[dim.ID] = true
+			}
 		}
 	}
-
-	if err := c.Charts().Add(chart); err != nil {
-		c.Warning(err)
+	if s.dimensions[id] {
+		return
 	}
+	dim := s.chart.GetDim(id)
+	if dim == nil {
+		dim = &collectorapi.Dim{}
+		s.chart.Dims = append(s.chart.Dims, dim)
+	}
+	*dim = collectorapi.Dim{
+		ID:   id,
+		Name: name,
+		Algo: algo,
+	}
+	s.dimensions[id] = true
+	s.chart.MarkNotCreated()
+}
+
+// Profile charts redraw through chartMetadataVersion. Ping and licensing charts
+// are not rebuilt from samples, so their device labels are replaced here.
+func (c *Collector) refreshAuxiliaryChartLabels() {
+	for _, chart := range *c.charts {
+		switch {
+		case isPingChart(chart):
+			chart.Labels = c.pingChartLabels()
+		case strings.HasPrefix(chart.Ctx, "snmp.license."):
+			chart.Labels = c.licenseChartLabels()
+		default:
+			continue
+		}
+		chart.MarkNotCreated()
+	}
+}
+
+func toChartLabels(labels map[string]string) []collectorapi.Label {
+	out := make([]collectorapi.Label, 0, len(labels))
+	for key, value := range labels {
+		out = append(out, collectorapi.Label{
+			Key:   key,
+			Value: value,
+		})
+	}
+	return out
 }
 
 func (c *Collector) removeProfileTableMetricChart(key string) {

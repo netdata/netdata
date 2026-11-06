@@ -15,6 +15,7 @@ import (
 // topologyDeviceSnapshot is the immutable output of one successful device
 // collection. It is not visible to readers until activated at global publish.
 type topologyDeviceSnapshot struct {
+	sourceInput    *topologydiag.DeviceInput
 	collectedAt    time.Time
 	freshFor       time.Duration
 	observation    topologymodel.ObservationSnapshot
@@ -27,14 +28,18 @@ type topologyDeviceSnapshot struct {
 // global publication boundary. Builders and unactivated snapshots are never
 // published to runtime readers.
 type topologyDeviceGeneration struct {
-	registrationID ddsnmp.DeviceRegistrationID
-	evidenceRef    topologydiag.EvidenceRef
-	collectedAt    time.Time
-	expiresAt      time.Time
-	observation    topologymodel.ObservationSnapshot
-	hasObservation bool
-	trap           topologyTrapDeviceGeneration
-	acquisition    *topologydiag.AcquisitionCapture
+	sourceInput          *topologydiag.DeviceInput
+	presentedInput       topologydiag.DeviceInput
+	presentation         *topologymodel.DevicePresentation
+	presentedObservation *topologymodel.ObservationSnapshot
+	registrationID       ddsnmp.DeviceRegistrationID
+	evidenceRef          topologydiag.EvidenceRef
+	collectedAt          time.Time
+	expiresAt            time.Time
+	observation          topologymodel.ObservationSnapshot
+	hasObservation       bool
+	trap                 topologyTrapDeviceGeneration
+	acquisition          *topologydiag.AcquisitionCapture
 }
 
 // topologyGeneration is the immutable device vector published after one
@@ -80,7 +85,13 @@ func activateTopologyDeviceSnapshot(
 	if snapshot.freshFor > 0 {
 		expiresAt = publishedAt.Add(snapshot.freshFor)
 	}
+	generationInput := topologydiag.DeviceInput{}
+	if snapshot.sourceInput != nil {
+		generationInput = *snapshot.sourceInput
+	}
 	return &topologyDeviceGeneration{
+		sourceInput:    snapshot.sourceInput,
+		presentedInput: generationInput,
 		registrationID: registrationID,
 		evidenceRef: topologydiag.EvidenceRef{
 			RegistrationID: registrationID,
@@ -141,7 +152,11 @@ func (g *topologyGeneration) observationSnapshots() []topologymodel.ObservationS
 
 	snapshots := make([]topologymodel.ObservationSnapshot, 0, len(g.renderableDevices))
 	for _, device := range g.renderableDevices {
-		snapshots = append(snapshots, device.observation)
+		observation := device.observation
+		if device.presentedObservation != nil {
+			observation = *device.presentedObservation
+		}
+		snapshots = append(snapshots, observation)
 	}
 	return snapshots
 }

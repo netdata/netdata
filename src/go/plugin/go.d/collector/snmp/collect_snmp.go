@@ -18,11 +18,11 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 
 	pms, err := c.ddSnmpColl.Collect()
 	c.captureCollectionFailures()
+	c.syncDeviceMetadata()
 	if err != nil {
 		c.markBGPCollectFailed(err)
 		return err
 	}
-	c.syncDeviceMetadata(pms)
 	if c.bgp == nil && profileMetricsHaveBGP(pms) {
 		c.enableBGPIntegration()
 	}
@@ -52,9 +52,13 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 			continue
 		}
 
-		if !c.seenScalarMetrics[m.Name] {
-			c.seenScalarMetrics[m.Name] = true
-			c.addProfileScalarMetricChart(m)
+		state := c.seenScalarMetrics[m.Name]
+		if state == nil || state.metadataVersion != c.chartMetadataVersion {
+			state = &metricChartState{
+				metadataVersion: c.chartMetadataVersion,
+				chart:           c.addProfileScalarMetricChart(m),
+			}
+			c.seenScalarMetrics[m.Name] = state
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -67,6 +71,7 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 		var ids []string
 		for k, v := range m.MultiValue {
 			id := metricIDFromName(m.Name, k)
+			state.observeDimension(id, k, dimAlgoFromDdSnmpType(m))
 			mx[id] = v
 			ids = append(ids, id)
 		}
@@ -98,9 +103,13 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 
 		seen[key] = true
 
-		if !c.seenTableMetrics[key] {
-			c.seenTableMetrics[key] = true
-			c.addProfileTableMetricChart(m)
+		state := c.seenTableMetrics[key]
+		if state == nil || state.metadataVersion != c.chartMetadataVersion {
+			state = &metricChartState{
+				metadataVersion: c.chartMetadataVersion,
+				chart:           c.addProfileTableMetricChart(m),
+			}
+			c.seenTableMetrics[key] = state
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -111,6 +120,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			var ids []string
 			for k, v := range m.MultiValue {
 				id := metricIDFromKey(key, k)
+				state.observeDimension(id, k, dimAlgoFromDdSnmpType(m))
 				mx[id] = v
 				ids = append(ids, id)
 			}
@@ -134,8 +144,8 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 	for _, pm := range pms {
 		name := stripFileNameExt(pm.Source)
 
-		if !c.seenProfiles[name] {
-			c.seenProfiles[name] = true
+		if c.seenProfiles[name] != c.chartMetadataVersion {
+			c.seenProfiles[name] = c.chartMetadataVersion
 			c.addProfileStatsCharts(name)
 		}
 

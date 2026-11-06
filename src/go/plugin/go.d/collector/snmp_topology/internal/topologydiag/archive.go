@@ -9,6 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
 const (
@@ -119,6 +120,10 @@ func newArchiveDeviceV1(
 		ExpiresAt:       device.ExpiresAt,
 		Renderable:      device.Renderable,
 		Expired:         device.Expired,
+	}
+	if device.Presentation != nil {
+		presentation := snmpdiag.DevicePresentation(*device.Presentation)
+		result.Presentation = &presentation
 	}
 	if device.Acquisition != nil {
 		capture, err := newArchiveCaptureV1(
@@ -435,6 +440,13 @@ func restoreArchiveDevice(
 		ExpiresAt:          d.ExpiresAt,
 		Renderable:         d.Renderable,
 		Expired:            d.Expired,
+	}
+	if d.Presentation != nil {
+		if !hasRef {
+			return SweepDevice{}, fmt.Errorf("topology sweep registration %d presentation has no retained success", registrationID)
+		}
+		presentation := topologymodel.DevicePresentation(*d.Presentation)
+		result.Presentation = &presentation
 	}
 	seenRoles := make(map[string]struct{}, 2)
 	seenAttemptOrdinals := make(map[uint64]struct{}, len(d.Captures))
