@@ -111,6 +111,27 @@ func TestRevocationChecker_Status(t *testing.T) {
 				ok: true,
 			},
 		},
+		"later CRL lists the certificate": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				crls:    []testPKIHandler{serveCRL(false), serveCRL(true)},
+				ldapCRL: true,
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
+		"issuer without the CRL-signing key usage": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuerWithoutCRLSign},
+				crls:    []testPKIHandler{serveCRL(true)},
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
 		"revoked by CRL without asking OCSP": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
@@ -185,6 +206,13 @@ func TestRevocationChecker_Status(t *testing.T) {
 			},
 			want: result{},
 		},
+		"OCSP answer for another certificate": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps:   []testPKIHandler{serveOCSPForAnotherCertificate},
+			},
+			want: result{},
+		},
 		"OCSP without an issuer URL": {
 			endpoints: testPKIEndpoints{
 				ocsps: []testPKIHandler{unexpected},
@@ -233,6 +261,8 @@ func TestRevocationChecker_Status(t *testing.T) {
 					ok:      ok,
 				})
 			}
+			assert.LessOrEqual(t, pki.hits["issuer"].Load(), int64(len(test.endpoints.issuers)),
+				"a check requests each issuer URL at most once")
 		})
 	}
 }
@@ -242,7 +272,8 @@ func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {
 		issuers: []testPKIHandler{serveIssuer},
 		crls:    []testPKIHandler{serveCRL(true)},
 	})
-	renewed := pki.issueLeaf(t, big.NewInt(2))
+	// A second certificate behind the same source, as with round-robin DNS.
+	other := pki.issueLeaf(t, big.NewInt(2))
 	rc := newRevocationChecker()
 
 	type downloads struct {
@@ -276,8 +307,28 @@ func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {
 			},
 		},
 		{
-			name:        "another serial downloads again",
-			cert:        renewed,
+			name:        "another serial downloads",
+			cert:        other,
+			at:          pki.now,
+			wantRevoked: false,
+			wantDownloads: downloads{
+				crl:    2,
+				issuer: 2,
+			},
+		},
+		{
+			name:        "first serial is still cached",
+			cert:        pki.leaf,
+			at:          pki.now,
+			wantRevoked: true,
+			wantDownloads: downloads{
+				crl:    2,
+				issuer: 2,
+			},
+		},
+		{
+			name:        "another serial is cached too",
+			cert:        other,
 			at:          pki.now,
 			wantRevoked: false,
 			wantDownloads: downloads{
@@ -287,9 +338,9 @@ func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {
 		},
 		{
 			name:        "next update downloads again",
-			cert:        renewed,
+			cert:        pki.leaf,
 			at:          pki.crlNextUpdate(),
-			wantRevoked: false,
+			wantRevoked: true,
 			wantDownloads: downloads{
 				crl:    3,
 				issuer: 3,
@@ -333,38 +384,58 @@ func TestRevocationChecker_RequestsAreBounded(t *testing.T) {
 
 	_, _, err := rc.status(t.Context(), pki.leaf, pki.now)
 
-	assert.ErrorContains(t, err, "Client.Timeout exceeded")
+	// The test context has no deadline, so only the client timeout can end the request this way.
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
-func TestRevocationChecker_PostsLongOCSPRequests(t *testing.T) {
-	ocspReq := bytes.Repeat([]byte{0x30}, 257)
-	pki := newTestPKI(t, testPKIEndpoints{
-		ocsps: []testPKIHandler{func(p *testPKI, w http.ResponseWriter, r *http.Request) {
-			body, err := io.ReadAll(r.Body)
-			assert.NoError(p.t, err)
-			assert.Equal(p.t, http.MethodPost, r.Method)
-			assert.Equal(p.t, "application/ocsp-request", r.Header.Get("Content-Type"))
-			assert.Equal(p.t, ocspReq, body)
-			p.writeOCSP(w, p.ca, p.caKey, p.leaf.SerialNumber, ocsp.Good)
-		}},
-	})
+func TestRevocationChecker_OCSPRequestMethod(t *testing.T) {
+	tests := map[string]struct {
+		size       int
+		wantMethod string
+	}{
+		"256-byte request uses GET": {
+			size:       256,
+			wantMethod: http.MethodGet,
+		},
+		"257-byte request uses POST": {
+			size:       257,
+			wantMethod: http.MethodPost,
+		},
+	}
 
-	resp, err := newRevocationChecker().queryOCSP(t.Context(), pki.leaf.OCSPServer[0], ocspReq, pki.leaf, pki.ca)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ocspReq := bytes.Repeat([]byte{0x30}, test.size)
+			pki := newTestPKI(t, testPKIEndpoints{
+				ocsps: []testPKIHandler{func(p *testPKI, w http.ResponseWriter, r *http.Request) {
+					der, err := p.ocspRequestBytes(r)
+					assert.NoError(p.t, err)
+					assert.Equal(p.t, test.wantMethod, r.Method)
+					assert.Equal(p.t, ocspReq, der)
+					p.writeOCSP(w, p.ca, p.caKey, p.leaf.SerialNumber, ocsp.Good)
+				}},
+			})
 
-	require.NoError(t, err)
-	assert.Equal(t, ocsp.Good, resp.Status)
+			resp, err := newRevocationChecker().queryOCSP(t.Context(), pki.leaf.OCSPServer[0], ocspReq, pki.leaf, pki.ca)
+
+			require.NoError(t, err)
+			assert.Equal(t, ocsp.Good, resp.Status)
+		})
+	}
 }
 
 // testPKI is a CA that serves its certificate, a CRL and OCSP answers over HTTP, and a server certificate it issued
 // that lists those URLs. A rogue CA with the same name signs answers the real CA did not.
 type testPKI struct {
-	t        testing.TB
-	now      time.Time
-	ca       *x509.Certificate
-	caKey    *ecdsa.PrivateKey
-	rogue    *x509.Certificate
-	rogueKey *ecdsa.PrivateKey
-	leaf     *x509.Certificate
+	t     testing.TB
+	now   time.Time
+	ca    *x509.Certificate
+	caKey *ecdsa.PrivateKey
+	// caWithoutCRLSign holds the CA's key in a certificate that lacks the CRL-signing key usage.
+	caWithoutCRLSign *x509.Certificate
+	rogue            *x509.Certificate
+	rogueKey         *ecdsa.PrivateKey
+	leaf             *x509.Certificate
 
 	crlURLs, ocspURLs, issuerURLs []string
 
@@ -390,12 +461,13 @@ func newTestPKI(t *testing.T, endpoints testPKIEndpoints) *testPKI {
 	ca, caKey := newTestCA(t, now)
 	rogue, rogueKey := newTestCA(t, now)
 	p := &testPKI{
-		t:        t,
-		now:      now,
-		ca:       ca,
-		caKey:    caKey,
-		rogue:    rogue,
-		rogueKey: rogueKey,
+		t:                t,
+		now:              now,
+		ca:               ca,
+		caKey:            caKey,
+		caWithoutCRLSign: selfSignCA(t, now, caKey, x509.KeyUsageCertSign),
+		rogue:            rogue,
+		rogueKey:         rogueKey,
 		hits: map[string]*atomic.Int64{
 			"crl":    {},
 			"ocsp":   {},
@@ -437,6 +509,11 @@ func newTestCA(t *testing.T, now time.Time) (*x509.Certificate, *ecdsa.PrivateKe
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
+	return selfSignCA(t, now, key, x509.KeyUsageCertSign|x509.KeyUsageCRLSign), key
+}
+
+func selfSignCA(t *testing.T, now time.Time, key *ecdsa.PrivateKey, keyUsage x509.KeyUsage) *x509.Certificate {
+	t.Helper()
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
@@ -446,13 +523,13 @@ func newTestCA(t *testing.T, now time.Time) (*x509.Certificate, *ecdsa.PrivateKe
 		NotAfter:              now.Add(48 * time.Hour),
 		IsCA:                  true,
 		BasicConstraintsValid: true,
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		KeyUsage:              keyUsage,
 	}
 	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
 	require.NoError(t, err)
 	cert, err := x509.ParseCertificate(der)
 	require.NoError(t, err)
-	return cert, key
+	return cert
 }
 
 // issueLeaf issues a server certificate with serial that lists the PKI's URLs.
@@ -524,24 +601,29 @@ func (p *testPKI) writeOCSP(
 	_, _ = w.Write(resp)
 }
 
-// ocspRequest decodes a GET request, which carries the URL-escaped base64 request as the last path segment.
-func (p *testPKI) ocspRequest(r *http.Request) (*ocsp.Request, error) {
-	if r.Method != http.MethodGet {
-		return nil, fmt.Errorf("unexpected method %s", r.Method)
+// ocspRequestBytes returns the DER request of a POST body, or of a GET, which carries it URL-escaped and base64
+// encoded as the last path segment.
+func (p *testPKI) ocspRequestBytes(r *http.Request) ([]byte, error) {
+	if r.Method == http.MethodPost {
+		if ct := r.Header.Get("Content-Type"); ct != "application/ocsp-request" {
+			return nil, fmt.Errorf("unexpected content type %q", ct)
+		}
+		return io.ReadAll(r.Body)
 	}
 	encoded, err := url.QueryUnescape(path.Base(r.URL.EscapedPath()))
 	if err != nil {
 		return nil, err
 	}
-	der, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return nil, err
-	}
-	return ocsp.ParseRequest(der)
+	return base64.StdEncoding.DecodeString(encoded)
 }
 
 func serveIssuer(p *testPKI, w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(p.ca.Raw)
+}
+
+// serveIssuerWithoutCRLSign serves a certificate for the CA's key that lacks the CRL-signing key usage.
+func serveIssuerWithoutCRLSign(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+	_, _ = w.Write(p.caWithoutCRLSign.Raw)
 }
 
 func serveIssuerPEM(p *testPKI, w http.ResponseWriter, _ *http.Request) {
@@ -574,7 +656,12 @@ func serveRogueCRL(p *testPKI, w http.ResponseWriter, _ *http.Request) {
 // serveOCSP answers with status after checking that the request names the server certificate.
 func serveOCSP(status int) testPKIHandler {
 	return func(p *testPKI, w http.ResponseWriter, r *http.Request) {
-		req, err := p.ocspRequest(r)
+		der, err := p.ocspRequestBytes(r)
+		if !assert.NoError(p.t, err) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		req, err := ocsp.ParseRequest(der)
 		if !assert.NoError(p.t, err) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -586,6 +673,11 @@ func serveOCSP(status int) testPKIHandler {
 
 func serveRogueOCSP(p *testPKI, w http.ResponseWriter, _ *http.Request) {
 	p.writeOCSP(w, p.rogue, p.rogueKey, p.leaf.SerialNumber, ocsp.Good)
+}
+
+// serveOCSPForAnotherCertificate answers good, signed by the CA, for a serial other than the requested one.
+func serveOCSPForAnotherCertificate(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+	p.writeOCSP(w, p.ca, p.caKey, new(big.Int).Add(p.leaf.SerialNumber, big.NewInt(1)), ocsp.Good)
 }
 
 func notFound(_ *testPKI, w http.ResponseWriter, r *http.Request) {

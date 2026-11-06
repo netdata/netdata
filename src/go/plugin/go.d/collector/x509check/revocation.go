@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"math/big"
 	"net/http"
 	"net/url"
 	"slices"
@@ -33,12 +32,17 @@ const revocationRequestTimeout = 10 * time.Second
 // certificate it lists is downloaded to verify CRL signatures and to build OCSP requests.
 type revocationChecker struct {
 	client *http.Client
-	// crls holds, per CRL URL, the verdict for one certificate serial until the CRL's next update.
-	crls map[string]crlVerdict
+	// crls holds CRL verdicts until the CRL's next update. A job can see several certificates behind one source,
+	// so a verdict is kept per certificate serial.
+	crls map[crlKey]crlVerdict
+}
+
+type crlKey struct {
+	url    string
+	serial string
 }
 
 type crlVerdict struct {
-	serial     *big.Int
 	revoked    bool
 	nextUpdate time.Time
 }
@@ -48,7 +52,7 @@ func newRevocationChecker() *revocationChecker {
 		client: web.NewHTTPClientWithTransport(web.ClientConfig{
 			Timeout: confopt.Duration(revocationRequestTimeout),
 		}, nil),
-		crls: make(map[string]crlVerdict),
+		crls: make(map[crlKey]crlVerdict),
 	}
 }
 
@@ -69,12 +73,13 @@ func (rc *revocationChecker) status(
 
 	issuer := sync.OnceValues(func() (*x509.Certificate, error) { return rc.fetchIssuer(ctx, cert) })
 
-	maps.DeleteFunc(rc.crls, func(_ string, v crlVerdict) bool { return !now.Before(v.nextUpdate) })
+	// The only expiry rule: a verdict without a future next update serves no later check.
+	maps.DeleteFunc(rc.crls, func(_ crlKey, v crlVerdict) bool { return !now.Before(v.nextUpdate) })
 	for _, crlURL := range cert.CRLDistributionPoints {
 		if isLDAPURL(crlURL) {
 			continue
 		}
-		revoked, err := rc.crlStatus(ctx, cert, crlURL, issuer, now)
+		revoked, err := rc.crlStatus(ctx, cert, crlURL, issuer)
 		if err != nil {
 			return false, false, err
 		}
@@ -94,9 +99,12 @@ func (rc *revocationChecker) crlStatus(
 	cert *x509.Certificate,
 	crlURL string,
 	issuer func() (*x509.Certificate, error),
-	now time.Time,
 ) (bool, error) {
-	if v, ok := rc.crls[crlURL]; ok && v.serial.Cmp(cert.SerialNumber) == 0 {
+	key := crlKey{
+		url:    crlURL,
+		serial: cert.SerialNumber.String(),
+	}
+	if v, ok := rc.crls[key]; ok {
 		return v.revoked, nil
 	}
 
@@ -112,9 +120,10 @@ func (rc *revocationChecker) crlStatus(
 	if err != nil {
 		return false, err
 	}
-	// Without the issuer the signature cannot be checked, and the CRL is used as downloaded.
+	// Without the issuer the signature cannot be checked, and the CRL is used as downloaded. Only the signature is
+	// checked, so a private CA whose certificate lacks the CRL-signing key usage still verifies.
 	if iss != nil {
-		if err := crl.CheckSignatureFrom(iss); err != nil {
+		if err := iss.CheckSignature(crl.SignatureAlgorithm, crl.RawTBSRevocationList, crl.Signature); err != nil {
 			return false, fmt.Errorf("verify CRL '%s': %w", crlURL, err)
 		}
 	}
@@ -122,12 +131,9 @@ func (rc *revocationChecker) crlStatus(
 	revoked := slices.ContainsFunc(crl.RevokedCertificateEntries, func(e x509.RevocationListEntry) bool {
 		return e.SerialNumber.Cmp(cert.SerialNumber) == 0
 	})
-	if now.Before(crl.NextUpdate) {
-		rc.crls[crlURL] = crlVerdict{
-			serial:     cert.SerialNumber,
-			revoked:    revoked,
-			nextUpdate: crl.NextUpdate,
-		}
+	rc.crls[key] = crlVerdict{
+		revoked:    revoked,
+		nextUpdate: crl.NextUpdate,
 	}
 	return revoked, nil
 }
@@ -159,7 +165,8 @@ func (rc *revocationChecker) ocspStatus(
 	return false, false, nil
 }
 
-// queryOCSP sends a short request with GET (RFC 6960 Appendix A.1) and a longer one with POST.
+// queryOCSP sends a request of up to 256 bytes with GET, encoded into the URL as RFC 6960 Appendix A.1 describes,
+// and a longer one with POST.
 func (rc *revocationChecker) queryOCSP(
 	ctx context.Context,
 	server string,
