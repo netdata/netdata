@@ -114,7 +114,7 @@ struct Entity {
 pub struct Aggregator {
     set: MetricSet,
     entities: HashMap<Labels, Entity>,
-    overflow: Option<Entity>,
+    overflow_entity: Option<Entity>,
     /// Oldest window not yet emitted; set on first use.
     oldest_open: Option<u64>,
     stats: Stats,
@@ -125,7 +125,7 @@ impl Aggregator {
         Self {
             set: set.clone(),
             entities: HashMap::new(),
-            overflow: None,
+            overflow_entity: None,
             oldest_open: None,
             stats: Stats::default(),
         }
@@ -133,7 +133,7 @@ impl Aggregator {
 
     pub fn stats(&self) -> Stats {
         Stats {
-            entities: self.entities.len() + usize::from(self.overflow.is_some()),
+            entities: self.entities.len() + usize::from(self.overflow_entity.is_some()),
             ..self.stats
         }
     }
@@ -146,13 +146,18 @@ impl Aggregator {
         let now_window = now / set.interval_secs;
         let oldest_open = *self
             .oldest_open
-            .get_or_insert(now_window.saturating_sub(set.lateness_windows));
-        let oldest_wanted = now_window.saturating_sub(set.lateness_windows + MAX_BACKLOG_WINDOWS);
+            .get_or_insert(now_window.saturating_sub(set.allowed_lateness_windows));
+        let oldest_wanted =
+            now_window.saturating_sub(set.allowed_lateness_windows + MAX_BACKLOG_WINDOWS);
         if oldest_open >= oldest_wanted {
             return oldest_open;
         }
         let skipped = oldest_wanted - oldest_open;
-        for entity in self.entities.values_mut().chain(self.overflow.as_mut()) {
+        for entity in self
+            .entities
+            .values_mut()
+            .chain(self.overflow_entity.as_mut())
+        {
             entity.fold_front(set, skipped, oldest_wanted);
         }
         self.oldest_open = Some(oldest_wanted);
@@ -175,11 +180,11 @@ impl Aggregator {
         let oldest_open = self.bound_backlog(now);
         let set = &*self.set.0;
         let newest = (now / set.interval_secs).max(oldest_open);
-        for (labels, batch_entity) in batch.entities {
-            if batch_entity.rows.is_empty() {
+        for (labels, entity_rows) in batch.entities {
+            if entity_rows.rows.is_empty() {
                 continue;
             }
-            let events: u64 = batch_entity.rows.values().map(|row| row.events).sum();
+            let events: u64 = entity_rows.rows.values().map(|row| row.events).sum();
             let full = set
                 .cardinality_limit
                 .as_ref()
@@ -192,12 +197,12 @@ impl Aggregator {
                 }
                 (Entry::Vacant(_), Some(limit)) => {
                     self.stats.overflowed_events += events;
-                    self.overflow.get_or_insert_with(|| {
+                    self.overflow_entity.get_or_insert_with(|| {
                         Entity::new(set, limit.overflow_labels.clone(), EntityKind::Overflow)
                     })
                 }
             };
-            for (window, batch_row) in batch_entity.rows {
+            for (window, batch_row) in entity_rows.rows {
                 let window = if window < oldest_open {
                     self.stats.late_events += batch_row.events;
                     oldest_open
@@ -229,7 +234,7 @@ impl Aggregator {
         let mut oldest_open = self.bound_backlog(now);
         let set = &*self.set.0;
         let now_window = now / set.interval_secs;
-        while oldest_open + set.lateness_windows < now_window {
+        while oldest_open + set.allowed_lateness_windows < now_window {
             let window = oldest_open;
             let stats = &mut self.stats;
             self.entities.retain(|_, entity| {
@@ -238,7 +243,7 @@ impl Aggregator {
                 stats.expired_entities += u64::from(expired);
                 !expired
             });
-            let expired = self.overflow.take_if(|entity| {
+            let expired = self.overflow_entity.take_if(|entity| {
                 entity.emit_window(set, window, &mut out);
                 entity.expire_if_idle(set, window, &mut out)
             });
@@ -384,7 +389,7 @@ mod tests {
         duration: Histogram,
     }
 
-    fn fixture(lateness: u64, expiry: u64, max: Option<usize>) -> Fixture {
+    fn fixture(allowed_lateness: u64, expiry: u64, max: Option<usize>) -> Fixture {
         let cardinality_limit = max.map(|max_entities| {
             let mut overflow_labels = Labels::new();
             overflow_labels.insert("overflow", "true");
@@ -393,13 +398,13 @@ mod tests {
                 overflow_labels,
             }
         });
-        let mut b = MetricSetBuilder::new(Settings {
-            allowed_lateness: Duration::from_secs(lateness),
+        let mut builder = MetricSetBuilder::new(Settings {
+            allowed_lateness: Duration::from_secs(allowed_lateness),
             expiry: Duration::from_secs(expiry),
             cardinality_limit,
             ..Settings::default()
         });
-        let requests = b.counter::<Outcome>(Chart {
+        let requests = builder.counter::<Outcome>(Chart {
             title: "Requests",
             units: "requests/s",
             family: "requests",
@@ -407,7 +412,7 @@ mod tests {
             chart_type: ChartType::Stacked,
             priority: 1,
         });
-        let duration = b.histogram(
+        let duration = builder.histogram(
             BOUNDS,
             Chart {
                 title: "Duration",
@@ -420,7 +425,7 @@ mod tests {
             "requests/s",
         );
         Fixture {
-            set: b.build(),
+            set: builder.build(),
             requests,
             duration,
         }
@@ -518,10 +523,10 @@ mod tests {
     }
 
     #[test]
-    fn lateness_keeps_windows_open_and_clamps_exactly_once() {
+    fn allowed_lateness_keeps_windows_open_and_clamps_exactly_once() {
         let f = fixture(10, 900, None);
         let mut aggregator = Aggregator::new(&f.set);
-        // The oldest open window is 990 (now 1000, lateness 10).
+        // The oldest open window is 990 (now 1000, allowed lateness 10).
         record(&f, &mut aggregator, "a", 995, 1, 0, 1000);
         // Too late: counted in the oldest open window.
         record(&f, &mut aggregator, "a", 100, 2, 0, 1000);
@@ -529,7 +534,8 @@ mod tests {
         record(&f, &mut aggregator, "a", 5000, 4, 0, 1000);
         assert_eq!(aggregator.stats().late_events, 2);
         assert_eq!(aggregator.stats().future_events, 4);
-        // Window 999 is not emitted before its end plus the lateness, 1010.
+        // Window 999 is not emitted before its end plus the allowed lateness,
+        // 1010.
         let out = text(&aggregator.emit(1009, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
         let ok_values = |out: &str| -> Vec<f64> {
@@ -702,11 +708,11 @@ mod tests {
                 Events = "events",
             }
         }
-        let mut b = MetricSetBuilder::new(Settings {
+        let mut builder = MetricSetBuilder::new(Settings {
             expiry: Duration::from_secs(3),
             ..Settings::default()
         });
-        let totals = b.cumulative_counter::<Events>(Chart {
+        let totals = builder.cumulative_counter::<Events>(Chart {
             title: "Events",
             units: "events/s",
             family: "events",
@@ -714,28 +720,28 @@ mod tests {
             chart_type: ChartType::Line,
             priority: 1,
         });
-        let set = b.build();
+        let set = builder.build();
         let mut aggregator = Aggregator::new(&set);
-        let set = |aggregator: &mut Aggregator, time: u64, total: Option<f64>| {
+        let set_total = |aggregator: &mut Aggregator, time: u64, total: Option<f64>| {
             let mut batch = Batch::new(&set);
             let mut entity = batch.entity(Labels::new());
-            let mut record = entity.record(time);
+            let mut measurements = entity.record(time);
             if let Some(total) = total {
-                record.set_total(totals, Events::Events, total);
+                measurements.set_total(totals, Events::Events, total);
             }
             aggregator.merge(batch, time);
         };
         // Baseline, two totals in one window (the last wins), no new total, a
         // reset, then a return after expiry with a new baseline.
-        set(&mut aggregator, 10, Some(100.0));
-        set(&mut aggregator, 11, Some(103.0));
-        set(&mut aggregator, 11, Some(107.0));
-        set(&mut aggregator, 12, None);
-        set(&mut aggregator, 13, Some(5.0));
+        set_total(&mut aggregator, 10, Some(100.0));
+        set_total(&mut aggregator, 11, Some(103.0));
+        set_total(&mut aggregator, 11, Some(107.0));
+        set_total(&mut aggregator, 12, None);
+        set_total(&mut aggregator, 13, Some(5.0));
         let mut out = text(&aggregator.emit(14, usize::MAX));
         out += &text(&aggregator.emit(18, usize::MAX));
-        set(&mut aggregator, 20, Some(50.0));
-        set(&mut aggregator, 21, Some(52.0));
+        set_total(&mut aggregator, 20, Some(50.0));
+        set_total(&mut aggregator, 21, Some(52.0));
         out += &text(&aggregator.emit(22, usize::MAX));
         validate_chart_stream(out.as_bytes()).unwrap();
         let values: Vec<&str> = out
@@ -767,8 +773,8 @@ mod tests {
                 2
             }
         }
-        let mut b = MetricSetBuilder::new(Settings::default());
-        let counter = b.counter::<Broken>(Chart {
+        let mut builder = MetricSetBuilder::new(Settings::default());
+        let counter = builder.counter::<Broken>(Chart {
             title: "C",
             units: "events/s",
             family: "c",
@@ -776,7 +782,7 @@ mod tests {
             chart_type: ChartType::Line,
             priority: 1,
         });
-        let set = b.build();
+        let set = builder.build();
         let mut batch = Batch::new(&set);
         let mut entity = batch.entity(Labels::new());
         entity.record(10).add(counter, Broken, 1.0);
@@ -813,7 +819,7 @@ mod tests {
                 Events = "events",
             }
         }
-        let mut b = MetricSetBuilder::new(Settings::default());
+        let mut builder = MetricSetBuilder::new(Settings::default());
         let chart = |context| Chart {
             title: "T",
             units: "u",
@@ -822,11 +828,11 @@ mod tests {
             chart_type: ChartType::Line,
             priority: 1,
         };
-        let requests = b.counter::<Outcome>(chart("svc.requests"));
-        let queued = b.gauge::<Queued>(chart("svc.queued"));
-        let totals = b.cumulative_counter::<Events>(chart("svc.events"));
-        let duration = b.histogram(BOUNDS, chart("svc.duration"), "requests/s");
-        let set = b.build();
+        let requests = builder.counter::<Outcome>(chart("svc.requests"));
+        let queued = builder.gauge::<Queued>(chart("svc.queued"));
+        let totals = builder.cumulative_counter::<Events>(chart("svc.events"));
+        let duration = builder.histogram(BOUNDS, chart("svc.duration"), "requests/s");
+        let set = builder.build();
         let mut aggregator = Aggregator::new(&set);
         let mut batch = Batch::new(&set);
         let mut entity = batch.entity(Labels::new());

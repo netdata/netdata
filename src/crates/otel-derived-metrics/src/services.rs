@@ -51,8 +51,8 @@ pub(crate) struct Services {
 
 impl Services {
     pub(crate) fn new(max_services: usize) -> Self {
-        let mut b = MetricSetBuilder::new(service_settings(max_services));
-        let requests = b.counter::<Outcome>(Chart {
+        let mut builder = MetricSetBuilder::new(service_settings(max_services));
+        let requests = builder.counter::<Outcome>(Chart {
             title: "Service requests",
             units: "requests/s",
             family: "requests",
@@ -63,7 +63,7 @@ impl Services {
         // Charts `otel_service.request_duration_avg`,
         // `otel_service.request_duration_max` and
         // `otel_service.request_duration_histogram`.
-        let duration = b.histogram(
+        let duration = builder.histogram(
             DURATION_BOUNDS,
             Chart {
                 title: "Service request duration",
@@ -76,7 +76,7 @@ impl Services {
             "requests/s",
         );
         Self {
-            metrics: b.build(),
+            metrics: builder.build(),
             requests,
             duration,
         }

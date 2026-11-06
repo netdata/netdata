@@ -252,7 +252,7 @@ pub(crate) struct MetricSetInner {
     pub(crate) id: u32,
     /// The collection interval in whole seconds.
     pub(crate) interval_secs: u64,
-    pub(crate) lateness_windows: u64,
+    pub(crate) allowed_lateness_windows: u64,
     pub(crate) expiry_windows: u64,
     pub(crate) cardinality_limit: Option<CardinalityLimit>,
     pub(crate) row_layout: RowLayout,
@@ -502,7 +502,7 @@ impl MetricSetBuilder {
         let windows = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
         MetricSet(Arc::new(MetricSetInner {
             id: self.id,
-            lateness_windows: windows(settings.allowed_lateness),
+            allowed_lateness_windows: windows(settings.allowed_lateness),
             expiry_windows: windows(settings.expiry),
             interval_secs: interval.as_secs(),
             cardinality_limit: settings.cardinality_limit,

@@ -49,8 +49,8 @@ pub(crate) struct ServiceLogs {
 
 impl ServiceLogs {
     pub(crate) fn new(max_services: usize) -> Self {
-        let mut b = MetricSetBuilder::new(service_settings(max_services));
-        let records = b.counter::<Severity>(Chart {
+        let mut builder = MetricSetBuilder::new(service_settings(max_services));
+        let records = builder.counter::<Severity>(Chart {
             title: "Service log records by severity",
             units: "records/s",
             family: "logs",
@@ -59,7 +59,7 @@ impl ServiceLogs {
             priority: 60_010,
         });
         Self {
-            metrics: b.build(),
+            metrics: builder.build(),
             records,
         }
     }

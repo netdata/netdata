@@ -130,7 +130,7 @@ impl Readout {
 #[derive(Debug, Default)]
 pub(crate) struct RowLayout {
     aggregations: Vec<Aggregation>,
-    initial_row: Vec<f64>,
+    empty_row: Vec<f64>,
     /// The columns of [`CumulativeCounter`](crate::CumulativeCounter)
     /// instruments, which hold totals until a window is emitted as increases.
     cumulative_columns: Vec<usize>,
@@ -142,7 +142,7 @@ impl RowLayout {
         let base = self.aggregations.len();
         self.aggregations
             .extend(std::iter::repeat_n(aggregation, len));
-        self.initial_row
+        self.empty_row
             .extend(std::iter::repeat_n(aggregation.initial(), len));
         base
     }
@@ -158,7 +158,7 @@ impl RowLayout {
 
     /// The row of a window without events.
     pub(crate) fn empty_row(&self) -> Box<[f64]> {
-        self.initial_row.as_slice().into()
+        self.empty_row.as_slice().into()
     }
 
     /// Combine `incoming` into `target`, each column by its [`Aggregation`].

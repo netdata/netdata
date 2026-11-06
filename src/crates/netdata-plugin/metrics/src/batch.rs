@@ -161,15 +161,16 @@ impl Measurements<'_> {
     }
 
     /// Set `total`, the source's running total for `dimension` of
-    /// `cumulative`; the chart shows how much it grew per second. Within a
-    /// window, the total set last counts. A non-finite total is ignored.
+    /// `cumulative_counter`; the chart shows how much it grew per second.
+    /// Within a window, the total set last counts. A non-finite total is
+    /// ignored.
     pub fn set_total<D: Dimension>(
         &mut self,
-        cumulative: CumulativeCounter<D>,
+        cumulative_counter: CumulativeCounter<D>,
         dimension: D,
         total: f64,
     ) -> &mut Self {
-        let column = self.column(cumulative.0, dimension);
+        let column = self.column(cumulative_counter.0, dimension);
         if total.is_finite() {
             self.row[column] = total;
         }
