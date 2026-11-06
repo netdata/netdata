@@ -203,16 +203,14 @@ impl Aggregator {
                 }
             };
             for (window, batch_row) in entity_rows.rows {
-                let window = if window < oldest_open {
+                let open_window = window.clamp(oldest_open, newest);
+                if window < oldest_open {
                     self.stats.late_events += batch_row.events;
-                    oldest_open
-                } else if window > newest {
+                }
+                if window > newest {
                     self.stats.future_events += batch_row.events;
-                    newest
-                } else {
-                    window
-                };
-                entity.merge_window(set, oldest_open, window, &batch_row.cells);
+                }
+                entity.merge_window(set, oldest_open, open_window, &batch_row.cells);
             }
         }
     }
