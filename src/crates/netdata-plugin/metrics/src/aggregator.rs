@@ -187,9 +187,9 @@ impl Aggregator {
     ///
     /// # Panics
     ///
-    /// If the batch is of another metric set.
+    /// In debug builds, if the batch is of another metric set.
     pub fn merge(&mut self, batch: Batch, now: u64) {
-        assert!(
+        debug_assert!(
             std::sync::Arc::ptr_eq(&batch.set().0, &self.set.0),
             "batch of another metric set"
         );
@@ -786,6 +786,7 @@ mod tests {
         assert_eq!(out.matches("'obsolete store_first'").count(), 1);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "instrument of another metric set")]
     fn an_instrument_of_another_metric_set_is_refused() {
@@ -796,6 +797,7 @@ mod tests {
         entity.record(10).add(other.requests, Outcome::Ok, 1.0);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "column index 2 out of 2")]
     fn a_column_index_out_of_range_is_refused() {
@@ -815,6 +817,7 @@ mod tests {
         entity.record(10).add(counter, Broken, 1.0);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "the collection interval must be whole seconds")]
     fn a_fractional_collection_interval_is_refused() {
@@ -1263,6 +1266,7 @@ mod tests {
     }
 
     /// Declares one gauge of `C` and charts it as `context`.
+    #[cfg(debug_assertions)]
     fn chart_one<C: crate::Column>(context: &'static str) {
         let mut builder = MetricSetBuilder::new(Settings::default());
         let gauge = builder.gauge::<C>();
@@ -1270,6 +1274,7 @@ mod tests {
         ChartsBuilder::new(&set).chart(gauge, descriptor(context, 1));
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "invalid dimension id")]
     fn dimension_ids_are_checked_before_the_context() {
@@ -1284,18 +1289,21 @@ mod tests {
         chart_one::<Bad>("nodot");
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "invalid context \"nodot\"")]
     fn a_context_without_a_dot_is_refused() {
         chart_one::<Queue>("nodot");
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "ends like an entity suffix")]
     fn a_context_ending_like_an_entity_suffix_is_refused() {
         chart_one::<Seen>("x.c_overflow");
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "duplicate context \"x.c\"")]
     fn a_used_context_is_refused() {
@@ -1308,6 +1316,7 @@ mod tests {
         charts.chart(queue, descriptor("x.c", 2));
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "duplicate column name \"a\"")]
     fn a_repeated_column_name_is_refused() {
@@ -1322,6 +1331,7 @@ mod tests {
         MetricSetBuilder::new(Settings::default()).counter::<Twice>();
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "an instrument needs at least one column")]
     fn a_column_type_without_names_is_refused() {
@@ -1336,12 +1346,14 @@ mod tests {
         MetricSetBuilder::new(Settings::default()).counter::<Empty>();
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "histogram bounds must be finite and increasing")]
     fn decreasing_histogram_bounds_are_refused() {
         MetricSetBuilder::new(Settings::default()).histogram(&[1.0, 0.5]);
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "invalid context \"nodot\"")]
     fn a_histogram_checks_its_base_context() {
@@ -1351,6 +1363,7 @@ mod tests {
         ChartsBuilder::new(&set).histogram(duration, descriptor("nodot", 1), "u");
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "duplicate context \"x.d_max\"")]
     fn a_histogram_refuses_a_used_derived_context() {
@@ -1363,12 +1376,14 @@ mod tests {
         charts.histogram(duration, descriptor("x.d", 2), "u");
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "metric set has no instruments")]
     fn a_set_without_instruments_is_refused() {
         MetricSetBuilder::new(Settings::default()).build();
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "the columns [\"jobs\"] already have a chart")]
     fn an_instrument_charted_twice_is_refused() {
@@ -1380,6 +1395,7 @@ mod tests {
         charts.chart(queue, descriptor("x.b", 2));
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "the columns [\"avg\"] have no chart")]
     fn an_instrument_without_charts_is_refused() {
@@ -1392,6 +1408,7 @@ mod tests {
         charts.build();
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "instrument of another metric set")]
     fn charting_an_instrument_of_another_set_is_refused() {
@@ -1400,6 +1417,7 @@ mod tests {
         ChartsBuilder::new(&e.set).chart(other.queue, descriptor("x.a", 1));
     }
 
+    #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "batch of another metric set")]
     fn a_batch_of_another_set_is_refused() {

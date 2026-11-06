@@ -146,7 +146,7 @@ impl ColumnGroup {
 /// What a set's rows hold: the column groups, each owning the next columns
 /// of the row, and the row of a window without events. The builder fills it
 /// only through [`Schema::add_column_group`], so every group passes its
-/// checks.
+/// checks (in debug builds).
 #[derive(Debug, Default)]
 pub(crate) struct Schema {
     column_groups: Vec<ColumnGroup>,
@@ -155,12 +155,12 @@ pub(crate) struct Schema {
 
 impl Schema {
     /// Adds a group of one value per name, in that order, taking the next
-    /// columns, and returns its index; after checking that there is at least
-    /// one name and that no name repeats.
+    /// columns, and returns its index; debug builds check that there is at
+    /// least one name and that no name repeats.
     pub(crate) fn add_column_group(&mut self, aggregation: Aggregation, names: Vec<String>) -> u32 {
-        assert!(!names.is_empty(), "an instrument needs at least one column");
+        debug_assert!(!names.is_empty(), "an instrument needs at least one column");
         for (i, name) in names.iter().enumerate() {
-            assert!(!names[..i].contains(name), "duplicate column name {name:?}");
+            debug_assert!(!names[..i].contains(name), "duplicate column name {name:?}");
         }
         let first = self.empty_row.len();
         let width = names.len() * aggregation.columns_per_value();

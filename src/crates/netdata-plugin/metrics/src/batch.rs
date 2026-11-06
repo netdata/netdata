@@ -127,9 +127,9 @@ impl BatchEntity<'_> {
 /// instrument, in one column of its [`Column`] type (a histogram has none).
 /// An event may hold measurements of several instruments.
 ///
-/// Every method panics if the instrument belongs to another [`MetricSet`],
-/// or if the column's index is out of range (a broken manual [`Column`]
-/// implementation).
+/// In debug builds, every method panics if the instrument belongs to another
+/// [`MetricSet`], or if the column's index is out of range (a broken manual
+/// [`Column`] implementation).
 pub struct Measurements<'a> {
     set_id: u32,
     row: &'a mut [f64],
@@ -137,13 +137,13 @@ pub struct Measurements<'a> {
 
 impl Measurements<'_> {
     fn check_set(&self, set_id: u32) {
-        assert_eq!(set_id, self.set_id, "instrument of another metric set");
+        debug_assert_eq!(set_id, self.set_id, "instrument of another metric set");
     }
 
     fn column<C: Column>(&self, columns: ColumnRange<C>, column: C) -> usize {
         self.check_set(columns.set_id);
         let index = column.index();
-        assert!(
+        debug_assert!(
             index < C::NAMES.len(),
             "column index {index} out of {}",
             C::NAMES.len()

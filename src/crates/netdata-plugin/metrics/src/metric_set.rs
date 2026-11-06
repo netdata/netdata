@@ -23,18 +23,18 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 ///
 /// # Names
 ///
-/// - Each name must appear once in `NAMES`. Declaring an instrument with a
-///   repeated name panics.
+/// - Each name must appear once in `NAMES`. In debug builds, declaring an
+///   instrument with a repeated name panics.
 /// - A charted column becomes a chart dimension with its name as the id, so
 ///   the names must also pass the rules at
 ///   [`ChartsBuilder::chart`](crate::ChartsBuilder::chart).
 ///
 /// # Manual implementations
 ///
-/// - `NAMES` must hold at least one name. Declaring an instrument with an
-///   empty `NAMES` panics.
-/// - `index` must return the value's position in `NAMES`. A measurement of a
-///   value whose index is out of range panics.
+/// - `NAMES` must hold at least one name. In debug builds, declaring an
+///   instrument with an empty `NAMES` panics.
+/// - `index` must return the value's position in `NAMES`. In debug builds, a
+///   measurement of a value whose index is out of range panics.
 pub trait Column: Copy + 'static {
     /// The names of all the columns, in order.
     const NAMES: &'static [&'static str];
@@ -203,20 +203,20 @@ impl Labels {
     }
 
     /// Insert a label, unless `value` is blank. The labels stay sorted by key,
-    /// whatever the insertion order.
+    /// whatever the insertion order. In release builds, a key already present
+    /// gets the new value.
     ///
     /// # Panics
     ///
-    /// If `key` is empty, longer than the agent's limit of 200 bytes, or
-    /// already present.
+    /// In debug builds, if `key` is empty, longer than the agent's limit of
+    /// 200 bytes, or already present.
     pub fn insert(&mut self, key: &str, value: &str) {
-        assert!(
+        debug_assert!(
             !key.is_empty() && key.len() <= MAX_LABEL_KEY_BYTES,
             "invalid label key {key:?}"
         );
-        let Err(at) = self.0.binary_search_by(|(k, _)| k.as_str().cmp(key)) else {
-            panic!("duplicate label key {key:?}");
-        };
+        let found = self.0.binary_search_by(|(k, _)| k.as_str().cmp(key));
+        debug_assert!(found.is_err(), "duplicate label key {key:?}");
         if value.chars().all(|c| c.is_whitespace() || c.is_control()) {
             return;
         }
@@ -224,8 +224,11 @@ impl Labels {
         while !value.is_char_boundary(end) {
             end -= 1;
         }
-        self.0
-            .insert(at, (key.to_string(), value[..end].to_string()));
+        let value = value[..end].to_string();
+        match found {
+            Ok(at) => self.0[at].1 = value,
+            Err(at) => self.0.insert(at, (key.to_string(), value)),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -327,22 +330,24 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If the collection interval is not a whole number of seconds of at
-    /// least 1, if `expiry` is 0, or if the cardinality limit's
-    /// `max_entities` is 0 or its overflow labels are empty.
+    /// If the cardinality limit's `max_entities` is 0; a plugin may take it
+    /// from its configuration, so this is checked in every build. In debug
+    /// builds also if the collection interval is not a whole number of
+    /// seconds of at least 1, if `expiry` is 0, or if the overflow labels are
+    /// empty.
     pub fn new(settings: Settings) -> Self {
         let interval = settings.collection_interval;
-        assert!(
+        debug_assert!(
             interval.as_secs() >= 1 && interval.subsec_nanos() == 0,
             "the collection interval must be whole seconds, at least 1: {interval:?}"
         );
-        assert!(!settings.expiry.is_zero(), "expiry must be positive");
+        debug_assert!(!settings.expiry.is_zero(), "expiry must be positive");
         if let Some(limit) = &settings.cardinality_limit {
             assert!(
                 limit.max_entities > 0,
                 "the cardinality limit must be positive"
             );
-            assert!(
+            debug_assert!(
                 !limit.overflow_labels.is_empty(),
                 "overflow labels are required"
             );
@@ -367,7 +372,7 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If `C::NAMES` is empty or a name repeats in it.
+    /// In debug builds, if `C::NAMES` is empty or a name repeats in it.
     pub fn counter<C: Column>(&mut self) -> Counter<C> {
         Counter(self.split_by(Aggregation::Sum))
     }
@@ -404,9 +409,9 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If `bounds` are not finite and strictly increasing.
+    /// In debug builds, if `bounds` are not finite and strictly increasing.
     pub fn histogram(&mut self, bounds: &'static [f64]) -> Histogram {
-        assert!(
+        debug_assert!(
             bounds.iter().all(|b| b.is_finite()) && bounds.windows(2).all(|w| w[0] < w[1]),
             "histogram bounds must be finite and increasing"
         );
@@ -430,9 +435,9 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If no instrument was added.
+    /// In debug builds, if no instrument was added.
     pub fn build(self) -> MetricSet {
-        assert!(
+        debug_assert!(
             !self.schema.column_groups().is_empty(),
             "metric set has no instruments"
         );

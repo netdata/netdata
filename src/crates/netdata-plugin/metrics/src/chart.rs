@@ -123,9 +123,9 @@ impl ChartsBuilder {
     ///
     /// # Panics
     ///
-    /// If the instrument is of another set or already has a chart, if a
-    /// column name is not a valid dimension id (empty, or holding spaces,
-    /// ASCII control characters, quotes, `\` or `=`, or starting with
+    /// In debug builds, if the instrument is of another set or already has a
+    /// chart, if a column name is not a valid dimension id (empty, or holding
+    /// spaces, ASCII control characters, quotes, `\` or `=`, or starting with
     /// `SLOT:`), or if `descriptor`'s context is invalid or already used.
     pub fn chart<C>(&mut self, columns: impl Into<ColumnRange<C>>, descriptor: ChartDescriptor) {
         let columns = columns.into();
@@ -153,9 +153,9 @@ impl ChartsBuilder {
     ///
     /// # Panics
     ///
-    /// If the histogram is of another set or already has its charts, if
-    /// `descriptor.context` is invalid, or if any of the three contexts is
-    /// already used.
+    /// In debug builds, if the histogram is of another set or already has its
+    /// charts, if `descriptor.context` is invalid, or if any of the three
+    /// contexts is already used.
     pub fn histogram(
         &mut self,
         histogram: Histogram,
@@ -186,11 +186,11 @@ impl ChartsBuilder {
     ///
     /// # Panics
     ///
-    /// If an instrument of the set has no chart.
+    /// In debug builds, if an instrument of the set has no chart.
     pub fn build(self) -> Charts {
         let groups = self.set.0.schema.column_groups();
         for (group, charted) in groups.iter().zip(&self.charted) {
-            assert!(charted, "the columns {:?} have no chart", group.names);
+            debug_assert!(charted, "the columns {:?} have no chart", group.names);
         }
         Charts(Arc::new(ChartsInner {
             set: self.set,
@@ -199,26 +199,26 @@ impl ChartsBuilder {
     }
 
     fn check_set(&self, set_id: u32) {
-        assert_eq!(set_id, self.set.0.id, "instrument of another metric set");
+        debug_assert_eq!(set_id, self.set.0.id, "instrument of another metric set");
     }
 
-    /// Checks `template`, in this order, then adds it: its group has no
-    /// chart yet, its dimension ids are valid, its context is valid, and its
-    /// context is unique in the charts.
+    /// Checks `template` in debug builds, in this order, then adds it: its
+    /// group has no chart yet, its dimension ids are valid, its context is
+    /// valid, and its context is unique in the charts.
     fn add(&mut self, template: ChartTemplate) {
         let group = self.set.0.schema.column_group(template.group);
         let charted = &mut self.charted[template.group as usize];
-        assert!(
+        debug_assert!(
             !*charted,
             "the columns {:?} already have a chart",
             group.names
         );
         for id in &group.names {
-            assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
+            debug_assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
         }
         let context = &template.context;
         check_context(context);
-        assert!(
+        debug_assert!(
             self.templates.iter().all(|t| &t.context != context),
             "duplicate context {context:?}"
         );
@@ -243,11 +243,11 @@ impl ChartTemplate {
     }
 }
 
-/// Panics unless `context` follows the rules at
+/// In debug builds, panics unless `context` follows the rules at
 /// [`ChartDescriptor::context`]: id bytes and dots, at least one dot inside,
 /// and no ending like an entity suffix.
 fn check_context(context: &str) {
-    assert!(
+    debug_assert!(
         context.bytes().all(|b| is_id_byte(b) || b == b'.')
             && context.contains('.')
             && !context.starts_with('.')
@@ -255,7 +255,7 @@ fn check_context(context: &str) {
         "invalid context {context:?}"
     );
     // Entity suffixes must not be mistaken for part of a context.
-    assert!(
+    debug_assert!(
         !ends_like_entity_suffix(context),
         "context {context:?} ends like an entity suffix"
     );

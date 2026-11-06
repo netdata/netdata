@@ -91,6 +91,11 @@
 //! of every template. Where OpenTelemetry splits a metric by attributes, the
 //! table splits an instrument by entity and by column; the charts show them
 //! as chart instances and dimensions.
+//!
+//! Mistakes in declaring or wiring a metric set come from the plugin's own
+//! code, so they are checked by debug assertions: tests and debug builds
+//! panic on them, release builds skip the checks. The `# Panics` sections
+//! list the checks and say which one runs in every build.
 
 mod aggregator;
 mod batch;
