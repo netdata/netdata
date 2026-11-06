@@ -189,7 +189,7 @@ jobs:
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -236,7 +236,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -308,7 +308,7 @@ jobs:
           path: ${{ github.workspace }}/.topology-ip-intel-stock/
           include-hidden-files: true
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -479,7 +479,7 @@ jobs:
           python3 .github/scripts/test-check-a53-erratum-843419.py
           python3 .github/scripts/check-a53-erratum-843419.py "${extract_dir}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -588,7 +588,7 @@ jobs:
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -656,7 +656,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: ./.github/scripts/windows-linker-check.ps1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -745,7 +745,7 @@ jobs:
           compression-level: 0
           retention-days: 30
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -813,7 +813,7 @@ jobs:
           NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
         run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -877,7 +877,7 @@ jobs:
           NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
         run: sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -945,7 +945,7 @@ jobs:
                  -v "$PWD":/netdata -w /netdata \
                  ubuntu:latest /bin/sh -x /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1055,7 +1055,7 @@ jobs:
         run: |
           .github/scripts/upload-new-version-tags.sh packages.netdata.cloud
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1119,7 +1119,7 @@ jobs:
             rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/nightly/${dir}" || exit 1
           done
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1184,7 +1184,7 @@ jobs:
           tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1203,7 +1203,7 @@ jobs:
             && github.event_name == 'workflow_dispatch'
           }}
       - name: Success Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'good'
           SLACK_FOOTER: ''
@@ -1254,7 +1254,7 @@ jobs:
             rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/stable/${dir}" || exit 1
           done
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1297,7 +1297,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1364,7 +1364,7 @@ jobs:
           docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --one-time-build ${{ needs.file-check.outputs.skip-go }}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -1457,7 +1457,7 @@ jobs:
           /usr/local/netdata/usr/sbin/netdata -D > ./netdata.log 2>&1 &
           ./packaging/runtime-check.sh
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

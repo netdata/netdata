@@ -34,7 +34,11 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
 
 ## Required Checks
 
-1. Identify the source MIB object for every profile field being added or changed.
+1. Identify the source MIB object for every profile field being added or changed, and confirm the configured OID is
+   that object's OID: a column `<entry>.<column>` (the entry is `<table>.1`) under its row's `table.OID`, or a scalar
+   with its `.0` instance. Profiles with these mistakes still load (an OID outside `table.OID` only logs a warning),
+   and a row whose columns double the entry arc still parses, so run the opt-in MIB check under Validation
+   (`src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows`).
 2. Check the object's `MAX-ACCESS` (SMIv2) or `ACCESS` (SMIv1).
 3. If the object is `not-accessible`, do not configure it as a readable `symbol.OID` unless it satisfies every
    device-scoped MIB-deviation requirement below.
@@ -43,36 +47,41 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
    - use `index` for one index component;
    - use `index_transform` for multiple components;
    - use `symbol.format` only for final formatting such as `ip_address`, `mac_address`, or `hex`.
-6. Put SNMP topology rows under top-level `topology:` with a required closed
+6. Resolve a cross-table tag through a row-index component (for example `ifXTable` via `index_transform`) only when
+   the MIB defines that component as the target table's index, such as an `InterfaceIndex`. A port number scoped to
+   a group, module or stack member (for example POWER-ETHERNET-MIB `pethPsePortIndex`) is not an ifIndex: identify
+   those rows by their own index tags and leave interface labels absent unless a MIB mapping such as ENTITY-MIB
+   `entAliasMappingTable` can be followed.
+7. Put SNMP topology rows under top-level `topology:` with a required closed
    `kind`. Do not mark topology rows by naming metrics `_topology_*`.
-7. Do not use chart/export-only value fields on topology row anchor symbols:
+8. Do not use chart/export-only value fields on topology row anchor symbols:
    `chart_meta`, `metric_type`, `mapping`, `transform`, `scale_factor`,
    or `format`.
-8. Keep regular `systemUptime` rows under `metrics:`. Do not model uptime as a
+9. Keep regular `systemUptime` rows under `metrics:`. Do not model uptime as a
    topology row kind; topology-specific uptime acquisition belongs in collector
    code, not profile topology schema.
-9. Put SNMP licensing rows under top-level `licensing:`. Do not model licensing
+10. Put SNMP licensing rows under top-level `licensing:`. Do not model licensing
    telemetry as underscore-prefixed hidden metrics or `_license_*` tag
    protocols.
-10. Licensing row value symbols may use `format` and exact `mapping`, but must
+11. Licensing row value symbols may use `format` and exact `mapping`, but must
    not use chart/export fields, transforms, scale factors, or
    underscore-prefixed generated names.
-11. For scalar licensing rows that combine multiple scalar signal OIDs into one
+12. For scalar licensing rows that combine multiple scalar signal OIDs into one
    license row, declare an explicit stable `id:`. For table licensing rows,
    keep every effective OID source (`symbol.OID`, `from`, or legacy `OID`) inside the same table OID and derive
    `not-accessible` INDEX values from the row index.
-12. Put SNMP BGP rows under top-level `bgp:`. Do not model BGP telemetry as
+13. Put SNMP BGP rows under top-level `bgp:`. Do not model BGP telemetry as
    vendor-specific raw metrics, `virtual_metrics`, or underscore-prefixed tag
    protocols when adding or migrating BGP coverage.
-13. BGP peer-state mappings must use the six RFC 4271 canonical states
+14. BGP peer-state mappings must use the six RFC 4271 canonical states
    (`idle`, `connect`, `active`, `opensent`, `openconfirm`, `established`).
    Use `partial: true` plus `partial_states` only when the source MIB is
    intentionally partial.
-14. For BGP table rows, derive `not-accessible` INDEX objects with exactly one
+15. For BGP table rows, derive `not-accessible` INDEX objects with exactly one
    row-index selector: `index`, `index_from_end`, or `index_transform`. Use
    `index_from_end` for trailing AFI/SAFI-like components after variable-length
    indexes such as `InetAddress`.
-15. To constrain a topology table to a fixed structural index prefix, use one
+16. To constrain a topology table to a fixed structural index prefix, use one
     readable anchor symbol and set `table.OID` to `<anchor-column>.<prefix>`.
     A simple same-index cross-table dependency inherits that prefix and is
     anchor-gated only when its target table has no symbol-bearing producer.
@@ -114,6 +123,28 @@ The retired `constant_value_one` key is ignored. Ordinary metric symbols still r
 - `drop_right` can be used when the right side has fixed trailing components.
 
 ## Common Patterns
+
+Interface alias label:
+
+- Every `interface`/`_interface` tag read from `ifName` MUST have an `_if_alias` sibling: a copy of that tag with only
+  `tag`, `symbol.OID` and `symbol.name` changed, so `table`, `MIB` and `index_transform` stay identical.
+  `TestStockProfiles_IfNameInterfaceTagsCarryIfAlias` enforces it.
+- The underscore keeps the alias out of chart IDs; the collector emits it as the `if_alias` chart label.
+
+```yaml
+- tag: interface
+  table: ifXTable
+  MIB: IF-MIB
+  symbol:
+    OID: 1.3.6.1.2.1.31.1.1.1.1
+    name: ifName
+- tag: _if_alias
+  table: ifXTable
+  MIB: IF-MIB
+  symbol:
+    OID: 1.3.6.1.2.1.31.1.1.1.18
+    name: ifAlias
+```
 
 Q-BRIDGE learned FDB MAC:
 
@@ -205,6 +236,10 @@ When adding a new topology kind, update all three parts together:
 Verify that topology rows are delivered through `ProfileMetrics.TopologyMetrics`,
 not through underscore-prefixed `HiddenMetrics`.
 
+Several kinds can feed one record: `if_name`, `if_status` and `if_duplex` rows all update one interface per ifIndex and
+arrive separately. A handler MUST store only the fields its row carries. Derive a value that combines columns from
+different rows (port speed from `ifHighSpeed` and `ifSpeed`) after ingest, so row order cannot change it.
+
 When adding or migrating licensing profile coverage, update all related parts
 together:
 
@@ -244,10 +279,20 @@ run local checks when needed to verify a claim, without treating review as a req
 ```bash
 # Profile schema, parsing and validation
 go test ./plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition
+# Stock profile loading and stock-wide rules (table scope, interface aliases)
+go test ./plugin/go.d/collector/snmp/ddsnmp
 # Acquisition, index decoding and typed row delivery
 go test ./plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector
 # Topology consumption of profile observations
 go test ./plugin/go.d/collector/snmp_topology
 ```
 
-See `src/go/plugin/go.d/collector/snmp/profile-format.md` for the full profile syntax and the "Field accessibility" section.
+When adding or changing profile OIDs, also run the opt-in MIB check (rules in its doc comment; skips when unset). Stock
+was verified against `librenms/librenms @ b787b2e9d38a87f39d95a6a077c9382261262336` `mibs/`; OIDs whose MIB is absent
+are counted, not failed.
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/librenms/librenms <dir> &&
+  git -C <dir> sparse-checkout set mibs
+NETDATA_SNMP_MIB_DIRS=<dir>/mibs go test -run TestStockProfiles_OIDsResolveAgainstMIBs ./plugin/go.d/collector/snmp/ddsnmp
+```

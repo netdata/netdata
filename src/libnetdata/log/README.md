@@ -219,7 +219,7 @@ Example logrotate configuration:
 |              `ND_SRC_IP`               |            `src_ip`            |          `SourceIP`           | when the event happened during an inbound request, this is the IP the request came from                   |
 |             `ND_SRC_PORT`              |           `src_port`           |         `SourcePort`          | when the event happened during an inbound request, this is the port the request came from                 |
 |        `ND_SRC_FORWARDED_HOST`         |      `src_forwarded_host`      |     `SourceForwardedHost`     | the contents of the HTTP header `X-Forwarded-Host`                                                        |
-|         `ND_SRC_FORWARDED_FOR`         |      `src_forwarded_for`       |     `SourceForwardedFor`      | the contents of the HTTP header `X-Forwarded-For`                                                         |
+|         `ND_SRC_FORWARDED_FOR`         |      `src_forwarded_for`       |     `SourceForwardedFor`      | the first address in the HTTP header `X-Forwarded-For`, if it is a valid IPv4/IPv6 address (port dropped) |
 |         `ND_SRC_CAPABILITIES`          |       `src_capabilities`       |     `SourceCapabilities`      | when the request came from a child, this is the communication capabilities of the child                   |
 |           `ND_DST_TRANSPORT`           |        `dst_transport`         |    `DestinationTransport`     | when the event happened during an outbound request, this is the outbound request transport                |
 |              `ND_DST_IP`               |            `dst_ip`            |        `DestinationIP`        | when the event happened during an outbound request, this is the IP the request destination                |

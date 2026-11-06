@@ -72,7 +72,7 @@ metrics:
       - tag: _storage_descr
         symbol:
           OID: 1.3.6.1.2.1.25.2.3.1.3
-          name: hrDeviceDescr
+          name: hrStorageDescr
       - tag: rm:storage_type # Needed for transformation
         symbol:
           OID: 1.3.6.1.2.1.25.2.3.1.2

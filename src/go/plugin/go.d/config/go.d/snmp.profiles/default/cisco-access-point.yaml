@@ -42,6 +42,23 @@ metrics:
           description: Number of repeaters currently associating with this device on this interface
           family: 'Network/Interface/Wireless/Repeater/Active'
           unit: "{repeater}"
+    metric_tags:
+      - tag: interface
+        table: ifXTable
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+      - tag: _if_alias
+        table: ifXTable
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias
+
+  - MIB: CISCO-DOT11-ASSOCIATION-MIB
+    table:
+      name: cDot11AssociationStatsTable
+      OID: 1.3.6.1.4.1.9.9.273.1.1.3
+    symbols:
       - name: cDot11AssStatsAssociated
         OID: 1.3.6.1.4.1.9.9.273.1.1.3.1.1
         chart_meta:
@@ -84,3 +101,8 @@ metrics:
         symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
+      - tag: _if_alias
+        table: ifXTable
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.18
+          name: ifAlias

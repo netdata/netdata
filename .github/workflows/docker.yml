@@ -173,7 +173,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -263,7 +263,7 @@ jobs:
           path: /tmp/build-cache/*
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -389,7 +389,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -454,7 +454,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.docker_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -550,7 +550,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -616,7 +616,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.quay_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -712,7 +712,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -778,7 +778,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.ghcr_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -834,7 +834,7 @@ jobs:
           ref: refs/heads/master
           inputs: '{"tag": "stable", "pwd": "${{ secrets.MSI_CODE_SIGNING_PASSWORD }}"}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

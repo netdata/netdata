@@ -4,7 +4,9 @@ package functions_test
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math"
@@ -84,6 +86,17 @@ func newHandler(s *source) *syntheticfunctions.Handler {
 }
 
 func ptr(n float64) *float64 { return &n }
+
+// fixtureRunID returns a fresh run ID: artifacts.Store.Begin creates a /tmp/nd-dem-<id> alias that is shared by
+// every test process on the host, so fixed IDs collide across parallel packages and concurrent checkouts.
+func fixtureRunID() string {
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(id[:])
+}
+
 func call(h *syntheticfunctions.Handler, method string, args ...string) *funcapi.FunctionResponse {
 	return h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 		Method:      method,
@@ -459,7 +472,7 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	store, err := artifacts.Open(t.TempDir())
 	require.NoError(t, err)
 	defer store.Close()
-	const runID = "0123456789abcdef0123456789abcdef"
+	runID := fixtureRunID()
 	dir, err := store.Begin(runID, "lighthouse:home")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "output"), 0700))

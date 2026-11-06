@@ -689,6 +689,15 @@ sockets on the same process port. `default_type` must reference
 evidence references, arrays, or JSON cells. For evidence sources, `evidence`
 names an evidence type id.
 
+`name_column` is the bullet key: the UI merges rows with the same value into
+one bullet and resolves link endpoint port names against it, so it must carry
+the same port identity the links use, and consumers always display it.
+Optional `label_column` names a scalar display column with an operator-facing
+label, such as an SNMP interface alias. Consumers show it together with the
+name (for example `Gi0/1/0 · Uplink to core`) and show the name alone when the
+label is null or empty. Never put such a label in `name_column`: ports sharing
+it would merge and links would stop resolving to their port.
+
 `hover.fields` is intentionally lightweight graph hover metadata. Full modal
 and table composition lives in `types.actor_types.<id>.presentation.modal`,
 `types.link_types.<id>.presentation.modal`, and optional
@@ -1650,10 +1659,15 @@ Managed SNMP device actor modals are port-centric:
   device name, management IP, vendor, model, port counts, and LLDP/CDP counts
   in the modal identification area;
 - use `actor_ports` as the primary `Ports` section;
+- port bullets key on `actor_ports.name` (the port identity link endpoints
+  use) and set `label_column: if_alias`, so bullets show the interface alias
+  next to the port name when the device reports one;
 - expose real port identity columns, including SNMP `if_index` as the visible
-  numeric port ID when known, source `port_id`, display `name`, `if_name`,
-  `if_descr`, `if_alias`, MAC, speed, status, mode, role, VLAN, FDB, link, and
-  neighbor counts;
+  numeric port ID when known, display `name` with a visible `if_alias` (Alias)
+  column next to it, source `port_id`, `if_name`, `if_descr`, MAC, speed,
+  status, mode, role, VLAN, FDB, link, and neighbor counts; the expanded row
+  repeats `if_alias` as `ifAlias` next to `ifName` and `ifDescr`, so the full
+  value is visible when the grid cell is truncated;
 - never invent numeric port IDs. Do not use row order or any generated sequence;
   `if_index` must come from the device/SNMP facts and must align with
   `actor_port_links.if_index`, so local port identity never contradicts the

@@ -7,7 +7,7 @@
 #include "spinlock.h"
 
 typedef struct netdata_rw_spinlock {
-    pid_t writer;
+    uint32_t writer;    // tid of the write holder, 0 = none (not pid_t: 64-bit on mingw-w64 x64)
     uint32_t counter;
 } RW_SPINLOCK;
 
@@ -31,7 +31,8 @@ bool rw_spinlock_trywrite_lock_with_trace(RW_SPINLOCK *rw_spinlock, const char *
 #define rw_spinlock_trywrite_lock(rw_spinlock) rw_spinlock_trywrite_lock_with_trace(rw_spinlock, __FUNCTION__)
 
 // The "[holder: ...]" suffix of the 3600s deadlock fatal; separate so the unit test can check it.
-void rw_spinlock_deadlock_holder_format(char *dst, size_t dst_size, pid_t self, pid_t writer, pid_t first_writer,
+void rw_spinlock_deadlock_holder_format(char *dst, size_t dst_size,
+                                        uint32_t self, uint32_t writer, uint32_t first_writer,
                                         uint32_t readers, uint32_t readers_min, uint32_t readers_max);
 
 int rw_spinlock_unittest(void);

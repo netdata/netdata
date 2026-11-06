@@ -53,6 +53,13 @@ int command_argument_sanitization_tests(void) {
         { "'a",          "'\\''a" },
         { "a'",          "a'\\''" },
         { "--foo'a'''b", "foo'\\''a'\\'''\\'''\\''b" },
+
+        // alarm-notify.sh builds variable names from the recipient roles it receives; it relies on
+        // backticks becoming quotes and '$' becoming '_' here, so that nothing in them is ever expanded
+        { "a`id`b",      "a'\\''id'\\''b" },
+        { "a$(id)b",     "a_(id)b" },
+        { "x[$(id)]",    "x[_(id)]" },
+        { "${HOME}",     "_{HOME}" },
     };
 
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

@@ -2,7 +2,11 @@
 
 package snmptopology
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+import (
+	"math"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+)
 
 const (
 	tagLldpLocChassisID        = "lldp_loc_chassis_id"
@@ -137,4 +141,5 @@ const (
 	topologyProfileChartIDPrefix      = "snmp_device_prof_"
 	topologyProfileChartContextPrefix = "snmp.device_prof_"
 	topologyHighSpeedMultiplier       = int64(1_000_000)
+	topologyIfSpeedSaturated          = int64(math.MaxUint32)
 )

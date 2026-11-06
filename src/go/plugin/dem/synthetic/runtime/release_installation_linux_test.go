@@ -256,3 +256,196 @@ func TestPublishedOnlineTrustFailurePreservesInstalledSelection(t *testing.T) {
 	require.NoError(t, candidate.Close())
 	require.Equal(t, 2, calls)
 }
+
+func TestPublishedEnsurePreservesWarmSelectionWithoutDiscoveryOrInventory(t *testing.T) {
+	for _, policy := range []UpdatePolicy{ManualUpdates, AutomaticUpdates} {
+		t.Run(string(policy), func(t *testing.T) {
+			s, _ := testStore(t)
+			current := installPublishedFixture(t, s, 1, policy)
+			before, err := os.ReadFile(filepath.Join(s.path, "selection.json"))
+			require.NoError(t, err)
+			// A full inventory would reject this unrelated retained generation.
+			unrelated := filepath.Join(s.path, "generations", strings.Repeat("f", 64))
+			require.NoError(t, os.Mkdir(unrelated, 0700))
+			damage := filepath.Join(unrelated, "prepared.json")
+			require.NoError(t, os.WriteFile(damage, []byte("broken"), 0600))
+			candidate, selected, err := s.BeginPublishedEnsure(context.Background(), func(context.Context) (Release, error) {
+				t.Fatal("warm ensure invoked release discovery")
+				return Release{}, nil
+			})
+			require.NoError(t, err)
+			require.Nil(t, candidate)
+			require.Equal(t, current.Manifest, *selected)
+			after, err := os.ReadFile(filepath.Join(s.path, "selection.json"))
+			require.NoError(t, err)
+			require.Equal(t, before, after, "warm ensure must preserve consent and publication")
+			data, err := os.ReadFile(damage)
+			require.NoError(t, err)
+			require.Equal(t, "broken", string(data), "warm ensure must not repair retained state")
+		})
+	}
+}
+
+func TestPublishedEnsureRefusesDamagedSelectionBeforeDiscovery(t *testing.T) {
+	for _, damage := range []string{"selection", "selected generation", "missing executable", "missing bound launcher"} {
+		t.Run(damage, func(t *testing.T) {
+			s, _ := testStore(t)
+			current := installPublishedFixture(t, s, 1, ManualUpdates)
+			path := filepath.Join(s.path, "selection.json")
+			if damage == "selected generation" {
+				path = filepath.Join(s.path, "generations", current.Manifest.Archive.SHA256, "prepared.json")
+			}
+			if damage == "missing executable" || damage == "missing bound launcher" {
+				name := current.Manifest.Layout.Node
+				if damage == "missing bound launcher" {
+					name = "chrome"
+				}
+				// Keep the payload as evidence while removing the expected entry.
+				file := filepath.Join(s.path, "generations", current.Manifest.Archive.SHA256, name)
+				require.NoError(t, os.Rename(file, file+".damaged"))
+			} else {
+				require.NoError(t, os.WriteFile(path, []byte("broken"), 0600))
+			}
+			before, err := os.ReadFile(path)
+			require.NoError(t, err)
+			candidate, selected, err := s.BeginPublishedEnsure(context.Background(), func(context.Context) (Release, error) {
+				t.Fatal("damaged ensure invoked release discovery")
+				return Release{}, nil
+			})
+			require.ErrorIs(t, err, ErrDamaged)
+			require.Nil(t, candidate)
+			require.Nil(t, selected)
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+			require.Equal(t, before, data)
+		})
+	}
+}
+
+func TestPublishedEnsureRejectsStructuralPayloadAncestors(t *testing.T) {
+	for _, target := range []string{"node", "../../../../outside"} {
+		t.Run(target, func(t *testing.T) {
+			s, _ := testStore(t)
+			current := installPublishedFixture(t, s, 1, ManualUpdates)
+			path := filepath.Join(s.path, "generations", current.Manifest.Archive.SHA256, "node")
+			require.NoError(t, os.Rename(path, path+".saved"))
+			require.NoError(t, os.Symlink(target, path))
+			candidate, selected, err := s.BeginPublishedEnsure(context.Background(), func(context.Context) (Release, error) {
+				t.Fatal("damaged payload invoked release discovery")
+				return Release{}, nil
+			})
+			require.ErrorIs(t, err, ErrDamaged)
+			require.Nil(t, candidate)
+			require.Nil(t, selected)
+		})
+	}
+}
+
+func TestPublishedEnsurePreservesOperationalFailures(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission failure requires the unprivileged service identity")
+	}
+	for _, name := range []string{"selection.json", "prepared.json", "node", "node/bin", "runner"} {
+		t.Run(name, func(t *testing.T) {
+			s, _ := testStore(t)
+			current := installPublishedFixture(t, s, 1, ManualUpdates)
+			before, err := os.ReadFile(filepath.Join(s.path, "selection.json"))
+			require.NoError(t, err)
+			path := filepath.Join(s.path, "generations", current.Manifest.Archive.SHA256, name)
+			if name == "selection.json" {
+				path = filepath.Join(s.path, name)
+			}
+			info, err := os.Stat(path)
+			require.NoError(t, err)
+			require.NoError(t, os.Chmod(path, 0))
+			t.Cleanup(func() { require.NoError(t, os.Chmod(path, info.Mode().Perm())) })
+			noDiscovery := func(context.Context) (Release, error) {
+				t.Fatal("operational failure invoked release discovery")
+				return Release{}, nil
+			}
+			candidate, selected, err := s.BeginPublishedEnsure(context.Background(), noDiscovery)
+			require.ErrorIs(t, err, os.ErrPermission)
+			require.NotErrorIs(t, err, ErrDamaged)
+			require.Nil(t, candidate)
+			require.Nil(t, selected)
+			require.NoError(t, os.Chmod(path, info.Mode().Perm()))
+			after, err := os.ReadFile(filepath.Join(s.path, "selection.json"))
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+			candidate, selected, err = s.BeginPublishedEnsure(context.Background(), noDiscovery)
+			require.NoError(t, err)
+			require.Nil(t, candidate)
+			require.Equal(t, current.Manifest, *selected)
+		})
+	}
+}
+
+func TestSelectedPayloadErrorPreservesInconclusiveFailure(t *testing.T) {
+	cause := errors.New("payload validation interrupted")
+	err := selectedPayloadError(cause)
+	require.ErrorIs(t, err, cause)
+	require.NotErrorIs(t, err, ErrDamaged)
+}
+
+func TestEnsurePayloadOpenPreservesOperationalFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission failure requires the unprivileged service identity")
+	}
+	s, _ := testStore(t)
+	current := installPublishedFixture(t, s, 1, ManualUpdates)
+	path := filepath.Join(s.path, "generations", current.Manifest.Archive.SHA256)
+	require.NoError(t, os.Chmod(path, 0))
+	t.Cleanup(func() { require.NoError(t, os.Chmod(path, 0700)) })
+	err := s.validateEnsureSelection(current.Manifest)
+	require.ErrorIs(t, err, os.ErrPermission)
+	require.NotErrorIs(t, err, ErrDamaged)
+}
+
+func TestPublishedEnsureSerializesColdEnrollmentAndCancellation(t *testing.T) {
+	s, _ := testStore(t)
+	release, archive, load := publishedFixture(t, 1)
+	candidate, selected, err := s.BeginPublishedEnsure(context.Background(), load)
+	require.NoError(t, err)
+	require.NotNil(t, candidate)
+	require.Nil(t, selected)
+	other, err := Open(s.config)
+	require.NoError(t, err)
+	defer other.Close()
+	noDiscovery := func(context.Context) (Release, error) {
+		t.Fatal("concurrent ensure invoked release discovery")
+		return Release{}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, _, err = other.BeginPublishedEnsure(ctx, noDiscovery)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.NoError(t, candidate.Import(context.Background(), archive))
+	require.NoError(t, candidate.Select())
+	require.NoError(t, candidate.Close())
+	candidate, selected, err = other.BeginPublishedEnsure(context.Background(), noDiscovery)
+	require.NoError(t, err)
+	require.Nil(t, candidate)
+	require.Equal(t, release.Manifest, *selected)
+	status, err := other.Inspect()
+	require.NoError(t, err)
+	require.True(t, status.AutomaticUpdates)
+}
+
+func TestPublishedEnsureCancellationDuringDiscoveryDoesNotEnroll(t *testing.T) {
+	s, _ := testStore(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	_, _, err := s.BeginPublishedEnsure(ctx, func(ctx context.Context) (Release, error) {
+		cancel()
+		return Release{}, ctx.Err()
+	})
+	require.ErrorIs(t, err, context.Canceled)
+	status, err := s.Inspect()
+	require.NoError(t, err)
+	require.Nil(t, status.Selected)
+	require.False(t, status.AutomaticUpdates)
+	// Cancellation released installer exclusion for an ordinary retry.
+	_, _, load := publishedFixture(t, 1)
+	candidate, _, err := s.BeginPublishedEnsure(context.Background(), load)
+	require.NoError(t, err)
+	require.NoError(t, candidate.Close())
+}

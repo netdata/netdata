@@ -314,11 +314,24 @@ const DICTIONARY_ITEM *dyncfg_get_template_of_new_job(const char *job_id) {
     return item;
 }
 
+static bool dyncfg_call_is_echo(nd_uuid_t *call_id) {
+    return nrpc_call_has_result_cb(call_id, dyncfg_echo_cb);
+}
+
+bool dyncfg_transaction_is_echo(const char *transaction) {
+    // inline callbacks receive the call id as their transaction
+    nd_uuid_t call_id;
+    if(!transaction || !*transaction || uuid_parse_flexi(transaction, call_id) != 0)
+        return false;
+
+    return dyncfg_call_is_echo(&call_id);
+}
+
 int dyncfg_function_intercept_cb(struct nrpc_request *req, void *data __maybe_unused) {
 
     // IMPORTANT: this function MUST call the result_cb even on failures
 
-    bool called_from_dyncfg_echo = nrpc_call_has_result_cb(req->call_id, dyncfg_echo_cb);
+    bool called_from_dyncfg_echo = dyncfg_call_is_echo(req->call_id);
     bool has_payload = req->payload && buffer_strlen(req->payload) ? true : false;
     bool make_the_call_to_plugin = true;
 
