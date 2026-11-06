@@ -1,7 +1,12 @@
 #include "netipc_uds_internal.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
 
 static size_t min_of_size_t(size_t a, size_t b)
 {
@@ -97,6 +102,147 @@ static void fill_envelope(nipc_header_t *hdr, size_t payload_len)
     hdr->payload_len = (uint32_t)payload_len;
 }
 
+/* Wire bytes the in-flight responses can occupy: the queue bound. */
+static size_t pending_bound(const nipc_uds_session_t *session)
+{
+    size_t payload = session->max_response_payload_bytes;
+    size_t budget = session->packet_size > NIPC_HEADER_LEN
+        ? (size_t)session->packet_size - NIPC_HEADER_LEN : 1;
+    size_t packets = payload == 0 ? 1 : 1 + (payload - 1) / budget;
+    size_t per_packet = NIPC_HEADER_LEN + NIPC_UDS_PENDING_RECORD_LEN;
+    if (packets > (SIZE_MAX - payload) / per_packet)
+        return SIZE_MAX;
+    size_t per_response = payload + packets * per_packet;
+    if (per_response > SIZE_MAX / session->inflight_count)
+        return SIZE_MAX;
+    return per_response * session->inflight_count;
+}
+
+/* A failure inside a progress send leaves a partial message on the wire or
+ * inbound bytes dropped: the session cannot continue. */
+static nipc_uds_error_t fail_session(nipc_uds_session_t *session,
+                                     nipc_uds_error_t err)
+{
+    (void)shutdown(session->fd, SHUT_RDWR);
+    nipc_uds_inflight_fail_all(session);
+    return err;
+}
+
+/* Sends one packet without blocking; while the socket is full, reads what
+ * the peer sent into the pending queue, so both peers keep making progress.
+ * No timeout: it waits as long as a blocking send would. */
+static nipc_uds_error_t send_with_progress_loop(nipc_uds_session_t *session,
+                                           const void *hdr, size_t hdr_len,
+                                           const void *payload,
+                                           size_t payload_len)
+{
+    struct iovec iov[2];
+    int iovcnt = 1;
+    iov[0].iov_base = (void *)hdr;
+    iov[0].iov_len = hdr_len;
+    if (payload && payload_len > 0) {
+        iov[1].iov_base = (void *)payload;
+        iov[1].iov_len = payload_len;
+        iovcnt = 2;
+    }
+    struct iovec *cur = iov;
+    size_t bound = pending_bound(session);
+    /* After a failed stream receive the inbound bytes belong to an
+     * abandoned message: never queue them. */
+    bool eof = session->recv_failed;
+
+    for (;;) {
+        struct msghdr msg;
+        memset(&msg, 0, sizeof(msg));
+        msg.msg_iov = cur;
+        msg.msg_iovlen = iovcnt;
+
+        ssize_t n = sendmsg(session->fd, &msg,
+                            NIPC_UDS_SEND_FLAGS | MSG_DONTWAIT);
+        if (n >= 0) {
+#if NIPC_UDS_STREAM
+            if (n == 0)
+                return NIPC_UDS_ERR_SEND;
+            size_t left = (size_t)n;
+            while (iovcnt > 0 && left >= cur->iov_len) {
+                left -= cur->iov_len;
+                cur++;
+                iovcnt--;
+            }
+            if (iovcnt == 0)
+                return NIPC_UDS_OK;
+            cur->iov_base = (uint8_t *)cur->iov_base + left;
+            cur->iov_len -= left;
+            continue;
+#else
+            return (size_t)n == hdr_len + payload_len ? NIPC_UDS_OK
+                                                      : NIPC_UDS_ERR_SEND;
+#endif
+        }
+        if (errno == EINTR)
+            continue;
+        if (errno != EAGAIN && errno != EWOULDBLOCK)
+            return NIPC_UDS_ERR_SEND;
+
+        /* After EOF only writability matters; the retried send reports a
+         * closed peer. */
+        struct pollfd pfd = {
+            .fd = session->fd,
+            .events = (short)(POLLOUT | (eof ? 0 : POLLIN)),
+            .revents = 0,
+        };
+        int rc = poll(&pfd, 1, -1);
+        if (rc < 0) {
+            if (errno == EINTR)
+                continue;
+            return NIPC_UDS_ERR_SEND;
+        }
+        if (!eof && (pfd.revents & (POLLIN | POLLHUP | POLLERR))) {
+            nipc_uds_error_t err = nipc_uds_pending_drain(session, bound, &eof);
+            if (err != NIPC_UDS_OK)
+                return fail_session(session, err);
+        }
+    }
+}
+
+/* macOS ignores MSG_DONTWAIT on a stream send that lacks buffer space and
+ * blocks, so on the stream baseline (macOS, FreeBSD) the descriptor is made
+ * non-blocking for the send instead. */
+static nipc_uds_error_t send_with_progress(nipc_uds_session_t *session,
+                                           const void *hdr, size_t hdr_len,
+                                           const void *payload,
+                                           size_t payload_len)
+{
+#if NIPC_UDS_STREAM
+    int flags = fcntl(session->fd, F_GETFL);
+    if (flags < 0 || fcntl(session->fd, F_SETFL, flags | O_NONBLOCK) < 0)
+        return NIPC_UDS_ERR_SEND;
+    nipc_uds_error_t err = send_with_progress_loop(session, hdr, hdr_len,
+                                                   payload, payload_len);
+    /* A descriptor left non-blocking would break later blocking calls. */
+    if (fcntl(session->fd, F_SETFL, flags) < 0)
+        return fail_session(session, NIPC_UDS_ERR_SEND);
+    return err;
+#else
+    return send_with_progress_loop(session, hdr, hdr_len, payload,
+                                   payload_len);
+#endif
+}
+
+/* One request in flight (every typed call) keeps the plain blocking send;
+ * only a pipelining client can deadlock with a server blocked sending. */
+static nipc_uds_error_t session_send_packet(nipc_uds_session_t *session,
+                                            const void *hdr, size_t hdr_len,
+                                            const void *payload,
+                                            size_t payload_len)
+{
+    if (session->role == NIPC_UDS_ROLE_CLIENT && session->inflight_count > 1)
+        return send_with_progress(session, hdr, hdr_len, payload,
+                                  payload_len);
+    return nipc_uds_raw_send_iov(session->fd, hdr, hdr_len, payload,
+                                 payload_len);
+}
+
 static nipc_uds_error_t send_single_packet(nipc_uds_session_t *session,
                                            nipc_header_t *hdr,
                                            const void *payload,
@@ -106,8 +252,8 @@ static nipc_uds_error_t send_single_packet(nipc_uds_session_t *session,
     uint8_t hdr_buf[NIPC_HEADER_LEN];
     nipc_header_encode(hdr, hdr_buf, sizeof(hdr_buf));
 
-    nipc_uds_error_t err = nipc_uds_raw_send_iov(
-        session->fd, hdr_buf, NIPC_HEADER_LEN, payload, payload_len);
+    nipc_uds_error_t err = session_send_packet(
+        session, hdr_buf, NIPC_HEADER_LEN, payload, payload_len);
     update_inflight_after_send(session, hdr, tracked, err);
     return err;
 }
@@ -121,8 +267,8 @@ static nipc_uds_error_t send_first_chunk(nipc_uds_session_t *session,
     uint8_t hdr_buf[NIPC_HEADER_LEN];
     nipc_header_encode(hdr, hdr_buf, sizeof(hdr_buf));
 
-    nipc_uds_error_t err = nipc_uds_raw_send_iov(
-        session->fd, hdr_buf, NIPC_HEADER_LEN, payload, first_chunk_payload);
+    nipc_uds_error_t err = session_send_packet(
+        session, hdr_buf, NIPC_HEADER_LEN, payload, first_chunk_payload);
     update_inflight_after_send(session, hdr, tracked, err);
     return err;
 }
@@ -152,8 +298,8 @@ static nipc_uds_error_t send_continuation_chunk(nipc_uds_session_t *session,
     uint8_t chk_buf[NIPC_HEADER_LEN];
     nipc_chunk_header_encode(&chk, chk_buf, sizeof(chk_buf));
 
-    nipc_uds_error_t err = nipc_uds_raw_send_iov(
-        session->fd, chk_buf, NIPC_HEADER_LEN, src, this_chunk);
+    nipc_uds_error_t err = session_send_packet(
+        session, chk_buf, NIPC_HEADER_LEN, src, this_chunk);
     update_inflight_after_send(session, hdr, tracked, err);
     return err;
 }

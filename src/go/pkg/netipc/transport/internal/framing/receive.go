@@ -22,8 +22,12 @@ type Receiver struct {
 
 	Recv                func([]byte) (int, error)
 	EnsurePacketScratch func(*[]byte, int) []byte
-	OnRecvError         func(error)
-	PropagateRecvError  func(error) bool
+	// A receive error that IsRecvDisconnect reports fails every in-flight
+	// request through FailAllInflight. Two fields, not one closure, so a
+	// receive builds no closure.
+	IsRecvDisconnect   func(error) bool
+	FailAllInflight    func()
+	PropagateRecvError func(error) bool
 
 	ErrLimitExceeded func(string) error
 	ErrProtocol      func(string) error
@@ -77,16 +81,13 @@ func SessionReceive(config SessionReceiveConfig, buf []byte) (protocol.Header, [
 		Recv:                config.Recv,
 		EnsurePacketScratch: config.EnsurePacketScratch,
 		PropagateRecvError:  config.PropagateRecvError,
-		OnRecvError: func(err error) {
-			if config.IsRecvDisconnect(err) {
-				config.FailAllInflight()
-			}
-		},
-		ErrLimitExceeded: config.ErrLimitExceeded,
-		ErrProtocol:      config.ErrProtocol,
-		ErrChunk:         config.ErrChunk,
-		ErrUnknownMsgID:  config.ErrUnknownMsgID,
-		ErrRecv:          config.ErrRecv,
+		IsRecvDisconnect:    config.IsRecvDisconnect,
+		FailAllInflight:     config.FailAllInflight,
+		ErrLimitExceeded:    config.ErrLimitExceeded,
+		ErrProtocol:         config.ErrProtocol,
+		ErrChunk:            config.ErrChunk,
+		ErrUnknownMsgID:     config.ErrUnknownMsgID,
+		ErrRecv:             config.ErrRecv,
 	}.Receive(buf)
 }
 
@@ -145,8 +146,8 @@ func (r Receiver) totalMessageLen(hdr protocol.Header) (int, error) {
 }
 
 func (r Receiver) noteRecvError(err error) {
-	if r.OnRecvError != nil {
-		r.OnRecvError(err)
+	if r.IsRecvDisconnect != nil && r.FailAllInflight != nil && r.IsRecvDisconnect(err) {
+		r.FailAllInflight()
 	}
 }
 

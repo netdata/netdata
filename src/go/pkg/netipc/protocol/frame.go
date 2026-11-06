@@ -66,6 +66,11 @@ const (
 	// initialization config.
 	MaxPayloadCap uint32 = 1024 * 1024
 
+	// ServerHandshakeTimeoutMs bounds how long an accepted connection may
+	// take to send HELLO before the server drops it, so a stalled client
+	// cannot hold server resources.
+	ServerHandshakeTimeoutMs uint32 = 5000
+
 	// Alignment for batch items and typed codec items.
 	Alignment = 8
 
@@ -95,6 +100,9 @@ var (
 	ErrHandlerFailed = errors.New("dispatch handler failed")
 	ErrTimeout       = errors.New("synchronous call deadline expired")
 	ErrAborted       = errors.New("synchronous call aborted")
+	ErrDisconnected  = errors.New("peer disconnected")
+	ErrNotReady      = errors.New("client not ready")
+	ErrTransport     = errors.New("transport I/O failed")
 )
 
 // ---------------------------------------------------------------------------

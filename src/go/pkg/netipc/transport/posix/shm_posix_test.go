@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || (freebsd && (amd64 || 386))
 
 package posix
 
@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"sync"
 	"testing"
@@ -16,6 +17,10 @@ import (
 )
 
 const testShmRunDir = "/tmp/nipc_shm_go_test"
+
+// testDeadPID is above every OS PID limit, so never a live process; a small
+// fixed PID such as 99999 can be in use on hosts with a large pid_max.
+const testDeadPID = math.MaxInt32
 
 func ensureShmRunDir(t *testing.T) {
 	t.Helper()
@@ -41,32 +46,20 @@ func uniqueShmService(t *testing.T, prefix string) string {
 	return fmt.Sprintf("%s_%s", prefix, uniqueService(t))
 }
 
-func waitShmClientAttach(t *testing.T, runDir, service string, sessionID uint64) *ShmContext {
+// waitShmClientAttach attaches once, after created closes: the server side
+// has made the region by then, so any failure is real.
+func waitShmClientAttach(t *testing.T, created <-chan struct{}, runDir, service string, sessionID uint64) *ShmContext {
 	t.Helper()
-
-	deadline := time.Now().Add(5 * time.Second)
-	var lastErr error
-	for time.Now().Before(deadline) {
-		ctx, err := ShmClientAttach(runDir, service, sessionID)
-		if err == nil {
-			return ctx
-		}
-		lastErr = err
-
-		if !errors.Is(err, ErrShmOpen) &&
-			!errors.Is(err, ErrShmNotReady) &&
-			!errors.Is(err, ErrShmBadMagic) &&
-			!errors.Is(err, ErrShmBadVersion) &&
-			!errors.Is(err, ErrShmBadHeader) &&
-			!errors.Is(err, ErrShmBadSize) {
-			t.Fatalf("attach should not fail with non-transient error while waiting for readiness: %v", err)
-		}
-
-		time.Sleep(10 * time.Millisecond)
+	select {
+	case <-created:
+	case <-time.After(10 * time.Second):
+		t.Fatal("server did not create the SHM region within 10s")
 	}
-
-	t.Fatalf("timed out waiting for SHM region readiness: %v", lastErr)
-	return nil
+	ctx, err := ShmClientAttach(runDir, service, sessionID)
+	if err != nil {
+		t.Fatalf("ShmClientAttach: %v", err)
+	}
+	return ctx
 }
 
 // buildShmMessage creates a complete wire message (32-byte header + payload).
@@ -96,8 +89,10 @@ func TestShmDirectRoundtrip(t *testing.T) {
 	var wg sync.WaitGroup
 	var serverErr error
 
+	created := make(chan struct{})
 	wg.Go(func() {
 		ctx, err := ShmServerCreate(testShmRunDir, svc, 1, 4096, 4096)
+		close(created)
 		if err != nil {
 			serverErr = fmt.Errorf("server create: %w", err)
 			return
@@ -130,7 +125,7 @@ func TestShmDirectRoundtrip(t *testing.T) {
 		}
 	})
 
-	client := waitShmClientAttach(t, testShmRunDir, svc, 1)
+	client := waitShmClientAttach(t, created, testShmRunDir, svc, 1)
 	defer client.ShmClose()
 
 	payload := []byte{0xCA, 0xFE, 0xBA, 0xBE}
@@ -179,8 +174,10 @@ func TestShmMultipleRoundtrips(t *testing.T) {
 	var wg sync.WaitGroup
 	var serverErr error
 
+	created := make(chan struct{})
 	wg.Go(func() {
 		ctx, err := ShmServerCreate(testShmRunDir, svc, 2, 4096, 4096)
+		close(created)
 		if err != nil {
 			serverErr = fmt.Errorf("server create: %w", err)
 			return
@@ -209,7 +206,7 @@ func TestShmMultipleRoundtrips(t *testing.T) {
 		}
 	})
 
-	client := waitShmClientAttach(t, testShmRunDir, svc, 2)
+	client := waitShmClientAttach(t, created, testShmRunDir, svc, 2)
 	defer client.ShmClose()
 
 	respBuf := make([]byte, 65536)
@@ -259,8 +256,8 @@ func TestShmStaleRecovery(t *testing.T) {
 	}
 
 	// Write a dead PID into the header
-	binary.NativeEndian.PutUint32(first.data[8:12], 99999) // very unlikely alive
-	first.ShmClose()                                       // close without unlink
+	binary.NativeEndian.PutUint32(first.data[8:12], testDeadPID)
+	first.ShmClose() // close without unlink
 
 	// Clean up stale regions (as production server would)
 	ShmCleanupStale(testShmRunDir, svc)
@@ -289,8 +286,8 @@ func TestShmStaleRecoveryInGroupWritableRunDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first create: %v", err)
 	}
-	binary.NativeEndian.PutUint32(first.data[8:12], 99999) // very unlikely alive
-	first.ShmClose()                                       // close without unlink
+	binary.NativeEndian.PutUint32(first.data[8:12], testDeadPID)
+	first.ShmClose() // close without unlink
 
 	// ServerCreate must reclaim the dead-owner region through its EEXIST path
 	second, err := ShmServerCreate(runDir, svc, 3, 1024, 1024)
@@ -342,8 +339,10 @@ func TestShmLargeMessage(t *testing.T) {
 	var wg sync.WaitGroup
 	var serverErr error
 
+	created := make(chan struct{})
 	wg.Go(func() {
 		ctx, err := ShmServerCreate(testShmRunDir, svc, 4, 65536, 65536)
+		close(created)
 		if err != nil {
 			serverErr = fmt.Errorf("server create: %w", err)
 			return
@@ -370,7 +369,7 @@ func TestShmLargeMessage(t *testing.T) {
 		}
 	})
 
-	client := waitShmClientAttach(t, testShmRunDir, svc, 4)
+	client := waitShmClientAttach(t, created, testShmRunDir, svc, 4)
 	defer client.ShmClose()
 
 	// 60000 bytes of payload
@@ -572,12 +571,16 @@ func TestShmMultiClient(t *testing.T) {
 		})
 	}
 
+	// The regions were created above, before the goroutines started.
+	shmCreated := make(chan struct{})
+	close(shmCreated)
+
 	// Attach clients and send unique messages
 	clients := make([]*ShmContext, numClients)
 	payloads := make([][]byte, numClients)
 	for i := range numClients {
 		sessionID := uint64(i + 1)
-		c := waitShmClientAttach(t, testShmRunDir, svc, sessionID)
+		c := waitShmClientAttach(t, shmCreated, testShmRunDir, svc, sessionID)
 		defer c.ShmClose()
 		clients[i] = c
 

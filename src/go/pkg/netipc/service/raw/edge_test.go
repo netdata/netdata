@@ -3,8 +3,8 @@
 package raw
 
 import (
+	"errors"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
@@ -54,12 +54,7 @@ func TestClientRefreshFromAuthFailed(t *testing.T) {
 		protocol.MethodCgroupsSnapshot,
 		testSnapshotDispatch(),
 	)
-	doneCh := make(chan struct{})
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-	time.Sleep(100 * time.Millisecond)
+	doneCh := runServerForTest(s)
 	defer func() {
 		s.Stop()
 		<-doneCh
@@ -100,12 +95,7 @@ func TestClientRefreshFromIncompatible(t *testing.T) {
 		protocol.MethodCgroupsSnapshot,
 		testSnapshotDispatch(),
 	)
-	doneCh := make(chan struct{})
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-	time.Sleep(100 * time.Millisecond)
+	doneCh := runServerForTest(s)
 	defer func() {
 		s.Stop()
 		<-doneCh
@@ -171,7 +161,15 @@ func TestClientRefreshFromBroken(t *testing.T) {
 	ensureRunDir()
 	cleanupAll(svc)
 
-	ts := startTestServer(svc, testSnapshotDispatch())
+	// A call that times out leaves the client BROKEN while the server stays up.
+	release := make(chan struct{})
+	ts := startTestServerUnixWithConfig(svc, testServerConfig(), protocol.MethodCgroupsSnapshot,
+		SnapshotDispatch(func(req *protocol.CgroupsRequest, b *protocol.CgroupsBuilder) bool {
+			<-release
+			return testCgroupsHandler(req, b)
+		}, 3))
+	defer ts.stop()
+	defer close(release)
 
 	client := NewSnapshotClient(testRunDir, svc, testClientConfig())
 	defer client.Close()
@@ -181,23 +179,12 @@ func TestClientRefreshFromBroken(t *testing.T) {
 		t.Fatal("expected READY")
 	}
 
-	// Kill server to make connection broken
-	ts.stop()
-	cleanupAll(svc)
-	time.Sleep(50 * time.Millisecond)
-
-	// Force a call to break the connection
-	_, _ = client.CallSnapshot()
-
-	// At this point, state should be BROKEN
-	if client.state != StateBroken {
-		t.Logf("state is %d (may not be broken if retry succeeded; skipping)", client.state)
-		return
+	if _, err := client.CallSnapshotWithTimeout(30); !errors.Is(err, protocol.ErrTimeout) {
+		t.Fatalf("CallSnapshot error = %v, want timeout", err)
 	}
-
-	// Start a new server
-	ts2 := startTestServer(svc, testSnapshotDispatch())
-	defer ts2.stop()
+	if client.state != StateBroken {
+		t.Fatalf("state = %d after a timed-out call, want BROKEN", client.state)
+	}
 
 	// Refresh from BROKEN should reconnect
 	changed := client.Refresh()

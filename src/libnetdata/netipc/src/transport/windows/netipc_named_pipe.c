@@ -10,6 +10,7 @@
 
 #include "netipc/netipc_named_pipe.h"
 #include "netipc/netipc_protocol.h"
+#include "netipc_win_security.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -210,12 +211,19 @@ static HANDLE create_pipe_instance(const wchar_t *pipe_name, uint32_t buf_size,
   if (first_instance)
     open_mode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
 
-  HANDLE h = CreateNamedPipeW(
-      pipe_name, open_mode,
-      PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
-      NIPC_NP_MAX_INSTANCES, buf_size, buf_size, 0, /* default timeout */
-      NULL                                          /* default security */
-  );
+  SECURITY_ATTRIBUTES sa;
+  if (!nipc_win_security_attrs_init(&sa))
+    return INVALID_HANDLE_VALUE;
+
+  HANDLE h = CreateNamedPipeW(pipe_name, open_mode,
+                              PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE |
+                                  PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+                              NIPC_NP_MAX_INSTANCES, buf_size, buf_size,
+                              0, /* default timeout */
+                              &sa);
+  DWORD err = GetLastError();
+  nipc_win_security_attrs_free(&sa);
+  SetLastError(err);
 
   return h;
 }
@@ -244,8 +252,11 @@ static nipc_np_error_t raw_send(HANDLE pipe, const void *data, size_t len) {
   return NIPC_NP_OK;
 }
 
+static nipc_np_error_t pipe_send(nipc_np_session_t *s, const void *data,
+                                 size_t len);
+
 /* Send header + payload as one pipe message (concatenated). */
-static nipc_np_error_t raw_send_msg(HANDLE pipe, const void *hdr,
+static nipc_np_error_t raw_send_msg(nipc_np_session_t *session, const void *hdr,
                                     size_t hdr_len, const void *payload,
                                     size_t payload_len) {
   /* Named Pipes don't support scatter-gather like sendmsg.
@@ -268,7 +279,7 @@ static nipc_np_error_t raw_send_msg(HANDLE pipe, const void *hdr,
   if (payload && payload_len > 0)
     memcpy(buf + hdr_len, payload, payload_len);
 
-  nipc_np_error_t err = raw_send(pipe, buf, total);
+  nipc_np_error_t err = pipe_send(session, buf, total);
 
   if (allocated)
     free(buf);
@@ -294,6 +305,263 @@ static int raw_recv(HANDLE pipe, void *buf, size_t buf_len, DWORD *bytes_read) {
   }
   *bytes_read = read;
   return 1; /* success */
+}
+
+/* Client pipe handles are overlapped (FILE_FLAG_OVERLAPPED), so a pipelining
+ * send can read responses while its write waits for buffer space. Every read
+ * and write on such a handle passes an OVERLAPPED and is waited to completion
+ * before the call returns, so the OVERLAPPED lives on that call's stack.
+ * Server handles stay synchronous. */
+
+static nipc_np_error_t send_error(DWORD err) {
+  return is_disconnect_error(err) ? NIPC_NP_ERR_DISCONNECTED : NIPC_NP_ERR_SEND;
+}
+
+/* Read one message on an overlapped handle and wait for it; same returns as
+ * raw_recv(). A message larger than buf (ERROR_MORE_DATA) fails, as on a
+ * synchronous handle. */
+static int overlapped_recv(HANDLE pipe, HANDLE event, void *buf, size_t buf_len,
+                           DWORD *bytes_read) {
+  OVERLAPPED ov = {0};
+  ov.hEvent = event;
+  DWORD read = 0;
+  *bytes_read = 0;
+  if (!ReadFile(pipe, buf, (DWORD)buf_len, &read, &ov)) {
+    DWORD err = GetLastError();
+    if (err != ERROR_IO_PENDING)
+      return is_disconnect_error(err) ? 0 : -1;
+  }
+  if (!GetOverlappedResult(pipe, &ov, &read, TRUE))
+    return is_disconnect_error(GetLastError()) ? 0 : -1;
+  if (read == 0)
+    return 0;
+  *bytes_read = read;
+  return 1;
+}
+
+/* Read one message with the session's handle kind. */
+static int pipe_recv(const nipc_np_session_t *s, void *buf, size_t buf_len,
+                     DWORD *bytes_read) {
+  if (s->read_event)
+    return overlapped_recv(s->pipe, s->read_event, buf, buf_len, bytes_read);
+  return raw_recv(s->pipe, buf, buf_len, bytes_read);
+}
+
+/* Post one message; finish_overlapped_send() collects its completion, also
+ * when WriteFile completed at once. */
+static nipc_np_error_t start_overlapped_send(HANDLE pipe, OVERLAPPED *ov,
+                                             const void *data, size_t len) {
+  DWORD written = 0;
+  if (!WriteFile(pipe, data, (DWORD)len, &written, ov)) {
+    DWORD err = GetLastError();
+    if (err != ERROR_IO_PENDING)
+      return send_error(err);
+  }
+  return NIPC_NP_OK;
+}
+
+static nipc_np_error_t finish_overlapped_send(HANDLE pipe, OVERLAPPED *ov,
+                                              size_t len) {
+  DWORD written = 0;
+  if (!GetOverlappedResult(pipe, ov, &written, TRUE))
+    return send_error(GetLastError());
+  return written == (DWORD)len ? NIPC_NP_OK : NIPC_NP_ERR_SEND;
+}
+
+/* Cancel a posted write and wait until the kernel no longer uses its
+ * OVERLAPPED and buffer. */
+static void cancel_overlapped_send(HANDLE pipe, OVERLAPPED *ov) {
+  DWORD written = 0;
+  CancelIoEx(pipe, ov);
+  GetOverlappedResult(pipe, ov, &written, TRUE);
+}
+
+#define NP_PENDING_RECORD_LEN 4u
+
+static void pending_compact(nipc_np_session_t *s) {
+  if (s->pending_head == 0)
+    return;
+  size_t left = s->pending_len - s->pending_head;
+  memmove(s->pending_buf, s->pending_buf + s->pending_head, left);
+  s->pending_len = left;
+  s->pending_head = 0;
+}
+
+/* Pop the oldest queued message into buf; same returns as raw_recv(). A
+ * message larger than buf fails, as a pipe read would with
+ * ERROR_MORE_DATA. */
+static int pending_pop(nipc_np_session_t *s, void *buf, size_t buf_len,
+                       DWORD *bytes_read) {
+  uint32_t rec;
+  memcpy(&rec, s->pending_buf + s->pending_head, sizeof(rec));
+  size_t start = s->pending_head + NP_PENDING_RECORD_LEN;
+  int rc = -1;
+  *bytes_read = 0;
+  if ((size_t)rec <= buf_len) {
+    memcpy(buf, s->pending_buf + start, rec);
+    *bytes_read = rec;
+    rc = 1;
+  }
+  s->pending_head = start + rec;
+  if (s->pending_head == s->pending_len)
+    s->pending_head = s->pending_len = 0;
+  return rc;
+}
+
+static int peek_available(HANDLE pipe, DWORD *available) {
+  *available = 0;
+  return PeekNamedPipe(pipe, NULL, 0, NULL, available, NULL) ? 0 : -1;
+}
+
+/* Read every message available now into the pending queue. Sets *drained if
+ * it read any. A disconnected pipe sets *eof: the posted write reports it. Queued bytes beyond progress_bound fail with
+ * NIPC_NP_ERR_PROTOCOL. */
+static nipc_np_error_t pending_drain(nipc_np_session_t *s, bool *drained,
+                                     bool *eof) {
+  size_t read_len = s->packet_size;
+  for (;;) {
+    DWORD available = 0;
+    if (peek_available(s->pipe, &available) < 0) {
+      if (is_disconnect_error(GetLastError())) {
+        *eof = true;
+        return NIPC_NP_OK;
+      }
+      /* Stopping the drain on a live pipe would bring the deadlock back. */
+      return NIPC_NP_ERR_PROTOCOL;
+    }
+    if (available == 0)
+      return NIPC_NP_OK;
+
+    pending_compact(s);
+    size_t need = s->pending_len + NP_PENDING_RECORD_LEN + read_len;
+    if (need < s->pending_len)
+      return NIPC_NP_ERR_PROTOCOL;
+    if (need > s->pending_cap) {
+      size_t cap = s->pending_cap ? s->pending_cap : 4096;
+      while (cap < need) {
+        if (cap > SIZE_MAX / 2)
+          return NIPC_NP_ERR_ALLOC;
+        cap *= 2;
+      }
+      uint8_t *p = realloc(s->pending_buf, cap);
+      if (!p)
+        return NIPC_NP_ERR_ALLOC;
+      s->pending_buf = p;
+      s->pending_cap = cap;
+    }
+
+    size_t start = s->pending_len;
+    DWORD n = 0;
+    int rc = overlapped_recv(s->pipe, s->read_event,
+                             s->pending_buf + start + NP_PENDING_RECORD_LEN,
+                             read_len, &n);
+    if (rc == 0) {
+      *eof = true;
+      return NIPC_NP_OK;
+    }
+    if (rc < 0)
+      return NIPC_NP_ERR_PROTOCOL; /* larger than a packet, or a read failure */
+    uint32_t rec = (uint32_t)n;
+    memcpy(s->pending_buf + start, &rec, sizeof(rec));
+    s->pending_len = start + NP_PENDING_RECORD_LEN + n;
+    if (s->pending_len > s->progress_bound)
+      return NIPC_NP_ERR_PROTOCOL;
+    *drained = true;
+  }
+}
+
+static void inflight_fail_all(nipc_np_session_t *s);
+
+/* A cancelled write leaves the message stream in an unknown state, and a
+ * drain failure drops inbound messages: close the pipe, so later calls fail
+ * with NIPC_NP_ERR_BAD_PARAM, and fail every in-flight request.
+ * nipc_np_close_session() still releases the rest. */
+static void break_session(nipc_np_session_t *s) {
+  CloseHandle(s->pipe);
+  s->pipe = INVALID_HANDLE_VALUE;
+  s->pending_len = s->pending_head = 0;
+  inflight_fail_all(s);
+}
+
+/* Wire bytes `inflight` responses can occupy: the pending queue bound. */
+static size_t pending_bound(uint32_t max_response_payload, uint32_t packet_size,
+                            uint32_t inflight) {
+  size_t payload = max_response_payload;
+  size_t budget =
+      packet_size > NIPC_HEADER_LEN ? packet_size - NIPC_HEADER_LEN : 1;
+  size_t packets = payload == 0 ? 1 : 1 + (payload - 1) / budget;
+  size_t per_packet = NIPC_HEADER_LEN + NP_PENDING_RECORD_LEN;
+  if (packets > (SIZE_MAX - payload) / per_packet)
+    return SIZE_MAX;
+  size_t per_response = payload + packets * per_packet;
+  if (per_response > SIZE_MAX / inflight)
+    return SIZE_MAX;
+  return per_response * inflight;
+}
+
+/* How long a stalled pipelined send keeps yielding before it sleeps. */
+#define NP_PROGRESS_YIELD_US 1000u
+
+static ULONGLONG progress_now_us(void) {
+  LARGE_INTEGER count, freq;
+  QueryPerformanceCounter(&count);
+  QueryPerformanceFrequency(&freq);
+  ULONGLONG c = (ULONGLONG)count.QuadPart, f = (ULONGLONG)freq.QuadPart;
+  return c / f * 1000000u + c % f * 1000000u / f;
+}
+
+/* Write one packet with the session's handle kind. A client with
+ * progress_bound set (more than one request in flight) reads what the server
+ * sent into the pending queue until its write completes, so both sides keep
+ * making progress. No timeout: it waits as long as a blocking write would. */
+static nipc_np_error_t pipe_send(nipc_np_session_t *s, const void *data,
+                                 size_t len) {
+  if (!s->write_event)
+    return raw_send(s->pipe, data, len);
+
+  OVERLAPPED ov = {0};
+  ov.hEvent = s->write_event;
+  nipc_np_error_t err = start_overlapped_send(s->pipe, &ov, data, len);
+  if (err != NIPC_NP_OK)
+    return err;
+  if (s->progress_bound == 0)
+    return finish_overlapped_send(s->pipe, &ov, len);
+
+  bool eof = false;
+  ULONGLONG yield_until = progress_now_us() + NP_PROGRESS_YIELD_US;
+  for (;;) {
+    DWORD w = WaitForSingleObject(s->write_event, 0);
+    if (w == WAIT_OBJECT_0)
+      return finish_overlapped_send(s->pipe, &ov, len);
+    if (w != WAIT_TIMEOUT) {
+      cancel_overlapped_send(s->pipe, &ov);
+      break_session(s);
+      return NIPC_NP_ERR_SEND;
+    }
+    if (!eof) {
+      bool drained = false;
+      err = pending_drain(s, &drained, &eof);
+      if (err != NIPC_NP_OK) {
+        cancel_overlapped_send(s->pipe, &ov);
+        break_session(s);
+        return err;
+      }
+      if (drained) {
+        yield_until = progress_now_us() + NP_PROGRESS_YIELD_US;
+        continue;
+      }
+    }
+    /* The server is busy or its reply is still being written: yield for up
+     * to NP_PROGRESS_YIELD_US after the last progress, then wait for the
+     * write in short slices. A slice lasts a system timer tick and only the
+     * write completing ends it early, so slicing at once stalls a server
+     * blocked on its reply to us. */
+    if (progress_now_us() < yield_until) {
+      SwitchToThread();
+      continue;
+    }
+    WaitForSingleObject(s->write_event, 1);
+  }
 }
 
 /* Poll a synchronous pipe handle until bytes are available. Go/Rust already
@@ -362,7 +630,6 @@ typedef struct {
   HANDLE abort_event;
 } receive_wait_t;
 
-static void inflight_fail_all(nipc_np_session_t *s);
 
 static receive_wait_t receive_wait_init(uint32_t timeout_ms,
                                         HANDLE abort_event) {
@@ -452,6 +719,13 @@ static nipc_np_error_t raw_recv_with_wait(nipc_np_session_t *session, void *buf,
                                           size_t buf_size,
                                           const receive_wait_t *wait,
                                           DWORD *bytes_read) {
+  if (nipc_np_session_has_pending(session)) {
+    if (pending_pop(session, buf, buf_size, bytes_read) <= 0) {
+      inflight_fail_all(session);
+      return NIPC_NP_ERR_RECV;
+    }
+    return NIPC_NP_OK;
+  }
   bool readable = false;
   nipc_np_error_t werr =
       wait_readable_for_receive(session->pipe, wait, &readable);
@@ -460,7 +734,7 @@ static nipc_np_error_t raw_recv_with_wait(nipc_np_session_t *session, void *buf,
   if (!readable)
     return NIPC_NP_ERR_TIMEOUT;
 
-  int rc = raw_recv(session->pipe, buf, buf_size, bytes_read);
+  int rc = pipe_recv(session, buf, buf_size, bytes_read);
   if (rc <= 0) {
     inflight_fail_all(session);
     return NIPC_NP_ERR_RECV;
@@ -470,7 +744,9 @@ static nipc_np_error_t raw_recv_with_wait(nipc_np_session_t *session, void *buf,
 
 static nipc_np_error_t raw_recv_blocking(nipc_np_session_t *session, void *buf,
                                          size_t buf_size, DWORD *bytes_read) {
-  int rc = raw_recv(session->pipe, buf, buf_size, bytes_read);
+  int rc = nipc_np_session_has_pending(session)
+               ? pending_pop(session, buf, buf_size, bytes_read)
+               : pipe_recv(session, buf, buf_size, bytes_read);
   if (rc <= 0) {
     inflight_fail_all(session);
     return NIPC_NP_ERR_RECV;
@@ -529,6 +805,7 @@ static void inflight_fail_all(nipc_np_session_t *s) {
 
 static nipc_np_error_t client_handshake(HANDLE pipe,
                                         const nipc_np_client_config_t *cfg,
+                                        const receive_wait_t *wait,
                                         nipc_np_session_t *session) {
   uint8_t buf[128];
 
@@ -575,14 +852,25 @@ static nipc_np_error_t client_handshake(HANDLE pipe,
   memcpy(buf + NIPC_HEADER_LEN, hello_buf, sizeof(hello_buf));
 
   /* Send HELLO */
-  nipc_np_error_t err =
-      raw_send(pipe, buf, NIPC_HEADER_LEN + sizeof(hello_buf));
+  OVERLAPPED ov = {0};
+  ov.hEvent = session->write_event;
+  nipc_np_error_t err = start_overlapped_send(pipe, &ov, buf,
+                                              NIPC_HEADER_LEN + sizeof(hello_buf));
+  if (err == NIPC_NP_OK)
+    err = finish_overlapped_send(pipe, &ov, NIPC_HEADER_LEN + sizeof(hello_buf));
   if (err != NIPC_NP_OK)
     return err;
 
-  /* Receive HELLO_ACK */
+  /* Receive HELLO_ACK; a server that never answers must not hold the
+   * client past its deadline. A server that rejects the client writes its
+   * reply and closes, so a disconnected pipe may still hold that reply. */
+  err = wait_readable_for_receive(pipe, wait, NULL);
+  if (err != NIPC_NP_OK && err != NIPC_NP_ERR_DISCONNECTED)
+    return err;
+
   DWORD bytes_read = 0;
-  int rc = raw_recv(pipe, buf, sizeof(buf), &bytes_read);
+  int rc = overlapped_recv(pipe, session->read_event, buf, sizeof(buf),
+                           &bytes_read);
   if (rc <= 0)
     return NIPC_NP_ERR_RECV;
 
@@ -620,6 +908,12 @@ static nipc_np_error_t client_handshake(HANDLE pipe,
   if (perr != NIPC_OK)
     return NIPC_NP_ERR_PROTOCOL;
 
+  /* The server must pick exactly one of the profiles this client offered. */
+  if (ack.selected_profile == 0 ||
+      (ack.selected_profile & (ack.selected_profile - 1)) != 0 ||
+      (ack.selected_profile & hello.supported_profiles) == 0)
+    return NIPC_NP_ERR_PROTOCOL;
+
   /* Fill session */
   session->pipe = pipe;
   session->role = NIPC_NP_ROLE_CLIENT;
@@ -644,6 +938,8 @@ static nipc_np_error_t client_handshake(HANDLE pipe,
 static nipc_np_error_t server_handshake(HANDLE pipe,
                                         const nipc_np_server_config_t *cfg,
                                         uint64_t session_id,
+                                        nipc_np_profile_prepare_fn prepare,
+                                        void *prepare_user,
                                         nipc_np_session_t *session) {
   uint8_t buf[128];
 
@@ -731,6 +1027,21 @@ static nipc_np_error_t server_handshake(HANDLE pipe,
   if (agreed_pkt <= NIPC_HEADER_LEN) {
     send_rejection_ack(pipe, NIPC_STATUS_INCOMPATIBLE);
     return NIPC_NP_ERR_INCOMPATIBLE;
+  }
+
+  /* Set up the selected profile before the ACK promises it. A profile the
+   * caller cannot prepare is dropped, as if the server never offered it. */
+  while (prepare &&
+         !prepare(prepare_user, selected, agreed_req_pay, agreed_resp_pay)) {
+    s_profiles &= ~selected;
+    intersection &= ~selected;
+    if (intersection == 0) {
+      send_rejection_ack(pipe, NIPC_STATUS_UNSUPPORTED);
+      return NIPC_NP_ERR_NO_PROFILE;
+    }
+    preferred_intersection = intersection & hello.preferred_profiles & s_preferred;
+    selected = preferred_intersection != 0 ? highest_bit(preferred_intersection)
+                                           : highest_bit(intersection);
   }
 
   /* Send HELLO_ACK (success) */
@@ -831,15 +1142,13 @@ nipc_np_error_t nipc_np_listen(const char *run_dir, const char *service_name,
 /*  Public API: accept                                                 */
 /* ------------------------------------------------------------------ */
 
-nipc_np_error_t nipc_np_accept(nipc_np_listener_t *listener,
-                               uint64_t session_id, nipc_np_session_t *out) {
-  if (!listener || !out)
+nipc_np_error_t nipc_np_accept_pending(nipc_np_listener_t *listener,
+                                       HANDLE *pipe_out) {
+  if (!listener || !pipe_out)
     return NIPC_NP_ERR_BAD_PARAM;
+  *pipe_out = INVALID_HANDLE_VALUE;
   if (listener->pipe == INVALID_HANDLE_VALUE || listener->pipe == NULL)
     return NIPC_NP_ERR_ACCEPT;
-
-  memset(out, 0, sizeof(*out));
-  out->pipe = INVALID_HANDLE_VALUE;
 
   /* Wait for client to connect to the current pipe instance */
   BOOL connected = ConnectNamedPipe(listener->pipe, NULL);
@@ -860,18 +1169,53 @@ nipc_np_error_t nipc_np_accept(nipc_np_listener_t *listener,
   HANDLE next = create_pipe_instance(listener->pipe_name, buf_size, FALSE);
   if (next == INVALID_HANDLE_VALUE) {
     /* Cannot create next instance — close the session pipe too. */
-    DisconnectNamedPipe(session_pipe);
     CloseHandle(session_pipe);
     return NIPC_NP_ERR_CREATE_PIPE;
   }
   listener->pipe = next;
 
-  /* Perform handshake */
-  nipc_np_error_t herr =
-      server_handshake(session_pipe, &listener->config, session_id, out);
+  *pipe_out = session_pipe;
+  return NIPC_NP_OK;
+}
+
+nipc_np_error_t nipc_np_accept_handshake(HANDLE pipe,
+                                         const nipc_np_server_config_t *config,
+                                         uint64_t session_id,
+                                         uint32_t timeout_ms,
+                                         nipc_np_session_t *out) {
+  return nipc_np_accept_handshake_prepared(pipe, config, session_id,
+                                           timeout_ms, NULL, NULL, out);
+}
+
+nipc_np_error_t nipc_np_accept_handshake_prepared(
+    HANDLE pipe, const nipc_np_server_config_t *config, uint64_t session_id,
+    uint32_t timeout_ms, nipc_np_profile_prepare_fn prepare, void *user,
+    nipc_np_session_t *out) {
+  if (!out || !config || pipe == INVALID_HANDLE_VALUE || pipe == NULL) {
+    if (pipe != INVALID_HANDLE_VALUE && pipe != NULL)
+      CloseHandle(pipe);
+    return NIPC_NP_ERR_BAD_PARAM;
+  }
+
+  memset(out, 0, sizeof(*out));
+  out->pipe = INVALID_HANDLE_VALUE;
+
+  bool readable = false;
+  nipc_np_error_t herr;
+  do {
+    herr = wait_readable(pipe, timeout_ms ? timeout_ms : 1000u, &readable);
+  } while (herr == NIPC_NP_OK && !readable && timeout_ms == 0);
+  if (herr == NIPC_NP_OK && !readable)
+    herr = NIPC_NP_ERR_TIMEOUT;
+  /* A peer gone before HELLO is a failed HELLO read, as without the wait. */
+  if (herr == NIPC_NP_ERR_DISCONNECTED)
+    herr = NIPC_NP_ERR_RECV;
+  if (herr == NIPC_NP_OK)
+    herr = server_handshake(pipe, config, session_id, prepare, user, out);
   if (herr != NIPC_NP_OK) {
-    DisconnectNamedPipe(session_pipe);
-    CloseHandle(session_pipe);
+    /* Close only: DisconnectNamedPipe would discard a rejection reply the
+     * client has not read yet. */
+    CloseHandle(pipe);
     out->pipe = INVALID_HANDLE_VALUE;
     return herr;
   }
@@ -879,18 +1223,103 @@ nipc_np_error_t nipc_np_accept(nipc_np_listener_t *listener,
   return NIPC_NP_OK;
 }
 
+nipc_np_error_t nipc_np_accept(nipc_np_listener_t *listener,
+                               uint64_t session_id, nipc_np_session_t *out) {
+  if (!listener || !out)
+    return NIPC_NP_ERR_BAD_PARAM;
+
+  memset(out, 0, sizeof(*out));
+  out->pipe = INVALID_HANDLE_VALUE;
+
+  HANDLE session_pipe;
+  nipc_np_error_t err = nipc_np_accept_pending(listener, &session_pipe);
+  if (err != NIPC_NP_OK)
+    return err;
+
+  return nipc_np_accept_handshake(session_pipe, &listener->config, session_id,
+                                  NIPC_SERVER_HANDSHAKE_TIMEOUT_MS, out);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Public API: connect                                                */
 /* ------------------------------------------------------------------ */
 
-nipc_np_error_t nipc_np_connect(const char *run_dir, const char *service_name,
-                                const nipc_np_client_config_t *config,
-                                nipc_np_session_t *out) {
+static void (*g_connect_busy_hook)(void *user);
+static void *g_connect_busy_user;
+
+void nipc_np_set_connect_busy_hook_for_tests(void (*hook)(void *user),
+                                             void *user) {
+  g_connect_busy_hook = hook;
+  g_connect_busy_user = user;
+}
+
+/* SECURITY_IDENTIFICATION lets the server identify the client but never act
+ * as it. Overlapped, so a pipelining send can read while its write waits. */
+static HANDLE create_client_pipe(const wchar_t *pipe_name) {
+  return CreateFileW(pipe_name, GENERIC_READ | GENERIC_WRITE, 0, /* no sharing */
+                     NULL, /* default security */
+                     OPEN_EXISTING,
+                     SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION |
+                         FILE_FLAG_OVERLAPPED,
+                     NULL /* no template */
+  );
+}
+
+/* Longest single busy-pipe wait, so an abort ends it promptly. */
+#define NP_CONNECT_BUSY_SLICE_MS 100u
+
+/* A server has no free pipe instance between accepting one client and
+ * creating the next instance, and connects in that window fail with
+ * ERROR_PIPE_BUSY. Wait, bounded by NIPC_NP_CONNECT_BUSY_WAIT_MS and the
+ * caller's deadline, for an instance, then try once more. */
+static HANDLE open_client_pipe(const wchar_t *pipe_name,
+                               const receive_wait_t *wait,
+                               nipc_np_error_t *err_out) {
+  *err_out = NIPC_NP_ERR_CONNECT;
+  HANDLE h = create_client_pipe(pipe_name);
+  if (h != INVALID_HANDLE_VALUE || GetLastError() != ERROR_PIPE_BUSY)
+    return h;
+
+  if (g_connect_busy_hook)
+    g_connect_busy_hook(g_connect_busy_user);
+
+  ULONGLONG busy_deadline = GetTickCount64() + NIPC_NP_CONNECT_BUSY_WAIT_MS;
+  if (!wait->infinite && wait->deadline < busy_deadline)
+    busy_deadline = wait->deadline;
+  for (;;) {
+    if (receive_wait_aborted(wait)) {
+      *err_out = NIPC_NP_ERR_ABORTED;
+      return INVALID_HANDLE_VALUE;
+    }
+    ULONGLONG now = GetTickCount64();
+    if (now >= busy_deadline) {
+      if (receive_wait_expired(wait))
+        *err_out = NIPC_NP_ERR_TIMEOUT;
+      return INVALID_HANDLE_VALUE;
+    }
+    ULONGLONG left = busy_deadline - now;
+    DWORD slice = left < NP_CONNECT_BUSY_SLICE_MS ? (DWORD)left
+                                                  : NP_CONNECT_BUSY_SLICE_MS;
+    if (WaitNamedPipeW(pipe_name, slice))
+      return create_client_pipe(pipe_name);
+    if (GetLastError() != ERROR_SEM_TIMEOUT)
+      return INVALID_HANDLE_VALUE;
+  }
+}
+
+nipc_np_error_t nipc_np_connect_timeout(const char *run_dir,
+                                        const char *service_name,
+                                        const nipc_np_client_config_t *config,
+                                        uint32_t timeout_ms,
+                                        HANDLE abort_event,
+                                        nipc_np_session_t *out) {
   if (!config || !out)
     return NIPC_NP_ERR_BAD_PARAM;
 
   memset(out, 0, sizeof(*out));
   out->pipe = INVALID_HANDLE_VALUE;
+
+  receive_wait_t wait = receive_wait_init(timeout_ms, abort_event);
 
   /* Build pipe name */
   wchar_t pipe_name[NIPC_NP_MAX_PIPE_NAME];
@@ -899,15 +1328,18 @@ nipc_np_error_t nipc_np_connect(const char *run_dir, const char *service_name,
     return NIPC_NP_ERR_BAD_PARAM;
 
   /* Connect to the server pipe */
-  HANDLE h =
-      CreateFileW(pipe_name, GENERIC_READ | GENERIC_WRITE, 0, /* no sharing */
-                  NULL,             /* default security */
-                  OPEN_EXISTING, 0, /* default attributes */
-                  NULL              /* no template */
-      );
-
+  nipc_np_error_t err;
+  HANDLE h = open_client_pipe(pipe_name, &wait, &err);
   if (h == INVALID_HANDLE_VALUE)
-    return NIPC_NP_ERR_CONNECT;
+    return err;
+
+  /* Whoever created the pipe name first owns it. Send HELLO and the auth
+   * token only to a server running as this account, SYSTEM or Administrators;
+   * other accounts cannot take those as owner. */
+  if (!nipc_win_owner_trusted(h)) {
+    CloseHandle(h);
+    return NIPC_NP_ERR_UNTRUSTED_SERVER;
+  }
 
   /* Set read mode to message mode */
   DWORD mode = PIPE_READMODE_MESSAGE;
@@ -916,15 +1348,30 @@ nipc_np_error_t nipc_np_connect(const char *run_dir, const char *service_name,
     return NIPC_NP_ERR_CONNECT;
   }
 
+  out->read_event = CreateEventW(NULL, TRUE, FALSE, NULL);
+  out->write_event = CreateEventW(NULL, TRUE, FALSE, NULL);
+  if (!out->read_event || !out->write_event) {
+    CloseHandle(h);
+    nipc_np_close_session(out);
+    return NIPC_NP_ERR_CONNECT;
+  }
+
   /* Perform handshake */
-  nipc_np_error_t err = client_handshake(h, config, out);
+  err = client_handshake(h, config, &wait, out);
   if (err != NIPC_NP_OK) {
     CloseHandle(h);
     out->pipe = INVALID_HANDLE_VALUE;
+    nipc_np_close_session(out);
     return err;
   }
 
   return NIPC_NP_OK;
+}
+
+nipc_np_error_t nipc_np_connect(const char *run_dir, const char *service_name,
+                                const nipc_np_client_config_t *config,
+                                nipc_np_session_t *out) {
+  return nipc_np_connect_timeout(run_dir, service_name, config, 0, NULL, out);
 }
 
 /* ------------------------------------------------------------------ */
@@ -936,12 +1383,10 @@ void nipc_np_close_session(nipc_np_session_t *session) {
     return;
 
   if (session->pipe != INVALID_HANDLE_VALUE && session->pipe != NULL) {
-    /* Only the server side should flush before disconnecting.
-     * Client-side flush on a broken session can block shutdown. */
-    if (session->role == NIPC_NP_ROLE_SERVER) {
-      FlushFileBuffers(session->pipe);
-      DisconnectNamedPipe(session->pipe);
-    }
+    /* Close only. The peer still reads every message written before the
+     * close, then sees ERROR_BROKEN_PIPE. FlushFileBuffers would block on a
+     * peer that stopped reading, and neither CancelSynchronousIo nor
+     * DisconnectNamedPipe from another thread releases it. */
     CloseHandle(session->pipe);
   }
   session->pipe = INVALID_HANDLE_VALUE;
@@ -954,6 +1399,18 @@ void nipc_np_close_session(nipc_np_session_t *session) {
   session->inflight_ids = NULL;
   session->inflight_count = 0;
   session->inflight_capacity = 0;
+
+  /* No I/O stays posted between calls, so the events can go. */
+  if (session->read_event)
+    CloseHandle(session->read_event);
+  if (session->write_event)
+    CloseHandle(session->write_event);
+  session->read_event = NULL;
+  session->write_event = NULL;
+  free(session->pending_buf);
+  session->pending_buf = NULL;
+  session->pending_len = session->pending_head = session->pending_cap = 0;
+  session->progress_bound = 0;
 }
 
 void nipc_np_close_listener(nipc_np_listener_t *listener) {
@@ -966,7 +1423,8 @@ void nipc_np_close_listener(nipc_np_listener_t *listener) {
     if (listener->pipe_name[0] != L'\0') {
       HANDLE wake =
           CreateFileW(listener->pipe_name, GENERIC_READ | GENERIC_WRITE, 0,
-                      NULL, OPEN_EXISTING, 0, NULL);
+                      NULL, OPEN_EXISTING,
+                      SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION, NULL);
       if (wake != INVALID_HANDLE_VALUE)
         CloseHandle(wake);
     }
@@ -995,6 +1453,14 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
     if (rc == -2)
       return NIPC_NP_ERR_LIMIT_EXCEEDED;
   }
+
+  /* One request in flight (every typed call) writes without draining; only a
+   * pipelining client can deadlock with a server blocked writing to it. */
+  session->progress_bound = 0;
+  if (session->write_event && session->inflight_count > 1)
+    session->progress_bound =
+        pending_bound(session->max_response_payload_bytes,
+                      session->packet_size, session->inflight_count);
 
   uint32_t max_payload = 0;
   uint32_t max_batch = 0;
@@ -1033,7 +1499,7 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
   if (total_msg <= session->packet_size) {
     uint8_t hdr_buf[NIPC_HEADER_LEN];
     nipc_header_encode(hdr, hdr_buf, sizeof(hdr_buf));
-    nipc_np_error_t err = raw_send_msg(session->pipe, hdr_buf, NIPC_HEADER_LEN,
+    nipc_np_error_t err = raw_send_msg(session, hdr_buf, NIPC_HEADER_LEN,
                                        payload, payload_len);
     if (err != NIPC_NP_OK && tracked) {
       if (err == NIPC_NP_ERR_SEND || err == NIPC_NP_ERR_DISCONNECTED)
@@ -1072,7 +1538,7 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
   uint8_t hdr_buf[NIPC_HEADER_LEN];
   nipc_header_encode(hdr, hdr_buf, sizeof(hdr_buf));
 
-  nipc_np_error_t err = raw_send_msg(session->pipe, hdr_buf, NIPC_HEADER_LEN,
+  nipc_np_error_t err = raw_send_msg(session, hdr_buf, NIPC_HEADER_LEN,
                                      payload, first_chunk_payload);
   if (err != NIPC_NP_OK) {
     if (tracked) {
@@ -1109,7 +1575,7 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
     nipc_chunk_header_encode(&chk, chk_buf, sizeof(chk_buf));
 
     err =
-        raw_send_msg(session->pipe, chk_buf, NIPC_HEADER_LEN, src, this_chunk);
+        raw_send_msg(session, chk_buf, NIPC_HEADER_LEN, src, this_chunk);
     if (err != NIPC_NP_OK) {
       if (tracked) {
         if (err == NIPC_NP_ERR_SEND || err == NIPC_NP_ERR_DISCONNECTED)
@@ -1337,6 +1803,10 @@ nipc_np_error_t nipc_np_wait_readable(nipc_np_session_t *session,
                                       uint32_t timeout_ms, bool *readable_out) {
   if (!session || !readable_out || session->pipe == INVALID_HANDLE_VALUE)
     return NIPC_NP_ERR_BAD_PARAM;
+  if (nipc_np_session_has_pending(session)) {
+    *readable_out = true;
+    return NIPC_NP_OK;
+  }
   nipc_np_error_t err = wait_readable(session->pipe, timeout_ms, readable_out);
   if (err == NIPC_NP_ERR_DISCONNECTED || err == NIPC_NP_ERR_RECV)
     inflight_fail_all(session);

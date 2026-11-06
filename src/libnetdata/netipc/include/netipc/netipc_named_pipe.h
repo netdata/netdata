@@ -39,6 +39,10 @@ extern "C" {
 /* Max concurrent pipe instances */
 #define NIPC_NP_MAX_INSTANCES PIPE_UNLIMITED_INSTANCES
 
+/* How long a connect waits for a free pipe instance when every instance is
+ * busy (ERROR_PIPE_BUSY). */
+#define NIPC_NP_CONNECT_BUSY_WAIT_MS 1000
+
 /* FNV-1a 64-bit constants */
 #define NIPC_FNV1A_OFFSET_BASIS 0xcbf29ce484222325ULL
 #define NIPC_FNV1A_PRIME        0x00000100000001B3ULL
@@ -70,6 +74,8 @@ typedef enum {
     NIPC_NP_ERR_DISCONNECTED,       /* peer disconnected (graceful) */
     NIPC_NP_ERR_TIMEOUT,            /* receive deadline expired */
     NIPC_NP_ERR_ABORTED,            /* receive aborted by caller */
+    NIPC_NP_ERR_UNTRUSTED_SERVER,   /* pipe owner is not this account,
+                                       SYSTEM or Administrators */
 } nipc_np_error_t;
 
 /* ------------------------------------------------------------------ */
@@ -116,7 +122,7 @@ typedef struct {
 /* ------------------------------------------------------------------ */
 
 typedef struct {
-    HANDLE          pipe;    /* connected pipe handle (native wait object) */
+    HANDLE          pipe;    /* connected pipe handle */
     nipc_np_role_t  role;
 
     /* Negotiated limits */
@@ -136,6 +142,20 @@ typedef struct {
     uint64_t *inflight_ids;
     uint32_t  inflight_count;
     uint32_t  inflight_capacity;
+
+    /* Events of the overlapped client handle's reads and writes; NULL on
+     * server sessions, whose handles are synchronous. */
+    HANDLE read_event;
+    HANDLE write_event;
+
+    /* Messages read while a pipelined send waited for its write, each a
+     * 4-byte length then its bytes; receive returns them first. */
+    uint8_t *pending_buf;
+    size_t   pending_len;
+    size_t   pending_head;
+    size_t   pending_cap;
+    /* Queue bound of the send in progress; 0 writes without draining. */
+    size_t   progress_bound;
 } nipc_np_session_t;
 
 /* ------------------------------------------------------------------ */
@@ -185,7 +205,8 @@ nipc_np_error_t nipc_np_listen(const char *run_dir,
  * Accept one client on a listener. Performs the full handshake.
  * session_id is placed into the hello-ack so the client can attach
  * to the correct per-session SHM region.
- * Blocks until a client connects and the handshake completes.
+ * Blocks until a client connects; the handshake then waits at most
+ * NIPC_SERVER_HANDSHAKE_TIMEOUT_MS for HELLO.
  * After accepting, creates a new pipe instance for subsequent clients.
  */
 nipc_np_error_t nipc_np_accept(nipc_np_listener_t *listener,
@@ -193,13 +214,67 @@ nipc_np_error_t nipc_np_accept(nipc_np_listener_t *listener,
                                 nipc_np_session_t *out);
 
 /*
+ * Accept one connection without handshaking, so the caller can run the
+ * handshake on another thread. Blocks until a client connects, then
+ * creates a new pipe instance for subsequent clients. The caller owns
+ * *pipe_out and passes it to nipc_np_accept_handshake().
+ */
+nipc_np_error_t nipc_np_accept_pending(nipc_np_listener_t *listener,
+                                       HANDLE *pipe_out);
+
+/*
+ * Complete the server side of the handshake on a pipe returned by
+ * nipc_np_accept_pending(). Waits at most timeout_ms for HELLO
+ * (NIPC_NP_ERR_TIMEOUT); 0 waits without a deadline. Takes ownership of
+ * pipe: on success it belongs to *out, on failure it is disconnected
+ * and closed.
+ */
+nipc_np_error_t nipc_np_accept_handshake(HANDLE pipe,
+                                         const nipc_np_server_config_t *config,
+                                         uint64_t session_id,
+                                         uint32_t timeout_ms,
+                                         nipc_np_session_t *out);
+
+/*
+ * Called by the server handshake once a profile is selected and the
+ * payload limits are agreed, before HELLO_ACK is sent, so the caller can
+ * set up profile resources (an SHM region) only for sessions that use
+ * them. Returning false drops that profile and the handshake selects
+ * again; with no profile left the client is rejected as unsupported.
+ */
+typedef bool (*nipc_np_profile_prepare_fn)(void *user, uint32_t profile,
+                                           uint32_t max_request_payload_bytes,
+                                           uint32_t max_response_payload_bytes);
+
+/* nipc_np_accept_handshake() with a prepare step; prepare may be NULL. */
+nipc_np_error_t nipc_np_accept_handshake_prepared(
+    HANDLE pipe, const nipc_np_server_config_t *config, uint64_t session_id,
+    uint32_t timeout_ms, nipc_np_profile_prepare_fn prepare, void *user,
+    nipc_np_session_t *out);
+
+/*
  * Connect to a server pipe derived from run_dir + service_name.
  * Performs the full handshake. Blocks until connected + handshake done.
+ * When every pipe instance is busy, waits up to NIPC_NP_CONNECT_BUSY_WAIT_MS
+ * for a free one.
  */
 nipc_np_error_t nipc_np_connect(const char *run_dir,
                                  const char *service_name,
                                  const nipc_np_client_config_t *config,
                                  nipc_np_session_t *out);
+
+/*
+ * nipc_np_connect() bounded by timeout_ms: the busy-pipe wait and the wait
+ * for HELLO_ACK together end with NIPC_NP_ERR_TIMEOUT after timeout_ms
+ * (0 = no deadline), and with NIPC_NP_ERR_ABORTED once abort_event is
+ * signaled (NULL = no abort).
+ */
+nipc_np_error_t nipc_np_connect_timeout(const char *run_dir,
+                                        const char *service_name,
+                                        const nipc_np_client_config_t *config,
+                                        uint32_t timeout_ms,
+                                        HANDLE abort_event,
+                                        nipc_np_session_t *out);
 
 /*
  * Close a session. Releases pipe handle and internal buffers.
@@ -266,7 +341,8 @@ nipc_np_error_t nipc_np_receive_timeout(nipc_np_session_t *session,
  *
  * On success:
  *   - returns NIPC_NP_OK
- *   - sets *readable_out to true if bytes are available
+ *   - sets *readable_out to true if bytes are available or a pipelined
+ *     send queued messages (nipc_np_session_has_pending)
  *   - sets *readable_out to false on timeout with no pending bytes
  *
  * Returns NIPC_NP_ERR_DISCONNECTED if the peer has gone away while waiting.
@@ -279,7 +355,21 @@ nipc_np_error_t nipc_np_wait_readable(nipc_np_session_t *session,
 /*  Utility                                                            */
 /* ------------------------------------------------------------------ */
 
-/* Get the HANDLE for WaitForSingleObject / WaitForMultipleObjects. */
+/*
+ * Whether the next receive can return a message read earlier by a
+ * pipelined send, without the pipe becoming readable.
+ */
+static inline bool nipc_np_session_has_pending(const nipc_np_session_t *s) {
+    return s->pending_head < s->pending_len;
+}
+
+/*
+ * The raw pipe HANDLE. It is not a readability signal: a pipe handle is
+ * signalled by I/O completion, not by arriving data. Use
+ * nipc_np_wait_readable(), and check nipc_np_session_has_pending() first: a
+ * pipelined send can read responses into the session, where the pipe no
+ * longer shows them.
+ */
 static inline HANDLE nipc_np_session_handle(const nipc_np_session_t *s) {
     return s->pipe;
 }
@@ -287,6 +377,17 @@ static inline HANDLE nipc_np_session_handle(const nipc_np_session_t *s) {
 static inline HANDLE nipc_np_listener_handle(const nipc_np_listener_t *l) {
     return l->pipe;
 }
+
+#ifdef NIPC_INTERNAL_TESTING
+/* Call hook(user) whenever a connect finds every pipe instance busy, before
+ * it waits for one. NULL removes the hook. */
+void nipc_np_set_connect_busy_hook_for_tests(void (*hook)(void *user),
+                                             void *user);
+
+/* Clients trust only pipes owned by this SID string instead of their own
+ * account, SYSTEM and Administrators. NULL restores the default. */
+void nipc_np_set_trusted_owner_for_tests(const char *sid);
+#endif
 
 #ifdef __cplusplus
 }

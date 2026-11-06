@@ -8,12 +8,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define SERVER_POLL_TIMEOUT_MS 100
 #define CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS 5u
-#define CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS 5000u
-#define CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS 5u
-#define CLIENT_CALL_RECONNECT_DRAIN_MS (SERVER_POLL_TIMEOUT_MS + 50u)
-#define CLIENT_CALL_RECONNECT_RETRIES 20u
 
 typedef struct {
     pthread_mutex_t lock;
@@ -21,6 +16,7 @@ typedef struct {
     bool copied;
     nipc_managed_server_t *server;
     nipc_session_ctx_t *session;
+    int fd; /* accepted connection, handshake still pending */
 } nipc_posix_session_start_arg_t;
 
 enum {
@@ -40,6 +36,11 @@ enum {
 };
 
 void nipc_service_posix_sleep_us(unsigned int usec);
+
+/* Zero-wait probe of a session socket. SHM sessions keep the socket open
+ * for their whole life and the kernel closes it when the peer exits, so
+ * HUP/ERR/EOF here is the dead-peer signal for both directions. */
+bool nipc_service_posix_peer_disconnected(int fd);
 const nipc_service_common_client_ops_t *nipc_service_posix_client_ops(void);
 void nipc_service_posix_client_disconnect(nipc_client_ctx_t *ctx);
 nipc_client_state_t nipc_service_posix_client_try_connect(nipc_client_ctx_t *ctx);
@@ -48,9 +49,12 @@ void *nipc_service_posix_malloc(size_t size, int fault_site);
 void *nipc_service_posix_calloc(size_t count, size_t size, int fault_site);
 bool nipc_service_posix_ensure_buffer(uint8_t **buf, size_t *buf_size,
                                       size_t need, int fault_site);
-int nipc_service_posix_poll_with_shutdown(int fd, bool *running);
+int nipc_service_posix_poll_with_shutdown(int fd, bool *running,
+                                          uint32_t poll_ms);
 void *nipc_service_posix_session_handler_thread(void *arg);
 void nipc_service_posix_server_reap_sessions_locked(nipc_managed_server_t *server);
+bool nipc_service_posix_server_wait_sessions(nipc_managed_server_t *server,
+                                             uint32_t grace_ms);
 int nipc_service_posix_pthread_create(pthread_t *thread,
                                       const pthread_attr_t *attr,
                                       void *(*start_routine)(void *),

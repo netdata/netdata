@@ -2,6 +2,8 @@ package apps_lookup
 
 import (
 	"fmt"
+	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -21,21 +23,22 @@ func appsLookupTestConfig() ClientConfig {
 	}
 }
 
-func waitAppsLookupReady(t *testing.T, client *Client) {
+// waitAppsLookupReady waits until server listens, then connects once.
+func waitAppsLookupReady(t *testing.T, server *Server, client *Client) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		client.Refresh()
-		if client.Ready() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	select {
+	case <-server.Listening():
+	case <-time.After(10 * time.Second):
+		t.Fatal("server not listening after 10s")
 	}
-	t.Fatalf("apps lookup client did not become ready; status=%+v", client.Status())
+	client.Refresh()
+	if !client.Ready() {
+		t.Fatalf("apps lookup client not ready after one refresh; status=%+v", client.Status())
+	}
 }
 
 func TestAppsLookupPublicWrapper(t *testing.T) {
-	runDir := t.TempDir()
+	runDir := shortTempDir(t)
 	service := fmt.Sprintf("go_apps_wrapper_%d", time.Now().UnixNano())
 	handler := Handler{Handle: func(req *protocol.AppsLookupRequestView, builder *protocol.AppsLookupBuilder) bool {
 		for i := uint32(0); i < req.ItemCount; i++ {
@@ -86,7 +89,7 @@ func TestAppsLookupPublicWrapper(t *testing.T) {
 	client.SetCallTimeout(500)
 	client.Abort()
 	client.ClearAbort()
-	waitAppsLookupReady(t, client)
+	waitAppsLookupReady(t, server, client)
 	if client.Status().State != StateReady {
 		t.Fatalf("status after ready = %+v", client.Status())
 	}
@@ -111,4 +114,20 @@ func TestAppsLookupPublicWrapper(t *testing.T) {
 	if err != nil || item.Pid != 12 {
 		t.Fatalf("apps timeout item = %+v err=%v", item, err)
 	}
+}
+
+// shortTempDir is a per-test run directory. t.TempDir() follows $TMPDIR,
+// which on macOS is long enough to push a socket path past the 104-byte
+// sun_path limit.
+func shortTempDir(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return t.TempDir()
+	}
+	dir, err := os.MkdirTemp("/tmp", "nipc_go_")
+	if err != nil {
+		t.Fatalf("create temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
 }

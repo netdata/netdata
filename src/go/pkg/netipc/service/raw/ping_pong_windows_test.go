@@ -4,7 +4,6 @@ package raw
 
 import (
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	windows "github.com/netdata/netdata/go/plugins/pkg/netipc/transport/windows"
@@ -50,22 +49,12 @@ type winTestServer struct {
 // and starts it in a background goroutine. Returns a handle for cleanup.
 func startTestServerWin(service string, expectedMethodCode uint16, handler DispatchHandler) *winTestServer {
 	s := NewServer(winTestRunDir, service, testWinServerConfig(), expectedMethodCode, handler)
-	doneCh := make(chan struct{})
-
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-
-	// Allow the Named Pipe listener to start
-	time.Sleep(200 * time.Millisecond)
-
-	return &winTestServer{server: s, doneCh: doneCh}
+	return &winTestServer{server: s, doneCh: runServerForTest(s)}
 }
 
 func (ts *winTestServer) stop() {
 	ts.server.Stop()
-	<-ts.doneCh
+	waitClosed(ts.doneCh, "server "+ts.server.serviceName+" Run")
 }
 
 func winPingPongIncrementDispatch() DispatchHandler {
@@ -75,8 +64,8 @@ func winPingPongIncrementDispatch() DispatchHandler {
 }
 
 func winPingPongStringReverseDispatch() DispatchHandler {
-	return StringReverseDispatch(func(s string) (string, bool) {
-		return winReverseString(s), true
+	return StringReverseDispatch(func(s []byte) (string, bool) {
+		return winReverseString(string(s)), true
 	})
 }
 
@@ -154,11 +143,12 @@ func TestWinStringReversePingPong(t *testing.T) {
 		responsesReceived++
 
 		expectedReversed := winReverseString(current)
-		if view.Str != expectedReversed {
+		if string(view.Str) != expectedReversed {
 			t.Fatalf("round %d: sent %q, expected reverse %q, got %q", i+1, current, expectedReversed, view.Str)
 		}
 
-		current = view.Str
+		// The view borrows the client buffer that the next call reuses.
+		current = string(view.Str)
 	}
 
 	if responsesReceived != 6 {

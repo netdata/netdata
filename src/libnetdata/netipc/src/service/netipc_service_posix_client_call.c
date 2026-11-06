@@ -18,6 +18,20 @@
 /*  Internal: send/receive via the active transport                    */
 /* ------------------------------------------------------------------ */
 
+/* The UDS transport reports EOF, EPIPE and ECONNRESET as plain send/recv
+ * failures; the session probe tells a gone server apart from any other I/O
+ * failure. Protocol errors keep their own meaning. */
+static nipc_error_t socket_failure(const nipc_client_ctx_t *ctx,
+                                   nipc_uds_error_t uerr,
+                                   nipc_error_t otherwise)
+{
+    if (uerr == NIPC_UDS_ERR_SEND || uerr == NIPC_UDS_ERR_RECV)
+        return nipc_service_posix_peer_disconnected(ctx->session.fd)
+                   ? NIPC_ERR_DISCONNECTED
+                   : NIPC_ERR_TRANSPORT;
+    return otherwise;
+}
+
 /*
  * Send a complete message (header + payload) using whichever transport
  * is active: SHM if negotiated, UDS otherwise.
@@ -44,7 +58,11 @@ static nipc_error_t transport_send(nipc_client_ctx_t *ctx,
                 ctx, (uint32_t)payload_len);
             return NIPC_ERR_OVERFLOW;
         }
-        return (serr == NIPC_SHM_OK) ? NIPC_OK : NIPC_ERR_NOT_READY;
+        if (serr == NIPC_SHM_OK)
+            return NIPC_OK;
+        return nipc_service_posix_peer_disconnected(ctx->session.fd)
+                   ? NIPC_ERR_DISCONNECTED
+                   : NIPC_ERR_TRANSPORT;
     }
 
     /* UDS path */
@@ -55,7 +73,8 @@ static nipc_error_t transport_send(nipc_client_ctx_t *ctx,
             ctx, (uint32_t)payload_len);
         return NIPC_ERR_OVERFLOW;
     }
-    return (uerr == NIPC_UDS_OK) ? NIPC_OK : NIPC_ERR_NOT_READY;
+    return (uerr == NIPC_UDS_OK) ? NIPC_OK
+                                 : socket_failure(ctx, uerr, NIPC_ERR_TRANSPORT);
 }
 
 /*
@@ -97,9 +116,18 @@ static nipc_error_t transport_receive(nipc_client_ctx_t *ctx,
                                                      &msg_len, wait_ms);
             if (serr == NIPC_SHM_OK)
                 break;
-            if (serr == NIPC_SHM_ERR_TIMEOUT)
+            if (serr == NIPC_SHM_ERR_TIMEOUT) {
+                /* Only an idle slice pays for the probe. */
+                if (nipc_service_posix_peer_disconnected(ctx->session.fd))
+                    return NIPC_ERR_DISCONNECTED;
                 continue;
-            return NIPC_ERR_TRUNCATED;
+            }
+            if (serr == NIPC_SHM_ERR_MSG_TOO_LARGE)
+                return NIPC_ERR_OVERFLOW;
+            /* A zero-length or corrupt slot is a truncated message. */
+            if (serr == NIPC_SHM_ERR_BAD_HEADER)
+                return NIPC_ERR_TRUNCATED;
+            return NIPC_ERR_TRANSPORT;
         }
 
         return nipc_service_common_client_parse_shm_response(
@@ -124,7 +152,7 @@ static nipc_error_t transport_receive(nipc_client_ctx_t *ctx,
     case NIPC_UDS_ERR_LIMIT_EXCEEDED:
         return NIPC_ERR_OVERFLOW;
     default:
-        return NIPC_ERR_TRUNCATED;
+        return socket_failure(ctx, uerr, NIPC_ERR_TRUNCATED);
     }
 }
 
@@ -164,15 +192,16 @@ nipc_error_t nipc_service_platform_do_raw_call(nipc_client_ctx_t *ctx,
 nipc_error_t nipc_service_platform_call_with_retry(
     nipc_client_ctx_t *ctx,
     nipc_service_platform_attempt_fn attempt,
-    void *state)
+    void *state,
+    uint32_t timeout_ms)
 {
     return nipc_service_common_call_with_retry(
-        ctx, attempt, state, nipc_service_posix_client_ops());
+        ctx, attempt, state, timeout_ms, nipc_service_posix_client_ops());
 }
 
 nipc_error_t nipc_service_platform_ensure_request_capacity(
-    nipc_client_ctx_t *ctx, size_t required_payload_bytes)
+    nipc_client_ctx_t *ctx, size_t required_payload_bytes, uint32_t timeout_ms)
 {
     return nipc_service_common_client_ensure_request_capacity(
-        ctx, required_payload_bytes, nipc_service_posix_client_ops());
+        ctx, required_payload_bytes, timeout_ms, nipc_service_posix_client_ops());
 }

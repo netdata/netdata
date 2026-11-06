@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
 
@@ -54,6 +56,15 @@ func rawSendPacket(fd int, pkt []byte) error {
 		return fmt.Errorf("short write: %d/%d", n, len(pkt))
 	}
 	return nil
+}
+
+// endStreamWrites: on a stream a short or over-long packet is only visible
+// once the peer stops sending, so end the peer's writes there; the receiver
+// then sees EOF where a SEQPACKET receiver sees the packet end.
+func endStreamWrites(fd int) {
+	if streamTransport {
+		_ = syscall.Shutdown(fd, syscall.SHUT_WR)
+	}
 }
 
 func encodePacket(hdr protocol.Header, payload []byte) []byte {
@@ -112,6 +123,13 @@ func validHelloAckPacket(status uint16) []byte {
 	}, payload)
 }
 
+// helloAckSelecting is a valid HELLO_ACK whose selected_profile is profile.
+func helloAckSelecting(profile uint32) []byte {
+	ack := validHelloAckPacket(protocol.StatusOK)
+	binary.NativeEndian.PutUint32(ack[protocol.HeaderSize+12:protocol.HeaderSize+16], profile)
+	return ack
+}
+
 func validHelloPacket() []byte {
 	hello := protocol.Hello{
 		LayoutVersion:           1,
@@ -167,7 +185,7 @@ func rawSeqpacketListener(t *testing.T, runDir, service string) (int, string) {
 	}
 	_ = os.Remove(path)
 
-	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_SEQPACKET, 0)
+	fd, err := syscall.Socket(syscall.AF_UNIX, sockType, 0)
 	if err != nil {
 		t.Fatalf("socket failed: %v", err)
 	}
@@ -188,7 +206,7 @@ func rawSeqpacketListener(t *testing.T, runDir, service string) (int, string) {
 func rawSeqpacketConnect(t *testing.T, path string) int {
 	t.Helper()
 
-	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_SEQPACKET, 0)
+	fd, err := syscall.Socket(syscall.AF_UNIX, sockType, 0)
 	if err != nil {
 		t.Fatalf("socket failed: %v", err)
 	}
@@ -216,13 +234,13 @@ func TestUdsAcceptOnClosedListener(t *testing.T) {
 }
 
 func TestUdsListenFailsWhenRunDirMissing(t *testing.T) {
-	runDir := filepath.Join(t.TempDir(), "missing")
+	runDir := filepath.Join(shortTempDir(t), "missing")
 	_, err := Listen(runDir, uniqueService(t), defaultServerConfig())
 	if !errors.Is(err, ErrSocket) {
 		t.Fatalf("Listen(missing runDir) = %v, want ErrSocket", err)
 	}
-	if !containsErrText(err, "bind:") {
-		t.Fatalf("Listen(missing runDir) = %v, want bind failure detail", err)
+	if !containsErrText(err, "lock open:") {
+		t.Fatalf("Listen(missing runDir) = %v, want lock open failure detail", err)
 	}
 }
 
@@ -252,7 +270,7 @@ func TestReceiveWaitTimeoutAndAbort(t *testing.T) {
 		t.Fatalf("fresh waitMs should reset deadline: %v", err)
 	}
 
-	expired := receiveWait{deadline: time.Now().Add(-time.Millisecond)}
+	expired := receiveWait{deadline: monotime.After(-time.Millisecond)}
 	if _, err := expired.waitMs(); !errors.Is(err, ErrTimeout) {
 		t.Fatalf("waitMs expired = %v, want ErrTimeout", err)
 	}
@@ -262,21 +280,24 @@ func TestReceiveWaitTimeoutAndAbort(t *testing.T) {
 		t.Fatalf("waitMs infinite = %d/%v, want %d/nil", waitMs, err, receiveAbortPollMs)
 	}
 
-	short := receiveWait{deadline: time.Now().Add(1500 * time.Microsecond)}
+	short := receiveWait{deadline: monotime.After(1500 * time.Microsecond)}
 	if waitMs, err := short.waitMs(); err != nil || waitMs < 1 || waitMs > 2 {
 		t.Fatalf("waitMs short deadline = %d/%v, want 1..2/nil", waitMs, err)
 	}
 }
 
 func TestReceiveAndStaleDirectGuards(t *testing.T) {
-	if err := pollReadableForReceive(1<<31, newReceiveWait(1, nil)); !errors.Is(err, ErrBadParam) {
+	// Non-constant so 32-bit builds compile; there it wraps negative and still hits the guard.
+	var highFD64 int64 = 1 << 31
+	highFD := int(highFD64)
+	if err := pollReadableForReceive(highFD, newReceiveWait(1, nil)); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("poll high fd error = %v, want ErrBadParam", err)
 	}
-	if _, err := rawRecvWithTimeout(1<<31, make([]byte, 1), newReceiveWait(1, nil)); !errors.Is(err, ErrBadParam) {
+	if _, err := rawRecvWithTimeout(highFD, make([]byte, 1), newReceiveWait(1, nil)); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("recv high fd error = %v, want ErrBadParam", err)
 	}
 
-	closedFD, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_SEQPACKET, 0)
+	closedFD, err := syscall.Socket(syscall.AF_UNIX, sockType, 0)
 	if err != nil {
 		t.Fatalf("socket for closed-fd receive guard: %v", err)
 	}
@@ -419,6 +440,7 @@ func TestUdsReceiveRejectsMalformedFirstPacket(t *testing.T) {
 			if err := rawSendPacket(server.fd, tc.pkt); err != nil {
 				t.Fatalf("rawSendPacket failed: %v", err)
 			}
+			endStreamWrites(server.fd)
 
 			buf := make([]byte, 4096)
 			_, _, err := client.Receive(buf)
@@ -501,13 +523,17 @@ func TestUdsReceiveRejectsMalformedChunkedBatchPayload(t *testing.T) {
 				copy(payload[16:], []byte("payload!!"))
 				return payload
 			}(),
-			first: 8,
+			first: 12,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			client, server := udsSessionPair(t, defaultServerConfig(), defaultClientConfig())
+			// The first packet is full, as a sender would make it: a stream
+			// receiver reads min(payload_len, packet_size - 32) bytes after
+			// its header.
+			client.PacketSize = uint32(protocol.HeaderSize + tc.first)
 
 			client.inflightIDs[42] = struct{}{}
 			firstPkt := encodePartialPacket(protocol.Header{
@@ -654,6 +680,8 @@ func TestUdsReceiveRejectsMalformedChunks(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			client, server := udsSessionPair(t, defaultServerConfig(), defaultClientConfig())
+			// A full first packet carries the 4 bytes of "head".
+			client.PacketSize = protocol.HeaderSize + 4
 
 			client.inflightIDs[42] = struct{}{}
 			firstPkt := encodePartialPacket(protocol.Header{
@@ -668,6 +696,7 @@ func TestUdsReceiveRejectsMalformedChunks(t *testing.T) {
 			if err := rawSendPacket(server.fd, tc.second); err != nil {
 				t.Fatalf("rawSendPacket(second) failed: %v", err)
 			}
+			endStreamWrites(server.fd)
 
 			buf := make([]byte, 4096)
 			_, _, err := client.Receive(buf)
@@ -724,7 +753,27 @@ func TestUdsClientHandshakeRejectsMalformedAck(t *testing.T) {
 				return ack[:protocol.HeaderSize+8]
 			},
 			want:     ErrProtocol,
-			wantText: "ack payload truncated",
+			wantText: truncatedText("ack payload truncated"),
+		},
+		{
+			name: "agreed packet size above proposal",
+			packetFn: func() []byte {
+				ack := validHelloAckPacket(protocol.StatusOK)
+				binary.NativeEndian.PutUint32(ack[protocol.HeaderSize+32:protocol.HeaderSize+36], ^uint32(0))
+				return ack
+			},
+			want:     ErrProtocol,
+			wantText: "agreed packet_size",
+		},
+		{
+			name: "agreed packet size too small",
+			packetFn: func() []byte {
+				ack := validHelloAckPacket(protocol.StatusOK)
+				binary.NativeEndian.PutUint32(ack[protocol.HeaderSize+32:protocol.HeaderSize+36], protocol.HeaderSize)
+				return ack
+			},
+			want:     ErrProtocol,
+			wantText: "agreed packet_size",
 		},
 		{
 			name: "bad ack payload layout",
@@ -735,6 +784,30 @@ func TestUdsClientHandshakeRejectsMalformedAck(t *testing.T) {
 			},
 			want:     ErrIncompatible,
 			wantText: "ack payload",
+		},
+		{
+			name: "selected profile not offered",
+			packetFn: func() []byte {
+				return helloAckSelecting(protocol.ProfileSHMHybrid)
+			},
+			want:     ErrProtocol,
+			wantText: "selected profile was not offered",
+		},
+		{
+			name: "no selected profile",
+			packetFn: func() []byte {
+				return helloAckSelecting(0)
+			},
+			want:     ErrProtocol,
+			wantText: "selected profile was not offered",
+		},
+		{
+			name: "two selected profiles",
+			packetFn: func() []byte {
+				return helloAckSelecting(protocol.ProfileBaseline | protocol.ProfileSHMHybrid)
+			},
+			want:     ErrProtocol,
+			wantText: "selected profile was not offered",
 		},
 	}
 
@@ -851,7 +924,7 @@ func TestUdsServerHandshakeRejectsMalformedHello(t *testing.T) {
 				return hello[:protocol.HeaderSize+8]
 			},
 			want:     ErrProtocol,
-			wantText: "hello payload",
+			wantText: truncatedText("hello payload"),
 		},
 		{
 			name: "bad hello payload layout",
@@ -888,6 +961,7 @@ func TestUdsServerHandshakeRejectsMalformedHello(t *testing.T) {
 			if err := rawSendPacket(cfd, tc.packetFn()); err != nil {
 				t.Fatalf("rawSendPacket failed: %v", err)
 			}
+			endStreamWrites(cfd)
 
 			err := <-handshakeDone
 			if err == nil {
@@ -943,17 +1017,202 @@ func defaultServerConfigPtr() *ServerConfig {
 	return &cfg
 }
 
+// truncatedText is the error text for a packet shorter than its header
+// declares: a SEQPACKET receiver sees the short packet and reports what it
+// lacks, a stream receiver hits EOF inside the packet.
+func truncatedText(seqpacket string) string {
+	if streamTransport {
+		return "truncated packet"
+	}
+	return seqpacket
+}
+
 func containsErrText(err error, want string) bool {
 	return err != nil && want != "" && strings.Contains(err.Error(), want)
 }
 
-func TestDetectPacketSizeFallbackAndSuccess(t *testing.T) {
-	if got := detectPacketSize(-1); got != defaultPacketSizeFallback {
-		t.Fatalf("detectPacketSize(-1) = %d, want fallback %d", got, defaultPacketSizeFallback)
+// A server between bind() and listen() refuses connects just like a dead
+// server's leftover socket file. A second server starting in that window
+// must not take the endpoint over: it fails with ErrAddrInUse, and the
+// first server stays reachable.
+func TestListenExcludesStartingServer(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	path := filepath.Join(runDir, service+".sock")
+	_ = os.Remove(path)
+
+	bound := make(chan struct{})
+	release := make(chan struct{})
+	hook := func(p string) {
+		if p != path {
+			return
+		}
+		close(bound)
+		<-release
+	}
+	listenHook.Store(&hook)
+
+	type result struct {
+		l   *Listener
+		err error
+	}
+	first := make(chan result, 1)
+	go func() {
+		l, err := Listen(runDir, service, defaultServerConfig())
+		first <- result{l, err}
+	}()
+	select {
+	case <-bound:
+	case <-time.After(10 * time.Second):
+		t.Fatal("first server never bound")
+	}
+	listenHook.Store(nil)
+
+	second, err := Listen(runDir, service, defaultServerConfig())
+	if !errors.Is(err, ErrAddrInUse) {
+		if second != nil {
+			second.Close()
+		}
+		close(release)
+		<-first
+		t.Fatalf("second server error = %v, want ErrAddrInUse", err)
 	}
 
-	client, _ := udsSessionPair(t, defaultServerConfig(), defaultClientConfig())
-	if got := detectPacketSize(client.fd); got == 0 {
-		t.Fatal("detectPacketSize(valid fd) returned 0")
+	close(release)
+	r := <-first
+	if r.err != nil {
+		t.Fatalf("first listen: %v", r.err)
+	}
+
+	// A connect to the endpoint must reach the first server.
+	cfd, err := syscall.Socket(syscall.AF_UNIX, sockType, 0)
+	if err != nil {
+		t.Fatalf("socket: %v", err)
+	}
+	defer syscall.Close(cfd)
+	if err := syscall.Connect(cfd, &syscall.SockaddrUnix{Name: path}); err != nil {
+		t.Fatalf("connect to endpoint: %v", err)
+	}
+	if err := pollReadableForReceive(r.l.Fd(), newReceiveWait(10000, nil)); err != nil {
+		t.Fatalf("first server never received the connection: %v", err)
+	}
+	r.l.Close()
+
+	// After the owner closed, the endpoint can be taken again.
+	again, err := Listen(runDir, service, defaultServerConfig())
+	if err != nil {
+		t.Fatalf("endpoint not free after close: %v", err)
+	}
+	again.Close()
+}
+
+// A lock file left with a mode missing owner read or write (a server that
+// ran under such a umask) must not block a start, and the start restores it.
+func TestListenOverLeftoverLockModes(t *testing.T) {
+	runDir := testRunDir(t)
+	for _, mode := range []os.FileMode{0o200, 0o400} {
+		service := uniqueService(t)
+		lock := filepath.Join(runDir, service+".lock")
+		_ = os.Remove(lock)
+		if err := os.WriteFile(lock, nil, 0o600); err != nil {
+			t.Fatalf("create lock: %v", err)
+		}
+		if err := os.Chmod(lock, mode); err != nil {
+			t.Fatalf("chmod lock: %v", err)
+		}
+
+		first, err := Listen(runDir, service, defaultServerConfig())
+		if err != nil {
+			t.Fatalf("listen over a %o lock: %v", mode, err)
+		}
+		info, err := os.Stat(lock)
+		if err != nil || info.Mode().Perm() != 0o600 {
+			t.Errorf("lock mode after listen over %o = %v (err %v), want 0600", mode, info.Mode().Perm(), err)
+		}
+		if second, err := Listen(runDir, service, defaultServerConfig()); !errors.Is(err, ErrAddrInUse) {
+			if second != nil {
+				second.Close()
+			}
+			t.Errorf("second server over a %o lock: err = %v, want ErrAddrInUse", mode, err)
+		}
+		first.Close()
+		_ = os.Remove(lock)
+	}
+}
+
+// A child that shares the lock's open file description (as a child forked
+// by another thread does until it execs) must not keep the endpoint once
+// the listener closes.
+func TestListenCloseReleasesLockHeldByChild(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	l, err := Listen(runDir, service, defaultServerConfig())
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+
+	child := exec.Command("/bin/sh", "-c", "read x")
+	child.ExtraFiles = []*os.File{l.lock}
+	gate, err := child.StdinPipe()
+	if err != nil {
+		t.Fatalf("stdin pipe: %v", err)
+	}
+	if err := child.Start(); err != nil {
+		t.Fatalf("start child: %v", err)
+	}
+	defer func() {
+		_ = gate.Close()
+		_ = child.Wait()
+	}()
+
+	l.Close()
+	again, err := Listen(runDir, service, defaultServerConfig())
+	if err != nil {
+		t.Fatalf("endpoint not free while the child holds the lock fd: %v", err)
+	}
+	again.Close()
+}
+
+func TestListenSocketOwnerOnly(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	l, err := Listen(runDir, service, defaultServerConfig())
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	st, statErr := os.Stat(filepath.Join(runDir, service+".sock"))
+	l.Close()
+	if statErr != nil {
+		t.Fatalf("stat socket: %v", statErr)
+	}
+	if mode := st.Mode().Perm(); mode != 0o600 {
+		t.Errorf("listener socket mode = %o, want 600", mode)
+	}
+}
+
+// A server whose client never sends HELLO reports the wait's own error,
+// as C and Rust do, not a generic receive failure.
+func TestServerHandshakeWaitKeepsTimeoutAndAbort(t *testing.T) {
+	aborted := make(chan struct{})
+	close(aborted)
+	cases := []struct {
+		name string
+		wait receiveWait
+		want error
+	}{
+		{"deadline", newReceiveWait(20, nil), ErrTimeout},
+		{"abort", newReceiveWait(0, aborted), ErrAborted},
+	}
+	for _, tc := range cases {
+		fds, err := syscall.Socketpair(syscall.AF_UNIX, sockType, 0)
+		if err != nil {
+			t.Fatalf("socketpair: %v", err)
+		}
+		_, err = serverHandshakeWait(fds[0], defaultServerConfigPtr(), 1, tc.wait, nil)
+		syscall.Close(fds[0])
+		syscall.Close(fds[1])
+		if !errors.Is(err, tc.want) {
+			t.Errorf("%s: %v, want %v", tc.name, err, tc.want)
+		}
 	}
 }
