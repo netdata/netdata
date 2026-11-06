@@ -365,10 +365,13 @@ modules:
           - error: "revocation status check for `source` failed: `reason`"
             when: "`check_revocation_status` is enabled."
             cause: >-
-              A CRL listed in the certificate could not be downloaded (a response over 64 MiB is rejected), parsed or
-              verified (`reason` names the URL), or the certificate is expired or not yet valid. The revocation
-              status chart shows a gap.
-            fix: Check that the Agent host can reach the CRL URLs listed in the certificate, and renew an expired certificate.
+              A CRL listed in the certificate could not be downloaded, parsed or verified (`reason` names the URL; only
+              version 2 CRLs up to 64 MiB are accepted), or the certificate is expired or not yet valid. The
+              revocation status chart shows a gap.
+            fix: >-
+              Check that the Agent host can reach the CRL URLs listed in the certificate, and renew an expired
+              certificate. For an `unsupported crl version` reason, have the CA issue version 2 CRLs (with OpenSSL, set
+              `crlnumber` in the CA configuration).
           - error: "revocation status of `source` could not be determined"
             when: "`check_revocation_status` is enabled."
             cause: >-
