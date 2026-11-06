@@ -22,9 +22,9 @@ use std::sync::Arc;
 pub struct ChartDescriptor {
     /// The Netdata context, for example `svc.requests`, of every entity's
     /// chart instance; a histogram's three charts have it plus a suffix
-    /// (`_avg`, `_max`, `_histogram`, see [`ChartsBuilder::histogram`]). Alerts, queries and the dashboard use
-    /// the context to group the instances. Each entity's chart id is built
-    /// from the chart's context:
+    /// (`_avg`, `_max`, `_histogram`, see [`ChartsBuilder::histogram`]).
+    /// Alerts, queries and the dashboard use the context to group the
+    /// instances. Each entity's chart id is built from the chart's context:
     /// - `<context>` for an entity without labels;
     /// - `<context>_<hash>` for any other entity, where `<hash>` is 16 hex
     ///   digits of a hash of its labels, stable across restarts and releases;
@@ -66,7 +66,7 @@ pub(crate) struct ChartTemplate {
     pub(crate) chart_type: ChartType,
     pub(crate) priority: i32,
     /// The index of its column group in the set's schema.
-    pub(crate) group: usize,
+    pub(crate) group: u32,
 }
 
 /// The charts of a [`MetricSet`]: one chart template per column group,
@@ -107,6 +107,7 @@ pub struct ChartsBuilder {
 }
 
 impl ChartsBuilder {
+    /// Starts the charts of `set`.
     pub fn new(set: &MetricSet) -> Self {
         Self {
             set: set.clone(),
@@ -205,9 +206,10 @@ impl ChartsBuilder {
     /// chart yet, its dimension ids are valid, its context is valid, and its
     /// context is unique in the charts.
     fn add(&mut self, template: ChartTemplate) {
-        let group = &self.set.0.schema.column_groups()[template.group];
+        let group = self.set.0.schema.column_group(template.group);
+        let charted = &mut self.charted[template.group as usize];
         assert!(
-            !self.charted[template.group],
+            !*charted,
             "the columns {:?} already have a chart",
             group.names
         );
@@ -220,7 +222,7 @@ impl ChartsBuilder {
             self.templates.iter().all(|t| &t.context != context),
             "duplicate context {context:?}"
         );
-        self.charted[template.group] = true;
+        *charted = true;
         self.templates.push(template);
     }
 }
@@ -228,7 +230,7 @@ impl ChartsBuilder {
 impl ChartTemplate {
     /// The template with `descriptor`'s fields as they are, over the column
     /// group with index `group`.
-    fn new(descriptor: ChartDescriptor, group: usize) -> Self {
+    fn new(descriptor: ChartDescriptor, group: u32) -> Self {
         Self {
             title: descriptor.title.to_string(),
             units: descriptor.units,
@@ -270,7 +272,7 @@ fn entity_suffix(labels: &Labels, kind: EntityKind) -> String {
     match kind {
         EntityKind::Overflow => OVERFLOW_SUFFIX.to_string(),
         EntityKind::Own if labels.is_empty() => String::new(),
-        EntityKind::Own => format!("_{:0HASH_DIGITS$x}", labels.stable_hash()),
+        EntityKind::Own => format!("_{:0HASH_DIGITS$x}", stable_hash(labels)),
     }
 }
 
@@ -284,6 +286,19 @@ fn ends_like_entity_suffix(context: &str) -> bool {
             .iter()
             .all(u8::is_ascii_hexdigit);
     hashed || context.ends_with(OVERFLOW_SUFFIX)
+}
+
+/// FNV-1a over the labels, which are sorted by key: stable across processes
+/// and releases, so an entity keeps its chart ids over restarts.
+pub(crate) fn stable_hash(labels: &Labels) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for (key, value) in labels.iter() {
+        for b in key.bytes().chain([0]).chain(value.bytes()).chain([0]) {
+            hash ^= u64::from(b);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    hash
 }
 
 fn is_id_byte(b: u8) -> bool {

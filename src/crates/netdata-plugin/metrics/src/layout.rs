@@ -92,14 +92,15 @@ impl Aggregation {
 #[derive(Debug)]
 pub struct ColumnRange<C> {
     pub(crate) set_id: u32,
-    /// The index of its column group in the set's schema.
-    pub(crate) group: usize,
+    /// The index of its column group in the set's schema; `u32` keeps the
+    /// handle two words.
+    pub(crate) group: u32,
     base: usize,
     _column: PhantomData<fn() -> C>,
 }
 
 impl<C: Column> ColumnRange<C> {
-    pub(crate) fn new(set_id: u32, group: usize, base: usize) -> Self {
+    pub(crate) fn new(set_id: u32, group: u32, base: usize) -> Self {
         Self {
             set_id,
             group,
@@ -156,11 +157,7 @@ impl Schema {
     /// Adds a group of one value per name, in that order, taking the next
     /// columns, and returns its index; after checking that there is at least
     /// one name and that no name repeats.
-    pub(crate) fn add_column_group(
-        &mut self,
-        aggregation: Aggregation,
-        names: Vec<String>,
-    ) -> usize {
+    pub(crate) fn add_column_group(&mut self, aggregation: Aggregation, names: Vec<String>) -> u32 {
         assert!(!names.is_empty(), "an instrument needs at least one column");
         for (i, name) in names.iter().enumerate() {
             assert!(!names[..i].contains(name), "duplicate column name {name:?}");
@@ -174,7 +171,12 @@ impl Schema {
             columns: first..first + width,
             names,
         });
-        self.column_groups.len() - 1
+        u32::try_from(self.column_groups.len() - 1).expect("too many column groups")
+    }
+
+    /// The group with index `group`.
+    pub(crate) fn column_group(&self, group: u32) -> &ColumnGroup {
+        &self.column_groups[group as usize]
     }
 
     /// In the order they were added, which is also column order.

@@ -20,7 +20,7 @@ impl Charts {
     ) {
         let schema = &self.0.set.0.schema;
         for (template, id) in self.0.templates.iter().zip(chart_ids) {
-            let group = &schema.column_groups()[template.group];
+            let group = schema.column_group(template.group);
             out.block(|block| {
                 self.write_chart_line(block, template, id, false);
                 if !labels.is_empty() {
@@ -61,7 +61,7 @@ impl Charts {
         let set = &self.0.set.0;
         let interval_secs = set.interval_secs;
         for (template, id) in self.0.templates.iter().zip(chart_ids) {
-            let group = &set.schema.column_groups()[template.group];
+            let group = set.schema.column_group(template.group);
             out.block(|block| {
                 write_begin(block, id, interval_secs * 1_000_000);
                 for (i, dimension_id) in group.names.iter().enumerate() {

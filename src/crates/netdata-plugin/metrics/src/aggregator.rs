@@ -5,10 +5,10 @@
 //! not yet emitted) to the current one open; each entity holds those windows
 //! as rows and folds them forward after a stall (`bound_backlog`). Entities
 //! are created on their first event, with or without measurements, and an
-//! expired entity is dropped with its rows and cumulative baselines. Only
-//! emitting reads the charts: an entity's first emitted window defines its
-//! chart instances, each emitted window updates them, and expiry marks them
-//! obsolete.
+//! expired entity is dropped with its rows and cumulative baselines. The
+//! charts come in only for output: a new entity caches its chart ids, its
+//! first emitted window defines its chart instances, each emitted window
+//! updates them, and expiry marks them obsolete.
 
 use crate::batch::Batch;
 use crate::chart::Charts;
@@ -68,8 +68,8 @@ struct Entity {
 }
 
 /// Collects the batches of one [`MetricSet`] and emits each window, once its
-/// allowed lateness has passed, as chart-protocol text through the set's
-/// [`Charts`].
+/// allowed lateness has passed, as chart-protocol text through the
+/// [`Charts`] it was created with.
 ///
 /// The aggregator reads no clock and does no I/O. Pass the current Unix time
 /// to [`Aggregator::merge`] and [`Aggregator::emit`], call `emit` at least
@@ -135,6 +135,8 @@ pub struct Aggregator {
 }
 
 impl Aggregator {
+    /// An aggregator of `set`, emitting through `charts`.
+    ///
     /// # Panics
     ///
     /// If `charts` are of another metric set.
@@ -511,7 +513,7 @@ mod tests {
         let mut aggregator = Aggregator::new(&f.set, &f.charts);
         record(&f, &mut aggregator, "checkout", 100, 3, 1, 100);
         let first = text(&aggregator.emit(101, usize::MAX));
-        let h = format!("{:016x}", labels("checkout").stable_hash());
+        let h = format!("{:016x}", crate::chart::stable_hash(&labels("checkout")));
         assert_eq!(
             first,
             format!(
@@ -996,6 +998,41 @@ mod tests {
             .filter_map(|line| line.strip_prefix(prefix.as_str()))
             .map(|value| value.trim().to_string())
             .collect()
+    }
+
+    #[test]
+    fn charts_declared_out_of_instrument_order_read_their_own_columns() {
+        let mut builder = MetricSetBuilder::new(Settings::default());
+        let requests = builder.counter::<Outcome>();
+        let queue = builder.gauge::<Queue>();
+        let duration = builder.histogram(&[1.0]);
+        let set = builder.build();
+        let mut charts = ChartsBuilder::new(&set);
+        charts.histogram(duration, descriptor("x.duration", 1), "u");
+        charts.chart(queue, descriptor("x.queue", 4));
+        charts.chart(requests, descriptor("x.requests", 5));
+        let mut aggregator = Aggregator::new(&set, &charts.build());
+        merge_event(&set, &mut aggregator, 10, 10, |m| {
+            m.add(requests, Outcome::Error, 4.0)
+                .set_value(queue, Queue::Jobs, 7.0)
+                .observe(duration, 3.0, 2.0);
+        });
+        let out = text(&aggregator.emit(11, usize::MAX));
+        validate_chart_stream(out.as_bytes()).unwrap();
+        let updates: Vec<&str> = out
+            .split_inclusive("END 11 0 1\n")
+            .map(|block| &block[block.find("BEGIN ").unwrap()..])
+            .collect();
+        assert_eq!(
+            updates,
+            [
+                "BEGIN x.duration_avg 1000000\nSET avg = 3\nEND 11 0 1\n",
+                "BEGIN x.duration_max 1000000\nSET max = 3\nEND 11 0 1\n",
+                "BEGIN x.duration_histogram 1000000\nSET 1 = 0\nSET +Inf = 2\nEND 11 0 1\n",
+                "BEGIN x.queue 1000000\nSET jobs = 7\nEND 11 0 1\n",
+                "BEGIN x.requests 1000000\nSET ok = 0\nSET error = 4\nEND 11 0 1\n",
+            ]
+        );
     }
 
     #[test]

@@ -152,7 +152,7 @@ pub struct Histogram {
     pub(crate) set_id: u32,
     /// The index of its first column group (the mean); the maximum and the
     /// buckets follow.
-    pub(crate) group: usize,
+    pub(crate) group: u32,
     /// The first of its columns, which follow its groups' order: the mean's
     /// sum and count, the maximum, then the buckets.
     pub(crate) base: usize,
@@ -192,8 +192,8 @@ impl Histogram {
 ///   needs no labels.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Labels(
-    /// Sorted by key, keys unique: the order the hash and the output rely
-    /// on.
+    /// Sorted by key, keys unique: the order entity identity, chart ids and
+    /// the output rely on.
     pub(crate) Vec<(String, String)>,
 );
 
@@ -238,20 +238,6 @@ impl Labels {
             .iter()
             .map(|(key, value)| (key.as_str(), value.as_str()))
     }
-
-    /// FNV-1a over the labels, which are sorted by key: stable across
-    /// processes and releases, so an entity keeps its chart ids over
-    /// restarts (see [`ChartDescriptor::context`](crate::ChartDescriptor::context)).
-    pub(crate) fn stable_hash(&self) -> u64 {
-        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-        for (key, value) in self.iter() {
-            for b in key.bytes().chain([0]).chain(value.bytes()).chain([0]) {
-                hash ^= u64::from(b);
-                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-            }
-        }
-        hash
-    }
 }
 
 /// A declared table: its instruments, each a group of columns, and its time
@@ -289,10 +275,10 @@ pub struct Settings {
     pub allowed_lateness: Duration,
     /// A timeout: the aggregator forgets an entity with no events for this
     /// long (its charts are marked obsolete: the agent stops collecting them
-    /// and later removes them). Rounded up to whole collection intervals. It counts emitted windows, which lag by
-    /// `allowed_lateness`: with expiry 900 s and an allowed lateness of 10 s,
-    /// an entity last recorded at second 0 expires at second 911. Default 15
-    /// minutes.
+    /// and later removes them). Rounded up to whole collection intervals. It
+    /// counts emitted windows, which lag by `allowed_lateness`: with expiry
+    /// 900 s and an allowed lateness of 10 s, an entity last recorded at
+    /// second 0 expires at second 911. Default 15 minutes.
     pub expiry: Duration,
     /// The limit on the number of entities; default none.
     pub cardinality_limit: Option<CardinalityLimit>,
@@ -373,7 +359,7 @@ impl MetricSetBuilder {
     fn split_by<C: Column>(&mut self, aggregation: Aggregation) -> ColumnRange<C> {
         let names = C::NAMES.iter().map(|name| name.to_string()).collect();
         let group = self.schema.add_column_group(aggregation, names);
-        let base = self.schema.column_groups()[group].columns.start;
+        let base = self.schema.column_group(group).columns.start;
         ColumnRange::new(self.id, group, base)
     }
 
@@ -435,7 +421,7 @@ impl MetricSetBuilder {
         Histogram {
             set_id: self.id,
             group,
-            base: self.schema.column_groups()[group].columns.start,
+            base: self.schema.column_group(group).columns.start,
             bounds,
         }
     }
