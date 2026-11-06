@@ -220,3 +220,71 @@ func TestIndexIdentityAllocationEnvelopes(t *testing.T) {
 		})
 	}
 }
+
+func indexIdentityCacheConfigs() map[string]ddprofiledefinition.MetricsConfig {
+	const root = "1.3.6.1.4.1.99999.991"
+	legacy := ddprofiledefinition.MetricsConfig{
+		MIB:     "EXAMPLE-MIB",
+		Table:   ddprofiledefinition.SymbolConfig{OID: root, Name: "rows"},
+		Symbols: []ddprofiledefinition.SymbolConfig{{OID: root + ".1.1", Name: "value"}},
+		MetricTags: []ddprofiledefinition.MetricTagConfig{
+			{Symbol: ddprofiledefinition.SymbolConfigCompat{Name: "row_index"}, Index: 1},
+			{Tag: "name", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: root + ".1.2", Name: "rowName"}},
+			{
+				Tag:     "state",
+				Symbol:  ddprofiledefinition.SymbolConfigCompat{OID: root + ".1.3", Name: "rowState"},
+				Mapping: ddprofiledefinition.NewExactMapping(map[string]string{"1": "up", "2": "down"}),
+			},
+		},
+	}
+	decoded := legacy.Clone()
+	decoded.MetricTags[0] = decodedTagWorkloads()[0].config
+	// Preserve fallback naming and ordinary companion tags: all participate in opt-in cached identity.
+	decoded.MetricTags[0].Tag = ""
+	decoded.MetricTags[0].Symbol.Name = "counter_name"
+	scoped := legacy.Clone()
+	scoped.MetricTags[0] = newScopedIdentityWorkload(0).config
+	return map[string]ddprofiledefinition.MetricsConfig{
+		"legacy-three-tags":       legacy,
+		"decoded-with-companions": decoded,
+		"scoped-with-companions":  scoped,
+	}
+}
+
+// Config IDs are computed per table/configuration, not per metric row. Opt-in identity encodes the complete tag
+// configuration in O(encoded tag configuration size); legacy tables keep their established compact path.
+func BenchmarkIndexIdentityCacheConfigID(b *testing.B) {
+	cache := &tableCache{}
+	for name, config := range indexIdentityCacheConfigs() {
+		b.Run(name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				if cache.generateConfigID(config) == "" {
+					b.Fatal("empty config identity")
+				}
+			}
+		})
+	}
+}
+
+func TestIndexIdentityCacheConfigAllocationEnvelopes(t *testing.T) {
+	cache := &tableCache{}
+	for name, config := range indexIdentityCacheConfigs() {
+		t.Run(name, func(t *testing.T) {
+			var identity string
+			allocs := testing.AllocsPerRun(100, func() { identity = cache.generateConfigID(config) })
+			require.NotEmpty(t, identity)
+			limit := float64(11)
+			if name == "legacy-three-tags" {
+				limit = 2
+			}
+			require.LessOrEqual(
+				t,
+				allocs,
+				limit,
+				"config identity allocations are bounded by config size, independent of table row count",
+			)
+			t.Logf("config key: %.0f allocations; %d encoded bytes", allocs, len(identity))
+		})
+	}
+}

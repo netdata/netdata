@@ -4,6 +4,7 @@ package ddsnmpcollector
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,5 +103,53 @@ func TestIndexDecodeConfigChangeDoesNotReuseIdentity(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, metrics, 1)
 		assert.Equal(t, fmt.Sprint(component), metrics[0].Tags["identity"])
+	}
+}
+
+func TestExtendedIndexTagConfigChangeDoesNotReuseIdentity(t *testing.T) {
+	const root = "1.3.6.1.4.1.99999.881"
+	for _, tc := range []struct {
+		name, before, after string
+		want                map[string]string
+	}{
+		{
+			name:   "fallback symbol name",
+			before: "- symbol: {name: first}\n  index_decode: {components: [{type: integer}, {type: integer}], component: 1}\n",
+			after:  "- symbol: {name: second}\n  index_decode: {components: [{type: integer}, {type: integer}], component: 1}\n",
+			want:   map[string]string{"second": "65"},
+		},
+		{
+			name:   "octet string index position",
+			before: "- tag: identity\n  index: 1\n  symbol: {format: octet_string}\n",
+			after:  "- tag: identity\n  index: 2\n  symbol: {format: octet_string}\n",
+			want:   map[string]string{"identity": "B"},
+		},
+		{
+			name:   "companion legacy tag",
+			before: "- tag: identity\n  index: 1\n  symbol: {format: octet_string}\n- tag: first\n  index: 2\n",
+			after:  "- tag: identity\n  index: 1\n  symbol: {format: octet_string}\n- tag: second\n  index: 2\n",
+			want:   map[string]string{"identity": "A", "second": "66"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl, handler := setupMockHandler(t)
+			defer ctrl.Finish()
+			collector := newTableCollector(handler, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
+			pdu := createGauge32PDU(root+".1.65.66", 10)
+			for i, tags := range []string{tc.before, tc.after, tc.after} {
+				def := decodeContractProfile(t, "metrics:\n- table: {OID: "+root+", name: rows}\n  symbols: [{OID: "+root+".1, name: value}]\n  metric_tags:\n    "+strings.ReplaceAll(tags, "\n", "\n    "))
+				if i < 2 {
+					expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.SnmpPDU{pdu})
+				} else {
+					handler.EXPECT().Get([]string{pdu.Name}).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{pdu}}, nil)
+				}
+				metrics, err := collector.collect(&ddsnmp.Profile{SourceFile: "decode-test.yaml", Definition: def}, &ddsnmp.CollectionStats{})
+				require.NoError(t, err)
+				require.Len(t, metrics, 1)
+				if i > 0 {
+					assert.Equal(t, tc.want, metrics[0].Tags)
+				}
+			}
+		})
 	}
 }

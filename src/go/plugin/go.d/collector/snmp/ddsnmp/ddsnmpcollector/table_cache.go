@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"maps"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -445,24 +446,40 @@ func (tc *tableCache) generateConfigID(cfg ddprofiledefinition.MetricsConfig) st
 	}
 
 	sb.WriteString(strings.Join(names, ","))
+	extended := false
 	for _, tag := range cfg.MetricTags {
-		extended := tag.IndexDecode != nil || tag.LookupScope != nil || tag.Symbol.Format == "octet_string"
+		extended = tag.IndexDecode != nil || tag.LookupScope != nil || tag.Symbol.Format == "octet_string"
 		for _, transform := range tag.IndexTransform {
 			extended = extended || len(transform.Mapping) > 0
 		}
-		if !extended {
-			continue
+		if extended {
+			break
 		}
-		// New index semantics must not reuse tags computed by another layout or scope.
-		// These fields contain only JSON-supported strings, integers, slices and maps.
-		identity, _ := json.Marshal(struct {
-			Tag, Format, Extract, Match, MatchValue string
-			Decode                                  *ddprofiledefinition.MetricIndexDecode
-			Transforms                              []ddprofiledefinition.MetricIndexTransform
-			Scope                                   *ddprofiledefinition.MetricLookupScope
-			Mapping                                 ddprofiledefinition.MappingConfig
-		}{tag.Tag, tag.Symbol.Format, tag.Symbol.ExtractValue, tag.Symbol.MatchPattern, tag.Symbol.MatchValue,
-			tag.IndexDecode, tag.IndexTransform, tag.LookupScope, tag.Mapping})
+	}
+	if extended {
+		// Cache entries contain the whole tag set, including companion legacy tags.
+		// Keep their source/selector semantics together and omit compiled runtime state.
+		type tagIdentity struct {
+			ddprofiledefinition.MetricTagConfig
+			Match string
+			Tags  map[string]string
+		}
+		tags := make([]tagIdentity, len(cfg.MetricTags))
+		for i, tag := range cfg.MetricTags {
+			// Metric scaling is unused for tags; normalize it so even a non-finite
+			// unused value cannot prevent JSON encoding of the identity.
+			tag.Symbol.ScaleFactor = 0
+			tag.LookupSymbol.ScaleFactor = 0
+			if len(tag.IndexFrom) > 0 {
+				tag.IndexFrom = slices.Clone(tag.IndexFrom)
+				for j := range tag.IndexFrom {
+					tag.IndexFrom[j].Symbol.ScaleFactor = 0
+				}
+			}
+			tags[i] = tagIdentity{MetricTagConfig: tag, Match: tag.Match, Tags: tag.Tags}
+		}
+		// All remaining serialized fields are JSON-supported strings, integers and collections.
+		identity, _ := json.Marshal(tags)
 		sb.WriteString("|index:")
 		sb.Write(identity)
 	}
