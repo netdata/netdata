@@ -1218,6 +1218,21 @@ seed_hostnames() {
   sanitize_file "$STAGING/host-seed.txt" host-seed
 }
 
+# find_netdatacli - sets NETDATACLI (empty when not found): PATH first, then
+# next to the daemon binary (installs under a prefix keep both in usr/sbin),
+# then the static install's bin/ directory. Neither of the last two is on PATH;
+# kickstart.sh resolves netdatacli the same way.
+find_netdatacli() {
+  NETDATACLI=$(command -v netdatacli 2>/dev/null) || NETDATACLI=""
+  if [ -z "$NETDATACLI" ] && [ -n "${NETDATA_BIN:-}" ] && [ -x "${NETDATA_BIN%/*}/netdatacli" ]; then
+    NETDATACLI="${NETDATA_BIN%/*}/netdatacli"
+  fi
+  if [ -z "$NETDATACLI" ] && [ -x /opt/netdata/bin/netdatacli ]; then
+    NETDATACLI=/opt/netdata/bin/netdatacli
+  fi
+  return 0
+}
+
 discover_environment() {
   # --- environment detection ------------------------------------------------------
   # Prefer the exact daemon command name: pidof can also return Netdata helper
@@ -1249,6 +1264,7 @@ discover_environment() {
   [ -z "${NETDATA_BIN:-}" ] && [ -n "${NETDATA_PID:-}" ] && [ -r "/proc/$NETDATA_PID/exe" ] && \
     NETDATA_BIN=$(readlink -f "/proc/$NETDATA_PID/exe" 2>/dev/null)
   [ -z "${NETDATA_BIN:-}" ] && [ -x /opt/netdata/usr/sbin/netdata ] && NETDATA_BIN=/opt/netdata/usr/sbin/netdata
+  find_netdatacli
 
   # probe /api/v3/info first: it stays reachable even under bearer protection,
   # where /api/v1/* is locked (so a protected-but-running agent isn't mis-flagged)
@@ -1515,9 +1531,39 @@ collect_state() {
 }
 
 # =============================================================================
-# 07-runtime (only when the agent responds)
+# 07-runtime (API captures when the agent's API answers; netdatacli captures
+# whenever the agent runs and netdatacli was found)
 # =============================================================================
+# collect_dyncfg_tree_cli - the dyncfg tree through the local command pipe.
+# The pipe is reachable only by root, the netdata user and the netdata group,
+# and the agent answers it as a member of its own space; the web API needs a
+# signed-in member, which the bundle cannot be. Returns non-zero, leaving no
+# file and no manifest row, when netdatacli was not found, the agent predates
+# the command, or the call fails, so the caller can fall back to the API under
+# the same path.
+collect_dyncfg_tree_cli() {
+  [ -n "${NETDATACLI:-}" ] && [ -n "${NETDATA_PID:-}" ] || return 1
+  deadline_exceeded && return 1
+  _dtc_rel=07-runtime/dyncfg-tree.json
+  _dtc_out="$WORK/$_dtc_rel"
+  mkdir -p "$(dirname "$_dtc_out")"
+  capture_output "$_dtc_out.cli" "$((API_CAP + 1))" 0 run_capped "$CMD_TIMEOUT" "$NETDATACLI" dyncfg-tree
+  if [ "$CAPTURE_RC" = 0 ] && [ "$CAPTURE_BYTES" -gt 0 ] && [ "$CAPTURE_BYTES" -le "$API_CAP" ] && \
+     mv -f "$_dtc_out.cli" "$_dtc_out"; then
+    sanitize_file "$_dtc_out"
+    manifest_add "$_dtc_rel" cmd "netdatacli dyncfg-tree" "Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state"
+    return 0
+  fi
+  rm -f "$_dtc_out.cli"
+  return 1
+}
+
 collect_runtime() {
+  # The command pipe does not need the web API, so the tree is tried through it
+  # whatever api_ok says - but at the tree's own place in the order: sanitizing
+  # a large tree can take minutes, and done first it would spend the global
+  # deadline that the smaller runtime captures before it need.
+  _rt_dyncfg_cli=0
   if [ "$api_ok" = "1" ]; then
     info "collecting: runtime (agent is up)"
     collect_api 07-runtime/info-v3.json "BEST SINGLE CALL: buildinfo, features, cloud status, per-tier retention (works even under bearer protection)" /api/v3/info
@@ -1528,13 +1574,17 @@ collect_runtime() {
     collect_api 07-runtime/alerts-active.json "Currently raised alerts" "/api/v3/alerts?options=active"
     collect_api 07-runtime/alerts-all.json "All alert instances (summary)" "/api/v1/alarms?all"
     collect_api 07-runtime/functions.json "Registered functions (which plugins expose what)" /api/v1/functions
-    collect_api 07-runtime/dyncfg-tree.json "Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state" "/api/v3/config?action=tree"
+    collect_dyncfg_tree_cli && _rt_dyncfg_cli=1
+    # agents that predate `netdatacli dyncfg-tree`, or a bundle run as a user
+    # who cannot reach the command pipe, fall back to the API
+    [ "$_rt_dyncfg_cli" = "1" ] || \
+      collect_api 07-runtime/dyncfg-tree.json "Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state" "/api/v3/config?action=tree"
     # /api/v3/info answers without any access check, so api_ok can be 1 while
     # this endpoint - which sits behind the dyncfg ACL - refuses us. The bundle
     # cannot authenticate: bearer token FILENAMES are themselves live tokens and
     # are never collected. Say so, rather than leaving a bare exit code, so the
     # reader does not read the absence as "no collector jobs exist".
-    if [ -f "$WORK/07-runtime/dyncfg-tree.json" ] && \
+    if [ "$_rt_dyncfg_cli" != "1" ] && [ -f "$WORK/07-runtime/dyncfg-tree.json" ] && \
        grep -q '"error":"capture failed' "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null; then
       # Keep the observed failure rather than asserting a cause: a refusal, a
       # timeout, a transport error and a 5xx all land here identically, and
@@ -1545,7 +1595,7 @@ collect_runtime() {
       _dt_new="$WORK/07-runtime/dyncfg-tree.json.new"
       _dt_ok=0
       if _dt_detail=$(tr -d "\n" < "$WORK/07-runtime/dyncfg-tree.json" 2>/dev/null) && [ -n "$_dt_detail" ]; then
-        if printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" > "$_dt_new"; then
+        if printf '%s\n' "{\"error\":\"dyncfg tree was not collected\",\"observed\":${_dt_detail},\"hint\":\"netdatacli dyncfg-tree was not usable (netdatacli was not found, the agent predates the command, the bundle did not run as root, the netdata user or a member of the netdata group, or the call failed), so the bundle fell back to /api/v3/config, which only signed-in members of the agent's space may list on current agents, and which a bearer-protected API refuses on older ones - a timeout, transport error or HTTP failure is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Run 'netdatacli dyncfg-tree' as root, or ask for the collector job state separately.\",\"means\":\"NOT evidence that no collector jobs exist\"}" > "$_dt_new"; then
           if mv -f "$_dt_new" "$WORK/07-runtime/dyncfg-tree.json"; then
             _dt_ok=1
           fi
@@ -1570,14 +1620,15 @@ collect_runtime() {
     mkdir -p "$WORK/07-runtime"
     echo "Agent API at 127.0.0.1:$NDPORT was unreachable when this bundle was created. See 05-logs and 06-state/status-file.json for why." > "$WORK/07-runtime/AGENT-WAS-DOWN.txt"
     manifest_add 07-runtime/AGENT-WAS-DOWN.txt "file" "generated" "Marker: agent API unreachable at collection time"
+    collect_dyncfg_tree_cli || :
   fi
   if [ -n "${NETDATA_BIN:-}" ]; then
     collect_cmd 07-runtime/buildinfo.txt "netdata -W buildinfo (verbatim - paths section matters; works with daemon down)" "$NETDATA_BIN" -W buildinfo
     collect_cmd_raw 07-runtime/buildinfo.json "netdata -W buildinfojson (machine-readable; no header so it parses as JSON)" "$NETDATA_BIN" -W buildinfojson
     collect_cmd 07-runtime/cmakecache.txt "netdata -W cmakecache: authoritative build config (compiler flags, enabled plugins, configured paths) - superset of buildinfo" "$NETDATA_BIN" -W cmakecache
   fi
-  if command -v netdatacli >/dev/null 2>&1 && [ -n "${NETDATA_PID:-}" ]; then
-    collect_cmd_raw 07-runtime/aclk-state.json "Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)" netdatacli aclk-state json
+  if [ -n "${NETDATACLI:-}" ] && [ -n "${NETDATA_PID:-}" ]; then
+    collect_cmd_raw 07-runtime/aclk-state.json "Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)" "$NETDATACLI" aclk-state json
   fi
 }
 
@@ -2027,7 +2078,7 @@ in a config file is still visible here.
 | `04-config/` | effective (running) config + every user-customized config file |
 | `05-logs/` | journal + agent log files (window-capped), updater log, coredump metadata |
 | `06-state/` | daemon status file (crash record), state/db disk usage, claim state |
-| `07-runtime/` | live API captures: info, node instances, alerts, aclk state, buildinfo |
+| `07-runtime/` | live agent state: API captures (info, node instances, alerts), netdatacli captures (dyncfg tree, aclk state), buildinfo |
 | `08-network/` | Netdata process-tree socket inventory, DNS, proxy, Netdata Cloud reachability |
 | `09-permissions/` | modes, ownership, setuid bits, file capabilities, extended attributes, SELinux/AppArmor contexts and ACLs - including every `plugins.d` |
 
@@ -2039,6 +2090,8 @@ in a config file is still visible here.
   their origin is recorded in `MANIFEST.json`.
 - `07-runtime/AGENT-WAS-DOWN.txt` exists when the local API probe failed (the
   agent may be down, or its API bound away from 127.0.0.1 / bearer-protected).
+  netdatacli captures such as `dyncfg-tree.json` do not need the API and can
+  still be present next to it.
 EOF
   manifest_add README.md file generated "Bundle documentation"
 }
