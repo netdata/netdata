@@ -92,6 +92,27 @@ func TestCollector_Init(t *testing.T) {
 			},
 			wantProvider: &fileProvider{},
 		},
+		"tls server name": {
+			config: func(c *Config) {
+				c.Source = "https://192.0.2.10:443"
+				c.TLSServerName = "example.org"
+			},
+			wantProvider: &netProvider{},
+		},
+		"tls server name with smtp": {
+			config: func(c *Config) {
+				c.Source = "smtp://192.0.2.10:587"
+				c.TLSServerName = "smtp.example.org"
+			},
+			wantProvider: &smtpProvider{},
+		},
+		"tls server name with file source": {
+			config: func(c *Config) {
+				c.Source = "file:///home/me/cert.pem"
+				c.TLSServerName = "example.org"
+			},
+			wantErr: true,
+		},
 		"empty source": {
 			config:  func(c *Config) { c.Source = "" },
 			wantErr: true,

@@ -17,6 +17,7 @@ type Config struct {
 	Timeout            confopt.Duration `yaml:"timeout,omitempty"             json:"timeout"`
 	CheckFullChain     bool             `yaml:"check_full_chain"              json:"check_full_chain"`
 	CheckRevocation    bool             `yaml:"check_revocation_status"       json:"check_revocation_status"`
+	TLSServerName      string           `yaml:"tls_server_name,omitempty"     json:"tls_server_name"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
 }
 

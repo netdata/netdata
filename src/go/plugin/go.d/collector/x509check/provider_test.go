@@ -37,9 +37,9 @@ func TestCollector_CollectFromSource(t *testing.T) {
 	certFile := writePEM(t, cert.Leaf)
 
 	for name, source := range map[string]func(t *testing.T) string{
-		"https": func(t *testing.T) string { return "https://" + serveTLS(t, cert) },
-		"tcp":   func(t *testing.T) string { return "tcp://" + serveTLS(t, cert) },
-		"smtp":  func(t *testing.T) string { return "smtp://" + serveSMTP(t, cert) },
+		"https": func(t *testing.T) string { return "https://" + serveTLS(t, serverConfig(cert)) },
+		"tcp":   func(t *testing.T) string { return "tcp://" + serveTLS(t, serverConfig(cert)) },
+		"smtp":  func(t *testing.T) string { return "smtp://" + serveSMTP(t, serverConfig(cert)) },
 		"file":  func(t *testing.T) string { return "file://" + certFile },
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -104,6 +104,137 @@ func TestCollector_CheckIsBounded(t *testing.T) {
 	}
 }
 
+func TestCollector_TLSServerNameSelectsCertificate(t *testing.T) {
+	notAfter := time.Now().Add(time.Hour)
+	config, requested := sniServerConfig(
+		newTestCertificate(t, "default.example.com", notAfter),
+		newTestCertificate(t, "site-a.example.com", notAfter),
+		newTestCertificate(t, "site-b.example.com", notAfter),
+	)
+	// Every job connects to the same address; only the server name differs.
+	tlsAddr := serveTLS(t, config)
+	smtpAddr := serveSMTP(t, config)
+	_, tlsPort, err := net.SplitHostPort(tlsAddr)
+	require.NoError(t, err)
+	_, smtpPort, err := net.SplitHostPort(smtpAddr)
+	require.NoError(t, err)
+
+	for name, test := range map[string]struct {
+		source         string
+		serverName     string
+		wantSNI        string
+		wantCommonName string
+	}{
+		"https source host name": {
+			source:         "https://localhost:" + tlsPort,
+			wantSNI:        "localhost",
+			wantCommonName: "default.example.com",
+		},
+		"https source address": {
+			source:         "https://" + tlsAddr,
+			wantSNI:        "",
+			wantCommonName: "default.example.com",
+		},
+		"https site a": {
+			source:         "https://" + tlsAddr,
+			serverName:     "site-a.example.com",
+			wantSNI:        "site-a.example.com",
+			wantCommonName: "site-a.example.com",
+		},
+		"https site b": {
+			source:         "https://" + tlsAddr,
+			serverName:     "site-b.example.com",
+			wantSNI:        "site-b.example.com",
+			wantCommonName: "site-b.example.com",
+		},
+		"tcp site a": {
+			source:         "tcp://" + tlsAddr,
+			serverName:     "site-a.example.com",
+			wantSNI:        "site-a.example.com",
+			wantCommonName: "site-a.example.com",
+		},
+		"https IP server name": {
+			source:         "https://localhost:" + tlsPort,
+			serverName:     "127.0.0.1",
+			wantSNI:        "",
+			wantCommonName: "default.example.com",
+		},
+		"smtp source host name": {
+			source:         "smtp://localhost:" + smtpPort,
+			wantSNI:        "localhost",
+			wantCommonName: "default.example.com",
+		},
+		"smtp site b": {
+			source:         "smtp://" + smtpAddr,
+			serverName:     "site-b.example.com",
+			wantSNI:        "site-b.example.com",
+			wantCommonName: "site-b.example.com",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.Source = test.source
+			c.TLSServerName = test.serverName
+			c.InsecureSkipVerify = true
+			require.NoError(t, c.Init(t.Context()))
+
+			certs, err := c.provider.certificates(t.Context())
+
+			select {
+			case sni := <-requested:
+				assert.Equal(t, test.wantSNI, sni)
+			case <-time.After(5 * time.Second):
+				t.Fatal("the server saw no TLS handshake")
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantCommonName, certs[0].Subject.CommonName)
+		})
+	}
+}
+
+func TestCollector_CheckVerifiesTLSServerName(t *testing.T) {
+	cert := newTestCertificate(t, "site-a.example.com", time.Now().Add(time.Hour))
+	addr := serveTLS(t, serverConfig(cert))
+	roots := x509.NewCertPool()
+	roots.AddCert(cert.Leaf)
+
+	for name, test := range map[string]struct {
+		serverName       string
+		wantHostMismatch string
+	}{
+		"no server name": {
+			wantHostMismatch: "127.0.0.1",
+		},
+		"server name in the certificate": {
+			serverName: "site-a.example.com",
+		},
+		"server name not in the certificate": {
+			serverName:       "site-b.example.com",
+			wantHostMismatch: "site-b.example.com",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.Source = "https://" + addr
+			c.TLSServerName = test.serverName
+			require.NoError(t, c.Init(t.Context()))
+			// The CA option reads through the privileged file helper, which tests cannot run, so trust the
+			// certificate directly.
+			c.provider.(*netProvider).tlsConfig.RootCAs = roots
+
+			err := c.Check(t.Context())
+
+			if test.wantHostMismatch == "" {
+				assert.NoError(t, err)
+				return
+			}
+			var mismatch x509.HostnameError
+			require.ErrorAs(t, err, &mismatch)
+			assert.Equal(t, test.wantHostMismatch, mismatch.Host)
+		})
+	}
+}
+
 func TestCollector_CheckEndsTLSWithCloseNotify(t *testing.T) {
 	cert := newTestCertificate(t, "localhost", time.Now().Add(time.Hour))
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -139,7 +270,7 @@ func TestRevocationRequestsAreBounded(t *testing.T) {
 	assert.Positive(t, revoke.HTTPClient.Timeout)
 }
 
-// newTestCertificate returns a self-signed server certificate.
+// newTestCertificate returns a self-signed server certificate for the host name commonName.
 func newTestCertificate(t *testing.T, commonName string, notAfter time.Time) tls.Certificate {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -149,6 +280,7 @@ func newTestCertificate(t *testing.T, commonName string, notAfter time.Time) tls
 		Subject: pkix.Name{
 			CommonName: commonName,
 		},
+		DNSNames:    []string{commonName},
 		NotBefore:   notAfter.Add(-48 * time.Hour),
 		NotAfter:    notAfter,
 		KeyUsage:    x509.KeyUsageDigitalSignature,
@@ -176,27 +308,49 @@ func writePEM(t *testing.T, cert *x509.Certificate) string {
 	return path
 }
 
-// serveTLS completes a TLS handshake presenting cert on every connection and returns the listener address.
-func serveTLS(t *testing.T, cert tls.Certificate) string {
-	t.Helper()
-	ln, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
+// serverConfig returns a server TLS config that presents cert.
+func serverConfig(cert tls.Certificate) *tls.Config {
+	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
-	})
+	}
+}
+
+// sniServerConfig returns a server TLS config that presents the certificate whose common name is the server name
+// the client requests, or fallback. It reports every requested name, empty when the client sent no SNI.
+func sniServerConfig(fallback tls.Certificate, named ...tls.Certificate) (*tls.Config, <-chan string) {
+	byName := make(map[string]tls.Certificate)
+	for _, cert := range named {
+		byName[cert.Leaf.Subject.CommonName] = cert
+	}
+	requested := make(chan string, 1)
+	return &tls.Config{
+		GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+			requested <- hello.ServerName
+			cert, ok := byName[hello.ServerName]
+			if !ok {
+				cert = fallback
+			}
+			return &cert, nil
+		},
+	}, requested
+}
+
+// serveTLS completes a TLS handshake with tlsConfig on every connection and returns the listener address.
+func serveTLS(t *testing.T, tlsConfig *tls.Config) string {
+	t.Helper()
+	ln, err := tls.Listen("tcp", "127.0.0.1:0", tlsConfig)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = ln.Close() })
 	go acceptEach(ln, func(conn net.Conn) { _ = conn.(*tls.Conn).Handshake() })
 	return ln.Addr().String()
 }
 
-// serveSMTP answers every connection as an SMTP server that offers STARTTLS with cert.
-func serveSMTP(t *testing.T, cert tls.Certificate) string {
+// serveSMTP answers every connection as an SMTP server that offers STARTTLS with tlsConfig.
+func serveSMTP(t *testing.T, tlsConfig *tls.Config) string {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = ln.Close() })
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{cert},
-	}
 
 	go acceptEach(ln, func(conn net.Conn) {
 		text := textproto.NewConn(conn)

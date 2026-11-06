@@ -3,8 +3,10 @@
 package x509check
 
 import (
+	"cmp"
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -19,6 +21,9 @@ func (c *Collector) initCertificateProvider(ctx context.Context) (certificatePro
 	}
 
 	if sourceURL.Scheme == "file" {
+		if c.TLSServerName != "" {
+			return nil, errors.New("tls_server_name cannot be used with a file:// source")
+		}
 		return &fileProvider{
 			path: sourceURL.Path,
 		}, nil
@@ -41,7 +46,8 @@ func (c *Collector) initCertificateProvider(ctx context.Context) (certificatePro
 	if tlsConfig == nil {
 		tlsConfig = &tls.Config{}
 	}
-	tlsConfig.ServerName = sourceURL.Hostname()
+	// SNI and hostname verification use the server name; the connection still goes to the source address.
+	tlsConfig.ServerName = cmp.Or(c.TLSServerName, sourceURL.Hostname())
 
 	ep := endpoint{
 		network:   network,
