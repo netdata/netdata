@@ -138,6 +138,7 @@ struct web_buffer *run_command_and_get_output_to_buffer(const char *command, int
 #include "gorilla/gorilla.h"
 #include "facets/facets.h"
 #include "functions_evloop/functions_evloop.h"
+#include "threads/nd-work-queue.h"
 #include "query_progress/progress.h"
 #include "stacktrace/stacktrace.h"
 

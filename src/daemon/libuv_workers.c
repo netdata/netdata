@@ -18,7 +18,13 @@ static void register_libuv_worker_jobs_internal(void) {
     uv_thread_set_name_np(buf);
 
     worker_register("LIBUV");
+    register_libuv_worker_job_names();
+}
 
+// The job names of the UV_EVENT_* ids. Also used by threads outside the libuv pool that run the same
+// work (data queries moved off the pool), so their job time is attributed the same way. Registering
+// the names does NOT make a thread a libuv pool thread (see libuv_worker_thread_is_current()).
+void register_libuv_worker_job_names(void) {
     // generic
     worker_register_job_name(UV_EVENT_WORKER_INIT, "worker init");
 

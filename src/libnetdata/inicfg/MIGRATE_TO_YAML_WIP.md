@@ -737,7 +737,7 @@ Netdata Cloud connectivity and integration settings
 | Key | Type | Comments |
 |-----|------|----------|
 | `proxy` | string | HTTP proxy server URL for Netdata Cloud connectivity. Special value "env" uses proxy environment variables (HTTP_PROXY, HTTPS_PROXY). Empty or unset disables proxy usage. This setting provides backwards compatibility with cloud.conf and is synchronized between netdata.conf and cloud.conf. |
-| `query threads` | number | Number of worker threads dedicated to processing Netdata Cloud queries and data aggregation requests. Automatically calculated based on CPU cores: parent nodes get 2x threads per core (up to 256 cores), child nodes get 1x per core, minimum 6 threads, maximum half of libuv worker threads. Must be at least 1. |
+| `query threads` | number | Number of worker threads dedicated to processing Netdata Cloud queries and data aggregation requests. Each is a dedicated thread. Default: 2x CPU cores on parents, 1x on children (up to 256 cores), capped at half of `libuv worker threads`, then raised to at least 6. Accepted range: 1 to `libuv worker threads`. |
 
 ### Section `CONFIG_SECTION_DB`
 Database engine configuration, retention, and storage tiers
