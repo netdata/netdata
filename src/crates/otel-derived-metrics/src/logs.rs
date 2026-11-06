@@ -160,7 +160,7 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let mut aggregator = Aggregator::new(&logs.metrics, &logs.charts);
+        let mut aggregator = Aggregator::new(&logs.charts);
         let mut batch = Batch::new(&logs.metrics);
         logs.record(&mut batch, "default", &request);
         aggregator.merge(batch, 100);

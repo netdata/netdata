@@ -62,22 +62,16 @@ impl DerivedMetrics {
             let logs = logs::ServiceLogs::new(config.max_services);
             let derivation = plugin::Derivation::new();
             Enabled {
-                service_aggregator: Mutex::new(Aggregator::new(
-                    &services.metrics,
-                    &services.charts,
-                )),
+                service_aggregator: Mutex::new(Aggregator::new(&services.charts)),
                 services,
-                logs_aggregator: Mutex::new(Aggregator::new(&logs.metrics, &logs.charts)),
+                logs_aggregator: Mutex::new(Aggregator::new(&logs.charts)),
                 logs,
-                derivation_aggregator: Mutex::new(Aggregator::new(
-                    &derivation.metrics,
-                    &derivation.charts,
-                )),
+                derivation_aggregator: Mutex::new(Aggregator::new(&derivation.charts)),
                 derivation,
             }
         });
         let plugin = plugin::Plugin::new();
-        let plugin_aggregator = Mutex::new(Aggregator::new(&plugin.metrics, &plugin.charts));
+        let plugin_aggregator = Mutex::new(Aggregator::new(&plugin.charts));
         Self {
             enabled,
             plugin,

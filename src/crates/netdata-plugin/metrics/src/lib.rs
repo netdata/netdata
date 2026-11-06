@@ -35,7 +35,7 @@
 //! );
 //! let charts = charts.build();
 //!
-//! let mut aggregator = Aggregator::new(&set, &charts);
+//! let mut aggregator = Aggregator::new(&charts);
 //!
 //! // Per unit of work, for example one export request: record its events at
 //! // their event time in one batch, then merge it once the work is durable.

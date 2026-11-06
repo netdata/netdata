@@ -69,7 +69,7 @@ struct Entity {
 
 /// Collects the batches of one [`MetricSet`] and emits each window, once its
 /// allowed lateness has passed, as chart-protocol text through the
-/// [`Charts`] it was created with.
+/// [`Charts`] it was created with (charts of that set).
 ///
 /// The aggregator reads no clock and does no I/O. Pass the current Unix time
 /// to [`Aggregator::merge`] and [`Aggregator::emit`], call `emit` at least
@@ -135,18 +135,10 @@ pub struct Aggregator {
 }
 
 impl Aggregator {
-    /// An aggregator of `set`, emitting through `charts`.
-    ///
-    /// # Panics
-    ///
-    /// If `charts` are of another metric set.
-    pub fn new(set: &MetricSet, charts: &Charts) -> Self {
-        assert!(
-            std::sync::Arc::ptr_eq(&charts.0.set.0, &set.0),
-            "charts of another metric set"
-        );
+    /// An aggregator of the metric set `charts` show, emitting through them.
+    pub fn new(charts: &Charts) -> Self {
         Self {
-            set: set.clone(),
+            set: charts.0.set.clone(),
             charts: charts.clone(),
             entities: HashMap::new(),
             overflow_entity: None,
@@ -510,7 +502,7 @@ mod tests {
     #[test]
     fn defines_once_then_updates_each_window() {
         let f = fixture(0, 900, None);
-        let mut aggregator = Aggregator::new(&f.set, &f.charts);
+        let mut aggregator = Aggregator::new(&f.charts);
         record(&f, &mut aggregator, "checkout", 100, 3, 1, 100);
         let first = text(&aggregator.emit(101, usize::MAX));
         let h = format!("{:016x}", crate::chart::stable_hash(&labels("checkout")));
@@ -561,7 +553,7 @@ mod tests {
     #[test]
     fn allowed_lateness_keeps_windows_open_and_clamps_exactly_once() {
         let f = fixture(10, 900, None);
-        let mut aggregator = Aggregator::new(&f.set, &f.charts);
+        let mut aggregator = Aggregator::new(&f.charts);
         // The oldest open window is 990 (now 1000, allowed lateness 10).
         record(&f, &mut aggregator, "a", 995, 1, 0, 1000);
         // Too late: counted in the oldest open window.
@@ -594,7 +586,7 @@ mod tests {
     #[test]
     fn expired_entities_are_marked_obsolete_and_revived() {
         let f = fixture(0, 3, None);
-        let mut aggregator = Aggregator::new(&f.set, &f.charts);
+        let mut aggregator = Aggregator::new(&f.charts);
         record(&f, &mut aggregator, "a", 10, 1, 0, 10);
         let mut out = text(&aggregator.emit(13, usize::MAX));
         assert!(!out.contains("obsolete"));
@@ -613,7 +605,7 @@ mod tests {
     #[test]
     fn entities_over_the_limit_share_the_overflow_entity() {
         let f = fixture(0, 3, Some(1));
-        let mut aggregator = Aggregator::new(&f.set, &f.charts);
+        let mut aggregator = Aggregator::new(&f.charts);
         record(&f, &mut aggregator, "a", 10, 1, 0, 10);
         record(&f, &mut aggregator, "b", 10, 2, 0, 10);
         record(&f, &mut aggregator, "c", 10, 3, 0, 10);
@@ -635,7 +627,7 @@ mod tests {
     #[test]
     fn entities_without_events_are_not_created() {
         let f = fixture(0, 3, Some(1));
-        let mut aggregator = Aggregator::new(&f.set, &f.charts);
+        let mut aggregator = Aggregator::new(&f.charts);
         let mut batch = Batch::new(&f.set);
         batch.entity(labels("empty"));
         aggregator.merge(batch, 10);
@@ -651,7 +643,7 @@ mod tests {
     #[test]
     fn a_clock_jump_renders_a_bounded_backlog_and_keeps_every_event() {
         let f = fixture(10, 1_000_000, None);
-        let mut aggregator = Aggregator::new(&f.set, &f.charts);
+        let mut aggregator = Aggregator::new(&f.charts);
         record(&f, &mut aggregator, "a", 10, 1, 0, 10);
         record(&f, &mut aggregator, "a", 100_000, 2, 0, 100_000);
         let open = aggregator.entities.values().next().unwrap().open_rows.len() as u64;
@@ -671,7 +663,7 @@ mod tests {
     #[test]
     fn events_spread_over_many_seconds_land_in_their_windows() {
         let f = fixture(10, 900, None);
-        let mut aggregator = Aggregator::new(&f.set, &f.charts);
+        let mut aggregator = Aggregator::new(&f.charts);
         let mut batch = Batch::new(&f.set);
         let mut entity = batch.entity(labels("a"));
         for time in [995, 996, 995, 997, 996, 999] {
@@ -689,7 +681,7 @@ mod tests {
     #[test]
     fn chunks_hold_whole_blocks_under_the_budget() {
         let f = fixture(0, 900, None);
-        let mut aggregator = Aggregator::new(&f.set, &f.charts);
+        let mut aggregator = Aggregator::new(&f.charts);
         for name in ["a", "b", "c", "d"] {
             record(&f, &mut aggregator, name, 10, 1, 0, 10);
         }
@@ -763,7 +755,7 @@ mod tests {
                 priority: 1,
             },
         );
-        let mut aggregator = Aggregator::new(&set, &charts.build());
+        let mut aggregator = Aggregator::new(&charts.build());
         let set_total = |aggregator: &mut Aggregator, time: u64, total: Option<f64>| {
             let mut batch = Batch::new(&set);
             let mut entity = batch.entity(Labels::new());
@@ -865,7 +857,7 @@ mod tests {
         charts.chart(queued, descriptor("svc.queued", 1));
         charts.chart(totals, descriptor("svc.events", 1));
         charts.histogram(duration, descriptor("svc.duration", 1), "requests/s");
-        let mut aggregator = Aggregator::new(&set, &charts.build());
+        let mut aggregator = Aggregator::new(&charts.build());
         let mut batch = Batch::new(&set);
         let mut entity = batch.entity(Labels::new());
         entity
@@ -898,7 +890,7 @@ mod tests {
     #[test]
     fn weights_scale_counts_and_histograms() {
         let f = fixture(0, 900, None);
-        let mut aggregator = Aggregator::new(&f.set, &f.charts);
+        let mut aggregator = Aggregator::new(&f.charts);
         let mut batch = Batch::new(&f.set);
         let mut entity = batch.entity(labels("a"));
         entity
@@ -1011,7 +1003,7 @@ mod tests {
         charts.histogram(duration, descriptor("x.duration", 1), "u");
         charts.chart(queue, descriptor("x.queue", 4));
         charts.chart(requests, descriptor("x.requests", 5));
-        let mut aggregator = Aggregator::new(&set, &charts.build());
+        let mut aggregator = Aggregator::new(&charts.build());
         merge_event(&set, &mut aggregator, 10, 10, |m| {
             m.add(requests, Outcome::Error, 4.0)
                 .set_value(queue, Queue::Jobs, 7.0)
@@ -1038,7 +1030,7 @@ mod tests {
     #[test]
     fn a_two_second_interval_shows_rates_values_and_times() {
         let e = every(2, &[0.5, 2.0]);
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.add(e.requests, Outcome::Ok, 3.0)
                 .set_total(e.totals, Seen::Events, 100.0)
@@ -1075,7 +1067,7 @@ mod tests {
     #[test]
     fn histogram_buckets_take_bounds_negative_values_and_odd_weights() {
         let e = every(1, &[0.5, 2.0]);
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             // A value equal to a bound counts in that bound's bucket.
             m.observe(e.duration, 0.5, 1.0)
@@ -1101,7 +1093,7 @@ mod tests {
     #[test]
     fn a_histogram_without_bounds_has_only_the_inf_bucket() {
         let e = every(1, &[]);
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.observe(e.duration, 5.0, 2.0);
         });
@@ -1119,7 +1111,7 @@ mod tests {
     fn a_gauge_keeps_the_value_set_last() {
         let e = every(1, &[]);
         // Two values in one row: the later call wins.
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.set_value(e.queue, Queue::Jobs, 1.0)
                 .set_value(e.queue, Queue::Jobs, 2.0);
@@ -1129,7 +1121,7 @@ mod tests {
             ["2"]
         );
         // Across batches the later merge wins; a batch without a value keeps it.
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.set_value(e.queue, Queue::Jobs, 5.0);
         });
@@ -1143,7 +1135,7 @@ mod tests {
         );
         // Late windows of one batch combine in the order they were first
         // recorded into, whatever their event times.
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         assert!(aggregator.emit(21, usize::MAX).is_empty());
         let mut batch = Batch::new(&e.set);
         let mut entity = batch.entity(Labels::new());
@@ -1165,7 +1157,7 @@ mod tests {
     #[test]
     fn a_backlog_fold_lets_older_last_values_win() {
         let e = every(1, &[]);
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         merge_event(&e.set, &mut aggregator, 1000, 1000, |m| {
             m.add(e.requests, Outcome::Ok, 1.0)
                 .set_value(e.queue, Queue::Jobs, 1.0)
@@ -1187,7 +1179,7 @@ mod tests {
     #[test]
     fn cumulative_totals_handle_equal_lower_and_negative_totals() {
         let e = every(1, &[]);
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         for (time, total) in [(10, 100.0), (11, 100.0), (12, 0.0), (13, -5.0), (14, -3.0)] {
             merge_event(&e.set, &mut aggregator, time, time, |m| {
                 m.set_total(e.totals, Seen::Events, total);
@@ -1197,7 +1189,7 @@ mod tests {
         let out = text(&aggregator.emit(16, usize::MAX));
         assert_eq!(values(&out, "events"), ["", "0", "0", "-5", "2", "0"]);
         // An event without a total first: no baseline yet, then the baseline.
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         merge_event(&e.set, &mut aggregator, 10, 10, |_| {});
         merge_event(&e.set, &mut aggregator, 11, 11, |m| {
             m.set_total(e.totals, Seen::Events, 50.0);
@@ -1208,7 +1200,7 @@ mod tests {
         let out = text(&aggregator.emit(13, usize::MAX));
         assert_eq!(values(&out, "events"), ["", "", "2"]);
         // A late, lower total after a newer one was emitted reads as a reset.
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.set_total(e.totals, Seen::Events, 100.0);
         });
@@ -1250,7 +1242,7 @@ mod tests {
         charts.chart(second, descriptor("x.second", 3));
         charts.histogram(duration, descriptor("x.duration", 4), "u");
         charts.chart(queue, descriptor("x.queue", 8));
-        let mut aggregator = Aggregator::new(&set, &charts.build());
+        let mut aggregator = Aggregator::new(&charts.build());
         for (time, totals) in [(10, [10.0, 20.0, 30.0]), (11, [11.0, 25.0, 33.0])] {
             merge_event(&set, &mut aggregator, time, time, |m| {
                 m.set_total(first, Pair::A, totals[0])
@@ -1409,19 +1401,11 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "charts of another metric set")]
-    fn charts_of_another_set_are_refused() {
-        let e = every(1, &[]);
-        let other = every(1, &[]);
-        Aggregator::new(&e.set, &other.charts);
-    }
-
-    #[test]
     #[should_panic(expected = "batch of another metric set")]
     fn a_batch_of_another_set_is_refused() {
         let e = every(1, &[]);
         let other = every(1, &[]);
-        let mut aggregator = Aggregator::new(&e.set, &e.charts);
+        let mut aggregator = Aggregator::new(&e.charts);
         aggregator.merge(Batch::new(&other.set), 10);
     }
 }

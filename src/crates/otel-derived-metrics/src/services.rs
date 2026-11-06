@@ -281,7 +281,7 @@ mod tests {
     }
 
     fn render(services: &Services, request: &ExportTraceServiceRequest) -> String {
-        let mut aggregator = Aggregator::new(&services.metrics, &services.charts);
+        let mut aggregator = Aggregator::new(&services.charts);
         let mut batch = Batch::new(&services.metrics);
         services.record(&mut batch, "default", request);
         aggregator.merge(batch, 100);

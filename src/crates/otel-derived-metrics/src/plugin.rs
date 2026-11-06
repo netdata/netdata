@@ -209,7 +209,7 @@ mod tests {
     #[test]
     fn ingest_outcomes_render_per_signal() {
         let plugin = Plugin::new();
-        let mut aggregator = Aggregator::new(&plugin.metrics, &plugin.charts);
+        let mut aggregator = Aggregator::new(&plugin.charts);
         aggregator.merge(plugin.ingest(Signal::Traces, 7, 2, 100), 100);
         aggregator.merge(plugin.ingest(Signal::Logs, 3, 0, 100), 100);
         let out = String::from_utf8(aggregator.emit(101, usize::MAX).concat()).unwrap();
@@ -226,7 +226,7 @@ mod tests {
     #[test]
     fn the_heartbeat_keeps_the_charts_defined_without_traffic() {
         let plugin = Plugin::new();
-        let mut aggregator = Aggregator::new(&plugin.metrics, &plugin.charts);
+        let mut aggregator = Aggregator::new(&plugin.charts);
         aggregator.merge(plugin.heartbeat(100), 100);
         let out = String::from_utf8(aggregator.emit(101, usize::MAX).concat()).unwrap();
         assert!(out.contains("CHART netdata.otel.spans "));
@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn derivation_charts_one_entity_per_signal_with_increases() {
         let derivation = Derivation::new();
-        let mut aggregator = Aggregator::new(&derivation.metrics, &derivation.charts);
+        let mut aggregator = Aggregator::new(&derivation.charts);
         let mut tick = |stats: Stats, now: u64| {
             let mut batch = Batch::new(&derivation.metrics);
             derivation.record(&mut batch, Signal::Traces, &stats, now);
