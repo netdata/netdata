@@ -24,12 +24,12 @@ pub(crate) fn write_definition(
         }
         write_clabel_commit(block);
     }
-    for dim in &template.dimensions {
+    for id in &template.dimension_ids {
         write_dimension(
             block,
             &DimensionLine {
-                id: &dim.id,
-                name: &dim.id,
+                id,
+                name: id,
                 algorithm: DimensionAlgorithm::Absolute,
                 multiplier: 1,
                 divisor: 1,
@@ -53,10 +53,10 @@ pub(crate) fn write_update(
     interval_secs: u64,
 ) {
     write_begin(block, id, interval_secs * 1_000_000);
-    for dim in &template.dimensions {
-        match dim.readout.value(row, interval_secs) {
-            Some(value) => write_set_float(block, &dim.id, value),
-            None => write_set_empty(block, &dim.id),
+    for (i, id) in template.dimension_ids.iter().enumerate() {
+        match template.value(row, i, interval_secs) {
+            Some(value) => write_set_float(block, id, value),
+            None => write_set_empty(block, id),
         }
     }
     write_end_timed(block, (window + 1) * interval_secs);

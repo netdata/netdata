@@ -1,9 +1,10 @@
 //! Chart descriptors, the chart templates a set makes from them, and the
 //! chart ids of each entity's chart instances.
 
-use crate::layout::Readout;
+use crate::layout::Aggregation;
 use crate::metric_set::Labels;
-use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
+use netdata_plugin_protocol::ChartType;
+use std::ops::Range;
 
 /// Describes an instrument's charts: their context, title, units, family,
 /// type and priority. A descriptor and the instrument's dimensions make a
@@ -49,8 +50,9 @@ pub struct ChartDescriptor {
 }
 
 /// One chart template of the set: the fields of its [`ChartDescriptor`]
-/// (derived ones for a histogram) and the dimensions its instrument gives it.
-/// Every entity gets one chart instance of it.
+/// (derived ones for a histogram), its dimensions, and the row's columns
+/// they read through its aggregation. Every entity gets one chart instance of
+/// it.
 #[derive(Debug)]
 pub(crate) struct ChartTemplate {
     pub(crate) title: String,
@@ -59,12 +61,25 @@ pub(crate) struct ChartTemplate {
     pub(crate) context: String,
     pub(crate) chart_type: ChartType,
     pub(crate) priority: i32,
-    pub(crate) dimensions: Vec<ChartDimension>,
+    pub(crate) aggregation: Aggregation,
+    /// The columns it owns: one per dimension, in dimension order, two for a
+    /// mean (sum, then count).
+    pub(crate) columns: Range<usize>,
+    /// Each dimension's id, which is also its name on the chart, in chart
+    /// order.
+    pub(crate) dimension_ids: Vec<String>,
 }
 
 impl ChartTemplate {
-    /// The template with `descriptor`'s fields as they are.
-    pub(crate) fn new(descriptor: ChartDescriptor, dimensions: Vec<ChartDimension>) -> Self {
+    /// The template with `descriptor`'s fields as they are, one dimension per
+    /// id, its columns from `first_column` on.
+    pub(crate) fn new(
+        descriptor: ChartDescriptor,
+        aggregation: Aggregation,
+        dimension_ids: &[&str],
+        first_column: usize,
+    ) -> Self {
+        let width = dimension_ids.len() * aggregation.columns_per_dimension();
         Self {
             title: descriptor.title.to_string(),
             units: descriptor.units,
@@ -72,26 +87,16 @@ impl ChartTemplate {
             context: descriptor.context.to_string(),
             chart_type: descriptor.chart_type,
             priority: descriptor.priority,
-            dimensions,
+            aggregation,
+            columns: first_column..first_column + width,
+            dimension_ids: dimension_ids.iter().map(|id| id.to_string()).collect(),
         }
     }
-}
 
-/// One dimension of a chart template: its id, which is also its name on the
-/// chart, and its readout.
-#[derive(Debug, Clone)]
-pub(crate) struct ChartDimension {
-    pub(crate) id: String,
-    pub(crate) readout: Readout,
-}
-
-impl ChartDimension {
-    pub(crate) fn new(id: &str, readout: Readout) -> Self {
-        assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
-        Self {
-            id: id.to_string(),
-            readout,
-        }
+    /// The value of the dimension with index `i` in `row`; none for a gap.
+    pub(crate) fn value(&self, row: &[f64], i: usize, interval_secs: u64) -> Option<f64> {
+        let column = self.columns.start + i * self.aggregation.columns_per_dimension();
+        self.aggregation.value(row, column, interval_secs)
     }
 }
 

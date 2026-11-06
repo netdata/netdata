@@ -1,8 +1,8 @@
 //! Metric set declarations: instruments, their chart templates, labels and
 //! settings.
 
-use crate::chart::{ChartDescriptor, ChartDimension, ChartTemplate, check_context};
-use crate::layout::{Aggregation, ColumnRange, Readout, RowLayout};
+use crate::chart::{ChartDescriptor, ChartTemplate, check_context};
+use crate::layout::{Aggregation, ChartSchema, ColumnRange};
 use netdata_plugin_protocol::ChartType;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -138,27 +138,29 @@ pub struct Gauge<D>(pub(crate) ColumnRange<D>);
 #[derive(Debug, Clone, Copy)]
 pub struct Histogram {
     pub(crate) set_id: u32,
+    /// The first of its columns, which follow its chart templates' order:
+    /// the mean's sum and count, the maximum, then the buckets.
     pub(crate) base: usize,
     pub(crate) bounds: &'static [f64],
 }
 
 impl Histogram {
-    /// The column of bucket `bucket`; the last bucket, `bounds.len()`, is
-    /// `+Inf`.
-    pub(crate) fn bucket_column(&self, bucket: usize) -> usize {
-        self.base + bucket
-    }
-
     pub(crate) fn sum_column(&self) -> usize {
-        self.bucket_column(self.bounds.len()) + 1
+        self.base
     }
 
     pub(crate) fn count_column(&self) -> usize {
-        self.sum_column() + 1
+        self.base + 1
     }
 
     pub(crate) fn max_column(&self) -> usize {
-        self.sum_column() + 2
+        self.base + 2
+    }
+
+    /// The column of bucket `bucket`; the last bucket, `bounds.len()`, is
+    /// `+Inf`.
+    pub(crate) fn bucket_column(&self, bucket: usize) -> usize {
+        self.base + 3 + bucket
     }
 }
 
@@ -256,62 +258,6 @@ pub(crate) struct MetricSetInner {
     pub(crate) expiry_windows: u64,
     pub(crate) cardinality_limit: Option<CardinalityLimit>,
     pub(crate) schema: ChartSchema,
-}
-
-/// What a set's rows hold and how its charts read them: the row layout, and
-/// the chart templates whose readouts point at its columns by index. The
-/// builder fills it only through the operations below, so every template
-/// passes the checks of [`ChartSchema::add_chart_template`].
-#[derive(Debug, Default)]
-pub(crate) struct ChartSchema {
-    row_layout: RowLayout,
-    chart_templates: Vec<ChartTemplate>,
-}
-
-impl ChartSchema {
-    /// Adds `len` columns with `aggregation` to the row layout; returns the
-    /// first.
-    fn add_columns(&mut self, len: usize, aggregation: Aggregation) -> usize {
-        self.row_layout.add_columns(len, aggregation)
-    }
-
-    /// Marks `columns` as holding a cumulative counter's totals.
-    fn mark_cumulative<D: Dimension>(&mut self, columns: ColumnRange<D>) {
-        self.row_layout.mark_cumulative(columns);
-    }
-
-    /// Checks `template`'s context (valid, unique in the schema) and
-    /// dimensions (at least one, ids unique), then adds it.
-    fn add_chart_template(&mut self, template: ChartTemplate) {
-        let context = &template.context;
-        check_context(context);
-        assert!(
-            !template.dimensions.is_empty(),
-            "chart {context} has no dimensions"
-        );
-        assert!(
-            self.chart_templates.iter().all(|t| &t.context != context),
-            "duplicate context {context:?}"
-        );
-        for (i, dim) in template.dimensions.iter().enumerate() {
-            assert!(
-                template.dimensions[..i].iter().all(|d| d.id != dim.id),
-                "duplicate dimension id {:?} in chart {context}",
-                dim.id
-            );
-        }
-        self.chart_templates.push(template);
-    }
-
-    pub(crate) fn row_layout(&self) -> &RowLayout {
-        &self.row_layout
-    }
-
-    /// In the order they were added, which is also the order of each
-    /// entity's chart ids.
-    pub(crate) fn chart_templates(&self) -> &[ChartTemplate] {
-        &self.chart_templates
-    }
 }
 
 /// The time and lifecycle settings of a metric set.
@@ -416,11 +362,10 @@ impl MetricSetBuilder {
     /// dimension id is invalid or repeats in `D::IDS`, or if `D::IDS` is
     /// empty.
     pub fn counter<D: Dimension>(&mut self, descriptor: ChartDescriptor) -> Counter<D> {
-        let columns = self.add_columns::<D>(Aggregation::Sum);
-        let dimensions = chart_dimensions(columns, Readout::Rate);
-        let template = ChartTemplate::new(descriptor, dimensions);
+        let first = self.schema.next_column();
+        let template = ChartTemplate::new(descriptor, Aggregation::Sum, D::IDS, first);
         self.schema.add_chart_template(template);
-        Counter(columns)
+        Counter(ColumnRange::new(self.id, first))
     }
 
     /// Adds a [`CumulativeCounter`] and its chart template.
@@ -432,12 +377,10 @@ impl MetricSetBuilder {
         &mut self,
         descriptor: ChartDescriptor,
     ) -> CumulativeCounter<D> {
-        let columns = self.add_columns::<D>(Aggregation::LastValue);
-        self.schema.mark_cumulative(columns);
-        let dimensions = chart_dimensions(columns, Readout::Rate);
-        let template = ChartTemplate::new(descriptor, dimensions);
+        let first = self.schema.next_column();
+        let template = ChartTemplate::new(descriptor, Aggregation::CumulativeSum, D::IDS, first);
         self.schema.add_chart_template(template);
-        CumulativeCounter(columns)
+        CumulativeCounter(ColumnRange::new(self.id, first))
     }
 
     /// Adds a [`Gauge`] and its chart template.
@@ -446,11 +389,10 @@ impl MetricSetBuilder {
     ///
     /// As [`MetricSetBuilder::counter`].
     pub fn gauge<D: Dimension>(&mut self, descriptor: ChartDescriptor) -> Gauge<D> {
-        let columns = self.add_columns::<D>(Aggregation::LastValue);
-        let dimensions = chart_dimensions(columns, Readout::Column);
-        let template = ChartTemplate::new(descriptor, dimensions);
+        let first = self.schema.next_column();
+        let template = ChartTemplate::new(descriptor, Aggregation::LastValue, D::IDS, first);
         self.schema.add_chart_template(template);
-        Gauge(columns)
+        Gauge(ColumnRange::new(self.id, first))
     }
 
     /// Adds a [`Histogram`] over `bounds`, with three chart templates. Each
@@ -490,14 +432,9 @@ impl MetricSetBuilder {
             "histogram bounds must be finite and increasing"
         );
         check_context(descriptor.context);
-        // Buckets including +Inf, then sum and count, then the maximum: the
-        // order of the Histogram column accessors.
-        let base = self.schema.add_columns(bounds.len() + 1, Aggregation::Sum);
-        self.schema.add_columns(2, Aggregation::Sum);
-        self.schema.add_columns(1, Aggregation::Max);
         let histogram = Histogram {
             set_id: self.id,
-            base,
+            base: self.schema.next_column(),
             bounds,
         };
         self.schema.add_chart_template(ChartTemplate {
@@ -507,13 +444,9 @@ impl MetricSetBuilder {
             context: format!("{}_avg", descriptor.context),
             chart_type: descriptor.chart_type,
             priority: descriptor.priority,
-            dimensions: vec![ChartDimension::new(
-                "avg",
-                Readout::Ratio {
-                    numerator: histogram.sum_column(),
-                    denominator: histogram.count_column(),
-                },
-            )],
+            aggregation: Aggregation::Mean,
+            columns: histogram.sum_column()..histogram.count_column() + 1,
+            dimension_ids: vec!["avg".to_string()],
         });
         self.schema.add_chart_template(ChartTemplate {
             title: format!("{} maximum", descriptor.title),
@@ -522,25 +455,12 @@ impl MetricSetBuilder {
             context: format!("{}_max", descriptor.context),
             chart_type: descriptor.chart_type,
             priority: descriptor.priority + 1,
-            dimensions: vec![ChartDimension::new(
-                "max",
-                Readout::Column(histogram.max_column()),
-            )],
+            aggregation: Aggregation::Max,
+            columns: histogram.max_column()..histogram.max_column() + 1,
+            dimension_ids: vec!["max".to_string()],
         });
-        let mut buckets: Vec<ChartDimension> = bounds
-            .iter()
-            .enumerate()
-            .map(|(i, bound)| {
-                ChartDimension::new(
-                    &bound.to_string(),
-                    Readout::Rate(histogram.bucket_column(i)),
-                )
-            })
-            .collect();
-        buckets.push(ChartDimension::new(
-            "+Inf",
-            Readout::Rate(histogram.bucket_column(bounds.len())),
-        ));
+        let mut buckets: Vec<String> = bounds.iter().map(|bound| bound.to_string()).collect();
+        buckets.push("+Inf".to_string());
         self.schema.add_chart_template(ChartTemplate {
             title: format!("{} histogram", descriptor.title),
             units: heatmap_units,
@@ -548,7 +468,9 @@ impl MetricSetBuilder {
             context: format!("{}_histogram", descriptor.context),
             chart_type: ChartType::Heatmap,
             priority: descriptor.priority + 2,
-            dimensions: buckets,
+            aggregation: Aggregation::Sum,
+            columns: histogram.bucket_column(0)..histogram.bucket_column(bounds.len()) + 1,
+            dimension_ids: buckets,
         });
         histogram
     }
@@ -575,24 +497,4 @@ impl MetricSetBuilder {
             schema: self.schema,
         }))
     }
-
-    /// Adds one column with `aggregation` per value of `D` to the schema's
-    /// row layout.
-    fn add_columns<D: Dimension>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
-        let base = self.schema.add_columns(D::IDS.len(), aggregation);
-        ColumnRange::new(self.id, base)
-    }
-}
-
-/// One chart dimension per value of `D`, named by its id; `readout` makes each
-/// dimension's readout from its column, for example `Readout::Rate`.
-fn chart_dimensions<D: Dimension>(
-    columns: ColumnRange<D>,
-    readout: fn(usize) -> Readout,
-) -> Vec<ChartDimension> {
-    D::IDS
-        .iter()
-        .zip(columns.range())
-        .map(|(id, column)| ChartDimension::new(id, readout(column)))
-        .collect()
 }

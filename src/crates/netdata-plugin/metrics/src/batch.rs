@@ -2,14 +2,14 @@
 //! window its event time falls in; the aggregator decides at merge time
 //! whether that window is still open.
 
-use crate::layout::{ColumnRange, RowLayout};
+use crate::layout::{ChartSchema, ColumnRange};
 use crate::metric_set::{
     Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels, MetricSet, MetricSetInner,
 };
 use indexmap::IndexMap;
 
 /// A batch's row for one entity and one window: its event count and its
-/// cells, one per column of the set's row layout.
+/// cells, one per column of the set's chart schema.
 pub(crate) struct BatchRow {
     pub(crate) events: u64,
     pub(crate) cells: Box<[f64]>,
@@ -32,7 +32,7 @@ impl EntityRows {
     /// This entity's row for `window` in the batch, added empty if missing;
     /// like [`Batch::entity`], a lookup that adds what is missing. Moves
     /// `last` to it.
-    fn row(&mut self, window: u64, row_layout: &RowLayout) -> &mut BatchRow {
+    fn row(&mut self, window: u64, schema: &ChartSchema) -> &mut BatchRow {
         let cached = self
             .rows
             .get_index(self.last)
@@ -42,7 +42,7 @@ impl EntityRows {
             self.last = entry.index();
             entry.or_insert_with(|| BatchRow {
                 events: 0,
-                cells: row_layout.empty_row(),
+                cells: schema.empty_row(),
             });
         }
         &mut self.rows[self.last]
@@ -114,7 +114,7 @@ impl BatchEntity<'_> {
     pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
         let set = self.set;
         let window = unix_seconds / set.interval_secs;
-        let batch_row = self.entity.row(window, set.schema.row_layout());
+        let batch_row = self.entity.row(window, &set.schema);
         batch_row.events += 1;
         Measurements {
             set_id: set.id,

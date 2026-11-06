@@ -1,53 +1,85 @@
 //! The table that batches and the aggregator keep: one row per entity and
-//! window, one column per number an instrument stores, one `f64` cell per row
-//! and column.
+//! window, one column per number a chart template stores, one `f64` cell per
+//! row and column.
 //!
 //! - A row aggregates the events of one entity counted in one window (see
 //!   [`Aggregator`](crate::Aggregator) for events outside the open windows).
 //!   A batch's row also counts its events.
-//! - The set's row layout fixes the columns: a counter, cumulative counter or
-//!   gauge has one per dimension, a histogram one per bucket plus its sum,
-//!   count and maximum. Instruments are typed handles to their columns.
-//! - Combining two rows applies each column's [`Aggregation`]: sums add,
-//!   maxima keep the larger value, last-value columns keep the value combined
-//!   last.
-//! - Columns are not dimensions: each chart dimension gets its value from one
-//!   or two columns through its [`Readout`] when a window is emitted.
+//! - Each chart template owns the next columns of the row: one per dimension,
+//!   two for a mean (its sum and count). Instruments are typed handles to
+//!   their templates' columns.
+//! - A template's [`Aggregation`] says what its columns start as, how two rows
+//!   combine, and how each dimension's value is read when a window is
+//!   emitted.
 
+use crate::chart::{ChartTemplate, check_context};
 use crate::metric_set::Dimension;
+use netdata_plugin_protocol::is_valid_dimension_id;
 use std::marker::PhantomData;
-use std::ops::Range;
 
-/// A column's aggregation: how it combines two values for the same entity,
-/// from two batches, a batch and the aggregator, or two windows folded into one
-/// after a stall.
+/// How a chart template's columns hold values and become the chart's
+/// values. Two values of one column combine, from two batches, a batch and
+/// the aggregator, or two windows folded into one after a stall, as follows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Aggregation {
-    /// Sum; starts at 0.
+    /// Sums, starting at 0, shown per second (divided by the collection
+    /// interval in seconds): counters and histogram buckets.
     Sum,
-    /// Larger value; starts unset (NaN).
-    Max,
-    /// The value combined last (gauges, cumulative totals); starts unset (NaN).
+    /// Running totals, the value combined last, starting unset (NaN); by the
+    /// time a window is emitted they hold increases, shown per second:
+    /// cumulative counters.
+    CumulativeSum,
+    /// The value combined last, starting unset (NaN), shown as is: gauges.
     LastValue,
+    /// The larger value, starting unset (NaN), shown as is: the histogram
+    /// maximum.
+    Max,
+    /// A sum and a count per dimension, both summed from 0, shown as their
+    /// ratio when the count is positive: the histogram mean.
+    Mean,
 }
 
 impl Aggregation {
-    pub(crate) fn initial(self) -> f64 {
+    /// The columns one dimension takes.
+    pub(crate) fn columns_per_dimension(self) -> usize {
         match self {
-            Aggregation::Sum => 0.0,
-            Aggregation::Max | Aggregation::LastValue => f64::NAN,
+            Aggregation::Mean => 2,
+            Aggregation::Sum
+            | Aggregation::CumulativeSum
+            | Aggregation::LastValue
+            | Aggregation::Max => 1,
         }
     }
 
-    pub(crate) fn apply(self, current: f64, incoming: f64) -> f64 {
+    /// A column's cell in a row without events.
+    fn initial(self) -> f64 {
         match self {
-            Aggregation::Sum => current + incoming,
+            Aggregation::Sum | Aggregation::Mean => 0.0,
+            Aggregation::CumulativeSum | Aggregation::LastValue | Aggregation::Max => f64::NAN,
+        }
+    }
+
+    fn combine(self, current: f64, incoming: f64) -> f64 {
+        match self {
+            Aggregation::Sum | Aggregation::Mean => current + incoming,
             Aggregation::Max if current.is_nan() => incoming,
             Aggregation::Max if incoming.is_nan() => current,
             Aggregation::Max => current.max(incoming),
-            Aggregation::LastValue if incoming.is_nan() => current,
-            Aggregation::LastValue => incoming,
+            Aggregation::CumulativeSum | Aggregation::LastValue if incoming.is_nan() => current,
+            Aggregation::CumulativeSum | Aggregation::LastValue => incoming,
         }
+    }
+
+    /// The value of the dimension whose columns start at `column`; none, a
+    /// gap, without one or for a non-finite one.
+    pub(crate) fn value(self, row: &[f64], column: usize, interval_secs: u64) -> Option<f64> {
+        let value = match self {
+            Aggregation::Sum | Aggregation::CumulativeSum => row[column] / interval_secs as f64,
+            Aggregation::Mean if row[column + 1] > 0.0 => row[column] / row[column + 1],
+            Aggregation::Mean => return None,
+            Aggregation::LastValue | Aggregation::Max => row[column],
+        };
+        value.is_finite().then_some(value)
     }
 }
 
@@ -69,11 +101,6 @@ impl<D: Dimension> ColumnRange<D> {
         }
     }
 
-    /// All the columns, one per value of `D`.
-    pub(crate) fn range(self) -> Range<usize> {
-        self.base..self.base + D::IDS.len()
-    }
-
     /// The column of the dimension with index `i`.
     pub(crate) fn column(self, i: usize) -> usize {
         self.base + i
@@ -89,71 +116,62 @@ impl<D> Clone for ColumnRange<D> {
 
 impl<D> Copy for ColumnRange<D> {}
 
-/// How a chart dimension gets its value for a window from the entity's row
-/// for that window; with no value, or a non-finite one, the dimension shows a
-/// gap.
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum Readout {
-    /// The column's cell per second: divided by the collection interval in
-    /// seconds. Counters, cumulative counters (their columns hold increases
-    /// by then) and histogram buckets.
-    Rate(usize),
-    /// One column's cell divided by another's; no value unless the
-    /// denominator is positive. The histogram mean: sum / count.
-    Ratio {
-        numerator: usize,
-        denominator: usize,
-    },
-    /// The column's cell as is; no value while it is unset. Gauges and the
-    /// histogram maximum.
-    Column(usize),
-}
-
-impl Readout {
-    /// The value for a window with this row; none for a gap.
-    pub(crate) fn value(self, row: &[f64], interval_secs: u64) -> Option<f64> {
-        let value = match self {
-            Readout::Rate(column) => row[column] / interval_secs as f64,
-            Readout::Ratio {
-                numerator,
-                denominator,
-            } if row[denominator] > 0.0 => row[numerator] / row[denominator],
-            Readout::Ratio { .. } => return None,
-            Readout::Column(column) => row[column],
-        };
-        value.is_finite().then_some(value)
-    }
-}
-
-/// The set's columns: each column's aggregation, its value in a row without
-/// events, and which columns hold cumulative totals.
+/// What a set's rows hold and how its charts read them: the chart templates,
+/// each owning the next columns of the row, and the row of a window without
+/// events. The builder fills it only through
+/// [`ChartSchema::add_chart_template`], so every template passes its checks.
 #[derive(Debug, Default)]
-pub(crate) struct RowLayout {
-    aggregations: Vec<Aggregation>,
+pub(crate) struct ChartSchema {
+    chart_templates: Vec<ChartTemplate>,
     empty_row: Vec<f64>,
-    /// The columns of [`CumulativeCounter`](crate::CumulativeCounter)
-    /// instruments, which hold totals until a window is emitted as increases.
-    cumulative_columns: Vec<usize>,
 }
 
-impl RowLayout {
-    /// Add `len` columns with `aggregation`; returns the first.
-    pub(crate) fn add_columns(&mut self, len: usize, aggregation: Aggregation) -> usize {
-        let base = self.aggregations.len();
-        self.aggregations
-            .extend(std::iter::repeat_n(aggregation, len));
+impl ChartSchema {
+    /// The first column the next chart template takes.
+    pub(crate) fn next_column(&self) -> usize {
+        self.empty_row.len()
+    }
+
+    /// Checks `template`'s dimension ids (valid, unique), its context (valid,
+    /// unique in the schema) and its columns (the next ones, as many as its
+    /// dimensions take), then adds it.
+    pub(crate) fn add_chart_template(&mut self, template: ChartTemplate) {
+        for id in &template.dimension_ids {
+            assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
+        }
+        let context = &template.context;
+        check_context(context);
+        assert!(
+            !template.dimension_ids.is_empty(),
+            "chart {context} has no dimensions"
+        );
+        assert!(
+            self.chart_templates.iter().all(|t| &t.context != context),
+            "duplicate context {context:?}"
+        );
+        for (i, id) in template.dimension_ids.iter().enumerate() {
+            assert!(
+                !template.dimension_ids[..i].contains(id),
+                "duplicate dimension id {id:?} in chart {context}"
+            );
+        }
+        let aggregation = template.aggregation;
+        let first = self.next_column();
+        let width = template.dimension_ids.len() * aggregation.columns_per_dimension();
+        assert_eq!(
+            template.columns,
+            first..first + width,
+            "chart {context} does not take the next columns"
+        );
         self.empty_row
-            .extend(std::iter::repeat_n(aggregation.initial(), len));
-        base
+            .extend(std::iter::repeat_n(aggregation.initial(), width));
+        self.chart_templates.push(template);
     }
 
-    /// Mark `columns` as holding a cumulative counter's totals.
-    pub(crate) fn mark_cumulative<D: Dimension>(&mut self, columns: ColumnRange<D>) {
-        self.cumulative_columns.extend(columns.range());
-    }
-
-    pub(crate) fn cumulative_columns(&self) -> &[usize] {
-        &self.cumulative_columns
+    /// In the order they were added, which is also the order of each
+    /// entity's chart ids.
+    pub(crate) fn chart_templates(&self) -> &[ChartTemplate] {
+        &self.chart_templates
     }
 
     /// The row of a window without events.
@@ -161,15 +179,23 @@ impl RowLayout {
         self.empty_row.as_slice().into()
     }
 
-    /// Combine `incoming` into `target`, each column by its [`Aggregation`].
+    /// Combine `incoming` into `target`, each template's columns by its
+    /// [`Aggregation`].
     pub(crate) fn combine(&self, target: &mut [f64], incoming: &[f64]) {
-        for ((aggregation, current), &incoming) in self
-            .aggregations
-            .iter()
-            .zip(target.iter_mut())
-            .zip(incoming)
-        {
-            *current = aggregation.apply(*current, incoming);
+        for template in &self.chart_templates {
+            let columns = template.columns.clone();
+            for (current, &incoming) in target[columns.clone()].iter_mut().zip(&incoming[columns]) {
+                *current = template.aggregation.combine(*current, incoming);
+            }
         }
+    }
+
+    /// The columns of the cumulative counters' templates, in order; they hold
+    /// totals until a window is emitted, and increases after.
+    pub(crate) fn cumulative_columns(&self) -> impl Iterator<Item = usize> + '_ {
+        self.chart_templates
+            .iter()
+            .filter(|template| template.aggregation == Aggregation::CumulativeSum)
+            .flat_map(|template| template.columns.clone())
     }
 }
