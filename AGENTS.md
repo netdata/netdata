@@ -125,7 +125,8 @@ removes debt beats a smaller one that preserves it.
     (ii). Record and explain unrelated search matches. An item you did not search for counts as silent scope-narrowing.
   - A repository-wide search cannot prove safety for consumers outside this repo (Netdata Cloud, exporters,
     streaming, ML, the docs pipeline). Renaming a shipped public contract is a user-owned breaking decision routed
-    through the Mandatory pause, not something the search clears.
+    through the Mandatory pause, not something the search clears. The explicit go.d V1-to-V2 chart/dimension ID
+    exception is owned by `src/go/plugin/go.d/docs/migrate-v1-to-v2.md#chart-and-dimension-ids`.
 - Allowed exceptions (pause conditions, not auto-routes). Recommend a non-clean route ONLY for:
   - (a) technically impossible: impossible to implement correctly at all, NOT within a preferred diff size;
   - (b) a concrete, evidenced safety risk: a named hazard such as data loss or a security/production-stability

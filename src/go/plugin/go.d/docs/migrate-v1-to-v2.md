@@ -5,14 +5,15 @@ Requirement language follows the root `AGENTS.md` definitions.
 This guide is for migrating an existing go.d collector from framework V1 to framework V2. It is not the starting point
 for a new collector; use `src/go/plugin/go.d/docs/how-to-write-a-collector.md` for new work.
 
-V1 collectors are public integrations. A migration MUST preserve their existing user-visible contracts unless the user
-explicitly approves a breaking change.
+V1 collectors are public integrations. A migration MUST preserve contexts, dimension names and the other contracts
+listed below. Chart IDs and dimension IDs MAY adopt the V2 naming model under "Chart And Dimension IDs"; this does not
+require a separate breaking-change approval.
 
 ## Core Rule
 
 A V1-to-V2 migration is compatibility work first. The clean end state is a V2 collector that behaves like the old
-collector from the user's point of view, with the old public contracts preserved and the internal collection path moved
-to `collectorapi.CollectorV2` and `metrix.CollectorStore`.
+collector from the user's point of view, with the required compatibility contracts preserved and collection moved to
+`collectorapi.CollectorV2` and `metrix.CollectorStore`.
 
 Do not combine a compatibility migration with new enrichment, new topology, new host scopes, config expansion, chart
 redesign, or framework changes unless that work is required for the migration itself. If the migration reveals useful
@@ -43,9 +44,9 @@ Create a compatibility manifest before implementation. The manifest can live in 
    - stock `.conf`;
    - DYNCFG behavior.
 4. Metric/chart contract.
-   - chart IDs;
+   - old and new chart IDs (record changes; equality is not required);
    - contexts;
-   - dimension IDs and names;
+   - old and new dimension IDs, and preserved dimension names;
    - algorithms;
    - units;
    - title, family, type, priority, multiplier, divisor, hidden, and float flags;
@@ -131,8 +132,7 @@ Unless the user approves a breaking change, the migration MUST preserve:
 - module name and job identity;
 - config field names and defaults;
 - chart contexts;
-- chart IDs;
-- dimension IDs and names;
+- dimension names;
 - dimension algorithms;
 - chart title, family, type, priority, units, multiplier, divisor, hidden, and float flags;
 - chart variable semantics used by health alerts;
@@ -142,6 +142,23 @@ Unless the user approves a breaking change, the migration MUST preserve:
 - service-discovery behavior;
 - vnode behavior;
 - user-facing lifecycle behavior.
+
+### Chart And Dimension IDs
+
+- Chart IDs and dimension IDs MAY change to the normal V2 representation. Preserve chart contexts and dimension names;
+  do not add framework features or collector-local compatibility code solely to retain V1 IDs.
+- Distinguish V1 internal metric keys from emitted IDs. The V1 renderer uses `dim.Name` as the wire ID when nonempty,
+  otherwise `dim.ID` (`jobruntime/job_v1_render.go`). For example, internal ID `cert_depth0_expiry` with name `expiry`
+  already emits wire ID/name `expiry`; V2 preserves both by using dimension name `expiry`.
+- V2 uses the dimension name as both its wire ID and display name. Preserve the effective V1 name, including the
+  fallback to `dim.ID` when `dim.Name` was empty. Do not invent a compatibility requirement for an internal map key.
+- Prefer derived chart IDs and instance labels. Record representative old/new IDs in the migration manifest and
+  report the change; preserving contexts/names does not promise continuity for ID-addressed history or consumers.
+- Search for literal and dynamically constructed references to the old IDs. Update affected in-repository consumers,
+  examples and tests to use the new IDs or preserved contexts/names. Alert behavior and measurement semantics MUST
+  remain compatible; this permission does not authorize dropping an alert dependency.
+- If the user specifically requires literal ID continuity, investigate support and resolve any framework prerequisite
+  before implementation. Do not silently substitute the normal V2 ID policy for that request.
 
 If an existing collector has an accidental bug or inconsistent artifact, record it separately. Fix it in the migration
 only when preserving the bug would make the V2 collector incorrect or untestable; otherwise split the fix into its own
@@ -224,8 +241,8 @@ timing changes, document the behavioral change and get approval when it affects 
 V1 collectors often build chart IDs with `fmt.Sprintf`. V2 templates derive contexts from `context_namespace`, group
 context namespaces, and chart context leaves. V2 autogen also has `engine.autogen.max_type_id_len` behavior.
 
-The migration MUST prove that generated chart IDs, contexts, and dimensions match the old public contract, or explicitly
-record and approve any difference.
+The migration MUST prove that contexts and dimension names match the old contract, including dynamically generated
+instances. Chart and dimension IDs follow "Chart And Dimension IDs"; changed IDs alone are not a migration blocker.
 
 ## Config Rules
 
@@ -264,18 +281,18 @@ The non-negotiable minimum is alert-observable parity. The migration MUST prove 
 referenced dimensions, referenced variables, and dimension algorithms/units used by alerts still resolve after
 migration. This is provable today with chart-template checks plus manual alert-variable review.
 
-Exhaustive compiled chart-identity parity is broader: title, family, type, priority, multiplier, divisor, hidden, float
+Compiled presentation compatibility is broader: title, family, type, priority, multiplier, divisor, hidden, float
 flags, label promotion, and lifecycle policy. If existing exported helpers cannot observe those fields, either add a
 framework `collecttest` helper under `src/go/plugin/framework/docs/changing-framework-code.md`, or record a manual
-comparison recipe with exact fields and evidence. Do not claim exhaustive chart identity parity without one of those
-paths.
+comparison recipe with exact fields and evidence. Do not claim exhaustive presentation compatibility without one of
+those paths.
 
 At minimum:
 
 - config YAML/JSON serialization compatibility;
 - `Init`, `Check`, `Collect`, and `Cleanup` lifecycle coverage;
 - metric-store cycle behavior, including `BeginCycle`, successful commit, and abort on expected hard collection errors;
-- alert-observable parity for chart contexts, dimension IDs/names, algorithms, units, and variables used by health
+- alert-observable parity for chart contexts, dimension names, algorithms, units, and variables used by health
   alerts;
 - chart template schema/decode/validate/compile coverage;
 - chart coverage for fixture data expected to materialize all dimensions;
@@ -285,12 +302,12 @@ At minimum:
 - generated integration artifact consistency when metadata changes;
 - host-scope tests if scopes/vnodes are preserved or introduced.
 
-`collecttest.AssertChartCoverage` is not a replacement for chart-identity parity. It verifies that emitted series and
-the template agree; it can still pass when both writer and template were renamed consistently.
+`collecttest.AssertChartCoverage` is not a replacement for compatibility checks. It verifies that emitted series and
+the template agree; it can still pass when both writer and template renamed a required context or dimension name.
 
-Exhaustive chart-identity parity is required before claiming full compatibility. If the migration lacks a shared helper
-or recorded manual comparison recipe for the compiled fields listed above, claim only the narrower compatibility that
-was actually proven.
+Check the compiled fields listed above before claiming presentation compatibility. Compare contexts, dimension names,
+values and instance labels independently of chart/dimension IDs. If the migration lacks evidence for a field, claim
+only the compatibility actually proven; changed IDs permitted by this guide do not require literal identity parity.
 
 Until a shared alert-variable helper exists, use a manual grep/review pass for alert variables:
 
@@ -305,7 +322,7 @@ Prefer table-driven tests using `map[string]struct{}` keyed by case name when ca
 
 ### Parity manifest recipe
 
-When chart-identity parity needs the compiled fields above and no shared helper observes them, this is a concrete form
+When compatibility checks need the compiled fields above and no shared helper observes them, this is a concrete form
 of that "manual comparison recipe": prove context/dimension/value parity by rendering BOTH collectors into one manifest
 shape, without depending on chart-ID string equality.
 
@@ -319,10 +336,10 @@ shape, without depending on chart-ID string equality.
    compare values within a tolerance (for example `1e-3`), not for exact equality. Assert that context, family, units,
    dimension names, and dimension algorithms match.
 
-Compare chart IDs too when the migration preserves them (the default). Omit only chart-ID equality when the user
-approved a breaking chart-ID change -- then the preserved contract is the context, and chart-ID-keyed alert examples in
-`src/health/REFERENCE.md` must be updated. A gap (NaN or absent value) MUST fail the comparison loudly; never silently
-map it to 0.
+Match chart instances by context and their identifying labels, and dimensions by display name. Compare literal IDs
+only when their continuity is an explicit migration requirement. Review ID-addressed examples and alert references,
+including `src/health/REFERENCE.md`, and update affected references. A gap (NaN or absent value) MUST fail a comparison
+expecting a measured value; never silently map it to 0.
 
 The render MUST go through the collector's LIVE `ChartTemplateYAML()` and store, not a separately rebuilt template -- a
 test that rebuilds the template can pass even when the shipped `ChartTemplateYAML()` is wrong.
@@ -367,7 +384,8 @@ before implementing collector-local glue.
 
 ## Anti-Patterns
 
-- Rewriting chart IDs, contexts, or dimensions only because the V2 template makes a new name easier.
+- Rewriting contexts or dimension names only because the V2 template makes a new name easier.
+- Blocking a normal migration or expanding framework scope solely to preserve V1 chart or dimension IDs.
 - Adding labels, host scopes, topology, or Functions in the same commit as the compatibility migration without a product
   decision.
 - Shipping a V1-to-bridge-to-V2 runtime path after the V2 store is in place.

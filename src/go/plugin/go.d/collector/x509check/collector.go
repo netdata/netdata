@@ -4,20 +4,25 @@ package x509check
 
 import (
 	"context"
+	"crypto/x509"
 	_ "embed"
-	"errors"
 	"fmt"
 	"time"
 
 	cfssllog "github.com/cloudflare/cfssl/log"
+	"github.com/cloudflare/cfssl/revoke"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
+
+//go:embed "charts.yaml"
+var chartTemplate string
 
 func init() {
 	cfssllog.Level = cfssllog.LevelFatal
@@ -26,20 +31,24 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		Create: func() collectorapi.CollectorV1 { return New() },
-		Config: func() any { return &Config{} },
+		CreateV2:   func() collectorapi.CollectorV2 { return New() },
+		Config:     func() any { return &Config{} },
+		StoreFirst: true,
 	})
 }
 
 func New() *Collector {
+	store := metrix.NewCollectorStore()
 	return &Collector{
 		Config: Config{
 			Timeout:        confopt.Duration(time.Second * 2),
 			CheckFullChain: false,
 		},
 
-		charts:    &collectorapi.Charts{},
-		seenCerts: make(map[string]bool),
+		store:             store,
+		metrics:           newCollectorMetrics(store),
+		now:               time.Now,
+		verifyCertificate: revoke.VerifyCertificateError,
 	}
 }
 
@@ -57,11 +66,12 @@ type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *collectorapi.Charts
-
 	prov provider
 
-	seenCerts map[string]bool
+	store             metrix.CollectorStore
+	metrics           collectorMetrics
+	now               func() time.Time
+	verifyCertificate func(*x509.Certificate) (revoked, ok bool, err error)
 }
 
 func (c *Collector) Configuration() any {
@@ -83,30 +93,14 @@ func (c *Collector) Init(ctx context.Context) error {
 }
 
 func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
-	if err != nil {
-		return err
-	}
-	if len(mx) == 0 {
-		return errors.New("no metrics collected")
-	}
-	return nil
+	_, err := c.certificates()
+	return err
 }
 
-func (c *Collector) Charts() *collectorapi.Charts {
-	return c.charts
-}
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
-	if err != nil {
-		c.Error(err)
-	}
+func (c *Collector) ChartTemplateYAML() string { return chartTemplate }
 
-	if len(mx) == 0 {
-		return nil
-	}
-	return mx
-}
+func (c *Collector) Collect(context.Context) error { return c.collect() }
 
 func (c *Collector) Cleanup(context.Context) {}

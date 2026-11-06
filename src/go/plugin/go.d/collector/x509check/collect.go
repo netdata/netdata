@@ -5,14 +5,12 @@ package x509check
 import (
 	"crypto/x509"
 	"fmt"
-	"time"
+	"strconv"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
-
-	"github.com/cloudflare/cfssl/revoke"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) certificates() ([]*x509.Certificate, error) {
 	certs, err := c.prov.certificates()
 	if err != nil {
 		return nil, err
@@ -22,41 +20,45 @@ func (c *Collector) collect() (map[string]int64, error) {
 		return nil, fmt.Errorf("no certificate was provided by '%s'", c.Config.Source)
 	}
 
-	mx := make(map[string]int64)
-
-	if err := c.collectCertificates(mx, certs); err != nil {
-		return nil, err
-	}
-
-	return mx, nil
+	return certs, nil
 }
 
-func (c *Collector) collectCertificates(mx map[string]int64, certs []*x509.Certificate) error {
+func (c *Collector) collect() error {
+	certs, err := c.certificates()
+	if err != nil {
+		return err
+	}
+
 	for i, cert := range certs {
-		cn := cert.Subject.CommonName
+		labels := c.metrics.meter.LabelSet(
+			metrix.Label{
+				Key:   "source",
+				Value: c.Source,
+			},
+			metrix.Label{
+				Key:   "common_name",
+				Value: cert.Subject.CommonName,
+			},
+			metrix.Label{
+				Key:   "depth",
+				Value: strconv.Itoa(i),
+			},
+		)
 
-		if !c.seenCerts[cn] {
-			c.seenCerts[cn] = true
-			c.addCertCharts(cn, i)
-		}
-
-		px := fmt.Sprintf("cert_depth%d_", i)
-
-		mx[px+"expiry"] = int64(time.Until(cert.NotAfter).Seconds())
+		c.metrics.expiry.Observe(float64(int64(cert.NotAfter.Sub(c.now()).Seconds())), labels)
 
 		if i == 0 && c.CheckRevocation {
-			func() {
-				rev, ok, err := revoke.VerifyCertificateError(cert)
-				if err != nil {
-					c.Debug(err)
-					return
-				}
-				if !ok {
-					return
-				}
-				mx[px+"revoked"] = oldmetrix.Bool(rev)
-				mx[px+"not_revoked"] = oldmetrix.Bool(!rev)
-			}()
+			revoked, ok, err := c.verifyCertificate(cert)
+			if err != nil {
+				c.Debug(err)
+			} else if ok {
+				c.metrics.revocation.ObserveStateSet(metrix.StateSetPoint{
+					States: map[string]bool{
+						"not_revoked": !revoked,
+						"revoked":     revoked,
+					},
+				}, labels)
+			}
 		}
 
 		if !c.CheckFullChain {

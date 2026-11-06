@@ -23,7 +23,7 @@ references when their surfaces are affected, including the IBM.d exception.
 |---|---|---|
 | New go.d collector, or a public-contract change (option, mode, metric meaning, ownership, Functions, vnodes) | `.agents/skills/collectors-go-design/SKILL.md`, then `src/go/plugin/go.d/docs/how-to-write-a-collector.md` | Design note in the SOW gate first; new go.d collectors use framework V2. |
 | `config_schema.json` (the DynCfg form) | `.agents/skills/collectors-go-design/config-schema.md`, then `src/plugins.d/DYNCFG.md` ("JSON Schema for Configuration UI") | Every visible property has a title and description; tabs equal `metadata.yaml` groups; secrets use `ui:widget: password`; the repo-wide `TestConfigSchemas*` rules must pass. |
-| Migrating go.d V1 collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` | Preserve public contracts unless a breaking change is explicitly approved. |
+| Migrating go.d V1 collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` | Follow its context/name compatibility contract and chart/dimension ID policy. |
 | go.d V2 implementation details | `.agents/skills/collectors-go-framework-v2/SKILL.md`, `src/go/pkg/metrix/README.md`, `src/go/plugin/framework/charttpl/README.md`, `src/go/plugin/framework/chartengine/README.md` | Skill for maintainer style, READMEs for framework API contracts. Editing `metrix` or framework packages is framework-gated work. |
 | New go.d discoverer or changed discovery capability, ownership or lifecycle | `.agents/skills/collectors-go-design/SKILL.md#the-collector-design-note` and its architecture gate | Implementation under `src/go/plugin/go.d/discovery/sdext/discoverer/`; shared engine under `src/go/plugin/agent/discovery/`. |
 | go.d helper packages | `src/go/plugin/go.d/docs/helper-packages.md` | Check existing HTTP, config-option, matcher, logger, socket, command, SQL, ping, log-file, and cloud-auth helpers before adding custom plumbing. |
@@ -60,8 +60,10 @@ references when their surfaces are affected, including the IBM.d exception.
 ## go.d V1-to-V2 Migration Rules
 
 - Migrations MUST start with `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`.
-- Migrations MUST preserve chart IDs, contexts, dimensions, config keys, defaults, health lookups, metadata,
+- Migrations MUST preserve contexts, dimension names, config keys, defaults, health lookups, metadata,
   stock config, and service discovery behavior unless the user explicitly approves a breaking change.
+- Chart and dimension IDs MAY adopt V2 naming without a separate approval; follow the migration guide's
+  "Chart And Dimension IDs" contract, reference audit and explicit-ID-continuity exception.
 - Compatibility migration SHOULD be separate from enrichment (new labels, host scopes, topology, Functions, config
   expansion).
 - A completed migration MUST NOT keep a runtime V1-to-V2 bridge. Temporary V1 logic MAY serve parity checks during
