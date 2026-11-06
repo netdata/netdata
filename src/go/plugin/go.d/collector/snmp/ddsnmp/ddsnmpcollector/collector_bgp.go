@@ -88,7 +88,7 @@ func (c *Collector) collectBGPRowsObserved(
 		return nil, errors.Join(errs...)
 	}
 	if len(errs) > 0 {
-		c.log.Limit(bgpRowsPartialErrorLogKey+prof.SourceFile, 1, bgpRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+bgpRowsPartialErrorLogKey+prof.SourceFile, 1, bgpRowsErrorLogEvery).
 			Warningf("collecting BGP rows for profile %q partially failed: %v", prof.SourceFile, errors.Join(errs...))
 	}
 

@@ -612,7 +612,7 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 		return nil, errors.Join(errs...)
 	}
 	if len(errs) > 0 {
-		s.collector.log.Limit(tableRowsPartialErrorLogKey+scope.profileSource, 1, tableRowsErrorLogEvery).
+		s.collector.log.Limit(s.collector.logKeyPrefix+tableRowsPartialErrorLogKey+scope.profileSource, 1, tableRowsErrorLogEvery).
 			Warningf("failed to walk some SNMP tables: %v", errors.Join(errs...))
 	}
 	return metrics, nil

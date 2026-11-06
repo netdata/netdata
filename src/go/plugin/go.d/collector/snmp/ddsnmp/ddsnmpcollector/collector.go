@@ -21,6 +21,9 @@ import (
 )
 
 type Config struct {
+	// LogKeyPrefix isolates warning budgets when collectors share a logger.
+	// Callers must keep it stable across refreshes and exclude credentials.
+	LogKeyPrefix        string
 	SnmpClient          gosnmp.Handler
 	Profiles            []*ddsnmp.Profile
 	Log                 *logger.Logger
@@ -31,6 +34,7 @@ type Config struct {
 
 func New(cfg Config) *Collector {
 	coll := &Collector{
+		logKeyPrefix:              cfg.LogKeyPrefix,
 		log:                       cfg.Log.With(slog.String("ddsnmp", "collector")),
 		profiles:                  make(map[string]*profileState),
 		missingOIDs:               make(map[string]bool),
@@ -57,6 +61,7 @@ func New(cfg Config) *Collector {
 	coll.deviceMetadataCollector = newDeviceMetadataCollector(cfg.SnmpClient, coll.missingOIDs, coll.log, cfg.SysObjectID)
 	coll.scalarCollector = newScalarCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
 	coll.tableCollector = newTableCollector(cfg.SnmpClient, coll.missingOIDs, coll.tableCache, coll.log, cfg.DisableBulkWalk)
+	coll.tableCollector.logKeyPrefix = cfg.LogKeyPrefix
 	coll.vmetricsCollector = newVirtualMetricsCollector(coll.log)
 
 	return coll
@@ -67,6 +72,7 @@ type (
 		failures                  ddsnmp.CollectionFailures
 		requests                  snmpRequestState
 		log                       *logger.Logger
+		logKeyPrefix              string
 		profiles                  map[string]*profileState
 		missingOIDs               map[string]bool
 		negative                  negativeEvidence
@@ -449,7 +455,7 @@ func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollectio
 	now := time.Now()
 	licenseRows, err := c.collectLicenseRowsObserved(ps.profile, &pm.Stats, profile.acquisition)
 	if err != nil {
-		c.log.Limit(licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
 			Warningf("failed to collect licensing rows for profile %q: %v", ps.profile.SourceFile, err)
 	}
 	pm.LicenseRows = append(pm.LicenseRows, licenseRows...)
@@ -465,7 +471,7 @@ func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollectio
 	}
 	if err != nil {
 		pm.BGPCollectError = err
-		c.log.Limit(bgpRowsFailedLogKey+ps.profile.SourceFile, 1, bgpRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+bgpRowsFailedLogKey+ps.profile.SourceFile, 1, bgpRowsErrorLogEvery).
 			Warningf("failed to collect BGP rows for profile %q: %v", ps.profile.SourceFile, err)
 	}
 	pm.BGPRows = append(pm.BGPRows, bgpRows...)

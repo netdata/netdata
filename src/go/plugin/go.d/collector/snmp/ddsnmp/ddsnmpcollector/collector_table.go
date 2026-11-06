@@ -29,6 +29,7 @@ type tableCollector struct {
 	missingOIDs     map[string]bool
 	tableCache      *tableCache
 	log             *logger.Logger
+	logKeyPrefix    string
 	rowProcessor    *tableRowProcessor
 }
 
@@ -394,7 +395,7 @@ func (tc *tableCollector) processRows(
 	}
 
 	if rowErrors.count > 0 {
-		key := tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(ctx.config)
+		key := tc.logKeyPrefix + tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(ctx.config)
 		tc.log.Limit(key, 1, tableRowsErrorLogEvery).
 			Warningf("failed to collect %d rows from table %q (%s) in profile %q; first error at row %q: %v", rowErrors.count, ctx.config.Table.Name, ctx.config.Table.OID, ctx.profileSource, rowErrors.firstRow, rowErrors.first)
 	}
@@ -535,7 +536,7 @@ func (tc *tableCollector) buildMetricsFromCache(
 	}
 
 	if rowErrors.count > 0 {
-		key := tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(
+		key := tc.logKeyPrefix + tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(
 			ctx.config,
 		)
 		tc.log.Limit(key, 1, tableRowsErrorLogEvery).
