@@ -42,7 +42,7 @@ modules:
           With `check_revocation_status` enabled, the collector also downloads the CRLs and queries the OCSP
           responders listed in the server certificate, and fetches the issuer certificate listed in it to verify the
           CRL and build the OCSP request. These requests go to the HTTP or HTTPS URLs in the certificate, so the Agent
-          host needs outbound access to them.
+          host needs outbound access to them. A CRL is downloaded again only after the next update time it states.
       default_behavior:
         auto_detection:
           description: ""

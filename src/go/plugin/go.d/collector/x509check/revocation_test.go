@@ -1,0 +1,614 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package x509check
+
+import (
+	"bytes"
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/base64"
+	"encoding/pem"
+	"fmt"
+	"io"
+	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"path"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/ocsp"
+)
+
+func TestRevocationChecker_Status(t *testing.T) {
+	type result struct {
+		revoked, ok bool
+	}
+	tests := map[string]struct {
+		endpoints testPKIEndpoints
+		at        func(*testPKI) time.Time
+		want      result
+		wantErr   bool
+	}{
+		"no CRL or OCSP URL": {
+			want: result{
+				ok: true,
+			},
+		},
+		"CRL lists the certificate": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				crls:    []testPKIHandler{serveCRL(true)},
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
+		"CRL does not list the certificate": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				crls:    []testPKIHandler{serveCRL(false)},
+			},
+			want: result{
+				ok: true,
+			},
+		},
+		"PEM CRL and issuer": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuerPEM},
+				crls:    []testPKIHandler{serveCRLPEM(true)},
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
+		"CRL without an issuer is used unverified": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{notFound},
+				crls:    []testPKIHandler{serveRogueCRL},
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
+		"CRL signed by another CA": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				crls:    []testPKIHandler{serveRogueCRL},
+			},
+			wantErr: true,
+		},
+		"CRL unreachable": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				crls:    []testPKIHandler{notFound},
+			},
+			wantErr: true,
+		},
+		"CRL is not a CRL": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				crls:    []testPKIHandler{serveIssuer},
+			},
+			wantErr: true,
+		},
+		"LDAP CRL is skipped": {
+			endpoints: testPKIEndpoints{
+				ldapCRL: true,
+			},
+			want: result{
+				ok: true,
+			},
+		},
+		"revoked by CRL without asking OCSP": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				crls:    []testPKIHandler{serveCRL(true)},
+				ocsps:   []testPKIHandler{unexpected},
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
+		"OCSP good": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps:   []testPKIHandler{serveOCSP(ocsp.Good)},
+			},
+			want: result{
+				ok: true,
+			},
+		},
+		"OCSP revoked": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps:   []testPKIHandler{serveOCSP(ocsp.Revoked)},
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
+		"OCSP unknown is reported as revoked": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps:   []testPKIHandler{serveOCSP(ocsp.Unknown)},
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
+		"OCSP after a CRL that does not list the certificate": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				crls:    []testPKIHandler{serveCRL(false)},
+				ocsps:   []testPKIHandler{serveOCSP(ocsp.Revoked)},
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
+		"failing OCSP responder is skipped": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{notFound, serveIssuer},
+				ocsps:   []testPKIHandler{notFound, serveOCSP(ocsp.Good)},
+			},
+			want: result{
+				ok: true,
+			},
+		},
+		"OCSP responders unreachable": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps:   []testPKIHandler{notFound, notFound},
+			},
+			want: result{},
+		},
+		"OCSP answer signed by another CA": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps:   []testPKIHandler{serveRogueOCSP},
+			},
+			want: result{},
+		},
+		"OCSP without an issuer URL": {
+			endpoints: testPKIEndpoints{
+				ocsps: []testPKIHandler{unexpected},
+			},
+			want: result{},
+		},
+		"OCSP with an unreachable issuer": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{notFound},
+				ocsps:   []testPKIHandler{unexpected},
+			},
+			want: result{},
+		},
+		"expired certificate": {
+			endpoints: testPKIEndpoints{
+				crls: []testPKIHandler{unexpected},
+			},
+			at:      func(p *testPKI) time.Time { return p.leaf.NotAfter },
+			wantErr: true,
+		},
+		"certificate not yet valid": {
+			endpoints: testPKIEndpoints{
+				crls: []testPKIHandler{unexpected},
+			},
+			at:      func(p *testPKI) time.Time { return p.leaf.NotBefore },
+			wantErr: true,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			pki := newTestPKI(t, test.endpoints)
+			at := pki.now
+			if test.at != nil {
+				at = test.at(pki)
+			}
+
+			revoked, ok, err := newRevocationChecker().status(t.Context(), pki.leaf, at)
+
+			if test.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.want, result{
+					revoked: revoked,
+					ok:      ok,
+				})
+			}
+		})
+	}
+}
+
+func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {
+	pki := newTestPKI(t, testPKIEndpoints{
+		issuers: []testPKIHandler{serveIssuer},
+		crls:    []testPKIHandler{serveCRL(true)},
+	})
+	renewed := pki.issueLeaf(t, big.NewInt(2))
+	rc := newRevocationChecker()
+
+	type downloads struct {
+		crl, issuer int64
+	}
+	for _, step := range []struct {
+		name          string
+		cert          *x509.Certificate
+		at            time.Time
+		wantRevoked   bool
+		wantDownloads downloads
+	}{
+		{
+			name:        "first check downloads",
+			cert:        pki.leaf,
+			at:          pki.now,
+			wantRevoked: true,
+			wantDownloads: downloads{
+				crl:    1,
+				issuer: 1,
+			},
+		},
+		{
+			name:        "cached verdict before the next update",
+			cert:        pki.leaf,
+			at:          pki.crlNextUpdate().Add(-time.Second),
+			wantRevoked: true,
+			wantDownloads: downloads{
+				crl:    1,
+				issuer: 1,
+			},
+		},
+		{
+			name:        "another serial downloads again",
+			cert:        renewed,
+			at:          pki.now,
+			wantRevoked: false,
+			wantDownloads: downloads{
+				crl:    2,
+				issuer: 2,
+			},
+		},
+		{
+			name:        "next update downloads again",
+			cert:        renewed,
+			at:          pki.crlNextUpdate(),
+			wantRevoked: false,
+			wantDownloads: downloads{
+				crl:    3,
+				issuer: 3,
+			},
+		},
+	} {
+		revoked, ok, err := rc.status(t.Context(), step.cert, step.at)
+
+		require.NoError(t, err, step.name)
+		assert.True(t, ok, step.name)
+		assert.Equal(t, step.wantRevoked, revoked, step.name)
+		assert.Equal(t, step.wantDownloads, downloads{
+			crl:    pki.hits["crl"].Load(),
+			issuer: pki.hits["issuer"].Load(),
+		}, step.name)
+	}
+}
+
+func TestRevocationChecker_CancelledIssuerDownloadIsNotAMissingIssuer(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	pki := newTestPKI(t, testPKIEndpoints{
+		issuers: []testPKIHandler{cancelAndStall(cancel)},
+		crls:    []testPKIHandler{serveRogueCRL},
+	})
+	rc := newRevocationChecker()
+
+	_, _, err := rc.status(ctx, pki.leaf, pki.now)
+
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Empty(t, rc.crls, "an unverified CRL must not be cached")
+}
+
+func TestRevocationChecker_RequestsAreBounded(t *testing.T) {
+	pki := newTestPKI(t, testPKIEndpoints{
+		crls: []testPKIHandler{stall},
+	})
+	rc := newRevocationChecker()
+	require.Positive(t, rc.client.Timeout)
+	rc.client.Timeout = 50 * time.Millisecond
+
+	_, _, err := rc.status(t.Context(), pki.leaf, pki.now)
+
+	assert.ErrorContains(t, err, "Client.Timeout exceeded")
+}
+
+func TestRevocationChecker_PostsLongOCSPRequests(t *testing.T) {
+	ocspReq := bytes.Repeat([]byte{0x30}, 257)
+	pki := newTestPKI(t, testPKIEndpoints{
+		ocsps: []testPKIHandler{func(p *testPKI, w http.ResponseWriter, r *http.Request) {
+			body, err := io.ReadAll(r.Body)
+			assert.NoError(p.t, err)
+			assert.Equal(p.t, http.MethodPost, r.Method)
+			assert.Equal(p.t, "application/ocsp-request", r.Header.Get("Content-Type"))
+			assert.Equal(p.t, ocspReq, body)
+			p.writeOCSP(w, p.ca, p.caKey, p.leaf.SerialNumber, ocsp.Good)
+		}},
+	})
+
+	resp, err := newRevocationChecker().queryOCSP(t.Context(), pki.leaf.OCSPServer[0], ocspReq, pki.leaf, pki.ca)
+
+	require.NoError(t, err)
+	assert.Equal(t, ocsp.Good, resp.Status)
+}
+
+// testPKI is a CA that serves its certificate, a CRL and OCSP answers over HTTP, and a server certificate it issued
+// that lists those URLs. A rogue CA with the same name signs answers the real CA did not.
+type testPKI struct {
+	t        testing.TB
+	now      time.Time
+	ca       *x509.Certificate
+	caKey    *ecdsa.PrivateKey
+	rogue    *x509.Certificate
+	rogueKey *ecdsa.PrivateKey
+	leaf     *x509.Certificate
+
+	crlURLs, ocspURLs, issuerURLs []string
+
+	// hits counts requests per endpoint kind ("crl", "ocsp", "issuer").
+	hits     map[string]*atomic.Int64
+	inFlight atomic.Int64
+}
+
+type testPKIHandler func(p *testPKI, w http.ResponseWriter, r *http.Request)
+
+// testPKIEndpoints lists the handlers behind each URL the server certificate lists, in order.
+type testPKIEndpoints struct {
+	issuers []testPKIHandler
+	crls    []testPKIHandler
+	ocsps   []testPKIHandler
+	// ldapCRL lists an LDAP CRL distribution point before the HTTP ones.
+	ldapCRL bool
+}
+
+func newTestPKI(t *testing.T, endpoints testPKIEndpoints) *testPKI {
+	t.Helper()
+	now := time.Now().Truncate(time.Second)
+	ca, caKey := newTestCA(t, now)
+	rogue, rogueKey := newTestCA(t, now)
+	p := &testPKI{
+		t:        t,
+		now:      now,
+		ca:       ca,
+		caKey:    caKey,
+		rogue:    rogue,
+		rogueKey: rogueKey,
+		hits: map[string]*atomic.Int64{
+			"crl":    {},
+			"ocsp":   {},
+			"issuer": {},
+		},
+	}
+
+	mux := http.NewServeMux()
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	serve := func(kind string, handlers []testPKIHandler) []string {
+		var urls []string
+		for i, handler := range handlers {
+			endpoint := fmt.Sprintf("/%s/%d", kind, i)
+			h := func(w http.ResponseWriter, r *http.Request) {
+				p.hits[kind].Add(1)
+				p.inFlight.Add(1)
+				defer p.inFlight.Add(-1)
+				handler(p, w, r)
+			}
+			mux.HandleFunc(endpoint, h)
+			// An OCSP GET request appends the encoded request to the URL path.
+			mux.HandleFunc(endpoint+"/", h)
+			urls = append(urls, srv.URL+endpoint)
+		}
+		return urls
+	}
+	if endpoints.ldapCRL {
+		p.crlURLs = append(p.crlURLs, "ldap://ldap.example.com/cn=Test%20CA?certificateRevocationList")
+	}
+	p.crlURLs = append(p.crlURLs, serve("crl", endpoints.crls)...)
+	p.ocspURLs = serve("ocsp", endpoints.ocsps)
+	p.issuerURLs = serve("issuer", endpoints.issuers)
+	p.leaf = p.issueLeaf(t, big.NewInt(1))
+	return p
+}
+
+func newTestCA(t *testing.T, now time.Time) (*x509.Certificate, *ecdsa.PrivateKey) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "Test CA",
+		},
+		NotBefore:             now.Add(-time.Hour),
+		NotAfter:              now.Add(48 * time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	require.NoError(t, err)
+	cert, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	return cert, key
+}
+
+// issueLeaf issues a server certificate with serial that lists the PKI's URLs.
+func (p *testPKI) issueLeaf(t *testing.T, serial *big.Int) *x509.Certificate {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	template := &x509.Certificate{
+		SerialNumber: serial,
+		Subject: pkix.Name{
+			CommonName: "example.org",
+		},
+		NotBefore:             p.now.Add(-time.Hour),
+		NotAfter:              p.now.Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		CRLDistributionPoints: p.crlURLs,
+		OCSPServer:            p.ocspURLs,
+		IssuingCertificateURL: p.issuerURLs,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, p.ca, &key.PublicKey, p.caKey)
+	require.NoError(t, err)
+	cert, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	return cert
+}
+
+func (p *testPKI) crlNextUpdate() time.Time {
+	return p.now.Add(time.Hour)
+}
+
+// crl returns a DER CRL signed by issuer that lists the PKI's first server certificate when revoked is set.
+func (p *testPKI) crl(issuer *x509.Certificate, key *ecdsa.PrivateKey, revoked bool) []byte {
+	template := &x509.RevocationList{
+		Number:     big.NewInt(1),
+		ThisUpdate: p.now.Add(-time.Minute),
+		NextUpdate: p.crlNextUpdate(),
+	}
+	if revoked {
+		template.RevokedCertificateEntries = []x509.RevocationListEntry{{
+			SerialNumber:   p.leaf.SerialNumber,
+			RevocationTime: p.now.Add(-time.Minute),
+		}}
+	}
+	der, err := x509.CreateRevocationList(rand.Reader, template, issuer, key)
+	assert.NoError(p.t, err)
+	return der
+}
+
+func (p *testPKI) writeOCSP(
+	w http.ResponseWriter,
+	issuer *x509.Certificate,
+	key *ecdsa.PrivateKey,
+	serial *big.Int,
+	status int,
+) {
+	resp, err := ocsp.CreateResponse(issuer, issuer, ocsp.Response{
+		Status:       status,
+		SerialNumber: serial,
+		ThisUpdate:   p.now.Add(-time.Minute),
+		NextUpdate:   p.now.Add(time.Hour),
+		RevokedAt:    p.now.Add(-time.Minute),
+	}, key)
+	if !assert.NoError(p.t, err) {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/ocsp-response")
+	_, _ = w.Write(resp)
+}
+
+// ocspRequest decodes a GET request, which carries the URL-escaped base64 request as the last path segment.
+func (p *testPKI) ocspRequest(r *http.Request) (*ocsp.Request, error) {
+	if r.Method != http.MethodGet {
+		return nil, fmt.Errorf("unexpected method %s", r.Method)
+	}
+	encoded, err := url.QueryUnescape(path.Base(r.URL.EscapedPath()))
+	if err != nil {
+		return nil, err
+	}
+	der, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, err
+	}
+	return ocsp.ParseRequest(der)
+}
+
+func serveIssuer(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+	_, _ = w.Write(p.ca.Raw)
+}
+
+func serveIssuerPEM(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+	_ = pem.Encode(w, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: p.ca.Raw,
+	})
+}
+
+func serveCRL(revoked bool) testPKIHandler {
+	return func(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(p.crl(p.ca, p.caKey, revoked))
+	}
+}
+
+func serveCRLPEM(revoked bool) testPKIHandler {
+	return func(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+		_ = pem.Encode(w, &pem.Block{
+			Type:  "X509 CRL",
+			Bytes: p.crl(p.ca, p.caKey, revoked),
+		})
+	}
+}
+
+// serveRogueCRL serves a CRL that lists the server certificate, signed by the rogue CA.
+func serveRogueCRL(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+	_, _ = w.Write(p.crl(p.rogue, p.rogueKey, true))
+}
+
+// serveOCSP answers with status after checking that the request names the server certificate.
+func serveOCSP(status int) testPKIHandler {
+	return func(p *testPKI, w http.ResponseWriter, r *http.Request) {
+		req, err := p.ocspRequest(r)
+		if !assert.NoError(p.t, err) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		assert.Equal(p.t, p.leaf.SerialNumber, req.SerialNumber)
+		p.writeOCSP(w, p.ca, p.caKey, req.SerialNumber, status)
+	}
+}
+
+func serveRogueOCSP(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+	p.writeOCSP(w, p.rogue, p.rogueKey, p.leaf.SerialNumber, ocsp.Good)
+}
+
+func notFound(_ *testPKI, w http.ResponseWriter, r *http.Request) {
+	http.NotFound(w, r)
+}
+
+func unexpected(p *testPKI, w http.ResponseWriter, r *http.Request) {
+	p.t.Errorf("unexpected request to %s", r.URL)
+	http.NotFound(w, r)
+}
+
+// stall holds the request until the client gives up or the test ends.
+func stall(p *testPKI, _ http.ResponseWriter, r *http.Request) {
+	select {
+	case <-r.Context().Done():
+	case <-p.t.Context().Done():
+	}
+}
+
+// cancelAndStall cancels the caller's context once its request arrives, then stalls.
+func cancelAndStall(cancel context.CancelFunc) testPKIHandler {
+	return func(p *testPKI, w http.ResponseWriter, r *http.Request) {
+		cancel()
+		stall(p, w, r)
+	}
+}

@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudflare/cfssl/revoke"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -262,12 +261,6 @@ func TestCollector_CheckEndsTLSWithCloseNotify(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the server never saw the session end")
 	}
-}
-
-func TestRevocationRequestsAreBounded(t *testing.T) {
-	// The revocation library sends its CRL, OCSP and issuer requests through this process-wide client.
-	require.NotNil(t, revoke.HTTPClient)
-	assert.Positive(t, revoke.HTTPClient.Timeout)
 }
 
 // newTestCertificate returns a self-signed server certificate.

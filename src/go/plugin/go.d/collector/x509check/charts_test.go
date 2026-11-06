@@ -4,6 +4,7 @@ package x509check
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"testing"
@@ -32,7 +33,9 @@ func TestCollector_ChartContract(t *testing.T) {
 			}, NotAfter: time.Now().Add(24 * time.Hour)},
 		},
 	}
-	c.revocationStatus = func(*x509.Certificate) (bool, bool, error) { return true, true, nil }
+	c.revocationStatus = func(context.Context, *x509.Certificate, time.Time) (bool, bool, error) {
+		return true, true, nil
+	}
 	require.NoError(t, collectCycle(t, c))
 	plan := preparePlan(t, newEngine(t, c), c)
 
@@ -114,7 +117,9 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 	}
 	c.provider = provider
 	verified := true
-	c.revocationStatus = func(*x509.Certificate) (bool, bool, error) { return false, verified, nil }
+	c.revocationStatus = func(context.Context, *x509.Certificate, time.Time) (bool, bool, error) {
+		return false, verified, nil
+	}
 	engine := newEngine(t, c)
 	require.NoError(t, collectCycle(t, c))
 	initial := preparePlan(t, engine, c)
