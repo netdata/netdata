@@ -4,7 +4,7 @@ package ddsnmpcollector
 
 import (
 	"errors"
-	"strconv"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -115,9 +115,16 @@ func TestHuaweiIndexIdentity_AllLoadedRowGroups(t *testing.T) {
 				row := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool {
 					return row.Table == table && row.Identity.Neighbor == peer.neighbor && row.Identity.RoutingInstance == wantInstance
 				})
-				assert.Equal(t, peer.description, row.Descriptors.Description)
-				assert.Equal(t, strconv.Itoa(peer.version), row.Descriptors.BGPVersion)
-				assert.Equal(t, strconv.Itoa(peer.remoteAS), row.Identity.RemoteAS)
+				assert.Empty(t, row.Descriptors.Description, "session-extension VPN identity is not a proven family-instance join")
+				if table == "hwBgpPeerStatisticTable" {
+					assert.NotEmpty(t, row.Identity.ProcessID)
+					assert.Empty(t, row.Descriptors.BGPVersion)
+					assert.Empty(t, row.Identity.RemoteAS)
+				} else {
+					assert.Empty(t, row.Identity.ProcessID)
+					assert.Equal(t, fmt.Sprint(peer.version), row.Descriptors.BGPVersion)
+					assert.Equal(t, fmt.Sprint(peer.remoteAS), row.Identity.RemoteAS)
+				}
 				switch table {
 				case "hwBgpPeerTable":
 					assert.True(t, row.State.Has)
@@ -133,135 +140,62 @@ func TestHuaweiIndexIdentity_AllLoadedRowGroups(t *testing.T) {
 	}
 }
 
-func TestHuaweiIndexIdentity_ScopedDuplicateRows(t *testing.T) {
-	for name, tc := range map[string]struct {
-		otherInstance               bool
-		conflictAS, conflictVersion bool
-		wantStats                   int
-		wantVersion                 string
-	}{
-		"same VRF AFIs agree":               {wantStats: 1, wantVersion: "4"},
-		"same VRF AFIs disagree on AS":      {conflictAS: true, wantStats: 0},
-		"same VRF AFIs disagree on version": {conflictVersion: true, wantStats: 1, wantVersion: ""},
-		"other VRF conflict ignored":        {otherInstance: true, conflictAS: true, conflictVersion: true, wantStats: 2, wantVersion: "4"},
+// Target tables cannot prove process ownership, even when numeric instance IDs
+// and peer addresses happen to match. Statistics must not depend on them.
+func TestHuaweiIndexIdentity_StatisticsIndependentOfOtherTables(t *testing.T) {
+	for name, tc := range map[string]struct{ pdus []gosnmp.SnmpPDU }{
+		"absent":                {},
+		"matching numeric IDs":  {pdus: huaweiIndexPDUs(huaweiIPv4TestPeer())},
+		"different numeric IDs": {pdus: huaweiIndexPDUs(huaweiIndexPeer{familyIndex: "99.1.1.1.4.192.0.2.1", sessionIndex: "99.1.4.192.0.2.1", neighbor: "192.0.2.1", remoteAS: 65099, version: 5, description: "unrelated"})},
 	} {
 		t.Run(name, func(t *testing.T) {
-			peer := huaweiIPv4TestPeer()
-			other := peer
-			other.familyIndex = "7.2.1.1.4.192.0.2.1"
-			if tc.otherInstance {
-				other.familyIndex = "9.2.1.1.4.192.0.2.1"
-				other.statisticsIndex = "2.9.4.192.0.2.1"
-				other.sessionIndex = "9.1.4.192.0.2.1"
-				other.instance = "9"
-				other.vrfName = "vrf-9"
-			}
-			if tc.conflictAS {
-				other.remoteAS = 65099
-			}
-			if tc.conflictVersion {
-				other.version = 5
-			}
-			pdus := huaweiIndexPDUs(peer, other)
-			if !tc.otherInstance {
-				// Only one statistics and session row exists for duplicate AFI sources.
-				pdus = nil
-				pdus = append(pdus, huaweiIndexPDUs(peer)...)
-				for _, pdu := range huaweiIndexPDUs(other) {
-					if !strings.HasPrefix(pdu.Name, huaweiTestRoot+"7.") && !strings.HasPrefix(pdu.Name, huaweiTestRoot+"8.") {
-						pdus = append(pdus, pdu)
-					}
+			profile := mustLoadTypedBGPProfile(t, "_huawei-bgp-vpn", func(row ddprofiledefinition.BGPConfig) bool { return row.ID == "huawei-bgp-peer-statistics" })
+			pdus := append([]gosnmp.SnmpPDU{}, tc.pdus...)
+			for process := 0; process < 3; process++ {
+				for column := 4; column <= 9; column++ {
+					pdus = append(pdus, createCounter32PDU(fmt.Sprintf("%s7.1.%d.%d.7.4.192.0.2.1", huaweiTestRoot, column, process), uint(process*100+column)))
 				}
 			}
-			collector := newHuaweiIndexCollector(t, &huaweiWalkInput{pdus: pdus})
+			_, handler := setupMockHandler(t)
+			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			handler.EXPECT().BulkWalkAll(huaweiTestRoot + "7").DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) { return snmprecPDUsWithPrefix(pdus, oid+"."), nil }).AnyTimes()
+			// No WALK for peer/family/session tables is allowed by this expectation.
+			collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 			rows := collectHuaweiIndexRows(t, collector)
-			var stats []ddsnmp.BGPRow
-			for _, row := range rows {
-				if row.Table == "hwBgpPeerStatisticTable" {
-					stats = append(stats, row)
+			require.Len(t, rows, 3)
+			for process := 0; process < 3; process++ {
+				row := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool { return row.Identity.ProcessID == fmt.Sprint(process) })
+				assert.Equal(t, "7", row.Identity.RoutingInstance)
+				assert.Equal(t, "192.0.2.1", row.Identity.Neighbor)
+				assert.Empty(t, row.Identity.RemoteAS)
+				assert.Empty(t, row.Descriptors.BGPVersion)
+				assert.Empty(t, row.Descriptors.Description)
+				for i, value := range []ddsnmp.BGPInt64{row.Transitions.Established, row.Transitions.Down, row.Traffic.Updates.Received, row.Traffic.Updates.Sent, row.Traffic.Messages.Received, row.Traffic.Messages.Sent} {
+					require.True(t, value.Has)
+					assert.EqualValues(t, process*100+i+4, value.Value)
 				}
-			}
-			require.Len(t, stats, tc.wantStats)
-			if tc.wantStats > 0 {
-				row := requireBGPRowMatching(t, stats, func(row ddsnmp.BGPRow) bool { return row.Identity.RoutingInstance == "7" })
-				assert.Equal(t, "65007", row.Identity.RemoteAS)
-				assert.Equal(t, tc.wantVersion, row.Descriptors.BGPVersion)
-				assert.Equal(t, peer.description, row.Descriptors.Description)
 			}
 		})
 	}
 }
 
-func TestHuaweiIndexIdentity_MissingScopedTargetAndRecovery(t *testing.T) {
-	for _, mode := range []string{"wrong VRF only", "absent target"} {
-		t.Run(mode, func(t *testing.T) {
-			peer := huaweiIPv4TestPeer()
-			input := &huaweiWalkInput{}
-			for _, pdu := range huaweiIndexPDUs(peer) {
-				if strings.HasPrefix(pdu.Name, huaweiTestRoot+"2.") {
-					if mode == "absent target" {
-						continue
-					}
-					pdu.Name = strings.Replace(pdu.Name, ".7.1.1.1.4.", ".9.1.1.1.4.", 1)
-				}
-				input.pdus = append(input.pdus, pdu)
-			}
-			collector := newHuaweiIndexCollector(t, input)
-			rows := collectHuaweiIndexRows(t, collector)
-			for _, row := range rows {
-				assert.NotEqual(t, "hwBgpPeerStatisticTable", row.Table, "missing scoped target must not supply required identity")
-			}
-			input.pdus = huaweiIndexPDUs(peer)
-			rows = collectHuaweiIndexRows(t, collector)
-			row := requireBGPRowMatching(t, rows, func(row ddsnmp.BGPRow) bool { return row.Table == "hwBgpPeerStatisticTable" })
-			assert.Equal(t, "65007", row.Identity.RemoteAS)
-		})
-	}
-}
-
-func TestHuaweiIndexIdentity_OptionalDescriptionAvailability(t *testing.T) {
-	for _, mode := range []string{"absent", "empty", "noSuch", "WALK error"} {
-		t.Run(mode, func(t *testing.T) {
-			peer := huaweiIPv4TestPeer()
-			input := &huaweiWalkInput{pdus: huaweiIndexPDUs(peer)}
-			collector := newHuaweiIndexCollector(t, input)
-			healthy := collectHuaweiIndexRows(t, collector)
-			require.Len(t, healthy, 4)
-			switch mode {
-			case "absent":
-				input.pdus = input.pdus[:len(input.pdus)-1]
-			case "empty":
-				input.pdus[len(input.pdus)-1] = createStringPDU(huaweiTestDescription+"."+peer.sessionIndex, "")
-			case "noSuch":
-				input.pdus[len(input.pdus)-1] = createPDU(huaweiTestDescription+"."+peer.sessionIndex, gosnmp.NoSuchInstance, nil)
-			case "WALK error":
-				input.failPrefix = huaweiTestRoot + "8"
-			}
-			rows := collectHuaweiIndexRows(t, collector)
-			require.Len(t, rows, 4)
-			for i := range healthy {
-				healthy[i].Descriptors.Description = ""
-			}
-			assert.ElementsMatch(t, healthy, rows, "optional description loss must preserve every identity and signal")
-			input.failPrefix = ""
-			input.pdus = huaweiIndexPDUs(peer)
-			rows = collectHuaweiIndexRows(t, collector)
-			require.Len(t, rows, 4)
-			for _, row := range rows {
-				assert.Equal(t, peer.description, row.Descriptors.Description)
-			}
-		})
-	}
-}
-
-func TestHuaweiIndexIdentity_SharedRequiredDependencyFailure(t *testing.T) {
+func TestHuaweiIndexIdentity_UnprovedSessionDescriptionIsNeverRead(t *testing.T) {
 	peer := huaweiIPv4TestPeer()
-	input := &huaweiWalkInput{pdus: huaweiIndexPDUs(peer), failPrefix: huaweiTestRoot + "2"}
-	collector := newHuaweiIndexCollector(t, input)
-	results, err := collector.Collect()
-	require.NoError(t, err, "the collector reports per-profile BGP failures without failing ordinary collection")
-	require.Len(t, results, 1)
-	require.Empty(t, results[0].BGPRows, "peer table is shared by required remote AS and optional version")
-	input.failPrefix = ""
-	require.Len(t, collectHuaweiIndexRows(t, collector), 4)
+	input := &huaweiWalkInput{pdus: huaweiIndexPDUs(peer), failPrefix: huaweiTestRoot + "8"}
+	rows := collectHuaweiIndexRows(t, newHuaweiIndexCollector(t, input))
+	require.Len(t, rows, 4)
+	for _, row := range rows {
+		assert.Empty(t, row.Descriptors.Description)
+	}
+}
+
+func TestHuaweiIndexIdentity_ConfiguredProcessCannotFallBackToAS(t *testing.T) {
+	profile := mustLoadTypedBGPProfile(t, "_huawei-bgp-vpn", func(row ddprofiledefinition.BGPConfig) bool { return row.ID == "huawei-bgp-peer-statistics" })
+	profile.Definition.BGP[0].Identity.ProcessID = ddprofiledefinition.BGPValueConfig{Index: 100}
+	profile.Definition.BGP[0].Identity.RemoteAS = ddprofiledefinition.BGPValueConfig{Value: "65001"}
+	_, handler := setupMockHandler(t)
+	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+	handler.EXPECT().BulkWalkAll(huaweiTestRoot+"7").Return([]gosnmp.SnmpPDU{createCounter32PDU(huaweiTestRoot+"7.1.4.0.7.4.192.0.2.1", 11)}, nil).AnyTimes()
+	collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+	assert.Empty(t, collectHuaweiIndexRows(t, collector))
 }

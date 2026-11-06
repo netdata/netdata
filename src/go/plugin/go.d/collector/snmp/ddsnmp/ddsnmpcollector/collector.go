@@ -531,6 +531,7 @@ func sanitizeLicenseRow(row *ddsnmp.LicenseRow) {
 
 func sanitizeBGPRow(row *ddsnmp.BGPRow) {
 	row.RowKey = metricMetaReplacer.Replace(row.RowKey)
+	row.Identity.ProcessID = metricMetaReplacer.Replace(row.Identity.ProcessID)
 	row.Identity.RoutingInstance = metricMetaReplacer.Replace(row.Identity.RoutingInstance)
 	row.Identity.Neighbor = metricMetaReplacer.Replace(row.Identity.Neighbor)
 	row.Identity.RemoteAS = metricMetaReplacer.Replace(row.Identity.RemoteAS)

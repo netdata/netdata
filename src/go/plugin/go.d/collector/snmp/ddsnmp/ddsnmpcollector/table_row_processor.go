@@ -311,12 +311,7 @@ type (
 	}
 	crossTableLookupValueIndex struct {
 		mapping     ddprofiledefinition.MappingConfig
-		targetScope []ddprofiledefinition.MetricIndexTransform
 		rowsByValue map[string][]string
-		rowsByScope map[scopedLookupValue][]string
-	}
-	scopedLookupValue struct {
-		scope, value string
 	}
 	// crossTableResolver handles resolving tags from other tables
 	crossTableResolver struct {
@@ -447,17 +442,6 @@ func (r *crossTableResolver) applyIndexTransform(
 
 		// Extract the range (inclusive)
 		extracted := parts[start : end+1]
-		if len(transform.Mapping) > 0 {
-			if start != end {
-				return ""
-			}
-			mapped, ok := transform.Mapping[extracted[0]]
-			if !ok {
-				return ""
-			}
-			result = append(result, mapped)
-			continue
-		}
 		result = append(result, extracted...)
 	}
 

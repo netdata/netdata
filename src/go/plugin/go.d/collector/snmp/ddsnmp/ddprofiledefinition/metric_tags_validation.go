@@ -65,17 +65,7 @@ func validateEnrichMetricTag(path string, metricTag *MetricTagConfig, scalar boo
 		metricTag.Symbol.OID = metricTag.OID
 		metricTag.OID = ""
 	}
-	errs = append(errs,
-		validateEnrichIndexFrom(metricTag),
-		validateIndexDecode(metricTag),
-		validateLookupScope(metricTag.LookupScope, metricTag.Table, metricTag.LookupSymbol),
-	)
-	if metricTag.LookupScope != nil && metricTag.Index != 0 {
-		errs = append(errs, errors.New("lookup_scope cannot be combined with index"))
-	}
-	if metricTag.LookupScope != nil && len(metricTag.IndexFrom) > 0 {
-		errs = append(errs, errors.New("lookup_scope cannot be combined with index_from"))
-	}
+	errs = append(errs, validateEnrichIndexFrom(metricTag), validateIndexDecode(metricTag))
 	if metricTag.IsIndexTag() {
 		symbol := SymbolConfig(metricTag.Symbol)
 		if symbol.Name == "" && metricTag.Tag == "" && metricTag.Index == 0 {
@@ -117,7 +107,20 @@ func validateEnrichMetricTag(path string, metricTag *MetricTagConfig, scalar boo
 			fmt.Errorf("`tag` or `symbol.name` must be provided if `mapping` (`%v`) is defined", metricTag.Mapping),
 		)
 	}
-	errs = append(errs, validateIndexTransforms(metricTag.IndexTransform))
+	for _, transform := range metricTag.IndexTransform {
+		if transform.DropRight != 0 && transform.End != 0 {
+			errs = append(
+				errs,
+				fmt.Errorf("transform rule cannot define both end and drop_right. Invalid rule: %#v", transform),
+			)
+		}
+		if transform.DropRight == 0 && transform.Start > transform.End && transform.End != 0 {
+			errs = append(
+				errs,
+				fmt.Errorf("transform rule end should be greater than start. Invalid rule: %#v", transform),
+			)
+		}
+	}
 
 	if scalar {
 		errs = append(errs, validateScalarMetricTag(metricTag))
@@ -154,12 +157,9 @@ func validateScalarMetricTag(tag *MetricTagConfig) error {
 	return errors.Join(errs...)
 }
 
-func validateEnrichMetricTags(path string, tags []MetricTagConfig, scalar bool, table string) error {
+func validateEnrichMetricTags(path string, tags []MetricTagConfig, scalar bool) error {
 	var errs []error
 	for i := range tags {
-		if tags[i].LookupScope != nil && tags[i].Table == table && table != "" {
-			errs = append(errs, fmt.Errorf("%s.metric_tags[%d]: lookup_scope requires a different target table", path, i))
-		}
 		errs = append(errs, validateEnrichMetricTag(fmt.Sprintf("%s.metric_tags[%d]", path, i), &tags[i], scalar))
 	}
 	return errors.Join(errs...)

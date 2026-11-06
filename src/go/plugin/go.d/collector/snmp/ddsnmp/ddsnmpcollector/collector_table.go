@@ -3,7 +3,6 @@
 package ddsnmpcollector
 
 import (
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -349,7 +348,8 @@ func (tc *tableCollector) processRows(
 	stats *ddsnmp.CollectionStats,
 ) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric
-	var errs []error
+	var firstErr error
+	var errorCount int
 
 	crossTableCtx := newCrossTableContext(ctx.walkedData, ctx.tableNameToOID)
 
@@ -381,7 +381,10 @@ func (tc *tableCollector) processRows(
 			delete(ctx.oidCache, index)
 			delete(ctx.tagCache, index)
 			stats.Errors.Processing.Table++
-			errs = append(errs, err)
+			errorCount++
+			if firstErr == nil {
+				firstErr = err
+			}
 			continue
 		}
 
@@ -393,8 +396,10 @@ func (tc *tableCollector) processRows(
 		ctx.acquisition.addValueReferences(currentRowOrdinal, index, rowMetrics)
 	}
 
-	if len(errs) > 0 {
-		tc.log.Warningf("failed to collect table metrics: %v", errors.Join(errs...))
+	if errorCount > 0 {
+		key := tableRowsProcessingErrorLogKey + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(ctx.config)
+		tc.log.Limit(key, 1, tableRowsErrorLogEvery).
+			Warningf("failed to collect %d rows from table %q (%s); first error: %v", errorCount, ctx.config.Table.Name, ctx.config.Table.OID, firstErr)
 	}
 
 	return metrics, nil

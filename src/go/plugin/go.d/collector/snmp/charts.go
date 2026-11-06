@@ -249,7 +249,7 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric, key string, labe
 	}
 
 	chart := &collectorapi.Chart{
-		ID:       chartIDFromKey(key),
+		ID:       key,
 		Title:    m.Description,
 		Units:    m.Unit,
 		Fam:      m.Family,

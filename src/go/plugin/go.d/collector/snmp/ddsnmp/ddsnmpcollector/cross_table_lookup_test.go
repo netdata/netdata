@@ -32,7 +32,6 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_NormalizesIPv6CurrentRowIn
 	rowIndex, err := resolver.resolveLookupIndexByValue(
 		tagCfg,
 		"0.0.16.32.1.18.248.0.0.0.0.0.0.0.0.2.35.2.83",
-		"0.0.16.32.1.18.248.0.0.0.0.0.0.0.0.2.35.2.83",
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2",
 		refTablePDUs,
 		newCrossTableContext(nil, nil),
@@ -71,7 +70,6 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_AllowsDuplicateRowsWhenTar
 
 	rowIndex, err := resolver.resolveLookupIndexByValue(
 		tagCfg,
-		"0.0.4.10.45.2.2",
 		"0.0.4.10.45.2.2",
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2",
 		refTablePDUs,
@@ -115,7 +113,6 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_RejectsDuplicateRowsWhenTa
 	_, err := resolver.resolveLookupIndexByValue(
 		tagCfg,
 		"0.0.4.10.45.2.2",
-		"0.0.4.10.45.2.2",
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2",
 		refTablePDUs,
 		newCrossTableContext(nil, nil),
@@ -157,7 +154,6 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_DoesNotCacheLookupErrorsAs
 	for range 2 {
 		_, err := resolver.resolveLookupIndexByValue(
 			tagCfg,
-			"0.0.4.10.45.2.2",
 			"0.0.4.10.45.2.2",
 			"1.3.6.1.4.1.2011.5.25.177.1.1.2",
 			refTablePDUs,
@@ -242,7 +238,6 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_SeparatesNormalizationSema
 
 			rowIndex, err := resolver.resolveLookupIndexByValue(
 				tagCfg,
-				tc.lookupValue,
 				tc.lookupValue,
 				refTableOID,
 				tc.refPDUs,

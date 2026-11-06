@@ -195,6 +195,7 @@ func topologyBGPAdjacencyLink(row topologymodel.BGPPeer, srcRef, dstRef topology
 
 func topologyBGPPeerActorRow(row topologymodel.BGPPeer) topologymodel.BGPPeerDetailRow {
 	return topologymodel.BGPPeerDetailRow{
+		ProcessID:             row.ProcessID,
 		RoutingInstance:       row.RoutingInstance,
 		NeighborIP:            strings.TrimSpace(row.NeighborIP),
 		RemoteAS:              strings.TrimSpace(row.RemoteAS),

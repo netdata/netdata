@@ -5,6 +5,7 @@ package snmp
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,13 +18,15 @@ func TestMetricIDs(t *testing.T) {
 			call: func() string { return metricIDFromName("metric.with space", "sub.key with space") },
 			want: "snmp_device_prof_metric.with space_sub.key with space",
 		},
-		"generic profile metric key keeps legacy raw ID": {
-			call: func() string { return metricIDFromKey("metric_192.0.2.10 with space", "rx.bytes") },
-			want: "snmp_device_prof_metric_192.0.2.10 with space_rx.bytes",
+		"table dimension identity preserves its complete subkey": {
+			call: func() string { return metricIDFromKey("snmp_device_prof_value_digest", "rx.bytes") },
+			want: "snmp_device_prof_value_digest_dim_19d114af95b3f52858fb79c334c6c76e43e14da258a332343e8293fcd7bfa60e",
 		},
-		"generic profile chart key stays cleaned": {
-			call: func() string { return chartIDFromKey("metric_192.0.2.10 with space") },
-			want: "snmp_device_prof_metric_192_0_2_10_with_space",
+		"canonical table tuple has a stable encoding": {
+			call: func() string {
+				return tableMetricKey(ddsnmp.Metric{Name: "value", Tags: map[string]string{"port": "1"}})
+			},
+			want: "snmp_device_prof_value_8543248f1ffbe6b474635119197afbd983caa4e085aa446bd59fe7720c3a0aae",
 		},
 		"BGP chart metric name uses cleaned ID": {
 			call: func() string { return metricIDFromName("bgp.peers.message_traffic", "received.total") },

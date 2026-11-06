@@ -13,6 +13,7 @@ import (
 
 func normalizeBGP(rows []BGPConfig) {
 	for i := range rows {
+		normalizeBGPValue(&rows[i].Identity.ProcessID)
 		normalizeBGPValue(&rows[i].Identity.RoutingInstance)
 		normalizeBGPValue(&rows[i].Identity.Neighbor)
 		normalizeBGPValue(&rows[i].Identity.RemoteAS)
@@ -54,6 +55,7 @@ func validateEnrichBGP(rows []BGPConfig) error {
 		isTable := row.Table.OID != ""
 
 		errs = append(errs, validateEnrichBGPRowShape(i, row))
+		errs = append(errs, validateEnrichBGPValue(fmt.Sprintf("bgp[%d].identity.process_id", i), &row.Identity.ProcessID, isTable))
 		errs = append(
 			errs,
 			validateEnrichBGPValue(
@@ -139,7 +141,7 @@ func validateEnrichBGP(rows []BGPConfig) error {
 		errs = append(errs, validateBGPSourceReferences(i, row))
 		errs = append(errs, validateBGPSignalDuplicates(i, row, seenSignals))
 
-		errs = append(errs, validateEnrichMetricTags(fmt.Sprintf("bgp[%d]", i), row.MetricTags, !isTable, row.Table.Name))
+		errs = append(errs, validateEnrichMetricTags(fmt.Sprintf("bgp[%d]", i), row.MetricTags, !isTable))
 	}
 
 	errs = append(errs, validateBGPTableReferences(rows))
@@ -170,7 +172,7 @@ func validateEnrichBGPRowShape(rowIdx int, row *BGPConfig) error {
 		if !row.Identity.Neighbor.IsSet() {
 			errs = append(errs, fmt.Errorf("bgp[%d].identity.neighbor: peer rows require neighbor identity", rowIdx))
 		}
-		if !row.Identity.RemoteAS.IsSet() {
+		if !row.Identity.RemoteAS.IsSet() && !(row.Identity.ProcessID.IsSet() && row.Identity.RoutingInstance.IsSet()) {
 			errs = append(errs, fmt.Errorf("bgp[%d].identity.remote_as: peer rows require remote_as identity", rowIdx))
 		}
 	case BGPRowKindPeerFamily:
@@ -180,7 +182,7 @@ func validateEnrichBGPRowShape(rowIdx int, row *BGPConfig) error {
 				fmt.Errorf("bgp[%d].identity.neighbor: peer_family rows require neighbor identity", rowIdx),
 			)
 		}
-		if !row.Identity.RemoteAS.IsSet() {
+		if !row.Identity.RemoteAS.IsSet() && !(row.Identity.ProcessID.IsSet() && row.Identity.RoutingInstance.IsSet()) {
 			errs = append(
 				errs,
 				fmt.Errorf("bgp[%d].identity.remote_as: peer_family rows require remote_as identity", rowIdx),
@@ -301,11 +303,6 @@ func validateEnrichBGPValue(path string, value *BGPValueConfig, isTable bool) er
 	}
 	errs = append(errs, validateMapping(value.Mapping, metadataSymbol))
 	errs = append(errs, validateBGPRowIndexSelector(path, value))
-	errs = append(errs, withValidationPath(path, validateIndexTransforms(value.IndexTransform)))
-	errs = append(errs, withValidationPath(path, validateLookupScope(value.LookupScope, value.Table, value.LookupSymbol)))
-	if value.LookupScope != nil && (value.Value != "" || value.Index != 0 || value.IndexFromEnd != 0) {
-		errs = append(errs, fmt.Errorf("%s: lookup_scope cannot be combined with value, index, or index_from_end", path))
-	}
 
 	if strings.HasPrefix(value.Name, "_") {
 		errs = append(errs, fmt.Errorf("%s.name: name %q cannot be underscore-prefixed", path, value.Name))
@@ -491,9 +488,6 @@ func validateBGPSourceReferences(rowIdx int, row *BGPConfig) error {
 	var errs []error
 	tableOID := TrimBGPOID(row.Table.OID)
 	for _, ref := range collectBGPValueReferences(*row) {
-		if ref.value.LookupScope != nil && ref.value.Table == row.Table.Name {
-			errs = append(errs, fmt.Errorf("bgp[%d].%s: lookup_scope requires a different target table", rowIdx, ref.path))
-		}
 		if ref.value.Table != "" {
 			continue
 		}
@@ -586,6 +580,7 @@ func collectBGPValueReferences(row BGPConfig) []bgpValueValidationRef {
 			})
 		}
 	}
+	add("identity.process_id", row.Identity.ProcessID)
 	add("identity.routing_instance", row.Identity.RoutingInstance)
 	add("identity.neighbor", row.Identity.Neighbor)
 	add("identity.remote_as", row.Identity.RemoteAS)

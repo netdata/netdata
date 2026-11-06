@@ -20,7 +20,6 @@ func (r *crossTableResolver) requiresLookupByValue(tagCfg ddprofiledefinition.Me
 func (r *crossTableResolver) resolveLookupIndexByValue(
 	tagCfg ddprofiledefinition.MetricTagConfig,
 	lookupValue string,
-	rowIndex string,
 	refTableOID string,
 	refTablePDUs map[string]gosnmp.SnmpPDU,
 	ctx *crossTableContext,
@@ -38,26 +37,17 @@ func (r *crossTableResolver) resolveLookupIndexByValue(
 	}
 
 	valueIndex := r.lookupValueIndex(tagCfg, refTableOID, refTablePDUs, ctx)
-	var matched []string
-	if tagCfg.LookupScope != nil {
-		scope, err := r.lookupScopeIndex(rowIndex, tagCfg.LookupScope.SourceIndexTransform)
-		if err != nil {
-			return "", err
-		}
-		matched = valueIndex.rowsByScope[scopedLookupValue{scope, normalizedLookupValue}]
-	} else {
-		matched = valueIndex.rowsByValue[normalizedLookupValue]
-	}
-	return r.findRowIndexByLookupValue(tagCfg, normalizedLookupValue, matched, refTablePDUs)
+	return r.findRowIndexByLookupValue(tagCfg, normalizedLookupValue, valueIndex.rowsByValue, refTablePDUs)
 }
 
 func (r *crossTableResolver) findRowIndexByLookupValue(
 	tagCfg ddprofiledefinition.MetricTagConfig,
 	lookupValue string,
-	matchedIndexes []string,
+	rowsByValue map[string][]string,
 	refTablePDUs map[string]gosnmp.SnmpPDU,
 ) (string, error) {
 	lookupSym := tagCfg.LookupSymbol
+	matchedIndexes := rowsByValue[lookupValue]
 
 	switch len(matchedIndexes) {
 	case 0:
@@ -103,23 +93,13 @@ func (r *crossTableResolver) lookupValueIndex(
 		matchValue:      lookupSym.MatchValue,
 	}
 
-	var targetScope []ddprofiledefinition.MetricIndexTransform
-	if tagCfg.LookupScope != nil {
-		targetScope = tagCfg.LookupScope.TargetIndexTransform
-	}
 	for _, index := range ctx.lookupValueIndexes[key] {
-		if lookupMappingsEqual(index.mapping, lookupSym.Mapping) && indexTransformsEqual(index.targetScope, targetScope) {
+		if lookupMappingsEqual(index.mapping, lookupSym.Mapping) {
 			return index
 		}
 	}
 
-	index := &crossTableLookupValueIndex{mapping: lookupSym.Mapping.Clone()}
-	if len(targetScope) == 0 {
-		index.rowsByValue = make(map[string][]string)
-	} else {
-		index.rowsByScope = make(map[scopedLookupValue][]string)
-		index.targetScope = tagCfg.LookupScope.Clone().TargetIndexTransform
-	}
+	rowsByValue := make(map[string][]string)
 	prefix := key.lookupColumnOID + "."
 	for fullOID, pdu := range refTablePDUs {
 		if !strings.HasPrefix(fullOID, prefix) {
@@ -130,53 +110,18 @@ func (r *crossTableResolver) lookupValueIndex(
 		if !ok {
 			continue
 		}
-		rowIndex := strings.TrimPrefix(fullOID, prefix)
-		if len(targetScope) == 0 {
-			index.rowsByValue[value] = append(index.rowsByValue[value], rowIndex)
-			continue
-		}
-		scope, err := r.lookupScopeIndex(rowIndex, targetScope)
-		if err != nil {
-			continue
-		}
-		lookup := scopedLookupValue{scope, value}
-		index.rowsByScope[lookup] = append(index.rowsByScope[lookup], rowIndex)
+		rowsByValue[value] = append(rowsByValue[value], strings.TrimPrefix(fullOID, prefix))
 	}
 
 	if ctx.lookupValueIndexes == nil {
 		ctx.lookupValueIndexes = make(map[crossTableLookupValueIndexKey][]*crossTableLookupValueIndex)
 	}
+	index := &crossTableLookupValueIndex{
+		mapping:     lookupSym.Mapping.Clone(),
+		rowsByValue: rowsByValue,
+	}
 	ctx.lookupValueIndexes[key] = append(ctx.lookupValueIndexes[key], index)
 	return index
-}
-
-func indexTransformsEqual(a, b []ddprofiledefinition.MetricIndexTransform) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i].Start != b[i].Start || a[i].End != b[i].End || a[i].DropRight != b[i].DropRight || !maps.Equal(a[i].Mapping, b[i].Mapping) {
-			return false
-		}
-	}
-	return true
-}
-
-// A scope is an OID index, not display text. Reject malformed keys rather than joining them.
-func (r *crossTableResolver) lookupScopeIndex(index string, transforms []ddprofiledefinition.MetricIndexTransform) (string, error) {
-	if len(transforms) == 0 {
-		return "", fmt.Errorf("lookup scope requires an index transform")
-	}
-	scope, err := r.transformIndex(index, transforms)
-	if err != nil {
-		return "", err
-	}
-	for _, arc := range strings.Split(scope, ".") {
-		if _, err := parseIndexArc(arc, 32); err != nil {
-			return "", fmt.Errorf("lookup scope contains an invalid index arc")
-		}
-	}
-	return scope, nil
 }
 
 func lookupMappingsEqual(a, b ddprofiledefinition.MappingConfig) bool {

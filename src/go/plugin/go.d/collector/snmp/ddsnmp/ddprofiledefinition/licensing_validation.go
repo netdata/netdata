@@ -101,7 +101,7 @@ func validateEnrichLicensing(licensing []LicensingConfig) error {
 		errs = append(errs, validateEnrichLicenseSignals(i, &row.Signals, isTable))
 		errs = append(errs, validateLicenseSourceReferences(i, row))
 		errs = append(errs, validateLicenseSignalDuplicates(i, row, seenSignals))
-		errs = append(errs, validateEnrichMetricTags(fmt.Sprintf("licensing[%d]", i), row.MetricTags, !isTable, row.Table.Name))
+		errs = append(errs, validateEnrichMetricTags(fmt.Sprintf("licensing[%d]", i), row.MetricTags, !isTable))
 	}
 
 	return errors.Join(errs...)
@@ -296,9 +296,6 @@ func validateEnrichLicenseValue(path string, value *LicenseValueConfig, isTable 
 		return nil
 	}
 
-	if value.LookupScope != nil {
-		errs = append(errs, fmt.Errorf("%s.lookup_scope: licensing values do not support lookup_scope", path))
-	}
 	if value.Kind != "" && !IsValidLicenseSignalKind(value.Kind) {
 		errs = append(errs, fmt.Errorf("%s.kind: invalid kind %q", path, value.Kind))
 	}
@@ -311,7 +308,6 @@ func validateEnrichLicenseValue(path string, value *LicenseValueConfig, isTable 
 		}
 	}
 	errs = append(errs, validateMapping(value.Mapping, metadataSymbol))
-	errs = append(errs, withValidationPath(path, validateIndexTransforms(value.IndexTransform)))
 
 	if strings.HasPrefix(value.Name, "_") {
 		errs = append(errs, fmt.Errorf("%s.name: name %q cannot be underscore-prefixed", path, value.Name))

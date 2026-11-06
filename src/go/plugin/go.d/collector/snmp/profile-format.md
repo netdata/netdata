@@ -172,7 +172,7 @@ virtual_metrics: <calculated metrics>
 
 Profile metric tags must be objects, such as `{tag: interface, index: 1}`.
 Top-level `metric_tags` read scalar OIDs: they require `symbol.OID` and cannot
-use `table`, `index`, `index_transform`, `index_decode`, `index_from`, or `lookup_scope`. Legacy tag-level OIDs are normalized
+use `table`, `index`, `index_transform`, `index_decode`, or `index_from`. Legacy tag-level OIDs are normalized
 before these checks.
 Datadog string references such as `metric_tags: [ifName]` are unsupported and
 fail YAML decoding. The Datadog metric `options` object (`placement`,
@@ -562,6 +562,15 @@ metrics:
 
 ### 5. metric_tags
 
+Table chart and dimension IDs use the full metric name plus every non-underscore
+tag name and value, including explicitly empty values. The collector sorts tag names
+and encodes the tuple with length-prefixed components, then combines its full SHA256
+hash with a bounded readable metric-name prefix. This preserves distinct identities
+when labels contain separators or characters that chart IDs normalize. Display tags
+that start with an underscore are excluded from identity; all labels remain available,
+and metric contexts are unchanged. All table IDs migrate to this representation;
+equal identity tuples still aggregate into one chart instance.
+
 The `metric_tags` section defines **global dynamic tags** — values collected once from the device and applied to **every metric** in the profile.
 
 They are evaluated during collection, just like other SNMP symbols, and remain the same for all metrics within that device.
@@ -602,7 +611,7 @@ See [**Tag Transformation**](#tag-transformation) for supported transformations 
 
 #### Underscore-prefixed tags
 
-Tag names that start with an underscore (e.g., `_if_type`) are **emitted as labels** but are **ignored for chart-ID composition** by the SNMP collector that consumes these metrics. Use underscore tags to keep chart IDs short when another tag already guarantees uniqueness (for example, `interface`). (You still get the underscore-tag value as a chart label.)
+Tag names that start with an underscore (e.g., `_if_type`) are **emitted as labels** but are **ignored for chart-ID composition** by the SNMP collector that consumes these metrics. Use underscore tags to keep display-only values out of chart identity when another tag already guarantees uniqueness (for example, `interface`). (You still get the underscore-tag value as a chart label.)
 
 Table chart labels follow the tags returned by collection, including changes and removals, without changing the chart
 or its dimensions when the identifying tags stay the same. Cached table tags retain their configured refresh interval.
@@ -1280,30 +1289,6 @@ metric_tags:
 
 If the current row index is `1.192.0.2.1.1.128`, the transform keeps `1.192.0.2.1` and drops the trailing AFI / SAFI pair.
 
-#### Structural Index Mapping
-
-An `index_transform` rule can map a single numeric arc while building a target row key.
-Set equal `start` and `end` positions, omit `drop_right`, and use canonical unsigned 32-bit
-decimal strings as both keys and values. A missing mapping entry fails the lookup; it does
-not retain the original arc. This differs from a tag-level `mapping`, which changes the
-final displayed value.
-
-For example, Huawei statistics rows encode `[AFI, VRF, address-length, address-octets]`,
-while session-extension rows use `[VRF, address-type, address-length, address-octets]`.
-This transform maps lengths 4 and 16 to address types 1 and 2, then retains the length and address:
-
-```yaml
-index_transform:
-  - {start: 1, end: 1}
-  - start: 2
-    end: 2
-    mapping: {"4": "1", "16": "2"}
-  - {start: 2}
-```
-
-The result for `1.7.4.192.0.2.1` is `7.1.4.192.0.2.1`. Other address lengths fail
-rather than constructing an unsupported target key.
-
 #### With Value Lookup (`lookup_symbol`)
 
 Some vendor MIBs split related data across tables that do **not** share the same row index.
@@ -1366,45 +1351,6 @@ metrics:
 - if no row matches, the tag lookup fails for that row
 - if one row matches, the collector reads the requested tag from that row
 - if multiple rows match, the lookup succeeds only when all matched rows resolve to the same final tag value; conflicting values fail the lookup
-
-#### Scoped Value Lookup (`lookup_scope`)
-
-Use `lookup_scope` with `table` and `lookup_symbol` when the same lookup value can occur
-in different VRFs or instances. Both `source_index_transform` and `target_index_transform`
-are required nonempty lists and use the same transform rules as `index_transform`.
-The collector matches the pair `(scope, normalized lookup value)`, so a target from a
-different scope cannot supply a value. Duplicate matches within one scope succeed only
-when their final values agree.
-
-For Huawei statistics rows, arc 1 is the VRF index; the older peer table puts its instance
-at arc 0. A typed BGP remote-AS field can retain the existing readable peer source while
-separating repeated addresses across VRFs:
-
-```yaml
-remote_as:
-  table: hwBgpPeerTable
-  symbol:
-    OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2
-    name: huawei.hwBgpPeerRemoteAs
-    format: uint32
-  lookup_symbol:
-    OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
-    name: huawei.hwBgpPeerRemoteAddr
-    format: ip_address
-  index_transform: [{start: 3}]
-  lookup_scope:
-    source_index_transform: [{start: 1, end: 1}]
-    target_index_transform: [{start: 0, end: 0}]
-```
-
-This syntax is supported by table metric tags, including typed-row `metric_tags`, and
-by typed BGP value fields. The target `table` must differ from the current row's table.
-A scoped tag cannot also use `index`, `index_from`, or `index_decode`; a scoped BGP value
-cannot use literal `value`, `index`, or `index_from_end`. Use `index_transform` when the
-lookup value needs index slicing. Validation rejects combinations that would bypass the
-scoped lookup. Licensing value fields do not support `lookup_scope`.
-Malformed scope keys fail the lookup. Cached reverse indexes include the target scope
-configuration, so a scope change cannot reuse an index built for another scope.
 
 #### Chained Value Keys (`index_from`)
 
@@ -1617,7 +1563,7 @@ Rejected identity rows do not enter the tag cache and are removed on cached refr
 healthy neighboring rows continue to collect.
 
 `index_decode` is mutually exclusive with `index`, `index_transform`, `index_from`,
-`table`, column OIDs, `lookup_symbol`, and `lookup_scope`. It is supported by ordinary
+`table`, column OIDs, and `lookup_symbol`. It is supported by ordinary
 table metric tags and typed-row `metric_tags`, including BGP, licensing and topology rows.
 Scalar and global tags cannot use it. Typed BGP and licensing **value fields** retain
 their existing index selectors; this extension applies to their row tags.
@@ -1728,6 +1674,11 @@ index-derived without a `symbol.OID`, or when it satisfies the proof-gated,
 selector-scoped device exception above.
 
 #### Stock Polling Source Guard
+
+The source guard checks every effective consumer after profile inheritance. A
+capture-proven device exception must retain its exact selector on every concrete
+consumer, including consumers that inherit the source; a generic profile must
+never broaden that exception to other devices.
 
 `TestStockProfiles_PollingAccessibility` runs with the normal profile tests and needs no
 installed MIB corpus. It checks actual acquisition sources, including legacy OID/from
@@ -2598,9 +2549,11 @@ are legacy migration mechanisms, not the preferred BGP transport.
 BGP row `kind` values are closed:
 
 - `device` — device-level BGP summaries with no peer identity.
-- `peer` — peer-level rows identified by `neighbor` and `remote_as`.
+- `peer` — peer-level rows identified by `neighbor` and `remote_as`, or by
+  `process_id`, `routing_instance`, and `neighbor` when the source has no provable AS.
 - `peer_family` — address-family rows identified by `neighbor`, `remote_as`,
-  `address_family`, and `subsequent_address_family`.
+  `address_family`, and `subsequent_address_family`. The same explicit process
+  and routing-instance identity may replace an unavailable `remote_as`.
 
 Peer-state mappings must use the six RFC 4271 state names: `idle`, `connect`,
 `active`, `opensent`, `openconfirm`, and `established`. A complete source must
@@ -2613,6 +2566,14 @@ chart/function label defaults to `default`. Profiles may still set
 `identity.routing_instance` explicitly when a vendor MIB exposes VRF or routing
 instance identity.
 
+`identity.process_id` preserves a BGP process independently of the routing instance.
+It uses the ordinary BGP value selectors. Its chart label is omitted and its
+Functions column is blank when unspecified. Explicit process `0` is retained. A configured process identity
+must resolve successfully; it must never fall back to an identity that merges processes.
+Without `remote_as`, both process and routing instance must be explicitly present.
+Do not join a process-scoped row to process-less metadata unless the MIB specifies
+that association. An equal numeric index or address alone does not prove ownership.
+
 Device rows support `device_counts.peers`, `device_counts.ibgp_peers`,
 `device_counts.ebgp_peers`, and per-state counters under
 `device_counts.states`. Peer and peer-family rows support typed groups such as
@@ -2623,8 +2584,7 @@ and `route_limits`.
 For table-backed rows, readable columns use `symbol:`. `not-accessible` index
 objects must be derived from the row index with `index`, `index_from_end`, or
 `index_transform`. Values from related tables use the first-class `table:`
-field on the BGP value, optionally with `lookup_symbol:` and
-[`lookup_scope`](#scoped-value-lookup-lookup_scope) when the current row
+field on the BGP value, optionally with `lookup_symbol:` when the current row
 must join to another table by value.
 
 Example device-level counts:
@@ -2684,13 +2644,16 @@ bgp:
           symbol: { OID: 1.3.6.1.4.1.99999.10.1.8, name: vendorBgpPeerOutUpdates }
 ```
 
-BGP descriptor-only dependency tables are optional. A missing row, empty/noSuch result,
-or failed WALK of a table used only for descriptors omits those descriptions while healthy
-BGP rows continue. A table also used by identity, signals or required tags remains a
-required dependency; its acquisition failure is not suppressed. For Huawei, the readable
-`hwBgpPeerSessionExtDescription` supplies optional descriptions; the notification-only
-`hwBgpPeerDescription` and `hwBgpPeerGRStatus` are not polling substitutes. Local-router GR
-role is not peer GR state.
+BGP descriptor values are optional: a missing row or empty/noSuch result omits
+that descriptor. A failed dependency-table WALK remains a collection failure,
+including when the table supplies only descriptors.
+
+Huawei statistics preserve the MIB's process/VPN/address tuple. AS, BGP version
+and description remain absent because the other tables do not identify the process.
+Family rows retain AS/version from their shared INDEX tables, but omit the
+session-extension description: equality between its VPN ID and the family table's
+peer-instance ID is not specified. Notification-only `hwBgpPeerDescription` and
+`hwBgpPeerGRStatus` are not polling substitutes. Local-router GR role is not peer GR state.
 
 ## Licensing rows
 

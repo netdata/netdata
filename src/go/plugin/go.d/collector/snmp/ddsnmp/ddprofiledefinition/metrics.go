@@ -154,7 +154,6 @@ type MetricTagConfig struct {
 
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 	IndexDecode    *MetricIndexDecode     `yaml:"index_decode,omitempty" json:"index_decode,omitempty"`
-	LookupScope    *MetricLookupScope     `yaml:"lookup_scope,omitempty" json:"lookup_scope,omitempty"`
 
 	MappingRef string        `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
 	Mapping    MappingConfig `yaml:"mapping,omitempty"     json:"mapping"`
@@ -173,9 +172,8 @@ func (m MetricTagConfig) Clone() MetricTagConfig {
 	m2.Symbol = m.Symbol.Clone()
 	m2.LookupSymbol = m.LookupSymbol.Clone()
 	m2.IndexFrom = cloneSlice(m.IndexFrom)
-	m2.IndexTransform = cloneSlice(m.IndexTransform)
+	m2.IndexTransform = slices.Clone(m.IndexTransform)
 	m2.IndexDecode = m.IndexDecode.Clone()
-	m2.LookupScope = m.LookupScope.Clone()
 	m2.Mapping = m.Mapping.Clone()
 	m2.Tags = maps.Clone(m.Tags)
 	return m2
@@ -238,10 +236,9 @@ type StaticMetricTagConfig struct {
 
 // MetricIndexTransform holds configs for metric index transform
 type MetricIndexTransform struct {
-	Start     uint              `yaml:"start"                json:"start"`
-	End       uint              `yaml:"end"                  json:"end"`
-	DropRight uint              `yaml:"drop_right,omitempty" json:"drop_right,omitempty"`
-	Mapping   map[string]string `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	Start     uint `yaml:"start"                json:"start"`
+	End       uint `yaml:"end"                  json:"end"`
+	DropRight uint `yaml:"drop_right,omitempty" json:"drop_right,omitempty"`
 }
 
 // IsIndexTag reports whether a normalized tag reads the row index instead of a column.

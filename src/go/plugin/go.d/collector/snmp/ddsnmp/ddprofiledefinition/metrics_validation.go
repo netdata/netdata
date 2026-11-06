@@ -79,7 +79,7 @@ func validateEnrichMetrics(metrics []MetricsConfig) error {
 				),
 			)
 		}
-		errs = append(errs, validateEnrichMetricTags(path, metric.MetricTags, !metric.IsColumn(), metric.Table.Name))
+		errs = append(errs, validateEnrichMetricTags(path, metric.MetricTags, !metric.IsColumn()))
 	}
 	return errors.Join(errs...)
 }

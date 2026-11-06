@@ -46,7 +46,7 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
 4. If a non-pollable object appears in the table `INDEX`, derive it from the row OID index using `index`,
    `index_transform`, or `index_decode`. A table root itself need not be readable; check the actual acquired column.
 5. Keep index extraction and value formatting separate:
-   - use `index` for one raw index arc and `index_transform` for arc slices or structural key mapping;
+   - use `index` for one raw index arc and `index_transform` for arc slices;
    - use `index_decode` for a full logical INDEX layout with variable or fixed-width octet strings;
    - use `symbol.format` for final formatting; text from decimal index octets requires `octet_string`, while
      `string` preserves its existing dotted-decimal behavior. See the Index Rules owner below.
@@ -101,7 +101,8 @@ A vendor profile MAY poll an object that the source MIB marks `not-accessible` o
 - **Proof:** A checked repository fixture or repeatable live capture proves that the matched device returns the object as
   a readable column and omits the standards-readable anchor needed to obtain the row otherwise.
 - **Isolation:** The device row overrides the generic row identity instead of adding a second generic fallback or a second
-  topology kind.
+  topology kind. Every effective consumer, including direct and transitive inheritors, MUST retain the exact
+  capture-proven selector; checking only the profile that declares the source does not establish polling scope.
 - **Documentation:** A short profile comment explains the vendor deviation and why index-only decoding cannot be used.
 - **Regression:** Tests pin both the selector-scoped override and real fixture collection through the profile parser and
   consumer path.
@@ -127,21 +128,20 @@ The retired `constant_value_one` key is ignored. Ordinary metric symbols still r
 - For `index_decode`, declare every logical component, including unselected components, and select with one-based
   `component`. An `octet_string` without `length` is length-prefixed; a positive fixed `length` omits the prefix.
   Layout, extraction and final formatting failures MUST reject the entire identity row and keep it out of caches.
-- Structural transform `mapping` selects exactly one arc (`start == end`, no `drop_right`) with canonical uint32
-  decimal keys and values. Missing entries fail the lookup; this is distinct from display-value mapping.
-- Repeated lookup values across VRFs MUST use `lookup_scope` selectors for both source and target indexes. Typed
-  BGP values and table metric tags support this; licensing value fields reject it. Do not combine it with
-  `index_from` or `index_decode`.
+- Cross-table joins require authoritative equivalence of their keys, including every ownership axis. Equal-looking
+  numeric indexes do not prove equal meaning; process-less metadata cannot be attributed to process-scoped rows
+  without a source contract. Omit unproved enrichment rather than manufacture identity or drop valid counters.
 
-Syntax, validation boundaries and Juniper/Isilon/Huawei examples live in
-`src/go/plugin/go.d/collector/snmp/profile-format.md#compound-index-decoding-index_decode`,
-`src/go/plugin/go.d/collector/snmp/profile-format.md#structural-index-mapping`, and
-`src/go/plugin/go.d/collector/snmp/profile-format.md#scoped-value-lookup-lookup_scope`.
+Compound syntax and validation live in
+`src/go/plugin/go.d/collector/snmp/profile-format.md#compound-index-decoding-index_decode`.
 For compound identity changes, test final chart IDs with every required axis, first WALK, cached GET and profile
-clone/reload. Include malformed unselected components and downstream formatting errors, not only decoder failures.
-For BGP dependencies, test optional-only descriptor WALK errors separately from missing/noSuch rows; a shared
-identity/signal/required-tag dependency MUST remain required. Availability semantics live in
-`src/go/plugin/go.d/collector/snmp/profile-format.md#bgp-rows`.
+clone/reload. Include punctuation, empty components, malformed unselected components and downstream formatting errors,
+not only decoder failures. Machine identity and display labels have separate contracts; see
+`src/go/plugin/go.d/collector/snmp/profile-format.md#5-metric_tags`.
+Typed BGP identity and optional-value availability are defined in
+`src/go/plugin/go.d/collector/snmp/profile-format.md#bgp-rows`. Preserve configured process identity through all
+consumers, including Functions, topology inventory and diagnostic replay. Missing optional values and failed
+SNMP dependency walks are different cases and MUST be tested separately.
 
 ## Common Patterns
 

@@ -169,6 +169,7 @@ func (c BGPConfig) Clone() BGPConfig {
 }
 
 type BGPIdentityConfig struct {
+	ProcessID               BGPValueConfig                        `yaml:"process_id,omitempty" json:"process_id"`
 	RoutingInstance         BGPValueConfig                        `yaml:"routing_instance,omitempty"          json:"routing_instance"`
 	Neighbor                BGPValueConfig                        `yaml:"neighbor,omitempty"                  json:"neighbor"`
 	RemoteAS                BGPValueConfig                        `yaml:"remote_as,omitempty"                 json:"remote_as"`
@@ -178,6 +179,7 @@ type BGPIdentityConfig struct {
 
 func (c BGPIdentityConfig) Clone() BGPIdentityConfig {
 	return BGPIdentityConfig{
+		ProcessID:               c.ProcessID.Clone(),
 		RoutingInstance:         c.RoutingInstance.Clone(),
 		Neighbor:                c.Neighbor.Clone(),
 		RemoteAS:                c.RemoteAS.Clone(),
@@ -504,7 +506,6 @@ type BGPValueConfig struct {
 	Name   string       `yaml:"name,omitempty"   json:"name,omitempty"`
 
 	LookupSymbol SymbolConfigCompat `yaml:"lookup_symbol,omitempty" json:"lookup_symbol"`
-	LookupScope  *MetricLookupScope `yaml:"lookup_scope,omitempty" json:"lookup_scope,omitempty"`
 
 	Format  string        `yaml:"format,omitempty"  json:"format,omitempty"`
 	Mapping MappingConfig `yaml:"mapping,omitempty" json:"mapping"`
@@ -523,7 +524,6 @@ func (c BGPValueConfig) IsSet() bool {
 		c.Name != "" ||
 		c.LookupSymbol.OID != "" ||
 		c.LookupSymbol.Name != "" ||
-		c.LookupScope != nil ||
 		c.Format != "" ||
 		c.Mapping.HasItems() ||
 		c.Mapping.Mode != ""
@@ -544,12 +544,11 @@ func (c BGPValueConfig) Clone() BGPValueConfig {
 		Table:          c.Table,
 		Index:          c.Index,
 		IndexFromEnd:   c.IndexFromEnd,
-		IndexTransform: cloneSlice(c.IndexTransform),
+		IndexTransform: slices.Clone(c.IndexTransform),
 		Symbol:         c.Symbol.Clone(),
 		OID:            c.OID,
 		Name:           c.Name,
 		LookupSymbol:   c.LookupSymbol.Clone(),
-		LookupScope:    c.LookupScope.Clone(),
 		Format:         c.Format,
 		Mapping:        c.Mapping.Clone(),
 	}

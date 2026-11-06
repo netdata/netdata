@@ -53,7 +53,6 @@ type stockIdentityEvidence struct {
 	Profile  string
 	TableOID string
 	Symbols  []string
-	Before   []stockIdentityObservation
 	After    []stockIdentityObservation
 }
 
@@ -132,16 +131,8 @@ func TestStockIndexIdentity_FinalCharts(t *testing.T) {
 			}
 			assert.Len(t, c.tableMetricCharts, len(metrics))
 			record := stockIdentityEvidence{Profile: tc.Profile, TableOID: tc.TableOID, Symbols: symbols, After: stockIdentityObservations(metrics, c)}
-			// Baseline comparison is opt-in local evidence, with no repository or network
-			// dependency in the ordinary regression test. Files come from the recorded base.
-			if dir := os.Getenv("NETDATA_SNMP_INDEX_BASELINE_DIR"); dir != "" {
-				baseline := stockIdentityBaseline(t, dir, tc)
-				oldMetrics := stockIdentityAcquire(t, baseline, pdus)
-				oldCollector := newTestSNMPCollector()
-				oldCollector.sysInfo = &snmputils.SysInfo{}
-				oldCollector.collectProfileTableMetrics(make(map[string]int64), oldMetrics)
-				record.Before = stockIdentityObservations(oldMetrics, oldCollector)
-			}
+			// Historical chart IDs must come from the historical binary. Loading old
+			// profiles into the current serializer does not reproduce old identities.
 			evidence[name] = record
 		})
 	}

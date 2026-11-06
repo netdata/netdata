@@ -448,10 +448,7 @@ func (tc *tableCache) generateConfigID(cfg ddprofiledefinition.MetricsConfig) st
 	sb.WriteString(strings.Join(names, ","))
 	extended := false
 	for _, tag := range cfg.MetricTags {
-		extended = tag.IndexDecode != nil || tag.LookupScope != nil || tag.Symbol.Format == "octet_string"
-		for _, transform := range tag.IndexTransform {
-			extended = extended || len(transform.Mapping) > 0
-		}
+		extended = tag.IndexDecode != nil || tag.Symbol.Format == "octet_string"
 		if extended {
 			break
 		}

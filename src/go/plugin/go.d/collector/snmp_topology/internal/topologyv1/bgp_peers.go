@@ -15,6 +15,7 @@ func buildSNMPTopologyV1BGPPeersTable(
 ) topologyapi.Table {
 	actorRefs := make([]any, len(rows))
 	remoteActors := make([]any, len(rows))
+	processIDs := make([]any, len(rows))
 	routingInstances := make([]any, len(rows))
 	neighborIPs := make([]any, len(rows))
 	remoteASes := make([]any, len(rows))
@@ -34,6 +35,7 @@ func buildSNMPTopologyV1BGPPeersTable(
 	for i, row := range rows {
 		actorRefs[i] = row.actorRef
 		remoteActors[i] = nullableActorRef(actorIndex, row.remoteActorHandle)
+		processIDs[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["process_id"]))
 		routingInstances[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(topologyV1ScalarLabelValue(row.values["routing_instance"]), "default"))
 		neighborIPs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeBGPPeerAddress(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
 		remoteASes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["remote_as"]))
@@ -54,6 +56,7 @@ func buildSNMPTopologyV1BGPPeersTable(
 	return topologyapi.MustTable(len(rows), snmpTopologyV1BGPPeersColumns(), []topologyapi.ColumnEncoding{
 		topologyapi.Values(actorRefs...),
 		topologyapi.Values(remoteActors...),
+		topologyapi.Values(processIDs...),
 		topologyapi.Values(routingInstances...),
 		topologyapi.Values(neighborIPs...),
 		topologyapi.Values(remoteASes...),
@@ -74,6 +77,7 @@ func buildSNMPTopologyV1BGPPeersTable(
 
 func snmpTopologyV1BGPPeerValues(row topologymodel.BGPPeerDetailRow) map[string]any {
 	out := map[string]any{
+		"process_id":       row.ProcessID,
 		"routing_instance": row.RoutingInstance,
 		"neighbor_ip":      row.NeighborIP,
 		"remote_as":        row.RemoteAS,

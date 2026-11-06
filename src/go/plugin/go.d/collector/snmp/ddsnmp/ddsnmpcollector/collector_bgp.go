@@ -334,16 +334,11 @@ func (c *Collector) walkBGPTableDependencies(
 	route *AcquisitionRouteReport,
 ) error {
 	var errs []error
-	requirements := bgpTableDependencyRequirements(cfg, metricsCfg, tableNameToOID)
-	for _, depOID := range slices.Sorted(maps.Keys(requirements)) {
+	for _, depOID := range bgpTableDependencies(cfg, metricsCfg, tableNameToOID) {
 		outcome := walkPass.walk(c.tableCollector, depOID, stats)
 		bindSourceWalk(route, outcome.sourceOperation, depOID, "dependency")
 		if outcome.err != nil {
-			if requirements[depOID] {
-				errs = append(errs, fmt.Errorf("table OID %q: %w", trimOID(depOID), outcome.err))
-			} else {
-				recordCollectionFailure(&c.failures.BGP, outcome.err, "bgp", "optional_dependency")
-			}
+			errs = append(errs, fmt.Errorf("table OID %q: %w", trimOID(depOID), outcome.err))
 		}
 	}
 	return errors.Join(errs...)
@@ -483,6 +478,12 @@ func (c *Collector) buildTableBGPRow(
 func (c *Collector) populateBGPRow(row *ddsnmp.BGPRow, cfg ddprofiledefinition.BGPConfig, ctx bgpValueContext) error {
 	var err error
 
+	if row.Identity.ProcessID, err = c.bgpTextValue(cfg.Identity.ProcessID, ctx.forField("identity.process_id")); err != nil {
+		return fmt.Errorf("identity.process_id: %w", err)
+	}
+	if cfg.Identity.ProcessID.IsSet() && row.Identity.ProcessID == "" {
+		return fmt.Errorf("identity.process_id: configured process identity is missing")
+	}
 	if row.Identity.RoutingInstance, err = c.bgpTextValue(cfg.Identity.RoutingInstance, ctx.forField("identity.routing_instance")); err != nil {
 		return fmt.Errorf("identity.routing_instance: %w", err)
 	}
@@ -1162,7 +1163,6 @@ func (c *Collector) lookupBGPValuePDU(
 		Table:          cfg.Table,
 		Symbol:         ddprofiledefinition.SymbolConfigCompat(sym),
 		LookupSymbol:   cfg.LookupSymbol,
-		LookupScope:    cfg.LookupScope,
 		IndexTransform: cfg.IndexTransform,
 	}
 	pdu, failure := c.tableCollector.rowProcessor.crossTableResolver.lookupTagPDU(tag, ctx.rowIndex, ctx.crossTableCtx)
@@ -1282,29 +1282,25 @@ func bgpTableDependencies(
 	metricsCfg ddprofiledefinition.MetricsConfig,
 	tableNameToOID map[string]string,
 ) []string {
-	return slices.Sorted(maps.Keys(bgpTableDependencyRequirements(cfg, metricsCfg, tableNameToOID)))
-}
-
-// A dependency shared with identity, signals or row tags remains required.
-func bgpTableDependencyRequirements(
-	cfg ddprofiledefinition.BGPConfig,
-	metricsCfg ddprofiledefinition.MetricsConfig,
-	tableNameToOID map[string]string,
-) map[string]bool {
 	deps := make(map[string]bool)
 	for _, dep := range extractTableDependencies(metricsCfg, tableNameToOID) {
 		deps[trimOID(dep)] = true
 	}
-	forEachBGPValuePath(cfg, func(path string, value ddprofiledefinition.BGPValueConfig) {
-		if value.Table == "" || value.Table == cfg.Table.Name {
+	forEachBGPValue(cfg, func(valueCfg ddprofiledefinition.BGPValueConfig) {
+		if valueCfg.Table == "" || valueCfg.Table == cfg.Table.Name {
 			return
 		}
-		if oid, ok := tableNameToOID[value.Table]; ok {
-			oid = trimOID(oid)
-			deps[oid] = deps[oid] || !strings.HasPrefix(path, "descriptors.")
+		if tableOID, ok := tableNameToOID[valueCfg.Table]; ok {
+			deps[trimOID(tableOID)] = true
 		}
 	})
-	return deps
+
+	result := make([]string, 0, len(deps))
+	for oid := range deps {
+		result = append(result, oid)
+	}
+	slices.Sort(result)
+	return result
 }
 
 func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, []string) {
@@ -1357,6 +1353,7 @@ func forEachBGPValuePath(
 			fn(path, value)
 		}
 	}
+	add("identity.process_id", cfg.Identity.ProcessID)
 	add("identity.routing_instance", cfg.Identity.RoutingInstance)
 	add("identity.neighbor", cfg.Identity.Neighbor)
 	add("identity.remote_as", cfg.Identity.RemoteAS)
@@ -1431,10 +1428,9 @@ func bgpRowHasSignals(row ddsnmp.BGPRow) bool {
 func bgpRowIdentityComplete(row ddsnmp.BGPRow) bool {
 	switch row.Kind {
 	case ddprofiledefinition.BGPRowKindPeer:
-		return row.Identity.Neighbor != "" && row.Identity.RemoteAS != ""
+		return row.Identity.HasPeerIdentity()
 	case ddprofiledefinition.BGPRowKindPeerFamily:
-		return row.Identity.Neighbor != "" &&
-			row.Identity.RemoteAS != "" &&
+		return row.Identity.HasPeerIdentity() &&
 			row.Identity.AddressFamily != "" &&
 			row.Identity.SubsequentAddressFamily != ""
 	default:

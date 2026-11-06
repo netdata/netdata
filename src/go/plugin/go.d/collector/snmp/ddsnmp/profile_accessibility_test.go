@@ -14,6 +14,8 @@ import (
 	"testing"
 
 	"github.com/golangsnmp/gomib/mib"
+
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
@@ -125,6 +127,23 @@ func TestStockProfiles_PollingAccessibility(t *testing.T) {
 			verified++
 		}
 	}
+	// Raw definitions pin the source roles; effective consumers own their selectors after inheritance.
+	files, err := filepath.Glob("../../../config/go.d/snmp.profiles/default/*.yaml")
+	require.NoError(t, err)
+	paths := multipath.New("../../../config/go.d/snmp.profiles/default")
+	for _, file := range files {
+		if strings.HasPrefix(filepath.Base(file), "_") {
+			continue // Abstract profiles cannot be selected; their concrete consumers are checked below.
+		}
+		profile, err := loadProfile(file, paths)
+		require.NoError(t, err, file)
+		require.NoError(t, prepareLoadedProfile(profile), file)
+		problems, err := effectivePollingScopeProblems(profile, facts, manifest.ExceptionSelector)
+		require.NoError(t, err, file)
+		for _, problem := range problems {
+			t.Errorf("%s: %s", filepath.Base(file), problem)
+		}
+	}
 	require.Equal(t, 3, exceptionCount, "only the three capture-proven RB750Gr3 source roles are permitted")
 	content, err := os.ReadFile("../../../config/go.d/snmp.profiles/default/topology-role-mikrotik-rb750gr3.yaml")
 	require.NoError(t, err)
@@ -144,6 +163,54 @@ func TestStockProfiles_PollingAccessibility(t *testing.T) {
 	require.Equal(t, "lldp_rem_man_addr", row["kind"])
 	require.Equal(t, map[any]any{"OID": "1.0.8802.1.1.2.1.4.2", "name": "lldpRemManAddrTable"}, row["table"])
 	t.Logf("%d exact polling sources checked; %d explicitly unresolved sources (not certified readable)", verified, unknown)
+}
+
+// Inheritance preserves the child's selector rather than intersecting it with its parents. Check the
+// prepared acquisition definition so direct and transitive consumers cannot broaden a source exception.
+func effectivePollingScopeProblems(
+	profile *Profile,
+	facts map[string]profileAccessFact,
+	exceptionSelector any,
+) ([]string, error) {
+	data, err := yaml.Marshal(profile.Definition)
+	if err != nil {
+		return nil, err
+	}
+	var doc map[any]any
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	actual, err := json.Marshal(accessJSONValue(doc["selector"]))
+	if err != nil {
+		return nil, err
+	}
+	expected, err := json.Marshal(exceptionSelector)
+	if err != nil {
+		return nil, err
+	}
+	var refs []profileOIDRef
+	collectProfileOIDRefs(doc, "", "", false, &refs)
+	var problems []string
+	for _, ref := range refs {
+		fact, ok := facts[accessFactKey(ref.module, ref.oid)]
+		if !ok ||
+			fact.Access != "not-accessible" && fact.Access != "accessible-for-notify" && fact.Access != "write-only" {
+			continue
+		}
+		if string(actual) != string(expected) {
+			problems = append(
+				problems,
+				fmt.Sprintf(
+					"%s polls %s::%s (%s) outside the capture-proven exception selector",
+					ref.path,
+					fact.Module,
+					fact.Object,
+					ref.oid,
+				),
+			)
+		}
+	}
+	return problems, nil
 }
 
 func checkPollingAccess(file string, ref profileOIDRef, facts map[string]profileAccessFact, unresolved map[string]bool) (problem string, known bool) {
@@ -207,7 +274,7 @@ func TestStockProfiles_AccessManifestAgainstMIBs(t *testing.T) {
 	for _, old := range manifest.Facts {
 		facts[accessFactKey(old.Declared, old.OID)] = old
 	}
-	// This newly acquired optional description must be proven even before the profile migration is integrated.
+	// Retain exact source evidence for this historical readable field; it is not a proven join source.
 	const huaweiDescriptionOID = "1.3.6.1.4.1.2011.5.25.177.1.1.8.1.11"
 	huawei, ok := corpus.accessFact("HUAWEI-BGP-VPN-MIB", huaweiDescriptionOID)
 	require.True(t, ok)

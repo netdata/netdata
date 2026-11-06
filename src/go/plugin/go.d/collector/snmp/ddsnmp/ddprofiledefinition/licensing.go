@@ -205,10 +205,8 @@ func (c LicenseUsageSignalsConfig) Clone() LicenseUsageSignalsConfig {
 }
 
 type LicenseValueConfig struct {
-	// LookupScope is reserved so unsupported scoped joins fail validation.
-	LookupScope *MetricLookupScope `yaml:"lookup_scope,omitempty" json:"lookup_scope,omitempty"`
-	Value       string             `yaml:"value,omitempty" json:"value,omitempty"`
-	From        string             `yaml:"from,omitempty"  json:"from,omitempty"`
+	Value string `yaml:"value,omitempty" json:"value,omitempty"`
+	From  string `yaml:"from,omitempty"  json:"from,omitempty"`
 
 	Index          uint                   `yaml:"index,omitempty"           json:"index,omitempty"`
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
@@ -224,8 +222,7 @@ type LicenseValueConfig struct {
 }
 
 func (c LicenseValueConfig) IsSet() bool {
-	return c.LookupScope != nil ||
-		c.Value != "" ||
+	return c.Value != "" ||
 		c.From != "" ||
 		c.Index != 0 ||
 		len(c.IndexTransform) > 0 ||
@@ -242,11 +239,10 @@ func (c LicenseValueConfig) IsSet() bool {
 
 func (c LicenseValueConfig) Clone() LicenseValueConfig {
 	return LicenseValueConfig{
-		LookupScope:    c.LookupScope.Clone(),
 		Value:          c.Value,
 		From:           c.From,
 		Index:          c.Index,
-		IndexTransform: cloneSlice(c.IndexTransform),
+		IndexTransform: slices.Clone(c.IndexTransform),
 		Symbol:         c.Symbol.Clone(),
 		OID:            c.OID,
 		Name:           c.Name,
