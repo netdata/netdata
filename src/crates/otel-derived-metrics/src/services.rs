@@ -52,9 +52,9 @@ pub(crate) struct Services {
 
 impl Services {
     pub(crate) fn new(max_services: usize) -> Result<Self, MetricSetError> {
-        let mut builder = MetricSetBuilder::new(service_settings(max_services));
-        let requests = builder.counter::<Outcome>();
-        let duration = builder.histogram(DURATION_BOUNDS);
+        let mut builder = MetricSetBuilder::new(service_settings(max_services))?;
+        let requests = builder.counter::<Outcome>()?;
+        let duration = builder.histogram(DURATION_BOUNDS)?;
         let metrics = builder.build()?;
         let mut charts = ChartsBuilder::new(&metrics);
         charts.chart(

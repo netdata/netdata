@@ -10,6 +10,7 @@ workspace = true
 [dependencies]
 indexmap = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 netdata-plugin-protocol = { workspace = true, features = ["test-support"] }

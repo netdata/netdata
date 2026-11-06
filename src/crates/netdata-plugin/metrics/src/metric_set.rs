@@ -2,10 +2,10 @@
 //! and settings.
 
 use crate::layout::{Aggregation, ColumnRange, Schema};
-use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
+use thiserror::Error;
 
 /// The agent keeps at most this many bytes of a label key.
 const MAX_LABEL_KEY_BYTES: usize = 200;
@@ -24,16 +24,16 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 ///
 /// # Names
 ///
-/// - Each name must appear once in `NAMES`. A repeated name makes
-///   [`MetricSetBuilder::build`] fail.
+/// - Each name must appear once in `NAMES`. Declaring an instrument with a
+///   repeated name fails with [`MetricSetError::DuplicateColumn`].
 /// - A charted column becomes a chart dimension with its name as the id, so
 ///   the names must also pass the rules at
 ///   [`ChartsBuilder::chart`](crate::ChartsBuilder::chart).
 ///
 /// # Manual implementations
 ///
-/// - `NAMES` must hold at least one name. An empty `NAMES` makes
-///   [`MetricSetBuilder::build`] fail.
+/// - `NAMES` must hold at least one name. Declaring an instrument with an
+///   empty `NAMES` fails with [`MetricSetError::NoColumns`].
 /// - `index` must return the value's position in `NAMES`. In debug builds, a
 ///   measurement of a value whose index is out of range panics.
 pub trait Column: Copy + 'static {
@@ -315,107 +315,108 @@ pub struct CardinalityLimit {
     pub overflow_labels: Labels,
 }
 
-/// A mistake in declaring a metric set, reported by
-/// [`MetricSetBuilder::build`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A mistake in declaring a metric set, returned by the
+/// [`MetricSetBuilder`] step that makes it.
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum MetricSetError {
     /// The collection interval is not a whole number of seconds of at least 1.
+    #[error("the collection interval must be whole seconds, at least 1: {0:?}")]
     CollectionInterval(Duration),
     /// `expiry` is 0.
+    #[error("expiry must be positive")]
     ZeroExpiry,
     /// The cardinality limit's `max_entities` is 0.
+    #[error("the cardinality limit must be positive")]
     ZeroCardinalityLimit,
     /// The cardinality limit's overflow labels are empty.
+    #[error("overflow labels are required")]
     NoOverflowLabels,
     /// A [`Column`] type has no names.
+    #[error("an instrument needs at least one column")]
     NoColumns,
     /// A name appears more than once in a [`Column`] type's names.
+    #[error("duplicate column name {0:?}")]
     DuplicateColumn(&'static str),
     /// Histogram bounds that are not finite and strictly increasing.
+    #[error("histogram bounds must be finite and increasing")]
     HistogramBounds,
     /// The set has no instrument.
+    #[error("metric set has no instruments")]
     NoInstruments,
 }
-
-impl fmt::Display for MetricSetError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::CollectionInterval(interval) => write!(
-                f,
-                "the collection interval must be whole seconds, at least 1: {interval:?}"
-            ),
-            Self::ZeroExpiry => f.write_str("expiry must be positive"),
-            Self::ZeroCardinalityLimit => f.write_str("the cardinality limit must be positive"),
-            Self::NoOverflowLabels => f.write_str("overflow labels are required"),
-            Self::NoColumns => f.write_str("an instrument needs at least one column"),
-            Self::DuplicateColumn(name) => write!(f, "duplicate column name {name:?}"),
-            Self::HistogramBounds => f.write_str("histogram bounds must be finite and increasing"),
-            Self::NoInstruments => f.write_str("metric set has no instruments"),
-        }
-    }
-}
-
-impl std::error::Error for MetricSetError {}
 
 static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 
 /// Declares a [`MetricSet`]: each instrument adds its column group (a
-/// histogram three). A mistake does not stop the declaration: the builder
-/// keeps the first one and [`build`](Self::build) reports it.
+/// histogram three). Each step checks its own input and adds nothing when
+/// the check fails.
 #[derive(Debug)]
 pub struct MetricSetBuilder {
     id: u32,
     settings: Settings,
     schema: Schema,
-    /// The first mistake, reported by `build`.
-    error: Option<MetricSetError>,
 }
 
 impl MetricSetBuilder {
-    /// Starts a metric set. Invalid settings make
-    /// [`build`](Self::build) fail.
-    pub fn new(settings: Settings) -> Self {
-        let error = check_settings(&settings).err();
-        Self {
+    /// Starts a metric set.
+    ///
+    /// # Errors
+    ///
+    /// Invalid settings: [`MetricSetError::CollectionInterval`],
+    /// [`MetricSetError::ZeroExpiry`], [`MetricSetError::ZeroCardinalityLimit`]
+    /// or [`MetricSetError::NoOverflowLabels`].
+    pub fn new(settings: Settings) -> Result<Self, MetricSetError> {
+        check_settings(&settings)?;
+        Ok(Self {
             id: NEXT_SET_ID.fetch_add(1, Ordering::Relaxed),
             settings,
             schema: Schema::default(),
-            error,
-        }
-    }
-
-    /// Keeps `check`'s error for `build` unless an earlier one is kept.
-    fn keep_first(&mut self, check: Result<(), MetricSetError>) {
-        if self.error.is_none() {
-            self.error = check.err();
-        }
+        })
     }
 
     /// Adds a column group of one column per value of `C`, aggregated by
     /// `aggregation`, and returns its handle.
-    fn split_by<C: Column>(&mut self, aggregation: Aggregation) -> ColumnRange<C> {
-        self.keep_first(check_names(C::NAMES));
+    fn split_by<C: Column>(
+        &mut self,
+        aggregation: Aggregation,
+    ) -> Result<ColumnRange<C>, MetricSetError> {
+        check_names(C::NAMES)?;
         let names = C::NAMES.iter().map(|name| name.to_string()).collect();
         let group = self.schema.add_column_group(aggregation, names);
         let base = self.schema.column_group(group).columns.start;
-        ColumnRange::new(self.id, group, base)
+        Ok(ColumnRange::new(self.id, group, base))
     }
 
-    /// Adds a [`Counter`]. An empty or repeating `C::NAMES` makes
-    /// [`build`](Self::build) fail.
-    pub fn counter<C: Column>(&mut self) -> Counter<C> {
-        Counter(self.split_by(Aggregation::Sum))
+    /// Adds a [`Counter`].
+    ///
+    /// # Errors
+    ///
+    /// [`MetricSetError::NoColumns`] or [`MetricSetError::DuplicateColumn`]
+    /// for `C::NAMES`.
+    pub fn counter<C: Column>(&mut self) -> Result<Counter<C>, MetricSetError> {
+        Ok(Counter(self.split_by(Aggregation::Sum)?))
     }
 
-    /// Adds a [`CumulativeCounter`]. `C::NAMES` as at
-    /// [`counter`](Self::counter).
-    pub fn cumulative_counter<C: Column>(&mut self) -> CumulativeCounter<C> {
-        CumulativeCounter(self.split_by(Aggregation::CumulativeSum))
+    /// Adds a [`CumulativeCounter`].
+    ///
+    /// # Errors
+    ///
+    /// As [`counter`](Self::counter).
+    pub fn cumulative_counter<C: Column>(
+        &mut self,
+    ) -> Result<CumulativeCounter<C>, MetricSetError> {
+        Ok(CumulativeCounter(
+            self.split_by(Aggregation::CumulativeSum)?,
+        ))
     }
 
-    /// Adds a [`Gauge`]. `C::NAMES` as at [`counter`](Self::counter).
-    pub fn gauge<C: Column>(&mut self) -> Gauge<C> {
-        Gauge(self.split_by(Aggregation::LastValue))
+    /// Adds a [`Gauge`].
+    ///
+    /// # Errors
+    ///
+    /// As [`counter`](Self::counter).
+    pub fn gauge<C: Column>(&mut self) -> Result<Gauge<C>, MetricSetError> {
+        Ok(Gauge(self.split_by(Aggregation::LastValue)?))
     }
 
     /// Adds a [`Histogram`] over `bounds`, with three column groups, each
@@ -430,10 +431,12 @@ impl MetricSetBuilder {
     /// [`ChartsBuilder::histogram`](crate::ChartsBuilder::histogram) charts
     /// each group on its own.
     ///
-    /// Bounds that are not finite and strictly increasing make
-    /// [`build`](Self::build) fail.
-    pub fn histogram(&mut self, bounds: &'static [f64]) -> Histogram {
-        self.keep_first(check_bounds(bounds));
+    /// # Errors
+    ///
+    /// [`MetricSetError::HistogramBounds`] when `bounds` are not finite and
+    /// strictly increasing.
+    pub fn histogram(&mut self, bounds: &'static [f64]) -> Result<Histogram, MetricSetError> {
+        check_bounds(bounds)?;
         let mut buckets: Vec<String> = bounds.iter().map(|bound| bound.to_string()).collect();
         buckets.push("+Inf".to_string());
         let group = self
@@ -442,24 +445,20 @@ impl MetricSetBuilder {
         self.schema
             .add_column_group(Aggregation::Max, vec!["max".to_string()]);
         self.schema.add_column_group(Aggregation::Sum, buckets);
-        Histogram {
+        Ok(Histogram {
             set_id: self.id,
             group,
             base: self.schema.column_group(group).columns.start,
             bounds,
-        }
+        })
     }
 
     /// Finishes the set.
     ///
     /// # Errors
     ///
-    /// The first mistake made in declaring the set (see [`MetricSetError`]),
-    /// or [`MetricSetError::NoInstruments`].
+    /// [`MetricSetError::NoInstruments`] when no instrument was added.
     pub fn build(self) -> Result<MetricSet, MetricSetError> {
-        if let Some(error) = self.error {
-            return Err(error);
-        }
         if self.schema.column_groups().is_empty() {
             return Err(MetricSetError::NoInstruments);
         }

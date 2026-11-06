@@ -51,8 +51,8 @@ pub(crate) struct ServiceLogs {
 
 impl ServiceLogs {
     pub(crate) fn new(max_services: usize) -> Result<Self, MetricSetError> {
-        let mut builder = MetricSetBuilder::new(service_settings(max_services));
-        let records = builder.counter::<Severity>();
+        let mut builder = MetricSetBuilder::new(service_settings(max_services))?;
+        let records = builder.counter::<Severity>()?;
         let metrics = builder.build()?;
         let mut charts = ChartsBuilder::new(&metrics);
         charts.chart(

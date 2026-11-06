@@ -144,10 +144,10 @@ impl ColumnGroup {
 }
 
 /// What a set's rows hold: the column groups, each owning the next columns
-/// of the row, and the row of a window without events. The builder checks
-/// each `Column` type's names and the histogram bounds the bucket names come
-/// from, and builds no set after a failed check, so every group of a set has
-/// names, none repeated.
+/// of the row, and the row of a window without events. The builder adds a
+/// group only after checking its `Column` type's names, or the histogram
+/// bounds the bucket names come from, so every group has names, none
+/// repeated.
 #[derive(Debug, Default)]
 pub(crate) struct Schema {
     column_groups: Vec<ColumnGroup>,

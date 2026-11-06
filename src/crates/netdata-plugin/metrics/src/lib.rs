@@ -17,8 +17,8 @@
 //!
 //! // Once, at startup: declare the table (its instruments), then the charts
 //! // that show it, and create the aggregator.
-//! let mut builder = MetricSetBuilder::new(Settings::default());
-//! let requests = builder.counter::<Outcome>();
+//! let mut builder = MetricSetBuilder::new(Settings::default())?;
+//! let requests = builder.counter::<Outcome>()?;
 //! let set = builder.build()?;
 //!
 //! let mut charts = ChartsBuilder::new(&set);
@@ -93,12 +93,12 @@
 //! table splits an instrument by entity and by column; the charts show them
 //! as chart instances and dimensions.
 //!
-//! A mistake in declaring a metric set makes [`MetricSetBuilder::build`]
-//! return a [`MetricSetError`]. Other mistakes of the plugin's own code, in
-//! its charts, its label keys, or an instrument or batch used with another
-//! metric set, are checked by debug assertions: tests and debug builds panic
-//! on them, release builds skip the checks. The `# Panics` sections list
-//! them.
+//! A mistake in declaring a metric set makes the [`MetricSetBuilder`] step
+//! that makes it return a [`MetricSetError`]. Other mistakes of the plugin's
+//! own code, in its charts, its label keys, or an instrument or batch used
+//! with another metric set, are checked by debug assertions: tests and debug
+//! builds panic on them, release builds skip the checks. The `# Panics`
+//! sections list them.
 
 mod aggregator;
 mod batch;

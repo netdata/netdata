@@ -47,9 +47,9 @@ pub(crate) struct Plugin {
 
 impl Plugin {
     pub(crate) fn new() -> Result<Self, MetricSetError> {
-        let mut builder = MetricSetBuilder::new(Settings::default());
-        let spans = builder.counter::<Acceptance>();
-        let log_records = builder.counter::<Acceptance>();
+        let mut builder = MetricSetBuilder::new(Settings::default())?;
+        let spans = builder.counter::<Acceptance>()?;
+        let log_records = builder.counter::<Acceptance>()?;
         let metrics = builder.build()?;
         let mut charts = ChartsBuilder::new(&metrics);
         charts.chart(
@@ -118,10 +118,10 @@ pub(crate) struct Derivation {
 
 impl Derivation {
     pub(crate) fn new() -> Result<Self, MetricSetError> {
-        let mut builder = MetricSetBuilder::new(Settings::default());
-        let services = builder.gauge::<Services>();
-        let adjusted = builder.cumulative_counter::<Adjustment>();
-        let expired = builder.cumulative_counter::<Expired>();
+        let mut builder = MetricSetBuilder::new(Settings::default())?;
+        let services = builder.gauge::<Services>()?;
+        let adjusted = builder.cumulative_counter::<Adjustment>()?;
+        let expired = builder.cumulative_counter::<Expired>()?;
         let metrics = builder.build()?;
         let mut charts = ChartsBuilder::new(&metrics);
         charts.chart(
