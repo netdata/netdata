@@ -70,8 +70,8 @@ impl Aggregation {
         }
     }
 
-    /// The value of the dimension whose columns start at `column`; none, a
-    /// gap, without one or for a non-finite one.
+    /// The value of the dimension whose columns start at `column`; `None` (a
+    /// gap) when there is no value or it is not finite.
     pub(crate) fn value(self, row: &[f64], column: usize, interval_secs: u64) -> Option<f64> {
         let value = match self {
             Aggregation::Sum | Aggregation::CumulativeSum => row[column] / interval_secs as f64,
@@ -132,9 +132,10 @@ impl ChartSchema {
         self.empty_row.len()
     }
 
-    /// Checks `template`'s dimension ids (valid, unique), its context (valid,
-    /// unique in the schema) and its columns (the next ones, as many as its
-    /// dimensions take), then adds it.
+    /// Checks `template`, in this order, then adds it: its dimension ids are
+    /// valid, its context is valid, it has at least one dimension, its
+    /// context is unique in the schema, its dimension ids are unique, and it
+    /// takes the next columns, as many as its dimensions need.
     pub(crate) fn add_chart_template(&mut self, template: ChartTemplate) {
         for id in &template.dimension_ids {
             assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
