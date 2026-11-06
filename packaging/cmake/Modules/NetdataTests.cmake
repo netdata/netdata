@@ -89,6 +89,12 @@ if(OS_LINUX)
         target_compile_options(http-auth-bearer-test PRIVATE -ffunction-sections -fdata-sections)
         target_link_options(http-auth-bearer-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
         target_link_libraries(http-auth-bearer-test libnetdata)
+
+        add_executable(api-v3-settings-test EXCLUDE_FROM_ALL
+                src/web/api/tests/api-v3-settings-test.c)
+        target_compile_options(api-v3-settings-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(api-v3-settings-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(api-v3-settings-test libnetdata)
 endif()
 
 if(ENABLE_CGROUPS_LOOKUP_SERVER)

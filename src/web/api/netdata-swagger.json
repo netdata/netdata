@@ -4175,8 +4175,8 @@
         "tags": [
           "settings"
         ],
-        "summary": "Retrieve user settings/preferences (GET)",
-        "description": "**V3 SPECIFIC ENDPOINT**\n\nRetrieves stored user settings and preferences from Netdata's settings storage.\nThe settings API provides persistent key-value storage for UI preferences, dashboard layouts,\nalert configurations, and other user-specific data.\n\n**Settings System:**\n- **Persistent storage**: Settings survive agent restarts\n- **Version-controlled**: Each update increments version for conflict detection\n- **User-scoped**: Authenticated users can have multiple named settings files\n- **Anonymous access**: Limited to 'default' file only\n- **JSON format**: All settings stored as JSON with mandatory 'version' field\n\n**File-Based Storage:**\nSettings are stored as individual files in Netdata's var/lib directory:\n- Anonymous users: Only `file=default` allowed\n- Authenticated users: Can create custom files (e.g., `file=my-dashboard`)\n- File names: Alphanumeric, dashes, underscores only\n\n**Version Control:**\nEach settings object has a `version` field:\n- Starts at version 1 for new files\n- Auto-incremented on each PUT operation\n- Used for optimistic locking to prevent conflicts\n\n**Use Cases:**\n- **Dashboard preferences**: Store layout, theme, selected metrics\n- **Alert customization**: Save user-specific alert thresholds\n- **UI state**: Remember filters, time ranges, node selections\n- **Multi-device sync**: Share settings across browsers/devices (for authenticated users)\n\n**Common Usage Patterns:**\n\n1. **Get default settings (anonymous user):**\n   ```\n   GET /api/v3/settings?file=default\n   ```\n\n2. **Get named settings file (authenticated):**\n   ```\n   GET /api/v3/settings?file=production-dashboard\n   ```\n\n**Response Structure:**\n```json\n{\n  \"version\": 3,\n  \"theme\": \"dark\",\n  \"defaultTimeRange\": \"-3600\",\n  \"favoriteMetrics\": [\"system.cpu\", \"system.ram\"]\n}\n```\n\n**New Files:**\nIf requested file doesn't exist, returns initial version:\n```json\n{\n  \"version\": 1\n}\n```\n\n**Size Limit:**\nMaximum settings file size: 20 MiB\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
+        "summary": "Retrieve the agent-wide dashboard settings (GET)",
+        "description": "**V3 SPECIFIC ENDPOINT**\n\nRetrieves the agent's dashboard settings object.\n\n**Settings System:**\n- **One object per agent**: there is a single settings object, `default`. It is shared by every caller\n  admitted to this API, anonymous or authenticated; it is not scoped to a user.\n- **Persistent storage**: stored as `settings/default` in Netdata's var/lib directory; survives restarts\n- **Version-controlled**: each update increments `version` for conflict detection\n- **JSON format**: a JSON object with a mandatory integer `version` field\n\nThe dashboard keeps agent-wide preferences here, such as the preferred nodes of the agent's local space.\nDo not store per-user or sensitive data in it.\n\n**Version Control:**\n- A missing object reads as version 1\n- Auto-incremented on each PUT operation\n- Used for optimistic locking to prevent conflicts\n\n**Usage:**\n```\nGET /api/v3/settings?file=default\n```\n\n**Response Structure:**\n```json\n{\n  \"version\": 3,\n  \"value\": {\n    \"preferred_node_ids\": [\"...\"]\n  }\n}\n```\n\n**New Object:**\nIf the object doesn't exist (or its stored `version` is not an integer from 1 to 9223372036854775806), returns the initial version:\n```json\n{\n  \"version\": 1\n}\n```\n\n**Size Limit:**\nMaximum settings file size: 20 MiB\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
         "security": [
           {},
           {
@@ -4188,10 +4188,14 @@
             "name": "file",
             "in": "query",
             "required": false,
-            "description": "Name of the settings file to retrieve.\n\n**File Naming Rules:**\n- Alphanumeric characters only\n- Dashes (-) and underscores (_) allowed\n- No spaces or special characters\n- Case-sensitive\n\n**Access Control:**\n- **Anonymous users**: Only `file=default` allowed\n- **Authenticated users (bearer token)**: Any valid file name\n\n**Examples:**\n- `default` - Default settings file\n- `my-dashboard` - Custom dashboard settings\n- `prod-alerts` - Production alert preferences\n- `mobile-view` - Mobile UI settings\n\n**Invalid File Names:**\n- Missing or empty: Returns 400 Bad Request\n- Special characters: Returns 400 Bad Request\n- Non-default for anonymous: Returns 400 Bad Request\n",
+            "allowEmptyValue": true,
+            "description": "Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty\nvalue) selects `default`. Any other value returns 400 Bad Request.\n",
             "schema": {
               "type": "string",
-              "pattern": "^[a-zA-Z0-9_-]+$",
+              "enum": [
+                "default",
+                ""
+              ],
               "default": "default"
             },
             "example": "default"
@@ -4210,41 +4214,38 @@
                   "properties": {
                     "version": {
                       "type": "integer",
+                      "format": "int64",
                       "description": "Current version number (auto-incremented on updates)",
-                      "minimum": 1
+                      "minimum": 1,
+                      "maximum": 9223372036854775806
                     }
                   },
                   "additionalProperties": true
                 },
                 "examples": {
-                  "new_file": {
+                  "new_object": {
                     "value": {
                       "version": 1
                     },
-                    "summary": "Newly created settings file with just version"
+                    "summary": "No settings stored yet"
                   },
-                  "existing_file": {
+                  "existing_object": {
                     "value": {
                       "version": 5,
-                      "theme": "dark",
-                      "language": "en",
-                      "dashboard": {
-                        "layout": "grid",
-                        "columns": 3
-                      },
-                      "notifications": {
-                        "enabled": true,
-                        "sound": false
+                      "value": {
+                        "preferred_node_ids": [
+                          "11111111-2222-3333-4444-555555555555"
+                        ]
                       }
                     },
-                    "summary": "Existing settings with custom fields"
+                    "summary": "Settings stored by the dashboard"
                   }
                 }
               }
             }
           },
           "400": {
-            "description": "Bad request. Common causes:\n- Invalid file name (contains special characters)\n- Anonymous user trying to access non-default file\n- Empty file name\n"
+            "description": "Bad request. Common causes:\n- `file` is not `default`\n- The request is not for the agent node\n"
           },
           "500": {
             "description": "Internal server error during settings retrieval."
@@ -4256,8 +4257,8 @@
         "tags": [
           "settings"
         ],
-        "summary": "Create or update user settings/preferences (PUT)",
-        "description": "**V3 SPECIFIC ENDPOINT**\n\nCreates or updates user settings with optimistic locking to prevent concurrent modification conflicts.\n\n**Update Process:**\n1. Client GET current settings (to get current version)\n2. Client modifies settings locally\n3. Client PUT updated settings WITH ORIGINAL VERSION\n4. Netdata validates version matches current file\n5. If match: Update succeeds, version auto-incremented\n6. If mismatch: Returns 409 Conflict\n\n**Conflict Resolution (409 Response):**\nWhen you receive 409 Conflict:\n1. Another client updated the file\n2. GET the file again to retrieve latest version\n3. Reapply your changes to the new version\n4. PUT again with the new version number\n\n**Optimistic Locking Flow:**\n```javascript\n// 1. Get current settings\nconst response = await fetch('/api/v3/settings?file=my-dashboard');\nconst settings = await response.json(); // { version: 3, ... }\n\n// 2. Modify settings\nsettings.theme = 'dark';\n\n// 3. PUT with ORIGINAL version (still 3)\nconst result = await fetch('/api/v3/settings?file=my-dashboard', {\n  method: 'PUT',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify(settings) // version: 3\n});\n\nif (result.status === 409) {\n  // Conflict! File was updated by another client\n  // Must GET again and retry\n}\n// If successful, file now has version: 4\n```\n\n**Payload Requirements:**\n- MUST be valid JSON\n- MUST include `version` field with current file version\n- MAY include any additional fields\n- Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large\n\n**Version Management:**\n- Client provides current version in payload\n- Netdata verifies version matches file on disk\n- Netdata increments version before saving\n- Saved file has version + 1\n\n**Use Cases:**\n- Save dashboard configuration changes\n- Update user preferences\n- Store UI state\n- Persist alert customizations\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
+        "summary": "Create or update the agent-wide dashboard settings (PUT)",
+        "description": "**V3 SPECIFIC ENDPOINT**\n\nCreates or updates the agent's single settings object (`default`), with optimistic locking to prevent\nconcurrent modification conflicts. The object is shared by every caller admitted to this API, anonymous\nor authenticated; it is not scoped to a user.\n\n**Update Process:**\n1. Client GET current settings (to get current version)\n2. Client modifies settings locally\n3. Client PUT updated settings WITH ORIGINAL VERSION\n4. Netdata validates version matches current file\n5. If match: Update succeeds, version auto-incremented\n6. If mismatch: Returns 409 Conflict\n\n**Conflict Resolution (409 Response):**\nWhen you receive 409 Conflict:\n1. Another client updated the file\n2. GET the file again to retrieve latest version\n3. Reapply your changes to the new version\n4. PUT again with the new version number\n\n**Optimistic Locking Flow:**\n```javascript\n// 1. Get current settings\nconst response = await fetch('/api/v3/settings?file=default');\nconst settings = await response.json(); // { version: 3, ... }\n\n// 2. Modify settings\nsettings.value = { ...settings.value, preferred_node_ids: nodeIds };\n\n// 3. PUT with ORIGINAL version (still 3)\nconst result = await fetch('/api/v3/settings?file=default', {\n  method: 'PUT',\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify(settings) // version: 3\n});\n\nif (result.status === 409) {\n  // Conflict! File was updated by another client\n  // Must GET again and retry\n}\n// If successful, file now has version: 4\n```\n\n**Payload Requirements:**\n- MUST be valid JSON\n- MUST include an integer `version` field with the current version (1 when nothing is stored yet)\n- MAY include any additional fields\n- Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large\n\n**Version Management:**\n- Client provides current version in payload\n- Netdata verifies version matches file on disk\n- Netdata increments version before saving\n- Saved file has version + 1\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
         "security": [
           {},
           {
@@ -4269,17 +4270,21 @@
             "name": "file",
             "in": "query",
             "required": false,
-            "description": "Name of the settings file to create or update.\n\n**File Naming Rules:**\n- Alphanumeric characters only\n- Dashes (-) and underscores (_) allowed\n- No spaces or special characters\n- Case-sensitive\n\n**Access Control:**\n- **Anonymous users**: Only `file=default` allowed\n- **Authenticated users (bearer token)**: Any valid file name\n\n**File Creation:**\n- If file doesn't exist: Created with initial payload\n- If file exists: Updated with new payload (version check applies)\n",
+            "allowEmptyValue": true,
+            "description": "Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty\nvalue) selects `default`. Any other value returns 400 Bad Request.\n",
             "schema": {
               "type": "string",
-              "pattern": "^[a-zA-Z0-9_-]+$",
+              "enum": [
+                "default",
+                ""
+              ],
               "default": "default"
             },
-            "example": "my-dashboard"
+            "example": "default"
           }
         ],
         "requestBody": {
-          "description": "JSON object containing settings data with mandatory `version` field.\n\n**Required Fields:**\n- `version`: Integer matching current file version (or 0 for non-existent files)\n\n**Optional Fields:**\n- Any user-defined fields\n\n**Size Limit:**\nMaximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large\n\n**Version Rules:**\n- New file: version can be 0 or 1\n- Existing file: version MUST match current file version exactly\n- Mismatch causes 409 Conflict\n",
+          "description": "JSON object containing settings data with mandatory `version` field.\n\n**Required Fields:**\n- `version`: Integer matching the current version (1 when nothing is stored yet)\n\n**Optional Fields:**\n- Any user-defined fields\n\n**Size Limit:**\nMaximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large\n\n**Version Rules:**\n- MUST be a JSON integer from 1 to 9223372036854775806 (strings, decimals and booleans return 400)\n- A stored version that has reached 9223372036854775806 cannot be incremented; such a PUT returns 400\n- Nothing stored yet: version MUST be 1\n- Existing object: version MUST match the stored version exactly\n- Mismatch causes 409 Conflict\n",
           "required": true,
           "content": {
             "application/json": {
@@ -4291,8 +4296,10 @@
                 "properties": {
                   "version": {
                     "type": "integer",
+                    "format": "int64",
                     "description": "Current version from GET request",
-                    "minimum": 0
+                    "minimum": 1,
+                    "maximum": 9223372036854775806
                   }
                 },
                 "additionalProperties": true
@@ -4300,21 +4307,23 @@
               "examples": {
                 "create_new": {
                   "value": {
-                    "version": 0,
-                    "theme": "dark",
-                    "language": "en"
+                    "version": 1,
+                    "value": {
+                      "preferred_node_ids": []
+                    }
                   },
-                  "summary": "Creating new settings file"
+                  "summary": "Creating the settings object (nothing stored yet)"
                 },
                 "update_existing": {
                   "value": {
                     "version": 5,
-                    "theme": "light",
-                    "dashboard": {
-                      "layout": "list"
+                    "value": {
+                      "preferred_node_ids": [
+                        "11111111-2222-3333-4444-555555555555"
+                      ]
                     }
                   },
-                  "summary": "Updating existing file (version from previous GET)"
+                  "summary": "Updating the stored object (version from previous GET)"
                 }
               }
             }
@@ -4328,7 +4337,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "message": {
+                    "status": {
+                      "type": "integer",
+                      "example": 200
+                    },
+                    "errorMessage": {
                       "type": "string",
                       "example": "OK"
                     }
@@ -4338,7 +4351,7 @@
             }
           },
           "400": {
-            "description": "Bad request. Common causes:\n- Invalid file name\n- Missing `version` field in payload\n- Invalid JSON payload\n- Empty payload\n- Anonymous user trying to access non-default file\n"
+            "description": "Bad request. Common causes:\n- `file` is not `default`\n- Missing `version` field in payload, `version` is not a valid integer, or it cannot be incremented\n- Invalid JSON payload\n- Empty payload\n"
           },
           "409": {
             "description": "Conflict. Version mismatch detected.\n\n**Resolution Steps:**\n1. GET current settings to retrieve latest version\n2. Reapply your changes to the new version\n3. PUT again with updated version number\n\nThis prevents lost updates when multiple clients modify settings concurrently.\n",
@@ -4347,7 +4360,11 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "message": {
+                    "status": {
+                      "type": "integer",
+                      "example": 409
+                    },
+                    "errorMessage": {
                       "type": "string",
                       "example": "Payload version does not match the version of the stored object"
                     }

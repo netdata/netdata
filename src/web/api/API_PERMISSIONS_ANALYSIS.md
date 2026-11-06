@@ -91,7 +91,7 @@ earlier transport/connection gates also apply.
 | `/api/v3/function` | `HTTP_ACL_FUNCTIONS` | `ANONYMOUS_DATA` | Execute function (permissions checked per-function) |
 | `/api/v3/functions` | `HTTP_ACL_FUNCTIONS` | `ANONYMOUS_DATA` | List functions |
 | `/api/v3/config` | `HTTP_ACL_DYNCFG` | `ANONYMOUS_DATA` | Dynamic configuration (read/write permissions checked per-action) |
-| `/api/v3/settings` | `HTTP_ACL_DASHBOARD` | `ANONYMOUS_DATA` | User settings (GET/PUT) |
+| `/api/v3/settings` | `HTTP_ACL_DASHBOARD` | `ANONYMOUS_DATA` | Agent-wide dashboard settings, one shared `default` object (GET/PUT) |
 
 ### Per-route ACL bypass entries
 
