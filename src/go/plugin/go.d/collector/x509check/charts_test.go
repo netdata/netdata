@@ -126,11 +126,12 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 	}
 	assert.Equal(t, 3, charts, "identical common names must not merge distinct depths")
 
-	// Successful observations with a shorter chain and unavailable revocation must retain charts with gaps.
+	// Successful observations with a shorter, renewed chain and unavailable revocation must retain charts with gaps.
 	chain := provider.certs
-	provider.certs = chain[:1]
+	renewed := *chain[0]
+	renewed.Subject.CommonName = "renewed"
+	provider.certs = []*x509.Certificate{&renewed}
 	verified = false
-	provider.certs[0].Subject.CommonName = "renewed"
 	for cycle := 0; cycle < 20; cycle++ {
 		require.NoError(t, collectCycle(t, c))
 		plan := preparePlan(t, engine, c)
@@ -155,16 +156,20 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 	}
 	provider.certs, verified = chain, true
 	require.NoError(t, collectCycle(t, c))
-	var updates int
+	var updates, labels int
 	for _, action := range preparePlan(t, engine, c).Actions {
 		switch a := action.(type) {
 		case chartengine.CreateChartAction, chartengine.RemoveChartAction:
 			t.Fatalf("recovery must reuse existing charts: %#v", a)
+		case chartengine.UpdateChartLabelsAction:
+			labels++
+			assert.Equal(t, "shared", a.Labels["common_name"])
 		case chartengine.UpdateChartAction:
 			updates++
 		}
 	}
 	assert.Equal(t, 3, updates)
+	assert.Equal(t, 1, labels, "the restored chain updates the renewed chart's metadata back")
 }
 
 func newEngine(t *testing.T, c *Collector) *chartengine.Engine {

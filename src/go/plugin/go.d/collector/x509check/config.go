@@ -24,5 +24,8 @@ func (c *Collector) validateConfig() error {
 	if c.Source == "" {
 		return errors.New("source is not set")
 	}
+	if c.Timeout.Duration() <= 0 {
+		return errors.New("timeout must be greater than zero")
+	}
 	return nil
 }

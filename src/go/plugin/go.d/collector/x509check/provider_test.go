@@ -3,6 +3,7 @@
 package x509check
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -10,7 +11,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/binary"
 	"encoding/pem"
+	"errors"
+	"io"
 	"math/big"
 	"net"
 	"net/textproto"
@@ -87,11 +91,45 @@ func TestCollector_CheckIsBounded(t *testing.T) {
 
 			select {
 			case err := <-done:
-				assert.Error(t, err)
+				if test.cancelAfter > 0 {
+					assert.ErrorIs(t, err, context.Canceled)
+				} else {
+					var timeout interface{ Timeout() bool }
+					assert.Truef(t, errors.As(err, &timeout) && timeout.Timeout(), "want a timeout error, got %v", err)
+				}
 			case <-time.After(5 * time.Second):
 				t.Fatal("Check is still blocked on a peer that never answers")
 			}
 		})
+	}
+}
+
+func TestCollector_CheckEndsTLSWithCloseNotify(t *testing.T) {
+	cert := newTestCertificate(t, "localhost", time.Now().Add(time.Hour))
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+	// TLS 1.2 keeps record content types in plaintext, so an alert record is visible on the wire.
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}, MaxVersion: tls.VersionTLS12}
+	received := make(chan []byte, 1)
+	go acceptEach(ln, func(conn net.Conn) {
+		recorder := &recordingConn{Conn: conn}
+		_, _ = io.Copy(io.Discard, tls.Server(recorder, tlsConfig))
+		received <- tlsRecordTypes(recorder.received.Bytes())
+	})
+
+	c := New()
+	c.Source = "tcp://" + ln.Addr().String()
+	c.InsecureSkipVerify = true
+	require.NoError(t, c.Init(t.Context()))
+	require.NoError(t, c.Check(t.Context()))
+
+	select {
+	case types := <-received:
+		const recordTypeAlert = 21
+		assert.Contains(t, types, byte(recordTypeAlert), "the client must end the session with close_notify")
+	case <-time.After(5 * time.Second):
+		t.Fatal("the server never saw the session end")
 	}
 }
 
@@ -215,4 +253,30 @@ func acceptEach(ln net.Listener, serve func(net.Conn)) {
 			serve(conn)
 		}()
 	}
+}
+
+// recordingConn keeps every byte read from the connection.
+type recordingConn struct {
+	net.Conn
+	received bytes.Buffer
+}
+
+func (c *recordingConn) Read(p []byte) (int, error) {
+	n, err := c.Conn.Read(p)
+	c.received.Write(p[:n])
+	return n, err
+}
+
+// tlsRecordTypes returns the content type of every complete TLS record in data.
+func tlsRecordTypes(data []byte) []byte {
+	var types []byte
+	for len(data) >= 5 {
+		size := 5 + int(binary.BigEndian.Uint16(data[3:5]))
+		if size > len(data) {
+			break
+		}
+		types = append(types, data[0])
+		data = data[size:]
+	}
+	return types
 }

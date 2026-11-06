@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -66,67 +65,56 @@ func TestCollector_ChartTemplate(t *testing.T) {
 
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
-		config       Config
+		config       func(*Config)
 		wantProvider certificateProvider
 		wantErr      bool
 	}{
 		"https": {
-			config: Config{
-				Source: "https://example.org:443",
-			},
+			config:       func(c *Config) { c.Source = "https://example.org:443" },
 			wantProvider: &netProvider{},
 		},
 		"tcp": {
-			config: Config{
-				Source: "tcp://example.org:443",
-			},
+			config:       func(c *Config) { c.Source = "tcp://example.org:443" },
 			wantProvider: &netProvider{},
 		},
 		"smtp": {
-			config: Config{
-				Source: "smtp://smtp.example.org:587",
-			},
+			config:       func(c *Config) { c.Source = "smtp://smtp.example.org:587" },
 			wantProvider: &smtpProvider{},
 		},
 		"file": {
-			config: Config{
-				Source: "file:///home/me/cert.pem",
-			},
+			config:       func(c *Config) { c.Source = "file:///home/me/cert.pem" },
 			wantProvider: &fileProvider{},
 		},
 		"file ignores TLS options": {
-			config: Config{
-				Source: "file:///home/me/cert.pem",
-				TLSConfig: tlscfg.TLSConfig{
-					TLSCA: "testdata/tls",
-				},
+			config: func(c *Config) {
+				c.Source = "file:///home/me/cert.pem"
+				c.TLSCA = "testdata/tls"
 			},
 			wantProvider: &fileProvider{},
 		},
 		"empty source": {
-			config: Config{
-				Source: "",
+			config:  func(c *Config) { c.Source = "" },
+			wantErr: true,
+		},
+		"zero timeout": {
+			config: func(c *Config) {
+				c.Source = "https://example.org:443"
+				c.Timeout = 0
 			},
 			wantErr: true,
 		},
 		"unsupported scheme": {
-			config: Config{
-				Source: "http://example.org",
-			},
+			config:  func(c *Config) { c.Source = "http://example.org" },
 			wantErr: true,
 		},
 		"udp scheme": {
-			config: Config{
-				Source: "udp://example.org:443",
-			},
+			config:  func(c *Config) { c.Source = "udp://example.org:443" },
 			wantErr: true,
 		},
 		"nonexistent TLS CA": {
-			config: Config{
-				Source: "https://example.org:443",
-				TLSConfig: tlscfg.TLSConfig{
-					TLSCA: "testdata/tls",
-				},
+			config: func(c *Config) {
+				c.Source = "https://example.org:443"
+				c.TLSCA = "testdata/tls"
 			},
 			wantErr: true,
 		},
@@ -135,7 +123,7 @@ func TestCollector_Init(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := New()
-			c.Config = test.config
+			test.config(&c.Config)
 
 			if test.wantErr {
 				assert.Error(t, c.Init(t.Context()))

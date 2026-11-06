@@ -63,16 +63,18 @@ func (p *fileProvider) certificates(context.Context) ([]*x509.Certificate, error
 }
 
 func (p *netProvider) certificates(ctx context.Context) ([]*x509.Certificate, error) {
-	ctx, cancel := p.withTimeout(ctx)
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
 
 	conn, err := p.dial(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = conn.Close() }()
 
 	tlsConn := tls.Client(conn, p.tlsConfig.Clone())
+	// Closing the TLS connection sends close_notify after a completed handshake, then closes conn.
+	defer func() { _ = tlsConn.Close() }()
+
 	if err := tlsConn.HandshakeContext(ctx); err != nil {
 		return nil, fmt.Errorf("error on SSL handshake with '%s': %w", p.address, err)
 	}
@@ -81,7 +83,7 @@ func (p *netProvider) certificates(ctx context.Context) ([]*x509.Certificate, er
 }
 
 func (p *smtpProvider) certificates(ctx context.Context) ([]*x509.Certificate, error) {
-	ctx, cancel := p.withTimeout(ctx)
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
 
 	conn, err := p.dial(ctx)
@@ -106,14 +108,6 @@ func (p *smtpProvider) certificates(ctx context.Context) ([]*x509.Certificate, e
 		return nil, errors.New("startTLS didn't succeed")
 	}
 	return state.PeerCertificates, nil
-}
-
-// withTimeout bounds ctx by the configured timeout; a non-positive timeout leaves ctx unbounded.
-func (e endpoint) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
-	if e.timeout <= 0 {
-		return context.WithCancel(ctx)
-	}
-	return context.WithTimeout(ctx, e.timeout)
 }
 
 // dial connects to the endpoint. ctx also bounds every later exchange on the connection: once it is done,

@@ -53,6 +53,10 @@ func (c *Collector) collect(ctx context.Context) error {
 func (c *Collector) fetchCertificates(ctx context.Context) ([]*x509.Certificate, error) {
 	certs, err := c.provider.certificates(ctx)
 	if err != nil {
+		// Cancellation ends a network exchange through a connection deadline; report the cancellation itself.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, err
 	}
 	if len(certs) == 0 {
