@@ -320,7 +320,9 @@ func (c *Collector) buildTableLicenseRow(
 		crossTableCtx: crossTableCtx,
 		orderedTags:   ctx.orderedTags,
 	}
-	c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx)
+	if err := c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx); err != nil {
+		return ddsnmp.LicenseRow{}, false, err
+	}
 
 	rowKey := rowIndex
 	row := ddsnmp.LicenseRow{

@@ -58,7 +58,7 @@ func (r *crossTableResolver) lookupTagPDU(
 		return gosnmp.SnmpPDU{}, failure
 	}
 	if r.requiresLookupByValue(tag) {
-		lookupIndex, err = r.resolveLookupIndexByValue(tag, lookupIndex, root, pdus, ctx)
+		lookupIndex, err = r.resolveLookupIndexByValue(tag, lookupIndex, index, root, pdus, ctx)
 		if err != nil {
 			return gosnmp.SnmpPDU{}, &tableLookupError{
 				oid:    tag.LookupSymbol.OID,

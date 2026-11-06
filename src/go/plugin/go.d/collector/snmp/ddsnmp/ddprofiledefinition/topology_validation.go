@@ -47,7 +47,7 @@ func validateEnrichTopology(topology []TopologyConfig) error {
 				),
 			)
 		}
-		errs = append(errs, validateEnrichMetricTags(path, metricConfig.MetricTags, !metricConfig.IsColumn()))
+		errs = append(errs, validateEnrichMetricTags(path, metricConfig.MetricTags, !metricConfig.IsColumn(), metricConfig.Table.Name))
 	}
 
 	return errors.Join(errs...)

@@ -98,6 +98,7 @@ func BenchmarkCrossTableResolver_JuniperPeerFamilyLookupScaling(b *testing.B) {
 						if _, err := resolver.resolveLookupIndexByValue(
 							tagCfg,
 							lookupValue,
+							lookupValue,
 							refTableOID,
 							refTablePDUs,
 							ctx,

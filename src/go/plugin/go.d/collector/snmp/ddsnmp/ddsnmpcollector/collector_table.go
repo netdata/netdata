@@ -378,6 +378,8 @@ func (tc *tableCollector) processRows(
 		}
 		rowMetrics, err := tc.rowProcessor.processRow(row, rowCtx)
 		if err != nil {
+			delete(ctx.oidCache, index)
+			delete(ctx.tagCache, index)
 			stats.Errors.Processing.Table++
 			errs = append(errs, err)
 			continue

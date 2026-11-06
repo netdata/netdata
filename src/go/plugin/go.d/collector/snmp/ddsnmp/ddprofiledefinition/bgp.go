@@ -504,6 +504,7 @@ type BGPValueConfig struct {
 	Name   string       `yaml:"name,omitempty"   json:"name,omitempty"`
 
 	LookupSymbol SymbolConfigCompat `yaml:"lookup_symbol,omitempty" json:"lookup_symbol"`
+	LookupScope  *MetricLookupScope `yaml:"lookup_scope,omitempty" json:"lookup_scope,omitempty"`
 
 	Format  string        `yaml:"format,omitempty"  json:"format,omitempty"`
 	Mapping MappingConfig `yaml:"mapping,omitempty" json:"mapping"`
@@ -522,6 +523,7 @@ func (c BGPValueConfig) IsSet() bool {
 		c.Name != "" ||
 		c.LookupSymbol.OID != "" ||
 		c.LookupSymbol.Name != "" ||
+		c.LookupScope != nil ||
 		c.Format != "" ||
 		c.Mapping.HasItems() ||
 		c.Mapping.Mode != ""
@@ -542,11 +544,12 @@ func (c BGPValueConfig) Clone() BGPValueConfig {
 		Table:          c.Table,
 		Index:          c.Index,
 		IndexFromEnd:   c.IndexFromEnd,
-		IndexTransform: slices.Clone(c.IndexTransform),
+		IndexTransform: cloneSlice(c.IndexTransform),
 		Symbol:         c.Symbol.Clone(),
 		OID:            c.OID,
 		Name:           c.Name,
 		LookupSymbol:   c.LookupSymbol.Clone(),
+		LookupScope:    c.LookupScope.Clone(),
 		Format:         c.Format,
 		Mapping:        c.Mapping.Clone(),
 	}

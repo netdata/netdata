@@ -90,8 +90,8 @@ metrics:
     metric_tags:
       - tag: fan_index
         symbol:
-          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.17.1.1
           name: sysExtFanIndex
+        index: 1
 
   # The table of Power supplies in the controller.
   # Not supported in Aruba 200, 800 and 2400 controllers.
@@ -113,8 +113,8 @@ metrics:
     metric_tags:
       - tag: powersupply_index
         symbol:
-          OID: 1.3.6.1.4.1.14823.2.2.1.2.1.18.1.1
           name: sysExtPowerSupplyIndex
+        index: 1
 
   # The packet loss count of the switch.
   - MIB: WLSX-SYSTEMEXT-MIB

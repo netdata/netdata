@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"encoding/json"
 	"maps"
 	"math/rand"
 	"sort"
@@ -444,6 +445,27 @@ func (tc *tableCache) generateConfigID(cfg ddprofiledefinition.MetricsConfig) st
 	}
 
 	sb.WriteString(strings.Join(names, ","))
+	for _, tag := range cfg.MetricTags {
+		extended := tag.IndexDecode != nil || tag.LookupScope != nil || tag.Symbol.Format == "octet_string"
+		for _, transform := range tag.IndexTransform {
+			extended = extended || len(transform.Mapping) > 0
+		}
+		if !extended {
+			continue
+		}
+		// New index semantics must not reuse tags computed by another layout or scope.
+		// These fields contain only JSON-supported strings, integers, slices and maps.
+		identity, _ := json.Marshal(struct {
+			Tag, Format, Extract, Match, MatchValue string
+			Decode                                  *ddprofiledefinition.MetricIndexDecode
+			Transforms                              []ddprofiledefinition.MetricIndexTransform
+			Scope                                   *ddprofiledefinition.MetricLookupScope
+			Mapping                                 ddprofiledefinition.MappingConfig
+		}{tag.Tag, tag.Symbol.Format, tag.Symbol.ExtractValue, tag.Symbol.MatchPattern, tag.Symbol.MatchValue,
+			tag.IndexDecode, tag.IndexTransform, tag.LookupScope, tag.Mapping})
+		sb.WriteString("|index:")
+		sb.Write(identity)
+	}
 
 	return sb.String()
 }

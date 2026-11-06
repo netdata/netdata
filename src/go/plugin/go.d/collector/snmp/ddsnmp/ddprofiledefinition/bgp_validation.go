@@ -139,7 +139,7 @@ func validateEnrichBGP(rows []BGPConfig) error {
 		errs = append(errs, validateBGPSourceReferences(i, row))
 		errs = append(errs, validateBGPSignalDuplicates(i, row, seenSignals))
 
-		errs = append(errs, validateEnrichMetricTags(fmt.Sprintf("bgp[%d]", i), row.MetricTags, !isTable))
+		errs = append(errs, validateEnrichMetricTags(fmt.Sprintf("bgp[%d]", i), row.MetricTags, !isTable, row.Table.Name))
 	}
 
 	errs = append(errs, validateBGPTableReferences(rows))
@@ -301,6 +301,11 @@ func validateEnrichBGPValue(path string, value *BGPValueConfig, isTable bool) er
 	}
 	errs = append(errs, validateMapping(value.Mapping, metadataSymbol))
 	errs = append(errs, validateBGPRowIndexSelector(path, value))
+	errs = append(errs, withValidationPath(path, validateIndexTransforms(value.IndexTransform)))
+	errs = append(errs, withValidationPath(path, validateLookupScope(value.LookupScope, value.Table, value.LookupSymbol)))
+	if value.LookupScope != nil && (value.Value != "" || value.Index != 0 || value.IndexFromEnd != 0) {
+		errs = append(errs, fmt.Errorf("%s: lookup_scope cannot be combined with value, index, or index_from_end", path))
+	}
 
 	if strings.HasPrefix(value.Name, "_") {
 		errs = append(errs, fmt.Errorf("%s.name: name %q cannot be underscore-prefixed", path, value.Name))
@@ -486,6 +491,9 @@ func validateBGPSourceReferences(rowIdx int, row *BGPConfig) error {
 	var errs []error
 	tableOID := TrimBGPOID(row.Table.OID)
 	for _, ref := range collectBGPValueReferences(*row) {
+		if ref.value.LookupScope != nil && ref.value.Table == row.Table.Name {
+			errs = append(errs, fmt.Errorf("bgp[%d].%s: lookup_scope requires a different target table", rowIdx, ref.path))
+		}
 		if ref.value.Table != "" {
 			continue
 		}

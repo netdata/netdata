@@ -334,11 +334,16 @@ func (c *Collector) walkBGPTableDependencies(
 	route *AcquisitionRouteReport,
 ) error {
 	var errs []error
-	for _, depOID := range bgpTableDependencies(cfg, metricsCfg, tableNameToOID) {
+	requirements := bgpTableDependencyRequirements(cfg, metricsCfg, tableNameToOID)
+	for _, depOID := range slices.Sorted(maps.Keys(requirements)) {
 		outcome := walkPass.walk(c.tableCollector, depOID, stats)
 		bindSourceWalk(route, outcome.sourceOperation, depOID, "dependency")
 		if outcome.err != nil {
-			errs = append(errs, fmt.Errorf("table OID %q: %w", trimOID(depOID), outcome.err))
+			if requirements[depOID] {
+				errs = append(errs, fmt.Errorf("table OID %q: %w", trimOID(depOID), outcome.err))
+			} else {
+				recordCollectionFailure(&c.failures.BGP, outcome.err, "bgp", "optional_dependency")
+			}
 		}
 	}
 	return errors.Join(errs...)
@@ -428,7 +433,9 @@ func (c *Collector) buildTableBGPRow(
 		rejected:           rejected,
 		dependencyRejected: dependencyRejected,
 	}
-	c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx)
+	if err := c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx); err != nil {
+		return ddsnmp.BGPRow{}, false, err
+	}
 
 	row := ddsnmp.BGPRow{
 		OriginProfileID: cfg.OriginProfileID,
@@ -1155,6 +1162,7 @@ func (c *Collector) lookupBGPValuePDU(
 		Table:          cfg.Table,
 		Symbol:         ddprofiledefinition.SymbolConfigCompat(sym),
 		LookupSymbol:   cfg.LookupSymbol,
+		LookupScope:    cfg.LookupScope,
 		IndexTransform: cfg.IndexTransform,
 	}
 	pdu, failure := c.tableCollector.rowProcessor.crossTableResolver.lookupTagPDU(tag, ctx.rowIndex, ctx.crossTableCtx)
@@ -1274,25 +1282,29 @@ func bgpTableDependencies(
 	metricsCfg ddprofiledefinition.MetricsConfig,
 	tableNameToOID map[string]string,
 ) []string {
+	return slices.Sorted(maps.Keys(bgpTableDependencyRequirements(cfg, metricsCfg, tableNameToOID)))
+}
+
+// A dependency shared with identity, signals or row tags remains required.
+func bgpTableDependencyRequirements(
+	cfg ddprofiledefinition.BGPConfig,
+	metricsCfg ddprofiledefinition.MetricsConfig,
+	tableNameToOID map[string]string,
+) map[string]bool {
 	deps := make(map[string]bool)
 	for _, dep := range extractTableDependencies(metricsCfg, tableNameToOID) {
 		deps[trimOID(dep)] = true
 	}
-	forEachBGPValue(cfg, func(valueCfg ddprofiledefinition.BGPValueConfig) {
-		if valueCfg.Table == "" || valueCfg.Table == cfg.Table.Name {
+	forEachBGPValuePath(cfg, func(path string, value ddprofiledefinition.BGPValueConfig) {
+		if value.Table == "" || value.Table == cfg.Table.Name {
 			return
 		}
-		if tableOID, ok := tableNameToOID[valueCfg.Table]; ok {
-			deps[trimOID(tableOID)] = true
+		if oid, ok := tableNameToOID[value.Table]; ok {
+			oid = trimOID(oid)
+			deps[oid] = deps[oid] || !strings.HasPrefix(path, "descriptors.")
 		}
 	})
-
-	result := make([]string, 0, len(deps))
-	for oid := range deps {
-		result = append(result, oid)
-	}
-	slices.Sort(result)
-	return result
+	return deps
 }
 
 func (c *Collector) bgpScalarOIDs(cfg ddprofiledefinition.BGPConfig) ([]string, []string) {
