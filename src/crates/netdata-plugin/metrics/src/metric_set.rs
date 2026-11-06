@@ -13,6 +13,14 @@ const MAX_LABEL_KEY_BYTES: usize = 200;
 /// The agent keeps at most this many bytes of a label value.
 const MAX_LABEL_VALUE_BYTES: usize = 800;
 
+/// The longest collection interval, in seconds: the agent reads a chart's
+/// `update_every` as an `int`.
+const MAX_INTERVAL_SECS: u64 = i32::MAX as u64;
+
+/// The most collection intervals a window may wait for late events: each
+/// entity keeps a row for every window still waiting.
+const MAX_ALLOWED_LATENESS_WINDOWS: u64 = 60;
+
 /// One column of an instrument: each value of the type is one column.
 ///
 /// For example, with `Outcome` from the [`columns!`](crate::columns) example,
@@ -270,19 +278,22 @@ pub(crate) struct MetricSetInner {
 #[derive(Debug, Clone)]
 pub struct Settings {
     /// The window length: each entity gets one row per collection interval.
-    /// Whole seconds, at least 1 (the agent's resolution). Default 1 s.
+    /// Whole seconds, at least 1 (the agent's resolution) and at most
+    /// `i32::MAX`. Default 1 s.
     pub collection_interval: Duration,
     /// A delay: how long after its end a window waits before it is emitted;
     /// until then it takes the events whose time falls in it, and older events
     /// are counted in the oldest open window. Rounded up to whole collection
-    /// intervals. Default 0.
+    /// intervals, at most 60 of them: each entity keeps a row for every window
+    /// still waiting. Default 0.
     pub allowed_lateness: Duration,
     /// A timeout: the aggregator forgets an entity with no events for this
     /// long (its charts are marked obsolete: the agent stops collecting them
     /// and later removes them). Rounded up to whole collection intervals. It
     /// counts emitted windows, which lag by `allowed_lateness`: with expiry
     /// 900 s and an allowed lateness of 10 s, an entity last recorded at
-    /// second 0 expires at second 911. Default 15 minutes.
+    /// second 0 expires at second 911. `Duration::MAX` means never. Default
+    /// 15 minutes.
     pub expiry: Duration,
     /// The limit on the number of entities; default none.
     pub cardinality_limit: Option<CardinalityLimit>,
@@ -319,9 +330,13 @@ pub struct CardinalityLimit {
 /// [`MetricSetBuilder`] step that makes it.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum MetricSetError {
-    /// The collection interval is not a whole number of seconds of at least 1.
-    #[error("the collection interval must be whole seconds, at least 1: {0:?}")]
+    /// The collection interval is not a whole number of seconds from 1 to
+    /// `i32::MAX`.
+    #[error("the collection interval must be whole seconds, from 1 to {max}: {0:?}", max = MAX_INTERVAL_SECS)]
     CollectionInterval(Duration),
+    /// The allowed lateness is more than 60 collection intervals.
+    #[error("the allowed lateness must be at most {max} collection intervals: {0:?}", max = MAX_ALLOWED_LATENESS_WINDOWS)]
+    AllowedLateness(Duration),
     /// `expiry` is 0.
     #[error("expiry must be positive")]
     ZeroExpiry,
@@ -464,11 +479,10 @@ impl MetricSetBuilder {
         }
         let settings = self.settings;
         let interval = settings.collection_interval;
-        let windows = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
         Ok(MetricSet(Arc::new(MetricSetInner {
             id: self.id,
-            allowed_lateness_windows: windows(settings.allowed_lateness),
-            expiry_windows: windows(settings.expiry),
+            allowed_lateness_windows: windows(settings.allowed_lateness, interval),
+            expiry_windows: windows(settings.expiry, interval),
             interval_secs: interval.as_secs(),
             cardinality_limit: settings.cardinality_limit,
             schema: self.schema,
@@ -476,10 +490,22 @@ impl MetricSetBuilder {
     }
 }
 
+/// `span` in whole collection intervals of `interval`, rounded up; a span
+/// longer than `u64::MAX` intervals counts as `u64::MAX`.
+fn windows(span: Duration, interval: Duration) -> u64 {
+    u64::try_from(span.as_nanos().div_ceil(interval.as_nanos())).unwrap_or(u64::MAX)
+}
+
 fn check_settings(settings: &Settings) -> Result<(), MetricSetError> {
     let interval = settings.collection_interval;
-    if interval.as_secs() == 0 || interval.subsec_nanos() != 0 {
+    if interval.as_secs() == 0
+        || interval.as_secs() > MAX_INTERVAL_SECS
+        || interval.subsec_nanos() != 0
+    {
         return Err(MetricSetError::CollectionInterval(interval));
+    }
+    if windows(settings.allowed_lateness, interval) > MAX_ALLOWED_LATENESS_WINDOWS {
+        return Err(MetricSetError::AllowedLateness(settings.allowed_lateness));
     }
     if settings.expiry.is_zero() {
         return Err(MetricSetError::ZeroExpiry);

@@ -351,7 +351,7 @@ impl Entity {
         window: u64,
         out: &mut Chunker,
     ) -> bool {
-        if !self.emitted || window < self.last_window + set.expiry_windows {
+        if !self.emitted || window < self.last_window.saturating_add(set.expiry_windows) {
             return false;
         }
         charts.write_obsolete(&self.chart_ids, out);
@@ -844,6 +844,21 @@ mod tests {
             ),
             (
                 Settings {
+                    collection_interval: Duration::from_secs(1 << 31),
+                    ..Settings::default()
+                },
+                MetricSetError::CollectionInterval(Duration::from_secs(1 << 31)),
+            ),
+            (
+                // Rounded up to 61 collection intervals.
+                Settings {
+                    allowed_lateness: Duration::from_millis(60_500),
+                    ..Settings::default()
+                },
+                MetricSetError::AllowedLateness(Duration::from_millis(60_500)),
+            ),
+            (
+                Settings {
                     expiry: Duration::ZERO,
                     ..Settings::default()
                 },
@@ -867,6 +882,11 @@ mod tests {
         for (settings, error) in cases {
             assert_eq!(MetricSetBuilder::new(settings).err(), Some(error));
         }
+        let longest_lateness = Settings {
+            allowed_lateness: Duration::from_secs(60),
+            ..Settings::default()
+        };
+        assert!(MetricSetBuilder::new(longest_lateness).is_ok());
     }
 
     #[test]
@@ -1433,6 +1453,33 @@ mod tests {
     fn a_set_without_instruments_is_refused() {
         let builder = MetricSetBuilder::new(Settings::default()).unwrap();
         assert_eq!(builder.build().err(), Some(MetricSetError::NoInstruments));
+    }
+
+    #[test]
+    fn a_huge_expiry_never_expires() {
+        // `Duration::MAX` is more windows than a `u64` holds; `u64::MAX`
+        // seconds is exactly `u64::MAX` windows.
+        for expiry in [Duration::MAX, Duration::from_secs(u64::MAX)] {
+            let mut builder = MetricSetBuilder::new(Settings {
+                expiry,
+                ..Settings::default()
+            })
+            .unwrap();
+            let queue = builder.gauge::<Queue>().unwrap();
+            let set = builder.build().unwrap();
+            let mut charts = ChartsBuilder::new(&set);
+            charts.chart(queue, descriptor("x.q", 1));
+            let mut aggregator = Aggregator::new(&charts.build());
+            let mut batch = Batch::new(&set);
+            batch
+                .entity(Labels::new())
+                .record(100)
+                .set_value(queue, Queue::Jobs, 1.0);
+            aggregator.merge(batch, 100);
+            let out = text(&aggregator.emit(100_000, usize::MAX));
+            assert!(!out.contains("obsolete"), "{expiry:?}");
+            assert_eq!(aggregator.stats().expired_entities, 0, "{expiry:?}");
+        }
     }
 
     #[cfg(debug_assertions)]
