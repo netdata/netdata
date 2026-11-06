@@ -179,6 +179,7 @@ impl Aggregator {
         );
         let oldest_open = self.bound_backlog(now);
         let set = &*self.set.0;
+        // Never below `oldest_open`: the clamp below and `merge_window` rely on it.
         let newest = (now / set.interval_secs).max(oldest_open);
         for (labels, entity_rows) in batch.entities {
             if entity_rows.rows.is_empty() {

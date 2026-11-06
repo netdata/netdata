@@ -29,9 +29,10 @@ pub(crate) struct EntityRows {
 }
 
 impl EntityRows {
-    /// The row for `window`, added empty if the batch has none yet; like
-    /// [`Batch::entity`], a lookup that adds what is missing.
-    pub(crate) fn row(&mut self, window: u64, row_layout: &RowLayout) -> &mut BatchRow {
+    /// This entity's row for `window` in the batch, added empty if missing;
+    /// like [`Batch::entity`], a lookup that adds what is missing. Moves
+    /// `last` to it.
+    fn row(&mut self, window: u64, row_layout: &RowLayout) -> &mut BatchRow {
         let cached = self
             .rows
             .get_index(self.last)
