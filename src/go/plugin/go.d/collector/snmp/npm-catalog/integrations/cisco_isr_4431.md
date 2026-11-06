@@ -222,7 +222,7 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_cfwConnectionStatCount` | `1` | per conn_stat_id | Integer that contains the value of the resource statistic. |
+| `snmp.device_prof_cfwConnectionStatCount` | `1` | per conn_stat_id, conn_stat_type | Integer that contains the value of the resource statistic. |
 
 ### Network / IP
 

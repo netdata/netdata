@@ -221,8 +221,8 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | `snmp.device_prof_ipIfStatsReasmReqds` | `{fragment}/s` | per interface_index, ipversion | The number of IP fragments received that needed to be reassembled at this interface |
 | `snmp.device_prof_jnxDcuStatsBytes` | `By/s` | per interface, address_family, destination_class_name | The number of bytes received on this interface, belonging to this address family that match this Destination Class |
 | `snmp.device_prof_jnxDcuStatsPackets` | `{packet}/s` | per interface, address_family, destination_class_name | The number of packets received on this interface, belonging to this address family that match this Destination Class |
-| `snmp.device_prof_jnxScuStatsBytes` | `By/s` | per interface, address_family | Number of bytes sent out of destination interface that match the source class and address family |
-| `snmp.device_prof_jnxScuStatsPackets` | `{packet}/s` | per interface, address_family | Number of packets sent out of destination interface that match the source class and address family |
+| `snmp.device_prof_jnxScuStatsBytes` | `By/s` | per interface, address_family, source_class_name | Number of bytes sent out of destination interface that match the source class and address family |
+| `snmp.device_prof_jnxScuStatsPackets` | `{packet}/s` | per interface, address_family, source_class_name | Number of packets sent out of destination interface that match the source class and address family |
 
 ### Network / Routing
 
@@ -272,26 +272,26 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
 | `snmp.device_prof_jnxIkeNumOfTunnels` | `{tunnel}` | device | Total number of active IKE Phase 1 tunnels |
-| `snmp.device_prof_jnxIkeTunMonActiveTime` | `s` | per ike_tunnel_index | Time this IKE Phase 1 tunnel has been active |
-| `snmp.device_prof_jnxIkeTunMonDPDDownCount` | `{event}/s` | per ike_tunnel_index | Number of DPD (Dead Peer Detection) down events on this tunnel |
-| `snmp.device_prof_jnxIkeTunMonInOctets` | `By/s` | per ike_tunnel_index | Number of bytes received on this IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonInPkts` | `{packet}/s` | per ike_tunnel_index | Number of packets received on this IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonLifeTime` | `s` | per ike_tunnel_index | Remaining lifetime of the IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonOutOctets` | `By/s` | per ike_tunnel_index | Number of bytes sent on this IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonOutPkts` | `{packet}/s` | per ike_tunnel_index | Number of packets sent on this IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonState` | `{status}` | per ike_tunnel_index | Current state of the IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonActiveTime` | `s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Time this IKE Phase 1 tunnel has been active |
+| `snmp.device_prof_jnxIkeTunMonDPDDownCount` | `{event}/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of DPD (Dead Peer Detection) down events on this tunnel |
+| `snmp.device_prof_jnxIkeTunMonInOctets` | `By/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of bytes received on this IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonInPkts` | `{packet}/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of packets received on this IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonLifeTime` | `s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Remaining lifetime of the IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonOutOctets` | `By/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of bytes sent on this IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonOutPkts` | `{packet}/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of packets sent on this IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonState` | `{status}` | per ike_tunnel_index, peer_address_type, peer_remote_address | Current state of the IKE Phase 1 tunnel |
 | `snmp.device_prof_jnxIpSecNumOfTunnels` | `{tunnel}` | device | Total number of active IPSec Phase 2 tunnels |
-| `snmp.device_prof_jnxIpSecSaMonActiveTime` | `s` | per sa_index | Time this IPSec Security Association has been active |
-| `snmp.device_prof_jnxIpSecSaMonLifeTime` | `s` | per sa_index | Remaining lifetime of this IPSec Security Association |
-| `snmp.device_prof_jnxIpSecSaMonState` | `{status}` | per sa_index | Status of this IPSec Security Association |
-| `snmp.device_prof_jnxIpSecTunMonDecryptFails` | `{failure}/s` | per ipsec_tunnel_index | Number of decryption failures on this tunnel |
-| `snmp.device_prof_jnxIpSecTunMonDroppedPkts` | `{drop}/s` | per ipsec_tunnel_index | Total number of packets dropped on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonEspAuthFails` | `{failure}/s` | per ipsec_tunnel_index | Number of ESP authentication failures on this tunnel |
-| `snmp.device_prof_jnxIpSecTunMonInDecryptedBytes` | `By/s` | per ipsec_tunnel_index | Number of decrypted bytes received on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonInDecryptedPkts` | `{packet}/s` | per ipsec_tunnel_index | Number of decrypted packets received on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonOutEncryptedBytes` | `By/s` | per ipsec_tunnel_index | Number of encrypted bytes sent on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonOutEncryptedPkts` | `{packet}/s` | per ipsec_tunnel_index | Number of encrypted packets sent on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonReplayDropPkts` | `{drop}/s` | per ipsec_tunnel_index | Number of packets dropped due to anti-replay check failure |
+| `snmp.device_prof_jnxIpSecSaMonActiveTime` | `s` | per sa_index, ipsec_tunnel_index, peer_address_type, peer_remote_address | Time this IPSec Security Association has been active |
+| `snmp.device_prof_jnxIpSecSaMonLifeTime` | `s` | per sa_index, ipsec_tunnel_index, peer_address_type, peer_remote_address | Remaining lifetime of this IPSec Security Association |
+| `snmp.device_prof_jnxIpSecSaMonState` | `{status}` | per sa_index, ipsec_tunnel_index, peer_address_type, peer_remote_address | Status of this IPSec Security Association |
+| `snmp.device_prof_jnxIpSecTunMonDecryptFails` | `{failure}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of decryption failures on this tunnel |
+| `snmp.device_prof_jnxIpSecTunMonDroppedPkts` | `{drop}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Total number of packets dropped on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonEspAuthFails` | `{failure}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of ESP authentication failures on this tunnel |
+| `snmp.device_prof_jnxIpSecTunMonInDecryptedBytes` | `By/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of decrypted bytes received on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonInDecryptedPkts` | `{packet}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of decrypted packets received on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonOutEncryptedBytes` | `By/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of encrypted bytes sent on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonOutEncryptedPkts` | `{packet}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of encrypted packets sent on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonReplayDropPkts` | `{drop}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of packets dropped due to anti-replay check failure |
 
 ### System / Activity
 
