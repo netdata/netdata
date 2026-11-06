@@ -2,6 +2,8 @@
 
 import contextlib
 import io
+import hashlib
+import json
 import os
 from pathlib import Path
 import runpy
@@ -86,21 +88,100 @@ class ArtifactPrefixesTest(unittest.TestCase):
         script = step_script('Upload Artifacts')
         stub = 'rclone() { printf "%s|%s\\n" "${7}" "${8}"; }\n'
         with tempfile.TemporaryDirectory() as directory:
-            dirs = ('latest', 'v2.12.2', '2', '2.12')
-            for name in dirs:
-                (Path(directory) / name).mkdir()
+            root = Path(directory)
+            stable = root / 'artifacts'
+            preview = root / 'preview-artifacts'
+            trees = {'stable': (stable, ('v2.12.2',)),
+                     'preview': (preview, ('latest', 'v2.12.2', '2', '2.12'))}
+            for tree, dirs in trees.values():
+                for name in dirs:
+                    (tree / name).mkdir(parents=True)
             for prefixes in ('stable', 'stable preview'):
                 with self.subTest(prefixes=prefixes):
                     result = subprocess.run(['bash', '-eu', '-c', stub + script],
-                                            cwd=directory, capture_output=True, text=True, check=True,
+                                            cwd=stable, capture_output=True, text=True, check=True,
                                             env={**os.environ, 'ARTIFACT_PREFIXES': prefixes})
                     self.assertCountEqual(result.stdout.splitlines(), [
-                        f'{name}/|s3:netdata-agent-artifacts/{prefix}/{name}/'
-                        for prefix in prefixes.split() for name in sorted(dirs)
+                        f'{"./" if prefix == "stable" else "../preview-artifacts/"}{name}/|'
+                        f's3:netdata-agent-artifacts/{prefix}/{name}/'
+                        for prefix in prefixes.split() for name in trees[prefix][1]
                     ])
             failure = subprocess.run(['bash', '-eu', '-c', 'rclone() { return 1; }\n' + script],
-                                     cwd=directory, env={**os.environ, 'ARTIFACT_PREFIXES': 'stable preview'})
+                                     cwd=stable, env={**os.environ, 'ARTIFACT_PREFIXES': 'stable preview'})
             self.assertNotEqual(failure.returncode, 0)
+
+
+class PrepareArtifactAliasesTest(unittest.TestCase):
+    def prepare(self, stable, preview, event='workflow_dispatch', build_type='release'):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        (root / 'packaging').mkdir()
+        (root / 'packaging/version').write_text('v2.12.2')
+        source = root / 'source'
+        source.mkdir()
+        files = ['netdata-v2.12.2.tar.gz', 'netdata-v2.12.2.tar.zst', 'netdata-x64.msi']
+        files += [f'netdata-{arch}-latest.gz.run'
+                  for arch in ('x86_64', 'aarch64', 'armv6l', 'armv7l')]
+        for name in files:
+            (source / name).write_text('synthetic artifact')
+        binaries = root / 'bin'
+        binaries.mkdir()
+        wget = binaries / 'wget'
+        wget.write_text('#!/usr/bin/env python3\n'
+                        'import json, pathlib, sys\n'
+                        f'versions = json.loads({json.dumps({"stable": stable, "preview": preview})!r})\n'
+                        'url = sys.argv[-1]\n'
+                        'pathlib.Path("lookups").open("a").write(url + "\\n")\n'
+                        'channel, alias, _ = url.rsplit("/", 3)[1:]\n'
+                        'value = versions.get(channel, {}).get(alias)\n'
+                        'if value is None:\n'
+                        '    pathlib.Path(sys.argv[sys.argv.index("-o") + 1]).write_text("HTTP/1.1 404 Not Found\\n")\n'
+                        '    sys.exit(8)\n'
+                        'pathlib.Path("Version").write_text(value)\n')
+        wget.chmod(0o755)
+        gpg = binaries / 'gpg'
+        gpg.write_text('#!/bin/sh\nprintf "synthetic signature" > Manifest.sig\n')
+        gpg.chmod(0o755)
+        result = subprocess.run(['bash', str(SCRIPTS / 'prepare-artifacts.sh'),
+                                 str(source), 'test-key', event, build_type],
+                                cwd=root, capture_output=True, text=True,
+                                env={**os.environ, 'PATH': f'{binaries}:{os.environ["PATH"]}'})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return root
+
+    def assert_tree(self, root, tree, aliases):
+        directory = root / 'artifacts' / tree
+        self.assertCountEqual([p.name for p in directory.iterdir()], ['v2.12.2', *aliases])
+        for target in directory.iterdir():
+            self.assertEqual((target / 'Version').read_text().strip(), 'v2.12.2')
+            self.assertTrue((target / 'Manifest.sig').is_file())
+            for line in (target / 'Manifest').read_text().splitlines():
+                name, size, digest = line.split()
+                data = (target / name).read_bytes()
+                self.assertEqual(len(data), int(size))
+                self.assertEqual(hashlib.sha256(data).hexdigest(), digest)
+
+    def test_channels_select_aliases_independently(self):
+        root = self.prepare(
+            {'latest': 'v2.12.3', '2': 'v2.12.3', '2.12': 'v2.12.3'},
+            {'latest': 'v2.12.1', '2': 'v2.12.1', '2.12': 'v2.12.1'},
+        )
+        self.assert_tree(root, 'r2', [])
+        self.assert_tree(root, 'r2-preview', ['latest', '2', '2.12'])
+
+    def test_aliases_use_their_own_metadata(self):
+        root = self.prepare({}, {'latest': 'v3.0.0', '2': 'v2.12.2', '2.12': 'v2.12.2-rc1'})
+        self.assert_tree(root, 'r2', ['latest', '2', '2.12'])
+        self.assert_tree(root, 'r2-preview', ['2.12'])
+
+    def test_nightly_and_pull_request_skip_preview(self):
+        for event, build_type in (('workflow_dispatch', 'nightly'), ('pull_request', 'release')):
+            with self.subTest(event=event, build_type=build_type):
+                root = self.prepare({}, {}, event, build_type)
+                self.assert_tree(root, 'r2', ['latest'])
+                self.assertFalse((root / 'artifacts/r2-preview').exists())
+                self.assertFalse((root / 'lookups').exists())
 
 
 if __name__ == '__main__':

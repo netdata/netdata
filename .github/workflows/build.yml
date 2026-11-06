@@ -745,6 +745,15 @@ jobs:
           path: artifacts/r2/*
           compression-level: 0
           retention-days: 30
+      - name: Store Preview R2 Artifacts
+        id: store-r2-preview
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request' && github.event.inputs.type == 'release'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: r2-preview-artifacts
+          path: artifacts/r2-preview/*
+          compression-level: 0
+          retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
         env:
@@ -762,6 +771,7 @@ jobs:
               Consolidate artifacts: ${{ steps.consolidate.outcome }}
               Store Github: ${{ steps.store-github.outcome }}
               Store R2: ${{ steps.store-r2.outcome }}
+              Store preview R2: ${{ steps.store-r2-preview.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
@@ -1254,6 +1264,13 @@ jobs:
         with:
           name: r2-artifacts
           path: artifacts
+      - name: Retrieve Preview Artifacts
+        id: fetch-preview
+        if: contains(steps.prefixes.outputs.prefixes, 'preview')
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: r2-preview-artifacts
+          path: preview-artifacts
       - name: Upload Artifacts
         id: upload
         env:
@@ -1267,8 +1284,13 @@ jobs:
         working-directory: artifacts
         run: |
           for prefix in ${ARTIFACT_PREFIXES}; do
-            for dir in */ ; do
-              rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/${prefix}/${dir}" || exit 1
+            source_dir=.
+            if [ "${prefix}" = preview ]; then
+              source_dir=../preview-artifacts
+            fi
+            for dir in "${source_dir}"/*/ ; do
+              name="$(basename "${dir}")"
+              rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/${prefix}/${name}/" || exit 1
             done
           done
       - name: Failure Notification
@@ -1283,6 +1305,7 @@ jobs:
               ${{ github.repository }}: Failed to upload stable build artifacts.
               Checkout: ${{ steps.checkout.outcome }}
               Select artifact prefixes: ${{ steps.prefixes.outcome }}
+              Fetch preview artifacts: ${{ steps.fetch-preview.outcome }}
               Install Rclone: ${{ steps.install-rclone.outcome }}
               Fetch artifacts: ${{ steps.fetch.outcome }}
               Upload artifacts: ${{ steps.upload.outcome }}
