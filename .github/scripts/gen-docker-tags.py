@@ -7,7 +7,7 @@ import sys
 
 from typing import Final
 
-from modules.release_versions import stable_reaches_preview
+from modules.release_versions import stable_reaches_preview, version_core
 
 github_event: Final = sys.argv[1]
 version: Final = sys.argv[2]
@@ -38,17 +38,20 @@ match version:
 
         nightly = True
     case _:
-        v = f'v{version}'.split('.')
+        version_core(version)
+        if '-' in version.split('+', 1)[0]:
+            versions = [f'v{version}']
+        else:
+            v = f'v{version}'.split('.')
+            versions = [
+                v[0],
+                '.'.join(v[0:2]),
+                '.'.join(v[0:3]),
+                'stable',
+            ]
 
-        versions = [
-            v[0],
-            '.'.join(v[0:2]),
-            '.'.join(v[0:3]),
-            'stable',
-        ]
-
-        if '-' not in version.split('+', 1)[0] and stable_reaches_preview(version):
-            versions.append('preview')
+            if stable_reaches_preview(version):
+                versions.append('preview')
 
         for h in REPOS.keys():
             tags[h] = [f'{REPOS[h]}:{t}' for t in versions]
