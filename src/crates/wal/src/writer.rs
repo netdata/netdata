@@ -43,7 +43,7 @@ use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use file_registry::FileDir;
@@ -88,6 +88,16 @@ struct ActiveFile {
     /// path, which writes no sync first.
     synced_up_to: ByteSize,
     synced_entry_count: u64,
+}
+
+impl ActiveFile {
+    /// Record the just-fsynced prefix as durable, so a later `Closed` (which
+    /// may not be preceded by a fresh sync on the `Drop` path) reports the
+    /// durable value, not unsynced tail bytes.
+    fn mark_synced(&mut self) {
+        self.synced_up_to = self.bytes_written;
+        self.synced_entry_count = self.log_entry_count;
+    }
 }
 
 /// The two opaque identifiers a writer stamps into every file it produces:
@@ -295,12 +305,7 @@ impl Stream {
         if let Some(active) = &mut self.active {
             active.writer.flush()?;
             active.writer.get_ref().sync_all()?;
-
-            // The just-fsynced prefix is now durable; remember it so a later
-            // `Closed` (which may not be preceded by a fresh sync on the `Drop`
-            // path) reports the durable value, not unsynced tail bytes.
-            active.synced_up_to = active.bytes_written;
-            active.synced_entry_count = active.log_entry_count;
+            active.mark_synced();
         }
         Ok(())
     }
@@ -310,6 +315,13 @@ impl Stream {
     /// — the event re-reports the accumulated state (not a delta).
     fn sync(&mut self) -> Result<()> {
         self.sync_data()?;
+        self.queue_synced();
+        Ok(())
+    }
+
+    /// Queue the `Synced` event for the active file (if any), reporting the
+    /// durable state recorded by the last `sync_data`.
+    fn queue_synced(&mut self) {
         if let Some(active) = &self.active {
             let event = FileEvent::Synced {
                 file_id: active.file_id,
@@ -321,7 +333,6 @@ impl Stream {
             };
             self.pending_events.push(event);
         }
-        Ok(())
     }
 
     fn shutdown(&mut self) -> Result<Vec<FileEvent>> {
@@ -499,6 +510,105 @@ impl Config {
     }
 }
 
+/// Threads that run the concurrent fsyncs of [`Writer::sync_all`]. They spend
+/// their time blocked in fsync, so this bounds how many files sync at once,
+/// not CPU use.
+const SYNC_THREADS: usize = 64;
+
+/// One fsync for the pool: a duplicate handle of the file, its position in
+/// the caller's batch, and where to send the result.
+type SyncJob = (File, usize, mpsc::Sender<(usize, std::io::Result<()>)>);
+
+/// The queue of a long-lived pool of fsync threads, started on first use.
+/// Idle threads block (one in `recv`, the rest on the queue's mutex) rather
+/// than spin: starting threads per call, or a work-stealing pool that spins
+/// while idle, costs more CPU than the overlap gains. `None` if no thread
+/// could start: syncs then run in turn.
+fn sync_queue() -> Option<&'static mpsc::Sender<SyncJob>> {
+    static QUEUE: OnceLock<Option<mpsc::Sender<SyncJob>>> = OnceLock::new();
+    QUEUE
+        .get_or_init(|| {
+            let (tx, rx) = mpsc::channel::<SyncJob>();
+            let rx = Arc::new(Mutex::new(rx));
+            let started = (0..SYNC_THREADS)
+                .filter(|i| {
+                    let rx = Arc::clone(&rx);
+                    std::thread::Builder::new()
+                        .name(format!("wal-sync-{i}"))
+                        .spawn(move || {
+                            loop {
+                                let job = rx.lock().unwrap_or_else(|e| e.into_inner()).recv();
+                                let Ok((file, index, reply)) = job else {
+                                    return;
+                                };
+                                let _ = reply.send((index, file.sync_all()));
+                            }
+                        })
+                        .inspect_err(|e| tracing::warn!(%e, "WAL sync thread failed to start"))
+                        .is_ok()
+                })
+                .count();
+            (started > 0).then_some(tx)
+        })
+        .as_ref()
+}
+
+/// Run `sync_data` on every stream — the fsyncs concurrently when there is
+/// more than one — and return the results in `streams` order. Buffers are
+/// flushed first, in turn: a `write`, not a wait on the disk.
+fn sync_data_concurrently(streams: &mut [&mut Stream]) -> Vec<Result<()>> {
+    // Checked first so a writer with a single active file never starts the pool.
+    let queue = if streams.len() > 1 {
+        sync_queue()
+    } else {
+        None
+    };
+    let Some(queue) = queue else {
+        return streams.iter_mut().map(|s| s.sync_data()).collect();
+    };
+
+    let mut results: Vec<Option<Result<()>>> = Vec::with_capacity(streams.len());
+    let (reply_tx, reply_rx) = mpsc::channel();
+    for (index, stream) in streams.iter_mut().enumerate() {
+        let Some(active) = stream.active.as_mut() else {
+            results.push(Some(Ok(())));
+            continue;
+        };
+        if let Err(e) = active.writer.flush() {
+            results.push(Some(Err(e.into())));
+            continue;
+        }
+        // No spare descriptor for the pool (e.g. EMFILE): sync this file here.
+        let Ok(file) = active.writer.get_ref().try_clone() else {
+            results.push(Some(active.writer.get_ref().sync_all().map_err(Into::into)));
+            continue;
+        };
+        results.push(match queue.send((file, index, reply_tx.clone())) {
+            Ok(()) => None,
+            Err(mpsc::SendError((file, ..))) => Some(file.sync_all().map_err(Into::into)),
+        });
+    }
+    drop(reply_tx);
+    // Ends when every job has replied, or early if a job was dropped unanswered.
+    while let Ok((index, result)) = reply_rx.recv() {
+        results[index] = Some(result.map_err(Into::into));
+    }
+
+    streams
+        .iter_mut()
+        .zip(results)
+        .map(|(stream, result)| {
+            let result = result.unwrap_or_else(|| {
+                Err(std::io::Error::other("WAL sync thread exited without a result").into())
+            });
+            if let (Ok(()), Some(active)) = (&result, stream.active.as_mut()) {
+                active.mark_synced();
+            }
+            result
+        })
+        .collect()
+}
+
 // ---------------------------------------------------------------------------
 // Writer
 // ---------------------------------------------------------------------------
@@ -628,9 +738,23 @@ impl Writer {
     /// Flush and fsync every stream with an active file, queuing a `Synced`
     /// event for each — including streams that saw no new bytes since their
     /// last sync (the event re-reports the accumulated state).
+    ///
+    /// The fsyncs run concurrently. On journaling filesystems (ext4, XFS) each
+    /// fsync waits for a journal commit and concurrent waiters share one, so
+    /// N active files cost about one commit instead of N back to back. The
+    /// `Synced` events are then queued in the same order and with the same
+    /// stop-at-the-first-error rule as a sequential pass; a stream's durable
+    /// prefix only advances after its own fsync succeeds.
     pub fn sync_all(&mut self) -> Result<()> {
-        for stream in self.streams.values_mut() {
-            stream.sync()?;
+        let mut active: Vec<&mut Stream> = self
+            .streams
+            .values_mut()
+            .filter(|s| s.active.is_some())
+            .collect();
+        let results = sync_data_concurrently(&mut active);
+        for (stream, result) in active.into_iter().zip(results) {
+            result?;
+            stream.queue_synced();
         }
         Ok(())
     }
@@ -923,6 +1047,62 @@ mod tests {
         let mut expected = vec![pk(1), pk(2)];
         expected.sort();
         assert_eq!(hashes, expected);
+    }
+
+    #[test]
+    fn sync_all_syncs_every_active_stream() {
+        // More streams than SYNC_THREADS, so some threads sync several.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        let streams = SYNC_THREADS as u64 + 5;
+        for label in 0..streams {
+            writer
+                .write_frame(
+                    pk(label),
+                    &[],
+                    b"payload",
+                    crate::FrameMeta {
+                        entry_count: 1,
+                        ingestion_ns: TimestampNs(label + 1),
+                        log_ts_range: None,
+                    },
+                )
+                .unwrap();
+        }
+        writer.take_all_events();
+
+        writer.sync_all().unwrap();
+
+        let mut synced: Vec<(u64, ByteSize, u64)> = writer
+            .take_all_events()
+            .iter()
+            .filter_map(|e| match e {
+                FileEvent::Synced {
+                    file_id,
+                    valid_up_to,
+                    entry_count,
+                    ..
+                } => Some((file_id.part_key, *valid_up_to, *entry_count)),
+                _ => None,
+            })
+            .collect();
+        synced.sort();
+        let mut expected: Vec<u64> = (0..streams).map(pk).collect();
+        expected.sort();
+        assert_eq!(synced.iter().map(|s| s.0).collect::<Vec<_>>(), expected);
+        for (_, valid_up_to, entry_count) in synced {
+            assert_eq!(entry_count, 1);
+            assert!(valid_up_to.0 > HEADER_SIZE as u64);
+        }
+
+        // A second pass re-reports every stream, as the sequential pass did.
+        writer.sync_all().unwrap();
+        let resynced = writer
+            .take_all_events()
+            .iter()
+            .filter(|e| matches!(e, FileEvent::Synced { .. }))
+            .count();
+        assert_eq!(resynced, streams as usize);
     }
 
     #[test]
