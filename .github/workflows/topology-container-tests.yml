@@ -8,6 +8,7 @@ on:
       - '.github/workflows/topology-container-tests.yml'
       - 'src/collectors/cgroups.plugin/**'
       - 'src/collectors/apps.plugin/**'
+      - 'packaging/cmake/Modules/NetdataTests.cmake'
       - 'src/collectors/network-viewer.plugin/**'
       - 'src/collectors/common-cgroups/**'
       - 'src/libnetdata/local-sockets/**'
@@ -17,6 +18,7 @@ on:
       - '.github/workflows/topology-container-tests.yml'
       - 'src/collectors/cgroups.plugin/**'
       - 'src/collectors/apps.plugin/**'
+      - 'packaging/cmake/Modules/NetdataTests.cmake'
       - 'src/collectors/network-viewer.plugin/**'
       - 'src/collectors/common-cgroups/**'
       - 'src/libnetdata/local-sockets/**'
@@ -36,6 +38,7 @@ env:
     apps-lookup-protocol-test
     apps-lookup-netipc-lock-test
     apps-cgroups-lookup-client-abort-test
+    apps-target-lifecycle-test
     cgroup-lookup-netipc-test
     cgroup-orchestrator-test
     cgroup-name-config-test
