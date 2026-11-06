@@ -76,6 +76,7 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 
 func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []ddsnmp.Metric) {
 	seen := make(map[string]bool)
+	labels := make(map[string]string)
 
 	for _, m := range metrics {
 		if !m.IsTable {
@@ -96,11 +97,15 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			continue
 		}
 
-		seen[key] = true
-
-		if !c.seenTableMetrics[key] {
-			c.seenTableMetrics[key] = true
-			c.addProfileTableMetricChart(m)
+		if !seen[key] {
+			seen[key] = true
+			// Samples may share a key; the first one owns the chart's metadata.
+			c.profileMetricLabels(labels, m)
+			if chart := c.tableMetricCharts[key]; chart != nil {
+				updateProfileChartLabels(chart, labels)
+			} else if chart := c.addProfileTableMetricChart(m, key, labels); chart != nil {
+				c.tableMetricCharts[key] = chart
+			}
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -122,10 +127,11 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 		}
 	}
 
-	for key := range c.seenTableMetrics {
+	for key, chart := range c.tableMetricCharts {
 		if !seen[key] {
-			delete(c.seenTableMetrics, key)
-			c.removeProfileTableMetricChart(key)
+			delete(c.tableMetricCharts, key)
+			chart.MarkRemove()
+			chart.MarkNotCreated()
 		}
 	}
 }
