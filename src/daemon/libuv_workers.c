@@ -311,8 +311,8 @@ void release_cmd_pool(CmdPool *pool) {
     // Close before freeing, under the lock, even if the owner already called close_cmd_pool().
     // This is what makes the buffer free safe: a producer that passed its owner's own "are we still
     // running" check and was then descheduled arrives here afterwards, and it MUST find the pool
-    // refusing rather than a NULL buffer to write into. Owners that never call close_cmd_pool() at
-    // all (the metadata sync loop) depend entirely on this.
+    // refusing rather than a NULL buffer to write into. An owner that releases the pool without
+    // calling close_cmd_pool() first depends entirely on this.
     pool->closed = true;
     netdata_cond_broadcast(&pool->not_full);
 
