@@ -558,7 +558,7 @@ fn chart_dimensions<D: Dimension>(
 ) -> Vec<ChartDimension> {
     D::IDS
         .iter()
-        .enumerate()
-        .map(|(i, id)| ChartDimension::new(id, readout(columns.column(i))))
+        .zip(columns.range())
+        .map(|(id, column)| ChartDimension::new(id, readout(column)))
         .collect()
 }
