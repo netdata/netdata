@@ -38,7 +38,6 @@ class DockerTagsTest(unittest.TestCase):
             ('2.12.2', 'v2.12.2-rc.1', True),
             ('2.12.1', 'v2.12.2-rc.1', False),
             ('2.12.2', '2.12.2+build.7', True),
-            ('2.12.2+build-7', 'v2.12.2', True),
         )
         for stable, preview, eligible in cases:
             with self.subTest(stable=stable, preview=preview):
@@ -57,6 +56,14 @@ class DockerTagsTest(unittest.TestCase):
                         f'{repo}:{tag}' for tag in suffixes
                     ))
                 self.assertEqual(result['nightly'], '0')
+
+    def test_build_metadata_hyphen_preserves_stable_eligibility(self):
+        result, fetch = self.generate('2.12.2+build-7', 'v2.12.2')
+        fetch.assert_called_once_with(
+            'https://artifacts.netdata.cloud/preview/latest/Version', timeout=30,
+        )
+        for registry, repo in zip(('docker', 'quay', 'ghcr'), REPOS):
+            self.assertIn(f'{repo}:preview', result[f'{registry}_tags'].split(','))
 
     def test_non_stable_does_not_fetch(self):
         for version, suffixes in (('', ['test']), ('nightly', ['edge', 'latest'])):
