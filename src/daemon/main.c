@@ -232,6 +232,7 @@ int pgc_unittest(void);
 int mrg_unittest(void);
 int pagecache_flush_drop_unittest(void);
 int pluginsd_parser_unittest(void);
+int pluginsd_timestamps_unittest(void);
 int pluginsd_vnodes_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_registry_cookie_unittest(void);
@@ -522,6 +523,7 @@ int netdata_main(int argc, char **argv) {
                             // first: its drain joins every exited thread, so run it before other tests start threads
                             if (threads_unittest()) return 1;
                             if (pluginsd_parser_unittest()) return 1;
+                            if (pluginsd_timestamps_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_registry_cookie_unittest()) return 1;
                             if (web_client_header_parsing_unittest()) return 1;
