@@ -18,13 +18,15 @@ func (c *Client) CallIncrementWithTimeout(requestValue uint64, timeoutMs uint32)
 
 	var result uint64
 
-	err := c.callWithRetry(func() error {
-		var reqBuf [protocol.IncrementPayloadSize]byte
-		if protocol.IncrementEncode(requestValue, reqBuf[:]) == 0 {
+	err := c.callWithRetry(timeoutMs, func() error {
+		// Client scratch: the payload reaches the transport, so a local
+		// array would be a heap allocation per call.
+		reqBuf := ensureClientScratch(&c.requestBuf, protocol.IncrementPayloadSize)
+		if protocol.IncrementEncode(requestValue, reqBuf) == 0 {
 			return protocol.ErrTruncated
 		}
 
-		_, payload, rerr := c.doRawCallWithTimeout(protocol.MethodIncrement, reqBuf[:], timeoutMs)
+		_, payload, rerr := c.doRawCallWithTimeout(protocol.MethodIncrement, reqBuf, timeoutMs)
 		if rerr != nil {
 			return rerr
 		}
@@ -60,7 +62,7 @@ func (c *Client) CallIncrementBatchWithTimeout(values []uint64, timeoutMs uint32
 		return nil, err
 	}
 
-	err = c.callWithRetry(func() error {
+	err = c.callWithRetry(timeoutMs, func() error {
 		batchBufSize, err := incrementBatchRequestSize(len(values))
 		if err != nil {
 			return err
@@ -81,7 +83,7 @@ func (c *Client) CallIncrementBatchWithTimeout(values []uint64, timeoutMs uint32
 		totalPayloadLen, _ := bb.Finish()
 		reqPayload := batchBuf[:totalPayloadLen]
 
-		hdr := protocol.Header{
+		c.requestHdr = protocol.Header{
 			Kind:            protocol.KindRequest,
 			Code:            protocol.MethodIncrement,
 			Flags:           protocol.FlagBatch,
@@ -89,13 +91,17 @@ func (c *Client) CallIncrementBatchWithTimeout(values []uint64, timeoutMs uint32
 			MessageID:       uint64(c.callCount) + 1,
 			TransportStatus: protocol.StatusOK,
 		}
+		hdr := &c.requestHdr
 
-		if err := c.transportSend(&hdr, reqPayload); err != nil {
+		if err := c.transportSend(hdr, reqPayload); err != nil {
 			return err
 		}
 
-		respHdr, respPayload, err := c.transportReceiveWithControl(
-			c.resolvedCallTimeout(timeoutMs), c.abortSignal())
+		waitMs := c.opRemainingMs()
+		if waitMs == 0 {
+			return protocol.ErrTimeout
+		}
+		respHdr, respPayload, err := c.transportReceiveWithControl(waitMs, c.abortSignal())
 		if err != nil {
 			return err
 		}

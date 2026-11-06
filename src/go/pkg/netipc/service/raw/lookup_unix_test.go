@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
 )
@@ -123,14 +124,7 @@ func startLookupTestServerWithConfig(service string, method uint16, handler Disp
 	cleanupAll(service)
 
 	s := NewServerWithWorkers(testRunDir, service, config, method, handler, workers)
-	doneCh := make(chan struct{})
-
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-
-	waitUnixServerReady(service)
+	doneCh := runServerForTest(s)
 	return &testServer{server: s, doneCh: doneCh}
 }
 
@@ -935,7 +929,7 @@ func TestLookupLogicalLimits(t *testing.T) {
 		ccfg.MaxRequestPayloadBytes = 48
 		client := NewCgroupsLookupClient(testRunDir, "unused", ccfg)
 		_, err := client.CallCgroupsLookup([][]byte{[]byte("/request-key-too-large-for-configured-cap")})
-		if !errors.Is(err, protocol.ErrBadLayout) {
+		if !errors.Is(err, protocol.ErrNotReady) {
 			t.Fatalf("expected not-ready failure before local oversized response, got %v", err)
 		}
 		client.Close()
@@ -959,7 +953,7 @@ func TestLookupRequestCapacityReconnectPaths(t *testing.T) {
 	}
 
 	client.session.MaxRequestPayloadBytes = 64
-	if err := client.ensureLookupRequestCapacity(128); err != nil {
+	if err := client.ensureLookupRequestCapacity(128, monotime.After(time.Second)); err != nil {
 		t.Fatalf("capacity reconnect should succeed: %v", err)
 	}
 	if client.state != StateReady {
@@ -970,14 +964,14 @@ func TestLookupRequestCapacityReconnectPaths(t *testing.T) {
 	}
 
 	client.session.MaxRequestPayloadBytes = 256
-	if err := client.ensureLookupRequestCapacity(128); err != nil {
+	if err := client.ensureLookupRequestCapacity(128, monotime.After(time.Second)); err != nil {
 		t.Fatalf("already-large session capacity = %v", err)
 	}
 
 	ts.stop()
 	cleanupAll(svc)
 	client.session.MaxRequestPayloadBytes = 64
-	if err := client.ensureLookupRequestCapacity(128); !errors.Is(err, protocol.ErrOverflow) {
+	if err := client.ensureLookupRequestCapacity(128, monotime.After(time.Second)); !errors.Is(err, protocol.ErrOverflow) {
 		t.Fatalf("capacity reconnect to stopped service = %v, want ErrOverflow", err)
 	}
 	if client.state == StateReady {
@@ -987,7 +981,7 @@ func TestLookupRequestCapacityReconnectPaths(t *testing.T) {
 	missing := NewAppsLookupClient(testRunDir, uniqueUnixService("go_svc_lookup_request_capacity_missing"), ccfg)
 	defer missing.Close()
 	missing.state = StateReady
-	if err := missing.ensureLookupRequestCapacity(128); err != nil {
+	if err := missing.ensureLookupRequestCapacity(128, monotime.After(time.Second)); err != nil {
 		t.Fatalf("sessionless configured capacity should not reconnect: %v", err)
 	}
 }
@@ -1058,10 +1052,12 @@ func TestLookupTimeoutDuringFollowupSubcall(t *testing.T) {
 		cfg := testServerConfig()
 		cfg.MaxResponsePayloadBytes = 320
 		var calls atomic.Uint32
+		// The second subcall is held until the client has given up on it.
+		release := make(chan struct{})
 		ts := startLookupTestServerWithConfig(svc, protocol.MethodAppsLookup, AppsLookupDispatch(
 			func(req *protocol.AppsLookupRequestView, builder *protocol.AppsLookupBuilder) bool {
 				if calls.Add(1) == 2 {
-					time.Sleep(150 * time.Millisecond)
+					<-release
 				}
 				builder.SetGeneration(9)
 				for i := uint32(0); i < req.ItemCount; i++ {
@@ -1081,12 +1077,16 @@ func TestLookupTimeoutDuringFollowupSubcall(t *testing.T) {
 			},
 		), cfg, 8)
 		defer ts.stop()
+		defer close(release)
 
 		client := NewAppsLookupClient(testRunDir, svc, testClientConfig())
 		defer client.Close()
 		refreshUnixClientReady(t, client)
 
-		_, err := client.CallAppsLookupWithTimeout([]uint32{11, 22, 33}, 30)
+		// The budget leaves slow or emulated runners room for the first
+		// subcall; only the held second subcall can expire it.
+
+		_, err := client.CallAppsLookupWithTimeout([]uint32{11, 22, 33}, 500)
 		if !errors.Is(err, protocol.ErrTimeout) {
 			t.Fatalf("apps follow-up timeout error = %v, want ErrTimeout", err)
 		}
@@ -1100,10 +1100,12 @@ func TestLookupTimeoutDuringFollowupSubcall(t *testing.T) {
 		cfg := testServerConfig()
 		cfg.MaxResponsePayloadBytes = 160
 		var calls atomic.Uint32
+		// The second subcall is held until the client has given up on it.
+		release := make(chan struct{})
 		ts := startLookupTestServerWithConfig(svc, protocol.MethodCgroupsLookup, CgroupsLookupDispatch(
 			func(req *protocol.CgroupsLookupRequestView, builder *protocol.CgroupsLookupBuilder) bool {
 				if calls.Add(1) == 2 {
-					time.Sleep(150 * time.Millisecond)
+					<-release
 				}
 				builder.SetGeneration(7)
 				for i := uint32(0); i < req.ItemCount; i++ {
@@ -1123,12 +1125,16 @@ func TestLookupTimeoutDuringFollowupSubcall(t *testing.T) {
 			},
 		), cfg, 8)
 		defer ts.stop()
+		defer close(release)
 
 		client := NewCgroupsLookupClient(testRunDir, svc, testClientConfig())
 		defer client.Close()
 		refreshUnixClientReady(t, client)
 
-		_, err := client.CallCgroupsLookupWithTimeout([][]byte{[]byte("/a"), []byte("/huge"), []byte("/b")}, 30)
+		// The budget leaves slow or emulated runners room for the first
+		// subcall; only the held second subcall can expire it.
+
+		_, err := client.CallCgroupsLookupWithTimeout([][]byte{[]byte("/a"), []byte("/huge"), []byte("/b")}, 500)
 		if !errors.Is(err, protocol.ErrTimeout) {
 			t.Fatalf("cgroups follow-up timeout error = %v, want ErrTimeout", err)
 		}
@@ -1144,12 +1150,14 @@ func TestLookupAbortDuringFollowupSubcall(t *testing.T) {
 		cfg := testServerConfig()
 		cfg.MaxResponsePayloadBytes = 320
 		var calls atomic.Uint32
+		// The second subcall is held until the client has given up on it.
+		release := make(chan struct{})
 		secondCall := make(chan struct{}, 1)
 		ts := startLookupTestServerWithConfig(svc, protocol.MethodAppsLookup, AppsLookupDispatch(
 			func(req *protocol.AppsLookupRequestView, builder *protocol.AppsLookupBuilder) bool {
 				if calls.Add(1) == 2 {
 					secondCall <- struct{}{}
-					time.Sleep(250 * time.Millisecond)
+					<-release
 				}
 				builder.SetGeneration(9)
 				for i := uint32(0); i < req.ItemCount; i++ {
@@ -1169,6 +1177,7 @@ func TestLookupAbortDuringFollowupSubcall(t *testing.T) {
 			},
 		), cfg, 8)
 		defer ts.stop()
+		defer close(release)
 
 		client := NewAppsLookupClient(testRunDir, svc, testClientConfig())
 		defer client.Close()
@@ -1202,12 +1211,14 @@ func TestLookupAbortDuringFollowupSubcall(t *testing.T) {
 		cfg := testServerConfig()
 		cfg.MaxResponsePayloadBytes = 160
 		var calls atomic.Uint32
+		// The second subcall is held until the client has given up on it.
+		release := make(chan struct{})
 		secondCall := make(chan struct{}, 1)
 		ts := startLookupTestServerWithConfig(svc, protocol.MethodCgroupsLookup, CgroupsLookupDispatch(
 			func(req *protocol.CgroupsLookupRequestView, builder *protocol.CgroupsLookupBuilder) bool {
 				if calls.Add(1) == 2 {
 					secondCall <- struct{}{}
-					time.Sleep(250 * time.Millisecond)
+					<-release
 				}
 				builder.SetGeneration(7)
 				for i := uint32(0); i < req.ItemCount; i++ {
@@ -1227,6 +1238,7 @@ func TestLookupAbortDuringFollowupSubcall(t *testing.T) {
 			},
 		), cfg, 8)
 		defer ts.stop()
+		defer close(release)
 
 		client := NewCgroupsLookupClient(testRunDir, svc, testClientConfig())
 		defer client.Close()
@@ -1940,8 +1952,8 @@ func TestLookupEndpointAbsentBeforeCall(t *testing.T) {
 		if client.state != StateNotFound {
 			t.Fatalf("apps absent state = %d, want StateNotFound", client.state)
 		}
-		if _, err := client.CallAppsLookupWithTimeout([]uint32{11, 22}, 1000); !errors.Is(err, protocol.ErrBadLayout) {
-			t.Fatalf("apps absent lookup error = %v, want ErrBadLayout", err)
+		if _, err := client.CallAppsLookupWithTimeout([]uint32{11, 22}, 1000); !errors.Is(err, protocol.ErrNotReady) {
+			t.Fatalf("apps absent lookup error = %v, want ErrNotReady", err)
 		}
 	})
 
@@ -1959,8 +1971,8 @@ func TestLookupEndpointAbsentBeforeCall(t *testing.T) {
 			t.Fatalf("cgroups absent state = %d, want StateNotFound", client.state)
 		}
 		paths := [][]byte{[]byte("/a"), []byte("/b")}
-		if _, err := client.CallCgroupsLookupWithTimeout(paths, 1000); !errors.Is(err, protocol.ErrBadLayout) {
-			t.Fatalf("cgroups absent lookup error = %v, want ErrBadLayout", err)
+		if _, err := client.CallCgroupsLookupWithTimeout(paths, 1000); !errors.Is(err, protocol.ErrNotReady) {
+			t.Fatalf("cgroups absent lookup error = %v, want ErrNotReady", err)
 		}
 	})
 }
@@ -1998,7 +2010,6 @@ func TestCgroupsLookupRetryOnFailure(t *testing.T) {
 
 	ts1.stop()
 	cleanupAll(svc)
-	time.Sleep(50 * time.Millisecond)
 
 	ts2 := startLookupTestServer(svc, protocol.MethodCgroupsLookup, CgroupsLookupDispatch(testCgroupsLookupHandler))
 	defer ts2.stop()
@@ -2032,13 +2043,7 @@ func TestLookupConcurrentClients(t *testing.T) {
 			wg.Go(func() {
 				client := NewCgroupsLookupClient(testRunDir, svc, testClientConfig())
 				defer client.Close()
-				for range 200 {
-					client.Refresh()
-					if client.Ready() {
-						break
-					}
-					time.Sleep(5 * time.Millisecond)
-				}
+				client.Refresh()
 				if !client.Ready() {
 					errs <- fmt.Errorf("client not ready")
 					return
@@ -2081,13 +2086,7 @@ func TestLookupConcurrentClients(t *testing.T) {
 			wg.Go(func() {
 				client := NewAppsLookupClient(testRunDir, svc, testClientConfig())
 				defer client.Close()
-				for range 200 {
-					client.Refresh()
-					if client.Ready() {
-						break
-					}
-					time.Sleep(5 * time.Millisecond)
-				}
+				client.Refresh()
 				if !client.Ready() {
 					errs <- fmt.Errorf("client not ready")
 					return

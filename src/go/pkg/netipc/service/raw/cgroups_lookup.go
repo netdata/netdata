@@ -156,7 +156,7 @@ func (c *Client) CallCgroupsLookupWithTimeout(paths [][]byte, timeoutMs uint32) 
 			if err == protocol.ErrOverflow && start < len(paths) {
 				oneItemSize, serr := cgroupsLookupRequestSize(paths[start : start+1])
 				if serr == nil {
-					if c.ensureLookupRequestCapacity(oneItemSize) == nil {
+					if c.ensureLookupRequestCapacity(oneItemSize, deadline) == nil {
 						continue
 					}
 				}
@@ -186,7 +186,7 @@ func (c *Client) CallCgroupsLookupWithTimeout(paths [][]byte, timeoutMs uint32) 
 			return nil, protocol.ErrOverflow
 		}
 		var payload []byte
-		if err := c.callWithRetry(func() error {
+		if err := c.callWithRetry(remainingTimeout, func() error {
 			_, callPayload, rerr := c.doRawCallWithTimeout(protocol.MethodCgroupsLookup, reqBuf[:reqLen], remainingTimeout)
 			if rerr != nil {
 				return rerr

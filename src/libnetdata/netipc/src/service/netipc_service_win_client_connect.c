@@ -79,9 +79,13 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
     memset(&session, 0, sizeof(session));
     session.pipe = INVALID_HANDLE_VALUE;
 
-    nipc_np_error_t err = nipc_np_connect(
+    uint32_t remaining = nipc_service_common_client_op_remaining_ms(ctx);
+    if (remaining == 0 || nipc_service_common_client_abort_requested(ctx))
+        return NIPC_CLIENT_DISCONNECTED;
+
+    nipc_np_error_t err = nipc_np_connect_timeout(
         ctx->run_dir, ctx->service_name,
-        &ctx->transport_config, &session);
+        &ctx->transport_config, remaining, ctx->abort_event, &session);
 
     switch (err) {
     case NIPC_NP_OK:
@@ -89,6 +93,7 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
     case NIPC_NP_ERR_CONNECT:
         return NIPC_CLIENT_NOT_FOUND;
     case NIPC_NP_ERR_AUTH_FAILED:
+    case NIPC_NP_ERR_UNTRUSTED_SERVER:
         return NIPC_CLIENT_AUTH_FAILED;
     case NIPC_NP_ERR_NO_PROFILE:
     case NIPC_NP_ERR_INCOMPATIBLE:
@@ -122,7 +127,14 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
             /* Retry attach: the server prepares SHM before accepting the
              * handshake, but filesystem/object visibility may lag briefly. */
             nipc_win_shm_error_t serr = NIPC_WIN_SHM_ERR_OPEN_MAPPING;
-            ULONGLONG deadline_ms = GetTickCount64() + CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS;
+            bool keep_shm = false;
+            uint32_t attach_ms = nipc_service_common_client_op_remaining_ms(ctx);
+            /* When the call deadline ends the wait first, WinSHM is not at
+             * fault and stays enabled for the next connect. */
+            bool call_bound = attach_ms < ctx->shm_attach_timeout_ms;
+            if (!call_bound)
+                attach_ms = ctx->shm_attach_timeout_ms;
+            ULONGLONG deadline_ms = GetTickCount64() + attach_ms;
             for (;;) {
                 serr = nipc_win_shm_client_attach(
                     ctx->run_dir, ctx->service_name,
@@ -136,13 +148,31 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
                     serr != NIPC_WIN_SHM_ERR_OPEN_EVENT &&
                     serr != NIPC_WIN_SHM_ERR_BAD_MAGIC)
                     break;
-                if (GetTickCount64() >= deadline_ms)
+                if (GetTickCount64() >= deadline_ms) {
+                    keep_shm = call_bound;
                     break;
+                }
+                if (nipc_service_common_client_abort_requested(ctx)) {
+                    keep_shm = true;
+                    break;
+                }
+                /* A server that refused or died breaks the session pipe;
+                 * waiting for its SHM objects would only burn the timeout. */
+                if (nipc_service_win_peer_disconnected(&session)) {
+                    keep_shm = true;
+                    break;
+                }
                 Sleep(CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS);
             }
 
             if (serr == NIPC_WIN_SHM_OK) {
                 ctx->shm = shm;
+            } else if (keep_shm) {
+                /* Not a WinSHM problem: keep WinSHM enabled for the next connect. */
+                free(shm);
+                nipc_np_close_session(&ctx->session);
+                ctx->session_valid = false;
+                return NIPC_CLIENT_DISCONNECTED;
             } else {
                 /* WinSHM attach failed after negotiation. Close that
                  * session, blacklist WinSHM for this client context, and
@@ -161,21 +191,12 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
     return NIPC_CLIENT_READY;
 }
 
+/* One reconnect per failed call, as the spec states; the call deadline
+ * bounds it. */
 bool nipc_service_win_client_reconnect_for_call(nipc_client_ctx_t *ctx)
 {
-    for (uint32_t i = 0; i < CLIENT_CALL_RECONNECT_RETRIES; i++) {
-        ctx->state = nipc_service_win_client_try_connect(ctx);
-        if (ctx->state == NIPC_CLIENT_READY)
-            return true;
-        if (ctx->state == NIPC_CLIENT_AUTH_FAILED ||
-            ctx->state == NIPC_CLIENT_INCOMPATIBLE)
-            return false;
-        if (i + 1u < CLIENT_CALL_RECONNECT_RETRIES)
-            Sleep(CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS);
-    }
-
-    return false;
+    ctx->state = nipc_service_win_client_try_connect(ctx);
+    return ctx->state == NIPC_CLIENT_READY;
 }
-
 
 #endif /* _WIN32 || __MSYS__ */

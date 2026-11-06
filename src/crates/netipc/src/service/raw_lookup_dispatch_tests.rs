@@ -122,7 +122,10 @@ fn request_capacity_growth_honors_abort_before_reconnect() {
     client.abort();
 
     assert_eq!(
-        client.ensure_lookup_request_capacity(protocol::MAX_PAYLOAD_DEFAULT as usize + 1),
+        client.ensure_lookup_request_capacity(
+            protocol::MAX_PAYLOAD_DEFAULT as usize + 1,
+            std::time::Instant::now() + std::time::Duration::from_secs(1),
+        ),
         Err(protocol::NipcError::Aborted)
     );
     assert_eq!(client.state, ClientState::Broken);

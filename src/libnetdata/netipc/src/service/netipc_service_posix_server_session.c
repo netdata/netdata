@@ -15,12 +15,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
+#include <unistd.h>
 
-int nipc_service_posix_poll_with_shutdown(int fd, bool *running)
+int nipc_service_posix_poll_with_shutdown(int fd, bool *running,
+                                          uint32_t poll_ms)
 {
     while (__atomic_load_n(running, __ATOMIC_RELAXED)) {
         struct pollfd pfd = { .fd = fd, .events = POLLIN };
-        int ret = poll(&pfd, 1, SERVER_POLL_TIMEOUT_MS);
+        int ret = poll(&pfd, 1, (int)poll_ms);
 
         if (ret < 0) {
             if (errno == EINTR)
@@ -40,7 +43,7 @@ int nipc_service_posix_poll_with_shutdown(int fd, bool *running)
     return 0;
 }
 
-static bool session_peer_disconnected(int fd)
+bool nipc_service_posix_peer_disconnected(int fd)
 {
     if (fd < 0)
         return true;
@@ -118,9 +121,9 @@ static void server_handle_session(nipc_managed_server_t *server,
         if (shm) {
             size_t msg_len;
             nipc_shm_error_t serr = nipc_shm_receive(shm, recv_buf, recv_size,
-                                                       &msg_len, SERVER_POLL_TIMEOUT_MS);
+                                                       &msg_len, server->poll_ms);
             if (serr == NIPC_SHM_ERR_TIMEOUT) {
-                if (session_peer_disconnected(session->fd))
+                if (nipc_service_posix_peer_disconnected(session->fd))
                     break;
                 continue; /* check running flag */
             }
@@ -137,7 +140,8 @@ static void server_handle_session(nipc_managed_server_t *server,
             payload_len = msg_len - NIPC_HEADER_LEN;
         } else {
             /* Poll the session fd before blocking on receive */
-            int pr = nipc_service_posix_poll_with_shutdown(session->fd, &server->running);
+            int pr = nipc_service_posix_poll_with_shutdown(session->fd, &server->running,
+                                                           server->poll_ms);
             if (pr <= 0)
                 break; /* shutdown or error */
 
@@ -270,6 +274,157 @@ static void server_handle_session(nipc_managed_server_t *server,
 /*  Internal: per-session handler thread                                */
 /* ------------------------------------------------------------------ */
 
+static void server_destroy_precreated_shm(nipc_shm_ctx_t **shm) {
+    if (!shm || !*shm)
+        return;
+    nipc_shm_destroy(*shm);
+    free(*shm);
+    *shm = NULL;
+}
+
+static bool server_prepare_accept_config(nipc_managed_server_t *server,
+                                         nipc_uds_server_config_t *cfg_out) {
+    *cfg_out = server->base_config;
+    cfg_out->max_request_payload_bytes =
+            __atomic_load_n(&server->learned_request_payload_bytes, __ATOMIC_ACQUIRE);
+    cfg_out->max_response_payload_bytes = __atomic_load_n(
+            &server->learned_response_payload_bytes, __ATOMIC_ACQUIRE);
+
+    uint32_t shm_profiles = cfg_out->supported_profiles &
+                                                    (NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX);
+    uint32_t request_capacity;
+    uint32_t response_capacity;
+    if (shm_profiles != 0 &&
+            (!nipc_service_common_header_payload_len_u32(
+                    cfg_out->max_request_payload_bytes, &request_capacity) ||
+             !nipc_service_common_header_payload_len_u32(
+                    cfg_out->max_response_payload_bytes, &response_capacity))) {
+        cfg_out->supported_profiles &= ~shm_profiles;
+        cfg_out->preferred_profiles &= ~shm_profiles;
+    }
+    return cfg_out->supported_profiles != 0;
+}
+
+typedef struct {
+    nipc_managed_server_t *server;
+    uint64_t session_id;
+    nipc_shm_ctx_t *shm;
+} server_shm_prepare_t;
+
+/* Handshake prepare step: create the session's SHM region once the
+ * negotiation selected SHM, sized for the agreed limits. */
+static bool server_prepare_profile(void *user, uint32_t profile,
+                                   uint32_t max_request_payload_bytes,
+                                   uint32_t max_response_payload_bytes) {
+    server_shm_prepare_t *prep = (server_shm_prepare_t *)user;
+    if (profile != NIPC_PROFILE_SHM_HYBRID && profile != NIPC_PROFILE_SHM_FUTEX)
+        return true;
+
+    uint32_t request_capacity;
+    uint32_t response_capacity;
+    if (!nipc_service_common_header_payload_len_u32(max_request_payload_bytes,
+                                                    &request_capacity) ||
+        !nipc_service_common_header_payload_len_u32(max_response_payload_bytes,
+                                                    &response_capacity))
+        return false;
+
+    nipc_shm_ctx_t *shm = nipc_service_posix_calloc(
+            1, sizeof(nipc_shm_ctx_t),
+            NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SHM_CTX_CALLOC_INTERNAL);
+    if (!shm)
+        return false;
+
+    nipc_managed_server_t *server = prep->server;
+    if (nipc_shm_server_create(server->run_dir, server->service_name,
+                               prep->session_id, request_capacity,
+                               response_capacity, shm) != NIPC_SHM_OK) {
+        free(shm);
+        return false;
+    }
+
+    prep->shm = shm;
+    if (server->test_event_hook)
+        server->test_event_hook(server->test_event_user,
+                                NIPC_SERVER_TEST_EVENT_SHM_CREATED);
+    return true;
+}
+
+/* Wait for HELLO without outliving a server stop or the handshake
+ * deadline. */
+static bool server_wait_hello(nipc_managed_server_t *server, int fd)
+{
+    uint32_t waited = 0;
+    while (__atomic_load_n(&server->running, __ATOMIC_RELAXED) &&
+           waited < server->handshake_ms) {
+        struct pollfd pfd = { .fd = fd, .events = POLLIN };
+        int ret = poll(&pfd, 1, (int)server->poll_ms);
+        if (ret < 0) {
+            if (errno == EINTR)
+                continue;
+            return false;
+        }
+        if (ret > 0)
+            return true;
+        waited += server->poll_ms;
+    }
+    return false;
+}
+
+/* Run the handshake for an accepted connection and publish the session.
+ * Takes ownership of fd. Returns false if the session must not start. */
+static bool server_session_handshake(nipc_managed_server_t *server,
+                                     nipc_session_ctx_t *sctx, int fd)
+{
+    nipc_uds_server_config_t cfg;
+    if (!server_prepare_accept_config(server, &cfg)) {
+        close(fd);
+        return false;
+    }
+
+    if (server->test_event_hook)
+        server->test_event_hook(server->test_event_user,
+                                NIPC_SERVER_TEST_EVENT_HANDSHAKE_STARTED);
+    if (!server_wait_hello(server, fd)) {
+        close(fd);
+        return false;
+    }
+
+    /* HELLO is readable, so this does not block on the client. */
+    server_shm_prepare_t prep = { .server = server, .session_id = sctx->id };
+    nipc_uds_session_t session;
+    if (nipc_uds_accept_handshake_prepared(fd, &cfg, sctx->id, server->poll_ms,
+                                           server_prepare_profile, &prep,
+                                           &session) != NIPC_UDS_OK) {
+        server_destroy_precreated_shm(&prep.shm);
+        return false;
+    }
+    nipc_shm_ctx_t *shm = prep.shm;
+
+    nipc_service_common_server_note_request_capacity(
+        server, session.max_request_payload_bytes);
+    nipc_service_common_server_note_response_capacity(
+        server, session.max_response_payload_bytes);
+
+    /* SHM profile guarantee: the prepare step created the region before the
+     * ACK selected SHM. */
+    if (session.selected_profile == NIPC_PROFILE_SHM_HYBRID ||
+        session.selected_profile == NIPC_PROFILE_SHM_FUTEX) {
+        if (!shm) {
+            nipc_uds_close_session(&session);
+            return false;
+        }
+    } else {
+        server_destroy_precreated_shm(&shm);
+    }
+
+    /* Publish under the lock: shutdown paths read session.fd under it. */
+    pthread_mutex_lock(&server->sessions_lock);
+    sctx->session = session;
+    sctx->shm = shm;
+    pthread_mutex_unlock(&server->sessions_lock);
+    return true;
+}
+
 /* Thread function: handles one client session from accept to disconnect. */
 void *nipc_service_posix_session_handler_thread(void *arg)
 {
@@ -277,34 +432,92 @@ void *nipc_service_posix_session_handler_thread(void *arg)
     pthread_mutex_lock(&start->lock);
     nipc_session_ctx_t *sctx = start->session;
     nipc_managed_server_t *server = start->server;
+    int fd = start->fd;
     start->copied = true;
     pthread_cond_signal(&start->copied_cond);
     pthread_mutex_unlock(&start->lock);
 
-    /* Allocate a per-session response buffer */
-    size_t resp_size = (size_t)sctx->session.max_response_payload_bytes;
-    if (resp_size < NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES)
-        resp_size = NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES;
-    uint8_t *resp_buf = nipc_service_posix_malloc(
-        resp_size, NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_RESP_BUF_MALLOC_INTERNAL);
-    if (resp_buf) {
-        server_handle_session(server, &sctx->session, sctx->shm,
-                              resp_buf, resp_size);
-        free(resp_buf);
+    if (server_session_handshake(server, sctx, fd)) {
+        /* Allocate a per-session response buffer */
+        size_t resp_size = (size_t)sctx->session.max_response_payload_bytes;
+        if (resp_size < NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES)
+            resp_size = NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES;
+        uint8_t *resp_buf = nipc_service_posix_malloc(
+            resp_size, NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_RESP_BUF_MALLOC_INTERNAL);
+        if (resp_buf) {
+            server_handle_session(server, &sctx->session, sctx->shm,
+                                  resp_buf, resp_size);
+            free(resp_buf);
+        }
     }
 
     /* Cleanup SHM and session */
     if (sctx->shm) {
         nipc_shm_destroy(sctx->shm);
         free(sctx->shm);
+        sctx->shm = NULL;
     }
+    /* Close under the lock so a concurrent shutdown never targets a
+     * reused descriptor. */
+    pthread_mutex_lock(&server->sessions_lock);
     nipc_uds_close_session(&sctx->session);
+    pthread_mutex_unlock(&server->sessions_lock);
 
     /* Mark inactive so the acceptor's reap loop (or server destroy)
      * can join this thread and free sctx.  Do NOT remove from the
      * tracking array here — the reap/destroy path owns that. */
     __atomic_store_n(&sctx->active, false, __ATOMIC_RELEASE);
+    /* sctx may be freed from here on; report through the server only. */
+    if (server->test_event_hook)
+        server->test_event_hook(server->test_event_user,
+                                NIPC_SERVER_TEST_EVENT_SESSION_EXITED);
     return NULL;
+}
+
+/* Wait up to grace_ms for session threads to finish on their own, then shut
+ * down the sockets of the rest so threads blocked in send/recv return.
+ * Returns true if all finished within the grace. */
+bool nipc_service_posix_server_wait_sessions(nipc_managed_server_t *server,
+                                             uint32_t grace_ms)
+{
+    struct timespec deadline;
+    clock_gettime(CLOCK_MONOTONIC, &deadline);
+    deadline.tv_sec += grace_ms / 1000;
+    deadline.tv_nsec += (grace_ms % 1000) * 1000000L;
+    if (deadline.tv_nsec >= 1000000000L) {
+        deadline.tv_sec++;
+        deadline.tv_nsec -= 1000000000L;
+    }
+
+    for (;;) {
+        pthread_mutex_lock(&server->sessions_lock);
+        int active_count = 0;
+        for (int i = 0; i < server->session_count; i++) {
+            if (__atomic_load_n(&server->sessions[i]->active, __ATOMIC_ACQUIRE))
+                active_count++;
+        }
+        pthread_mutex_unlock(&server->sessions_lock);
+
+        if (active_count == 0)
+            return true;
+
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        if (now.tv_sec > deadline.tv_sec ||
+            (now.tv_sec == deadline.tv_sec && now.tv_nsec >= deadline.tv_nsec))
+            break;
+
+        nipc_service_posix_sleep_us(5000); /* 5ms poll interval */
+    }
+
+    pthread_mutex_lock(&server->sessions_lock);
+    for (int i = 0; i < server->session_count; i++) {
+        nipc_session_ctx_t *s = server->sessions[i];
+        if (__atomic_load_n(&s->active, __ATOMIC_ACQUIRE) && s->session.fd >= 0)
+            shutdown(s->session.fd, SHUT_RDWR);
+    }
+    pthread_mutex_unlock(&server->sessions_lock);
+    return false;
 }
 
 /* ------------------------------------------------------------------ */

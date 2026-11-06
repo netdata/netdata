@@ -40,6 +40,13 @@
 
 #define NIPC_CLIENT_CALL_TIMEOUT_DEFAULT_MS 30000u
 #define NIPC_CLIENT_ABORT_POLL_MS 100u
+/* Server poll slice: how often idle workers and the acceptor notice a stop. */
+#define NIPC_SERVER_POLL_DEFAULT_MS 100u
+/* How long destroy waits for session workers to finish their current
+ * message before interrupting their blocking I/O. */
+#define NIPC_SERVER_STOP_GRACE_DEFAULT_MS 1000u
+/* How long a client retries attaching a negotiated SHM region. */
+#define NIPC_CLIENT_SHM_ATTACH_TIMEOUT_DEFAULT_MS 5000u
 #define NIPC_SERVICE_MIN_PAYLOAD_BUFFER_BYTES 1024u
 #define NIPC_LOGICAL_LOOKUP_ITEMS_DEFAULT 65536u
 #define NIPC_LOGICAL_LOOKUP_SUBCALLS_DEFAULT 4096u
@@ -155,6 +162,10 @@ typedef struct {
   uint32_t max_logical_lookup_subcalls;
   uint32_t max_logical_lookup_response_bytes;
   uint32_t abort_requested;
+  /* How long to retry attaching a negotiated SHM region; tests shorten it. */
+  uint32_t shm_attach_timeout_ms;
+  /* Monotonic deadline of the call or refresh in progress (internal). */
+  uint64_t op_deadline_ms;
 
   /* Stats */
   uint32_t connect_count;
@@ -334,6 +345,12 @@ typedef struct nipc_session_ctx {
 #endif
 } nipc_session_ctx_t;
 
+enum {
+  NIPC_SERVER_TEST_EVENT_HANDSHAKE_STARTED = 1,
+  NIPC_SERVER_TEST_EVENT_SESSION_EXITED = 2,
+  NIPC_SERVER_TEST_EVENT_SHM_CREATED = 3,
+};
+
 struct nipc_managed_server {
   /* Listener */
 #if defined(_WIN32) || defined(__MSYS__)
@@ -362,8 +379,10 @@ struct nipc_managed_server {
   volatile LONG running;
   volatile LONG accept_loop_active;
   volatile LONG accept_loop_thread_id;
+  volatile LONG stop_requested; /* set by stop/drain/destroy, never cleared */
 #else
   bool running;
+  bool stop_requested; /* set by stop/drain/destroy, never cleared */
 #endif
 
   /* Session tracking */
@@ -387,6 +406,19 @@ struct nipc_managed_server {
   /* Auth token needed for SHM kernel object naming */
   uint64_t auth_token;
 #endif
+
+  /* Waits. Init sets the production defaults; repo tests shorten them so
+   * timeout paths run in milliseconds. */
+  uint32_t poll_ms;
+  uint32_t stop_grace_ms;
+  uint32_t handshake_ms;
+
+  /* Test-only event notifications, NULL in production. Events:
+   * NIPC_SERVER_TEST_EVENT_HANDSHAKE_STARTED, a worker waits for HELLO;
+   * NIPC_SERVER_TEST_EVENT_SESSION_EXITED, a worker freed its slot;
+   * NIPC_SERVER_TEST_EVENT_SHM_CREATED, a session's SHM region exists. */
+  void (*test_event_hook)(void *user, int event);
+  void *test_event_user;
 };
 
 /*
@@ -429,6 +461,26 @@ nipc_server_init_raw_for_tests(nipc_managed_server_t *server,
 #endif
                                int worker_count, uint16_t expected_method_code,
                                nipc_server_handler_fn handler, void *user);
+
+/*
+ * Shorten the server waits: the poll slice, the stop grace and the handshake
+ * deadline. Call after init and before run.
+ */
+void nipc_server_set_timings_for_tests(nipc_managed_server_t *server,
+                                       uint32_t poll_ms, uint32_t stop_grace_ms,
+                                       uint32_t handshake_ms);
+
+/*
+ * Report server events to fn, called from worker threads. Call after init
+ * and before run.
+ */
+void nipc_server_set_event_hook_for_tests(nipc_managed_server_t *server,
+                                          void (*fn)(void *user, int event),
+                                          void *user);
+
+/* Shorten the client's SHM attach retry window. */
+void nipc_client_set_shm_attach_timeout_for_tests(nipc_client_ctx_t *ctx,
+                                                  uint32_t timeout_ms);
 
 nipc_error_t nipc_apps_lookup_remaining_timeout_for_tests(
     nipc_client_ctx_t *ctx, uint64_t deadline_ms, uint32_t *timeout_out);
@@ -480,14 +532,18 @@ void nipc_posix_service_test_fault_clear(void);
 
 /*
  * Run the acceptor loop. Blocking. Accepts clients, reads requests,
- * dispatches to the handler, sends responses.
+ * dispatches to the handler, sends responses. Each connection's handshake
+ * runs in its worker with a NIPC_SERVER_HANDSHAKE_TIMEOUT_MS deadline; a
+ * connection over the worker limit is closed before HELLO_ACK.
  *
- * Returns when nipc_server_stop() is called or on fatal error.
+ * Returns when nipc_server_stop() is called or on fatal error. A stop
+ * issued before run makes run return at once; the server is single-use.
  */
 void nipc_server_run(nipc_managed_server_t *server);
 
 /*
- * Signal shutdown. The acceptor loop will exit after current work.
+ * Signal shutdown. Only signals and wakes the acceptor loop; run owns the
+ * listener and closes it on exit.
  */
 void nipc_server_stop(nipc_managed_server_t *server);
 
@@ -504,7 +560,8 @@ void nipc_server_stop(nipc_managed_server_t *server);
 bool nipc_server_drain(nipc_managed_server_t *server, uint32_t timeout_ms);
 
 /*
- * Cleanup: close listener, free workers. Safe after stop.
+ * Cleanup: stop, close listener, free workers. Sessions get a 1000 ms grace
+ * to finish, then their blocking I/O is interrupted until they exit.
  */
 void nipc_server_destroy(nipc_managed_server_t *server);
 

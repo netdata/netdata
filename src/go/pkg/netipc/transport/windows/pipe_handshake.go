@@ -3,6 +3,7 @@
 package windows
 
 import (
+	"errors"
 	"fmt"
 	"syscall"
 
@@ -22,8 +23,13 @@ func helloAckLayoutIncompatible(buf []byte) bool {
 	return framing.HelloAckLayoutIncompatible(buf)
 }
 
-func clientHandshake(handle syscall.Handle, config *ClientConfig) (*Session, error) {
+func clientHandshake(handle syscall.Handle, io *pipeIO, config *ClientConfig, wait receiveWait) (*Session, error) {
 	pktSize := applyDefault(config.PacketSize, defaultPacketSize)
+	pending := &Session{handle: handle, role: RoleClient, io: io}
+
+	// A server that never answers must not hold the client past its
+	// deadline; the wait's own error is the result, not a receive failure.
+	var waitErr error
 
 	ack, err := framing.ClientHandshake(framing.ClientHandshakeConfig{
 		Hello: framing.HelloConfig{
@@ -36,14 +42,23 @@ func clientHandshake(handle syscall.Handle, config *ClientConfig) (*Session, err
 			AuthToken:               config.AuthToken,
 			PacketSize:              pktSize,
 		},
-		Send:            func(pkt []byte) error { return rawWrite(handle, pkt) },
-		Recv:            func(dst []byte) (int, error) { return rawRecv(handle, dst) },
+		Send: pending.writePacket,
+		Recv: func(dst []byte) (int, error) {
+			if err := waitHelloAck(pending, wait); err != nil {
+				waitErr = err
+				return 0, err
+			}
+			return pending.readPacket(dst)
+		},
 		StatusError:     helloAckStatusError,
 		ErrSend:         func(msg string) error { return wrapErr(ErrSend, msg) },
 		ErrRecv:         func(msg string) error { return wrapErr(ErrRecv, msg) },
 		ErrProtocol:     func(msg string) error { return wrapErr(ErrProtocol, msg) },
 		ErrIncompatible: func(msg string) error { return wrapErr(ErrIncompatible, msg) },
 	})
+	if waitErr != nil {
+		return nil, waitErr
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -51,6 +66,7 @@ func clientHandshake(handle syscall.Handle, config *ClientConfig) (*Session, err
 	return &Session{
 		handle:                  handle,
 		role:                    RoleClient,
+		io:                      io,
 		MaxRequestPayloadBytes:  ack.AgreedMaxRequestPayloadBytes,
 		MaxRequestBatchItems:    ack.AgreedMaxRequestBatchItems,
 		MaxResponsePayloadBytes: ack.AgreedMaxResponsePayloadBytes,
@@ -60,6 +76,25 @@ func clientHandshake(handle syscall.Handle, config *ClientConfig) (*Session, err
 		SessionID:               ack.SessionID,
 		inflightIDs:             make(map[uint64]struct{}),
 	}, nil
+}
+
+// waitHelloAck waits until HELLO_ACK can be read. A server that rejects the
+// client writes its reply and closes, so a disconnected pipe may still hold
+// that reply: the read reports what is there.
+func waitHelloAck(pending *Session, wait receiveWait) error {
+	for {
+		waitMs, err := wait.waitMs()
+		if err != nil {
+			return err
+		}
+		ready, err := pending.WaitReadable(waitMs)
+		if ready || errors.Is(err, ErrDisconnected) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
 }
 
 func helloAckStatusError(status uint16) error {
@@ -80,10 +115,17 @@ func helloAckStatusError(status uint16) error {
 }
 
 func serverHandshake(handle syscall.Handle, config *ServerConfig, sessionID uint64) (*Session, error) {
+	return serverHandshakeWait(handle, config, sessionID, newReceiveWait(0, nil), nil)
+}
+
+func serverHandshakeWait(handle syscall.Handle, config *ServerConfig, sessionID uint64, wait receiveWait, prepare ProfilePrepare) (*Session, error) {
+	pending := &Session{handle: handle, role: RoleServer}
 	serverPktSize := applyDefault(config.PacketSize, defaultPacketSize)
 	sRespPay := applyDefault(config.MaxResponsePayloadBytes, protocol.MaxPayloadDefault)
 	sReqPay := applyDefault(config.MaxRequestPayloadBytes, protocol.MaxPayloadDefault)
 
+	// The wait's own timeout or abort is returned as is, as in C and Rust.
+	var waitErr error
 	ack, err := framing.ServerHandshake(framing.ServerHandshakeConfig{
 		ServerHelloConfig: framing.ServerHelloConfig{
 			PacketSize:              serverPktSize,
@@ -93,8 +135,15 @@ func serverHandshake(handle syscall.Handle, config *ServerConfig, sessionID uint
 			PreferredProfiles:       config.PreferredProfiles,
 			AuthToken:               config.AuthToken,
 		},
-		SessionID:       sessionID,
-		Recv:            func(dst []byte) (int, error) { return rawRecv(handle, dst) },
+		SessionID: sessionID,
+		Prepare:   prepare,
+		Recv: func(dst []byte) (int, error) {
+			n, err := pending.rawRecvWithTimeout(dst, wait)
+			if errors.Is(err, ErrTimeout) || errors.Is(err, ErrAborted) {
+				waitErr = err
+			}
+			return n, err
+		},
 		SendAck:         func(status uint16, ack protocol.HelloAck) error { return sendHelloAck(handle, status, ack) },
 		StatusError:     helloAckStatusError,
 		ErrRecv:         func(msg string) error { return wrapErr(ErrRecv, msg) },
@@ -102,6 +151,9 @@ func serverHandshake(handle syscall.Handle, config *ServerConfig, sessionID uint
 		ErrProtocol:     func(msg string) error { return wrapErr(ErrProtocol, msg) },
 		ErrIncompatible: func(msg string) error { return wrapErr(ErrIncompatible, msg) },
 	})
+	if waitErr != nil {
+		return nil, waitErr
+	}
 	if err != nil {
 		return nil, err
 	}

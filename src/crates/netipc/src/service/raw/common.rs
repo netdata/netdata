@@ -1,5 +1,37 @@
 pub(super) const SERVER_POLL_TIMEOUT_MS: u32 = 100;
+/// How long a stopping server waits for session workers to finish their
+/// current message before forcing them out of blocking I/O.
+pub(super) const SERVER_STOP_GRACE_MS: u64 = 1_000;
+
+/// Server waits. Production uses the defaults; tests shorten them per
+/// instance so timeout paths run in milliseconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ServerTimings {
+    pub(super) poll_ms: u32,
+    pub(super) stop_grace: std::time::Duration,
+    pub(super) handshake_ms: u32,
+}
+
+impl Default for ServerTimings {
+    fn default() -> Self {
+        Self {
+            poll_ms: SERVER_POLL_TIMEOUT_MS,
+            stop_grace: std::time::Duration::from_millis(SERVER_STOP_GRACE_MS),
+            handshake_ms: crate::protocol::SERVER_HANDSHAKE_TIMEOUT_MS,
+        }
+    }
+}
+
+impl ServerTimings {
+    /// How long a connection waits for a worker slot before it is refused.
+    /// Two poll slices: a worker whose client left exits within one.
+    pub(super) fn slot_wait(&self) -> std::time::Duration {
+        std::time::Duration::from_millis(2 * self.poll_ms as u64)
+    }
+}
+#[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
 pub(super) const CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS: u64 = 5;
+#[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
 pub(super) const CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS: u64 = 5_000;
 pub(super) const CACHE_RESPONSE_BUF_SIZE: usize = 65536;
 pub const LOOKUP_LOGICAL_ITEMS_DEFAULT: u32 = 65_536;
@@ -43,6 +75,29 @@ impl LookupLogicalConfig {
                 self.max_response_bytes
             },
         }
+    }
+}
+
+/// When all workers are busy, wait up to `slot_wait` for one to
+/// finish, so a client that reconnects right after closing is not refused
+/// while its old worker exits. The accept loop has nothing else to serve
+/// while full, so waiting costs nothing. Returns whether a slot is free.
+pub(super) fn wait_for_worker_slot(
+    running: &std::sync::atomic::AtomicBool,
+    slot_wait: std::time::Duration,
+    mut has_slot: impl FnMut() -> bool,
+) -> bool {
+    let deadline = std::time::Instant::now() + slot_wait;
+    loop {
+        if has_slot() {
+            return true;
+        }
+        if !running.load(std::sync::atomic::Ordering::Acquire)
+            || std::time::Instant::now() >= deadline
+        {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
     }
 }
 

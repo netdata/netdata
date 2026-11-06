@@ -139,6 +139,67 @@ func TestPipeSingleClientPingPong(t *testing.T) {
 	}
 }
 
+func TestPipeConnectWaitsForBusyPipe(t *testing.T) {
+	service := uniquePipeService(t)
+	listener := startListener(t, testPipeRunDir, service, defaultServerConfig())
+	defer listener.Close()
+
+	// The first client takes the only instance; the server has not accepted
+	// it, so no next instance exists yet.
+	pipeName, err := BuildPipeName(testPipeRunDir, service)
+	if err != nil {
+		t.Fatalf("BuildPipeName: %v", err)
+	}
+	holder, err := createClientPipe(&pipeName[0])
+	if err != nil {
+		t.Fatalf("first client: %v", err)
+	}
+	defer syscall.CloseHandle(holder)
+
+	busy := make(chan struct{})
+	var busyOnce sync.Once
+	connectBusyHook = func() { busyOnce.Do(func() { close(busy) }) }
+	defer func() { connectBusyHook = nil }()
+
+	// Accept the holder once the second client found the pipe busy, then
+	// serve the second client's handshake.
+	done := make(chan struct{})
+	accepted := make(chan *Session, 1)
+	go func() {
+		defer close(accepted)
+		select {
+		case <-busy:
+		case <-done:
+			return
+		}
+		first, err := listener.AcceptPending()
+		if err != nil {
+			return
+		}
+		defer first.Close()
+		second, err := listener.AcceptPending()
+		if err != nil {
+			return
+		}
+		if session, err := second.Handshake(2, defaultServerConfig(), 10000, nil); err == nil {
+			accepted <- session
+		}
+	}()
+
+	client, err := Connect(testPipeRunDir, service, defaultClientConfigPtr())
+	if err != nil {
+		close(done)
+		t.Fatalf("busy pipe connect: %v", err)
+	}
+	defer client.Close()
+
+	server, ok := <-accepted
+	if !ok {
+		t.Fatal("server did not accept the waiting client")
+	}
+	server.Close()
+}
+
 func TestPipeWaitReadable(t *testing.T) {
 	client, server := sessionPair(t, defaultServerConfig(), defaultClientConfig())
 

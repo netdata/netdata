@@ -1,6 +1,10 @@
 package raw
 
-import "github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+import (
+	"sync"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
+)
 
 // SnapshotHandler serves a single CGROUPS_SNAPSHOT service kind.
 type SnapshotHandler func(*protocol.CgroupsRequest, *protocol.CgroupsBuilder) bool
@@ -24,16 +28,16 @@ func (c *Client) CallSnapshotWithTimeout(timeoutMs uint32) (*protocol.CgroupsRes
 		return nil, err
 	}
 
-	var result *protocol.CgroupsResponseView
-
-	err := c.callWithRetry(func() error {
+	err := c.callWithRetry(timeoutMs, func() error {
 		req := protocol.CgroupsRequest{LayoutVersion: 1, Flags: 0}
-		var reqBuf [4]byte
-		if req.Encode(reqBuf[:]) == 0 {
+		// Client scratch: the payload reaches the transport, so a local
+		// array would be a heap allocation per call.
+		reqBuf := ensureClientScratch(&c.requestBuf, 4)
+		if req.Encode(reqBuf) == 0 {
 			return protocol.ErrTruncated
 		}
 
-		_, payload, rerr := c.doRawCallWithTimeout(protocol.MethodCgroupsSnapshot, reqBuf[:], timeoutMs)
+		_, payload, rerr := c.doRawCallWithTimeout(protocol.MethodCgroupsSnapshot, reqBuf, timeoutMs)
 		if rerr != nil {
 			return rerr
 		}
@@ -42,13 +46,30 @@ func (c *Client) CallSnapshotWithTimeout(timeoutMs uint32) (*protocol.CgroupsRes
 		if derr != nil {
 			return derr
 		}
-		result = &view
+		c.snapshotView = view
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
+	// The view lives in the client, so returning it does not allocate.
+	return &c.snapshotView, nil
+}
+
+// The request and builder handed to a snapshot handler escape through that
+// call; pooled scratch keeps them off the per-request heap. Each dispatch
+// owns its entry until it returns.
+type snapshotScratch struct {
+	req     protocol.CgroupsRequest
+	builder protocol.CgroupsBuilder
+}
+
+var snapshotScratchPool = sync.Pool{New: func() any { return new(snapshotScratch) }}
+
+// release drops the reference to the caller's response buffer.
+func (s *snapshotScratch) release() {
+	*s = snapshotScratch{}
+	snapshotScratchPool.Put(s)
 }
 
 // SnapshotDispatch adapts a typed snapshot handler to the raw dispatch shape.
@@ -57,7 +78,10 @@ func SnapshotDispatch(handle SnapshotHandler, maxItems uint32) DispatchHandler {
 		return nil
 	}
 	return func(request []byte, responseBuf []byte) (int, error) {
-		req, err := protocol.DecodeCgroupsRequest(request)
+		scratch := snapshotScratchPool.Get().(*snapshotScratch)
+		defer scratch.release()
+		var err error
+		scratch.req, err = protocol.DecodeCgroupsRequest(request)
 		if err != nil {
 			return 0, err
 		}
@@ -69,8 +93,9 @@ func SnapshotDispatch(handle SnapshotHandler, maxItems uint32) DispatchHandler {
 		if !ok || len(responseBuf) < minRequired {
 			return 0, protocol.ErrOverflow
 		}
-		builder := protocol.NewCgroupsBuilder(responseBuf, itemBudget, 0, 0)
-		if !handle(&req, builder) {
+		builder := &scratch.builder
+		builder.Reset(responseBuf, itemBudget, 0, 0)
+		if !handle(&scratch.req, builder) {
 			return 0, errHandlerFailed
 		}
 		n := builder.Finish()

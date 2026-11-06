@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
 
@@ -63,8 +64,12 @@ func TestLookupCommonSizingHelpers(t *testing.T) {
 	if _, err := checkedLookupU32(-1); !errors.Is(err, protocol.ErrOverflow) {
 		t.Fatalf("checkedLookupU32 negative error = %v", err)
 	}
-	if _, err := checkedLookupU32(int(uint64(^uint32(0)) + 1)); !errors.Is(err, protocol.ErrOverflow) {
-		t.Fatalf("checkedLookupU32 overflow error = %v", err)
+	// A 32-bit int cannot exceed uint32 max; non-constant so those builds compile.
+	if strconv.IntSize >= 64 {
+		maxU32 := uint64(^uint32(0))
+		if _, err := checkedLookupU32(int(maxU32 + 1)); !errors.Is(err, protocol.ErrOverflow) {
+			t.Fatalf("checkedLookupU32 overflow error = %v", err)
+		}
 	}
 }
 
@@ -228,15 +233,15 @@ func TestLookupDeadlineAndTimeoutHelpers(t *testing.T) {
 	if remaining, err := client.lookupRemainingTimeout(deadline); err != nil || remaining == 0 {
 		t.Fatalf("lookupRemainingTimeout active = %d/%v", remaining, err)
 	}
-	farFuture := time.Now().Add(time.Duration(^uint32(0)) * time.Millisecond).Add(time.Hour)
+	farFuture := monotime.After(time.Duration(^uint32(0))*time.Millisecond + time.Hour)
 	if remaining, err := client.lookupRemainingTimeout(farFuture); err != nil || remaining != ^uint32(0) {
 		t.Fatalf("lookupRemainingTimeout far future = %d/%v, want max uint32/nil", remaining, err)
 	}
-	if _, err := client.lookupRemainingTimeout(time.Now().Add(-time.Millisecond)); !errors.Is(err, protocol.ErrTimeout) {
+	if _, err := client.lookupRemainingTimeout(monotime.After(-time.Millisecond)); !errors.Is(err, protocol.ErrTimeout) {
 		t.Fatalf("lookupRemainingTimeout expired error = %v", err)
 	}
 	client.Abort()
-	if _, err := client.lookupRemainingTimeout(time.Now().Add(time.Second)); !errors.Is(err, protocol.ErrAborted) {
+	if _, err := client.lookupRemainingTimeout(monotime.After(time.Second)); !errors.Is(err, protocol.ErrAborted) {
 		t.Fatalf("lookupRemainingTimeout aborted error = %v", err)
 	}
 }
@@ -287,7 +292,7 @@ func TestClientTimeoutAbortCapacityAndRetryHelpers(t *testing.T) {
 	}
 
 	client.state = StateReady
-	if err := client.callWithRetry(func() error { return nil }); err != nil {
+	if err := client.callWithRetry(0, func() error { return nil }); err != nil {
 		t.Fatalf("successful retry wrapper error = %v", err)
 	}
 	if client.callCount != 1 {
@@ -295,13 +300,13 @@ func TestClientTimeoutAbortCapacityAndRetryHelpers(t *testing.T) {
 	}
 
 	client.Abort()
-	if err := client.callWithRetry(func() error { return nil }); !errors.Is(err, protocol.ErrAborted) {
+	if err := client.callWithRetry(0, func() error { return nil }); !errors.Is(err, protocol.ErrAborted) {
 		t.Fatalf("aborted retry wrapper error = %v, want ErrAborted", err)
 	}
 
 	client = NewIncrementClient("", "", testLookupClientConfig())
 	client.state = StateReady
-	if err := client.callWithRetry(func() error { return protocol.ErrTimeout }); !errors.Is(err, protocol.ErrTimeout) {
+	if err := client.callWithRetry(0, func() error { return protocol.ErrTimeout }); !errors.Is(err, protocol.ErrTimeout) {
 		t.Fatalf("timeout retry wrapper error = %v, want ErrTimeout", err)
 	}
 	if client.state != StateBroken {
@@ -310,7 +315,7 @@ func TestClientTimeoutAbortCapacityAndRetryHelpers(t *testing.T) {
 
 	client = NewIncrementClient("", "", testLookupClientConfig())
 	client.state = StateReady
-	if err := client.callWithRetry(func() error { return protocol.ErrBadLayout }); !errors.Is(err, protocol.ErrBadLayout) {
+	if err := client.callWithRetry(0, func() error { return protocol.ErrBadLayout }); !errors.Is(err, protocol.ErrBadLayout) {
 		t.Fatalf("non-overflow retry wrapper error = %v, want ErrBadLayout", err)
 	}
 	if client.errorCount == 0 {
@@ -319,7 +324,7 @@ func TestClientTimeoutAbortCapacityAndRetryHelpers(t *testing.T) {
 
 	client = NewIncrementClient("", "", testLookupClientConfig())
 	client.state = StateReady
-	if err := client.callWithRetry(func() error { return protocol.ErrOverflow }); !errors.Is(err, protocol.ErrOverflow) {
+	if err := client.callWithRetry(0, func() error { return protocol.ErrOverflow }); !errors.Is(err, protocol.ErrOverflow) {
 		t.Fatalf("overflow retry wrapper error = %v, want ErrOverflow", err)
 	}
 	if client.errorCount == 0 {
@@ -355,7 +360,7 @@ func TestLookupClientCapacityAndWaitHelpers(t *testing.T) {
 
 func TestLookupReadyAndCapacityGuards(t *testing.T) {
 	client := &Client{abortCh: make(chan struct{})}
-	if err := client.ensureReadyForLogicalLookup(); !errors.Is(err, protocol.ErrBadLayout) {
+	if err := client.ensureReadyForLogicalLookup(); !errors.Is(err, protocol.ErrNotReady) {
 		t.Fatalf("not-ready logical lookup error = %v", err)
 	}
 	if client.errorCount != 1 {
@@ -372,30 +377,31 @@ func TestLookupReadyAndCapacityGuards(t *testing.T) {
 	}
 
 	client = &Client{abortCh: make(chan struct{})}
-	if err := client.ensureLookupRequestCapacity(-1); !errors.Is(err, protocol.ErrOverflow) {
+	if err := client.ensureLookupRequestCapacity(-1, monotime.After(time.Second)); !errors.Is(err, protocol.ErrOverflow) {
 		t.Fatalf("negative request capacity error = %v", err)
 	}
 	if strconv.IntSize >= 64 {
-		if err := client.ensureLookupRequestCapacity(int(uint64(^uint32(0)) + 1)); !errors.Is(err, protocol.ErrOverflow) {
+		maxU32 := uint64(^uint32(0))
+		if err := client.ensureLookupRequestCapacity(int(maxU32+1), monotime.After(time.Second)); !errors.Is(err, protocol.ErrOverflow) {
 			t.Fatalf("unrepresentable request capacity error = %v", err)
 		}
 	}
 	client = &Client{abortCh: make(chan struct{})}
-	if err := client.ensureLookupRequestCapacity(int(protocol.MaxPayloadDefault) + 1); !errors.Is(err, protocol.ErrOverflow) {
+	if err := client.ensureLookupRequestCapacity(int(protocol.MaxPayloadDefault)+1, monotime.After(time.Second)); !errors.Is(err, protocol.ErrOverflow) {
 		t.Fatalf("default request capacity error = %v", err)
 	}
 	client.config.MaxRequestPayloadBytes = 8
-	if err := client.ensureLookupRequestCapacity(9); !errors.Is(err, protocol.ErrOverflow) {
+	if err := client.ensureLookupRequestCapacity(9, monotime.After(time.Second)); !errors.Is(err, protocol.ErrOverflow) {
 		t.Fatalf("configured request capacity error = %v", err)
 	}
 	client.config.MaxRequestPayloadBytes = 16
-	if err := client.ensureLookupRequestCapacity(16); err != nil {
+	if err := client.ensureLookupRequestCapacity(16, monotime.After(time.Second)); err != nil {
 		t.Fatalf("sessionless request capacity = %v", err)
 	}
 
 	client = &Client{abortCh: make(chan struct{}), state: StateReady}
 	client.Abort()
-	if err := client.ensureLookupRequestCapacity(1); !errors.Is(err, protocol.ErrAborted) {
+	if err := client.ensureLookupRequestCapacity(1, monotime.After(time.Second)); !errors.Is(err, protocol.ErrAborted) {
 		t.Fatalf("aborted capacity growth error = %v, want ErrAborted", err)
 	}
 	if client.state != StateBroken || client.errorCount != 1 {
@@ -440,7 +446,8 @@ func TestIncrementBatchRejectsUnrepresentableItemCount(t *testing.T) {
 	if strconv.IntSize < 64 {
 		t.Skip("synthetic oversized slice guard requires 64-bit int")
 	}
-	if _, err := incrementBatchRequestSize(int(uint64(^uint32(0)) + 1)); !errors.Is(err, protocol.ErrOverflow) {
+	maxU32 := uint64(^uint32(0))
+	if _, err := incrementBatchRequestSize(int(maxU32 + 1)); !errors.Is(err, protocol.ErrOverflow) {
 		t.Fatalf("huge increment batch error = %v, want ErrOverflow", err)
 	}
 }
@@ -671,7 +678,7 @@ func TestSimpleRawDispatchGuardCoverage(t *testing.T) {
 		if protocol.StringReverseEncode("abc", req) == 0 {
 			t.Fatal("encode string reverse request")
 		}
-		dispatch := StringReverseDispatch(func(s string) (string, bool) {
+		dispatch := StringReverseDispatch(func([]byte) (string, bool) {
 			return "cba", true
 		})
 		resp := make([]byte, protocol.StringReverseHdrSize+4)
@@ -680,13 +687,13 @@ func TestSimpleRawDispatchGuardCoverage(t *testing.T) {
 			t.Fatalf("string reverse dispatch success = n %d err %v", n, err)
 		}
 		view, err := protocol.StringReverseDecode(resp[:n])
-		if err != nil || view.Str != "cba" {
+		if err != nil || string(view.Str) != "cba" {
 			t.Fatalf("string reverse dispatch view = %+v err %v", view, err)
 		}
 		if n, err := dispatch(req[:1], resp); n != 0 || !errors.Is(err, protocol.ErrTruncated) {
 			t.Fatalf("string reverse bad request = n %d err %v, want 0 ErrTruncated", n, err)
 		}
-		failing := StringReverseDispatch(func(string) (string, bool) {
+		failing := StringReverseDispatch(func([]byte) (string, bool) {
 			return "", false
 		})
 		if n, err := failing(req, resp); n != 0 || !errors.Is(err, errHandlerFailed) {

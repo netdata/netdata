@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
 
 // Listener is a listening Named Pipe endpoint.
@@ -64,8 +66,26 @@ func (l *Listener) Accept() (*Session, error) {
 }
 
 // AcceptWithConfig accepts one client connection using a caller-provided
-// per-session server config and session ID.
+// per-session server config and session ID. The handshake waits at most
+// protocol.ServerHandshakeTimeoutMs for HELLO; servers that must not block
+// their accept loop use AcceptPending and PendingConn.Handshake instead.
 func (l *Listener) AcceptWithConfig(sessionID uint64, config ServerConfig) (*Session, error) {
+	pending, err := l.AcceptPending()
+	if err != nil {
+		return nil, err
+	}
+	return pending.Handshake(sessionID, config, protocol.ServerHandshakeTimeoutMs, nil)
+}
+
+// PendingConn is a connected pipe instance whose handshake has not run yet.
+// Splitting accept from handshake lets a server bound the handshake and run
+// it outside its accept loop.
+type PendingConn struct {
+	handle syscall.Handle
+}
+
+// AcceptPending waits for one client connection without reading HELLO.
+func (l *Listener) AcceptPending() (*PendingConn, error) {
 	l.mu.Lock()
 	if l.handle == syscall.InvalidHandle {
 		l.mu.Unlock()
@@ -92,7 +112,6 @@ func (l *Listener) AcceptWithConfig(sessionID uint64, config ServerConfig) (*Ses
 			l.handle = syscall.InvalidHandle
 		}
 		l.mu.Unlock()
-		disconnectNamedPipe(sessionHandle)
 		syscall.CloseHandle(sessionHandle)
 		return nil, wrapErr(ErrAccept, "listener closed")
 	}
@@ -104,20 +123,93 @@ func (l *Listener) AcceptWithConfig(sessionID uint64, config ServerConfig) (*Ses
 			l.handle = syscall.InvalidHandle
 		}
 		l.mu.Unlock()
-		disconnectNamedPipe(sessionHandle)
 		syscall.CloseHandle(sessionHandle)
 		return nil, perr
 	}
 	l.handle = next
 	l.mu.Unlock()
 
-	session, herr := serverHandshake(sessionHandle, &config, sessionID)
-	if herr != nil {
-		disconnectNamedPipe(sessionHandle)
-		syscall.CloseHandle(sessionHandle)
-		return nil, herr
+	return &PendingConn{handle: sessionHandle}, nil
+}
+
+// Handle returns the pipe handle, or InvalidHandle once consumed.
+func (p *PendingConn) Handle() syscall.Handle {
+	return p.handle
+}
+
+// Handshake reads HELLO and answers it. timeoutMs bounds the wait for HELLO
+// (0 = no deadline) and abortCh, when non-nil, cancels it. The connection is
+// consumed: on success the Session owns the handle, on failure it is closed.
+func (p *PendingConn) Handshake(
+	sessionID uint64,
+	config ServerConfig,
+	timeoutMs uint32,
+	abortCh <-chan struct{},
+) (*Session, error) {
+	return p.HandshakePrepared(sessionID, config, timeoutMs, abortCh, nil)
+}
+
+// ProfilePrepare sets up a selected profile's resources (an SHM region)
+// during the server handshake, once the payload limits are agreed and
+// before HELLO_ACK is sent. Returning false drops that profile and the
+// handshake selects again; with no profile left the client is rejected as
+// unsupported.
+type ProfilePrepare func(profile, maxRequestPayloadBytes, maxResponsePayloadBytes uint32) bool
+
+// HandshakePrepared is Handshake with a prepare step; prepare may be nil.
+func (p *PendingConn) HandshakePrepared(
+	sessionID uint64,
+	config ServerConfig,
+	timeoutMs uint32,
+	abortCh <-chan struct{},
+	prepare ProfilePrepare,
+) (*Session, error) {
+	handle := p.handle
+	if handle == syscall.InvalidHandle {
+		return nil, wrapErr(ErrAccept, "connection already consumed")
+	}
+	p.handle = syscall.InvalidHandle
+
+	session, err := serverHandshakeWait(handle, &config, sessionID, newReceiveWait(timeoutMs, abortCh), prepare)
+	if err != nil {
+		// Close only: DisconnectNamedPipe would discard a rejection reply
+		// the client has not read yet.
+		syscall.CloseHandle(handle)
+		return nil, err
 	}
 	return session, nil
+}
+
+// Close drops a connection that will not be handshaken.
+func (p *PendingConn) Close() {
+	if p.handle != syscall.InvalidHandle {
+		syscall.CloseHandle(p.handle)
+		p.handle = syscall.InvalidHandle
+	}
+}
+
+// Wake connects to the listener once and disconnects, so an accept blocked
+// in ConnectNamedPipe returns. It never closes the listener's handle.
+func (l *Listener) Wake() {
+	l.mu.Lock()
+	pipeName := l.pipeName
+	l.mu.Unlock()
+	if len(pipeName) == 0 || pipeName[0] == 0 {
+		return
+	}
+
+	wake, err := syscall.CreateFile(
+		&pipeName[0],
+		_GENERIC_READ|_GENERIC_WRITE,
+		0,
+		nil,
+		_OPEN_EXISTING,
+		_SECURITY_SQOS_PRESENT|_SECURITY_IDENTIFICATION,
+		0,
+	)
+	if err == nil && wake != syscall.InvalidHandle && wake != 0 {
+		syscall.CloseHandle(wake)
+	}
 }
 
 // Close closes the listener.
@@ -143,7 +235,7 @@ func (l *Listener) Close() {
 			0,
 			nil,
 			_OPEN_EXISTING,
-			0,
+			_SECURITY_SQOS_PRESENT|_SECURITY_IDENTIFICATION,
 			0,
 		)
 		if err == nil && wake != syscall.InvalidHandle && wake != 0 {
@@ -166,14 +258,21 @@ func createPipeInstance(pipeName []uint16, bufSize uint32, firstInstance bool) (
 		openMode |= _FILE_FLAG_FIRST_PIPE_INSTANCE
 	}
 
+	attrs, err := newOwnerOnlyAttributes()
+	if err != nil {
+		return syscall.InvalidHandle, wrapErr(ErrCreatePipe, err.Error())
+	}
+	defer attrs.free()
+
 	handle, err := createNamedPipe(
 		&pipeName[0],
 		openMode,
-		_PIPE_TYPE_MESSAGE|_PIPE_READMODE_MESSAGE|_PIPE_WAIT,
+		_PIPE_TYPE_MESSAGE|_PIPE_READMODE_MESSAGE|_PIPE_WAIT|_PIPE_REJECT_REMOTE_CLIENTS,
 		_PIPE_UNLIMITED_INSTANCES,
 		bufSize,
 		bufSize,
 		0,
+		attrs.ptr(),
 	)
 	if err != nil {
 		errno, ok := err.(syscall.Errno)

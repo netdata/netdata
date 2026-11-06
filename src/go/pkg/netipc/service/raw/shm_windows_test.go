@@ -89,7 +89,7 @@ func TestWinShmRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatalf("CallStringReverse failed: %v", err)
 		}
-		if reversed.Str != "olleh" {
+		if string(reversed.Str) != "olleh" {
 			t.Fatalf("string reverse result = %q, want %q", reversed.Str, "olleh")
 		}
 	})
@@ -105,7 +105,8 @@ func TestWinShmIdleTimeoutKeepsSessionAlive(t *testing.T) {
 
 	waitWinClientReady(t, client)
 
-	time.Sleep(350 * time.Millisecond)
+	// Stay idle across several server receive timeouts.
+	time.Sleep(5 * time.Duration(testServerTimings.pollMs) * time.Millisecond)
 
 	got, err := client.CallIncrement(9)
 	if err != nil {
@@ -175,7 +176,9 @@ func TestWinShmAttachFailureFallsBackToBaseline(t *testing.T) {
 		}
 	}()
 
-	client := NewIncrementClient(winTestRunDir, svc, testWinShmClientConfig())
+	// The listener negotiates SHM but never creates the objects, so the
+	// attach window runs out; the test window keeps that in milliseconds.
+	client := NewIncrementClient(winTestRunDir, svc, testWinShmClientConfig()).useTestTimings()
 
 	if changed := client.Refresh(); !changed {
 		t.Fatal("refresh should transition to READY via baseline fallback after WinSHM attach failure")
@@ -233,7 +236,8 @@ func TestWinShmMalformedShortRequestRecovers(t *testing.T) {
 		t.Fatalf("WinShmSend malformed short request failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	// The server ends the session on the malformed message.
+	waitSessionExits(ts.server, 1)
 
 	got, err := client.CallIncrement(9)
 	if err != nil {
@@ -265,7 +269,8 @@ func TestWinShmMalformedHeaderRequestRecovers(t *testing.T) {
 		t.Fatalf("WinShmSend malformed header request failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	// The server ends the session on the malformed message.
+	waitSessionExits(ts.server, 1)
 
 	got, err := client.CallIncrement(11)
 	if err != nil {
@@ -309,7 +314,8 @@ func TestWinShmUnexpectedMessageKindRecovers(t *testing.T) {
 		t.Fatalf("WinShmSend unexpected-kind request failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	// The server ends the session on the malformed message.
+	waitSessionExits(ts.server, 1)
 
 	got, err := client.CallIncrement(13)
 	if err != nil {
@@ -352,7 +358,21 @@ func TestWinShmMalformedBatchRequestRecovers(t *testing.T) {
 		t.Fatalf("WinShmSend malformed batch request failed: %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	// The server answers the malformed batch with an error status and keeps
+	// the session.
+	respBuf := make([]byte, protocol.HeaderSize+4096)
+	n, err := client.shm.WinShmReceive(respBuf, 5000)
+	if err != nil {
+		t.Fatalf("WinShmReceive reply to malformed batch failed: %v", err)
+	}
+	respHdr, err := protocol.DecodeHeader(respBuf[:n])
+	if err != nil {
+		t.Fatalf("decode reply to malformed batch: %v", err)
+	}
+	if respHdr.MessageID != 1 || respHdr.TransportStatus == protocol.StatusOK {
+		t.Fatalf("reply to malformed batch = id %d status %d, want id 1 with an error status",
+			respHdr.MessageID, respHdr.TransportStatus)
+	}
 
 	got, err := client.CallIncrement(21)
 	if err != nil {
@@ -434,5 +454,57 @@ func TestWinShmBatchResponseOverflowRespectsConfiguredCeiling(t *testing.T) {
 	}
 	if client.reconnectCount < 1 {
 		t.Fatalf("expected reconnect_count >= 1 after capped WinSHM batch overflow, got %d", client.reconnectCount)
+	}
+}
+
+func TestWinShmRegionOnlyForShmSessions(t *testing.T) {
+	svc := uniqueWinService("go_win_shm_only_selected")
+	ts := startTestIncrementServerWinWithConfig(svc, testWinShmServerConfig())
+	defer ts.stop()
+	s := ts.server
+
+	baseline := NewIncrementClient(winTestRunDir, svc, testWinClientConfig())
+	baseline.config.SupportedProfiles = protocol.ProfileBaseline
+	baseline.config.PreferredProfiles = protocol.ProfileBaseline
+	defer baseline.Close()
+	baseline.Refresh()
+	if !baseline.Ready() {
+		t.Fatalf("baseline client not ready, state=%d", baseline.state)
+	}
+	if n := shmCreatedCount(s); n != 0 {
+		t.Fatalf("baseline session created %d SHM regions, want 0", n)
+	}
+
+	badAuth := NewIncrementClient(winTestRunDir, svc, testWinShmClientConfig())
+	badAuth.config.AuthToken++
+	defer badAuth.Close()
+	badAuth.Refresh()
+	if badAuth.Ready() {
+		t.Fatal("client with a wrong auth token must not become ready")
+	}
+	if n := shmCreatedCount(s); n != 0 {
+		t.Fatalf("rejected handshake created %d SHM regions, want 0", n)
+	}
+
+	shmClient := NewIncrementClient(winTestRunDir, svc, testWinShmClientConfig())
+	defer shmClient.Close()
+	shmClient.Refresh()
+	if !shmClient.Ready() || shmClient.session.SelectedProfile != protocol.ProfileSHMHybrid {
+		t.Fatalf("SHM client not ready over SHM, state=%d session=%+v", shmClient.state, shmClient.session)
+	}
+	if n := shmCreatedCount(s); n != 1 {
+		t.Fatalf("SHM session created %d SHM regions, want 1", n)
+	}
+
+	s.failShmCreate.Store(true)
+	fallback := NewIncrementClient(winTestRunDir, svc, testWinShmClientConfig())
+	defer fallback.Close()
+	fallback.Refresh()
+	if !fallback.Ready() || fallback.session.SelectedProfile != protocol.ProfileBaseline {
+		t.Fatalf("client after SHM create failure not ready over baseline, state=%d session=%+v",
+			fallback.state, fallback.session)
+	}
+	if n := shmCreatedCount(s); n != 0 {
+		t.Fatalf("failed SHM create reported %d regions, want 0", n)
 	}
 }

@@ -124,17 +124,17 @@ static void fill_server_session(nipc_uds_session_t *session, int fd,
 
 nipc_uds_error_t nipc_uds_client_handshake(int fd,
                                            const nipc_uds_client_config_t *cfg,
+                                           uint32_t timeout_ms, int abort_fd,
                                            nipc_uds_session_t *session) {
   uint8_t buf[128];
-  uint32_t pkt_size = cfg->packet_size;
-  if (pkt_size == 0)
-    pkt_size = nipc_uds_detect_packet_size(fd);
+  uint32_t pkt_size = nipc_uds_packet_size(fd, cfg->packet_size);
 
   nipc_hello_t hello = {
       .layout_version = 1,
-      .supported_profiles = cfg->supported_profiles ? cfg->supported_profiles
-                                                    : NIPC_PROFILE_BASELINE,
-      .preferred_profiles = cfg->preferred_profiles,
+      .supported_profiles = (cfg->supported_profiles ? cfg->supported_profiles
+                                                     : NIPC_PROFILE_BASELINE) &
+                            NIPC_UDS_PLATFORM_PROFILES,
+      .preferred_profiles = cfg->preferred_profiles & NIPC_UDS_PLATFORM_PROFILES,
       .max_request_payload_bytes = apply_default(cfg->max_request_payload_bytes,
                                                  NIPC_MAX_PAYLOAD_DEFAULT),
       .max_request_batch_items =
@@ -161,9 +161,23 @@ nipc_uds_error_t nipc_uds_client_handshake(int fd,
   if (err != NIPC_UDS_OK)
     return err;
 
+  /* A server that accepted but never answers must not hold the client. */
+  nipc_uds_wait_t wait = nipc_uds_wait_init(timeout_ms, abort_fd);
+#if NIPC_UDS_STREAM
+  size_t len = 0;
+  err = nipc_uds_stream_recv_packet(fd, buf, sizeof(buf), 0, &wait, &len);
+  if (err != NIPC_UDS_OK)
+    return err;
+  ssize_t n = (ssize_t)len;
+#else
+  err = nipc_uds_wait_for_readable(fd, &wait);
+  if (err != NIPC_UDS_OK)
+    return err;
+
   ssize_t n = nipc_uds_raw_recv(fd, buf, sizeof(buf));
   if (n <= 0)
     return NIPC_UDS_ERR_RECV;
+#endif
 
   nipc_header_t ack_hdr;
   nipc_error_t perr = nipc_header_decode(buf, (size_t)n, &ack_hdr);
@@ -189,8 +203,16 @@ nipc_uds_error_t nipc_uds_client_handshake(int fd,
   if (perr != NIPC_OK)
     return NIPC_UDS_ERR_PROTOCOL;
 
+  /* The server must pick exactly one of the profiles this client offered. */
+  if (ack.selected_profile == 0 ||
+      (ack.selected_profile & (ack.selected_profile - 1)) != 0 ||
+      (ack.selected_profile & hello.supported_profiles) == 0)
+    return NIPC_UDS_ERR_PROTOCOL;
+
   fill_client_session(session, fd, &ack);
-  if (session->packet_size <= NIPC_HEADER_LEN)
+  /* A server may only lower the client's proposal; a larger size could
+   * exceed what this side's kernel accepts. */
+  if (session->packet_size <= NIPC_HEADER_LEN || session->packet_size > pkt_size)
     return NIPC_UDS_ERR_PROTOCOL;
 
   return NIPC_UDS_OK;
@@ -199,23 +221,36 @@ nipc_uds_error_t nipc_uds_client_handshake(int fd,
 nipc_uds_error_t nipc_uds_server_handshake(int fd,
                                            const nipc_uds_server_config_t *cfg,
                                            uint64_t session_id,
+                                           nipc_uds_profile_prepare_fn prepare,
+                                           void *prepare_user,
+                                           const nipc_uds_wait_t *wait,
                                            nipc_uds_session_t *session) {
   uint8_t buf[128];
-  uint32_t server_pkt_size = cfg->packet_size;
-  if (server_pkt_size == 0)
-    server_pkt_size = nipc_uds_detect_packet_size(fd);
+  uint32_t server_pkt_size = nipc_uds_packet_size(fd, cfg->packet_size);
 
   uint32_t s_resp_pay =
       apply_default(cfg->max_response_payload_bytes, NIPC_MAX_PAYLOAD_DEFAULT);
   uint32_t s_req_pay =
       apply_default(cfg->max_request_payload_bytes, NIPC_MAX_PAYLOAD_DEFAULT);
   uint32_t s_profiles =
-      cfg->supported_profiles ? cfg->supported_profiles : NIPC_PROFILE_BASELINE;
-  uint32_t s_preferred = cfg->preferred_profiles;
+      (cfg->supported_profiles ? cfg->supported_profiles : NIPC_PROFILE_BASELINE) &
+      NIPC_UDS_PLATFORM_PROFILES;
+  uint32_t s_preferred = cfg->preferred_profiles & NIPC_UDS_PLATFORM_PROFILES;
 
+#if NIPC_UDS_STREAM
+  size_t len = 0;
+  nipc_uds_error_t rerr =
+      nipc_uds_stream_recv_packet(fd, buf, sizeof(buf), 0, wait, &len);
+  if (rerr != NIPC_UDS_OK)
+    return rerr;
+  ssize_t n = (ssize_t)len;
+#else
+  /* The caller waited for HELLO; a datagram arrives whole. */
+  (void)wait;
   ssize_t n = nipc_uds_raw_recv(fd, buf, sizeof(buf));
   if (n <= 0)
     return NIPC_UDS_ERR_RECV;
+#endif
 
   nipc_header_t hdr;
   nipc_error_t perr = nipc_header_decode(buf, (size_t)n, &hdr);
@@ -273,6 +308,21 @@ nipc_uds_error_t nipc_uds_server_handshake(int fd,
   if (agreed_pkt <= NIPC_HEADER_LEN) {
     send_rejection_ack(fd, NIPC_STATUS_INCOMPATIBLE);
     return NIPC_UDS_ERR_INCOMPATIBLE;
+  }
+
+  /* Set up the selected profile before the ACK promises it. A profile the
+   * caller cannot prepare is dropped, as if the server never offered it. */
+  while (prepare &&
+         !prepare(prepare_user, selected, agreed_req_pay, agreed_resp_pay)) {
+    s_profiles &= ~selected;
+    intersection &= ~selected;
+    if (intersection == 0) {
+      send_rejection_ack(fd, NIPC_STATUS_UNSUPPORTED);
+      return NIPC_UDS_ERR_NO_PROFILE;
+    }
+    preferred_intersection = intersection & hello.preferred_profiles & s_preferred;
+    selected = preferred_intersection != 0 ? highest_bit(preferred_intersection)
+                                           : highest_bit(intersection);
   }
 
   nipc_hello_ack_t ack = {
