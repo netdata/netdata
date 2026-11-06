@@ -60,8 +60,7 @@
 //!   [`ipc::WRITER_SOCKET_PATH`]).
 //! - [`component`] — the [`component::Component`] trait and
 //!   [`component::ComponentHandle`] spawn/shutdown machinery, including
-//!   the recovery-time batch helpers ([`component::batch_recover`],
-//!   [`component::drain_pending`]).
+//!   the recovery-time batch helper ([`component::batch_recover`]).
 //! - [`cleaner`] — the shared stateless path-deletion worker (one per
 //!   process; the senders own the when-to-delete policy).
 //! - [`uploader`] — the shared remote-upload worker (one per process,

@@ -42,9 +42,8 @@
 //!   responses still queued when a component also emits unsolicited
 //!   responses (the catalog builder's time-trigger and `Flush` rotations
 //!   each emit a `Rotated` with no preceding `AddEntry`). Production code
-//!   consults it only in the synchronous recovery drains — [`batch_recover`]
-//!   leaves it balanced, [`drain_pending`] drains it to zero — while
-//!   steady-state routing goes through [`ComponentHandle::into_parts`],
+//!   consults it only in the synchronous recovery drain — [`batch_recover`]
+//!   leaves it balanced — while steady-state routing goes through [`ComponentHandle::into_parts`],
 //!   which drops it; recovery tests assert it to pin fire-and-forget request
 //!   counts. Nothing else observes backlog.
 //! - Single owner: the handle's mutating methods take `&mut self` and the
@@ -57,8 +56,8 @@
 //!   request sender and the receiver moves into a signal-tagging forwarder
 //!   task feeding the run loop's merged response channel.
 //! - Error semantics: the machinery raises no errors of its own. A dead
-//!   component surfaces only as closed channels; [`batch_recover`] and
-//!   [`drain_pending`] translate that into the fatal `anyhow` errors that
+//!   component surfaces only as closed channels; [`batch_recover`]
+//!   translates that into the fatal `anyhow` errors that
 //!   fail startup, and the ledger's run loop exits its event loop when a
 //!   worker channel closes (cleaner, uploader, per-pipeline forwarder
 //!   alike).
@@ -76,7 +75,7 @@
 //!   `build_pipeline`).
 //!
 //! [`crate::recovery`] replays startup work through these same handles via
-//! [`batch_recover`] / [`drain_pending`] so recovery and steady state share
+//! [`batch_recover`] so recovery and steady state share
 //! one code path; `recovery/remote.rs` deliberately sends fire-and-forget
 //! instead, never awaiting uploads during startup. Tests pin the machinery's
 //! behavior through custom `Component` impls (`recovery/tests.rs`) and by
@@ -204,48 +203,19 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// catalog-builder `AddEntry`s `reconcile_remote_uploads` enqueues
     /// fire-and-forget — are preserved: the live receiver carries them into
     /// the forwarder and on to the run loop. The dropped counter was only
-    /// ever consulted by the synchronous recovery drains (`batch_recover` /
-    /// `drain_pending`); steady-state routing ignores it.
+    /// ever consulted by the synchronous recovery drain (`batch_recover`);
+    /// steady-state routing ignores it.
     pub fn into_parts(self) -> (mpsc::UnboundedSender<Req>, mpsc::UnboundedReceiver<Resp>) {
         (self.tx, self.rx)
     }
-}
-
-/// Drain the responses a handle's in-flight counter still accounts for,
-/// processing each one.
-///
-/// Used to flush responses enqueued as side effects of another component's
-/// `batch_recover` — e.g. the WAL-delete requests `recover_unindexed` fires
-/// at the cleaner while its indexer responses are still streaming back.
-/// Precondition: every earlier request/response round on this handle was
-/// itself consumed 1:1 (a `batch_recover` recv-s exactly what it sent,
-/// rebalancing the counter), so the counter here counts only the
-/// fire-and-forget sends; a component that emits unsolicited responses could
-/// otherwise end the drain early. Each drained response must still answer
-/// exactly one such send (true of the cleaner, the sole production target —
-/// `recovery::local::drain_wal_deletes`). A closed response channel
-/// mid-drain means the component died with requests outstanding: fatal
-/// `anyhow` error, failing startup.
-pub async fn drain_pending<Req: Send + 'static, Resp: Send + 'static>(
-    handle: &mut ComponentHandle<Req, Resp>,
-    mut process: impl FnMut(Resp),
-) -> anyhow::Result<()> {
-    while handle.pending() > 0 {
-        let resp = handle
-            .recv()
-            .await
-            .ok_or_else(|| anyhow::anyhow!("component died during drain"))?;
-        process(resp);
-    }
-    Ok(())
 }
 
 /// Send a batch of requests to a component and process every response.
 ///
 /// Recovery's replay primitive: pending work re-enters through the normal
 /// component path instead of duplicating its processing logic
-/// (`recovery::local` calls it on the indexer and the cleaner; an empty
-/// batch returns `Ok(())` without touching the component).
+/// (`recovery::local` calls it on the cleaner; an empty batch returns
+/// `Ok(())` without touching the component).
 ///
 /// The two loops are decoupled on purpose: all requests go out first, then
 /// exactly `count` responses are consumed in arrival order and handed to
@@ -254,9 +224,7 @@ pub async fn drain_pending<Req: Send + 'static, Resp: Send + 'static>(
 /// request with exactly one response; workers that also emit unsolicited
 /// responses (the catalog builder) are driven fire-and-forget instead
 /// (`recovery/remote.rs`). Because the loop recv-s exactly what it sent, the
-/// in-flight counter returns to its pre-call value — which is what lets a
-/// following [`drain_pending`] count only the fire-and-forget sends `process`
-/// makes. A dead component — a failed `send` or a `None` mid-batch — is a
+/// in-flight counter returns to its pre-call value. A dead component — a failed `send` or a `None` mid-batch — is a
 /// fatal `anyhow` error that fails startup.
 pub async fn batch_recover<Req: Send + 'static, Resp: Send + 'static>(
     requests: Vec<Req>,

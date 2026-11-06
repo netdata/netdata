@@ -28,9 +28,16 @@ pub use ledger::Ledger;
 
 use bridge::signals::Signal;
 
+use std::path::Path;
+use std::time::Duration;
+
 use anyhow::{Context, Result};
 use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::{Connection, Endpoint};
+
+/// How long a starting ledger waits for a previous instance to release the
+/// store. Covers that instance's normal shutdown; longer means it is wedged.
+const STORE_LOCK_WAIT: Duration = Duration::from_secs(30);
 
 /// Ledger worker entry point.
 ///
@@ -64,6 +71,9 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     let identity = config
         .identity
         .context("plugin config reached the ledger without a resolved identity")?;
+
+    // Held for the process lifetime; the kernel releases it on any exit.
+    let _store_lock = lock_store(&config.base_dir).await?;
 
     // `Ledger::new` runs the full supervisor handshake; see its docs for the
     // step order and what `Ready` claims. Each signal's lifecycle config is
@@ -105,4 +115,70 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     result.context("ledger event loop error")?;
 
     Ok(())
+}
+
+/// Take the exclusive lock on `{base_dir}/.ledger.lock`, so two ledgers never
+/// recover or seal the same store at once (a previous instance still shutting
+/// down, or one orphaned by a supervisor that was SIGKILLed). Waits up to
+/// [`STORE_LOCK_WAIT`], then fails startup; the agent restarts the plugin.
+async fn lock_store(base_dir: &Path) -> Result<std::fs::File> {
+    std::fs::create_dir_all(base_dir)
+        .with_context(|| format!("failed to create {}", base_dir.display()))?;
+    let path = base_dir.join(".ledger.lock");
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(&path)
+        .with_context(|| format!("failed to open {}", path.display()))?;
+
+    let deadline = tokio::time::Instant::now() + STORE_LOCK_WAIT;
+    let mut logged = false;
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(file),
+            Err(std::fs::TryLockError::WouldBlock) => {
+                if tokio::time::Instant::now() >= deadline {
+                    anyhow::bail!(
+                        "{} is still locked by another ledger after {}s",
+                        path.display(),
+                        STORE_LOCK_WAIT.as_secs()
+                    );
+                }
+                if !logged {
+                    tracing::warn!(
+                        "{} is locked by another ledger; waiting up to {}s",
+                        path.display(),
+                        STORE_LOCK_WAIT.as_secs()
+                    );
+                    logged = true;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+            Err(std::fs::TryLockError::Error(e)) => {
+                return Err(e).with_context(|| format!("failed to lock {}", path.display()));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod store_lock_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_second_ledger_waits_for_the_first_to_release_the_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let first = lock_store(dir.path()).await.unwrap();
+        let base = dir.path().to_path_buf();
+        let second = tokio::spawn(async move { lock_store(&base).await });
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(!second.is_finished(), "the store is still held");
+        drop(first);
+        tokio::time::timeout(Duration::from_secs(5), second)
+            .await
+            .expect("lock acquired after release")
+            .unwrap()
+            .unwrap();
+    }
 }

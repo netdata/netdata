@@ -18,6 +18,7 @@ clap = { workspace = true }
 bytesize = { workspace = true }
 ferryboat = { workspace = true }
 humantime = { workspace = true }
+libc = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
 netdata-plugin-types = { workspace = true }
 otel-ledger = { workspace = true }
