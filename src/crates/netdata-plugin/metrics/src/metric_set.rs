@@ -363,11 +363,9 @@ impl MetricSetBuilder {
     /// dimension id is invalid or repeats in `D::IDS`, or if `D::IDS` is
     /// empty.
     pub fn counter<D: Dimension>(&mut self, descriptor: ChartDescriptor) -> Counter<D> {
-        let columns = self.column_range::<D>(Aggregation::Sum);
-        self.add_chart_template(ChartTemplate::new(
-            descriptor,
-            per_dimension(columns, Readout::Rate),
-        ));
+        let columns = self.add_columns::<D>(Aggregation::Sum);
+        let dimensions = chart_dimensions(columns, Readout::Rate);
+        self.add_chart_template(ChartTemplate::new(descriptor, dimensions));
         Counter(columns)
     }
 
@@ -380,12 +378,10 @@ impl MetricSetBuilder {
         &mut self,
         descriptor: ChartDescriptor,
     ) -> CumulativeCounter<D> {
-        let columns = self.column_range::<D>(Aggregation::LastValue);
+        let columns = self.add_columns::<D>(Aggregation::LastValue);
         self.row_layout.mark_cumulative(columns.range());
-        self.add_chart_template(ChartTemplate::new(
-            descriptor,
-            per_dimension(columns, Readout::Rate),
-        ));
+        let dimensions = chart_dimensions(columns, Readout::Rate);
+        self.add_chart_template(ChartTemplate::new(descriptor, dimensions));
         CumulativeCounter(columns)
     }
 
@@ -395,11 +391,9 @@ impl MetricSetBuilder {
     ///
     /// As [`MetricSetBuilder::counter`].
     pub fn gauge<D: Dimension>(&mut self, descriptor: ChartDescriptor) -> Gauge<D> {
-        let columns = self.column_range::<D>(Aggregation::LastValue);
-        self.add_chart_template(ChartTemplate::new(
-            descriptor,
-            per_dimension(columns, Readout::Column),
-        ));
+        let columns = self.add_columns::<D>(Aggregation::LastValue);
+        let dimensions = chart_dimensions(columns, Readout::Column);
+        self.add_chart_template(ChartTemplate::new(descriptor, dimensions));
         Gauge(columns)
     }
 
@@ -526,14 +520,14 @@ impl MetricSetBuilder {
         }))
     }
 
-    /// Add one column with `aggregation` per value of `D`.
-    fn column_range<D: Dimension>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
-        ColumnRange::new(
-            self.id,
-            self.row_layout.add_columns(D::IDS.len(), aggregation),
-        )
+    /// Adds one column with `aggregation` per value of `D` to the row layout.
+    fn add_columns<D: Dimension>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
+        let base = self.row_layout.add_columns(D::IDS.len(), aggregation);
+        ColumnRange::new(self.id, base)
     }
 
+    /// Checks `template`'s context (valid, unique in the set) and dimensions
+    /// (at least one, ids unique), then adds it.
     fn add_chart_template(&mut self, template: ChartTemplate) {
         let context = &template.context;
         check_context(context);
@@ -556,14 +550,15 @@ impl MetricSetBuilder {
     }
 }
 
-/// One dimension per value of `D`, each reading its own column with `read`.
-fn per_dimension<D: Dimension>(
+/// One chart dimension per value of `D`, named by its id; `readout` makes each
+/// dimension's readout from its column, for example `Readout::Rate`.
+fn chart_dimensions<D: Dimension>(
     columns: ColumnRange<D>,
-    read: fn(usize) -> Readout,
+    readout: fn(usize) -> Readout,
 ) -> Vec<ChartDimension> {
     D::IDS
         .iter()
         .enumerate()
-        .map(|(i, id)| ChartDimension::new(id, read(columns.column(i))))
+        .map(|(i, id)| ChartDimension::new(id, readout(columns.column(i))))
         .collect()
 }
