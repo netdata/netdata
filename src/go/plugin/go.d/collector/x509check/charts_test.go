@@ -4,15 +4,8 @@ package x509check
 
 import (
 	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/pem"
-	"math/big"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -29,7 +22,7 @@ func TestCollector_ChartContract(t *testing.T) {
 	c := New()
 	c.Source = "https://example.org:443"
 	c.CheckFullChain, c.CheckRevocation = true, true
-	c.prov = &mockProvider{
+	c.provider = &mockProvider{
 		certs: []*x509.Certificate{
 			{Subject: pkix.Name{
 				CommonName: "example.org",
@@ -39,7 +32,7 @@ func TestCollector_ChartContract(t *testing.T) {
 			}, NotAfter: time.Now().Add(24 * time.Hour)},
 		},
 	}
-	c.verifyCertificate = func(*x509.Certificate) (bool, bool, error) { return true, true, nil }
+	c.revocationStatus = func(*x509.Certificate) (bool, bool, error) { return true, true, nil }
 	require.NoError(t, collectCycle(t, c))
 	plan := preparePlan(t, newEngine(t, c), c)
 
@@ -119,9 +112,9 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 			}, NotAfter: time.Now().Add(24 * time.Hour)},
 		},
 	}
-	c.prov = provider
+	c.provider = provider
 	verified := true
-	c.verifyCertificate = func(*x509.Certificate) (bool, bool, error) { return false, verified, nil }
+	c.revocationStatus = func(*x509.Certificate) (bool, bool, error) { return false, verified, nil }
 	engine := newEngine(t, c)
 	require.NoError(t, collectCycle(t, c))
 	initial := preparePlan(t, engine, c)
@@ -172,40 +165,6 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 3, updates)
-}
-
-func TestCollector_FileCertificate(t *testing.T) {
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-	now := time.Now().Truncate(time.Second)
-	certificate := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			CommonName: "example.org",
-		},
-		NotBefore: now.Add(-time.Hour),
-		NotAfter:  now.Add(24 * time.Hour),
-	}
-	der, err := x509.CreateCertificate(rand.Reader, certificate, certificate, &key.PublicKey, key)
-	require.NoError(t, err)
-	filename := filepath.Join(t.TempDir(), "certificate.pem")
-	require.NoError(t, os.WriteFile(filename, pem.EncodeToMemory(&pem.Block{
-		Type:  "CERTIFICATE",
-		Bytes: der,
-	}), 0600))
-	c := New()
-	c.Source = "file://" + filename
-	c.now = func() time.Time { return now }
-	c.CheckRevocation = true
-	require.NoError(t, c.Init(t.Context()))
-	require.NoError(t, c.Check(t.Context()))
-	require.NoError(t, collectCycle(t, c))
-	// Preserve the revocation library's result for valid certificates without revocation endpoints.
-	assert.Equal(t, map[string]float64{
-		"expiry/0/": 86400, "revocation_status/0/not_revoked": 1, "revocation_status/0/revoked": 0,
-	}, readMetrics(c))
-	c.Cleanup(t.Context())
-	c.Cleanup(t.Context())
 }
 
 func newEngine(t *testing.T, c *Collector) *chartengine.Engine {

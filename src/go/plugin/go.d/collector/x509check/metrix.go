@@ -5,9 +5,9 @@ package x509check
 import "github.com/netdata/netdata/go/plugins/pkg/metrix"
 
 type collectorMetrics struct {
-	meter      metrix.SnapshotMeter
-	expiry     metrix.SnapshotGauge
-	revocation metrix.StateSetInstrument
+	meter            metrix.SnapshotMeter
+	expiry           metrix.SnapshotGauge
+	revocationStatus metrix.StateSetInstrument
 }
 
 func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
@@ -15,8 +15,9 @@ func newCollectorMetrics(store metrix.CollectorStore) collectorMetrics {
 	return collectorMetrics{
 		meter:  meter,
 		expiry: meter.Gauge("expiry"),
-		revocation: meter.StateSet("revocation_status",
+		revocationStatus: meter.StateSet("revocation_status",
 			metrix.WithStateSetMode(metrix.ModeEnum),
-			metrix.WithStateSetStates("not_revoked", "revoked")),
+			metrix.WithStateSetStates("not_revoked", "revoked"),
+		),
 	}
 }

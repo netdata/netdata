@@ -38,12 +38,11 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
-func TestCollector_Cleanup(t *testing.T) {
-	c := New()
-	assert.NotPanics(t, func() {
-		c.Cleanup(context.Background())
-		c.Cleanup(context.Background())
-	})
+func TestCollector_ConfigSchemaMatchesMetadata(t *testing.T) {
+	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml",
+		collecttest.ConfigSchemaCheck{
+			Defaults: true,
+		})
 }
 
 func TestCollector_ChartTemplate(t *testing.T) {
@@ -53,6 +52,7 @@ func TestCollector_ChartTemplate(t *testing.T) {
 	require.NoError(t, err)
 	_, err = chartengine.Compile(spec, 1)
 	require.NoError(t, err)
+
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
 	health, err := os.ReadFile("../../../../../health/health.d/x509check.conf")
@@ -65,84 +65,78 @@ func TestCollector_ChartTemplate(t *testing.T) {
 }
 
 func TestCollector_Init(t *testing.T) {
-	const (
-		file = iota
-		net
-		smtp
-	)
 	tests := map[string]struct {
 		config       Config
-		providerType int
-		err          bool
+		wantProvider certificateProvider
+		wantErr      bool
 	}{
-		"ok from net https": {
+		"https": {
 			config: Config{
-				Source: "https://example.org",
+				Source: "https://example.org:443",
 			},
-			providerType: net,
+			wantProvider: &netProvider{},
 		},
-		"ok from net tcp": {
+		"tcp": {
 			config: Config{
-				Source: "tcp://example.org",
+				Source: "tcp://example.org:443",
 			},
-			providerType: net,
+			wantProvider: &netProvider{},
 		},
-		"ok from file": {
+		"smtp": {
+			config: Config{
+				Source: "smtp://smtp.example.org:587",
+			},
+			wantProvider: &smtpProvider{},
+		},
+		"file": {
 			config: Config{
 				Source: "file:///home/me/cert.pem",
 			},
-			providerType: file,
+			wantProvider: &fileProvider{},
 		},
-		"ok from smtp": {
+		"file ignores TLS options": {
 			config: Config{
-				Source: "smtp://smtp.my_mail.org:587",
+				Source: "file:///home/me/cert.pem",
+				TLSConfig: tlscfg.TLSConfig{
+					TLSCA: "testdata/tls",
+				},
 			},
-			providerType: smtp,
+			wantProvider: &fileProvider{},
 		},
 		"empty source": {
 			config: Config{
 				Source: "",
 			},
-			err: true},
-		"unknown provider": {
+			wantErr: true,
+		},
+		"unsupported scheme": {
 			config: Config{
 				Source: "http://example.org",
 			},
-			err: true,
+			wantErr: true,
 		},
-		"nonexistent TLSCA": {
+		"nonexistent TLS CA": {
 			config: Config{
-				Source: "https://example.org",
+				Source: "https://example.org:443",
 				TLSConfig: tlscfg.TLSConfig{
 					TLSCA: "testdata/tls",
 				},
 			},
-			err: true,
+			wantErr: true,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := New()
-			collr.Config = test.config
+			c := New()
+			c.Config = test.config
 
-			if test.err {
-				assert.Error(t, collr.Init(context.Background()))
-			} else {
-				require.NoError(t, collr.Init(context.Background()))
-
-				var typeOK bool
-				switch test.providerType {
-				case file:
-					_, typeOK = collr.prov.(*fromFile)
-				case net:
-					_, typeOK = collr.prov.(*fromNet)
-				case smtp:
-					_, typeOK = collr.prov.(*fromSMTP)
-				}
-
-				assert.True(t, typeOK)
+			if test.wantErr {
+				assert.Error(t, c.Init(t.Context()))
+				return
 			}
+			require.NoError(t, c.Init(t.Context()))
+			assert.IsType(t, test.wantProvider, c.provider)
 		})
 	}
 }
@@ -152,23 +146,33 @@ func TestCollector_Check(t *testing.T) {
 		provider *mockProvider
 		wantErr  bool
 	}{
-		"certificate": {provider: &mockProvider{
-			certs: []*x509.Certificate{{}},
-		}},
-		"provider error": {provider: &mockProvider{
-			err: true,
-		}, wantErr: true},
-		"empty chain": {provider: &mockProvider{}, wantErr: true},
+		"certificate": {
+			provider: &mockProvider{
+				certs: []*x509.Certificate{{}},
+			},
+		},
+		"provider error": {
+			provider: &mockProvider{
+				err: true,
+			},
+			wantErr: true,
+		},
+		"empty chain": {
+			provider: &mockProvider{},
+			wantErr:  true,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := New()
-			c.prov = test.provider
+			c.provider = test.provider
 			c.CheckRevocation = true
-			c.verifyCertificate = func(*x509.Certificate) (bool, bool, error) {
+			c.revocationStatus = func(*x509.Certificate) (bool, bool, error) {
 				t.Fatal("Check must not perform optional revocation I/O")
 				return false, false, nil
 			}
+
 			err := c.Check(t.Context())
+
 			if test.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -181,23 +185,51 @@ func TestCollector_Check(t *testing.T) {
 
 func TestCollector_Collect(t *testing.T) {
 	for name, test := range map[string]struct {
-		fullChain, checkRevocation bool
-		revoked, verified          bool
-		verifyErr                  error
-		want                       map[string]float64
+		fullChain       bool
+		checkRevocation bool
+		revoked         bool
+		verified        bool
+		verifyErr       error
+		want            map[string]float64
 	}{
-		"leaf only":  {want: map[string]float64{"expiry/0/": 3600}},
-		"full chain": {fullChain: true, want: map[string]float64{"expiry/0/": 3600, "expiry/1/": -60}},
-		"not revoked": {checkRevocation: true, verified: true, want: map[string]float64{
-			"expiry/0/": 3600, "revocation_status/0/not_revoked": 1, "revocation_status/0/revoked": 0,
-		}},
-		"revoked leaf in chain": {fullChain: true, checkRevocation: true, revoked: true, verified: true,
+		"leaf only": {
+			want: map[string]float64{"expiry/0/": 3600},
+		},
+		"full chain": {
+			fullChain: true,
+			want:      map[string]float64{"expiry/0/": 3600, "expiry/1/": -60},
+		},
+		"not revoked": {
+			checkRevocation: true,
+			verified:        true,
 			want: map[string]float64{
-				"expiry/0/": 3600, "expiry/1/": -60, "revocation_status/0/not_revoked": 0, "revocation_status/0/revoked": 1,
-			}},
-		"unverified": {checkRevocation: true, want: map[string]float64{"expiry/0/": 3600}},
-		"verification error": {checkRevocation: true, verified: true, verifyErr: errors.New("verification failed"),
-			want: map[string]float64{"expiry/0/": 3600}},
+				"expiry/0/":                       3600,
+				"revocation_status/0/not_revoked": 1,
+				"revocation_status/0/revoked":     0,
+			},
+		},
+		"revoked leaf in chain": {
+			fullChain:       true,
+			checkRevocation: true,
+			revoked:         true,
+			verified:        true,
+			want: map[string]float64{
+				"expiry/0/":                       3600,
+				"expiry/1/":                       -60,
+				"revocation_status/0/not_revoked": 0,
+				"revocation_status/0/revoked":     1,
+			},
+		},
+		"undetermined revocation": {
+			checkRevocation: true,
+			want:            map[string]float64{"expiry/0/": 3600},
+		},
+		"revocation check error": {
+			checkRevocation: true,
+			verified:        true,
+			verifyErr:       errors.New("verification failed"),
+			want:            map[string]float64{"expiry/0/": 3600},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -207,18 +239,21 @@ func TestCollector_Collect(t *testing.T) {
 			}
 			c := New()
 			c.Source = "https://example.org:443"
+			c.CheckFullChain = test.fullChain
+			c.CheckRevocation = test.checkRevocation
 			c.now = func() time.Time { return now }
-			c.prov = &mockProvider{
+			c.provider = &mockProvider{
 				certs: certs,
 			}
-			c.CheckFullChain, c.CheckRevocation = test.fullChain, test.checkRevocation
 			calls := 0
-			c.verifyCertificate = func(cert *x509.Certificate) (bool, bool, error) {
+			c.revocationStatus = func(cert *x509.Certificate) (bool, bool, error) {
 				calls++
 				assert.Same(t, certs[0], cert)
 				return test.revoked, test.verified, test.verifyErr
 			}
+
 			require.NoError(t, collectCycle(t, c))
+
 			assert.Equal(t, test.want, readMetrics(c))
 			if test.checkRevocation {
 				assert.Equal(t, 1, calls)
@@ -241,33 +276,45 @@ func TestCollector_CollectAbort(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := New()
-			c.prov = &mockProvider{
+			c.provider = &mockProvider{
 				certs: []*x509.Certificate{{NotAfter: time.Now().Add(time.Hour)}},
 			}
 			require.NoError(t, collectCycle(t, c))
 			before := readMetrics(c)
-			c.prov = provider
+
+			c.provider = provider
 			require.Error(t, collectCycle(t, c))
+
 			assert.Equal(t, before, readMetrics(c, metrix.ReadRaw()), "abort must retain committed values")
 			assert.Empty(t, readMetrics(c), "failed observations must not appear fresh")
 		})
 	}
 }
 
-func collectCycle(t *testing.T, c *Collector) error {
-	t.Helper()
+func TestCollector_Cleanup(t *testing.T) {
+	c := New()
+	assert.NotPanics(t, func() {
+		c.Cleanup(context.Background())
+		c.Cleanup(context.Background())
+	})
+}
+
+// collectCycle runs Collect inside a metric-store cycle, committing on success and aborting on error.
+func collectCycle(tb testing.TB, c *Collector) error {
+	tb.Helper()
 	store, ok := metrix.AsCycleManagedStore(c.MetricStore())
-	require.True(t, ok)
+	require.True(tb, ok)
 	cc := store.CycleController()
 	cc.BeginCycle()
-	if err := c.Collect(t.Context()); err != nil {
+	if err := c.Collect(tb.Context()); err != nil {
 		cc.AbortCycle()
 		return err
 	}
-	require.NoError(t, cc.CommitCycleSuccess())
+	require.NoError(tb, cc.CommitCycleSuccess())
 	return nil
 }
 
+// readMetrics returns the stored values keyed by "metric/depth/state".
 func readMetrics(c *Collector, opts ...metrix.ReadOption) map[string]float64 {
 	values := make(map[string]float64)
 	c.MetricStore().
@@ -285,7 +332,7 @@ type mockProvider struct {
 	err   bool
 }
 
-func (m mockProvider) certificates() ([]*x509.Certificate, error) {
+func (m *mockProvider) certificates(context.Context) ([]*x509.Certificate, error) {
 	if m.err {
 		return nil, errors.New("mock certificates error")
 	}

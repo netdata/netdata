@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	_ "embed"
 	"fmt"
+	"net/http"
 	"time"
 
 	cfssllog "github.com/cloudflare/cfssl/log"
@@ -14,7 +15,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -22,10 +22,18 @@ import (
 var configSchema string
 
 //go:embed "charts.yaml"
-var chartTemplate string
+var chartTemplateYAML string
+
+// revocationRequestTimeout bounds each CRL, OCSP and issuer request of a revocation check.
+const revocationRequestTimeout = 10 * time.Second
 
 func init() {
+	// The revocation library is configured process-wide; this collector is its only user.
 	cfssllog.Level = cfssllog.LevelFatal
+	revoke.HTTPClient = &http.Client{
+		Timeout: revocationRequestTimeout,
+	}
+
 	collectorapi.Register("x509check", collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
@@ -41,37 +49,26 @@ func New() *Collector {
 	store := metrix.NewCollectorStore()
 	return &Collector{
 		Config: Config{
-			Timeout:        confopt.Duration(time.Second * 2),
-			CheckFullChain: false,
+			Timeout: confopt.Duration(time.Second * 2),
 		},
-
-		store:             store,
-		metrics:           newCollectorMetrics(store),
-		now:               time.Now,
-		verifyCertificate: revoke.VerifyCertificateError,
+		store:            store,
+		metrics:          newCollectorMetrics(store),
+		now:              time.Now,
+		revocationStatus: revoke.VerifyCertificateError,
 	}
-}
-
-type Config struct {
-	Vnode            string           `yaml:"vnode,omitempty"         json:"vnode"`
-	UpdateEvery      int              `yaml:"update_every,omitempty"  json:"update_every"`
-	Source           string           `yaml:"source"                  json:"source"`
-	Timeout          confopt.Duration `yaml:"timeout,omitempty"       json:"timeout"`
-	CheckFullChain   bool             `yaml:"check_full_chain"        json:"check_full_chain"`
-	CheckRevocation  bool             `yaml:"check_revocation_status" json:"check_revocation_status"`
-	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	prov provider
+	provider certificateProvider
 
-	store             metrix.CollectorStore
-	metrics           collectorMetrics
-	now               func() time.Time
-	verifyCertificate func(*x509.Certificate) (revoked, ok bool, err error)
+	store   metrix.CollectorStore
+	metrics collectorMetrics
+
+	now              func() time.Time
+	revocationStatus func(*x509.Certificate) (revoked, ok bool, err error)
 }
 
 func (c *Collector) Configuration() any {
@@ -80,27 +77,33 @@ func (c *Collector) Configuration() any {
 
 func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("config validation: %v", err)
+		return fmt.Errorf("config validation: %w", err)
 	}
 
-	prov, err := c.initProvider(ctx)
+	provider, err := c.initCertificateProvider(ctx)
 	if err != nil {
-		return fmt.Errorf("certificate provider init: %v", err)
+		return fmt.Errorf("certificate provider init: %w", err)
 	}
-	c.prov = prov
+	c.provider = provider
 
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	_, err := c.certificates()
+func (c *Collector) Check(ctx context.Context) error {
+	_, err := c.fetchCertificates(ctx)
 	return err
 }
 
-func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
-
-func (c *Collector) ChartTemplateYAML() string { return chartTemplate }
-
-func (c *Collector) Collect(context.Context) error { return c.collect() }
+func (c *Collector) Collect(ctx context.Context) error {
+	return c.collect(ctx)
+}
 
 func (c *Collector) Cleanup(context.Context) {}
+
+func (c *Collector) MetricStore() metrix.CollectorStore {
+	return c.store
+}
+
+func (c *Collector) ChartTemplateYAML() string {
+	return chartTemplateYAML
+}

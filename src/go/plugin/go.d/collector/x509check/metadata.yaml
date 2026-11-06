@@ -6,13 +6,20 @@ modules:
       module_name: x509check
       monitored_instance:
         name: X.509 certificate
-        link: ""
+        link: https://datatracker.ietf.org/doc/html/rfc5280
         categories:
           - data-collection.synthetic-testing
         icon_filename: lock.svg
       keywords:
+        - x.509 certificate
         - x509
         - certificate
+        - ssl
+        - tls
+        - certificate expiration
+        - certificate revocation
+        - ocsp
+        - crl
       info_provided_to_referring_integrations:
         description: ""
       related_resources:
@@ -20,18 +27,37 @@ modules:
           list: []
     overview:
       data_collection:
-        metrics_description: ""
+        metrics_description: |
+          This collector tracks how long X.509 (SSL/TLS) certificates remain valid and whether they have been revoked.
+
+          It reads the certificate that a website or any other TLS service presents, including mail servers that
+          use STARTTLS, or a certificate stored in a local file. It charts the time left until the certificate
+          expires and, optionally, the expiration of every certificate in the chain and the revocation status of
+          the server certificate. Stock alerts warn before a certificate expires and when it is revoked.
         method_description: |
-          This collectors monitors x509 certificates expiration time and revocation status.
+          Every collection interval, each job connects to its `source` and completes a TLS handshake, after a
+          `STARTTLS` command for `smtp://` sources, to read the certificates the server presents. A `file://` source
+          is read from disk instead. The collector never requests a page or sends mail.
+
+          With `check_revocation_status` enabled, the collector also downloads the CRLs and queries the OCSP
+          responder listed in the server certificate, fetching the issuer certificate when OCSP needs it. These
+          requests go over HTTP to the certificate authority, so the Agent host needs outbound access to them.
       default_behavior:
         auto_detection:
           description: ""
         limits:
-          description: ""
+          description: |
+            - The handshake verifies the certificate like any TLS client. A certificate that is expired, self-signed,
+              or issued for another name fails collection, and its charts show gaps instead of the time left. Set
+              `tls_ca` for a private CA, or `tls_skip_verify` to read such certificates anyway.
+            - A `file://` source provides only the first certificate in the file, so `check_full_chain` has no effect
+              there.
+            - Revocation status is checked for the server certificate only, not for the rest of the chain.
         performance_impact:
           description: ""
       additional_permissions:
-        description: ""
+        description: |
+          For a `file://` source, the `netdata` user needs read access to the certificate file.
       multi_instance: true
       supported_platforms:
         include: []
@@ -49,62 +75,72 @@ modules:
             title: Config options
             enabled: true
           list:
-            - name: update_every
-              description: Data collection interval (seconds).
-              default_value: 1
-              required: false
-              group: Collection
-            - name: autodetection_retry
-              description: Autodetection retry interval (seconds). Set 0 to disable.
-              default_value: 0
-              required: false
-              group: Collection
-
             - name: source
-              description: "Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp."
+              description: "Where to read the certificate, as a URL: `https`, `tcp`, `tcp4`, `tcp6`, `udp`, `udp4` or `udp6` for a TLS server, `smtp` for an SMTP server with STARTTLS, `file` for a local PEM file."
               default_value: ""
-              required: false
+              required: true
               group: Target
+              detailed_description: |
+                Network sources need a port. The host name is sent for SNI and, unless `tls_skip_verify` is set, checked
+                against the certificate.
+
+                | Scheme | Use for | Example |
+                |:-------|:--------|:--------|
+                | `https`, `tcp` | Websites and services that start TLS on connect (LDAPS, IMAPS, SMTPS on port 465) | `https://example.com:443` |
+                | `tcp4`, `tcp6` | The same, over IPv4 or IPv6 only | `tcp6://example.com:443` |
+                | `smtp` | SMTP servers that upgrade with STARTTLS (ports 25 and 587) | `smtp://smtp.example.com:587` |
+                | `file` | A PEM file on the Agent host; note the three slashes before an absolute path | `file:///etc/ssl/certs/example.com.pem` |
             - name: timeout
-              description: SSL connection timeout (seconds).
+              description: Certificate retrieval timeout, in seconds. Covers the connection, the SMTP exchange and the TLS handshake.
               default_value: 2
               required: false
               group: Target
 
-            - name: check_full_chain
-              description: Monitor expiration time for all certificates in the chain (including intermediates and root).
-              default_value: no
-              required: false
-              group: Validation
-            - name: check_revocation_status
-              description: Check the revocation status of the certificate.
-              default_value: no
-              required: false
-              group: Validation
-
             - name: tls_skip_verify
-              description: Skip TLS certificate and hostname verification (insecure).
+              description: Skip TLS certificate and hostname verification, so certificates that are self-signed, expired or issued for another name are still read.
               default_value: no
               required: false
               group: TLS
             - name: tls_ca
-              description: Path to CA bundle used to validate the server certificate.
+              description: Path to a CA bundle used to verify the server certificate. Leave empty to use the system trust store.
               default_value: ""
               required: false
               group: TLS
             - name: tls_cert
-              description: Path to client TLS certificate (for mTLS).
+              description: Path to a client certificate file for mutual TLS. Requires a client key.
               default_value: ""
               required: false
               group: TLS
             - name: tls_key
-              description: Path to client TLS private key (for mTLS).
+              description: Path to the client key file for mutual TLS. Requires a client certificate.
               default_value: ""
               required: false
               group: TLS
 
+            - name: check_full_chain
+              description: Report the expiration time of every certificate the source presents, including intermediates and the root, not only the server certificate.
+              default_value: no
+              required: false
+              group: Checks
+            - name: check_revocation_status
+              description: Check whether the server certificate has been revoked, using the CRL and OCSP endpoints listed in it.
+              default_value: no
+              required: false
+              group: Checks
+
+            - name: update_every
+              description: Data collection interval, in seconds.
+              default_value: 60
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.
+              default_value: 0
+              required: false
+              group: Collection
+
             - name: vnode
-              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
               required: false
               group: Virtual Node
@@ -113,65 +149,160 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: Ceph RGW certificate
-              description: Check the certificate presented by a Ceph RGW HTTPS endpoint.
+            - name: Website
+              description: The certificate of an HTTPS website.
               config: |
                 jobs:
-                  - name: ceph_rgw_cert
-                    source: https://rgw.example.org:443
+                  - name: example_com
+                    source: https://example.com:443
+            - name: Other TLS service
+              description: A service that starts TLS on connect, such as LDAPS, IMAPS or SMTPS on port 465.
+              config: |
+                jobs:
+                  - name: ldap_example_com
+                    source: tcp://ldap.example.com:636
+            - name: SMTP server with STARTTLS
+              description: A mail server that upgrades the connection with STARTTLS.
+              config: |
+                jobs:
+                  - name: smtp_example_com
+                    source: smtp://smtp.example.com:587
+            - name: Local certificate file
+              description: A PEM certificate file on the Agent host.
+              config: |
+                jobs:
+                  - name: example_com_file
+                    source: file:///etc/ssl/certs/example.com.pem
+            - name: Full chain and revocation status
+              description: Also track the intermediate and root certificates, and check whether the server certificate has been revoked.
+              config: |
+                jobs:
+                  - name: example_com
+                    source: https://example.com:443
+                    check_full_chain: yes
                     check_revocation_status: yes
-            - name: Website certificate
-              description: Website certificate.
+            - name: Self-signed certificate
+              description: A certificate the Agent host does not trust. To verify it against your own CA instead, set `tls_ca`.
               config: |
                 jobs:
-                  - name: my_site_cert
-                    source: https://my_site.org:443
-            - name: Local file certificate
-              description: Local file certificate.
-              config: |
-                jobs:
-                  - name: my_file_cert
-                    source: file:///home/me/cert.pem
-            - name: SMTP certificate
-              description: SMTP certificate.
-              config: |
-                jobs:
-                  - name: my_smtp_cert
-                    source: smtp://smtp.my_mail.org:587
+                  - name: internal_example
+                    source: https://internal.example.com:443
+                    tls_skip_verify: yes
             - name: Multi-instance
               description: |
-                > **Note**: When you define more than one job, their names must be unique.
-                
-                Check the expiration status of the multiple websites' certificates.
+                > **Note**: When you define multiple jobs, their names must be unique.
+
+                Certificates of several websites.
               config: |
                 jobs:
-                  - name: my_site_cert1
-                    source: https://my_site1.org:443
-                
-                  - name: my_site_cert2
-                    source: https://my_site1.org:443
-                
-                  - name: my_site_cert3
-                    source: https://my_site3.org:443
+                  - name: example_com
+                    source: https://example.com:443
+
+                  - name: example_org
+                    source: https://example.org:443
+
+                  - name: example_net
+                    source: https://example.net:443
     troubleshooting:
-      problems:
-        list: []
+      errors:
+        list:
+          - error: "config validation: source is not set"
+            cause: The job has no `source` option.
+            fix: Set `source` to the URL of the certificate, for example `https://example.com:443`.
+          - error: "unsupported scheme `scheme` in source `source`"
+            cause: >-
+              `source` does not start with a supported scheme. A plain `http://` URL, or a host and port without a
+              scheme, produce this error.
+            fix: Use one of the schemes listed for the `source` option, for example `https://example.com:443`.
+          - error: "error on dial to `host`: dial tcp: address `host`: missing port in address"
+            cause: A network `source` has no port; the collector does not assume one from the scheme.
+            fix: Add the port, for example `https://example.com:443` or `smtp://smtp.example.com:587`.
+          - error: "error on dial to `host:port`: dial tcp `address`: connect: connection refused"
+            cause: Nothing listens on that port, or a firewall rejects the connection from the Agent host.
+            fix: Check the host and port in `source`, and that the Agent host can reach them.
+          - error: "error on dial to `host:port`: dial tcp `address`: i/o timeout"
+            cause: The connection was not established within `timeout`, usually because a firewall drops it silently.
+            fix: Check that the Agent host can reach the host and port in `source`. Otherwise raise `timeout`.
+          - error: "error on SSL handshake with `host:port`: context deadline exceeded"
+            cause: >-
+              The server did not complete the TLS handshake within `timeout`. The port may expect a STARTTLS protocol
+              first, or the server is slow or filtered.
+            fix: >-
+              Check that the port starts TLS on connect. For SMTP on ports 25 or 587, use an `smtp://` source.
+              Otherwise raise `timeout`.
+          - error: "error on creating SMTP client: read tcp `address`: i/o timeout"
+            cause: >-
+              The server sent no SMTP greeting within `timeout`. A port that starts TLS on connect, such as SMTPS on
+              port 465, never sends a plain greeting.
+            fix: For a port that starts TLS on connect, use `tcp://` instead of `smtp://`. Otherwise raise `timeout`.
+          - error: "tls: first record does not look like a TLS handshake"
+            cause: The port answers in plain text, for example HTTP on port 80 or SMTP before STARTTLS.
+            fix: Point `source` at the TLS port, or use an `smtp://` source for SMTP with STARTTLS.
+          - error: "tls: failed to verify certificate: x509: certificate signed by unknown authority"
+            cause: The certificate is self-signed or issued by a CA that the Agent host does not trust.
+            fix: "Set `tls_ca` to the CA certificate that issued it, or set `tls_skip_verify: yes`."
+          - error: "tls: failed to verify certificate: x509: certificate has expired or is not yet valid"
+            cause: >-
+              The certificate has expired, or the clock of the Agent host is wrong. While verification fails, the
+              charts show gaps instead of the time left.
+            fix: >-
+              Renew the certificate, or correct the clock. To keep charting an expired certificate, set
+              `tls_skip_verify: yes`.
+          - error: "tls: failed to verify certificate: x509: certificate is valid for `names`, not `host`"
+            cause: The host name in `source` is not one of the names in the certificate.
+            fix: "Use a host name the certificate covers, or set `tls_skip_verify: yes`."
+          - error: "tls: failed to verify certificate: x509: cannot validate certificate for `ip` because it doesn't contain any IP SANs"
+            cause: "`source` uses an IP address, and the certificate lists only host names."
+            fix: Use the host name of the service in `source`.
+          - error: "error on startTLS with `host:port`: `reply`"
+            cause: The SMTP server rejected the STARTTLS command, usually because it does not offer STARTTLS on that port.
+            fix: >-
+              Check that the server offers STARTTLS on that port. For a port that starts TLS on connect, such as 465,
+              use `tcp://` instead of `smtp://`.
+          - error: "error on reading `path`: open `path`: permission denied"
+            cause: The `netdata` user cannot read the certificate file or one of its parent directories.
+            fix: Grant read access to the file, for example `setfacl -m u:netdata:r /etc/ssl/certs/example.com.pem`.
+          - error: "error on reading `path`: open `path`: no such file or directory"
+            cause: >-
+              The file does not exist at that path. A `file://` URL with two slashes before an absolute path, such as
+              `file://etc/ssl/cert.pem`, drops the first directory.
+            fix: Use three slashes before an absolute path, for example `file:///etc/ssl/certs/example.com.pem`.
+          - error: "error on decoding `path`: PEM decode failed (not a valid PEM file)"
+            cause: The file is not in PEM format, for example a binary DER certificate.
+            fix: "Convert it to PEM: `openssl x509 -inform der -in cert.der -out cert.pem`."
+          - error: "error on parsing certificate `path`: invalid X.509 certificate"
+            cause: The first PEM block in the file is not a certificate, for example a private key.
+            fix: Point `source` at a file whose first PEM block is the certificate.
+          - error: "revocation status check for `source` failed: `reason`"
+            when: "`check_revocation_status` is enabled."
+            cause: >-
+              A CRL or OCSP request to the certificate authority failed or timed out, or the certificate has expired.
+              The revocation status chart shows a gap.
+            fix: Check that the Agent host can reach the CRL and OCSP URLs listed in the certificate over HTTP.
+          - error: "revocation status of `source` could not be determined"
+            when: "`check_revocation_status` is enabled."
+            cause: >-
+              No OCSP responder answered, or the issuer certificate needed for the OCSP request could not be
+              downloaded. The revocation status chart shows a gap.
+            fix: Check that the Agent host can reach the OCSP and issuer certificate URLs listed in the certificate.
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ""
+      description: |
+        When a certificate cannot be read, or its revocation status cannot be determined, the affected charts show
+        gaps rather than zeros.
       availability: []
       scopes:
-        - name: source
-          description: These metrics refer to the SSL certificate.
+        - name: certificate
+          description: One certificate presented by the source; only the server certificate unless `check_full_chain` is enabled.
           labels:
             - name: source
-              description: Same as the "source" configuration option.
+              description: The `source` option of the job.
             - name: common_name
-              description: The common name (CN) extracted from the certificate.
+              description: Common name (CN) of the certificate subject, for example `example.com`.
             - name: depth
-              description: The depth of the certificate within the certificate chain. The leaf certificate has a depth of 0, and subsequent certificates (intermediate certificates) have increasing depth values. The root certificate is at the highest depth.
+              description: Position of the certificate in the chain, `0` for the server certificate and higher values for its issuers toward the root.
           metrics:
             - name: x509check.time_until_expiration
               description: Time Until Certificate Expiration
