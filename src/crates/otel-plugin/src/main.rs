@@ -104,8 +104,49 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
     }
 }
 
-#[tokio::main]
-async fn main() {
+/// Raise this process's glibc malloc arena limit to one per CPU. The agent
+/// starts plugins with `MALLOC_ARENA_MAX=1`; with a single arena, the
+/// ingestor's runtime threads serialize on its lock as soon as requests run in
+/// parallel. Must run before any thread exists: glibc binds a thread to an
+/// arena at its first allocation and keeps it. Returns the limit set, or
+/// `None` if it could not be set.
+fn raise_glibc_arenas_for_process() -> Option<usize> {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
+        let arenas = libc::c_int::try_from(cpus).unwrap_or(libc::c_int::MAX);
+        // SAFETY: `mallopt` takes no pointers and only adjusts allocator parameters.
+        (unsafe { libc::mallopt(libc::M_ARENA_MAX, arenas) } == 1).then_some(cpus)
+    }
+
+    #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+    {
+        None
+    }
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    // Only the ingestor: the other modes are not allocation-heavy across
+    // threads and keep the agent's (memory-saving) arena limit.
+    let ingestor_arenas = matches!(
+        cli.command,
+        Some(CliCommand::Worker {
+            kind: WorkerKind::Ingestor { .. }
+        })
+    )
+    .then(raise_glibc_arenas_for_process);
+
+    // What `#[tokio::main]` builds, created only after the arena limit is set.
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("failed to build the tokio runtime")
+        .block_on(async_main(cli, ingestor_arenas));
+}
+
+async fn async_main(cli: Cli, ingestor_arenas: Option<Option<usize>>) {
     // rustls cannot pick a crypto provider on its own here: tonic brings
     // `ring` and opendal's reqwest brings `aws-lc-rs`, and with both compiled
     // in, every default `ServerConfig::builder()` (tonic's gRPC TLS and the
@@ -115,8 +156,6 @@ async fn main() {
     rustls::crypto::ring::default_provider()
         .install_default()
         .expect("no rustls crypto provider is installed before main");
-
-    let cli = Cli::parse();
 
     // Each arm installs the global tracing subscriber exactly once, then
     // dispatches. Stdout is reserved for protocol output — pluginsd for the
@@ -147,6 +186,19 @@ async fn main() {
                 WorkerKind::LegacyLogs { .. } => "otel-plugin/legacy-logs",
             };
             rt::init_tracing_with_identifier(syslog_id);
+            // Arenas are glibc-only; elsewhere there is nothing to report.
+            #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+            let _ = ingestor_arenas;
+            #[cfg(all(target_os = "linux", target_env = "gnu"))]
+            match ingestor_arenas {
+                Some(Some(arena_max)) => {
+                    tracing::info!(arena_max, "raised glibc malloc arenas for ingestor process");
+                }
+                Some(None) => {
+                    tracing::warn!("failed to raise glibc malloc arenas for ingestor process");
+                }
+                None => {}
+            }
             if let Err(e) = run_worker(kind).await {
                 tracing::error!("{e:#}");
                 std::process::exit(1);
