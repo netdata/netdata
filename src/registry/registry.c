@@ -30,6 +30,14 @@ static inline void registry_unlock(void) {
 // COOKIES
 
 static void registry_set_cookie(struct web_client *w, const char *guid) {
+    // Validate guid to prevent HTTP header injection (CR/LF injection)
+    for (const char *p = guid; *p; p++) {
+        if (!isalnum((unsigned char)*p) && *p != '-') {
+            netdata_log_error("REGISTRY: invalid character in guid, refusing to set cookie");
+            return;
+        }
+    }
+
     char rfc7231_expires[RFC7231_MAX_LENGTH];
     rfc7231_datetime(rfc7231_expires, sizeof(rfc7231_expires), now_realtime_sec() + registry.persons_expiration);
 
