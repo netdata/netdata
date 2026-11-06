@@ -306,6 +306,7 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_SHUTDOWN_EVLOOP,
     RRDENG_OPCODE_MRG_LOAD,
     RRDENG_OPCODE_CLEANUP,
+    RRDENG_OPCODE_JOURNAL_FILTER,
 
     RRDENG_OPCODE_MAX
 };
@@ -465,6 +466,7 @@ struct rrdengine_instance {
     struct {
         struct completion load_mrg;
         bool create_new_datafile_pair;
+        bool files_loaded;                          // atomic; every datafile of the tier is in datafiles.JudyL
     } loading;
 
     struct rrdengine_statistics stats;

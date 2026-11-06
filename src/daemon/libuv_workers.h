@@ -27,6 +27,7 @@ enum event_loop_job {
 
     // datafile full
     UV_EVENT_DBENGINE_JOURNAL_INDEX,
+    UV_EVENT_DBENGINE_JOURNAL_FILTER,       // build journal time filters of existing journals
 
     // db rotation related
     UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT,
