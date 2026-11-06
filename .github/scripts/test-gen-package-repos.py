@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 SCRIPTS = Path(__file__).resolve().parent
 WORKFLOW = (SCRIPTS.parent / 'workflows/packaging.yml').read_text()
@@ -48,6 +48,11 @@ class PackageReposTest(unittest.TestCase):
                 if eligible:
                     expected += ' netdata/netdata-preview'
                 self.assertEqual(self.generate(stable, preview), expected)
+
+    def test_missing_preview_is_eligible(self):
+        error = HTTPError('https://example.invalid/Version', 404, 'Not Found', None, None)
+        self.assertEqual(self.generate('2.12.2', '', error),
+                         'netdata/netdata netdata/netdata-preview')
 
     def test_lookup_failure(self):
         with self.assertRaises(URLError):

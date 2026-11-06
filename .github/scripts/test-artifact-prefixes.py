@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 SCRIPTS = Path(__file__).resolve().parent
 WORKFLOW = (SCRIPTS.parent / 'workflows/build.yml').read_text()
@@ -57,6 +57,21 @@ class ArtifactPrefixesTest(unittest.TestCase):
             with self.subTest(stable=stable, preview=preview):
                 self.assertEqual(self.select(self.eligibility(stable, preview)),
                                  (0, f'prefixes={expected}\n'))
+
+    def test_missing_preview_is_eligible(self):
+        error = HTTPError('https://example.invalid/Version', 404, 'Not Found', None, None)
+        self.assertEqual(self.select(self.eligibility('2.12.2', '', error)),
+                         (0, 'prefixes=stable preview\n'))
+        with self.assertRaises(ValueError):
+            self.eligibility('invalid', '', error)
+
+    def test_other_http_errors_propagate(self):
+        for status in (403, 500):
+            error = HTTPError('https://example.invalid/Version', status, 'Failure', None, None)
+            with self.subTest(status=status), self.assertRaises(HTTPError) as caught:
+                self.eligibility('2.12.2', '', error)
+            self.assertIs(caught.exception, error)
+            error.close()
 
     def test_lookup_errors_stop_selection(self):
         with self.assertRaises(URLError):

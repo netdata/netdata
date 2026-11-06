@@ -6,7 +6,7 @@ import runpy
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 
 SCRIPT = Path(__file__).with_name('gen-docker-tags.py')
@@ -100,6 +100,12 @@ class DockerTagsTest(unittest.TestCase):
                         '2.12.2-rc..1', '02.12.2-rc.1'):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 self.generate(version, error=URLError('unavailable'))
+
+    def test_missing_preview_is_eligible(self):
+        error = HTTPError('https://example.invalid/Version', 404, 'Not Found', None, None)
+        result, _ = self.generate('2.12.2', error=error)
+        for registry, repo in zip(('docker', 'quay', 'ghcr'), REPOS):
+            self.assertIn(f'{repo}:preview', result[f'{registry}_tags'].split(','))
 
     def test_network_failure_fails(self):
         with self.assertRaises(URLError):

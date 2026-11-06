@@ -2,6 +2,7 @@
 
 import re
 import sys
+from urllib.error import HTTPError
 import urllib.request
 
 PREVIEW_VERSION_URL = 'https://artifacts.netdata.cloud/preview/latest/Version'
@@ -23,8 +24,15 @@ def version_core(value: str, *, stable: bool = False) -> tuple[int, int, int]:
 
 def stable_reaches_preview(version: str) -> bool:
     stable_core = version_core(version, stable=True)
-    with urllib.request.urlopen(PREVIEW_VERSION_URL, timeout=30) as response:
-        preview_version = response.read().decode('utf-8').strip()
+    try:
+        with urllib.request.urlopen(PREVIEW_VERSION_URL, timeout=30) as response:
+            preview_version = response.read().decode('utf-8').strip()
+    except HTTPError as error:
+        if error.code != 404:
+            raise
+        # Missing preview metadata means no published version to outrank this release.
+        error.close()
+        return True
     # Stable releases outrank prereleases with the same core; metadata is ignored.
     return stable_core >= version_core(preview_version)
 
