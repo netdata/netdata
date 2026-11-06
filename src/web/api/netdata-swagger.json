@@ -711,7 +711,7 @@
         "tags": [
           "dyncfg"
         ],
-        "description": "Get dynamic configuration information.\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
+        "description": "Get dynamic configuration information.\n\n**Security & Access Control:**\n- 🔒 **Access is checked per action** - IP-based ACL restrictions apply\n- **Listing (`tree`, the default action):** requires a caller signed in to the Netdata Cloud space this agent is claimed to, on any plan, with a role that can view node data, so not Billing (HTTP 412 when not signed in, 403 when signed in to another space or as Billing)\n- **Other actions:** checked against the configuration entry's own view and edit permissions\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
         "security": [
           {},
           {
@@ -786,6 +786,26 @@
           },
           "400": {
             "description": "Something is wrong with the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/config_default_response"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden. The caller is signed in to another Netdata Cloud space, or lacks the permission this action needs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/config_default_response"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Precondition failed. The caller is not signed in to Netdata Cloud; listing (`tree`) and the configuration entries require it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3939,7 +3959,7 @@
           "config"
         ],
         "summary": "Manage Netdata dynamic configuration",
-        "description": "Provides access to Netdata's dynamic configuration system, allowing retrieval, modification,\nand management of configuration across plugins and data collectors.\n\n**Dynamic Configuration System:**\nNetdata's dyncfg system allows runtime configuration management without restarting the agent:\n- **View configuration tree**: Browse all configurable components\n- **Get current config**: Retrieve active configuration for any component\n- **Update configuration**: Modify settings on-the-fly\n- **Add/remove jobs**: Manage data collection jobs dynamically\n- **Enable/disable**: Toggle components without editing files\n- **Test configuration**: Validate changes before applying\n\n**Configuration Hierarchy:**\n```\n/ (root)\n├── collectors/\n│   ├── plugins.d/\n│   ├── python.d/\n│   ├── go.d/\n│   └── ...\n├── health/\n└── streaming/\n```\n\n**Common Actions:**\n- `tree` - Browse configuration hierarchy\n- `get` - Retrieve current configuration\n- `schema` - Get configuration schema/template\n- `update` - Modify existing configuration\n- `add` - Create new job/instance\n- `remove` - Delete job/instance\n- `enable` - Activate disabled component\n- `disable` - Deactivate component\n- `test` - Validate configuration without applying\n- `restart` - Restart component with new config\n- `userconfig` - Get user-editable configuration\n\n**Use Cases:**\n- **Configuration management**: Centrally manage agent configuration\n- **Job provisioning**: Add new data collection jobs without restart\n- **A/B testing**: Test configuration changes before deployment\n- **Automation**: Integrate with configuration management tools\n- **Troubleshooting**: View and modify settings for debugging\n\n**Common Usage Patterns:**\n\n1. **Browse configuration tree:**\n   ```\n   /api/v3/config?action=tree&path=/\n   ```\n\n2. **Get configuration for a specific component:**\n   ```\n   /api/v3/config?action=get&id=collectors:go.d:prometheus\n   ```\n\n3. **Get configuration schema:**\n   ```\n   /api/v3/config?action=schema&id=collectors:go.d:prometheus\n   ```\n\n4. **Add new data collection job:**\n   ```\n   POST /api/v3/config?action=add&id=collectors:go.d:prometheus&name=my-app\n   Content-Type: application/json\n\n   {\n     \"url\": \"http://my-app:9090/metrics\",\n     \"update_every\": 10\n   }\n   ```\n\n5. **Update existing configuration:**\n   ```\n   POST /api/v3/config?action=update&id=collectors:go.d:prometheus:my-app\n   Content-Type: application/json\n\n   {\n     \"update_every\": 5\n   }\n   ```\n\n6. **Test configuration before applying:**\n   ```\n   POST /api/v3/config?action=test&id=collectors:go.d:prometheus&name=test-job\n   [configuration JSON]\n   ```\n\n**ID Format:**\nConfiguration IDs use colon-separated hierarchical paths:\n- `collectors:go.d:prometheus` - Plugin/collector level\n- `collectors:go.d:prometheus:job-name` - Specific job/instance\n- `health:notifications` - Health alert notifications\n\n**Request Body:**\nFor `update`, `add`, and `test` actions, provide configuration as JSON in request body.\nUse `schema` action to get the expected configuration structure.\n\n**Security:**\n- Configuration changes require appropriate permissions\n- Some actions may be restricted by ACL\n- Changes are logged for audit trail\n\n**Security & Access Control:**\n- 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply\n- **Default Access:** Public (no authentication required)\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
+        "description": "Provides access to Netdata's dynamic configuration system, allowing retrieval, modification,\nand management of configuration across plugins and data collectors.\n\n**Dynamic Configuration System:**\nNetdata's dyncfg system allows runtime configuration management without restarting the agent:\n- **View configuration tree**: Browse all configurable components\n- **Get current config**: Retrieve active configuration for any component\n- **Update configuration**: Modify settings on-the-fly\n- **Add/remove jobs**: Manage data collection jobs dynamically\n- **Enable/disable**: Toggle components without editing files\n- **Test configuration**: Validate changes before applying\n\n**Configuration Hierarchy:**\n```\n/ (root)\n├── collectors/\n│   ├── plugins.d/\n│   ├── python.d/\n│   ├── go.d/\n│   └── ...\n├── health/\n└── streaming/\n```\n\n**Common Actions:**\n- `tree` - Browse configuration hierarchy\n- `get` - Retrieve current configuration\n- `schema` - Get configuration schema/template\n- `update` - Modify existing configuration\n- `add` - Create new job/instance\n- `remove` - Delete job/instance\n- `enable` - Activate disabled component\n- `disable` - Deactivate component\n- `test` - Validate configuration without applying\n- `restart` - Restart component with new config\n- `userconfig` - Get user-editable configuration\n\n**Use Cases:**\n- **Configuration management**: Centrally manage agent configuration\n- **Job provisioning**: Add new data collection jobs without restart\n- **A/B testing**: Test configuration changes before deployment\n- **Automation**: Integrate with configuration management tools\n- **Troubleshooting**: View and modify settings for debugging\n\n**Common Usage Patterns:**\n\n1. **Browse configuration tree:**\n   ```\n   /api/v3/config?action=tree&path=/\n   ```\n\n2. **Get configuration for a specific component:**\n   ```\n   /api/v3/config?action=get&id=collectors:go.d:prometheus\n   ```\n\n3. **Get configuration schema:**\n   ```\n   /api/v3/config?action=schema&id=collectors:go.d:prometheus\n   ```\n\n4. **Add new data collection job:**\n   ```\n   POST /api/v3/config?action=add&id=collectors:go.d:prometheus&name=my-app\n   Content-Type: application/json\n\n   {\n     \"url\": \"http://my-app:9090/metrics\",\n     \"update_every\": 10\n   }\n   ```\n\n5. **Update existing configuration:**\n   ```\n   POST /api/v3/config?action=update&id=collectors:go.d:prometheus:my-app\n   Content-Type: application/json\n\n   {\n     \"update_every\": 5\n   }\n   ```\n\n6. **Test configuration before applying:**\n   ```\n   POST /api/v3/config?action=test&id=collectors:go.d:prometheus&name=test-job\n   [configuration JSON]\n   ```\n\n**ID Format:**\nConfiguration IDs use colon-separated hierarchical paths:\n- `collectors:go.d:prometheus` - Plugin/collector level\n- `collectors:go.d:prometheus:job-name` - Specific job/instance\n- `health:notifications` - Health alert notifications\n\n**Request Body:**\nFor `update`, `add`, and `test` actions, provide configuration as JSON in request body.\nUse `schema` action to get the expected configuration structure.\n\n**Security:**\n- Configuration changes require appropriate permissions\n- Some actions may be restricted by ACL\n- Changes are logged for audit trail\n\n**Security & Access Control:**\n- 🔒 **Access is checked per action** - IP-based ACL restrictions apply\n- **Listing (`tree`, the default action):** requires a caller signed in to the Netdata Cloud space this agent is claimed to, on any plan, with a role that can view node data, so not Billing (HTTP 412 when not signed in, 403 when signed in to another space or as Billing)\n- **Other actions:** checked against the configuration entry's own view and edit permissions\n- **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token\n- **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf\n- **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools\n",
         "security": [
           {},
           {
@@ -4032,7 +4052,10 @@
             "description": "Bad request. Common causes:\n- Invalid action name\n- Missing required parameters (`id`, `name`)\n- Invalid `id` or `name` format\n- Malformed request body JSON\n"
           },
           "403": {
-            "description": "Forbidden. Configuration change requires higher permissions.\n"
+            "description": "Forbidden. The caller is signed in to another Netdata Cloud space, or lacks the permission this action needs.\n"
+          },
+          "412": {
+            "description": "Precondition failed. The caller is not signed in to Netdata Cloud; listing (`tree`) and the configuration entries require it.\n"
           },
           "404": {
             "description": "Configuration component not found. The specified `id` does not exist.\n"

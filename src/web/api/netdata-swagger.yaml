@@ -661,8 +661,9 @@ paths:
         Get dynamic configuration information.
 
         **Security & Access Control:**
-        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
-        - **Default Access:** Public (no authentication required)
+        - 🔒 **Access is checked per action** - IP-based ACL restrictions apply
+        - **Listing (`tree`, the default action):** requires a caller signed in to the Netdata Cloud space this agent is claimed to, on any plan, with a role that can view node data, so not Billing (HTTP 412 when not signed in, 403 when signed in to another space or as Billing)
+        - **Other actions:** checked against the configuration entry's own view and edit permissions
         - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
         - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
         - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
@@ -712,6 +713,18 @@ paths:
                   - $ref: "#/components/schemas/config_schema"
         "400":
           description: Something is wrong with the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/config_default_response'
+        "403":
+          description: Forbidden. The caller is signed in to another Netdata Cloud space, or lacks the permission this action needs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/config_default_response'
+        "412":
+          description: Precondition failed. The caller is not signed in to Netdata Cloud; listing (`tree`) and the configuration entries require it.
           content:
             application/json:
               schema:
@@ -5388,8 +5401,9 @@ paths:
         - Changes are logged for audit trail
 
         **Security & Access Control:**
-        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
-        - **Default Access:** Public (no authentication required)
+        - 🔒 **Access is checked per action** - IP-based ACL restrictions apply
+        - **Listing (`tree`, the default action):** requires a caller signed in to the Netdata Cloud space this agent is claimed to, on any plan, with a role that can view node data, so not Billing (HTTP 412 when not signed in, 403 when signed in to another space or as Billing)
+        - **Other actions:** checked against the configuration entry's own view and edit permissions
         - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
         - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
         - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
@@ -5567,7 +5581,10 @@ paths:
             - Malformed request body JSON
         "403":
           description: |
-            Forbidden. Configuration change requires higher permissions.
+            Forbidden. The caller is signed in to another Netdata Cloud space, or lacks the permission this action needs.
+        "412":
+          description: |
+            Precondition failed. The caller is not signed in to Netdata Cloud; listing (`tree`) and the configuration entries require it.
         "404":
           description: |
             Configuration component not found. The specified `id` does not exist.

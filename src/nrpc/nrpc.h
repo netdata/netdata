@@ -294,6 +294,9 @@ bool nrpc_method_unregister(NRPC_OWNER owner, const char *name, NRPC_SOURCE sour
 // true if name is a reserved dynamic-configuration method name ("config" or "config <id>")
 bool nrpc_method_name_is_dyncfg(const char *name);
 
+// true if cmd is the dyncfg tree listing ("config tree ..."), split as the tree handler splits it
+bool nrpc_cmd_is_dyncfg_tree(const char *cmd);
+
 // Call specification: the caller's input to one method invocation. Stack-
 // filled by the caller; the in-flight call record copies what it keeps, so
 // pointers into dying scopes are safe. Every field's zero keeps the meaning a

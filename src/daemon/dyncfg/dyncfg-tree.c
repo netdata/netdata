@@ -198,6 +198,10 @@ static int dyncfg_config_execute_cb(struct nrpc_request *req, void *data) {
     }
 
     if(strcmp(action, "tree") == 0) {
+        // who may list is checked before this runs, in nrpc_method_authorize_acquire()
+        // (signed-in members of the agent's space, on any plan, with a role that can
+        // view node data); viewing and editing an entry are checked per entry,
+        // against its view/edit access
         if(!path || !*path)
             path = "/";
 
