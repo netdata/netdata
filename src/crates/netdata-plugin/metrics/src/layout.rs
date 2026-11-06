@@ -1,25 +1,27 @@
 //! The table that batches and the aggregator keep: one row per entity and
-//! window, one column per number a chart template stores, one `f64` cell per
+//! window, one column per number an instrument stores, one `f64` cell per
 //! row and column.
 //!
 //! - A row aggregates the events of one entity counted in one window (see
 //!   [`Aggregator`](crate::Aggregator) for events outside the open windows).
 //!   A batch's row also counts its events.
-//! - Each chart template owns the next columns of the row: one per dimension,
-//!   two for a mean (its sum and count). Instruments are typed handles to
-//!   their templates' columns.
-//! - A template's [`Aggregation`] says what its columns start as, how two rows
-//!   combine, and how each dimension's value is read when a window is
-//!   emitted.
+//! - The columns come in column groups, each owning the next columns of the
+//!   row: one per value it yields, two for a mean (its sum and count). An
+//!   instrument has one group (a histogram three); instruments are typed
+//!   handles to their groups' columns.
+//! - A group's [`Aggregation`] says what its columns start as, how two rows
+//!   combine, and what each of its values is when a window is emitted.
+//!
+//! The table knows nothing of charts; the charts read it when windows are
+//! emitted (see [`Charts`](crate::Charts)).
 
-use crate::chart::{ChartTemplate, check_context};
-use crate::metric_set::Dimension;
-use netdata_plugin_protocol::is_valid_dimension_id;
+use crate::metric_set::Column;
 use std::marker::PhantomData;
+use std::ops::Range;
 
-/// How a chart template's columns hold values and become the chart's
-/// values. Two values of one column combine, from two batches, a batch and
-/// the aggregator, or two windows folded into one after a stall, as follows.
+/// How a column group's columns hold values and become the group's values.
+/// Two values of one column combine, from two batches, a batch and the
+/// aggregator, or two windows folded into one after a stall, as follows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Aggregation {
     /// Sums, starting at 0, shown per second (divided by the collection
@@ -34,14 +36,14 @@ pub(crate) enum Aggregation {
     /// The larger value, starting unset (NaN), shown as is: the histogram
     /// maximum.
     Max,
-    /// A sum and a count per dimension, both summed from 0, shown as their
+    /// A sum and a count per value, both summed from 0, shown as their
     /// ratio when the count is positive: the histogram mean.
     Mean,
 }
 
 impl Aggregation {
-    /// The columns one dimension takes.
-    pub(crate) fn columns_per_dimension(self) -> usize {
+    /// The columns one value takes.
+    pub(crate) fn columns_per_value(self) -> usize {
         match self {
             Aggregation::Mean => 2,
             Aggregation::Sum
@@ -70,9 +72,9 @@ impl Aggregation {
         }
     }
 
-    /// The value of the dimension whose columns start at `column`; `None` (a
-    /// gap) when there is no value or it is not finite.
-    pub(crate) fn value(self, row: &[f64], column: usize, interval_secs: u64) -> Option<f64> {
+    /// The value whose columns start at `column`; `None` (a gap) when there
+    /// is no value or it is not finite.
+    fn value(self, row: &[f64], column: usize, interval_secs: u64) -> Option<f64> {
         let value = match self {
             Aggregation::Sum | Aggregation::CumulativeSum => row[column] / interval_secs as f64,
             Aggregation::Mean if row[column + 1] > 0.0 => row[column] / row[column + 1],
@@ -83,96 +85,101 @@ impl Aggregation {
     }
 }
 
-/// The columns of one instrument split by `D`, one per dimension from
-/// `base`, in the set `set_id`: what every such instrument is.
+/// The columns an instrument split by `C` writes, one per value of `C`.
+/// [`Counter`](crate::Counter), [`CumulativeCounter`](crate::CumulativeCounter)
+/// and [`Gauge`](crate::Gauge) each convert into it, which is how
+/// [`ChartsBuilder::chart`](crate::ChartsBuilder::chart) takes any of them.
 #[derive(Debug)]
-pub(crate) struct ColumnRange<D> {
+pub struct ColumnRange<C> {
     pub(crate) set_id: u32,
+    /// The index of its column group in the set's schema.
+    pub(crate) group: usize,
     base: usize,
-    _dimension: PhantomData<fn() -> D>,
+    _column: PhantomData<fn() -> C>,
 }
 
-impl<D: Dimension> ColumnRange<D> {
-    pub(crate) fn new(set_id: u32, base: usize) -> Self {
+impl<C: Column> ColumnRange<C> {
+    pub(crate) fn new(set_id: u32, group: usize, base: usize) -> Self {
         Self {
             set_id,
+            group,
             base,
-            _dimension: PhantomData,
+            _column: PhantomData,
         }
     }
 
-    /// The column of the dimension with index `i`.
+    /// The column of the value of `C` with index `i`.
     pub(crate) fn column(self, i: usize) -> usize {
         self.base + i
     }
 }
 
-// A handle: copyable whatever its dimension type.
-impl<D> Clone for ColumnRange<D> {
+// A handle: copyable whatever its column type.
+impl<C> Clone for ColumnRange<C> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<D> Copy for ColumnRange<D> {}
+impl<C> Copy for ColumnRange<C> {}
 
-/// What a set's rows hold and how its charts read them: the chart templates,
-/// each owning the next columns of the row, and the row of a window without
-/// events. The builder fills it only through
-/// [`ChartSchema::add_chart_template`], so every template passes its checks.
+/// Contiguous columns of the row sharing one [`Aggregation`], with the names
+/// of the values they yield.
+#[derive(Debug)]
+pub(crate) struct ColumnGroup {
+    pub(crate) aggregation: Aggregation,
+    /// One per value, in value order; two for a mean (sum, then count).
+    pub(crate) columns: Range<usize>,
+    /// One per value, in value order.
+    pub(crate) names: Vec<String>,
+}
+
+impl ColumnGroup {
+    /// The value with index `i` in `row`; none for a gap.
+    pub(crate) fn value(&self, row: &[f64], i: usize, interval_secs: u64) -> Option<f64> {
+        let column = self.columns.start + i * self.aggregation.columns_per_value();
+        self.aggregation.value(row, column, interval_secs)
+    }
+}
+
+/// What a set's rows hold: the column groups, each owning the next columns
+/// of the row, and the row of a window without events. The builder fills it
+/// only through [`Schema::add_column_group`], so every group passes its
+/// checks.
 #[derive(Debug, Default)]
-pub(crate) struct ChartSchema {
-    chart_templates: Vec<ChartTemplate>,
+pub(crate) struct Schema {
+    column_groups: Vec<ColumnGroup>,
     empty_row: Vec<f64>,
 }
 
-impl ChartSchema {
-    /// The first column the next chart template takes.
-    pub(crate) fn next_column(&self) -> usize {
-        self.empty_row.len()
-    }
-
-    /// Checks `template`, in this order, then adds it: its dimension ids are
-    /// valid, its context is valid, it has at least one dimension, its
-    /// context is unique in the schema, its dimension ids are unique, and it
-    /// takes the next columns, as many as its dimensions need.
-    pub(crate) fn add_chart_template(&mut self, template: ChartTemplate) {
-        for id in &template.dimension_ids {
-            assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
+impl Schema {
+    /// Adds a group of one value per name, in that order, taking the next
+    /// columns, and returns its index; after checking that there is at least
+    /// one name and that no name repeats.
+    pub(crate) fn add_column_group(
+        &mut self,
+        aggregation: Aggregation,
+        names: Vec<String>,
+    ) -> usize {
+        assert!(!names.is_empty(), "an instrument needs at least one column");
+        for (i, name) in names.iter().enumerate() {
+            assert!(!names[..i].contains(name), "duplicate column name {name:?}");
         }
-        let context = &template.context;
-        check_context(context);
-        assert!(
-            !template.dimension_ids.is_empty(),
-            "chart {context} has no dimensions"
-        );
-        assert!(
-            self.chart_templates.iter().all(|t| &t.context != context),
-            "duplicate context {context:?}"
-        );
-        for (i, id) in template.dimension_ids.iter().enumerate() {
-            assert!(
-                !template.dimension_ids[..i].contains(id),
-                "duplicate dimension id {id:?} in chart {context}"
-            );
-        }
-        let aggregation = template.aggregation;
-        let first = self.next_column();
-        let width = template.dimension_ids.len() * aggregation.columns_per_dimension();
-        assert_eq!(
-            template.columns,
-            first..first + width,
-            "chart {context} does not take the next columns"
-        );
+        let first = self.empty_row.len();
+        let width = names.len() * aggregation.columns_per_value();
         self.empty_row
             .extend(std::iter::repeat_n(aggregation.initial(), width));
-        self.chart_templates.push(template);
+        self.column_groups.push(ColumnGroup {
+            aggregation,
+            columns: first..first + width,
+            names,
+        });
+        self.column_groups.len() - 1
     }
 
-    /// In the order they were added, which is also the order of each
-    /// entity's chart ids.
-    pub(crate) fn chart_templates(&self) -> &[ChartTemplate] {
-        &self.chart_templates
+    /// In the order they were added, which is also column order.
+    pub(crate) fn column_groups(&self) -> &[ColumnGroup] {
+        &self.column_groups
     }
 
     /// The row of a window without events.
@@ -180,23 +187,23 @@ impl ChartSchema {
         self.empty_row.as_slice().into()
     }
 
-    /// Combine `incoming` into `target`, each template's columns by its
+    /// Combine `incoming` into `target`, each group's columns by its
     /// [`Aggregation`].
     pub(crate) fn combine(&self, target: &mut [f64], incoming: &[f64]) {
-        for template in &self.chart_templates {
-            let columns = template.columns.clone();
+        for group in &self.column_groups {
+            let columns = group.columns.clone();
             for (current, &incoming) in target[columns.clone()].iter_mut().zip(&incoming[columns]) {
-                *current = template.aggregation.combine(*current, incoming);
+                *current = group.aggregation.combine(*current, incoming);
             }
         }
     }
 
-    /// The columns of the cumulative counters' templates, in order; they hold
+    /// The columns of the cumulative counters' groups, in order; they hold
     /// totals until a window is emitted, and increases after.
     pub(crate) fn cumulative_columns(&self) -> impl Iterator<Item = usize> + '_ {
-        self.chart_templates
+        self.column_groups
             .iter()
-            .filter(|template| template.aggregation == Aggregation::CumulativeSum)
-            .flat_map(|template| template.columns.clone())
+            .filter(|group| group.aggregation == Aggregation::CumulativeSum)
+            .flat_map(|group| group.columns.clone())
     }
 }

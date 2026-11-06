@@ -11,12 +11,12 @@
 
 use crate::services::{service_labels, service_settings};
 use netdata_plugin_metrics::{
-    Batch, BatchEntity, ChartDescriptor, ChartType, Counter, MetricSet, MetricSetBuilder,
-    dimensions,
+    Batch, BatchEntity, ChartDescriptor, ChartType, Charts, ChartsBuilder, Counter, MetricSet,
+    MetricSetBuilder, columns,
 };
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
-dimensions! {
+columns! {
     /// Severity ranges, most severe first.
     enum Severity {
         Fatal = "fatal",
@@ -45,22 +45,30 @@ impl Severity {
 
 pub(crate) struct ServiceLogs {
     pub(crate) metrics: MetricSet,
+    pub(crate) charts: Charts,
     records: Counter<Severity>,
 }
 
 impl ServiceLogs {
     pub(crate) fn new(max_services: usize) -> Self {
         let mut builder = MetricSetBuilder::new(service_settings(max_services));
-        let records = builder.counter::<Severity>(ChartDescriptor {
-            title: "Service log records by severity",
-            units: "records/s",
-            family: "logs",
-            context: "otel_service.log_records",
-            chart_type: ChartType::Stacked,
-            priority: 60_010,
-        });
+        let records = builder.counter::<Severity>();
+        let metrics = builder.build();
+        let mut charts = ChartsBuilder::new(&metrics);
+        charts.chart(
+            records,
+            ChartDescriptor {
+                title: "Service log records by severity",
+                units: "records/s",
+                family: "logs",
+                context: "otel_service.log_records",
+                chart_type: ChartType::Stacked,
+                priority: 60_010,
+            },
+        );
         Self {
-            metrics: builder.build(),
+            charts: charts.build(),
+            metrics,
             records,
         }
     }
@@ -96,7 +104,7 @@ impl ServiceLogs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netdata_plugin_metrics::{Aggregator, Dimension};
+    use netdata_plugin_metrics::{Aggregator, Column};
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
@@ -120,7 +128,7 @@ mod tests {
         ];
         for (number, name) in expected {
             let severity = Severity::from_number(number);
-            assert_eq!(Severity::IDS[severity.index()], name, "{number}");
+            assert_eq!(Severity::NAMES[severity.index()], name, "{number}");
         }
     }
 
@@ -152,7 +160,7 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let mut aggregator = Aggregator::new(&logs.metrics);
+        let mut aggregator = Aggregator::new(&logs.metrics, &logs.charts);
         let mut batch = Batch::new(&logs.metrics);
         logs.record(&mut batch, "default", &request);
         aggregator.merge(batch, 100);

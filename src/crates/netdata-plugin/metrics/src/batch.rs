@@ -2,14 +2,14 @@
 //! window its event time falls in; the aggregator decides at merge time
 //! whether that window is still open.
 
-use crate::layout::{ChartSchema, ColumnRange};
+use crate::layout::{ColumnRange, Schema};
 use crate::metric_set::{
-    Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels, MetricSet, MetricSetInner,
+    Column, Counter, CumulativeCounter, Gauge, Histogram, Labels, MetricSet, MetricSetInner,
 };
 use indexmap::IndexMap;
 
 /// A batch's row for one entity and one window: its event count and its
-/// cells, one per column of the set's chart schema.
+/// cells, one per column of the set's schema.
 pub(crate) struct BatchRow {
     pub(crate) events: u64,
     pub(crate) cells: Box<[f64]>,
@@ -32,7 +32,7 @@ impl EntityRows {
     /// This entity's row for `window` in the batch, added empty if missing;
     /// like [`Batch::entity`], a lookup that adds what is missing. Moves
     /// `last` to it.
-    fn row(&mut self, window: u64, schema: &ChartSchema) -> &mut BatchRow {
+    fn row(&mut self, window: u64, schema: &Schema) -> &mut BatchRow {
         let cached = self
             .rows
             .get_index(self.last)
@@ -79,8 +79,8 @@ impl Batch {
     /// if it got at least one [`record`](BatchEntity::record) and the
     /// aggregator is not at its
     /// [`CardinalityLimit`](crate::CardinalityLimit) (else its events go to
-    /// the overflow entity); its chart instances are defined on the next
-    /// [`Aggregator::emit`](crate::Aggregator::emit).
+    /// the overflow entity); its rows are emitted from the next
+    /// [`Aggregator::emit`](crate::Aggregator::emit) on.
     ///
     /// Looking the same labels up again in one batch is correct but slower,
     /// so look an entity up once per group of events that share labels, not
@@ -124,12 +124,12 @@ impl BatchEntity<'_> {
 }
 
 /// One event's measurements: each method call is one measurement of one
-/// instrument, for one value of its [`Dimension`] type (a histogram has
-/// none). An event may hold measurements of several instruments.
+/// instrument, in one column of its [`Column`] type (a histogram has none).
+/// An event may hold measurements of several instruments.
 ///
 /// Every method panics if the instrument belongs to another [`MetricSet`],
-/// or if the dimension's index is out of range (a broken manual
-/// [`Dimension`] implementation).
+/// or if the column's index is out of range (a broken manual [`Column`]
+/// implementation).
 pub struct Measurements<'a> {
     set_id: u32,
     row: &'a mut [f64],
@@ -140,60 +140,49 @@ impl Measurements<'_> {
         assert_eq!(set_id, self.set_id, "instrument of another metric set");
     }
 
-    fn column<D: Dimension>(&self, columns: ColumnRange<D>, dimension: D) -> usize {
+    fn column<C: Column>(&self, columns: ColumnRange<C>, column: C) -> usize {
         self.check_set(columns.set_id);
-        let index = dimension.index();
+        let index = column.index();
         assert!(
-            index < D::IDS.len(),
-            "dimension index {index} out of {}",
-            D::IDS.len()
+            index < C::NAMES.len(),
+            "column index {index} out of {}",
+            C::NAMES.len()
         );
         columns.column(index)
     }
 
-    /// Add `amount` to `dimension` of `counter` in this event's window; the
-    /// chart shows the window's sum per second. A non-finite amount is
-    /// ignored.
-    pub fn add<D: Dimension>(
-        &mut self,
-        counter: Counter<D>,
-        dimension: D,
-        amount: f64,
-    ) -> &mut Self {
-        let column = self.column(counter.0, dimension);
+    /// Add `amount` to `column` of `counter` in this event's window; its
+    /// value is the window's sum per second. A non-finite amount is ignored.
+    pub fn add<C: Column>(&mut self, counter: Counter<C>, column: C, amount: f64) -> &mut Self {
+        let column = self.column(counter.0, column);
         if amount.is_finite() {
             self.row[column] += amount;
         }
         self
     }
 
-    /// Set `total`, the source's running total for `dimension` of
-    /// `cumulative_counter`; the chart shows how much it grew per second.
+    /// Set `total`, the source's running total for `column` of
+    /// `cumulative_counter`; its value is how much the total grew per second.
     /// Within a window, the total set last counts. A non-finite total is
     /// ignored.
-    pub fn set_total<D: Dimension>(
+    pub fn set_total<C: Column>(
         &mut self,
-        cumulative_counter: CumulativeCounter<D>,
-        dimension: D,
+        cumulative_counter: CumulativeCounter<C>,
+        column: C,
         total: f64,
     ) -> &mut Self {
-        let column = self.column(cumulative_counter.0, dimension);
+        let column = self.column(cumulative_counter.0, column);
         if total.is_finite() {
             self.row[column] = total;
         }
         self
     }
 
-    /// Set `value` for `dimension` of `gauge`; the chart shows it as is.
+    /// Set `value` for `column` of `gauge`; its value is the value as set.
     /// Within a window, the value set last counts. A non-finite value is
     /// ignored.
-    pub fn set_value<D: Dimension>(
-        &mut self,
-        gauge: Gauge<D>,
-        dimension: D,
-        value: f64,
-    ) -> &mut Self {
-        let column = self.column(gauge.0, dimension);
+    pub fn set_value<C: Column>(&mut self, gauge: Gauge<C>, column: C, value: f64) -> &mut Self {
+        let column = self.column(gauge.0, column);
         if value.is_finite() {
             self.row[column] = value;
         }

@@ -9,8 +9,8 @@
 //! adjusted count its `ot=th` sampling threshold implies.
 
 use netdata_plugin_metrics::{
-    Batch, BatchEntity, CardinalityLimit, ChartDescriptor, ChartType, Counter, Histogram, Labels,
-    MetricSet, MetricSetBuilder, Settings, dimensions,
+    Batch, BatchEntity, CardinalityLimit, ChartDescriptor, ChartType, Charts, ChartsBuilder,
+    Counter, Histogram, Labels, MetricSet, MetricSetBuilder, Settings, columns,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
@@ -32,7 +32,7 @@ const DURATION_BOUNDS: &[f64] = &[
 /// second as soon as it ends would show each batch as one spike.
 const ALLOWED_LATENESS: Duration = Duration::from_secs(10);
 
-dimensions! {
+columns! {
     /// How a request ended.
     enum Outcome {
         Success = "success",
@@ -45,6 +45,7 @@ const UNKNOWN_SERVICE: &str = "unknown_service";
 
 pub(crate) struct Services {
     pub(crate) metrics: MetricSet,
+    pub(crate) charts: Charts,
     requests: Counter<Outcome>,
     duration: Histogram,
 }
@@ -52,19 +53,26 @@ pub(crate) struct Services {
 impl Services {
     pub(crate) fn new(max_services: usize) -> Self {
         let mut builder = MetricSetBuilder::new(service_settings(max_services));
-        let requests = builder.counter::<Outcome>(ChartDescriptor {
-            title: "Service requests",
-            units: "requests/s",
-            family: "requests",
-            context: "otel_service.requests",
-            chart_type: ChartType::Stacked,
-            priority: 60_000,
-        });
+        let requests = builder.counter::<Outcome>();
+        let duration = builder.histogram(DURATION_BOUNDS);
+        let metrics = builder.build();
+        let mut charts = ChartsBuilder::new(&metrics);
+        charts.chart(
+            requests,
+            ChartDescriptor {
+                title: "Service requests",
+                units: "requests/s",
+                family: "requests",
+                context: "otel_service.requests",
+                chart_type: ChartType::Stacked,
+                priority: 60_000,
+            },
+        );
         // Charts `otel_service.request_duration_avg`,
         // `otel_service.request_duration_max` and
         // `otel_service.request_duration_histogram`.
-        let duration = builder.histogram(
-            DURATION_BOUNDS,
+        charts.histogram(
+            duration,
             ChartDescriptor {
                 title: "Service request duration",
                 units: "seconds",
@@ -76,7 +84,8 @@ impl Services {
             "requests/s",
         );
         Self {
-            metrics: builder.build(),
+            charts: charts.build(),
+            metrics,
             requests,
             duration,
         }
@@ -272,7 +281,7 @@ mod tests {
     }
 
     fn render(services: &Services, request: &ExportTraceServiceRequest) -> String {
-        let mut aggregator = Aggregator::new(&services.metrics);
+        let mut aggregator = Aggregator::new(&services.metrics, &services.charts);
         let mut batch = Batch::new(&services.metrics);
         services.record(&mut batch, "default", request);
         aggregator.merge(batch, 100);
