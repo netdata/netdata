@@ -230,15 +230,27 @@ func TestRevocationChecker_Status(t *testing.T) {
 			endpoints: testPKIEndpoints{
 				crls: []testPKIHandler{unexpected},
 			},
-			at:      func(p *testPKI) time.Time { return p.leaf.NotAfter },
+			at:      func(p *testPKI) time.Time { return p.leaf.NotAfter.Add(time.Second) },
 			wantErr: true,
 		},
 		"certificate not yet valid": {
 			endpoints: testPKIEndpoints{
 				crls: []testPKIHandler{unexpected},
 			},
-			at:      func(p *testPKI) time.Time { return p.leaf.NotBefore },
+			at:      func(p *testPKI) time.Time { return p.leaf.NotBefore.Add(-time.Second) },
 			wantErr: true,
+		},
+		"certificate at its last valid instant": {
+			at: func(p *testPKI) time.Time { return p.leaf.NotAfter },
+			want: result{
+				ok: true,
+			},
+		},
+		"certificate at its first valid instant": {
+			at: func(p *testPKI) time.Time { return p.leaf.NotBefore },
+			want: result{
+				ok: true,
+			},
 		},
 	}
 
@@ -273,7 +285,10 @@ func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {
 		crls:    []testPKIHandler{serveCRL(true)},
 	})
 	// A second certificate behind the same source, as with round-robin DNS.
-	other := pki.issueLeaf(t, big.NewInt(2))
+	other := pki.issueLeaf(t, big.NewInt(2), pki.ca, pki.caKey)
+	// The same serial from a CA with another name is another certificate.
+	otherCA, otherCAKey := newTestCA(t, pki.now, "Other CA")
+	otherIssuer := pki.issueLeaf(t, pki.leaf.SerialNumber, otherCA, otherCAKey)
 	rc := newRevocationChecker()
 
 	type downloads struct {
@@ -337,13 +352,23 @@ func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {
 			},
 		},
 		{
+			name:        "the first serial from another issuer downloads",
+			cert:        otherIssuer,
+			at:          pki.now,
+			wantRevoked: true,
+			wantDownloads: downloads{
+				crl:    3,
+				issuer: 3,
+			},
+		},
+		{
 			name:        "next update downloads again",
 			cert:        pki.leaf,
 			at:          pki.crlNextUpdate(),
 			wantRevoked: true,
 			wantDownloads: downloads{
-				crl:    3,
-				issuer: 3,
+				crl:    4,
+				issuer: 4,
 			},
 		},
 	} {
@@ -458,14 +483,14 @@ type testPKIEndpoints struct {
 func newTestPKI(t *testing.T, endpoints testPKIEndpoints) *testPKI {
 	t.Helper()
 	now := time.Now().Truncate(time.Second)
-	ca, caKey := newTestCA(t, now)
-	rogue, rogueKey := newTestCA(t, now)
+	ca, caKey := newTestCA(t, now, "Test CA")
+	rogue, rogueKey := newTestCA(t, now, "Test CA")
 	p := &testPKI{
 		t:                t,
 		now:              now,
 		ca:               ca,
 		caKey:            caKey,
-		caWithoutCRLSign: selfSignCA(t, now, caKey, x509.KeyUsageCertSign),
+		caWithoutCRLSign: selfSignCA(t, now, "Test CA", caKey, x509.KeyUsageCertSign),
 		rogue:            rogue,
 		rogueKey:         rogueKey,
 		hits: map[string]*atomic.Int64{
@@ -496,28 +521,35 @@ func newTestPKI(t *testing.T, endpoints testPKIEndpoints) *testPKI {
 		return urls
 	}
 	if endpoints.ldapCRL {
-		p.crlURLs = append(p.crlURLs, "ldap://ldap.example.com/cn=Test%20CA?certificateRevocationList")
+		// Upper case: URL schemes are case-insensitive.
+		p.crlURLs = append(p.crlURLs, "LDAP://ldap.example.com/cn=Test%20CA?certificateRevocationList")
 	}
 	p.crlURLs = append(p.crlURLs, serve("crl", endpoints.crls)...)
 	p.ocspURLs = serve("ocsp", endpoints.ocsps)
 	p.issuerURLs = serve("issuer", endpoints.issuers)
-	p.leaf = p.issueLeaf(t, big.NewInt(1))
+	p.leaf = p.issueLeaf(t, big.NewInt(1), p.ca, p.caKey)
 	return p
 }
 
-func newTestCA(t *testing.T, now time.Time) (*x509.Certificate, *ecdsa.PrivateKey) {
+func newTestCA(t *testing.T, now time.Time, name string) (*x509.Certificate, *ecdsa.PrivateKey) {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	return selfSignCA(t, now, key, x509.KeyUsageCertSign|x509.KeyUsageCRLSign), key
+	return selfSignCA(t, now, name, key, x509.KeyUsageCertSign|x509.KeyUsageCRLSign), key
 }
 
-func selfSignCA(t *testing.T, now time.Time, key *ecdsa.PrivateKey, keyUsage x509.KeyUsage) *x509.Certificate {
+func selfSignCA(
+	t *testing.T,
+	now time.Time,
+	name string,
+	key *ecdsa.PrivateKey,
+	keyUsage x509.KeyUsage,
+) *x509.Certificate {
 	t.Helper()
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
-			CommonName: "Test CA",
+			CommonName: name,
 		},
 		NotBefore:             now.Add(-time.Hour),
 		NotAfter:              now.Add(48 * time.Hour),
@@ -532,8 +564,13 @@ func selfSignCA(t *testing.T, now time.Time, key *ecdsa.PrivateKey, keyUsage x50
 	return cert
 }
 
-// issueLeaf issues a server certificate with serial that lists the PKI's URLs.
-func (p *testPKI) issueLeaf(t *testing.T, serial *big.Int) *x509.Certificate {
+// issueLeaf issues a server certificate with serial, signed by issuer, that lists the PKI's URLs.
+func (p *testPKI) issueLeaf(
+	t *testing.T,
+	serial *big.Int,
+	issuer *x509.Certificate,
+	issuerKey *ecdsa.PrivateKey,
+) *x509.Certificate {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
@@ -550,7 +587,7 @@ func (p *testPKI) issueLeaf(t *testing.T, serial *big.Int) *x509.Certificate {
 		OCSPServer:            p.ocspURLs,
 		IssuingCertificateURL: p.issuerURLs,
 	}
-	der, err := x509.CreateCertificate(rand.Reader, template, p.ca, &key.PublicKey, p.caKey)
+	der, err := x509.CreateCertificate(rand.Reader, template, issuer, &key.PublicKey, issuerKey)
 	require.NoError(t, err)
 	cert, err := x509.ParseCertificate(der)
 	require.NoError(t, err)

@@ -42,8 +42,8 @@ modules:
           With `check_revocation_status` enabled, the collector also downloads the CRLs and queries the OCSP
           responders listed in the server certificate, and fetches the issuer certificate listed in it to verify the
           CRL and build the OCSP request. These requests go to the HTTP or HTTPS URLs in the certificate, so the Agent
-          host needs outbound access to them. Each job reuses a CRL's result for a certificate until the next update
-          time the CRL states.
+          host needs outbound access to them. Each request times out after 10 seconds; `timeout` does not apply to
+          them. Each job reuses a CRL's result for a certificate until the next update time the CRL states.
       default_behavior:
         auto_detection:
           description: ""

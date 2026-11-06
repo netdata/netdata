@@ -33,12 +33,13 @@ const revocationRequestTimeout = 10 * time.Second
 type revocationChecker struct {
 	client *http.Client
 	// crls holds CRL verdicts until the CRL's next update. A job can see several certificates behind one source,
-	// so a verdict is kept per certificate serial.
+	// so a verdict is kept per certificate, which its issuer name and serial identify (RFC 5280 4.1.2.2).
 	crls map[crlKey]crlVerdict
 }
 
 type crlKey struct {
 	url    string
+	issuer string
 	serial string
 }
 
@@ -64,10 +65,11 @@ func (rc *revocationChecker) status(
 	cert *x509.Certificate,
 	now time.Time,
 ) (revoked, ok bool, err error) {
-	if !now.Before(cert.NotAfter) {
+	// The validity period includes both bounds (RFC 5280 4.1.2.5).
+	if now.After(cert.NotAfter) {
 		return false, false, fmt.Errorf("certificate expired at %s", cert.NotAfter)
 	}
-	if !now.After(cert.NotBefore) {
+	if now.Before(cert.NotBefore) {
 		return false, false, fmt.Errorf("certificate is not valid until %s", cert.NotBefore)
 	}
 
@@ -102,6 +104,7 @@ func (rc *revocationChecker) crlStatus(
 ) (bool, error) {
 	key := crlKey{
 		url:    crlURL,
+		issuer: string(cert.RawIssuer),
 		serial: cert.SerialNumber.String(),
 	}
 	if v, ok := rc.crls[key]; ok {
