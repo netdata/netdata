@@ -270,7 +270,7 @@ func TestRevocationRequestsAreBounded(t *testing.T) {
 	assert.Positive(t, revoke.HTTPClient.Timeout)
 }
 
-// newTestCertificate returns a self-signed server certificate for the host name commonName.
+// newTestCertificate returns a self-signed server certificate.
 func newTestCertificate(t *testing.T, commonName string, notAfter time.Time) tls.Certificate {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
