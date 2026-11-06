@@ -116,6 +116,7 @@ impl PluginConfig {
             index: IndexConfig {
                 dir: root.join("index"),
                 retention: tuning.retention.clone(),
+                indexers: tuning.indexers.clone(),
             },
             catalog: CatalogConfig {
                 dir: root.join("catalog"),
@@ -291,6 +292,9 @@ pub struct SignalConfig {
     /// Ingestion time-bounds: reject out-of-window records per-record.
     #[serde(default)]
     pub ingest: IngestConfig,
+    /// How many WAL files may be sealed into SFSTs concurrently.
+    #[serde(default)]
+    pub indexers: IndexersTuning,
 }
 
 impl Default for SignalConfig {
@@ -305,8 +309,39 @@ impl Default for SignalConfig {
             retention: RetentionPolicy::default(),
             catalog: CatalogTuning::default(),
             ingest: IngestConfig::default(),
+            indexers: IndexersTuning::default(),
         }
     }
+}
+
+/// Seal concurrency bounds for one signal. A seal is CPU-bound and holds a
+/// whole WAL file's index in memory, so the ledger starts with `min` seals and
+/// moves by at most one every 10 s within `[min, max]`: up when the waiting
+/// files would keep one more seal busy, down when one fewer would do
+/// (otel-ledger `indexer.rs`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IndexersTuning {
+    /// Seals that may run regardless of backlog (at least 1).
+    #[serde(default = "default_indexers_min")]
+    pub min: usize,
+    /// Upper bound on concurrent seals; `None` means one per ledger worker
+    /// thread (the CPU count unless the runtime is capped).
+    #[serde(default)]
+    pub max: Option<usize>,
+}
+
+impl Default for IndexersTuning {
+    fn default() -> Self {
+        Self {
+            min: default_indexers_min(),
+            max: None,
+        }
+    }
+}
+
+fn default_indexers_min() -> usize {
+    1
 }
 
 /// Catalog tuning for one signal (the dir is derived, not configured).
@@ -460,6 +495,8 @@ pub struct IndexConfig {
     pub dir: PathBuf,
     /// Per-tenant retention policy for SFST files (validated; see [`RetentionPolicy`]).
     pub retention: RetentionPolicy,
+    /// Seal concurrency bounds (see [`IndexersTuning`]).
+    pub indexers: IndexersTuning,
 }
 
 /// Catalog file configuration (runtime-only; see [`IndexConfig`]).

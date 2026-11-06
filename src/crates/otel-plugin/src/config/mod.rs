@@ -443,6 +443,26 @@ fn validate(config: &PluginConfig) -> Result<()> {
         .validate()
         .map_err(|e| anyhow::anyhow!("traces.{e}"))?;
 
+    validate_indexers("logs", &config.logs.indexers)?;
+    validate_indexers("traces", &config.traces.indexers)?;
+
+    Ok(())
+}
+
+/// Seal concurrency bounds: at least one seal, and an explicit `max` that does
+/// not undercut `min`. Hard errors rather than clamps, like the retention check.
+fn validate_indexers(signal: &str, t: &bridge::config::IndexersTuning) -> Result<()> {
+    if t.min == 0 {
+        anyhow::bail!("{signal}.indexers.min must be at least 1");
+    }
+    if let Some(max) = t.max {
+        if max < t.min {
+            anyhow::bail!(
+                "{signal}.indexers.max ({max}) must be \"auto\" or at least {signal}.indexers.min ({})",
+                t.min
+            );
+        }
+    }
     Ok(())
 }
 
@@ -1956,6 +1976,63 @@ logs:
         let ingest = o.logs.as_ref().unwrap().ingest.as_ref().unwrap();
         assert_eq!(ingest.max_age, Some(Duration::from_secs(36 * 3600)));
         assert_eq!(ingest.future_skew, Some(Duration::from_secs(30)));
+    }
+
+    #[test]
+    fn indexers_default_to_one_min_and_auto_max() {
+        let config = resolved_stock();
+        for t in [&config.logs.indexers, &config.traces.indexers] {
+            assert_eq!(t.min, 1);
+            assert_eq!(t.max, None);
+        }
+    }
+
+    #[test]
+    fn indexers_from_user_yaml_accept_count_and_auto() {
+        let config = resolve_with_user(
+            "logs:\n  indexers:\n    min: 2\n    max: 6\ntraces:\n  indexers:\n    max: auto\n",
+        )
+        .unwrap();
+        assert_eq!(config.logs.indexers.min, 2);
+        assert_eq!(config.logs.indexers.max, Some(6));
+        assert_eq!(config.traces.indexers.min, 1);
+        assert_eq!(config.traces.indexers.max, None);
+    }
+
+    #[test]
+    fn indexers_from_env_override_user_yaml() {
+        let config = resolve_layers(
+            Some("logs:\n  indexers:\n    max: 6\n"),
+            &[
+                ("NETDATA_OTEL_CFG_LOGS_INDEXERS_MIN", "3"),
+                ("NETDATA_OTEL_CFG_LOGS_INDEXERS_MAX", "auto"),
+                ("NETDATA_OTEL_CFG_TRACES_INDEXERS_MAX", "4"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(config.logs.indexers.min, 3);
+        assert_eq!(config.logs.indexers.max, None, "env auto wins over user 6");
+        assert_eq!(config.traces.indexers.max, Some(4));
+    }
+
+    #[test]
+    fn indexers_invalid_bounds_are_rejected() {
+        for (yaml, needle) in [
+            ("logs:\n  indexers:\n    min: 0\n", "logs.indexers.min"),
+            (
+                "traces:\n  indexers:\n    min: 4\n    max: 2\n",
+                "traces.indexers.max",
+            ),
+            ("logs:\n  indexers:\n    max: lots\n", "auto"),
+            ("logs:\n  indexers:\n    workers: 2\n", "workers"),
+        ] {
+            let err = resolve_with_user(yaml).unwrap_err();
+            assert!(format!("{err:#}").contains(needle), "{yaml}: {err:#}");
+        }
+        let err =
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_LOGS_INDEXERS_MAX", "many")]))
+                .unwrap_err();
+        assert!(format!("{err:#}").contains("INDEXERS_MAX"), "{err:#}");
     }
 
     #[test]

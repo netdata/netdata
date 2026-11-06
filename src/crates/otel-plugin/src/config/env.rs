@@ -30,7 +30,8 @@ use super::receivers::{
     DEPRECATED_ENDPOINT_KEYS, ProtocolOverride, ReceiversOverride, TlsOverride, resolve_deprecated,
 };
 use super::signal::{
-    AuthOverride, CatalogOverride, IngestOverride, RemoteStorageOverride, SignalOverride,
+    AuthOverride, CatalogOverride, IndexersOverride, IngestOverride, RemoteStorageOverride,
+    SignalOverride,
 };
 
 /// A snapshot of the `NETDATA_OTEL_CFG_*` environment (name → raw value).
@@ -334,6 +335,10 @@ impl SignalOverride {
             max_age: parse_env_duration(env, &var(prefix, "INGEST_MAX_AGE"))?,
             future_skew: parse_env_duration(env, &var(prefix, "INGEST_FUTURE_SKEW"))?,
         };
+        let indexers = IndexersOverride {
+            min: parse_env_var(env, &var(prefix, "INDEXERS_MIN"))?,
+            max: parse_env_var(env, &var(prefix, "INDEXERS_MAX"))?,
+        };
         Ok(Self {
             crc_enabled: parse_env_bool(env, &var(prefix, "CRC_ENABLED"))?,
             compression_enabled: parse_env_bool(env, &var(prefix, "COMPRESSION_ENABLED"))?,
@@ -357,6 +362,11 @@ impl SignalOverride {
                 None
             },
             ingest: if ingest.has_any() { Some(ingest) } else { None },
+            indexers: if indexers.has_any() {
+                Some(indexers)
+            } else {
+                None
+            },
             // The former plugin's journal dir stays YAML-only (`logs.journal_dir`,
             // consumed by `resolve_legacy_journal_dir`); no env var exists for it.
             journal_dir: None,

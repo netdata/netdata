@@ -38,6 +38,8 @@ use netdata_plugin_protocol::{Message, MessageReader, MessageWriter};
 use netdata_plugin_types::{FunctionDeclaration, FunctionProgressResponse, FunctionResult};
 use tokio::process::Command;
 
+use crate::startup_keepalive::StartupKeepalive;
+
 /// Maximum time to wait for a worker to connect after spawning.
 const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -555,23 +557,16 @@ impl Supervisor {
     ///
     /// We intentionally do not restart workers — the Netdata agent is
     /// responsible for restarting the entire plugin.
-    async fn run(&mut self) -> anyhow::Result<&'static str> {
+    async fn run(&mut self, signals: &mut StopSignals) -> anyhow::Result<&'static str> {
         // PLUGIN_KEEPALIVE is a benign no-op on the agent side; the point is
         // regular stdout traffic so the agent's 2-minute idle read on this
         // plugin never fires while nothing else is being emitted.
         let mut keepalive = tokio::time::interval(tokio::time::Duration::from_secs(60));
-        let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
-            .context("failed to register SIGINT handler")?;
-        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .context("failed to register SIGTERM handler")?;
 
         loop {
             tokio::select! {
-                _ = sigint.recv() => {
-                    return Ok("received SIGINT");
-                }
-                _ = sigterm.recv() => {
-                    return Ok("received SIGTERM");
+                reason = signals.recv() => {
+                    return Ok(reason);
                 }
                 msg = self.reader.recv() => {
                     match msg {
@@ -621,6 +616,55 @@ impl Supervisor {
             }
         }
     }
+}
+
+/// SIGINT/SIGTERM, registered at the very start of [`run`] so a stop request
+/// during worker startup is honoured instead of being queued behind it.
+struct StopSignals {
+    sigint: tokio::signal::unix::Signal,
+    sigterm: tokio::signal::unix::Signal,
+}
+
+impl StopSignals {
+    fn register() -> anyhow::Result<Self> {
+        use tokio::signal::unix::{SignalKind, signal};
+        Ok(Self {
+            sigint: signal(SignalKind::interrupt()).context("failed to register SIGINT handler")?,
+            sigterm: signal(SignalKind::terminate())
+                .context("failed to register SIGTERM handler")?,
+        })
+    }
+
+    async fn recv(&mut self) -> &'static str {
+        tokio::select! {
+            _ = self.sigint.recv() => "received SIGINT",
+            _ = self.sigterm.recv() => "received SIGTERM",
+        }
+    }
+}
+
+/// Whether `e` is a write to a closed agent pipe. During startup that means
+/// the agent already stopped this plugin instance, so the supervisor exits 0:
+/// the agent disables a plugin that exits non-zero before its first
+/// successful collection (`plugins_d.c`), which would leave OpenTelemetry
+/// ingestion off until the agent restarts.
+fn is_agent_gone(e: &anyhow::Error) -> bool {
+    e.chain().any(|cause| {
+        let io = cause.downcast_ref::<std::io::Error>().or_else(|| {
+            match cause.downcast_ref::<netdata_plugin_protocol::NetdataPluginError>() {
+                Some(netdata_plugin_protocol::NetdataPluginError::Transport(io)) => Some(io),
+                _ => None,
+            }
+        });
+        io.is_some_and(|io| io.kind() == std::io::ErrorKind::BrokenPipe)
+    })
+}
+
+/// How the startup handshake ended.
+enum Startup {
+    Done(anyhow::Result<(Vec<FunctionDeclaration>, Vec<FunctionDeclaration>)>),
+    Stopped(&'static str),
+    AgentGone(std::io::Error),
 }
 
 /// Guard for one IPC socket file: `new` removes any stale file at the path
@@ -689,11 +733,33 @@ where
 
     tracing::info!("spawning {name} socket={}", sock.path());
 
-    let child = Command::new(self_exe)
-        .args(["worker", name, "--socket", sock.path()])
+    let mut cmd = Command::new(self_exe);
+    cmd.args(["worker", name, "--socket", sock.path()])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::inherit());
+    // A worker must not outlive the supervisor: `ChildGuard` cannot run when
+    // the supervisor is SIGKILLed, and an orphaned ledger keeps its WAL
+    // directory busy while the agent starts the next instance.
+    #[cfg(target_os = "linux")]
+    {
+        let parent = std::process::id() as libc::pid_t;
+        // SAFETY: the closure runs in the forked child before exec and calls
+        // only the async-signal-safe `prctl` and `getppid`.
+        unsafe {
+            cmd.pre_exec(move || {
+                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                // The supervisor died between fork and prctl.
+                if libc::getppid() != parent {
+                    return Err(std::io::Error::from_raw_os_error(libc::ESRCH));
+                }
+                Ok(())
+            });
+        }
+    }
+    let child = cmd
         .spawn()
         .with_context(|| format!("failed to spawn {name} worker"))?;
 
@@ -718,6 +784,7 @@ where
 /// agent quits; workers are shut down on both the graceful and error paths.
 pub async fn run() -> anyhow::Result<()> {
     tracing::info!("starting otel-plugin");
+    let mut signals = StopSignals::register()?;
     let nd_env = rt::NetdataEnv::from_environment();
     match serde_json::to_string(&nd_env) {
         Ok(json) => tracing::info!("netdata environment: {json}"),
@@ -808,36 +875,71 @@ pub async fn run() -> anyhow::Result<()> {
         sockets: [writer_sock, ledger_sock, ingestor_sock, legacy_sock],
     };
 
-    supervisor
+    if let Err(e) = supervisor
         .writer
         .write_raw(b"TRUST_DURATIONS 1\n")
         .await
-        .context("failed to write TRUST_DURATIONS to agent")?;
+        .context("failed to write TRUST_DURATIONS to agent")
+    {
+        return agent_gone_or(e);
+    }
+
+    // Heartbeats until the declarations go out: the handshake below lasts as
+    // long as the ledger's startup recovery.
+    let mut startup_keepalive =
+        StartupKeepalive::start().context("failed to start the startup keepalive")?;
 
     // The ledger is configured first: it must be listening on the writer
     // socket before the ingestor connects to it. Its declarations are
     // forwarded only after the ingestor's handshake also succeeded — bind
-    // before declare (see `register_declarations`). A handshake failure here
-    // returns straight out and ChildGuard SIGKILLs the remaining workers on
-    // unwind: the ledger does not read its supervisor connection while it
-    // waits in `accept_writer`, so a graceful Shutdown would not reach it
-    // anyway, and legacy-logs treats a pre-Configure Shutdown as an error.
-    let ledger_declarations = supervisor
-        .configure_ledger(plugin_config.clone())
-        .await
-        .context("ledger configuration failed")?;
+    // before declare (see `register_declarations`). A handshake failure, a
+    // stop signal or a closed agent pipe returns straight out and ChildGuard
+    // SIGKILLs the remaining workers on unwind: the ledger does not read its
+    // supervisor connection while it recovers or waits in `accept_writer`, so
+    // a graceful Shutdown would not reach it anyway, and legacy-logs treats a
+    // pre-Configure Shutdown as an error.
+    let startup = {
+        let handshake = async {
+            let ledger = supervisor
+                .configure_ledger(plugin_config.clone())
+                .await
+                .context("ledger configuration failed")?;
+            let ingestor = supervisor
+                .configure_ingestor(plugin_config)
+                .await
+                .context("ingestor configuration failed")?;
+            Ok::<_, anyhow::Error>((ledger, ingestor))
+        };
+        tokio::select! {
+            r = handshake => Startup::Done(r),
+            reason = signals.recv() => Startup::Stopped(reason),
+            e = startup_keepalive.failure() => Startup::AgentGone(e),
+        }
+    };
+    let (ledger_declarations, ingestor_declarations) = match startup {
+        Startup::Done(r) => r?,
+        Startup::Stopped(reason) => {
+            tracing::info!("{reason} during startup, stopping workers");
+            return Ok(());
+        }
+        Startup::AgentGone(e) => {
+            tracing::info!("agent closed the plugin's stdout during startup ({e}), exiting");
+            return Ok(());
+        }
+    };
 
-    let ingestor_declarations = supervisor
-        .configure_ingestor(plugin_config)
-        .await
-        .context("ingestor configuration failed")?;
+    if let Err(e) = startup_keepalive.stop() {
+        return agent_gone_or(anyhow::Error::new(e).context("startup keepalive failed"));
+    }
 
-    supervisor
-        .register_declarations(Worker::Ledger, ledger_declarations)
-        .await?;
-    supervisor
-        .register_declarations(Worker::Ingestor, ingestor_declarations)
-        .await?;
+    for (worker, declarations) in [
+        (Worker::Ledger, ledger_declarations),
+        (Worker::Ingestor, ingestor_declarations),
+    ] {
+        if let Err(e) = supervisor.register_declarations(worker, declarations).await {
+            return agent_gone_or(e);
+        }
+    }
 
     // The legacy-logs viewer is best-effort and decoupled from the new pipeline:
     // a configure failure disables it but MUST NOT take down the new pipeline.
@@ -848,7 +950,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     tracing::info!("workers ready, entering main loop");
 
-    match supervisor.run().await {
+    match supervisor.run(&mut signals).await {
         Ok(reason) => {
             tracing::info!("{reason}, shutting down");
             supervisor.shutdown_workers().await;
@@ -866,9 +968,34 @@ pub async fn run() -> anyhow::Result<()> {
     }
 }
 
+/// The startup exit for a failed write to the agent: `Ok` (exit 0) when the
+/// agent is gone (see [`is_agent_gone`]), the error otherwise.
+fn agent_gone_or(e: anyhow::Error) -> anyhow::Result<()> {
+    if is_agent_gone(&e) {
+        tracing::info!("agent closed the plugin's stdout during startup ({e:#}), exiting");
+        Ok(())
+    } else {
+        Err(e)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::resolve_identity;
+    use super::{is_agent_gone, resolve_identity};
+
+    #[test]
+    fn broken_pipe_is_recognised_through_the_transport_error() {
+        let pipe = || std::io::Error::new(std::io::ErrorKind::BrokenPipe, "closed");
+        let wrapped = anyhow::Error::new(netdata_plugin_protocol::NetdataPluginError::from(pipe()))
+            .context("failed to declare ledger function to agent");
+        assert!(is_agent_gone(&wrapped));
+        assert!(is_agent_gone(
+            &anyhow::Error::new(pipe()).context("keepalive")
+        ));
+        let other = anyhow::Error::new(std::io::Error::other("disk full"));
+        assert!(!is_agent_gone(&other));
+        assert!(!is_agent_gone(&anyhow::anyhow!("ledger handshake")));
+    }
 
     #[test]
     fn resolve_identity_accepts_dashed_form() {
