@@ -176,6 +176,21 @@ RRDR *rrd2rrdr_legacy(
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
 bool query_target_calculate_window(struct query_target *qt);
 
+// the series lives in the system allocator, not in the query's ONEWAYALLOC: one-way allocations
+// are released only when the query ends, so every buffer a growing series leaves behind would
+// stay allocated until then
+static inline NETDATA_DOUBLE *query_time_grouping_series_create(size_t group, size_t *entries, const char *context) {
+    *entries = query_time_grouping_series_initial_entries(group);
+    return (NETDATA_DOUBLE *)mallocz(onewayalloc_mul_or_fatal(*entries, sizeof(NETDATA_DOUBLE), context));
+}
+
+static inline NETDATA_DOUBLE *query_time_grouping_series_grow(NETDATA_DOUBLE *series, size_t *entries, const char *context) {
+    size_t wanted = onewayalloc_mul_or_fatal(*entries, 2, context);
+    series = (NETDATA_DOUBLE *)reallocz(series, onewayalloc_mul_or_fatal(wanted, sizeof(NETDATA_DOUBLE), context));
+    *entries = wanted;
+    return series;
+}
+
 #ifdef __cplusplus
 }
 #endif

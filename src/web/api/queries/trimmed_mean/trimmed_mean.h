@@ -15,12 +15,8 @@ struct tg_trimmed_mean {
 };
 
 static inline void tg_trimmed_mean_create_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
-    size_t entries = query_time_grouping_series_initial_entries(r->view.group);
-
     struct tg_trimmed_mean *g = (struct tg_trimmed_mean *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_trimmed_mean));
-    g->series = onewayalloc_mallocz(
-        r->internal.owa, onewayalloc_mul_or_fatal(entries, sizeof(*g->series), "trimmed mean series"));
-    g->series_size = entries;
+    g->series = query_time_grouping_series_create(r->view.group, &g->series_size, "trimmed mean series");
 
     g->percent = def;
     if(options && *options) {
@@ -68,7 +64,7 @@ static inline void tg_trimmed_mean_reset(RRDR *r) {
 
 static inline void tg_trimmed_mean_free(RRDR *r) {
     struct tg_trimmed_mean *g = (struct tg_trimmed_mean *)r->time_grouping.data;
-    if(g) onewayalloc_freez(r->internal.owa, g->series);
+    if(g) freez(g->series);
 
     onewayalloc_freez(r->internal.owa, r->time_grouping.data);
     r->time_grouping.data = NULL;
@@ -78,11 +74,7 @@ static inline void tg_trimmed_mean_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_trimmed_mean *g = (struct tg_trimmed_mean *)r->time_grouping.data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
-        g->series = onewayalloc_doublesize(
-            r->internal.owa,
-            g->series,
-            onewayalloc_mul_or_fatal(g->series_size, sizeof(*g->series), "trimmed mean series"));
-        g->series_size *= 2;
+        g->series = query_time_grouping_series_grow(g->series, &g->series_size, "trimmed mean series");
     }
 
     g->series[g->next_pos++] = value;

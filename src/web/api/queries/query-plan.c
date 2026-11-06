@@ -880,8 +880,9 @@ static size_t query_plan_unittest_series_size(RRDR *r) {
     }
 }
 
-// a huge group must not decide the initial series size, and the series must still hold
-// every point added after it grows
+// a huge group must not decide the initial series size, the series must still hold every
+// point added after it grows, and growing must not leave buffers behind in the query's
+// one-way allocator (it releases memory only when the query ends)
 static int query_plan_unittest_expect_time_grouping_series_grows(void) {
     struct {
         RRDR_TIME_GROUPING grouping;
@@ -903,6 +904,7 @@ static int query_plan_unittest_expect_time_grouping_series_grows(void) {
             .view = { .group = (size_t)1 << 16 },
         };
 
+        size_t owa_memory = onewayalloc_allocated_memory();
         rrdr_set_grouping_function(&r, cases[i].grouping);
         r.time_grouping.create(&r, cases[i].options);
 
@@ -916,6 +918,12 @@ static int query_plan_unittest_expect_time_grouping_series_grows(void) {
 
         for(size_t v = points; v > 0; v--)
             r.time_grouping.add(&r, (NETDATA_DOUBLE)v);
+
+        if(onewayalloc_allocated_memory() != owa_memory) {
+            fprintf(stderr, "QUERY PLAN UNITTEST: %s grew its series inside the query's one-way allocator (%zu -> %zu bytes)\n",
+                    time_grouping_id2txt(cases[i].grouping), owa_memory, onewayalloc_allocated_memory());
+            errors++;
+        }
 
         RRDR_VALUE_FLAGS flags = RRDR_VALUE_NOTHING;
         NETDATA_DOUBLE value = r.time_grouping.flush(&r, &flags);
