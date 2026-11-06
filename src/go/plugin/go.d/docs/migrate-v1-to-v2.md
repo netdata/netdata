@@ -150,8 +150,9 @@ Unless the user approves a breaking change, the migration MUST preserve:
 - Distinguish V1 internal metric keys from emitted IDs. The V1 renderer uses `dim.Name` as the wire ID when nonempty,
   otherwise `dim.ID` (`jobruntime/job_v1_render.go`). For example, internal ID `cert_depth0_expiry` with name `expiry`
   already emits wire ID/name `expiry`; V2 preserves both by using dimension name `expiry`.
-- V2 uses the dimension name as both its wire ID and display name. Preserve the effective V1 name, including the
-  fallback to `dim.ID` when `dim.Name` was empty. Do not invent a compatibility requirement for an internal map key.
+- V2 uses the dimension name as both its wire ID and display name. Preserve the name V1 emitted: `dim.Name`, or
+  `dim.ID` when `dim.Name` was empty, because V1 then emitted the ID itself. A `dim.ID` that V1 never emitted is an
+  internal map key with no compatibility requirement.
 - Prefer derived chart IDs and instance labels. Record representative old/new IDs in the migration manifest and
   report the change; preserving contexts/names does not promise continuity for ID-addressed history or consumers.
 - Search for literal and dynamically constructed references to the old IDs. Update affected in-repository consumers,
@@ -327,8 +328,9 @@ of that "manual comparison recipe": prove context/dimension/value parity by rend
 shape, without depending on chart-ID string equality.
 
 1. Freeze the V1 output as a golden manifest. For representative fixtures, run the V1 `Collect()` + `Charts()` and
-   serialize, per chart: context, type, family, units, priority, and per dimension the name, algorithm, and de-scaled
-   value (the V1 `map[string]int64` value divided by the dimension `Div`). Commit the goldens under `testdata/`.
+   serialize, per chart: context, identifying labels, type, family, units, priority, and per dimension the name,
+   algorithm, and de-scaled value (the V1 `map[string]int64` value divided by the dimension `Div`). Commit the goldens
+   under `testdata/`.
 2. Render the V2 path into the same shape. Load the collector's LIVE `ChartTemplateYAML()` into a real `chartengine`,
    run a cycle through the real `Collect()` and `metrix` store, plan against the store, and read the plan's
    create/update actions into the same per-chart structure.
@@ -375,7 +377,8 @@ Prefer small coherent commits:
 
 1. Add missing compatibility tests, if needed.
 2. Move registration and collection path to V2.
-3. Convert charts to `charts.yaml` while preserving chart identity.
+3. Convert charts to `charts.yaml` while preserving contexts, dimension names and the other contracts in "What Must
+   Stay Stable".
 4. Update synchronized integration artifacts.
 5. Add follow-up enrichment only in a separate batch.
 
