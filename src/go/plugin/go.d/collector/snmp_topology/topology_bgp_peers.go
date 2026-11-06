@@ -42,11 +42,11 @@ func topologyBGPPeerFromRow(row ddsnmp.BGPRow) (topologymodel.BGPPeer, bool) {
 
 	neighbor := topologyutil.FirstNonEmptyString(row.Identity.Neighbor, row.Tags["neighbor"])
 	remoteAS := topologyutil.FirstNonEmptyString(row.Identity.RemoteAS, row.Tags["remote_as"])
-	processID := topologyutil.FirstNonEmptyString(row.Identity.ProcessID, row.Tags["process_id"])
+	processID := topologyutil.FirstBGPIdentifier(row.Identity.ProcessID, row.Tags["process_id"])
 	instance := topologyBGPRoutingInstance(row)
 	identity := ddsnmp.BGPIdentity{
 		ProcessID:       processID,
-		RoutingInstance: topologyutil.FirstNonEmptyString(row.Identity.RoutingInstance, row.Tags["routing_instance"]),
+		RoutingInstance: topologyutil.FirstBGPIdentifier(row.Identity.RoutingInstance, row.Tags["routing_instance"]),
 		Neighbor:        neighbor,
 		RemoteAS:        remoteAS,
 	}
@@ -75,7 +75,7 @@ func topologyBGPPeerFromRow(row ddsnmp.BGPRow) (topologymodel.BGPPeer, bool) {
 }
 
 func topologyBGPRoutingInstance(row ddsnmp.BGPRow) string {
-	return topologyutil.FirstNonEmptyString(row.Identity.RoutingInstance, row.Tags["routing_instance"], "default")
+	return topologyutil.FirstBGPIdentifier(row.Identity.RoutingInstance, row.Tags["routing_instance"], "default")
 }
 
 func topologyBGPPeerCacheKey(row ddsnmp.BGPRow, peer topologymodel.BGPPeer) string {

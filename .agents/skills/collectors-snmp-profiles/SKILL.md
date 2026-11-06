@@ -141,9 +141,12 @@ the renderer. Exercise the full path with names that normalize to the same displ
 maps. Strict row rejection must retain bounded error summaries for ordinary and typed tables. Machine identity and
 display labels have separate contracts; see
 `src/go/plugin/go.d/collector/snmp/profile-format.md#5-metric_tags`.
+V1 `Dim.ID` is a job-scoped sample lookup key; `DIMENSION` and `SET` use `Dim.Name` when set. Do not infer
+wire identity or name validation from an internal key, or replace chart-scoped names with job-scoped keys.
 Typed BGP identity and optional-value availability are defined in
 `src/go/plugin/go.d/collector/snmp/profile-format.md#bgp-rows`. Preserve configured process identity through all
-consumers, including Functions, topology inventory and diagnostic replay. Missing optional values and failed
+consumers, including Functions, topology inventory and diagnostic replay. In topology, preserve exact nonblank process and
+routing-instance identifiers through grouping and output; absence/default handling must not rewrite those tokens. Missing optional values and failed
 SNMP dependency walks are different cases and MUST be tested separately.
 
 ## Common Patterns

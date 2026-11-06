@@ -30,7 +30,7 @@ func metricIDFromKey(key string, subkeys ...string) string {
 	if len(subkeys) == 0 {
 		return key
 	}
-	// A dimension's display name is not an identity-safe suffix.
+	// Frame job-scoped sample keys; V1 still emits the chart-scoped dimension Name when set.
 	var storage [128]byte
 	encoded := storage[:0]
 	for _, subkey := range subkeys {

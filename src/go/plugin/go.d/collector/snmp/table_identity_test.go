@@ -155,7 +155,17 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 					if firstSamples == nil {
 						firstSamples = samples
 						wire := renderIdentityMetrics(t, metrics)
+						require.Contains(t, wire, "DIMENSION '"+tc.Metric+"' '"+tc.Metric+"'")
+						require.Contains(t, wire, "SET '"+tc.Metric+"' = 100\n")
+						require.Contains(t, wire, "SET '"+tc.Metric+"' = 101\n")
 						for id := range ids {
+							require.NotContains(
+								t,
+								wire,
+								"DIMENSION '"+id+"'",
+								"job-scoped lookup keys must not replace named dimensions",
+							)
+							require.NotContains(t, wire, "SET '"+id+"'")
 							require.Contains(t, wire, "CHART 'snmp_fixture."+id+"'")
 							require.Contains(t, wire, "BEGIN 'snmp_fixture."+id+"'")
 						}

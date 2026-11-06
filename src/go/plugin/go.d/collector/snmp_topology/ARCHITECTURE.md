@@ -889,6 +889,14 @@ survives acquisition evidence, diagnostic archives, replay and the actor-owned B
 peer table. Device-local process IDs do not change graph relationship grouping, which
 remains the managed actor pair and routing instance.
 
+Process and routing-instance values are opaque semantic identifiers. Select the first
+nonblank typed value or fallback tag without trimming its bytes; `edge` and ` edge `
+are distinct identifiers. Empty or whitespace-only values remain absent, and the
+routing-instance default is applied only after testing whether explicit peer identity
+is complete. Inventory cells, graph grouping, repeated enrichment and relationship
+evidence preserve the same identifiers. IP and ASN normalization follow their separate
+protocol rules; generic display-string trimming does not apply to these two fields.
+
 ## Validation Checklist
 
 Useful focused checks after changes:

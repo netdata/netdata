@@ -562,14 +562,24 @@ metrics:
 
 ### 5. metric_tags
 
-Table chart and dimension IDs use the full metric name plus every non-underscore
+Table chart IDs use the full metric name plus every non-underscore
 tag name and value, including explicitly empty values. The collector sorts tag names
 and encodes the tuple with length-prefixed components, then combines its full SHA256
 hash with a bounded readable metric-name prefix. This preserves distinct identities
 when labels contain separators or characters that chart IDs normalize. Display tags
 that start with an underscore are excluded from identity; all labels remain available,
-and metric contexts are unchanged. All table IDs migrate to this representation;
+and metric contexts are unchanged. All table chart IDs migrate to this representation;
 equal identity tuples still aggregate into one chart instance.
+
+Internal sample-map keys also include framed dimension subkeys so they are unique
+across the collector job. These internal keys are separate from Netdata's
+chart-scoped dimension IDs: `DIMENSION` and `SET` use the dimension name whenever
+it is set. This change preserves that name-based output contract.
+
+Custom metric names, mapping labels and transform-generated dimension names must
+be suitable for the quoted plugins.d protocol fields. This change does not add
+general dimension-name validation or escaping; unusual custom names containing
+line breaks, apostrophes or a dangling backslash retain that limitation.
 
 Acquisition preserves the exact semantic tag and typed identity values. The chart
 renderer sanitizes labels for the plugin wire only after IDs have been built. Two

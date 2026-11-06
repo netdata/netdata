@@ -35,8 +35,10 @@ func buildSNMPTopologyV1BGPPeersTable(
 	for i, row := range rows {
 		actorRefs[i] = row.actorRef
 		remoteActors[i] = nullableActorRef(actorIndex, row.remoteActorHandle)
-		processIDs[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["process_id"]))
-		routingInstances[i] = nullableStringRef(stringsDict, topologyutil.FirstNonEmptyString(topologyV1ScalarLabelValue(row.values["routing_instance"]), "default"))
+		processID, _ := row.values["process_id"].(string)
+		routingInstance, _ := row.values["routing_instance"].(string)
+		processIDs[i] = nullableBGPIdentifierRef(stringsDict, processID)
+		routingInstances[i] = nullableBGPIdentifierRef(stringsDict, topologyutil.FirstBGPIdentifier(routingInstance, "default"))
 		neighborIPs[i] = nullableStringRef(stringsDict, topologyutil.NormalizeBGPPeerAddress(topologyV1ScalarLabelValue(row.values["neighbor_ip"])))
 		remoteASes[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["remote_as"]))
 		states[i] = nullableStringRef(stringsDict, topologyV1ScalarLabelValue(row.values["state"]))
@@ -73,6 +75,13 @@ func buildSNMPTopologyV1BGPPeersTable(
 		topologyapi.Values(lastReceivedUpdateAges...),
 		topologyapi.Values(sources...),
 	})
+}
+
+func nullableBGPIdentifierRef(dict *topologyapi.StringDictionary, value string) any {
+	if value = topologyutil.FirstBGPIdentifier(value); value == "" {
+		return nil
+	}
+	return dict.Ref(value)
 }
 
 func snmpTopologyV1BGPPeerValues(row topologymodel.BGPPeerDetailRow) map[string]any {

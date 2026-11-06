@@ -46,7 +46,8 @@ component must be an explicit public tag; the SNMP row index is not automaticall
 
 `tableMetricKey` in `metric_ids.go` frames the complete metric name and sorted public tag names and values,
 including explicit empty values. A bounded readable prefix and full SHA-256 digest produce the final chart-safe ID.
-Dimension subkeys are framed separately. [Underscore-prefixed tags](/src/go/plugin/go.d/collector/snmp/profile-format.md#underscore-prefixed-tags)
+Dimension subkeys are framed separately for job-scoped sample-map lookup. They do not replace the chart-scoped
+Netdata dimension ID: V1 emits `Dim.Name` when set and falls back to `Dim.ID` only when the name is empty. [Underscore-prefixed tags](/src/go/plugin/go.d/collector/snmp/profile-format.md#underscore-prefixed-tags)
 are display metadata and do not partition identity. Acquisition preserves semantic tags and typed identity bytes;
 only temporary `rm:` tags are removed. The framework sanitizes chart-label values when serializing the wire protocol,
 after machine identity has been established.
