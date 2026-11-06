@@ -104,7 +104,8 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
     }
 }
 
-/// Raise this process's glibc malloc arena limit to one per CPU. The agent
+/// Raise this process's glibc malloc arena limit to one per runtime worker
+/// (one per CPU unless `TOKIO_WORKER_THREADS` says otherwise). The agent
 /// starts plugins with `MALLOC_ARENA_MAX=1`; with a single arena, the
 /// ingestor's runtime threads serialize on its lock as soon as requests run in
 /// parallel. Must run before any thread exists: glibc binds a thread to an
@@ -113,10 +114,15 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
 fn raise_glibc_arenas_for_process() -> Option<usize> {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {
-        let cpus = std::thread::available_parallelism().map_or(1, |n| n.get());
-        let arenas = libc::c_int::try_from(cpus).unwrap_or(libc::c_int::MAX);
+        // One per runtime worker: the runtime's default, or its override.
+        let workers = std::env::var("TOKIO_WORKER_THREADS")
+            .ok()
+            .and_then(|v| v.parse::<usize>().ok())
+            .filter(|&n| n > 0)
+            .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()));
+        let arenas = libc::c_int::try_from(workers).unwrap_or(libc::c_int::MAX);
         // SAFETY: `mallopt` takes no pointers and only adjusts allocator parameters.
-        (unsafe { libc::mallopt(libc::M_ARENA_MAX, arenas) } == 1).then_some(cpus)
+        (unsafe { libc::mallopt(libc::M_ARENA_MAX, arenas) } == 1).then_some(workers)
     }
 
     #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
