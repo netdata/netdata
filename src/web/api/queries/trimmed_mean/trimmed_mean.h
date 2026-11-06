@@ -15,8 +15,7 @@ struct tg_trimmed_mean {
 };
 
 static inline void tg_trimmed_mean_create_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
-    size_t entries = r->view.group;
-    if(entries < 10) entries = 10;
+    size_t entries = query_time_grouping_series_initial_entries(r->view.group);
 
     struct tg_trimmed_mean *g = (struct tg_trimmed_mean *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_trimmed_mean));
     g->series = onewayalloc_mallocz(

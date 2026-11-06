@@ -15,8 +15,7 @@ struct tg_percentile {
 };
 
 static inline void tg_percentile_create_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
-    size_t entries = r->view.group;
-    if(entries < 10) entries = 10;
+    size_t entries = query_time_grouping_series_initial_entries(r->view.group);
 
     struct tg_percentile *g = (struct tg_percentile *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_percentile));
     g->series = onewayalloc_mallocz(
