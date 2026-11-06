@@ -255,8 +255,63 @@ pub(crate) struct MetricSetInner {
     pub(crate) allowed_lateness_windows: u64,
     pub(crate) expiry_windows: u64,
     pub(crate) cardinality_limit: Option<CardinalityLimit>,
-    pub(crate) row_layout: RowLayout,
-    pub(crate) chart_templates: Vec<ChartTemplate>,
+    pub(crate) schema: ChartSchema,
+}
+
+/// What a set's rows hold and how its charts read them: the row layout, and
+/// the chart templates whose readouts point at its columns by index. The
+/// builder fills it only through the operations below, so every template
+/// passes the checks of [`ChartSchema::add_chart_template`].
+#[derive(Debug, Default)]
+pub(crate) struct ChartSchema {
+    row_layout: RowLayout,
+    chart_templates: Vec<ChartTemplate>,
+}
+
+impl ChartSchema {
+    /// Adds `len` columns with `aggregation` to the row layout; returns the
+    /// first.
+    fn add_columns(&mut self, len: usize, aggregation: Aggregation) -> usize {
+        self.row_layout.add_columns(len, aggregation)
+    }
+
+    /// Marks `columns` as holding a cumulative counter's totals.
+    fn mark_cumulative<D: Dimension>(&mut self, columns: ColumnRange<D>) {
+        self.row_layout.mark_cumulative(columns);
+    }
+
+    /// Checks `template`'s context (valid, unique in the schema) and
+    /// dimensions (at least one, ids unique), then adds it.
+    fn add_chart_template(&mut self, template: ChartTemplate) {
+        let context = &template.context;
+        check_context(context);
+        assert!(
+            !template.dimensions.is_empty(),
+            "chart {context} has no dimensions"
+        );
+        assert!(
+            self.chart_templates.iter().all(|t| &t.context != context),
+            "duplicate context {context:?}"
+        );
+        for (i, dim) in template.dimensions.iter().enumerate() {
+            assert!(
+                template.dimensions[..i].iter().all(|d| d.id != dim.id),
+                "duplicate dimension id {:?} in chart {context}",
+                dim.id
+            );
+        }
+        self.chart_templates.push(template);
+    }
+
+    pub(crate) fn row_layout(&self) -> &RowLayout {
+        &self.row_layout
+    }
+
+    /// In the order they were added, which is also the order of each
+    /// entity's chart ids.
+    pub(crate) fn chart_templates(&self) -> &[ChartTemplate] {
+        &self.chart_templates
+    }
 }
 
 /// The time and lifecycle settings of a metric set.
@@ -318,8 +373,7 @@ static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 pub struct MetricSetBuilder {
     id: u32,
     settings: Settings,
-    row_layout: RowLayout,
-    chart_templates: Vec<ChartTemplate>,
+    schema: ChartSchema,
 }
 
 impl MetricSetBuilder {
@@ -350,8 +404,7 @@ impl MetricSetBuilder {
         Self {
             id: NEXT_SET_ID.fetch_add(1, Ordering::Relaxed),
             settings,
-            row_layout: RowLayout::default(),
-            chart_templates: Vec::new(),
+            schema: ChartSchema::default(),
         }
     }
 
@@ -365,7 +418,8 @@ impl MetricSetBuilder {
     pub fn counter<D: Dimension>(&mut self, descriptor: ChartDescriptor) -> Counter<D> {
         let columns = self.add_columns::<D>(Aggregation::Sum);
         let dimensions = chart_dimensions(columns, Readout::Rate);
-        self.add_chart_template(ChartTemplate::new(descriptor, dimensions));
+        let template = ChartTemplate::new(descriptor, dimensions);
+        self.schema.add_chart_template(template);
         Counter(columns)
     }
 
@@ -379,9 +433,10 @@ impl MetricSetBuilder {
         descriptor: ChartDescriptor,
     ) -> CumulativeCounter<D> {
         let columns = self.add_columns::<D>(Aggregation::LastValue);
-        self.row_layout.mark_cumulative(columns);
+        self.schema.mark_cumulative(columns);
         let dimensions = chart_dimensions(columns, Readout::Rate);
-        self.add_chart_template(ChartTemplate::new(descriptor, dimensions));
+        let template = ChartTemplate::new(descriptor, dimensions);
+        self.schema.add_chart_template(template);
         CumulativeCounter(columns)
     }
 
@@ -393,7 +448,8 @@ impl MetricSetBuilder {
     pub fn gauge<D: Dimension>(&mut self, descriptor: ChartDescriptor) -> Gauge<D> {
         let columns = self.add_columns::<D>(Aggregation::LastValue);
         let dimensions = chart_dimensions(columns, Readout::Column);
-        self.add_chart_template(ChartTemplate::new(descriptor, dimensions));
+        let template = ChartTemplate::new(descriptor, dimensions);
+        self.schema.add_chart_template(template);
         Gauge(columns)
     }
 
@@ -436,17 +492,15 @@ impl MetricSetBuilder {
         check_context(descriptor.context);
         // Buckets including +Inf, then sum and count, then the maximum: the
         // order of the Histogram column accessors.
-        let base = self
-            .row_layout
-            .add_columns(bounds.len() + 1, Aggregation::Sum);
-        self.row_layout.add_columns(2, Aggregation::Sum);
-        self.row_layout.add_columns(1, Aggregation::Max);
+        let base = self.schema.add_columns(bounds.len() + 1, Aggregation::Sum);
+        self.schema.add_columns(2, Aggregation::Sum);
+        self.schema.add_columns(1, Aggregation::Max);
         let histogram = Histogram {
             set_id: self.id,
             base,
             bounds,
         };
-        self.add_chart_template(ChartTemplate {
+        self.schema.add_chart_template(ChartTemplate {
             title: format!("{} average", descriptor.title),
             units: descriptor.units,
             family: descriptor.family,
@@ -461,7 +515,7 @@ impl MetricSetBuilder {
                 },
             )],
         });
-        self.add_chart_template(ChartTemplate {
+        self.schema.add_chart_template(ChartTemplate {
             title: format!("{} maximum", descriptor.title),
             units: descriptor.units,
             family: descriptor.family,
@@ -487,7 +541,7 @@ impl MetricSetBuilder {
             "+Inf",
             Readout::Rate(histogram.bucket_column(bounds.len())),
         ));
-        self.add_chart_template(ChartTemplate {
+        self.schema.add_chart_template(ChartTemplate {
             title: format!("{} histogram", descriptor.title),
             units: heatmap_units,
             family: descriptor.family,
@@ -505,7 +559,10 @@ impl MetricSetBuilder {
     ///
     /// If no instrument was added.
     pub fn build(self) -> MetricSet {
-        assert!(!self.chart_templates.is_empty(), "metric set has no charts");
+        assert!(
+            !self.schema.chart_templates().is_empty(),
+            "metric set has no charts"
+        );
         let settings = self.settings;
         let interval = settings.collection_interval;
         let windows = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
@@ -515,38 +572,15 @@ impl MetricSetBuilder {
             expiry_windows: windows(settings.expiry),
             interval_secs: interval.as_secs(),
             cardinality_limit: settings.cardinality_limit,
-            row_layout: self.row_layout,
-            chart_templates: self.chart_templates,
+            schema: self.schema,
         }))
     }
 
-    /// Adds one column with `aggregation` per value of `D` to the row layout.
+    /// Adds one column with `aggregation` per value of `D` to the schema's
+    /// row layout.
     fn add_columns<D: Dimension>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
-        let base = self.row_layout.add_columns(D::IDS.len(), aggregation);
+        let base = self.schema.add_columns(D::IDS.len(), aggregation);
         ColumnRange::new(self.id, base)
-    }
-
-    /// Checks `template`'s context (valid, unique in the set) and dimensions
-    /// (at least one, ids unique), then adds it.
-    fn add_chart_template(&mut self, template: ChartTemplate) {
-        let context = &template.context;
-        check_context(context);
-        assert!(
-            !template.dimensions.is_empty(),
-            "chart {context} has no dimensions"
-        );
-        assert!(
-            self.chart_templates.iter().all(|t| &t.context != context),
-            "duplicate context {context:?}"
-        );
-        for (i, dim) in template.dimensions.iter().enumerate() {
-            assert!(
-                template.dimensions[..i].iter().all(|d| d.id != dim.id),
-                "duplicate dimension id {:?} in chart {context}",
-                dim.id
-            );
-        }
-        self.chart_templates.push(template);
     }
 }
 

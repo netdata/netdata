@@ -114,7 +114,7 @@ impl BatchEntity<'_> {
     pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
         let set = self.set;
         let window = unix_seconds / set.interval_secs;
-        let batch_row = self.entity.row(window, &set.row_layout);
+        let batch_row = self.entity.row(window, set.schema.row_layout());
         batch_row.events += 1;
         Measurements {
             set_id: set.id,

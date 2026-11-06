@@ -259,13 +259,13 @@ impl Aggregator {
 impl Entity {
     fn new(set: &MetricSetInner, labels: Labels, kind: EntityKind) -> Self {
         Self {
-            chart_ids: chart_ids(&set.chart_templates, &labels, kind),
+            chart_ids: chart_ids(set.schema.chart_templates(), &labels, kind),
             labels,
             defined: false,
             first_window: u64::MAX,
             last_window: 0,
             open_rows: VecDeque::new(),
-            previous_totals: vec![f64::NAN; set.row_layout.cumulative_columns().len()]
+            previous_totals: vec![f64::NAN; set.schema.row_layout().cumulative_columns().len()]
                 .into_boxed_slice(),
         }
     }
@@ -273,11 +273,12 @@ impl Entity {
     /// Merge one batch row into this entity's row of `window`, an open window
     /// from `oldest_open` onwards.
     fn merge_window(&mut self, set: &MetricSetInner, oldest_open: u64, window: u64, row: &[f64]) {
+        let row_layout = set.schema.row_layout();
         let index = (window - oldest_open) as usize;
         while self.open_rows.len() <= index {
-            self.open_rows.push_back(set.row_layout.empty_row());
+            self.open_rows.push_back(row_layout.empty_row());
         }
-        set.row_layout.combine(&mut self.open_rows[index], row);
+        row_layout.combine(&mut self.open_rows[index], row);
         self.first_window = self.first_window.min(window);
         self.last_window = self.last_window.max(window);
     }
@@ -289,12 +290,13 @@ impl Entity {
         if take == 0 {
             return;
         }
-        let mut folded = set.row_layout.empty_row();
+        let row_layout = set.schema.row_layout();
+        let mut folded = row_layout.empty_row();
         for row in self.open_rows.drain(..take) {
-            set.row_layout.combine(&mut folded, &row);
+            row_layout.combine(&mut folded, &row);
         }
         match self.open_rows.front_mut() {
-            Some(front) => set.row_layout.combine(front, &folded),
+            Some(front) => row_layout.combine(front, &folded),
             None => self.open_rows.push_back(folded),
         }
         self.first_window = self.first_window.max(new_first);
@@ -308,16 +310,16 @@ impl Entity {
             return;
         }
         if !self.defined {
-            for (template, id) in set.chart_templates.iter().zip(&self.chart_ids) {
+            for (template, id) in set.schema.chart_templates().iter().zip(&self.chart_ids) {
                 out.block(|block| {
                     write_definition(block, template, id, &self.labels, set.interval_secs)
                 });
             }
             self.defined = true;
         }
-        let mut row = row.unwrap_or_else(|| set.row_layout.empty_row());
+        let mut row = row.unwrap_or_else(|| set.schema.row_layout().empty_row());
         self.totals_to_increases(set, &mut row);
-        for (template, id) in set.chart_templates.iter().zip(&self.chart_ids) {
+        for (template, id) in set.schema.chart_templates().iter().zip(&self.chart_ids) {
             out.block(|block| write_update(block, template, id, &row, window, set.interval_secs));
         }
     }
@@ -329,7 +331,7 @@ impl Entity {
         if !self.defined || window < self.last_window + set.expiry_windows {
             return false;
         }
-        for (template, id) in set.chart_templates.iter().zip(&self.chart_ids) {
+        for (template, id) in set.schema.chart_templates().iter().zip(&self.chart_ids) {
             out.block(|block| write_obsolete(block, template, id, set.interval_secs));
         }
         true
@@ -338,9 +340,8 @@ impl Entity {
     /// Replace the totals in `row` with their increase since the entity's
     /// previous total, and remember the new totals.
     fn totals_to_increases(&mut self, set: &MetricSetInner, row: &mut [f64]) {
-        for (&column, previous) in set
-            .row_layout
-            .cumulative_columns()
+        let cumulative_columns = set.schema.row_layout().cumulative_columns();
+        for (&column, previous) in cumulative_columns
             .iter()
             .zip(self.previous_totals.iter_mut())
         {
