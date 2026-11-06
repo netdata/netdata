@@ -241,12 +241,12 @@ impl Aggregator {
                 stats.expired_entities += u64::from(expired);
                 !expired
             });
-            let expired = self.overflow_entity.take_if(|entity| {
+            if let Some(entity) = self.overflow_entity.as_mut() {
                 entity.emit_window(set, window, &mut out);
-                entity.expire_if_idle(set, window, &mut out)
-            });
-            if expired.is_some() {
-                self.stats.expired_entities += 1;
+                if entity.expire_if_idle(set, window, &mut out) {
+                    self.overflow_entity = None;
+                    self.stats.expired_entities += 1;
+                }
             }
             oldest_open += 1;
         }
