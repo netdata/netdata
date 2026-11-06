@@ -12,7 +12,7 @@
 use crate::services::{service_labels, service_settings};
 use netdata_plugin_metrics::{
     Batch, BatchEntity, ChartDescriptor, ChartType, Charts, ChartsBuilder, Counter, MetricSet,
-    MetricSetBuilder, columns,
+    MetricSetBuilder, MetricSetError, columns,
 };
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
@@ -50,10 +50,10 @@ pub(crate) struct ServiceLogs {
 }
 
 impl ServiceLogs {
-    pub(crate) fn new(max_services: usize) -> Self {
+    pub(crate) fn new(max_services: usize) -> Result<Self, MetricSetError> {
         let mut builder = MetricSetBuilder::new(service_settings(max_services));
         let records = builder.counter::<Severity>();
-        let metrics = builder.build();
+        let metrics = builder.build()?;
         let mut charts = ChartsBuilder::new(&metrics);
         charts.chart(
             records,
@@ -66,11 +66,11 @@ impl ServiceLogs {
                 priority: 60_010,
             },
         );
-        Self {
+        Ok(Self {
             charts: charts.build(),
             metrics,
             records,
-        }
+        })
     }
 
     /// Record the log records of `request` into `batch`.
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn counts_records_per_service_and_severity() {
-        let logs = ServiceLogs::new(10);
+        let logs = ServiceLogs::new(10).unwrap();
         let record = |severity: i32| LogRecord {
             time_unix_nano: 95_000_000_000,
             severity_number: severity,

@@ -174,7 +174,9 @@ async fn run_ingestor(
     // ingest outcomes. The export services record into it; the tick loop
     // renders it. Its stores have their own locks, apart from the
     // ChartManager's.
-    let derived = Arc::new(DerivedMetrics::new(&config.derived_metrics));
+    let derived = Arc::new(
+        DerivedMetrics::new(&config.derived_metrics).context("declaring the derived metrics")?,
+    );
 
     // Channel for tick loop → main loop chart data forwarding
     let (chart_tx, mut chart_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);

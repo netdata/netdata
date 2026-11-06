@@ -1563,9 +1563,9 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos() as u64;
-        let derived = Arc::new(DerivedMetrics::new(
-            &otel_bridge::config::DerivedMetricsConfig::default(),
-        ));
+        let derived = Arc::new(
+            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
+        );
         let tmp = tempfile::tempdir().unwrap();
         let mut service = test_service_with_ingest(
             tmp.path().to_path_buf(),

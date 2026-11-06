@@ -10,7 +10,7 @@
 
 use netdata_plugin_metrics::{
     Batch, BatchEntity, CardinalityLimit, ChartDescriptor, ChartType, Charts, ChartsBuilder,
-    Counter, Histogram, Labels, MetricSet, MetricSetBuilder, Settings, columns,
+    Counter, Histogram, Labels, MetricSet, MetricSetBuilder, MetricSetError, Settings, columns,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
@@ -51,11 +51,11 @@ pub(crate) struct Services {
 }
 
 impl Services {
-    pub(crate) fn new(max_services: usize) -> Self {
+    pub(crate) fn new(max_services: usize) -> Result<Self, MetricSetError> {
         let mut builder = MetricSetBuilder::new(service_settings(max_services));
         let requests = builder.counter::<Outcome>();
         let duration = builder.histogram(DURATION_BOUNDS);
-        let metrics = builder.build();
+        let metrics = builder.build()?;
         let mut charts = ChartsBuilder::new(&metrics);
         charts.chart(
             requests,
@@ -83,12 +83,12 @@ impl Services {
             },
             "requests/s",
         );
-        Self {
+        Ok(Self {
             charts: charts.build(),
             metrics,
             requests,
             duration,
-        }
+        })
     }
 
     /// Record the requests among the spans of `request` into `batch`.
@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn counts_roots_servers_and_consumers_only() {
-        let services = Services::new(10);
+        let services = Services::new(10).unwrap();
         let out = render(
             &services,
             &request(
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn service_identity_labels() {
-        let services = Services::new(10);
+        let services = Services::new(10).unwrap();
         let out = render(
             &services,
             &request(
@@ -369,7 +369,7 @@ mod tests {
 
     #[test]
     fn an_all_zero_parent_id_marks_a_root() {
-        let services = Services::new(10);
+        let services = Services::new(10).unwrap();
         let mut root = span(false, SpanKind::Internal, false, 95, 10, "");
         root.parent_span_id = vec![0; 8];
         let out = render(
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn blank_identity_values_fall_back() {
-        let services = Services::new(10);
+        let services = Services::new(10).unwrap();
         let out = render(
             &services,
             &request(
@@ -408,7 +408,7 @@ mod tests {
         assert_eq!(adjusted_count("ot=th:zz"), 1.0);
         assert_eq!(adjusted_count("ot=th:123456789abcdef"), 1.0);
 
-        let services = Services::new(10);
+        let services = Services::new(10).unwrap();
         let out = render(
             &services,
             &request(

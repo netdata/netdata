@@ -664,9 +664,9 @@ mod tests {
             .unwrap()
             .as_nanos() as u64;
         let tenant = TenantId::default_tenant();
-        let derived = Arc::new(DerivedMetrics::new(
-            &otel_bridge::config::DerivedMetricsConfig::default(),
-        ));
+        let derived = Arc::new(
+            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
+        );
         let tmp = tempfile::tempdir().unwrap();
 
         // Stored: three root spans count as three requests.

@@ -2,6 +2,7 @@
 //! and settings.
 
 use crate::layout::{Aggregation, ColumnRange, Schema};
+use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -23,16 +24,16 @@ const MAX_LABEL_VALUE_BYTES: usize = 800;
 ///
 /// # Names
 ///
-/// - Each name must appear once in `NAMES`. In debug builds, declaring an
-///   instrument with a repeated name panics.
+/// - Each name must appear once in `NAMES`. A repeated name makes
+///   [`MetricSetBuilder::build`] fail.
 /// - A charted column becomes a chart dimension with its name as the id, so
 ///   the names must also pass the rules at
 ///   [`ChartsBuilder::chart`](crate::ChartsBuilder::chart).
 ///
 /// # Manual implementations
 ///
-/// - `NAMES` must hold at least one name. In debug builds, declaring an
-///   instrument with an empty `NAMES` panics.
+/// - `NAMES` must hold at least one name. An empty `NAMES` makes
+///   [`MetricSetBuilder::build`] fail.
 /// - `index` must return the value's position in `NAMES`. In debug builds, a
 ///   measurement of a value whose index is out of range panics.
 pub trait Column: Copy + 'static {
@@ -314,83 +315,105 @@ pub struct CardinalityLimit {
     pub overflow_labels: Labels,
 }
 
+/// A mistake in declaring a metric set, reported by
+/// [`MetricSetBuilder::build`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MetricSetError {
+    /// The collection interval is not a whole number of seconds of at least 1.
+    CollectionInterval(Duration),
+    /// `expiry` is 0.
+    ZeroExpiry,
+    /// The cardinality limit's `max_entities` is 0.
+    ZeroCardinalityLimit,
+    /// The cardinality limit's overflow labels are empty.
+    NoOverflowLabels,
+    /// A [`Column`] type has no names.
+    NoColumns,
+    /// A name appears more than once in a [`Column`] type's names.
+    DuplicateColumn(&'static str),
+    /// Histogram bounds that are not finite and strictly increasing.
+    HistogramBounds,
+    /// The set has no instrument.
+    NoInstruments,
+}
+
+impl fmt::Display for MetricSetError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CollectionInterval(interval) => write!(
+                f,
+                "the collection interval must be whole seconds, at least 1: {interval:?}"
+            ),
+            Self::ZeroExpiry => f.write_str("expiry must be positive"),
+            Self::ZeroCardinalityLimit => f.write_str("the cardinality limit must be positive"),
+            Self::NoOverflowLabels => f.write_str("overflow labels are required"),
+            Self::NoColumns => f.write_str("an instrument needs at least one column"),
+            Self::DuplicateColumn(name) => write!(f, "duplicate column name {name:?}"),
+            Self::HistogramBounds => f.write_str("histogram bounds must be finite and increasing"),
+            Self::NoInstruments => f.write_str("metric set has no instruments"),
+        }
+    }
+}
+
+impl std::error::Error for MetricSetError {}
+
 static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 
 /// Declares a [`MetricSet`]: each instrument adds its column group (a
-/// histogram three).
+/// histogram three). A mistake does not stop the declaration: the builder
+/// keeps the first one and [`build`](Self::build) reports it.
 #[derive(Debug)]
 pub struct MetricSetBuilder {
     id: u32,
     settings: Settings,
     schema: Schema,
+    /// The first mistake, reported by `build`.
+    error: Option<MetricSetError>,
 }
 
 impl MetricSetBuilder {
-    /// Starts a metric set.
-    ///
-    /// # Panics
-    ///
-    /// If the cardinality limit's `max_entities` is 0; a plugin may take it
-    /// from its configuration, so this is checked in every build. In debug
-    /// builds also if the collection interval is not a whole number of
-    /// seconds of at least 1, if `expiry` is 0, or if the overflow labels are
-    /// empty.
+    /// Starts a metric set. Invalid settings make
+    /// [`build`](Self::build) fail.
     pub fn new(settings: Settings) -> Self {
-        let interval = settings.collection_interval;
-        debug_assert!(
-            interval.as_secs() >= 1 && interval.subsec_nanos() == 0,
-            "the collection interval must be whole seconds, at least 1: {interval:?}"
-        );
-        debug_assert!(!settings.expiry.is_zero(), "expiry must be positive");
-        if let Some(limit) = &settings.cardinality_limit {
-            assert!(
-                limit.max_entities > 0,
-                "the cardinality limit must be positive"
-            );
-            debug_assert!(
-                !limit.overflow_labels.is_empty(),
-                "overflow labels are required"
-            );
-        }
+        let error = check_settings(&settings).err();
         Self {
             id: NEXT_SET_ID.fetch_add(1, Ordering::Relaxed),
             settings,
             schema: Schema::default(),
+            error,
+        }
+    }
+
+    /// Keeps `check`'s error for `build` unless an earlier one is kept.
+    fn keep_first(&mut self, check: Result<(), MetricSetError>) {
+        if self.error.is_none() {
+            self.error = check.err();
         }
     }
 
     /// Adds a column group of one column per value of `C`, aggregated by
     /// `aggregation`, and returns its handle.
     fn split_by<C: Column>(&mut self, aggregation: Aggregation) -> ColumnRange<C> {
+        self.keep_first(check_names(C::NAMES));
         let names = C::NAMES.iter().map(|name| name.to_string()).collect();
         let group = self.schema.add_column_group(aggregation, names);
         let base = self.schema.column_group(group).columns.start;
         ColumnRange::new(self.id, group, base)
     }
 
-    /// Adds a [`Counter`].
-    ///
-    /// # Panics
-    ///
-    /// In debug builds, if `C::NAMES` is empty or a name repeats in it.
+    /// Adds a [`Counter`]. An empty or repeating `C::NAMES` makes
+    /// [`build`](Self::build) fail.
     pub fn counter<C: Column>(&mut self) -> Counter<C> {
         Counter(self.split_by(Aggregation::Sum))
     }
 
-    /// Adds a [`CumulativeCounter`].
-    ///
-    /// # Panics
-    ///
-    /// As [`MetricSetBuilder::counter`].
+    /// Adds a [`CumulativeCounter`]. `C::NAMES` as at
+    /// [`counter`](Self::counter).
     pub fn cumulative_counter<C: Column>(&mut self) -> CumulativeCounter<C> {
         CumulativeCounter(self.split_by(Aggregation::CumulativeSum))
     }
 
-    /// Adds a [`Gauge`].
-    ///
-    /// # Panics
-    ///
-    /// As [`MetricSetBuilder::counter`].
+    /// Adds a [`Gauge`]. `C::NAMES` as at [`counter`](Self::counter).
     pub fn gauge<C: Column>(&mut self) -> Gauge<C> {
         Gauge(self.split_by(Aggregation::LastValue))
     }
@@ -407,14 +430,10 @@ impl MetricSetBuilder {
     /// [`ChartsBuilder::histogram`](crate::ChartsBuilder::histogram) charts
     /// each group on its own.
     ///
-    /// # Panics
-    ///
-    /// In debug builds, if `bounds` are not finite and strictly increasing.
+    /// Bounds that are not finite and strictly increasing make
+    /// [`build`](Self::build) fail.
     pub fn histogram(&mut self, bounds: &'static [f64]) -> Histogram {
-        debug_assert!(
-            bounds.iter().all(|b| b.is_finite()) && bounds.windows(2).all(|w| w[0] < w[1]),
-            "histogram bounds must be finite and increasing"
-        );
+        self.keep_first(check_bounds(bounds));
         let mut buckets: Vec<String> = bounds.iter().map(|bound| bound.to_string()).collect();
         buckets.push("+Inf".to_string());
         let group = self
@@ -433,24 +452,67 @@ impl MetricSetBuilder {
 
     /// Finishes the set.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// In debug builds, if no instrument was added.
-    pub fn build(self) -> MetricSet {
-        debug_assert!(
-            !self.schema.column_groups().is_empty(),
-            "metric set has no instruments"
-        );
+    /// The first mistake made in declaring the set (see [`MetricSetError`]),
+    /// or [`MetricSetError::NoInstruments`].
+    pub fn build(self) -> Result<MetricSet, MetricSetError> {
+        if let Some(error) = self.error {
+            return Err(error);
+        }
+        if self.schema.column_groups().is_empty() {
+            return Err(MetricSetError::NoInstruments);
+        }
         let settings = self.settings;
         let interval = settings.collection_interval;
         let windows = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
-        MetricSet(Arc::new(MetricSetInner {
+        Ok(MetricSet(Arc::new(MetricSetInner {
             id: self.id,
             allowed_lateness_windows: windows(settings.allowed_lateness),
             expiry_windows: windows(settings.expiry),
             interval_secs: interval.as_secs(),
             cardinality_limit: settings.cardinality_limit,
             schema: self.schema,
-        }))
+        })))
     }
+}
+
+fn check_settings(settings: &Settings) -> Result<(), MetricSetError> {
+    let interval = settings.collection_interval;
+    if interval.as_secs() == 0 || interval.subsec_nanos() != 0 {
+        return Err(MetricSetError::CollectionInterval(interval));
+    }
+    if settings.expiry.is_zero() {
+        return Err(MetricSetError::ZeroExpiry);
+    }
+    if let Some(limit) = &settings.cardinality_limit {
+        if limit.max_entities == 0 {
+            return Err(MetricSetError::ZeroCardinalityLimit);
+        }
+        if limit.overflow_labels.is_empty() {
+            return Err(MetricSetError::NoOverflowLabels);
+        }
+    }
+    Ok(())
+}
+
+fn check_names(names: &[&'static str]) -> Result<(), MetricSetError> {
+    if names.is_empty() {
+        return Err(MetricSetError::NoColumns);
+    }
+    for (i, &name) in names.iter().enumerate() {
+        if names[..i].contains(&name) {
+            return Err(MetricSetError::DuplicateColumn(name));
+        }
+    }
+    Ok(())
+}
+
+fn check_bounds(bounds: &[f64]) -> Result<(), MetricSetError> {
+    let valid = bounds.iter().all(|bound| bound.is_finite())
+        && bounds.windows(2).all(|pair| pair[0] < pair[1]);
+    if !valid {
+        return Err(MetricSetError::HistogramBounds);
+    }
+    Ok(())
 }

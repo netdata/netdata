@@ -15,7 +15,7 @@ mod logs;
 mod plugin;
 mod services;
 
-use netdata_plugin_metrics::{Aggregator, Batch};
+use netdata_plugin_metrics::{Aggregator, Batch, MetricSetError};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use otel_bridge::config::DerivedMetricsConfig;
@@ -56,27 +56,32 @@ pub struct DerivedMetrics {
 }
 
 impl DerivedMetrics {
-    pub fn new(config: &DerivedMetricsConfig) -> Self {
-        let enabled = config.enabled.then(|| {
-            let services = services::Services::new(config.max_services);
-            let logs = logs::ServiceLogs::new(config.max_services);
-            let derivation = plugin::Derivation::new();
-            Enabled {
+    /// # Errors
+    ///
+    /// A metric set that the plugin declares wrongly.
+    pub fn new(config: &DerivedMetricsConfig) -> Result<Self, MetricSetError> {
+        let enabled = if config.enabled {
+            let services = services::Services::new(config.max_services)?;
+            let logs = logs::ServiceLogs::new(config.max_services)?;
+            let derivation = plugin::Derivation::new()?;
+            Some(Enabled {
                 service_aggregator: Mutex::new(Aggregator::new(&services.charts)),
                 services,
                 logs_aggregator: Mutex::new(Aggregator::new(&logs.charts)),
                 logs,
                 derivation_aggregator: Mutex::new(Aggregator::new(&derivation.charts)),
                 derivation,
-            }
-        });
-        let plugin = plugin::Plugin::new();
+            })
+        } else {
+            None
+        };
+        let plugin = plugin::Plugin::new()?;
         let plugin_aggregator = Mutex::new(Aggregator::new(&plugin.charts));
-        Self {
+        Ok(Self {
             enabled,
             plugin,
             plugin_aggregator,
-        }
+        })
     }
 
     /// A batch for the spans of one export request; `None` when derived

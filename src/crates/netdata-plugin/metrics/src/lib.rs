@@ -19,7 +19,7 @@
 //! // that show it, and create the aggregator.
 //! let mut builder = MetricSetBuilder::new(Settings::default());
 //! let requests = builder.counter::<Outcome>();
-//! let set = builder.build();
+//! let set = builder.build()?;
 //!
 //! let mut charts = ChartsBuilder::new(&set);
 //! charts.chart(
@@ -59,6 +59,7 @@
 //! // to the agent.
 //! let text = String::from_utf8(aggregator.emit(101, 1 << 20).concat()).unwrap();
 //! assert!(text.contains("SET success = 1\nSET error = 1\n"));
+//! # Ok::<(), netdata_plugin_metrics::MetricSetError>(())
 //! ```
 //!
 //! The table:
@@ -92,10 +93,12 @@
 //! table splits an instrument by entity and by column; the charts show them
 //! as chart instances and dimensions.
 //!
-//! Mistakes in declaring or wiring a metric set come from the plugin's own
-//! code, so they are checked by debug assertions: tests and debug builds
-//! panic on them, release builds skip the checks. The `# Panics` sections
-//! list the checks and say which one runs in every build.
+//! A mistake in declaring a metric set makes [`MetricSetBuilder::build`]
+//! return a [`MetricSetError`]. Other mistakes of the plugin's own code, in
+//! its charts, its label keys, or an instrument or batch used with another
+//! metric set, are checked by debug assertions: tests and debug builds panic
+//! on them, release builds skip the checks. The `# Panics` sections list
+//! them.
 
 mod aggregator;
 mod batch;
@@ -110,6 +113,6 @@ pub use chart::{ChartDescriptor, Charts, ChartsBuilder};
 pub use layout::ColumnRange;
 pub use metric_set::{
     CardinalityLimit, Column, Counter, CumulativeCounter, Gauge, Histogram, Labels, MetricSet,
-    MetricSetBuilder, Settings,
+    MetricSetBuilder, MetricSetError, Settings,
 };
 pub use netdata_plugin_protocol::ChartType;

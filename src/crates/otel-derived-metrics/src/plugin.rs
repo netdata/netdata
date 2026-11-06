@@ -4,7 +4,7 @@
 
 use netdata_plugin_metrics::{
     Batch, ChartDescriptor, ChartType, Charts, ChartsBuilder, Counter, CumulativeCounter, Gauge,
-    Labels, MetricSet, MetricSetBuilder, Settings, Stats, columns,
+    Labels, MetricSet, MetricSetBuilder, MetricSetError, Settings, Stats, columns,
 };
 use otel_bridge::signals::Signal;
 
@@ -46,11 +46,11 @@ pub(crate) struct Plugin {
 }
 
 impl Plugin {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self, MetricSetError> {
         let mut builder = MetricSetBuilder::new(Settings::default());
         let spans = builder.counter::<Acceptance>();
         let log_records = builder.counter::<Acceptance>();
-        let metrics = builder.build();
+        let metrics = builder.build()?;
         let mut charts = ChartsBuilder::new(&metrics);
         charts.chart(
             spans,
@@ -74,12 +74,12 @@ impl Plugin {
                 priority: 150_001,
             },
         );
-        Self {
+        Ok(Self {
             charts: charts.build(),
             metrics,
             spans,
             log_records,
-        }
+        })
     }
 
     pub(crate) fn ingest(&self, signal: Signal, accepted: u64, rejected: u64, now: u64) -> Batch {
@@ -117,12 +117,12 @@ pub(crate) struct Derivation {
 }
 
 impl Derivation {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self, MetricSetError> {
         let mut builder = MetricSetBuilder::new(Settings::default());
         let services = builder.gauge::<Services>();
         let adjusted = builder.cumulative_counter::<Adjustment>();
         let expired = builder.cumulative_counter::<Expired>();
-        let metrics = builder.build();
+        let metrics = builder.build()?;
         let mut charts = ChartsBuilder::new(&metrics);
         charts.chart(
             services,
@@ -158,13 +158,13 @@ impl Derivation {
                 priority: 150_012,
             },
         );
-        Self {
+        Ok(Self {
             charts: charts.build(),
             metrics,
             services,
             adjusted,
             expired,
-        }
+        })
     }
 
     /// Record the statistics of `signal`'s aggregator at `now` into `batch`.
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn ingest_outcomes_render_per_signal() {
-        let plugin = Plugin::new();
+        let plugin = Plugin::new().unwrap();
         let mut aggregator = Aggregator::new(&plugin.charts);
         aggregator.merge(plugin.ingest(Signal::Traces, 7, 2, 100), 100);
         aggregator.merge(plugin.ingest(Signal::Logs, 3, 0, 100), 100);
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn the_heartbeat_keeps_the_charts_defined_without_traffic() {
-        let plugin = Plugin::new();
+        let plugin = Plugin::new().unwrap();
         let mut aggregator = Aggregator::new(&plugin.charts);
         aggregator.merge(plugin.heartbeat(100), 100);
         let out = String::from_utf8(aggregator.emit(101, usize::MAX).concat()).unwrap();
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn derivation_charts_one_entity_per_signal_with_increases() {
-        let derivation = Derivation::new();
+        let derivation = Derivation::new().unwrap();
         let mut aggregator = Aggregator::new(&derivation.charts);
         let mut tick = |stats: Stats, now: u64| {
             let mut batch = Batch::new(&derivation.metrics);
