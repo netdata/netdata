@@ -16,6 +16,11 @@
         "minimum": 0.5,
         "default": 2
       },
+      "tls_server_name": {
+        "title": "TLS server name",
+        "description": "Host name sent to the server (SNI) and checked against the certificate, instead of the host in `source`. Leave empty to use the host in `source`.",
+        "type": "string"
+      },
       "tls_skip_verify": {
         "title": "Skip TLS verification",
         "description": "Skip TLS certificate and hostname verification, so certificates that are self-signed, expired or issued for another name are still read.",
@@ -84,6 +89,10 @@
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
     },
+    "tls_server_name": {
+      "ui:placeholder": "www.example.com",
+      "ui:help": "The connection still goes to the host and port in `source`. For example, with `source` set to `https://127.0.0.1:443` on a server that hosts several sites, enter the name of the site to check.\n\nOnly this value decides whether SNI is sent: an IP address entered here sends no SNI and is checked against the IP addresses in the certificate, while a host name is sent even when `source` is an IP address. Not available for `file://` sources."
+    },
     "vnode": {
       "ui:placeholder": "my-vnode",
       "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define the Virtual Node in `vnodes.conf` first, then enter its name here."
@@ -101,6 +110,7 @@
         {
           "title": "TLS",
           "fields": [
+            "tls_server_name",
             "tls_skip_verify",
             "tls_ca",
             "tls_cert",

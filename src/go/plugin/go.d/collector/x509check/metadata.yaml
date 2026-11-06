@@ -89,7 +89,8 @@ modules:
               group: Target
               detailed_description: |
                 Network sources need a port. The host name is sent for SNI and, unless `tls_skip_verify` is set, checked
-                against the certificate.
+                against the certificate. To use another name for both while connecting to the same address, set
+                `tls_server_name`.
 
                 | Scheme | Use for | Example |
                 |:-------|:--------|:--------|
@@ -103,6 +104,22 @@ modules:
               required: false
               group: Target
 
+            - name: tls_server_name
+              description: Host name sent to the server (SNI) and checked against the certificate, instead of the host in `source`. Leave empty to use the host in `source`.
+              default_value: ""
+              required: false
+              group: TLS
+              detailed_description: |
+                The job still connects to the host and port in `source`, so it can read the certificate issued for one
+                name from a server reached at another address:
+
+                - each site hosted on one IP address and port, with one job per site;
+                - an origin server behind a load balancer or CDN, reached at its own address;
+                - each node of a pool, reached at its address and verified against the shared host name.
+
+                A host name set here is sent as SNI even when `source` is an IP address. An IP address set here sends
+                no SNI and is checked against the IP addresses listed in the certificate. A `file://` source does not
+                accept this option.
             - name: tls_skip_verify
               description: Skip TLS certificate and hostname verification, so certificates that are self-signed, expired or issued for another name are still read.
               default_value: no
@@ -201,6 +218,19 @@ modules:
                   - name: internal_example
                     source: https://internal.example.com:443
                     tls_skip_verify: yes
+            - name: Several sites on one address
+              description: >-
+                A server that hosts several sites on one IP address and port, checked locally: every job connects to
+                the same address and asks for a different site.
+              config: |
+                jobs:
+                  - name: site_a_local
+                    source: https://127.0.0.1:443
+                    tls_server_name: site-a.example.com
+
+                  - name: site_b_local
+                    source: https://127.0.0.1:443
+                    tls_server_name: site-b.example.com
             - name: Multi-instance
               description: |
                 > **Note**: When you define multiple jobs, their names must be unique.
@@ -233,6 +263,11 @@ modules:
           - error: "certificate provider init: source parse: parse `source`: first path segment in URL cannot contain colon"
             cause: "`source` is an IP address and port without a scheme."
             fix: Add the scheme, for example `tcp://192.0.2.10:443`.
+          - error: "certificate provider init: tls_server_name cannot be used with a file:// source"
+            cause: >-
+              `tls_server_name` is set on a job whose `source` is a local file, which has no server to ask for a
+              certificate.
+            fix: Remove `tls_server_name` from the job, or point `source` at the server that presents the certificate.
           - error: "error on dial to `host`: dial tcp: address `host`: missing port in address"
             cause: A network `source` has no port; the collector does not assume one from the scheme.
             fix: Add the port, for example `https://example.com:443` or `smtp://smtp.example.com:587`.
@@ -282,11 +317,19 @@ modules:
               Renew the certificate, or correct the clock. To keep charting an expired certificate, set
               `tls_skip_verify: yes`.
           - error: "tls: failed to verify certificate: x509: certificate is valid for `names`, not `host`"
-            cause: The host name in `source` is not one of the names in the certificate.
-            fix: "Use a host name the certificate covers, or set `tls_skip_verify: yes`."
+            cause: >-
+              The host name in `source`, or `tls_server_name` when it is set, is not one of the names in the
+              certificate.
+            fix: >-
+              Use a host name the certificate covers, in `source` or in `tls_server_name`, or set
+              `tls_skip_verify: yes`.
           - error: "tls: failed to verify certificate: x509: cannot validate certificate for `ip` because it doesn't contain any IP SANs"
-            cause: "`source` uses an IP address, and the certificate lists only host names."
-            fix: Use the host name of the service in `source`.
+            cause: >-
+              The certificate is checked against an IP address, from `source` or `tls_server_name`, and lists only
+              host names.
+            fix: >-
+              Use the host name of the service in `source`, or keep the address in `source` and set `tls_server_name`
+              to that host name.
           - error: "tls: failed to verify certificate: x509: certificate relies on legacy Common Name field, use SANs instead"
             cause: The certificate names its host only in the Common Name and has no Subject Alternative Names.
             fix: "Reissue the certificate with Subject Alternative Names, or set `tls_skip_verify: yes`."
