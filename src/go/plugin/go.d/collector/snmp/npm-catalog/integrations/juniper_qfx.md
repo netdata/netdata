@@ -228,20 +228,20 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_jnxVirtualChassisPortCarrierTrans` | `{error}` | per port_name | Total number of Carrier errors on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortCollisions` | `{collision}` | per port_name | Total number of Collisions on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInCRCAlignErrors` | `{error}` | per port_name | Total number of Input CRC Alignment errors on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInMcasts` | `{packet}` | per port_name | Total number of multicast packets received on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInOctets` | `By` | per port_name | Total number of octets received on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInOctets1secRate` | `By/s` | per port_name | Total number of octets received per second on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInPkts` | `{packet}` | per port_name | Total number of packets received on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInPkts1secRate` | `{packet}/s` | per port_name | Total number of packets received per second on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutMcasts` | `{packet}` | per port_name | Total number of multicast packets sent from the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutOctets` | `By` | per port_name | Total number of octets sent on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutOctets1secRate` | `By/s` | per port_name | Total number of octets sent per second on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutPkts` | `{packet}` | per port_name | Total number of packets sent from the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutPkts1secRate` | `{packet}/s` | per port_name | Total number of packets sent per second from the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortUndersizePkts` | `{packet}` | per port_name | Total number of Undersize Packets on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortCarrierTrans` | `{error}` | per member_index, port_name | Total number of Carrier errors on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortCollisions` | `{collision}` | per member_index, port_name | Total number of Collisions on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInCRCAlignErrors` | `{error}` | per member_index, port_name | Total number of Input CRC Alignment errors on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInMcasts` | `{packet}` | per member_index, port_name | Total number of multicast packets received on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInOctets` | `By` | per member_index, port_name | Total number of octets received on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInOctets1secRate` | `By/s` | per member_index, port_name | Total number of octets received per second on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInPkts` | `{packet}` | per member_index, port_name | Total number of packets received on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInPkts1secRate` | `{packet}/s` | per member_index, port_name | Total number of packets received per second on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutMcasts` | `{packet}` | per member_index, port_name | Total number of multicast packets sent from the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutOctets` | `By` | per member_index, port_name | Total number of octets sent on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutOctets1secRate` | `By/s` | per member_index, port_name | Total number of octets sent per second on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutPkts` | `{packet}` | per member_index, port_name | Total number of packets sent from the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutPkts1secRate` | `{packet}/s` | per member_index, port_name | Total number of packets sent per second from the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortUndersizePkts` | `{packet}` | per member_index, port_name | Total number of Undersize Packets on the virtual-chassis port |
 
 ### System / Activity
 
