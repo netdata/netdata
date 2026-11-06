@@ -1,6 +1,6 @@
 # Anonymous telemetry events
 
-By default, Netdata collects anonymous usage information from the open-source monitoring Agent. For events like start, stop, crash, etc., we use our own cloud function in GCP. For frontend telemetry (page views, etc.) on the dashboard itself, we use the open-source product analytics platform [PostHog](https://github.com/PostHog/posthog).
+By default, Netdata collects anonymous usage information from the open-source monitoring Agent. For events like start, stop, crash, etc., we use our own cloud function in GCP. For frontend telemetry on the dashboard itself, the dashboard loads third-party services: [PostHog](https://github.com/PostHog/posthog) for product analytics, Google Tag Manager, Reo.dev and Sentry for error reporting.
 
 We are strongly committed to your [data privacy](https://netdata.cloud/privacy/).
 
@@ -12,30 +12,25 @@ We use the statistics gathered from this information for two purposes:
 
 Netdata collects usage information via two different channels:
 
-- **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](/docs/dashboards-and-charts/README.md).
+- **Agent dashboard**: When you access an [Agent's dashboard](/docs/dashboards-and-charts/README.md), it loads PostHog, Google Tag Manager, Reo.dev and Sentry, which send product usage events and error reports.
 - **Agent backend**: The `netdata` daemon executes the [`anonymous-statistics.sh`](https://github.com/netdata/netdata/blob/master/src/daemon/anonymous-statistics.sh.in) script when Netdata starts, stops cleanly, or fails.
 
 ## What data is collected
 
-### Agent Dashboard - PostHog JavaScript
+### Agent Dashboard - third-party services
 
-When you access an Agent dashboard session by visiting `http://NODE:19999`, Netdata initializes a PostHog session and masks various event attributes.
+When you access an Agent dashboard by visiting `http://NODE:19999`, and telemetry is not opted out, the dashboard loads these services in your browser:
 
-_Note_: You can see the relevant code in the [dashboard repository](https://github.com/netdata/dashboard/blob/master/src/domains/global/sagas.ts#L107) where the `window.posthog.register()` call is made.
+| Service | What it is used for |
+|---|---|
+| [PostHog](https://posthog.com/docs/libraries/js) | Product usage events (page views, feature use) |
+| [Google Tag Manager](https://support.google.com/tagmanager/) | Marketing and usage tags |
+| [Reo.dev](https://www.reo.dev/) | Developer activity analytics |
+| [Sentry](https://docs.sentry.io/platforms/javascript/) | Error and crash reports from the dashboard |
 
-```JavaScript
-window.posthog.register({
-    distinct_id: machineGuid,
-    $ip: "127.0.0.1",
-    $current_url: "agent dashboard",
-    $pathname: "netdata-dashboard",
-    $host: "dashboard.netdata.io",
-})
-```
+When you sign in to Netdata Cloud from the dashboard, the product usage events are associated with your Netdata Cloud account.
 
-In the above snippet, a Netdata PostHog session is initialized and the `ip`, `current_url`, `pathname`, and `host` attributes are set to constant values for all events that may be sent during the session. This way, information like the IP or hostname of the Agent will not be sent as part of the product usage event data.
-
-We have configured the dashboard to trigger the PostHog JavaScript code only when the variable `anonymous_statistics` is true. The value of this variable is controlled via the [opt-out mechanism](#opt-out-methods).
+The dashboard loads these services only when the Agent's `anonymous_statistics` setting is true. The value of this setting is controlled via the [opt-out mechanism](#opt-out-methods).
 
 ### Agent Backend - Anonymous Statistics Script
 
@@ -83,7 +78,7 @@ To see exactly what and how is collected, you can review the script template `sr
 All opt-out methods prevent:
 
 - The daemon from executing the anonymous statistics script
-- The PostHog JavaScript snippet (which remains on the dashboard) from firing and sending any data to Netdata PostHog
+- The dashboard from loading PostHog, Google Tag Manager, Reo.dev and Sentry, so it sends them no data
 
 When opt-out is enabled, the anonymous statistics script exits immediately without sending any data.
 
@@ -225,7 +220,7 @@ To confirm that telemetry is disabled:
 
 :::note
 
-If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer send PostHog events, and the backend statistics script will not execute.
+If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer load PostHog, Google Tag Manager, Reo.dev or Sentry, and the backend statistics script will not execute.
 
 :::
 
