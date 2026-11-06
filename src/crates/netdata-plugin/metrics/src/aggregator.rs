@@ -144,24 +144,24 @@ impl Aggregator {
     fn bound_backlog(&mut self, now: u64) -> u64 {
         let set = &*self.set.0;
         let now_window = now / set.interval_secs;
-        let oldest_open = *self
+        let mut oldest_open = self
             .oldest_open
-            .get_or_insert(now_window.saturating_sub(set.allowed_lateness_windows));
+            .unwrap_or(now_window.saturating_sub(set.allowed_lateness_windows));
         let oldest_wanted =
             now_window.saturating_sub(set.allowed_lateness_windows + MAX_BACKLOG_WINDOWS);
-        if oldest_open >= oldest_wanted {
-            return oldest_open;
+        if oldest_open < oldest_wanted {
+            let skipped = oldest_wanted - oldest_open;
+            for entity in self
+                .entities
+                .values_mut()
+                .chain(self.overflow_entity.as_mut())
+            {
+                entity.fold_front(set, skipped, oldest_wanted);
+            }
+            oldest_open = oldest_wanted;
         }
-        let skipped = oldest_wanted - oldest_open;
-        for entity in self
-            .entities
-            .values_mut()
-            .chain(self.overflow_entity.as_mut())
-        {
-            entity.fold_front(set, skipped, oldest_wanted);
-        }
-        self.oldest_open = Some(oldest_wanted);
-        oldest_wanted
+        self.oldest_open = Some(oldest_open);
+        oldest_open
     }
 
     /// Merge a batch. `now`, the current Unix time, picks the current window:
