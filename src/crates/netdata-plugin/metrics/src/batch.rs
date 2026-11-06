@@ -2,7 +2,7 @@
 //! window its event time falls in; the aggregator decides at merge time
 //! whether that window is still open.
 
-use crate::layout::ColumnRange;
+use crate::layout::{ColumnRange, RowLayout};
 use crate::metric_set::{
     Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels, MetricSet, MetricSetInner,
 };
@@ -26,6 +26,26 @@ pub(crate) struct EntityRows {
     /// Position in `rows` of the window recorded into last; events mostly
     /// arrive in time order, so it answers most lookups without hashing.
     last: usize,
+}
+
+impl EntityRows {
+    /// The row for `window`, added empty if the batch has none yet; like
+    /// [`Batch::entity`], a lookup that adds what is missing.
+    pub(crate) fn row(&mut self, window: u64, row_layout: &RowLayout) -> &mut BatchRow {
+        let cached = self
+            .rows
+            .get_index(self.last)
+            .is_some_and(|(&last_window, _)| last_window == window);
+        if !cached {
+            let entry = self.rows.entry(window);
+            self.last = entry.index();
+            entry.or_insert_with(|| BatchRow {
+                events: 0,
+                cells: row_layout.empty_row(),
+            });
+        }
+        &mut self.rows[self.last]
+    }
 }
 
 /// The events of one unit of work (for example one request) for one
@@ -93,21 +113,7 @@ impl BatchEntity<'_> {
     pub fn record(&mut self, unix_seconds: u64) -> Measurements<'_> {
         let set = self.set;
         let window = unix_seconds / set.interval_secs;
-        let entity = &mut *self.entity;
-        let index = match entity.rows.get_index(entity.last) {
-            Some((&last_window, _)) if last_window == window => entity.last,
-            _ => {
-                let entry = entity.rows.entry(window);
-                let index = entry.index();
-                entry.or_insert_with(|| BatchRow {
-                    events: 0,
-                    cells: set.row_layout.empty_row(),
-                });
-                index
-            }
-        };
-        entity.last = index;
-        let batch_row = &mut entity.rows[index];
+        let batch_row = self.entity.row(window, &set.row_layout);
         batch_row.events += 1;
         Measurements {
             set_id: set.id,
