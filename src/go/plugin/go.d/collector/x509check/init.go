@@ -28,7 +28,7 @@ func (c *Collector) initCertificateProvider(ctx context.Context) (certificatePro
 	switch sourceURL.Scheme {
 	case "https", "smtp":
 		network = "tcp"
-	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6":
+	case "tcp", "tcp4", "tcp6":
 		network = sourceURL.Scheme
 	default:
 		return nil, fmt.Errorf("unsupported scheme '%s' in source '%s'", sourceURL.Scheme, c.Source)

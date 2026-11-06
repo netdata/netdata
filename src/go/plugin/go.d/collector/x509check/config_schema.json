@@ -6,7 +6,7 @@
     "properties": {
       "source": {
         "title": "Source",
-        "description": "Where to read the certificate, as a URL: `https`, `tcp`, `tcp4`, `tcp6`, `udp`, `udp4` or `udp6` for a TLS server, `smtp` for an SMTP server with STARTTLS, `file` for a local PEM file.",
+        "description": "Where to read the certificate, as a URL: `https`, `tcp`, `tcp4` or `tcp6` for a TLS server, `smtp` for an SMTP server with STARTTLS, `file` for a local PEM file.",
         "type": "string"
       },
       "timeout": {

@@ -76,7 +76,7 @@ modules:
             enabled: true
           list:
             - name: source
-              description: "Where to read the certificate, as a URL: `https`, `tcp`, `tcp4`, `tcp6`, `udp`, `udp4` or `udp6` for a TLS server, `smtp` for an SMTP server with STARTTLS, `file` for a local PEM file."
+              description: "Where to read the certificate, as a URL: `https`, `tcp`, `tcp4` or `tcp6` for a TLS server, `smtp` for an SMTP server with STARTTLS, `file` for a local PEM file."
               default_value: ""
               required: true
               group: Target
@@ -211,8 +211,8 @@ modules:
             fix: Set `source` to the URL of the certificate, for example `https://example.com:443`.
           - error: "unsupported scheme `scheme` in source `source`"
             cause: >-
-              `source` does not start with a supported scheme. A plain `http://` URL, or a host and port without a
-              scheme, produce this error.
+              `source` does not start with a supported scheme. A plain `http://` URL, a `udp://` URL (TLS does not run
+              over UDP), or a host and port without a scheme produce this error.
             fix: Use one of the schemes listed for the `source` option, for example `https://example.com:443`.
           - error: "error on dial to `host`: dial tcp: address `host`: missing port in address"
             cause: A network `source` has no port; the collector does not assume one from the scheme.

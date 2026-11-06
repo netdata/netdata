@@ -115,6 +115,12 @@ func TestCollector_Init(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		"udp scheme": {
+			config: Config{
+				Source: "udp://example.org:443",
+			},
+			wantErr: true,
+		},
 		"nonexistent TLS CA": {
 			config: Config{
 				Source: "https://example.org:443",
