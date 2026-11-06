@@ -741,10 +741,10 @@ impl Writer {
     ///
     /// The fsyncs run concurrently. On journaling filesystems (ext4, XFS) each
     /// fsync waits for a journal commit and concurrent waiters share one, so
-    /// N active files cost about one commit instead of N back to back. The
-    /// `Synced` events are then queued in the same order and with the same
-    /// stop-at-the-first-error rule as a sequential pass; a stream's durable
-    /// prefix only advances after its own fsync succeeds.
+    /// N active files cost about one commit instead of N back to back. Every
+    /// stream is attempted; a `Synced` event is queued for each stream whose
+    /// own fsync succeeded (its durable prefix advances only then), and the
+    /// first error, if any, is returned.
     pub fn sync_all(&mut self) -> Result<()> {
         let mut active: Vec<&mut Stream> = self
             .streams
@@ -752,11 +752,16 @@ impl Writer {
             .filter(|s| s.active.is_some())
             .collect();
         let results = sync_data_concurrently(&mut active);
+        let mut first_error = None;
         for (stream, result) in active.into_iter().zip(results) {
-            result?;
-            stream.queue_synced();
+            match result {
+                Ok(()) => stream.queue_synced(),
+                Err(e) => {
+                    first_error.get_or_insert(e);
+                }
+            }
         }
-        Ok(())
+        first_error.map_or(Ok(()), Err)
     }
 
     /// Rotate every stream whose active file has met a rotation threshold as
