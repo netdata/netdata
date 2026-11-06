@@ -88,7 +88,7 @@ func (c *Collector) collectBGPRowsObserved(
 		return nil, errors.Join(errs...)
 	}
 	if len(errs) > 0 {
-		c.log.Limit(bgpRowsPartialErrorLogKey+prof.SourceFile, 1, bgpRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+bgpRowsPartialErrorLogKey+prof.SourceFile, 1, bgpRowsErrorLogEvery).
 			Warningf("collecting BGP rows for profile %q partially failed: %v", prof.SourceFile, errors.Join(errs...))
 	}
 
@@ -280,6 +280,7 @@ func (c *Collector) collectTableBGPRows(
 
 		var rowOrdinal uint32
 		var dependencyRejected uint64
+		var rowErrors tableProcessingErrors
 		for rowIndex, rowPDUs := range ctx.rows {
 			var rejected *uint64
 			if route != nil {
@@ -294,7 +295,7 @@ func (c *Collector) collectTableBGPRows(
 				}
 				stats.Errors.Processing.BGP++
 				recordCollectionFailure(&c.failures.BGP, err, "bgp", "processing")
-				errs = append(errs, fmt.Errorf("BGP table %q row %q: %w", bgpConfigDisplayName(cfg), rowIndex, err))
+				rowErrors.add(rowIndex, err)
 				continue
 			}
 			if ok {
@@ -310,6 +311,9 @@ func (c *Collector) collectTableBGPRows(
 				route.Rejected++
 			}
 			rowOrdinal++
+		}
+		if err := rowErrors.err(); err != nil {
+			errs = append(errs, fmt.Errorf("BGP table %q: %w", bgpConfigDisplayName(cfg), err))
 		}
 		if route != nil {
 			if dependencyRejected > 0 {
@@ -428,7 +432,9 @@ func (c *Collector) buildTableBGPRow(
 		rejected:           rejected,
 		dependencyRejected: dependencyRejected,
 	}
-	c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx)
+	if err := c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx); err != nil {
+		return ddsnmp.BGPRow{}, false, err
+	}
 
 	row := ddsnmp.BGPRow{
 		OriginProfileID: cfg.OriginProfileID,
@@ -476,6 +482,12 @@ func (c *Collector) buildTableBGPRow(
 func (c *Collector) populateBGPRow(row *ddsnmp.BGPRow, cfg ddprofiledefinition.BGPConfig, ctx bgpValueContext) error {
 	var err error
 
+	if row.Identity.ProcessID, err = c.bgpTextValue(cfg.Identity.ProcessID, ctx.forField("identity.process_id")); err != nil {
+		return fmt.Errorf("identity.process_id: %w", err)
+	}
+	if cfg.Identity.ProcessID.IsSet() && row.Identity.ProcessID == "" {
+		return fmt.Errorf("identity.process_id: configured process identity is missing")
+	}
 	if row.Identity.RoutingInstance, err = c.bgpTextValue(cfg.Identity.RoutingInstance, ctx.forField("identity.routing_instance")); err != nil {
 		return fmt.Errorf("identity.routing_instance: %w", err)
 	}
@@ -1345,6 +1357,7 @@ func forEachBGPValuePath(
 			fn(path, value)
 		}
 	}
+	add("identity.process_id", cfg.Identity.ProcessID)
 	add("identity.routing_instance", cfg.Identity.RoutingInstance)
 	add("identity.neighbor", cfg.Identity.Neighbor)
 	add("identity.remote_as", cfg.Identity.RemoteAS)
@@ -1419,10 +1432,9 @@ func bgpRowHasSignals(row ddsnmp.BGPRow) bool {
 func bgpRowIdentityComplete(row ddsnmp.BGPRow) bool {
 	switch row.Kind {
 	case ddprofiledefinition.BGPRowKindPeer:
-		return row.Identity.Neighbor != "" && row.Identity.RemoteAS != ""
+		return row.Identity.HasPeerIdentity()
 	case ddprofiledefinition.BGPRowKindPeerFamily:
-		return row.Identity.Neighbor != "" &&
-			row.Identity.RemoteAS != "" &&
+		return row.Identity.HasPeerIdentity() &&
 			row.Identity.AddressFamily != "" &&
 			row.Identity.SubsequentAddressFamily != ""
 	default:

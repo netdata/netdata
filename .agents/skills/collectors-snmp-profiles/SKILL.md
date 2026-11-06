@@ -40,13 +40,17 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
    and a row whose columns double the entry arc still parses, so run the opt-in MIB check under Validation
    (`src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows`).
 2. Check the object's `MAX-ACCESS` (SMIv2) or `ACCESS` (SMIv1).
-3. If the object is `not-accessible`, do not configure it as a readable `symbol.OID` unless it satisfies every
-   device-scoped MIB-deviation requirement below.
-4. If a `not-accessible` object appears in the table `INDEX`, derive it from the row OID index using `index` or `index_transform`.
+3. Polling inputs MUST be readable: `not-accessible`, `accessible-for-notify`, and `write-only` are not polling
+   access. Notification-only and write-only fields MUST NOT supply GET/WALK inputs. A device-scoped deviation for
+   a `not-accessible` source MUST satisfy every requirement below and the exact source-role guard; a vendor name
+   or OID alone never authorizes an exception.
+4. If a non-pollable object appears in the table `INDEX`, derive it from the row OID index using `index`,
+   `index_transform`, or `index_decode`. A table root itself need not be readable; check the actual acquired column.
 5. Keep index extraction and value formatting separate:
-   - use `index` for one index component;
-   - use `index_transform` for multiple components;
-   - use `symbol.format` only for final formatting such as `ip_address`, `mac_address`, or `hex`.
+   - use `index` for one raw index arc and `index_transform` for arc slices;
+   - use `index_decode` for a full logical INDEX layout with variable or fixed-width octet strings;
+   - use `symbol.format` for final formatting; text from decimal index octets requires `octet_string`, while
+     `string` preserves its existing dotted-decimal behavior. See the Index Rules owner below.
 6. Resolve a cross-table tag through a row-index component (for example `ifXTable` via `index_transform`) only when
    the MIB defines that component as the target table's index, such as an `InterfaceIndex`. A port number scoped to
    a group, module or stack member (for example POWER-ETHERNET-MIB `pethPsePortIndex`) is not an ifIndex: identify
@@ -77,17 +81,17 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
    (`idle`, `connect`, `active`, `opensent`, `openconfirm`, `established`).
    Use `partial: true` plus `partial_states` only when the source MIB is
    intentionally partial.
-15. For BGP table rows, derive `not-accessible` INDEX objects with exactly one
-   row-index selector: `index`, `index_from_end`, or `index_transform`. Use
-   `index_from_end` for trailing AFI/SAFI-like components after variable-length
-   indexes such as `InetAddress`.
+15. Typed BGP value fields derive `not-accessible` INDEX objects with exactly one selector: `index`, `index_from_end`,
+   or `index_transform`. Use `index_from_end` for trailing AFI/SAFI-like components after variable-length indexes
+   such as `InetAddress`. BGP row `metric_tags` use `index`, `index_transform`, or `index_decode` for row-index
+   identity; follow the Index Rules below.
 16. To constrain a topology table to a fixed structural index prefix, use one
     readable anchor symbol and set `table.OID` to `<anchor-column>.<prefix>`.
     A simple same-index cross-table dependency inherits that prefix and is
     anchor-gated only when its target table has no symbol-bearing producer.
     A target route with a real symbol owner remains eager. Do not rely on
     propagation for ordinary metrics, multiple anchors, `lookup_symbol`,
-    `index_transform`, `index_from`, or conflicting dependency scopes.
+    `index_transform`, `index_decode`, `index_from`, or conflicting dependency scopes.
 
 ## Device-Scoped MIB Deviations
 
@@ -98,7 +102,8 @@ A vendor profile MAY poll an object that the source MIB marks `not-accessible` o
 - **Proof:** A checked repository fixture or repeatable live capture proves that the matched device returns the object as
   a readable column and omits the standards-readable anchor needed to obtain the row otherwise.
 - **Isolation:** The device row overrides the generic row identity instead of adding a second generic fallback or a second
-  topology kind.
+  topology kind. Every effective consumer, including direct and transitive inheritors, MUST retain the exact
+  capture-proven selector; checking only the profile that declares the source does not establish polling scope.
 - **Documentation:** A short profile comment explains the vendor deviation and why index-only decoding cannot be used.
 - **Regression:** Tests pin both the selector-scoped override and real fixture collection through the profile parser and
   consumer path.
@@ -121,6 +126,29 @@ The retired `constant_value_one` key is ignored. Ordinary metric symbols still r
 - `index_transform: [{start: N}]` keeps index component `N` through the last component when `N > 0`.
 - `index_transform: [{start: 0, end: 0}]` keeps only the first index component.
 - `drop_right` can be used when the right side has fixed trailing components.
+- For `index_decode`, declare every logical component, including unselected components, and select with one-based
+  `component`. An `octet_string` without `length` is length-prefixed; a positive fixed `length` omits the prefix.
+  Layout, extraction and final formatting failures MUST reject the entire identity row and keep it out of caches.
+- Cross-table joins require authoritative equivalence of their keys, including every ownership axis. Equal-looking
+  numeric indexes do not prove equal meaning; process-less metadata cannot be attributed to process-scoped rows
+  without a source contract. Omit unproved enrichment rather than manufacture identity or drop valid counters.
+
+Compound syntax and validation live in
+`src/go/plugin/go.d/collector/snmp/profile-format.md#compound-index-decoding-index_decode`.
+For compound identity changes, test final chart IDs with every required axis, first WALK, cached GET and profile
+clone/reload. Include punctuation, empty components, malformed unselected components and downstream formatting errors,
+not only decoder failures. Preserve exact semantic identity through acquisition and caches; defer wire sanitation to
+the renderer. Exercise the full path with names that normalize to the same display label, not just prebuilt metric
+maps. Strict row rejection must retain bounded error summaries for ordinary and typed tables. Machine identity and
+display labels have separate contracts; see
+`src/go/plugin/go.d/collector/snmp/profile-format.md#5-metric_tags`.
+V1 `Dim.ID` is a job-scoped sample lookup key; `DIMENSION` and `SET` use `Dim.Name` when set. Do not infer
+wire identity or name validation from an internal key, or replace chart-scoped names with job-scoped keys.
+Typed BGP identity and optional-value availability are defined in
+`src/go/plugin/go.d/collector/snmp/profile-format.md#bgp-rows`. Preserve configured process identity through all
+consumers, including Functions, topology inventory and diagnostic replay. In topology, preserve exact nonblank process and
+routing-instance identifiers through grouping and output; absence/default handling must not rewrite those tokens. Missing optional values and failed
+SNMP dependency walks are different cases and MUST be tested separately.
 
 ## Common Patterns
 
@@ -221,7 +249,7 @@ topology runtime normalizes IP-compatible bytes later.
 When a profile reads a table column, verify that the MIB object is readable:
 
 ```bash
-rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+not-accessible' path/to/MIB
+rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+(not-accessible|accessible-for-notify)|ACCESS[[:space:]]+(not-accessible|write-only)' path/to/MIB
 ```
 
 For known topology-sensitive symbols, scan profile YAMLs before committing:
@@ -293,12 +321,18 @@ go test ./plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector
 go test ./plugin/go.d/collector/snmp_topology
 ```
 
-When adding or changing profile OIDs, also run the opt-in MIB check (rules in its doc comment; skips when unset). Stock
-was verified against `librenms/librenms @ b787b2e9d38a87f39d95a6a077c9382261262336` `mibs/`; OIDs whose MIB is absent
-are counted, not failed.
+`TestStockProfiles_PollingAccessibility` is always on. Its exact module/object/access evidence and source-file hashes
+are pinned in `src/go/plugin/go.d/collector/snmp/ddsnmp/testdata/profile-mib-access.json`. New unknown polling sources
+fail; unresolved existing source roles remain an explicit bounded baseline, never proof of readability.
+Only the exact RB750Gr3 selector/row/source deviations pinned by the guard and checked capture are allowed.
+
+When changing acquisition inputs, verify the manifest against its recorded MIB corpus revision. The refresh command
+and exception evidence are owned by
+`src/go/plugin/go.d/collector/snmp/profile-format.md#stock-polling-source-guard`. Refresh MUST NOT silently expand the
+unresolved baseline or accept changed pinned source hashes. The opt-in OID-resolution check remains useful for
+structural errors and reports absent MIB coverage; it is not a substitute for access evidence.
 
 ```bash
-git clone --depth 1 --filter=blob:none --sparse https://github.com/librenms/librenms <dir> &&
-  git -C <dir> sparse-checkout set mibs
-NETDATA_SNMP_MIB_DIRS=<dir>/mibs go test -run TestStockProfiles_OIDsResolveAgainstMIBs ./plugin/go.d/collector/snmp/ddsnmp
+NETDATA_SNMP_MIB_DIRS=<pinned-mibs> go test -count=1 ./plugin/go.d/collector/snmp/ddsnmp \
+  -run 'TestStockProfiles_(PollingAccessibility|AccessManifestAgainstMIBs|OIDsResolveAgainstMIBs)'
 ```

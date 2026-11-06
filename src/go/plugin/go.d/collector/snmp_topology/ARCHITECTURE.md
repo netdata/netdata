@@ -882,6 +882,21 @@ When adding new collected state, add it to:
 - Add collector refresh or generation lifecycle behavior:
   - root package only.
 
+BGP inventory preserves an optional process ID independently of the routing instance.
+Process-scoped rows may omit remote AS when the source cannot prove that association;
+they still require explicit process, routing instance and neighbor identity. The process
+survives acquisition evidence, diagnostic archives, replay and the actor-owned BGP
+peer table. Device-local process IDs do not change graph relationship grouping, which
+remains the managed actor pair and routing instance.
+
+Process and routing-instance values are opaque semantic identifiers. Select the first
+nonblank typed value or fallback tag without trimming its bytes; `edge` and ` edge `
+are distinct identifiers. Empty or whitespace-only values remain absent, and the
+routing-instance default is applied only after testing whether explicit peer identity
+is complete. Inventory cells, graph grouping, repeated enrichment and relationship
+evidence preserve the same identifiers. IP and ASN normalization follow their separate
+protocol rules; generic display-string trimming does not apply to these two fields.
+
 ## Validation Checklist
 
 Useful focused checks after changes:

@@ -5,7 +5,6 @@ package snmp
 import (
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -174,39 +173,6 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 		mx[px+"errors_processing_licensing"] = pm.Stats.Errors.Processing.Licensing
 		mx[px+"errors_processing_bgp"] = pm.Stats.Errors.Processing.BGP
 	}
-}
-
-func tableMetricKey(m ddsnmp.Metric) string {
-	if m.Name == "" {
-		return ""
-	}
-
-	// Filter keys we actually use (skip "_" and empty values) and precompute final length.
-	include := make([]string, 0, len(m.Tags))
-	totalLen := len(m.Name)
-	for k, v := range m.Tags {
-		if v == "" || strings.HasPrefix(k, "_") {
-			continue
-		}
-		include = append(include, k)
-		totalLen += len("_") + len(v)
-	}
-	if len(include) == 0 {
-		return m.Name
-	}
-
-	sort.Strings(include)
-
-	var sb strings.Builder
-	sb.Grow(totalLen)
-
-	sb.WriteString(m.Name)
-	for _, k := range include {
-		sb.WriteByte('_')
-		sb.WriteString(m.Tags[k])
-	}
-
-	return sb.String()
 }
 
 func stripFileNameExt(path string) string {

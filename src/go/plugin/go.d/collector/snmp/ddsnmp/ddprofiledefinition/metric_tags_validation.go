@@ -65,7 +65,7 @@ func validateEnrichMetricTag(path string, metricTag *MetricTagConfig, scalar boo
 		metricTag.Symbol.OID = metricTag.OID
 		metricTag.OID = ""
 	}
-	errs = append(errs, validateEnrichIndexFrom(metricTag))
+	errs = append(errs, validateEnrichIndexFrom(metricTag), validateIndexDecode(metricTag))
 	if metricTag.IsIndexTag() {
 		symbol := SymbolConfig(metricTag.Symbol)
 		if symbol.Name == "" && metricTag.Tag == "" && metricTag.Index == 0 {
@@ -130,6 +130,9 @@ func validateEnrichMetricTag(path string, metricTag *MetricTagConfig, scalar boo
 
 func validateScalarMetricTag(tag *MetricTagConfig) error {
 	var errs []error
+	if tag.IndexDecode != nil {
+		errs = append(errs, errors.New("scalar metric_tags do not support `index_decode`"))
+	}
 	if tag.Table != "" {
 		errs = append(
 			errs,

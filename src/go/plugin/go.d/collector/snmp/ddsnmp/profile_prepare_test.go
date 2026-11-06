@@ -443,3 +443,30 @@ func TestLoadProfileByName_LegacyTableMetricTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestPreparePreservesDecodedIndexTag(t *testing.T) {
+	length := uint(48)
+	tag := ddprofiledefinition.MetricTagConfig{
+		Tag:    "row_name",
+		Symbol: ddprofiledefinition.SymbolConfigCompat{Format: "string"},
+		IndexDecode: &ddprofiledefinition.MetricIndexDecode{
+			Components: []ddprofiledefinition.MetricIndexComponent{
+				{Type: "integer"},
+				{Type: "octet_string", Length: &length},
+			},
+			Component: 2,
+		},
+	}
+	profile := &Profile{Definition: &ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{{
+			Table:      ddprofiledefinition.SymbolConfig{OID: "1.2", Name: "rows"},
+			Symbols:    []ddprofiledefinition.SymbolConfig{{OID: "1.2.1", Name: "value"}},
+			MetricTags: []ddprofiledefinition.MetricTagConfig{tag},
+		}},
+	}}
+	require.NoError(t, ddprofiledefinition.ValidateEnrichProfile(profile.Definition))
+	handleCrossTableTagsWithoutMetrics(profile)
+	require.Len(t, profile.Definition.Metrics, 1)
+	assert.Equal(t, tag, profile.Definition.Metrics[0].MetricTags[0])
+	assert.True(t, profile.Definition.Metrics[0].MetricTags[0].IsIndexTag())
+}

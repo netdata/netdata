@@ -66,7 +66,7 @@ func TestCollector_TableChartLabelLifecycle(t *testing.T) {
 						original, dimensions, firstSamples = chart, chart.Dims, samples
 					}
 					assert.Same(t, original, chart)
-					assert.Equal(t, "snmp_device_prof_port_power_1_1", chart.ID)
+					assert.Equal(t, "snmp_device_prof_port_power_44676bb68dcbc62d6e2a3dc700bb8fdac433f8477fe44cea0c87448c2d671e80", chart.ID)
 					assert.Equal(t, firstSamples, samples)
 					assert.Equal(t, dimensions, chart.Dims)
 					for i := range dimensions {
@@ -185,7 +185,7 @@ func TestCollector_TableChartLabelsSharedKey(t *testing.T) {
 		require.Len(t, *c.Charts(), 1)
 		chart := (*c.Charts())[0]
 		assert.Equal(t, step.alias, chartLabels(chart)["if_alias"], "the first sample for a key owns its chart labels")
-		assert.Equal(t, map[string]int64{"snmp_device_prof_power_1": 7}, samples)
+		assert.Equal(t, map[string]int64{"snmp_device_prof_power_22b8062f5aedcbe6e8a8779a53bb4497336830dfd90437a83e97ac628e8eab51": 7}, samples)
 		assert.Equal(t, step.redraw, !chart.IsCreated())
 		chart.SetCreated(true)
 	}
@@ -285,14 +285,14 @@ func TestCollector_TableChartLabelOutput(t *testing.T) {
 				return false
 			}, 5*time.Second, 10*time.Millisecond)
 			wire := strings.TrimPrefix(out.String(), before)
-			chart := "CHART 'snmp_fixture.snmp_device_prof_power_1'"
+			chart := "CHART 'snmp_fixture.snmp_device_prof_power_9fb28e1383b7b124087181687e55702c9adc56e5e6d16900e94b2a763a5bc86a'"
 			assert.Equal(t, step.redraw, strings.Contains(wire, chart), wire)
 			if step.absent {
 				assert.Contains(t, wire, "obsolete")
-				assert.NotContains(t, wire, "BEGIN 'snmp_fixture.snmp_device_prof_power_1'")
+				assert.NotContains(t, wire, "BEGIN 'snmp_fixture.snmp_device_prof_power_9fb28e1383b7b124087181687e55702c9adc56e5e6d16900e94b2a763a5bc86a'")
 				return
 			}
-			assert.Contains(t, wire, "BEGIN 'snmp_fixture.snmp_device_prof_power_1'")
+			assert.Contains(t, wire, "BEGIN 'snmp_fixture.snmp_device_prof_power_9fb28e1383b7b124087181687e55702c9adc56e5e6d16900e94b2a763a5bc86a'")
 			assert.Contains(t, wire, " = 7\n")
 			if step.redraw {
 				assert.Contains(t, wire, "CLABEL_COMMIT\n")

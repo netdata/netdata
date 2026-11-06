@@ -53,12 +53,14 @@ func newTableRowProcessor(log *logger.Logger) *tableRowProcessor {
 }
 
 func (p *tableRowProcessor) processRow(row *tableRowData, ctx *tableRowProcessingContext) ([]ddsnmp.Metric, error) {
-	p.processRowTags(row, ctx)
+	if err := p.processRowTags(row, ctx); err != nil {
+		return nil, err
+	}
 
 	return p.processRowMetrics(row, ctx)
 }
 
-func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProcessingContext) {
+func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProcessingContext) error {
 	// Collect tags in the order they appear in the profile
 	for _, orderedTag := range ctx.orderedTags {
 		var err error
@@ -87,7 +89,11 @@ func (p *tableRowProcessor) processRowTags(row *tableRowData, ctx *tableRowProce
 			*ctx.dependencyRejected++
 		}
 		p.log.Debugf("Error processing tag %s for row %s: %v", metricTagDisplayName(orderedTag.config), row.index, err)
+		if orderedTag.config.IndexDecode != nil {
+			return fmt.Errorf("invalid row identity %s: %w", metricTagDisplayName(orderedTag.config), err)
+		}
 	}
+	return nil
 }
 
 func (p *tableRowProcessor) processSingleSameTableTag(
@@ -142,6 +148,13 @@ func (p *tableRowProcessor) processIndexTag(
 	tagName := metricTagDisplayName(cfg)
 
 	rawValue := index
+	if cfg.IndexDecode != nil {
+		var err error
+		rawValue, err = decodeIndexComponent(index, cfg.IndexDecode)
+		if err != nil {
+			return "", "", err
+		}
+	}
 	if cfg.Index != 0 {
 		indexValue, ok := p.extractIndexPosition(index, cfg.Index)
 		if !ok {

@@ -124,11 +124,18 @@ type BGPRow struct {
 }
 
 type BGPIdentity struct {
+	ProcessID               string
 	RoutingInstance         string
 	Neighbor                string
 	RemoteAS                string
 	AddressFamily           ddprofiledefinition.BGPAddressFamily
 	SubsequentAddressFamily ddprofiledefinition.BGPSubsequentAddressFamily
+}
+
+// HasPeerIdentity accepts a process-scoped source without an AS only when its
+// routing instance is also known. Other sources keep the remote-AS requirement.
+func (v BGPIdentity) HasPeerIdentity() bool {
+	return v.Neighbor != "" && (v.RemoteAS != "" || (v.ProcessID != "" && v.RoutingInstance != ""))
 }
 
 type BGPDescriptors struct {

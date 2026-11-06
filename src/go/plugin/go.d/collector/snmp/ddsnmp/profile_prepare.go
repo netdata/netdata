@@ -123,7 +123,7 @@ func crossTableOnlyTagOIDs(
 		}
 		for _, tag := range m.MetricTags {
 			scope := indexScope
-			if tag.Index != 0 || len(tag.IndexTransform) > 0 || len(tag.IndexFrom) > 0 || tag.LookupSymbol.OID != "" {
+			if tag.IndexDecode != nil || tag.Index != 0 || len(tag.IndexTransform) > 0 || len(tag.IndexFrom) > 0 || tag.LookupSymbol.OID != "" {
 				scope = ""
 			}
 			for source := range tag.TableSources() {

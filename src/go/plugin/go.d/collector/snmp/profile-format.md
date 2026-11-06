@@ -172,7 +172,7 @@ virtual_metrics: <calculated metrics>
 
 Profile metric tags must be objects, such as `{tag: interface, index: 1}`.
 Top-level `metric_tags` read scalar OIDs: they require `symbol.OID` and cannot
-use `table`, `index`, `index_transform`, or `index_from`. Legacy tag-level OIDs are normalized
+use `table`, `index`, `index_transform`, `index_decode`, or `index_from`. Legacy tag-level OIDs are normalized
 before these checks.
 Datadog string references such as `metric_tags: [ifName]` are unsupported and
 fail YAML decoding. The Datadog metric `options` object (`placement`,
@@ -562,6 +562,30 @@ metrics:
 
 ### 5. metric_tags
 
+Table chart IDs use the full metric name plus every non-underscore
+tag name and value, including explicitly empty values. The collector sorts tag names
+and encodes the tuple with length-prefixed components, then combines its full SHA256
+hash with a bounded readable metric-name prefix. This preserves distinct identities
+when labels contain separators or characters that chart IDs normalize. Display tags
+that start with an underscore are excluded from identity; all labels remain available,
+and metric contexts are unchanged. All table chart IDs migrate to this representation;
+equal identity tuples still aggregate into one chart instance.
+
+Internal sample-map keys also include framed dimension subkeys so they are unique
+across the collector job. These internal keys are separate from Netdata's
+chart-scoped dimension IDs: `DIMENSION` and `SET` use the dimension name whenever
+it is set. This change preserves that name-based output contract.
+
+Custom metric names, mapping labels and transform-generated dimension names must
+be suitable for the quoted plugins.d protocol fields. This change does not add
+general dimension-name validation or escaping; unusual custom names containing
+line breaks, apostrophes or a dangling backslash retain that limitation.
+
+Acquisition preserves the exact semantic tag and typed identity values. The chart
+renderer sanitizes labels for the plugin wire only after IDs have been built. Two
+names that look the same after display sanitation still have separate chart IDs
+and samples. Temporary `rm:` tags are removed before export.
+
 The `metric_tags` section defines **global dynamic tags** — values collected once from the device and applied to **every metric** in the profile.
 
 They are evaluated during collection, just like other SNMP symbols, and remain the same for all metrics within that device.
@@ -602,7 +626,7 @@ See [**Tag Transformation**](#tag-transformation) for supported transformations 
 
 #### Underscore-prefixed tags
 
-Tag names that start with an underscore (e.g., `_if_type`) are **emitted as labels** but are **ignored for chart-ID composition** by the SNMP collector that consumes these metrics. Use underscore tags to keep chart IDs short when another tag already guarantees uniqueness (for example, `interface`). (You still get the underscore-tag value as a chart label.)
+Tag names that start with an underscore (e.g., `_if_type`) are **emitted as labels** but are **ignored for chart-ID composition** by the SNMP collector that consumes these metrics. Use underscore tags to keep display-only values out of chart identity when another tag already guarantees uniqueness (for example, `interface`). (You still get the underscore-tag value as a chart label.)
 
 Table chart labels follow the tags returned by collection, including changes and removals, without changing the chart
 or its dimensions when the identifying tags stay the same. Cached table tags retain their configured refresh interval.
@@ -1418,8 +1442,9 @@ hop from the collected columns. A chain does not make a network request per row.
 the common OID prefix of their referenced columns; a declared table producer retains its own scope. Fixed source
 index prefixes are not propagated through value-derived keys. Cached tags keep their configured refresh interval;
 a refreshed missing chain removes the corresponding labels from surviving table charts.
-Existing acquisition-error handling is unchanged: a failed dependency walk suppresses the affected licensing or BGP
-row set; a successfully walked table with a missing instance only omits that tag.
+A failed required dependency walk suppresses the affected licensing or BGP row set; a successfully
+walked table with a missing instance only omits that tag. BGP tables used exclusively for optional
+descriptors follow the availability rules in [BGP Rows](#bgp-rows).
 
 ### Index-Based
 
@@ -1494,6 +1519,72 @@ If the current row index is `1.192.0.2.1.1.128`, the collector:
 - formats it as an IP address
 - emits `neighbor="192.0.2.1"`
 
+#### Compound Index Decoding (`index_decode`)
+
+Use `index_decode` on a table metric tag when component boundaries depend on encoded
+string lengths. Declare the **complete INDEX layout**, including components that this tag
+does not select. `component` selects a logical component starting at **1**; it does not
+count raw OID arcs.
+
+Supported component types are:
+
+- `integer`: one unsigned 32-bit OID arc; no `length` is allowed.
+- `octet_string`: a length arc followed by that many octets, each in `0..255`.
+  A zero-length variable string is valid. A positive `length: N` instead declares exactly
+  N octets without a length prefix, as required by a fixed-width MIB INDEX component.
+
+For the Juniper firewall INDEX `[filter-name, counter-name, counter-type]`, both names
+are length-prefixed strings. Select the counter name using:
+
+```yaml
+metric_tags:
+  - tag: counter_name
+    symbol:
+      name: jnxFWCounterName
+      format: octet_string
+    index_decode:
+      components:
+        - {type: octet_string}
+        - {type: octet_string}
+        - {type: integer}
+      component: 2
+```
+
+The suffix `3.70.79.79.3.98.97.114.2` yields `counter_name="bar"`. A tag selecting
+component 1 yields `FOO`; component 3 yields `2`. Keep all identity axes required by the
+MIB: for example, a virtual-chassis port name also needs its member identifier.
+
+Isilon quota domain IDs use one fixed 48-octet component:
+
+```yaml
+metric_tags:
+  - tag: quota_domain_id
+    symbol: {name: quotaDomainID, format: octet_string}
+    index_decode:
+      components: [{type: octet_string, length: 48}]
+      component: 1
+```
+
+Decoding selects dotted decimal octets; `symbol.format: octet_string` explicitly converts
+them to text bytes, preserving spaces, UTF-8 bytes and empty strings. `format: string`
+retains the dotted decimal representation, preserving its existing behavior. Other final
+formats such as `ip_address`, `hex`, and `mac_address` remain separate from layout decoding.
+
+The complete suffix must fit the layout exactly. Truncated components, trailing arcs,
+invalid lengths, nondecimal or overflowing arcs, and octets above 255 reject the row,
+including errors in unselected components. Any later processing error for an `index_decode`
+tag, such as an invalid final IP format or failed extraction, also rejects the whole row.
+Rejected identity rows do not enter the tag cache and are removed on cached refresh;
+healthy neighboring rows continue to collect. Ordinary, BGP and licensing table
+processing retains only an error count and one representative error per table;
+repeated warnings use the existing collection-cycle limiters.
+
+`index_decode` is mutually exclusive with `index`, `index_transform`, `index_from`,
+`table`, column OIDs, and `lookup_symbol`. It is supported by ordinary
+table metric tags and typed-row `metric_tags`, including BGP, licensing and topology rows.
+Scalar and global tags cannot use it. Typed BGP and licensing **value fields** retain
+their existing index selectors; this extension applies to their row tags.
+
 ### Field Accessibility
 
 SNMP profile symbols must only read objects that the source MIB exposes as
@@ -1504,9 +1595,10 @@ Rules:
 
 - `read-only`, `read-write`, and `read-create` objects can be read as
   `symbol.OID` values.
-- `not-accessible` objects must not be read as `symbol.OID` values in generic standards profiles.
+- `not-accessible`, `accessible-for-notify`, and `write-only` objects are not polling sources.
+  Notification-only access permits a value in notifications, not a GET or WALK column.
 - A `not-accessible` object that is part of a table `INDEX` can be derived from
-  the row OID index using `index` or `index_transform`.
+  the row OID index using `index`, `index_transform`, or `index_decode`.
 - A selector-scoped device or topology-role profile may override a generic row to read a
   `not-accessible` object only when a checked fixture or repeatable device
   capture proves that the device returns the object as a column and omits the
@@ -1516,10 +1608,11 @@ Rules:
 - Keep SNMP index slicing in the profile YAML; keep format conversion in
   `symbol.format`.
 
-The two index extraction mechanisms use different counting bases:
+The index extraction mechanisms use different counting bases:
 
 - `index: N` is **1-based**: `index: 1` selects the first index component,
   `index: 2` the second, and so on. Use this to pick a single component.
+- `index_decode.component` is **1-based** over logical MIB components, after decoding their widths.
 - `index_transform: [{start: M, end: K}]` is **0-based** over the row index
   parts. `start: 0` is the first component. `end` is inclusive. Setting
   `end: 0` together with `start: N > 0` slices to the tail (`start: N` to the
@@ -1589,13 +1682,47 @@ Examples:
 Audit recipe:
 
 ```bash
-rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+not-accessible|ACCESS[[:space:]]+not-accessible' path/to/MIB
+rg -n -C 4 'OBJECT-TYPE|MAX-ACCESS[[:space:]]+(not-accessible|accessible-for-notify)|ACCESS[[:space:]]+(not-accessible|write-only)' path/to/MIB
 rg -n 'name:[[:space:]]*(dot1qTpFdbAddress|ipAddressAddr|ipNetToPhysicalIfIndex|ipNetToPhysicalNetAddressType|ipNetToPhysicalNetAddress|lldpLocManAddrSubtype|lldpLocManAddr|lldpRemManAddrSubtype|lldpRemManAddr)\b' src/go/plugin/go.d/config/go.d/snmp.profiles
 ```
 
-Any profile hit for a `not-accessible` object is valid only when the tag is
+Any polling profile hit for a non-pollable object is valid only when the tag is
 index-derived without a `symbol.OID`, or when it satisfies the proof-gated,
 selector-scoped device exception above.
+
+#### Stock Polling Source Guard
+
+The source guard checks every effective consumer after profile inheritance. A
+capture-proven device exception must retain its exact selector on every concrete
+consumer, including consumers that inherit the source; a generic profile must
+never broaden that exception to other devices.
+
+`TestStockProfiles_PollingAccessibility` runs with the normal profile tests and needs no
+installed MIB corpus. It checks actual acquisition sources, including legacy OID/from
+aliases, YAML anchors, typed fields and lookup columns; abstract table roots are excluded.
+Its exact source facts and pinned source-file hashes live in
+`ddsnmp/testdata/profile-mib-access.json`. Existing unresolved sources are recorded by
+profile, field role, declared module and OID; that baseline does not authorize a new source.
+Nearest ancestors are not evidence that a column is readable.
+
+From `src/go`, verify the manifest against the MIB corpus revision recorded in that file:
+
+```bash
+NETDATA_SNMP_MIB_DIRS=<pinned-mibs> go test -count=1 ./plugin/go.d/collector/snmp/ddsnmp \
+  -run 'TestStockProfiles_(PollingAccessibility|AccessManifestAgainstMIBs)'
+```
+
+To add exact source evidence, use the same pinned corpus and add `NETDATA_SNMP_MIB_REFRESH=1`
+to the command. Inspect the manifest diff and rerun without refresh. Refresh does not grow
+the unresolved baseline and rejects changed hashes for existing pinned source files;
+resolve missing objects or review an explicit baseline change instead of allowing unknown inputs.
+The guard resolves objects and parent rows in their declared modules, including modules
+that share numeric OIDs.
+
+Only the three exact RB750Gr3 source roles covered by the selector, deviation comment and
+checked capture projection are exempted. `TestProfileAccessibility_RB750CaptureEvidence`
+checks that projection. There is no vendor-wide or OID-only exemption; generic profiles
+must derive inaccessible INDEX values from the row suffix.
 
 ## Tag Transformation
 
@@ -1691,6 +1818,9 @@ Use `format` when the raw SNMP value must be converted before tag or metadata pr
 
 **Currently used by this profile set**:
 
+- `format: octet_string` for text encoded as dotted decimal index octets; see
+  [Compound Index Decoding](#compound-index-decoding-index_decode).
+- `format: string` retains dotted decimal index text; it does not decode octets.
 - `format: hex` for octet-string values such as:
   - MAC addresses
   - binary management-address values
@@ -2436,9 +2566,11 @@ are legacy migration mechanisms, not the preferred BGP transport.
 BGP row `kind` values are closed:
 
 - `device` — device-level BGP summaries with no peer identity.
-- `peer` — peer-level rows identified by `neighbor` and `remote_as`.
+- `peer` — peer-level rows identified by `neighbor` and `remote_as`, or by
+  `process_id`, `routing_instance`, and `neighbor` when the source has no provable AS.
 - `peer_family` — address-family rows identified by `neighbor`, `remote_as`,
-  `address_family`, and `subsequent_address_family`.
+  `address_family`, and `subsequent_address_family`. The same explicit process
+  and routing-instance identity may replace an unavailable `remote_as`.
 
 Peer-state mappings must use the six RFC 4271 state names: `idle`, `connect`,
 `active`, `opensent`, `openconfirm`, and `established`. A complete source must
@@ -2451,6 +2583,14 @@ chart/function label defaults to `default`. Profiles may still set
 `identity.routing_instance` explicitly when a vendor MIB exposes VRF or routing
 instance identity.
 
+`identity.process_id` preserves a BGP process independently of the routing instance.
+It uses the ordinary BGP value selectors. Its chart label is omitted and its
+Functions column is blank when unspecified. Explicit process `0` is retained. A configured process identity
+must resolve successfully; it must never fall back to an identity that merges processes.
+Without `remote_as`, both process and routing instance must be explicitly present.
+Do not join a process-scoped row to process-less metadata unless the MIB specifies
+that association. An equal numeric index or address alone does not prove ownership.
+
 Device rows support `device_counts.peers`, `device_counts.ibgp_peers`,
 `device_counts.ebgp_peers`, and per-state counters under
 `device_counts.states`. Peer and peer-family rows support typed groups such as
@@ -2458,11 +2598,12 @@ Device rows support `device_counts.peers`, `device_counts.ibgp_peers`,
 `last_error`, `last_notifications`, `reasons`, `graceful_restart`, `routes`,
 and `route_limits`.
 
-For table-backed rows, readable columns use `symbol:`. `not-accessible` index
+For table-backed BGP value fields, readable columns use `symbol:`. `not-accessible` index
 objects must be derived from the row index with `index`, `index_from_end`, or
 `index_transform`. Values from related tables use the first-class `table:`
 field on the BGP value, optionally with `lookup_symbol:` when the current row
-must join to another table by value.
+must join to another table by value. BGP row `metric_tags` use the ordinary tag
+selectors `index`, `index_transform`, or `index_decode` for row-index identity.
 
 Example device-level counts:
 
@@ -2520,6 +2661,17 @@ bgp:
         sent:
           symbol: { OID: 1.3.6.1.4.1.99999.10.1.8, name: vendorBgpPeerOutUpdates }
 ```
+
+BGP descriptor values are optional: a missing row or empty/noSuch result omits
+that descriptor. A failed dependency-table WALK remains a collection failure,
+including when the table supplies only descriptors.
+
+Huawei statistics preserve the MIB's process/VPN/address tuple. AS, BGP version
+and description remain absent because the other tables do not identify the process.
+Family rows retain AS/version from their shared INDEX tables, but omit the
+session-extension description: equality between its VPN ID and the family table's
+peer-instance ID is not specified. Notification-only `hwBgpPeerDescription` and
+`hwBgpPeerGRStatus` are not polling substitutes. Local-router GR role is not peer GR state.
 
 ## Licensing rows
 

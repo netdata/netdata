@@ -67,7 +67,7 @@ func (c *Collector) collectLicenseRowsObserved(
 		return nil, errors.Join(errs...)
 	}
 	if len(errs) > 0 {
-		c.log.Limit(licenseRowsPartialErrorLogKey+prof.SourceFile, 1, licenseRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+licenseRowsPartialErrorLogKey+prof.SourceFile, 1, licenseRowsErrorLogEvery).
 			Warningf("collecting licensing rows for profile %q partially failed: %v", prof.SourceFile, errors.Join(errs...))
 	}
 
@@ -195,22 +195,23 @@ func (c *Collector) collectTableLicenseRows(
 		if route != nil {
 			route.Rows = uint64(len(ctx.rows))
 		}
+		var rowErrors tableProcessingErrors
 		for rowIndex, rowPDUs := range ctx.rows {
 			row, ok, err := c.buildTableLicenseRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags)
 			if err != nil {
 				rejectAcquisitionRoute(route)
 				stats.Errors.Processing.Licensing++
 				recordCollectionFailure(&c.failures.Licensing, err, "licensing", "processing")
-				errs = append(
-					errs,
-					fmt.Errorf("licensing table %q row %q: %w", licensingConfigDisplayName(cfg), rowIndex, err),
-				)
+				rowErrors.add(rowIndex, err)
 				continue
 			}
 			if ok {
 				rows = append(rows, row)
 				acquisition.addLicenseReference(route, rowIndex)
 			}
+		}
+		if err := rowErrors.err(); err != nil {
+			errs = append(errs, fmt.Errorf("licensing table %q: %w", licensingConfigDisplayName(cfg), err))
 		}
 		if route != nil {
 			setAcquisitionRouteCounts(route, route.Rows, route.Values, route.Rejected)
@@ -320,7 +321,9 @@ func (c *Collector) buildTableLicenseRow(
 		crossTableCtx: crossTableCtx,
 		orderedTags:   ctx.orderedTags,
 	}
-	c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx)
+	if err := c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx); err != nil {
+		return ddsnmp.LicenseRow{}, false, err
+	}
 
 	rowKey := rowIndex
 	row := ddsnmp.LicenseRow{
@@ -492,7 +495,7 @@ func (c *Collector) populateLicenseTimerTimestamp(
 ) error {
 	if sourceOID, ok := licenseTimerZeroDateAndTimePlaceholder(cfg, ctx); ok {
 		ctx.record(cfg, sourceOID, "empty_date")
-		c.log.Limit(licenseTimerNoValueLogKey+sourceOID, 1, licenseRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+licenseTimerNoValueLogKey+sourceOID, 1, licenseRowsErrorLogEvery).
 			Warningf("license timer %q returned zero DateAndTime placeholder; treating timer as absent", sourceOID)
 		return nil
 	}
@@ -501,7 +504,7 @@ func (c *Collector) populateLicenseTimerTimestamp(
 	if err != nil {
 		source := licenseTimerSource(cfg, name)
 		ctx.record(cfg, source, "conversion")
-		c.log.Limit(licenseTimerMalformedLogKey+source, 1, licenseRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+licenseTimerMalformedLogKey+source, 1, licenseRowsErrorLogEvery).
 			Warningf("license timer %q is malformed: %v; treating timer as absent", source, err)
 		return nil
 	}
@@ -529,7 +532,7 @@ func (c *Collector) populateLicenseTimerRemaining(
 	if err != nil {
 		source := licenseTimerSource(cfg, name)
 		ctx.record(cfg, source, "conversion")
-		c.log.Limit(licenseTimerMalformedLogKey+source, 1, licenseRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+licenseTimerMalformedLogKey+source, 1, licenseRowsErrorLogEvery).
 			Warningf("license timer %q is malformed: %v; treating timer as absent", source, err)
 		return nil
 	}

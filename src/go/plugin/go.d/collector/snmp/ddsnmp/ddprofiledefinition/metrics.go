@@ -153,6 +153,7 @@ type MetricTagConfig struct {
 	IndexFrom []MetricTagIndexSource `yaml:"index_from,omitempty" json:"index_from,omitempty"`
 
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
+	IndexDecode    *MetricIndexDecode     `yaml:"index_decode,omitempty" json:"index_decode,omitempty"`
 
 	MappingRef string        `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
 	Mapping    MappingConfig `yaml:"mapping,omitempty"     json:"mapping"`
@@ -172,6 +173,7 @@ func (m MetricTagConfig) Clone() MetricTagConfig {
 	m2.LookupSymbol = m.LookupSymbol.Clone()
 	m2.IndexFrom = cloneSlice(m.IndexFrom)
 	m2.IndexTransform = slices.Clone(m.IndexTransform)
+	m2.IndexDecode = m.IndexDecode.Clone()
 	m2.Mapping = m.Mapping.Clone()
 	m2.Tags = maps.Clone(m.Tags)
 	return m2
@@ -243,6 +245,10 @@ type MetricIndexTransform struct {
 func (tagCfg MetricTagConfig) IsIndexTag() bool {
 	if len(tagCfg.IndexFrom) > 0 {
 		return false
+	}
+
+	if tagCfg.IndexDecode != nil {
+		return true
 	}
 
 	if tagCfg.Index != 0 {

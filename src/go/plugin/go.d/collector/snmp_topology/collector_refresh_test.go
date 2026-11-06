@@ -1017,7 +1017,7 @@ func TestCollectorCancelsInFlightVLANContextRefresh(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
 	go func() {
-		_, _, err := collectTopologyVLANContext(ctx, coll, dev, "100", nil, nil)
+		_, _, err := collectTopologyVLANContext(ctx, coll, 1, dev, "100", nil, nil)
 		errCh <- err
 	}()
 
