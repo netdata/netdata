@@ -9,7 +9,7 @@ use crate::metric_set::{
 use indexmap::IndexMap;
 
 /// A batch's row for one entity and one window: its event count and its
-/// cells, one per column of the set's layout.
+/// cells, one per column of the set's row layout.
 pub(crate) struct BatchRow {
     pub(crate) events: u64,
     pub(crate) cells: Box<[f64]>,
@@ -101,7 +101,7 @@ impl BatchEntity<'_> {
                 let index = entry.index();
                 entry.or_insert_with(|| BatchRow {
                     events: 0,
-                    cells: set.layout.empty_row(),
+                    cells: set.row_layout.empty_row(),
                 });
                 index
             }

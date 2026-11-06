@@ -110,14 +110,14 @@ const HASH_DIGITS: usize = 16;
 
 /// The chart id of an entity's instance of each template, in template order.
 pub(crate) fn chart_ids(
-    charts: &[ChartTemplate],
+    templates: &[ChartTemplate],
     labels: &Labels,
     kind: EntityKind,
 ) -> Vec<String> {
     let suffix = entity_suffix(labels, kind);
-    charts
+    templates
         .iter()
-        .map(|chart| format!("{}{suffix}", chart.context))
+        .map(|template| format!("{}{suffix}", template.context))
         .collect()
 }
 

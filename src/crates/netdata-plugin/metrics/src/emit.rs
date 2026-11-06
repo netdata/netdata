@@ -12,19 +12,19 @@ use netdata_plugin_protocol::{
 /// A chart instance's definition: the CHART line, its labels and dimensions.
 pub(crate) fn write_definition(
     block: &mut Vec<u8>,
-    chart: &ChartTemplate,
+    template: &ChartTemplate,
     id: &str,
     labels: &Labels,
     interval_secs: u64,
 ) {
-    write_chart_line(block, chart, id, interval_secs, false);
+    write_chart_line(block, template, id, interval_secs, false);
     if !labels.is_empty() {
         for (key, value) in labels.iter() {
             write_clabel(block, key, value, LabelSource::Auto);
         }
         write_clabel_commit(block);
     }
-    for dim in &chart.dimensions {
+    for dim in &template.dimensions {
         write_dimension(
             block,
             &DimensionLine {
@@ -46,14 +46,14 @@ pub(crate) fn write_definition(
 /// `row`, or a gap, timed at the window's end.
 pub(crate) fn write_update(
     block: &mut Vec<u8>,
-    chart: &ChartTemplate,
+    template: &ChartTemplate,
     id: &str,
     row: &[f64],
     window: u64,
     interval_secs: u64,
 ) {
     write_begin(block, id, interval_secs * 1_000_000);
-    for dim in &chart.dimensions {
+    for dim in &template.dimensions {
         match dim.readout.value(row, interval_secs) {
             Some(value) => write_set_float(block, &dim.id, value),
             None => write_set_empty(block, &dim.id),
@@ -65,18 +65,18 @@ pub(crate) fn write_update(
 /// The CHART line alone, marked obsolete, marks a chart instance obsolete.
 pub(crate) fn write_obsolete(
     block: &mut Vec<u8>,
-    chart: &ChartTemplate,
+    template: &ChartTemplate,
     id: &str,
     interval_secs: u64,
 ) {
-    write_chart_line(block, chart, id, interval_secs, true);
+    write_chart_line(block, template, id, interval_secs, true);
 }
 
 /// `store_first` aligns the agent's clock for the chart to whole seconds and
 /// keeps its first point, so every timed END lands exactly on its window.
 fn write_chart_line(
     block: &mut Vec<u8>,
-    chart: &ChartTemplate,
+    template: &ChartTemplate,
     id: &str,
     interval_secs: u64,
     obsolete: bool,
@@ -86,12 +86,12 @@ fn write_chart_line(
         &ChartLine {
             id,
             name: "",
-            title: &chart.title,
-            units: chart.units,
-            family: chart.family,
-            context: &chart.context,
-            chart_type: chart.chart_type,
-            priority: chart.priority,
+            title: &template.title,
+            units: template.units,
+            family: template.family,
+            context: &template.context,
+            chart_type: template.chart_type,
+            priority: template.priority,
             update_every: interval_secs,
             options: ChartOptions {
                 obsolete,

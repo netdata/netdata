@@ -255,8 +255,8 @@ pub(crate) struct MetricSetInner {
     pub(crate) lateness_windows: u64,
     pub(crate) expiry_windows: u64,
     pub(crate) cardinality_limit: Option<CardinalityLimit>,
-    pub(crate) layout: RowLayout,
-    pub(crate) charts: Vec<ChartTemplate>,
+    pub(crate) row_layout: RowLayout,
+    pub(crate) chart_templates: Vec<ChartTemplate>,
 }
 
 /// The time and lifecycle settings of a metric set.
@@ -318,8 +318,8 @@ static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 pub struct MetricSetBuilder {
     id: u32,
     settings: Settings,
-    layout: RowLayout,
-    charts: Vec<ChartTemplate>,
+    row_layout: RowLayout,
+    chart_templates: Vec<ChartTemplate>,
 }
 
 impl MetricSetBuilder {
@@ -350,8 +350,8 @@ impl MetricSetBuilder {
         Self {
             id: NEXT_SET_ID.fetch_add(1, Ordering::Relaxed),
             settings,
-            layout: RowLayout::default(),
-            charts: Vec::new(),
+            row_layout: RowLayout::default(),
+            chart_templates: Vec::new(),
         }
     }
 
@@ -375,7 +375,7 @@ impl MetricSetBuilder {
     /// As [`MetricSetBuilder::counter`].
     pub fn cumulative_counter<D: Dimension>(&mut self, chart: Chart) -> CumulativeCounter<D> {
         let columns = self.column_range::<D>(Aggregation::LastValue);
-        self.layout.mark_cumulative(columns.range());
+        self.row_layout.mark_cumulative(columns.range());
         self.chart(chart, per_dimension(columns, Readout::Rate));
         CumulativeCounter(columns)
     }
@@ -427,15 +427,17 @@ impl MetricSetBuilder {
         check_context(chart.context);
         // Buckets including +Inf, then sum and count, then the maximum: the
         // order of the Histogram column accessors.
-        let base = self.layout.add_columns(bounds.len() + 1, Aggregation::Sum);
-        self.layout.add_columns(2, Aggregation::Sum);
-        self.layout.add_columns(1, Aggregation::Max);
+        let base = self
+            .row_layout
+            .add_columns(bounds.len() + 1, Aggregation::Sum);
+        self.row_layout.add_columns(2, Aggregation::Sum);
+        self.row_layout.add_columns(1, Aggregation::Max);
         let histogram = Histogram {
             set_id: self.id,
             base,
             bounds,
         };
-        self.add_chart(ChartTemplate {
+        self.add_chart_template(ChartTemplate {
             title: format!("{} average", chart.title),
             units: chart.units,
             family: chart.family,
@@ -450,7 +452,7 @@ impl MetricSetBuilder {
                 },
             )],
         });
-        self.add_chart(ChartTemplate {
+        self.add_chart_template(ChartTemplate {
             title: format!("{} maximum", chart.title),
             units: chart.units,
             family: chart.family,
@@ -476,7 +478,7 @@ impl MetricSetBuilder {
             "+Inf",
             Readout::Rate(histogram.bucket_column(bounds.len())),
         ));
-        self.add_chart(ChartTemplate {
+        self.add_chart_template(ChartTemplate {
             title: format!("{} histogram", chart.title),
             units: heatmap_units,
             family: chart.family,
@@ -494,7 +496,7 @@ impl MetricSetBuilder {
     ///
     /// If no instrument was added.
     pub fn build(self) -> MetricSet {
-        assert!(!self.charts.is_empty(), "metric set has no charts");
+        assert!(!self.chart_templates.is_empty(), "metric set has no charts");
         let settings = self.settings;
         let interval = settings.collection_interval;
         let windows = |span: Duration| span.as_nanos().div_ceil(interval.as_nanos()) as u64;
@@ -504,18 +506,21 @@ impl MetricSetBuilder {
             expiry_windows: windows(settings.expiry),
             interval_secs: interval.as_secs(),
             cardinality_limit: settings.cardinality_limit,
-            layout: self.layout,
-            charts: self.charts,
+            row_layout: self.row_layout,
+            chart_templates: self.chart_templates,
         }))
     }
 
     /// Add one column with `aggregation` per value of `D`.
     fn column_range<D: Dimension>(&mut self, aggregation: Aggregation) -> ColumnRange<D> {
-        ColumnRange::new(self.id, self.layout.add_columns(D::IDS.len(), aggregation))
+        ColumnRange::new(
+            self.id,
+            self.row_layout.add_columns(D::IDS.len(), aggregation),
+        )
     }
 
     fn chart(&mut self, chart: Chart, dimensions: Vec<ChartDimension>) {
-        self.add_chart(ChartTemplate {
+        self.add_chart_template(ChartTemplate {
             title: chart.title.to_string(),
             units: chart.units,
             family: chart.family,
@@ -526,25 +531,25 @@ impl MetricSetBuilder {
         });
     }
 
-    fn add_chart(&mut self, chart: ChartTemplate) {
-        let context = &chart.context;
+    fn add_chart_template(&mut self, template: ChartTemplate) {
+        let context = &template.context;
         check_context(context);
         assert!(
-            !chart.dimensions.is_empty(),
+            !template.dimensions.is_empty(),
             "chart {context} has no dimensions"
         );
         assert!(
-            self.charts.iter().all(|c| &c.context != context),
+            self.chart_templates.iter().all(|t| &t.context != context),
             "duplicate context {context:?}"
         );
-        for (i, dim) in chart.dimensions.iter().enumerate() {
+        for (i, dim) in template.dimensions.iter().enumerate() {
             assert!(
-                chart.dimensions[..i].iter().all(|d| d.id != dim.id),
+                template.dimensions[..i].iter().all(|d| d.id != dim.id),
                 "duplicate dimension id {:?} in chart {context}",
                 dim.id
             );
         }
-        self.charts.push(chart);
+        self.chart_templates.push(template);
     }
 }
 

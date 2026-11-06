@@ -5,7 +5,7 @@
 //! - A row aggregates the events of one entity counted in one window (see
 //!   [`Aggregator`](crate::Aggregator) for events outside the open windows).
 //!   A batch's row also counts its events.
-//! - The set's layout fixes the columns: a counter, cumulative counter or
+//! - The set's row layout fixes the columns: a counter, cumulative counter or
 //!   gauge has one per dimension, a histogram one per bucket plus its sum,
 //!   count and maximum. Instruments are typed handles to their columns.
 //! - Combining two rows applies each column's [`Aggregation`]: sums add,
