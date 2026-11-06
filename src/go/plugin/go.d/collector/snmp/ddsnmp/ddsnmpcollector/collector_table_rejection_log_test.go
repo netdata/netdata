@@ -146,3 +146,48 @@ func BenchmarkTableRejectedRowSummary(b *testing.B) {
 		})
 	}
 }
+
+// Cached value failures retain one contextual diagnostic, regardless of row count.
+func BenchmarkCachedTableProcessingErrors(b *testing.B) {
+	const root = "1.3.6.1.4.1.99999.995"
+	def := decodeContractProfile(
+		b,
+		"metrics:\n- table: {OID: "+root+", name: counters}\n  symbols: [{OID: "+root+".1, name: count}]\n  metric_tags: [{tag: row, index: 1}]\n",
+	)
+	for _, count := range []int{1, 4096} {
+		b.Run(fmt.Sprint(count), func(b *testing.B) {
+			cfg := def.Metrics[0]
+			ctx := &cacheProcessingContext{
+				config:        cfg,
+				columnOIDs:    buildColumnOIDs(cfg),
+				tableName:     cfg.Table.Name,
+				profileSource: "custom.yaml",
+				cachedOIDs:    make(map[string]map[string]string, count),
+				cachedTags:    make(map[string]map[string]string, count),
+				pdus:          make(map[string]gosnmp.SnmpPDU, count),
+			}
+			for i := 0; i < count; i++ {
+				index := fmt.Sprint(i + 1)
+				oid := root + ".1." + index
+				ctx.cachedOIDs[index] = map[string]string{root + ".1": oid}
+				ctx.cachedTags[index] = map[string]string{"row": index}
+				ctx.pdus[oid] = createStringPDU(oid, "not-a-number")
+			}
+			collector := newTableCollector(
+				nil,
+				nil,
+				newTableCache(time.Hour, 0),
+				logger.NewWithWriter(io.Discard),
+				false,
+			)
+			var stats ddsnmp.CollectionStats
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := collector.buildMetricsFromCache(ctx, &stats); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}

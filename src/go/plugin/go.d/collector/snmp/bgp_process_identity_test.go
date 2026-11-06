@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -46,19 +45,7 @@ func TestHuaweiProcessesRetainAllCountersThroughChartsAndFunctions(t *testing.T)
 	handler := snmpmock.NewMockHandler(gomock.NewController(t))
 	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
 	handler.EXPECT().BulkWalkAll(root).Return(pdus, nil).AnyTimes()
-	handler.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
-		var values []gosnmp.SnmpPDU
-		for _, oid := range oids {
-			for _, pdu := range pdus {
-				if strings.Trim(oid, ".") == pdu.Name {
-					values = append(values, pdu)
-				}
-			}
-		}
-		return &gosnmp.SnmpPacket{
-			Variables: values,
-		}, nil
-	}).AnyTimes()
+
 	acquisition := ddsnmpcollector.New(
 		ddsnmpcollector.Config{
 			SnmpClient: handler,
@@ -66,7 +53,7 @@ func TestHuaweiProcessesRetainAllCountersThroughChartsAndFunctions(t *testing.T)
 			Log:        logger.New(),
 		},
 	)
-	for _, phase := range []string{"first WALK", "cached GET", "profile clone"} {
+	for _, phase := range []string{"first WALK", "repeated WALK", "profile clone"} {
 		t.Run(phase, func(t *testing.T) {
 			if phase == "profile clone" {
 				cloned := *profile

@@ -280,6 +280,7 @@ func (c *Collector) collectTableBGPRows(
 
 		var rowOrdinal uint32
 		var dependencyRejected uint64
+		var rowErrors tableProcessingErrors
 		for rowIndex, rowPDUs := range ctx.rows {
 			var rejected *uint64
 			if route != nil {
@@ -294,7 +295,7 @@ func (c *Collector) collectTableBGPRows(
 				}
 				stats.Errors.Processing.BGP++
 				recordCollectionFailure(&c.failures.BGP, err, "bgp", "processing")
-				errs = append(errs, fmt.Errorf("BGP table %q row %q: %w", bgpConfigDisplayName(cfg), rowIndex, err))
+				rowErrors.add(rowIndex, err)
 				continue
 			}
 			if ok {
@@ -310,6 +311,9 @@ func (c *Collector) collectTableBGPRows(
 				route.Rejected++
 			}
 			rowOrdinal++
+		}
+		if err := rowErrors.err(); err != nil {
+			errs = append(errs, fmt.Errorf("BGP table %q: %w", bgpConfigDisplayName(cfg), err))
 		}
 		if route != nil {
 			if dependencyRejected > 0 {

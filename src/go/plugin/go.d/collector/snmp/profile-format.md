@@ -571,6 +571,11 @@ that start with an underscore are excluded from identity; all labels remain avai
 and metric contexts are unchanged. All table IDs migrate to this representation;
 equal identity tuples still aggregate into one chart instance.
 
+Acquisition preserves the exact semantic tag and typed identity values. The chart
+renderer sanitizes labels for the plugin wire only after IDs have been built. Two
+names that look the same after display sanitation still have separate chart IDs
+and samples. Temporary `rm:` tags are removed before export.
+
 The `metric_tags` section defines **global dynamic tags** — values collected once from the device and applied to **every metric** in the profile.
 
 They are evaluated during collection, just like other SNMP symbols, and remain the same for all metrics within that device.
@@ -1560,7 +1565,9 @@ invalid lengths, nondecimal or overflowing arcs, and octets above 255 reject the
 including errors in unselected components. Any later processing error for an `index_decode`
 tag, such as an invalid final IP format or failed extraction, also rejects the whole row.
 Rejected identity rows do not enter the tag cache and are removed on cached refresh;
-healthy neighboring rows continue to collect.
+healthy neighboring rows continue to collect. Ordinary, BGP and licensing table
+processing retains only an error count and one representative error per table;
+repeated warnings use the existing collection-cycle limiters.
 
 `index_decode` is mutually exclusive with `index`, `index_transform`, `index_from`,
 `table`, column OIDs, and `lookup_symbol`. It is supported by ordinary

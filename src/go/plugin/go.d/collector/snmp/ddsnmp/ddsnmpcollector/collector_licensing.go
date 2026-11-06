@@ -195,22 +195,23 @@ func (c *Collector) collectTableLicenseRows(
 		if route != nil {
 			route.Rows = uint64(len(ctx.rows))
 		}
+		var rowErrors tableProcessingErrors
 		for rowIndex, rowPDUs := range ctx.rows {
 			row, ok, err := c.buildTableLicenseRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags)
 			if err != nil {
 				rejectAcquisitionRoute(route)
 				stats.Errors.Processing.Licensing++
 				recordCollectionFailure(&c.failures.Licensing, err, "licensing", "processing")
-				errs = append(
-					errs,
-					fmt.Errorf("licensing table %q row %q: %w", licensingConfigDisplayName(cfg), rowIndex, err),
-				)
+				rowErrors.add(rowIndex, err)
 				continue
 			}
 			if ok {
 				rows = append(rows, row)
 				acquisition.addLicenseReference(route, rowIndex)
 			}
+		}
+		if err := rowErrors.err(); err != nil {
+			errs = append(errs, fmt.Errorf("licensing table %q: %w", licensingConfigDisplayName(cfg), err))
 		}
 		if route != nil {
 			setAcquisitionRouteCounts(route, route.Rows, route.Values, route.Rejected)

@@ -3,12 +3,21 @@
 package snmp
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
+	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/require"
 )
@@ -19,6 +28,10 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 		"chart_normalization": {{"filter", "a.b"}, {"filter", "a_b"}},
 		"spaces":              {{"filter", "a b"}, {"filter", "a_b"}},
 		"empty_components":    {{"", "x"}, {"x", ""}},
+		"apostrophes":         {{"filter", "a'b"}, {"filter", "ab"}},
+		"line_breaks":         {{"filter", "a\r\nb"}, {"filter", "a  b"}},
+		"nul":                 {{"filter", "a\x00b"}, {"filter", "ab"}},
+		"backslash":           {{"filter", "a\\"}, {"filter", "a/"}},
 		"long_components": {
 			{strings.Repeat("f", 127), strings.Repeat("c", 126) + "a"},
 			{strings.Repeat("f", 127), strings.Repeat("c", 126) + "b"},
@@ -55,28 +68,113 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 					},
 				)
 			}
-			metrics := stockIdentityAcquire(t, profile, pdus)
-			require.Len(t, metrics, 2)
+
+			handler := snmpmock.NewMockHandler(gomock.NewController(t))
+			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			handler.EXPECT().MaxOids().Return(60).AnyTimes()
+			walks, gets := 0, 0
+			handler.EXPECT().BulkWalkAll(tc.TableOID).DoAndReturn(func(string) ([]gosnmp.SnmpPDU, error) {
+				walks++
+				return pdus, nil
+			}).AnyTimes()
+			handler.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
+				gets++
+				packet := &gosnmp.SnmpPacket{}
+				for _, oid := range oids {
+					found := false
+					for _, pdu := range pdus {
+						if strings.Trim(oid, ".") == pdu.Name {
+							packet.Variables = append(packet.Variables, pdu)
+							found = true
+						}
+					}
+					require.True(t, found, "cached acquisition requested unexpected OID %s", oid)
+				}
+				return packet, nil
+			}).AnyTimes()
+			acquire := func(p *ddsnmp.Profile) *ddsnmpcollector.Collector {
+				return ddsnmpcollector.New(
+					ddsnmpcollector.Config{
+						SnmpClient: handler,
+						Profiles:   []*ddsnmp.Profile{p},
+						Log:        logger.New(),
+					},
+				)
+			}
+			acquisition := acquire(profile)
 			c := newTestSNMPCollector()
 			c.sysInfo = &snmputils.SysInfo{}
-			samples := map[string]int64{}
-			c.collectProfileTableMetrics(samples, metrics)
-			require.Len(t, c.tableMetricCharts, 2, "distinct MIB INDEX tuples require separate final charts")
-			ids := map[string]bool{}
-			for _, chart := range c.tableMetricCharts {
-				require.False(t, ids[chart.ID], "chart IDs must be unique")
-				ids[chart.ID] = true
-				require.Len(t, chart.Dims, 1)
-				require.Contains(t, []int64{100, 101}, samples[chart.Dims[0].ID])
-				require.True(t, c.Charts().Has(chart.ID))
-			}
-			require.Len(t, samples, 2)
-			// Polling and recreating a collector must produce the same identities.
-			for _, next := range []*Collector{c, newTestSNMPCollector()} {
-				next.sysInfo = &snmputils.SysInfo{}
-				nextSamples := map[string]int64{}
-				next.collectProfileTableMetrics(nextSamples, metrics)
-				require.Equal(t, samples, nextSamples)
+			var firstSamples map[string]int64
+			for _, phase := range []string{"first WALK", "cached GET", "profile clone", "profile reload"} {
+				t.Run(phase, func(t *testing.T) {
+					switch phase {
+					case "profile clone":
+						clone := *profile
+						clone.Definition = profile.Definition.Clone()
+						acquisition = acquire(&clone)
+					case "profile reload":
+						reloaded, err := ddsnmp.LoadProfileByName("_juniper-firewall.yaml")
+						require.NoError(t, err)
+						acquisition = acquire(stockIdentitySelectRow(t, reloaded, tc))
+					}
+					beforeWalk, beforeGet := walks, gets
+					results, err := acquisition.Collect()
+					require.NoError(t, err)
+					require.Len(t, results, 1)
+					metrics := results[0].Metrics
+					require.Len(t, metrics, 2)
+					if phase == "cached GET" {
+						require.Equal(t, beforeWalk, walks, "cached collection must not WALK")
+						require.Greater(t, gets, beforeGet, "cached collection must GET")
+					} else {
+						require.Greater(t, walks, beforeWalk)
+					}
+					for _, metric := range metrics {
+						row := rows[int(metric.Value)-100]
+						require.Equal(t, row[0], metric.Tags["firewall_filter_name"])
+						require.Equal(
+							t,
+							row[1],
+							metric.Tags["counter_name"],
+							"semantic identity bytes must survive acquisition",
+						)
+					}
+					samples := map[string]int64{}
+					c.collectProfileTableMetrics(samples, metrics)
+					require.Len(t, c.tableMetricCharts, 2, "distinct MIB INDEX tuples require separate final charts")
+					ids := map[string]bool{}
+					for _, chart := range c.tableMetricCharts {
+						require.False(t, ids[chart.ID], "chart IDs must be unique")
+						ids[chart.ID] = true
+						require.Regexp(t, `^[a-zA-Z0-9_]+$`, chart.ID)
+						require.Len(t, chart.Dims, 1)
+						require.Contains(t, []int64{100, 101}, samples[chart.Dims[0].ID])
+						require.True(t, c.Charts().Has(chart.ID))
+					}
+					require.Len(t, samples, 2)
+					if firstSamples == nil {
+						firstSamples = samples
+						wire := renderIdentityMetrics(t, metrics)
+						for id := range ids {
+							require.Contains(t, wire, "CHART 'snmp_fixture."+id+"'")
+							require.Contains(t, wire, "BEGIN 'snmp_fixture."+id+"'")
+						}
+						for _, row := range rows {
+							require.Contains(
+								t,
+								wire,
+								"CLABEL 'counter_name' '"+netdataapi.SanitizeWireValue(row[1])+"' '1'\n",
+							)
+						}
+						require.NotContains(t, wire, "\x00")
+						require.NotContains(t, wire, "\r")
+						require.NotContains(t, wire, "\\")
+						require.Contains(t, wire, " = 100\n")
+						require.Contains(t, wire, " = 101\n")
+					} else {
+						require.Equal(t, firstSamples, samples, "polling and reload must retain final identities")
+					}
+				})
 			}
 		})
 	}
@@ -162,4 +260,47 @@ func TestTableIdentityAggregationAndDimensions(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Exercise the managed V1 renderer after real acquisition and chart construction.
+// Labels may be normalized for the wire, but that must never merge machine IDs.
+func renderIdentityMetrics(t *testing.T, metrics []ddsnmp.Metric) string {
+	t.Helper()
+	c := newTestSNMPCollector()
+	c.sysInfo = &snmputils.SysInfo{}
+	module := &collectorapi.MockCollectorV1{
+		ChartsFunc: c.Charts,
+		CollectFunc: func(context.Context) map[string]int64 {
+			samples := make(map[string]int64)
+			c.collectProfileTableMetrics(samples, metrics)
+			return samples
+		},
+	}
+	out := &chartLabelOutput{}
+	job := jobruntime.NewJob(jobruntime.JobConfig{
+		PluginName: "go.d",
+		Name:       "fixture",
+		ModuleName: "snmp",
+		FullName:   "snmp_fixture",
+		Module:     module,
+		Out:        out,
+	})
+	require.NoError(t, job.AutoDetectionManaged(t.Context()))
+	run := jobruntime.NewManagedRun(t.Context(), nil)
+	done := make(chan struct{})
+	go func() { defer close(done); job.StartManaged(run) }()
+	defer func() {
+		run.Stop(nil)
+		require.True(t, waitForChartJobSignal(done), "managed job did not stop")
+	}()
+	require.True(t, waitForChartJobSignal(run.StartupDone()), "managed startup blocked")
+	require.NoError(t, run.StartupErr())
+	require.Eventually(t, func() bool {
+		if strings.Contains(out.String(), "_data_collection_status'") {
+			return true
+		}
+		job.Tick(0)
+		return false
+	}, 5*time.Second, 10*time.Millisecond)
+	return out.String()
 }

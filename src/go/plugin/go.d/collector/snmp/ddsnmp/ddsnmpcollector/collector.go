@@ -501,40 +501,20 @@ func sanitizeMetricMetadata(m *ddsnmp.Metric) {
 	m.Description = metricMetaReplacer.Replace(m.Description)
 	m.Family = metricMetaReplacer.Replace(m.Family)
 	m.Unit = metricMetaReplacer.Replace(m.Unit)
-	for k, v := range m.Tags {
-		// Remove tags prefixed with "rm:", which are intended for temporary use during transforms
-		// and should not appear in the final exported metric.
-		if strings.HasPrefix(k, "rm:") {
-			delete(m.Tags, k)
-			continue
-		}
-		m.Tags[k] = metricMetaReplacer.Replace(v)
-	}
+	removeTemporaryTags(m.Tags)
 }
 
 func sanitizeLicenseRow(row *ddsnmp.LicenseRow) {
-	row.ID = metricMetaReplacer.Replace(row.ID)
 	row.Name = metricMetaReplacer.Replace(row.Name)
 	row.Feature = metricMetaReplacer.Replace(row.Feature)
 	row.Component = metricMetaReplacer.Replace(row.Component)
 	row.Type = metricMetaReplacer.Replace(row.Type)
 	row.Impact = metricMetaReplacer.Replace(row.Impact)
 	row.State.Raw = metricMetaReplacer.Replace(row.State.Raw)
-	for k, v := range row.Tags {
-		if strings.HasPrefix(k, "rm:") {
-			delete(row.Tags, k)
-			continue
-		}
-		row.Tags[k] = metricMetaReplacer.Replace(v)
-	}
+	removeTemporaryTags(row.Tags)
 }
 
 func sanitizeBGPRow(row *ddsnmp.BGPRow) {
-	row.RowKey = metricMetaReplacer.Replace(row.RowKey)
-	row.Identity.ProcessID = metricMetaReplacer.Replace(row.Identity.ProcessID)
-	row.Identity.RoutingInstance = metricMetaReplacer.Replace(row.Identity.RoutingInstance)
-	row.Identity.Neighbor = metricMetaReplacer.Replace(row.Identity.Neighbor)
-	row.Identity.RemoteAS = metricMetaReplacer.Replace(row.Identity.RemoteAS)
 	row.Descriptors.LocalAddress = metricMetaReplacer.Replace(row.Descriptors.LocalAddress)
 	row.Descriptors.LocalAS = metricMetaReplacer.Replace(row.Descriptors.LocalAS)
 	row.Descriptors.LocalIdentifier = metricMetaReplacer.Replace(row.Descriptors.LocalIdentifier)
@@ -574,12 +554,17 @@ func sanitizeBGPRow(row *ddsnmp.BGPRow) {
 	sanitizeBGPInt64(&row.Device.Peers)
 	sanitizeBGPInt64(&row.Device.InternalPeers)
 	sanitizeBGPInt64(&row.Device.ExternalPeers)
-	for k, v := range row.Tags {
-		if strings.HasPrefix(k, "rm:") {
-			delete(row.Tags, k)
-			continue
+	removeTemporaryTags(row.Tags)
+}
+
+// Semantic tags and typed IDs must retain their exact bytes until machine identity
+// is built. The chart renderer owns wire sanitation; only transform-local tags
+// are removed here.
+func removeTemporaryTags(tags map[string]string) {
+	for key := range tags {
+		if strings.HasPrefix(key, "rm:") {
+			delete(tags, key)
 		}
-		row.Tags[k] = metricMetaReplacer.Replace(v)
 	}
 }
 

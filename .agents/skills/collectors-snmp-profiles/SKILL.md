@@ -136,7 +136,10 @@ Compound syntax and validation live in
 `src/go/plugin/go.d/collector/snmp/profile-format.md#compound-index-decoding-index_decode`.
 For compound identity changes, test final chart IDs with every required axis, first WALK, cached GET and profile
 clone/reload. Include punctuation, empty components, malformed unselected components and downstream formatting errors,
-not only decoder failures. Machine identity and display labels have separate contracts; see
+not only decoder failures. Preserve exact semantic identity through acquisition and caches; defer wire sanitation to
+the renderer. Exercise the full path with names that normalize to the same display label, not just prebuilt metric
+maps. Strict row rejection must retain bounded error summaries for ordinary and typed tables. Machine identity and
+display labels have separate contracts; see
 `src/go/plugin/go.d/collector/snmp/profile-format.md#5-metric_tags`.
 Typed BGP identity and optional-value availability are defined in
 `src/go/plugin/go.d/collector/snmp/profile-format.md#bgp-rows`. Preserve configured process identity through all
