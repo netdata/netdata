@@ -84,6 +84,7 @@ void stream_sender_structures_free(struct rrdhost *host) {
     host->sender->scb = NULL;
     waitq_destroy(&host->sender->waitq);
     stream_compressor_destroy(&host->sender->thread.compressor);
+    sender_pending_free(host->sender);
 
     replication_sender_cleanup(host->sender);
 
