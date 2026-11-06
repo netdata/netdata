@@ -47,7 +47,7 @@ match version:
             'stable',
         ]
 
-        if stable_reaches_preview(version):
+        if '-' not in version.split('+', 1)[0] and stable_reaches_preview(version):
             versions.append('preview')
 
         for h in REPOS.keys():

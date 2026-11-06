@@ -38,6 +38,7 @@ class DockerTagsTest(unittest.TestCase):
             ('2.12.2', 'v2.12.2-rc.1', True),
             ('2.12.1', 'v2.12.2-rc.1', False),
             ('2.12.2', '2.12.2+build.7', True),
+            ('2.12.2+build-7', 'v2.12.2', True),
         )
         for stable, preview, eligible in cases:
             with self.subTest(stable=stable, preview=preview):
@@ -73,8 +74,19 @@ class DockerTagsTest(unittest.TestCase):
                         'v2.12.2+', 'v2.12.2 trailing'):
             with self.subTest(preview=preview), self.assertRaises(ValueError):
                 self.generate('2.12.2', preview)
-        with self.assertRaises(ValueError):
-            self.generate('2.12.2-rc.1')
+
+    def test_prerelease_does_not_fetch(self):
+        for version, suffixes in (
+            ('2.12.2-rc1', ['v2', 'v2.12', 'v2.12.2-rc1', 'stable']),
+            ('2.12.2-rc.1', ['v2', 'v2.12', 'v2.12.2-rc', 'stable']),
+        ):
+            with self.subTest(version=version):
+                result, fetch = self.generate(version, error=URLError('unavailable'))
+                fetch.assert_not_called()
+                self.assertEqual(result['tags'], ','.join(
+                    f'{repo}:{tag}' for repo in REPOS for tag in suffixes
+                ))
+                self.assertEqual(result['nightly'], '0')
 
     def test_network_failure_fails(self):
         with self.assertRaises(URLError):
