@@ -126,8 +126,8 @@ scanit() {
 
   progress "Configuring netdata source..."
   USE_SYSTEM_PROTOBUF=1
-  # Coverity analyzes the C code only: disable every Go-built component, as
-  # netdata-installer.sh --disable-go does, so configure does not need Go.
+  # Coverity analyzes the C code only: turn off the Go-built components that
+  # default to on, so configure does not require a Go toolchain.
   ENABLE_GO=0
   ENABLE_IBM=0
   ENABLE_SCRIPTS=0
