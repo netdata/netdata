@@ -7346,8 +7346,7 @@
         "schema": {
           "type": "number",
           "format": "integer",
-          "default": 0,
-          "maximum": 315360000
+          "default": 0
         }
       },
       "dataTimeResampling2": {
@@ -7358,8 +7357,7 @@
         "schema": {
           "type": "number",
           "format": "integer",
-          "default": 0,
-          "maximum": 315360000
+          "default": 0
         }
       },
       "timeoutMS": {

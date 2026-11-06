@@ -900,7 +900,7 @@ static int query_plan_unittest_expect_time_grouping_series_grows(void) {
         ONEWAYALLOC *owa = onewayalloc_create(0);
         RRDR r = {
             .internal = { .owa = owa },
-            .view = { .group = (size_t)1 << 24 },
+            .view = { .group = (size_t)1 << 16 },
         };
 
         rrdr_set_grouping_function(&r, cases[i].grouping);
