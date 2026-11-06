@@ -379,7 +379,7 @@ impl MetricSetBuilder {
         descriptor: ChartDescriptor,
     ) -> CumulativeCounter<D> {
         let columns = self.add_columns::<D>(Aggregation::LastValue);
-        self.row_layout.mark_cumulative(columns.range());
+        self.row_layout.mark_cumulative(columns);
         let dimensions = chart_dimensions(columns, Readout::Rate);
         self.add_chart_template(ChartTemplate::new(descriptor, dimensions));
         CumulativeCounter(columns)

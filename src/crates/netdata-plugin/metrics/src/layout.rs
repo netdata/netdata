@@ -148,8 +148,8 @@ impl RowLayout {
     }
 
     /// Mark `columns` as holding a cumulative counter's totals.
-    pub(crate) fn mark_cumulative(&mut self, columns: Range<usize>) {
-        self.cumulative_columns.extend(columns);
+    pub(crate) fn mark_cumulative<D: Dimension>(&mut self, columns: ColumnRange<D>) {
+        self.cumulative_columns.extend(columns.range());
     }
 
     pub(crate) fn cumulative_columns(&self) -> &[usize] {
