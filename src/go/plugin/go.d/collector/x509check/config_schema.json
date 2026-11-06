@@ -5,7 +5,7 @@
     "type": "object",
     "properties": {
       "source": {
-        "title": "Source",
+        "title": "Certificate source",
         "description": "Where to read the certificate, as a URL: `https`, `tcp`, `tcp4` or `tcp6` for a TLS server, `smtp` for an SMTP server with STARTTLS, `file` for a local PEM file.",
         "type": "string"
       },
@@ -42,7 +42,7 @@
       },
       "check_full_chain": {
         "title": "Check full chain",
-        "description": "Report the expiration time of every certificate the source presents, including intermediates and the root, not only the server certificate.",
+        "description": "Report the expiration time of every certificate the server sends, such as intermediates, not only the server certificate.",
         "type": "boolean",
         "default": false
       },

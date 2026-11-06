@@ -33,31 +33,38 @@ modules:
           It reads the certificate that a website or any other TLS service presents, including mail servers that
           use STARTTLS, or a certificate stored in a local file. It charts the time left until the certificate
           expires and, optionally, the expiration of every certificate in the chain and the revocation status of
-          the server certificate. Stock alerts warn before a certificate expires and when it is revoked.
+          the server certificate. Stock alerts fire before a certificate expires and when it is revoked.
         method_description: |
           Every collection interval, each job connects to its `source` and completes a TLS handshake, after a
           `STARTTLS` command for `smtp://` sources, to read the certificates the server presents. A `file://` source
           is read from disk instead. The collector never requests a page or sends mail.
 
           With `check_revocation_status` enabled, the collector also downloads the CRLs and queries the OCSP
-          responder listed in the server certificate, fetching the issuer certificate when OCSP needs it. These
-          requests go over HTTP to the certificate authority, so the Agent host needs outbound access to them.
+          responders listed in the server certificate, and fetches the issuer certificate listed in it to verify the
+          CRL and build the OCSP request. These requests go to the HTTP or HTTPS URLs in the certificate, so the Agent
+          host needs outbound access to them.
       default_behavior:
         auto_detection:
           description: ""
         limits:
           description: |
             - The handshake verifies the certificate like any TLS client. A certificate that is expired, self-signed,
-              or issued for another name fails collection, and its charts show gaps instead of the time left. Set
-              `tls_ca` for a private CA, or `tls_skip_verify` to read such certificates anyway.
+              or issued for another name fails collection: a running job's charts show gaps instead of the time left,
+              and a job that starts in this state stays stopped unless `autodetection_retry` is set. Set `tls_ca` for
+              a private CA, or `tls_skip_verify` to read such certificates anyway.
             - A `file://` source provides only the first certificate in the file, so `check_full_chain` has no effect
               there.
-            - Revocation status is checked for the server certificate only, not for the rest of the chain.
+            - Revocation status is checked for the server certificate only. A certificate that lists no CRL or OCSP
+              URL is always reported as not revoked, and an OCSP `unknown` answer is reported as revoked.
+            - With an `smtp://` source, `timeout` covers the whole SMTP exchange. A mail server that delays its
+              greeting, a common anti-spam measure on port 25, needs a `timeout` longer than that delay.
         performance_impact:
           description: ""
       additional_permissions:
         description: |
-          For a `file://` source, the `netdata` user needs read access to the certificate file.
+          | Permission | Needed when |
+          |:-----------|:------------|
+          | The `netdata` user can read the file | `tls_ca`, `tls_cert` or `tls_key` is set |
       multi_instance: true
       supported_platforms:
         include: []
@@ -118,15 +125,21 @@ modules:
               group: TLS
 
             - name: check_full_chain
-              description: Report the expiration time of every certificate the source presents, including intermediates and the root, not only the server certificate.
+              description: Report the expiration time of every certificate the server sends, such as intermediates, not only the server certificate.
               default_value: no
               required: false
               group: Checks
+              detailed_description: |
+                Servers usually leave the root certificate out of the chain they send, so it is charted only when the
+                server includes it.
             - name: check_revocation_status
               description: Check whether the server certificate has been revoked, using the CRL and OCSP endpoints listed in it.
               default_value: no
               required: false
               group: Checks
+              detailed_description: |
+                The revocation status chart exists only for the server certificate (`depth` `0`). It appears with the
+                first check that determines a status.
 
             - name: update_every
               description: Data collection interval, in seconds.
@@ -174,7 +187,7 @@ modules:
                   - name: example_com_file
                     source: file:///etc/ssl/certs/example.com.pem
             - name: Full chain and revocation status
-              description: Also track the intermediate and root certificates, and check whether the server certificate has been revoked.
+              description: Also track the intermediate certificates the server sends, and check whether the server certificate has been revoked.
               config: |
                 jobs:
                   - name: example_com
@@ -209,14 +222,24 @@ modules:
           - error: "config validation: source is not set"
             cause: The job has no `source` option.
             fix: Set `source` to the URL of the certificate, for example `https://example.com:443`.
-          - error: "unsupported scheme `scheme` in source `source`"
+          - error: "config validation: timeout must be greater than zero"
+            cause: "`timeout` is zero or negative."
+            fix: Set `timeout` to a positive number of seconds, or remove it to use the default.
+          - error: "certificate provider init: unsupported scheme `scheme` in source `source`"
             cause: >-
               `source` does not start with a supported scheme. A plain `http://` URL, a `udp://` URL (TLS does not run
-              over UDP), or a host and port without a scheme produce this error.
+              over UDP), or a host name and port without a scheme produce this error.
             fix: Use one of the schemes listed for the `source` option, for example `https://example.com:443`.
+          - error: "certificate provider init: source parse: parse `source`: first path segment in URL cannot contain colon"
+            cause: "`source` is an IP address and port without a scheme."
+            fix: Add the scheme, for example `tcp://192.0.2.10:443`.
           - error: "error on dial to `host`: dial tcp: address `host`: missing port in address"
             cause: A network `source` has no port; the collector does not assume one from the scheme.
             fix: Add the port, for example `https://example.com:443` or `smtp://smtp.example.com:587`.
+          - error: "error on dial to `host:port`: dial tcp: lookup `host`: no such host"
+            when: The resolver address can appear after the host name, as in `lookup example.com on 127.0.0.53:53`.
+            cause: The host name in `source` does not resolve from the Agent host.
+            fix: Check the host name, and the DNS configuration of the Agent host.
           - error: "error on dial to `host:port`: dial tcp `address`: connect: connection refused"
             cause: Nothing listens on that port, or a firewall rejects the connection from the Agent host.
             fix: Check the host and port in `source`, and that the Agent host can reach them.
@@ -233,18 +256,28 @@ modules:
           - error: "error on creating SMTP client: read tcp `address`: i/o timeout"
             cause: >-
               The server sent no SMTP greeting within `timeout`. A port that starts TLS on connect, such as SMTPS on
-              port 465, never sends a plain greeting.
+              port 465, never sends a plain greeting, and some mail servers delay their greeting to slow down spam.
             fix: For a port that starts TLS on connect, use `tcp://` instead of `smtp://`. Otherwise raise `timeout`.
+          - error: "error on startTLS with `host:port`: `reply`"
+            cause: The SMTP server rejected the STARTTLS command, usually because it does not offer STARTTLS on that port.
+            fix: >-
+              Check that the server offers STARTTLS on that port. For a port that starts TLS on connect, such as 465,
+              use `tcp://` instead of `smtp://`.
           - error: "tls: first record does not look like a TLS handshake"
             cause: The port answers in plain text, for example HTTP on port 80 or SMTP before STARTTLS.
             fix: Point `source` at the TLS port, or use an `smtp://` source for SMTP with STARTTLS.
+          - error: "tls: server selected unsupported protocol version `version`"
+            cause: The server offers only TLS 1.0 or 1.1, which the collector does not accept.
+            fix: >-
+              Enable TLS 1.2 or later on the server. Until then, monitor the certificate file with a `file://` source
+              on a host that can read it.
           - error: "tls: failed to verify certificate: x509: certificate signed by unknown authority"
             cause: The certificate is self-signed or issued by a CA that the Agent host does not trust.
             fix: "Set `tls_ca` to the CA certificate that issued it, or set `tls_skip_verify: yes`."
-          - error: "tls: failed to verify certificate: x509: certificate has expired or is not yet valid"
+          - error: "tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time `now` is after `not_after`"
             cause: >-
-              The certificate has expired, or the clock of the Agent host is wrong. While verification fails, the
-              charts show gaps instead of the time left.
+              The certificate has expired, or the clock of the Agent host is wrong. While verification fails, a
+              running job's charts show gaps instead of the time left.
             fix: >-
               Renew the certificate, or correct the clock. To keep charting an expired certificate, set
               `tls_skip_verify: yes`.
@@ -254,14 +287,12 @@ modules:
           - error: "tls: failed to verify certificate: x509: cannot validate certificate for `ip` because it doesn't contain any IP SANs"
             cause: "`source` uses an IP address, and the certificate lists only host names."
             fix: Use the host name of the service in `source`.
-          - error: "error on startTLS with `host:port`: `reply`"
-            cause: The SMTP server rejected the STARTTLS command, usually because it does not offer STARTTLS on that port.
-            fix: >-
-              Check that the server offers STARTTLS on that port. For a port that starts TLS on connect, such as 465,
-              use `tcp://` instead of `smtp://`.
+          - error: "tls: failed to verify certificate: x509: certificate relies on legacy Common Name field, use SANs instead"
+            cause: The certificate names its host only in the Common Name and has no Subject Alternative Names.
+            fix: "Reissue the certificate with Subject Alternative Names, or set `tls_skip_verify: yes`."
           - error: "error on reading `path`: open `path`: permission denied"
-            cause: The `netdata` user cannot read the certificate file or one of its parent directories.
-            fix: Grant read access to the file, for example `setfacl -m u:netdata:r /etc/ssl/certs/example.com.pem`.
+            cause: The collector cannot read the certificate file or one of its parent directories.
+            fix: Grant the `netdata` user read access to the file, for example `setfacl -m u:netdata:r /etc/ssl/certs/example.com.pem`.
           - error: "error on reading `path`: open `path`: no such file or directory"
             cause: >-
               The file does not exist at that path. A `file://` URL with two slashes before an absolute path, such as
@@ -273,17 +304,29 @@ modules:
           - error: "error on parsing certificate `path`: invalid X.509 certificate"
             cause: The first PEM block in the file is not a certificate, for example a private key.
             fix: Point `source` at a file whose first PEM block is the certificate.
+          - error: "create tls config: could not read certificate `path`: `reason`"
+            cause: The file set in `tls_ca` or `tls_cert` does not exist, or the `netdata` user cannot read it.
+            fix: Check the path, and grant the `netdata` user read access to the file.
+          - error: "create tls config: could not read key `path`: `reason`"
+            cause: The file set in `tls_key` does not exist, or the `netdata` user cannot read it.
+            fix: Check the path, and grant the `netdata` user read access to the file.
+          - error: "create tls config: could not parse any PEM certificates `path`"
+            cause: The file set in `tls_ca` contains no PEM certificate.
+            fix: Point `tls_ca` at a PEM file with the CA certificates.
+          - error: "create tls config: could not parse keypair `cert`:`key`"
+            cause: The files set in `tls_cert` and `tls_key` are not a matching PEM certificate and private key.
+            fix: Point `tls_cert` and `tls_key` at the certificate and the private key of the same pair.
           - error: "revocation status check for `source` failed: `reason`"
             when: "`check_revocation_status` is enabled."
             cause: >-
-              A CRL or OCSP request to the certificate authority failed or timed out, or the certificate has expired.
-              The revocation status chart shows a gap.
-            fix: Check that the Agent host can reach the CRL and OCSP URLs listed in the certificate over HTTP.
+              A CRL listed in the certificate could not be downloaded or verified (`reason` names the URL), or the
+              certificate is expired or not yet valid. The revocation status chart shows a gap.
+            fix: Check that the Agent host can reach the CRL URLs listed in the certificate, and renew an expired certificate.
           - error: "revocation status of `source` could not be determined"
             when: "`check_revocation_status` is enabled."
             cause: >-
-              No OCSP responder answered, or the issuer certificate needed for the OCSP request could not be
-              downloaded. The revocation status chart shows a gap.
+              No OCSP responder listed in the certificate returned a usable answer, or the issuer certificate needed
+              for the OCSP request is not listed or could not be downloaded. The revocation status chart shows a gap.
             fix: Check that the Agent host can reach the OCSP and issuer certificate URLs listed in the certificate.
     metrics:
       folding:
