@@ -488,9 +488,13 @@ func TestCollectSNMP_HidesBGPDiagnosticsButKeepsFunctionCache(t *testing.T) {
 	}
 	require.NotNil(t, chart)
 	assert.Equal(t, "snmp.bgp.peers.availability", chart.Ctx)
+	require.Len(t, chart.Dims, 2)
+	dimensions := make(map[string]int64, len(chart.Dims))
 	for _, dim := range chart.Dims {
-		assert.Contains(t, mx, dim.ID)
+		require.Contains(t, mx, dim.ID)
+		dimensions[dim.Name] = mx[dim.ID]
 	}
+	assert.Equal(t, map[string]int64{"established": 1, "admin_enabled": 1}, dimensions)
 	assert.Equal(t, "198.51.100.1", chartLabels(chart)["local_address"])
 	assert.Equal(t, "Transit Peer", chartLabels(chart)["peer_description"])
 

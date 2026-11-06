@@ -570,6 +570,7 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 				continue
 			}
 			ctx := &tableProcessingContext{
+				profileSource:  scope.profileSource,
 				cacheEvidence:  cacheEvidence,
 				config:         req.config,
 				pdus:           req.route.pdus,

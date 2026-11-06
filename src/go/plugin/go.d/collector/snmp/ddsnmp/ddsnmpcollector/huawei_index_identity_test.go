@@ -3,7 +3,6 @@
 package ddsnmpcollector
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -63,8 +62,8 @@ func huaweiIndexPDUs(peers ...huaweiIndexPeer) []gosnmp.SnmpPDU {
 }
 
 type huaweiWalkInput struct {
-	pdus       []gosnmp.SnmpPDU
-	failPrefix string
+	pdus            []gosnmp.SnmpPDU
+	forbiddenPrefix string
 }
 
 func newHuaweiIndexCollector(t *testing.T, input *huaweiWalkInput) *Collector {
@@ -73,8 +72,8 @@ func newHuaweiIndexCollector(t *testing.T, input *huaweiWalkInput) *Collector {
 	_, handler := setupMockHandler(t)
 	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
 	handler.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) {
-		if input.failPrefix != "" && strings.HasPrefix(oid, input.failPrefix) {
-			return nil, errors.New("synthetic dependency WALK failure")
+		if input.forbiddenPrefix != "" {
+			require.False(t, strings.HasPrefix(oid, input.forbiddenPrefix), "unproved dependency WALK: %s", oid)
 		}
 		return snmprecPDUsWithPrefix(input.pdus, oid+"."), nil
 	}).AnyTimes()
@@ -181,7 +180,7 @@ func TestHuaweiIndexIdentity_StatisticsIndependentOfOtherTables(t *testing.T) {
 
 func TestHuaweiIndexIdentity_UnprovedSessionDescriptionIsNeverRead(t *testing.T) {
 	peer := huaweiIPv4TestPeer()
-	input := &huaweiWalkInput{pdus: huaweiIndexPDUs(peer), failPrefix: huaweiTestRoot + "8"}
+	input := &huaweiWalkInput{pdus: huaweiIndexPDUs(peer), forbiddenPrefix: huaweiTestRoot + "8"}
 	rows := collectHuaweiIndexRows(t, newHuaweiIndexCollector(t, input))
 	require.Len(t, rows, 4)
 	for _, row := range rows {

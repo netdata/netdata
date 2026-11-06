@@ -107,6 +107,46 @@ func TestTableRejectedRowsBoundedLoggingAndRecovery(t *testing.T) {
 	}
 }
 
+func TestTableRejectionDiagnosticsIdentifyEachProfile(t *testing.T) {
+	const base = "1.3.6.1.4.1.99999.986"
+	var profiles []*ddsnmp.Profile
+	for i, source := range []string{"alpha.yaml", "beta.yaml"} {
+		// Same named metric over distinct readable columns survives production deduplication.
+		raw := fmt.Sprintf("metrics:\n- table: {OID: %[1]s, name: source}\n  symbols: [{OID: %[1]s.%[2]d, name: counter}]\n  metric_tags:\n  - tag: name\n    index_decode: {components: [{type: integer}], component: 1}\n", base, i+1)
+		profiles = append(profiles, &ddsnmp.Profile{SourceFile: source, Definition: decodeContractProfile(t, raw)})
+	}
+	profiles = ddsnmp.FinalizeProfiles(profiles)
+	require.Len(t, profiles, 2)
+	for _, profile := range profiles {
+		require.Len(t, profile.Definition.Metrics, 1)
+	}
+	handler := &sourceTestHandler{walk: func(string) ([]gosnmp.SnmpPDU, error) {
+		return []gosnmp.SnmpPDU{createGauge32PDU(base+".1.7.8", 10), createGauge32PDU(base+".2.7.8", 20)}, nil
+	}}
+	var output bytes.Buffer
+	collector := New(Config{SnmpClient: handler, Profiles: profiles, Log: logger.NewWithWriter(&output)})
+	firstLogBytes := 0
+	for cycle := 0; cycle < 2; cycle++ {
+		result, err := collector.Collect()
+		require.NoError(t, err)
+		require.Len(t, result, 2)
+		for _, profile := range result {
+			require.Empty(t, profile.Metrics)
+			require.EqualValues(t, 1, profile.Stats.Errors.Processing.Table)
+		}
+		require.Equal(t, 2, strings.Count(output.String(), "failed to collect 1 rows"), "each profile owns its warning budget")
+		require.Contains(t, output.String(), "alpha.yaml")
+		require.Contains(t, output.String(), "beta.yaml")
+		require.Contains(t, output.String(), "first error at row")
+		require.Contains(t, output.String(), "7.8")
+		if cycle == 0 {
+			firstLogBytes = output.Len()
+		} else {
+			require.Equal(t, firstLogBytes, output.Len(), "repeat failures remain rate limited")
+		}
+	}
+}
+
 // The diagnostic envelope is O(1) retained errors, independent of the rejected row population.
 // Time remains O(rows); ns/op is a local trend indicator rather than a test gate.
 func BenchmarkTableRejectedRowSummary(b *testing.B) {

@@ -94,7 +94,8 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
 
 ## Device-Scoped MIB Deviations
 
-A vendor profile MAY poll an object that the source MIB marks `not-accessible` only when all of these requirements hold:
+A vendor profile MAY poll an object that the source MIB marks `not-accessible`, `accessible-for-notify`, or `write-only`
+only when all of these requirements hold:
 
 - **Scope:** The polling row is declared in a selector-matched device or topology-role profile. A generic standards
   profile MUST NOT carry the deviation.

@@ -82,6 +82,7 @@ type (
 	tableProcessingContext struct {
 		cacheEvidence   *AcquisitionCacheInput
 		processingRoute *AcquisitionRouteReport
+		profileSource   string
 		// === Input data (set when context is created) ===
 
 		// config is the metric configuration for this table
@@ -393,9 +394,9 @@ func (tc *tableCollector) processRows(
 	}
 
 	if rowErrors.count > 0 {
-		key := tableRowsProcessingErrorLogKey + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(ctx.config)
+		key := tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(ctx.config)
 		tc.log.Limit(key, 1, tableRowsErrorLogEvery).
-			Warningf("failed to collect %d rows from table %q (%s); first error: %v", rowErrors.count, ctx.config.Table.Name, ctx.config.Table.OID, rowErrors.first)
+			Warningf("failed to collect %d rows from table %q (%s) in profile %q; first error at row %q: %v", rowErrors.count, ctx.config.Table.Name, ctx.config.Table.OID, ctx.profileSource, rowErrors.firstRow, rowErrors.first)
 	}
 
 	return metrics, nil

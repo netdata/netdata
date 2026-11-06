@@ -121,7 +121,10 @@ func indexIdentityCacheConfigs() map[string]ddprofiledefinition.MetricsConfig {
 	// Preserve fallback naming and ordinary companion tags: all participate in opt-in cached identity.
 	decoded.MetricTags[0].Tag = ""
 	decoded.MetricTags[0].Symbol.Name = "counter_name"
+	lookup := legacy.Clone()
+	lookup.MetricTags[0].LookupSymbol = ddprofiledefinition.SymbolConfigCompat{OID: root + ".2.1", Name: "lookupKey", Format: "octet_string"}
 	return map[string]ddprofiledefinition.MetricsConfig{
+		"lookup-with-companions":  lookup,
 		"legacy-three-tags":       legacy,
 		"decoded-with-companions": decoded,
 	}
