@@ -1,7 +1,7 @@
 //! Metric set declarations: instruments, their chart templates, labels and
 //! settings.
 
-use crate::chart::{Chart, ChartDimension, ChartTemplate, check_context};
+use crate::chart::{ChartDescriptor, ChartDimension, ChartTemplate, check_context};
 use crate::layout::{Aggregation, ColumnRange, Readout, RowLayout};
 use netdata_plugin_protocol::ChartType;
 use std::sync::Arc;
@@ -359,12 +359,15 @@ impl MetricSetBuilder {
     ///
     /// # Panics
     ///
-    /// If `chart`'s context is invalid or already used in the set, if a
+    /// If `descriptor`'s context is invalid or already used in the set, if a
     /// dimension id is invalid or repeats in `D::IDS`, or if `D::IDS` is
     /// empty.
-    pub fn counter<D: Dimension>(&mut self, chart: Chart) -> Counter<D> {
+    pub fn counter<D: Dimension>(&mut self, descriptor: ChartDescriptor) -> Counter<D> {
         let columns = self.column_range::<D>(Aggregation::Sum);
-        self.chart(chart, per_dimension(columns, Readout::Rate));
+        self.add_chart_template(ChartTemplate::new(
+            descriptor,
+            per_dimension(columns, Readout::Rate),
+        ));
         Counter(columns)
     }
 
@@ -373,10 +376,16 @@ impl MetricSetBuilder {
     /// # Panics
     ///
     /// As [`MetricSetBuilder::counter`].
-    pub fn cumulative_counter<D: Dimension>(&mut self, chart: Chart) -> CumulativeCounter<D> {
+    pub fn cumulative_counter<D: Dimension>(
+        &mut self,
+        descriptor: ChartDescriptor,
+    ) -> CumulativeCounter<D> {
         let columns = self.column_range::<D>(Aggregation::LastValue);
         self.row_layout.mark_cumulative(columns.range());
-        self.chart(chart, per_dimension(columns, Readout::Rate));
+        self.add_chart_template(ChartTemplate::new(
+            descriptor,
+            per_dimension(columns, Readout::Rate),
+        ));
         CumulativeCounter(columns)
     }
 
@@ -385,46 +394,52 @@ impl MetricSetBuilder {
     /// # Panics
     ///
     /// As [`MetricSetBuilder::counter`].
-    pub fn gauge<D: Dimension>(&mut self, chart: Chart) -> Gauge<D> {
+    pub fn gauge<D: Dimension>(&mut self, descriptor: ChartDescriptor) -> Gauge<D> {
         let columns = self.column_range::<D>(Aggregation::LastValue);
-        self.chart(chart, per_dimension(columns, Readout::Column));
+        self.add_chart_template(ChartTemplate::new(
+            descriptor,
+            per_dimension(columns, Readout::Column),
+        ));
         Gauge(columns)
     }
 
     /// Adds a [`Histogram`] over `bounds`, with three chart templates. Each
-    /// template's context is `chart.context` plus a suffix, and its title
-    /// `chart.title` plus a word:
+    /// template's context is `descriptor.context` plus a suffix, and its
+    /// title `descriptor.title` plus a word:
     /// - `<context>_avg`: one dimension, `avg`, the mean observed value per
-    ///   window, in `chart.units`. Its title is `<title> average`, its priority
-    ///   `chart.priority` and its chart type `chart.chart_type`;
+    ///   window, in `descriptor.units`. Its title is `<title> average`, its
+    ///   priority `descriptor.priority` and its chart type
+    ///   `descriptor.chart_type`;
     /// - `<context>_max`: one dimension, `max`, the largest observed value per
-    ///   window, in `chart.units`. Its title is `<title> maximum`, its priority
-    ///   `chart.priority + 1` and its chart type `chart.chart_type`. It is a
-    ///   chart of its own because the dashboard combines every dimension of a
-    ///   chart the same way, across chart instances and over time: a maximum
-    ///   needs max, a mean is averaged;
+    ///   window, in `descriptor.units`. Its title is `<title> maximum`, its
+    ///   priority `descriptor.priority + 1` and its chart type
+    ///   `descriptor.chart_type`. It is a chart of its own because the
+    ///   dashboard combines every dimension of a chart the same way, across
+    ///   chart instances and over time: a maximum needs max, a mean is
+    ///   averaged;
     /// - `<context>_histogram`: a heatmap of observations per second in each
     ///   bucket, in `heatmap_units`, one dimension per bucket named by its
     ///   upper bound as Rust prints the `f64` (`0.005`, `1`, `1048576`;
     ///   `+Inf` last). Its title is `<title> histogram`, its priority
-    ///   `chart.priority + 2` and its chart type a heatmap; `chart.chart_type`
-    ///   does not apply to it.
+    ///   `descriptor.priority + 2` and its chart type a heatmap;
+    ///   `descriptor.chart_type` does not apply to it.
     ///
     /// # Panics
     ///
-    /// If `bounds` are not finite and strictly increasing, if `chart.context`
-    /// is invalid, or if any of the three contexts is already used.
+    /// If `bounds` are not finite and strictly increasing, if
+    /// `descriptor.context` is invalid, or if any of the three contexts is
+    /// already used.
     pub fn histogram(
         &mut self,
         bounds: &'static [f64],
-        chart: Chart,
+        descriptor: ChartDescriptor,
         heatmap_units: &'static str,
     ) -> Histogram {
         assert!(
             bounds.iter().all(|b| b.is_finite()) && bounds.windows(2).all(|w| w[0] < w[1]),
             "histogram bounds must be finite and increasing"
         );
-        check_context(chart.context);
+        check_context(descriptor.context);
         // Buckets including +Inf, then sum and count, then the maximum: the
         // order of the Histogram column accessors.
         let base = self
@@ -438,12 +453,12 @@ impl MetricSetBuilder {
             bounds,
         };
         self.add_chart_template(ChartTemplate {
-            title: format!("{} average", chart.title),
-            units: chart.units,
-            family: chart.family,
-            context: format!("{}_avg", chart.context),
-            chart_type: chart.chart_type,
-            priority: chart.priority,
+            title: format!("{} average", descriptor.title),
+            units: descriptor.units,
+            family: descriptor.family,
+            context: format!("{}_avg", descriptor.context),
+            chart_type: descriptor.chart_type,
+            priority: descriptor.priority,
             dimensions: vec![ChartDimension::new(
                 "avg",
                 Readout::Ratio {
@@ -453,12 +468,12 @@ impl MetricSetBuilder {
             )],
         });
         self.add_chart_template(ChartTemplate {
-            title: format!("{} maximum", chart.title),
-            units: chart.units,
-            family: chart.family,
-            context: format!("{}_max", chart.context),
-            chart_type: chart.chart_type,
-            priority: chart.priority + 1,
+            title: format!("{} maximum", descriptor.title),
+            units: descriptor.units,
+            family: descriptor.family,
+            context: format!("{}_max", descriptor.context),
+            chart_type: descriptor.chart_type,
+            priority: descriptor.priority + 1,
             dimensions: vec![ChartDimension::new(
                 "max",
                 Readout::Column(histogram.max_column()),
@@ -479,12 +494,12 @@ impl MetricSetBuilder {
             Readout::Rate(histogram.bucket_column(bounds.len())),
         ));
         self.add_chart_template(ChartTemplate {
-            title: format!("{} histogram", chart.title),
+            title: format!("{} histogram", descriptor.title),
             units: heatmap_units,
-            family: chart.family,
-            context: format!("{}_histogram", chart.context),
+            family: descriptor.family,
+            context: format!("{}_histogram", descriptor.context),
             chart_type: ChartType::Heatmap,
-            priority: chart.priority + 2,
+            priority: descriptor.priority + 2,
             dimensions: buckets,
         });
         histogram
@@ -517,18 +532,6 @@ impl MetricSetBuilder {
             self.id,
             self.row_layout.add_columns(D::IDS.len(), aggregation),
         )
-    }
-
-    fn chart(&mut self, chart: Chart, dimensions: Vec<ChartDimension>) {
-        self.add_chart_template(ChartTemplate {
-            title: chart.title.to_string(),
-            units: chart.units,
-            family: chart.family,
-            context: chart.context.to_string(),
-            chart_type: chart.chart_type,
-            priority: chart.priority,
-            dimensions,
-        });
     }
 
     fn add_chart_template(&mut self, template: ChartTemplate) {

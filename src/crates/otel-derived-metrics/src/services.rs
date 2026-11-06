@@ -9,8 +9,8 @@
 //! adjusted count its `ot=th` sampling threshold implies.
 
 use netdata_plugin_metrics::{
-    Batch, BatchEntity, CardinalityLimit, Chart, ChartType, Counter, Histogram, Labels, MetricSet,
-    MetricSetBuilder, Settings, dimensions,
+    Batch, BatchEntity, CardinalityLimit, ChartDescriptor, ChartType, Counter, Histogram, Labels,
+    MetricSet, MetricSetBuilder, Settings, dimensions,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
@@ -52,7 +52,7 @@ pub(crate) struct Services {
 impl Services {
     pub(crate) fn new(max_services: usize) -> Self {
         let mut builder = MetricSetBuilder::new(service_settings(max_services));
-        let requests = builder.counter::<Outcome>(Chart {
+        let requests = builder.counter::<Outcome>(ChartDescriptor {
             title: "Service requests",
             units: "requests/s",
             family: "requests",
@@ -65,7 +65,7 @@ impl Services {
         // `otel_service.request_duration_histogram`.
         let duration = builder.histogram(
             DURATION_BOUNDS,
-            Chart {
+            ChartDescriptor {
                 title: "Service request duration",
                 units: "seconds",
                 family: "requests",

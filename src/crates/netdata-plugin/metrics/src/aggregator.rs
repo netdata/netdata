@@ -369,7 +369,8 @@ impl Entity {
 mod tests {
     use super::*;
     use crate::{
-        CardinalityLimit, Chart, ChartType, Counter, Histogram, MetricSetBuilder, Settings,
+        CardinalityLimit, ChartDescriptor, ChartType, Counter, Histogram, MetricSetBuilder,
+        Settings,
     };
     use netdata_plugin_protocol::validate_chart_stream;
     use std::time::Duration;
@@ -404,7 +405,7 @@ mod tests {
             cardinality_limit,
             ..Settings::default()
         });
-        let requests = builder.counter::<Outcome>(Chart {
+        let requests = builder.counter::<Outcome>(ChartDescriptor {
             title: "Requests",
             units: "requests/s",
             family: "requests",
@@ -414,7 +415,7 @@ mod tests {
         });
         let duration = builder.histogram(
             BOUNDS,
-            Chart {
+            ChartDescriptor {
                 title: "Duration",
                 units: "seconds",
                 family: "requests",
@@ -712,7 +713,7 @@ mod tests {
             expiry: Duration::from_secs(3),
             ..Settings::default()
         });
-        let totals = builder.cumulative_counter::<Events>(Chart {
+        let totals = builder.cumulative_counter::<Events>(ChartDescriptor {
             title: "Events",
             units: "events/s",
             family: "events",
@@ -774,7 +775,7 @@ mod tests {
             }
         }
         let mut builder = MetricSetBuilder::new(Settings::default());
-        let counter = builder.counter::<Broken>(Chart {
+        let counter = builder.counter::<Broken>(ChartDescriptor {
             title: "C",
             units: "events/s",
             family: "c",
@@ -820,7 +821,7 @@ mod tests {
             }
         }
         let mut builder = MetricSetBuilder::new(Settings::default());
-        let chart = |context| Chart {
+        let descriptor = |context| ChartDescriptor {
             title: "T",
             units: "u",
             family: "f",
@@ -828,10 +829,10 @@ mod tests {
             chart_type: ChartType::Line,
             priority: 1,
         };
-        let requests = builder.counter::<Outcome>(chart("svc.requests"));
-        let queued = builder.gauge::<Queued>(chart("svc.queued"));
-        let totals = builder.cumulative_counter::<Events>(chart("svc.events"));
-        let duration = builder.histogram(BOUNDS, chart("svc.duration"), "requests/s");
+        let requests = builder.counter::<Outcome>(descriptor("svc.requests"));
+        let queued = builder.gauge::<Queued>(descriptor("svc.queued"));
+        let totals = builder.cumulative_counter::<Events>(descriptor("svc.events"));
+        let duration = builder.histogram(BOUNDS, descriptor("svc.duration"), "requests/s");
         let set = builder.build();
         let mut aggregator = Aggregator::new(&set);
         let mut batch = Batch::new(&set);

@@ -3,7 +3,8 @@
 //!
 //! ```
 //! use netdata_plugin_metrics::{
-//!     Aggregator, Batch, Chart, ChartType, Labels, MetricSetBuilder, Settings, dimensions,
+//!     Aggregator, Batch, ChartDescriptor, ChartType, Labels, MetricSetBuilder, Settings,
+//!     dimensions,
 //! };
 //!
 //! dimensions! {
@@ -16,7 +17,7 @@
 //! // Once, at startup: declare the instruments and their chart templates, and
 //! // create the aggregator.
 //! let mut builder = MetricSetBuilder::new(Settings::default());
-//! let requests = builder.counter::<Outcome>(Chart {
+//! let requests = builder.counter::<Outcome>(ChartDescriptor {
 //!     title: "Requests",
 //!     units: "requests/s",
 //!     family: "requests",
@@ -53,10 +54,10 @@
 //!
 //! Terms:
 //! - an *instrument* is a [`Counter`], [`CumulativeCounter`], [`Gauge`] or
-//!   [`Histogram`]; each brings its *chart template* (a [`Chart`] and its
-//!   dimensions; a histogram brings three, derived from its [`Chart`]), and
-//!   the other instruments are split into dimensions, one per value of their
-//!   [`Dimension`] type;
+//!   [`Histogram`]; each brings its *chart template* (a [`ChartDescriptor`]
+//!   and its dimensions; a histogram brings three, derived from its
+//!   descriptor), and the other instruments are split into dimensions, one
+//!   per value of their [`Dimension`] type;
 //! - an *entity* is the thing being monitored, for example one service,
 //!   identified by its [`Labels`]; it gets one *chart instance* (in Netdata's
 //!   sense: one chart with its own chart id) of every chart template of the
@@ -88,7 +89,7 @@ mod metric_set;
 
 pub use aggregator::{Aggregator, Stats};
 pub use batch::{Batch, BatchEntity, Measurements};
-pub use chart::Chart;
+pub use chart::ChartDescriptor;
 pub use metric_set::{
     CardinalityLimit, Counter, CumulativeCounter, Dimension, Gauge, Histogram, Labels, MetricSet,
     MetricSetBuilder, Settings,

@@ -1,18 +1,20 @@
-//! Chart templates, which a set declares, and the chart ids of each
-//! entity's chart instances.
+//! Chart descriptors, the chart templates a set makes from them, and the
+//! chart ids of each entity's chart instances.
 
 use crate::layout::Readout;
 use crate::metric_set::Labels;
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 
-/// How a chart template is presented: the fields that all its chart
-/// instances share, one instance per entity. They map to the CHART line of the
-/// plugins.d protocol (`src/plugins.d/README.md` in the Netdata repository);
-/// the crate sets the CHART line's other fields itself. A histogram derives
-/// its three chart templates from one `Chart` (see
+/// Describes an instrument's charts: their context, title, units, family,
+/// type and priority. A descriptor and the instrument's dimensions make a
+/// chart template, and every entity gets one chart instance of each template.
+/// The fields map to the CHART line of the plugins.d protocol
+/// (`src/plugins.d/README.md` in the Netdata repository); the crate sets the
+/// CHART line's other fields itself. A histogram derives its three chart
+/// templates from one descriptor (see
 /// [`MetricSetBuilder::histogram`](crate::MetricSetBuilder::histogram)).
 #[derive(Debug, Clone, Copy)]
-pub struct Chart {
+pub struct ChartDescriptor {
     /// The Netdata context, for example `svc.requests`, of every entity's
     /// chart instance; a histogram's three charts have it plus a suffix
     /// (`_avg`, `_max`, `_histogram`). Alerts, queries and the dashboard use
@@ -46,8 +48,9 @@ pub struct Chart {
     pub priority: i32,
 }
 
-/// One chart template of the set: its [`Chart`] fields and the dimensions its
-/// instrument gives it. Every entity gets one chart instance of it.
+/// One chart template of the set: the fields of its [`ChartDescriptor`]
+/// (derived ones for a histogram) and the dimensions its instrument gives it.
+/// Every entity gets one chart instance of it.
 #[derive(Debug)]
 pub(crate) struct ChartTemplate {
     pub(crate) title: String,
@@ -57,6 +60,21 @@ pub(crate) struct ChartTemplate {
     pub(crate) chart_type: ChartType,
     pub(crate) priority: i32,
     pub(crate) dimensions: Vec<ChartDimension>,
+}
+
+impl ChartTemplate {
+    /// The template with `descriptor`'s fields as they are.
+    pub(crate) fn new(descriptor: ChartDescriptor, dimensions: Vec<ChartDimension>) -> Self {
+        Self {
+            title: descriptor.title.to_string(),
+            units: descriptor.units,
+            family: descriptor.family,
+            context: descriptor.context.to_string(),
+            chart_type: descriptor.chart_type,
+            priority: descriptor.priority,
+            dimensions,
+        }
+    }
 }
 
 /// One dimension of a chart template: its id, which is also its name on the
@@ -77,8 +95,9 @@ impl ChartDimension {
     }
 }
 
-/// Panics unless `context` follows the rules at [`Chart::context`]: id bytes
-/// and dots, at least one dot inside, and no ending like an entity suffix.
+/// Panics unless `context` follows the rules at
+/// [`ChartDescriptor::context`]: id bytes and dots, at least one dot inside,
+/// and no ending like an entity suffix.
 pub(crate) fn check_context(context: &str) {
     assert!(
         context.bytes().all(|b| is_id_byte(b) || b == b'.')
@@ -122,7 +141,7 @@ pub(crate) fn chart_ids(
 }
 
 /// What follows the context in an entity's chart ids; the scheme is
-/// documented at [`Chart::context`].
+/// documented at [`ChartDescriptor::context`].
 fn entity_suffix(labels: &Labels, kind: EntityKind) -> String {
     match kind {
         EntityKind::Overflow => OVERFLOW_SUFFIX.to_string(),

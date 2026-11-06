@@ -3,7 +3,7 @@
 //! arrival time, so the metric sets have no lateness.
 
 use netdata_plugin_metrics::{
-    Batch, Chart, ChartType, Counter, CumulativeCounter, Gauge, Labels, MetricSet,
+    Batch, ChartDescriptor, ChartType, Counter, CumulativeCounter, Gauge, Labels, MetricSet,
     MetricSetBuilder, Settings, Stats, dimensions,
 };
 use otel_bridge::signals::Signal;
@@ -47,7 +47,7 @@ pub(crate) struct Plugin {
 impl Plugin {
     pub(crate) fn new() -> Self {
         let mut builder = MetricSetBuilder::new(Settings::default());
-        let spans = builder.counter(Chart {
+        let spans = builder.counter(ChartDescriptor {
             title: "OpenTelemetry spans received",
             units: "spans/s",
             family: "ingest",
@@ -55,7 +55,7 @@ impl Plugin {
             chart_type: ChartType::Stacked,
             priority: 150_000,
         });
-        let log_records = builder.counter(Chart {
+        let log_records = builder.counter(ChartDescriptor {
             title: "OpenTelemetry log records received",
             units: "records/s",
             family: "ingest",
@@ -106,7 +106,7 @@ pub(crate) struct Derivation {
 impl Derivation {
     pub(crate) fn new() -> Self {
         let mut builder = MetricSetBuilder::new(Settings::default());
-        let services = builder.gauge(Chart {
+        let services = builder.gauge(ChartDescriptor {
             title: "Services with derived charts",
             units: "services",
             family: "derived metrics",
@@ -114,7 +114,7 @@ impl Derivation {
             chart_type: ChartType::Line,
             priority: 150_010,
         });
-        let adjusted = builder.cumulative_counter(Chart {
+        let adjusted = builder.cumulative_counter(ChartDescriptor {
             title: "Records counted in another time slot or chart set",
             units: "records/s",
             family: "derived metrics",
@@ -123,7 +123,7 @@ impl Derivation {
             chart_type: ChartType::Line,
             priority: 150_011,
         });
-        let expired = builder.cumulative_counter(Chart {
+        let expired = builder.cumulative_counter(ChartDescriptor {
             title: "Services removed after 15 minutes without data",
             units: "services/s",
             family: "derived metrics",
