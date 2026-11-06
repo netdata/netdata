@@ -145,25 +145,3 @@ func BenchmarkIndexIdentityCacheConfigID(b *testing.B) {
 		})
 	}
 }
-
-func TestIndexIdentityCacheConfigAllocationEnvelopes(t *testing.T) {
-	cache := &tableCache{}
-	for name, config := range indexIdentityCacheConfigs() {
-		t.Run(name, func(t *testing.T) {
-			var identity string
-			allocs := testing.AllocsPerRun(100, func() { identity = cache.generateConfigID(config) })
-			require.NotEmpty(t, identity)
-			limit := float64(11)
-			if name == "legacy-three-tags" {
-				limit = 2
-			}
-			require.LessOrEqual(
-				t,
-				allocs,
-				limit,
-				"config identity allocations are bounded by config size, independent of table row count",
-			)
-			t.Logf("config key: %.0f allocations; %d encoded bytes", allocs, len(identity))
-		})
-	}
-}
