@@ -41,8 +41,9 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
    (`src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows`).
 2. Check the object's `MAX-ACCESS` (SMIv2) or `ACCESS` (SMIv1).
 3. Polling inputs MUST be readable: `not-accessible`, `accessible-for-notify`, and `write-only` are not polling
-   access. Notification-only fields cannot supply GET/WALK values. A device-scoped deviation MUST satisfy every
-   requirement below and the exact source-role guard; a vendor name or OID alone never authorizes an exception.
+   access. Notification-only and write-only fields MUST NOT supply GET/WALK inputs. A device-scoped deviation for
+   a `not-accessible` source MUST satisfy every requirement below and the exact source-role guard; a vendor name
+   or OID alone never authorizes an exception.
 4. If a non-pollable object appears in the table `INDEX`, derive it from the row OID index using `index`,
    `index_transform`, or `index_decode`. A table root itself need not be readable; check the actual acquired column.
 5. Keep index extraction and value formatting separate:
@@ -94,8 +95,7 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
 
 ## Device-Scoped MIB Deviations
 
-A vendor profile MAY poll an object that the source MIB marks `not-accessible`, `accessible-for-notify`, or `write-only`
-only when all of these requirements hold:
+A vendor profile MAY poll an object that the source MIB marks `not-accessible` only when all of these requirements hold:
 
 - **Scope:** The polling row is declared in a selector-matched device or topology-role profile. A generic standards
   profile MUST NOT carry the deviation.
