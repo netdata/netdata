@@ -1,0 +1,15 @@
+Begin3
+Title:          netdata
+Version:        NETDATA_VERSION
+Description:    netdata - X-Ray Vision for your infrastructure!
+                netdata is a high-resolution, real-time, low-latency observability platform.
+                Per-second data collection, high-performance long-term storage, low-latency
+                visualization, machine-learning based anomaly detection, alerts and notifications,
+                advanced correlations and fast root cause analysis, native horizontal scalability.
+Keywords:       X-Ray Vision for your infrastructure
+Author:         Netdata Inc.
+Maintained-by:  Netdata Inc.
+Original-site:  https://netdata.cloud/
+Platform:       Unix
+Copying-policy: GPL
+End
