@@ -81,10 +81,10 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
    (`idle`, `connect`, `active`, `opensent`, `openconfirm`, `established`).
    Use `partial: true` plus `partial_states` only when the source MIB is
    intentionally partial.
-15. For BGP table rows, derive `not-accessible` INDEX objects with exactly one
-   row-index selector: `index`, `index_from_end`, or `index_transform`. Use
-   `index_from_end` for trailing AFI/SAFI-like components after variable-length
-   indexes such as `InetAddress`.
+15. Typed BGP value fields derive `not-accessible` INDEX objects with exactly one selector: `index`, `index_from_end`,
+   or `index_transform`. Use `index_from_end` for trailing AFI/SAFI-like components after variable-length indexes
+   such as `InetAddress`. BGP row `metric_tags` use `index`, `index_transform`, or `index_decode` for row-index
+   identity; follow the Index Rules below.
 16. To constrain a topology table to a fixed structural index prefix, use one
     readable anchor symbol and set `table.OID` to `<anchor-column>.<prefix>`.
     A simple same-index cross-table dependency inherits that prefix and is

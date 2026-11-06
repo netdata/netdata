@@ -2598,11 +2598,12 @@ Device rows support `device_counts.peers`, `device_counts.ibgp_peers`,
 `last_error`, `last_notifications`, `reasons`, `graceful_restart`, `routes`,
 and `route_limits`.
 
-For table-backed rows, readable columns use `symbol:`. `not-accessible` index
+For table-backed BGP value fields, readable columns use `symbol:`. `not-accessible` index
 objects must be derived from the row index with `index`, `index_from_end`, or
 `index_transform`. Values from related tables use the first-class `table:`
 field on the BGP value, optionally with `lookup_symbol:` when the current row
-must join to another table by value.
+must join to another table by value. BGP row `metric_tags` use the ordinary tag
+selectors `index`, `index_transform`, or `index_decode` for row-index identity.
 
 Example device-level counts:
 
