@@ -117,8 +117,9 @@ modules:
                 - an origin server behind a load balancer or CDN, reached at its own address;
                 - each node of a pool, reached at its address and verified against the shared host name.
 
-                An IP address sends no SNI and is checked against the IP addresses listed in the certificate. A
-                `file://` source does not accept this option.
+                A host name set here is sent as SNI even when `source` is an IP address. An IP address set here sends
+                no SNI and is checked against the IP addresses listed in the certificate. A `file://` source does not
+                accept this option.
             - name: tls_skip_verify
               description: Skip TLS certificate and hostname verification, so certificates that are self-signed, expired or issued for another name are still read.
               default_value: no

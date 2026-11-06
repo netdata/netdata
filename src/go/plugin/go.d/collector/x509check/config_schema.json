@@ -91,7 +91,7 @@
     },
     "tls_server_name": {
       "ui:placeholder": "www.example.com",
-      "ui:help": "The connection still goes to the host and port in `source`. For example, with `source` set to `https://127.0.0.1:443` on a server that hosts several sites, enter the name of the site to check.\n\nAn IP address sends no SNI and is checked against the IP addresses in the certificate. Not available for `file://` sources."
+      "ui:help": "The connection still goes to the host and port in `source`. For example, with `source` set to `https://127.0.0.1:443` on a server that hosts several sites, enter the name of the site to check.\n\nOnly this value decides whether SNI is sent: an IP address entered here sends no SNI and is checked against the IP addresses in the certificate, while a host name is sent even when `source` is an IP address. Not available for `file://` sources."
     },
     "vnode": {
       "ui:placeholder": "my-vnode",
