@@ -25,6 +25,7 @@ const (
 	oidPethPsePortEntry    = "1.3.6.1.2.1.105.1.1.1"
 	oidCpeExtPsePortEntry  = "1.3.6.1.4.1.9.9.402.1.2.1"
 	oidPethMainPseEntry    = "1.3.6.1.2.1.105.1.3.1.1"
+	oidEntAliasIdentifier  = "1.3.6.1.2.1.47.1.3.2.1.2"
 	ciscoCat29xxStackSysID = "1.3.6.1.4.1.9.1.1208"
 )
 
@@ -34,17 +35,57 @@ type poeFixtureRow struct {
 }
 
 // The fixture is a 3-member Catalyst 2960-X stack: PoE rows are indexed (group, port) with the port numbered within
-// its stack member, so each row must keep its own chart identity.
+// its stack member, so each row must keep its own chart identity. The numerical links and ifNames come from
+// LibreNMS ios_2960x.snmprec at b787b2e9d38a87f39d95a6a077c9382261262336. ifAlias values were replaced with
+// deterministic endpoint-<ifIndex> strings. Only the 120 PoE ports' required mapping columns were retained.
 func TestCollector_Collect_CiscoCatalystPoE_FromLibreNMSFixture(t *testing.T) {
+	for name, tc := range map[string]struct {
+		oid   string
+		value any
+	}{
+		"complete mappings":     {},
+		"missing physical link": {oid: oidCpeExtPsePortEntry + ".11.1.1"},
+		"zero physical link":    {oid: oidCpeExtPsePortEntry + ".11.1.1", value: 0},
+		"missing alias link":    {oid: oidEntAliasIdentifier + ".1010.0"},
+		"wrong row pointer":     {oid: oidEntAliasIdentifier + ".1010.0", value: "1.3.6.1.2.1.2.2.1.2.10101"},
+		"zero row pointer":      {oid: oidEntAliasIdentifier + ".1010.0", value: "0.0"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			pdus := loadSnmprecPDUs(t, "librenms/cisco_2960x_poe_tables.snmprec")
+			if tc.oid != "" {
+				found := false
+				pdus = slices.DeleteFunc(pdus, func(pdu gosnmp.SnmpPDU) bool {
+					if strings.Trim(pdu.Name, ".") == tc.oid {
+						found = true
+						return true
+					}
+					return false
+				})
+				require.True(t, found)
+				if tc.value != nil {
+					typ := gosnmp.Integer
+					if _, ok := tc.value.(string); ok {
+						typ = gosnmp.ObjectIdentifier
+					}
+					pdus = append(pdus, createPDU(tc.oid, typ, tc.value))
+				}
+			}
+			collectCiscoPoEFixture(t, pdus, tc.oid != "")
+		})
+	}
+}
+
+func collectCiscoPoEFixture(t *testing.T, pdus []gosnmp.SnmpPDU, missingFirstMapping bool) {
+	t.Helper()
+
 	profile := matchedProfileByFile(t, ciscoCat29xxStackSysID, "cisco-catalyst.yaml")
 	filterProfileForPoE(t, profile)
 
-	pdus := loadSnmprecPDUs(t, "librenms/cisco_2960x_poe_tables.snmprec")
 	pdus = append(pdus, pethPsePortRowsFor(pdus)...)
 
 	ctrl, mockHandler := setupMockHandler(t)
 	defer ctrl.Finish()
-	expectFixtureAgent(mockHandler, pdus)
+	walks := expectFixtureAgent(mockHandler, pdus)
 
 	collector := New(Config{
 		SnmpClient:  mockHandler,
@@ -56,6 +97,14 @@ func TestCollector_Collect_CiscoCatalystPoE_FromLibreNMSFixture(t *testing.T) {
 	results, err := collector.Collect()
 	require.NoError(t, err)
 	require.Len(t, results, 1)
+	// The two final labels and both PoE rows share dependency routes. No row performs its own network lookup.
+	assert.Len(t, walks, 5)
+	for oid, count := range walks {
+		assert.Equal(t, 1, count, "walk route %s", oid)
+	}
+	assert.Equal(t, 1, walks[oidEntAliasIdentifier])
+	assert.Equal(t, 1, walks["1.3.6.1.2.1.31.1.1.1"])
+	t.Logf("120 PoE ports use shared acquisition routes: %v", walks)
 
 	columns := fixtureColumns(pdus)
 	portIndexes := slices.Sorted(maps.Keys(columns[oidCpeExtPsePortEntry+".9"]))
@@ -65,8 +114,18 @@ func TestCollector_Collect_CiscoCatalystPoE_FromLibreNMSFixture(t *testing.T) {
 	wantFaults := make(map[string]poeFixtureRow)
 	wantDetection := make(map[string]map[string]string)
 	for _, index := range portIndexes {
+		portTags := poePortTags(index)
+		if !missingFirstMapping || index != "1.1" {
+			group, port, _ := strings.Cut(index, ".")
+			g, err := strconv.Atoi(group)
+			require.NoError(t, err)
+			p, err := strconv.Atoi(port)
+			require.NoError(t, err)
+			portTags["_interface"] = fmt.Sprintf("Gi%d/0/%d", g, p)
+			portTags["_if_alias"] = fmt.Sprintf("endpoint-%d", 10100+(g-1)*500+p)
+		}
 		wantPower[index] = poeFixtureRow{
-			Tags: poePortTags(index),
+			Tags: portTags,
 			Values: map[string]int64{
 				"allocated":   columns[oidCpeExtPsePortEntry+".7"][index],
 				"available":   columns[oidCpeExtPsePortEntry+".8"][index],
@@ -74,7 +133,7 @@ func TestCollector_Collect_CiscoCatalystPoE_FromLibreNMSFixture(t *testing.T) {
 				"max_drawn":   columns[oidCpeExtPsePortEntry+".10"][index],
 			},
 		}
-		pethTags := poePortTags(index)
+		pethTags := maps.Clone(portTags)
 		pethTags["_pse_port_priority"] = "low"
 		wantDetection[index] = pethTags
 		wantFaults[index] = poeFixtureRow{
@@ -153,6 +212,7 @@ func filterProfileForPoE(t *testing.T, profile *ddsnmp.Profile) {
 
 	require.Len(t, profile.Definition.Metrics, 3)
 	require.Len(t, profile.Definition.VirtualMetrics, 2)
+	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 }
 
 // No public capture carries Cisco pethPsePortTable rows. cpeExtPsePortEntry AUGMENTS pethPsePortEntry, so the
@@ -199,11 +259,15 @@ func fixtureColumns(pdus []gosnmp.SnmpPDU) map[string]map[string]int64 {
 	return out
 }
 
-func expectFixtureAgent(mockHandler *snmpmock.MockHandler, pdus []gosnmp.SnmpPDU) {
+func expectFixtureAgent(mockHandler *snmpmock.MockHandler, pdus []gosnmp.SnmpPDU) map[string]int {
+	walks := make(map[string]int)
 	mockHandler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
 	mockHandler.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) {
-		return snmprecPDUsWithPrefix(pdus, strings.Trim(oid, ".")+"."), nil
+		oid = strings.Trim(oid, ".")
+		walks[oid]++
+		return snmprecPDUsWithPrefix(pdus, oid+"."), nil
 	}).AnyTimes()
+	return walks
 }
 
 func poePortTags(index string) map[string]string {

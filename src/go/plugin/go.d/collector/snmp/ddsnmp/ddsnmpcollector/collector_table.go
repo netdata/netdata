@@ -609,13 +609,13 @@ func extractTableDependencies(cfg ddprofiledefinition.MetricsConfig, tableNameTo
 	deps := make(map[string]bool)
 
 	for _, tagCfg := range cfg.MetricTags {
-		// Skip if not a cross-table tag
-		if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
-			continue
-		}
-
-		if tableOID, ok := tableNameToOID[tagCfg.Table]; ok {
-			deps[tableOID] = true
+		for source := range tagCfg.TableSources() {
+			if source.Table == cfg.Table.Name {
+				continue
+			}
+			if tableOID, ok := tableNameToOID[source.Table]; ok {
+				deps[tableOID] = true
+			}
 		}
 	}
 
@@ -636,7 +636,7 @@ func buildOrderedTags(cfg ddprofiledefinition.MetricsConfig) []orderedTagConfig 
 		switch {
 		case tagCfg.IsIndexTag():
 			tt = tagTypeIndex
-		case tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name:
+		case len(tagCfg.IndexFrom) > 0 || tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name:
 			tt = tagTypeCrossTable
 		default:
 			tt = tagTypeSameTable

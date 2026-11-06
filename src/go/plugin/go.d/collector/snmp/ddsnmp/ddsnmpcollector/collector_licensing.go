@@ -787,11 +787,7 @@ func licensingConfigAsMetricsConfig(cfg ddprofiledefinition.LicensingConfig) ddp
 	}
 
 	forEachLicenseValue(cfg, addColumn)
-	for _, tagCfg := range cfg.MetricTags {
-		if tagCfg.Symbol.OID != "" {
-			columns[trimOID(tagCfg.Symbol.OID)] = ddprofiledefinition.SymbolConfig(tagCfg.Symbol)
-		}
-	}
+	addTypedRowTagColumns(columns, cfg.MetricTags)
 
 	symbols := make([]ddprofiledefinition.SymbolConfig, 0, len(columns))
 	for _, sym := range columns {
@@ -830,58 +826,17 @@ func licensingTableNameToOID(configs []ddprofiledefinition.LicensingConfig) map[
 		}
 		metricsCfg := licensingConfigAsMetricsConfig(cfg)
 		for _, tagCfg := range metricsCfg.MetricTags {
-			if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
-				continue
-			}
-			if _, ok := tableNameToOID[tagCfg.Table]; ok {
-				continue
-			}
-			if tagCfg.Symbol.OID != "" {
-				crossTableOIDs[tagCfg.Table] = append(crossTableOIDs[tagCfg.Table], tagCfg.Symbol.OID)
-			}
-			if tagCfg.LookupSymbol.OID != "" {
-				crossTableOIDs[tagCfg.Table] = append(crossTableOIDs[tagCfg.Table], tagCfg.LookupSymbol.OID)
-			}
+			addReferencedTableOIDs(tagCfg, tableNameToOID, crossTableOIDs)
 		}
 	}
 
 	for tableName, oids := range crossTableOIDs {
-		if oid := longestCommonOIDPrefix(oids); oid != "" {
+		if oid := ddprofiledefinition.CommonOIDPrefix(oids); oid != "" {
 			tableNameToOID[tableName] = oid
 		}
 	}
 
 	return tableNameToOID
-}
-
-func longestCommonOIDPrefix(oids []string) string {
-	if len(oids) == 0 {
-		return ""
-	}
-	slices.Sort(oids)
-	oids = slices.Compact(oids)
-	prefixParts := splitOIDParts(oids[0])
-	for _, oid := range oids[1:] {
-		parts := splitOIDParts(oid)
-		n := min(len(parts), len(prefixParts))
-		i := 0
-		for i < n && prefixParts[i] == parts[i] {
-			i++
-		}
-		prefixParts = prefixParts[:i]
-		if len(prefixParts) == 0 {
-			return ""
-		}
-	}
-	return strings.Join(prefixParts, ".")
-}
-
-func splitOIDParts(oid string) []string {
-	parts := strings.Split(strings.Trim(oid, "."), ".")
-	if len(parts) == 1 && parts[0] == "" {
-		return nil
-	}
-	return parts
 }
 
 func (c *Collector) licensingScalarOIDs(cfg ddprofiledefinition.LicensingConfig) ([]string, []string) {

@@ -1151,66 +1151,25 @@ func (c *Collector) lookupBGPValuePDU(
 		return pdu, sourceOID, ok, nil
 	}
 
-	refTableOID, err := c.tableCollector.rowProcessor.crossTableResolver.findReferencedTableOID(
-		cfg.Table,
-		ctx.crossTableCtx.tableNameToOID,
-	)
-	if err != nil {
-		ctx.record(sym, sourceOID, "dependency_processing")
-		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
-			err: err,
-		}
+	tag := ddprofiledefinition.MetricTagConfig{
+		Table:          cfg.Table,
+		Symbol:         ddprofiledefinition.SymbolConfigCompat(sym),
+		LookupSymbol:   cfg.LookupSymbol,
+		IndexTransform: cfg.IndexTransform,
 	}
-	refTablePDUs, err := c.tableCollector.rowProcessor.crossTableResolver.getReferencedTableData(
-		cfg.Table,
-		refTableOID,
-		ctx.crossTableCtx.walkedData,
-	)
-	if err != nil {
-		ctx.record(sym, sourceOID, "dependency_processing")
-		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
-			err: err,
-		}
-	}
-	lookupIndex, err := c.tableCollector.rowProcessor.crossTableResolver.transformIndex(
-		ctx.rowIndex,
-		cfg.IndexTransform,
-	)
-	if err != nil {
-		ctx.record(sym, sourceOID, "dependency_processing")
-		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
-			err: err,
-		}
-	}
-	tagCfg := ddprofiledefinition.MetricTagConfig{
-		Table:        cfg.Table,
-		Symbol:       ddprofiledefinition.SymbolConfigCompat(sym),
-		LookupSymbol: cfg.LookupSymbol,
-	}
-	if c.tableCollector.rowProcessor.crossTableResolver.requiresLookupByValue(tagCfg) {
-		lookupIndex, err = c.tableCollector.rowProcessor.crossTableResolver.resolveLookupIndexByValue(
-			tagCfg,
-			lookupIndex,
-			refTableOID,
-			refTablePDUs,
-			ctx.crossTableCtx,
-		)
-		if err != nil {
-			ctx.record(sym, sourceOID, "dependency_processing")
-			return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
-				err: err,
+	pdu, failure := c.tableCollector.rowProcessor.crossTableResolver.lookupTagPDU(tag, ctx.rowIndex, ctx.crossTableCtx)
+	if failure != nil {
+		if failure.reason == "missing_dependency" {
+			ctx.record(sym, failure.oid, failure.reason)
+			if ctx.requiredDependencyMissing != nil {
+				*ctx.requiredDependencyMissing = true
 			}
+			return gosnmp.SnmpPDU{}, sourceOID, false, nil
 		}
-	}
-
-	fullOID := sourceOID + "." + lookupIndex
-	pdu, ok := refTablePDUs[fullOID]
-	if !ok {
-		ctx.record(sym, fullOID, "missing_dependency")
-		if ctx.requiredDependencyMissing != nil {
-			*ctx.requiredDependencyMissing = true
+		ctx.record(sym, sourceOID, "dependency_processing")
+		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
+			err: failure,
 		}
-		return gosnmp.SnmpPDU{}, sourceOID, false, nil
 	}
 	return pdu, sourceOID, true, nil
 }
@@ -1251,11 +1210,7 @@ func bgpConfigAsMetricsConfig(cfg ddprofiledefinition.BGPConfig) ddprofiledefini
 	}
 
 	forEachBGPValue(cfg, addColumn)
-	for _, tagCfg := range cfg.MetricTags {
-		if tagCfg.Symbol.OID != "" {
-			columns[trimOID(tagCfg.Symbol.OID)] = ddprofiledefinition.SymbolConfig(tagCfg.Symbol)
-		}
-	}
+	addTypedRowTagColumns(columns, cfg.MetricTags)
 
 	symbols := make([]ddprofiledefinition.SymbolConfig, 0, len(columns))
 	for _, sym := range columns {
@@ -1294,37 +1249,19 @@ func bgpTableNameToOID(configs []ddprofiledefinition.BGPConfig) map[string]strin
 		}
 		metricsCfg := bgpConfigAsMetricsConfig(cfg)
 		for _, tagCfg := range metricsCfg.MetricTags {
-			if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
-				continue
-			}
-			if _, ok := tableNameToOID[tagCfg.Table]; ok {
-				continue
-			}
-			if tagCfg.Symbol.OID != "" {
-				crossTableOIDs[tagCfg.Table] = append(crossTableOIDs[tagCfg.Table], tagCfg.Symbol.OID)
-			}
-			if tagCfg.LookupSymbol.OID != "" {
-				crossTableOIDs[tagCfg.Table] = append(crossTableOIDs[tagCfg.Table], tagCfg.LookupSymbol.OID)
-			}
+			addReferencedTableOIDs(tagCfg, tableNameToOID, crossTableOIDs)
 		}
 		forEachBGPValue(cfg, func(valueCfg ddprofiledefinition.BGPValueConfig) {
-			if valueCfg.Table == "" || valueCfg.Table == cfg.Table.Name {
-				return
-			}
-			if _, ok := tableNameToOID[valueCfg.Table]; ok {
-				return
-			}
-			if oid := valueCfg.EffectiveSymbol().OID; oid != "" {
-				crossTableOIDs[valueCfg.Table] = append(crossTableOIDs[valueCfg.Table], oid)
-			}
-			if oid := ddprofiledefinition.SymbolConfig(valueCfg.LookupSymbol).OID; oid != "" {
-				crossTableOIDs[valueCfg.Table] = append(crossTableOIDs[valueCfg.Table], oid)
-			}
+			addReferencedTableOIDs(ddprofiledefinition.MetricTagConfig{
+				Table:        valueCfg.Table,
+				Symbol:       ddprofiledefinition.SymbolConfigCompat(valueCfg.EffectiveSymbol()),
+				LookupSymbol: valueCfg.LookupSymbol,
+			}, tableNameToOID, crossTableOIDs)
 		})
 	}
 
 	for tableName, oids := range crossTableOIDs {
-		if oid := longestCommonOIDPrefix(oids); oid != "" {
+		if oid := ddprofiledefinition.CommonOIDPrefix(oids); oid != "" {
 			tableNameToOID[tableName] = oid
 		}
 	}

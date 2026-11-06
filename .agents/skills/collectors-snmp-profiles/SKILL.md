@@ -87,7 +87,7 @@ MIB audit of untouched symbols; parser changes still need the relevant input and
     anchor-gated only when its target table has no symbol-bearing producer.
     A target route with a real symbol owner remains eager. Do not rely on
     propagation for ordinary metrics, multiple anchors, `lookup_symbol`,
-    `index_transform`, or conflicting dependency scopes.
+    `index_transform`, `index_from`, or conflicting dependency scopes.
 
 ## Device-Scoped MIB Deviations
 
@@ -127,9 +127,15 @@ The retired `constant_value_one` key is ignored. Ordinary metric symbols still r
 Interface alias label:
 
 - Every `interface`/`_interface` tag read from `ifName` MUST have an `_if_alias` sibling: a copy of that tag with only
-  `tag`, `symbol.OID` and `symbol.name` changed, so `table`, `MIB` and `index_transform` stay identical.
+  `tag`, `symbol.OID` and `symbol.name` changed; keep the table and complete lookup chain identical.
   `TestStockProfiles_IfNameInterfaceTagsCarryIfAlias` enforces it.
 - The underscore keeps the alias out of chart IDs; the collector emits it as the `if_alias` chart label.
+
+Value-keyed table joins use
+`src/go/plugin/go.d/collector/snmp/profile-format.md#chained-value-keys-index_from`. Verify each intermediate column
+against its source MIB, including compound target indexes and RowPointer type. Validate missing, malformed and
+recovered links through collection and final chart-label output, not only the resolver. Dependency tests MUST cover
+all hops, shared routes and cache invalidation; never propagate a source index prefix through a value-derived key.
 
 ```yaml
 - tag: interface

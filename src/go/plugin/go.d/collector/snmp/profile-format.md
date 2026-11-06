@@ -172,7 +172,7 @@ virtual_metrics: <calculated metrics>
 
 Profile metric tags must be objects, such as `{tag: interface, index: 1}`.
 Top-level `metric_tags` read scalar OIDs: they require `symbol.OID` and cannot
-use `table`, `index`, or `index_transform`. Legacy tag-level OIDs are normalized
+use `table`, `index`, `index_transform`, or `index_from`. Legacy tag-level OIDs are normalized
 before these checks.
 Datadog string references such as `metric_tags: [ifName]` are unsupported and
 fail YAML decoding. The Datadog metric `options` object (`placement`,
@@ -463,7 +463,7 @@ topology:
   is the symbol column plus a fixed structural index prefix, simple same-index
   cross-table dependencies inherit that prefix. For example, an anchor root
   `<column>.1` constrains dependency column walks to `<dependency-column>.1`.
-  Dependencies using `lookup_symbol`, `index_transform`, multiple anchors, or
+  Dependencies using `lookup_symbol`, `index_transform`, `index_from`, multiple anchors, or
   conflicting scopes use their ordinary common-prefix route instead. This
   structural prefix propagation is topology-only; ordinary metric-table
   dependencies retain their existing common-prefix collection roots.
@@ -1142,6 +1142,7 @@ Cross-table tags let you **use data from another SNMP table** as a tag source.
 - Reads tag values from the specified `table:` instead of the current one.
 - Matches rows between tables by their **index**.
 - When index structures differ, an optional `index_transform` can modify the current table’s index to align it with the target.
+- When a column value supplies the next row key, `index_from` follows one or more such columns in order.
 - When the target table is keyed differently, an optional `lookup_symbol` can match a transformed index value against a column in the target table and then read tags from the matched row.
 
 #### Same Index
@@ -1341,6 +1342,84 @@ metrics:
 - if no row matches, the tag lookup fails for that row
 - if one row matches, the collector reads the requested tag from that row
 - if multiple rows match, the lookup succeeds only when all matched rows resolve to the same final tag value; conflicting values fail the lookup
+
+#### Chained Value Keys (`index_from`)
+
+Use `index_from` when a row contains a key for another table, possibly through several intermediate tables.
+It is available on table `metric_tags` in `metrics`, `topology`, `licensing`, and `bgp` rows.
+
+Resolution proceeds in order:
+
+1. Apply the tag's `index_transform`, if present, to the original row index once.
+2. For each `index_from` entry, read its `symbol` at the current key in its named `table`.
+3. Convert/format that PDU, take the first `extract_value` capture if configured, apply
+   `match_pattern`/`match_value`, and apply exact `mapping`. The result becomes the next key.
+4. Use the final key with the tag's existing `table` and `symbol`. If `lookup_symbol` is also present,
+   match that key against the lookup column before reading the final symbol.
+
+Every entry requires `table`, `symbol.OID`, and `symbol.name`. A nonempty chain also requires the final table and
+symbol, and cannot be combined with `index`. Scalar/global tags and typed BGP value fields do not accept `index_from`.
+An empty list preserves ordinary tag behavior.
+Chained lookup columns do not establish source rows, even when they refer back to the source table at another index.
+
+Hop symbols accept `format`, `extract_value`, `match_pattern` with a nonempty `match_value`, and exact `mapping`.
+They do not accept metric types, scale factors, chart metadata, numeric transforms, or bitmask mappings.
+Extraction requires a capture group; a missing or empty capture, pattern mismatch, conversion failure, missing
+instance, or empty result stops the chain and omits that tag. It never falls back to the original index.
+This strict extraction applies to `index_from`; existing `lookup_symbol` extraction behavior is unchanged.
+
+For example, a Cisco PoE row has a `(group, port)` index, not an ifIndex. The readable
+`cpeExtPsePortEntPhyIndex` column provides its physical entity index. Appending `.0` selects the default logical
+scope in ENTITY-MIB; the next hop accepts only an `ifIndex` RowPointer and extracts its index. The paired tags below
+then read `ifName` and `ifAlias` without changing the PoE chart's group/port identity:
+
+```yaml
+metric_tags:
+  - tag: _interface
+    table: ifXTable
+    MIB: IF-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.31.1.1.1.1
+      name: ifName
+    index_from:
+      - table: cpeExtPsePortTable
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.402.1.2.1.11
+          name: cpeExtPsePortEntPhyIndex
+          match_pattern: '^([1-9][0-9]*)$'
+          match_value: '$1.0'
+      - table: entAliasMappingTable
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.3.2.1.2
+          name: entAliasMappingIdentifier
+          extract_value: '^\.?1\.3\.6\.1\.2\.1\.2\.2\.1\.1\.([1-9][0-9]*)$'
+  - tag: _if_alias
+    table: ifXTable
+    MIB: IF-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.31.1.1.1.18
+      name: ifAlias
+    index_from:
+      - table: cpeExtPsePortTable
+        symbol:
+          OID: 1.3.6.1.4.1.9.9.402.1.2.1.11
+          name: cpeExtPsePortEntPhyIndex
+          match_pattern: '^([1-9][0-9]*)$'
+          match_value: '$1.0'
+      - table: entAliasMappingTable
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.3.2.1.2
+          name: entAliasMappingIdentifier
+          extract_value: '^\.?1\.3\.6\.1\.2\.1\.2\.2\.1\.1\.([1-9][0-9]*)$'
+```
+
+The collector acquires each required table through its existing shared routes and tag cache, then resolves each
+hop from the collected columns. A chain does not make a network request per row. Synthetic dependency routes use
+the common OID prefix of their referenced columns; a declared table producer retains its own scope. Fixed source
+index prefixes are not propagated through value-derived keys. Cached tags keep their configured refresh interval;
+a refreshed missing chain removes the corresponding labels from surviving table charts.
+Existing acquisition-error handling is unchanged: a failed dependency walk suppresses the affected licensing or BGP
+row set; a successfully walked table with a missing instance only omits that tag.
 
 ### Index-Based
 
