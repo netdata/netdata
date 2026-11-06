@@ -142,6 +142,38 @@ size of the persistent metrics volume on the parent node:
 helm upgrade --set parent.database.volumesize=4Gi netdata netdata/netdata
 ```
 
+### API key and streaming
+
+The Helm chart deploys a `parent` pod and one `child` pod per node. Each child streams its metrics to the parent inside the cluster. This child-to-parent stream is authenticated with an **API key** — a UUID stored in each pod's `stream.conf`.
+
+For a standard in-cluster deployment you do **not** need to create an API key yourself. The chart ships with a hardcoded default (`11111111-2222-3333-4444-555555555555`) embedded in both the parent's and the children's `stream.conf`, so streaming works as soon as the chart is installed.
+
+:::note
+
+The API key is not exposed as an individual Helm value. Because it is plain text inside the `stream.conf` blocks, there is no single `--set` flag to change it. `parent.configs.stream.data` and `child.configs.stream.data` replace the full `stream.conf` contents, so start from the chart's current defaults and modify only the required fields.
+
+:::
+
+To use your own API key, generate a new UUID:
+
+```bash
+uuidgen
+```
+
+Then update only these fields in the chart's existing `stream.conf` defaults:
+
+- In `parent.configs.stream.data`, replace the default section header `[11111111-2222-3333-4444-555555555555]` with your new UUID.
+- In `child.configs.stream.data`, replace `api key = 11111111-2222-3333-4444-555555555555` with the same UUID.
+- Change `destination = netdata:19999` only if you want children to stream to a parent outside the cluster.
+
+Apply it:
+
+```bash
+helm upgrade -f override.yml netdata netdata/netdata
+```
+
+If you want children to stream to a parent **outside** the cluster instead, point `destination` at that external parent and make sure its `stream.conf` accepts the same API key. For the full set of `stream.conf` options (TLS, filtering, retention, replication), see the [streaming documentation](/src/streaming/README.md).
+
 ### Configure service discovery
 
 Netdata's [service discovery](https://github.com/netdata/agent-service-discovery/#service-discovery), installed as part
