@@ -7,11 +7,7 @@ import (
 	"crypto/x509"
 	_ "embed"
 	"fmt"
-	"net/http"
 	"time"
-
-	cfssllog "github.com/cloudflare/cfssl/log"
-	"github.com/cloudflare/cfssl/revoke"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -24,16 +20,7 @@ var configSchema string
 //go:embed "charts.yaml"
 var chartTemplateYAML string
 
-// revocationRequestTimeout bounds each CRL, OCSP and issuer request of a revocation check.
-const revocationRequestTimeout = 10 * time.Second
-
 func init() {
-	// The revocation library is configured process-wide; this collector is its only user.
-	cfssllog.Level = cfssllog.LevelFatal
-	revoke.HTTPClient = &http.Client{
-		Timeout: revocationRequestTimeout,
-	}
-
 	collectorapi.Register("x509check", collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
@@ -54,7 +41,7 @@ func New() *Collector {
 		store:            store,
 		metrics:          newCollectorMetrics(store),
 		now:              time.Now,
-		revocationStatus: revoke.VerifyCertificateError,
+		revocationStatus: newRevocationChecker().status,
 	}
 }
 
@@ -68,7 +55,7 @@ type Collector struct {
 	metrics collectorMetrics
 
 	now              func() time.Time
-	revocationStatus func(*x509.Certificate) (revoked, ok bool, err error)
+	revocationStatus func(ctx context.Context, cert *x509.Certificate, now time.Time) (revoked, ok bool, err error)
 }
 
 func (c *Collector) Configuration() any {

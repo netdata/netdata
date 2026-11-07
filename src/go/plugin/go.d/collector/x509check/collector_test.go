@@ -181,7 +181,7 @@ func TestCollector_Check(t *testing.T) {
 			c := New()
 			c.provider = test.provider
 			c.CheckRevocation = true
-			c.revocationStatus = func(*x509.Certificate) (bool, bool, error) {
+			c.revocationStatus = func(context.Context, *x509.Certificate, time.Time) (bool, bool, error) {
 				t.Fatal("Check must not perform optional revocation I/O")
 				return false, false, nil
 			}
@@ -261,9 +261,10 @@ func TestCollector_Collect(t *testing.T) {
 				certs: certs,
 			}
 			calls := 0
-			c.revocationStatus = func(cert *x509.Certificate) (bool, bool, error) {
+			c.revocationStatus = func(_ context.Context, cert *x509.Certificate, at time.Time) (bool, bool, error) {
 				calls++
 				assert.Same(t, certs[0], cert)
+				assert.Equal(t, now, at)
 				return test.revoked, test.verified, test.verifyErr
 			}
 
@@ -285,15 +286,16 @@ func TestCollector_Collect(t *testing.T) {
 }
 
 func TestCollector_CollectHonorsCancellationDuringRevocationCheck(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	pki := newTestPKI(t, testPKIEndpoints{
+		crls: []testPKIHandler{cancelAndStall(cancel)},
+	})
 	c := New()
 	c.Source = "https://example.org:443"
 	c.CheckRevocation = true
-	c.provider = &mockProvider{certs: []*x509.Certificate{{NotAfter: time.Now().Add(time.Hour)}}}
-	release := make(chan struct{})
-	t.Cleanup(func() { close(release) })
-	c.revocationStatus = func(*x509.Certificate) (bool, bool, error) {
-		<-release
-		return false, true, nil
+	c.provider = &mockProvider{
+		certs: []*x509.Certificate{pki.leaf},
 	}
 	store, ok := metrix.AsCycleManagedStore(c.MetricStore())
 	require.True(t, ok)
@@ -301,8 +303,6 @@ func TestCollector_CollectHonorsCancellationDuringRevocationCheck(t *testing.T) 
 	cc.BeginCycle()
 	defer cc.AbortCycle()
 
-	ctx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(100*time.Millisecond, cancel)
 	done := make(chan error, 1)
 	go func() { done <- c.Collect(ctx) }()
 
@@ -312,6 +312,9 @@ func TestCollector_CollectHonorsCancellationDuringRevocationCheck(t *testing.T) 
 	case <-time.After(5 * time.Second):
 		t.Fatal("Collect is still waiting for a revocation check after cancellation")
 	}
+	assert.Equal(t, int64(1), pki.hits["crl"].Load())
+	assert.Eventually(t, func() bool { return pki.inFlight.Load() == 0 }, 5*time.Second, 10*time.Millisecond,
+		"the cancelled CRL request must end, not run on in the background")
 }
 
 func TestCollector_CollectAbort(t *testing.T) {
