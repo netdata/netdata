@@ -37,7 +37,8 @@ is read from disk instead. The collector never requests a page or sends mail.
 With `check_revocation_status` enabled, the collector also downloads the CRLs and queries the OCSP
 responders listed in the server certificate, and fetches the issuer certificate listed in it to verify the
 CRL and build the OCSP request. These requests go to the HTTP or HTTPS URLs in the certificate, so the Agent
-host needs outbound access to them.
+host needs outbound access to them. Each request times out after 10 seconds; `timeout` does not apply to
+them. Each job reuses a CRL's result for a certificate until the next update time the CRL states.
 
 
 This collector is supported on all platforms.
@@ -64,7 +65,9 @@ This integration doesn't support auto-detection.
 - A `file://` source provides only the first certificate in the file, so `check_full_chain` has no effect
   there.
 - Revocation status is checked for the server certificate only. A certificate that lists no CRL or OCSP
-  URL is always reported as not revoked, and an OCSP `unknown` answer is reported as revoked.
+  URL is always reported as not revoked (LDAP CRL URLs are skipped), and an OCSP `unknown` answer is
+  reported as revoked. When the issuer certificate cannot be downloaded, a CRL is used without checking
+  its signature.
 - With an `smtp://` source, `timeout` covers the whole SMTP exchange. A mail server that delays its
   greeting, a common anti-spam measure on port 25, needs a `timeout` longer than that delay.
 
@@ -733,11 +736,11 @@ Point `tls_cert` and `tls_key` at the certificate and the private key of the sam
 
 **Cause**
 
-A CRL listed in the certificate could not be downloaded or verified (`reason` names the URL), or the certificate is expired or not yet valid. The revocation status chart shows a gap.
+A CRL listed in the certificate could not be downloaded, parsed or verified (`reason` names the URL; only version 2 CRLs up to 64 MiB are accepted), or the certificate is expired or not yet valid. The revocation status chart shows a gap.
 
 **Fix**
 
-Check that the Agent host can reach the CRL URLs listed in the certificate, and renew an expired certificate.
+Check that the Agent host can reach the CRL URLs listed in the certificate, and renew an expired certificate. For an `unsupported crl version` reason, have the CA issue version 2 CRLs (with OpenSSL, set `crlnumber` in the CA configuration).
 
 #### revocation status of `source` could not be determined
 
