@@ -137,6 +137,7 @@ static inline void string_merge(STRING **stringpp, STRING *new_string) {
     string_freez(old);
 }
 
+// the caller MUST hold rrdcontext_lock(rc): this replaces and frees the context's metadata strings
 static void rrdcontext_merge_with(RRDCONTEXT *rc, bool archived, STRING *title, STRING *family, STRING *units, RRDSET_TYPE chart_type, uint32_t priority) {
     OLDNEW oldnew = oldnew_decide(rrd_flag_is_archived(rc), archived);
 
@@ -192,8 +193,25 @@ static void rrdcontext_merge_with(RRDCONTEXT *rc, bool archived, STRING *title, 
 }
 
 void rrdcontext_update_from_collected_rrdinstance(RRDINSTANCE *ri) {
-    rrdcontext_merge_with(ri->rc, rrd_flag_is_archived(ri),
-                          ri->title, ri->family, ri->units, ri->chart_type, ri->priority);
+    // rrdinstance_conflict_callback() swaps and frees the instance's strings under its spinlock:
+    // merge from our own references, taken under that lock
+    spinlock_lock(&ri->spinlock);
+    STRING *title = string_dup(ri->title);
+    STRING *family = string_dup(ri->family);
+    STRING *units = string_dup(ri->units);
+    RRDSET_TYPE chart_type = ri->chart_type;
+    uint32_t priority = ri->priority;
+    spinlock_unlock(&ri->spinlock);
+
+    // collectors merge into the same context from rrdcontext_conflict_callback(), under the context lock
+    RRDCONTEXT *rc = ri->rc;
+    rrdcontext_lock(rc);
+    rrdcontext_merge_with(rc, rrd_flag_is_archived(ri), title, family, units, chart_type, priority);
+    rrdcontext_unlock(rc);
+
+    string_freez(title);
+    string_freez(family);
+    string_freez(units);
 }
 
 static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *rrdhost __maybe_unused) {
