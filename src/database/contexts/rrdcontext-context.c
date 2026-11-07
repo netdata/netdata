@@ -193,8 +193,8 @@ static void rrdcontext_merge_with(RRDCONTEXT *rc, bool archived, STRING *title, 
 }
 
 void rrdcontext_update_from_collected_rrdinstance(RRDINSTANCE *ri) {
-    // rrdinstance_conflict_callback() swaps and frees the instance's strings under its spinlock:
-    // merge from our own references, taken under that lock
+    // rrdinstance_conflict_callback() swaps the instance's strings under its spinlock;
+    // take our own references before the old strings are freed after that lock is released
     spinlock_lock(&ri->spinlock);
     STRING *title = string_dup(ri->title);
     STRING *family = string_dup(ri->family);
