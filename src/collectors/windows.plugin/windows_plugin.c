@@ -229,7 +229,6 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = NULL},
-    // the terminator of this array
     {.name = "PerflibASP",
      .dim = "PerflibASP",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -238,6 +237,14 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = NULL},
+    {.name = "PerflibPagingFile",
+     .dim = "PerflibPagingFile",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibPagingFile,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_PerflibPagingFile_cleanup},
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL, .rd = NULL, .thread = NULL, .cleanup = NULL}};
 

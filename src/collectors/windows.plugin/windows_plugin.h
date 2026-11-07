@@ -64,6 +64,7 @@ int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
 int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
 int do_PerflibDNS(int update_every, usec_t dt __maybe_unused);
+int do_PerflibPagingFile(int update_every, usec_t dt __maybe_unused);
 
 // Cleanup
 void do_GetHardwareInfo_cleanup();
@@ -73,6 +74,7 @@ void do_GetSystemCPU_cleanup();
 void do_GetPowerSupply_cleanup();
 void do_PerflibSMB_cleanup();
 void do_PerflibStorage_cleanup();
+void do_PerflibPagingFile_cleanup(void);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY

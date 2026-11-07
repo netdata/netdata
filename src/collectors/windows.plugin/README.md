@@ -23,6 +23,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibProcesses = yes
         # PerflibProcessor = yes
         # PerflibMemory = yes
+        # PerflibPagingFile = yes
         # PerflibStorage = yes
         # PerflibNetwork = yes
         # PerflibSMB = yes
