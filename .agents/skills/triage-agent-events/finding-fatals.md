@@ -118,6 +118,14 @@ holder. A `[holder: ...]` suffix carries what the lock knows:
   can be a waiting writer's flicked bit. Treat them as leads.
 - No suffix: plain spinlock, waitq, or an older agent.
 
+`Failed to initialize SQLite` (`rrd_init`, metadata database) is
+mostly environmental. Agents with the precise-reason change append
+`metadata database: <stage> [PRAGMA <name> | #<index>] failed:
+SQLite rc <n>, extended <n> (<text>), OS errno <n>` and, for
+corruption, whether recovery was requested for the next start.
+Match the message by prefix. Older agents carry no reason, and
+their `AE_FATAL_ERRNO` is not SQLite's error.
+
 ### `no last status`
 
 First-ever start, or the prior status file was corrupted /

@@ -628,18 +628,67 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
     return rc;
 }
 
-char *get_database_extented_error(sqlite3 *database, int i, const char *description)
+static __thread SQLITE_INIT_FAILURE sqlite_init_failure_last;
+
+void sqlite_init_failure_clear(void)
 {
-    const char *err = sqlite3_errstr(sqlite3_extended_errcode(database));
+    memset(&sqlite_init_failure_last, 0, sizeof(sqlite_init_failure_last));
+}
 
-    if (!err)
-        return NULL;
+void sqlite_init_failure_record(sqlite3 *database, const char *stage, const char *statement, int rc)
+{
+    SQLITE_INIT_FAILURE *f = &sqlite_init_failure_last;
+    memset(f, 0, sizeof(*f));
+    f->stage = stage;
+    f->rc = rc;
+    // the connection's codes describe the call that just failed, as long as nothing else used it since
+    f->extended_rc = database ? sqlite3_extended_errcode(database) : rc;
+    f->os_errno = database ? sqlite3_system_errno(database) : 0;
 
-    size_t len = strlen(err)+ strlen(description) + 32;
-    char *full_err = mallocz(len);
+    // the returned code is authoritative; if the connection reports another error, it is not about this call
+    if ((f->extended_rc & 0xff) != (rc & 0xff)) {
+        f->extended_rc = rc;
+        f->os_errno = 0;
+    }
+    if (statement)
+        strncpyz(f->statement, statement, sizeof(f->statement) - 1);
+}
 
-    snprintfz(full_err, len - 1, "%s: %d: %s", description, i,  err);
-    return full_err;
+void sqlite_init_failure_get(SQLITE_INIT_FAILURE *dst)
+{
+    *dst = sqlite_init_failure_last;
+}
+
+void sqlite_init_failure_format(const SQLITE_INIT_FAILURE *f, char *dst, size_t dst_size)
+{
+    if (!f->stage) {
+        strncpyz(dst, "no SQLite error recorded", dst_size - 1);
+        return;
+    }
+
+    const char *recovery = "";
+    if (f->recovery == SQLITE_INIT_RECOVERY_REQUESTED)
+        recovery = "; recovery requested for the next start";
+    else if (f->recovery == SQLITE_INIT_RECOVERY_NOT_MARKED)
+        recovery = "; recovery could not be requested";
+
+    snprintfz(dst, dst_size - 1, "%s%s%s failed: SQLite rc %d, extended %d (%s), OS errno %d%s",
+              f->stage, *f->statement ? " " : "", f->statement,
+              f->rc, f->extended_rc, sqlite3_errstr(f->extended_rc), f->os_errno, recovery);
+}
+
+// A statement id that is safe to report: the PRAGMA name, or the index in the batch.
+static void init_statement_id(char *dst, size_t dst_size, const char *sql, int index)
+{
+    if (strncasecmp(sql, "PRAGMA ", 7) == 0) {
+        const char *s = sql + 7;
+        size_t len = strspn(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.");
+        if (len && len + 8 < dst_size) {
+            snprintfz(dst, dst_size - 1, "PRAGMA %.*s", (int)len, s);
+            return;
+        }
+    }
+    snprintfz(dst, dst_size - 1, "#%d", index);
 }
 
 int init_database_batch(sqlite3 *database, const char *batch[], const char *description)
@@ -649,15 +698,19 @@ int init_database_batch(sqlite3 *database, const char *batch[], const char *desc
     for (int i = 0; batch[i]; i++) {
         rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
+            char statement[sizeof(sqlite_init_failure_last.statement)];
+            init_statement_id(statement, sizeof(statement), batch[i], i);
+            sqlite_init_failure_record(database, description, statement, rc);
+
             error_report("SQLite error during database initialization, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", batch[i]);
-            char *error_str = get_database_extented_error(database, i, description);
-            if (error_str)
-                analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
             sqlite3_free(err_msg);
-            freez(error_str);
             if (SQLITE_CORRUPT == rc || SQLITE_NOTADB == rc) {
-                if (mark_database_to_recover(NULL, database, rc))
+                bool marked = mark_database_to_recover(NULL, database, rc);
+                if (database == db_meta)
+                    sqlite_init_failure_last.recovery =
+                        marked ? SQLITE_INIT_RECOVERY_REQUESTED : SQLITE_INIT_RECOVERY_NOT_MARKED;
+                if (marked)
                     error_report("Database is corrupted will attempt to fix");
                 return SQLITE_CORRUPT;
             }
