@@ -137,6 +137,9 @@ pub struct NetdataTracesService {
     /// region, so tenants ingest in parallel (same discipline as the logs
     /// service).
     writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
+    /// One fsync round at a time per tenant; requests that arrive during a
+    /// round wait here, and one round after it covers them all.
+    sync_gates: Mutex<HashMap<TenantId, Arc<tokio::sync::Mutex<()>>>>,
     /// Process-wide monotonic clock, shared across tenants, streams, and
     /// signals (lib.rs creates one instance for logs + traces): the WAL writer
     /// stamps per-frame `ingestion_ns` from it, so one clock keeps frame
@@ -176,6 +179,7 @@ impl NetdataTracesService {
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
+            sync_gates: Mutex::new(HashMap::new()),
             clock,
             sender,
             wal_base_dir,
@@ -395,7 +399,13 @@ impl NetdataTracesService {
                 )
             }
         };
-        {
+        // The writer lock covers the writes and the event sends, not the
+        // fsyncs: holding it across them serialized every request of the
+        // tenant behind the slowest fsync. Events still go out under the lock,
+        // so each file's Created/Synced/Closed reach the ledger in order.
+        // Fsync rounds take turns at the tenant's sync gate; a request whose
+        // bytes an earlier round already made durable skips its own.
+        let target = {
             let mut writer = writer.lock().unwrap();
             for p in &prepared {
                 let ingestion_ns = self.clock.lock().unwrap().now_ns();
@@ -423,21 +433,45 @@ impl NetdataTracesService {
                         Status::internal("WAL write error")
                     })?;
             }
-            writer.sync_all().map_err(|e| {
+            let target = writer.sync_target();
+            let events = writer.take_all_events();
+            self.sender.send_events(tenant_id.clone(), events);
+            target
+        };
+        let gate = {
+            let mut gates = self.sync_gates.lock().unwrap();
+            Arc::clone(gates.entry(tenant_id.clone()).or_default())
+        };
+        let _turn = gate.lock().await;
+        let ticket = {
+            let mut writer = writer.lock().unwrap();
+            if writer.is_covered(&target) {
+                None
+            } else {
+                Some(writer.begin_sync())
+            }
+        };
+        let Some(ticket) = ticket else {
+            return Ok(ExportTraceServiceResponse {
+                partial_success: build_partial_success(out_of_window),
+            });
+        };
+        // Off the async workers: an fsync can take tens of milliseconds.
+        let ticket = tokio::task::spawn_blocking(move || ticket.fsync())
+            .await
+            .map_err(|e| {
+                tracing::error!(%e, "traces WAL sync task failed");
+                Status::internal("WAL sync error")
+            })?;
+        {
+            let mut writer = writer.lock().unwrap();
+            let result = writer.finish_sync(ticket);
+            let events = writer.take_all_events();
+            self.sender.send_events(tenant_id.clone(), events);
+            result.map_err(|e| {
                 tracing::error!(%e, "failed to sync traces WAL");
                 Status::internal("WAL sync error")
             })?;
-            // Drain AND forward the lifecycle events while STILL holding the
-            // writer lock, so drain+send is atomic per tenant: a file's
-            // Created→Synced→Closed reach the one ledger channel in the order
-            // the lock serialized their writes. `send_events` is synchronous
-            // and non-blocking (unbounded channel), so no `.await` under the
-            // lock.
-            let events = writer.take_all_events();
-            // `send_events` takes the tenant by value and the core only
-            // borrows it, so clone here — the last use of the id in this
-            // request either way.
-            self.sender.send_events(tenant_id.clone(), events);
         }
 
         Ok(ExportTraceServiceResponse {
