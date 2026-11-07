@@ -381,8 +381,9 @@ func (r *ownedJobRegistry) submitChild(child *ownedChildIntent) error {
 	uid := r.nextLocked()
 	r.mu.Unlock()
 	plan := jobmgr.WorkPlan{
-		Claims:     []string{DynCfgJobGraphClaim},
-		NoResponse: true,
+		Claims:              []string{DynCfgJobGraphClaim},
+		NoResponse:          true,
+		YieldClaimOnPrepare: DynCfgJobGraphClaim,
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID: child.id,
 			Prepare: func(ctx context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {

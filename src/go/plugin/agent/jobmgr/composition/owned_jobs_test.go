@@ -37,6 +37,19 @@ func newOwnedRun(
 	discovered ...confgroup.Config,
 ) (*runGeneration, ownedjobs.Registry, *processSynchronizedBuffer) {
 	t.Helper()
+	return newOwnedRunWithCreator(t, collectorapi.Creator{
+		Create: create,
+		Config: func() any { return &collectorapi.MockConfiguration{} },
+	}, ownerOnly, discovered...)
+}
+
+func newOwnedRunWithCreator(
+	t *testing.T,
+	creator collectorapi.Creator,
+	ownerOnly bool,
+	discovered ...confgroup.Config,
+) (*runGeneration, ownedjobs.Registry, *processSynchronizedBuffer) {
+	t.Helper()
 	output := newProcessSynchronizedBuffer()
 	frames, err := lifecycle.NewFrameOwner(output)
 	require.NoError(t, err)
@@ -60,7 +73,7 @@ func newOwnedRun(
 		UIDs:            uids,
 		Frames:          frames,
 		Modules: collectorapi.Registry{
-			"module": {Create: create, Config: func() any { return &collectorapi.MockConfiguration{} }},
+			"module": creator,
 		},
 		Jobs:      services,
 		Discovery: discovery,
@@ -587,4 +600,121 @@ func TestOwnedJobsCompositionFreezesExcludedModules(t *testing.T) {
 	require.NoError(t, err)
 	config.OwnerOnlyModules[0] = "changed"
 	require.Equal(t, []string{"test"}, process.core.config.Discovery.ExcludedModules)
+}
+
+func TestOwnedJobsDeclaredDependencyWaitsThenStartsWithoutResettingSibling(t *testing.T) {
+	var ready atomic.Bool
+	var dependentInits atomic.Int64
+	creator := collectorapi.Creator{
+		Config: func() any { return &collectorapi.MockConfiguration{} },
+		Create: func() collectorapi.CollectorV1 {
+			collector := ownedTestCollector().(*collectorapi.MockCollectorV1)
+			collector.InitFunc = func(context.Context) error {
+				if collector.Config.OptionStr == "dependent" {
+					dependentInits.Add(1)
+				}
+				return nil
+			}
+			return collector
+		},
+		ActivationDependencies: func(config map[string]any) ([]collectorapi.ActivationDependency, error) {
+			if config["option_str"] != "dependent" {
+				return nil, nil
+			}
+			return []collectorapi.ActivationDependency{{Kind: "owned-runtime", Name: "browser", Ready: func() error {
+				if ready.Load() {
+					return nil
+				}
+				return errors.New("runtime pending")
+			}}}, nil
+		},
+	}
+	generation, registry, _ := newOwnedRunWithCreator(t, creator, true)
+	owner, err := registry.Bind(t.Context(), "site")
+	require.NoError(t, err)
+	children := ownedTestChildren(2)
+	children[0].Config.Set("option_str", "dependent")
+	applyOwned(t, owner, 1, children)
+	require.Eventually(t, func() bool {
+		states := owner.Status()
+		return states[0].ConfigStatus == "accepted" && states[0].Desired == states[0].Applied &&
+			states[1].RuntimeStatus == "active"
+	}, time.Second, time.Millisecond)
+	pending := owner.Status()
+	require.Zero(t, dependentInits.Load(), "unavailable declared dependency must prevent collector Init")
+	ready.Store(true)
+	generation.dyncfg.NotifyDependencyChanged("owned-runtime", "browser")
+	after := waitOwnedRunning(t, owner, 2)
+	require.EqualValues(t, 1, dependentInits.Load())
+	require.Equal(t, pending[0].Desired, after[0].Desired)
+	require.Equal(t, pending[1].Desired, after[1].Desired)
+	require.Equal(t, pending[1].Generation, after[1].Generation)
+	require.NoError(t, generation.run.DirtyCause())
+}
+
+func TestOwnedJobsParentEditSupersedesYieldedDependencyAdmission(t *testing.T) {
+	entered, release := make(chan struct{}, 1), make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	var blockNext atomic.Bool
+	var oldInits, newInits atomic.Int64
+	creator := collectorapi.Creator{
+		Config: func() any { return &collectorapi.MockConfiguration{} },
+		Create: func() collectorapi.CollectorV1 {
+			if blockNext.CompareAndSwap(true, false) {
+				entered <- struct{}{}
+				<-release
+			}
+			collector := ownedTestCollector().(*collectorapi.MockCollectorV1)
+			collector.InitFunc = func(context.Context) error {
+				switch collector.Config.OptionStr {
+				case "old":
+					oldInits.Add(1)
+				case "new":
+					newInits.Add(1)
+				}
+				return nil
+			}
+			return collector
+		},
+		ActivationDependencies: func(map[string]any) ([]collectorapi.ActivationDependency, error) {
+			return []collectorapi.ActivationDependency{
+				{Kind: "owned-runtime", Name: "browser", Ready: func() error { return nil }},
+			}, nil
+		},
+	}
+	generation, registry, _ := newOwnedRunWithCreator(t, creator, true)
+	t.Cleanup(unblock)
+	owner, err := registry.Bind(t.Context(), "site")
+	require.NoError(t, err)
+	children := ownedTestChildren(2)
+	applyOwned(t, owner, 1, children[1:])
+	healthy := waitOwnedRunning(t, owner, 1)[0]
+	children[0].Config.Set("option_str", "old")
+	blockNext.Store(true)
+	applyOwned(t, owner, 2, children)
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("declared-dependency admission did not enter configuration validation")
+	}
+	children[0].Config.Set("option_str", "new")
+	applyCtx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	snapshot, err := owner.Prepare(applyCtx, 3, children)
+	require.NoError(t, err)
+	require.NoError(
+		t,
+		snapshot.Apply(applyCtx),
+		"parent edit must acquire the yielded graph claim before validation drains",
+	)
+	during := owner.Status()
+	require.Equal(t, healthy.Desired, during[1].Desired)
+	require.Equal(t, healthy.Generation, during[1].Generation)
+	unblock()
+	after := waitOwnedRunning(t, owner, 2)
+	require.Zero(t, oldInits.Load(), "superseded admission must not initialize its old configuration")
+	require.EqualValues(t, 1, newInits.Load())
+	require.Equal(t, healthy.Generation, after[1].Generation)
+	require.NoError(t, generation.run.DirtyCause())
 }

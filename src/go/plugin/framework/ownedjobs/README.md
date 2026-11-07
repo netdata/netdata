@@ -39,6 +39,10 @@ Application checks the parent lifetime and predecessor revision again. `errors.I
 the owner or snapshot is no longer current; the candidate was not adopted. Context cancellation and other errors
 must retain their own meaning rather than being treated as stale-edit rejection.
 
+`Apply` waits for the parent adoption command to settle, but can return context cancellation after the desired set was
+adopted. The parent MUST coordinate its canonical document with adoption instead of treating every error as rejection.
+`Status` is a child realization projection: an empty desired set has no rows and supplies no parent adoption receipt.
+
 A child's stable `Key` is local to its parent. `Config` contains its native module/name and collector configuration;
 the native job identity must also be unique. `Enabled: false` retains a desired child without running it. Omitting
 a previously present child removes it.
