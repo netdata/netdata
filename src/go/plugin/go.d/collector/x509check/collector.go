@@ -55,7 +55,7 @@ type Collector struct {
 	metrics collectorMetrics
 
 	now              func() time.Time
-	revocationStatus func(ctx context.Context, cert *x509.Certificate, now time.Time) (revoked, ok bool, err error)
+	revocationStatus func(ctx context.Context, chain []*x509.Certificate, now time.Time) (revoked, ok bool, err error)
 }
 
 func (c *Collector) Configuration() any {

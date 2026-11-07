@@ -40,10 +40,11 @@ modules:
           is read from disk instead. The collector never requests a page or sends mail.
 
           With `check_revocation_status` enabled, the collector also downloads the CRLs and queries the OCSP
-          responders listed in the server certificate, and fetches the issuer certificate listed in it to verify the
-          CRL and build the OCSP request. These requests go to the HTTP or HTTPS URLs in the certificate, so the Agent
-          host needs outbound access to them. Each request times out after 10 seconds; `timeout` does not apply to
-          them. Each job reuses a CRL's result for a certificate until the next update time the CRL states.
+          responders listed in the server certificate. It verifies their answers with the certificate of the issuer
+          that signed the server certificate: the one the server sends, or else the one downloaded from the issuer URL
+          listed in the server certificate. These requests go to the HTTP or HTTPS URLs in the certificate, so the
+          Agent host needs outbound access to them. Each request times out after 10 seconds; `timeout` does not apply
+          to them. Each job reuses a CRL's result for a certificate until the next update time the CRL states.
       default_behavior:
         auto_detection:
           description: ""
@@ -57,8 +58,13 @@ modules:
               there.
             - Revocation status is checked for the server certificate only. A certificate that lists no CRL or OCSP
               URL is always reported as not revoked (LDAP CRL URLs are skipped), and an OCSP `unknown` answer is
-              reported as revoked. When the issuer certificate cannot be downloaded, a CRL is used without checking
-              its signature.
+              reported as revoked.
+            - Revocation status comes only from CRLs and OCSP answers that verify against the issuer of the server
+              certificate and are current by the Agent host's clock, within 5 minutes. The chart shows a gap when the
+              issuer certificate is unavailable (a private CA whose certificates list no issuer URL, behind a server
+              that does not send the CA certificate; a `file://` source whose certificate lists no issuer URL), when
+              the CA publishes outdated CRLs or OCSP answers, or when the Agent host's clock is off by more than 5
+              minutes.
             - With an `smtp://` source, `timeout` covers the whole SMTP exchange. A mail server that delays its
               greeting, a common anti-spam measure on port 25, needs a `timeout` longer than that delay.
         performance_impact:
@@ -365,19 +371,27 @@ modules:
           - error: "revocation status check for `source` failed: `reason`"
             when: "`check_revocation_status` is enabled."
             cause: >-
-              A CRL listed in the certificate could not be downloaded, parsed or verified (`reason` names the URL; only
-              version 2 CRLs up to 64 MiB are accepted), or the certificate is expired or not yet valid. The
-              revocation status chart shows a gap.
+              A CRL listed in the certificate could not be downloaded, parsed or verified, or the certificate is
+              expired or not yet valid; `reason` names the CRL URL and the problem. Only version 2 CRLs up to 64 MiB
+              are accepted, and only complete CRLs (not delta or indirect CRLs) that the certificate's issuer issued
+              and signed, that cover the server certificate, and that are current within 5 minutes. The revocation
+              status chart shows a gap.
             fix: >-
-              Check that the Agent host can reach the CRL URLs listed in the certificate, and renew an expired
-              certificate. For an `unsupported crl version` reason, have the CA issue version 2 CRLs (with OpenSSL, set
-              `crlnumber` in the CA configuration).
+              Check that the Agent host can reach the CRL URLs listed in the certificate and that its clock is
+              correct, and renew an expired certificate. For an `unsupported crl version` reason, have the CA issue
+              version 2 CRLs (with OpenSSL, set `crlnumber` in the CA configuration). For an `outdated since` reason,
+              have the CA publish a current CRL.
           - error: "revocation status of `source` could not be determined"
             when: "`check_revocation_status` is enabled."
             cause: >-
-              No OCSP responder listed in the certificate returned a usable answer, or the issuer certificate needed
-              for the OCSP request is not listed or could not be downloaded. The revocation status chart shows a gap.
-            fix: Check that the Agent host can reach the OCSP and issuer certificate URLs listed in the certificate.
+              The issuer certificate of the server certificate is unavailable: the server does not send it, and the
+              issuer URL listed in the certificate is missing, unreachable, or serves a certificate that did not sign
+              the server certificate. Or no OCSP responder listed in the certificate returned a usable answer: one
+              that is current within 5 minutes and signed by the issuer or by a responder it authorized for OCSP
+              signing. The revocation status chart shows a gap.
+            fix: >-
+              Configure the server to send its intermediate CA certificates, and check that the Agent host can reach
+              the issuer certificate and OCSP URLs listed in the certificate and that its clock is correct.
     metrics:
       folding:
         title: Metrics

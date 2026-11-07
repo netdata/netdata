@@ -33,7 +33,7 @@ func TestCollector_ChartContract(t *testing.T) {
 			}, NotAfter: time.Now().Add(24 * time.Hour)},
 		},
 	}
-	c.revocationStatus = func(context.Context, *x509.Certificate, time.Time) (bool, bool, error) {
+	c.revocationStatus = func(context.Context, []*x509.Certificate, time.Time) (bool, bool, error) {
 		return true, true, nil
 	}
 	require.NoError(t, collectCycle(t, c))
@@ -117,7 +117,7 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 	}
 	c.provider = provider
 	verified := true
-	c.revocationStatus = func(context.Context, *x509.Certificate, time.Time) (bool, bool, error) {
+	c.revocationStatus = func(context.Context, []*x509.Certificate, time.Time) (bool, bool, error) {
 		return false, verified, nil
 	}
 	engine := newEngine(t, c)

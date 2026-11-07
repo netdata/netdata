@@ -181,7 +181,7 @@ func TestCollector_Check(t *testing.T) {
 			c := New()
 			c.provider = test.provider
 			c.CheckRevocation = true
-			c.revocationStatus = func(context.Context, *x509.Certificate, time.Time) (bool, bool, error) {
+			c.revocationStatus = func(context.Context, []*x509.Certificate, time.Time) (bool, bool, error) {
 				t.Fatal("Check must not perform optional revocation I/O")
 				return false, false, nil
 			}
@@ -261,9 +261,10 @@ func TestCollector_Collect(t *testing.T) {
 				certs: certs,
 			}
 			calls := 0
-			c.revocationStatus = func(_ context.Context, cert *x509.Certificate, at time.Time) (bool, bool, error) {
+			c.revocationStatus = func(_ context.Context, chain []*x509.Certificate, at time.Time) (bool, bool, error) {
 				calls++
-				assert.Same(t, certs[0], cert)
+				// The whole chain, also when only the server certificate is charted.
+				assert.Equal(t, certs, chain)
 				assert.Equal(t, now, at)
 				return test.revoked, test.verified, test.verifyErr
 			}
@@ -294,8 +295,9 @@ func TestCollector_CollectHonorsCancellationDuringRevocationCheck(t *testing.T) 
 	c := New()
 	c.Source = "https://example.org:443"
 	c.CheckRevocation = true
+	// The presented CA signed the server certificate, so the CRL is requested.
 	c.provider = &mockProvider{
-		certs: []*x509.Certificate{pki.leaf},
+		certs: []*x509.Certificate{pki.leaf, pki.ca},
 	}
 	store, ok := metrix.AsCycleManagedStore(c.MetricStore())
 	require.True(t, ok)

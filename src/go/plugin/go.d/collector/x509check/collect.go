@@ -13,12 +13,13 @@ import (
 )
 
 func (c *Collector) collect(ctx context.Context) error {
-	certs, err := c.fetchCertificates(ctx)
+	chain, err := c.fetchCertificates(ctx)
 	if err != nil {
 		return err
 	}
+	certs := chain
 	if !c.CheckFullChain {
-		certs = certs[:1]
+		certs = chain[:1]
 	}
 
 	now := c.now()
@@ -42,7 +43,8 @@ func (c *Collector) collect(ctx context.Context) error {
 		c.metrics.expiry.Observe(float64(int64(cert.NotAfter.Sub(now).Seconds())), labels)
 
 		if depth == 0 && c.CheckRevocation {
-			if err := c.collectRevocationStatus(ctx, cert, now, labels); err != nil {
+			// The whole chain, which can hold the server certificate's issuer.
+			if err := c.collectRevocationStatus(ctx, chain, now, labels); err != nil {
 				return err
 			}
 		}
@@ -66,14 +68,15 @@ func (c *Collector) fetchCertificates(ctx context.Context) ([]*x509.Certificate,
 	return certs, nil
 }
 
-// collectRevocationStatus leaves a gap when the status cannot be determined. It returns only the context error.
+// collectRevocationStatus records the status of the server certificate, chain[0], and leaves a gap when it cannot be
+// determined. It returns only the context error.
 func (c *Collector) collectRevocationStatus(
 	ctx context.Context,
-	cert *x509.Certificate,
+	chain []*x509.Certificate,
 	now time.Time,
 	labels metrix.LabelSet,
 ) error {
-	revoked, ok, err := c.revocationStatus(ctx, cert, now)
+	revoked, ok, err := c.revocationStatus(ctx, chain, now)
 	// A cancelled request reads as a failed or undetermined check; report the cancellation itself.
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return ctxErr
