@@ -388,7 +388,7 @@ mod tests {
     use super::*;
     use crate::{
         CardinalityLimit, ChartDescriptor, ChartType, ChartsBuilder, Counter, CumulativeCounter,
-        Gauge, Histogram, Measurements, MetricSetBuilder, MetricSetError, Settings,
+        Error, Gauge, Histogram, Measurements, MetricSetBuilder, Settings,
     };
     use netdata_plugin_protocol::validate_chart_stream;
     use std::time::Duration;
@@ -429,31 +429,35 @@ mod tests {
         let duration = builder.histogram(BOUNDS).unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.chart(
-            requests,
-            ChartDescriptor {
-                title: "Requests".into(),
-                units: "requests/s".into(),
-                family: "requests".into(),
-                context: "svc.requests".into(),
-                chart_type: ChartType::Stacked,
-                priority: 1,
-            },
-        );
-        charts.histogram(
-            duration,
-            ChartDescriptor {
-                title: "Duration".into(),
-                units: "seconds".into(),
-                family: "requests".into(),
-                context: "svc.duration".into(),
-                chart_type: ChartType::Line,
-                priority: 2,
-            },
-            "requests/s".into(),
-        );
+        charts
+            .chart(
+                requests,
+                ChartDescriptor {
+                    title: "Requests".into(),
+                    units: "requests/s".into(),
+                    family: "requests".into(),
+                    context: "svc.requests".into(),
+                    chart_type: ChartType::Stacked,
+                    priority: 1,
+                },
+            )
+            .unwrap();
+        charts
+            .histogram(
+                duration,
+                ChartDescriptor {
+                    title: "Duration".into(),
+                    units: "seconds".into(),
+                    family: "requests".into(),
+                    context: "svc.duration".into(),
+                    chart_type: ChartType::Line,
+                    priority: 2,
+                },
+                "requests/s".into(),
+            )
+            .unwrap();
         Fixture {
-            charts: charts.build(),
+            charts: charts.build().unwrap(),
             set,
             requests,
             duration,
@@ -746,18 +750,20 @@ mod tests {
         let totals = builder.cumulative_counter::<Events>().unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.chart(
-            totals,
-            ChartDescriptor {
-                title: "Events".into(),
-                units: "events/s".into(),
-                family: "events".into(),
-                context: "src.events".into(),
-                chart_type: ChartType::Line,
-                priority: 1,
-            },
-        );
-        let mut aggregator = Aggregator::new(&charts.build());
+        charts
+            .chart(
+                totals,
+                ChartDescriptor {
+                    title: "Events".into(),
+                    units: "events/s".into(),
+                    family: "events".into(),
+                    context: "src.events".into(),
+                    chart_type: ChartType::Line,
+                    priority: 1,
+                },
+            )
+            .unwrap();
+        let mut aggregator = Aggregator::new(&charts.build().unwrap());
         let set_total = |aggregator: &mut Aggregator, time: u64, total: Option<f64>| {
             let mut batch = Batch::new(&set);
             let mut entity = batch.entity(Labels::new());
@@ -833,21 +839,21 @@ mod tests {
                     collection_interval: Duration::from_millis(1500),
                     ..Settings::default()
                 },
-                MetricSetError::CollectionInterval(Duration::from_millis(1500)),
+                Error::CollectionInterval(Duration::from_millis(1500)),
             ),
             (
                 Settings {
                     collection_interval: Duration::ZERO,
                     ..Settings::default()
                 },
-                MetricSetError::CollectionInterval(Duration::ZERO),
+                Error::CollectionInterval(Duration::ZERO),
             ),
             (
                 Settings {
                     collection_interval: Duration::from_secs(1 << 31),
                     ..Settings::default()
                 },
-                MetricSetError::CollectionInterval(Duration::from_secs(1 << 31)),
+                Error::CollectionInterval(Duration::from_secs(1 << 31)),
             ),
             (
                 // Rounded up to 61 collection intervals.
@@ -855,28 +861,28 @@ mod tests {
                     allowed_lateness: Duration::from_millis(60_500),
                     ..Settings::default()
                 },
-                MetricSetError::AllowedLateness(Duration::from_millis(60_500)),
+                Error::AllowedLateness(Duration::from_millis(60_500)),
             ),
             (
                 Settings {
                     expiry: Duration::ZERO,
                     ..Settings::default()
                 },
-                MetricSetError::ZeroExpiry,
+                Error::ZeroExpiry,
             ),
             (
                 Settings {
                     cardinality_limit: limit(0, labels("overflow")),
                     ..Settings::default()
                 },
-                MetricSetError::ZeroCardinalityLimit,
+                Error::ZeroCardinalityLimit,
             ),
             (
                 Settings {
                     cardinality_limit: limit(10, Labels::new()),
                     ..Settings::default()
                 },
-                MetricSetError::NoOverflowLabels,
+                Error::NoOverflowLabels,
             ),
         ];
         for (settings, error) in cases {
@@ -918,11 +924,15 @@ mod tests {
         let duration = builder.histogram(BOUNDS).unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.chart(requests, descriptor("svc.requests", 1));
-        charts.chart(queued, descriptor("svc.queued", 1));
-        charts.chart(totals, descriptor("svc.events", 1));
-        charts.histogram(duration, descriptor("svc.duration", 1), "requests/s".into());
-        let mut aggregator = Aggregator::new(&charts.build());
+        charts
+            .chart(requests, descriptor("svc.requests", 1))
+            .unwrap();
+        charts.chart(queued, descriptor("svc.queued", 1)).unwrap();
+        charts.chart(totals, descriptor("svc.events", 1)).unwrap();
+        charts
+            .histogram(duration, descriptor("svc.duration", 1), "requests/s".into())
+            .unwrap();
+        let mut aggregator = Aggregator::new(&charts.build().unwrap());
         let mut batch = Batch::new(&set);
         let mut entity = batch.entity(Labels::new());
         entity
@@ -1019,12 +1029,14 @@ mod tests {
         let duration = builder.histogram(bounds).unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.chart(requests, descriptor("x.requests", 1));
-        charts.chart(totals, descriptor("x.totals", 2));
-        charts.chart(queue, descriptor("x.queue", 3));
-        charts.histogram(duration, descriptor("x.duration", 4), "u".into());
+        charts.chart(requests, descriptor("x.requests", 1)).unwrap();
+        charts.chart(totals, descriptor("x.totals", 2)).unwrap();
+        charts.chart(queue, descriptor("x.queue", 3)).unwrap();
+        charts
+            .histogram(duration, descriptor("x.duration", 4), "u".into())
+            .unwrap();
         Every {
-            charts: charts.build(),
+            charts: charts.build().unwrap(),
             set,
             requests,
             totals,
@@ -1066,10 +1078,12 @@ mod tests {
         let duration = builder.histogram(&[1.0]).unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.histogram(duration, descriptor("x.duration", 1), "u".into());
-        charts.chart(queue, descriptor("x.queue", 4));
-        charts.chart(requests, descriptor("x.requests", 5));
-        let mut aggregator = Aggregator::new(&charts.build());
+        charts
+            .histogram(duration, descriptor("x.duration", 1), "u".into())
+            .unwrap();
+        charts.chart(queue, descriptor("x.queue", 4)).unwrap();
+        charts.chart(requests, descriptor("x.requests", 5)).unwrap();
+        let mut aggregator = Aggregator::new(&charts.build().unwrap());
         merge_event(&set, &mut aggregator, 10, 10, |m| {
             m.add(requests, Outcome::Error, 4.0)
                 .set_value(queue, Queue::Jobs, 7.0)
@@ -1303,12 +1317,14 @@ mod tests {
         let queue = builder.gauge::<Queue>().unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.chart(first, descriptor("x.first", 1));
-        charts.chart(requests, descriptor("x.requests", 2));
-        charts.chart(second, descriptor("x.second", 3));
-        charts.histogram(duration, descriptor("x.duration", 4), "u".into());
-        charts.chart(queue, descriptor("x.queue", 8));
-        let mut aggregator = Aggregator::new(&charts.build());
+        charts.chart(first, descriptor("x.first", 1)).unwrap();
+        charts.chart(requests, descriptor("x.requests", 2)).unwrap();
+        charts.chart(second, descriptor("x.second", 3)).unwrap();
+        charts
+            .histogram(duration, descriptor("x.duration", 4), "u".into())
+            .unwrap();
+        charts.chart(queue, descriptor("x.queue", 8)).unwrap();
+        let mut aggregator = Aggregator::new(&charts.build().unwrap());
         for (time, totals) in [(10, [10.0, 20.0, 30.0]), (11, [11.0, 25.0, 33.0])] {
             merge_event(&set, &mut aggregator, time, time, |m| {
                 m.set_total(first, Pair::A, totals[0])
@@ -1328,18 +1344,18 @@ mod tests {
         assert_eq!(values(&out, "jobs"), ["7", "7"]);
     }
 
-    /// Declares one gauge of `C` and charts it as `context`.
-    #[cfg(debug_assertions)]
-    fn chart_one<C: crate::Column>(context: &'static str) {
+    /// Declares one gauge of `C` and charts it as `context`, then finishes
+    /// the charts.
+    fn chart_one<C: crate::Column>(context: &'static str) -> Result<Charts, Error> {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         let gauge = builder.gauge::<C>().unwrap();
         let set = builder.build().unwrap();
-        ChartsBuilder::new(&set).chart(gauge, descriptor(context, 1));
+        let mut charts = ChartsBuilder::new(&set);
+        charts.chart(gauge, descriptor(context, 1))?;
+        charts.build()
     }
 
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "invalid dimension id")]
     fn dimension_ids_are_checked_before_the_context() {
         #[derive(Clone, Copy)]
         struct Bad;
@@ -1349,34 +1365,51 @@ mod tests {
                 0
             }
         }
-        chart_one::<Bad>("nodot");
+        assert_eq!(
+            chart_one::<Bad>("nodot").err(),
+            Some(Error::InvalidDimensionId("bad id".into()))
+        );
     }
 
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "invalid context \"nodot\"")]
-    fn a_context_without_a_dot_is_refused() {
-        chart_one::<Queue>("nodot");
+    fn invalid_contexts_are_refused() {
+        for context in ["nodot", ".x", "x.", "x y.z", "x/y.z"] {
+            assert_eq!(
+                chart_one::<Queue>(context).err(),
+                Some(Error::InvalidContext(context.into())),
+                "{context:?}"
+            );
+        }
     }
 
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "ends like an entity suffix")]
     fn a_context_ending_like_an_entity_suffix_is_refused() {
-        chart_one::<Seen>("x.c_overflow");
+        for context in ["x.c_overflow", "x.c_0123456789abcdef"] {
+            assert_eq!(
+                chart_one::<Seen>(context).err(),
+                Some(Error::ContextLikeEntitySuffix(context.into())),
+                "{context:?}"
+            );
+        }
     }
 
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "duplicate context \"x.c\"")]
     fn a_used_context_is_refused() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         let requests = builder.counter::<Outcome>().unwrap();
         let queue = builder.gauge::<Queue>().unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.chart(requests, descriptor("x.c", 1));
-        charts.chart(queue, descriptor("x.c", 2));
+        charts.chart(requests, descriptor("x.c", 1)).unwrap();
+        assert_eq!(
+            charts.chart(queue, descriptor("x.c", 2)).err(),
+            Some(Error::DuplicateContext("x.c".into()))
+        );
+        // The failed step added nothing: the gauge is still without a chart.
+        assert_eq!(
+            charts.build().err(),
+            Some(Error::ColumnsWithoutChart(vec!["jobs".into()]))
+        );
     }
 
     #[test]
@@ -1392,10 +1425,10 @@ mod tests {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         assert_eq!(
             builder.counter::<Twice>().err(),
-            Some(MetricSetError::DuplicateColumn("a"))
+            Some(Error::DuplicateColumn("a"))
         );
         // The failed step added nothing.
-        assert_eq!(builder.build().err(), Some(MetricSetError::NoInstruments));
+        assert_eq!(builder.build().err(), Some(Error::NoInstruments));
     }
 
     #[test]
@@ -1409,10 +1442,7 @@ mod tests {
             }
         }
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        assert_eq!(
-            builder.counter::<Empty>().err(),
-            Some(MetricSetError::NoColumns)
-        );
+        assert_eq!(builder.counter::<Empty>().err(), Some(Error::NoColumns));
     }
 
     #[test]
@@ -1420,39 +1450,51 @@ mod tests {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         assert_eq!(
             builder.histogram(&[1.0, 0.5]).err(),
-            Some(MetricSetError::HistogramBounds)
+            Some(Error::HistogramBounds)
         );
         // The failed step added nothing.
-        assert_eq!(builder.build().err(), Some(MetricSetError::NoInstruments));
+        assert_eq!(builder.build().err(), Some(Error::NoInstruments));
     }
 
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "invalid context \"nodot\"")]
     fn a_histogram_checks_its_base_context() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         let duration = builder.histogram(&[1.0]).unwrap();
         let set = builder.build().unwrap();
-        ChartsBuilder::new(&set).histogram(duration, descriptor("nodot", 1), "u".into());
+        assert_eq!(
+            ChartsBuilder::new(&set)
+                .histogram(duration, descriptor("nodot", 1), "u".into())
+                .err(),
+            Some(Error::InvalidContext("nodot".into()))
+        );
     }
 
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "duplicate context \"x.d_max\"")]
     fn a_histogram_refuses_a_used_derived_context() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         let queue = builder.gauge::<Queue>().unwrap();
         let duration = builder.histogram(&[1.0]).unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.chart(queue, descriptor("x.d_max", 1));
-        charts.histogram(duration, descriptor("x.d", 2), "u".into());
+        charts.chart(queue, descriptor("x.d_max", 1)).unwrap();
+        assert_eq!(
+            charts
+                .histogram(duration, descriptor("x.d", 2), "u".into())
+                .err(),
+            Some(Error::DuplicateContext("x.d_max".into()))
+        );
+        // The failed step added nothing, not even the `avg` chart, whose
+        // context was free.
+        assert_eq!(
+            charts.build().err(),
+            Some(Error::ColumnsWithoutChart(vec!["avg".into()]))
+        );
     }
 
     #[test]
     fn a_set_without_instruments_is_refused() {
         let builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        assert_eq!(builder.build().err(), Some(MetricSetError::NoInstruments));
+        assert_eq!(builder.build().err(), Some(Error::NoInstruments));
     }
 
     #[test]
@@ -1468,8 +1510,8 @@ mod tests {
             let queue = builder.gauge::<Queue>().unwrap();
             let set = builder.build().unwrap();
             let mut charts = ChartsBuilder::new(&set);
-            charts.chart(queue, descriptor("x.q", 1));
-            let mut aggregator = Aggregator::new(&charts.build());
+            charts.chart(queue, descriptor("x.q", 1)).unwrap();
+            let mut aggregator = Aggregator::new(&charts.build().unwrap());
             let mut batch = Batch::new(&set);
             batch
                 .entity(Labels::new())
@@ -1482,38 +1524,43 @@ mod tests {
         }
     }
 
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "the columns [\"jobs\"] already have a chart")]
     fn an_instrument_charted_twice_is_refused() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         let queue = builder.gauge::<Queue>().unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.chart(queue, descriptor("x.a", 1));
-        charts.chart(queue, descriptor("x.b", 2));
+        charts.chart(queue, descriptor("x.a", 1)).unwrap();
+        assert_eq!(
+            charts.chart(queue, descriptor("x.b", 2)).err(),
+            Some(Error::ColumnsAlreadyCharted(vec!["jobs".into()]))
+        );
     }
 
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "the columns [\"avg\"] have no chart")]
     fn an_instrument_without_charts_is_refused() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         let queue = builder.gauge::<Queue>().unwrap();
         builder.histogram(&[1.0]).unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.chart(queue, descriptor("x.a", 1));
-        charts.build();
+        charts.chart(queue, descriptor("x.a", 1)).unwrap();
+        assert_eq!(
+            charts.build().err(),
+            Some(Error::ColumnsWithoutChart(vec!["avg".into()]))
+        );
     }
 
-    #[cfg(debug_assertions)]
     #[test]
-    #[should_panic(expected = "instrument of another metric set")]
     fn charting_an_instrument_of_another_set_is_refused() {
         let e = every(1, &[]);
         let other = every(1, &[]);
-        ChartsBuilder::new(&e.set).chart(other.queue, descriptor("x.a", 1));
+        assert_eq!(
+            ChartsBuilder::new(&e.set)
+                .chart(other.queue, descriptor("x.a", 1))
+                .err(),
+            Some(Error::InstrumentOfAnotherSet)
+        );
     }
 
     #[cfg(debug_assertions)]

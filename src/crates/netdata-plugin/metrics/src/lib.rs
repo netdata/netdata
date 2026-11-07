@@ -32,8 +32,8 @@
 //!         chart_type: ChartType::Stacked,
 //!         priority: 1000,
 //!     },
-//! );
-//! let charts = charts.build();
+//! )?;
+//! let charts = charts.build()?;
 //!
 //! let mut aggregator = Aggregator::new(&charts);
 //!
@@ -59,7 +59,7 @@
 //! // to the agent.
 //! let text = String::from_utf8(aggregator.emit(101, 1 << 20).concat()).unwrap();
 //! assert!(text.contains("SET success = 1\nSET error = 1\n"));
-//! # Ok::<(), netdata_plugin_metrics::MetricSetError>(())
+//! # Ok::<(), netdata_plugin_metrics::Error>(())
 //! ```
 //!
 //! The table:
@@ -93,10 +93,11 @@
 //! table splits an instrument by entity and by column; the charts show them
 //! as chart instances and dimensions.
 //!
-//! A mistake in declaring a metric set makes the [`MetricSetBuilder`] step
-//! that makes it return a [`MetricSetError`]. Other mistakes of the plugin's
-//! own code, in its charts, its label keys, or an instrument or batch used
-//! with another metric set, are checked by debug assertions: tests and debug
+//! A mistake in declaring a metric set or its charts makes the
+//! [`MetricSetBuilder`] or [`ChartsBuilder`] step that makes it return an
+//! [`Error`], and that step adds nothing. Other mistakes of the plugin's own
+//! code, in its label keys, or an instrument or batch of another metric set
+//! used to record or merge, are checked by debug assertions: tests and debug
 //! builds panic on them, release builds skip the checks. The `# Panics`
 //! sections list them.
 
@@ -104,15 +105,17 @@ mod aggregator;
 mod batch;
 mod chart;
 mod emit;
+mod error;
 mod layout;
 mod metric_set;
 
 pub use aggregator::{Aggregator, Stats};
 pub use batch::{Batch, BatchEntity, Measurements};
 pub use chart::{ChartDescriptor, Charts, ChartsBuilder};
+pub use error::Error;
 pub use layout::ColumnRange;
 pub use metric_set::{
     CardinalityLimit, Column, Counter, CumulativeCounter, Gauge, Histogram, Labels, MetricSet,
-    MetricSetBuilder, MetricSetError, Settings,
+    MetricSetBuilder, Settings,
 };
 pub use netdata_plugin_protocol::ChartType;

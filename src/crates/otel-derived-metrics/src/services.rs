@@ -10,7 +10,7 @@
 
 use netdata_plugin_metrics::{
     Batch, BatchEntity, CardinalityLimit, ChartDescriptor, ChartType, Charts, ChartsBuilder,
-    Counter, Histogram, Labels, MetricSet, MetricSetBuilder, MetricSetError, Settings, columns,
+    Counter, Histogram, Labels, MetricSet, MetricSetBuilder, Settings, columns,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::KeyValue;
@@ -51,7 +51,7 @@ pub(crate) struct Services {
 }
 
 impl Services {
-    pub(crate) fn new(max_services: usize) -> Result<Self, MetricSetError> {
+    pub(crate) fn new(max_services: usize) -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(service_settings(max_services))?;
         let requests = builder.counter::<Outcome>()?;
         let duration = builder.histogram(DURATION_BOUNDS)?;
@@ -67,7 +67,7 @@ impl Services {
                 chart_type: ChartType::Stacked,
                 priority: 60_000,
             },
-        );
+        )?;
         // Charts `otel_service.request_duration_avg`,
         // `otel_service.request_duration_max` and
         // `otel_service.request_duration_histogram`.
@@ -82,9 +82,9 @@ impl Services {
                 priority: 60_001,
             },
             "requests/s".into(),
-        );
+        )?;
         Ok(Self {
-            charts: charts.build(),
+            charts: charts.build()?,
             metrics,
             requests,
             duration,

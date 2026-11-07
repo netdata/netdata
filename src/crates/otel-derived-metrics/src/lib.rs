@@ -15,7 +15,7 @@ mod logs;
 mod plugin;
 mod services;
 
-use netdata_plugin_metrics::{Aggregator, Batch, MetricSetError};
+use netdata_plugin_metrics::{Aggregator, Batch};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use otel_bridge::config::DerivedMetricsConfig;
@@ -59,7 +59,7 @@ impl DerivedMetrics {
     /// # Errors
     ///
     /// A metric set that the plugin declares wrongly.
-    pub fn new(config: &DerivedMetricsConfig) -> Result<Self, MetricSetError> {
+    pub fn new(config: &DerivedMetricsConfig) -> Result<Self, netdata_plugin_metrics::Error> {
         let enabled = if config.enabled {
             let services = services::Services::new(config.max_services)?;
             let logs = logs::ServiceLogs::new(config.max_services)?;

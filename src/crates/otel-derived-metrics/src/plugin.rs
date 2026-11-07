@@ -4,7 +4,7 @@
 
 use netdata_plugin_metrics::{
     Batch, ChartDescriptor, ChartType, Charts, ChartsBuilder, Counter, CumulativeCounter, Gauge,
-    Labels, MetricSet, MetricSetBuilder, MetricSetError, Settings, Stats, columns,
+    Labels, MetricSet, MetricSetBuilder, Settings, Stats, columns,
 };
 use otel_bridge::signals::Signal;
 
@@ -46,7 +46,7 @@ pub(crate) struct Plugin {
 }
 
 impl Plugin {
-    pub(crate) fn new() -> Result<Self, MetricSetError> {
+    pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
         let spans = builder.counter::<Acceptance>()?;
         let log_records = builder.counter::<Acceptance>()?;
@@ -62,7 +62,7 @@ impl Plugin {
                 chart_type: ChartType::Stacked,
                 priority: 150_000,
             },
-        );
+        )?;
         charts.chart(
             log_records,
             ChartDescriptor {
@@ -73,9 +73,9 @@ impl Plugin {
                 chart_type: ChartType::Stacked,
                 priority: 150_001,
             },
-        );
+        )?;
         Ok(Self {
-            charts: charts.build(),
+            charts: charts.build()?,
             metrics,
             spans,
             log_records,
@@ -117,7 +117,7 @@ pub(crate) struct Derivation {
 }
 
 impl Derivation {
-    pub(crate) fn new() -> Result<Self, MetricSetError> {
+    pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
         let services = builder.gauge::<Services>()?;
         let adjusted = builder.cumulative_counter::<Adjustment>()?;
@@ -134,7 +134,7 @@ impl Derivation {
                 chart_type: ChartType::Line,
                 priority: 150_010,
             },
-        );
+        )?;
         charts.chart(
             adjusted,
             ChartDescriptor {
@@ -146,7 +146,7 @@ impl Derivation {
                 chart_type: ChartType::Line,
                 priority: 150_011,
             },
-        );
+        )?;
         charts.chart(
             expired,
             ChartDescriptor {
@@ -157,9 +157,9 @@ impl Derivation {
                 chart_type: ChartType::Line,
                 priority: 150_012,
             },
-        );
+        )?;
         Ok(Self {
-            charts: charts.build(),
+            charts: charts.build()?,
             metrics,
             services,
             adjusted,

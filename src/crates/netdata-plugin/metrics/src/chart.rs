@@ -7,6 +7,7 @@
 //! chart instance (one chart id) of every template.
 
 use crate::aggregator::EntityKind;
+use crate::error::Error;
 use crate::layout::ColumnRange;
 use crate::metric_set::{Histogram, Labels, MetricSet};
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
@@ -92,7 +93,8 @@ impl Charts {
 }
 
 /// Declares the [`Charts`] of a [`MetricSet`]: every instrument of the set
-/// gets its chart (a histogram three), in the order they are added here.
+/// gets its chart (a histogram three), in the order they are added here. A
+/// step that returns an [`Error`] adds nothing.
 #[derive(Debug)]
 pub struct ChartsBuilder {
     set: MetricSet,
@@ -116,16 +118,27 @@ impl ChartsBuilder {
     /// [`Gauge`](crate::Gauge): one dimension per column, its id the
     /// column's name.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// In debug builds, if the instrument is of another set or already has a
-    /// chart, if a column name is not a valid dimension id (empty, or holding
-    /// spaces, ASCII control characters, quotes, `\` or `=`, or starting with
-    /// `SLOT:`), or if `descriptor`'s context is invalid or already used.
-    pub fn chart<C>(&mut self, columns: impl Into<ColumnRange<C>>, descriptor: ChartDescriptor) {
+    /// Checked in this order:
+    /// - [`Error::InstrumentOfAnotherSet`];
+    /// - [`Error::ColumnsAlreadyCharted`];
+    /// - [`Error::InvalidDimensionId`] when a column name is empty, holds
+    ///   spaces, ASCII control characters, quotes, `\` or `=`, or starts with
+    ///   `SLOT:`;
+    /// - [`Error::InvalidContext`] or [`Error::ContextLikeEntitySuffix`] (the
+    ///   rules at [`ChartDescriptor::context`]);
+    /// - [`Error::DuplicateContext`].
+    pub fn chart<C>(
+        &mut self,
+        columns: impl Into<ColumnRange<C>>,
+        descriptor: ChartDescriptor,
+    ) -> Result<(), Error> {
         let columns = columns.into();
-        self.check_set(columns.set_id);
+        self.check_set(columns.set_id)?;
+        self.check(&descriptor, columns.group)?;
         self.add(descriptor, columns.group);
+        Ok(())
     }
 
     /// Adds the three charts of a [`Histogram`], one per column group (see
@@ -146,19 +159,19 @@ impl ChartsBuilder {
     ///   `descriptor.priority + 2`; `descriptor.chart_type` does not apply to
     ///   it.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// In debug builds, if the histogram is of another set or already has its
-    /// charts, if `descriptor.context` is invalid, or if any of the three
-    /// contexts is already used.
+    /// As [`ChartsBuilder::chart`], with `descriptor.context` checked first
+    /// against the context rules, then each of the three charts in the order
+    /// above.
     pub fn histogram(
         &mut self,
         histogram: Histogram,
         descriptor: ChartDescriptor,
         heatmap_units: String,
-    ) {
-        self.check_set(histogram.set_id);
-        check_context(&descriptor.context);
+    ) -> Result<(), Error> {
+        self.check_set(histogram.set_id)?;
+        check_context(&descriptor.context)?;
         let avg = ChartDescriptor {
             title: format!("{} average", descriptor.title),
             units: descriptor.units.clone(),
@@ -166,7 +179,6 @@ impl ChartsBuilder {
             context: format!("{}_avg", descriptor.context),
             ..descriptor
         };
-        self.add(avg, histogram.group);
         let max = ChartDescriptor {
             title: format!("{} maximum", descriptor.title),
             units: descriptor.units.clone(),
@@ -175,7 +187,6 @@ impl ChartsBuilder {
             priority: descriptor.priority + 1,
             ..descriptor
         };
-        self.add(max, histogram.group + 1);
         let buckets = ChartDescriptor {
             title: format!("{} histogram", descriptor.title),
             units: heatmap_units,
@@ -184,73 +195,99 @@ impl ChartsBuilder {
             priority: descriptor.priority + 2,
             ..descriptor
         };
-        self.add(buckets, histogram.group + 2);
+        let templates = [
+            (avg, histogram.group),
+            (max, histogram.group + 1),
+            (buckets, histogram.group + 2),
+        ];
+        // The three contexts differ in their suffixes, so checking each
+        // against the charts added before is enough.
+        for (descriptor, group) in &templates {
+            self.check(descriptor, *group)?;
+        }
+        for (descriptor, group) in templates {
+            self.add(descriptor, group);
+        }
+        Ok(())
     }
 
     /// Finishes the charts.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// In debug builds, if an instrument of the set has no chart.
-    pub fn build(self) -> Charts {
+    /// [`Error::ColumnsWithoutChart`] when an instrument of the set has no
+    /// chart.
+    pub fn build(self) -> Result<Charts, Error> {
         let groups = self.set.0.schema.column_groups();
         for (group, charted) in groups.iter().zip(&self.charted) {
-            debug_assert!(charted, "the columns {:?} have no chart", group.names);
+            if !charted {
+                return Err(Error::ColumnsWithoutChart(group.names.clone()));
+            }
         }
-        Charts(Arc::new(ChartsInner {
+        Ok(Charts(Arc::new(ChartsInner {
             set: self.set,
             templates: self.templates,
-        }))
+        })))
     }
 
-    fn check_set(&self, set_id: u32) {
-        debug_assert_eq!(set_id, self.set.0.id, "instrument of another metric set");
+    fn check_set(&self, set_id: u32) -> Result<(), Error> {
+        if set_id == self.set.0.id {
+            Ok(())
+        } else {
+            Err(Error::InstrumentOfAnotherSet)
+        }
+    }
+
+    /// Checks the chart of `descriptor` over the column group with index
+    /// `group`, in this order: the group has no chart yet, its dimension ids
+    /// are valid, the context is valid, and the context is unique in the
+    /// charts.
+    fn check(&self, descriptor: &ChartDescriptor, group: u32) -> Result<(), Error> {
+        let column_group = self.set.0.schema.column_group(group);
+        if self.charted[group as usize] {
+            return Err(Error::ColumnsAlreadyCharted(column_group.names.clone()));
+        }
+        for id in &column_group.names {
+            if !is_valid_dimension_id(id) {
+                return Err(Error::InvalidDimensionId(id.clone()));
+            }
+        }
+        let context = &descriptor.context;
+        check_context(context)?;
+        if self
+            .templates
+            .iter()
+            .any(|t| &t.descriptor.context == context)
+        {
+            return Err(Error::DuplicateContext(context.clone()));
+        }
+        Ok(())
     }
 
     /// Adds the template of `descriptor` over the column group with index
-    /// `group`, after checking in debug builds, in this order: the group has
-    /// no chart yet, its dimension ids are valid, the context is valid, and
-    /// the context is unique in the charts.
+    /// `group`, which [`ChartsBuilder::check`] accepted.
     fn add(&mut self, descriptor: ChartDescriptor, group: u32) {
-        let column_group = self.set.0.schema.column_group(group);
-        let charted = &mut self.charted[group as usize];
-        debug_assert!(
-            !*charted,
-            "the columns {:?} already have a chart",
-            column_group.names
-        );
-        for id in &column_group.names {
-            debug_assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
-        }
-        let context = &descriptor.context;
-        check_context(context);
-        debug_assert!(
-            self.templates
-                .iter()
-                .all(|t| &t.descriptor.context != context),
-            "duplicate context {context:?}"
-        );
-        *charted = true;
+        self.charted[group as usize] = true;
         self.templates.push(ChartTemplate { descriptor, group });
     }
 }
 
-/// In debug builds, panics unless `context` follows the rules at
-/// [`ChartDescriptor::context`]: id bytes and dots, at least one dot inside,
-/// and no ending like an entity suffix.
-fn check_context(context: &str) {
-    debug_assert!(
-        context.bytes().all(|b| is_id_byte(b) || b == b'.')
-            && context.contains('.')
-            && !context.starts_with('.')
-            && !context.ends_with('.'),
-        "invalid context {context:?}"
-    );
+/// Checks `context` against the rules at [`ChartDescriptor::context`]: id
+/// bytes and dots, at least one dot inside, and no ending like an entity
+/// suffix.
+fn check_context(context: &str) -> Result<(), Error> {
+    let valid = context.bytes().all(|b| is_id_byte(b) || b == b'.')
+        && context.contains('.')
+        && !context.starts_with('.')
+        && !context.ends_with('.');
+    if !valid {
+        return Err(Error::InvalidContext(context.to_string()));
+    }
     // Entity suffixes must not be mistaken for part of a context.
-    debug_assert!(
-        !ends_like_entity_suffix(context),
-        "context {context:?} ends like an entity suffix"
-    );
+    if ends_like_entity_suffix(context) {
+        return Err(Error::ContextLikeEntitySuffix(context.to_string()));
+    }
+    Ok(())
 }
 
 const OVERFLOW_SUFFIX: &str = "_overflow";
