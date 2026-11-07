@@ -60,14 +60,14 @@ modules:
             - Revocation status is checked for the server certificate only. A certificate that lists no CRL or OCSP
               URL is reported as not revoked while it is within its validity period (LDAP CRL URLs are skipped), and
               an OCSP `unknown` answer is reported as revoked.
-            - Revocation status comes only from CRLs and OCSP answers that verify against the issuer of the server
-              certificate and are current by the Agent host's clock, within 5 minutes. The issuer certificate must be
-              one the server sends, one that TLS verification reached through `tls_ca` or the system's trusted CAs, or
-              the one at the issuer URL listed in the server certificate. Without it the chart shows a gap, for
-              example with `tls_skip_verify` for a private CA whose certificates list no issuer URL, behind a server
-              that does not send the CA certificate, or for a `file://` source whose certificate lists none. The chart
-              also shows a gap when the CA publishes outdated CRLs or OCSP answers, and can show one when the Agent
-              host's clock is more than 5 minutes off.
+            - For a certificate that lists CRL or OCSP URLs, revocation status comes only from CRLs and OCSP answers
+              that verify against the issuer of the server certificate and are current by the Agent host's clock,
+              within 5 minutes. The issuer certificate must be one the server sends, one that TLS verification reached
+              through `tls_ca` or the system's trusted CAs, or the one at the issuer URL listed in the server
+              certificate. Without it the chart shows a gap, for example with `tls_skip_verify` for a private CA whose
+              certificates list no issuer URL, behind a server that does not send the CA certificate, or for a
+              `file://` source whose certificate lists none. The chart also shows a gap when the CA publishes outdated
+              CRLs or OCSP answers, and can show one when the Agent host's clock is more than 5 minutes off.
             - With an `smtp://` source, `timeout` covers the whole SMTP exchange. A mail server that delays its
               greeting, a common anti-spam measure on port 25, needs a `timeout` longer than that delay.
         performance_impact:
@@ -395,10 +395,11 @@ modules:
           - error: "revocation status of `source` could not be determined: `reason`"
             when: "`check_revocation_status` is enabled."
             cause: >-
-              A CRL listed in the certificate could not be downloaded, parsed or verified, or the certificate is
-              expired or not yet valid; `reason` names the CRL URL and the problem, and the revocation status chart
-              shows a gap. A CRL must be a complete version 2 CRL (not a delta or indirect CRL) up to 64 MiB, issued
-              and signed by the certificate's issuer, covering the server certificate, and current within 5 minutes.
+              A CRL listed in the certificate could not be downloaded, parsed or verified, and `reason` names its URL
+              and the problem; or the certificate is expired or not yet valid, and `reason` gives the time. The
+              revocation status chart shows a gap. A CRL must be a complete version 2 CRL (not a delta or indirect
+              CRL) up to 64 MiB, issued and signed by the certificate's issuer, covering the server certificate, and
+              current within 5 minutes.
             fix: >-
               Check that the Agent host can reach the CRL URLs listed in the certificate and that its clock is
               correct, and renew an expired certificate. For an `unsupported crl version` reason, have the CA issue
