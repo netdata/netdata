@@ -997,94 +997,34 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		{name: "object", value: map[string]any{"name": "max"}},
 	}
 
-	t.Run("invalid-time-group", func(t *testing.T) {
-		trackContract(t, "CASE-023/mcp-invalid-time-group")
-		advertised := c023MCPSchemaEnum(t, c023MCPQueryMetricsProperties(t, 500, session(t).Session), "time_group")
-		requestID := 501
-		for _, invalid := range invalidEnumValues {
-			t.Run(invalid.name, func(t *testing.T) {
-				arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
-				arguments["time_group"] = invalid.value
-				response := c023MCPCall(t, requestID, session(t).Session, arguments)
-				requestID++
-				c023MCPAssertEnumError(t, response.Document, "time_group", invalid.value, advertised)
-			})
-		}
-	})
-
-	t.Run("time-group-null-missing", func(t *testing.T) {
-		trackContract(t, "CASE-023/mcp-time-group-null-missing")
-		arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
-		arguments["time_group"] = nil
-		response := c023MCPCall(t, 540, session(t).Session, arguments)
-		c023MCPAssertMissingParam(t, response.Document, "time_group")
-	})
-
-	t.Run("time-group-accepted-names", func(t *testing.T) {
-		trackContract(t, "CASE-023/mcp-time-group-accepted-names")
-		requestID := 550
-		for _, valid := range []struct{ value, canonical string }{
-			{value: "max", canonical: "max"},
-			{value: "avg", canonical: "average"},
-			{value: "percentile95"},
-		} {
-			t.Run("accepts-"+valid.value, func(t *testing.T) {
-				arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
-				arguments["time_group"] = valid.value
-				response := c023MCPCall(t, requestID, session(t).Session, arguments)
-				requestID++
-				doc := c023MCPQueryDocument(t, response.Document)
-				if valid.canonical == "" {
-					return
-				}
-				request := queryObject(t, doc, "request", "query request")
+	type acceptedValue struct{ value, canonical string }
+	enumParameters := []struct {
+		parameter, slug string
+		requestID       int
+		accepted        []acceptedValue
+		// echo returns the canonical name the query response reports.
+		echo func(t *testing.T, request map[string]any) any
+	}{
+		{
+			parameter: "time_group", slug: "time-group", requestID: 500,
+			accepted: []acceptedValue{
+				{value: "max", canonical: "max"},
+				{value: "avg", canonical: "average"},
+				{value: "percentile95"},
+			},
+			echo: func(t *testing.T, request map[string]any) any {
 				aggregations := queryObject(t, request, "aggregations", "query request.aggregations")
-				timeAggregation := queryObject(t, aggregations, "time", "query request.aggregations.time")
-				if got := timeAggregation["time_group"]; got != valid.canonical {
-					t.Errorf("MCP time_group %q echo = %v, want %q", valid.value, got, valid.canonical)
-				}
-			})
-		}
-	})
-
-	t.Run("invalid-aggregation", func(t *testing.T) {
-		trackContract(t, "CASE-023/mcp-invalid-aggregation")
-		advertised := c023MCPSchemaEnum(t, c023MCPQueryMetricsProperties(t, 600, session(t).Session), "aggregation")
-		requestID := 601
-		for _, invalid := range invalidEnumValues {
-			t.Run(invalid.name, func(t *testing.T) {
-				arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
-				arguments["aggregation"] = invalid.value
-				response := c023MCPCall(t, requestID, session(t).Session, arguments)
-				requestID++
-				c023MCPAssertEnumError(t, response.Document, "aggregation", invalid.value, advertised)
-			})
-		}
-	})
-
-	t.Run("aggregation-null-missing", func(t *testing.T) {
-		trackContract(t, "CASE-023/mcp-aggregation-null-missing")
-		arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
-		arguments["aggregation"] = nil
-		response := c023MCPCall(t, 640, session(t).Session, arguments)
-		c023MCPAssertMissingParam(t, response.Document, "aggregation")
-	})
-
-	t.Run("aggregation-accepted-names", func(t *testing.T) {
-		trackContract(t, "CASE-023/mcp-aggregation-accepted-names")
-		requestID := 650
-		for _, valid := range []struct{ value, canonical string }{
-			{value: "max", canonical: "max"},
-			{value: "avg", canonical: "average"},
-			{value: "percentage", canonical: "percentage"},
-		} {
-			t.Run("accepts-"+valid.value, func(t *testing.T) {
-				arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
-				arguments["aggregation"] = valid.value
-				response := c023MCPCall(t, requestID, session(t).Session, arguments)
-				requestID++
-				doc := c023MCPQueryDocument(t, response.Document)
-				request := queryObject(t, doc, "request", "query request")
+				return queryObject(t, aggregations, "time", "query request.aggregations.time")["time_group"]
+			},
+		},
+		{
+			parameter: "aggregation", slug: "aggregation", requestID: 600,
+			accepted: []acceptedValue{
+				{value: "max", canonical: "max"},
+				{value: "avg", canonical: "average"},
+				{value: "percentage", canonical: "percentage"},
+			},
+			echo: func(t *testing.T, request map[string]any) any {
 				aggregations := queryObject(t, request, "aggregations", "query request.aggregations")
 				metrics, ok := aggregations["metrics"].([]any)
 				if !ok || len(metrics) == 0 {
@@ -1094,10 +1034,50 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 				if !ok {
 					t.Fatalf("query request.aggregations.metrics[0] is malformed: %v", metrics[0])
 				}
-				if got := pass["aggregation"]; got != valid.canonical {
-					t.Errorf("MCP aggregation %q echo = %v, want %q", valid.value, got, valid.canonical)
-				}
-			})
+				return pass["aggregation"]
+			},
+		},
+	}
+
+	for _, enum := range enumParameters {
+		call := func(t *testing.T, id int, value any) map[string]any {
+			t.Helper()
+			arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
+			arguments[enum.parameter] = value
+			return c023MCPCall(t, id, session(t).Session, arguments).Document
 		}
-	})
+
+		t.Run("invalid-"+enum.slug, func(t *testing.T) {
+			trackContract(t, "CASE-023/mcp-invalid-"+enum.slug)
+			advertised := c023MCPSchemaEnum(
+				t, c023MCPQueryMetricsProperties(t, enum.requestID, session(t).Session), enum.parameter)
+			for i, invalid := range invalidEnumValues {
+				t.Run(invalid.name, func(t *testing.T) {
+					response := call(t, enum.requestID+1+i, invalid.value)
+					c023MCPAssertEnumError(t, response, enum.parameter, invalid.value, advertised)
+				})
+			}
+		})
+
+		t.Run(enum.slug+"-null-missing", func(t *testing.T) {
+			trackContract(t, "CASE-023/mcp-"+enum.slug+"-null-missing")
+			c023MCPAssertMissingParam(t, call(t, enum.requestID+40, nil), enum.parameter)
+		})
+
+		t.Run(enum.slug+"-accepted-names", func(t *testing.T) {
+			trackContract(t, "CASE-023/mcp-"+enum.slug+"-accepted-names")
+			for i, valid := range enum.accepted {
+				t.Run("accepts-"+valid.value, func(t *testing.T) {
+					doc := c023MCPQueryDocument(t, call(t, enum.requestID+50+i, valid.value))
+					if valid.canonical == "" {
+						return
+					}
+					request := queryObject(t, doc, "request", "query request")
+					if got := enum.echo(t, request); got != valid.canonical {
+						t.Errorf("MCP %s %q echo = %v, want %q", enum.parameter, valid.value, got, valid.canonical)
+					}
+				})
+			}
+		})
+	}
 }
