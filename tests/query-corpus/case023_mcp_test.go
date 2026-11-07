@@ -989,6 +989,7 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		{name: "wrong-case", value: "MAX"},
 		{name: "leading-nul", value: "\x00max"},
 		{name: "interior-nul", value: "max\x00junk"},
+		{name: "inside-name-nul", value: "ma\x00x"},
 		{name: "trailing-nul", value: "max\x00"},
 		{name: "number", value: 5},
 		{name: "boolean", value: true},
