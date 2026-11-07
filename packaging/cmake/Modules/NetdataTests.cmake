@@ -18,6 +18,14 @@ if(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT)
 endif()
 
 if(OS_LINUX)
+    foreach(apps_test IN ITEMS stat identity)
+        add_executable(apps-${apps_test}-test EXCLUDE_FROM_ALL
+                src/collectors/apps.plugin/tests/test_apps_${apps_test}.c)
+        target_compile_options(apps-${apps_test}-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(apps-${apps_test}-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(apps-${apps_test}-test libnetdata)
+    endforeach()
+
     add_executable(cgroup-name-config-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_name_config.c
             src/collectors/cgroups.plugin/cgroup-name-config.c)

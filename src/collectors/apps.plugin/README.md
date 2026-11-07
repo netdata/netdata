@@ -177,6 +177,13 @@ airdrop-sharing: sharingd
 > `apps.plugin` attempts to obtain the full process name by searching for it in the **cmdline**.
 > If successful, the entire process name is used; otherwise, the shortened version is used.
 
+Command lines are read when a process is first observed, when its operating-system process name
+changes, and every 30 collection iterations. Periodic reads are staggered across processes and
+also retry failed reads. Changes that leave the process name unchanged can take up to 30
+iterations to appear (30 seconds at the default one-second collection interval). Changed command
+lines refresh process matching and any groups inherited by descendants. If a read fails, matching
+falls back to the process name until a later read succeeds.
+
 #### Windows process fields
 
 | Field   | Description                                                      | Example                                                                   |

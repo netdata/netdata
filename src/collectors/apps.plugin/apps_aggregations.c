@@ -150,10 +150,26 @@ static struct target *get_apps_groups_target_for_pid(struct pid_stat *p) {
 }
 
 static void assign_a_target_to_all_processes(void) {
+    bool identity_changed = false;
     // assign targets from app_groups.conf
     for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
-        if(!p->target)
+        identity_changed |= p->identity_changed;
+        if(!p->target) {
+            p->matched_by_config = false;
             p->target = get_apps_groups_target_for_pid(p);
+        }
+    }
+
+    if(identity_changed) {
+        for(struct pid_stat *p = root_of_pids(); p; p = p->next) {
+            if(p->matched_by_config) continue;
+            for(struct pid_stat *pp = p; pp; pp = pp->parent) {
+                if(pp->identity_changed) {
+                    p->target = NULL;
+                    break;
+                }
+            }
+        }
     }
 
     // assign targets from their parents, if they have
@@ -178,6 +194,9 @@ static void assign_a_target_to_all_processes(void) {
 
         fatal_assert(p->target != NULL);
     }
+
+    for(struct pid_stat *p = root_of_pids(); p; p = p->next)
+        p->identity_changed = false;
 }
 
 #if (PROCESSES_HAVE_SERVICE == 1)
