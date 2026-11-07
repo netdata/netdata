@@ -51,6 +51,7 @@ bool sql_set_host_label(nd_uuid_t *host_id, const char *label_key, const char *l
 
 uint64_t sqlite_get_meta_space(void);
 int sql_init_meta_database(db_check_action_type_t rebuild, int memory);
+void sql_init_meta_failure_reason(char *dst, size_t dst_size, int *os_errno);
 
 void cleanup_agent_event_log(void);
 void add_agent_event(event_log_type_t event_id, int64_t value);
