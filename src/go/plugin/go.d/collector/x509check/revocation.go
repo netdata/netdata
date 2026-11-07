@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,7 +41,7 @@ const (
 
 // revocationChecker checks a certificate against the CRLs and then the OCSP responders it lists. It uses only CRLs and
 // OCSP answers from the certificate's issuer, which must have signed the certificate: one the source presented with
-// it, or else one downloaded from the issuer URLs the certificate lists.
+// it or TLS verification found, or else one downloaded from the issuer URLs the certificate lists.
 type revocationChecker struct {
 	client *http.Client
 	// crls holds CRL verdicts until the CRL's next update. A job can see several certificates behind one source,
@@ -68,25 +69,25 @@ func newRevocationChecker() *revocationChecker {
 	}
 }
 
-// status reports whether the server certificate, chain[0], is revoked; the rest of chain is what the source presented
-// with it. A certificate outside its validity period, or a CRL that cannot be downloaded, parsed or verified, is an
-// error. ok is false without an error when no issuer that signed the certificate is available, or no OCSP responder
-// gives a usable answer. Any OCSP status other than good counts as revoked.
+// status reports whether cert is revoked; issuers are certificates that may have issued it. An error means that the
+// status could not be determined, and names why: the certificate is outside its validity period, no issuer that
+// signed it is found, a CRL cannot be downloaded, parsed or verified, or no OCSP responder gives a usable answer. Any
+// OCSP status other than good counts as revoked.
 func (rc *revocationChecker) status(
 	ctx context.Context,
-	chain []*x509.Certificate,
+	cert *x509.Certificate,
+	issuers []*x509.Certificate,
 	now time.Time,
-) (revoked, ok bool, err error) {
-	cert := chain[0]
+) (bool, error) {
 	// The validity period includes both bounds (RFC 5280 4.1.2.5).
 	if now.After(cert.NotAfter) {
-		return false, false, fmt.Errorf("certificate expired at %s", cert.NotAfter)
+		return false, fmt.Errorf("certificate expired at %s", cert.NotAfter)
 	}
 	if now.Before(cert.NotBefore) {
-		return false, false, fmt.Errorf("certificate is not valid until %s", cert.NotBefore)
+		return false, fmt.Errorf("certificate is not valid until %s", cert.NotBefore)
 	}
 
-	issuer := sync.OnceValues(func() (*x509.Certificate, error) { return rc.findIssuer(ctx, chain) })
+	issuer := sync.OnceValues(func() (*x509.Certificate, error) { return rc.findIssuer(ctx, cert, issuers) })
 
 	// The only expiry rule: a verdict without a future next update serves no later check.
 	maps.DeleteFunc(rc.crls, func(_ crlKey, v crlVerdict) bool { return !now.Before(v.nextUpdate) })
@@ -94,72 +95,71 @@ func (rc *revocationChecker) status(
 		if isLDAPURL(crlURL) {
 			continue
 		}
-		revoked, ok, err := rc.crlStatus(ctx, cert, crlURL, issuer, now)
-		// A missing issuer leaves OCSP unusable too.
-		if err != nil || !ok || revoked {
-			return revoked, ok, err
+		revoked, err := rc.crlStatus(ctx, cert, crlURL, issuer, now)
+		if err != nil || revoked {
+			return revoked, err
 		}
 	}
 
 	if len(cert.OCSPServer) == 0 {
-		return false, true, nil
+		return false, nil
 	}
 	return rc.ocspStatus(ctx, cert, issuer, now)
 }
 
-// crlStatus reports whether the CRL at crlURL lists cert. ok is false without an error when no issuer is available to
-// verify the CRL.
+// crlStatus reports whether the CRL at crlURL lists cert.
 func (rc *revocationChecker) crlStatus(
 	ctx context.Context,
 	cert *x509.Certificate,
 	crlURL string,
 	issuer func() (*x509.Certificate, error),
 	now time.Time,
-) (revoked, ok bool, err error) {
+) (bool, error) {
 	key := crlKey{
 		url:    crlURL,
 		issuer: string(cert.RawIssuer),
 		serial: cert.SerialNumber.String(),
 	}
 	if v, ok := rc.crls[key]; ok {
-		return v.revoked, true, nil
+		return v.revoked, nil
 	}
 
 	iss, err := issuer()
-	if err != nil || iss == nil {
-		return false, false, err
+	if err != nil {
+		return false, err
 	}
 	body, err := rc.get(ctx, crlURL)
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
 	crl, err := parseCRL(body)
 	if err != nil {
-		return false, false, fmt.Errorf("parse CRL '%s': %w", crlURL, err)
+		return false, fmt.Errorf("parse CRL '%s': %w", crlURL, err)
 	}
 	if err := verifyCRL(crl, cert, iss, now); err != nil {
-		return false, false, fmt.Errorf("verify CRL '%s': %w", crlURL, err)
+		return false, fmt.Errorf("verify CRL '%s': %w", crlURL, err)
 	}
 
-	revoked = slices.ContainsFunc(crl.RevokedCertificateEntries, func(e x509.RevocationListEntry) bool {
+	revoked := slices.ContainsFunc(crl.RevokedCertificateEntries, func(e x509.RevocationListEntry) bool {
 		return e.SerialNumber.Cmp(cert.SerialNumber) == 0
 	})
 	rc.crls[key] = crlVerdict{
 		revoked:    revoked,
 		nextUpdate: crl.NextUpdate,
 	}
-	return revoked, true, nil
+	return revoked, nil
 }
 
+// ocspStatus reports the status the first responder with a usable answer gives; failing responders are skipped.
 func (rc *revocationChecker) ocspStatus(
 	ctx context.Context,
 	cert *x509.Certificate,
 	issuer func() (*x509.Certificate, error),
 	now time.Time,
-) (revoked, ok bool, err error) {
+) (bool, error) {
 	iss, err := issuer()
-	if err != nil || iss == nil {
-		return false, false, err
+	if err != nil {
+		return false, err
 	}
 	// The request names the issuer by cert's issuer field (RFC 6960 4.1.1): only the issuer certificate's key is
 	// authenticated, and its subject may be encoded otherwise.
@@ -169,18 +169,21 @@ func (rc *revocationChecker) ocspStatus(
 		Hash: crypto.SHA1,
 	})
 	if err != nil {
-		return false, false, fmt.Errorf("create OCSP request: %w", err)
+		return false, fmt.Errorf("create OCSP request: %w", err)
 	}
 
-	// The first responder that gives a usable answer decides; failing responders are skipped.
+	var reasons []string
 	for _, server := range cert.OCSPServer {
 		resp, err := rc.queryOCSP(ctx, server, req, cert, iss)
-		if err != nil || verifyOCSPResponse(resp, cert, iss, now) != nil {
-			continue
+		if err == nil {
+			err = verifyOCSPResponse(resp, cert, iss, now)
 		}
-		return resp.Status != ocsp.Good, true, nil
+		if err == nil {
+			return resp.Status != ocsp.Good, nil
+		}
+		reasons = append(reasons, fmt.Sprintf("'%s': %s", server, err))
 	}
-	return false, false, nil
+	return false, fmt.Errorf("no usable OCSP answer: %s", strings.Join(reasons, "; "))
 }
 
 // queryOCSP sends a request of up to 256 bytes with GET, encoded into the URL as RFC 6960 Appendix A.1 describes,
@@ -210,26 +213,51 @@ func (rc *revocationChecker) queryOCSP(
 	return ocsp.ParseResponseForCert(body, cert, issuer)
 }
 
-// findIssuer returns the certificate that signed chain[0]: the first one the source presented with it, or else the
-// first one downloaded from the issuer URLs chain[0] lists, or nil. Its only error is the context's, so that a
-// cancelled download is not taken for a missing issuer.
-func (rc *revocationChecker) findIssuer(ctx context.Context, chain []*x509.Certificate) (*x509.Certificate, error) {
-	cert := chain[0]
-	for _, issuer := range chain[1:] {
+// findIssuer returns the certificate that signed cert: the first of issuers that did, or else the first one
+// downloaded from the issuer URLs cert lists.
+func (rc *revocationChecker) findIssuer(
+	ctx context.Context,
+	cert *x509.Certificate,
+	issuers []*x509.Certificate,
+) (*x509.Certificate, error) {
+	for _, issuer := range issuers {
 		if signedBy(cert, issuer) {
 			return issuer, nil
 		}
 	}
+
+	reasons := []string{"none of the certificates the source sent or TLS verification found signed it"}
+	if len(cert.IssuingCertificateURL) == 0 {
+		reasons = append(reasons, "the certificate lists no issuer URL")
+	}
 	for _, issuerURL := range cert.IssuingCertificateURL {
-		body, err := rc.get(ctx, issuerURL)
-		if err != nil {
-			continue
-		}
-		if issuer, err := parseCertificate(body); err == nil && signedBy(cert, issuer) {
+		issuer, err := rc.downloadIssuer(ctx, cert, issuerURL)
+		if err == nil {
 			return issuer, nil
 		}
+		reasons = append(reasons, err.Error())
 	}
-	return nil, ctx.Err()
+	return nil, fmt.Errorf("issuer certificate not found: %s", strings.Join(reasons, "; "))
+}
+
+// downloadIssuer returns the certificate at issuerURL if it signed cert.
+func (rc *revocationChecker) downloadIssuer(
+	ctx context.Context,
+	cert *x509.Certificate,
+	issuerURL string,
+) (*x509.Certificate, error) {
+	body, err := rc.get(ctx, issuerURL)
+	if err != nil {
+		return nil, err
+	}
+	issuer, err := parseCertificate(body)
+	if err != nil {
+		return nil, fmt.Errorf("parse issuer certificate '%s': %w", issuerURL, err)
+	}
+	if !signedBy(cert, issuer) {
+		return nil, fmt.Errorf("the certificate at '%s' did not sign it", issuerURL)
+	}
+	return issuer, nil
 }
 
 // signedBy reports whether issuer's key verifies cert's signature, which makes it the key of cert's issuer: CRLs and

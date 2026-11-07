@@ -9,6 +9,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -34,39 +35,27 @@ import (
 )
 
 func TestRevocationChecker_Status(t *testing.T) {
-	type result struct {
-		revoked, ok bool
-	}
 	tests := map[string]struct {
 		endpoints testPKIEndpoints
 		// chain is what the source presents; the server certificate alone by default.
-		chain   func(*testPKI) []*x509.Certificate
-		at      func(*testPKI) time.Time
-		want    result
-		wantErr bool
+		chain func(*testPKI) []*x509.Certificate
+		at    func(*testPKI) time.Time
+		// want is the status, and wantErr part of the reason when it cannot be determined.
+		want    bool
+		wantErr string
 	}{
-		"no CRL or OCSP URL": {
-			want: result{
-				ok: true,
-			},
-		},
+		"no CRL or OCSP URL": {},
 		"CRL lists the certificate": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				crls:    []testPKIHandler{serveCRL(true)},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"CRL does not list the certificate": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				crls:    []testPKIHandler{serveCRL(false)},
-			},
-			want: result{
-				ok: true,
 			},
 		},
 		"PEM CRL and issuer": {
@@ -74,47 +63,41 @@ func TestRevocationChecker_Status(t *testing.T) {
 				issuers: []testPKIHandler{serveIssuerPEM},
 				crls:    []testPKIHandler{serveCRLPEM(true)},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"CRL with an unreachable issuer is not used": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{notFound},
 				crls:    []testPKIHandler{unexpected},
 			},
-			want: result{},
+			wantErr: "TLS verification found signed it; GET",
 		},
 		"CRL without an issuer URL is not used": {
 			endpoints: testPKIEndpoints{
 				crls: []testPKIHandler{unexpected},
 			},
-			want: result{},
+			wantErr: "the certificate lists no issuer URL",
 		},
 		"issuer that did not sign the certificate": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveRogueIssuer},
 				crls:    []testPKIHandler{unexpected},
 			},
-			want: result{},
+			wantErr: "did not sign it",
 		},
 		"issuer that did not sign the certificate, for OCSP": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveRogueIssuer},
 				ocsps:   []testPKIHandler{unexpected},
 			},
-			want: result{},
+			wantErr: "did not sign it",
 		},
 		"issuer URL after one that did not sign the certificate": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveRogueIssuer, serveIssuer},
 				crls:    []testPKIHandler{serveCRL(true)},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"issuer from the presented chain": {
 			endpoints: testPKIEndpoints{
@@ -122,10 +105,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 				crls:    []testPKIHandler{serveCRL(true)},
 			},
 			chain: func(p *testPKI) []*x509.Certificate { return []*x509.Certificate{p.leaf, p.rogue, p.ca} },
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want:  true,
 		},
 		"SHA-1 signed certificate": {
 			endpoints: testPKIEndpoints{
@@ -138,10 +118,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 				})
 				return []*x509.Certificate{leaf}
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"presented chain without the issuer": {
 			endpoints: testPKIEndpoints{
@@ -149,24 +126,21 @@ func TestRevocationChecker_Status(t *testing.T) {
 				crls:    []testPKIHandler{serveCRL(true)},
 			},
 			chain: func(p *testPKI) []*x509.Certificate { return []*x509.Certificate{p.leaf, p.rogue} },
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want:  true,
 		},
 		"CRL signed by another CA": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				crls:    []testPKIHandler{serveRogueCRL},
 			},
-			wantErr: true,
+			wantErr: "verification failure",
 		},
 		"CRL from another issuer name with the issuer's key": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				crls:    []testPKIHandler{serveRenamedCRL},
 			},
-			wantErr: true,
+			wantErr: "differs from the certificate's issuer name",
 		},
 		"CRL past its next update": {
 			endpoints: testPKIEndpoints{
@@ -174,7 +148,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 				crls:    []testPKIHandler{serveCRL(false)},
 			},
 			at:      func(p *testPKI) time.Time { return p.nextUpdate().Add(revocationClockSkew + time.Second) },
-			wantErr: true,
+			wantErr: "outdated since",
 		},
 		"CRL past its next update within the clock skew": {
 			endpoints: testPKIEndpoints{
@@ -182,9 +156,6 @@ func TestRevocationChecker_Status(t *testing.T) {
 				crls:    []testPKIHandler{serveCRL(false)},
 			},
 			at: func(p *testPKI) time.Time { return p.nextUpdate().Add(revocationClockSkew) },
-			want: result{
-				ok: true,
-			},
 		},
 		"CRL before its this update": {
 			endpoints: testPKIEndpoints{
@@ -192,7 +163,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 				crls:    []testPKIHandler{serveCRL(false)},
 			},
 			at:      func(p *testPKI) time.Time { return p.thisUpdate().Add(-revocationClockSkew - time.Second) },
-			wantErr: true,
+			wantErr: "not valid until",
 		},
 		"CRL before its this update within the clock skew": {
 			endpoints: testPKIEndpoints{
@@ -200,9 +171,6 @@ func TestRevocationChecker_Status(t *testing.T) {
 				crls:    []testPKIHandler{serveCRL(false)},
 			},
 			at: func(p *testPKI) time.Time { return p.thisUpdate().Add(-revocationClockSkew) },
-			want: result{
-				ok: true,
-			},
 		},
 		"CRL partition for the certificate": {
 			endpoints: testPKIEndpoints{
@@ -211,10 +179,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					rl.ExtraExtensions = []pkix.Extension{idpExtension([]string{p.crlURLs[0]}, idpOnlyUserCerts)}
 				})},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"CRL partition for other certificates": {
 			endpoints: testPKIEndpoints{
@@ -223,7 +188,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					rl.ExtraExtensions = []pkix.Extension{idpExtension([]string{p.crlURLs[0] + "-other"})}
 				})},
 			},
-			wantErr: true,
+			wantErr: "names none of the certificate's CRL URLs",
 		},
 		"CRL of CA certificates": {
 			endpoints: testPKIEndpoints{
@@ -232,7 +197,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					rl.ExtraExtensions = []pkix.Extension{idpExtension(nil, idpOnlyCACerts)}
 				})},
 			},
-			wantErr: true,
+			wantErr: "covers only CA certificates",
 		},
 		"delta CRL": {
 			endpoints: testPKIEndpoints{
@@ -245,7 +210,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					}}
 				})},
 			},
-			wantErr: true,
+			wantErr: "unsupported critical extension 2.5.29.27",
 		},
 		"CRL with a non-critical extension it does not process": {
 			endpoints: testPKIEndpoints{
@@ -257,10 +222,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					}}
 				})},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"CRL entry with a critical extension": {
 			endpoints: testPKIEndpoints{
@@ -273,7 +235,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					}}
 				})},
 			},
-			wantErr: true,
+			wantErr: "unsupported critical entry extension 2.5.29.29",
 		},
 		"CRL entry with a non-critical extension": {
 			endpoints: testPKIEndpoints{
@@ -282,31 +244,25 @@ func TestRevocationChecker_Status(t *testing.T) {
 					rl.RevokedCertificateEntries[0].ReasonCode = 1 // keyCompromise
 				})},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"CRL unreachable": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				crls:    []testPKIHandler{notFound},
 			},
-			wantErr: true,
+			wantErr: "returned HTTP status code: 404",
 		},
 		"CRL is not a CRL": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				crls:    []testPKIHandler{serveIssuer},
 			},
-			wantErr: true,
+			wantErr: "parse CRL",
 		},
 		"LDAP CRL is skipped": {
 			endpoints: testPKIEndpoints{
 				ldapCRL: true,
-			},
-			want: result{
-				ok: true,
 			},
 		},
 		"later CRL lists the certificate": {
@@ -315,20 +271,14 @@ func TestRevocationChecker_Status(t *testing.T) {
 				crls:    []testPKIHandler{serveCRL(false), serveCRL(true)},
 				ldapCRL: true,
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"issuer without the CRL-signing key usage": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuerWithoutCRLSign},
 				crls:    []testPKIHandler{serveCRL(true)},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"revoked by CRL without asking OCSP": {
 			endpoints: testPKIEndpoints{
@@ -336,18 +286,12 @@ func TestRevocationChecker_Status(t *testing.T) {
 				crls:    []testPKIHandler{serveCRL(true)},
 				ocsps:   []testPKIHandler{unexpected},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"OCSP good": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveOCSP(ocsp.Good)},
-			},
-			want: result{
-				ok: true,
 			},
 		},
 		"OCSP revoked": {
@@ -355,20 +299,14 @@ func TestRevocationChecker_Status(t *testing.T) {
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveOCSP(ocsp.Revoked)},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"OCSP unknown is reported as revoked": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveOCSP(ocsp.Unknown)},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"OCSP after a CRL that does not list the certificate": {
 			endpoints: testPKIEndpoints{
@@ -376,18 +314,12 @@ func TestRevocationChecker_Status(t *testing.T) {
 				crls:    []testPKIHandler{serveCRL(false)},
 				ocsps:   []testPKIHandler{serveOCSP(ocsp.Revoked)},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"failing OCSP responder is skipped": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{notFound, serveIssuer},
 				ocsps:   []testPKIHandler{notFound, serveOCSP(ocsp.Good)},
-			},
-			want: result{
-				ok: true,
 			},
 		},
 		"OCSP responders unreachable": {
@@ -395,29 +327,29 @@ func TestRevocationChecker_Status(t *testing.T) {
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{notFound, notFound},
 			},
-			want: result{},
+			wantErr: "no usable OCSP answer",
 		},
 		"OCSP answer signed by another CA": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveRogueOCSP},
 			},
-			want: result{},
+			wantErr: "bad OCSP signature",
 		},
 		"OCSP answer for another certificate": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveOCSPForAnotherCertificate},
 			},
-			want: result{},
+			wantErr: "no response matching the supplied certificate",
 		},
 		"OCSP answer past its next update": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveOCSP(ocsp.Good)},
 			},
-			at:   func(p *testPKI) time.Time { return p.nextUpdate().Add(revocationClockSkew + time.Second) },
-			want: result{},
+			at:      func(p *testPKI) time.Time { return p.nextUpdate().Add(revocationClockSkew + time.Second) },
+			wantErr: "outdated since",
 		},
 		"OCSP answer past its next update within the clock skew": {
 			endpoints: testPKIEndpoints{
@@ -425,17 +357,14 @@ func TestRevocationChecker_Status(t *testing.T) {
 				ocsps:   []testPKIHandler{serveOCSP(ocsp.Good)},
 			},
 			at: func(p *testPKI) time.Time { return p.nextUpdate().Add(revocationClockSkew) },
-			want: result{
-				ok: true,
-			},
 		},
 		"OCSP answer before its this update": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveOCSP(ocsp.Good)},
 			},
-			at:   func(p *testPKI) time.Time { return p.thisUpdate().Add(-revocationClockSkew - time.Second) },
-			want: result{},
+			at:      func(p *testPKI) time.Time { return p.thisUpdate().Add(-revocationClockSkew - time.Second) },
+			wantErr: "not valid until",
 		},
 		"OCSP answer before its this update within the clock skew": {
 			endpoints: testPKIEndpoints{
@@ -443,9 +372,6 @@ func TestRevocationChecker_Status(t *testing.T) {
 				ocsps:   []testPKIHandler{serveOCSP(ocsp.Good)},
 			},
 			at: func(p *testPKI) time.Time { return p.thisUpdate().Add(-revocationClockSkew) },
-			want: result{
-				ok: true,
-			},
 		},
 		"OCSP answer without a next update within the clock skew of its this update": {
 			endpoints: testPKIEndpoints{
@@ -455,9 +381,6 @@ func TestRevocationChecker_Status(t *testing.T) {
 				})},
 			},
 			at: func(p *testPKI) time.Time { return p.thisUpdate().Add(revocationClockSkew) },
-			want: result{
-				ok: true,
-			},
 		},
 		"OCSP answer without a next update past the clock skew of its this update": {
 			endpoints: testPKIEndpoints{
@@ -466,22 +389,22 @@ func TestRevocationChecker_Status(t *testing.T) {
 					answer.NextUpdate = time.Time{}
 				})},
 			},
-			at:   func(p *testPKI) time.Time { return p.thisUpdate().Add(revocationClockSkew + time.Second) },
-			want: result{},
+			at:      func(p *testPKI) time.Time { return p.thisUpdate().Add(revocationClockSkew + time.Second) },
+			wantErr: "outdated since",
 		},
 		"OCSP answer about a certificate of an issuer with another name": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveOCSPAbout(func(p *testPKI) *x509.Certificate { return p.caRenamed })},
 			},
-			want: result{},
+			wantErr: "about a certificate of another issuer",
 		},
 		"OCSP answer about a certificate of an issuer with another key": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveOCSPAbout(func(p *testPKI) *x509.Certificate { return p.rogue })},
 			},
-			want: result{},
+			wantErr: "about a certificate of another issuer",
 		},
 		"OCSP request names the certificate's issuer, not the issuer certificate's subject": {
 			endpoints: testPKIEndpoints{
@@ -489,9 +412,6 @@ func TestRevocationChecker_Status(t *testing.T) {
 				ocsps:   []testPKIHandler{serveOCSP(ocsp.Good)},
 			},
 			chain: func(p *testPKI) []*x509.Certificate { return []*x509.Certificate{p.leaf, p.caRenamed} },
-			want: result{
-				ok: true,
-			},
 		},
 		"stale OCSP answer is skipped": {
 			endpoints: testPKIEndpoints{
@@ -504,10 +424,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					serveOCSP(ocsp.Revoked),
 				},
 			},
-			want: result{
-				revoked: true,
-				ok:      true,
-			},
+			want: true,
 		},
 		"OCSP answer with the issuer's certificate": {
 			endpoints: testPKIEndpoints{
@@ -516,17 +433,11 @@ func TestRevocationChecker_Status(t *testing.T) {
 					answer.Certificate = p.ca
 				})},
 			},
-			want: result{
-				ok: true,
-			},
 		},
 		"OCSP answer from an authorized responder": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{serveDelegatedOCSP(func(*testPKI, *x509.Certificate) {})},
-			},
-			want: result{
-				ok: true,
 			},
 		},
 		"OCSP answer from a responder not authorized for OCSP signing": {
@@ -536,7 +447,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					responder.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
 				})},
 			},
-			want: result{},
+			wantErr: "not authorized for OCSP signing",
 		},
 		"OCSP answer from an expired responder": {
 			endpoints: testPKIEndpoints{
@@ -545,7 +456,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					responder.NotAfter = p.now.Add(-time.Second)
 				})},
 			},
-			want: result{},
+			wantErr: "outside its validity period",
 		},
 		"OCSP answer from a responder not yet valid": {
 			endpoints: testPKIEndpoints{
@@ -554,7 +465,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 					responder.NotBefore = p.now.Add(time.Second)
 				})},
 			},
-			want: result{},
+			wantErr: "outside its validity period",
 		},
 		"OCSP answer from a CA certificate authorized for OCSP signing": {
 			endpoints: testPKIEndpoints{
@@ -565,46 +476,40 @@ func TestRevocationChecker_Status(t *testing.T) {
 					responder.KeyUsage |= x509.KeyUsageCertSign
 				})},
 			},
-			want: result{},
+			wantErr: "is a CA certificate",
 		},
 		"OCSP without an issuer URL": {
 			endpoints: testPKIEndpoints{
 				ocsps: []testPKIHandler{unexpected},
 			},
-			want: result{},
+			wantErr: "the certificate lists no issuer URL",
 		},
 		"OCSP with an unreachable issuer": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{notFound},
 				ocsps:   []testPKIHandler{unexpected},
 			},
-			want: result{},
+			wantErr: "TLS verification found signed it; GET",
 		},
 		"expired certificate": {
 			endpoints: testPKIEndpoints{
 				crls: []testPKIHandler{unexpected},
 			},
 			at:      func(p *testPKI) time.Time { return p.leaf.NotAfter.Add(time.Second) },
-			wantErr: true,
+			wantErr: "certificate expired at",
 		},
 		"certificate not yet valid": {
 			endpoints: testPKIEndpoints{
 				crls: []testPKIHandler{unexpected},
 			},
 			at:      func(p *testPKI) time.Time { return p.leaf.NotBefore.Add(-time.Second) },
-			wantErr: true,
+			wantErr: "certificate is not valid until",
 		},
 		"certificate at its last valid instant": {
 			at: func(p *testPKI) time.Time { return p.leaf.NotAfter },
-			want: result{
-				ok: true,
-			},
 		},
 		"certificate at its first valid instant": {
 			at: func(p *testPKI) time.Time { return p.leaf.NotBefore },
-			want: result{
-				ok: true,
-			},
 		},
 	}
 
@@ -620,16 +525,13 @@ func TestRevocationChecker_Status(t *testing.T) {
 				at = test.at(pki)
 			}
 
-			revoked, ok, err := newRevocationChecker().status(t.Context(), chain, at)
+			revoked, err := newRevocationChecker().status(t.Context(), chain[0], chain[1:], at)
 
-			if test.wantErr {
-				assert.Error(t, err)
+			if test.wantErr != "" {
+				assert.ErrorContains(t, err, test.wantErr)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, test.want, result{
-					revoked: revoked,
-					ok:      ok,
-				})
+				assert.Equal(t, test.want, revoked)
 			}
 			assert.LessOrEqual(t, pki.hits["issuer"].Load(), int64(len(test.endpoints.issuers)),
 				"a check requests each issuer URL at most once")
@@ -742,13 +644,12 @@ func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {
 			},
 		},
 	} {
-		revoked, ok, err := rc.status(t.Context(), step.chain, step.at)
+		revoked, err := rc.status(t.Context(), step.chain[0], step.chain[1:], step.at)
 
 		if step.wantErr {
-			assert.Error(t, err, step.name)
+			assert.ErrorContains(t, err, "differs from the certificate's issuer name", step.name)
 		} else {
 			require.NoError(t, err, step.name)
-			assert.True(t, ok, step.name)
 			assert.Equal(t, step.wantRevoked, revoked, step.name)
 		}
 		assert.Equal(t, step.wantDownloads, downloads{
@@ -756,19 +657,6 @@ func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {
 			issuer: pki.hits["issuer"].Load(),
 		}, step.name)
 	}
-}
-
-func TestRevocationChecker_CancelledIssuerDownloadIsNotAMissingIssuer(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	pki := newTestPKI(t, testPKIEndpoints{
-		issuers: []testPKIHandler{cancelAndStall(cancel)},
-		crls:    []testPKIHandler{unexpected},
-	})
-
-	_, _, err := newRevocationChecker().status(ctx, []*x509.Certificate{pki.leaf}, pki.now)
-
-	assert.ErrorIs(t, err, context.Canceled)
 }
 
 func TestRevocationChecker_RequestsAreBounded(t *testing.T) {
@@ -779,7 +667,7 @@ func TestRevocationChecker_RequestsAreBounded(t *testing.T) {
 	require.Positive(t, rc.client.Timeout)
 	rc.client.Timeout = 50 * time.Millisecond
 
-	_, _, err := rc.status(t.Context(), []*x509.Certificate{pki.leaf, pki.ca}, pki.now)
+	_, err := rc.status(t.Context(), pki.leaf, []*x509.Certificate{pki.ca}, pki.now)
 
 	// The test context has no deadline, so only the client timeout can end the request this way.
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
@@ -1182,6 +1070,18 @@ func (p *testPKI) issueLeaf(
 	modify ...func(*x509.Certificate),
 ) *x509.Certificate {
 	t.Helper()
+	return p.issueServerCertificate(t, serial, issuer, issuerKey, modify...).Leaf
+}
+
+// issueServerCertificate is issueLeaf with the certificate's private key, for a TLS server.
+func (p *testPKI) issueServerCertificate(
+	t testing.TB,
+	serial *big.Int,
+	issuer *x509.Certificate,
+	issuerKey *ecdsa.PrivateKey,
+	modify ...func(*x509.Certificate),
+) tls.Certificate {
+	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	template := &x509.Certificate{
@@ -1204,7 +1104,11 @@ func (p *testPKI) issueLeaf(
 	require.NoError(t, err)
 	cert, err := x509.ParseCertificate(der)
 	require.NoError(t, err)
-	return cert
+	return tls.Certificate{
+		Certificate: [][]byte{der},
+		PrivateKey:  key,
+		Leaf:        cert,
+	}
 }
 
 // thisUpdate is when the PKI's CRLs and OCSP answers were issued.

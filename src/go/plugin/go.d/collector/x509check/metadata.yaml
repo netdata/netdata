@@ -41,9 +41,10 @@ modules:
 
           With `check_revocation_status` enabled, the collector also downloads the CRLs and queries the OCSP
           responders listed in the server certificate. It verifies their answers with the certificate of the issuer
-          that signed the server certificate: the one the server sends, or else the one downloaded from the issuer URL
-          listed in the server certificate. These requests go to the HTTP or HTTPS URLs in the certificate, so the
-          Agent host needs outbound access to them. Each request times out after 10 seconds; `timeout` does not apply
+          that signed the server certificate: one the server sends or that TLS verification of the server certificate
+          reached, such as a root CA from `tls_ca`, or else the one downloaded from the issuer URL listed in the server
+          certificate. These requests go to the HTTP or HTTPS URLs in the certificate, so the Agent host needs
+          outbound access to them. Each request times out after 10 seconds; `timeout` does not apply
           to them. Each job reuses a CRL's result for a certificate until the next update time the CRL states.
       default_behavior:
         auto_detection:
@@ -60,12 +61,12 @@ modules:
               URL is always reported as not revoked (LDAP CRL URLs are skipped), and an OCSP `unknown` answer is
               reported as revoked.
             - Revocation status comes only from CRLs and OCSP answers that verify against the issuer of the server
-              certificate and are current by the Agent host's clock, within 5 minutes. The issuer certificate must
-              come from the server, sent along with its own certificate, or from the issuer URL listed in the server
-              certificate; `tls_ca` is not used. Without it the chart shows a gap, for example for a private CA whose
-              certificates list no issuer URL, or a `file://` source whose certificate lists none. The chart also
-              shows a gap when the CA publishes outdated CRLs or OCSP answers, and can show one when the Agent host's
-              clock is more than 5 minutes off.
+              certificate and are current by the Agent host's clock, within 5 minutes. The issuer certificate must be
+              one the server sends, one that TLS verification reached through `tls_ca` or the system's trusted CAs, or
+              the one at the issuer URL listed in the server certificate. Without it the chart shows a gap, for
+              example with `tls_skip_verify` for a private CA whose certificates list no issuer URL, or for a
+              `file://` source whose certificate lists none. The chart also shows a gap when the CA publishes outdated
+              CRLs or OCSP answers, and can show one when the Agent host's clock is more than 5 minutes off.
             - With an `smtp://` source, `timeout` covers the whole SMTP exchange. A mail server that delays its
               greeting, a common anti-spam measure on port 25, needs a `timeout` longer than that delay.
         performance_impact:
@@ -369,7 +370,27 @@ modules:
           - error: "create tls config: could not parse keypair `cert`:`key`"
             cause: The files set in `tls_cert` and `tls_key` are not a matching PEM certificate and private key.
             fix: Point `tls_cert` and `tls_key` at the certificate and the private key of the same pair.
-          - error: "revocation status check for `source` failed: `reason`"
+          - error: "revocation status of `source` could not be determined: issuer certificate not found: `reason`"
+            when: "`check_revocation_status` is enabled."
+            cause: >-
+              The certificate of the CA that issued the server certificate is unavailable: the server does not send
+              it, TLS verification did not reach it (`tls_skip_verify` is set, or the source is `file://`), and the
+              issuer URL listed in the server certificate is missing, unreachable, or does not serve that certificate
+              as a single DER or PEM certificate; `reason` says which. The revocation status chart shows a gap.
+            fix: >-
+              Configure the server to send the CA certificate that issued its certificate, or, with TLS verification
+              on, add that CA certificate to `tls_ca`. Otherwise check that the Agent host can reach the issuer URL
+              listed in the certificate.
+          - error: "revocation status of `source` could not be determined: no usable OCSP answer: `reason`"
+            when: "`check_revocation_status` is enabled."
+            cause: >-
+              No OCSP responder listed in the certificate returned a usable answer: one about this certificate,
+              current within 5 minutes, and signed by the issuer or by a responder it authorized for OCSP signing;
+              `reason` gives each responder's problem. The revocation status chart shows a gap.
+            fix: >-
+              Check that the Agent host can reach the OCSP URLs listed in the certificate and that its clock is
+              correct. For an `outdated since` reason, the responder serves stale answers; report it to the CA.
+          - error: "revocation status of `source` could not be determined: `reason`"
             when: "`check_revocation_status` is enabled."
             cause: >-
               A CRL listed in the certificate could not be downloaded, parsed or verified, or the certificate is
@@ -381,18 +402,6 @@ modules:
               correct, and renew an expired certificate. For an `unsupported crl version` reason, have the CA issue
               version 2 CRLs (with OpenSSL, set `crlnumber` in the CA configuration). For an `outdated since` reason,
               have the CA publish a current CRL.
-          - error: "revocation status of `source` could not be determined"
-            when: "`check_revocation_status` is enabled."
-            cause: >-
-              The certificate of the server certificate's issuer is unavailable: the server does not send it, and the
-              issuer URL listed in the certificate is missing or unreachable, or does not serve the certificate that
-              signed it as a single DER or PEM certificate. Or no OCSP responder listed in the certificate returned a
-              usable answer: one about this certificate, current within 5 minutes, and signed by the issuer or by a
-              responder it authorized for OCSP signing. The revocation status chart shows a gap.
-            fix: >-
-              Configure the server to send the CA certificate that issued its certificate, and check that the Agent
-              host can reach the issuer certificate and OCSP URLs listed in the certificate and that its clock is
-              correct.
     metrics:
       folding:
         title: Metrics

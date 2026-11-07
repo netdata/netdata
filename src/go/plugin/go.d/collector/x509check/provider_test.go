@@ -177,7 +177,7 @@ func TestCollector_TLSServerNameSelectsCertificate(t *testing.T) {
 			c.InsecureSkipVerify = true
 			require.NoError(t, c.Init(t.Context()))
 
-			certs, err := c.provider.certificates(t.Context())
+			src, err := c.provider.certificates(t.Context())
 
 			select {
 			case sni := <-requested:
@@ -186,7 +186,7 @@ func TestCollector_TLSServerNameSelectsCertificate(t *testing.T) {
 				t.Fatal("the server saw no TLS handshake")
 			}
 			require.NoError(t, err)
-			assert.Equal(t, test.wantCommonName, certs[0].Subject.CommonName)
+			assert.Equal(t, test.wantCommonName, src.chain[0].Subject.CommonName)
 		})
 	}
 }
