@@ -138,7 +138,7 @@ typedef struct sqlite_init_failure {
     char statement[48];                 // the PRAGMA name, or the statement index in the batch
     int rc;                             // the code the failing call returned
     int extended_rc;                    // sqlite3_extended_errcode() of the connection
-    int os_errno;                       // sqlite3_system_errno() of the connection, 0 = none
+    int os_errno;                       // sqlite3_system_errno() of the connection, 0 = none; a GetLastError() code on Windows
     SQLITE_INIT_RECOVERY recovery;
 } SQLITE_INIT_FAILURE;
 

@@ -675,9 +675,16 @@ void sqlite_init_failure_format(const SQLITE_INIT_FAILURE *f, char *dst, size_t 
     else if (f->recovery == SQLITE_INIT_RECOVERY_NOT_MARKED)
         recovery = reset ? "; reset could not be requested" : "; recovery could not be requested";
 
-    snprintfz(dst, dst_size - 1, "%s%s%s failed: SQLite rc %d, extended %d (%s), OS errno %d%s",
+#if defined(OS_WINDOWS)
+    // SQLite uses its Win32 VFS here, so the OS error is a GetLastError() code
+    const char *os_error_label = "Windows error";
+#else
+    const char *os_error_label = "OS errno";
+#endif
+
+    snprintfz(dst, dst_size - 1, "%s%s%s failed: SQLite rc %d, extended %d (%s), %s %d%s",
               f->stage, *f->statement ? " " : "", f->statement,
-              f->rc, f->extended_rc, sqlite3_errstr(f->extended_rc), f->os_errno, recovery);
+              f->rc, f->extended_rc, sqlite3_errstr(f->extended_rc), os_error_label, f->os_errno, recovery);
 }
 
 // A statement id that is safe to report: the PRAGMA name, or the index in the batch.

@@ -768,8 +768,14 @@ static __thread SQLITE_INIT_FAILURE meta_init_failure;
 void sql_init_meta_failure_reason(char *dst, size_t dst_size, int *os_errno)
 {
     sqlite_init_failure_format(&meta_init_failure, dst, dst_size);
-    if (os_errno)
+    if (os_errno) {
+#if defined(OS_WINDOWS)
+        // a GetLastError() code is not an errno; the reason above carries it
+        *os_errno = 0;
+#else
         *os_errno = meta_init_failure.os_errno;
+#endif
+    }
 }
 
 /*
