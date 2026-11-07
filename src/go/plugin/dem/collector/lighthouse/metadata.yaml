@@ -98,7 +98,9 @@ modules:
             title: Configuration options
           list:
             - name: site_id
-              description: Groups this job with other DEM jobs for the same site. Leave empty to keep the job unassigned.
+              description: Groups this job with other DEM jobs for the same site; leave empty to keep it unassigned. Use 1–64 lowercase letters, digits, underscores or hyphens, starting with a letter or digit.
+              detailed_description: Retained runs and captures keep the site association recorded when the attempt started.
+                Changing this option does not relabel existing evidence; records without an association remain unassigned.
               default_value: ''
               required: false
               group: General
@@ -467,7 +469,8 @@ modules:
           returns:
             description: One row per retained reporter event, preserving actual and expected status and failure
               phase. The run object also contains test counts, nullable lab metrics, capture state, artifact
-              metadata and history errors; dropped_events discloses omitted event detail.
+              metadata and history errors; dropped_events discloses omitted event detail. The run.site_id field
+              contains the association recorded for the attempt; an empty value means unassigned.
             columns:
               - name: at_ms
                 type: timestamp
@@ -627,7 +630,8 @@ modules:
           returns:
             description: Retained capture metadata remains available after run history expires. Fetch verifies content
               and returns encoding=base64 and data_base64 without rendering HTML. A missing recorded capture
-              returns expired_or_unavailable, which does not prove why the file is absent.
+              returns expired_or_unavailable, which does not prove why the file is absent. The top-level site_id field
+              contains the recorded association; an empty value means unassigned.
             columns:
               - name: artifact_id
                 type: string

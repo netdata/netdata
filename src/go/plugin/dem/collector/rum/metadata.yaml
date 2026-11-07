@@ -1626,7 +1626,9 @@ modules:
                     name: name
                     required: true
                   - default_value: ""
-                    description: Groups this job with other DEM jobs for the same site. Leave empty to keep the job unassigned.
+                    description: Groups this job with other DEM jobs for the same site; leave empty to keep it unassigned. Use 1–64 lowercase letters, digits, underscores or hyphens, starting with a letter or digit.
+                    detailed_description: Retained RUM observations keep the site association recorded when they were received.
+                      Changing this option does not relabel existing evidence; records without an association remain unassigned.
                     group: Site
                     name: site_id
                     required: false

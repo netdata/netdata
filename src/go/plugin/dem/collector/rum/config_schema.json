@@ -281,7 +281,7 @@
       },
       "site_id": {
         "title": "Site ID",
-        "description": "Groups this job with other DEM jobs for the same site. Leave empty to keep the job unassigned.",
+        "description": "Groups this job with other DEM jobs for the same site; leave empty to keep it unassigned. Use 1–64 lowercase letters, digits, underscores or hyphens, starting with a letter or digit.",
         "type": [
           "string",
           "null"

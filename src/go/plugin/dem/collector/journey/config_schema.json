@@ -12,7 +12,7 @@
       },
       "site_id": {
         "title": "Site ID",
-        "description": "Groups this job with other DEM jobs for the same site. Leave empty to keep the job unassigned.",
+        "description": "Groups this job with other DEM jobs for the same site; leave empty to keep it unassigned. Use 1–64 lowercase letters, digits, underscores or hyphens, starting with a letter or digit.",
         "type": [
           "string",
           "null"
@@ -172,7 +172,7 @@
       }
     },
     "site_id": {
-      "ui:help": "Use the same ID across independent RUM, journey and Lighthouse jobs to group a site. The ID does not replace the job name or require a RUM job. Use 1–64 lowercase letters, digits, underscores or hyphens, starting with a letter or digit.",
+      "ui:help": "The ID does not replace the job name or require a RUM job. Retained runs and captures keep the association recorded when they were produced.",
       "ui:placeholder": "storefront"
     }
   }
