@@ -217,7 +217,7 @@ target_link_libraries(netdata PRIVATE
         "$<$<BOOL:${ENABLE_SENTRY}>:sentry>"
         "$<$<BOOL:${ENABLE_WEBRTC}>:LibDataChannel::LibDataChannelStatic>"
         PkgConfig::CURL
-        "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi>"
+        "$<$<BOOL:${OS_WINDOWS}>:odbc32;setupapi;winspool>"
 )
 
 netdata_add_protobuf(netdata)

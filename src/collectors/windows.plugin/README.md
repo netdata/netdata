@@ -8,7 +8,7 @@ The Windows plugin primarily collects metrics from Microsoft Windows [Performanc
 
 ## Default Configuration
 
-By default, all collector threads are enabled except for `PerflibThermalZone`. `PerflibSMB` is also enabled by default; on systems where the "SMB Server Shares" object is not available, no SMB metrics are collected. You can enable disabled collectors or disable any of the currently active ones by modifying the `[plugin:windows]` section in your configuration file.
+By default, all collector threads are enabled except for `PerflibThermalZone` and `GetPrinters`. `PerflibSMB` is also enabled by default; on systems where the "SMB Server Shares" object is not available, no SMB metrics are collected. You can enable disabled collectors or disable any of the currently active ones by modifying the `[plugin:windows]` section in your configuration file.
 
 To change a setting, remove the comment symbol (`#`) from the beginning of the line and set the value to either `yes` or `no`.
 
@@ -20,6 +20,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # GetSensors = yes
         # GetHardwareInfo = yes
         # PerflibServices = yes
+        # GetPrinters = no
         # PerflibProcesses = yes
         # PerflibProcessor = yes
         # PerflibMemory = yes
@@ -48,11 +49,11 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
 When the plugin is running, most threads will collect data using Netdata's default update `every interval`. However,
 to avoid overloading the host, Netdata uses different `update every` intervals for specific threads, as shown below:
 
-| Period (seconds) | Threads                                                                             |
-|------------------|-------------------------------------------------------------------------------------|
-| 5                | `PerflibHyperV`, `PerflibThermalZone`                                               |
-| 10               | `GetHardwareInfo`, `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
-| 30               | `PerflibServices`                                                                   |
+| Period (seconds) | Threads                                                                                            |
+|------------------|----------------------------------------------------------------------------------------------------|
+| 5                | `PerflibHyperV`, `PerflibThermalZone`                                                              |
+| 10               | `GetHardwareInfo`, `GetPrinters`, `PerflibAD`, `PerflibADCS`, `PerflibADFS`, and `PerflibExchange` |
+| 30               | `PerflibServices`                                                                                  |
 
 To customize the update interval for a specific thread, you can set the update every value within the corresponding
 thread configuration in your `netdata.conf` file. For example, to modify the intervals for the `Object`
@@ -89,3 +90,29 @@ Perflib may not report a newly created queue until it becomes active, such as af
 the raw Perflib instance name. The `queue` chart label is sanitized for display; for example,
 `host\private$\name` appears as `host/private_/name`. Use the original queue path in the selector rather than copying
 the displayed label.
+
+## GetPrinters
+
+`GetPrinters` reads local printers and printer connections from the Windows print spooler (`EnumPrintersW` and, for
+non-empty queues, `EnumJobsW`). It is disabled by default. Enable it in `[plugin:windows]` with `GetPrinters = yes`
+and configure it in `[plugin:windows:GetPrinters]`:
+
+```ini
+[plugin:windows:GetPrinters]
+    update every = 10s
+    printers to monitor = *
+    max monitored printers = 100
+```
+
+The selector uses the same syntax as the MSMQ selector above; printer connections such as `\\server\printer` can be
+pasted verbatim. Matching printers are selected in case-insensitive alphabetical order up to the cap; unselected
+printers get no charts and their queues are not opened.
+
+Each selected printer gets three charts: queued jobs, printer status, and jobs by status. Status values match the
+`Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter; an offline printer reports `other`. Job user
+names, machine names, and document titles are never collected.
+
+The module runs on its own thread only while its `update every` differs from the global interval. Opening the queue of
+an unreachable printer connection can block; while it is blocked, this module collects nothing and Netdata shutdown
+waits for the call to return. If the spooler cannot be enumerated (for example, the Spooler service is stopped), the
+charts show gaps and are kept until a successful enumeration shows the printer is gone.
