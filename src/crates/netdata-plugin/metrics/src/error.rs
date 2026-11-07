@@ -40,7 +40,8 @@ pub enum Error {
     /// The instrument to chart is of another metric set.
     #[error("instrument of another metric set")]
     InstrumentOfAnotherSet,
-    /// The instrument already has its chart; these are its column names.
+    /// A column group already has its chart; these are the group's column
+    /// names (for a histogram, those of one of its three groups).
     #[error("the columns {0:?} already have a chart")]
     ColumnsAlreadyCharted(Vec<String>),
     /// A column name is not a valid dimension id.
@@ -58,7 +59,12 @@ pub enum Error {
     /// A context is already used in the charts.
     #[error("duplicate context {0:?}")]
     DuplicateContext(String),
-    /// An instrument of the set has no chart; these are its column names.
+    /// A histogram's priority is above `i32::MAX - 2`: its `max` and heatmap
+    /// charts take the next two priorities.
+    #[error("histogram priority {0} must be at most {max}", max = i32::MAX - 2)]
+    HistogramPriority(i32),
+    /// A column group of the set has no chart; these are the group's column
+    /// names (for a histogram, those of one of its three groups).
     #[error("the columns {0:?} have no chart")]
     ColumnsWithoutChart(Vec<String>),
 }

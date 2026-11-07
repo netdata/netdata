@@ -96,10 +96,12 @@
 //! A mistake in declaring a metric set or its charts makes the
 //! [`MetricSetBuilder`] or [`ChartsBuilder`] step that makes it return an
 //! [`Error`], and that step adds nothing. Other mistakes of the plugin's own
-//! code, in its label keys, or an instrument or batch of another metric set
-//! used to record or merge, are checked by debug assertions: tests and debug
-//! builds panic on them, release builds skip the checks. The `# Panics`
-//! sections list them.
+//! code are checked by debug assertions: an empty, too long or repeated label
+//! key, and, when recording or merging, an instrument or batch of another
+//! metric set or a column index out of range (a broken manual [`Column`]
+//! implementation). Tests and debug builds panic on them, release builds skip
+//! the checks. [`Labels::insert`] and [`Aggregator::merge`] list them under
+//! `# Panics`, [`Measurements`] in its own documentation.
 
 mod aggregator;
 mod batch;

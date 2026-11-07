@@ -344,8 +344,8 @@ impl MetricSetBuilder {
     /// # Errors
     ///
     /// Invalid settings: [`Error::CollectionInterval`],
-    /// [`Error::ZeroExpiry`], [`Error::ZeroCardinalityLimit`]
-    /// or [`Error::NoOverflowLabels`].
+    /// [`Error::AllowedLateness`], [`Error::ZeroExpiry`],
+    /// [`Error::ZeroCardinalityLimit`] or [`Error::NoOverflowLabels`].
     pub fn new(settings: Settings) -> Result<Self, Error> {
         check_settings(&settings)?;
         Ok(Self {

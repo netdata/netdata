@@ -58,7 +58,7 @@ pub struct DerivedMetrics {
 impl DerivedMetrics {
     /// # Errors
     ///
-    /// A metric set that the plugin declares wrongly.
+    /// A metric set, or its charts, that the plugin declares wrongly.
     pub fn new(config: &DerivedMetricsConfig) -> Result<Self, netdata_plugin_metrics::Error> {
         let enabled = if config.enabled {
             let services = services::Services::new(config.max_services)?;

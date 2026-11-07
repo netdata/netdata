@@ -1492,6 +1492,56 @@ mod tests {
     }
 
     #[test]
+    fn a_histogram_of_another_set_is_refused() {
+        let e = every(1, BOUNDS);
+        let other = every(1, BOUNDS);
+        assert_eq!(
+            ChartsBuilder::new(&e.set)
+                .histogram(other.duration, descriptor("x.d", 1), "u".into())
+                .err(),
+            Some(Error::InstrumentOfAnotherSet)
+        );
+    }
+
+    #[test]
+    fn a_histogram_charted_twice_is_refused() {
+        let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
+        let duration = builder.histogram(&[1.0]).unwrap();
+        let set = builder.build().unwrap();
+        let mut charts = ChartsBuilder::new(&set);
+        charts
+            .histogram(duration, descriptor("x.d", 1), "u".into())
+            .unwrap();
+        assert_eq!(
+            charts
+                .histogram(duration, descriptor("x.e", 4), "u".into())
+                .err(),
+            Some(Error::ColumnsAlreadyCharted(vec!["avg".into()]))
+        );
+    }
+
+    #[test]
+    fn a_histogram_priority_needs_room_for_its_charts() {
+        let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
+        let duration = builder.histogram(&[1.0]).unwrap();
+        let set = builder.build().unwrap();
+        let mut charts = ChartsBuilder::new(&set);
+        for priority in [i32::MAX - 1, i32::MAX] {
+            assert_eq!(
+                charts
+                    .histogram(duration, descriptor("x.d", priority), "u".into())
+                    .err(),
+                Some(Error::HistogramPriority(priority))
+            );
+        }
+        // The failed steps added nothing; the highest priority with room fits.
+        charts
+            .histogram(duration, descriptor("x.d", i32::MAX - 2), "u".into())
+            .unwrap();
+        charts.build().unwrap();
+    }
+
+    #[test]
     fn a_set_without_instruments_is_refused() {
         let builder = MetricSetBuilder::new(Settings::default()).unwrap();
         assert_eq!(builder.build().err(), Some(Error::NoInstruments));

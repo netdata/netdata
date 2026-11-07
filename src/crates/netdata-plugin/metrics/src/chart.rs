@@ -13,7 +13,7 @@ use crate::metric_set::{Histogram, Labels, MetricSet};
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 use std::sync::Arc;
 
-/// Describes a chart: its context, title, units, family, type and priority.
+/// Describes a chart: its title, units, family, context, type and priority.
 /// [`ChartsBuilder`] makes a chart template of it over one of the table's
 /// column groups, whose values become the dimensions, and every entity gets
 /// one chart instance of each template. The fields map to the CHART line of
@@ -43,9 +43,10 @@ pub struct ChartDescriptor {
     ///
     /// It must contain a dot (a chart id is the agent's `type.id`, and an
     /// entity without labels has the context itself as its chart id), not
-    /// start or end with one, use only letters, digits, `_`, `-` and `.`, and
-    /// not end in `_overflow` or in `_` and 16 hex digits. Contexts must be
-    /// unique: within one [`Charts`] this is checked, across them it is not.
+    /// start or end with one, use only ASCII letters, digits, `_`, `-` and
+    /// `.`, and not end in `_overflow` or in `_` and 16 hex digits. Contexts
+    /// must be unique: within one [`Charts`] this is checked, across them it
+    /// is not.
     pub context: String,
     /// How the dashboard draws the chart, for example as lines or stacked
     /// areas.
@@ -136,8 +137,12 @@ impl ChartsBuilder {
     ) -> Result<(), Error> {
         let columns = columns.into();
         self.check_set(columns.set_id)?;
-        self.check(&descriptor, columns.group)?;
-        self.add(descriptor, columns.group);
+        let template = ChartTemplate {
+            descriptor,
+            group: columns.group,
+        };
+        self.check(&template)?;
+        self.add(template);
         Ok(())
     }
 
@@ -161,9 +166,14 @@ impl ChartsBuilder {
     ///
     /// # Errors
     ///
-    /// As [`ChartsBuilder::chart`], with `descriptor.context` checked first
-    /// against the context rules, then each of the three charts in the order
-    /// above.
+    /// Checked in this order:
+    /// - [`Error::InstrumentOfAnotherSet`];
+    /// - [`Error::InvalidContext`] or [`Error::ContextLikeEntitySuffix`] for
+    ///   `descriptor.context`;
+    /// - [`Error::HistogramPriority`] when `descriptor.priority + 2`
+    ///   overflows;
+    /// - each of the three charts, in the order above, as in
+    ///   [`ChartsBuilder::chart`] from [`Error::ColumnsAlreadyCharted`] on.
     pub fn histogram(
         &mut self,
         histogram: Histogram,
@@ -171,7 +181,12 @@ impl ChartsBuilder {
         heatmap_units: String,
     ) -> Result<(), Error> {
         self.check_set(histogram.set_id)?;
+        // Checked on its own: a derived context can pass where the base one
+        // fails, `x.` giving `x._avg`.
         check_context(&descriptor.context)?;
+        let Some(heatmap_priority) = descriptor.priority.checked_add(2) else {
+            return Err(Error::HistogramPriority(descriptor.priority));
+        };
         let avg = ChartDescriptor {
             title: format!("{} average", descriptor.title),
             units: descriptor.units.clone(),
@@ -184,7 +199,7 @@ impl ChartsBuilder {
             units: descriptor.units.clone(),
             family: descriptor.family.clone(),
             context: format!("{}_max", descriptor.context),
-            priority: descriptor.priority + 1,
+            priority: heatmap_priority - 1,
             ..descriptor
         };
         let buckets = ChartDescriptor {
@@ -192,21 +207,30 @@ impl ChartsBuilder {
             units: heatmap_units,
             context: format!("{}_histogram", descriptor.context),
             chart_type: ChartType::Heatmap,
-            priority: descriptor.priority + 2,
+            priority: heatmap_priority,
             ..descriptor
         };
         let templates = [
-            (avg, histogram.group),
-            (max, histogram.group + 1),
-            (buckets, histogram.group + 2),
+            ChartTemplate {
+                descriptor: avg,
+                group: histogram.group,
+            },
+            ChartTemplate {
+                descriptor: max,
+                group: histogram.group + 1,
+            },
+            ChartTemplate {
+                descriptor: buckets,
+                group: histogram.group + 2,
+            },
         ];
         // The three contexts differ in their suffixes, so checking each
         // against the charts added before is enough.
-        for (descriptor, group) in &templates {
-            self.check(descriptor, *group)?;
+        for template in &templates {
+            self.check(template)?;
         }
-        for (descriptor, group) in templates {
-            self.add(descriptor, group);
+        for template in templates {
+            self.add(template);
         }
         Ok(())
     }
@@ -238,13 +262,12 @@ impl ChartsBuilder {
         }
     }
 
-    /// Checks the chart of `descriptor` over the column group with index
-    /// `group`, in this order: the group has no chart yet, its dimension ids
-    /// are valid, the context is valid, and the context is unique in the
-    /// charts.
-    fn check(&self, descriptor: &ChartDescriptor, group: u32) -> Result<(), Error> {
-        let column_group = self.set.0.schema.column_group(group);
-        if self.charted[group as usize] {
+    /// Checks `template` before it is added, in this order: its column group
+    /// has no chart yet, the group's dimension ids are valid, the context is
+    /// valid, and the context is unique in the charts.
+    fn check(&self, template: &ChartTemplate) -> Result<(), Error> {
+        let column_group = self.set.0.schema.column_group(template.group);
+        if self.charted[template.group as usize] {
             return Err(Error::ColumnsAlreadyCharted(column_group.names.clone()));
         }
         for id in &column_group.names {
@@ -252,7 +275,7 @@ impl ChartsBuilder {
                 return Err(Error::InvalidDimensionId(id.clone()));
             }
         }
-        let context = &descriptor.context;
+        let context = &template.descriptor.context;
         check_context(context)?;
         if self
             .templates
@@ -264,11 +287,10 @@ impl ChartsBuilder {
         Ok(())
     }
 
-    /// Adds the template of `descriptor` over the column group with index
-    /// `group`, which [`ChartsBuilder::check`] accepted.
-    fn add(&mut self, descriptor: ChartDescriptor, group: u32) {
-        self.charted[group as usize] = true;
-        self.templates.push(ChartTemplate { descriptor, group });
+    /// Adds `template`, which [`ChartsBuilder::check`] accepted.
+    fn add(&mut self, template: ChartTemplate) {
+        self.charted[template.group as usize] = true;
+        self.templates.push(template);
     }
 }
 
