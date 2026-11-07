@@ -13,6 +13,70 @@ static unsigned command_string_size;
 
 static int exit_status;
 
+#if defined(OS_WINDOWS)
+static bool command_pipe_server_is_trusted(HANDLE pipe)
+{
+    ULONG server_pid = 0;
+    HANDLE process = NULL, token = NULL, membership_source = NULL, membership_token = NULL;
+    PSID system_sid = NULL, administrators_sid = NULL;
+    bool trusted = false;
+    TOKEN_USER *user = NULL;
+    TOKEN_ELEVATION elevation = {0};
+    DWORD size = 0;
+    SID_IDENTIFIER_AUTHORITY nt_authority = SECURITY_NT_AUTHORITY;
+
+    if (!GetNamedPipeServerProcessId(pipe, &server_pid) || !server_pid)
+        goto cleanup;
+    process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, server_pid);
+    if (!process || GetProcessId(process) != server_pid ||
+        !OpenProcessToken(process, TOKEN_QUERY, &token))
+        goto cleanup;
+
+    if (!GetTokenInformation(token, TokenUser, NULL, 0, &size) && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+        goto cleanup;
+    user = mallocz(size);
+    if (!user || !GetTokenInformation(token, TokenUser, user, size, &size))
+        goto cleanup;
+
+    if (!AllocateAndInitializeSid(&nt_authority, 1, SECURITY_LOCAL_SYSTEM_RID,
+                                  0, 0, 0, 0, 0, 0, 0, &system_sid))
+        goto cleanup;
+    if (EqualSid(user->User.Sid, system_sid)) {
+        trusted = true;
+        goto cleanup;
+    }
+
+    if (!GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size) ||
+        !elevation.TokenIsElevated ||
+        !AllocateAndInitializeSid(&nt_authority, 2, SECURITY_BUILTIN_DOMAIN_RID,
+                                  DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &administrators_sid))
+        goto cleanup;
+
+    if (!OpenProcessToken(process, TOKEN_QUERY | TOKEN_DUPLICATE, &membership_source) ||
+        !DuplicateToken(membership_source, SecurityIdentification, &membership_token))
+        goto cleanup;
+
+    BOOL is_admin = FALSE;
+    if (CheckTokenMembership(membership_token, administrators_sid, &is_admin) && is_admin)
+        trusted = true;
+
+cleanup:
+    if (trusted) {
+        ULONG verified_pid = 0;
+        if (!GetNamedPipeServerProcessId(pipe, &verified_pid) || verified_pid != server_pid)
+            trusted = false;
+    }
+    if (administrators_sid) FreeSid(administrators_sid);
+    if (system_sid) FreeSid(system_sid);
+    freez(user);
+    if (membership_token) CloseHandle(membership_token);
+    if (membership_source) CloseHandle(membership_source);
+    if (token) CloseHandle(token);
+    if (process) CloseHandle(process);
+    return trusted;
+}
+#endif
+
 static void close_client_pipe(void)
 {
     if (!client_pipe_close_requested) {
@@ -170,6 +234,7 @@ static void connect_cb(uv_connect_t* req, int status)
     ret = uv_write(&write_req, (uv_stream_t *)&client_pipe, &write_buf, 1, pipe_write_cb);
     if (ret) {
         fprintf(stderr, "uv_write(): %s\n", uv_strerror(ret));
+        close_client_pipe();
     }
 //  fprintf(stderr, "COMMAND: Sending command: \"%s\"\n", command_string);
 }
@@ -210,11 +275,97 @@ int main(int argc, char **argv)
     req.data = buffer_create(128, NULL);
 
     const char *pipename = daemon_pipename();
+
+#if defined(OS_WINDOWS)
+    // libuv's Windows client open does not expose SQOS flags. Open natively so
+    // the server receives identification-only access to this process token.
+    int wide_len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pipename, -1, NULL, 0);
+    if (!wide_len) {
+        fprintf(stderr, "Invalid UTF-8 in command-pipe path (Win32 error %lu).\n",
+                (unsigned long)GetLastError());
+        close_client_pipe();
+        uv_run(loop, UV_RUN_DEFAULT);
+        buffer_free(req.data);
+        return exit_status;
+    }
+
+    wchar_t *wide_pipename = malloc((size_t)wide_len * sizeof(*wide_pipename));
+    if (!wide_pipename || !MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                                pipename, -1, wide_pipename, wide_len)) {
+        fprintf(stderr, "Cannot convert command-pipe path to UTF-16.\n");
+        free(wide_pipename);
+        close_client_pipe();
+        uv_run(loop, UV_RUN_DEFAULT);
+        buffer_free(req.data);
+        return exit_status;
+    }
+
+    HANDLE pipe_handle = INVALID_HANDLE_VALUE;
+    DWORD pipe_error = ERROR_SUCCESS;
+    for (unsigned attempt = 0; attempt < 10; ++attempt) {
+        pipe_handle = CreateFileW(wide_pipename, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+                                  FILE_FLAG_OVERLAPPED | SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION,
+                                  NULL);
+        if (pipe_handle != INVALID_HANDLE_VALUE)
+            break;
+
+        pipe_error = GetLastError();
+        if (pipe_error != ERROR_PIPE_BUSY || !WaitNamedPipeW(wide_pipename, 1000))
+            break;
+    }
+    free(wide_pipename);
+
+    if (pipe_handle == INVALID_HANDLE_VALUE) {
+        connect_cb(&req, uv_translate_sys_error((int)pipe_error));
+    }
+    else {
+        if (!command_pipe_server_is_trusted(pipe_handle)) {
+            fprintf(stderr, "The command-pipe server is not a trusted Netdata service process.\n");
+            CloseHandle(pipe_handle);
+            close_client_pipe();
+            uv_run(loop, UV_RUN_DEFAULT);
+            buffer_free(req.data);
+            return 1;
+        }
+        uv_file pipe_fd = uv_open_osfhandle((uv_os_fd_t)pipe_handle);
+        if (pipe_fd < 0) {
+            int saved_errno = errno;
+            fprintf(stderr, "Cannot convert command-pipe handle to a libuv descriptor.\n");
+            CloseHandle(pipe_handle);
+            int uv_error;
+            switch (saved_errno) {
+                case EMFILE: uv_error = UV_EMFILE; break;
+                case ENOMEM: uv_error = UV_ENOMEM; break;
+                case EINVAL: uv_error = UV_EINVAL; break;
+                case EBADF: uv_error = UV_EBADF; break;
+                case EACCES: uv_error = UV_EACCES; break;
+                case EINTR: uv_error = UV_EINTR; break;
+                case EAGAIN: uv_error = UV_EAGAIN; break;
+                case EEXIST: uv_error = UV_EEXIST; break;
+                case ENOSPC: uv_error = UV_ENOSPC; break;
+                default: uv_error = UV_EIO; break;
+            }
+            connect_cb(&req, uv_error);
+        }
+        else {
+            // Successful adoption transfers pipe_fd ownership to libuv; close_client_pipe() closes it.
+            ret = uv_pipe_open(&client_pipe, pipe_fd); // NOSONAR (c:S2095)
+            if (ret) {
+                close(pipe_fd);
+                connect_cb(&req, ret);
+            }
+            else
+                connect_cb(&req, 0);
+        }
+    }
+#else
     uv_pipe_connect(&req, &client_pipe, pipename, connect_cb);
+#endif
 
     uv_run(loop, UV_RUN_DEFAULT);
 
     close_client_pipe();
+    uv_run(loop, UV_RUN_DEFAULT); // Complete the asynchronous close before returning.
     buffer_free(client_pipe.data);
 
     return exit_status;

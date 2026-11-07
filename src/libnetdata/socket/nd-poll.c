@@ -283,9 +283,10 @@ void nd_poll_destroy(nd_poll_t *ndpl) {
 DEFINE_JUDYL_TYPED(POINTERS, const void *);
 
 struct nd_poll_t {
-    struct pollfd *fds;         // Array of file descriptors
-    nfds_t nfds;                // Number of active file descriptors
-    nfds_t capacity;            // Allocated capacity for `fds` array
+    struct pollfd *fds;         // Array of file descriptors for poll()
+    int *original_fds;          // Real fd for each slot; fds[i].fd may be -1 when disabled
+    nfds_t nfds;                // Number of tracked file descriptors
+    nfds_t capacity;            // Allocated capacity for fds/original_fds arrays
     nfds_t last_pos;
     POINTERS_JudyLSet pointers; // Judy array to store user data
 };
@@ -296,6 +297,7 @@ struct nd_poll_t {
 nd_poll_t *nd_poll_create() {
     nd_poll_t *ndpl = callocz(1, sizeof(nd_poll_t));
     ndpl->fds = mallocz(INITIAL_CAPACITY * sizeof(struct pollfd));
+    ndpl->original_fds = mallocz(INITIAL_CAPACITY * sizeof(int));
     ndpl->nfds = 0;
     ndpl->capacity = INITIAL_CAPACITY;
 
@@ -309,15 +311,17 @@ static void ensure_capacity(nd_poll_t *ndpl) {
     if (ndpl->nfds < ndpl->capacity) return;
 
     nfds_t new_capacity = ndpl->capacity * 2;
-    struct pollfd *new_fds = reallocz(ndpl->fds, new_capacity * sizeof(struct pollfd));
-
-    ndpl->fds = new_fds;
+    ndpl->fds = reallocz(ndpl->fds, new_capacity * sizeof(struct pollfd));
+    ndpl->original_fds = reallocz(ndpl->original_fds, new_capacity * sizeof(int));
     ndpl->capacity = new_capacity;
 }
 
 static inline short int nd_poll_events_to_poll_events(nd_poll_event_t events) {
-    short int pevents = POLLERR | POLLHUP | POLLNVAL | POLLRDHUP;
-    if (events & ND_POLL_READ) pevents |= POLLIN;
+    // POLLERR, POLLHUP, POLLNVAL are output-only flags reported in revents regardless
+    // of what is set in events. WSAPoll on Windows rejects them in the events field
+    // with WSAEINVAL, so never include them here.
+    short int pevents = 0;
+    if (events & ND_POLL_READ)  pevents |= POLLIN;
     if (events & ND_POLL_WRITE) pevents |= POLLOUT;
     return pevents;
 }
@@ -350,10 +354,14 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, const void *da
         return false;
 
     ensure_capacity(ndpl);
-    struct pollfd *pfd = &ndpl->fds[ndpl->nfds++];
-    pfd->fd = fd;
-    pfd->events = nd_poll_events_to_poll_events(events);
+    short int poll_events = nd_poll_events_to_poll_events(events);
+    struct pollfd *pfd = &ndpl->fds[ndpl->nfds];
+    // poll()/WSAPoll() ignores entries with fd < 0; use -1 when no events are requested.
+    pfd->fd = (poll_events != 0) ? fd : -1;
+    pfd->events = poll_events;
     pfd->revents = 0;
+    ndpl->original_fds[ndpl->nfds] = fd;
+    ndpl->nfds++;
 
     return true;
 }
@@ -363,11 +371,11 @@ bool nd_poll_del(nd_poll_t *ndpl, int fd) {
     if(!POINTERS_DEL(&ndpl->pointers, fd))
         return false;
 
+    // Search by original_fds so we find entries that are currently disabled (fds[i].fd == -1).
     for (nfds_t i = 0; i < ndpl->nfds; i++) {
-        if (ndpl->fds[i].fd == fd) {
-
-            // Remove the file descriptor by shifting the array
+        if (ndpl->original_fds[i] == fd) {
             memmove(&ndpl->fds[i], &ndpl->fds[i + 1], (ndpl->nfds - i - 1) * sizeof(struct pollfd));
+            memmove(&ndpl->original_fds[i], &ndpl->original_fds[i + 1], (ndpl->nfds - i - 1) * sizeof(int));
             ndpl->nfds--;
 
             if(i < ndpl->last_pos)
@@ -383,10 +391,15 @@ bool nd_poll_del(nd_poll_t *ndpl, int fd) {
 // Update an existing file descriptor in the event poll
 ALWAYS_INLINE_HOT_FLATTEN
 bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events) {
+    // Search by original_fds so we find disabled entries (fds[i].fd == -1).
     for (nfds_t i = 0; i < ndpl->nfds; i++) {
-        if (ndpl->fds[i].fd == fd) {
+        if (ndpl->original_fds[i] == fd) {
             struct pollfd *pfd = &ndpl->fds[i];
-            pfd->events = nd_poll_events_to_poll_events(events);
+            short int poll_events = nd_poll_events_to_poll_events(events);
+            pfd->events = poll_events;
+            // Restore real fd when events become non-zero; disable when zero.
+            // WSAPoll rejects events == 0; fd = -1 tells it to skip this slot.
+            pfd->fd = (poll_events != 0) ? fd : -1;
             return true;
         }
     }
@@ -401,11 +414,19 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
             short int revents = ndpl->fds[i].revents;
             ndpl->fds[i].revents = 0;
 
-            result->data = POINTERS_GET(&ndpl->pointers, ndpl->fds[i].fd);
+            // Use original_fds for the POINTERS lookup; fds[i].fd may be -1 when disabled.
+            result->data = POINTERS_GET(&ndpl->pointers, ndpl->original_fds[i]);
             if(!result->data)
                 continue;
 
-            result->events = nd_poll_events_from_poll_revents(revents & ndpl->fds[i].events);
+            // Intersect revents with the current subscription mask to suppress
+            // stale POLLIN/POLLOUT that nd_poll_upd() removed after poll() returned.
+            // POLLERR, POLLHUP, POLLNVAL, POLLRDHUP are output-only: poll() sets them
+            // in revents regardless and nd_poll_events_to_poll_events() never puts them
+            // in pfd->events (WSAPoll rejects them there), so they must always pass through.
+            result->events = nd_poll_events_from_poll_revents(
+                revents &
+                (ndpl->fds[i].events | (short int)(POLLERR | POLLHUP | POLLNVAL | POLLRDHUP)));
             if(!result->events)
                 // nd_poll_upd() may have removed some flags since we got this
                 continue;
@@ -419,14 +440,18 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
     return false;
 }
 
-// Rotate the fds array to prevent starvation
+// Rotate both arrays in sync to prevent starvation
 static inline void rotate_fds(nd_poll_t *ndpl) {
     if (ndpl->nfds == 0 || ndpl->nfds == 1)
-        return; // No rotation needed for empty or single-entry arrays
+        return;
 
-    struct pollfd first = ndpl->fds[0];
+    struct pollfd first_pfd = ndpl->fds[0];
     memmove(&ndpl->fds[0], &ndpl->fds[1], (ndpl->nfds - 1) * sizeof(struct pollfd));
-    ndpl->fds[ndpl->nfds - 1] = first;
+    ndpl->fds[ndpl->nfds - 1] = first_pfd;
+
+    int first_orig = ndpl->original_fds[0];
+    memmove(&ndpl->original_fds[0], &ndpl->original_fds[1], (ndpl->nfds - 1) * sizeof(int));
+    ndpl->original_fds[ndpl->nfds - 1] = first_orig;
 }
 
 // Wait for events
@@ -471,7 +496,8 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
 // Destroy the event poll context
 void nd_poll_destroy(nd_poll_t *ndpl) {
     if (ndpl) {
-        free(ndpl->fds);
+        freez(ndpl->fds);
+        freez(ndpl->original_fds);
         POINTERS_FREE(&ndpl->pointers, NULL, NULL);
         freez(ndpl);
     }

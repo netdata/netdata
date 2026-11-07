@@ -234,8 +234,10 @@ OS_PROCESS_MEMORY os_process_memory(pid_t pid) {
     if (process_id == 0)
         process_id = GetCurrentProcessId();
     
-    // OpenProcess is a direct Windows API call - low level access to process
-    hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, process_id);
+    // PROCESS_QUERY_INFORMATION (without PROCESS_VM_READ) is sufficient for
+    // GetProcessMemoryInfo on Vista+ and avoids the VM-read right that causes
+    // OpenProcess to fail for processes that deny PROCESS_VM_READ.
+    hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, process_id);
     if (hProcess) {
         // GetProcessMemoryInfo is a direct Windows API call to get memory info
         PROCESS_MEMORY_COUNTERS_EX pmc;
@@ -246,53 +248,15 @@ OS_PROCESS_MEMORY os_process_memory(pid_t pid) {
             proc_mem.rss = pmc.WorkingSetSize;
             proc_mem.max_rss = pmc.PeakWorkingSetSize;
             proc_mem.virtual_size = pmc.PagefileUsage + pmc.WorkingSetSize;
-            
-            // Get module information to determine text and shared memory
-            // CreateToolhelp32Snapshot is a low-level Windows API call
-            HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, process_id);
-            if (hSnapshot != INVALID_HANDLE_VALUE) {
-                MODULEENTRY32 me;
-                ZeroMemory(&me, sizeof(me));
-                me.dwSize = sizeof(MODULEENTRY32);
-                
-                // Module32First/Next are direct API calls to examine loaded modules
-                if (Module32First(hSnapshot, &me)) {
-                    // The first module is the executable itself
-                    proc_mem.text = me.modBaseSize;
-                    
-                    // Sum all other modules as shared code
-                    while (Module32Next(hSnapshot, &me)) {
-                        proc_mem.shared += me.modBaseSize;
-                    }
-                }
-                CloseHandle(hSnapshot);
-            }
-            
-            // Get virtual memory information for more detailed breakdown
-            MEMORY_BASIC_INFORMATION mbi;
-            ZeroMemory(&mbi, sizeof(mbi));
-            SIZE_T address = 0;
-            
-            // VirtualQueryEx is a low-level API to get memory region info
-            while (VirtualQueryEx(hProcess, (LPCVOID)address, &mbi, sizeof(mbi)) == sizeof(mbi)) {
-                if (mbi.State == MEM_COMMIT) {
-                    if (mbi.Type == MEM_PRIVATE && !(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) {
-                        // Private data memory
-                        proc_mem.data += mbi.RegionSize;
-                    }
-                }
-                
-                // Move to the next region
-                address = (SIZE_T)mbi.BaseAddress + mbi.RegionSize;
-                
-                // Avoid potential infinite loop on 64-bit systems
-                if (address < (SIZE_T)mbi.BaseAddress)
-                    break;
-            }
-            
-            // If data counting failed, fall back to estimation
-            if (proc_mem.data == 0)
-                proc_mem.data = pmc.PrivateUsage - proc_mem.text;
+
+            // CreateToolhelp32Snapshot requires the loader lock (contends with
+            // DllMain/DLL_THREAD_ATTACH during thread burst phases).
+            // VirtualQueryEx iterates every virtual memory region; on a Netdata
+            // process with hundreds of dbengine memory-mapped files this loop
+            // can take over 100 seconds on a cold OS page cache.
+            // GetProcessMemoryInfo already provides the essential RSS / max_rss
+            // values; approximate data with PrivateUsage instead.
+            proc_mem.data = pmc.PrivateUsage;
         }
         CloseHandle(hProcess);
     }

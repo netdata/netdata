@@ -39,11 +39,11 @@ All of Netdata's documentation **assumes your config directory is at** `/etc/net
 
 ### On Windows
 
-On Windows, the **Netdata config directory** is located at `C:\Program Files\Netdata\etc\netdata`. Like on Linux, this directory contains configuration files, a few directories for specific configurations (including `health.d` for your alert overrides), and the `edit-config` helper script.
+On Windows, the **Netdata config directory** is located at `C:\Program Files\Netdata\etc\netdata`. Like on Linux, this directory contains configuration files and directories for specific configurations (including `health.d` for your alert overrides). The `edit-config.ps1` helper is installed at `C:\Program Files\Netdata\usr\libexec\netdata\edit-config.ps1`.
 
 :::note
 
-`edit-config` requires the bundled MSYS2 shell that ships with Netdata for Windows — see [Editing configuration files](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for how to open it and use `edit-config` there. Because `C:\Program Files\Netdata` is a protected system directory, run the MSYS2 shell with Administrator privileges.
+The **Netdata → Edit Netdata Configuration** Start Menu shortcut requests administrator approval and opens the selected file. You can also run `edit-config.ps1` from PowerShell; it prompts for elevation when needed. If your default editor is already running without administrator privileges, close it before using the shortcut so Windows starts an elevated editor instance. See the [Windows installer guide](/packaging/windows/WINDOWS_INSTALLER.md#working-with-netdata-on-windows).
 
 :::
 
@@ -56,7 +56,7 @@ For alert-specific configuration on Windows — where the stock alert templates 
 
 You should use the `edit-config` script for making configuration changes. This script lives inside your config directory and helps you manage and safely edit configuration files.
 
-On Windows, run `edit-config` from the bundled MSYS2 shell — see [On Windows](#on-windows) above.
+On Windows, use the Start Menu shortcut or run the installed `edit-config.ps1` helper; it requests administrator approval when needed. See [On Windows](#on-windows) above.
 
 To edit `netdata.conf`:
 

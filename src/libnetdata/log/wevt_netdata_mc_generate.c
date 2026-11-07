@@ -4,6 +4,10 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <string.h>
+#if defined(OS_WINDOWS) || defined(_WIN32)
+#include <io.h>
+#include <fcntl.h>
+#endif
 
 // from winnt.h
 #define EVENTLOG_SUCCESS 0x0000
@@ -140,6 +144,13 @@ const char *get_msg_format(MESSAGE_ID msg) {
 int main(int argc, const char **argv) {
     (void)argc; (void)argv;
 
+#if defined(OS_WINDOWS) || defined(_WIN32)
+    // All format strings contain explicit \r\n.  MinGW text-mode stdout would
+    // translate \n → \r\n a second time, turning the ".\r\n" MC terminator into
+    // ".\r\r\n" which windmc cannot recognise.  Binary mode disables that.
+    _setmode(_fileno(stdout), _O_BINARY);
+#endif
+
     const char *header = NULL, *footer = NULL, *s_header = NULL, *s_footer = NULL;
 
     bool manifest = false;
@@ -206,6 +217,7 @@ int main(int argc, const char **argv) {
                  "                             message=\"$(string.Channel.Aclk)\"\r\n"
                  "                             enabled=\"true\"\r\n"
                  "                             />\r\n"
+                 "\r\n"
                  "                </channels>\r\n"
                  "\r\n"
                  "                <levels>\r\n"
@@ -294,8 +306,7 @@ int main(int argc, const char **argv) {
         footer = "                </events>\r\n"
                  "            </provider>\r\n"
                  "        </events>\r\n"
-                 "    </instrumentation>\r\n"
-                 ;
+                 "    </instrumentation>\r\n";
 
         s_header = "    <localization>\r\n"
                    "        <resources culture=\"en-US\">\r\n"
@@ -516,4 +527,3 @@ int main(int argc, const char **argv) {
         printf("%s", s_footer);
     }
 }
-

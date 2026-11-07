@@ -91,7 +91,13 @@ typedef void ** PPvoid_t;
 
 #ifndef _WORD_T
 #define _WORD_T
-typedef unsigned long    Word_t, * PWord_t;  // expect 32-bit or 64-bit words.
+// On Windows (LLP64), unsigned long is 32-bit even in 64-bit mode.
+// Use unsigned long long for JU_64BIT to match pointer width.
+#if defined(JU_64BIT) && defined(_WIN64)
+typedef unsigned long long  Word_t, * PWord_t;
+#else
+typedef unsigned long       Word_t, * PWord_t;  // expect 32-bit or 64-bit words.
+#endif
 #endif
 
 #ifndef NULL
@@ -201,8 +207,8 @@ typedef struct J_UDY_ERROR_STRUCT
 // warning.
 
 #define   JERR (-1)                     /* functions returning int or Word_t */
-#define  PJERR ((Pvoid_t)  (~0UL))      /* mainly for use here, see below    */
-#define PPJERR ((PPvoid_t) (~0UL))      /* functions that return PPvoid_t    */
+#define  PJERR ((Pvoid_t)  (~(Word_t)0))      /* mainly for use here, see below    */
+#define PPJERR ((PPvoid_t) (~(Word_t)0))      /* functions that return PPvoid_t    */
 
 // Convenience macro for when detailed error information (PJError_t) is not
 // desired by the caller; a purposely short name:

@@ -734,9 +734,8 @@ function Collect-SnmpDiagnostics {
 
 # --- collectors -------------------------------------------------------------------
 # Launch a native netdata binary (netdata.exe / netdatacli.exe) DIRECTLY as a
-# foreground process. These MUST NOT go through Start-Job: they are MSYS2
-# binaries whose runtime does not initialize inside a PowerShell background-job
-# runspace, so they exit non-zero with no output (an empty dump / empty stdout).
+# foreground process. These MUST NOT go through Start-Job: native Windows
+# binaries need this direct-launch path to retain reliable output and exit codes.
 # A foreground child with an inherited console works. Notes:
 #  - System.Diagnostics.Process, not Start-Process: Start-Process -PassThru does
 #    not expose a reliable .ExitCode on Windows PowerShell 5.1 (it reads back
@@ -792,7 +791,7 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     $header = "# netdata-support-bundle v$ToolVersion | command: $originText | captured: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))"
     if ($nativeExe) {
-        # MSYS2 binary: direct launch, never Start-Job (see Invoke-NativeProcess).
+        # Native Windows binary: direct launch, never Start-Job (see Invoke-NativeProcess).
         # Text file, so merge stdout+stderr like the old `2>&1`; never silent.
         $np = Invoke-NativeProcess $nativeExe $nativeArgs $timeout
         if ($np.LaunchError) { $result = "ERROR: could not launch: $($np.LaunchError)" }
@@ -828,7 +827,7 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     $result = ''
     if ($nativeExe) {
-        # MSYS2 binary: direct launch, never Start-Job (see Invoke-NativeProcess).
+        # Native Windows binary: direct launch, never Start-Job (see Invoke-NativeProcess).
         # JSON output, so keep stdout ONLY (merging stderr would corrupt it); a
         # failed/empty run leaves nothing and the file is dropped below.
         $np = Invoke-NativeProcess $nativeExe $nativeArgs $TimeoutSeconds
@@ -1183,8 +1182,8 @@ if ($ApiOk) {
 # exited) so it is never evaluated on non-Windows self-test runs.
 $IsElevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (Test-Path $NetdataExe) {
-    # these MSYS2 netdata.exe invocations use the native direct-launch path, not
-    # Start-Job (which yields empty output for MSYS2 binaries - see Invoke-NativeProcess)
+    # these native Windows netdata.exe invocations use the direct-launch path, not
+    # Start-Job (see Invoke-NativeProcess)
     Save-Cmd '07-runtime\buildinfo.txt' 'netdata -W buildinfo (verbatim; works with daemon down)' $null 'netdata.exe -W buildinfo' -nativeExe $NetdataExe -nativeArgs '-W', 'buildinfo'
     Save-CmdRaw '07-runtime\buildinfo.json' 'netdata -W buildinfojson (machine-readable; no header so it parses as JSON)' $null 'netdata.exe -W buildinfojson' -nativeExe $NetdataExe -nativeArgs '-W', 'buildinfojson'
     Save-Cmd '07-runtime\cmakecache.txt' 'netdata -W cmakecache: authoritative build config (flags, plugins, paths) - superset of buildinfo' $null 'netdata.exe -W cmakecache' -nativeExe $NetdataExe -nativeArgs '-W', 'cmakecache'
@@ -1200,7 +1199,7 @@ if (Test-Path $NetdataExe) {
     # of Save-Cmd.
     #
     # Launched via Invoke-NativeProcess (direct foreground child, never
-    # Start-Job) since netdata.exe is an MSYS2 binary; the dump itself goes to
+    # Start-Job) since netdata.exe is a native Windows binary; the dump itself goes to
     # -perflibfile, so stdout is normally empty and stderr carries the
     # "written to" confirmation or the failure reason.
     $perfPath = Join-Path $Work '07-runtime\perflib.json'
@@ -1242,7 +1241,7 @@ if (Test-Path $NetdataExe) {
     Add-Manifest '07-runtime\perflib.json' 'cmd' $perfOrigin $perfTitle
 }
 if ((Test-Path $NetdataCli) -and $NetdataProc) {
-    # netdatacli.exe is also MSYS2: native direct-launch, not Start-Job
+    # netdatacli.exe is also native Windows: direct-launch, not Start-Job
     Save-CmdRaw '07-runtime\aclk-state.json' 'Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)' $null 'netdatacli.exe aclk-state json' -nativeExe $NetdataCli -nativeArgs 'aclk-state', 'json'
 }
 

@@ -6,6 +6,10 @@
 #define MAX_COMMAND_LENGTH (8192)
 #define MAX_EXIT_STATUS_LENGTH 23 /* Can't ever be bigger than "X-18446744073709551616" */
 
+#if defined(OS_WINDOWS)
+int command_pipe_security_unittest(void);
+#endif
+
 typedef enum cmd {
     CMD_HELP = 0,
     CMD_RELOAD_HEALTH,

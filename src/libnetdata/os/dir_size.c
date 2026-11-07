@@ -9,7 +9,7 @@
 #include <string.h>
 #include <errno.h>
 
-// Hash table to keep track of visited inodes to avoid cycles
+// Hash table to keep track of visited filesystem identities.
 typedef struct {
     ino_t inode;    // Inode number
     dev_t device;   // Device ID
@@ -49,7 +49,66 @@ static void calc_dir_size_recursive(const char *base_path, const char *rel_path,
         return;
     }
 
-    // Create inode-device pair to detect loops
+    // UCRT does not provide usable inode values, so identify Windows filesystem
+    // objects from their native file handles instead of stat's inode/device pair.
+#if defined(OS_WINDOWS)
+    wchar_t *wide_path = os_translate_msys_to_windows_pathW(path);
+    if (!wide_path) {
+        result->errors++;
+        return;
+    }
+
+    HANDLE handle = CreateFileW(wide_path, FILE_READ_ATTRIBUTES,
+                                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                NULL, OPEN_EXISTING,
+                                FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+    freez(wide_path);
+    BY_HANDLE_FILE_INFORMATION info;
+    if (handle == INVALID_HANDLE_VALUE || !GetFileInformationByHandle(handle, &info)) {
+        if (handle != INVALID_HANDLE_VALUE)
+            CloseHandle(handle);
+        result->errors++;
+        // Preserve file-size accounting when metadata access is denied. A file
+        // does not need cycle protection; only directory traversal does.
+        if (S_ISDIR(statbuf.st_mode))
+            return;
+    }
+    else {
+        if (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+            FILE_ATTRIBUTE_TAG_INFO tag_info;
+            if (!GetFileInformationByHandleEx(handle, FileAttributeTagInfo,
+                                              &tag_info, sizeof(tag_info))) {
+                CloseHandle(handle);
+                result->errors++;
+                return;
+            }
+            // Name-surrogate tags (for example symlinks and junctions) redirect
+            // path traversal. Other reparse tags can describe ordinary files.
+            if (IsReparseTagNameSurrogate(tag_info.ReparseTag)) {
+                CloseHandle(handle);
+                return;
+            }
+        }
+        CloseHandle(handle);
+
+        // Some filesystems report a zero file index when stable identities are
+        // unavailable. Count the object without deduplication instead of
+        // treating every such object as the same visited path.
+        if (info.nFileIndexHigh == 0 && info.nFileIndexLow == 0) {
+            goto have_identity;
+        }
+
+        char name[64];
+        snprintfz(name, sizeof(name), "W_%08lx_%08lx%08lx",
+                  (unsigned long)info.dwVolumeSerialNumber,
+                  (unsigned long)info.nFileIndexHigh,
+                  (unsigned long)info.nFileIndexLow);
+        if (dictionary_get(visited_inodes, name))
+            return;
+        dictionary_set(visited_inodes, name, NULL, sizeof(void *));
+    }
+have_identity:
+#else
     INODE_DEVICE_PAIR id_pair = {
         .inode = statbuf.st_ino,
         .device = statbuf.st_dev
@@ -65,6 +124,7 @@ static void calc_dir_size_recursive(const char *base_path, const char *rel_path,
     
     // Add to visited inodes
     dictionary_set(visited_inodes, name, NULL, sizeof(void *));
+#endif
 
     // Handle different file types
     if (S_ISDIR(statbuf.st_mode)) {
