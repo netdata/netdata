@@ -234,9 +234,12 @@ func (rc *revocationChecker) findIssuer(ctx context.Context, chain []*x509.Certi
 
 // signedBy reports whether issuer's key verifies cert's signature, which makes it the key of cert's issuer: CRLs and
 // OCSP answers it verifies come from that issuer. Nothing else in a downloaded issuer certificate is authenticated,
-// so only the signature is checked, as the CRL signature is.
+// so only the signature is checked, as the CRL signature is. The key must also be in its canonical encoding: OCSP
+// names the issuer by the hash of the encoding, and the certificate parser accepts an RSA key followed by other bytes.
 func signedBy(cert, issuer *x509.Certificate) bool {
-	return issuer.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature) == nil
+	spki, err := x509.MarshalPKIXPublicKey(issuer.PublicKey)
+	return err == nil && bytes.Equal(spki, issuer.RawSubjectPublicKeyInfo) &&
+		issuer.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature) == nil
 }
 
 // verifyCRL checks that crl is a current and complete CRL of cert's issuer that covers cert (RFC 5280 6.3.3).

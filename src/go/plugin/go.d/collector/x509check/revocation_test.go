@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -816,6 +817,75 @@ func TestRevocationChecker_OCSPRequestMethod(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, ocsp.Good, resp.Status)
+		})
+	}
+}
+
+func TestSignedBy(t *testing.T) {
+	now := time.Now()
+	caKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+	caTemplate := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			CommonName: "RSA CA",
+		},
+		NotBefore:             now.Add(-time.Hour),
+		NotAfter:              now.Add(time.Hour),
+		IsCA:                  true,
+		BasicConstraintsValid: true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, caTemplate, caTemplate, &caKey.PublicKey, caKey)
+	require.NoError(t, err)
+	ca, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	leafKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	der, err = x509.CreateCertificate(rand.Reader, &x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		NotBefore:    now.Add(-time.Hour),
+		NotAfter:     now.Add(time.Hour),
+	}, ca, &leafKey.PublicKey, caKey)
+	require.NoError(t, err)
+	leaf, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+
+	// The CA's key followed by other bytes, which the certificate parser accepts as the same key; OCSP would name the
+	// issuer by the hash of these bytes.
+	var spki struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}
+	_, err = asn1.Unmarshal(ca.RawSubjectPublicKeyInfo, &spki)
+	require.NoError(t, err)
+	spki.PublicKey.Bytes = append(spki.PublicKey.Bytes, 0x00)
+	spki.PublicKey.BitLength += 8
+	padded, err := asn1.Marshal(spki)
+	require.NoError(t, err)
+	paddedKey, err := x509.ParsePKIXPublicKey(padded)
+	require.NoError(t, err)
+	require.Equal(t, ca.PublicKey, paddedKey)
+	forged := *ca
+	forged.RawSubjectPublicKeyInfo = padded
+
+	tests := map[string]struct {
+		issuer *x509.Certificate
+		want   bool
+	}{
+		"issuer": {
+			issuer: ca,
+			want:   true,
+		},
+		"issuer key encoded with trailing bytes": {
+			issuer: &forged,
+			want:   false,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, signedBy(leaf, test.issuer))
 		})
 	}
 }
