@@ -97,7 +97,7 @@ void buffer_json_group_by_to_array(BUFFER *wb, RRDR_GROUP_BY group_by) {
     }
 }
 
-// returns false when the name is not a known aggregation function
+// returns false when the name is not a known aggregation function; s must not be NULL
 bool group_by_aggregate_function_lookup(const char *s, RRDR_GROUP_BY_FUNCTION *function) {
     static const struct {
         const char *name;

@@ -384,47 +384,47 @@ func c023MCPAssertOptionsError(t *testing.T, response map[string]any, group stri
 }
 
 // c023MCPAssertInvalidParams checks a structured -32602 INVALID_PARAMS error
-// and returns its message.
-func c023MCPAssertInvalidParams(t *testing.T, response map[string]any, group string) string {
+// for the request described by label and returns its message.
+func c023MCPAssertInvalidParams(t *testing.T, response map[string]any, label string) string {
 	t.Helper()
 
 	if result, has := response["result"]; has {
 		if object, ok := result.(map[string]any); ok {
-			t.Errorf("MCP accepted invalid %s: result keys=%v", group, keys(object))
+			t.Errorf("MCP accepted invalid %s: result keys=%v", label, keys(object))
 		} else {
-			t.Errorf("MCP accepted invalid %s: result type=%T", group, result)
+			t.Errorf("MCP accepted invalid %s: result type=%T", label, result)
 		}
 		return ""
 	}
 	errorObject, ok := response["error"].(map[string]any)
 	if !ok {
-		t.Errorf("MCP invalid %s returned no structured error: %v", group, response)
+		t.Errorf("MCP invalid %s returned no structured error: %v", label, response)
 		return ""
 	}
 	if got, ok := errorObject["code"].(float64); !ok || got != -32602 {
-		t.Errorf("MCP %s error.code = %v, want -32602 Invalid Params", group, errorObject["code"])
+		t.Errorf("MCP %s error.code = %v, want -32602 Invalid Params", label, errorObject["code"])
 	}
 	message, ok := errorObject["message"].(string)
 	if !ok || message == "" {
-		t.Errorf("MCP %s error.message is empty or malformed: %v", group, errorObject["message"])
+		t.Errorf("MCP %s error.message is empty or malformed: %v", label, errorObject["message"])
 	}
 
 	data, ok := errorObject["data"].(map[string]any)
 	if !ok {
-		t.Errorf("MCP %s error.data is missing or malformed: %v", group, errorObject["data"])
+		t.Errorf("MCP %s error.data is missing or malformed: %v", label, errorObject["data"])
 		return message
 	}
 	if got := data["status"]; got != "error" {
-		t.Errorf("MCP %s error.data.status = %v, want error", group, got)
+		t.Errorf("MCP %s error.data.status = %v, want error", label, got)
 	}
 	if got := data["code"]; got != "INVALID_PARAMS" {
-		t.Errorf("MCP %s error.data.code = %v, want INVALID_PARAMS", group, got)
+		t.Errorf("MCP %s error.data.code = %v, want INVALID_PARAMS", label, got)
 	}
 	if got, ok := data["codeNumeric"].(float64); !ok || got != 2 {
-		t.Errorf("MCP %s error.data.codeNumeric = %v, want 2", group, data["codeNumeric"])
+		t.Errorf("MCP %s error.data.codeNumeric = %v, want 2", label, data["codeNumeric"])
 	}
 	if got, ok := data["message"].(string); !ok || got == "" {
-		t.Errorf("MCP %s error.data.message is empty or malformed: %v", group, data["message"])
+		t.Errorf("MCP %s error.data.message is empty or malformed: %v", label, data["message"])
 	}
 	return message
 }
