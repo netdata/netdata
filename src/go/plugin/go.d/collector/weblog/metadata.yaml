@@ -43,7 +43,10 @@ modules:
         exclude: []
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Log file permissions
+            description: |
+              The user running Netdata must have read access to every configured web server log file.
       configuration:
         file:
           name: go.d/web_log.conf
@@ -98,10 +101,24 @@ modules:
               group: Collection
 
             - name: path
-              description: Path to the web server log file.
+              description: Path to the web server log file. Supports shell glob patterns.
               default_value: ""
               required: true
               group: Target
+              detailed_description: |
+                Each `web_log` job follows a **single** log file. `path` accepts a shell glob pattern, but when a glob matches multiple files the collector follows only **one** match — it does not merge data from every match into one stream.
+
+                To monitor several log files, add a separate job for each one. For example, if your server stores one Apache access log per account at `/var/lib/apache2/domlogs/<user>-ssl_log`, collect every account's traffic with one job per file:
+
+                ```yaml
+                jobs:
+                  - name: user1_ssl_log
+                    path: /var/lib/apache2/domlogs/user1-ssl_log
+                  - name: user2_ssl_log
+                    path: /var/lib/apache2/domlogs/user2-ssl_log
+                ```
+
+                A glob such as `/var/lib/apache2/domlogs/*-ssl_log` will **not** follow every matching log — only one file is read, so the remaining traffic is silently missing. Use one job per file to cover every log you need.
             - name: exclude_path
               description: Path to exclude.
               default_value: "*.gz"
