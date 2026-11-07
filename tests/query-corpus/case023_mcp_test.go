@@ -521,14 +521,17 @@ func c023MCPSchemaEnum(t *testing.T, properties map[string]any, parameter string
 }
 
 // c023MCPAssertEnumError checks that an invalid enum value is rejected with
-// INVALID_PARAMS and that the message names the parameter and lists exactly
-// the values the schema advertises for it.
-func c023MCPAssertEnumError(t *testing.T, response map[string]any, parameter string, advertised []string) {
+// INVALID_PARAMS and that the message names the parameter, does not echo the
+// rejected value and lists exactly the values the schema advertises for it.
+func c023MCPAssertEnumError(t *testing.T, response map[string]any, parameter string, rejected any, advertised []string) {
 	t.Helper()
 
 	message := c023MCPAssertInvalidParams(t, response, parameter)
 	if message == "" {
 		return
+	}
+	if value, ok := rejected.(string); ok && value != "" && strings.Contains(message, value) {
+		t.Errorf("MCP %s error message echoes the rejected value %q: %q", parameter, value, message)
 	}
 	if !strings.Contains(message, "'"+parameter+"'") {
 		t.Errorf("MCP %s error message does not name the parameter: %q", parameter, message)
@@ -577,7 +580,11 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		"CASE-023/mcp-invalid-options",
 		"CASE-023/mcp-invalid-numeric-options",
 		"CASE-023/mcp-invalid-time-group",
+		"CASE-023/mcp-time-group-null-missing",
+		"CASE-023/mcp-time-group-accepted-names",
 		"CASE-023/mcp-invalid-aggregation",
+		"CASE-023/mcp-aggregation-null-missing",
+		"CASE-023/mcp-aggregation-accepted-names",
 	} {
 		registerContract(t, contract)
 	}
@@ -999,16 +1006,22 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 				arguments["time_group"] = invalid.value
 				response := c023MCPCall(t, requestID, session(t).Session, arguments)
 				requestID++
-				c023MCPAssertEnumError(t, response.Document, "time_group", advertised)
+				c023MCPAssertEnumError(t, response.Document, "time_group", invalid.value, advertised)
 			})
 		}
-		t.Run("null", func(t *testing.T) {
-			arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
-			arguments["time_group"] = nil
-			response := c023MCPCall(t, requestID, session(t).Session, arguments)
-			requestID++
-			c023MCPAssertMissingParam(t, response.Document, "time_group")
-		})
+	})
+
+	t.Run("time-group-null-missing", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-time-group-null-missing")
+		arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
+		arguments["time_group"] = nil
+		response := c023MCPCall(t, 540, session(t).Session, arguments)
+		c023MCPAssertMissingParam(t, response.Document, "time_group")
+	})
+
+	t.Run("time-group-accepted-names", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-time-group-accepted-names")
+		requestID := 550
 		for _, valid := range []struct{ value, canonical string }{
 			{value: "max", canonical: "max"},
 			{value: "avg", canonical: "average"},
@@ -1043,16 +1056,22 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 				arguments["aggregation"] = invalid.value
 				response := c023MCPCall(t, requestID, session(t).Session, arguments)
 				requestID++
-				c023MCPAssertEnumError(t, response.Document, "aggregation", advertised)
+				c023MCPAssertEnumError(t, response.Document, "aggregation", invalid.value, advertised)
 			})
 		}
-		t.Run("null", func(t *testing.T) {
-			arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
-			arguments["aggregation"] = nil
-			response := c023MCPCall(t, requestID, session(t).Session, arguments)
-			requestID++
-			c023MCPAssertMissingParam(t, response.Document, "aggregation")
-		})
+	})
+
+	t.Run("aggregation-null-missing", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-aggregation-null-missing")
+		arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
+		arguments["aggregation"] = nil
+		response := c023MCPCall(t, 640, session(t).Session, arguments)
+		c023MCPAssertMissingParam(t, response.Document, "aggregation")
+	})
+
+	t.Run("aggregation-accepted-names", func(t *testing.T) {
+		trackContract(t, "CASE-023/mcp-aggregation-accepted-names")
+		requestID := 650
 		for _, valid := range []struct{ value, canonical string }{
 			{value: "max", canonical: "max"},
 			{value: "avg", canonical: "average"},
