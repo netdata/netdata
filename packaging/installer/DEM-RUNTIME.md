@@ -44,6 +44,26 @@ establish ownership of pre-existing shared or administrator-selected parents, so
 helper refuses unsafe paths. An administrator must inspect and reconcile those directories explicitly, or use the
 policy-only route below; the helper never relaxes its root-execution checks.
 
+Ownership and write-permission failures identify the rejected path, its numeric owner UID and octal mode. Inspect
+that path and its parents, including any symbolic links, before changing them. For example, if the helper reports
+`/opt/netdata/usr/sbin` with owner UID `0` and mode `0775`:
+
+```sh
+namei -l /opt/netdata/usr/sbin/netdata
+```
+
+If `/opt/netdata/usr/sbin` is confirmed to be a root-managed Netdata directory, remove its group/other write bits
+without changing its contents or other permissions, then retry the original runtime setup command:
+
+```sh
+sudo chmod go-w /opt/netdata/usr/sbin
+```
+
+Apply corrections only to the reported path after checking its intended ownership. Do not recursively change
+permissions or alter shared directories to satisfy the helper. A nonroot-owned executable or parent requires an
+administrator to reconcile ownership or select a root-owned installation; nonroot source installations can use
+the policy-only route below. Symbolic links must be root-owned, but their permission bits are not checked.
+
 The same setup is included in `kickstart.sh --install-dem-runtime`. Existing `runtime.release_url` and trust
 requirements still apply. Initial installation enables daily automatic preparation unless `--manual-updates` is
 specified. **Restart the Agent explicitly to activate the first installation or an update.** The helper does not
