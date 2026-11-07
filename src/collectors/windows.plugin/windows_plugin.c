@@ -238,6 +238,14 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = NULL},
+    {.name = "PerflibNPS",
+     .dim = "PerflibNPS",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibNPS,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = NULL},
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL, .rd = NULL, .thread = NULL, .cleanup = NULL}};
 

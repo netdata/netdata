@@ -41,6 +41,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibMSMQ = yes
         # PerflibNUMA = yes
         # PerflibASP = yes
+        # PerflibNPS = yes
 ```
 
 ## Update Every per Thread

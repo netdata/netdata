@@ -5727,3 +5727,209 @@ modules:
               chart_type: line
               dimensions:
                 - name: failure
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibNPS
+      monitored_instance:
+        name: Network Policy Server
+        description: "Monitor Windows Network Policy Server (NPS) RADIUS authentication and accounting traffic through Perflib."
+        link: "https://learn.microsoft.com/en-us/windows-server/networking/technologies/nps/nps-top"
+        categories:
+          - data-collection.applications
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - nps
+        - network policy server
+        - radius
+        - ias
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor RADIUS authentication and accounting requests, responses, packets, and packet errors handled by the
+          Windows Network Policy Server, plus the time since the NPS service started and since its counters were reset.
+        method_description: |
+          It queries the single-instance `NPS Authentication Server` and `NPS Accounting Server` objects from Perflib.
+          Event counters are cumulative since the NPS (`IAS`) service started; Netdata shows them both as per-second
+          rates and as the raw cumulative totals.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector is enabled by default and automatically detects both NPS performance objects. On hosts without
+            the Network Policy Server role it collects nothing and keeps checking, so a role installed later is picked up
+            without restarting Netdata. If one object is unavailable, the other is still collected.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Network Policy Server role
+            description: |
+              Install the Network Policy and Access Services role (service `IAS`). The performance objects exist only
+              when the role is installed.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: PerflibNPS
+              description: An option to enable or disable the data collection.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to the Network Policy Server on the host."
+          labels: []
+          metrics:
+            - name: nps.authentication_requests
+              description: RADIUS Access-Request packets received and Access-Accept, Access-Reject and Access-Challenge
+                responses sent.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: accepts
+                - name: rejects
+                - name: challenges
+            - name: nps.authentication_requests_total
+              description: Cumulative authentication requests and responses since the NPS service started.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: accepts
+                - name: rejects
+                - name: challenges
+            - name: nps.authentication_packets
+              description: Packets received and sent on the authentication port.
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nps.authentication_packets_total
+              description: Cumulative authentication packets since the NPS service started.
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nps.authentication_errors
+              description: Authentication packets with an invalid authenticator, dropped, from unknown clients (invalid),
+                malformed, or of an unknown RADIUS type.
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: bad_authenticators
+                - name: dropped
+                - name: invalid
+                - name: malformed
+                - name: unknown_type
+            - name: nps.authentication_errors_total
+              description: Cumulative authentication packet errors since the NPS service started.
+              unit: packets
+              chart_type: stacked
+              dimensions:
+                - name: bad_authenticators
+                - name: dropped
+                - name: invalid
+                - name: malformed
+                - name: unknown_type
+            - name: nps.authentication_uptime
+              description: Time since the NPS service started and since its authentication counters were last reset.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+                - name: since_reset
+            - name: nps.accounting_requests
+              description: RADIUS Accounting-Request packets received and Accounting-Response packets sent.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: responses
+            - name: nps.accounting_requests_total
+              description: Cumulative accounting requests and responses since the NPS service started.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: responses
+            - name: nps.accounting_packets
+              description: Packets received and sent on the accounting port.
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nps.accounting_packets_total
+              description: Cumulative accounting packets since the NPS service started.
+              unit: packets
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: nps.accounting_errors
+              description: Accounting packets with an invalid authenticator, dropped, from unknown clients (invalid),
+                malformed, not written to the accounting log (no record), or of an unknown RADIUS type.
+              unit: packets/s
+              chart_type: stacked
+              dimensions:
+                - name: bad_authenticators
+                - name: dropped
+                - name: invalid
+                - name: malformed
+                - name: no_record
+                - name: unknown_type
+            - name: nps.accounting_errors_total
+              description: Cumulative accounting packet errors since the NPS service started.
+              unit: packets
+              chart_type: stacked
+              dimensions:
+                - name: bad_authenticators
+                - name: dropped
+                - name: invalid
+                - name: malformed
+                - name: no_record
+                - name: unknown_type
+            - name: nps.accounting_uptime
+              description: Time since the NPS service started and since its accounting counters were last reset.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+                - name: since_reset
