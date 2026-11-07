@@ -119,11 +119,13 @@ holder. A `[holder: ...]` suffix carries what the lock knows:
 - No suffix: plain spinlock, waitq, or an older agent.
 
 `Failed to initialize SQLite` (`rrd_init`, metadata database) is
-mostly environmental. Agents with the precise-reason change append
+mostly environmental. Agents with PR #24642 append
 `metadata database: <stage> [PRAGMA <name> | #<index>] failed:
-SQLite rc <n>, extended <n> (<text>), OS errno <n>` (only for
-CANTOPEN/IOERR) and whether the next start was asked to recover
-(rc 11) or reset (rc 26, database moved to `netdata-meta.bad`).
+SQLite rc <n>, extended <n> (<text>), OS errno <n>` and whether
+the next start was asked to recover (rc 11) or reset (rc 26).
+`OS errno` is always printed; it is captured only for
+CANTOPEN/IOERR and is 0 otherwise. A requested reset means the
+next start attempts to move the database to `netdata-meta.bad`.
 Match the message by prefix. Older agents carry no reason, and
 their `AE_FATAL_ERRNO` is not SQLite's error.
 

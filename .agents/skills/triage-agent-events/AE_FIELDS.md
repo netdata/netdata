@@ -202,7 +202,7 @@ graceful exits.
 | `fatal.filename` | `AE_FATAL_FILENAME` | always | Source file. **Slice on this for "this file is buggy".** |
 | `fatal.function` | `AE_FATAL_FUNCTION` | always | Function name (with demangled symbol). **Slice on this for "this function is buggy".** |
 | `fatal.message` | `AE_FATAL_MESSAGE` | always | Panic message. Subject of FTS. |
-| `fatal.errno` | `AE_FATAL_ERRNO` | always | errno string at panic. Before the fatal-hook fix it could be a stale errno from the previous log line on the same thread whenever errno was 0; read it as a lead only on older agents. |
+| `fatal.errno` | `AE_FATAL_ERRNO` | always | errno string at panic. On agents built without PR #24642 it could be a stale errno from the previous log line on the same thread whenever errno was 0; read it there as a lead only. |
 | `fatal.thread` | `AE_FATAL_THREAD` | always | Worker thread name (e.g. `CTXLOAD`, `STREAM:63`). |
 | `fatal.thread_id` | `AE_FATAL_THREAD_ID` | always | POSIX TID. |
 | `fatal.stack_trace` | `AE_FATAL_STACK_TRACE` | always | Backtrace. Real addresses preserved (anonymization is dedup-only, `status-file-dedup.c:26-36`). |
