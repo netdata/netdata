@@ -229,7 +229,7 @@ impl Aggregator {
                 if window > newest {
                     self.stats.future_events += batch_row.events;
                 }
-                entity.merge_window(set, oldest_open, open_window, &batch_row.cells);
+                entity.merge_window(set, oldest_open, open_window, batch_row.cells);
             }
         }
     }
@@ -290,13 +290,25 @@ impl Entity {
     }
 
     /// Merge one batch row into this entity's row of `window`, an open window
-    /// from `oldest_open` onwards.
-    fn merge_window(&mut self, set: &MetricSetInner, oldest_open: u64, window: u64, row: &[f64]) {
+    /// from `oldest_open` onwards. Without a row for `window` yet, the batch
+    /// row becomes it: combining a row into an empty row yields the row
+    /// itself, for every aggregation, and batch rows start empty too.
+    fn merge_window(
+        &mut self,
+        set: &MetricSetInner,
+        oldest_open: u64,
+        window: u64,
+        row: Box<[f64]>,
+    ) {
         let index = (window - oldest_open) as usize;
-        while self.open_rows.len() <= index {
-            self.open_rows.push_back(set.schema.empty_row());
+        if let Some(open) = self.open_rows.get_mut(index) {
+            set.schema.combine(open, &row);
+        } else {
+            while self.open_rows.len() < index {
+                self.open_rows.push_back(set.schema.empty_row());
+            }
+            self.open_rows.push_back(row);
         }
-        set.schema.combine(&mut self.open_rows[index], row);
         self.first_window = self.first_window.min(window);
         self.last_window = self.last_window.max(window);
     }
@@ -1191,6 +1203,41 @@ mod tests {
         assert_eq!(values(&out, "+Inf"), ["2"]);
         assert_eq!(values(&out, "avg"), ["5"]);
         assert_eq!(values(&out, "max"), ["5"]);
+    }
+
+    #[test]
+    fn a_window_from_one_batch_or_two_reads_the_same() {
+        let record = |batch: &mut Batch, e: &Every, time: u64, part: u64| {
+            batch
+                .entity(Labels::new())
+                .record(time)
+                .add(e.requests, Outcome::Ok, 1.0 + part as f64)
+                .set_total(e.totals, Seen::Events, 10.0 * (time + part) as f64)
+                .set_value(e.queue, Queue::Jobs, 3.0 + part as f64)
+                .observe(e.duration, 0.25 * (1 + part) as f64, 1.0);
+        };
+        // Window 11 is skipped, so window 12 also needs an empty row before it.
+        let windows = [10, 12];
+        let mut texts = Vec::new();
+        for split in [false, true] {
+            let e = every(1, &[0.5]);
+            let mut aggregator = Aggregator::new(&e.charts);
+            for time in windows {
+                let mut batch = Batch::new(&e.set);
+                record(&mut batch, &e, time, 0);
+                if split {
+                    aggregator.merge(batch, time);
+                    batch = Batch::new(&e.set);
+                }
+                record(&mut batch, &e, time, 1);
+                aggregator.merge(batch, time);
+            }
+            texts.push(text(&aggregator.emit(13, usize::MAX)));
+        }
+        assert_eq!(texts[0], texts[1]);
+        assert!(texts[0].contains("BEGIN x.requests 1000000\nSET ok = 3\n"));
+        assert!(texts[0].contains("BEGIN x.queue 1000000\nSET jobs = 4\nEND 11 0 1\n"));
+        assert!(texts[0].contains("BEGIN x.queue 1000000\nSET jobs =\nEND 12 0 1\n"));
     }
 
     #[test]
