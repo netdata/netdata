@@ -103,6 +103,7 @@ typedef enum rrdr_group_by_function {
     RRDR_GROUP_BY_FUNCTION_EXTREMES,
 } RRDR_GROUP_BY_FUNCTION;
 
+bool group_by_aggregate_function_lookup(const char *s, RRDR_GROUP_BY_FUNCTION *function);
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s);
 const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function);
 
