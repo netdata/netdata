@@ -943,3 +943,141 @@ int web_client_forwarded_for_unittest(void)
 
     return errors;
 }
+
+// a dashboard version directory and a plain one, each with an index.html
+static const char *web_client_test_web_subdirs[] = { "v3", "docs" };
+
+static void web_client_test_remove_web_dir(const char *web_dir)
+{
+    char path[FILENAME_MAX + 1];
+
+    for (size_t i = 0; i < sizeof(web_client_test_web_subdirs) / sizeof(web_client_test_web_subdirs[0]); i++) {
+        snprintfz(path, sizeof(path), "%s/%s/index.html", web_dir, web_client_test_web_subdirs[i]);
+        (void)unlink(path);
+        snprintfz(path, sizeof(path), "%s/%s", web_dir, web_client_test_web_subdirs[i]);
+        (void)rmdir(path);
+    }
+
+    (void)rmdir(web_dir);
+}
+
+static bool web_client_test_make_web_dir(char *web_dir)
+{
+    char path[FILENAME_MAX + 1];
+
+    if (!mkdtemp(web_dir))
+        return false;
+
+    for (size_t i = 0; i < sizeof(web_client_test_web_subdirs) / sizeof(web_client_test_web_subdirs[0]); i++) {
+        snprintfz(path, sizeof(path), "%s/%s", web_dir, web_client_test_web_subdirs[i]);
+        if (mkdir(path, 0700) != 0)
+            goto failed;
+
+        snprintfz(path, sizeof(path), "%s/%s/index.html", web_dir, web_client_test_web_subdirs[i]);
+        FILE *fp = fopen(path, "w");
+        if (!fp)
+            goto failed;
+
+        fputs("<html></html>\n", fp);
+        if (fclose(fp) != 0)
+            goto failed;
+    }
+
+    return true;
+
+failed:
+    web_client_test_remove_web_dir(web_dir);
+    return false;
+}
+
+int web_client_static_redirect_unittest(void)
+{
+    fprintf(stderr, "\n%s() running...\n", __FUNCTION__);
+
+    int errors = 0;
+
+    char web_dir[] = "/tmp/netdata-web-redirect-XXXXXX";
+    if (!web_client_test_make_web_dir(web_dir)) {
+        fprintf(stderr, "  FAILED: cannot create the temporary web directory '%s'\n", web_dir);
+        return 1;
+    }
+
+    // the response headers are sent to one end and read back from the other
+    int sv[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) != 0) {
+        fprintf(stderr, "  FAILED: cannot create a socket pair: %s\n", strerror(errno));
+        web_client_test_remove_web_dir(web_dir);
+        return 1;
+    }
+
+    const char *saved_web_dir = netdata_configured_web_dir;
+    netdata_configured_web_dir = web_dir;
+
+    // A directory requested without a trailing slash is redirected to its last
+    // URL component with a slash, relative to the request. A %3F ends the decoded
+    // path that selects the directory, but not the URL as received, so the
+    // component after it can look like a URL scheme. The redirect must stay a
+    // relative path either way.
+    static const struct {
+        const char *target;
+        const char *location;
+    } cases[] = {
+        { "/v3", "./v3/" },
+        { "/v3?a=1", "./v3/?a=1" },
+        { "/docs", "./docs/" },
+        { "/docs?a=1&b=2", "./docs/?a=1&b=2" },
+        { "/v3%3F/https:evil.example", "./https:evil.example/" },
+        { "/v3%3F/https:evil.example?a=1", "./https:evil.example/?a=1" },
+        { "/docs%3F/http:evil.example", "./http:evil.example/" },
+    };
+
+    size_t memory_accounting = 0;
+    struct web_client *w = web_client_create(&memory_accounting);
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        web_client_reuse_from_cache(w);
+        w->fd = sv[0];
+        web_client_set_conn_unix(w);
+        w->acl = HTTP_ACL_DASHBOARD;
+        buffer_sprintf(w->response.data, "GET %s HTTP/1.1\r\n\r\n", cases[i].target);
+
+        web_client_process_request_from_web_server(w);
+
+        char headers[4096];
+        ssize_t received = recv(sv[1], headers, sizeof(headers) - 1, MSG_DONTWAIT);
+        headers[received > 0 ? received : 0] = '\0';
+
+        WEB_CLIENT_TEST(
+            strncmp(headers, "HTTP/1.1 301 ", 13) == 0,
+            "'%s' was answered with '%.*s', expected a 301",
+            cases[i].target,
+            (int)strcspn(headers, "\r\n"),
+            headers);
+        char location[256];
+        snprintfz(location, sizeof(location), "\r\nLocation: %s\r\n", cases[i].location);
+        WEB_CLIENT_TEST(
+            strstr(headers, location) != NULL,
+            "'%s' was not redirected to '%s', the response headers are:\n%s",
+            cases[i].target,
+            cases[i].location,
+            headers);
+
+        web_client_request_done(w);
+    }
+
+    w->fd = -1;
+    web_client_free(w);
+    WEB_CLIENT_TEST(memory_accounting == 0, "web client leaked %zu accounted bytes", memory_accounting);
+
+    netdata_configured_web_dir = saved_web_dir;
+    close(sv[0]);
+    close(sv[1]);
+    web_client_test_remove_web_dir(web_dir);
+
+    if (errors)
+        fprintf(stderr, "%s() failed with %d error(s)\n", __FUNCTION__, errors);
+    else
+        fprintf(stderr, "%s() passed\n", __FUNCTION__);
+
+    return errors;
+}
