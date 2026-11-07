@@ -643,13 +643,14 @@ void sqlite_init_failure_record(sqlite3 *database, const char *stage, const char
     f->rc = rc;
     // the connection's codes describe the call that just failed, as long as nothing else used it since
     f->extended_rc = database ? sqlite3_extended_errcode(database) : rc;
-    f->os_errno = database ? sqlite3_system_errno(database) : 0;
 
     // the returned code is authoritative; if the connection reports another error, it is not about this call
-    if ((f->extended_rc & 0xff) != (rc & 0xff)) {
+    if ((f->extended_rc & 0xff) != (rc & 0xff))
         f->extended_rc = rc;
-        f->os_errno = 0;
-    }
+
+    // SQLite updates the OS error only on CANTOPEN and IOERR; for any other code it belongs to an earlier failure
+    if (database && ((rc & 0xff) == SQLITE_CANTOPEN || (rc & 0xff) == SQLITE_IOERR))
+        f->os_errno = sqlite3_system_errno(database);
     if (statement)
         strncpyz(f->statement, statement, sizeof(f->statement) - 1);
 }
@@ -666,11 +667,13 @@ void sqlite_init_failure_format(const SQLITE_INIT_FAILURE *f, char *dst, size_t 
         return;
     }
 
+    // SQLITE_CORRUPT asks the next start to recover the database, SQLITE_NOTADB to move it aside and start empty
+    bool reset = (f->rc & 0xff) == SQLITE_NOTADB;
     const char *recovery = "";
     if (f->recovery == SQLITE_INIT_RECOVERY_REQUESTED)
-        recovery = "; recovery requested for the next start";
+        recovery = reset ? "; reset requested for the next start" : "; recovery requested for the next start";
     else if (f->recovery == SQLITE_INIT_RECOVERY_NOT_MARKED)
-        recovery = "; recovery could not be requested";
+        recovery = reset ? "; reset could not be requested" : "; recovery could not be requested";
 
     snprintfz(dst, dst_size - 1, "%s%s%s failed: SQLite rc %d, extended %d (%s), OS errno %d%s",
               f->stage, *f->statement ? " " : "", f->statement,

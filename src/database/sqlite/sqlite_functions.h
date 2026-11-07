@@ -129,7 +129,7 @@ int db_execute(sqlite3 *database, const char *cmd, int *sqlite_rc);
 // Startup reports it in the fatal message and the status file. It holds no SQL text and no paths.
 typedef enum {
     SQLITE_INIT_RECOVERY_NONE = 0,      // not a corruption error
-    SQLITE_INIT_RECOVERY_REQUESTED,     // the .recover/.delete marker was created; the next start acts on it
+    SQLITE_INIT_RECOVERY_REQUESTED,     // the .recover (CORRUPT) or .delete (NOTADB) marker was created
     SQLITE_INIT_RECOVERY_NOT_MARKED,    // corruption error, but no marker was created
 } SQLITE_INIT_RECOVERY;
 
