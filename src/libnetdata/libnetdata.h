@@ -285,6 +285,17 @@ bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now)
 // Returns true if both endpoints were absolute.
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest);
 
+// the resampling time a query uses: none when not positive, at most API_QUERY_TIME_SPAN_MAX
+static inline time_t rrdr_resampling_time_normalize(time_t resampling_time) {
+    if(resampling_time <= 0)
+        return 0;
+
+    if(resampling_time > API_QUERY_TIME_SPAN_MAX)
+        return API_QUERY_TIME_SPAN_MAX;
+
+    return resampling_time;
+}
+
 int netdata_base64_decode(unsigned char *out, const unsigned char *in, int in_len);
 int netdata_base64_encode(unsigned char *encoded, const unsigned char *input, size_t input_size);
 

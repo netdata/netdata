@@ -1272,6 +1272,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     // copy the request into query_thread_target
     qt->request = *qtr;
+    qt->request.resampling_time = rrdr_resampling_time_normalize(qt->request.resampling_time);
 
     query_target_generate_name(qt);
     qt->window.after = qt->request.after;

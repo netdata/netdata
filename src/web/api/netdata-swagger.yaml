@@ -9405,7 +9405,7 @@ components:
       name: gtime
       in: query
       description: |
-        The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).
+        The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute). Values above 315360000 (10 years) are treated as 315360000.
       required: false
       allowEmptyValue: false
       schema:
@@ -9416,7 +9416,7 @@ components:
       name: time_resampling
       in: query
       description: |
-        For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average.
+        For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average. Values above 315360000 (10 years) are treated as 315360000.
       required: false
       schema:
         type: number
