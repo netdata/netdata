@@ -126,6 +126,22 @@ func TestRevocationChecker_Status(t *testing.T) {
 				ok:      true,
 			},
 		},
+		"SHA-1 signed certificate": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				crls:    []testPKIHandler{serveCRL(true)},
+			},
+			chain: func(p *testPKI) []*x509.Certificate {
+				leaf := p.issueLeaf(p.t, p.leaf.SerialNumber, p.ca, p.caKey, func(template *x509.Certificate) {
+					template.SignatureAlgorithm = x509.ECDSAWithSHA1
+				})
+				return []*x509.Certificate{leaf}
+			},
+			want: result{
+				revoked: true,
+				ok:      true,
+			},
+		},
 		"presented chain without the issuer": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
@@ -430,14 +446,48 @@ func TestRevocationChecker_Status(t *testing.T) {
 				ok: true,
 			},
 		},
-		"OCSP answer without a next update": {
+		"OCSP answer without a next update within the clock skew of its this update": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps: []testPKIHandler{serveOCSPWith(func(_ *testPKI, answer *ocsp.Response) {
 					answer.NextUpdate = time.Time{}
 				})},
 			},
-			at: func(p *testPKI) time.Time { return p.nextUpdate().Add(revocationClockSkew + time.Second) },
+			at: func(p *testPKI) time.Time { return p.thisUpdate().Add(revocationClockSkew) },
+			want: result{
+				ok: true,
+			},
+		},
+		"OCSP answer without a next update past the clock skew of its this update": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps: []testPKIHandler{serveOCSPWith(func(_ *testPKI, answer *ocsp.Response) {
+					answer.NextUpdate = time.Time{}
+				})},
+			},
+			at:   func(p *testPKI) time.Time { return p.thisUpdate().Add(revocationClockSkew + time.Second) },
+			want: result{},
+		},
+		"OCSP answer about a certificate of an issuer with another name": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps:   []testPKIHandler{serveOCSPAbout(func(p *testPKI) *x509.Certificate { return p.caRenamed })},
+			},
+			want: result{},
+		},
+		"OCSP answer about a certificate of an issuer with another key": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps:   []testPKIHandler{serveOCSPAbout(func(p *testPKI) *x509.Certificate { return p.rogue })},
+			},
+			want: result{},
+		},
+		"OCSP request names the certificate's issuer, not the issuer certificate's subject": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{unexpected},
+				ocsps:   []testPKIHandler{serveOCSP(ocsp.Good)},
+			},
+			chain: func(p *testPKI) []*x509.Certificate { return []*x509.Certificate{p.leaf, p.caRenamed} },
 			want: result{
 				ok: true,
 			},
@@ -472,7 +522,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 		"OCSP answer from an authorized responder": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
-				ocsps:   []testPKIHandler{serveDelegatedOCSP(x509.ExtKeyUsageOCSPSigning, -time.Hour, time.Hour)},
+				ocsps:   []testPKIHandler{serveDelegatedOCSP(func(*testPKI, *x509.Certificate) {})},
 			},
 			want: result{
 				ok: true,
@@ -481,25 +531,38 @@ func TestRevocationChecker_Status(t *testing.T) {
 		"OCSP answer from a responder not authorized for OCSP signing": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
-				ocsps:   []testPKIHandler{serveDelegatedOCSP(x509.ExtKeyUsageServerAuth, -time.Hour, time.Hour)},
+				ocsps: []testPKIHandler{serveDelegatedOCSP(func(_ *testPKI, responder *x509.Certificate) {
+					responder.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+				})},
 			},
 			want: result{},
 		},
 		"OCSP answer from an expired responder": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
-				ocsps: []testPKIHandler{
-					serveDelegatedOCSP(x509.ExtKeyUsageOCSPSigning, -time.Hour, -time.Second),
-				},
+				ocsps: []testPKIHandler{serveDelegatedOCSP(func(p *testPKI, responder *x509.Certificate) {
+					responder.NotAfter = p.now.Add(-time.Second)
+				})},
 			},
 			want: result{},
 		},
 		"OCSP answer from a responder not yet valid": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
-				ocsps: []testPKIHandler{
-					serveDelegatedOCSP(x509.ExtKeyUsageOCSPSigning, time.Second, time.Hour),
-				},
+				ocsps: []testPKIHandler{serveDelegatedOCSP(func(p *testPKI, responder *x509.Certificate) {
+					responder.NotBefore = p.now.Add(time.Second)
+				})},
+			},
+			want: result{},
+		},
+		"OCSP answer from a CA certificate authorized for OCSP signing": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps: []testPKIHandler{serveDelegatedOCSP(func(_ *testPKI, responder *x509.Certificate) {
+					responder.IsCA = true
+					responder.BasicConstraintsValid = true
+					responder.KeyUsage |= x509.KeyUsageCertSign
+				})},
 			},
 			want: result{},
 		},
@@ -1039,12 +1102,14 @@ func selfSignCA(
 	return cert
 }
 
-// issueLeaf issues a server certificate with serial, signed by issuer, that lists the PKI's URLs.
+// issueLeaf issues a server certificate with serial, signed by issuer, that lists the PKI's URLs, after modify
+// changes its template.
 func (p *testPKI) issueLeaf(
-	t *testing.T,
+	t testing.TB,
 	serial *big.Int,
 	issuer *x509.Certificate,
 	issuerKey *ecdsa.PrivateKey,
+	modify ...func(*x509.Certificate),
 ) *x509.Certificate {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -1061,6 +1126,9 @@ func (p *testPKI) issueLeaf(
 		CRLDistributionPoints: p.crlURLs,
 		OCSPServer:            p.ocspURLs,
 		IssuingCertificateURL: p.issuerURLs,
+	}
+	for _, m := range modify {
+		m(template)
 	}
 	der, err := x509.CreateCertificate(rand.Reader, template, issuer, &key.PublicKey, issuerKey)
 	require.NoError(t, err)
@@ -1121,7 +1189,17 @@ func (p *testPKI) writeOCSP(
 	key *ecdsa.PrivateKey,
 	answer ocsp.Response,
 ) {
-	resp, err := ocsp.CreateResponse(p.ca, signer, answer, key)
+	p.writeOCSPAbout(w, p.ca, signer, key, answer)
+}
+
+// writeOCSPAbout writes answer, signed with key, about a certificate that issuer issued.
+func (p *testPKI) writeOCSPAbout(
+	w http.ResponseWriter,
+	issuer, signer *x509.Certificate,
+	key *ecdsa.PrivateKey,
+	answer ocsp.Response,
+) {
+	resp, err := ocsp.CreateResponse(issuer, signer, answer, key)
 	if !assert.NoError(p.t, err) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1206,7 +1284,8 @@ func serveRenamedCRL(p *testPKI, w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(p.crl(p.caRenamed, p.caKey, true))
 }
 
-// serveOCSP answers with status after checking that the request names the server certificate.
+// serveOCSP answers with status after checking that the request names the server certificate. Like OpenSSL's
+// responder, it answers unknown when the request names another issuer.
 func serveOCSP(status int) testPKIHandler {
 	return func(p *testPKI, w http.ResponseWriter, r *http.Request) {
 		der, err := p.ocspRequestBytes(r)
@@ -1220,7 +1299,21 @@ func serveOCSP(status int) testPKIHandler {
 			return
 		}
 		assert.Equal(p.t, p.leaf.SerialNumber, req.SerialNumber)
+		own, err := ocsp.CreateRequest(p.leaf, p.ca, nil)
+		if !assert.NoError(p.t, err) {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		ownReq, err := ocsp.ParseRequest(own)
+		if !assert.NoError(p.t, err) {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		answer := p.ocspAnswer(status)
+		if !bytes.Equal(req.IssuerNameHash, ownReq.IssuerNameHash) ||
+			!bytes.Equal(req.IssuerKeyHash, ownReq.IssuerKeyHash) {
+			answer.Status = ocsp.Unknown
+		}
 		answer.SerialNumber = req.SerialNumber
 		p.writeOCSP(w, p.ca, p.caKey, answer)
 	}
@@ -1235,9 +1328,17 @@ func serveOCSPWith(modify func(p *testPKI, answer *ocsp.Response)) testPKIHandle
 	}
 }
 
-// serveDelegatedOCSP answers good, signed by a responder whose certificate the CA issued for usage, valid from
-// notBefore to notAfter relative to now.
-func serveDelegatedOCSP(usage x509.ExtKeyUsage, notBefore, notAfter time.Duration) testPKIHandler {
+// serveOCSPAbout answers good for the server certificate's serial, signed by the CA, but about a certificate that
+// issuer issued.
+func serveOCSPAbout(issuer func(p *testPKI) *x509.Certificate) testPKIHandler {
+	return func(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+		p.writeOCSPAbout(w, issuer(p), p.ca, p.caKey, p.ocspAnswer(ocsp.Good))
+	}
+}
+
+// serveDelegatedOCSP answers good, signed by a responder whose certificate the CA issued for OCSP signing, after
+// modify changes the responder certificate's template.
+func serveDelegatedOCSP(modify func(p *testPKI, responder *x509.Certificate)) testPKIHandler {
 	return func(p *testPKI, w http.ResponseWriter, _ *http.Request) {
 		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if !assert.NoError(p.t, err) {
@@ -1249,11 +1350,12 @@ func serveDelegatedOCSP(usage x509.ExtKeyUsage, notBefore, notAfter time.Duratio
 			Subject: pkix.Name{
 				CommonName: "Test CA OCSP Responder",
 			},
-			NotBefore:   p.now.Add(notBefore),
-			NotAfter:    p.now.Add(notAfter),
+			NotBefore:   p.now.Add(-time.Hour),
+			NotAfter:    p.now.Add(time.Hour),
 			KeyUsage:    x509.KeyUsageDigitalSignature,
-			ExtKeyUsage: []x509.ExtKeyUsage{usage},
+			ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageOCSPSigning},
 		}
+		modify(p, template)
 		der, err := x509.CreateCertificate(rand.Reader, template, p.ca, &key.PublicKey, p.caKey)
 		if !assert.NoError(p.t, err) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

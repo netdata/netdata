@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/pem"
@@ -14,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math/big"
 	"net/http"
 	"net/url"
 	"slices"
@@ -159,7 +161,11 @@ func (rc *revocationChecker) ocspStatus(
 	if err != nil || iss == nil {
 		return false, false, err
 	}
-	req, err := ocsp.CreateRequest(cert, iss, &ocsp.RequestOptions{
+	// The request names the issuer by cert's issuer field (RFC 6960 4.1.1): only the issuer certificate's key is
+	// authenticated, and its subject may be encoded otherwise.
+	named := *iss
+	named.RawSubject = cert.RawIssuer
+	req, err := ocsp.CreateRequest(cert, &named, &ocsp.RequestOptions{
 		Hash: crypto.SHA1,
 	})
 	if err != nil {
@@ -169,7 +175,7 @@ func (rc *revocationChecker) ocspStatus(
 	// The first responder that gives a usable answer decides; failing responders are skipped.
 	for _, server := range cert.OCSPServer {
 		resp, err := rc.queryOCSP(ctx, server, req, cert, iss)
-		if err != nil || verifyOCSPResponse(resp, iss, now) != nil {
+		if err != nil || verifyOCSPResponse(resp, cert, iss, now) != nil {
 			continue
 		}
 		return resp.Status != ocsp.Good, true, nil
@@ -205,13 +211,12 @@ func (rc *revocationChecker) queryOCSP(
 }
 
 // findIssuer returns the certificate that signed chain[0]: the first one the source presented with it, or else the
-// first one downloaded from the issuer URLs chain[0] lists, or nil. A key that verifies the certificate's signature is
-// the key of its issuer, so CRLs and OCSP answers it verifies come from that issuer. Its only error is the context's,
-// so that a cancelled download is not taken for a missing issuer.
+// first one downloaded from the issuer URLs chain[0] lists, or nil. Its only error is the context's, so that a
+// cancelled download is not taken for a missing issuer.
 func (rc *revocationChecker) findIssuer(ctx context.Context, chain []*x509.Certificate) (*x509.Certificate, error) {
 	cert := chain[0]
 	for _, issuer := range chain[1:] {
-		if cert.CheckSignatureFrom(issuer) == nil {
+		if signedBy(cert, issuer) {
 			return issuer, nil
 		}
 	}
@@ -220,18 +225,26 @@ func (rc *revocationChecker) findIssuer(ctx context.Context, chain []*x509.Certi
 		if err != nil {
 			continue
 		}
-		if issuer, err := parseCertificate(body); err == nil && cert.CheckSignatureFrom(issuer) == nil {
+		if issuer, err := parseCertificate(body); err == nil && signedBy(cert, issuer) {
 			return issuer, nil
 		}
 	}
 	return nil, ctx.Err()
 }
 
+// signedBy reports whether issuer's key verifies cert's signature, which makes it the key of cert's issuer: CRLs and
+// OCSP answers it verifies come from that issuer. Nothing else in a downloaded issuer certificate is authenticated,
+// so only the signature is checked, as the CRL signature is.
+func signedBy(cert, issuer *x509.Certificate) bool {
+	return issuer.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature) == nil
+}
+
 // verifyCRL checks that crl is a current and complete CRL of cert's issuer that covers cert (RFC 5280 6.3.3).
 func verifyCRL(crl *x509.RevocationList, cert, issuer *x509.Certificate, now time.Time) error {
 	// The issuer certificate's own subject is not compared: only its key is authenticated, by cert's signature.
 	if !bytes.Equal(crl.RawIssuer, cert.RawIssuer) {
-		return fmt.Errorf("issued by '%s', not by the certificate's issuer '%s'", crl.Issuer, cert.Issuer)
+		return fmt.Errorf("issuer name '%s' differs from the certificate's issuer name '%s' (compared as encoded)",
+			crl.Issuer, cert.Issuer)
 	}
 	// Only the signature is checked, so a private CA whose certificate lacks the CRL-signing key usage still verifies.
 	if err := issuer.CheckSignature(crl.SignatureAlgorithm, crl.RawTBSRevocationList, crl.Signature); err != nil {
@@ -243,10 +256,13 @@ func verifyCRL(crl *x509.RevocationList, cert, issuer *x509.Certificate, now tim
 	return checkCRLScope(crl, cert)
 }
 
-// verifyOCSPResponse checks what ocsp.ParseResponseForCert, which verifies the signature, leaves out: the answer must
-// be current (RFC 6960 3.2), and a delegated responder that signed it must be authorized for OCSP signing by the
-// issuer and within its validity period (RFC 6960 4.2.2.2).
-func verifyOCSPResponse(resp *ocsp.Response, issuer *x509.Certificate, now time.Time) error {
+// verifyOCSPResponse checks what ocsp.ParseResponseForCert, which verifies the signature, leaves out (RFC 6960 3.2):
+// the answer must identify cert and be current, and a delegated responder that signed it must be authorized for OCSP
+// signing by the issuer (RFC 6960 4.2.2.2).
+func verifyOCSPResponse(resp *ocsp.Response, cert, issuer *x509.Certificate, now time.Time) error {
+	if err := checkOCSPCertID(resp, cert, issuer); err != nil {
+		return err
+	}
 	if err := checkUpdateTimes(resp.ThisUpdate, resp.NextUpdate, now); err != nil {
 		return err
 	}
@@ -258,20 +274,78 @@ func verifyOCSPResponse(resp *ocsp.Response, issuer *x509.Certificate, now time.
 	if !slices.Contains(responder.ExtKeyUsage, x509.ExtKeyUsageOCSPSigning) {
 		return errors.New("responder certificate is not authorized for OCSP signing")
 	}
+	// A subordinate CA that carries the OCSP-signing usage could otherwise answer for its issuer's certificates.
+	if responder.IsCA {
+		return errors.New("responder certificate is a CA certificate")
+	}
 	if now.Before(responder.NotBefore) || now.After(responder.NotAfter) {
 		return errors.New("responder certificate is outside its validity period")
 	}
 	return nil
 }
 
+// checkOCSPCertID checks that the single response ocsp.ParseResponseForCert chose, by serial number alone, also names
+// cert's issuer: by the hash of cert's issuer field and of the issuer's key (RFC 6960 4.1.1). Otherwise a responder
+// key that serves two CAs could vouch for one CA's certificate with an answer about the other's.
+func checkOCSPCertID(resp *ocsp.Response, cert, issuer *x509.Certificate) error {
+	// ResponseData and SingleResponse (RFC 6960 4.2.1) up to the fields needed; asn1.Unmarshal ignores the rest.
+	var data struct {
+		Version     int `asn1:"optional,explicit,default:0,tag:0"`
+		ResponderID asn1.RawValue
+		ProducedAt  time.Time `asn1:"generalized"`
+		Responses   []struct {
+			CertID struct {
+				HashAlgorithm  pkix.AlgorithmIdentifier
+				IssuerNameHash []byte
+				IssuerKeyHash  []byte
+				SerialNumber   *big.Int
+			}
+		}
+	}
+	var spki struct {
+		Algorithm pkix.AlgorithmIdentifier
+		PublicKey asn1.BitString
+	}
+	if _, err := asn1.Unmarshal(resp.TBSResponseData, &data); err != nil {
+		return err
+	}
+	if _, err := asn1.Unmarshal(issuer.RawSubjectPublicKeyInfo, &spki); err != nil {
+		return err
+	}
+	if !resp.IssuerHash.Available() {
+		return errors.New("unsupported certificate ID hash")
+	}
+	hash := func(b []byte) []byte {
+		h := resp.IssuerHash.New()
+		h.Write(b)
+		return h.Sum(nil)
+	}
+
+	for _, single := range data.Responses {
+		id := single.CertID
+		if id.SerialNumber.Cmp(cert.SerialNumber) != 0 {
+			continue
+		}
+		if !bytes.Equal(id.IssuerNameHash, hash(cert.RawIssuer)) ||
+			!bytes.Equal(id.IssuerKeyHash, hash(spki.PublicKey.RightAlign())) {
+			return errors.New("answer is about a certificate of another issuer")
+		}
+		return nil
+	}
+	return errors.New("answer is not about the certificate")
+}
+
 // checkUpdateTimes checks that now falls between a CRL's or an OCSP answer's this-update and next-update times, within
-// revocationClockSkew. Without a next update, newer information may be available at any time (RFC 6960 4.2.2.1), and
-// only the this-update time is checked.
+// revocationClockSkew. Without a next update, newer information is available all the time (RFC 6960 4.2.2.1), so
+// the answer is current only at its this-update time.
 func checkUpdateTimes(thisUpdate, nextUpdate, now time.Time) error {
+	if nextUpdate.IsZero() {
+		nextUpdate = thisUpdate
+	}
 	if thisUpdate.After(now.Add(revocationClockSkew)) {
 		return fmt.Errorf("not valid until %s", thisUpdate)
 	}
-	if !nextUpdate.IsZero() && now.After(nextUpdate.Add(revocationClockSkew)) {
+	if now.After(nextUpdate.Add(revocationClockSkew)) {
 		return fmt.Errorf("outdated since %s", nextUpdate)
 	}
 	return nil

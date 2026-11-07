@@ -60,11 +60,12 @@ modules:
               URL is always reported as not revoked (LDAP CRL URLs are skipped), and an OCSP `unknown` answer is
               reported as revoked.
             - Revocation status comes only from CRLs and OCSP answers that verify against the issuer of the server
-              certificate and are current by the Agent host's clock, within 5 minutes. The chart shows a gap when the
-              issuer certificate is unavailable (a private CA whose certificates list no issuer URL, behind a server
-              that does not send the CA certificate; a `file://` source whose certificate lists no issuer URL), when
-              the CA publishes outdated CRLs or OCSP answers, or when the Agent host's clock is off by more than 5
-              minutes.
+              certificate and are current by the Agent host's clock, within 5 minutes. The issuer certificate must
+              come from the server, sent along with its own certificate, or from the issuer URL listed in the server
+              certificate; `tls_ca` is not used. Without it the chart shows a gap, for example for a private CA whose
+              certificates list no issuer URL, or a `file://` source whose certificate lists none. The chart also
+              shows a gap when the CA publishes outdated CRLs or OCSP answers, and can show one when the Agent host's
+              clock is more than 5 minutes off.
             - With an `smtp://` source, `timeout` covers the whole SMTP exchange. A mail server that delays its
               greeting, a common anti-spam measure on port 25, needs a `timeout` longer than that delay.
         performance_impact:
@@ -372,10 +373,9 @@ modules:
             when: "`check_revocation_status` is enabled."
             cause: >-
               A CRL listed in the certificate could not be downloaded, parsed or verified, or the certificate is
-              expired or not yet valid; `reason` names the CRL URL and the problem. Only version 2 CRLs up to 64 MiB
-              are accepted, and only complete CRLs (not delta or indirect CRLs) that the certificate's issuer issued
-              and signed, that cover the server certificate, and that are current within 5 minutes. The revocation
-              status chart shows a gap.
+              expired or not yet valid; `reason` names the CRL URL and the problem, and the revocation status chart
+              shows a gap. A CRL must be a complete version 2 CRL (not a delta or indirect CRL) up to 64 MiB, issued
+              and signed by the certificate's issuer, covering the server certificate, and current within 5 minutes.
             fix: >-
               Check that the Agent host can reach the CRL URLs listed in the certificate and that its clock is
               correct, and renew an expired certificate. For an `unsupported crl version` reason, have the CA issue
@@ -384,14 +384,15 @@ modules:
           - error: "revocation status of `source` could not be determined"
             when: "`check_revocation_status` is enabled."
             cause: >-
-              The issuer certificate of the server certificate is unavailable: the server does not send it, and the
-              issuer URL listed in the certificate is missing, unreachable, or serves a certificate that did not sign
-              the server certificate. Or no OCSP responder listed in the certificate returned a usable answer: one
-              that is current within 5 minutes and signed by the issuer or by a responder it authorized for OCSP
-              signing. The revocation status chart shows a gap.
+              The certificate of the server certificate's issuer is unavailable: the server does not send it, and the
+              issuer URL listed in the certificate is missing or unreachable, or does not serve the certificate that
+              signed it as a single DER or PEM certificate. Or no OCSP responder listed in the certificate returned a
+              usable answer: one about this certificate, current within 5 minutes, and signed by the issuer or by a
+              responder it authorized for OCSP signing. The revocation status chart shows a gap.
             fix: >-
-              Configure the server to send its intermediate CA certificates, and check that the Agent host can reach
-              the issuer certificate and OCSP URLs listed in the certificate and that its clock is correct.
+              Configure the server to send the CA certificate that issued its certificate, and check that the Agent
+              host can reach the issuer certificate and OCSP URLs listed in the certificate and that its clock is
+              correct.
     metrics:
       folding:
         title: Metrics
