@@ -5,6 +5,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/siteid"
+
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 )
 
@@ -13,6 +15,9 @@ func (h *Handler) checks(
 	args map[string]string,
 	response map[string]any,
 ) *funcapi.FunctionResponse {
+	if err := siteid.Validate(args["site_id"]); err != nil {
+		return funcapi.ErrorResponse(400, "%v", err)
+	}
 	if err := validKind(args["kind"]); err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
@@ -23,6 +28,9 @@ func (h *Handler) checks(
 	rows := make([][]any, 0)
 	truncated := false
 	for _, j := range h.deps.Jobs(time.Now()) {
+		if args["site_id"] != "" && args["site_id"] != j.SiteID {
+			continue
+		}
 		if args["job_id"] != "" && args["job_id"] != j.JobID {
 			continue
 		}
@@ -60,6 +68,7 @@ func (h *Handler) checks(
 				timestamp(j.LastFailureUS),
 				detail,
 				historyErr,
+				j.SiteID,
 			},
 		)
 	}
@@ -72,9 +81,9 @@ func (h *Handler) checks(
 var checksMethod = method{
 	id:     "synthetics-checks",
 	title:  "Synthetic monitors",
-	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt.",
+	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt. Optional site_id selects the recorded association; empty means all sites, and blank Site ID cells are unassigned.",
 	sort:   "job_id",
-	params: []string{"job_id", "kind", "limit"},
+	params: []string{"job_id", "kind", "limit", "site_id"},
 	columns: columns(
 		column{
 			"job_id",
@@ -95,5 +104,6 @@ var checksMethod = method{
 		column{"last_failure_us", "Last failure in this activation", funcapi.FieldTypeTimestamp, ""},
 		column{"error", "Last error", funcapi.FieldTypeString, ""},
 		column{"history_error", "History error", funcapi.FieldTypeString, ""},
+		column{"site_id", "Site ID", funcapi.FieldTypeString, ""},
 	),
 }

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/siteid"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 )
@@ -64,9 +65,13 @@ func runFilter(args map[string]string, now int64) (query.RunFilter, error) {
 	before := now
 	f := query.RunFilter{
 		JobID:   args["job_id"],
+		SiteID:  args["site_id"],
 		Kind:    model.Kind(args["kind"]),
 		Outcome: model.Outcome(args["outcome"]),
 		Before:  &before,
+	}
+	if err := siteid.Validate(f.SiteID); err != nil {
+		return f, err
 	}
 	if err := validKind(args["kind"]); err != nil {
 		return f, err

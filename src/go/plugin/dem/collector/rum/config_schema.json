@@ -278,6 +278,16 @@
             "default": false
           }
         }
+      },
+      "site_id": {
+        "title": "Site ID",
+        "description": "Groups this job with other DEM jobs for the same site. Leave empty to keep the job unassigned.",
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^([a-z0-9][a-z0-9_-]{0,63})?$",
+        "default": ""
       }
     },
     "required": [
@@ -502,6 +512,7 @@
           "title": "Site",
           "fields": [
             "name",
+            "site_id",
             "display_name",
             "allowed_origins",
             "public_url"

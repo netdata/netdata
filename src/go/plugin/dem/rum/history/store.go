@@ -5,6 +5,7 @@ package history
 import (
 	"context"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/siteid"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 )
 
@@ -22,6 +23,10 @@ func NewStore(journal *demjournal.Store) *Store {
 // An attempted record must never be blindly replayed.
 func (s *Store) AppendEvent(ctx context.Context, r EventRecord) (bool, error) {
 	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	// Validate grouping at admission; decoded records retain their stored attribution.
+	if err := siteid.Validate(r.SiteID); err != nil {
 		return false, err
 	}
 	if err := validateEvent(r); err != nil {

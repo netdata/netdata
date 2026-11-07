@@ -20,7 +20,7 @@ type liveCursor struct {
 	Sites   map[string]livePosition `json:"sites"`
 }
 
-func (s *Service) Live(ctx context.Context, filter, after string, limit int) ([]LiveEvent, string, error) {
+func (s *Service) Live(ctx context.Context, filter, after string, limit int, siteID string) ([]LiveEvent, string, error) {
 	cursor := liveCursor{
 		Version: 1,
 		Sites:   map[string]livePosition{},
@@ -53,7 +53,7 @@ func (s *Service) Live(ctx context.Context, filter, after string, limit int) ([]
 			delete(cursor.Sites, key)
 		}
 	}
-	err := s.visit(ctx, filter, func(key string, site *rumregistry.Site) {
+	err := s.visit(ctx, filter, siteID, func(key string, site *rumregistry.Site) {
 		pos := cursor.Sites[key]
 		if pos.Generation != site.Generation {
 			pos = livePosition{

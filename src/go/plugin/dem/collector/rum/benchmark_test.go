@@ -44,7 +44,7 @@ func BenchmarkCollect(b *testing.B) {
 				b,
 				json.Unmarshal(
 					[]byte(
-						`{"name":"shop","display_name":"Shop","allowed_origins":["https://example.org"]}`,
+						`{"site_id":"storefront","name":"shop","display_name":"Shop","allowed_origins":["https://example.org"]}`,
 					),
 					&c.Config,
 				),

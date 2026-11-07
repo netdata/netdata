@@ -9,7 +9,21 @@ modules:
             name: RUM Sites
             description: Inspect site setup, sampling, receiver availability and recent activity to diagnose missing
                 browser data.
-            parameters: []
+            parameters:
+              - id: site_id
+                name: site_id
+                description: Filter by the recorded site association. Leave empty for no association filter.
+                type: string
+                required: false
+                default: ''
+                options: []
+              - id: site
+                name: site
+                description: Filter by native site job name. Leave empty to include all sites.
+                type: string
+                required: false
+                default: ''
+                options: []
             returns:
                 description: One admitted site job. The response also includes collector public URL and ingress
                     availability.
@@ -120,6 +134,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Retained capacity-loss evidence; affected measurements are unavailable.
+                  - name: site_id
+                    type: string
+                    unit: ''
+                    description: Recorded site association; empty means unassigned.
             performance: Reads bounded local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -133,6 +151,13 @@ modules:
             description: Compare document-entry pages using recent observed traffic, Web Vital populations and
                 attributed elements.
             parameters:
+              - id: site_id
+                name: site_id
+                description: Filter by the recorded site association. Leave empty for no association filter.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -230,6 +255,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Retained capacity-loss evidence; affected measurements are unavailable.
+                  - name: site_id
+                    type: string
+                    unit: ''
+                    description: Recorded site association; empty means unassigned.
             performance: Reads bounded local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -243,6 +272,13 @@ modules:
             description: Read recent browser events for live activity views, optionally continuing from a previous
                 response.
             parameters:
+              - id: site_id
+                name: site_id
+                description: Filter by the recorded site association. Leave empty for no association filter.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -358,6 +394,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Increasing report revision within this metric or event identity.
+                  - name: site_id
+                    type: string
+                    unit: ''
+                    description: Recorded site association; empty means unassigned.
             performance: Reads bounded local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -371,6 +411,13 @@ modules:
             description: Investigate sampled sessions with retained observations received within a time range, including pages, errors and
                 optional interaction heuristics.
             parameters:
+              - id: site_id
+                name: site_id
+                description: Filter by the recorded site association. Leave empty for no association filter.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -478,6 +525,10 @@ modules:
                     type: timestamp
                     unit: ''
                     description: Last Selected Observation in Unix microseconds; default descending sort.
+                  - name: site_id
+                    type: string
+                    unit: ''
+                    description: Recorded site association; empty means unassigned.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -491,6 +542,13 @@ modules:
             description: Group errors originally received by the Agent in the selected range by fingerprint; select a
                 fingerprint to investigate affected sessions, pages and browsers.
             parameters:
+              - id: site_id
+                name: site_id
+                description: Filter by the recorded site association. Leave empty for no association filter.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -578,6 +636,10 @@ modules:
                     description: Stable row identity scoped to the site; the visible values remain available for
                         filtering.
                     visibility: hidden
+                  - name: site_id
+                    type: string
+                    unit: ''
+                    description: Recorded site association; empty means unassigned.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -591,6 +653,13 @@ modules:
             description: Read the retained event timeline for a session to follow navigation, errors and traced
                 requests.
             parameters:
+              - id: site_id
+                name: site_id
+                description: Filter by the recorded site association. Leave empty for no association filter.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -656,6 +725,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Increasing report revision within this metric or event identity.
+                  - name: site_id
+                    type: string
+                    unit: ''
+                    description: Recorded site association; empty means unassigned.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -708,6 +781,8 @@ modules:
           - name: site
             description: One configured site.
             labels:
+              - name: site_id
+                description: Optional site association; native chart identity remains unchanged.
               - name: display_name
                 description: Optional human-readable site name, present when display_name differs from the native site
                     job name.
@@ -958,6 +1033,8 @@ modules:
           - name: site host
             description: One configured site grouped by host.
             labels:
+              - name: site_id
+                description: Optional site association; native chart identity remains unchanged.
               - name: display_name
                 description: Optional human-readable site name, present when display_name differs from the native site
                     job name.
@@ -994,6 +1071,8 @@ modules:
           - name: site fingerprint
             description: One configured site grouped by fingerprint.
             labels:
+              - name: site_id
+                description: Optional site association; native chart identity remains unchanged.
               - name: display_name
                 description: Optional human-readable site name, present when display_name differs from the native site
                     job name.
@@ -1017,6 +1096,8 @@ modules:
           - name: site browser
             description: One configured site grouped by browser.
             labels:
+              - name: site_id
+                description: Optional site association; native chart identity remains unchanged.
               - name: display_name
                 description: Optional human-readable site name, present when display_name differs from the native site
                     job name.
@@ -1091,6 +1172,8 @@ modules:
           - name: site device
             description: One configured site grouped by device.
             labels:
+              - name: site_id
+                description: Optional site association; native chart identity remains unchanged.
               - name: display_name
                 description: Optional human-readable site name, present when display_name differs from the native site
                     job name.
@@ -1165,6 +1248,8 @@ modules:
           - name: site country
             description: One configured site grouped by country.
             labels:
+              - name: site_id
+                description: Optional site association; native chart identity remains unchanged.
               - name: display_name
                 description: Optional human-readable site name, present when display_name differs from the native site
                     job name.
@@ -1239,6 +1324,8 @@ modules:
           - name: site page
             description: One configured site grouped by page.
             labels:
+              - name: site_id
+                description: Optional site association; native chart identity remains unchanged.
               - name: display_name
                 description: Optional human-readable site name, present when display_name differs from the native site
                     job name.
@@ -1313,6 +1400,8 @@ modules:
           - name: site version
             description: One configured site grouped by version.
             labels:
+              - name: site_id
+                description: Optional site association; native chart identity remains unchanged.
               - name: display_name
                 description: Optional human-readable site name, present when display_name differs from the native site
                     job name.
@@ -1387,6 +1476,8 @@ modules:
           - name: site view
             description: One configured site grouped by view.
             labels:
+              - name: site_id
+                description: Optional site association; native chart identity remains unchanged.
               - name: display_name
                 description: Optional human-readable site name, present when display_name differs from the native site
                     job name.
@@ -1465,6 +1556,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            site_id: storefront
                             allowed_origins: [https://shop.example.org]
                     description: Native charts, session timelines and errors, with country-only location and frustration
                         heuristics disabled. No OTLP receiver is required.
@@ -1472,6 +1564,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            site_id: storefront
                             allowed_origins: [https://shop.example.org]
                             investigate:
                               sample_rate: 0
@@ -1481,6 +1574,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            site_id: storefront
                             allowed_origins: [https://shop.example.org]
                             investigate:
                               sample_rate: 0
@@ -1491,6 +1585,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            site_id: storefront
                             allowed_origins: [https://shop.example.org]
                             event_logs:
                               enabled: true
@@ -1501,6 +1596,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            site_id: storefront
                             allowed_origins: [https://shop.example.org]
                             tracing:
                               enabled: true
@@ -1529,6 +1625,11 @@ modules:
                     group: Site
                     name: name
                     required: true
+                  - default_value: ""
+                    description: Groups this job with other DEM jobs for the same site. Leave empty to keep the job unassigned.
+                    group: Site
+                    name: site_id
+                    required: false
                   - default_value: ""
                     description: Human-readable site name. Leave empty to use the site key.
                     group: Site

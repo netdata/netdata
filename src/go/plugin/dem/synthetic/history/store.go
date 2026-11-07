@@ -22,6 +22,7 @@ func (s *Store) Sync(ctx context.Context) error { return s.journal.Sync(ctx) }
 
 type RunFilter struct {
 	JobID   string
+	SiteID  string
 	Kind    synthetic.Kind
 	Outcome synthetic.Outcome
 	After   int64

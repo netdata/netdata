@@ -18,6 +18,7 @@ type Receiver struct {
 
 // Site contains only the copied observations needed to investigate one site.
 type Site struct {
+	SiteID            string
 	Name, Label       string
 	AllowedOrigins    []string
 	Sampling          Sampling

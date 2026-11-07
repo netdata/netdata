@@ -137,6 +137,49 @@ The four collector modules (the journeys below show them in action):
 | `journey` | One job per journey script (`script` or `script_path`) | Every 900 s, 120 s timeout | Prepared request, registration, metric store |
 | `lighthouse` | One job per audited URL | Every 1800 s, 180 s timeout | Prepared request, registration, metric store |
 
+### Site association
+
+The optional `site_id` on RUM, journey and Lighthouse configurations groups independent jobs. It MUST NOT own native
+configuration, runtime admission, browser workers or cancellation. Empty associations are unassigned, and browser jobs
+MUST NOT require a RUM job to use the same association. The receiver remains process infrastructure.
+
+Keep these identities distinct:
+
+| Identity | Meaning |
+|---|---|
+| Native module and job name | Configuration, lifecycle and framework publication owner |
+| RUM `site` / job name | Beacon route and physical RUM history namespace |
+| Synthetic `kind:name`, run ID | Monitor identity and individual execution/artifact ownership |
+| `site_id` | Explicit logical grouping, independent of all those identities |
+
+Association is copied through observations and persisted at observation/execution time. History queries MUST use the
+stored value, not the current job configuration. Session/error reductions retain both physical identity and association,
+so reassignment cannot merge evidence from different groups. Old records without the optional field remain unassigned.
+Grouping labels MUST NOT become chart-instance identifiers or a new authorization boundary.
+
+Frontend consumers group native desired configurations, then join current Function observations. Active registries alone
+omit disabled and failed-startup jobs. A guided site setup submits ordinary per-job DynCfg operations and presents each
+outcome; there is no atomic site save, parent revision, generated child configuration or shared deletion lifecycle.
+Joins retain Agent/node identity as well as module and job name. Equal site associations on different Agents do not
+create cross-Agent configuration authority, automatic deployment or failover.
+
+### Capacity remains process-owned
+
+Journey and Lighthouse already share the process Executor. Independent configuration owners allow a future shared
+admission coordinator, bounded concurrency and optional site-based fairness without adding parent jobs. Site association
+MUST NOT allocate a separate executor or browser pool. Job retirement must still cancel and drain only its own work.
+
+This association does not improve execution capacity by itself. Current synchronous collection can miss framework ticks
+while a prior run is busy; queueing those calls alone cannot reconstruct missed occurrences. A future central scheduler
+can register independent jobs through their `Run` lifecycle, own due times, and leave metric publication in `Collect`.
+Registration must be cancelled and joined before native predecessor release.
+
+Warm browser reuse additionally needs explicit worker lifetime, runtime leases, per-attempt cancellation and browser
+state cleanup. A live shared worker cannot be considered reaped after each attempt. Preserve verified completion at the
+appropriate boundary and qualify Playwright and Lighthouse separately. The current fail-stop on unverified process
+drainage also stops RUM; independent jobs do not provide process isolation. These are separate execution changes that
+need measurement and validation, not promises made by site grouping.
+
 ## Journey 1: a browser report
 
 A website installs one script tag. From then on, every sampled visitor's browser sends reports to the receiver, and each

@@ -15,6 +15,7 @@ type Job struct {
 	JobID          string         `json:"job_id"`
 	Kind           synthetic.Kind `json:"kind"`
 	Name           string         `json:"name"`
+	SiteID         string         `json:"site_id,omitempty"`
 	Target         string         `json:"target,omitempty"`
 	CadenceSeconds int            `json:"cadence_seconds"`
 	TimeoutSeconds float64        `json:"timeout_seconds"`

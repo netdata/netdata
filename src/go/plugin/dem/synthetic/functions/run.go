@@ -67,6 +67,7 @@ func runDetail(run model.Run) map[string]any {
 	detail := map[string]any{
 		"id":             run.ID,
 		"job_id":         run.JobID,
+		"site_id":        run.SiteID,
 		"kind":           run.Kind,
 		"name":           run.Name,
 		"target":         run.Target,

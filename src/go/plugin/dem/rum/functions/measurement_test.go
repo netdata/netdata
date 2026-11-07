@@ -18,7 +18,7 @@ type measurementSource struct {
 	page query.Page
 }
 
-func (s measurementSource) Pages(context.Context, string) ([]query.Page, error) {
+func (s measurementSource) Pages(context.Context, string, string) ([]query.Page, error) {
 	return []query.Page{s.page}, nil
 }
 
@@ -76,7 +76,7 @@ func (s measurementSiteSource) Receiver() query.Receiver {
 		Serving: s.serving,
 	}
 }
-func (s measurementSiteSource) Sites(context.Context) ([]query.Site, error) {
+func (s measurementSiteSource) Sites(context.Context, string) ([]query.Site, error) {
 	return []query.Site{{Name: "shop", Sampling: query.Sampling{
 		MeasureRate: s.rate,
 	}, Activity: query.Activity{

@@ -97,6 +97,11 @@ modules:
             enabled: true
             title: Configuration options
           list:
+            - name: site_id
+              description: Groups this job with other DEM jobs for the same site. Leave empty to keep the job unassigned.
+              default_value: ''
+              required: false
+              group: General
             - name: name
               description: Native job name used to identify this monitor and its history. Renaming creates
                 a separate monitor.
@@ -131,7 +136,7 @@ modules:
           list:
             - name: Monitor a home page
               description: Create one native browser monitor after preparing the runtime.
-              config: "jobs:\n  - name: home\n    url: https://example.org/\n"
+              config: "jobs:\n  - name: home\n    site_id: example-site\n    url: https://example.org/\n"
     troubleshooting:
       problems:
         list:
@@ -150,7 +155,9 @@ modules:
       scopes:
         - name: job
           description: One configured native browser monitor.
-          labels: []
+          labels:
+            - name: site_id
+              description: Configured site association; absent for unassigned jobs.
           metrics:
             - name: dem_synthetic.execution_state
               description: Synthetic attempt outcome
@@ -203,6 +210,13 @@ modules:
             and failed-startup configuration remains in native job status. Freshness belongs to the last observation,
             independently of a waiting or running attempt.
           parameters:
+            - id: site_id
+              name: Site (`site_id`)
+              description: Filter by the recorded site association. Leave empty to include all sites and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: job_id
               name: Monitor (`job_id`)
               description: Native module and job name, such as journey:checkout. Leave empty to include all
@@ -286,6 +300,10 @@ modules:
                 type: string
                 unit: ''
                 description: History error.
+              - name: site_id
+                type: string
+                unit: ''
+                description: Site ID. Empty means unassigned.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -304,6 +322,13 @@ modules:
             second or accept negative offsets from now; omitted bounds cover retained history through now.
             Results are capped at 2000 and disclose truncation.
           parameters:
+            - id: site_id
+              name: Site (`site_id`)
+              description: Filter by the recorded site association. Leave empty to include all sites and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: job_id
               name: Monitor (`job_id`)
               description: Native module and job name, such as journey:checkout. Leave empty to include all
@@ -404,6 +429,10 @@ modules:
                 type: string
                 unit: ''
                 description: History error.
+              - name: site_id
+                type: string
+                unit: ''
+                description: Site ID. Empty means unassigned.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -497,6 +526,13 @@ modules:
             Journey recovery without a screenshot leaves its previous failure capture eligible. Disabled or
             deleted monitors keep the same preference; renamed monitors form separate groups.
           parameters:
+            - id: site_id
+              name: Site (`site_id`)
+              description: Filter by the recorded site association. Leave empty to include all sites and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: job_id
               name: Monitor (`job_id`)
               description: Exact native module and job name to filter captures, such as journey:checkout. Leave
@@ -547,6 +583,10 @@ modules:
                 type: integer
                 unit: ''
                 description: Number of captures in the set.
+              - name: site_id
+                type: string
+                unit: ''
+                description: Site ID. Empty means unassigned.
           performance: Reads local capture metadata and file sizes without reading capture contents or starting a browser.
           security: Requires member-equivalent access. Exposes monitor identities and capture metadata, not capture contents.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse jobs

@@ -3,6 +3,8 @@ context_namespace: dem_synthetic
 groups:
   - family: Execution
     metrics: [execution_state, duration]
+    chart_defaults:
+      label_promotion: [site_id]
     charts:
       - context: execution_state
         title: Synthetic attempt outcome
@@ -19,6 +21,8 @@ groups:
   - family: Desktop lab performance
     context_namespace: lighthouse
     metrics: [performance, fcp, lcp, tbt, si, cls]
+    chart_defaults:
+      label_promotion: [site_id]
     charts:
       - context: performance
         title: Lighthouse performance score

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/siteid"
+
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
@@ -14,15 +16,16 @@ import (
 var artifactsMethod = method{
 	id:     "synthetics-artifacts",
 	title:  "Retained synthetic captures",
-	help:   "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–2000. Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance.",
+	help:   "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–2000. Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional site_id selects the recorded association; empty means all sites, and blank Site ID cells are unassigned.",
 	sort:   "published_us",
-	params: []string{"job_id", "before", "limit"},
+	params: []string{"job_id", "before", "limit", "site_id"},
 	columns: columns(
 		column{"run_id", "Run", funcapi.FieldTypeString, ""},
 		column{"job_id", "Monitor", funcapi.FieldTypeString, ""},
 		column{"published_us", "Published", funcapi.FieldTypeTimestamp, ""},
 		column{"bytes", "Set size", funcapi.FieldTypeInteger, "bytes"},
 		column{"artifact_count", "Artifacts", funcapi.FieldTypeInteger, ""},
+		column{"site_id", "Site ID", funcapi.FieldTypeString, ""},
 	),
 }
 
@@ -31,6 +34,9 @@ func (h *Handler) artifacts(
 	args map[string]string,
 	response map[string]any,
 ) *funcapi.FunctionResponse {
+	if err := siteid.Validate(args["site_id"]); err != nil {
+		return funcapi.ErrorResponse(400, "%v", err)
+	}
 	limit, err := rowLimit(args["limit"])
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
@@ -41,6 +47,7 @@ func (h *Handler) artifacts(
 	}
 	page, err := h.deps.Catalogue(ctx, artifacts.Filter{
 		JobID:  args["job_id"],
+		SiteID: args["site_id"],
 		Before: cursor,
 		Limit:  limit,
 	})
@@ -49,7 +56,7 @@ func (h *Handler) artifacts(
 	}
 	rows := make([][]any, 0, len(page.Sets))
 	for _, set := range page.Sets {
-		rows = append(rows, []any{set.RunID, set.JobID, set.PublishedUS, set.Bytes, set.Artifacts})
+		rows = append(rows, []any{set.RunID, set.JobID, set.PublishedUS, set.Bytes, set.Artifacts, set.SiteID})
 	}
 	response["data"] = rows
 	response["limit"] = limit

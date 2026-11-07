@@ -12,6 +12,7 @@ import (
 	"io"
 	"io/fs"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/siteid"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
@@ -113,7 +114,7 @@ func (s *Store) readManifest(id string) (manifest, error) {
 	if err != nil {
 		return manifest{}, err
 	}
-	if m.Version != 2 || m.RunID != id || !validJobID(m.JobID) || m.PublishedUS <= 0 || len(m.Artifacts) == 0 {
+	if siteid.Validate(m.SiteID) != nil || m.Version != 2 || m.RunID != id || !validJobID(m.JobID) || m.PublishedUS <= 0 || len(m.Artifacts) == 0 {
 		return manifest{}, fmt.Errorf("invalid artifact manifest")
 	}
 	ids := make(map[string]bool)

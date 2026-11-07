@@ -794,3 +794,41 @@ type fixtureUse struct{ paths Paths }
 func (u fixtureUse) Paths() Paths                       { return u.paths }
 func (u fixtureUse) Completion() *ndexec.TreeCompletion { return nil }
 func (u fixtureUse) Finish(bool) error                  { return nil }
+
+func TestExecutionSnapshotsAssociationBeforeLaunchAndThroughCompletion(t *testing.T) {
+	for _, prelaunch := range []bool{true, false} {
+		t.Run(fmt.Sprint(prelaunch), func(t *testing.T) {
+			engine, history, _ := testEngine(t)
+			request := journey()
+			request.SiteID = "storefront"
+			if prelaunch {
+				engine.platform = func() error { return errors.New("unavailable runtime") }
+			} else {
+				engine.start = starter(t, resultPayload(success()))
+			}
+			execution := engine.Execute(context.Background(), request, nil)
+			require.True(t, execution.Drained)
+			assert.Equal(t, "journey:checkout", execution.Run.JobID)
+			assert.Equal(t, "storefront", execution.Run.SiteID)
+			request.SiteID = "moved"
+			assert.Equal(t, "storefront", execution.Run.SiteID)
+			for _, run := range history.runs {
+				assert.Equal(t, "storefront", run.SiteID)
+			}
+			if prelaunch {
+				assert.Equal(t, synthetic.Error, execution.Run.Outcome)
+			} else {
+				assert.Equal(t, synthetic.Success, execution.Run.Outcome)
+				assert.Len(t, history.runs, 2)
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	engine, _, _ := testEngine(t)
+	request := journey()
+	request.SiteID = "storefront"
+	result := engine.Execute(ctx, request, nil)
+	assert.Equal(t, synthetic.Cancelled, result.Run.Outcome)
+	assert.Equal(t, "storefront", result.Run.SiteID)
+}

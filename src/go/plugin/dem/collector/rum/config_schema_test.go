@@ -161,3 +161,26 @@ func TestCaptureFormAndRuntimeValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestSiteAssociationFormValidation(t *testing.T) {
+	var bundle map[string]any
+	require.NoError(t, json.Unmarshal([]byte(schema), &bundle))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("rum.json", bundle["jsonSchema"]))
+	form, err := compiler.Compile("rum.json")
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		value any
+		valid bool
+	}{
+		{nil, true}, {"", true}, {"storefront-1_web", true}, {"Upper", false}, {"_first", false}, {"site.name", false}, {64, false},
+	} {
+		input := map[string]any{"name": "job", "allowed_origins": []any{"https://example.org"}, "site_id": tc.value}
+		err := form.Validate(input)
+		if tc.valid {
+			assert.NoError(t, err)
+		} else {
+			assert.Error(t, err)
+		}
+	}
+}

@@ -3,6 +3,8 @@ context_namespace: dem_synthetic
 groups:
   - family: Execution
     metrics: [execution_state, duration]
+    chart_defaults:
+      label_promotion: [site_id]
     charts:
       - context: execution_state
         title: Synthetic attempt outcome
@@ -19,6 +21,8 @@ groups:
   - family: Tests
     context_namespace: journey
     metrics: [tests_declared, tests_passed, tests_failed, tests_timed_out, tests_skipped, tests_expected_failure, tests_not_run]
+    chart_defaults:
+      label_promotion: [site_id]
     charts:
       - context: declared_tests
         title: Declared journey tests

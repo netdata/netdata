@@ -362,3 +362,37 @@ func TestMeasurementPublicationDistinguishesMissingAndLiteralUnknownHost(t *test
 	require.Len(t, ids, 2)
 	require.NotEqual(t, ids["unknown"], ids["value"])
 }
+
+func TestSiteAssociationPromotesChartLabelsWithoutChangingIdentity(t *testing.T) {
+	ctx := context.Background()
+	db, err := demjournal.Open(ctx, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	hub := registry.New()
+	t.Cleanup(hub.PublishReceiver(registry.Availability{Serving: true}).Close)
+	var baseline []string
+	for _, group := range []string{"", "storefront", "checkout"} {
+		c := New(Dependencies{Registry: hub, History: history.NewStore(db)})
+		c.Name, c.SiteID, c.DisplayName = "job", group, "Readable job"
+		c.AllowedOrigins = []string{"https://example.org"}
+		require.NoError(t, c.Init(ctx))
+		c.aggregator.Ingest(&beacon.Beacon{Site: "job", SessionID: "session", ExperienceID: "document", PageGroup: "/entry", Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}}, Vitals: []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}}})
+		collectMeasurements(t, c)
+		charts := measurementCharts(t, c)
+		require.NotEmpty(t, charts)
+		var identities []string
+		for _, chart := range charts {
+			identities = append(identities, chart.ChartID)
+			require.Equal(t, group, chart.Labels["site_id"])
+			require.Equal(t, "Readable job", chart.Labels["display_name"])
+			if group == "" {
+				require.NotContains(t, chart.Labels, "site_id")
+			}
+		}
+		if baseline == nil {
+			baseline = identities
+		} else {
+			require.ElementsMatch(t, baseline, identities, "site association is metadata, never chart identity")
+		}
+	}
+}

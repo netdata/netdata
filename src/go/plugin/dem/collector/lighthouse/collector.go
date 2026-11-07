@@ -22,6 +22,7 @@ var charts string
 var schema string
 
 type Config struct {
+	SiteID      string           `yaml:"site_id,omitempty" json:"site_id,omitempty"`
 	Name        string           `yaml:"name"         json:"name"`
 	UpdateEvery int              `yaml:"update_every" json:"update_every"`
 	Timeout     confopt.Duration `yaml:"timeout"      json:"timeout"`

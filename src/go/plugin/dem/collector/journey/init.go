@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/attemptmetrics"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
@@ -29,6 +31,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 	request := model.Request{
 		Kind:       model.Journey,
+		SiteID:     c.SiteID,
 		Name:       c.Name,
 		Script:     c.Script,
 		ScriptPath: c.ScriptPath,
@@ -54,6 +57,12 @@ func (c *Collector) Init(ctx context.Context) error {
 			return errors.New("script_path must reference a regular file")
 		}
 	}
+	meter := c.store.Write().SnapshotMeter("")
+	if request.SiteID != "" {
+		meter = meter.WithLabels(metrix.Label{Key: "site_id", Value: request.SiteID})
+	}
+	c.attempt = attemptmetrics.New(meter)
+	c.metrics = newMetrics(meter)
 	c.request = request
 	c.initialized = true
 	return nil

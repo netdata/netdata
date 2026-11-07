@@ -5,6 +5,7 @@ package config
 // Site is one monitored web property. AllowedOrigins is required
 // Native job admission determines whether its endpoints exist.
 type Site struct {
+	SiteID         string   `yaml:"site_id" json:"site_id"`
 	Name           string   `yaml:"name"                          json:"name"`
 	DisplayName    string   `yaml:"display_name"                  json:"display_name"`
 	AllowedOrigins []string `yaml:"allowed_origins"               json:"allowed_origins"`

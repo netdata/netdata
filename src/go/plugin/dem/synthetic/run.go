@@ -63,6 +63,7 @@ type Run struct {
 	JobID         string           `json:"job_id"`
 	Kind          Kind             `json:"kind"`
 	Name          string           `json:"name"`
+	SiteID        string           `json:"site_id,omitempty"`
 	Target        string           `json:"target,omitempty"`
 	StartedUS     int64            `json:"started_us"`
 	CompletedUS   int64            `json:"completed_us"`

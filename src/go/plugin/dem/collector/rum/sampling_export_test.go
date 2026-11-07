@@ -147,11 +147,11 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 			}
 			assert.Equal(t, observations, documents)
 			assert.Equal(t, 1, errorsLive)
-			rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10)
+			rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
 			require.NoError(t, err)
-			timeline, err := store.QuerySessionEvents(context.Background(), "shop", session)
+			timeline, err := store.QuerySessionEvents(context.Background(), "shop", session, "")
 			require.NoError(t, err)
-			errors, err := store.QueryErrors(context.Background(), "shop", "", 0, time.Now().Unix()+10)
+			errors, err := store.QueryErrors(context.Background(), "shop", "", 0, time.Now().Unix()+10, "")
 			require.NoError(t, err)
 			if !tc.promote {
 				assert.Empty(t, rows)

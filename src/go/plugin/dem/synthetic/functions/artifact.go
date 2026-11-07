@@ -40,7 +40,7 @@ func (h *Handler) artifact(
 	if errors.Is(err, query.ErrExpired) {
 		return funcapi.RawResponse(map[string]any{
 			"status": 404, "errorMessage": err.Error(), "capture_state": evidence.CaptureState,
-			"job_id": evidence.JobID, "run_id": evidence.RunID,
+			"job_id": evidence.JobID, "run_id": evidence.RunID, "site_id": evidence.SiteID,
 		})
 	}
 	if err != nil {
@@ -49,6 +49,7 @@ func (h *Handler) artifact(
 	response["capture_state"] = evidence.CaptureState
 	response["run_id"] = evidence.RunID
 	response["job_id"] = evidence.JobID
+	response["site_id"] = evidence.SiteID
 	rows := make([][]any, 0, len(evidence.Artifacts))
 	for _, item := range evidence.Artifacts {
 		rows = append(rows, []any{item.ID, item.Kind, item.MIME, item.Bytes, item.SHA256, item.Availability})

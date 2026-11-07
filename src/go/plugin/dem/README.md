@@ -11,6 +11,55 @@ The stock configuration starts one loopback receiver and no sites. Configuration
 object (`dem:collector:receiver`); each site is an independent job (`dem:collector:rum:<name>`). Native `name` is the
 stable beacon/history key; `display_name` is presentation metadata. Renaming a site starts a new history namespace.
 
+## Group monitors by site
+
+Set the same optional `site_id` on RUM, journey and Lighthouse jobs that monitor one website. For example, use
+`storefront` for its RUM job, checkout and login journeys, and homepage audit; use `documentation` for the documentation
+RUM job and search journey. The receiver remains shared infrastructure and has no site association.
+The association is configured on each Agent; using the same value on another Agent does not deploy or move jobs there.
+
+`site_id` is a grouping identifier of 1–64 lowercase letters, digits, underscores or hyphens, starting with a letter or
+digit. Omission or an empty value leaves the job unassigned. It is independent of the job's `name`, a RUM job's
+`display_name`, and website URLs. A synthetic-only site needs no RUM job or receiver. Jobs still need distinct names
+within their collector module, including when they belong to different sites.
+
+For example, these entries associate two independent jobs with Storefront:
+
+```yaml
+# dem/rum.conf
+jobs:
+  - name: storefront-rum
+    site_id: storefront
+    display_name: Storefront
+    allowed_origins: [https://shop.example.org]
+```
+
+```yaml
+# dem/journey.conf
+jobs:
+  - name: storefront-checkout
+    site_id: storefront
+    script_path: /etc/netdata/dem/checkout.spec.ts
+    update_every: 300
+    timeout: 120
+```
+
+The RUM installation key in this example is still `storefront-rum`, so its script URL ends in
+`/rum/storefront-rum.js`. Grouping does not rename beacon endpoints or change which origins may send data.
+
+Each job keeps its own configuration, DynCfg entry, schedule, secrets and enable/disable controls. Editing checkout
+does not edit login or RUM. Site-oriented authoring can guide several normal job operations, but those operations are
+independent: a partial success must show which jobs succeeded and which need attention. File configuration remains in
+the usual collector files; there is no separate site configuration owner or implicit inheritance between jobs.
+
+Chart labels and DEM Functions expose `site_id` for grouping. Existing RUM `site` fields and selectors still identify
+the RUM job; `site_id` identifies its logical group. Retained observations, synthetic runs and captures keep the
+association recorded when they were produced. Changing a job's association does not move its old evidence. Older
+records without an association remain unassigned. Site grouping does not combine RUM populations or authorize access
+to another job's artifacts.
+
+## Receive browser reports
+
 Expose the receiver through HTTPS, configure its public URL and actual trusted proxy addresses, then install
 `<script async src="https://rum.example.org/rum/shop.js"></script>` on the configured website. Public URLs may include a
 reverse-proxy path prefix. The receiver serves the pinned Faro 2.11.0 SDK and optional tracing bundle; visitors need no

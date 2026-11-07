@@ -12,16 +12,16 @@ import (
 var pagesMethod = method{
 	id:      "rum-pages",
 	title:   "RUM Pages",
-	help:    "All retained document-entry groups in the receipt window, including groups outside chart top-N. Vitals use the latest report per document experience; sample counts describe retained populations and loss counts conservatively flag possible incompleteness. Percentiles, activity counts and session counts are null when capacity loss makes them incomplete. Sessions are observed browser identities, not people or concurrency. Frustration signals are unavailable when capture is disabled",
+	help:    "Optional site_id groups jobs independently of the physical site job key; empty means no group filter. All retained document-entry groups in the receipt window, including groups outside chart top-N. Vitals use the latest report per document experience; sample counts describe retained populations and loss counts conservatively flag possible incompleteness. Percentiles, activity counts and session counts are null when capacity loss makes them incomplete. Sessions are observed browser identities, not people or concurrency. Frustration signals are unavailable when capture is disabled",
 	sort:    "pageviews_window",
 	every:   10,
 	columns: rumPagesColumns,
-	params:  []string{"site"},
+	params:  []string{"site", "site_id"},
 }
 
-func (h *Handler) pagesRows(ctx context.Context, site string) (rows [][]any, err error) {
+func (h *Handler) pagesRows(ctx context.Context, site, siteID string) (rows [][]any, err error) {
 	var pages []query.Page
-	pages, err = h.deps.Pages(ctx, site)
+	pages, err = h.deps.Pages(ctx, site, siteID)
 	for _, p := range pages {
 		rows = append(
 			rows,
@@ -46,7 +46,7 @@ func (h *Handler) pagesRows(ctx context.Context, site string) (rows [][]any, err
 				p.Vitals[beacon.INP].Lost,
 				p.Vitals[beacon.CLS].Lost,
 				p.Lost,
-				p.SessionsLost,
+				p.SessionsLost, p.SiteID,
 			},
 		)
 	}
@@ -55,6 +55,7 @@ func (h *Handler) pagesRows(ctx context.Context, site string) (rows [][]any, err
 }
 
 var rumPagesColumns = map[string]any{
+	"site_id": (funcapi.Column{Index: 21, Name: "Site ID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
 	"row_id": (funcapi.Column{
 		Index:         12,
 		Name:          "Row ID",

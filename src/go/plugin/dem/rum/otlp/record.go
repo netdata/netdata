@@ -106,6 +106,7 @@ func baseAttrs(b *beacon.Beacon) []*commonpb.KeyValue {
 			out = append(out, strAttr(k, v))
 		}
 	}
+	add("dem.site_id", b.SiteID)
 	add("session.id", b.SessionID)
 	add("document.experience.id", b.ExperienceID)
 	add("application.view.id", b.ViewID)

@@ -8,10 +8,10 @@ import (
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
-func (s *Service) Sites(ctx context.Context) ([]Site, error) {
+func (s *Service) Sites(ctx context.Context, siteID string) ([]Site, error) {
 	var out []Site
 	state := s.registry.Availability()
-	err := s.visit(ctx, "", func(key string, site *rumregistry.Site) {
+	err := s.visit(ctx, "", siteID, func(key string, site *rumregistry.Site) {
 		cfg := site.Route.Config()
 		publicBase := cfg.PublicURL
 		if publicBase == "" {
@@ -33,6 +33,7 @@ func (s *Service) Sites(ctx context.Context) ([]Site, error) {
 			out,
 			Site{
 				Name:           cfg.Name,
+				SiteID:         cfg.SiteID,
 				Label:          cfg.Label(),
 				AllowedOrigins: cfg.AllowedOrigins,
 				Sampling: Sampling{
@@ -58,9 +59,9 @@ func (s *Service) Sites(ctx context.Context) ([]Site, error) {
 	})
 	return out, err
 }
-func (s *Service) Pages(ctx context.Context, filter string) ([]Page, error) {
+func (s *Service) Pages(ctx context.Context, filter, siteID string) ([]Page, error) {
 	var out []Page
-	err := s.visit(ctx, filter, func(key string, site *rumregistry.Site) {
+	err := s.visit(ctx, filter, siteID, func(key string, site *rumregistry.Site) {
 		rows := site.Aggregator.Pages()
 		redact := siteRedactor(site)
 		for i := range rows {

@@ -47,7 +47,7 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	b.View, b.ViewID = "payment", "view-two"
 	b.Vitals[0].Revision, b.Vitals[0].Value = 2, 0.5
 	owner.Ingest(b)
-	pages, err := service.Pages(ctx, "shop")
+	pages, err := service.Pages(ctx, "shop", "")
 	require.NoError(t, err)
 	require.Len(t, pages, 1)
 	require.Equal(t, "/entry", pages[0].Page)
@@ -55,7 +55,7 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	require.Equal(t, 1, pages[0].Sessions)
 	require.Equal(t, 1, pages[0].Vitals[beacon.CLS].N)
 	require.Equal(t, 0.5, pages[0].Vitals[beacon.CLS].P75)
-	sites, err := service.Sites(ctx)
+	sites, err := service.Sites(ctx, "")
 	require.NoError(t, err)
 	require.Equal(t, 1, sites[0].Activity.ObservedSessions)
 	require.EqualValues(t, 1, sites[0].Activity.ApplicationViewsWindow)
@@ -75,19 +75,19 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 		}
 	}
 	require.Equal(t, []uint64{1, 2}, updates)
-	pending, err := service.SessionEvents(ctx, "shop", "session")
+	pending, err := service.SessionEvents(ctx, "shop", "session", "")
 	require.NoError(t, err)
 	flush, cancel := context.WithCancel(ctx)
 	cancel()
 	writer.Run(flush)
-	persisted, err := service.SessionEvents(ctx, "shop", "session")
+	persisted, err := service.SessionEvents(ctx, "shop", "session", "")
 	require.NoError(t, err)
 	require.Equal(t, pending, persisted, "journal overlap must include all identity fields")
 	retire()
-	afterRetirement, err := service.SessionEvents(ctx, "shop", "session")
+	afterRetirement, err := service.SessionEvents(ctx, "shop", "session", "")
 	require.NoError(t, err)
 	require.Equal(t, pending, afterRetirement)
-	sessions, err := service.Sessions(ctx, "shop", "", 0, now.Unix()+5)
+	sessions, err := service.Sessions(ctx, "shop", "", 0, now.Unix()+5, "")
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	require.EqualValues(t, 1, sessions[0].Pageviews)
@@ -118,14 +118,14 @@ func TestPagesExposeRetainedGroupsBeyondChartTopNAndWindowedSessions(t *testing.
 		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "expired", Revision: 1}},
 	})
 	service := query.New(hub, nil)
-	pages, err := service.Pages(context.Background(), "shop")
+	pages, err := service.Pages(context.Background(), "shop", "")
 	require.NoError(t, err)
 	require.Len(t, pages, 25, "chart top-N is 20 but Functions must expose all retained groups")
 	for _, page := range pages {
 		require.Equal(t, 1, page.Sessions)
 		require.Equal(t, 1, page.PageviewsWindow)
 	}
-	sites, err := service.Sites(context.Background())
+	sites, err := service.Sites(context.Background(), "")
 	require.NoError(t, err)
 	require.Equal(t, 25, sites[0].Activity.ObservedSessions)
 }

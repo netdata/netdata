@@ -41,6 +41,9 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 		if runID == "" && (run.StartedUS/1000000 < f.After || run.StartedUS/1000000 > before) {
 			return nil
 		}
+		if f.SiteID != "" && run.SiteID != f.SiteID {
+			return nil
+		}
 		if f.Kind != "" && run.Kind != f.Kind {
 			return nil
 		}
@@ -72,7 +75,7 @@ func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, err
 			return err
 		}
 		switch name := string(key); name {
-		case "DEM_PHASE", "DEM_JOB_ID", "DEM_RUN_ID", "DEM_DATA":
+		case "DEM_PHASE", "DEM_JOB_ID", "DEM_RUN_ID", "DEM_DATA", "DEM_SITE_ID":
 			if _, exists := values[name]; exists {
 				return fmt.Errorf("duplicate synthetic history field %s", name)
 			}
@@ -95,6 +98,9 @@ func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, err
 	var run synthetic.Run
 	if err := json.Unmarshal([]byte(values["DEM_DATA"]), &run); err != nil {
 		return "", run, false, fmt.Errorf("decode synthetic history: %w", err)
+	}
+	if site, present := values["DEM_SITE_ID"]; present && site != run.SiteID {
+		return "", run, false, fmt.Errorf("synthetic journal site association mismatch")
 	}
 	phase := values["DEM_PHASE"]
 	if (phase != "start" && phase != "complete") || run.ID != values["DEM_RUN_ID"] || run.JobID != values["DEM_JOB_ID"] || run.StartedUS != started {

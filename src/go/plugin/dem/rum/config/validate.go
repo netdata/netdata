@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/siteid"
 )
 
 var tracingHostRe = regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.?$`)
@@ -41,6 +43,9 @@ func tracingAddress(raw string, destination bool) bool {
 // shared by file config and dynamic configuration.
 func ValidateSiteExtras(s Site) []string {
 	var errs []string
+	if err := siteid.Validate(s.SiteID); err != nil {
+		errs = append(errs, err.Error())
+	}
 	switch s.GeolocationMode() {
 	case GeolocationOff, GeolocationCountry, GeolocationCity:
 	default:

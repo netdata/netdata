@@ -15,11 +15,11 @@ import (
 // redactors additionally guard output using the current configured credentials.
 func (s *Service) redactors(ctx context.Context) (map[string]*redact.Redactor, error) {
 	out := map[string]*redact.Redactor{}
-	err := s.visit(ctx, "", func(key string, site *rumregistry.Site) { out[key] = siteRedactor(site) })
+	err := s.visit(ctx, "", "", func(key string, site *rumregistry.Site) { out[key] = siteRedactor(site) })
 	return out, err
 }
-func (s *Service) Sessions(ctx context.Context, site, userID string, after, before int64) ([]Session, error) {
-	rows, err := s.history.QuerySessions(ctx, site, userID, after, before, 2000)
+func (s *Service) Sessions(ctx context.Context, site, userID string, after, before int64, siteID string) ([]Session, error) {
+	rows, err := s.history.QuerySessions(ctx, site, userID, after, before, 2000, siteID)
 	if err != nil {
 		return nil, err
 	}
@@ -46,16 +46,19 @@ func (s *Service) Sessions(ctx context.Context, site, userID string, after, befo
 	}
 	return out, err
 }
-func (s *Service) SessionEvents(ctx context.Context, site, session string) ([]SessionEvent, error) {
+func (s *Service) SessionEvents(ctx context.Context, site, session, siteID string) ([]SessionEvent, error) {
 	// Copy the bounded active ring before journal I/O, releasing leases before any I/O.
 	// A retiring generation can then flush while this query reads persisted data.
 	var live []history.SessionEventRecord
 	redactors := map[string]*redact.Redactor{}
-	err := s.visit(ctx, site, func(key string, runtime *rumregistry.Site) {
+	err := s.visit(ctx, site, "", func(key string, runtime *rumregistry.Site) {
 		redact := siteRedactor(runtime)
 		redactors[key] = redact
 		events, _ := runtime.Aggregator.SessionEvents(session)
 		for _, event := range events {
+			if siteID != "" && event.SiteID != siteID {
+				continue
+			}
 			row := history.SessionEventRecord{
 				ExperienceID: event.ExperienceID,
 				View:         event.View,
@@ -64,6 +67,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session string) ([]Se
 				Revision:     event.Revision,
 
 				Site:       key,
+				SiteID:     event.SiteID,
 				SessionID:  session,
 				ObservedUS: event.TS.UnixMicro(),
 				Type:       event.Type,
@@ -79,7 +83,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session string) ([]Se
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.history.QuerySessionEvents(ctx, site, session)
+	rows, err := s.history.QuerySessionEvents(ctx, site, session, siteID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +122,9 @@ func (s *Service) Errors(
 	ctx context.Context,
 	site, fingerprint string,
 	after, before int64,
+	siteID string,
 ) ([]ErrorGroup, error) {
-	rows, err := s.history.QueryErrors(ctx, site, fingerprint, after, before)
+	rows, err := s.history.QueryErrors(ctx, site, fingerprint, after, before, siteID)
 	if err != nil {
 		return nil, err
 	}

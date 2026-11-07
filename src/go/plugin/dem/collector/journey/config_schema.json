@@ -10,6 +10,16 @@
         "type": "string",
         "minLength": 1
       },
+      "site_id": {
+        "title": "Site ID",
+        "description": "Groups this job with other DEM jobs for the same site. Leave empty to keep the job unassigned.",
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^([a-z0-9][a-z0-9_-]{0,63})?$",
+        "default": ""
+      },
       "script": {
         "title": "Script",
         "description": "Inline Playwright Test JavaScript or TypeScript source. Leave empty when using Script path.",
@@ -91,7 +101,7 @@
               "maxLength": 0
             },
             "script": {
-              "pattern": "[^\\t\\n\\v\\f\\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+              "pattern": "[^\\t\\n\\v\\f\\r    -     　]"
             }
           }
         },
@@ -112,6 +122,12 @@
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
+        {
+          "title": "General",
+          "fields": [
+            "site_id"
+          ]
+        },
         {
           "title": "Journey",
           "fields": [
@@ -154,6 +170,10 @@
           "ui:widget": "password"
         }
       }
+    },
+    "site_id": {
+      "ui:help": "Use the same ID across independent RUM, journey and Lighthouse jobs to group a site. The ID does not replace the job name or require a RUM job. Use 1–64 lowercase letters, digits, underscores or hyphens, starting with a letter or digit.",
+      "ui:placeholder": "storefront"
     }
   }
 }

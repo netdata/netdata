@@ -57,6 +57,7 @@ func (s *Store) inventory(ctx context.Context) ([]Set, Inventory) {
 			sets,
 			Set{
 				JobID:       m.JobID,
+				SiteID:      m.SiteID,
 				RunID:       id,
 				PublishedUS: m.PublishedUS,
 				Bytes:       size,

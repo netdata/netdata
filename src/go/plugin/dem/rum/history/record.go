@@ -14,6 +14,7 @@ import (
 // EventRecord is an immutable self-contained investigation event. ObservedUS
 // is Agent receipt time, preserved through delayed promotion and persistence.
 type EventRecord struct {
+	SiteID                                       string
 	ExperienceID, View, ViewID, MetricID         string
 	Revision                                     uint64
 	Site, SessionID                              string
@@ -27,6 +28,7 @@ type EventRecord struct {
 // StartedAt and LastAt are seconds; LastObservedUS preserves ordering precision.
 // UserIDs are the sorted distinct nonempty IDs on those events, not session ownership.
 type SessionRecord struct {
+	SiteID                              string
 	Site, SessionID                     string
 	StartedAt, LastAt                   int64
 	LastObservedUS                      int64
@@ -38,6 +40,7 @@ type SessionRecord struct {
 }
 
 type SessionEventRecord struct {
+	SiteID                               string
 	ExperienceID, View, ViewID, MetricID string
 	Revision                             uint64
 	Site, SessionID                      string
@@ -49,6 +52,7 @@ type SessionEventRecord struct {
 // selected fingerprint; otherwise SessionsAffected, TopPage and Browsers are
 // unset and must be displayed as unavailable, not as measured zeroes.
 type ErrorGroup struct {
+	SiteID                                        string
 	Site, Fingerprint, Type, Message, SampleStack string
 	CountWindow, SessionsAffected                 int
 	FirstSeen, LastSeen                           int64
@@ -65,7 +69,7 @@ func eventFields(r EventRecord) []journal.Field {
 	}
 	for _, field := range []struct{ name, value string }{
 		{"DEM_EXPERIENCE_ID", r.ExperienceID}, {"DEM_VIEW", r.View}, {"DEM_VIEW_ID", r.ViewID}, {"DEM_METRIC_ID", r.MetricID},
-		{"DEM_SITE", r.Site}, {"DEM_SESSION_ID", r.SessionID}, {"DEM_TYPE", r.Type},
+		{"DEM_SITE_ID", r.SiteID}, {"DEM_SITE", r.Site}, {"DEM_SESSION_ID", r.SessionID}, {"DEM_TYPE", r.Type},
 		{"DEM_PAGE", r.Page}, {"DEM_TEXT", r.Text}, {"DEM_TRACE_ID", r.TraceID},
 		{"DEM_BROWSER", r.Browser}, {"DEM_DEVICE", r.Device}, {"DEM_COUNTRY", r.Country},
 		{"DEM_VERSION", r.Version}, {"DEM_USER_ID", r.UserID},
@@ -87,7 +91,8 @@ func eventFields(r EventRecord) []journal.Field {
 }
 
 // Read callback-scoped payloads directly and retain only domain strings.
-func decodeEvent(entry *journal.SnapshotEntry) (EventRecord, bool, error) {
+// previousSiteID already owns its bytes and can safely outlive the callback.
+func decodeEvent(entry *journal.SnapshotEntry, previousSiteID string) (EventRecord, bool, error) {
 	var r EventRecord
 	var envelope demjournal.Envelope
 	var revision string
@@ -115,6 +120,14 @@ func decodeEvent(entry *journal.SnapshotEntry) (EventRecord, bool, error) {
 		case "DEM_METRIC_ID":
 			bit = 1 << 4
 			r.MetricID = string(value)
+		case "DEM_SITE_ID":
+			bit = 1 << 20
+			// Reuse the prior owned string when adjacent records share grouping.
+			if string(value) == previousSiteID {
+				r.SiteID = previousSiteID
+			} else {
+				r.SiteID = string(value)
+			}
 		case "DEM_SITE":
 			bit = 1 << 5
 			r.Site = string(value)

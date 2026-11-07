@@ -27,7 +27,7 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	prefix := fixtureRunID()[:31]
 	for i, jobID := range []string{"journey:retired", "lighthouse:renamed", "journey:retired"} {
 		runID := fmt.Sprintf("%s%x", prefix, i+1)
-		work, err := store.Begin(runID, jobID)
+		work, err := store.Begin(runID, jobID, []string{"storefront", "other-site", "storefront"}[i])
 		require.NoError(t, err)
 		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(work, "output/report.html"), []byte("<html>report</html>"), 0600))
@@ -76,6 +76,19 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	validate(t, page2)
 	filtered := call(h, "synthetics-artifacts", "job_id:lighthouse:renamed", "limit:1")
 	require.Len(t, responseData(t, filtered), 1)
+	sitePage := call(h, "synthetics-artifacts", "site_id:storefront", "limit:1")
+	siteRows := responseData(t, sitePage)
+	require.Len(t, siteRows, 1)
+	assert.Equal(t, "storefront", rowValues(t, sitePage, siteRows[0])["site_id"])
+	assert.Equal(t, prefix+"3", rowValues(t, sitePage, siteRows[0])["run_id"])
+	validate(t, sitePage)
+	siteNext := call(h, "synthetics-artifacts", "site_id:storefront", "limit:1", "before:"+sitePage.RawResponse["next"].(string))
+	siteRows = responseData(t, siteNext)
+	require.Len(t, siteRows, 1)
+	assert.Equal(t, prefix+"1", rowValues(t, siteNext, siteRows[0])["run_id"])
+	assert.Empty(t, responseData(t, call(h, "synthetics-artifacts", "site_id:storefront", "job_id:lighthouse:renamed")))
+	detail := call(h, "synthetics-artifact", "job_id:journey:retired", "run_id:"+prefix+"1")
+	assert.Equal(t, "storefront", detail.RawResponse["site_id"])
 	filteredStatus, err := json.Marshal(filtered.RawResponse["storage"])
 	require.NoError(t, err)
 	var filteredFields map[string]any

@@ -40,7 +40,7 @@ func (e InvalidArgument) Error() string { return e.Message }
 
 // visit holds a lease only while copying domain snapshots. Retirement can
 // revoke future admission without exposing a collector or desired config.
-func (s *Service) visit(ctx context.Context, filter string, fn func(string, *rumregistry.Site)) error {
+func (s *Service) visit(ctx context.Context, filter, siteID string, fn func(string, *rumregistry.Site)) error {
 	keys := s.registry.Keys()
 	sort.Strings(keys)
 	for _, key := range keys {
@@ -54,7 +54,7 @@ func (s *Service) visit(ctx context.Context, filter string, fn func(string, *rum
 		if !ok {
 			continue
 		}
-		if leaseCtx.Err() == nil {
+		if leaseCtx.Err() == nil && (siteID == "" || site.Route.Config().SiteID == siteID) {
 			fn(key, site)
 		}
 		release()

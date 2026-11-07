@@ -32,6 +32,7 @@ func BenchmarkCollect(b *testing.B) {
 		result: model.Execution{
 			Drained: true,
 			Run: model.Run{
+				SiteID:     "storefront",
 				Kind:       model.Journey,
 				Outcome:    model.Success,
 				DurationMS: &duration,
@@ -46,6 +47,7 @@ func BenchmarkCollect(b *testing.B) {
 		Executor: e,
 		Registry: syntheticregistry.New(),
 	})
+	c.SiteID = "storefront"
 	c.Name = "benchmark"
 	c.Script = "export {};"
 	c.Secrets = []journey.Secret{{Name: "DEM_SECRET_TOKEN", Value: "fixture-value"}}

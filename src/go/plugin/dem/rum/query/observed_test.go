@@ -37,7 +37,7 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 		Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1, Time: observed.Add(-24 * time.Hour)}},
 	}
 	require.False(t, owner.Ingest(prior).Investigated)
-	rows, err := store.QuerySessions(ctx, "shop", "", observed.Unix(), observed.Unix(), 0)
+	rows, err := store.QuerySessions(ctx, "shop", "", observed.Unix(), observed.Unix(), 0, "")
 	require.NoError(t, err)
 	require.Empty(t, rows)
 	trigger := &beacon.Beacon{

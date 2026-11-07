@@ -10,7 +10,7 @@ import (
 )
 
 // scan selects receipt-time buckets, then checks inclusive whole-second bounds.
-func (s *Store) scan(ctx context.Context, site string, after, before int64, visit func(EventRecord)) error {
+func (s *Store) scan(ctx context.Context, site string, after, before int64, siteID string, visit func(EventRecord)) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -25,12 +25,14 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, visi
 	if reader == nil {
 		return ctx.Err()
 	}
+	var previousSiteID string
 	return reader.VisitRange("rum", after, before, func(entry *journal.SnapshotEntry) error {
-		record, rum, err := decodeEvent(entry)
+		record, rum, err := decodeEvent(entry, previousSiteID)
 		if err != nil {
 			return err
 		}
-		if rum && (site == "" || record.Site == site) && record.ObservedUS/1_000_000 >= after && record.ObservedUS/1_000_000 <= before {
+		previousSiteID = record.SiteID
+		if rum && (siteID == "" || record.SiteID == siteID) && (site == "" || record.Site == site) && record.ObservedUS/1_000_000 >= after && record.ObservedUS/1_000_000 <= before {
 			visit(record)
 		}
 		return nil
@@ -38,7 +40,7 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, visi
 }
 
 // matchSession reads identity postings across all retained time.
-func (s *Store) matchSession(ctx context.Context, site, session string, visit func(EventRecord)) error {
+func (s *Store) matchSession(ctx context.Context, site, session, siteID string, visit func(EventRecord)) error {
 	reader, closeReader, err := s.journal.OpenReader(ctx)
 	if err != nil {
 		return err
@@ -47,12 +49,14 @@ func (s *Store) matchSession(ctx context.Context, site, session string, visit fu
 	if reader == nil {
 		return ctx.Err()
 	}
+	var previousSiteID string
 	return reader.VisitMatch("DEM_SESSION_ID", session, func(entry *journal.SnapshotEntry) error {
-		record, rum, err := decodeEvent(entry)
+		record, rum, err := decodeEvent(entry, previousSiteID)
 		if err != nil {
 			return err
 		}
-		if rum && record.SessionID == session && (site == "" || record.Site == site) {
+		previousSiteID = record.SiteID
+		if rum && (siteID == "" || record.SiteID == siteID) && record.SessionID == session && (site == "" || record.Site == site) {
 			visit(record)
 		}
 		return nil

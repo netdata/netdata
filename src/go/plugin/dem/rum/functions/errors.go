@@ -12,11 +12,11 @@ import (
 var errorsMethod = method{
 	id:      "rum-errors",
 	title:   "RUM Errors",
-	help:    "Retained errors originally received by the Agent in the selected inclusive Unix-second range; select fingerprint for affected-session, page and browser statistics",
+	help:    "Optional site_id groups jobs independently of the physical site job key; empty means no group filter. Retained errors originally received by the Agent in the selected inclusive Unix-second range; select fingerprint for affected-session, page and browser statistics",
 	sort:    "count_window",
 	every:   10,
 	history: true,
-	params:  []string{"site", "fingerprint", "after", "before"},
+	params:  []string{"site", "site_id", "fingerprint", "after", "before"},
 	columns: rumErrorsColumns,
 }
 
@@ -24,9 +24,10 @@ func (h *Handler) errorsRows(
 	ctx context.Context,
 	site, fingerprint string,
 	after, before, now int64,
+	siteID string,
 ) (rows [][]any, err error) {
 	var groups []query.ErrorGroup
-	groups, err = h.deps.Errors(ctx, site, fingerprint, after, before)
+	groups, err = h.deps.Errors(ctx, site, fingerprint, after, before, siteID)
 	for _, g := range groups {
 		rows = append(
 			rows,
@@ -42,7 +43,7 @@ func (h *Handler) errorsRows(
 				detail(g.Details, g.TopPage),
 				detail(g.Details, strings.Join(g.Browsers, ",")),
 				h.redact.Apply(g.SampleStack),
-				rowID(g.Site, g.Fingerprint),
+				rowID(g.Site, rowID(g.SiteID, g.Fingerprint)), g.SiteID,
 			},
 		)
 	}
@@ -50,6 +51,7 @@ func (h *Handler) errorsRows(
 }
 
 var rumErrorsColumns = map[string]any{
+	"site_id": (funcapi.Column{Index: 12, Name: "Site ID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
 	"row_id": (funcapi.Column{
 		Index:         11,
 		Name:          "Row ID",

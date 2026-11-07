@@ -89,7 +89,7 @@ func (e *Traces) resourceSpans(b *beacon.Beacon) *tracepb.ResourceSpans {
 		service = "rum:" + b.Site
 	}
 	res := []*commonpb.KeyValue{strAttr("service.name", service), strAttr("rum.site", b.Site)}
-	for _, kv := range [][2]string{{"rum.browser", b.Browser}, {"rum.browser_version", b.BrowserVersion}, {"rum.device", b.Device}, {"rum.country", b.Country}, {"rum.session_id", b.SessionID}, {"rum.experience_id", b.ExperienceID}, {"rum.view_id", b.ViewID}, {"rum.view", b.View}, {"rum.document_entry", b.PageGroup}} {
+	for _, kv := range [][2]string{{"dem.site_id", b.SiteID}, {"rum.browser", b.Browser}, {"rum.browser_version", b.BrowserVersion}, {"rum.device", b.Device}, {"rum.country", b.Country}, {"rum.session_id", b.SessionID}, {"rum.experience_id", b.ExperienceID}, {"rum.view_id", b.ViewID}, {"rum.view", b.View}, {"rum.document_entry", b.PageGroup}} {
 		if kv[1] != "" {
 			res = append(res, strAttr(kv[0], kv[1]))
 		}

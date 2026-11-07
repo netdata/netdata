@@ -29,6 +29,7 @@ func BenchmarkCollect(b *testing.B) {
 		result: model.Execution{
 			Drained: true,
 			Run: model.Run{
+				SiteID:     "storefront",
 				Kind:       model.Lighthouse,
 				Outcome:    model.Success,
 				DurationMS: &duration,
@@ -47,6 +48,7 @@ func BenchmarkCollect(b *testing.B) {
 		Executor: e,
 		Registry: syntheticregistry.New(),
 	})
+	c.SiteID = "storefront"
 	c.Name = "benchmark"
 	c.URL = "https://example.org/"
 	if err := c.Init(context.Background()); err != nil {

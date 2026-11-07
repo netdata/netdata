@@ -18,6 +18,7 @@ const liveRingCap = 5000
 // from a genuine zero, matching the FUNCTION's "null when absent" column
 // contract.
 type LiveRow struct {
+	SiteID                                            string
 	ExperienceID, View, ViewID, MetricID, Kind, Vital string
 	Revision                                          uint64
 	Seq                                               uint64
@@ -43,6 +44,7 @@ type LiveRow struct {
 // appendLive gives each measurement its own unambiguous update identity.
 func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) {
 	base := LiveRow{
+		SiteID:       b.SiteID,
 		TS:           now,
 		Site:         b.Site,
 		Country:      b.Country,

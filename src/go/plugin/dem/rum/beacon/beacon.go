@@ -67,6 +67,7 @@ func IsFrustration(name string) bool {
 // Beacon is one accepted Faro payload after origin/limit checks, URL
 // stripping and GeoIP. Client IPs never appear here.
 type Beacon struct {
+	SiteID       string // Receiver-owned grouping, never supplied by browser decoding.
 	Site         string
 	Received     time.Time
 	SessionID    string

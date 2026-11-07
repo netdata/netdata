@@ -48,7 +48,7 @@ func TestUnreadableOwnedSetDefersRetentionUntilInventoryRecovers(t *testing.T) {
 			_, err := rand.Read(raw[:])
 			require.NoError(t, err)
 			id := hex.EncodeToString(raw[:])
-			work, err := s.Begin(id, job)
+			work, err := s.Begin(id, job, "")
 			require.NoError(t, err)
 			require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 			require.NoError(

@@ -11,6 +11,7 @@ func (s *Store) QueryErrors(
 	ctx context.Context,
 	site, fingerprint string,
 	after, before int64,
+	siteID string,
 ) ([]ErrorGroup, error) {
 	type group struct {
 		record          ErrorGroup
@@ -18,17 +19,18 @@ func (s *Store) QueryErrors(
 		sessions        map[string]struct{}
 		pages, browsers map[string]int
 	}
-	groups := make(map[[2]string]*group)
-	err := s.scan(ctx, site, after, before, func(r EventRecord) {
+	groups := make(map[[3]string]*group)
+	err := s.scan(ctx, site, after, before, siteID, func(r EventRecord) {
 		if r.Type != "error" || (fingerprint != "" && r.Fingerprint != fingerprint) {
 			return
 		}
-		key := [2]string{r.Site, r.Fingerprint}
+		key := [3]string{r.Site, r.SiteID, r.Fingerprint}
 		g := groups[key]
 		if g == nil {
 			g = &group{
 				record: ErrorGroup{
 					Site:        r.Site,
+					SiteID:      r.SiteID,
 					Fingerprint: r.Fingerprint,
 					Type:        r.ErrorType,
 					Message:     r.Message,
@@ -81,6 +83,9 @@ func (s *Store) QueryErrors(
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Site != out[j].Site {
 			return out[i].Site < out[j].Site
+		}
+		if out[i].SiteID != out[j].SiteID {
+			return out[i].SiteID < out[j].SiteID
 		}
 		return out[i].Fingerprint < out[j].Fingerprint
 	})

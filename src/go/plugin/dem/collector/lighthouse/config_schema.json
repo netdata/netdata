@@ -10,6 +10,16 @@
         "type": "string",
         "minLength": 1
       },
+      "site_id": {
+        "title": "Site ID",
+        "description": "Groups this job with other DEM jobs for the same site. Leave empty to keep the job unassigned.",
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^([a-z0-9][a-z0-9_-]{0,63})?$",
+        "default": ""
+      },
       "url": {
         "title": "URL",
         "description": "Absolute HTTP or HTTPS URL of the page to audit. Embedded credentials are not accepted.",
@@ -48,6 +58,12 @@
     "ui:options": {
       "tabs": [
         {
+          "title": "General",
+          "fields": [
+            "site_id"
+          ]
+        },
+        {
           "title": "Target",
           "fields": [
             "name",
@@ -68,6 +84,10 @@
           ]
         }
       ]
+    },
+    "site_id": {
+      "ui:help": "Use the same ID across independent RUM, journey and Lighthouse jobs to group a site. The ID does not replace the job name or require a RUM job. Use 1–64 lowercase letters, digits, underscores or hyphens, starting with a letter or digit.",
+      "ui:placeholder": "storefront"
     }
   }
 }

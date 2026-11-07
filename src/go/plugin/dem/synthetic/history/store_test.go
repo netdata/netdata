@@ -92,7 +92,7 @@ func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 	assert.Equal(t, run, detail)
 	_, err = history.NewStore(st).GetRun(ctx, "wrong", run.ID)
 	assert.ErrorIs(t, err, os.ErrNotExist)
-	rum, err := rumhistory.NewStore(st).QuerySessions(ctx, "", "", 0, time.Now().Unix()+1, 100)
+	rum, err := rumhistory.NewStore(st).QuerySessions(ctx, "", "", 0, time.Now().Unix()+1, 100, "")
 	require.NoError(t, err)
 	require.Len(t, rum, 1)
 	cancelled, cancel := context.WithCancel(ctx)
@@ -229,6 +229,8 @@ func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
 		"scalar JSON job mismatch":   func(fields map[string][]string) { fields["DEM_JOB_ID"] = []string{"different"} },
 		"scalar JSON start mismatch": func(fields map[string][]string) { fields["DEM_STARTED_US"] = []string{"120000001"} },
 		"invalid phase":              func(fields map[string][]string) { fields["DEM_PHASE"] = []string{"other"} },
+		"scalar JSON site mismatch":  func(fields map[string][]string) { fields["DEM_SITE_ID"] = []string{"storefront"} },
+		"multiple site values":       func(fields map[string][]string) { fields["DEM_SITE_ID"] = []string{"", "other-site"} },
 		"malformed JSON":             func(fields map[string][]string) { fields["DEM_DATA"] = []string{"{"} },
 	}
 	for _, field := range []string{"DEM_PHASE", "DEM_JOB_ID", "DEM_RUN_ID", "DEM_DATA"} {

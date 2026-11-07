@@ -93,6 +93,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.redactor = redact.NewRedactor(c.EventLogs.Destination.AuthToken, c.Tracing.Destination.AuthToken)
 	c.aggregator = aggregate.New(time.Duration(c.Window), aggregate.SiteCfg{
 		Name:               c.Name,
+		SiteID:             c.SiteID,
 		DisplayName:        c.Label(),
 		PageGroups:         c.PageGroups,
 		Countries:          c.Countries,
@@ -104,6 +105,9 @@ func (c *Collector) Init(ctx context.Context) error {
 		},
 	})
 	m := c.store.Write().SnapshotMeter("")
+	if c.SiteID != "" {
+		m = m.WithLabels(metrix.Label{Key: "site_id", Value: c.SiteID})
+	}
 	if c.DisplayName != "" && c.DisplayName != c.Name {
 		m = m.WithLabels(metrix.Label{
 			Key:   "display_name",

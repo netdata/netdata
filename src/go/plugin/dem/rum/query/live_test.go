@@ -50,7 +50,7 @@ func TestLiveOutOfOrderReceivedTimesDoNotSkipOrReplay(t *testing.T) {
 			sequences := map[string]uint64{}
 			var cursor string
 			for range 4 {
-				rows, next, err := service.Live(context.Background(), "", cursor, limit)
+				rows, next, err := service.Live(context.Background(), "", cursor, limit, "")
 				require.NoError(t, err)
 				cursor = next
 				for _, row := range rows {

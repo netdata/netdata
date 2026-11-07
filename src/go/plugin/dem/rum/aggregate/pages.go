@@ -8,6 +8,7 @@ import (
 )
 
 type PageInfo struct {
+	SiteID                                  string
 	Site, Page                              string
 	PageviewsWindow, Sessions, ErrorsWindow int
 	Vitals                                  map[string]VitalStats
@@ -34,6 +35,7 @@ func (a *Aggregator) Pages() []PageInfo {
 		}
 		out = append(out, PageInfo{
 			Site:              a.site.cfg.Name,
+			SiteID:            a.site.cfg.SiteID,
 			Page:              key.value,
 			PageviewsWindow:   int(p.documents),
 			Sessions:          p.sessions,

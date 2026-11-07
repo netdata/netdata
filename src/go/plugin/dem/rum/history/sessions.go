@@ -15,23 +15,25 @@ func (s *Store) QuerySessions(
 	site, userID string,
 	after, before int64,
 	limit int,
+	siteID string,
 ) ([]SessionRecord, error) {
 	type summary struct {
 		record      SessionRecord
 		first, last int64
 		userIDs     map[string]struct{}
 	}
-	groups := make(map[[2]string]*summary)
-	err := s.scan(ctx, site, after, before, func(r EventRecord) {
+	groups := make(map[[3]string]*summary)
+	err := s.scan(ctx, site, after, before, siteID, func(r EventRecord) {
 		if r.SessionID == "" {
 			return
 		}
-		key := [2]string{r.Site, r.SessionID}
+		key := [3]string{r.Site, r.SiteID, r.SessionID}
 		g := groups[key]
 		if g == nil {
 			g = &summary{
 				record: SessionRecord{
 					Site:      r.Site,
+					SiteID:    r.SiteID,
 					SessionID: r.SessionID,
 					EntryPage: r.Page,
 				},
@@ -94,6 +96,9 @@ func (s *Store) QuerySessions(
 		if out[i].Site != out[j].Site {
 			return out[i].Site < out[j].Site
 		}
+		if out[i].SiteID != out[j].SiteID {
+			return out[i].SiteID < out[j].SiteID
+		}
 		return out[i].SessionID < out[j].SessionID
 	})
 	if limit > 0 && len(out) > limit {
@@ -104,9 +109,9 @@ func (s *Store) QuerySessions(
 
 // QuerySessionEvents returns the full retained timeline in Agent receipt-time
 // order. Activity-only presence records contribute to summaries, not timelines.
-func (s *Store) QuerySessionEvents(ctx context.Context, site, sessionID string) ([]SessionEventRecord, error) {
+func (s *Store) QuerySessionEvents(ctx context.Context, site, sessionID, siteID string) ([]SessionEventRecord, error) {
 	var out []SessionEventRecord
-	err := s.matchSession(ctx, site, sessionID, func(r EventRecord) {
+	err := s.matchSession(ctx, site, sessionID, siteID, func(r EventRecord) {
 		if r.Type == "activity" {
 			return
 		}
@@ -120,6 +125,7 @@ func (s *Store) QuerySessionEvents(ctx context.Context, site, sessionID string) 
 				Revision:     r.Revision,
 
 				Site:       r.Site,
+				SiteID:     r.SiteID,
 				SessionID:  r.SessionID,
 				ObservedUS: r.ObservedUS,
 				Type:       r.Type,
