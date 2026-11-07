@@ -253,7 +253,9 @@ pub(crate) struct MetricSetInner {
     pub(crate) expiry_windows: u64,
     pub(crate) cardinality_limit: Option<CardinalityLimit>,
     pub(crate) schema: Schema,
-    /// How the agent shows the table: read only when emitting.
+    /// How the agent shows the table. Recording never reads it; the
+    /// aggregator reads the chart ids when it creates an entity, and the rest
+    /// when emitting.
     pub(crate) charts: Charts,
 }
 
@@ -311,10 +313,9 @@ pub struct CardinalityLimit {
 
 static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 
-/// Declares a [`MetricSet`]: each instrument adds its column group (a
-/// histogram three) and the chart that shows it (a histogram three), in the
-/// order declared. Each step checks its own input and adds nothing when a
-/// check fails.
+/// Declares a [`MetricSet`]: each instrument adds its column group and the
+/// chart that shows it (a histogram three of each), in the order declared.
+/// Each step checks its own input and adds nothing when a check fails.
 #[derive(Debug)]
 pub struct MetricSetBuilder {
     id: u32,

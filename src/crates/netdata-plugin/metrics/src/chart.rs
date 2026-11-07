@@ -2,9 +2,9 @@
 //! the chart templates made from them over the table's column groups, and
 //! the chart ids of each entity's chart instances.
 //!
-//! This is where Netdata's terms start: a column group becomes a chart
-//! template, its values the template's dimensions, and each entity gets one
-//! chart instance (one chart id) of every template.
+//! A column group becomes a chart template, its values the template's
+//! dimensions, and each entity gets one chart instance (one chart id) of
+//! every template.
 
 use crate::aggregator::EntityKind;
 use crate::error::Error;
@@ -13,7 +13,9 @@ use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
 
 /// Describes a chart: its title, units, family, context, type and priority.
 /// Each [`MetricSetBuilder`](crate::MetricSetBuilder) instrument step takes
-/// one and makes a chart template of it over the instrument's column group,
+/// one and makes a chart template of it over the instrument's column group
+/// (a histogram three, from derived descriptors, see
+/// [`MetricSetBuilder::histogram`](crate::MetricSetBuilder::histogram)),
 /// whose values become the dimensions, and every entity gets one chart
 /// instance of each template. The fields map to the CHART line of the
 /// plugins.d protocol (`src/plugins.d/README.md` in the Netdata repository);
