@@ -58,15 +58,16 @@ modules:
             - A `file://` source provides only the first certificate in the file, so `check_full_chain` has no effect
               there.
             - Revocation status is checked for the server certificate only. A certificate that lists no CRL or OCSP
-              URL is always reported as not revoked (LDAP CRL URLs are skipped), and an OCSP `unknown` answer is
-              reported as revoked.
+              URL is reported as not revoked while it is within its validity period (LDAP CRL URLs are skipped), and
+              an OCSP `unknown` answer is reported as revoked.
             - Revocation status comes only from CRLs and OCSP answers that verify against the issuer of the server
               certificate and are current by the Agent host's clock, within 5 minutes. The issuer certificate must be
               one the server sends, one that TLS verification reached through `tls_ca` or the system's trusted CAs, or
               the one at the issuer URL listed in the server certificate. Without it the chart shows a gap, for
-              example with `tls_skip_verify` for a private CA whose certificates list no issuer URL, or for a
-              `file://` source whose certificate lists none. The chart also shows a gap when the CA publishes outdated
-              CRLs or OCSP answers, and can show one when the Agent host's clock is more than 5 minutes off.
+              example with `tls_skip_verify` for a private CA whose certificates list no issuer URL, behind a server
+              that does not send the CA certificate, or for a `file://` source whose certificate lists none. The chart
+              also shows a gap when the CA publishes outdated CRLs or OCSP answers, and can show one when the Agent
+              host's clock is more than 5 minutes off.
             - With an `smtp://` source, `timeout` covers the whole SMTP exchange. A mail server that delays its
               greeting, a common anti-spam measure on port 25, needs a `timeout` longer than that delay.
         performance_impact:
@@ -374,12 +375,13 @@ modules:
             when: "`check_revocation_status` is enabled."
             cause: >-
               The certificate of the CA that issued the server certificate is unavailable: the server does not send
-              it, TLS verification did not reach it (`tls_skip_verify` is set, or the source is `file://`), and the
-              issuer URL listed in the server certificate is missing, unreachable, or does not serve that certificate
-              as a single DER or PEM certificate; `reason` says which. The revocation status chart shows a gap.
+              it, TLS verification did not reach it (for example, `tls_skip_verify` is set or the source is
+              `file://`), and the issuer URL listed in the server certificate is missing, unreachable, or does not
+              serve that certificate as a single DER or PEM certificate; `reason` says which. The revocation status
+              chart shows a gap.
             fix: >-
-              Configure the server to send the CA certificate that issued its certificate, or, with TLS verification
-              on, add that CA certificate to `tls_ca`. Otherwise check that the Agent host can reach the issuer URL
+              Configure the server to send the CA certificate that issued its certificate, or set `tls_ca` to that CA
+              certificate and remove `tls_skip_verify`. Otherwise check that the Agent host can reach the issuer URL
               listed in the certificate.
           - error: "revocation status of `source` could not be determined: no usable OCSP answer: `reason`"
             when: "`check_revocation_status` is enabled."

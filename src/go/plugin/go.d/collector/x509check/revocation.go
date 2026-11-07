@@ -210,7 +210,14 @@ func (rc *revocationChecker) queryOCSP(
 	if err != nil {
 		return nil, err
 	}
-	return ocsp.ParseResponseForCert(body, cert, issuer)
+	resp, err := ocsp.ParseResponseForCert(body, cert, issuer)
+	// Errors from outside the OCSP package can quote the answer, which anyone on the path can write.
+	var parseErr ocsp.ParseError
+	var respErr ocsp.ResponseError
+	if err != nil && !errors.As(err, &parseErr) && !errors.As(err, &respErr) {
+		return nil, errors.New("invalid OCSP response")
+	}
+	return resp, err
 }
 
 // findIssuer returns the certificate that signed cert: the first of issuers that did, or else the first one
@@ -226,7 +233,7 @@ func (rc *revocationChecker) findIssuer(
 		}
 	}
 
-	reasons := []string{"none of the certificates the source sent or TLS verification found signed it"}
+	reasons := []string{"no certificate the source sent or TLS verification found signed it"}
 	if len(cert.IssuingCertificateURL) == 0 {
 		reasons = append(reasons, "the certificate lists no issuer URL")
 	}
@@ -250,9 +257,10 @@ func (rc *revocationChecker) downloadIssuer(
 	if err != nil {
 		return nil, err
 	}
+	// The parser error can quote the response, which anyone on the path can write, so it is replaced.
 	issuer, err := parseCertificate(body)
 	if err != nil {
-		return nil, fmt.Errorf("parse issuer certificate '%s': %w", issuerURL, err)
+		return nil, fmt.Errorf("'%s' does not serve a single DER or PEM certificate", issuerURL)
 	}
 	if !signedBy(cert, issuer) {
 		return nil, fmt.Errorf("the certificate at '%s' did not sign it", issuerURL)
@@ -272,10 +280,10 @@ func signedBy(cert, issuer *x509.Certificate) bool {
 
 // verifyCRL checks that crl is a current and complete CRL of cert's issuer that covers cert (RFC 5280 6.3.3).
 func verifyCRL(crl *x509.RevocationList, cert, issuer *x509.Certificate, now time.Time) error {
-	// The issuer certificate's own subject is not compared: only its key is authenticated, by cert's signature.
+	// The issuer certificate's own subject is not compared: only its key is authenticated, by cert's signature. The
+	// names are not quoted: the CRL is not verified yet, and anyone on the path can write it.
 	if !bytes.Equal(crl.RawIssuer, cert.RawIssuer) {
-		return fmt.Errorf("issuer name '%s' differs from the certificate's issuer name '%s' (compared as encoded)",
-			crl.Issuer, cert.Issuer)
+		return errors.New("issuer name differs from the certificate's issuer name (compared as encoded)")
 	}
 	// Only the signature is checked, so a private CA whose certificate lacks the CRL-signing key usage still verifies.
 	if err := issuer.CheckSignature(crl.SignatureAlgorithm, crl.RawTBSRevocationList, crl.Signature); err != nil {

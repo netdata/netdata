@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -327,7 +328,8 @@ func TestRevocationChecker_Status(t *testing.T) {
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{notFound, notFound},
 			},
-			wantErr: "no usable OCSP answer",
+			// The prefix names the troubleshooting entry.
+			wantErr: "no usable OCSP answer: '",
 		},
 		"OCSP answer signed by another CA": {
 			endpoints: testPKIEndpoints{
@@ -489,7 +491,8 @@ func TestRevocationChecker_Status(t *testing.T) {
 				issuers: []testPKIHandler{notFound},
 				ocsps:   []testPKIHandler{unexpected},
 			},
-			wantErr: "TLS verification found signed it; GET",
+			// The prefix names the troubleshooting entry.
+			wantErr: "issuer certificate not found: no certificate the source sent",
 		},
 		"expired certificate": {
 			endpoints: testPKIEndpoints{
@@ -656,6 +659,66 @@ func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {
 			crl:    pki.hits["crl"].Load(),
 			issuer: pki.hits["issuer"].Load(),
 		}, step.name)
+	}
+}
+
+func TestRevocationChecker_ReasonsDoNotQuoteServedData(t *testing.T) {
+	// A certificate that the parser rejects with an error that quotes its URI, which anyone on the path can write.
+	quoted := strings.Repeat("q", 1000)
+	unparsable := func(p *testPKI) []byte {
+		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		require.NoError(p.t, err)
+		template := &x509.Certificate{
+			SerialNumber: big.NewInt(3),
+			NotBefore:    p.now.Add(-time.Hour),
+			NotAfter:     p.now.Add(time.Hour),
+			URIs: []*url.URL{{
+				Scheme: "https",
+				Host:   quoted + ".",
+			}},
+		}
+		der, err := x509.CreateCertificate(rand.Reader, template, p.ca, &key.PublicKey, p.caKey)
+		require.NoError(p.t, err)
+		_, err = x509.ParseCertificate(der)
+		require.ErrorContains(p.t, err, quoted)
+		return der
+	}
+
+	tests := map[string]struct {
+		endpoints testPKIEndpoints
+		wantErr   string
+	}{
+		"issuer URL": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{func(p *testPKI, w http.ResponseWriter, _ *http.Request) {
+					_, _ = w.Write(unparsable(p))
+				}},
+				crls: []testPKIHandler{unexpected},
+			},
+			wantErr: "does not serve a single DER or PEM certificate",
+		},
+		"certificate in an OCSP answer": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps: []testPKIHandler{serveOCSPWith(func(p *testPKI, answer *ocsp.Response) {
+					answer.Certificate = &x509.Certificate{
+						Raw: unparsable(p),
+					}
+				})},
+			},
+			wantErr: "invalid OCSP response",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			pki := newTestPKI(t, test.endpoints)
+
+			_, err := newRevocationChecker().status(t.Context(), pki.leaf, nil, pki.now)
+
+			require.ErrorContains(t, err, test.wantErr)
+			assert.NotContains(t, err.Error(), quoted)
+		})
 	}
 }
 

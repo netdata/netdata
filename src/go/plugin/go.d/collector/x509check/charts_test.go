@@ -117,9 +117,9 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 		},
 	}
 	c.provider = provider
-	verified := true
+	determined := true
 	c.revocationStatus = func(context.Context, *x509.Certificate, []*x509.Certificate, time.Time) (bool, error) {
-		if !verified {
+		if !determined {
 			return false, errors.New("undetermined")
 		}
 		return false, nil
@@ -140,7 +140,7 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 	renewed := *chain[0]
 	renewed.Subject.CommonName = "renewed"
 	provider.certs = []*x509.Certificate{&renewed}
-	verified = false
+	determined = false
 	for cycle := 0; cycle < 20; cycle++ {
 		require.NoError(t, collectCycle(t, c))
 		plan := preparePlan(t, engine, c)
@@ -163,7 +163,7 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 			assert.Equal(t, 1, labels, "renewal updates metadata without changing identity")
 		}
 	}
-	provider.certs, verified = chain, true
+	provider.certs, determined = chain, true
 	require.NoError(t, collectCycle(t, c))
 	var updates, labels int
 	for _, action := range preparePlan(t, engine, c).Actions {

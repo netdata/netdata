@@ -4,6 +4,7 @@ package x509check
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"net"
@@ -291,35 +292,47 @@ func TestCollector_Collect(t *testing.T) {
 }
 
 func TestCollector_CollectTakesRevocationIssuerFromVerifiedChain(t *testing.T) {
-	pki := newTestPKI(t, testPKIEndpoints{
-		issuers: []testPKIHandler{unexpected},
-		crls:    []testPKIHandler{serveCRL(true)},
-	})
-	// The server sends only its certificate, which a root the job trusts through tls_ca issued.
-	server := pki.issueServerCertificate(t, pki.leaf.SerialNumber, pki.ca, pki.caKey, func(template *x509.Certificate) {
-		template.DNSNames = []string{"localhost"}
-	})
-	_, port, err := net.SplitHostPort(serveTLS(t, serverConfig(server)))
-	require.NoError(t, err)
-	roots := x509.NewCertPool()
-	roots.AddCert(pki.ca)
-	c := New()
-	c.Source = "https://localhost:" + port
-	c.CheckFullChain = true
-	c.CheckRevocation = true
-	c.now = func() time.Time { return pki.now }
-	require.NoError(t, c.Init(t.Context()))
-	// The CA option reads through the privileged file helper, which tests cannot run, so trust the root directly.
-	c.provider.(*netProvider).tlsConfig.RootCAs = roots
+	for scheme, serve := range map[string]func(*testing.T, *tls.Config) string{
+		"https": serveTLS,
+		"smtp":  serveSMTP,
+	} {
+		t.Run(scheme, func(t *testing.T) {
+			pki := newTestPKI(t, testPKIEndpoints{
+				issuers: []testPKIHandler{unexpected},
+				crls:    []testPKIHandler{serveCRL(true)},
+			})
+			// The server sends only its certificate, which a root the job trusts through tls_ca issued.
+			server := pki.issueServerCertificate(t, pki.leaf.SerialNumber, pki.ca, pki.caKey,
+				func(template *x509.Certificate) { template.DNSNames = []string{"localhost"} })
+			_, port, err := net.SplitHostPort(serve(t, serverConfig(server)))
+			require.NoError(t, err)
+			roots := x509.NewCertPool()
+			roots.AddCert(pki.ca)
+			c := New()
+			c.Source = scheme + "://localhost:" + port
+			c.CheckFullChain = true
+			c.CheckRevocation = true
+			c.now = func() time.Time { return pki.now }
+			require.NoError(t, c.Init(t.Context()))
+			// The CA option reads through the privileged file helper, which tests cannot run, so trust the root
+			// directly.
+			switch p := c.provider.(type) {
+			case *netProvider:
+				p.tlsConfig.RootCAs = roots
+			case *smtpProvider:
+				p.tlsConfig.RootCAs = roots
+			}
 
-	require.NoError(t, collectCycle(t, c))
+			require.NoError(t, collectCycle(t, c))
 
-	// The root decides the revocation status but is not charted: the source did not send it.
-	assert.Equal(t, map[string]float64{
-		"expiry/0/":                       server.Leaf.NotAfter.Sub(pki.now).Seconds(),
-		"revocation_status/0/not_revoked": 0,
-		"revocation_status/0/revoked":     1,
-	}, readMetrics(c))
+			// The root decides the revocation status but is not charted: the source did not send it.
+			assert.Equal(t, map[string]float64{
+				"expiry/0/":                       server.Leaf.NotAfter.Sub(pki.now).Seconds(),
+				"revocation_status/0/not_revoked": 0,
+				"revocation_status/0/revoked":     1,
+			}, readMetrics(c))
+		})
+	}
 }
 
 func TestCollector_CollectHonorsCancellationDuringRevocationCheck(t *testing.T) {
