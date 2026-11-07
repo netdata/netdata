@@ -18,8 +18,17 @@ use std::sync::Arc;
 /// one chart instance of each template. The fields map to the CHART line of
 /// the plugins.d protocol (`src/plugins.d/README.md` in the Netdata
 /// repository); the crate sets the CHART line's other fields itself.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ChartDescriptor {
+    /// Shown above the chart on the dashboard. A histogram's charts add a word
+    /// to it (`average`, `maximum`, `histogram`).
+    pub title: String,
+    /// Shown as is; the crate adds nothing. Counter and cumulative counter
+    /// values are per second, so give them units that say so, for example
+    /// `requests/s`.
+    pub units: String,
+    /// The dashboard family (submenu): the CHART line's `family` field.
+    pub family: String,
     /// The Netdata context, for example `svc.requests`, of every entity's
     /// chart instance; a histogram's three charts have it plus a suffix
     /// (`_avg`, `_max`, `_histogram`, see [`ChartsBuilder::histogram`]).
@@ -32,20 +41,11 @@ pub struct ChartDescriptor {
     ///   [`CardinalityLimit`](crate::CardinalityLimit)).
     ///
     /// It must contain a dot (a chart id is the agent's `type.id`, and an
-    /// entity without labels has the context itself as its chart id), use
-    /// only letters, digits, `_`, `-` and `.`, and not end in `_overflow` or
-    /// in `_` and 16 hex digits. Contexts must be unique: within one
-    /// [`Charts`] this is checked, across them it is not.
-    pub context: &'static str,
-    /// Shown above the chart on the dashboard. A histogram's charts add a word
-    /// to it (`average`, `maximum`, `histogram`).
-    pub title: &'static str,
-    /// Shown as is; the crate adds nothing. Counter and cumulative counter
-    /// values are per second, so give them units that say so, for example
-    /// `requests/s`.
-    pub units: &'static str,
-    /// The dashboard family (submenu): the CHART line's `family` field.
-    pub family: &'static str,
+    /// entity without labels has the context itself as its chart id), not
+    /// start or end with one, use only letters, digits, `_`, `-` and `.`, and
+    /// not end in `_overflow` or in `_` and 16 hex digits. Contexts must be
+    /// unique: within one [`Charts`] this is checked, across them it is not.
+    pub context: String,
     /// How the dashboard draws the chart, for example as lines or stacked
     /// areas.
     pub chart_type: ChartType,
@@ -53,18 +53,13 @@ pub struct ChartDescriptor {
     pub priority: i32,
 }
 
-/// One chart template: the fields of its [`ChartDescriptor`] (derived ones
-/// for a histogram) and the column group it shows, one dimension per value
-/// of the group, named by the value's name. Every entity gets one chart
+/// One chart template: a [`ChartDescriptor`] (a derived one for each of a
+/// histogram's charts) over the column group it shows, one dimension per
+/// value of the group, named by the value's name. Every entity gets one chart
 /// instance of it.
 #[derive(Debug)]
 pub(crate) struct ChartTemplate {
-    pub(crate) title: String,
-    pub(crate) units: &'static str,
-    pub(crate) family: &'static str,
-    pub(crate) context: String,
-    pub(crate) chart_type: ChartType,
-    pub(crate) priority: i32,
+    pub(crate) descriptor: ChartDescriptor,
     /// The index of its column group in the set's schema.
     pub(crate) group: u32,
 }
@@ -91,7 +86,7 @@ impl Charts {
         self.0
             .templates
             .iter()
-            .map(|template| format!("{}{suffix}", template.context))
+            .map(|template| format!("{}{suffix}", template.descriptor.context))
             .collect()
     }
 }
@@ -130,7 +125,7 @@ impl ChartsBuilder {
     pub fn chart<C>(&mut self, columns: impl Into<ColumnRange<C>>, descriptor: ChartDescriptor) {
         let columns = columns.into();
         self.check_set(columns.set_id);
-        self.add(ChartTemplate::new(descriptor, columns.group));
+        self.add(descriptor, columns.group);
     }
 
     /// Adds the three charts of a [`Histogram`], one per column group (see
@@ -160,26 +155,36 @@ impl ChartsBuilder {
         &mut self,
         histogram: Histogram,
         descriptor: ChartDescriptor,
-        heatmap_units: &'static str,
+        heatmap_units: String,
     ) {
         self.check_set(histogram.set_id);
-        check_context(descriptor.context);
-        let mut template = ChartTemplate::new(descriptor, histogram.group);
-        template.title = format!("{} average", descriptor.title);
-        template.context = format!("{}_avg", descriptor.context);
-        self.add(template);
-        let mut template = ChartTemplate::new(descriptor, histogram.group + 1);
-        template.title = format!("{} maximum", descriptor.title);
-        template.context = format!("{}_max", descriptor.context);
-        template.priority = descriptor.priority + 1;
-        self.add(template);
-        let mut template = ChartTemplate::new(descriptor, histogram.group + 2);
-        template.title = format!("{} histogram", descriptor.title);
-        template.context = format!("{}_histogram", descriptor.context);
-        template.units = heatmap_units;
-        template.chart_type = ChartType::Heatmap;
-        template.priority = descriptor.priority + 2;
-        self.add(template);
+        check_context(&descriptor.context);
+        let avg = ChartDescriptor {
+            title: format!("{} average", descriptor.title),
+            units: descriptor.units.clone(),
+            family: descriptor.family.clone(),
+            context: format!("{}_avg", descriptor.context),
+            ..descriptor
+        };
+        self.add(avg, histogram.group);
+        let max = ChartDescriptor {
+            title: format!("{} maximum", descriptor.title),
+            units: descriptor.units.clone(),
+            family: descriptor.family.clone(),
+            context: format!("{}_max", descriptor.context),
+            priority: descriptor.priority + 1,
+            ..descriptor
+        };
+        self.add(max, histogram.group + 1);
+        let buckets = ChartDescriptor {
+            title: format!("{} histogram", descriptor.title),
+            units: heatmap_units,
+            context: format!("{}_histogram", descriptor.context),
+            chart_type: ChartType::Heatmap,
+            priority: descriptor.priority + 2,
+            ..descriptor
+        };
+        self.add(buckets, histogram.group + 2);
     }
 
     /// Finishes the charts.
@@ -202,44 +207,31 @@ impl ChartsBuilder {
         debug_assert_eq!(set_id, self.set.0.id, "instrument of another metric set");
     }
 
-    /// Checks `template` in debug builds, in this order, then adds it: its
-    /// group has no chart yet, its dimension ids are valid, its context is
-    /// valid, and its context is unique in the charts.
-    fn add(&mut self, template: ChartTemplate) {
-        let group = self.set.0.schema.column_group(template.group);
-        let charted = &mut self.charted[template.group as usize];
+    /// Adds the template of `descriptor` over the column group with index
+    /// `group`, after checking in debug builds, in this order: the group has
+    /// no chart yet, its dimension ids are valid, the context is valid, and
+    /// the context is unique in the charts.
+    fn add(&mut self, descriptor: ChartDescriptor, group: u32) {
+        let column_group = self.set.0.schema.column_group(group);
+        let charted = &mut self.charted[group as usize];
         debug_assert!(
             !*charted,
             "the columns {:?} already have a chart",
-            group.names
+            column_group.names
         );
-        for id in &group.names {
+        for id in &column_group.names {
             debug_assert!(is_valid_dimension_id(id), "invalid dimension id {id:?}");
         }
-        let context = &template.context;
+        let context = &descriptor.context;
         check_context(context);
         debug_assert!(
-            self.templates.iter().all(|t| &t.context != context),
+            self.templates
+                .iter()
+                .all(|t| &t.descriptor.context != context),
             "duplicate context {context:?}"
         );
         *charted = true;
-        self.templates.push(template);
-    }
-}
-
-impl ChartTemplate {
-    /// The template with `descriptor`'s fields as they are, over the column
-    /// group with index `group`.
-    fn new(descriptor: ChartDescriptor, group: u32) -> Self {
-        Self {
-            title: descriptor.title.to_string(),
-            units: descriptor.units,
-            family: descriptor.family,
-            context: descriptor.context.to_string(),
-            chart_type: descriptor.chart_type,
-            priority: descriptor.priority,
-            group,
-        }
+        self.templates.push(ChartTemplate { descriptor, group });
     }
 }
 

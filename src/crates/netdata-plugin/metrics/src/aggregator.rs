@@ -432,10 +432,10 @@ mod tests {
         charts.chart(
             requests,
             ChartDescriptor {
-                title: "Requests",
-                units: "requests/s",
-                family: "requests",
-                context: "svc.requests",
+                title: "Requests".into(),
+                units: "requests/s".into(),
+                family: "requests".into(),
+                context: "svc.requests".into(),
                 chart_type: ChartType::Stacked,
                 priority: 1,
             },
@@ -443,14 +443,14 @@ mod tests {
         charts.histogram(
             duration,
             ChartDescriptor {
-                title: "Duration",
-                units: "seconds",
-                family: "requests",
-                context: "svc.duration",
+                title: "Duration".into(),
+                units: "seconds".into(),
+                family: "requests".into(),
+                context: "svc.duration".into(),
                 chart_type: ChartType::Line,
                 priority: 2,
             },
-            "requests/s",
+            "requests/s".into(),
         );
         Fixture {
             charts: charts.build(),
@@ -749,10 +749,10 @@ mod tests {
         charts.chart(
             totals,
             ChartDescriptor {
-                title: "Events",
-                units: "events/s",
-                family: "events",
-                context: "src.events",
+                title: "Events".into(),
+                units: "events/s".into(),
+                family: "events".into(),
+                context: "src.events".into(),
                 chart_type: ChartType::Line,
                 priority: 1,
             },
@@ -921,7 +921,7 @@ mod tests {
         charts.chart(requests, descriptor("svc.requests", 1));
         charts.chart(queued, descriptor("svc.queued", 1));
         charts.chart(totals, descriptor("svc.events", 1));
-        charts.histogram(duration, descriptor("svc.duration", 1), "requests/s");
+        charts.histogram(duration, descriptor("svc.duration", 1), "requests/s".into());
         let mut aggregator = Aggregator::new(&charts.build());
         let mut batch = Batch::new(&set);
         let mut entity = batch.entity(Labels::new());
@@ -998,10 +998,10 @@ mod tests {
 
     fn descriptor(context: &'static str, priority: i32) -> ChartDescriptor {
         ChartDescriptor {
-            title: "T",
-            units: "u",
-            family: "f",
-            context,
+            title: "T".into(),
+            units: "u".into(),
+            family: "f".into(),
+            context: context.into(),
             chart_type: ChartType::Line,
             priority,
         }
@@ -1022,7 +1022,7 @@ mod tests {
         charts.chart(requests, descriptor("x.requests", 1));
         charts.chart(totals, descriptor("x.totals", 2));
         charts.chart(queue, descriptor("x.queue", 3));
-        charts.histogram(duration, descriptor("x.duration", 4), "u");
+        charts.histogram(duration, descriptor("x.duration", 4), "u".into());
         Every {
             charts: charts.build(),
             set,
@@ -1066,7 +1066,7 @@ mod tests {
         let duration = builder.histogram(&[1.0]).unwrap();
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
-        charts.histogram(duration, descriptor("x.duration", 1), "u");
+        charts.histogram(duration, descriptor("x.duration", 1), "u".into());
         charts.chart(queue, descriptor("x.queue", 4));
         charts.chart(requests, descriptor("x.requests", 5));
         let mut aggregator = Aggregator::new(&charts.build());
@@ -1306,7 +1306,7 @@ mod tests {
         charts.chart(first, descriptor("x.first", 1));
         charts.chart(requests, descriptor("x.requests", 2));
         charts.chart(second, descriptor("x.second", 3));
-        charts.histogram(duration, descriptor("x.duration", 4), "u");
+        charts.histogram(duration, descriptor("x.duration", 4), "u".into());
         charts.chart(queue, descriptor("x.queue", 8));
         let mut aggregator = Aggregator::new(&charts.build());
         for (time, totals) in [(10, [10.0, 20.0, 30.0]), (11, [11.0, 25.0, 33.0])] {
@@ -1433,7 +1433,7 @@ mod tests {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         let duration = builder.histogram(&[1.0]).unwrap();
         let set = builder.build().unwrap();
-        ChartsBuilder::new(&set).histogram(duration, descriptor("nodot", 1), "u");
+        ChartsBuilder::new(&set).histogram(duration, descriptor("nodot", 1), "u".into());
     }
 
     #[cfg(debug_assertions)]
@@ -1446,7 +1446,7 @@ mod tests {
         let set = builder.build().unwrap();
         let mut charts = ChartsBuilder::new(&set);
         charts.chart(queue, descriptor("x.d_max", 1));
-        charts.histogram(duration, descriptor("x.d", 2), "u");
+        charts.histogram(duration, descriptor("x.d", 2), "u".into());
     }
 
     #[test]

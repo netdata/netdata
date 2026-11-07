@@ -25,10 +25,10 @@
 //! charts.chart(
 //!     requests,
 //!     ChartDescriptor {
-//!         title: "Requests",
-//!         units: "requests/s",
-//!         family: "requests",
-//!         context: "svc.requests",
+//!         title: "Requests".into(),
+//!         units: "requests/s".into(),
+//!         family: "requests".into(),
+//!         context: "svc.requests".into(),
 //!         chart_type: ChartType::Stacked,
 //!         priority: 1000,
 //!     },

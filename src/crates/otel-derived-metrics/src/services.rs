@@ -60,10 +60,10 @@ impl Services {
         charts.chart(
             requests,
             ChartDescriptor {
-                title: "Service requests",
-                units: "requests/s",
-                family: "requests",
-                context: "otel_service.requests",
+                title: "Service requests".into(),
+                units: "requests/s".into(),
+                family: "requests".into(),
+                context: "otel_service.requests".into(),
                 chart_type: ChartType::Stacked,
                 priority: 60_000,
             },
@@ -74,14 +74,14 @@ impl Services {
         charts.histogram(
             duration,
             ChartDescriptor {
-                title: "Service request duration",
-                units: "seconds",
-                family: "requests",
-                context: "otel_service.request_duration",
+                title: "Service request duration".into(),
+                units: "seconds".into(),
+                family: "requests".into(),
+                context: "otel_service.request_duration".into(),
                 chart_type: ChartType::Line,
                 priority: 60_001,
             },
-            "requests/s",
+            "requests/s".into(),
         );
         Ok(Self {
             charts: charts.build(),

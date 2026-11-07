@@ -58,10 +58,10 @@ impl ServiceLogs {
         charts.chart(
             records,
             ChartDescriptor {
-                title: "Service log records by severity",
-                units: "records/s",
-                family: "logs",
-                context: "otel_service.log_records",
+                title: "Service log records by severity".into(),
+                units: "records/s".into(),
+                family: "logs".into(),
+                context: "otel_service.log_records".into(),
                 chart_type: ChartType::Stacked,
                 priority: 60_010,
             },

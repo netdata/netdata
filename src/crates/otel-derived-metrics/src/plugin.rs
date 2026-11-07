@@ -55,10 +55,10 @@ impl Plugin {
         charts.chart(
             spans,
             ChartDescriptor {
-                title: "OpenTelemetry spans received",
-                units: "spans/s",
-                family: "ingest",
-                context: "netdata.otel.spans",
+                title: "OpenTelemetry spans received".into(),
+                units: "spans/s".into(),
+                family: "ingest".into(),
+                context: "netdata.otel.spans".into(),
                 chart_type: ChartType::Stacked,
                 priority: 150_000,
             },
@@ -66,10 +66,10 @@ impl Plugin {
         charts.chart(
             log_records,
             ChartDescriptor {
-                title: "OpenTelemetry log records received",
-                units: "records/s",
-                family: "ingest",
-                context: "netdata.otel.log_records",
+                title: "OpenTelemetry log records received".into(),
+                units: "records/s".into(),
+                family: "ingest".into(),
+                context: "netdata.otel.log_records".into(),
                 chart_type: ChartType::Stacked,
                 priority: 150_001,
             },
@@ -127,10 +127,10 @@ impl Derivation {
         charts.chart(
             services,
             ChartDescriptor {
-                title: "Services with derived charts",
-                units: "services",
-                family: "derived metrics",
-                context: "netdata.otel.derived_services",
+                title: "Services with derived charts".into(),
+                units: "services".into(),
+                family: "derived metrics".into(),
+                context: "netdata.otel.derived_services".into(),
                 chart_type: ChartType::Line,
                 priority: 150_010,
             },
@@ -138,10 +138,10 @@ impl Derivation {
         charts.chart(
             adjusted,
             ChartDescriptor {
-                title: "Records counted in another time slot or chart set",
-                units: "records/s",
-                family: "derived metrics",
-                context: "netdata.otel.derived_adjusted_records",
+                title: "Records counted in another time slot or chart set".into(),
+                units: "records/s".into(),
+                family: "derived metrics".into(),
+                context: "netdata.otel.derived_adjusted_records".into(),
                 // One record can be both late and overflowed.
                 chart_type: ChartType::Line,
                 priority: 150_011,
@@ -150,10 +150,10 @@ impl Derivation {
         charts.chart(
             expired,
             ChartDescriptor {
-                title: "Services removed after 15 minutes without data",
-                units: "services/s",
-                family: "derived metrics",
-                context: "netdata.otel.derived_expired_services",
+                title: "Services removed after 15 minutes without data".into(),
+                units: "services/s".into(),
+                family: "derived metrics".into(),
+                context: "netdata.otel.derived_expired_services".into(),
                 chart_type: ChartType::Line,
                 priority: 150_012,
             },

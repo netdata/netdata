@@ -93,17 +93,18 @@ impl Charts {
         id: &str,
         obsolete: bool,
     ) {
+        let descriptor = &template.descriptor;
         write_chart(
             block,
             &ChartLine {
                 id,
                 name: "",
-                title: &template.title,
-                units: template.units,
-                family: template.family,
-                context: &template.context,
-                chart_type: template.chart_type,
-                priority: template.priority,
+                title: &descriptor.title,
+                units: &descriptor.units,
+                family: &descriptor.family,
+                context: &descriptor.context,
+                chart_type: descriptor.chart_type,
+                priority: descriptor.priority,
                 update_every: self.0.set.0.interval_secs,
                 options: ChartOptions {
                     obsolete,
