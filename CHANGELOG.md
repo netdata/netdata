@@ -414,6 +414,17 @@
 - Feat(go.d): support optional collector operational tests ([#24615](https://github.com/netdata/netdata/issues/24615))
 - Regenerate integrations docs ([#24587](https://github.com/netdata/netdata/issues/24587))
 - Feat(dem): rehearse draft journeys with configuration Test ([#24618](https://github.com/netdata/netdata/issues/24618))
+- Fix(snmp): refresh labels on surviving table charts ([#24620](https://github.com/netdata/netdata/issues/24620))
+- Docs: require concrete benefit for review-driven changes ([#24621](https://github.com/netdata/netdata/issues/24621))
+- Dbengine: move Cloud queries and parallel weights off the libuv pool ([#24581](https://github.com/netdata/netdata/issues/24581))
+- Feat(snmp): add chained table lookups for Cisco PoE labels ([#24623](https://github.com/netdata/netdata/issues/24623))
+- Regenerate integrations docs ([#24619](https://github.com/netdata/netdata/issues/24619))
+- Coverity: disable all Go-built components in the scan build ([#24624](https://github.com/netdata/netdata/issues/24624))
+- Fix(snmp): derive table row identity from SNMP indexes ([#24625](https://github.com/netdata/netdata/issues/24625))
+- Regenerate integrations docs ([#24628](https://github.com/netdata/netdata/issues/24628))
+- Chore(go.d/x509check): migrate to framework v2 ([#24634](https://github.com/netdata/netdata/issues/24634))
+- Feat(go.d/x509check): add tls_server_name option ([#24636](https://github.com/netdata/netdata/issues/24636))
+- Regenerate integrations docs ([#24635](https://github.com/netdata/netdata/issues/24635))
 
 ## [2.12.0] - 2026-09-30
 
