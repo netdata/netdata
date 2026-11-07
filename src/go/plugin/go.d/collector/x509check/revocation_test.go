@@ -436,6 +436,16 @@ func TestRevocationChecker_Status(t *testing.T) {
 				})},
 			},
 		},
+		// An intermediate CA that signs its answers itself sends its own certificate, which its root issued, as
+		// OpenSSL's responder does by default.
+		"OCSP answer with the issuer's certificate from another CA": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps: []testPKIHandler{serveOCSPWith(func(p *testPKI, answer *ocsp.Response) {
+					answer.Certificate = p.caIssuedByRogue
+				})},
+			},
+		},
 		"OCSP answer from an authorized responder": {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
@@ -450,6 +460,16 @@ func TestRevocationChecker_Status(t *testing.T) {
 				})},
 			},
 			wantErr: "not authorized for OCSP signing",
+		},
+		"OCSP answer from a responder another CA certified": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps: []testPKIHandler{serveDelegatedOCSPFrom(
+					func(p *testPKI) (*x509.Certificate, *ecdsa.PrivateKey) { return p.rogue, p.rogueKey },
+					func(*testPKI, *x509.Certificate) {},
+				)},
+			},
+			wantErr: "responder certificate is not signed by the issuer",
 		},
 		"OCSP answer from an expired responder": {
 			endpoints: testPKIEndpoints{
@@ -764,7 +784,7 @@ func TestRevocationChecker_OCSPRequestMethod(t *testing.T) {
 				}},
 			})
 
-			resp, err := newRevocationChecker().queryOCSP(t.Context(), pki.leaf.OCSPServer[0], ocspReq, pki.leaf, pki.ca)
+			resp, err := newRevocationChecker().queryOCSP(t.Context(), pki.leaf.OCSPServer[0], ocspReq, pki.leaf)
 
 			require.NoError(t, err)
 			assert.Equal(t, ocsp.Good, resp.Status)
@@ -1016,9 +1036,11 @@ type testPKI struct {
 	caWithoutCRLSign *x509.Certificate
 	// caRenamed holds the CA's key in a certificate with another name.
 	caRenamed *x509.Certificate
-	rogue     *x509.Certificate
-	rogueKey  *ecdsa.PrivateKey
-	leaf      *x509.Certificate
+	// caIssuedByRogue holds the CA's key in a certificate another CA issued, as an intermediate CA's certificate is.
+	caIssuedByRogue *x509.Certificate
+	rogue           *x509.Certificate
+	rogueKey        *ecdsa.PrivateKey
+	leaf            *x509.Certificate
 
 	crlURLs, ocspURLs, issuerURLs []string
 
@@ -1050,8 +1072,17 @@ func newTestPKI(t *testing.T, endpoints testPKIEndpoints) *testPKI {
 		caKey:            caKey,
 		caWithoutCRLSign: selfSignCA(t, now, "Test CA", caKey, x509.KeyUsageCertSign),
 		caRenamed:        selfSignCA(t, now, "Renamed CA", caKey, x509.KeyUsageCertSign|x509.KeyUsageCRLSign),
-		rogue:            rogue,
-		rogueKey:         rogueKey,
+		caIssuedByRogue: signCA(
+			t,
+			now,
+			"Test CA",
+			&caKey.PublicKey,
+			x509.KeyUsageCertSign|x509.KeyUsageCRLSign,
+			rogue,
+			rogueKey,
+		),
+		rogue:    rogue,
+		rogueKey: rogueKey,
 		hits: map[string]*atomic.Int64{
 			"crl":    {},
 			"ocsp":   {},
@@ -1105,6 +1136,21 @@ func selfSignCA(
 	keyUsage x509.KeyUsage,
 ) *x509.Certificate {
 	t.Helper()
+	return signCA(t, now, name, &key.PublicKey, keyUsage, nil, key)
+}
+
+// signCA returns a CA certificate for pub that parent issued with parentKey, or that parentKey signs itself when
+// parent is nil.
+func signCA(
+	t *testing.T,
+	now time.Time,
+	name string,
+	pub *ecdsa.PublicKey,
+	keyUsage x509.KeyUsage,
+	parent *x509.Certificate,
+	parentKey *ecdsa.PrivateKey,
+) *x509.Certificate {
+	t.Helper()
 	template := &x509.Certificate{
 		SerialNumber: big.NewInt(1),
 		Subject: pkix.Name{
@@ -1116,7 +1162,10 @@ func selfSignCA(
 		BasicConstraintsValid: true,
 		KeyUsage:              keyUsage,
 	}
-	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if parent == nil {
+		parent = template
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, parent, pub, parentKey)
 	require.NoError(t, err)
 	cert, err := x509.ParseCertificate(der)
 	require.NoError(t, err)
@@ -1376,6 +1425,18 @@ func serveOCSPAbout(issuer func(p *testPKI) *x509.Certificate) testPKIHandler {
 // serveDelegatedOCSP answers good, signed by a responder whose certificate the CA issued for OCSP signing, after
 // modify changes the responder certificate's template.
 func serveDelegatedOCSP(modify func(p *testPKI, responder *x509.Certificate)) testPKIHandler {
+	return serveDelegatedOCSPFrom(
+		func(p *testPKI) (*x509.Certificate, *ecdsa.PrivateKey) { return p.ca, p.caKey },
+		modify,
+	)
+}
+
+// serveDelegatedOCSPFrom answers good, signed by a responder whose certificate the CA that certifier returns issued
+// for OCSP signing, after modify changes the responder certificate's template.
+func serveDelegatedOCSPFrom(
+	certifier func(p *testPKI) (*x509.Certificate, *ecdsa.PrivateKey),
+	modify func(p *testPKI, responder *x509.Certificate),
+) testPKIHandler {
 	return func(p *testPKI, w http.ResponseWriter, _ *http.Request) {
 		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if !assert.NoError(p.t, err) {
@@ -1393,7 +1454,8 @@ func serveDelegatedOCSP(modify func(p *testPKI, responder *x509.Certificate)) te
 			ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageOCSPSigning},
 		}
 		modify(p, template)
-		der, err := x509.CreateCertificate(rand.Reader, template, p.ca, &key.PublicKey, p.caKey)
+		ca, caKey := certifier(p)
+		der, err := x509.CreateCertificate(rand.Reader, template, ca, &key.PublicKey, caKey)
 		if !assert.NoError(p.t, err) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -174,7 +174,7 @@ func (rc *revocationChecker) ocspStatus(
 
 	var reasons []string
 	for _, server := range cert.OCSPServer {
-		resp, err := rc.queryOCSP(ctx, server, req, cert, iss)
+		resp, err := rc.queryOCSP(ctx, server, req, cert)
 		if err == nil {
 			err = verifyOCSPResponse(resp, cert, iss, now)
 		}
@@ -192,7 +192,7 @@ func (rc *revocationChecker) queryOCSP(
 	ctx context.Context,
 	server string,
 	ocspReq []byte,
-	cert, issuer *x509.Certificate,
+	cert *x509.Certificate,
 ) (*ocsp.Response, error) {
 	var body []byte
 	var err error
@@ -210,7 +210,10 @@ func (rc *revocationChecker) queryOCSP(
 	if err != nil {
 		return nil, err
 	}
-	resp, err := ocsp.ParseResponseForCert(body, cert, issuer)
+	// Without an issuer, the parser verifies the signature only against a certificate the answer embeds, and does not
+	// require the issuer to have signed that certificate, which an intermediate CA's own certificate is not.
+	// verifyOCSPResponse authenticates the signer.
+	resp, err := ocsp.ParseResponseForCert(body, cert, nil)
 	// Errors from outside the OCSP package can quote the answer, which anyone on the path can write.
 	var parseErr ocsp.ParseError
 	var respErr ocsp.ResponseError
@@ -295,20 +298,32 @@ func verifyCRL(crl *x509.RevocationList, cert, issuer *x509.Certificate, now tim
 	return checkCRLScope(crl, cert)
 }
 
-// verifyOCSPResponse checks what ocsp.ParseResponseForCert, which verifies the signature, leaves out (RFC 6960 3.2):
-// the answer must identify cert and be current, and a delegated responder that signed it must be authorized for OCSP
-// signing by the issuer (RFC 6960 4.2.2.2).
+// verifyOCSPResponse checks that the answer is signed with the issuer's key or by a responder the issuer authorized
+// for OCSP signing (RFC 6960 4.2.2.2), identifies cert, and is current (RFC 6960 3.2).
 func verifyOCSPResponse(resp *ocsp.Response, cert, issuer *x509.Certificate, now time.Time) error {
+	signer := issuer
+	// An embedded certificate with the issuer's key is the issuer's own, whoever issued it; any other is a delegated
+	// responder's.
+	if responder := resp.Certificate; responder != nil &&
+		!bytes.Equal(responder.RawSubjectPublicKeyInfo, issuer.RawSubjectPublicKeyInfo) {
+		if err := checkDelegatedResponder(responder, issuer, now); err != nil {
+			return err
+		}
+		signer = responder
+	}
+	if err := resp.CheckSignatureFrom(signer); err != nil {
+		return fmt.Errorf("bad OCSP signature: %w", err)
+	}
 	if err := checkOCSPCertID(resp, cert, issuer); err != nil {
 		return err
 	}
-	if err := checkUpdateTimes(resp.ThisUpdate, resp.NextUpdate, now); err != nil {
-		return err
-	}
-	// An embedded certificate with the issuer's key is the issuer's own.
-	responder := resp.Certificate
-	if responder == nil || bytes.Equal(responder.RawSubjectPublicKeyInfo, issuer.RawSubjectPublicKeyInfo) {
-		return nil
+	return checkUpdateTimes(resp.ThisUpdate, resp.NextUpdate, now)
+}
+
+// checkDelegatedResponder checks that issuer certified responder for OCSP signing and that it is valid at now.
+func checkDelegatedResponder(responder, issuer *x509.Certificate, now time.Time) error {
+	if issuer.CheckSignature(responder.SignatureAlgorithm, responder.RawTBSCertificate, responder.Signature) != nil {
+		return errors.New("responder certificate is not signed by the issuer")
 	}
 	if !slices.Contains(responder.ExtKeyUsage, x509.ExtKeyUsageOCSPSigning) {
 		return errors.New("responder certificate is not authorized for OCSP signing")
