@@ -72,6 +72,11 @@ static bool test_reader(void) {
     stat_fixture(buf, sizeof(buf), "next-server (v", 44);
     CHECK(fputs(buf, fp) >= 0 && fflush(fp) == 0);
     enable_guest_charts = true;
+    int saved_open_flags = procfile_open_flags;
+    procfile_open_flags = O_RDONLY | O_NOFOLLOW;
+    CHECK(!apps_os_read_pid_stat_linux(&p, NULL));
+    CHECK(!p.comm_orig && !p.starttime);
+    procfile_open_flags = saved_open_flags;
     CHECK(apps_os_read_pid_stat_linux(&p, NULL));
     CHECK(p.ppid == 3 && p.state == 'S' && p.starttime == 21 && p.values[PDF_THREADS] == 19);
     CHECK(strcmp(string2str(p.comm_orig), "next-server (v") == 0);

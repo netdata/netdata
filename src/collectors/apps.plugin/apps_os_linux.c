@@ -1037,8 +1037,20 @@ bool apps_os_read_pid_stat_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     // Reject truncated records rather than publish partial counters.
     char buf[4096];
     char *fields[44];
-    if(read_txt_file(p->stat_filename, buf, sizeof(buf)) || strlen(buf) == sizeof(buf) - 1 ||
-       !parse_proc_pid_stat(buf, fields, enable_guest_charts ? 44 : 22) ||
+    int fd = open(p->stat_filename, procfile_open_flags | O_CLOEXEC);
+    if(fd == -1) goto cleanup;
+
+    ssize_t bytes;
+    do {
+        bytes = read(fd, buf, sizeof(buf) - 1);
+    } while(bytes == -1 && errno == EINTR);
+    int read_errno = errno;
+    close(fd);
+    errno = read_errno;
+    if(bytes <= 0 || (size_t)bytes == sizeof(buf) - 1) goto cleanup;
+    buf[bytes] = '\0';
+
+    if(!parse_proc_pid_stat(buf, fields, enable_guest_charts ? 44 : 22) ||
        str2pid_t(fields[0]) != p->pid)
         goto cleanup;
 
