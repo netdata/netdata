@@ -22,6 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/ownedjobs"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
@@ -85,6 +86,8 @@ type Config struct {
 	Secrets       *SecretsConfig            // nil disables all secret services
 	InitialVnodes map[string]*vnodes.Config // file-configured vnodes
 
+	OwnerOnlyModules []string                          // collector modules whose jobs require parent ownership
+	OwnedJobServices []ownedjobs.Service               // run-scoped parent components
 	Services         []ProcessService                  // optional process-owned background services
 	ProcessFunctions []funcapi.ProcessFunctionProvider // independent of collector selection
 
@@ -132,6 +135,13 @@ func NewProcess(config Config) (*Process, error) {
 		(len(config.Modules) == 0 && len(config.ProcessFunctions) == 0) ||
 		(len(config.Modules) != 0 && (len(config.Defaults) == 0 || len(config.DiscoveryProviders) == 0)) {
 		return nil, errors.New("jobmgr composition: incomplete production configuration")
+	}
+	ownerOnly := make(map[string]bool, len(config.OwnerOnlyModules))
+	for _, name := range config.OwnerOnlyModules {
+		if _, ok := config.Modules[name]; !ok {
+			return nil, fmt.Errorf("jobmgr composition: owner-only module %q is not registered", name)
+		}
+		ownerOnly[name] = true
 	}
 	modules := make(collectorapi.Registry, len(config.Modules))
 	maps.Copy(modules, config.Modules)
@@ -204,6 +214,8 @@ func NewProcess(config Config) (*Process, error) {
 		Modules:          modules,
 		ProcessFunctions: slices.Clone(config.ProcessFunctions),
 		Jobs: runJobServices{
+			OwnerOnlyModules:  ownerOnly,
+			OwnedJobServices:  slices.Clone(config.OwnedJobServices),
 			PluginName:        config.PluginName,
 			Defaults:          defaults,
 			Runtime:           config.Runtime,
@@ -212,11 +224,12 @@ func NewProcess(config Config) (*Process, error) {
 		},
 		Secrets: secretConfig,
 		Discovery: runDiscoveryServices{
-			BuildContext: build,
-			Disabled:     len(modules) == 0,
-			Providers:    providers,
-			RunJob:       slices.Clone(config.RunJob),
-			AutoEnable:   config.AutoEnable,
+			ExcludedModules: slices.Clone(config.OwnerOnlyModules),
+			BuildContext:    build,
+			Disabled:        len(modules) == 0,
+			Providers:       providers,
+			RunJob:          slices.Clone(config.RunJob),
+			AutoEnable:      config.AutoEnable,
 		},
 		DependencySources: processDependencySources(config.Services),
 		FinalizeOutput:    finalizeOutput,

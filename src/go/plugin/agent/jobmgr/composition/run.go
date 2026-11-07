@@ -5,6 +5,7 @@ package composition
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -21,11 +22,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/hostoutput"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/ownedjobs"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 type runJobServices struct {
+	OwnerOnlyModules  map[string]bool
+	OwnedJobServices  []ownedjobs.Service
 	SNMPVnodeAcquirer vnodes.SNMPAcquirer
 	PluginName        string                    // owning plugin name
 	Defaults          confgroup.Registry        // per-module config defaults
@@ -68,7 +72,10 @@ type runGeneration struct {
 	kernel              *jobmgr.CommandKernel          // the command kernel
 	metrics             *runMetrics                    // jobmgr.runtime metrics projection (nil when runtime charts off)
 	metricsRegistration *runMetricsRegistration        // synchronous runtime-writer lease
-	secretEpoch         *processSecretEpoch            // process-owned Store epoch used by this run
+	ownedServices       []ownedjobs.Service
+	ownerServicesCancel context.CancelFunc
+	ownerServicesDone   []<-chan struct{}
+	secretEpoch         *processSecretEpoch // process-owned Store epoch used by this run
 
 	mu               sync.Mutex // guards started/startedAttempted
 	started          bool       // start succeeded
@@ -281,16 +288,18 @@ func newRunGeneration(
 	}
 	dynCfgJobs, err := joboutput.NewDynCfgJobController(
 		joboutput.DynCfgJobControllerConfig{
-			PluginName:    config.Jobs.PluginName,
-			Generation:    config.Generation,
-			Modules:       config.Modules,
-			Defaults:      config.Jobs.Defaults,
-			Factory:       jobs,
-			ConfigModules: configModules,
-			Graph:         graph,
-			Frames:        config.Frames,
-			Dependencies:  dependencyIndex,
-			Diagnostics:   config.Diagnostics,
+			EnableJobOwners:  len(config.Jobs.OwnedJobServices) > 0,
+			OwnerOnlyModules: config.Jobs.OwnerOnlyModules,
+			PluginName:       config.Jobs.PluginName,
+			Generation:       config.Generation,
+			Modules:          config.Modules,
+			Defaults:         config.Jobs.Defaults,
+			Factory:          jobs,
+			ConfigModules:    configModules,
+			Graph:            graph,
+			Frames:           config.Frames,
+			Dependencies:     dependencyIndex,
+			Diagnostics:      config.Diagnostics,
 		},
 	)
 	if err != nil {
@@ -349,6 +358,7 @@ func newRunGeneration(
 		}
 	}
 	return &runGeneration{
+		ownedServices:       slices.Clone(config.Jobs.OwnedJobServices),
 		dependencySources:   config.DependencySources,
 		subscriptions:       subscriptions,
 		publication:         config.Publication,
@@ -440,6 +450,9 @@ func (rg *runGeneration) startWithRunContext(
 	if err := rg.dyncfg.PublishInitial(startupCtx, rg.kernel, rg.run.Generation()); err != nil {
 		return rg.stopAfterStartFailure(startupCtx, err)
 	}
+	if err := rg.startOwnerServices(runCtx); err != nil {
+		return rg.stopAfterStartFailure(startupCtx, err)
+	}
 	if err := rg.startDiscovery(startupCtx); err != nil {
 		return rg.stopAfterStartFailure(startupCtx, err)
 	}
@@ -478,6 +491,7 @@ func (rg *runGeneration) abortConstruction() error {
 
 func (rg *runGeneration) Stop() {
 	if rg != nil && rg.kernel != nil {
+		rg.stopOwnerServices()
 		rg.vnodes.stopAcquisition()
 		rg.scheduler.StopBackgroundWorkers()
 		rg.kernel.Stop()
@@ -491,11 +505,15 @@ func (rg *runGeneration) Wait(ctx context.Context) error {
 	waitErr := rg.kernel.Wait(ctx)
 	select {
 	case <-rg.kernel.Done():
+		rg.stopOwnerServices()
 		rg.vnodes.stopAcquisition()
 		rg.scheduler.StopBackgroundWorkers()
 	default:
 	}
-	return errors.Join(waitErr, rg.scheduler.WaitBackgroundWorkers(ctx), rg.vnodes.waitAcquisition(ctx))
+	return errors.Join(waitErr, rg.scheduler.WaitBackgroundWorkers(ctx), rg.vnodes.waitAcquisition(ctx),
+		rg.waitOwnerServices(ctx),
+		rg.dyncfg.WaitJobOwners(ctx),
+	)
 }
 
 type runMetricsRegistration struct {

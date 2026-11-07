@@ -20,11 +20,12 @@ import (
 const discoveryResourceID = "__jobmgr_discovery__"
 
 type runDiscoveryServices struct {
-	Disabled     bool                            // Functions-only process: no collector discovery
-	BuildContext agentdiscovery.BuildContext     // discovery build context (paths, defaults, output/registration seams)
-	Providers    *agentdiscovery.ProviderCatalog // frozen discovery provider catalog
-	RunJob       []string                        // allow-list filter of job names (empty = allow all)
-	AutoEnable   bool                            // publish discovered jobs as Running vs Accepted
+	ExcludedModules []string                        // immutable collector modules owned by parent components
+	Disabled        bool                            // Functions-only process: no collector discovery
+	BuildContext    agentdiscovery.BuildContext     // discovery build context (paths, defaults, output/registration seams)
+	Providers       *agentdiscovery.ProviderCatalog // frozen discovery provider catalog
+	RunJob          []string                        // allow-list filter of job names (empty = allow all)
+	AutoEnable      bool                            // publish discovered jobs as Running vs Accepted
 }
 
 func (rds runDiscoveryServices) valid() bool {
@@ -47,35 +48,7 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	inventory, err := jobmgrdiscovery.NewInventoryIndex(
-		jobmgrdiscovery.InventoryConfig{
-			Generation:  rg.run.Generation(),
-			RunJob:      rg.discovery.RunJob,
-			AutoEnable:  rg.discovery.AutoEnable,
-			Commands:    rg.kernel,
-			Diagnostics: rg.diagnostics,
-			Plan: func(batch jobmgrdiscovery.SourceInventoryBatch) (jobmgr.WorkPlan, error) {
-				observations := make([]joboutput.DiscoveredJobInventory, len(batch.Observations))
-				for i, inventory := range batch.Observations {
-					candidates := make([]joboutput.DiscoveredJobCandidate, len(inventory.Candidates))
-					for j, candidate := range inventory.Candidates {
-						candidates[j] = joboutput.DiscoveredJobCandidate{
-							Config:      candidate.Config,
-							Source:      candidate.Source,
-							Incarnation: candidate.Incarnation,
-						}
-					}
-					observations[i] = joboutput.DiscoveredJobInventory{
-						FullName: inventory.FullName, Version: inventory.Version, Candidates: candidates,
-						Sources: inventory.Sources, AutoEnable: inventory.AutoEnable,
-					}
-				}
-				return rg.dyncfg.PlanInventory(joboutput.DiscoveredJobInventoryBatch{
-					FullName: batch.FullName, Observations: observations,
-				})
-			},
-		},
-	)
+	inventory, err := rg.newInventoryIndex()
 	if err != nil {
 		return err
 	}
@@ -526,4 +499,38 @@ func (rd *readyDiscovery) Finalize() error {
 	rd.finalized = true
 	rd.mu.Unlock()
 	return nil
+}
+
+// newInventoryIndex is the production source membership and delivery boundary.
+func (rg *runGeneration) newInventoryIndex() (*jobmgrdiscovery.InventoryIndex, error) {
+	return jobmgrdiscovery.NewInventoryIndex(
+		jobmgrdiscovery.InventoryConfig{
+			ExcludedModules: rg.discovery.ExcludedModules,
+			Generation:      rg.run.Generation(),
+			RunJob:          rg.discovery.RunJob,
+			AutoEnable:      rg.discovery.AutoEnable,
+			Commands:        rg.kernel,
+			Diagnostics:     rg.diagnostics,
+			Plan: func(batch jobmgrdiscovery.SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+				observations := make([]joboutput.DiscoveredJobInventory, len(batch.Observations))
+				for i, inventory := range batch.Observations {
+					candidates := make([]joboutput.DiscoveredJobCandidate, len(inventory.Candidates))
+					for j, candidate := range inventory.Candidates {
+						candidates[j] = joboutput.DiscoveredJobCandidate{
+							Config:      candidate.Config,
+							Source:      candidate.Source,
+							Incarnation: candidate.Incarnation,
+						}
+					}
+					observations[i] = joboutput.DiscoveredJobInventory{
+						FullName: inventory.FullName, Version: inventory.Version, Candidates: candidates,
+						Sources: inventory.Sources, AutoEnable: inventory.AutoEnable,
+					}
+				}
+				return rg.dyncfg.PlanInventory(joboutput.DiscoveredJobInventoryBatch{
+					FullName: batch.FullName, Observations: observations,
+				})
+			},
+		},
+	)
 }

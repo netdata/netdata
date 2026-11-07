@@ -29,7 +29,10 @@ func (dcjc *DynCfgJobController) configCreateCleanup(
 		dyncfg.CommandTest,
 		dyncfg.CommandUserconfig,
 	)
-	if sourceType == confgroup.TypeDyncfg && configType == dyncfg.ConfigTypeJob {
+	if dcjc.owned.protected(config.ID, config.Module) {
+		commands = dyncfg.JoinCommands(dyncfg.CommandSchema, dyncfg.CommandGet, dyncfg.CommandTest)
+	}
+	if !dcjc.owned.protected(config.ID, config.Module) && sourceType == confgroup.TypeDyncfg && configType == dyncfg.ConfigTypeJob {
 		commands += " " + string(dyncfg.CommandRemove)
 	}
 	return dcjc.protocolCleanup(func(api *netdataapi.API) error {

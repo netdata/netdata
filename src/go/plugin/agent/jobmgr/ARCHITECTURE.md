@@ -491,6 +491,26 @@ A plugin-side DynCfg `add` is replay/upsert-capable because the daemon uses it t
 Ordinary user duplicate adds remain create-only at the daemon boundary. Removal targets only the current DynCfg
 override and does not immediately reactivate a masked lower-priority source.
 
+### Parent-owned native jobs
+
+Composition can declare owner-only collector modules and run-scoped parent services through
+[`framework/ownedjobs`](../../framework/ownedjobs/README.md). A parent holds canonical desired configuration; Job
+Manager owns each generated child's native lifecycle. Generated jobs cannot acquire independently editable DynCfg
+intent, including through a template ADD, a daemon echo or ordinary discovery before graph materialization.
+Owner-only modules are excluded before standalone inventory tracks source membership, so empty source withdrawals
+cannot leave native candidate records behind. Unowned modules retain their existing behavior.
+
+The parent prepares a complete immutable child set, then adopts it under the native jobs claim. Parent lifetime,
+parent revision and child desired identity are distinct. Unchanged child identities survive parent edits and trusted
+source takeover. Changed or removed children lose output, scheduling and Function admission before individual native
+transitions can wait on wire publication or physical release. Existing native workers still own construction,
+dependency waits, retry and cleanup; successor activation waits for predecessor release.
+
+Parent adoption does not make every child ready atomically. Each affected child realizes its desired state through
+a normal per-job transaction, so large parents do not require one oversized graph mutation. Status exposes accepted
+parent revision, desired/applied child identity and current runtime state separately. Retired owner capabilities and
+stale child work cannot adopt or publish a replacement's state.
+
 ### Collector source-priority event flow
 
 One public collector/job name can have several distinct configurations. `discovery/inventory.go` reports one immutable

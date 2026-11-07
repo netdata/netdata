@@ -70,6 +70,7 @@ type candidateKey struct {
 }
 
 type candidateWorkToken struct {
+	Owner     *ownedChildIntent
 	Run       uint64
 	Intent    uint64
 	Attempt   uint64
@@ -201,6 +202,7 @@ type candidateSourceAdmission struct {
 // canonical lane serializes policy changes. Population preparation runs off-loop;
 // live runtime settlement prepares only bounded entry/header changes on the loop.
 type candidateRecord struct {
+	Owner     *ownedChildIntent
 	Revision  uint64
 	Inventory DiscoveredJobInventory
 	Cursor    *sourceObservation
@@ -398,7 +400,7 @@ func (c *candidateController) valid(name string, token candidateWorkToken) bool 
 }
 
 func (c *candidateController) validRecord(r *candidateRecord, token candidateWorkToken) bool {
-	if token.Run != c.run {
+	if token.Run != c.run || token.Owner != nil && token.Owner.revoked.Load() {
 		return false
 	}
 	entry := r.entry(token.Candidate)
@@ -1435,7 +1437,9 @@ func (c *candidateController) progress(d *candidateDelta, now int64) error {
 			if err != nil {
 				return err
 			}
-			work := &candidateWork{Token: candidateWorkToken{Run: c.run, Intent: r.Intent, Attempt: attempt, Candidate: key}, Config: e.Candidate.Config}
+			work := &candidateWork{Token: candidateWorkToken{Run: c.run, Intent: r.Intent, Attempt: attempt, Candidate: key,
+				Owner: r.Owner,
+			}, Config: e.Candidate.Config}
 			r.Active = work
 			r.Wake = nil
 			r.Phase = candidatePreparing

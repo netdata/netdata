@@ -333,7 +333,19 @@ func (dcjc *DynCfgJobController) prepareResourceTransaction(
 	}
 	transaction, err := PrepareResourceTransaction(spec)
 	if err == nil {
-		return transaction, nil
+		var expected *ownedChildIntent
+		result := noResponseResult()
+		if spec.reply != nil {
+			if spec.reply.candidate != nil {
+				expected = spec.reply.candidate.after.Owner
+			}
+			if spec.reply.command != "" {
+				result = rejectedResult(
+					jobFailure{class: failureForbidden, message: "configuration is controlled by its parent owner"},
+				)
+			}
+		}
+		return dcjc.guardOwned(transaction, expected, result), nil
 	}
 	var rollbackErr error
 	if spec.Graph != nil && spec.MutationPrepared {

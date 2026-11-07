@@ -82,7 +82,7 @@ func (dcjc *DynCfgJobController) publishInitialTemplates(
 func (dcjc *DynCfgJobController) templatePublicationCleanup() lifecycle.TaskCleanup {
 	names := make([]string, 0, len(dcjc.modules))
 	for name, creator := range dcjc.modules {
-		if creator.InstancePolicy == collectorapi.InstancePolicyPerJob {
+		if creator.InstancePolicy == collectorapi.InstancePolicyPerJob && !dcjc.ownerOnly[name] {
 			names = append(names, name)
 		}
 	}

@@ -31,7 +31,12 @@ type candidateDecisionOptions struct {
 	restart   restartObservationTransition
 }
 
-func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, scope lifecycle.ResourceTransactionScope, current lifecycle.ReadyResource, permit lifecycle.LongLivedPermit, delta *candidateDelta, options ...candidateDecisionOptions) (lifecycle.PreparedResourceTransaction, error) {
+func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, scope lifecycle.ResourceTransactionScope, current lifecycle.ReadyResource, permit lifecycle.LongLivedPermit, delta *candidateDelta, options ...candidateDecisionOptions) (transaction lifecycle.PreparedResourceTransaction, resultErr error) {
+	defer func() {
+		if resultErr == nil {
+			transaction = dcjc.guardOwned(transaction, delta.after.Owner, noResponseResult())
+		}
+	}()
 	var option candidateDecisionOptions
 	if len(options) > 0 {
 		option = options[0]

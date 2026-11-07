@@ -118,8 +118,9 @@ type ConstructedJob struct {
 	retryAutoDetection func() bool                 // whether a failed auto-detection should be rescheduled
 	resolvedReferences bool                        // lifecycle failures may contain resolved secret values
 	stageFunctions     bool                        // job Function lifecycle still needs post-probe staging
-	publishRuntime     func() error                // scheduler publication after readiness
-	attachProjections  func() error                // binds external runtime/vnode projections before acceptance
+	revokeRuntime      func()
+	publishRuntime     func() error // scheduler publication after readiness
+	attachProjections  func() error // binds external runtime/vnode projections before acceptance
 	attach             func(lifecycle.ResourceIdentity, *stagedJobOwner) (constructedJobAttachment, error)
 	candidateJob       RuntimeJob
 	runtimeStage       *stagedRuntimeService
@@ -297,7 +298,7 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 		return nil, errors.Join(err, state.permit.AbortUnused())
 	}
 	state.constructed = accepted
-	return &JobGeneration{
+	generationJob := &JobGeneration{
 		continuation: state.continuation,
 		ID:           state.id,
 		Generation:   state.generation,
@@ -307,7 +308,11 @@ func (pj PreparedJob) Accept(ctx context.Context, generation uint64) (*JobGenera
 		permit:       state.permit,
 		owner:        state.owner,
 		processOwner: state.constructed.processOwner,
-	}, nil
+	}
+	if intent := state.continuation.Owner; intent != nil {
+		intent.attach(generationJob)
+	}
+	return generationJob, nil
 }
 
 func probeConstructed(
@@ -771,7 +776,14 @@ func (jg *JobGeneration) abortProcessOwned(ctx context.Context) error {
 	return jg.permit.Return()
 }
 
-func (jg *JobGeneration) Finalize() error {
+func (jg *JobGeneration) Finalize() (resultErr error) {
+	if jg != nil && jg.continuation.Owner != nil {
+		defer func() {
+			if resultErr == nil {
+				jg.continuation.Owner.detach(jg)
+			}
+		}()
+	}
 	if jg == nil {
 		return errors.New("job output: nil JobGeneration")
 	}
@@ -885,4 +897,17 @@ func callJobLifecycle(name string, call func() error) (err error) {
 		}
 	}()
 	return call()
+}
+
+// revokeOwnedAdmissions is bounded and never drains external work. The normal
+// resource transaction still performs Stop, publication withdrawal and cleanup.
+func (jg *JobGeneration) revokeOwnedAdmissions() {
+	jg.resources.outputGate.RevokeAdmissions()
+	if jg.resources.revokeRuntime != nil {
+		jg.resources.revokeRuntime()
+	}
+	if handlers, ok := jg.resources.Handlers.(interface{ RevokeAdmissions() }); ok {
+		handlers.RevokeAdmissions()
+	}
+	jg.processOwner.Retire()
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 )
@@ -60,6 +61,7 @@ func newProcessManagedJob(
 		candidateJob:     job,
 		processOwner:     owner,
 		publishRuntime:   scheduled.Publish,
+		revokeRuntime:    scheduled.RevokeAdmissions,
 	}, nil
 }
 
@@ -134,6 +136,7 @@ type scheduledJobSupport struct {
 	job       RuntimeJob                 // runtime job registered for ticks
 	started   bool                       // runtime initiation succeeded
 	published bool                       // Register succeeded after readiness
+	revoked   bool                       // new scheduler admission was revoked by a parent
 	stopped   bool                       // Unregister succeeded
 	released  bool                       // Release succeeded (terminal)
 }
@@ -154,6 +157,9 @@ func (sjs *scheduledJobSupport) Start(context.Context) error {
 func (sjs *scheduledJobSupport) Publish() error {
 	sjs.mu.Lock()
 	defer sjs.mu.Unlock()
+	if sjs.revoked {
+		return jobmgr.ErrProcessAttemptRetired
+	}
 	if !sjs.started || sjs.stopped || sjs.released || sjs.published {
 		return errors.New("job output: invalid scheduler support publication")
 	}
@@ -277,4 +283,16 @@ func finalizeProcessOwnedConstructed(constructed ConstructedJob) (resultErr erro
 		)
 	}
 	return resultErr
+}
+
+func (sjs *scheduledJobSupport) RevokeAdmissions() {
+	sjs.mu.Lock()
+	defer sjs.mu.Unlock()
+	sjs.revoked = true
+	if sjs.published {
+		// Keep the support attached; Stop/Release still belong to the runtime.
+		if err := sjs.scheduler.Unregister(sjs.identity, sjs.job); err == nil {
+			sjs.published = false
+		}
+	}
 }

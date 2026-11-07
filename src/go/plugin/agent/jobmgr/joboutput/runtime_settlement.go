@@ -96,6 +96,15 @@ func (t *runtimeSettlementTransaction) Apply(ctx context.Context) (applied lifec
 		}
 	}()
 	dcjc := t.controller
+	if intent := t.current.continuation.Owner; intent != nil && intent.revoked.Load() {
+		return lifecycle.NewAppliedResourceTransaction(
+			t.scope,
+			lifecycle.ResourceTransactionUnchanged,
+			t.current,
+			noResponseResult(),
+			func() error { return nil },
+		)
+	}
 	record, exists := dcjc.graph.Lookup(t.scope.ID)
 	if !exists || (record.Status != dyncfg.StatusAccepted.String() && record.Status != dyncfg.StatusRunning.String()) {
 		return lifecycle.AppliedResourceTransaction{}, errors.New("job output: runtime settlement graph changed inside transaction")

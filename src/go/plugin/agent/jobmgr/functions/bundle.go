@@ -27,26 +27,27 @@ const (
 type functionBundle struct {
 	mu sync.Mutex
 
-	kind            functionBundleKind
-	module          string
-	job             collectorapi.RuntimeJob
-	handler         funcapi.MethodHandler
-	methods         []funcapi.FunctionConfig
-	availability    map[string]bool
-	pollable        bool
-	references      int
-	retired         bool
-	cleanupStart    bool
-	cleanupErr      error
-	cleanupDone     chan struct{}
-	attempts        jobmgr.ProcessAttemptAuthority
-	identityKey     string
-	resource        string
-	target          uint64
-	invocationID    uint64
-	activeCallbacks int
-	quarantined     bool
-	quarantineFixed bool
+	kind              functionBundleKind
+	module            string
+	job               collectorapi.RuntimeJob
+	handler           funcapi.MethodHandler
+	methods           []funcapi.FunctionConfig
+	availability      map[string]bool
+	pollable          bool
+	references        int
+	retired           bool
+	admissionsRevoked bool
+	cleanupStart      bool
+	cleanupErr        error
+	cleanupDone       chan struct{}
+	attempts          jobmgr.ProcessAttemptAuthority
+	identityKey       string
+	resource          string
+	target            uint64
+	invocationID      uint64
+	activeCallbacks   int
+	quarantined       bool
+	quarantineFixed   bool
 }
 
 type functionAvailabilityPoll struct {
@@ -100,7 +101,7 @@ func (fb *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll, err
 		return functionAvailabilityPoll{}, errors.New("jobmgr Function bundle: nil availability poll")
 	}
 	fb.mu.Lock()
-	if fb.retired || !fb.pollable {
+	if fb.retired || fb.admissionsRevoked || !fb.pollable {
 		fb.mu.Unlock()
 		return functionAvailabilityPoll{}, nil
 	}
@@ -164,7 +165,7 @@ func (fb *functionBundle) invoke(
 		return functionErrorResult(503, "Function handler did not complete before its deadline")
 	}
 	fb.mu.Lock()
-	if fb.retired || fb.quarantined {
+	if fb.retired || fb.admissionsRevoked || fb.quarantined {
 		fb.mu.Unlock()
 		return functionErrorResult(503, "Function handler is unavailable")
 	}
@@ -619,5 +620,5 @@ func (fb *functionBundle) available(method string) bool {
 	}
 	fb.mu.Lock()
 	defer fb.mu.Unlock()
-	return !fb.retired && !fb.quarantined && fb.availability[method]
+	return !fb.retired && !fb.admissionsRevoked && !fb.quarantined && fb.availability[method]
 }

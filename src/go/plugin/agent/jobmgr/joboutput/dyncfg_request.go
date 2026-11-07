@@ -91,6 +91,12 @@ func (dcjc *DynCfgJobController) resolveRequest(request DynCfgJobRequest) (dynCf
 	if module == name {
 		resourceID = module
 	}
+	if (command == dyncfg.CommandAdd || command == dyncfg.CommandUpdate ||
+		command == dyncfg.CommandEnable || command == dyncfg.CommandDisable ||
+		command == dyncfg.CommandRemove || command == dyncfg.CommandRestart) &&
+		dcjc.owned.protected(resourceID, module) {
+		return dynCfgTarget{}, newDynCfgFailure(failureForbidden, "configuration is controlled by its parent owner")
+	}
 	return dynCfgTarget{
 		command:    command,
 		module:     module,

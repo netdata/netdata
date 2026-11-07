@@ -1398,3 +1398,14 @@ func (c *Controller) cleanupUnpublishedGroups(ctx context.Context, groups map[co
 	}
 	return err
 }
+
+// RevokeAdmissions closes collector callback admission without taking the
+// publication lock or waiting for wire withdrawal or existing invocations.
+func (jh *JobHandle) RevokeAdmissions() {
+	if jh == nil || jh.bundle == nil {
+		return
+	}
+	jh.bundle.mu.Lock()
+	jh.bundle.admissionsRevoked = true
+	jh.bundle.mu.Unlock()
+}

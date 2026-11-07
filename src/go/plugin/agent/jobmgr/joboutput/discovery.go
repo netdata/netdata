@@ -30,6 +30,16 @@ func (dcjc *DynCfgJobController) PlanInventory(batch DiscoveredJobInventoryBatch
 		Transaction: &jobmgr.ResourceTransactionPlan{
 			ID: batch.FullName,
 			Prepare: func(ctx context.Context, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResourceTransaction, error) {
+				module := ""
+				for _, inventory := range batch.Observations {
+					if len(inventory.Candidates) > 0 {
+						module = inventory.Candidates[0].Config.Module()
+						break
+					}
+				}
+				if dcjc.owned.protected(batch.FullName, module) {
+					return dcjc.noop(scope, current, permit, noResponseResult())
+				}
 				invalid := make(map[candidateKey]bool)
 				for _, inventory := range batch.Observations {
 					for _, candidate := range inventory.Candidates {

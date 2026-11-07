@@ -611,3 +611,36 @@ func TestInventoryIndexRejectsInvalidGroupBeforeObservingBatch(t *testing.T) {
 		})
 	}
 }
+
+func TestInventoryIndexExcludedModulesNeverAcquireSourceMembership(t *testing.T) {
+	var planned []SourceInventory
+	excluded := []string{"owned"}
+	index, err := NewInventoryIndex(InventoryConfig{
+		Generation:      1,
+		ExcludedModules: excluded,
+		Commands:        inventoryTestCommands(nil),
+		Plan: func(batch SourceInventoryBatch) (jobmgr.WorkPlan, error) {
+			planned = append(planned, batch.Observations...)
+			return jobmgr.WorkPlan{}, nil
+		},
+	})
+	require.NoError(t, err)
+	// A caller changing its input after construction cannot change admission.
+	excluded[0] = "owned_child"
+	owned := inventoryTestConfig("child_job", confgroup.TypeUser, "source").SetModule("owned")
+	ordinary := inventoryTestConfig("job", confgroup.TypeUser, "source").SetModule("owned_child")
+	require.Equal(t, owned.FullName(), ordinary.FullName(), "module/name pairs can share a native FullName")
+	for _, group := range []*confgroup.Group{
+		{Source: "source", Configs: []confgroup.Config{owned, ordinary}},
+		{Source: "source"},
+		{Source: "source", Configs: []confgroup.Config{owned}},
+		{Source: "source"},
+	} {
+		require.NoError(t, index.Apply(t.Context(), []*confgroup.Group{group}))
+	}
+	require.Len(t, planned, 2, "only the ordinary source and its withdrawal should be delivered")
+	require.Len(t, planned[0].Candidates, 1)
+	require.Equal(t, "owned_child", planned[0].Candidates[0].Config.Module())
+	require.Empty(t, planned[1].Candidates)
+	require.Empty(t, planned[1].Sources)
+}

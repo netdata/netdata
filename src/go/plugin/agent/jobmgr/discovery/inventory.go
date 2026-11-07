@@ -18,24 +18,26 @@ import (
 )
 
 type InventoryConfig struct {
-	Generation  uint64
-	RunJob      []string
-	AutoEnable  bool
-	Plan        PlanInventory
-	Commands    PreparedCommandPort
-	Diagnostics jobmgr.DiagnosticObserver
+	ExcludedModules []string // modules whose jobs cannot originate in discovery
+	Generation      uint64
+	RunJob          []string
+	AutoEnable      bool
+	Plan            PlanInventory
+	Commands        PreparedCommandPort
+	Diagnostics     jobmgr.DiagnosticObserver
 }
 
 // InventoryIndex owns source observations and their ordered delivery for one run.
 // Selection, activation and candidate failures belong to the job controller.
 // Apply is called serially by the discovery pipeline.
 type InventoryIndex struct {
-	generation  uint64
-	runJob      map[string]struct{}
-	autoEnable  bool
-	plan        PlanInventory
-	commands    PreparedCommandPort
-	diagnostics jobmgr.DiagnosticObserver
+	excludedModules map[string]struct{}
+	generation      uint64
+	runJob          map[string]struct{}
+	autoEnable      bool
+	plan            PlanInventory
+	commands        PreparedCommandPort
+	diagnostics     jobmgr.DiagnosticObserver
 
 	sources          map[string]map[uint64]SourceCandidate
 	sourceNames      map[string]map[string]uint64
@@ -63,19 +65,24 @@ func NewInventoryIndex(config InventoryConfig) (*InventoryIndex, error) {
 		}
 		runJob[name] = struct{}{}
 	}
+	excludedModules := make(map[string]struct{}, len(config.ExcludedModules))
+	for _, name := range config.ExcludedModules {
+		excludedModules[name] = struct{}{}
+	}
 	return &InventoryIndex{
-		generation:  config.Generation,
-		runJob:      runJob,
-		autoEnable:  config.AutoEnable,
-		plan:        config.Plan,
-		commands:    config.Commands,
-		diagnostics: config.Diagnostics,
-		sources:     make(map[string]map[uint64]SourceCandidate),
-		sourceNames: make(map[string]map[string]uint64),
-		presence:    make(map[string]map[string]uint64),
-		candidates:  make(map[string]map[inventoryCandidateKey]SourceCandidate),
-		versions:    make(map[string]uint64),
-		pending:     make(map[string][]SourceInventoryBatch),
+		excludedModules: excludedModules,
+		generation:      config.Generation,
+		runJob:          runJob,
+		autoEnable:      config.AutoEnable,
+		plan:            config.Plan,
+		commands:        config.Commands,
+		diagnostics:     config.Diagnostics,
+		sources:         make(map[string]map[uint64]SourceCandidate),
+		sourceNames:     make(map[string]map[string]uint64),
+		presence:        make(map[string]map[string]uint64),
+		candidates:      make(map[string]map[inventoryCandidateKey]SourceCandidate),
+		versions:        make(map[string]uint64),
+		pending:         make(map[string][]SourceInventoryBatch),
 	}, nil
 }
 
@@ -245,6 +252,11 @@ func (ii *InventoryIndex) applyGroup(group *confgroup.Group, observations map[st
 }
 
 func (ii *InventoryIndex) allowed(config confgroup.Config) bool {
+	// Reject parent-owned modules before source membership is recorded. Their
+	// later metadata-free withdrawals must not create independent native intent.
+	if _, excluded := ii.excludedModules[config.Module()]; excluded {
+		return false
+	}
 	if len(ii.runJob) == 0 {
 		return true
 	}

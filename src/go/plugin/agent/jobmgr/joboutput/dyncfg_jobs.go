@@ -31,16 +31,18 @@ type DynCfgJobRequest struct {
 }
 
 type DynCfgJobControllerConfig struct {
-	PluginName    string                    // owning plugin name
-	Generation    uint64                    // owning run generation
-	Modules       collectorapi.Registry     // collector module registry
-	Defaults      confgroup.Registry        // per-module config defaults
-	Factory       *Factory                  // job construction factory
-	ConfigModules *ConfigModuleFactory      // short-lived config-probe factory
-	Graph         *dyncfg.Graph             // dyncfg graph authority
-	Frames        *lifecycle.FrameOwner     // protocol frame sink
-	Dependencies  JobDependencyIndex        // secret-dependency index (optional)
-	Diagnostics   jobmgr.DiagnosticObserver // operational log sink
+	EnableJobOwners  bool
+	OwnerOnlyModules map[string]bool           // modules admitted only through parent capabilities
+	PluginName       string                    // owning plugin name
+	Generation       uint64                    // owning run generation
+	Modules          collectorapi.Registry     // collector module registry
+	Defaults         confgroup.Registry        // per-module config defaults
+	Factory          *Factory                  // job construction factory
+	ConfigModules    *ConfigModuleFactory      // short-lived config-probe factory
+	Graph            *dyncfg.Graph             // dyncfg graph authority
+	Frames           *lifecycle.FrameOwner     // protocol frame sink
+	Dependencies     JobDependencyIndex        // secret-dependency index (optional)
+	Diagnostics      jobmgr.DiagnosticObserver // operational log sink
 }
 
 type JobDependencyIndex interface {
@@ -50,6 +52,8 @@ type JobDependencyIndex interface {
 // DynCfgJobController prepares collector configuration graph/resource
 // transactions. CommandKernel remains the only current-job authority.
 type DynCfgJobController struct {
+	owned            *ownedJobRegistry
+	ownerOnly        map[string]bool
 	generation       uint64                    // owning run generation
 	pluginName       string                    // owning plugin
 	prefix           string                    // "<plugin>:collector:" ID prefix
@@ -78,7 +82,8 @@ func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobControl
 		config.Frames == nil {
 		return nil, errors.New("job output: incomplete DynCfg job controller configuration")
 	}
-	return &DynCfgJobController{
+	controller := &DynCfgJobController{
+		ownerOnly:     config.OwnerOnlyModules,
 		generation:    config.Generation,
 		pluginName:    config.PluginName,
 		prefix:        DynCfgJobPrefix(config.PluginName),
@@ -93,7 +98,15 @@ func NewDynCfgJobController(config DynCfgJobControllerConfig) (*DynCfgJobControl
 		diagnostics:   config.Diagnostics,
 		scheduler:     config.Factory.config.Scheduler,
 		candidates:    newCandidateController(config.Generation),
-	}, nil
+	}
+	controller.owned = &ownedJobRegistry{
+		controller:   controller,
+		owners:       make(map[string]*nativeJobOwner),
+		reservations: make(map[string]*ownedChildIntent),
+		dispatchDone: make(chan struct{}),
+	}
+	controller.owned.enabled.Store(config.EnableJobOwners)
+	return controller, nil
 }
 
 func (dcjc *DynCfgJobController) BindBackgroundWorkers(
@@ -107,6 +120,7 @@ func (dcjc *DynCfgJobController) BindBackgroundWorkers(
 	dcjc.scheduler.accepted.validWork = dcjc.candidates.valid
 	dcjc.scheduler.accepted.resumeWork = dcjc.retainCandidateResume
 	dcjc.scheduler.retireCandidates = func() {
+		dcjc.owned.retire()
 		dcjc.candidates.retire()
 		dcjc.restartObservers.retire()
 	}
