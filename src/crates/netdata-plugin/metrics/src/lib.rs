@@ -4,8 +4,7 @@
 //!
 //! ```
 //! use netdata_plugin_metrics::{
-//!     Aggregator, Batch, ChartDescriptor, ChartType, ChartsBuilder, Labels, MetricSetBuilder,
-//!     Settings, columns,
+//!     Aggregator, Batch, ChartDescriptor, ChartType, Labels, MetricSetBuilder, Settings, columns,
 //! };
 //!
 //! columns! {
@@ -15,27 +14,20 @@
 //!     }
 //! }
 //!
-//! // Once, at startup: declare the table (its instruments), then the charts
-//! // that show it, and create the aggregator.
+//! // Once, at startup: declare the metric set, each instrument with its
+//! // chart, and create the aggregator.
 //! let mut builder = MetricSetBuilder::new(Settings::default())?;
-//! let requests = builder.counter::<Outcome>()?;
+//! let requests = builder.counter::<Outcome>(ChartDescriptor {
+//!     title: "Requests".into(),
+//!     units: "requests/s".into(),
+//!     family: "requests".into(),
+//!     context: "svc.requests".into(),
+//!     chart_type: ChartType::Stacked,
+//!     priority: 1000,
+//! })?;
 //! let set = builder.build()?;
 //!
-//! let mut charts = ChartsBuilder::new(&set);
-//! charts.chart(
-//!     requests,
-//!     ChartDescriptor {
-//!         title: "Requests".into(),
-//!         units: "requests/s".into(),
-//!         family: "requests".into(),
-//!         context: "svc.requests".into(),
-//!         chart_type: ChartType::Stacked,
-//!         priority: 1000,
-//!     },
-//! )?;
-//! let charts = charts.build()?;
-//!
-//! let mut aggregator = Aggregator::new(&charts);
+//! let mut aggregator = Aggregator::new(&set);
 //!
 //! // Per unit of work, for example one export request: record its events at
 //! // their event time in one batch, then merge it once the work is durable.
@@ -86,23 +78,23 @@
 //!   `set_value`, `set_total`, `observe`). The events of one entity in one
 //!   window combine into that window's row.
 //!
-//! The charts ([`Charts`]) are how the agent shows the table, and the only
-//! part that uses Netdata's terms: each column group becomes a *chart
-//! template* whose *dimensions* are the group's values, and each entity gets
-//! one *chart instance* (in Netdata's sense: one chart with its own chart id)
-//! of every template. Where OpenTelemetry splits a metric by attributes, the
-//! table splits an instrument by entity and by column; the charts show them
-//! as chart instances and dimensions.
+//! The charts are how the agent shows the table, declared with each
+//! instrument by a [`ChartDescriptor`]; recording never sees them. Each
+//! column group becomes a *chart template* whose *dimensions* are the group's
+//! values, and each entity gets one *chart instance* (in Netdata's sense: one
+//! chart with its own chart id) of every template. Where OpenTelemetry splits
+//! a metric by attributes, the table splits an instrument by entity and by
+//! column; the charts show them as chart instances and dimensions.
 //!
-//! A mistake in declaring a metric set or its charts makes the
-//! [`MetricSetBuilder`] or [`ChartsBuilder`] step that makes it return an
-//! [`Error`], and that step adds nothing. Other mistakes of the plugin's own
-//! code are checked by debug assertions: an empty, too long or repeated label
-//! key, and, when recording or merging, an instrument or batch of another
-//! metric set or a column index out of range (a broken manual [`Column`]
-//! implementation). Tests and debug builds panic on them, release builds skip
-//! the checks. [`Labels::insert`] and [`Aggregator::merge`] list them under
-//! `# Panics`, [`Measurements`] in its own documentation.
+//! A mistake in declaring a metric set makes the [`MetricSetBuilder`] step
+//! that makes it return an [`Error`], and that step adds nothing. Other
+//! mistakes of the plugin's own code are checked by debug assertions: an
+//! empty, too long or repeated label key, and, when recording or merging, an
+//! instrument or batch of another metric set or a column index out of range
+//! (a broken manual [`Column`] implementation). Tests and debug builds panic
+//! on them, release builds skip the checks. [`Labels::insert`] and
+//! [`Aggregator::merge`] list them under `# Panics`, [`Measurements`] in its
+//! own documentation.
 
 mod aggregator;
 mod batch;
@@ -114,9 +106,8 @@ mod metric_set;
 
 pub use aggregator::{Aggregator, Stats};
 pub use batch::{Batch, BatchEntity, Measurements};
-pub use chart::{ChartDescriptor, Charts, ChartsBuilder};
+pub use chart::ChartDescriptor;
 pub use error::Error;
-pub use layout::ColumnRange;
 pub use metric_set::{
     CardinalityLimit, Column, Counter, CumulativeCounter, Gauge, Histogram, Labels, MetricSet,
     MetricSetBuilder, Settings,

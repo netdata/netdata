@@ -11,7 +11,6 @@
 //! updates them, and expiry marks them obsolete.
 
 use crate::batch::Batch;
-use crate::chart::Charts;
 use crate::emit::Chunker;
 use crate::metric_set::{Labels, MetricSet, MetricSetInner};
 use std::collections::hash_map::Entry;
@@ -68,8 +67,8 @@ struct Entity {
 }
 
 /// Collects the batches of one [`MetricSet`] and emits each window, once its
-/// allowed lateness has passed, as chart-protocol text through the
-/// [`Charts`] it was created with (charts of that set).
+/// allowed lateness has passed, as chart-protocol text through the set's
+/// charts.
 ///
 /// The aggregator reads no clock and does no I/O. Pass the current Unix time
 /// to [`Aggregator::merge`] and [`Aggregator::emit`], call `emit` at least
@@ -126,7 +125,6 @@ struct Entity {
 ///   [`Stats::overflowed_events`]).
 pub struct Aggregator {
     set: MetricSet,
-    charts: Charts,
     entities: HashMap<Labels, Entity>,
     overflow_entity: Option<Entity>,
     /// Oldest window not yet emitted; set on first use.
@@ -135,11 +133,10 @@ pub struct Aggregator {
 }
 
 impl Aggregator {
-    /// An aggregator of the metric set `charts` show, emitting through them.
-    pub fn new(charts: &Charts) -> Self {
+    /// An aggregator of the metric set `set`.
+    pub fn new(set: &MetricSet) -> Self {
         Self {
-            set: charts.0.set.clone(),
-            charts: charts.clone(),
+            set: set.clone(),
             entities: HashMap::new(),
             overflow_entity: None,
             oldest_open: None,
@@ -195,7 +192,6 @@ impl Aggregator {
         );
         let oldest_open = self.bound_backlog(now);
         let set = &*self.set.0;
-        let charts = &self.charts;
         // Never below `oldest_open`: the clamp below and `merge_window` rely on it.
         let newest = (now / set.interval_secs).max(oldest_open);
         for (labels, entity_rows) in batch.entities {
@@ -210,14 +206,14 @@ impl Aggregator {
             let entity = match (self.entities.entry(labels), full) {
                 (Entry::Occupied(entry), _) => entry.into_mut(),
                 (Entry::Vacant(entry), None) => {
-                    let entity = Entity::new(set, charts, entry.key().clone(), EntityKind::Own);
+                    let entity = Entity::new(set, entry.key().clone(), EntityKind::Own);
                     entry.insert(entity)
                 }
                 (Entry::Vacant(_), Some(limit)) => {
                     self.stats.overflowed_events += events;
                     self.overflow_entity.get_or_insert_with(|| {
                         let labels = limit.overflow_labels.clone();
-                        Entity::new(set, charts, labels, EntityKind::Overflow)
+                        Entity::new(set, labels, EntityKind::Overflow)
                     })
                 }
             };
@@ -250,20 +246,19 @@ impl Aggregator {
         let mut out = Chunker::new(max_chunk);
         let mut oldest_open = self.bound_backlog(now);
         let set = &*self.set.0;
-        let charts = &self.charts;
         let now_window = now / set.interval_secs;
         while oldest_open + set.allowed_lateness_windows < now_window {
             let window = oldest_open;
             let stats = &mut self.stats;
             self.entities.retain(|_, entity| {
-                entity.emit_window(set, charts, window, &mut out);
-                let expired = entity.expire_if_idle(set, charts, window, &mut out);
+                entity.emit_window(set, window, &mut out);
+                let expired = entity.expire_if_idle(set, window, &mut out);
                 stats.expired_entities += u64::from(expired);
                 !expired
             });
             if let Some(entity) = self.overflow_entity.as_mut() {
-                entity.emit_window(set, charts, window, &mut out);
-                if entity.expire_if_idle(set, charts, window, &mut out) {
+                entity.emit_window(set, window, &mut out);
+                if entity.expire_if_idle(set, window, &mut out) {
                     self.overflow_entity = None;
                     self.stats.expired_entities += 1;
                 }
@@ -276,9 +271,9 @@ impl Aggregator {
 }
 
 impl Entity {
-    fn new(set: &MetricSetInner, charts: &Charts, labels: Labels, kind: EntityKind) -> Self {
+    fn new(set: &MetricSetInner, labels: Labels, kind: EntityKind) -> Self {
         Self {
-            chart_ids: charts.chart_ids(&labels, kind),
+            chart_ids: set.charts.chart_ids(&labels, kind),
             labels,
             emitted: false,
             first_window: u64::MAX,
@@ -333,40 +328,28 @@ impl Entity {
 
     /// Emit `window`, the oldest open one, and drop its row; nothing
     /// is written before the entity's first event.
-    fn emit_window(
-        &mut self,
-        set: &MetricSetInner,
-        charts: &Charts,
-        window: u64,
-        out: &mut Chunker,
-    ) {
+    fn emit_window(&mut self, set: &MetricSetInner, window: u64, out: &mut Chunker) {
         let row = self.open_rows.pop_front();
         if window < self.first_window {
             return;
         }
         if !self.emitted {
-            charts.write_definitions(&self.chart_ids, &self.labels, out);
+            set.write_definitions(&self.chart_ids, &self.labels, out);
             self.emitted = true;
         }
         let mut row = row.unwrap_or_else(|| set.schema.empty_row());
         self.totals_to_increases(set, &mut row);
-        charts.write_updates(&self.chart_ids, &row, window, out);
+        set.write_updates(&self.chart_ids, &row, window, out);
     }
 
     /// When the entity has had no events for the expiry time as of `window`,
     /// mark its chart instances obsolete and return true; the caller drops
     /// it.
-    fn expire_if_idle(
-        &self,
-        set: &MetricSetInner,
-        charts: &Charts,
-        window: u64,
-        out: &mut Chunker,
-    ) -> bool {
+    fn expire_if_idle(&self, set: &MetricSetInner, window: u64, out: &mut Chunker) -> bool {
         if !self.emitted || window < self.last_window.saturating_add(set.expiry_windows) {
             return false;
         }
-        charts.write_obsolete(&self.chart_ids, out);
+        set.write_obsolete(&self.chart_ids, out);
         true
     }
 
@@ -399,8 +382,8 @@ impl Entity {
 mod tests {
     use super::*;
     use crate::{
-        CardinalityLimit, ChartDescriptor, ChartType, ChartsBuilder, Counter, CumulativeCounter,
-        Error, Gauge, Histogram, Measurements, MetricSetBuilder, Settings,
+        CardinalityLimit, ChartDescriptor, ChartType, Counter, CumulativeCounter, Error, Gauge,
+        Histogram, Measurements, MetricSetBuilder, Settings,
     };
     use netdata_plugin_protocol::validate_chart_stream;
     use std::time::Duration;
@@ -416,7 +399,6 @@ mod tests {
 
     struct Fixture {
         set: MetricSet,
-        charts: Charts,
         requests: Counter<Outcome>,
         duration: Histogram,
     }
@@ -437,26 +419,19 @@ mod tests {
             ..Settings::default()
         })
         .unwrap();
-        let requests = builder.counter::<Outcome>().unwrap();
-        let duration = builder.histogram(BOUNDS).unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts
-            .chart(
-                requests,
-                ChartDescriptor {
-                    title: "Requests".into(),
-                    units: "requests/s".into(),
-                    family: "requests".into(),
-                    context: "svc.requests".into(),
-                    chart_type: ChartType::Stacked,
-                    priority: 1,
-                },
-            )
+        let requests = builder
+            .counter::<Outcome>(ChartDescriptor {
+                title: "Requests".into(),
+                units: "requests/s".into(),
+                family: "requests".into(),
+                context: "svc.requests".into(),
+                chart_type: ChartType::Stacked,
+                priority: 1,
+            })
             .unwrap();
-        charts
+        let duration = builder
             .histogram(
-                duration,
+                BOUNDS,
                 ChartDescriptor {
                     title: "Duration".into(),
                     units: "seconds".into(),
@@ -469,8 +444,7 @@ mod tests {
             )
             .unwrap();
         Fixture {
-            charts: charts.build().unwrap(),
-            set,
+            set: builder.build().unwrap(),
             requests,
             duration,
         }
@@ -521,7 +495,7 @@ mod tests {
     #[test]
     fn defines_once_then_updates_each_window() {
         let f = fixture(0, 900, None);
-        let mut aggregator = Aggregator::new(&f.charts);
+        let mut aggregator = Aggregator::new(&f.set);
         record(&f, &mut aggregator, "checkout", 100, 3, 1, 100);
         let chunks = aggregator.emit(101, usize::MAX);
         // On the wire, 2 and 1 as IEEE 754 bits in base64.
@@ -576,7 +550,7 @@ mod tests {
     #[test]
     fn allowed_lateness_keeps_windows_open_and_clamps_exactly_once() {
         let f = fixture(10, 900, None);
-        let mut aggregator = Aggregator::new(&f.charts);
+        let mut aggregator = Aggregator::new(&f.set);
         // The oldest open window is 990 (now 1000, allowed lateness 10).
         record(&f, &mut aggregator, "a", 995, 1, 0, 1000);
         // Too late: counted in the oldest open window.
@@ -609,7 +583,7 @@ mod tests {
     #[test]
     fn expired_entities_are_marked_obsolete_and_revived() {
         let f = fixture(0, 3, None);
-        let mut aggregator = Aggregator::new(&f.charts);
+        let mut aggregator = Aggregator::new(&f.set);
         record(&f, &mut aggregator, "a", 10, 1, 0, 10);
         let mut out = text(&aggregator.emit(13, usize::MAX));
         assert!(!out.contains("obsolete"));
@@ -628,7 +602,7 @@ mod tests {
     #[test]
     fn entities_over_the_limit_share_the_overflow_entity() {
         let f = fixture(0, 3, Some(1));
-        let mut aggregator = Aggregator::new(&f.charts);
+        let mut aggregator = Aggregator::new(&f.set);
         record(&f, &mut aggregator, "a", 10, 1, 0, 10);
         record(&f, &mut aggregator, "b", 10, 2, 0, 10);
         record(&f, &mut aggregator, "c", 10, 3, 0, 10);
@@ -650,7 +624,7 @@ mod tests {
     #[test]
     fn entities_without_events_are_not_created() {
         let f = fixture(0, 3, Some(1));
-        let mut aggregator = Aggregator::new(&f.charts);
+        let mut aggregator = Aggregator::new(&f.set);
         let mut batch = Batch::new(&f.set);
         batch.entity(labels("empty"));
         aggregator.merge(batch, 10);
@@ -666,7 +640,7 @@ mod tests {
     #[test]
     fn a_clock_jump_renders_a_bounded_backlog_and_keeps_every_event() {
         let f = fixture(10, 1_000_000, None);
-        let mut aggregator = Aggregator::new(&f.charts);
+        let mut aggregator = Aggregator::new(&f.set);
         record(&f, &mut aggregator, "a", 10, 1, 0, 10);
         record(&f, &mut aggregator, "a", 100_000, 2, 0, 100_000);
         let open = aggregator.entities.values().next().unwrap().open_rows.len() as u64;
@@ -686,7 +660,7 @@ mod tests {
     #[test]
     fn events_spread_over_many_seconds_land_in_their_windows() {
         let f = fixture(10, 900, None);
-        let mut aggregator = Aggregator::new(&f.charts);
+        let mut aggregator = Aggregator::new(&f.set);
         let mut batch = Batch::new(&f.set);
         let mut entity = batch.entity(labels("a"));
         for time in [995, 996, 995, 997, 996, 999] {
@@ -704,7 +678,7 @@ mod tests {
     #[test]
     fn chunks_hold_whole_blocks_under_the_budget() {
         let f = fixture(0, 900, None);
-        let mut aggregator = Aggregator::new(&f.charts);
+        let mut aggregator = Aggregator::new(&f.set);
         for name in ["a", "b", "c", "d"] {
             record(&f, &mut aggregator, name, 10, 1, 0, 10);
         }
@@ -730,7 +704,7 @@ mod tests {
         assert_eq!(labels.0.len(), 1);
         assert_eq!(labels.0[0].1.len(), 800);
         let f = fixture(0, 900, None);
-        let entity = Entity::new(&f.set.0, &f.charts, labels, EntityKind::Own);
+        let entity = Entity::new(&f.set.0, labels, EntityKind::Own);
         assert!(entity.chart_ids[0].starts_with("svc.requests_"));
         assert!(netdata_plugin_protocol::is_valid_chart_id(
             &entity.chart_ids[0]
@@ -747,8 +721,7 @@ mod tests {
         ba.insert("a", "1");
         assert_eq!(ab, ba);
         let f = fixture(0, 900, None);
-        let ids =
-            |labels: Labels| Entity::new(&f.set.0, &f.charts, labels, EntityKind::Own).chart_ids;
+        let ids = |labels: Labels| Entity::new(&f.set.0, labels, EntityKind::Own).chart_ids;
         assert_eq!(ids(ab), ids(ba));
         assert_eq!(ids(Labels::new())[0], "svc.requests");
     }
@@ -765,23 +738,18 @@ mod tests {
             ..Settings::default()
         })
         .unwrap();
-        let totals = builder.cumulative_counter::<Events>().unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts
-            .chart(
-                totals,
-                ChartDescriptor {
-                    title: "Events".into(),
-                    units: "events/s".into(),
-                    family: "events".into(),
-                    context: "src.events".into(),
-                    chart_type: ChartType::Line,
-                    priority: 1,
-                },
-            )
+        let totals = builder
+            .cumulative_counter::<Events>(ChartDescriptor {
+                title: "Events".into(),
+                units: "events/s".into(),
+                family: "events".into(),
+                context: "src.events".into(),
+                chart_type: ChartType::Line,
+                priority: 1,
+            })
             .unwrap();
-        let mut aggregator = Aggregator::new(&charts.build().unwrap());
+        let set = builder.build().unwrap();
+        let mut aggregator = Aggregator::new(&set);
         let set_total = |aggregator: &mut Aggregator, time: u64, total: Option<f64>| {
             let mut batch = Batch::new(&set);
             let mut entity = batch.entity(Labels::new());
@@ -836,7 +804,7 @@ mod tests {
             }
         }
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let counter = builder.counter::<Broken>().unwrap();
+        let counter = builder.counter::<Broken>(descriptor("x.c", 1)).unwrap();
         let set = builder.build().unwrap();
         let mut batch = Batch::new(&set);
         let mut entity = batch.entity(Labels::new());
@@ -936,21 +904,20 @@ mod tests {
             }
         }
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let requests = builder.counter::<Outcome>().unwrap();
-        let queued = builder.gauge::<Queued>().unwrap();
-        let totals = builder.cumulative_counter::<Events>().unwrap();
-        let duration = builder.histogram(BOUNDS).unwrap();
+        let requests = builder
+            .counter::<Outcome>(descriptor("svc.requests", 1))
+            .unwrap();
+        let queued = builder
+            .gauge::<Queued>(descriptor("svc.queued", 1))
+            .unwrap();
+        let totals = builder
+            .cumulative_counter::<Events>(descriptor("svc.events", 1))
+            .unwrap();
+        let duration = builder
+            .histogram(BOUNDS, descriptor("svc.duration", 1), "requests/s".into())
+            .unwrap();
         let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts
-            .chart(requests, descriptor("svc.requests", 1))
-            .unwrap();
-        charts.chart(queued, descriptor("svc.queued", 1)).unwrap();
-        charts.chart(totals, descriptor("svc.events", 1)).unwrap();
-        charts
-            .histogram(duration, descriptor("svc.duration", 1), "requests/s".into())
-            .unwrap();
-        let mut aggregator = Aggregator::new(&charts.build().unwrap());
+        let mut aggregator = Aggregator::new(&set);
         let mut batch = Batch::new(&set);
         let mut entity = batch.entity(Labels::new());
         entity
@@ -983,7 +950,7 @@ mod tests {
     #[test]
     fn weights_scale_counts_and_histograms() {
         let f = fixture(0, 900, None);
-        let mut aggregator = Aggregator::new(&f.charts);
+        let mut aggregator = Aggregator::new(&f.set);
         let mut batch = Batch::new(&f.set);
         let mut entity = batch.entity(labels("a"));
         entity
@@ -1017,7 +984,6 @@ mod tests {
     /// One instrument of each kind, declared in this order.
     struct Every {
         set: MetricSet,
-        charts: Charts,
         requests: Counter<Outcome>,
         totals: CumulativeCounter<Seen>,
         queue: Gauge<Queue>,
@@ -1041,21 +1007,18 @@ mod tests {
             ..Settings::default()
         })
         .unwrap();
-        let requests = builder.counter::<Outcome>().unwrap();
-        let totals = builder.cumulative_counter::<Seen>().unwrap();
-        let queue = builder.gauge::<Queue>().unwrap();
-        let duration = builder.histogram(bounds).unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts.chart(requests, descriptor("x.requests", 1)).unwrap();
-        charts.chart(totals, descriptor("x.totals", 2)).unwrap();
-        charts.chart(queue, descriptor("x.queue", 3)).unwrap();
-        charts
-            .histogram(duration, descriptor("x.duration", 4), "u".into())
+        let requests = builder
+            .counter::<Outcome>(descriptor("x.requests", 1))
+            .unwrap();
+        let totals = builder
+            .cumulative_counter::<Seen>(descriptor("x.totals", 2))
+            .unwrap();
+        let queue = builder.gauge::<Queue>(descriptor("x.queue", 3)).unwrap();
+        let duration = builder
+            .histogram(bounds, descriptor("x.duration", 4), "u".into())
             .unwrap();
         Every {
-            charts: charts.build().unwrap(),
-            set,
+            set: builder.build().unwrap(),
             requests,
             totals,
             queue,
@@ -1089,46 +1052,9 @@ mod tests {
     }
 
     #[test]
-    fn charts_declared_out_of_instrument_order_read_their_own_columns() {
-        let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let requests = builder.counter::<Outcome>().unwrap();
-        let queue = builder.gauge::<Queue>().unwrap();
-        let duration = builder.histogram(&[1.0]).unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts
-            .histogram(duration, descriptor("x.duration", 1), "u".into())
-            .unwrap();
-        charts.chart(queue, descriptor("x.queue", 4)).unwrap();
-        charts.chart(requests, descriptor("x.requests", 5)).unwrap();
-        let mut aggregator = Aggregator::new(&charts.build().unwrap());
-        merge_event(&set, &mut aggregator, 10, 10, |m| {
-            m.add(requests, Outcome::Error, 4.0)
-                .set_value(queue, Queue::Jobs, 7.0)
-                .observe(duration, 3.0, 2.0);
-        });
-        let out = text(&aggregator.emit(11, usize::MAX));
-        validate_chart_stream(out.as_bytes()).unwrap();
-        let updates: Vec<&str> = out
-            .split_inclusive("END 11 0 1\n")
-            .map(|block| &block[block.find("BEGIN ").unwrap()..])
-            .collect();
-        assert_eq!(
-            updates,
-            [
-                "BEGIN x.duration_avg 1000000\nSET avg = 3\nEND 11 0 1\n",
-                "BEGIN x.duration_max 1000000\nSET max = 3\nEND 11 0 1\n",
-                "BEGIN x.duration_histogram 1000000\nSET 1 = 0\nSET +Inf = 2\nEND 11 0 1\n",
-                "BEGIN x.queue 1000000\nSET jobs = 7\nEND 11 0 1\n",
-                "BEGIN x.requests 1000000\nSET ok = 0\nSET error = 4\nEND 11 0 1\n",
-            ]
-        );
-    }
-
-    #[test]
     fn a_two_second_interval_shows_rates_values_and_times() {
         let e = every(2, &[0.5, 2.0]);
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.add(e.requests, Outcome::Ok, 3.0)
                 .set_total(e.totals, Seen::Events, 100.0)
@@ -1165,7 +1091,7 @@ mod tests {
     #[test]
     fn histogram_buckets_take_bounds_negative_values_and_odd_weights() {
         let e = every(1, &[0.5, 2.0]);
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             // A value equal to a bound counts in that bound's bucket.
             m.observe(e.duration, 0.5, 1.0)
@@ -1191,7 +1117,7 @@ mod tests {
     #[test]
     fn a_histogram_without_bounds_has_only_the_inf_bucket() {
         let e = every(1, &[]);
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.observe(e.duration, 5.0, 2.0);
         });
@@ -1221,7 +1147,7 @@ mod tests {
         let mut texts = Vec::new();
         for split in [false, true] {
             let e = every(1, &[0.5]);
-            let mut aggregator = Aggregator::new(&e.charts);
+            let mut aggregator = Aggregator::new(&e.set);
             for time in windows {
                 let mut batch = Batch::new(&e.set);
                 record(&mut batch, &e, time, 0);
@@ -1244,7 +1170,7 @@ mod tests {
     fn a_gauge_keeps_the_value_set_last() {
         let e = every(1, &[]);
         // Two values in one row: the later call wins.
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.set_value(e.queue, Queue::Jobs, 1.0)
                 .set_value(e.queue, Queue::Jobs, 2.0);
@@ -1254,7 +1180,7 @@ mod tests {
             ["2"]
         );
         // Across batches the later merge wins; a batch without a value keeps it.
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.set_value(e.queue, Queue::Jobs, 5.0);
         });
@@ -1268,7 +1194,7 @@ mod tests {
         );
         // Late windows of one batch combine in the order they were first
         // recorded into, whatever their event times.
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         assert!(aggregator.emit(21, usize::MAX).is_empty());
         let mut batch = Batch::new(&e.set);
         let mut entity = batch.entity(Labels::new());
@@ -1290,7 +1216,7 @@ mod tests {
     #[test]
     fn a_backlog_fold_lets_older_last_values_win() {
         let e = every(1, &[]);
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         merge_event(&e.set, &mut aggregator, 1000, 1000, |m| {
             m.add(e.requests, Outcome::Ok, 1.0)
                 .set_value(e.queue, Queue::Jobs, 1.0)
@@ -1312,7 +1238,7 @@ mod tests {
     #[test]
     fn cumulative_totals_handle_equal_lower_and_negative_totals() {
         let e = every(1, &[]);
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         for (time, total) in [(10, 100.0), (11, 100.0), (12, 0.0), (13, -5.0), (14, -3.0)] {
             merge_event(&e.set, &mut aggregator, time, time, |m| {
                 m.set_total(e.totals, Seen::Events, total);
@@ -1322,7 +1248,7 @@ mod tests {
         let out = text(&aggregator.emit(16, usize::MAX));
         assert_eq!(values(&out, "events"), ["", "0", "0", "-5", "2", "0"]);
         // An event without a total first: no baseline yet, then the baseline.
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         merge_event(&e.set, &mut aggregator, 10, 10, |_| {});
         merge_event(&e.set, &mut aggregator, 11, 11, |m| {
             m.set_total(e.totals, Seen::Events, 50.0);
@@ -1333,7 +1259,7 @@ mod tests {
         let out = text(&aggregator.emit(13, usize::MAX));
         assert_eq!(values(&out, "events"), ["", "", "2"]);
         // A late, lower total after a newer one was emitted reads as a reset.
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         merge_event(&e.set, &mut aggregator, 10, 10, |m| {
             m.set_total(e.totals, Seen::Events, 100.0);
         });
@@ -1363,21 +1289,21 @@ mod tests {
             }
         }
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let first = builder.cumulative_counter::<Pair>().unwrap();
-        let requests = builder.counter::<Outcome>().unwrap();
-        let second = builder.cumulative_counter::<Single>().unwrap();
-        let duration = builder.histogram(&[0.5]).unwrap();
-        let queue = builder.gauge::<Queue>().unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts.chart(first, descriptor("x.first", 1)).unwrap();
-        charts.chart(requests, descriptor("x.requests", 2)).unwrap();
-        charts.chart(second, descriptor("x.second", 3)).unwrap();
-        charts
-            .histogram(duration, descriptor("x.duration", 4), "u".into())
+        let first = builder
+            .cumulative_counter::<Pair>(descriptor("x.first", 1))
             .unwrap();
-        charts.chart(queue, descriptor("x.queue", 8)).unwrap();
-        let mut aggregator = Aggregator::new(&charts.build().unwrap());
+        let requests = builder
+            .counter::<Outcome>(descriptor("x.requests", 2))
+            .unwrap();
+        let second = builder
+            .cumulative_counter::<Single>(descriptor("x.second", 3))
+            .unwrap();
+        let duration = builder
+            .histogram(&[0.5], descriptor("x.duration", 4), "u".into())
+            .unwrap();
+        let queue = builder.gauge::<Queue>(descriptor("x.queue", 8)).unwrap();
+        let set = builder.build().unwrap();
+        let mut aggregator = Aggregator::new(&set);
         for (time, totals) in [(10, [10.0, 20.0, 30.0]), (11, [11.0, 25.0, 33.0])] {
             merge_event(&set, &mut aggregator, time, time, |m| {
                 m.set_total(first, Pair::A, totals[0])
@@ -1397,15 +1323,30 @@ mod tests {
         assert_eq!(values(&out, "jobs"), ["7", "7"]);
     }
 
-    /// Declares one gauge of `C` and charts it as `context`, then finishes
-    /// the charts.
-    fn chart_one<C: crate::Column>(context: &'static str) -> Result<Charts, Error> {
+    /// Declares one gauge of `C` charted as `context`, then finishes the set.
+    fn chart_one<C: crate::Column>(context: &'static str) -> Result<MetricSet, Error> {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let gauge = builder.gauge::<C>().unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts.chart(gauge, descriptor(context, 1))?;
-        charts.build()
+        builder.gauge::<C>(descriptor(context, 1))?;
+        builder.build()
+    }
+
+    /// The number of column groups and of chart templates in `set`.
+    fn declared(set: &MetricSet) -> (usize, usize) {
+        (
+            set.0.schema.column_groups().len(),
+            set.0.charts.templates.len(),
+        )
+    }
+
+    #[test]
+    fn a_refused_chart_adds_no_columns() {
+        let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
+        assert_eq!(
+            builder.counter::<Outcome>(descriptor("nodot", 1)).err(),
+            Some(Error::InvalidContext("nodot".into()))
+        );
+        // The failed step added nothing, not even the column group.
+        assert_eq!(builder.build().err(), Some(Error::NoInstruments));
     }
 
     #[test]
@@ -1449,20 +1390,13 @@ mod tests {
     #[test]
     fn a_used_context_is_refused() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let requests = builder.counter::<Outcome>().unwrap();
-        let queue = builder.gauge::<Queue>().unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts.chart(requests, descriptor("x.c", 1)).unwrap();
+        builder.counter::<Outcome>(descriptor("x.c", 1)).unwrap();
         assert_eq!(
-            charts.chart(queue, descriptor("x.c", 2)).err(),
+            builder.gauge::<Queue>(descriptor("x.c", 2)).err(),
             Some(Error::DuplicateContext("x.c".into()))
         );
-        // The failed step added nothing: the gauge is still without a chart.
-        assert_eq!(
-            charts.build().err(),
-            Some(Error::ColumnsWithoutChart(vec!["jobs".into()]))
-        );
+        // The failed step added nothing: only the counter is declared.
+        assert_eq!(declared(&builder.build().unwrap()), (1, 1));
     }
 
     #[test]
@@ -1477,7 +1411,7 @@ mod tests {
         }
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         assert_eq!(
-            builder.counter::<Twice>().err(),
+            builder.counter::<Twice>(descriptor("x.c", 1)).err(),
             Some(Error::DuplicateColumn("a"))
         );
         // The failed step added nothing.
@@ -1495,14 +1429,19 @@ mod tests {
             }
         }
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        assert_eq!(builder.counter::<Empty>().err(), Some(Error::NoColumns));
+        assert_eq!(
+            builder.counter::<Empty>(descriptor("x.c", 1)).err(),
+            Some(Error::NoColumns)
+        );
     }
 
     #[test]
     fn decreasing_histogram_bounds_are_refused() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
         assert_eq!(
-            builder.histogram(&[1.0, 0.5]).err(),
+            builder
+                .histogram(&[1.0, 0.5], descriptor("x.d", 1), "u".into())
+                .err(),
             Some(Error::HistogramBounds)
         );
         // The failed step added nothing.
@@ -1512,11 +1451,9 @@ mod tests {
     #[test]
     fn a_histogram_checks_its_base_context() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let duration = builder.histogram(&[1.0]).unwrap();
-        let set = builder.build().unwrap();
         assert_eq!(
-            ChartsBuilder::new(&set)
-                .histogram(duration, descriptor("nodot", 1), "u".into())
+            builder
+                .histogram(&[1.0], descriptor("nodot", 1), "u".into())
                 .err(),
             Some(Error::InvalidContext("nodot".into()))
         );
@@ -1525,73 +1462,34 @@ mod tests {
     #[test]
     fn a_histogram_refuses_a_used_derived_context() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let queue = builder.gauge::<Queue>().unwrap();
-        let duration = builder.histogram(&[1.0]).unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts.chart(queue, descriptor("x.d_max", 1)).unwrap();
+        builder.gauge::<Queue>(descriptor("x.d_max", 1)).unwrap();
         assert_eq!(
-            charts
-                .histogram(duration, descriptor("x.d", 2), "u".into())
+            builder
+                .histogram(&[1.0], descriptor("x.d", 2), "u".into())
                 .err(),
             Some(Error::DuplicateContext("x.d_max".into()))
         );
         // The failed step added nothing, not even the `avg` chart, whose
-        // context was free.
-        assert_eq!(
-            charts.build().err(),
-            Some(Error::ColumnsWithoutChart(vec!["avg".into()]))
-        );
-    }
-
-    #[test]
-    fn a_histogram_of_another_set_is_refused() {
-        let e = every(1, BOUNDS);
-        let other = every(1, BOUNDS);
-        assert_eq!(
-            ChartsBuilder::new(&e.set)
-                .histogram(other.duration, descriptor("x.d", 1), "u".into())
-                .err(),
-            Some(Error::InstrumentOfAnotherSet)
-        );
-    }
-
-    #[test]
-    fn a_histogram_charted_twice_is_refused() {
-        let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let duration = builder.histogram(&[1.0]).unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts
-            .histogram(duration, descriptor("x.d", 1), "u".into())
-            .unwrap();
-        assert_eq!(
-            charts
-                .histogram(duration, descriptor("x.e", 4), "u".into())
-                .err(),
-            Some(Error::ColumnsAlreadyCharted(vec!["avg".into()]))
-        );
+        // context was free, or its column group: only the gauge is declared.
+        assert_eq!(declared(&builder.build().unwrap()), (1, 1));
     }
 
     #[test]
     fn a_histogram_priority_needs_room_for_its_charts() {
         let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let duration = builder.histogram(&[1.0]).unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
         for priority in [i32::MAX - 1, i32::MAX] {
             assert_eq!(
-                charts
-                    .histogram(duration, descriptor("x.d", priority), "u".into())
+                builder
+                    .histogram(&[1.0], descriptor("x.d", priority), "u".into())
                     .err(),
                 Some(Error::HistogramPriority(priority))
             );
         }
         // The failed steps added nothing; the highest priority with room fits.
-        charts
-            .histogram(duration, descriptor("x.d", i32::MAX - 2), "u".into())
+        builder
+            .histogram(&[1.0], descriptor("x.d", i32::MAX - 2), "u".into())
             .unwrap();
-        charts.build().unwrap();
+        assert_eq!(declared(&builder.build().unwrap()), (3, 3));
     }
 
     #[test]
@@ -1610,11 +1508,9 @@ mod tests {
                 ..Settings::default()
             })
             .unwrap();
-            let queue = builder.gauge::<Queue>().unwrap();
+            let queue = builder.gauge::<Queue>(descriptor("x.q", 1)).unwrap();
             let set = builder.build().unwrap();
-            let mut charts = ChartsBuilder::new(&set);
-            charts.chart(queue, descriptor("x.q", 1)).unwrap();
-            let mut aggregator = Aggregator::new(&charts.build().unwrap());
+            let mut aggregator = Aggregator::new(&set);
             let mut batch = Batch::new(&set);
             batch
                 .entity(Labels::new())
@@ -1627,52 +1523,13 @@ mod tests {
         }
     }
 
-    #[test]
-    fn an_instrument_charted_twice_is_refused() {
-        let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let queue = builder.gauge::<Queue>().unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts.chart(queue, descriptor("x.a", 1)).unwrap();
-        assert_eq!(
-            charts.chart(queue, descriptor("x.b", 2)).err(),
-            Some(Error::ColumnsAlreadyCharted(vec!["jobs".into()]))
-        );
-    }
-
-    #[test]
-    fn an_instrument_without_charts_is_refused() {
-        let mut builder = MetricSetBuilder::new(Settings::default()).unwrap();
-        let queue = builder.gauge::<Queue>().unwrap();
-        builder.histogram(&[1.0]).unwrap();
-        let set = builder.build().unwrap();
-        let mut charts = ChartsBuilder::new(&set);
-        charts.chart(queue, descriptor("x.a", 1)).unwrap();
-        assert_eq!(
-            charts.build().err(),
-            Some(Error::ColumnsWithoutChart(vec!["avg".into()]))
-        );
-    }
-
-    #[test]
-    fn charting_an_instrument_of_another_set_is_refused() {
-        let e = every(1, &[]);
-        let other = every(1, &[]);
-        assert_eq!(
-            ChartsBuilder::new(&e.set)
-                .chart(other.queue, descriptor("x.a", 1))
-                .err(),
-            Some(Error::InstrumentOfAnotherSet)
-        );
-    }
-
     #[cfg(debug_assertions)]
     #[test]
     #[should_panic(expected = "batch of another metric set")]
     fn a_batch_of_another_set_is_refused() {
         let e = every(1, &[]);
         let other = every(1, &[]);
-        let mut aggregator = Aggregator::new(&e.charts);
+        let mut aggregator = Aggregator::new(&e.set);
         aggregator.merge(Batch::new(&other.set), 10);
     }
 }

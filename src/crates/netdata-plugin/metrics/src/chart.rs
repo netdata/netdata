@@ -8,17 +8,16 @@
 
 use crate::aggregator::EntityKind;
 use crate::error::Error;
-use crate::layout::ColumnRange;
-use crate::metric_set::{Histogram, Labels, MetricSet};
+use crate::metric_set::Labels;
 use netdata_plugin_protocol::{ChartType, is_valid_dimension_id};
-use std::sync::Arc;
 
 /// Describes a chart: its title, units, family, context, type and priority.
-/// [`ChartsBuilder`] makes a chart template of it over one of the table's
-/// column groups, whose values become the dimensions, and every entity gets
-/// one chart instance of each template. The fields map to the CHART line of
-/// the plugins.d protocol (`src/plugins.d/README.md` in the Netdata
-/// repository); the crate sets the CHART line's other fields itself.
+/// Each [`MetricSetBuilder`](crate::MetricSetBuilder) instrument step takes
+/// one and makes a chart template of it over the instrument's column group,
+/// whose values become the dimensions, and every entity gets one chart
+/// instance of each template. The fields map to the CHART line of the
+/// plugins.d protocol (`src/plugins.d/README.md` in the Netdata repository);
+/// the crate sets the CHART line's other fields itself.
 #[derive(Debug, Clone)]
 pub struct ChartDescriptor {
     /// Shown above the chart on the dashboard. A histogram's charts add a word
@@ -32,7 +31,8 @@ pub struct ChartDescriptor {
     pub family: String,
     /// The Netdata context, for example `svc.requests`, of every entity's
     /// chart instance; a histogram's three charts have it plus a suffix
-    /// (`_avg`, `_max`, `_histogram`, see [`ChartsBuilder::histogram`]).
+    /// (`_avg`, `_max`, `_histogram`, see
+    /// [`MetricSetBuilder::histogram`](crate::MetricSetBuilder::histogram)).
     /// Alerts, queries and the dashboard use the context to group the
     /// instances. Each entity's chart id is built from the chart's context:
     /// - `<context>` for an entity without labels;
@@ -45,7 +45,7 @@ pub struct ChartDescriptor {
     /// entity without labels has the context itself as its chart id), not
     /// start or end with one, use only ASCII letters, digits, `_`, `-` and
     /// `.`, and not end in `_overflow` or in `_` and 16 hex digits. Contexts
-    /// must be unique: within one [`Charts`] this is checked, across them it
+    /// must be unique: within one metric set this is checked, across sets it
     /// is not.
     pub context: String,
     /// How the dashboard draws the chart, for example as lines or stacked
@@ -66,15 +66,10 @@ pub(crate) struct ChartTemplate {
     pub(crate) group: u32,
 }
 
-/// The charts of a [`MetricSet`]: one chart template per column group,
-/// declared with [`ChartsBuilder`]. Cheap to clone; the aggregator keeps it to
-/// emit the table's windows as charts.
-#[derive(Debug, Clone)]
-pub struct Charts(pub(crate) Arc<ChartsInner>);
-
-#[derive(Debug)]
-pub(crate) struct ChartsInner {
-    pub(crate) set: MetricSet,
+/// The charts of a metric set: one chart template per column group. The
+/// aggregator emits the table's windows through them.
+#[derive(Debug, Default)]
+pub(crate) struct Charts {
     /// In the order they were declared, which is also the order of each
     /// entity's chart ids and of its blocks in the output.
     pub(crate) templates: Vec<ChartTemplate>,
@@ -85,197 +80,26 @@ impl Charts {
     /// order.
     pub(crate) fn chart_ids(&self, labels: &Labels, kind: EntityKind) -> Box<[String]> {
         let suffix = entity_suffix(labels, kind);
-        self.0
-            .templates
+        self.templates
             .iter()
             .map(|template| format!("{}{suffix}", template.descriptor.context))
             .collect()
     }
-}
 
-/// Declares the [`Charts`] of a [`MetricSet`]: every instrument of the set
-/// gets its chart (a histogram three), in the order they are added here. A
-/// step that returns an [`Error`] adds nothing.
-#[derive(Debug)]
-pub struct ChartsBuilder {
-    set: MetricSet,
-    templates: Vec<ChartTemplate>,
-    /// Per column group of the set: whether a template shows it.
-    charted: Vec<bool>,
-}
-
-impl ChartsBuilder {
-    /// Starts the charts of `set`.
-    pub fn new(set: &MetricSet) -> Self {
-        Self {
-            set: set.clone(),
-            templates: Vec::new(),
-            charted: vec![false; set.0.schema.column_groups().len()],
-        }
-    }
-
-    /// Adds the chart of a [`Counter`](crate::Counter),
-    /// [`CumulativeCounter`](crate::CumulativeCounter) or
-    /// [`Gauge`](crate::Gauge): one dimension per column, its id the
-    /// column's name.
-    ///
-    /// # Errors
-    ///
-    /// Checked in this order:
-    /// - [`Error::InstrumentOfAnotherSet`];
-    /// - [`Error::ColumnsAlreadyCharted`];
-    /// - [`Error::InvalidDimensionId`] when a column name is empty, holds
-    ///   spaces, ASCII control characters, quotes, `\` or `=`, or starts with
-    ///   `SLOT:`;
-    /// - [`Error::InvalidContext`] or [`Error::ContextLikeEntitySuffix`] (the
-    ///   rules at [`ChartDescriptor::context`]);
-    /// - [`Error::DuplicateContext`].
-    pub fn chart<C>(
-        &mut self,
-        columns: impl Into<ColumnRange<C>>,
-        descriptor: ChartDescriptor,
+    /// Checks the chart of a column group whose values are named `names`,
+    /// before the group is added, in this order: the names are valid
+    /// dimension ids, the context is valid, and no chart has the context yet.
+    pub(crate) fn check(
+        &self,
+        names: &[String],
+        descriptor: &ChartDescriptor,
     ) -> Result<(), Error> {
-        let columns = columns.into();
-        self.check_set(columns.set_id)?;
-        let template = ChartTemplate {
-            descriptor,
-            group: columns.group,
-        };
-        self.check(&template)?;
-        self.add(template);
-        Ok(())
-    }
-
-    /// Adds the three charts of a [`Histogram`], one per column group (see
-    /// [`MetricSetBuilder::histogram`](crate::MetricSetBuilder::histogram)).
-    /// Each chart's context is `descriptor.context` plus a suffix, and its
-    /// title `descriptor.title` plus a word:
-    /// - `<context>_avg`, the mean: dimension `avg`, in `descriptor.units`,
-    ///   titled `<title> average`, with priority `descriptor.priority` and
-    ///   chart type `descriptor.chart_type`;
-    /// - `<context>_max`, the maximum: dimension `max`, in
-    ///   `descriptor.units`, titled `<title> maximum`, with priority
-    ///   `descriptor.priority + 1` and chart type `descriptor.chart_type`. It
-    ///   is a chart of its own because the dashboard combines every dimension
-    ///   of a chart the same way, across chart instances and over time: a
-    ///   maximum needs max, a mean is averaged;
-    /// - `<context>_histogram`, the buckets: a heatmap, one dimension per
-    ///   bucket, in `heatmap_units`, titled `<title> histogram`, with priority
-    ///   `descriptor.priority + 2`; `descriptor.chart_type` does not apply to
-    ///   it.
-    ///
-    /// # Errors
-    ///
-    /// Checked in this order:
-    /// - [`Error::InstrumentOfAnotherSet`];
-    /// - [`Error::InvalidContext`] or [`Error::ContextLikeEntitySuffix`] for
-    ///   `descriptor.context`;
-    /// - [`Error::HistogramPriority`] when `descriptor.priority + 2`
-    ///   overflows;
-    /// - each of the three charts, in the order above, as in
-    ///   [`ChartsBuilder::chart`] from [`Error::ColumnsAlreadyCharted`] on.
-    pub fn histogram(
-        &mut self,
-        histogram: Histogram,
-        descriptor: ChartDescriptor,
-        heatmap_units: String,
-    ) -> Result<(), Error> {
-        self.check_set(histogram.set_id)?;
-        // Checked on its own: a derived context can pass where the base one
-        // fails, `x.` giving `x._avg`.
-        check_context(&descriptor.context)?;
-        let Some(heatmap_priority) = descriptor.priority.checked_add(2) else {
-            return Err(Error::HistogramPriority(descriptor.priority));
-        };
-        let avg = ChartDescriptor {
-            title: format!("{} average", descriptor.title),
-            units: descriptor.units.clone(),
-            family: descriptor.family.clone(),
-            context: format!("{}_avg", descriptor.context),
-            ..descriptor
-        };
-        let max = ChartDescriptor {
-            title: format!("{} maximum", descriptor.title),
-            units: descriptor.units.clone(),
-            family: descriptor.family.clone(),
-            context: format!("{}_max", descriptor.context),
-            priority: heatmap_priority - 1,
-            ..descriptor
-        };
-        let buckets = ChartDescriptor {
-            title: format!("{} histogram", descriptor.title),
-            units: heatmap_units,
-            context: format!("{}_histogram", descriptor.context),
-            chart_type: ChartType::Heatmap,
-            priority: heatmap_priority,
-            ..descriptor
-        };
-        let templates = [
-            ChartTemplate {
-                descriptor: avg,
-                group: histogram.group,
-            },
-            ChartTemplate {
-                descriptor: max,
-                group: histogram.group + 1,
-            },
-            ChartTemplate {
-                descriptor: buckets,
-                group: histogram.group + 2,
-            },
-        ];
-        // The three contexts differ in their suffixes, so checking each
-        // against the charts added before is enough.
-        for template in &templates {
-            self.check(template)?;
-        }
-        for template in templates {
-            self.add(template);
-        }
-        Ok(())
-    }
-
-    /// Finishes the charts.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::ColumnsWithoutChart`] when an instrument of the set has no
-    /// chart.
-    pub fn build(self) -> Result<Charts, Error> {
-        let groups = self.set.0.schema.column_groups();
-        for (group, charted) in groups.iter().zip(&self.charted) {
-            if !charted {
-                return Err(Error::ColumnsWithoutChart(group.names.clone()));
-            }
-        }
-        Ok(Charts(Arc::new(ChartsInner {
-            set: self.set,
-            templates: self.templates,
-        })))
-    }
-
-    fn check_set(&self, set_id: u32) -> Result<(), Error> {
-        if set_id == self.set.0.id {
-            Ok(())
-        } else {
-            Err(Error::InstrumentOfAnotherSet)
-        }
-    }
-
-    /// Checks `template` before it is added, in this order: its column group
-    /// has no chart yet, the group's dimension ids are valid, the context is
-    /// valid, and the context is unique in the charts.
-    fn check(&self, template: &ChartTemplate) -> Result<(), Error> {
-        let column_group = self.set.0.schema.column_group(template.group);
-        if self.charted[template.group as usize] {
-            return Err(Error::ColumnsAlreadyCharted(column_group.names.clone()));
-        }
-        for id in &column_group.names {
+        for id in names {
             if !is_valid_dimension_id(id) {
                 return Err(Error::InvalidDimensionId(id.clone()));
             }
         }
-        let context = &template.descriptor.context;
+        let context = &descriptor.context;
         check_context(context)?;
         if self
             .templates
@@ -287,11 +111,52 @@ impl ChartsBuilder {
         Ok(())
     }
 
-    /// Adds `template`, which [`ChartsBuilder::check`] accepted.
-    fn add(&mut self, template: ChartTemplate) {
-        self.charted[template.group as usize] = true;
-        self.templates.push(template);
+    /// Adds the template of the column group `group`, whose chart
+    /// [`Charts::check`] accepted.
+    pub(crate) fn add(&mut self, group: u32, descriptor: ChartDescriptor) {
+        self.templates.push(ChartTemplate { descriptor, group });
     }
+}
+
+/// The descriptors of a histogram's three charts, mean, maximum and buckets,
+/// derived from `descriptor` as documented at
+/// [`MetricSetBuilder::histogram`](crate::MetricSetBuilder::histogram).
+/// Checks the base context and that the priorities fit; the caller checks
+/// each derived chart.
+pub(crate) fn histogram_descriptors(
+    descriptor: ChartDescriptor,
+    heatmap_units: String,
+) -> Result<[ChartDescriptor; 3], Error> {
+    // Checked on its own: a derived context can pass where the base one
+    // fails, `x.` giving `x._avg`.
+    check_context(&descriptor.context)?;
+    let Some(heatmap_priority) = descriptor.priority.checked_add(2) else {
+        return Err(Error::HistogramPriority(descriptor.priority));
+    };
+    let avg = ChartDescriptor {
+        title: format!("{} average", descriptor.title),
+        units: descriptor.units.clone(),
+        family: descriptor.family.clone(),
+        context: format!("{}_avg", descriptor.context),
+        ..descriptor
+    };
+    let max = ChartDescriptor {
+        title: format!("{} maximum", descriptor.title),
+        units: descriptor.units.clone(),
+        family: descriptor.family.clone(),
+        context: format!("{}_max", descriptor.context),
+        priority: heatmap_priority - 1,
+        ..descriptor
+    };
+    let buckets = ChartDescriptor {
+        title: format!("{} histogram", descriptor.title),
+        units: heatmap_units,
+        context: format!("{}_histogram", descriptor.context),
+        chart_type: ChartType::Heatmap,
+        priority: heatmap_priority,
+        ..descriptor
+    };
+    Ok([avg, max, buckets])
 }
 
 /// Checks `context` against the rules at [`ChartDescriptor::context`]: id

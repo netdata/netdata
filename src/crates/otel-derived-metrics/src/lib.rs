@@ -58,25 +58,25 @@ pub struct DerivedMetrics {
 impl DerivedMetrics {
     /// # Errors
     ///
-    /// A metric set, or its charts, that the plugin declares wrongly.
+    /// A metric set that the plugin declares wrongly.
     pub fn new(config: &DerivedMetricsConfig) -> Result<Self, netdata_plugin_metrics::Error> {
         let enabled = if config.enabled {
             let services = services::Services::new(config.max_services)?;
             let logs = logs::ServiceLogs::new(config.max_services)?;
             let derivation = plugin::Derivation::new()?;
             Some(Enabled {
-                service_aggregator: Mutex::new(Aggregator::new(&services.charts)),
+                service_aggregator: Mutex::new(Aggregator::new(&services.metrics)),
                 services,
-                logs_aggregator: Mutex::new(Aggregator::new(&logs.charts)),
+                logs_aggregator: Mutex::new(Aggregator::new(&logs.metrics)),
                 logs,
-                derivation_aggregator: Mutex::new(Aggregator::new(&derivation.charts)),
+                derivation_aggregator: Mutex::new(Aggregator::new(&derivation.metrics)),
                 derivation,
             })
         } else {
             None
         };
         let plugin = plugin::Plugin::new()?;
-        let plugin_aggregator = Mutex::new(Aggregator::new(&plugin.charts));
+        let plugin_aggregator = Mutex::new(Aggregator::new(&plugin.metrics));
         Ok(Self {
             enabled,
             plugin,

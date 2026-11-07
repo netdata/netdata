@@ -3,8 +3,8 @@
 //! arrival time, so the metric sets have no lateness.
 
 use netdata_plugin_metrics::{
-    Batch, ChartDescriptor, ChartType, Charts, ChartsBuilder, Counter, CumulativeCounter, Gauge,
-    Labels, MetricSet, MetricSetBuilder, Settings, Stats, columns,
+    Batch, ChartDescriptor, ChartType, Counter, CumulativeCounter, Gauge, Labels, MetricSet,
+    MetricSetBuilder, Settings, Stats, columns,
 };
 use otel_bridge::signals::Signal;
 
@@ -40,7 +40,6 @@ columns! {
 /// The plugin's ingest outcomes: one label-less entity.
 pub(crate) struct Plugin {
     pub(crate) metrics: MetricSet,
-    pub(crate) charts: Charts,
     spans: Counter<Acceptance>,
     log_records: Counter<Acceptance>,
 }
@@ -48,35 +47,24 @@ pub(crate) struct Plugin {
 impl Plugin {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
-        let spans = builder.counter::<Acceptance>()?;
-        let log_records = builder.counter::<Acceptance>()?;
-        let metrics = builder.build()?;
-        let mut charts = ChartsBuilder::new(&metrics);
-        charts.chart(
-            spans,
-            ChartDescriptor {
-                title: "OpenTelemetry spans received".into(),
-                units: "spans/s".into(),
-                family: "ingest".into(),
-                context: "netdata.otel.spans".into(),
-                chart_type: ChartType::Stacked,
-                priority: 150_000,
-            },
-        )?;
-        charts.chart(
-            log_records,
-            ChartDescriptor {
-                title: "OpenTelemetry log records received".into(),
-                units: "records/s".into(),
-                family: "ingest".into(),
-                context: "netdata.otel.log_records".into(),
-                chart_type: ChartType::Stacked,
-                priority: 150_001,
-            },
-        )?;
+        let spans = builder.counter::<Acceptance>(ChartDescriptor {
+            title: "OpenTelemetry spans received".into(),
+            units: "spans/s".into(),
+            family: "ingest".into(),
+            context: "netdata.otel.spans".into(),
+            chart_type: ChartType::Stacked,
+            priority: 150_000,
+        })?;
+        let log_records = builder.counter::<Acceptance>(ChartDescriptor {
+            title: "OpenTelemetry log records received".into(),
+            units: "records/s".into(),
+            family: "ingest".into(),
+            context: "netdata.otel.log_records".into(),
+            chart_type: ChartType::Stacked,
+            priority: 150_001,
+        })?;
         Ok(Self {
-            charts: charts.build()?,
-            metrics,
+            metrics: builder.build()?,
             spans,
             log_records,
         })
@@ -110,7 +98,6 @@ impl Plugin {
 /// signal, labelled `signal`, fed from its aggregator's statistics every tick.
 pub(crate) struct Derivation {
     pub(crate) metrics: MetricSet,
-    pub(crate) charts: Charts,
     services: Gauge<Services>,
     adjusted: CumulativeCounter<Adjustment>,
     expired: CumulativeCounter<Expired>,
@@ -119,48 +106,33 @@ pub(crate) struct Derivation {
 impl Derivation {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
-        let services = builder.gauge::<Services>()?;
-        let adjusted = builder.cumulative_counter::<Adjustment>()?;
-        let expired = builder.cumulative_counter::<Expired>()?;
-        let metrics = builder.build()?;
-        let mut charts = ChartsBuilder::new(&metrics);
-        charts.chart(
-            services,
-            ChartDescriptor {
-                title: "Services with derived charts".into(),
-                units: "services".into(),
-                family: "derived metrics".into(),
-                context: "netdata.otel.derived_services".into(),
-                chart_type: ChartType::Line,
-                priority: 150_010,
-            },
-        )?;
-        charts.chart(
-            adjusted,
-            ChartDescriptor {
-                title: "Records counted in another time slot or chart set".into(),
-                units: "records/s".into(),
-                family: "derived metrics".into(),
-                context: "netdata.otel.derived_adjusted_records".into(),
-                // One record can be both late and overflowed.
-                chart_type: ChartType::Line,
-                priority: 150_011,
-            },
-        )?;
-        charts.chart(
-            expired,
-            ChartDescriptor {
-                title: "Services removed after 15 minutes without data".into(),
-                units: "services/s".into(),
-                family: "derived metrics".into(),
-                context: "netdata.otel.derived_expired_services".into(),
-                chart_type: ChartType::Line,
-                priority: 150_012,
-            },
-        )?;
+        let services = builder.gauge::<Services>(ChartDescriptor {
+            title: "Services with derived charts".into(),
+            units: "services".into(),
+            family: "derived metrics".into(),
+            context: "netdata.otel.derived_services".into(),
+            chart_type: ChartType::Line,
+            priority: 150_010,
+        })?;
+        let adjusted = builder.cumulative_counter::<Adjustment>(ChartDescriptor {
+            title: "Records counted in another time slot or chart set".into(),
+            units: "records/s".into(),
+            family: "derived metrics".into(),
+            context: "netdata.otel.derived_adjusted_records".into(),
+            // One record can be both late and overflowed.
+            chart_type: ChartType::Line,
+            priority: 150_011,
+        })?;
+        let expired = builder.cumulative_counter::<Expired>(ChartDescriptor {
+            title: "Services removed after 15 minutes without data".into(),
+            units: "services/s".into(),
+            family: "derived metrics".into(),
+            context: "netdata.otel.derived_expired_services".into(),
+            chart_type: ChartType::Line,
+            priority: 150_012,
+        })?;
         Ok(Self {
-            charts: charts.build()?,
-            metrics,
+            metrics: builder.build()?,
             services,
             adjusted,
             expired,
@@ -209,7 +181,7 @@ mod tests {
     #[test]
     fn ingest_outcomes_render_per_signal() {
         let plugin = Plugin::new().unwrap();
-        let mut aggregator = Aggregator::new(&plugin.charts);
+        let mut aggregator = Aggregator::new(&plugin.metrics);
         aggregator.merge(plugin.ingest(Signal::Traces, 7, 2, 100), 100);
         aggregator.merge(plugin.ingest(Signal::Logs, 3, 0, 100), 100);
         let out = netdata_plugin_protocol::readable_chart_stream(
@@ -228,7 +200,7 @@ mod tests {
     #[test]
     fn the_heartbeat_keeps_the_charts_defined_without_traffic() {
         let plugin = Plugin::new().unwrap();
-        let mut aggregator = Aggregator::new(&plugin.charts);
+        let mut aggregator = Aggregator::new(&plugin.metrics);
         aggregator.merge(plugin.heartbeat(100), 100);
         let out = netdata_plugin_protocol::readable_chart_stream(
             &aggregator.emit(101, usize::MAX).concat(),
@@ -240,7 +212,7 @@ mod tests {
     #[test]
     fn derivation_charts_one_entity_per_signal_with_increases() {
         let derivation = Derivation::new().unwrap();
-        let mut aggregator = Aggregator::new(&derivation.charts);
+        let mut aggregator = Aggregator::new(&derivation.metrics);
         let mut tick = |stats: Stats, now: u64| {
             let mut batch = Batch::new(&derivation.metrics);
             derivation.record(&mut batch, Signal::Traces, &stats, now);

@@ -12,8 +12,8 @@
 //! - A group's [`Aggregation`] says what its columns start as, how two rows
 //!   combine, and what each of its values is when a window is emitted.
 //!
-//! The table knows nothing of charts; the charts read it when windows are
-//! emitted (see [`Charts`](crate::Charts)).
+//! The table knows nothing of charts; the charts (`chart.rs`) read it when
+//! windows are emitted.
 
 use crate::metric_set::Column;
 use std::marker::PhantomData;
@@ -85,25 +85,21 @@ impl Aggregation {
     }
 }
 
-/// The columns an instrument split by `C` writes, one per value of `C`.
-/// [`Counter`](crate::Counter), [`CumulativeCounter`](crate::CumulativeCounter)
-/// and [`Gauge`](crate::Gauge) each convert into it, which is how
-/// [`ChartsBuilder::chart`](crate::ChartsBuilder::chart) takes any of them.
+/// The columns an instrument split by `C` writes, one per value of `C`:
+/// what a [`Counter`](crate::Counter),
+/// [`CumulativeCounter`](crate::CumulativeCounter) or [`Gauge`](crate::Gauge)
+/// holds.
 #[derive(Debug)]
-pub struct ColumnRange<C> {
+pub(crate) struct ColumnRange<C> {
     pub(crate) set_id: u32,
-    /// The index of its column group in the set's schema; `u32` keeps the
-    /// handle two words.
-    pub(crate) group: u32,
     base: usize,
     _column: PhantomData<fn() -> C>,
 }
 
 impl<C: Column> ColumnRange<C> {
-    pub(crate) fn new(set_id: u32, group: u32, base: usize) -> Self {
+    pub(crate) fn new(set_id: u32, base: usize) -> Self {
         Self {
             set_id,
-            group,
             base,
             _column: PhantomData,
         }

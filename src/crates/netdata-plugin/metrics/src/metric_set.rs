@@ -1,6 +1,7 @@
-//! Metric set declarations: instruments (the table's column groups), labels
-//! and settings.
+//! Metric set declarations: instruments (the table's column groups) with
+//! their charts, labels and settings.
 
+use crate::chart::{self, ChartDescriptor, Charts};
 use crate::error::Error;
 use crate::layout::{Aggregation, ColumnRange, Schema};
 use std::sync::Arc;
@@ -34,9 +35,9 @@ pub(crate) const MAX_ALLOWED_LATENESS_WINDOWS: u64 = 60;
 ///
 /// - Each name must appear once in `NAMES`. Declaring an instrument with a
 ///   repeated name fails with [`Error::DuplicateColumn`].
-/// - A charted column becomes a chart dimension with its name as the id, so
-///   the names must also pass the rules at
-///   [`ChartsBuilder::chart`](crate::ChartsBuilder::chart).
+/// - Each column is also a chart dimension with its name as the id, so the
+///   names must also pass the rules at
+///   [`MetricSetBuilder::counter`](crate::MetricSetBuilder::counter).
 ///
 /// # Manual implementations
 ///
@@ -133,24 +134,6 @@ pub struct CumulativeCounter<C>(pub(crate) ColumnRange<C>);
 #[derive(Debug, Clone, Copy)]
 pub struct Gauge<C>(pub(crate) ColumnRange<C>);
 
-impl<C> From<Counter<C>> for ColumnRange<C> {
-    fn from(counter: Counter<C>) -> Self {
-        counter.0
-    }
-}
-
-impl<C> From<CumulativeCounter<C>> for ColumnRange<C> {
-    fn from(cumulative_counter: CumulativeCounter<C>) -> Self {
-        cumulative_counter.0
-    }
-}
-
-impl<C> From<Gauge<C>> for ColumnRange<C> {
-    fn from(gauge: Gauge<C>) -> Self {
-        gauge.0
-    }
-}
-
 /// A distribution of observed values, for example request durations, over
 /// fixed bucket bounds; its three column groups are described at
 /// [`MetricSetBuilder::histogram`]. An observation counts in the first
@@ -159,9 +142,6 @@ impl<C> From<Gauge<C>> for ColumnRange<C> {
 #[derive(Debug, Clone, Copy)]
 pub struct Histogram {
     pub(crate) set_id: u32,
-    /// The index of its first column group (the mean); the maximum and the
-    /// buckets follow.
-    pub(crate) group: u32,
     /// The first of its columns, which follow its groups' order: the mean's
     /// sum and count, the maximum, then the buckets.
     pub(crate) base: usize,
@@ -252,11 +232,12 @@ impl Labels {
     }
 }
 
-/// A declared table: its instruments, each a group of columns, and its time
-/// and lifecycle settings; every entity has one row per window. Cheap to
-/// clone; batches, its [`Charts`](crate::Charts) and the aggregator share it.
+/// A declared metric set: a table (its instruments, each a group of columns;
+/// every entity has one row per window), the charts that show it, and its
+/// time and lifecycle settings. Cheap to clone; batches and the aggregator
+/// share it.
 ///
-/// A plugin may have several sets, each with its own charts and
+/// A plugin may have several sets, each with its own
 /// [`Aggregator`](crate::Aggregator).
 #[derive(Debug, Clone)]
 pub struct MetricSet(pub(crate) Arc<MetricSetInner>);
@@ -272,6 +253,8 @@ pub(crate) struct MetricSetInner {
     pub(crate) expiry_windows: u64,
     pub(crate) cardinality_limit: Option<CardinalityLimit>,
     pub(crate) schema: Schema,
+    /// How the agent shows the table: read only when emitting.
+    pub(crate) charts: Charts,
 }
 
 /// The time and lifecycle settings of a metric set.
@@ -329,13 +312,15 @@ pub struct CardinalityLimit {
 static NEXT_SET_ID: AtomicU32 = AtomicU32::new(0);
 
 /// Declares a [`MetricSet`]: each instrument adds its column group (a
-/// histogram three). Each step checks its own input and adds nothing when
-/// the check fails.
+/// histogram three) and the chart that shows it (a histogram three), in the
+/// order declared. Each step checks its own input and adds nothing when a
+/// check fails.
 #[derive(Debug)]
 pub struct MetricSetBuilder {
     id: u32,
     settings: Settings,
     schema: Schema,
+    charts: Charts,
 }
 
 impl MetricSetBuilder {
@@ -352,51 +337,69 @@ impl MetricSetBuilder {
             id: NEXT_SET_ID.fetch_add(1, Ordering::Relaxed),
             settings,
             schema: Schema::default(),
+            charts: Charts::default(),
         })
     }
 
     /// Adds a column group of one column per value of `C`, aggregated by
-    /// `aggregation`, and returns its handle.
-    fn split_by<C: Column>(&mut self, aggregation: Aggregation) -> Result<ColumnRange<C>, Error> {
+    /// `aggregation`, with its chart, and returns its handle.
+    fn split_by<C: Column>(
+        &mut self,
+        aggregation: Aggregation,
+        descriptor: ChartDescriptor,
+    ) -> Result<ColumnRange<C>, Error> {
         check_names(C::NAMES)?;
-        let names = C::NAMES.iter().map(|name| name.to_string()).collect();
+        let names: Vec<String> = C::NAMES.iter().map(|name| name.to_string()).collect();
+        self.charts.check(&names, &descriptor)?;
         let group = self.schema.add_column_group(aggregation, names);
+        self.charts.add(group, descriptor);
         let base = self.schema.column_group(group).columns.start;
-        Ok(ColumnRange::new(self.id, group, base))
+        Ok(ColumnRange::new(self.id, base))
     }
 
-    /// Adds a [`Counter`].
+    /// Adds a [`Counter`] and its chart, `descriptor`: one dimension per
+    /// column, its id the column's name.
     ///
     /// # Errors
     ///
-    /// [`Error::NoColumns`] or [`Error::DuplicateColumn`]
-    /// for `C::NAMES`.
-    pub fn counter<C: Column>(&mut self) -> Result<Counter<C>, Error> {
-        Ok(Counter(self.split_by(Aggregation::Sum)?))
+    /// Checked in this order:
+    /// - [`Error::NoColumns`] or [`Error::DuplicateColumn`] for `C::NAMES`;
+    /// - [`Error::InvalidDimensionId`] when a column name is empty, holds
+    ///   spaces, ASCII control characters, quotes, `\` or `=`, or starts with
+    ///   `SLOT:`;
+    /// - [`Error::InvalidContext`] or [`Error::ContextLikeEntitySuffix`] (the
+    ///   rules at [`ChartDescriptor::context`]);
+    /// - [`Error::DuplicateContext`].
+    pub fn counter<C: Column>(&mut self, descriptor: ChartDescriptor) -> Result<Counter<C>, Error> {
+        Ok(Counter(self.split_by(Aggregation::Sum, descriptor)?))
     }
 
-    /// Adds a [`CumulativeCounter`].
+    /// Adds a [`CumulativeCounter`] and its chart, as
+    /// [`counter`](Self::counter) does.
     ///
     /// # Errors
     ///
     /// As [`counter`](Self::counter).
-    pub fn cumulative_counter<C: Column>(&mut self) -> Result<CumulativeCounter<C>, Error> {
+    pub fn cumulative_counter<C: Column>(
+        &mut self,
+        descriptor: ChartDescriptor,
+    ) -> Result<CumulativeCounter<C>, Error> {
         Ok(CumulativeCounter(
-            self.split_by(Aggregation::CumulativeSum)?,
+            self.split_by(Aggregation::CumulativeSum, descriptor)?,
         ))
     }
 
-    /// Adds a [`Gauge`].
+    /// Adds a [`Gauge`] and its chart, as [`counter`](Self::counter) does.
     ///
     /// # Errors
     ///
     /// As [`counter`](Self::counter).
-    pub fn gauge<C: Column>(&mut self) -> Result<Gauge<C>, Error> {
-        Ok(Gauge(self.split_by(Aggregation::LastValue)?))
+    pub fn gauge<C: Column>(&mut self, descriptor: ChartDescriptor) -> Result<Gauge<C>, Error> {
+        Ok(Gauge(self.split_by(Aggregation::LastValue, descriptor)?))
     }
 
-    /// Adds a [`Histogram`] over `bounds`, with three column groups, each
-    /// yielding these values per window:
+    /// Adds a [`Histogram`] over `bounds` and its charts. It has three column
+    /// groups, each yielding these values per window:
     /// - the mean: one value, `avg`, the weighted mean of the observed values;
     /// - the maximum: one value, `max`, the largest observed value
     ///   (unweighted);
@@ -404,27 +407,62 @@ impl MetricSetBuilder {
     ///   bucket named by its upper bound as Rust prints the `f64` (`0.005`,
     ///   `1`, `1048576`; `+Inf` last).
     ///
-    /// [`ChartsBuilder::histogram`](crate::ChartsBuilder::histogram) charts
-    /// each group on its own.
+    /// # Charts
+    ///
+    /// One per group, each made from `descriptor`: its context is
+    /// `descriptor.context` plus a suffix, and its title `descriptor.title`
+    /// plus a word:
+    /// - `<context>_avg`, the mean: dimension `avg`, in `descriptor.units`,
+    ///   titled `<title> average`, with priority `descriptor.priority` and
+    ///   chart type `descriptor.chart_type`;
+    /// - `<context>_max`, the maximum: dimension `max`, in
+    ///   `descriptor.units`, titled `<title> maximum`, with priority
+    ///   `descriptor.priority + 1` and chart type `descriptor.chart_type`. It
+    ///   is a chart of its own because the dashboard combines every dimension
+    ///   of a chart the same way, across chart instances and over time: a
+    ///   maximum needs max, a mean is averaged;
+    /// - `<context>_histogram`, the buckets: a heatmap, one dimension per
+    ///   bucket, in `heatmap_units`, titled `<title> histogram`, with priority
+    ///   `descriptor.priority + 2`; `descriptor.chart_type` does not apply to
+    ///   it.
     ///
     /// # Errors
     ///
-    /// [`Error::HistogramBounds`] when `bounds` are not finite and
-    /// strictly increasing.
-    pub fn histogram(&mut self, bounds: &'static [f64]) -> Result<Histogram, Error> {
+    /// Checked in this order:
+    /// - [`Error::HistogramBounds`] when `bounds` are not finite and strictly
+    ///   increasing;
+    /// - [`Error::InvalidContext`] or [`Error::ContextLikeEntitySuffix`] for
+    ///   `descriptor.context`;
+    /// - [`Error::HistogramPriority`] when `descriptor.priority + 2`
+    ///   overflows;
+    /// - each of the three charts, in the order above, as in
+    ///   [`counter`](Self::counter) from [`Error::InvalidDimensionId`] on.
+    pub fn histogram(
+        &mut self,
+        bounds: &'static [f64],
+        descriptor: ChartDescriptor,
+        heatmap_units: String,
+    ) -> Result<Histogram, Error> {
         check_bounds(bounds)?;
-        let mut buckets: Vec<String> = bounds.iter().map(|bound| bound.to_string()).collect();
-        buckets.push("+Inf".to_string());
-        let group = self
-            .schema
-            .add_column_group(Aggregation::Mean, vec!["avg".to_string()]);
-        self.schema
-            .add_column_group(Aggregation::Max, vec!["max".to_string()]);
-        self.schema.add_column_group(Aggregation::Sum, buckets);
+        let [avg, max, buckets] = chart::histogram_descriptors(descriptor, heatmap_units)?;
+        let avg_names = vec!["avg".to_string()];
+        let max_names = vec!["max".to_string()];
+        let mut bucket_names: Vec<String> = bounds.iter().map(|bound| bound.to_string()).collect();
+        bucket_names.push("+Inf".to_string());
+        // The three contexts differ in their suffixes, so checking each
+        // against the charts added before is enough.
+        self.charts.check(&avg_names, &avg)?;
+        self.charts.check(&max_names, &max)?;
+        self.charts.check(&bucket_names, &buckets)?;
+        let mean = self.schema.add_column_group(Aggregation::Mean, avg_names);
+        self.charts.add(mean, avg);
+        let group = self.schema.add_column_group(Aggregation::Max, max_names);
+        self.charts.add(group, max);
+        let group = self.schema.add_column_group(Aggregation::Sum, bucket_names);
+        self.charts.add(group, buckets);
         Ok(Histogram {
             set_id: self.id,
-            group,
-            base: self.schema.column_group(group).columns.start,
+            base: self.schema.column_group(mean).columns.start,
             bounds,
         })
     }
@@ -447,6 +485,7 @@ impl MetricSetBuilder {
             interval_secs: interval.as_secs(),
             cardinality_limit: settings.cardinality_limit,
             schema: self.schema,
+            charts: self.charts,
         })))
     }
 }

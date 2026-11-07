@@ -1,15 +1,15 @@
 //! The only writer of chart-protocol text: chart instance definitions,
 //! updates and obsolete marks, packed into chunks.
 
-use crate::chart::{ChartTemplate, Charts};
-use crate::metric_set::Labels;
+use crate::chart::ChartTemplate;
+use crate::metric_set::{Labels, MetricSetInner};
 use netdata_plugin_protocol::{
     ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
     write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end_timed,
     write_set_empty, write_set_float,
 };
 
-impl Charts {
+impl MetricSetInner {
     /// The definition of each of an entity's chart instances, whose ids are
     /// `chart_ids`: the CHART line, its labels and dimensions.
     pub(crate) fn write_definitions(
@@ -18,9 +18,8 @@ impl Charts {
         labels: &Labels,
         out: &mut Chunker,
     ) {
-        let schema = &self.0.set.0.schema;
-        for (template, id) in self.0.templates.iter().zip(chart_ids) {
-            let group = schema.column_group(template.group);
+        for (template, id) in self.charts.templates.iter().zip(chart_ids) {
+            let group = self.schema.column_group(template.group);
             out.block(|block| {
                 self.write_chart_line(block, template, id, false);
                 if !labels.is_empty() {
@@ -58,10 +57,9 @@ impl Charts {
         window: u64,
         out: &mut Chunker,
     ) {
-        let set = &self.0.set.0;
-        let interval_secs = set.interval_secs;
-        for (template, id) in self.0.templates.iter().zip(chart_ids) {
-            let group = set.schema.column_group(template.group);
+        let interval_secs = self.interval_secs;
+        for (template, id) in self.charts.templates.iter().zip(chart_ids) {
+            let group = self.schema.column_group(template.group);
             out.block(|block| {
                 write_begin(block, id, interval_secs * 1_000_000);
                 for (i, dimension_id) in group.names.iter().enumerate() {
@@ -78,7 +76,7 @@ impl Charts {
     /// The CHART line alone, marked obsolete, marks a chart instance
     /// obsolete: one per chart instance of the entity.
     pub(crate) fn write_obsolete(&self, chart_ids: &[String], out: &mut Chunker) {
-        for (template, id) in self.0.templates.iter().zip(chart_ids) {
+        for (template, id) in self.charts.templates.iter().zip(chart_ids) {
             out.block(|block| self.write_chart_line(block, template, id, true));
         }
     }
@@ -105,7 +103,7 @@ impl Charts {
                 context: &descriptor.context,
                 chart_type: descriptor.chart_type,
                 priority: descriptor.priority,
-                update_every: self.0.set.0.interval_secs,
+                update_every: self.interval_secs,
                 options: ChartOptions {
                     obsolete,
                     store_first: true,

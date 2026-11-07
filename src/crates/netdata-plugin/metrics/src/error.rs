@@ -1,11 +1,10 @@
-//! The crate's error: a mistake in declaring a metric set or its charts.
+//! The crate's error: a mistake in declaring a metric set.
 
 use crate::metric_set::{MAX_ALLOWED_LATENESS_WINDOWS, MAX_INTERVAL_SECS};
 use std::time::Duration;
 
-/// A mistake in declaring a metric set or its charts, returned by the
-/// [`MetricSetBuilder`](crate::MetricSetBuilder) or
-/// [`ChartsBuilder`](crate::ChartsBuilder) step that makes it.
+/// A mistake in declaring a metric set, returned by the
+/// [`MetricSetBuilder`](crate::MetricSetBuilder) step that makes it.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Error {
     /// The collection interval is not a whole number of seconds from 1 to
@@ -37,13 +36,6 @@ pub enum Error {
     /// The set has no instrument.
     #[error("metric set has no instruments")]
     NoInstruments,
-    /// The instrument to chart is of another metric set.
-    #[error("instrument of another metric set")]
-    InstrumentOfAnotherSet,
-    /// A column group already has its chart; these are the group's column
-    /// names (for a histogram, those of one of its three groups).
-    #[error("the columns {0:?} already have a chart")]
-    ColumnsAlreadyCharted(Vec<String>),
     /// A column name is not a valid dimension id.
     #[error("invalid dimension id {0:?}")]
     InvalidDimensionId(String),
@@ -56,15 +48,11 @@ pub enum Error {
     /// and 16 hex digits).
     #[error("context {0:?} ends like an entity suffix")]
     ContextLikeEntitySuffix(String),
-    /// A context is already used in the charts.
+    /// A context is already used in the metric set.
     #[error("duplicate context {0:?}")]
     DuplicateContext(String),
     /// A histogram's priority is above `i32::MAX - 2`: its `max` and heatmap
     /// charts take the next two priorities.
     #[error("histogram priority {0} must be at most {max}", max = i32::MAX - 2)]
     HistogramPriority(i32),
-    /// A column group of the set has no chart; these are the group's column
-    /// names (for a histogram, those of one of its three groups).
-    #[error("the columns {0:?} have no chart")]
-    ColumnsWithoutChart(Vec<String>),
 }
