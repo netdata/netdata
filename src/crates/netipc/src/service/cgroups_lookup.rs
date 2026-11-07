@@ -211,6 +211,11 @@ impl ManagedServer {
         self.inner.stop();
     }
 
+    /// Returns a signal that is set once `run()` accepts connections.
+    pub fn listening_signal(&self) -> raw::ListeningSignal {
+        self.inner.listening_signal()
+    }
+
     pub fn running_flag(&self) -> Arc<AtomicBool> {
         self.inner.running_flag()
     }
@@ -306,7 +311,7 @@ mod tests {
         assert_eq!(client.status().state, ClientState::NotFound);
 
         let paths: [&[u8]; 1] = [b"/x".as_slice()];
-        assert_eq!(client.call(&paths).unwrap_err(), NipcError::BadLayout);
+        assert_eq!(client.call(&paths).unwrap_err(), NipcError::NotReady);
         assert_eq!(client.status().error_count, 1);
 
         client.close();

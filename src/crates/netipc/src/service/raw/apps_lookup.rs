@@ -95,7 +95,7 @@ impl RawClient {
                 Ok(next) => next,
                 Err(NipcError::Overflow) if start < pids.len() => {
                     let one_item_size = apps_lookup_request_size(1)?;
-                    if self.ensure_lookup_request_capacity(one_item_size)? {
+                    if self.ensure_lookup_request_capacity(one_item_size, deadline)? {
                         continue;
                     }
                     return Err(NipcError::Overflow);

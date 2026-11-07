@@ -1,9 +1,10 @@
 use super::client::{ClientState, RawClient};
-use super::common::{CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS, CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS};
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+use super::common::CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS;
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use crate::protocol::{PROFILE_SHM_FUTEX, PROFILE_SHM_HYBRID};
 use crate::transport::posix::UdsSession;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use crate::transport::shm::ShmContext;
 
 impl RawClient {
@@ -11,21 +12,37 @@ impl RawClient {
     /// upgrade if negotiated.
     #[cfg(unix)]
     pub(super) fn try_connect(&mut self) -> ClientState {
-        match UdsSession::connect(&self.run_dir, &self.service_name, &self.transport_config) {
+        let remaining = self.op_remaining_ms();
+        if remaining == 0 || self.abort_requested() {
+            return ClientState::Disconnected;
+        }
+        let abort = self.abort_requested.clone();
+        match UdsSession::connect_with_timeout(
+            &self.run_dir,
+            &self.service_name,
+            &self.transport_config,
+            remaining,
+            Some(&abort),
+        ) {
             Ok(session) => {
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                 let selected_profile = session.selected_profile;
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                 let session_id = session.session_id;
 
-                #[cfg(target_os = "linux")]
+                #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                 {
                     if selected_profile == PROFILE_SHM_HYBRID
                         || selected_profile == PROFILE_SHM_FUTEX
                     {
                         let mut shm_ok = false;
-                        let deadline = std::time::Instant::now()
-                            + std::time::Duration::from_millis(CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS);
+                        // When the call deadline ends the wait first, SHM is
+                        // not at fault and stays enabled for the next connect.
+                        let call_left =
+                            std::time::Duration::from_millis(self.op_remaining_ms() as u64);
+                        let call_bound = call_left < self.shm_attach_timeout;
+                        let deadline =
+                            std::time::Instant::now() + call_left.min(self.shm_attach_timeout);
                         loop {
                             match ShmContext::client_attach(
                                 &self.run_dir,
@@ -39,7 +56,19 @@ impl RawClient {
                                 }
                                 Err(_) => {
                                     if std::time::Instant::now() >= deadline {
+                                        if call_bound {
+                                            return ClientState::Disconnected;
+                                        }
                                         break;
+                                    }
+                                    if self.abort_requested() {
+                                        return ClientState::Disconnected;
+                                    }
+                                    // A server that refused or died closes the
+                                    // session socket; its SHM region will never
+                                    // appear. Not an SHM problem: keep SHM enabled.
+                                    if super::server_session_unix::peer_disconnected(session.fd()) {
+                                        return ClientState::Disconnected;
                                     }
                                     std::thread::sleep(std::time::Duration::from_millis(
                                         CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS,

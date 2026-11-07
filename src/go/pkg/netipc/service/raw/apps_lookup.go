@@ -85,7 +85,7 @@ func (c *Client) CallAppsLookupWithTimeout(pids []uint32, timeoutMs uint32) (*pr
 		if err != nil {
 			oneItemSize, serr := appsLookupRequestSize([]uint32{0})
 			if errors.Is(err, protocol.ErrOverflow) && start < len(pids) && serr == nil {
-				if c.ensureLookupRequestCapacity(oneItemSize) == nil {
+				if c.ensureLookupRequestCapacity(oneItemSize, deadline) == nil {
 					continue
 				}
 			}
@@ -107,7 +107,7 @@ func (c *Client) CallAppsLookupWithTimeout(pids []uint32, timeoutMs uint32) (*pr
 			return nil, protocol.ErrOverflow
 		}
 		var payload []byte
-		if err := c.callWithRetry(func() error {
+		if err := c.callWithRetry(remainingTimeout, func() error {
 			_, callPayload, rerr := c.doRawCallWithTimeout(protocol.MethodAppsLookup, reqBuf[:reqLen], remainingTimeout)
 			if rerr != nil {
 				return rerr

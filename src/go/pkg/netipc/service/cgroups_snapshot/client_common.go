@@ -53,12 +53,14 @@ func (c *Client) ClearAbort() {
 }
 
 // CallSnapshot performs a blocking typed cgroups snapshot call.
+// The returned view is valid until the next typed call on this client.
 func (c *Client) CallSnapshot() (*protocol.CgroupsResponseView, error) {
 	return c.CallSnapshotWithTimeout(0)
 }
 
 // CallSnapshotWithTimeout performs a blocking typed call with an explicit
-// timeout. A zero timeout uses the client's context-level default.
+// timeout. A zero timeout uses the client's context-level default. The
+// returned view is valid until the next typed call on this client.
 func (c *Client) CallSnapshotWithTimeout(timeoutMs uint32) (*protocol.CgroupsResponseView, error) {
 	return c.inner.CallSnapshotWithTimeout(timeoutMs)
 }
@@ -109,4 +111,10 @@ func (s *Server) Run() error {
 // Stop signals the server to stop.
 func (s *Server) Stop() {
 	s.inner.Stop()
+}
+
+// Listening returns a channel closed once Run has bound the listener and
+// clients can connect.
+func (s *Server) Listening() <-chan struct{} {
+	return s.inner.Listening()
 }

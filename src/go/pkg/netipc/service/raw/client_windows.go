@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	windows "github.com/netdata/netdata/go/plugins/pkg/netipc/transport/windows"
 )
@@ -26,6 +27,13 @@ type Client struct {
 	requestBuf   []byte
 	sendBuf      []byte
 	transportBuf []byte
+	// Request header of the call in progress: its address goes to the
+	// transport, so a per-call variable would be a heap allocation per call.
+	requestHdr protocol.Header
+	// Views returned by the typed calls: valid until the next typed call, and
+	// kept here so that returning their address does not allocate.
+	snapshotView      protocol.CgroupsResponseView
+	stringReverseView protocol.StringReverseView
 
 	connectCount   uint32
 	reconnectCount uint32
@@ -39,6 +47,12 @@ type Client struct {
 	abortRequested                atomic.Bool
 	abortMu                       sync.Mutex
 	abortCh                       chan struct{}
+	// shmAttachTimeout bounds the SHM attach retry after negotiation;
+	// tests shorten it per instance.
+	shmAttachTimeout time.Duration
+	// opDeadline bounds the call or refresh in progress, in monotime
+	// nanoseconds; zero outside one.
+	opDeadline int64
 }
 
 func newClient(runDir, serviceName string, config windows.ClientConfig, expectedMethodCode uint16) *Client {
@@ -50,6 +64,7 @@ func newClient(runDir, serviceName string, config windows.ClientConfig, expected
 		config:             config,
 		callTimeoutMs:      ClientCallTimeoutDefaultMs,
 		abortCh:            make(chan struct{}),
+		shmAttachTimeout:   clientShmAttachRetryTimeout,
 	}
 	client.SetLookupLogicalConfig(LookupLogicalConfig{})
 	return client
@@ -67,7 +82,11 @@ func (c *Client) disconnect() {
 }
 
 func (c *Client) tryConnect() ClientState {
-	session, err := windows.Connect(c.runDir, c.serviceName, &c.config)
+	remaining := c.opRemainingMs()
+	if remaining == 0 || c.abortRequested.Load() {
+		return StateDisconnected
+	}
+	session, err := windows.ConnectTimeout(c.runDir, c.serviceName, &c.config, remaining, c.abortSignal())
 	if err != nil {
 		switch {
 		case isConnectError(err):
@@ -84,7 +103,11 @@ func (c *Client) tryConnect() ClientState {
 	// Win SHM upgrade if negotiated
 	if session.SelectedProfile == windows.WinShmProfileHybrid ||
 		session.SelectedProfile == windows.WinShmProfileBusywait {
-		deadline := time.Now().Add(clientShmAttachRetryTimeout)
+		// When the call deadline ends the wait first, WinSHM is not at
+		// fault and stays enabled for the next connect.
+		callLeft := time.Duration(c.opRemainingMs()) * time.Millisecond
+		callBound := callLeft < c.shmAttachTimeout
+		deadline := time.Now().Add(min(callLeft, c.shmAttachTimeout))
 		for {
 			shm, serr := windows.WinShmClientAttach(
 				c.runDir, c.serviceName,
@@ -97,7 +120,22 @@ func (c *Client) tryConnect() ClientState {
 				break
 			}
 			if !time.Now().Before(deadline) {
+				if callBound {
+					session.Close()
+					return StateDisconnected
+				}
 				break
+			}
+			if c.abortRequested.Load() {
+				session.Close()
+				return StateDisconnected
+			}
+			// A server that refused or died breaks the session pipe; its
+			// SHM objects will never appear. Not a WinSHM problem: keep it
+			// enabled for the next connect.
+			if pipePeerDisconnected(session) {
+				session.Close()
+				return StateDisconnected
 			}
 			time.Sleep(clientShmAttachRetryInterval)
 		}
@@ -143,22 +181,56 @@ func (c *Client) transportSend(hdr *protocol.Header, payload []byte) error {
 				c.noteRequestCapacity(uint32(len(payload)))
 				return protocol.ErrOverflow
 			}
-			return protocol.ErrTruncated
+			return c.shmSendFailure()
 		}
 		return nil
 	}
 
 	if c.session == nil {
-		return protocol.ErrTruncated
+		return protocol.ErrTransport
 	}
 	if err := c.session.Send(hdr, payload); err != nil {
 		if errors.Is(err, windows.ErrLimitExceeded) {
 			c.noteRequestCapacity(uint32(len(payload)))
 			return protocol.ErrOverflow
 		}
-		return protocol.ErrTruncated
+		return c.pipeFailure(err, protocol.ErrTransport)
 	}
 	return nil
+}
+
+// pipeFailure maps a pipe send/recv failure. A broken pipe is a disconnect;
+// a plain send/recv failure is one when the session probe says the server is
+// gone, and a transport failure otherwise; protocol errors keep their own
+// meaning.
+func (c *Client) pipeFailure(err error, otherwise error) error {
+	if errors.Is(err, windows.ErrDisconnected) {
+		return protocol.ErrDisconnected
+	}
+	if errors.Is(err, windows.ErrSend) || errors.Is(err, windows.ErrRecv) {
+		if c.session != nil && pipePeerDisconnected(c.session) {
+			return protocol.ErrDisconnected
+		}
+		return protocol.ErrTransport
+	}
+	return otherwise
+}
+
+// shmSendFailure maps a failed SHM send: a disconnect when the session probe
+// says the server is gone, a transport failure otherwise.
+func (c *Client) shmSendFailure() error {
+	if c.session != nil && pipePeerDisconnected(c.session) {
+		return protocol.ErrDisconnected
+	}
+	return protocol.ErrTransport
+}
+
+// pipePeerDisconnected is a zero-wait probe of a session pipe. WinSHM sessions
+// keep the pipe open for their whole life and the kernel breaks it when the
+// peer exits, so a broken pipe is the dead-peer signal for both directions.
+func pipePeerDisconnected(session *windows.Session) bool {
+	_, err := session.WaitReadable(0)
+	return errors.Is(err, windows.ErrDisconnected)
 }
 
 func (c *Client) transportReceive() (protocol.Header, []byte, error) {
@@ -169,7 +241,8 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 	scratch := ensureClientScratch(&c.transportBuf, c.maxReceiveMessageBytes())
 
 	if c.shm != nil {
-		deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+		// One monotonic read per slice, as in C.
+		deadline := monotime.After(time.Duration(timeoutMs) * time.Millisecond)
 		for {
 			select {
 			case <-abortCh:
@@ -177,13 +250,9 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 			default:
 			}
 
-			if timeoutMs != 0 && !time.Now().Before(deadline) {
-				return protocol.Header{}, nil, protocol.ErrTimeout
-			}
-
 			waitMs := clientAbortPollMs
 			if timeoutMs != 0 {
-				remaining := time.Until(deadline)
+				remaining := time.Duration(deadline - monotime.Now())
 				if remaining <= 0 {
 					return protocol.Header{}, nil, protocol.ErrTimeout
 				}
@@ -193,9 +262,23 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 			mlen, err := c.shm.WinShmReceive(scratch, waitMs)
 			if err != nil {
 				if errors.Is(err, windows.ErrWinShmTimeout) {
+					// Only an idle slice pays for the probe.
+					if c.session != nil && pipePeerDisconnected(c.session) {
+						return protocol.Header{}, nil, protocol.ErrDisconnected
+					}
 					continue
 				}
-				return protocol.Header{}, nil, protocol.ErrTruncated
+				if errors.Is(err, windows.ErrWinShmDisconnected) {
+					return protocol.Header{}, nil, protocol.ErrDisconnected
+				}
+				if errors.Is(err, windows.ErrWinShmMsgTooLarge) {
+					return protocol.Header{}, nil, protocol.ErrOverflow
+				}
+				// A zero-length or corrupt slot is a truncated message.
+				if errors.Is(err, windows.ErrWinShmBadHeader) {
+					return protocol.Header{}, nil, protocol.ErrTruncated
+				}
+				return protocol.Header{}, nil, protocol.ErrTransport
 			}
 			if mlen < protocol.HeaderSize {
 				return protocol.Header{}, nil, protocol.ErrTruncated
@@ -210,7 +293,7 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 	}
 
 	if c.session == nil {
-		return protocol.Header{}, nil, protocol.ErrTruncated
+		return protocol.Header{}, nil, protocol.ErrTransport
 	}
 
 	hdr, payload, err := c.session.ReceiveTimeout(scratch, timeoutMs, abortCh)
@@ -221,7 +304,10 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 		if errors.Is(err, windows.ErrAborted) {
 			return protocol.Header{}, nil, protocol.ErrAborted
 		}
-		return protocol.Header{}, nil, protocol.ErrTruncated
+		if errors.Is(err, windows.ErrLimitExceeded) {
+			return protocol.Header{}, nil, protocol.ErrOverflow
+		}
+		return protocol.Header{}, nil, c.pipeFailure(err, protocol.ErrTruncated)
 	}
 	return hdr, payload, nil
 }
@@ -243,7 +329,7 @@ func isConnectError(err error) bool {
 }
 
 func isAuthError(err error) bool {
-	return errors.Is(err, windows.ErrAuthFailed)
+	return errors.Is(err, windows.ErrAuthFailed) || errors.Is(err, windows.ErrUntrustedServer)
 }
 
 func isIncompatibleError(err error) bool {

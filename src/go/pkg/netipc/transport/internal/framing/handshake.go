@@ -21,6 +21,9 @@ type HelloConfig struct {
 	MaxResponsePayloadBytes uint32
 	MaxResponseBatchItems   uint32
 	AuthToken               uint64
+	// PlatformProfiles limits the offered profiles to those the platform
+	// can provide; 0 means no limit.
+	PlatformProfiles uint32
 }
 
 type ServerHelloConfig struct {
@@ -30,6 +33,9 @@ type ServerHelloConfig struct {
 	SupportedProfiles       uint32
 	PreferredProfiles       uint32
 	AuthToken               uint64
+	// PlatformProfiles limits the accepted profiles to those the platform
+	// can provide; 0 means no limit.
+	PlatformProfiles uint32
 }
 
 type ClientHandshakeConfig struct {
@@ -48,6 +54,11 @@ type ClientHandshakeConfig struct {
 type ServerHandshakeConfig struct {
 	ServerHelloConfig
 	SessionID uint64
+
+	// Prepare, when set, runs once a profile is selected and the payload
+	// limits are agreed, before HELLO_ACK is sent. Returning false drops
+	// that profile and the handshake selects again.
+	Prepare func(profile, maxRequestPayloadBytes, maxResponsePayloadBytes uint32) bool
 
 	Recv        func([]byte) (int, error)
 	SendAck     func(uint16, protocol.HelloAck) error
@@ -79,16 +90,26 @@ func HelloAckLayoutIncompatible(buf []byte) bool {
 	return len(buf) >= 2 && binary.NativeEndian.Uint16(buf[0:2]) != 1
 }
 
-func BuildHelloPacket(config HelloConfig) [protocol.HeaderSize + HelloPayloadSize]byte {
-	if config.SupportedProfiles == 0 {
-		config.SupportedProfiles = protocol.ProfileBaseline
+// profiles applies the baseline default and then the platform limit.
+func profiles(supported, preferred, platform uint32) (uint32, uint32) {
+	if supported == 0 {
+		supported = protocol.ProfileBaseline
 	}
+	if platform != 0 {
+		supported &= platform
+		preferred &= platform
+	}
+	return supported, preferred
+}
+
+func BuildHelloPacket(config HelloConfig) [protocol.HeaderSize + HelloPayloadSize]byte {
+	supported, preferred := profiles(config.SupportedProfiles, config.PreferredProfiles, config.PlatformProfiles)
 
 	hello := protocol.Hello{
 		LayoutVersion:           1,
 		Flags:                   0,
-		SupportedProfiles:       config.SupportedProfiles,
-		PreferredProfiles:       config.PreferredProfiles,
+		SupportedProfiles:       supported,
+		PreferredProfiles:       preferred,
 		MaxRequestPayloadBytes:  config.MaxRequestPayloadBytes,
 		MaxRequestBatchItems:    config.MaxRequestBatchItems,
 		MaxResponsePayloadBytes: config.MaxResponsePayloadBytes,
@@ -177,13 +198,18 @@ func ClientHandshake(config ClientHandshakeConfig) (protocol.HelloAck, error) {
 		return protocol.HelloAck{}, config.ErrProtocol("ack payload: " + err.Error())
 	}
 
+	offered, _ := profiles(config.Hello.SupportedProfiles, 0, config.Hello.PlatformProfiles)
+	selected := ack.SelectedProfile
+	if selected == 0 || selected&(selected-1) != 0 || selected&offered == 0 {
+		return protocol.HelloAck{}, config.ErrProtocol("selected profile was not offered")
+	}
+
 	return ack, nil
 }
 
 func NegotiateHello(hello protocol.Hello, config ServerHelloConfig) (protocol.HelloAck, uint16, bool) {
-	if config.SupportedProfiles == 0 {
-		config.SupportedProfiles = protocol.ProfileBaseline
-	}
+	config.SupportedProfiles, config.PreferredProfiles = profiles(
+		config.SupportedProfiles, config.PreferredProfiles, config.PlatformProfiles)
 
 	intersection := hello.SupportedProfiles & config.SupportedProfiles
 	if intersection == 0 {
@@ -258,6 +284,23 @@ func ServerHandshake(config ServerHandshakeConfig) (protocol.HelloAck, error) {
 		return protocol.HelloAck{}, config.StatusError(status)
 	}
 	ack.SessionID = config.SessionID
+
+	// Set up the selected profile before the ACK promises it. A profile the
+	// caller cannot prepare is dropped, as if the server never offered it.
+	for config.Prepare != nil && !config.Prepare(ack.SelectedProfile,
+		ack.AgreedMaxRequestPayloadBytes, ack.AgreedMaxResponsePayloadBytes) {
+		ack.ServerSupportedProfiles &^= ack.SelectedProfile
+		ack.IntersectionProfiles &^= ack.SelectedProfile
+		if ack.IntersectionProfiles == 0 {
+			sendRejection(config.SendAck, protocol.StatusUnsupported)
+			return protocol.HelloAck{}, config.StatusError(protocol.StatusUnsupported)
+		}
+		preferred := ack.IntersectionProfiles & hello.PreferredProfiles & config.PreferredProfiles
+		ack.SelectedProfile = highestBit(ack.IntersectionProfiles)
+		if preferred != 0 {
+			ack.SelectedProfile = highestBit(preferred)
+		}
+	}
 
 	if err := config.SendAck(protocol.StatusOK, ack); err != nil {
 		return protocol.HelloAck{}, config.ErrSend("hello_ack send: " + err.Error())

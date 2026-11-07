@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
 )
@@ -30,6 +31,13 @@ type Client struct {
 	requestBuf   []byte
 	sendBuf      []byte
 	transportBuf []byte
+	// Request header of the call in progress: its address goes to the
+	// transport, so a per-call variable would be a heap allocation per call.
+	requestHdr protocol.Header
+	// Views returned by the typed calls: valid until the next typed call, and
+	// kept here so that returning their address does not allocate.
+	snapshotView      protocol.CgroupsResponseView
+	stringReverseView protocol.StringReverseView
 
 	// Stats
 	connectCount   uint32
@@ -44,6 +52,12 @@ type Client struct {
 	abortRequested                atomic.Bool
 	abortMu                       sync.Mutex
 	abortCh                       chan struct{}
+	// shmAttachTimeout bounds the SHM attach retry after negotiation;
+	// tests shorten it per instance.
+	shmAttachTimeout time.Duration
+	// opDeadline bounds the call or refresh in progress, in monotime
+	// nanoseconds; zero outside one.
+	opDeadline int64
 }
 
 func newClient(runDir, serviceName string, config posix.ClientConfig, expectedMethodCode uint16) *Client {
@@ -55,6 +69,7 @@ func newClient(runDir, serviceName string, config posix.ClientConfig, expectedMe
 		config:             config,
 		callTimeoutMs:      ClientCallTimeoutDefaultMs,
 		abortCh:            make(chan struct{}),
+		shmAttachTimeout:   clientShmAttachRetryTimeout,
 	}
 	client.SetLookupLogicalConfig(LookupLogicalConfig{})
 	return client
@@ -72,7 +87,11 @@ func (c *Client) disconnect() {
 }
 
 func (c *Client) tryConnect() ClientState {
-	session, err := posix.Connect(c.runDir, c.serviceName, &c.config)
+	remaining := c.opRemainingMs()
+	if remaining == 0 || c.abortRequested.Load() {
+		return StateDisconnected
+	}
+	session, err := posix.ConnectTimeout(c.runDir, c.serviceName, &c.config, remaining, c.abortSignal())
 	if err != nil {
 		switch {
 		case isConnectError(err):
@@ -91,7 +110,11 @@ func (c *Client) tryConnect() ClientState {
 		session.SelectedProfile == protocol.ProfileSHMFutex {
 		// Retry attach: the server prepared SHM before handshake, but the
 		// client may still race slightly with the peer exposing the region.
-		deadline := time.Now().Add(clientShmAttachRetryTimeout)
+		// When the call deadline ends the wait first, SHM is not at fault
+		// and stays enabled for the next connect.
+		callLeft := time.Duration(c.opRemainingMs()) * time.Millisecond
+		callBound := callLeft < c.shmAttachTimeout
+		deadline := time.Now().Add(min(callLeft, c.shmAttachTimeout))
 		for {
 			shm, serr := posix.ShmClientAttach(c.runDir, c.serviceName, session.SessionID)
 			if serr == nil {
@@ -99,7 +122,22 @@ func (c *Client) tryConnect() ClientState {
 				break
 			}
 			if !time.Now().Before(deadline) {
+				if callBound {
+					session.Close()
+					return StateDisconnected
+				}
 				break
+			}
+			if c.abortRequested.Load() {
+				session.Close()
+				return StateDisconnected
+			}
+			// A server that refused or died closes the session socket; its
+			// SHM region will never appear. Not an SHM problem: keep SHM
+			// enabled for the next connect.
+			if peerDisconnected(session.Fd()) {
+				session.Close()
+				return StateDisconnected
 			}
 			time.Sleep(clientShmAttachRetryInterval)
 		}
@@ -154,23 +192,46 @@ func (c *Client) transportSend(hdr *protocol.Header, payload []byte) error {
 				c.noteRequestCapacity(payloadLen)
 				return protocol.ErrOverflow
 			}
-			return protocol.ErrTruncated
+			return c.shmSendFailure()
 		}
 		return nil
 	}
 
 	// UDS path
 	if c.session == nil {
-		return protocol.ErrTruncated
+		return protocol.ErrTransport
 	}
 	if err := c.session.Send(hdr, payload); err != nil {
 		if errors.Is(err, posix.ErrLimitExceeded) {
 			c.noteRequestCapacity(payloadLen)
 			return protocol.ErrOverflow
 		}
-		return protocol.ErrTruncated
+		return c.socketFailure(err, protocol.ErrTransport)
 	}
 	return nil
+}
+
+// socketFailure maps a socket send/recv failure. The transport reports EOF,
+// EPIPE and ECONNRESET as plain send/recv failures, so the session probe tells
+// a gone server apart from any other I/O failure; protocol errors keep their
+// own meaning.
+func (c *Client) socketFailure(err error, otherwise error) error {
+	if errors.Is(err, posix.ErrSend) || errors.Is(err, posix.ErrRecv) {
+		if c.session != nil && peerDisconnected(c.session.Fd()) {
+			return protocol.ErrDisconnected
+		}
+		return protocol.ErrTransport
+	}
+	return otherwise
+}
+
+// shmSendFailure maps a failed SHM send: a disconnect when the session probe
+// says the server is gone, a transport failure otherwise.
+func (c *Client) shmSendFailure() error {
+	if c.session != nil && peerDisconnected(c.session.Fd()) {
+		return protocol.ErrDisconnected
+	}
+	return protocol.ErrTransport
 }
 
 func (c *Client) transportReceive() (protocol.Header, []byte, error) {
@@ -181,7 +242,8 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 	scratch := ensureClientScratch(&c.transportBuf, c.maxReceiveMessageBytes())
 
 	if c.shm != nil {
-		deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+		// One monotonic read per slice, as in C.
+		deadline := monotime.After(time.Duration(timeoutMs) * time.Millisecond)
 		for {
 			select {
 			case <-abortCh:
@@ -189,13 +251,9 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 			default:
 			}
 
-			if timeoutMs != 0 && !time.Now().Before(deadline) {
-				return protocol.Header{}, nil, protocol.ErrTimeout
-			}
-
 			waitMs := clientAbortPollMs
 			if timeoutMs != 0 {
-				remaining := time.Until(deadline)
+				remaining := time.Duration(deadline - monotime.Now())
 				if remaining <= 0 {
 					return protocol.Header{}, nil, protocol.ErrTimeout
 				}
@@ -205,9 +263,16 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 			mlen, err := c.shm.ShmReceive(scratch, waitMs)
 			if err != nil {
 				if errors.Is(err, posix.ErrShmTimeout) {
+					// Only an idle slice pays for the probe.
+					if c.session != nil && peerDisconnected(c.session.Fd()) {
+						return protocol.Header{}, nil, protocol.ErrDisconnected
+					}
 					continue
 				}
-				return protocol.Header{}, nil, protocol.ErrTruncated
+				if errors.Is(err, posix.ErrShmMsgTooLarge) {
+					return protocol.Header{}, nil, protocol.ErrOverflow
+				}
+				return protocol.Header{}, nil, protocol.ErrTransport
 			}
 			if mlen < protocol.HeaderSize {
 				return protocol.Header{}, nil, protocol.ErrTruncated
@@ -223,7 +288,7 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 
 	// UDS path: receive returns (Header, payload, error)
 	if c.session == nil {
-		return protocol.Header{}, nil, protocol.ErrTruncated
+		return protocol.Header{}, nil, protocol.ErrTransport
 	}
 
 	hdr, payload, err := c.session.ReceiveTimeout(scratch, timeoutMs, abortCh)
@@ -234,7 +299,10 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 		if errors.Is(err, posix.ErrAborted) {
 			return protocol.Header{}, nil, protocol.ErrAborted
 		}
-		return protocol.Header{}, nil, protocol.ErrTruncated
+		if errors.Is(err, posix.ErrLimitExceeded) {
+			return protocol.Header{}, nil, protocol.ErrOverflow
+		}
+		return protocol.Header{}, nil, c.socketFailure(err, protocol.ErrTruncated)
 	}
 	return hdr, payload, nil
 }

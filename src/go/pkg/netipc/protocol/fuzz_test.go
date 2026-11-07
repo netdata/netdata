@@ -1,3 +1,7 @@
+//go:build netipc_extended
+
+// Fuzz targets run only from tests/run-extended-fuzz.sh.
+
 package protocol
 
 import (

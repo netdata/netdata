@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"syscall"
 	"testing"
-	"time"
 	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
@@ -50,18 +49,14 @@ func testWinShmClientConfig() windows.ClientConfig {
 	return cfg
 }
 
+// waitWinClientReady refreshes once: servers in these tests are already
+// listening, so a single connect must succeed.
 func waitWinClientReady(t *testing.T, client *Client) {
 	t.Helper()
-
-	for i := 0; i < 100; i++ {
-		client.Refresh()
-		if client.Ready() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	client.Refresh()
+	if !client.Ready() {
+		t.Fatalf("client not ready after one refresh, state=%d", client.state)
 	}
-
-	t.Fatalf("client not ready, final state=%d", client.state)
 }
 
 func startTestServerWinWithConfig(
@@ -71,16 +66,7 @@ func startTestServerWinWithConfig(
 	handler DispatchHandler,
 ) *winTestServer {
 	s := NewServer(winTestRunDir, service, cfg, expectedMethodCode, handler)
-	doneCh := make(chan struct{})
-
-	go func() {
-		defer close(doneCh)
-		_ = s.Run()
-	}()
-
-	time.Sleep(200 * time.Millisecond)
-
-	return &winTestServer{server: s, doneCh: doneCh}
+	return &winTestServer{server: s, doneCh: runServerForTest(s)}
 }
 
 func startTestIncrementServerWinWithConfig(service string, cfg windows.ServerConfig) *winTestServer {
@@ -280,7 +266,7 @@ func startRawWinHelloAckServer(t *testing.T, service string, packet []byte) *win
 		srv.doneCh <- nil
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	// The pipe instance exists before this returns, so clients can open it.
 	return srv
 }
 
@@ -378,7 +364,7 @@ func startRawWinSessionServerN(t *testing.T, service string, cfg windows.ServerC
 		srv.doneCh <- nil
 	}()
 
-	time.Sleep(200 * time.Millisecond)
+	// The pipe instance exists before this returns, so clients can open it.
 	return srv
 }
 
@@ -425,8 +411,8 @@ func winIncrementDispatchHandler() DispatchHandler {
 }
 
 func winStringReverseDispatchHandler() DispatchHandler {
-	return StringReverseDispatch(func(s string) (string, bool) {
-		return winReverseString(s), true
+	return StringReverseDispatch(func(s []byte) (string, bool) {
+		return winReverseString(string(s)), true
 	})
 }
 

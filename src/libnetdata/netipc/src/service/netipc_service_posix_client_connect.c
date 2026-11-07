@@ -76,9 +76,14 @@ nipc_client_state_t nipc_service_posix_client_try_connect(nipc_client_ctx_t *ctx
     memset(&session, 0, sizeof(session));
     session.fd = -1;
 
-    nipc_uds_error_t err = nipc_uds_connect(
+    uint32_t remaining = nipc_service_common_client_op_remaining_ms(ctx);
+    if (remaining == 0 || nipc_service_common_client_abort_requested(ctx))
+        return NIPC_CLIENT_DISCONNECTED;
+
+    int abort_fd = ctx->abort_pipe_valid ? ctx->abort_pipe[0] : -1;
+    nipc_uds_error_t err = nipc_uds_connect_timeout(
         ctx->run_dir, ctx->service_name,
-        &ctx->transport_config, &session);
+        &ctx->transport_config, remaining, abort_fd, &session);
 
     switch (err) {
     case NIPC_UDS_OK:
@@ -119,7 +124,14 @@ nipc_client_state_t nipc_service_posix_client_try_connect(nipc_client_ctx_t *ctx
             /* Retry attach: server creates the SHM region after
              * the UDS handshake, so it may not exist yet. */
             nipc_shm_error_t serr = NIPC_SHM_ERR_NOT_READY;
-            uint64_t deadline_ms = nipc_service_platform_monotonic_ms() + CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS;
+            bool keep_shm = false;
+            uint32_t attach_ms = nipc_service_common_client_op_remaining_ms(ctx);
+            /* When the call deadline ends the wait first, SHM is not at
+             * fault and stays enabled for the next connect. */
+            bool call_bound = attach_ms < ctx->shm_attach_timeout_ms;
+            if (!call_bound)
+                attach_ms = ctx->shm_attach_timeout_ms;
+            uint64_t deadline_ms = nipc_service_platform_monotonic_ms() + attach_ms;
             for (;;) {
                 serr = nipc_shm_client_attach(
                     ctx->run_dir, ctx->service_name,
@@ -130,13 +142,31 @@ nipc_client_state_t nipc_service_posix_client_try_connect(nipc_client_ctx_t *ctx
                     serr != NIPC_SHM_ERR_OPEN &&
                     serr != NIPC_SHM_ERR_BAD_MAGIC)
                     break;
-                if (nipc_service_platform_monotonic_ms() >= deadline_ms)
+                if (nipc_service_platform_monotonic_ms() >= deadline_ms) {
+                    keep_shm = call_bound;
                     break;
+                }
+                if (nipc_service_common_client_abort_requested(ctx)) {
+                    keep_shm = true;
+                    break;
+                }
+                /* A server that refused or died closes the session socket;
+                 * waiting for its SHM region would only burn the timeout. */
+                if (nipc_service_posix_peer_disconnected(session.fd)) {
+                    keep_shm = true;
+                    break;
+                }
                 nipc_service_posix_sleep_us(CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS * 1000u);
             }
 
             if (serr == NIPC_SHM_OK) {
                 ctx->shm = shm;
+            } else if (keep_shm) {
+                /* Not an SHM problem: keep SHM enabled for the next connect. */
+                free(shm);
+                nipc_uds_close_session(&ctx->session);
+                ctx->session_valid = false;
+                return NIPC_CLIENT_DISCONNECTED;
             } else {
                 /* SHM attach failed after negotiation. Close that session,
                  * blacklist SHM for this client context, and retry
@@ -155,18 +185,10 @@ nipc_client_state_t nipc_service_posix_client_try_connect(nipc_client_ctx_t *ctx
     return NIPC_CLIENT_READY;
 }
 
+/* One reconnect per failed call, as the spec states; the call deadline
+ * bounds it. */
 bool nipc_service_posix_client_reconnect_for_call(nipc_client_ctx_t *ctx)
 {
-    for (uint32_t i = 0; i < CLIENT_CALL_RECONNECT_RETRIES; i++) {
-        ctx->state = nipc_service_posix_client_try_connect(ctx);
-        if (ctx->state == NIPC_CLIENT_READY)
-            return true;
-        if (ctx->state == NIPC_CLIENT_AUTH_FAILED ||
-            ctx->state == NIPC_CLIENT_INCOMPATIBLE)
-            return false;
-        if (i + 1u < CLIENT_CALL_RECONNECT_RETRIES)
-            nipc_service_posix_sleep_us(CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS * 1000u);
-    }
-
-    return false;
+    ctx->state = nipc_service_posix_client_try_connect(ctx);
+    return ctx->state == NIPC_CLIENT_READY;
 }

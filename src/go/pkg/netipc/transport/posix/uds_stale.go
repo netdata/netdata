@@ -18,29 +18,67 @@ const (
 	staleLiveServer staleResult = 2
 )
 
-const (
-	staleDialAttempts   = 3
-	staleDialRetryDelay = 50 * time.Millisecond
-	staleDialTimeout    = 1 * time.Second
-)
+const staleDialTimeout = 1 * time.Second
 
+// dialStaleCandidate reports whether a live server accepts on path. The
+// endpoint lock, not repeated dials, keeps a starting server's endpoint
+// safe (see acquireEndpointLock).
 func dialStaleCandidate(path string) error {
-	var err error
-	for attempt := range staleDialAttempts {
-		var conn net.Conn
-		conn, err = net.DialTimeout("unixpacket", path, staleDialTimeout)
-		if err == nil {
-			_ = conn.Close()
-			return nil
-		}
-		if !errors.Is(err, syscall.ECONNREFUSED) {
-			return err
-		}
-		if attempt+1 < staleDialAttempts {
-			time.Sleep(staleDialRetryDelay)
-		}
+	conn, err := net.DialTimeout(staleDialNetwork, path, staleDialTimeout)
+	if err == nil {
+		_ = conn.Close()
 	}
 	return err
+}
+
+// acquireEndpointLock takes the endpoint lock {runDir}/{serviceName}.lock.
+// A server's socket file exists from bind() until listen(), and connects in
+// that window are refused just as for a dead server's leftover file, so a
+// connect probe alone cannot tell a starting server from a stale one. The
+// lock can: its holder owns the endpoint, and the kernel drops it when that
+// process dies. The file stays on disk; removing it would let a starter
+// that already opened it lock an orphaned inode.
+func acquireEndpointLock(runDir, serviceName string) (*os.File, error) {
+	lockPath := runDir + "/" + serviceName + ".lock"
+	// The file takes 0600 & ~umask. A umask without owner read or write would
+	// leave it unopenable read-write, so a narrower open follows (flock works
+	// on any access mode) and Fchmod restores 0600 for the next starter.
+	// Fchmod fails only for a file another account owns, which the lock still
+	// works on.
+	const flags = syscall.O_CLOEXEC | syscall.O_NOFOLLOW
+	fd, err := syscall.Open(lockPath, syscall.O_RDWR|syscall.O_CREAT|flags, 0o600)
+	if errors.Is(err, syscall.EACCES) {
+		fd, err = syscall.Open(lockPath, syscall.O_WRONLY|flags, 0)
+	}
+	if errors.Is(err, syscall.EACCES) {
+		fd, err = syscall.Open(lockPath, syscall.O_RDONLY|flags, 0)
+	}
+	if err != nil {
+		return nil, wrapErr(ErrSocket, "lock open: "+err.Error())
+	}
+	_ = syscall.Fchmod(fd, 0o600)
+	for {
+		err = syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
+		if err != syscall.EINTR {
+			break
+		}
+	}
+	if err != nil {
+		_ = syscall.Close(fd)
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, ErrAddrInUse
+		}
+		return nil, wrapErr(ErrSocket, "lock: "+err.Error())
+	}
+	return os.NewFile(uintptr(fd), lockPath), nil
+}
+
+// releaseEndpointLock unlocks before closing: a child forked by another
+// thread shares the open file description until it execs, and its copy
+// would keep the lock held.
+func releaseEndpointLock(lock *os.File) {
+	_ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+	_ = lock.Close()
 }
 
 func checkAndRecoverStale(path string) staleResult {

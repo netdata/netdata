@@ -1,9 +1,11 @@
 //go:build unix
 
-// Package posix implements the L1 POSIX UDS SEQPACKET transport.
+// Package posix implements the L1 POSIX UDS transport.
 //
 // Connection lifecycle, handshake with profile/limit negotiation,
-// and send/receive with transparent chunking over AF_UNIX SEQPACKET sockets.
+// and send/receive with transparent chunking over AF_UNIX SEQPACKET sockets
+// (a stream socket carrying the same packets on macOS and FreeBSD, see
+// uds_stream.go).
 // Wire-compatible with the C and Rust implementations.
 //
 // Pure Go — no cgo. Works with CGO_ENABLED=0.
@@ -25,6 +27,7 @@ const (
 	defaultBacklog                   = 16
 	defaultBatchItems                = 1
 	defaultPacketSizeFallback uint32 = 65536
+	packetSizeMax             uint32 = 262144
 	helloPayloadSize                 = 44
 	helloAckPayloadSize              = 48
 
@@ -102,13 +105,14 @@ func buildSocketPath(runDir, serviceName string) (string, error) {
 	return path, nil
 }
 
-// detectPacketSize reads SO_SNDBUF from the socket.
-func detectPacketSize(fd int) uint32 {
-	val, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_SNDBUF)
-	if err != nil || val <= 0 {
-		return defaultPacketSizeFallback
+// packetSizeLimit returns the packet size this side may propose: configured
+// (0 = no preference) capped by what the kernel accepts as one packet.
+func packetSizeLimit(fd int, configured uint32) uint32 {
+	limit := min(kernelPacketLimit(fd), packetSizeMax)
+	if configured != 0 && configured < limit {
+		return configured
 	}
-	return uint32(val)
+	return limit
 }
 
 // highestBit returns the highest set bit in a bitmask (0 if empty).
@@ -141,30 +145,32 @@ func minU32(a, b uint32) uint32 {
 //  Low-level I/O
 // ---------------------------------------------------------------------------
 
+// sendPacket sends one packet: one SEQPACKET message, or all its bytes on a
+// stream.
+func sendPacket(fd int, hdr []byte, payload []byte) error {
+	if streamTransport {
+		return streamSendAll(fd, hdr, payload)
+	}
+	return rawSendIov(fd, hdr, payload)
+}
+
 // rawSendIov sends header + payload as one SEQPACKET message using sendmsg.
 func rawSendIov(fd int, hdr []byte, payload []byte) error {
 	var iov [2]syscall.Iovec
 	iov[0].Base = unsafe.SliceData(hdr) // #nosec G103 -- sendmsg iovec needs the backing byte-slice pointer.
 	iov[0].SetLen(len(hdr))
 
-	iovlen := uint64(1)
+	// Msghdr.Iovlen is uint64, uint32 or int32 depending on the platform;
+	// untyped constants assign to all of them.
+	msg := syscall.Msghdr{Iov: &iov[0]}
+	msg.Iovlen = 1
 	if len(payload) > 0 {
 		iov[1].Base = unsafe.SliceData(payload) // #nosec G103 -- sendmsg iovec needs the backing byte-slice pointer.
 		iov[1].SetLen(len(payload))
-		iovlen = 2
+		msg.Iovlen = 2
 	}
 
-	msg := syscall.Msghdr{
-		Iov:    &iov[0],
-		Iovlen: iovlen,
-	}
-
-	n, _, errno := syscall.Syscall(
-		syscall.SYS_SENDMSG,
-		uintptr(fd),
-		uintptr(unsafe.Pointer(&msg)), // #nosec G103 -- raw sendmsg syscall requires a Msghdr pointer.
-		uintptr(syscall.MSG_NOSIGNAL),
-	)
+	n, errno := rawSendmsg(fd, &msg, sendFlags)
 	if errno != 0 {
 		return wrapErr(ErrSend, errno.Error())
 	}
@@ -185,7 +191,9 @@ func ensureScratchBuf(buf *[]byte, needed int) []byte {
 
 // rawRecv receives one SEQPACKET message. Returns bytes received.
 func rawRecv(fd int, buf []byte) (int, error) {
-	n, _, _, _, err := syscall.Recvmsg(fd, buf, nil, 0)
+	// read(2) behaves as recvmsg with no flags (one datagram on SEQPACKET)
+	// and skips the source address that syscall.Recvmsg allocates.
+	n, err := syscall.Read(fd, buf)
 	if err != nil {
 		return 0, wrapErr(ErrRecv, err.Error())
 	}

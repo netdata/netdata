@@ -38,19 +38,23 @@ pub use client::{ClientAbortHandle, ClientState, ClientStatus, RawClient};
 pub use common::LookupLogicalConfig;
 pub use dispatch::{DispatchError, DispatchHandler};
 pub use increment::{IncrementHandler, increment_dispatch};
-pub use server::ManagedServer;
+#[cfg(test)]
+pub(crate) use server::RunningTestServer;
+pub use server::{ListeningSignal, ManagedServer};
 pub use string_reverse::{StringReverseHandler, string_reverse_dispatch};
 
+#[cfg(all(test, any(target_os = "linux", target_os = "freebsd")))]
+use crate::protocol::STATUS_BAD_ENVELOPE;
 #[cfg(all(test, unix))]
 use crate::protocol::{
     self, CgroupsRequest, FLAG_BATCH, HEADER_SIZE, Header, INCREMENT_PAYLOAD_SIZE, KIND_REQUEST,
     MAGIC_MSG, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT, METHOD_STRING_REVERSE, NipcError,
-    STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, VERSION, batch_item_get, increment_decode,
-    string_reverse_decode, string_reverse_encode,
+    STATUS_INTERNAL_ERROR, VERSION, batch_item_get, increment_decode, string_reverse_decode,
+    string_reverse_encode,
 };
 #[cfg(all(test, unix))]
 use crate::transport::posix::{ClientConfig, ServerConfig, UdsListener, UdsSession};
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(all(test, any(target_os = "linux", target_os = "freebsd")))]
 use crate::transport::shm::ShmContext;
 #[cfg(all(test, windows))]
 use crate::transport::windows::{ClientConfig, NpListener, NpSession, ServerConfig};
