@@ -97,27 +97,36 @@ void buffer_json_group_by_to_array(BUFFER *wb, RRDR_GROUP_BY group_by) {
     }
 }
 
+// returns false when the name is not a known aggregation function
+bool group_by_aggregate_function_lookup(const char *s, RRDR_GROUP_BY_FUNCTION *function) {
+    static const struct {
+        const char *name;
+        RRDR_GROUP_BY_FUNCTION function;
+    } functions[] = {
+        { "average",    RRDR_GROUP_BY_FUNCTION_AVERAGE },
+        { "avg",        RRDR_GROUP_BY_FUNCTION_AVERAGE },
+        { "min",        RRDR_GROUP_BY_FUNCTION_MIN },
+        { "max",        RRDR_GROUP_BY_FUNCTION_MAX },
+        { "sum",        RRDR_GROUP_BY_FUNCTION_SUM },
+        { "percentage", RRDR_GROUP_BY_FUNCTION_PERCENTAGE },
+        { "extremes",   RRDR_GROUP_BY_FUNCTION_EXTREMES },
+    };
+
+    for(size_t i = 0; i < _countof(functions); i++) {
+        if(strcmp(s, functions[i].name) == 0) {
+            *function = functions[i].function;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// unknown names fall back to average
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s) {
-    if(strcmp(s, "average") == 0)
-        return RRDR_GROUP_BY_FUNCTION_AVERAGE;
-
-    if(strcmp(s, "avg") == 0)
-        return RRDR_GROUP_BY_FUNCTION_AVERAGE;
-
-    if(strcmp(s, "min") == 0)
-        return RRDR_GROUP_BY_FUNCTION_MIN;
-
-    if(strcmp(s, "max") == 0)
-        return RRDR_GROUP_BY_FUNCTION_MAX;
-
-    if(strcmp(s, "sum") == 0)
-        return RRDR_GROUP_BY_FUNCTION_SUM;
-
-    if(strcmp(s, "percentage") == 0)
-        return RRDR_GROUP_BY_FUNCTION_PERCENTAGE;
-
-    if(strcmp(s, "extremes") == 0)
-        return RRDR_GROUP_BY_FUNCTION_EXTREMES;
+    RRDR_GROUP_BY_FUNCTION function;
+    if(group_by_aggregate_function_lookup(s, &function))
+        return function;
 
     return RRDR_GROUP_BY_FUNCTION_AVERAGE;
 }
