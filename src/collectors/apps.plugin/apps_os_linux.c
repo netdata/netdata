@@ -987,78 +987,83 @@ static inline void update_proc_state_count(char proc_stt) {
     }
 }
 
-bool apps_os_read_pid_stat_linux(struct pid_stat *p, void *ptr __maybe_unused) {
-    static procfile *ff = NULL;
+// comm is not escaped: parentheses and even newlines are legal name bytes.
+static bool parse_proc_pid_stat(char *buf, char **fields, size_t count) {
+    size_t len = strlen(buf);
+    char *open = strchr(buf, '(');
+    char *close = strrchr(buf, ')');
+    if(!len || buf[len - 1] != '\n' || !open || !close || close < open ||
+       open == buf || open[-1] != ' ' || close[1] != ' ')
+        return false;
 
+    fields[0] = buf;
+    open[-1] = '\0';
+    fields[1] = open + 1;
+    *close = '\0';
+
+    char *cursor = close + 2;
+    for(size_t i = 2; i < count; i++) {
+        while(isspace((unsigned char)*cursor)) cursor++;
+        if(!*cursor) return false;
+        fields[i] = cursor;
+        while(*cursor && !isspace((unsigned char)*cursor)) cursor++;
+        if(*cursor) *cursor++ = '\0';
+    }
+
+    if(!fields[2][0] || fields[2][1]) return false;
+
+    // Validate consumed numbers before any process state or counters are changed.
+    static const size_t numeric_fields[] = {0, 3, 9, 10, 11, 12, 13, 14, 15, 16, 19, 21, 42, 43};
+    for(size_t i = 0; i < sizeof(numeric_fields) / sizeof(numeric_fields[0]); i++) {
+        size_t field = numeric_fields[i];
+        if(field >= count) continue;
+        if(!isdigit((unsigned char)fields[field][0])) return false;
+        char *end;
+        errno = 0;
+        unsigned long long value = strtoull(fields[field], &end, 10);
+        if(errno || *end || ((field == 0 || field == 3 || field == 19) && value > INT32_MAX))
+            return false;
+    }
+    return true;
+}
+
+bool apps_os_read_pid_stat_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     if(unlikely(!p->stat_filename)) {
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/proc/%d/stat", netdata_configured_host_prefix, p->pid);
         p->stat_filename = strdupz(filename);
     }
 
-    bool set_quotes = (!ff) ? true : false;
+    // Reject truncated records rather than publish partial counters.
+    char buf[4096];
+    char *fields[44];
+    if(read_txt_file(p->stat_filename, buf, sizeof(buf)) || strlen(buf) == sizeof(buf) - 1 ||
+       !parse_proc_pid_stat(buf, fields, enable_guest_charts ? 44 : 22) ||
+       str2pid_t(fields[0]) != p->pid)
+        goto cleanup;
 
-    ff = procfile_reopen(ff, p->stat_filename, NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    if(unlikely(!ff)) goto cleanup;
-
-    // if(set_quotes) procfile_set_quotes(ff, "()");
-    if(unlikely(set_quotes))
-        procfile_set_open_close(ff, "(", ")");
-
-    ff = procfile_readall(ff);
-    if(unlikely(!ff)) goto cleanup;
-
-    // p->pid           = str2pid_t(procfile_lineword(ff, 0, 0));
-    char *comm          = procfile_lineword(ff, 0, 1);
-    p->state            = *(procfile_lineword(ff, 0, 2));
-    p->ppid             = (int32_t)str2pid_t(procfile_lineword(ff, 0, 3));
-    // p->pgrp          = (int32_t)str2pid_t(procfile_lineword(ff, 0, 4));
-    // p->session       = (int32_t)str2pid_t(procfile_lineword(ff, 0, 5));
-    // p->tty_nr        = (int32_t)str2pid_t(procfile_lineword(ff, 0, 6));
-    // p->tpgid         = (int32_t)str2pid_t(procfile_lineword(ff, 0, 7));
-    // p->flags         = str2uint64_t(procfile_lineword(ff, 0, 8));
+    char *comm          = fields[1];
+    p->state            = *(fields[2]);
+    p->ppid             = (int32_t)str2pid_t(fields[3]);
 
     update_pid_comm(p, comm);
 
-    pid_incremental_rate(stat, PDF_MINFLT,  str2kernel_uint_t(procfile_lineword(ff, 0,  9)));
-    pid_incremental_rate(stat, PDF_CMINFLT, str2kernel_uint_t(procfile_lineword(ff, 0, 10)));
-    pid_incremental_rate(stat, PDF_MAJFLT,  str2kernel_uint_t(procfile_lineword(ff, 0, 11)));
-    pid_incremental_rate(stat, PDF_CMAJFLT, str2kernel_uint_t(procfile_lineword(ff, 0, 12)));
-    pid_incremental_cpu(stat, PDF_UTIME,   str2kernel_uint_t(procfile_lineword(ff, 0, 13)));
-    pid_incremental_cpu(stat, PDF_STIME,   str2kernel_uint_t(procfile_lineword(ff, 0, 14)));
-    pid_incremental_cpu(stat, PDF_CUTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 15)));
-    pid_incremental_cpu(stat, PDF_CSTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
-    // p->priority      = str2kernel_uint_t(procfile_lineword(ff, 0, 17));
-    // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
-    p->values[PDF_THREADS] = (int32_t) str2uint32_t(procfile_lineword(ff, 0, 19), NULL);
-    // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
-    p->starttime = str2kernel_uint_t(procfile_lineword(ff, 0, 21));
+    pid_incremental_rate(stat, PDF_MINFLT,  str2kernel_uint_t(fields[9]));
+    pid_incremental_rate(stat, PDF_CMINFLT, str2kernel_uint_t(fields[10]));
+    pid_incremental_rate(stat, PDF_MAJFLT,  str2kernel_uint_t(fields[11]));
+    pid_incremental_rate(stat, PDF_CMAJFLT, str2kernel_uint_t(fields[12]));
+    pid_incremental_cpu(stat, PDF_UTIME,   str2kernel_uint_t(fields[13]));
+    pid_incremental_cpu(stat, PDF_STIME,   str2kernel_uint_t(fields[14]));
+    pid_incremental_cpu(stat, PDF_CUTIME,  str2kernel_uint_t(fields[15]));
+    pid_incremental_cpu(stat, PDF_CSTIME,  str2kernel_uint_t(fields[16]));
+    p->values[PDF_THREADS] = (int32_t) str2uint32_t(fields[19], NULL);
+    p->starttime = str2kernel_uint_t(fields[21]);
     kernel_uint_t collected_starttime = p->starttime / system_hz;
     p->values[PDF_UPTIME] = (system_uptime_secs > collected_starttime)?(system_uptime_secs - collected_starttime):0;
-    // p->vsize         = str2kernel_uint_t(procfile_lineword(ff, 0, 22));
-    // p->rss           = str2kernel_uint_t(procfile_lineword(ff, 0, 23));
-    // p->rsslim        = str2kernel_uint_t(procfile_lineword(ff, 0, 24));
-    // p->starcode      = str2kernel_uint_t(procfile_lineword(ff, 0, 25));
-    // p->endcode       = str2kernel_uint_t(procfile_lineword(ff, 0, 26));
-    // p->startstack    = str2kernel_uint_t(procfile_lineword(ff, 0, 27));
-    // p->kstkesp       = str2kernel_uint_t(procfile_lineword(ff, 0, 28));
-    // p->kstkeip       = str2kernel_uint_t(procfile_lineword(ff, 0, 29));
-    // p->signal        = str2kernel_uint_t(procfile_lineword(ff, 0, 30));
-    // p->blocked       = str2kernel_uint_t(procfile_lineword(ff, 0, 31));
-    // p->sigignore     = str2kernel_uint_t(procfile_lineword(ff, 0, 32));
-    // p->sigcatch      = str2kernel_uint_t(procfile_lineword(ff, 0, 33));
-    // p->wchan         = str2kernel_uint_t(procfile_lineword(ff, 0, 34));
-    // p->nswap         = str2kernel_uint_t(procfile_lineword(ff, 0, 35));
-    // p->cnswap        = str2kernel_uint_t(procfile_lineword(ff, 0, 36));
-    // p->exit_signal   = str2kernel_uint_t(procfile_lineword(ff, 0, 37));
-    // p->processor     = str2kernel_uint_t(procfile_lineword(ff, 0, 38));
-    // p->rt_priority   = str2kernel_uint_t(procfile_lineword(ff, 0, 39));
-    // p->policy        = str2kernel_uint_t(procfile_lineword(ff, 0, 40));
-    // p->delayacct_blkio_ticks = str2kernel_uint_t(procfile_lineword(ff, 0, 41));
 
     if(enable_guest_charts) {
-        pid_incremental_cpu(stat, PDF_GTIME,  str2kernel_uint_t(procfile_lineword(ff, 0, 42)));
-        pid_incremental_cpu(stat, PDF_CGTIME, str2kernel_uint_t(procfile_lineword(ff, 0, 43)));
+        pid_incremental_cpu(stat, PDF_GTIME,  str2kernel_uint_t(fields[42]));
+        pid_incremental_cpu(stat, PDF_CGTIME, str2kernel_uint_t(fields[43]));
 
         if (show_guest_time || p->values[PDF_GTIME] || p->values[PDF_CGTIME]) {
             p->values[PDF_UTIME] -= (p->values[PDF_UTIME] >= p->values[PDF_GTIME]) ? p->values[PDF_GTIME] : p->values[PDF_UTIME];
