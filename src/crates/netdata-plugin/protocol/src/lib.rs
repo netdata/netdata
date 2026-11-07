@@ -88,8 +88,6 @@ pub use netdata_plugin_types::{
     FunctionResult, HttpAccess,
 };
 
-#[cfg(any(test, feature = "test-support"))]
-pub use chart::validate_chart_stream;
 /// Chart-protocol encoding: the chart vocabulary and one `write_*` function
 /// per line kind, all writing into a `bytes::BufMut`.
 pub use chart::{
@@ -98,6 +96,8 @@ pub use chart::{
     write_clabel_commit, write_dimension, write_end, write_end_timed, write_quoted,
     write_set_empty, write_set_float, write_set_int,
 };
+#[cfg(any(test, feature = "test-support"))]
+pub use chart::{read_float_value, readable_chart_stream, validate_chart_stream};
 /// [`MessageWriter::send`] encodes every variant to its keyword line(s),
 /// except `Quit` and `FunctionProgressRequest`, which are inbound-only and
 /// encode to nothing.

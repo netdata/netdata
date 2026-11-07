@@ -862,7 +862,7 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
 
 -   `value`
 
-    is the collected value. A dimension declared with the `type=float` option accepts decimal values. A `type=int` dimension (the default) accepts integers only: to push fractional values to it, multiply the value by 100 or 1000 and set the `DIMENSION` divider to 1000. An empty value (`SET id =`) stores a gap for this commit.
+    is the collected value. A dimension declared with the `type=float` option accepts decimal values, or the exact bits of the double: `@` followed by its IEEE 754 representation in base64 (digits `A-Z`, `a-z`, `0-9`, `+`, `/`, most significant first, without padding), for example `@D/4AAAAAAAA` for 1.5. A plugin that writes the base64 form skips the conversion to decimal digits. A `type=int` dimension (the default) accepts integers only: to push fractional values to it, multiply the value by 100 or 1000 and set the `DIMENSION` divider to 1000. An empty value (`SET id =`) stores a gap for this commit.
 
 > END [seconds [microseconds [pending]]]
 

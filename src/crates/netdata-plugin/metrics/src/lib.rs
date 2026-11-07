@@ -58,7 +58,8 @@
 //! // Once per second: write the windows whose allowed lateness has passed
 //! // to the agent.
 //! let text = String::from_utf8(aggregator.emit(101, 1 << 20).concat()).unwrap();
-//! assert!(text.contains("SET success = 1\nSET error = 1\n"));
+//! // Each value is exact, as `@` and its IEEE 754 bits in base64: 1 here.
+//! assert!(text.contains("SET success = @D/wAAAAAAAA\nSET error = @D/wAAAAAAAA\n"));
 //! # Ok::<(), netdata_plugin_metrics::Error>(())
 //! ```
 //!

@@ -164,7 +164,9 @@ mod tests {
         let mut batch = Batch::new(&logs.metrics);
         logs.record(&mut batch, "default", &request);
         aggregator.merge(batch, 100);
-        let out = String::from_utf8(aggregator.emit(106, usize::MAX).concat()).unwrap();
+        let out = netdata_plugin_protocol::readable_chart_stream(
+            &aggregator.emit(106, usize::MAX).concat(),
+        );
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'checkout' 1\n"));
         assert!(out.contains(

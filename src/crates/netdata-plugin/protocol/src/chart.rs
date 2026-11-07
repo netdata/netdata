@@ -24,7 +24,6 @@
 //! `test-support`) checks whole streams in tests.
 
 use bytes::BufMut;
-use std::fmt;
 
 /// Chart rendering type on the `CHART` line.
 ///
@@ -95,8 +94,7 @@ pub struct ChartOptions {
 /// Options of a `DIMENSION` line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct DimensionOptions {
-    /// Collected values are decimals (`SET` with a fractional value), not
-    /// integers.
+    /// Values are doubles, written with [`write_set_float`], not integers.
     pub float: bool,
     /// Hide the dimension from the chart.
     pub hidden: bool,
@@ -264,21 +262,95 @@ pub fn write_set_int(buf: &mut impl BufMut, dimension_id: &str, value: i64) {
 }
 
 /// Write `SET <dimension_id> = <value>` for a dimension declared with
-/// [`DimensionOptions::float`]. The value is the shortest decimal that
-/// round-trips, in plain notation like go.d writes it. A non-finite value is
-/// written as an empty `SET`: no value this update.
+/// [`DimensionOptions::float`]. The value is exact: `@` and the 64 bits of
+/// the double in base64, most significant digit first, without padding, for
+/// example `@D/4AAAAAAAA` for 1.5. The agent decodes it as it decodes its own
+/// streaming (`str2ndd_encoded`, accepted on float dimensions since v2.10.0);
+/// it is several times cheaper to write than the shortest decimal. A
+/// non-finite value is written as an empty `SET`: no value this update.
 pub fn write_set_float(buf: &mut impl BufMut, dimension_id: &str, value: f64) {
     if !value.is_finite() {
         write_set_empty(buf, dimension_id);
         return;
     }
     write_set_prefix(buf, dimension_id);
-    buf.put_u8(b' ');
-    // `Display` for f64 prints the shortest round-trip digits in plain
-    // decimal form; normalize -0 so the agent never sees a sign on zero.
+    buf.put_slice(b" @");
+    // Normalize -0 so the agent never stores a sign on zero.
     let value = if value == 0.0 { 0.0 } else { value };
-    let _ = fmt::Write::write_fmt(&mut BufAdapter(buf), format_args!("{value}"));
+    write_base64(buf, value.to_bits());
     buf.put_u8(b'\n');
+}
+
+/// libnetdata's base64 digits (`base64_digits`, `src/libnetdata/buffer/buffer.c`).
+const BASE64_DIGITS: &[u8; 64] =
+    b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/// Write `bits` in base64, most significant digit first, without leading
+/// zero digits (one digit for 0), as libnetdata's
+/// `print_uint64_base64_reversed` and `char_array_reverse` do.
+fn write_base64(buf: &mut impl BufMut, mut bits: u64) {
+    // 64 bits take at most 11 digits of 6 bits.
+    let mut digits = [0u8; 11];
+    let mut start = digits.len();
+    loop {
+        start -= 1;
+        digits[start] = BASE64_DIGITS[(bits & 63) as usize];
+        bits >>= 6;
+        if bits == 0 {
+            break;
+        }
+    }
+    buf.put_slice(&digits[start..]);
+}
+
+/// Read a `SET` value of a float dimension as the agent reads it: `@` and
+/// base64 bits (as [`write_set_float`] writes them), or a decimal. `None` for
+/// anything else, including base64 digits that do not fit 64 bits.
+#[cfg(any(test, feature = "test-support"))]
+pub fn read_float_value(word: &str) -> Option<f64> {
+    let Some(digits) = word.strip_prefix('@') else {
+        return word.parse().ok();
+    };
+    if digits.is_empty() {
+        return None;
+    }
+    let mut bits = 0u64;
+    for digit in digits.bytes() {
+        let value = BASE64_DIGITS.iter().position(|&d| d == digit)? as u64;
+        if bits >> 58 != 0 {
+            return None;
+        }
+        bits = bits << 6 | value;
+    }
+    Some(f64::from_bits(bits))
+}
+
+/// `stream` as text with every `@` base64 `SET` value written as a decimal
+/// (Rust's `Display`), so tests can assert on readable values. Other lines,
+/// and values that do not decode, stay as they are.
+#[cfg(any(test, feature = "test-support"))]
+pub fn readable_chart_stream(stream: &[u8]) -> String {
+    let text = std::str::from_utf8(stream).expect("chart stream is UTF-8");
+    let mut out = String::with_capacity(text.len());
+    for line in text.split_inclusive('\n') {
+        let decoded = line
+            .strip_prefix("SET ")
+            .and_then(|rest| rest.split_once(" = @"))
+            .and_then(|(id, word)| {
+                let word = word.strip_suffix('\n').unwrap_or(word);
+                read_float_value(&format!("@{word}")).map(|value| (id, value))
+            });
+        match decoded {
+            Some((id, value)) => {
+                out.push_str(&format!("SET {id} = {value}"));
+                if line.ends_with('\n') {
+                    out.push('\n');
+                }
+            }
+            None => out.push_str(line),
+        }
+    }
+    out
 }
 
 /// Write `SET <dimension_id> =`: the dimension gets no value this update
@@ -406,21 +478,12 @@ fn write_u64(buf: &mut impl BufMut, value: u64) {
     buf.put_slice(itoa::Buffer::new().format(value).as_bytes());
 }
 
-/// Lets `fmt` machinery write into a `BufMut`.
-struct BufAdapter<'a, B>(&'a mut B);
-
-impl<B: BufMut> fmt::Write for BufAdapter<'_, B> {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        self.0.put_slice(s.as_bytes());
-        Ok(())
-    }
-}
-
 #[cfg(any(test, feature = "test-support"))]
 pub use validate::validate_chart_stream;
 
 #[cfg(any(test, feature = "test-support"))]
 mod validate {
+    use super::read_float_value;
     use std::collections::{HashMap, HashSet};
 
     #[derive(Default)]
@@ -520,8 +583,8 @@ mod validate {
     /// update_every; `DIMENSION`/`CLABEL` only after `CHART`;
     /// `CLABEL_COMMIT` only after a `CLABEL`; `BEGIN` only for a defined chart
     /// that is not obsolete; `SET` only inside `BEGIN`..`END`, once per
-    /// dimension, only for a declared dimension, with decimal values only on
-    /// float dimensions; `END <t>` or `END <t> 0 1` with `t` strictly
+    /// dimension, only for a declared dimension, with float values (decimal or
+    /// `@` base64, [`read_float_value`]) only on float dimensions; `END <t>` or `END <t> 0 1` with `t` strictly
     /// increasing per chart. Returns the first problem with its 1-based line
     /// number.
     pub fn validate_chart_stream(stream: &[u8]) -> Result<(), String> {
@@ -652,9 +715,9 @@ mod validate {
                     let state = &charts[chart.as_str()];
                     let value = args.get(1);
                     if state.float_dimensions.contains(id) {
-                        if value.is_some_and(|v| v.parse::<f64>().map_or(true, |f| !f.is_finite()))
+                        if value.is_some_and(|v| read_float_value(v).is_none_or(|f| !f.is_finite()))
                         {
-                            return fail(format!("SET {id} has a non-decimal value"));
+                            return fail(format!("SET {id} has an invalid float value"));
                         }
                     } else if state.int_dimensions.contains(id) {
                         if value.is_some_and(|v| v.parse::<i64>().is_err()) {
@@ -824,19 +887,70 @@ mod tests {
                 write_set_empty(b, "w");
                 write_end(b, 1_700_000_000);
             }),
-            "BEGIN a.b 1000000\nSET x = -3\nSET y = 0.1\nSET z =\nSET w =\nEND 1700000000\n"
+            "BEGIN a.b 1000000\nSET x = -3\nSET y = @D+5mZmZmZma\nSET z =\nSET w =\nEND 1700000000\n"
         );
         assert_eq!(line(|b| write_end_timed(b, 7)), "END 7 0 1\n");
     }
 
     #[test]
-    fn float_values_are_plain_decimals() {
+    fn float_values_are_ieee754_base64() {
         let set = |v: f64| line(|b| write_set_float(b, "d", v));
-        assert_eq!(set(1e-7), "SET d = 0.0000001\n");
-        assert_eq!(set(2.5e10), "SET d = 25000000000\n");
-        assert_eq!(set(-0.0), "SET d = 0\n");
+        // Expected words computed independently from libnetdata's algorithm.
+        assert_eq!(set(1.0), "SET d = @D/wAAAAAAAA\n");
+        assert_eq!(set(1.5), "SET d = @D/4AAAAAAAA\n");
+        assert_eq!(set(0.1), "SET d = @D+5mZmZmZma\n");
+        assert_eq!(set(-7.0), "SET d = @MAcAAAAAAAA\n");
+        assert_eq!(set(f64::MAX), "SET d = @H/v////////\n");
+        assert_eq!(set(5e-324), "SET d = @B\n");
+        assert_eq!(set(0.0), "SET d = @A\n");
+        assert_eq!(set(-0.0), "SET d = @A\n");
         assert_eq!(set(f64::INFINITY), "SET d =\n");
-        assert_eq!(set(0.0005), "SET d = 0.0005\n");
+        assert_eq!(set(f64::NAN), "SET d =\n");
+    }
+
+    #[test]
+    fn float_values_round_trip() {
+        for value in [
+            1e-7,
+            2.5e10,
+            0.0005,
+            -0.5,
+            123.456,
+            f64::MIN_POSITIVE,
+            f64::MIN,
+            f64::EPSILON,
+            9_007_199_254_740_993.0,
+        ] {
+            let text = line(|b| write_set_float(b, "d", value));
+            let word = text.strip_prefix("SET d = ").unwrap().trim_end();
+            assert_eq!(
+                read_float_value(word).map(f64::to_bits),
+                Some(value.to_bits()),
+                "{value}"
+            );
+        }
+        assert_eq!(read_float_value("1.5"), Some(1.5));
+        assert_eq!(read_float_value("@"), None);
+        assert_eq!(read_float_value("@A!"), None);
+        // Leading zero digits are only zeros; more than 64 bits do not fit.
+        assert_eq!(read_float_value("@AAAAAAAAAAAAA"), Some(0.0));
+        assert_eq!(read_float_value("@BAAAAAAAAAAA"), None);
+        assert_eq!(read_float_value("@QAAAAAAAAAA"), None);
+    }
+
+    #[test]
+    fn readable_streams_show_decimals() {
+        let stream = line(|b| {
+            write_begin(b, "a.b", 1_000_000);
+            write_set_float(b, "x", 1.5);
+            write_set_float(b, "y", f64::NAN);
+            write_set_int(b, "z", 7);
+            write_end(b, 1);
+        });
+        assert_eq!(
+            readable_chart_stream(stream.as_bytes()),
+            "BEGIN a.b 1000000\nSET x = 1.5\nSET y =\nSET z = 7\nEND 1\n"
+        );
     }
 
     #[test]
@@ -930,6 +1044,11 @@ mod tests {
                     "CHART a.b '' 't' 'u' 'f' 'c' line 1 1\nDIMENSION d 'd' absolute 1 1\n\
                      BEGIN a.b 1\nSET d = 1.5\nEND 1\n",
                     "non-integer",
+                ),
+                (
+                    "CHART a.b '' 't' 'u' 'f' 'c' line 1 1\nDIMENSION d 'd' absolute 1 1 'type=float'\n\
+                     BEGIN a.b 1\nSET d = @D/4!\nEND 1\n",
+                    "invalid float value",
                 ),
                 (
                     "CHART a.b '' 't' 'u' 'f' 'c' line 1 1\nDIMENSION d 'd' absolute 1 1\n\

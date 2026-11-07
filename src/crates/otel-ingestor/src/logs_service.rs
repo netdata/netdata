@@ -1620,7 +1620,7 @@ mod tests {
             let prefix = format!("SET {dimension} = ");
             out.lines()
                 .filter_map(|l| l.strip_prefix(&prefix))
-                .map(|v| v.parse::<f64>().unwrap())
+                .map(|v| netdata_plugin_protocol::read_float_value(v).unwrap())
                 .sum()
         };
         assert_eq!(sum("error"), 1.0);

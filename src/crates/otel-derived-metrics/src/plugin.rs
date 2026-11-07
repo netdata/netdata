@@ -212,7 +212,9 @@ mod tests {
         let mut aggregator = Aggregator::new(&plugin.charts);
         aggregator.merge(plugin.ingest(Signal::Traces, 7, 2, 100), 100);
         aggregator.merge(plugin.ingest(Signal::Logs, 3, 0, 100), 100);
-        let out = String::from_utf8(aggregator.emit(101, usize::MAX).concat()).unwrap();
+        let out = netdata_plugin_protocol::readable_chart_stream(
+            &aggregator.emit(101, usize::MAX).concat(),
+        );
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains(
             "BEGIN netdata.otel.spans 1000000\nSET accepted = 7\nSET rejected = 2\nEND 101 0 1\n"
@@ -228,7 +230,9 @@ mod tests {
         let plugin = Plugin::new().unwrap();
         let mut aggregator = Aggregator::new(&plugin.charts);
         aggregator.merge(plugin.heartbeat(100), 100);
-        let out = String::from_utf8(aggregator.emit(101, usize::MAX).concat()).unwrap();
+        let out = netdata_plugin_protocol::readable_chart_stream(
+            &aggregator.emit(101, usize::MAX).concat(),
+        );
         assert!(out.contains("CHART netdata.otel.spans "));
         assert!(out.contains("SET accepted = 0\nSET rejected = 0\n"));
     }
@@ -242,7 +246,9 @@ mod tests {
             derivation.record(&mut batch, Signal::Traces, &stats, now);
             derivation.record(&mut batch, Signal::Logs, &Stats::default(), now);
             aggregator.merge(batch, now);
-            String::from_utf8(aggregator.emit(now + 1, usize::MAX).concat()).unwrap()
+            netdata_plugin_protocol::readable_chart_stream(
+                &aggregator.emit(now + 1, usize::MAX).concat(),
+            )
         };
         let first = tick(
             Stats {

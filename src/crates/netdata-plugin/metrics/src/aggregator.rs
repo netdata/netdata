@@ -470,8 +470,10 @@ mod tests {
         labels
     }
 
+    /// The emitted text with `SET` values as decimals; on the wire they are
+    /// `@` base64 (`write_set_float`).
     fn text(chunks: &[Vec<u8>]) -> String {
-        String::from_utf8(chunks.concat()).unwrap()
+        netdata_plugin_protocol::readable_chart_stream(&chunks.concat())
     }
 
     /// Records `count` requests of `name` at `time`, the first `errors` of them
@@ -509,7 +511,11 @@ mod tests {
         let f = fixture(0, 900, None);
         let mut aggregator = Aggregator::new(&f.charts);
         record(&f, &mut aggregator, "checkout", 100, 3, 1, 100);
-        let first = text(&aggregator.emit(101, usize::MAX));
+        let chunks = aggregator.emit(101, usize::MAX);
+        // On the wire, 2 and 1 as IEEE 754 bits in base64.
+        let wire = String::from_utf8(chunks.concat()).unwrap();
+        assert!(wire.contains("SET ok = @EAAAAAAAAAA\nSET error = @D/wAAAAAAAA\n"));
+        let first = text(&chunks);
         let h = format!("{:016x}", crate::chart::stable_hash(&labels("checkout")));
         assert_eq!(
             first,
