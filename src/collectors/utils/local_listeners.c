@@ -300,7 +300,7 @@ int main(int argc, char **argv) {
         for(size_t i = 0; i < _countof(ls.timings) ;i++) {
             if(!ls.timings[i].end_ut) continue;
             usec_t dt_ut = ls.timings[i].end_ut - ls.timings[i].start_ut;
-            double percent = (100.0 * (double)dt_ut) / (double)total_ut;
+            double percent = total_ut ? (100.0 * (double)dt_ut) / (double)total_ut : 0.0;
             duration_snprintf(buf, sizeof(buf), (int64_t)dt_ut, "us", true);
             fprintf(stderr, "%20s: %6.2f%% %s\n", ls.timings[i].name, percent, buf);
         }

@@ -385,10 +385,18 @@ int nd_work_queue_unittest(void) {
         struct nd_work_queue_ut ut = { .block = true };
         completion_init(&ut.release);
         ND_WORK_QUEUE *wq = nd_work_queue_create("WQUT", 1, 0, NULL, NULL);
-        for(size_t i = 0; i < 3; i++)
-            nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut);
+        for(size_t i = 0; i < 3; i++) {
+            if(!nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut)) {
+                fprintf(stderr, "  FAILED: submit %zu was refused\n", i);
+                errors++;
+            }
+        }
 
-        nd_work_queue_ut_wait_for(&ut.running, 1, 10 * USEC_PER_SEC);
+        if(!nd_work_queue_ut_wait_for(&ut.running, 1, 10 * USEC_PER_SEC)) {
+            fprintf(stderr, "  FAILED: expected 1 job running, got %zu\n",
+                    __atomic_load_n(&ut.running, __ATOMIC_RELAXED));
+            errors++;
+        }
         nd_work_queue_stop(wq);
 
         if(nd_work_queue_submit(wq, nd_work_queue_ut_job, &ut)) {
@@ -397,13 +405,14 @@ int nd_work_queue_unittest(void) {
         }
 
         // a job is still running: freeing must time out and leave the queue alone
-        if(nd_work_queue_stop_and_free(wq, 100 * USEC_PER_MS)) {
+        bool freed = nd_work_queue_stop_and_free(wq, 100 * USEC_PER_MS);
+        if(freed) {
             fprintf(stderr, "  FAILED: the queue was freed while a job was running\n");
             errors++;
         }
 
         completion_mark_complete(&ut.release);
-        if(!nd_work_queue_stop_and_free(wq, 10 * USEC_PER_SEC)) {
+        if(!freed && !nd_work_queue_stop_and_free(wq, 10 * USEC_PER_SEC)) {
             fprintf(stderr, "  FAILED: the queue did not stop after its jobs finished\n");
             errors++;
         }
