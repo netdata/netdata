@@ -326,8 +326,9 @@ pub struct IndexersTuning {
     #[serde(default = "default_indexers_min")]
     pub min: usize,
     /// Upper bound on concurrent seals; `None` means one per ledger worker
-    /// thread (the CPU count unless the runtime is capped).
-    #[serde(default)]
+    /// thread (the CPU count unless the runtime is capped). YAML spells it
+    /// `auto` (the stock file does), or a count.
+    #[serde(default, with = "opt_auto_count")]
     pub max: Option<usize>,
 }
 
@@ -1110,7 +1111,13 @@ traces:
 
     #[test]
     fn lifecycle_for_derives_dirs_and_tuning() {
-        let c = full_config();
+        let mut c = full_config();
+        // Distinct per-signal indexer bounds, so a cross-wired forward shows.
+        c.logs.indexers = IndexersTuning {
+            min: 2,
+            max: Some(5),
+        };
+        c.traces.indexers = IndexersTuning { min: 3, max: None };
 
         let logs = c.lifecycle_for(Signal::Logs);
         assert_eq!(
@@ -1128,6 +1135,10 @@ traces:
         // Tuning carried from the logs section.
         assert!(!logs.wal.compression_enabled);
         assert_eq!(logs.catalog.rotation_count, 7);
+        assert_eq!(
+            (logs.index.indexers.min, logs.index.indexers.max),
+            (2, Some(5))
+        );
         // Storage is NOT carried per-signal — it is global on PluginConfig,
         // owned by the coordinator shell.
 
@@ -1139,6 +1150,10 @@ traces:
         // Per-signal tuning is the traces section, not logs'.
         let traces_rot = traces.wal.rotation.resolve("default");
         assert_eq!(traces_rot.max_entries, 1000);
+        assert_eq!(
+            (traces.index.indexers.min, traces.index.indexers.max),
+            (3, None)
+        );
     }
 
     #[test]
@@ -1220,6 +1235,42 @@ traces:
     }
 
     #[test]
+    fn indexers_max_reads_auto_count_or_null_from_yaml() {
+        for (yaml, max) in [
+            ("max: auto\n", None),
+            ("max: AUTO\n", None),
+            ("max: 6\n", Some(6)),
+            ("max: null\n", None),
+            ("min: 2\n", None),
+        ] {
+            let t: IndexersTuning = serde_yaml::from_str(yaml).unwrap();
+            assert_eq!(t.max, max, "{yaml}");
+        }
+        for yaml in ["max: -1\n", "max: 2.5\n", "max: lots\n"] {
+            let err = serde_yaml::from_str::<IndexersTuning>(yaml).unwrap_err();
+            assert!(err.to_string().contains("\"auto\""), "{yaml}: {err}");
+        }
+        let auto = IndexersTuning { min: 1, max: None };
+        assert!(serde_yaml::to_string(&auto).unwrap().contains("max: auto"));
+    }
+
+    #[test]
+    fn indexers_survive_bincode_ipc() {
+        for t in [
+            IndexersTuning {
+                min: 2,
+                max: Some(7),
+            },
+            IndexersTuning { min: 1, max: None },
+        ] {
+            let bytes = bincode::serde::encode_to_vec(&t, bincode::config::standard()).unwrap();
+            let (back, _): (IndexersTuning, usize) =
+                bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+            assert_eq!((back.min, back.max), (t.min, t.max));
+        }
+    }
+
+    #[test]
     fn retention_horizon_resolves_defaults_overrides_and_validates() {
         // Absent horizon inherits the code default; the invariant holds (10y > 7d).
         let policy: RetentionPolicy = serde_yaml::from_str(
@@ -1274,6 +1325,76 @@ traces:
             back.resolve("default").horizon,
             Duration::from_secs(1234 * 86_400)
         );
+    }
+}
+
+/// Serde for an optional count whose `None` is spelled `auto`, dual-mode like
+/// `opt_duration`: in human-readable formats (YAML) a count, `auto` or null; a
+/// plain `Option<usize>` otherwise (bincode IPC has no self-describing types).
+mod opt_auto_count {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(val: &Option<usize>, s: S) -> Result<S::Ok, S::Error> {
+        match (s.is_human_readable(), val) {
+            (true, None) => "auto".serialize(s),
+            _ => val.serialize(s),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<usize>, D::Error> {
+        if !d.is_human_readable() {
+            return Option::<usize>::deserialize(d);
+        }
+
+        struct Visitor;
+
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = Option<usize>;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a positive integer or \"auto\"")
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, n: u64) -> Result<Self::Value, E> {
+                usize::try_from(n)
+                    .map(Some)
+                    .map_err(|_| E::custom(format!("{n} is too large")))
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, n: i64) -> Result<Self::Value, E> {
+                u64::try_from(n)
+                    .map_err(|_| {
+                        E::custom(format!("expected a positive integer or \"auto\", got {n}"))
+                    })
+                    .and_then(|n| self.visit_u64(n))
+            }
+
+            fn visit_f64<E: serde::de::Error>(self, n: f64) -> Result<Self::Value, E> {
+                Err(E::custom(format!(
+                    "expected a positive integer or \"auto\", got {n}"
+                )))
+            }
+
+            fn visit_str<E: serde::de::Error>(self, s: &str) -> Result<Self::Value, E> {
+                if s.trim().eq_ignore_ascii_case("auto") {
+                    Ok(None)
+                } else {
+                    Err(E::custom(format!(
+                        "expected a positive integer or \"auto\", got \"{s}\""
+                    )))
+                }
+            }
+
+            fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+                Ok(None)
+            }
+
+            fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+                Ok(None)
+            }
+        }
+
+        d.deserialize_any(Visitor)
     }
 }
 

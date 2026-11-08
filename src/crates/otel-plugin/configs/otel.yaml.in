@@ -128,6 +128,14 @@ logs:
     # my-tenant:
     #   max_age: "30 days"
 
+  indexers:
+    # Finished files are indexed in the background; a file is not queryable
+    # until it is indexed. The number of log files indexed in parallel
+    # starts at "min" and grows with the backlog up to "max" ("auto" = one per
+    # CPU). Each indexer uses one CPU core while it runs.
+    min: 1
+    max: auto
+
 traces:
   rotation:
     # Incoming spans are appended to a current file; a new file starts when
@@ -153,6 +161,14 @@ traces:
     # Per-tenant overrides (any subset of the fields above):
     # my-tenant:
     #   max_age: "30 days"
+
+  indexers:
+    # Finished files are indexed in the background; a file is not queryable
+    # until it is indexed. The number of trace files indexed in parallel
+    # starts at "min" and grows with the backlog up to "max" ("auto" = one per
+    # CPU). Each indexer uses one CPU core while it runs.
+    min: 1
+    max: auto
 
 remote_storage:
   # Upload data to remote object storage, in addition to keeping it on local

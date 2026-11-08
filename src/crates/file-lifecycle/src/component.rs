@@ -41,10 +41,10 @@
 //!   (saturating), so [`ComponentHandle::pending`] is a lower bound on the
 //!   responses still queued when a component also emits unsolicited
 //!   responses (the catalog builder's time-trigger and `Flush` rotations
-//!   each emit a `Rotated` with no preceding `AddEntry`). Production code
-//!   consults it only in the synchronous recovery drain — [`batch_recover`]
-//!   leaves it balanced — while steady-state routing goes through [`ComponentHandle::into_parts`],
-//!   which drops it; recovery tests assert it to pin fire-and-forget request
+//!   each emit a `Rotated` with no preceding `AddEntry`). No production
+//!   code reads it: [`batch_recover`] only leaves it balanced, and
+//!   steady-state routing goes through [`ComponentHandle::into_parts`], which
+//!   drops it. Recovery tests assert it to pin fire-and-forget request
 //!   counts. Nothing else observes backlog.
 //! - Single owner: the handle's mutating methods take `&mut self` and the
 //!   response channel is single-consumer, so a handle is driven by one task
@@ -170,9 +170,8 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// responses with no matching request (the catalog builder's time-trigger
     /// and `Flush` rotations each emit a `Rotated` with no preceding
     /// `AddEntry`), so `pending` is a lower bound on the responses still
-    /// queued, not an exact send/recv balance. Production code consults the
-    /// counter only in the synchronous recovery drains, which run against
-    /// 1:1 request/response workers; steady-state routing goes through
+    /// queued, not an exact send/recv balance. No production code reads the
+    /// counter (recovery tests assert it); steady-state routing goes through
     /// [`ComponentHandle::into_parts`] and ignores it.
     ///
     /// Returns `None` once the component task is gone and the queue is
@@ -202,9 +201,8 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// receiver — e.g. the `EntryAccepted`/`Rotated` answers to the
     /// catalog-builder `AddEntry`s `reconcile_remote_uploads` enqueues
     /// fire-and-forget — are preserved: the live receiver carries them into
-    /// the forwarder and on to the run loop. The dropped counter was only
-    /// ever consulted by the synchronous recovery drain (`batch_recover`);
-    /// steady-state routing ignores it.
+    /// the forwarder and on to the run loop. The dropped counter is read by
+    /// no production code (only recovery tests assert it).
     pub fn into_parts(self) -> (mpsc::UnboundedSender<Req>, mpsc::UnboundedReceiver<Resp>) {
         (self.tx, self.rx)
     }

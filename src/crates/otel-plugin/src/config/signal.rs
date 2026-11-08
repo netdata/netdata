@@ -105,16 +105,45 @@ impl std::str::FromStr for IndexersMax {
 
 impl<'de> Deserialize<'de> for IndexersMax {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Raw {
-            Count(usize),
-            Text(String),
+        // A visitor rather than an untagged enum, so `-1` or `2.5` get the
+        // same message as a bad string instead of serde's generic variant error.
+        struct Visitor;
+
+        impl serde::de::Visitor<'_> for Visitor {
+            type Value = IndexersMax;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a positive integer or \"auto\"")
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, n: u64) -> Result<Self::Value, E> {
+                usize::try_from(n)
+                    .map(|n| IndexersMax(Some(n)))
+                    .map_err(|_| {
+                        E::custom(format!("expected a positive integer or \"auto\", got {n}"))
+                    })
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, n: i64) -> Result<Self::Value, E> {
+                u64::try_from(n)
+                    .map_err(|_| {
+                        E::custom(format!("expected a positive integer or \"auto\", got {n}"))
+                    })
+                    .and_then(|n| self.visit_u64(n))
+            }
+
+            fn visit_f64<E: serde::de::Error>(self, n: f64) -> Result<Self::Value, E> {
+                Err(E::custom(format!(
+                    "expected a positive integer or \"auto\", got {n}"
+                )))
+            }
+
+            fn visit_str<E: serde::de::Error>(self, s: &str) -> Result<Self::Value, E> {
+                s.parse().map_err(E::custom)
+            }
         }
-        match Raw::deserialize(d)? {
-            Raw::Count(n) => Ok(Self(Some(n))),
-            Raw::Text(s) => s.parse().map_err(serde::de::Error::custom),
-        }
+
+        d.deserialize_any(Visitor)
     }
 }
 

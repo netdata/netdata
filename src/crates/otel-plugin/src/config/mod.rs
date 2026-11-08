@@ -375,9 +375,11 @@ fn validate_listener(prefix: &str, listener: &ProtocolConfig) -> Result<()> {
 /// absolute (the per-signal dirs join onto it); `remote_storage.uri` must be
 /// non-empty when storage is enabled; at least one OTLP listener must be
 /// enabled, each enabled one must pass [`validate_listener`], and two enabled
-/// listeners must not overlap (two listeners cannot bind one socket); and each
+/// listeners must not overlap (two listeners cannot bind one socket); each
 /// signal's retention must satisfy the catalog-horizon invariant
-/// (`netdata-plugin/bridge/src/config.rs` `RetentionPolicy::validate`).
+/// (`netdata-plugin/bridge/src/config.rs` `RetentionPolicy::validate`); and
+/// each signal's `indexers.min` must be at least 1, with an explicit
+/// `indexers.max` no lower than `min` ([`validate_indexers`]).
 fn validate(config: &PluginConfig) -> Result<()> {
     if config.base_dir.as_os_str().is_empty() {
         anyhow::bail!("base_dir must be set (the mandatory root for all signal storage)");
@@ -2024,6 +2026,8 @@ logs:
                 "traces.indexers.max",
             ),
             ("logs:\n  indexers:\n    max: lots\n", "auto"),
+            ("logs:\n  indexers:\n    max: -1\n", "\"auto\", got -1"),
+            ("logs:\n  indexers:\n    max: 2.5\n", "\"auto\", got 2.5"),
             ("logs:\n  indexers:\n    workers: 2\n", "workers"),
         ] {
             let err = resolve_with_user(yaml).unwrap_err();
@@ -2392,6 +2396,14 @@ logs:
         assert_eq!(config.metrics.max_new_charts_per_request, 100);
 
         assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v2"));
+
+        // The stock file spells out the indexer defaults (`max: auto`), which
+        // metadata.yaml documents as mirroring it.
+        let defaults = bridge::config::IndexersTuning::default();
+        for t in [&config.logs.indexers, &config.traces.indexers] {
+            assert_eq!((t.min, t.max), (defaults.min, defaults.max));
+        }
+        assert_eq!(substituted.matches("\n  indexers:\n").count(), 2);
 
         assert!(!config.remote_storage.enabled);
         assert_eq!(
