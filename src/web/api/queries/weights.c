@@ -135,13 +135,30 @@ static struct weights_host_snapshot *weights_host_snapshot_get(DICTIONARY *snaps
     return snapshot;
 }
 
+// Each result owns references to its context, instance and metric: the results are formatted after the
+// query target or the contexts walk that found them has released its own references.
+static void register_result_acquire(struct register_result *t) {
+    t->rca = rrdcontext_acquired_ref(t->rca);
+    t->ria = rrdinstance_acquired_ref(t->ria);
+    t->rma = rrdmetric_acquired_ref(t->rma);
+}
+
+static void register_result_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct register_result *t = value;
+    rrdmetric_acquired_unref(t->rma);
+    rrdinstance_acquired_unref(t->ria);
+    rrdcontext_acquired_unref(t->rca);
+}
+
 static DICTIONARY *register_result_init() {
     DICTIONARY *results = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct register_result));
+    dictionary_register_delete_callback(results, register_result_delete_cb, NULL);
     return results;
 }
 
 static DICTIONARY *register_result_init_single_threaded() {
     DICTIONARY *results = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct register_result));
+    dictionary_register_delete_callback(results, register_result_delete_cb, NULL);
     return results;
 }
 
@@ -157,7 +174,9 @@ static void merge_results_dictionaries(DICTIONARY *main_results, DICTIONARY *loc
     struct register_result *local_result;
     dfe_start_read(local_results, local_result) {
         // workers process disjoint hosts and results are keyed by rma pointer, so keys never collide
-        dictionary_set(main_results, local_result_dfe.name, local_result, sizeof(struct register_result));
+        struct register_result t = *local_result;
+        register_result_acquire(&t);
+        dictionary_set(main_results, local_result_dfe.name, &t, sizeof(struct register_result));
     }
     dfe_done(local_result);
 }
@@ -201,6 +220,8 @@ static void register_result(DICTIONARY *results, RRDHOST *host, STRING *hostname
 
     if(baseline)
         t.baseline = *baseline;
+
+    register_result_acquire(&t);
 
     // Use the original pointer address approach - revert the stable key change
     char buf[20 + 1];

@@ -64,6 +64,15 @@ time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria);
 STRING *rrdcontext_acquired_units_dup(RRDCONTEXT_ACQUIRED *rca);
 RRDSET_TYPE rrdcontext_acquired_chart_type(RRDCONTEXT_ACQUIRED *rca);
 
+// Extra references for callers that keep objects after the query or walk that acquired them releases its own.
+// Release a metric before its instance and an instance before its context.
+RRDCONTEXT_ACQUIRED *rrdcontext_acquired_ref(RRDCONTEXT_ACQUIRED *rca);
+void rrdcontext_acquired_unref(RRDCONTEXT_ACQUIRED *rca);
+RRDINSTANCE_ACQUIRED *rrdinstance_acquired_ref(RRDINSTANCE_ACQUIRED *ria);
+void rrdinstance_acquired_unref(RRDINSTANCE_ACQUIRED *ria);
+RRDMETRIC_ACQUIRED *rrdmetric_acquired_ref(RRDMETRIC_ACQUIRED *rma);
+void rrdmetric_acquired_unref(RRDMETRIC_ACQUIRED *rma);
+
 // ----------------------------------------------------------------------------
 // public API for rrdhost
 

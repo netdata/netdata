@@ -676,6 +676,13 @@ RRDSET_TYPE rrdcontext_acquired_chart_type(RRDCONTEXT_ACQUIRED *rca) {
     return rc->chart_type;
 }
 
+RRDCONTEXT_ACQUIRED *rrdcontext_acquired_ref(RRDCONTEXT_ACQUIRED *rca) { return rrdcontext_acquired_dup(rca); }
+void rrdcontext_acquired_unref(RRDCONTEXT_ACQUIRED *rca) { rrdcontext_release(rca); }
+RRDINSTANCE_ACQUIRED *rrdinstance_acquired_ref(RRDINSTANCE_ACQUIRED *ria) { return rrdinstance_acquired_dup(ria); }
+void rrdinstance_acquired_unref(RRDINSTANCE_ACQUIRED *ria) { rrdinstance_release(ria); }
+RRDMETRIC_ACQUIRED *rrdmetric_acquired_ref(RRDMETRIC_ACQUIRED *rma) { return rrdmetric_acquired_dup(rma); }
+void rrdmetric_acquired_unref(RRDMETRIC_ACQUIRED *rma) { rrdmetric_release(rma); }
+
 static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_unused,
                                                QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi) {
     RRDSET_ACQUIRED *rsa = rrdinstance_acquired_rrdset_acquire(qi->ria);

@@ -306,8 +306,9 @@ typedef struct rrdinstance {
     // belongs to, and whether the instance uses the chart's labels or its own. A chart re-created with the same
     // id takes the instance over (the conflict callbacks) while the old chart may still exist and be destroyed
     // later, on another thread, so its teardown must check under this lock that it still owns what it tears
-    // down. It also serializes the metadata the conflict callback swaps (title, units, family, chart_type, priority,
-    // update_every) against readers that take references to it, like the context worker's merge.
+    // down. It also serializes the metadata the conflict callbacks swap (the instance's name, title, units, family,
+    // chart_type, priority, update_every, and the name of each of its metrics) against readers that take references
+    // to it: the context worker's merge and the *_dup() helpers used by queries and the APIs.
     // Nothing else is locked while holding it, except the labels lock in rrdlabels_flush().
     SPINLOCK spinlock;
 } RRDINSTANCE;
