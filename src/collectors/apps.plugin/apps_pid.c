@@ -501,16 +501,8 @@ static void rebuild_pid_identity(struct pid_stat *p) {
     // Windows can supply cmdline before the first comm sample.
     if(!p->comm_collected) return;
 
-    const char *comm = string2str(p->comm_orig);
-    size_t len = strlen(comm);
-    char *buf;
-    if(len >= 2 && comm[0] == '(' && comm[len - 1] == ')') {
-        buf = mallocz(len - 1);
-        memcpy(buf, &comm[1], len - 2);
-        buf[len - 2] = '\0';
-    }
-    else
-        buf = strdupz(comm);
+    // OS readers already remove framing; parentheses here belong to the process name.
+    char *buf = strdupz(string2str(p->comm_orig));
 
     sanitize_apps_plugin_chart_meta(buf);
     string_freez(p->comm);

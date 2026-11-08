@@ -120,6 +120,28 @@ static bool test_empty_identity(void) {
     return true;
 }
 
+static bool test_literal_parentheses(void) {
+    const char *names[] = {"(worker)", "((worker))", "()"};
+    const char *cmdlines[] = {NULL, "", "/usr/bin/(worker)"};
+    APPS_MATCH bare_worker = pid_match_create("worker");
+    for(size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+        for(size_t j = 0; j < sizeof(cmdlines) / sizeof(cmdlines[0]); j++) {
+            struct pid_stat p = {.pid = 60};
+            os_cmdline = cmdlines[j];
+            update_pid_comm(&p, names[i]);
+            CHECK(strcmp(string2str(p.comm_orig), names[i]) == 0);
+            CHECK(strcmp(string2str(p.comm), names[i]) == 0);
+            CHECK(!pid_match_check(&p, &bare_worker));
+            APPS_MATCH exact = pid_match_create(names[i]);
+            CHECK(pid_match_check(&p, &exact));
+            pid_match_cleanup(&exact);
+            clear_identity(&p);
+        }
+    }
+    pid_match_cleanup(&bare_worker);
+    return true;
+}
+
 static bool test_derived_metadata(void) {
     struct pid_stat p = {.pid = 600};
     global_iterations_counter = 1;
@@ -205,7 +227,7 @@ static bool test_inherited_assignments(void) {
 int main(void) {
     apps_managers_and_aggregators_init();
     if(!test_refresh_schedule() || !test_staggering_and_initial_failure() ||
-       !test_empty_identity() || !test_derived_metadata() || !test_inherited_assignments())
+       !test_empty_identity() || !test_literal_parentheses() || !test_derived_metadata() || !test_inherited_assignments())
         return 1;
 
     managed_list_clear(&tree.managers);
