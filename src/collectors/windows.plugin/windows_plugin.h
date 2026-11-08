@@ -62,6 +62,7 @@ void do_PerflibMSMQ_cleanup(void);
 int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
+int do_PerflibSMBClient(int update_every, usec_t dt __maybe_unused);
 int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
 int do_PerflibDNS(int update_every, usec_t dt __maybe_unused);
 
@@ -72,6 +73,7 @@ void do_GetServicesStatus_cleanup();
 void do_GetSystemCPU_cleanup();
 void do_GetPowerSupply_cleanup();
 void do_PerflibSMB_cleanup();
+void do_PerflibSMBClient_cleanup(void);
 void do_PerflibStorage_cleanup();
 
 enum PERFLIB_PRIO {
@@ -416,6 +418,17 @@ enum PERFLIB_PRIO {
     PRIO_SMB_SERVER_SHARES_READ_REQUESTS,
     PRIO_SMB_SERVER_SHARES_METADATA_REQUESTS,
     PRIO_SMB_SERVER_SHARES_FILES_OPENED,
+
+    PRIO_SMB_CLIENT_SHARE_TRAFFIC,
+    PRIO_SMB_CLIENT_SHARE_DATA_TRAFFIC,
+    PRIO_SMB_CLIENT_SHARE_REQUESTS,
+    PRIO_SMB_CLIENT_SHARE_SMBDIRECT_TRAFFIC,
+    PRIO_SMB_CLIENT_SHARE_SMBDIRECT_REQUESTS,
+    PRIO_SMB_CLIENT_SHARE_TURBO_IO,
+    PRIO_SMB_CLIENT_SHARE_CREDIT_STALLS,
+    PRIO_SMB_CLIENT_SHARE_OUTSTANDING_REQUESTS,
+    PRIO_SMB_CLIENT_SHARE_AVG_QUEUE_LENGTH,
+    PRIO_SMB_CLIENT_SHARE_LATENCY,
 
     PRIO_TERMINAL_SERVICES_SESSIONS,
     PRIO_DNS_QUERIES,
