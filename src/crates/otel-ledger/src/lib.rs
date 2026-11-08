@@ -72,8 +72,11 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         .identity
         .context("plugin config reached the ledger without a resolved identity")?;
 
-    // Held for the process lifetime; the kernel releases it on any exit.
-    let _store_lock = lock_store(&config.base_dir).await?;
+    // Forgotten, so the lock is held until the process exits and the kernel
+    // releases it: dropping it when this function returns would free the
+    // store while in-flight seals (blocking-pool tasks the runtime teardown
+    // still waits for) are writing to it.
+    std::mem::forget(log_before_return(lock_store(&config.base_dir).await)?);
 
     // `Ledger::new` runs the full supervisor handshake; see its docs for the
     // step order and what `Ready` claims. Each signal's lifecycle config is
@@ -83,7 +86,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     // where each signal's files live. Remote storage is process-global, so it is
     // passed once (`config.remote_storage`, with its one download cache), not
     // per signal.
-    let mut ledger = Ledger::new(
+    let ledger = Ledger::new(
         supervisor,
         &config.writer_socket_path,
         identity.machine_id,
@@ -95,7 +98,8 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         &config.legacy_read_cache_dir(),
     )
     .await
-    .context("failed to initialize ledger")?;
+    .context("failed to initialize ledger");
+    let mut ledger = log_before_return(ledger)?;
 
     // Log the error while `ledger` is still in scope: returning drops its
     // supervisor connection. The supervisor treats a worker disconnect as
@@ -117,20 +121,41 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     Ok(())
 }
 
+/// Log a startup error before `run_worker` returns it. Returning drops the
+/// supervisor connection, and the supervisor's teardown can SIGKILL this
+/// process before `main` gets to log the error (see the comment at
+/// `ledger.run()` above).
+fn log_before_return<T>(result: Result<T>) -> Result<T> {
+    if let Err(e) = &result {
+        tracing::error!("ledger startup failed: {e:#}");
+    }
+    result
+}
+
 /// Take the exclusive lock on `{base_dir}/.ledger.lock`, so two ledgers never
 /// recover or seal the same store at once (a previous instance still shutting
 /// down, or one orphaned by a supervisor that was SIGKILLed). Waits up to
 /// [`STORE_LOCK_WAIT`], then fails startup; the agent restarts the plugin.
 async fn lock_store(base_dir: &Path) -> Result<std::fs::File> {
-    std::fs::create_dir_all(base_dir)
-        .with_context(|| format!("failed to create {}", base_dir.display()))?;
     let path = base_dir.join(".ledger.lock");
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(&path)
-        .with_context(|| format!("failed to open {}", path.display()))?;
+    // Directory creation and open can block on a slow disk; keep them off the
+    // runtime threads.
+    let file = {
+        let base_dir = base_dir.to_path_buf();
+        let path = path.clone();
+        tokio::task::spawn_blocking(move || -> Result<std::fs::File> {
+            std::fs::create_dir_all(&base_dir)
+                .with_context(|| format!("failed to create {}", base_dir.display()))?;
+            std::fs::OpenOptions::new()
+                .create(true)
+                .truncate(false)
+                .write(true)
+                .open(&path)
+                .with_context(|| format!("failed to open {}", path.display()))
+        })
+        .await
+        .context("store lock open task failed")??
+    };
 
     let deadline = tokio::time::Instant::now() + STORE_LOCK_WAIT;
     let mut logged = false;
