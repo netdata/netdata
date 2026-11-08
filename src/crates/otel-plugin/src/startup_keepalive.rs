@@ -9,6 +9,7 @@
 //! `startup_keepalive.rs`.
 
 use std::io::{self, Write};
+use std::panic::{self, AssertUnwindSafe};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -43,18 +44,30 @@ impl StartupKeepalive {
         let worker = thread::Builder::new()
             .name("otel-startup-keepalive".into())
             .spawn(move || {
-                loop {
-                    match stopped.try_recv() {
-                        Ok(()) | Err(mpsc::TryRecvError::Disconnected) => return Ok(()),
-                        Err(mpsc::TryRecvError::Empty) => {}
+                let beats = panic::catch_unwind(AssertUnwindSafe(|| {
+                    loop {
+                        match stopped.try_recv() {
+                            Ok(()) | Err(mpsc::TryRecvError::Disconnected) => return Ok(()),
+                            Err(mpsc::TryRecvError::Empty) => {}
+                        }
+                        write()?;
+                        match stopped.recv_timeout(interval) {
+                            Ok(()) | Err(RecvTimeoutError::Disconnected) => return Ok(()),
+                            Err(RecvTimeoutError::Timeout) => {}
+                        }
                     }
-                    if let Err(err) = write() {
+                }));
+                // Report a write error and a panic alike: a panic drops
+                // `failed` unsent, which `failure` would read as a clean stop.
+                match beats {
+                    Ok(Ok(())) => Ok(()),
+                    Ok(Err(err)) => {
                         let _ = failed.send(());
-                        return Err(err);
+                        Err(err)
                     }
-                    match stopped.recv_timeout(interval) {
-                        Ok(()) | Err(RecvTimeoutError::Disconnected) => return Ok(()),
-                        Err(RecvTimeoutError::Timeout) => {}
+                    Err(payload) => {
+                        let _ = failed.send(());
+                        panic::resume_unwind(payload)
                     }
                 }
             })?;
@@ -66,7 +79,8 @@ impl StartupKeepalive {
     }
 
     /// Resolves when a heartbeat write fails (the agent closed our stdout),
-    /// with that write's error. Pending forever while writes succeed.
+    /// with that write's error, or when the worker thread panics. Pending
+    /// forever while writes succeed.
     pub(crate) async fn failure(&mut self) -> io::Error {
         if (&mut self.failed).await.is_err() {
             // The worker ended without reporting a failure: it was stopped.
@@ -146,6 +160,17 @@ mod tests {
             .unwrap();
         assert_eq!(err.kind(), io::ErrorKind::BrokenPipe);
         assert!(keepalive.worker.is_none());
+        keepalive.stop().unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_panicked_worker_is_reported() {
+        let mut keepalive =
+            StartupKeepalive::spawn(Duration::from_secs(60), || panic!("keepalive bug")).unwrap();
+        let err = tokio::time::timeout(Duration::from_secs(2), keepalive.failure())
+            .await
+            .expect("a panic resolves failure()");
+        assert!(err.to_string().contains("panicked"), "{err}");
         keepalive.stop().unwrap();
     }
 

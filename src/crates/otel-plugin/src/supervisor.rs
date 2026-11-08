@@ -84,11 +84,21 @@ fn resolve_identity(value: Option<&str>, var_name: &str) -> anyhow::Result<Machi
 struct ChildGuard {
     child: tokio::process::Child,
     name: &'static str,
+    /// Write end of the worker's stdin lifeline (`crate::lifeline`), never
+    /// written: it closes with this guard or with the supervisor process, and
+    /// the worker exits on the end-of-file. Dropped after `drop` has run, so
+    /// the SIGKILL decision there sees the worker as it was.
+    _lifeline: Option<tokio::process::ChildStdin>,
 }
 
 impl ChildGuard {
-    fn new(child: tokio::process::Child, name: &'static str) -> Self {
-        Self { child, name }
+    fn new(mut child: tokio::process::Child, name: &'static str) -> Self {
+        let lifeline = child.stdin.take();
+        Self {
+            child,
+            name,
+            _lifeline: lifeline,
+        }
     }
 }
 
@@ -664,7 +674,9 @@ fn is_agent_gone(e: &anyhow::Error) -> bool {
 enum Startup {
     Done(anyhow::Result<(Vec<FunctionDeclaration>, Vec<FunctionDeclaration>)>),
     Stopped(&'static str),
-    AgentGone(std::io::Error),
+    /// A startup heartbeat failed: the agent closed our stdout (a broken
+    /// pipe), or another write error or a keepalive panic.
+    KeepaliveFailed(std::io::Error),
 }
 
 /// Guard for one IPC socket file: `new` removes any stale file at the path
@@ -734,13 +746,19 @@ where
     tracing::info!("spawning {name} socket={}", sock.path());
 
     let mut cmd = Command::new(self_exe);
-    cmd.args(["worker", name, "--socket", sock.path()])
-        .stdin(Stdio::null())
+    cmd.args(["worker", "--lifeline", name, "--socket", sock.path()])
+        .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
     // A worker must not outlive the supervisor: `ChildGuard` cannot run when
     // the supervisor is SIGKILLed, and an orphaned ledger keeps its WAL
-    // directory busy while the agent starts the next instance.
+    // directory busy while the agent starts the next instance. The stdin pipe
+    // is the portable guard (`crate::lifeline`); std opens it close-on-exec,
+    // so a later worker does not inherit this one's write end. On Linux,
+    // PDEATHSIG also kills the worker at once, even if it is too starved to
+    // run its lifeline thread. PDEATHSIG fires when the forking *thread*
+    // exits; this runs inside `block_on` on the main thread, which lives as
+    // long as the process.
     #[cfg(target_os = "linux")]
     {
         let parent = std::process::id() as libc::pid_t;
@@ -764,13 +782,20 @@ where
         .with_context(|| format!("failed to spawn {name} worker"))?;
 
     // Wrap immediately so the child is killed if accept() fails.
-    let guard = ChildGuard::new(child, name);
+    let mut guard = ChildGuard::new(child, name);
 
-    let conn = tokio::time::timeout(WORKER_CONNECT_TIMEOUT, listener.accept())
-        .await
-        .map_err(|_| anyhow::anyhow!("{name} failed to connect within {WORKER_CONNECT_TIMEOUT:?}"))
-        .and_then(|r| r.map_err(Into::into))
-        .with_context(|| format!("{name} worker connection failed"))?;
+    // A worker that dies before connecting fails startup at once instead of
+    // after the whole connect timeout.
+    let conn = tokio::select! {
+        r = tokio::time::timeout(WORKER_CONNECT_TIMEOUT, listener.accept()) => r
+            .map_err(|_| anyhow::anyhow!("{name} failed to connect within {WORKER_CONNECT_TIMEOUT:?}"))
+            .and_then(|r| r.map_err(Into::into))
+            .with_context(|| format!("{name} worker connection failed"))?,
+        status = guard.child.wait() => {
+            let status = status.map_or_else(|e| e.to_string(), |s| s.to_string());
+            anyhow::bail!("{name} worker exited before connecting ({status})");
+        }
+    };
     tracing::info!("{name} worker connected to supervisor");
 
     Ok((conn, guard))
@@ -855,10 +880,21 @@ pub async fn run() -> anyhow::Result<()> {
     // Spawn the ledger first: it listens on the writer socket, and on startup
     // the ingestor connects to that socket to stream records to it. Reversing
     // the order would race the ingestor against a not-yet-listening ledger.
-    let (ledger_conn, ledger_child) = spawn_worker(&self_exe, &ledger_sock, "ledger").await?;
-    let (ingestor_conn, ingestor_child) =
-        spawn_worker(&self_exe, &ingestor_sock, "ingestor").await?;
-    let (legacy_conn, legacy_child) = spawn_worker(&self_exe, &legacy_sock, "legacy-logs").await?;
+    // A stop signal ends the spawning at once; dropping the future drops the
+    // `ChildGuard`s of the workers already started, which kills them.
+    let spawned = async {
+        let ledger = spawn_worker(&self_exe, &ledger_sock, "ledger").await?;
+        let ingestor = spawn_worker(&self_exe, &ingestor_sock, "ingestor").await?;
+        let legacy = spawn_worker(&self_exe, &legacy_sock, "legacy-logs").await?;
+        Ok::<_, anyhow::Error>((ledger, ingestor, legacy))
+    };
+    let ((ledger_conn, ledger_child), (ingestor_conn, ingestor_child), (legacy_conn, legacy_child)) = tokio::select! {
+        r = spawned => r?,
+        reason = signals.recv() => {
+            tracing::info!("{reason} while starting workers, stopping");
+            return Ok(());
+        }
+    };
 
     let mut supervisor = Supervisor {
         ingestor: ingestor_conn,
@@ -913,7 +949,7 @@ pub async fn run() -> anyhow::Result<()> {
         tokio::select! {
             r = handshake => Startup::Done(r),
             reason = signals.recv() => Startup::Stopped(reason),
-            e = startup_keepalive.failure() => Startup::AgentGone(e),
+            e = startup_keepalive.failure() => Startup::KeepaliveFailed(e),
         }
     };
     let (ledger_declarations, ingestor_declarations) = match startup {
@@ -922,9 +958,8 @@ pub async fn run() -> anyhow::Result<()> {
             tracing::info!("{reason} during startup, stopping workers");
             return Ok(());
         }
-        Startup::AgentGone(e) => {
-            tracing::info!("agent closed the plugin's stdout during startup ({e}), exiting");
-            return Ok(());
+        Startup::KeepaliveFailed(e) => {
+            return agent_gone_or(anyhow::Error::new(e).context("startup keepalive failed"));
         }
     };
 
@@ -981,7 +1016,60 @@ fn agent_gone_or(e: anyhow::Error) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_agent_gone, resolve_identity};
+    use super::{agent_gone_or, is_agent_gone, resolve_identity};
+
+    #[test]
+    fn only_a_broken_pipe_counts_as_the_agent_leaving() {
+        let io = |kind| anyhow::Error::new(std::io::Error::new(kind, "write failed"));
+        assert!(agent_gone_or(io(std::io::ErrorKind::BrokenPipe)).is_ok());
+        assert!(agent_gone_or(io(std::io::ErrorKind::Other)).is_err());
+        assert!(agent_gone_or(io(std::io::ErrorKind::StorageFull)).is_err());
+    }
+
+    #[tokio::test]
+    async fn a_worker_that_dies_before_connecting_fails_fast() {
+        let dir = tempfile::tempdir().unwrap();
+        let sock = super::SocketGuard::new(dir.path(), "ledger");
+        let started = std::time::Instant::now();
+        let err = super::spawn_worker::<bridge::LedgerRequest, bridge::LedgerResponse>(
+            std::path::Path::new("/bin/false"),
+            &sock,
+            "ledger",
+        )
+        .await
+        .err()
+        .expect("startup fails");
+        assert!(
+            format!("{err:#}").contains("exited before connecting"),
+            "{err:#}"
+        );
+        assert!(started.elapsed() < std::time::Duration::from_secs(10));
+    }
+
+    /// The lifeline relies on each worker's stdin pipe being close-on-exec: a
+    /// worker spawned later must not hold an earlier worker's write end open.
+    #[tokio::test]
+    async fn a_lifeline_write_end_is_not_inherited_by_later_children() {
+        use std::process::Stdio;
+        use tokio::process::Command;
+        let mut first = Command::new("cat")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .spawn()
+            .unwrap();
+        let lifeline = first.stdin.take();
+        let _later = Command::new("sleep")
+            .arg("30")
+            .stdin(Stdio::null())
+            .kill_on_drop(true)
+            .spawn()
+            .unwrap();
+        drop(lifeline);
+        tokio::time::timeout(std::time::Duration::from_secs(5), first.wait())
+            .await
+            .expect("the first child sees end-of-file")
+            .unwrap();
+    }
 
     #[test]
     fn broken_pipe_is_recognised_through_the_transport_error() {

@@ -16,6 +16,7 @@
 //! `otel_ledger`, `otel_legacy_logs`); this crate owns only the entry point,
 //! the supervisor, and configuration loading.
 mod config;
+mod lifeline;
 mod startup_keepalive;
 mod supervisor;
 
@@ -54,6 +55,10 @@ enum CliCommand {
     /// Run as a worker subprocess of this same executable; spawned by the
     /// supervisor's own re-exec, not an operator command.
     Worker {
+        /// Exit when stdin closes: the supervisor passes a pipe it never
+        /// writes, so end-of-file means the supervisor is gone (`lifeline`).
+        #[arg(long)]
+        lifeline: bool,
         #[command(subcommand)]
         kind: WorkerKind,
     },
@@ -141,7 +146,8 @@ fn main() {
     let worker_arenas = matches!(
         cli.command,
         Some(CliCommand::Worker {
-            kind: WorkerKind::Ingestor { .. } | WorkerKind::Ledger { .. }
+            kind: WorkerKind::Ingestor { .. } | WorkerKind::Ledger { .. },
+            ..
         })
     )
     .then(raise_glibc_arenas_for_process);
@@ -187,7 +193,7 @@ async fn async_main(cli: Cli, worker_arenas: Option<Option<usize>>) {
             };
             std::process::exit(code);
         }
-        Some(CliCommand::Worker { kind }) => {
+        Some(CliCommand::Worker { lifeline, kind }) => {
             let syslog_id = match &kind {
                 WorkerKind::Ingestor { .. } => "otel-plugin/ingestor",
                 WorkerKind::Ledger { .. } => "otel-plugin/ledger",
@@ -206,6 +212,12 @@ async fn async_main(cli: Cli, worker_arenas: Option<Option<usize>>) {
                     tracing::warn!("failed to raise glibc malloc arenas for {syslog_id}");
                 }
                 None => {}
+            }
+            if lifeline {
+                if let Err(e) = lifeline::exit_when_stdin_closes() {
+                    tracing::error!("failed to start the supervisor lifeline watcher: {e}");
+                    std::process::exit(1);
+                }
             }
             if let Err(e) = run_worker(kind).await {
                 tracing::error!("{e:#}");
@@ -276,7 +288,34 @@ mod tests {
     #[test]
     fn worker_subcommand_still_routes() {
         let cli = parse(&["otel-plugin", "worker", "ingestor", "--socket", "/s"]).unwrap();
-        assert!(matches!(cli.command, Some(CliCommand::Worker { .. })));
+        assert!(matches!(
+            cli.command,
+            Some(CliCommand::Worker {
+                lifeline: false,
+                ..
+            })
+        ));
+    }
+
+    // The argv `supervisor::spawn_worker` builds.
+    #[test]
+    fn worker_lifeline_flag_precedes_the_kind() {
+        let cli = parse(&[
+            "otel-plugin",
+            "worker",
+            "--lifeline",
+            "ledger",
+            "--socket",
+            "/s",
+        ])
+        .unwrap();
+        assert!(matches!(
+            cli.command,
+            Some(CliCommand::Worker {
+                lifeline: true,
+                kind: WorkerKind::Ledger { .. }
+            })
+        ));
     }
 
     // `allow_hyphen_values` on since/until must survive the subcommand flatten.
