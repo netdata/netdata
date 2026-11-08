@@ -844,8 +844,11 @@ static inline QUERY_INSTANCE *query_instance_allocate(QUERY_TARGET *qt, RRDINSTA
     return qi;
 }
 
+// name: the caller's reference to the instance name, so that matching and output use the same name;
+// NULL to match a reference taken here
 static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED *ria,
                                              RRDINSTANCE *ri,
+                                             STRING *name_ref,
                                              SIMPLE_PATTERN *instances_sp,
                                              bool match_ids,
                                              bool match_names,
@@ -857,8 +860,10 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED 
     if(instances_sp) {
         ret = SP_NOT_MATCHED;
 
-        // the name is replaced while we use it: match our own reference
-        STRING *name = match_names ? rrdinstance_acquired_name_dup(ria) : NULL;
+        // the name is replaced while we use it: match a reference
+        STRING *name = name_ref, *name_owned = NULL;
+        if(match_names && !name)
+            name = name_owned = rrdinstance_acquired_name_dup(ria);
 
         if(match_ids)
             ret = simple_pattern_matches_string_extract(instances_sp, ri->id, NULL, 0);
@@ -880,7 +885,7 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED 
             ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
         }
 
-        string_freez(name);
+        string_freez(name_owned);
 
         if (ret == SP_NOT_MATCHED && match_ids && host_node_id_str[0]) {
             snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(ria), host_node_id_str);
@@ -928,7 +933,7 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 
     if(queryable_instance && filter_instances)
         queryable_instance = (SP_MATCHED_POSITIVE == query_instance_matches(
-                ria, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qtl->instances_version,
+                ria, ri, qi->name, qt->instances.pattern, qtl->match_ids, qtl->match_names, qtl->instances_version,
                 qtl->host_hostname, qtl->host_node_id_str));
 
     // chart_label_key has no scope variant: the scope checks before this call already applied it
@@ -1029,7 +1034,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            SIMPLE_PATTERN_RESULT ret = query_instance_matches(qt->request.ria, ri,
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(qt->request.ria, ri, NULL,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names,
                 qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
             if(ret != SP_MATCHED_POSITIVE)
@@ -1058,7 +1063,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri,
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri, NULL,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
                 qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
             if(ret != SP_MATCHED_POSITIVE) {
@@ -1096,7 +1101,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             
             // Check scope_instances
             if(qt->instances.scope_pattern) {
-                SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri,
+                SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri, NULL,
                     qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
                     qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
                 if(ret != SP_MATCHED_POSITIVE)
@@ -1504,8 +1509,9 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     return qt;
 }
 
-// true when the dimension matches the pattern (or there is no pattern) by id or by name
-static bool query_metric_name_matches(RRDMETRIC_ACQUIRED *rma, RRDMETRIC *rm, SIMPLE_PATTERN *sp,
+// true when the dimension matches the pattern (or there is no pattern) by id or by name;
+// name is the caller's reference to the metric name (the name is replaced while we use it)
+static bool query_metric_name_matches(RRDMETRIC *rm, STRING *name, SIMPLE_PATTERN *sp,
                                       bool match_ids, bool match_names) {
     if(!sp)
         return true;
@@ -1515,13 +1521,8 @@ static bool query_metric_name_matches(RRDMETRIC_ACQUIRED *rma, RRDMETRIC *rm, SI
     if (match_ids)
         ret = simple_pattern_matches_string_extract(sp, rm->id, NULL, 0);
 
-    if (ret == SP_NOT_MATCHED && match_names) {
-        // the name is replaced while we use it: match our own reference
-        STRING *name = rrdmetric_acquired_name_dup(rma);
-        if (name != rm->id || !match_ids)
-            ret = simple_pattern_matches_string_extract(sp, name, NULL, 0);
-        string_freez(name);
-    }
+    if (ret == SP_NOT_MATCHED && match_names && (name != rm->id || !match_ids))
+        ret = simple_pattern_matches_string_extract(sp, name, NULL, 0);
 
     return ret == SP_MATCHED_POSITIVE;
 }
@@ -1562,28 +1563,25 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 
                 RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *) ri_dfe.item;
                 
-                // Check scope_instances first - if it doesn't match, skip entirely
-                if(scope_instances_sp) {
-                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(
-                        ria, ri, scope_instances_sp, match_ids, match_names, version,
-                        host_identity.hostname, host_node_id_str);
+                // scope_instances and instances match the same snapshot of the name
+                if(scope_instances_sp || instances_sp) {
+                    STRING *name = match_names ? rrdinstance_acquired_name_dup(ria) : NULL;
+                    bool matched =
+                        (!scope_instances_sp ||
+                         query_instance_matches(ria, ri, name, scope_instances_sp, match_ids, match_names, version,
+                                                host_identity.hostname, host_node_id_str) == SP_MATCHED_POSITIVE) &&
+                        (!instances_sp ||
+                         query_instance_matches(ria, ri, name, instances_sp, match_ids, match_names, version,
+                                                host_identity.hostname, host_node_id_str) == SP_MATCHED_POSITIVE);
+                    string_freez(name);
 
-                    if (ret != SP_MATCHED_POSITIVE)
+                    if(!matched)
                         continue;
                 }
-                
+
                 // Check scope_labels - if it doesn't match, skip entirely
                 if(scope_labels_pa) {
                     if(!query_instance_matches_labels(ria, NULL, scope_labels_pa))
-                        continue;
-                }
-
-                if(instances_sp) {
-                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(
-                        ria, ri, instances_sp, match_ids, match_names, version,
-                        host_identity.hostname, host_node_id_str);
-
-                    if (ret != SP_MATCHED_POSITIVE)
                         continue;
                 }
 
@@ -1602,9 +1600,17 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 
                             RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item;
 
-                            if(!query_metric_name_matches(rma, rm, scope_dimensions_sp, match_ids, match_names) ||
-                               !query_metric_name_matches(rma, rm, dimensions_sp, match_ids, match_names))
-                                continue;
+                            // scope_dimensions and dimensions match the same snapshot of the name
+                            if(scope_dimensions_sp || dimensions_sp) {
+                                STRING *name = match_names ? rrdmetric_acquired_name_dup(rma) : NULL;
+                                bool matched =
+                                    query_metric_name_matches(rm, name, scope_dimensions_sp, match_ids, match_names) &&
+                                    query_metric_name_matches(rm, name, dimensions_sp, match_ids, match_names);
+                                string_freez(name);
+
+                                if(!matched)
+                                    continue;
+                            }
 
                             dfe_unlock(rm);
 
