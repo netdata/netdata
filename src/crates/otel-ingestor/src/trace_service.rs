@@ -139,7 +139,7 @@ pub struct NetdataTracesService {
     writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
     /// One fsync round at a time per tenant; requests that arrive during a
     /// round wait here, and one round after it covers them all.
-    sync_gates: Mutex<HashMap<TenantId, Arc<tokio::sync::Mutex<()>>>>,
+    sync_gates: crate::wal_sync::SyncGates,
     /// Process-wide monotonic clock, shared across tenants, streams, and
     /// signals (lib.rs creates one instance for logs + traces): the WAL writer
     /// stamps per-frame `ingestion_ns` from it, so one clock keeps frame
@@ -179,7 +179,7 @@ impl NetdataTracesService {
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
-            sync_gates: Mutex::new(HashMap::new()),
+            sync_gates: crate::wal_sync::SyncGates::default(),
             clock,
             sender,
             wal_base_dir,
@@ -404,7 +404,8 @@ impl NetdataTracesService {
         // tenant behind the slowest fsync. Events still go out under the lock,
         // so each file's Created/Synced/Closed reach the ledger in order.
         // Fsync rounds take turns at the tenant's sync gate; a request whose
-        // bytes an earlier round already made durable skips its own.
+        // bytes an earlier round already made durable skips its own
+        // (`wal_sync::make_durable`).
         let target = {
             let mut writer = writer.lock().unwrap();
             for p in &prepared {
@@ -438,41 +439,15 @@ impl NetdataTracesService {
             self.sender.send_events(tenant_id.clone(), events);
             target
         };
-        let gate = {
-            let mut gates = self.sync_gates.lock().unwrap();
-            Arc::clone(gates.entry(tenant_id.clone()).or_default())
-        };
-        let _turn = gate.lock().await;
-        let ticket = {
-            let mut writer = writer.lock().unwrap();
-            if writer.is_covered(&target) {
-                None
-            } else {
-                Some(writer.begin_sync())
-            }
-        };
-        let Some(ticket) = ticket else {
-            return Ok(ExportTraceServiceResponse {
-                partial_success: build_partial_success(out_of_window),
-            });
-        };
-        // Off the async workers: an fsync can take tens of milliseconds.
-        let ticket = tokio::task::spawn_blocking(move || ticket.fsync())
-            .await
-            .map_err(|e| {
-                tracing::error!(%e, "traces WAL sync task failed");
-                Status::internal("WAL sync error")
-            })?;
-        {
-            let mut writer = writer.lock().unwrap();
-            let result = writer.finish_sync(ticket);
-            let events = writer.take_all_events();
-            self.sender.send_events(tenant_id.clone(), events);
-            result.map_err(|e| {
-                tracing::error!(%e, "failed to sync traces WAL");
-                Status::internal("WAL sync error")
-            })?;
-        }
+        crate::wal_sync::make_durable(
+            writer,
+            self.sync_gates.gate(tenant_id),
+            Arc::clone(&self.sender),
+            tenant_id.clone(),
+            target,
+            "traces",
+        )
+        .await?;
 
         Ok(ExportTraceServiceResponse {
             partial_success: build_partial_success(out_of_window),
