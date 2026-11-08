@@ -102,6 +102,13 @@ metrics:
 #   - the download cache for remote storage (see remote_storage below).
 base_dir: @logdir_POST@/otel/v2
 
+# glibc malloc arenas for the ingestor and ledger processes. "auto" gives one
+# per CPU, so their threads do not wait on each other's allocations; this
+# replaces netdata.conf's "glibc malloc arena max for plugins" for these two
+# processes. A number caps them, which can lower memory fragmentation at the
+# cost of ingestion throughput. Ignored where the C library is not glibc.
+malloc_arena_max: auto
+
 logs:
   rotation:
     # Incoming logs are appended to a current file; a new file starts when

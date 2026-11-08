@@ -59,6 +59,11 @@ enum CliCommand {
         /// writes, so end-of-file means the supervisor is gone (`lifeline`).
         #[arg(long)]
         lifeline: bool,
+        /// glibc malloc arena limit for the ingestor and ledger: a count, or
+        /// `auto` (the default) for one per runtime worker thread. Carries
+        /// otel.yaml's `malloc_arena_max`; ignored by the other workers.
+        #[arg(long)]
+        malloc_arena_max: Option<config::AutoCount>,
         #[command(subcommand)]
         kind: WorkerKind,
     },
@@ -110,29 +115,36 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
     }
 }
 
-/// Raise this process's glibc malloc arena limit to one per runtime worker
-/// (one per CPU unless `TOKIO_WORKER_THREADS` says otherwise). The agent
-/// starts plugins with `MALLOC_ARENA_MAX=1`; with a single arena, the
-/// ingestor's runtime threads serialize on its lock as soon as requests run in
-/// parallel, and so do the ledger's concurrent seals. Must run before any thread exists: glibc binds a thread to an
-/// arena at its first allocation and keeps it. Returns the limit set, or
-/// `None` if it could not be set.
-fn raise_glibc_arenas_for_process() -> Option<usize> {
+/// Set this process's glibc malloc arena limit: `requested` (otel.yaml's
+/// `malloc_arena_max`), or one per runtime worker (one per CPU unless
+/// `TOKIO_WORKER_THREADS` says otherwise) for `auto`. This replaces the
+/// `MALLOC_ARENA_MAX` the agent exports to every plugin from netdata.conf's
+/// `glibc malloc arena max for plugins` (1 on most profiles): with a single
+/// arena, the ingestor's runtime threads serialize on its lock as soon as
+/// requests run in parallel, and so do the ledger's concurrent seals. The
+/// plugin cannot tell an operator's netdata.conf value from the profile
+/// default, so the cap lives in otel.yaml instead. Must run before any thread
+/// exists: glibc binds a thread to an arena at its first allocation and keeps
+/// it. Returns the limit set, or `None` if it could not be set.
+fn set_glibc_arenas_for_process(requested: Option<usize>) -> Option<usize> {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {
-        // One per runtime worker: the runtime's default, or its override.
-        let workers = std::env::var("TOKIO_WORKER_THREADS")
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .filter(|&n| n > 0)
-            .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()));
-        let arenas = libc::c_int::try_from(workers).unwrap_or(libc::c_int::MAX);
+        let arenas = requested.filter(|&n| n > 0).unwrap_or_else(|| {
+            // One per runtime worker: the runtime's default, or its override.
+            std::env::var("TOKIO_WORKER_THREADS")
+                .ok()
+                .and_then(|v| v.parse::<usize>().ok())
+                .filter(|&n| n > 0)
+                .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()))
+        });
+        let max = libc::c_int::try_from(arenas).unwrap_or(libc::c_int::MAX);
         // SAFETY: `mallopt` takes no pointers and only adjusts allocator parameters.
-        (unsafe { libc::mallopt(libc::M_ARENA_MAX, arenas) } == 1).then_some(workers)
+        (unsafe { libc::mallopt(libc::M_ARENA_MAX, max) } == 1).then_some(arenas)
     }
 
     #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
     {
+        let _ = requested;
         None
     }
 }
@@ -143,14 +155,16 @@ fn main() {
     // Only the ingestor and the ledger: the other modes are not
     // allocation-heavy across threads and keep the agent's (memory-saving)
     // arena limit.
-    let worker_arenas = matches!(
-        cli.command,
+    let worker_arenas = match &cli.command {
         Some(CliCommand::Worker {
             kind: WorkerKind::Ingestor { .. } | WorkerKind::Ledger { .. },
+            malloc_arena_max,
             ..
-        })
-    )
-    .then(raise_glibc_arenas_for_process);
+        }) => Some(set_glibc_arenas_for_process(
+            malloc_arena_max.and_then(|a| a.0),
+        )),
+        _ => None,
+    };
 
     // What `#[tokio::main]` builds, created only after the arena limit is set.
     tokio::runtime::Builder::new_multi_thread()
@@ -193,7 +207,7 @@ async fn async_main(cli: Cli, worker_arenas: Option<Option<usize>>) {
             };
             std::process::exit(code);
         }
-        Some(CliCommand::Worker { lifeline, kind }) => {
+        Some(CliCommand::Worker { lifeline, kind, .. }) => {
             let syslog_id = match &kind {
                 WorkerKind::Ingestor { .. } => "otel-plugin/ingestor",
                 WorkerKind::Ledger { .. } => "otel-plugin/ledger",
@@ -206,10 +220,10 @@ async fn async_main(cli: Cli, worker_arenas: Option<Option<usize>>) {
             #[cfg(all(target_os = "linux", target_env = "gnu"))]
             match worker_arenas {
                 Some(Some(arena_max)) => {
-                    tracing::info!(arena_max, "raised glibc malloc arenas for {syslog_id}");
+                    tracing::info!(arena_max, "set glibc malloc arenas for {syslog_id}");
                 }
                 Some(None) => {
-                    tracing::warn!("failed to raise glibc malloc arenas for {syslog_id}");
+                    tracing::warn!("failed to set glibc malloc arenas for {syslog_id}");
                 }
                 None => {}
             }
@@ -313,9 +327,37 @@ mod tests {
             cli.command,
             Some(CliCommand::Worker {
                 lifeline: true,
+                malloc_arena_max: None,
                 kind: WorkerKind::Ledger { .. }
             })
         ));
+    }
+
+    // otel.yaml's `malloc_arena_max`, as `supervisor::arena_args` passes it.
+    #[test]
+    fn worker_malloc_arena_max_reads_auto_or_a_count() {
+        for (arenas, expected) in [("auto", None), ("6", Some(6))] {
+            let cli = parse(&[
+                "otel-plugin",
+                "worker",
+                "--lifeline",
+                "--malloc-arena-max",
+                arenas,
+                "ingestor",
+                "--socket",
+                "/s",
+            ])
+            .unwrap();
+            let Some(CliCommand::Worker {
+                malloc_arena_max: Some(config::AutoCount(max)),
+                kind: WorkerKind::Ingestor { .. },
+                ..
+            }) = cli.command
+            else {
+                panic!("unexpected parse for {arenas}");
+            };
+            assert_eq!(max, expected);
+        }
     }
 
     // `allow_hyphen_values` on since/until must survive the subcommand flatten.

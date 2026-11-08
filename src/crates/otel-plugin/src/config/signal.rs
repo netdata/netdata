@@ -81,15 +81,17 @@ pub(super) struct IndexersOverride {
     #[serde(default)]
     pub(super) min: Option<usize>,
     #[serde(default)]
-    pub(super) max: Option<IndexersMax>,
+    pub(super) max: Option<AutoCount>,
 }
 
-/// The `indexers.max` value: a count, or `auto` (one seal per ledger worker
-/// thread). Accepts a YAML integer or string, and parses from an env value.
+/// A count or `auto` (`None`): `indexers.max` (auto = one seal per ledger
+/// worker thread) and `malloc_arena_max` (auto = one arena per runtime worker
+/// thread). Accepts a YAML integer or string, and parses from an env value or
+/// the worker's `--malloc-arena-max` argument.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct IndexersMax(pub(super) Option<usize>);
+pub(crate) struct AutoCount(pub(crate) Option<usize>);
 
-impl std::str::FromStr for IndexersMax {
+impl std::str::FromStr for AutoCount {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -103,25 +105,23 @@ impl std::str::FromStr for IndexersMax {
     }
 }
 
-impl<'de> Deserialize<'de> for IndexersMax {
+impl<'de> Deserialize<'de> for AutoCount {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         // A visitor rather than an untagged enum, so `-1` or `2.5` get the
         // same message as a bad string instead of serde's generic variant error.
         struct Visitor;
 
         impl serde::de::Visitor<'_> for Visitor {
-            type Value = IndexersMax;
+            type Value = AutoCount;
 
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 f.write_str("a positive integer or \"auto\"")
             }
 
             fn visit_u64<E: serde::de::Error>(self, n: u64) -> Result<Self::Value, E> {
-                usize::try_from(n)
-                    .map(|n| IndexersMax(Some(n)))
-                    .map_err(|_| {
-                        E::custom(format!("expected a positive integer or \"auto\", got {n}"))
-                    })
+                usize::try_from(n).map(|n| AutoCount(Some(n))).map_err(|_| {
+                    E::custom(format!("expected a positive integer or \"auto\", got {n}"))
+                })
             }
 
             fn visit_i64<E: serde::de::Error>(self, n: i64) -> Result<Self::Value, E> {
@@ -278,7 +278,7 @@ pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
         if let Some(v) = i.min {
             config.indexers.min = v;
         }
-        if let Some(IndexersMax(v)) = i.max {
+        if let Some(AutoCount(v)) = i.max {
             config.indexers.max = v;
         }
     }

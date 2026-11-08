@@ -209,6 +209,7 @@ impl ConfigOverride {
         let receivers = receivers_from_map(env)?;
         let metrics = MetricsOverride::from_map(env)?;
         let base_dir = get_env(env, "NETDATA_OTEL_CFG_BASE_DIR")?.map(PathBuf::from);
+        let malloc_arena_max = parse_env_var(env, "NETDATA_OTEL_CFG_MALLOC_ARENA_MAX")?;
         let remote_storage = RemoteStorageOverride::from_map(env)?;
         let auth = AuthOverride::from_map(env)?;
         let logs = SignalOverride::from_map(env, "LOGS")?;
@@ -225,6 +226,7 @@ impl ConfigOverride {
                 None
             },
             base_dir,
+            malloc_arena_max,
             remote_storage: if remote_storage.has_any() {
                 Some(remote_storage)
             } else {

@@ -69,6 +69,12 @@ pub struct PluginConfig {
     /// shipped stock logs tuning.
     #[serde(default)]
     pub traces: SignalConfig,
+    /// glibc malloc arena limit (`M_ARENA_MAX`) for the ingestor and ledger
+    /// workers; `None` (`auto` in YAML) is one per runtime worker thread. The
+    /// supervisor passes it on each worker's command line, because it must be
+    /// set before the worker starts any thread; ignored off glibc.
+    #[serde(default, with = "opt_auto_count")]
+    pub malloc_arena_max: Option<usize>,
     /// Socket path for WAL event IPC between ingestor and ledger: the
     /// ingestor connects to it and the ledger accepts its single writer
     /// connection. Set by the supervisor at runtime, not present in YAML

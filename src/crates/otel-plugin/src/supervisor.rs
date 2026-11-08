@@ -733,6 +733,7 @@ async fn spawn_worker<S, R>(
     self_exe: &std::path::Path,
     sock: &SocketGuard,
     name: &'static str,
+    worker_args: &[&str],
 ) -> anyhow::Result<(Connection<S, R>, ChildGuard)>
 where
     S: serde::Serialize + Send + 'static,
@@ -746,7 +747,9 @@ where
     tracing::info!("spawning {name} socket={}", sock.path());
 
     let mut cmd = Command::new(self_exe);
-    cmd.args(["worker", "--lifeline", name, "--socket", sock.path()])
+    cmd.args(["worker", "--lifeline"])
+        .args(worker_args)
+        .args([name, "--socket", sock.path()])
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -882,10 +885,12 @@ pub async fn run() -> anyhow::Result<()> {
     // the order would race the ingestor against a not-yet-listening ledger.
     // A stop signal ends the spawning at once; dropping the future drops the
     // `ChildGuard`s of the workers already started, which kills them.
+    let arenas = arena_args(plugin_config.malloc_arena_max);
+    let arenas: Vec<&str> = arenas.iter().map(String::as_str).collect();
     let spawned = async {
-        let ledger = spawn_worker(&self_exe, &ledger_sock, "ledger").await?;
-        let ingestor = spawn_worker(&self_exe, &ingestor_sock, "ingestor").await?;
-        let legacy = spawn_worker(&self_exe, &legacy_sock, "legacy-logs").await?;
+        let ledger = spawn_worker(&self_exe, &ledger_sock, "ledger", &arenas).await?;
+        let ingestor = spawn_worker(&self_exe, &ingestor_sock, "ingestor", &arenas).await?;
+        let legacy = spawn_worker(&self_exe, &legacy_sock, "legacy-logs", &[]).await?;
         Ok::<_, anyhow::Error>((ledger, ingestor, legacy))
     };
     let ((ledger_conn, ledger_child), (ingestor_conn, ingestor_child), (legacy_conn, legacy_child)) = tokio::select! {
@@ -1003,6 +1008,13 @@ pub async fn run() -> anyhow::Result<()> {
     }
 }
 
+/// The worker arguments that carry `malloc_arena_max` to the ingestor and
+/// ledger, which must apply it before they start any thread (`main.rs`).
+fn arena_args(malloc_arena_max: Option<usize>) -> [String; 2] {
+    let value = malloc_arena_max.map_or_else(|| "auto".to_string(), |n| n.to_string());
+    ["--malloc-arena-max".to_string(), value]
+}
+
 /// The startup exit for a failed write to the agent: `Ok` (exit 0) when the
 /// agent is gone (see [`is_agent_gone`]), the error otherwise.
 fn agent_gone_or(e: anyhow::Error) -> anyhow::Result<()> {
@@ -1016,7 +1028,13 @@ fn agent_gone_or(e: anyhow::Error) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{agent_gone_or, is_agent_gone, resolve_identity};
+    use super::{agent_gone_or, arena_args, is_agent_gone, resolve_identity};
+
+    #[test]
+    fn arena_args_carry_auto_or_the_count() {
+        assert_eq!(arena_args(None), ["--malloc-arena-max", "auto"]);
+        assert_eq!(arena_args(Some(4)), ["--malloc-arena-max", "4"]);
+    }
 
     #[test]
     fn only_a_broken_pipe_counts_as_the_agent_leaving() {
@@ -1035,6 +1053,7 @@ mod tests {
             std::path::Path::new("/bin/false"),
             &sock,
             "ledger",
+            &[],
         )
         .await
         .err()
