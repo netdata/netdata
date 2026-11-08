@@ -51,7 +51,8 @@ bool sql_set_host_label(nd_uuid_t *host_id, const char *label_key, const char *l
 
 uint64_t sqlite_get_meta_space(void);
 int sql_init_meta_database(db_check_action_type_t rebuild, int memory);
-// *os_errno gets the errno to report with the failure (0 on Windows, where SQLite reports GetLastError() codes)
+// *os_errno gets the OS errno for CANTOPEN/IOERR failures and 0 otherwise; on Windows it is always 0 because SQLite
+// reports GetLastError() codes there
 void sql_init_meta_failure_reason(char *dst, size_t dst_size, int *os_errno);
 
 void cleanup_agent_event_log(void);
