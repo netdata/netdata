@@ -753,6 +753,7 @@ set(FREEBSD_PLUGIN_FILES
         src/collectors/freebsd.plugin/freebsd_devstat.c
         src/collectors/freebsd.plugin/freebsd_kstat_zfs.c
         src/collectors/freebsd.plugin/freebsd_ipfw.c
+        src/collectors/freebsd.plugin/freebsd_acpi_battery.c
         src/collectors/proc.plugin/zfs_common.c
         src/collectors/proc.plugin/zfs_common.h
 )
