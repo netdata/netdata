@@ -5753,8 +5753,9 @@ modules:
           It covers local printers and printer connections configured on the host; it does not poll printer devices,
           which the SNMP collector covers.
         method_description: |
-          It calls the print spooler API. `EnumPrintersW` reads every printer's name, status flags, and queued job
-          count. For printers with queued jobs, it opens the queue and reads the jobs with `EnumJobsW`. Status values
+          It calls the print spooler API. `EnumPrintersW` lists printer names from the local registry and cache without
+          contacting print servers. Each selected printer is then opened to read its status flags and queued job count
+          (`GetPrinterW`) and, when jobs are queued, its jobs (`EnumJobsW`). Status values
           follow the `Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter. Job user names, machine
           names, and document titles are not collected.
       supported_platforms:
@@ -5774,8 +5775,9 @@ modules:
             By default, at most 100 printers are charted, three charts each.
         performance_impact:
           description: |
-            One spooler enumeration per collection, plus one queue read per selected printer with queued jobs. For a
-            printer connection, reading the queue can contact the print server and block when it is unreachable. The
+            One name enumeration per collection, plus one printer open and status read per selected printer, and a job
+            read for selected printers with queued jobs. Unselected printers are never opened. For a selected printer
+            connection, opening it can contact the print server and block when it is unreachable. The
             module runs on its own thread while its `update every` differs from the global interval; a blocked call
             stops only this module, but Netdata shutdown waits for it to return.
     setup:

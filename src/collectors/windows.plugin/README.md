@@ -93,8 +93,9 @@ the displayed label.
 
 ## GetPrinters
 
-`GetPrinters` reads local printers and printer connections from the Windows print spooler (`EnumPrintersW` and, for
-non-empty queues, `EnumJobsW`). It is disabled by default. Enable it in `[plugin:windows]` with `GetPrinters = yes`
+`GetPrinters` reads local printers and printer connections from the Windows print spooler. It lists printer names
+without contacting print servers (`EnumPrintersW` level 4), then opens only the selected printers to read their status
+and queue (`GetPrinterW`, and `EnumJobsW` for non-empty queues). It is disabled by default. Enable it in `[plugin:windows]` with `GetPrinters = yes`
 and configure it in `[plugin:windows:GetPrinters]`:
 
 ```ini
@@ -112,7 +113,8 @@ Each selected printer gets three charts: queued jobs, printer status, and jobs b
 `Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter; an offline printer reports `other`. Job user
 names, machine names, and document titles are never collected.
 
-The module runs on its own thread only while its `update every` differs from the global interval. Opening the queue of
-an unreachable printer connection can block; while it is blocked, this module collects nothing and Netdata shutdown
-waits for the call to return. If the spooler cannot be enumerated (for example, the Spooler service is stopped), the
+The module runs on its own thread only while its `update every` differs from the global interval. Opening a selected
+printer connection whose print server is unreachable can block; while it is blocked, this module collects nothing and
+Netdata shutdown waits for the call to return. Exclude such connections with `printers to monitor` (for example
+`!\\oldserver\*,*`); excluded printers are never opened. If the spooler cannot be enumerated (for example, the Spooler service is stopped), the
 charts show gaps and are kept until a successful enumeration shows the printer is gone.

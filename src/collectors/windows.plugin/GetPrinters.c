@@ -70,7 +70,7 @@ struct printer {
 
 typedef struct {
     char *name;
-    const PRINTER_INFO_2W *info;
+    const PRINTER_INFO_4W *info;
 } PRINTER_SAMPLE;
 
 typedef struct {
@@ -82,6 +82,7 @@ static DICTIONARY *printers = NULL;
 static SIMPLE_PATTERN *printers_to_monitor = NULL;
 static long long max_printers = PRINTERS_DEFAULT_MAX;
 static SPOOLER_BUFFER printers_buffer = {0};
+static SPOOLER_BUFFER printer_info_buffer = {0};
 static SPOOLER_BUFFER jobs_buffer = {0};
 static DWORD last_enum_error = ERROR_SUCCESS;
 
@@ -153,7 +154,18 @@ static DWORD spooler_enum(SPOOLER_BUFFER *buffer, spooler_enum_fn fn, void *ctx,
 
 static BOOL spooler_enum_printers_call(void *ctx __maybe_unused, BYTE *data, DWORD size, DWORD *needed, DWORD *returned)
 {
-    return EnumPrintersW(PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS, NULL, 2, data, size, needed, returned);
+    // Level 4 names come from the registry/local cache; level 2 would open every remote connection, so an
+    // unreachable connection excluded by the selector could still block collection.
+    return EnumPrintersW(PRINTER_ENUM_LOCAL | PRINTER_ENUM_CONNECTIONS, NULL, 4, data, size, needed, returned);
+}
+
+static BOOL spooler_get_printer_call(void *ctx, BYTE *data, DWORD size, DWORD *needed, DWORD *returned)
+{
+    if (!GetPrinterW((HANDLE)ctx, 2, data, size, needed))
+        return FALSE;
+
+    *returned = 1;
+    return TRUE;
 }
 
 static BOOL spooler_enum_jobs_call(void *ctx, BYTE *data, DWORD size, DWORD *needed, DWORD *returned)
@@ -356,33 +368,22 @@ static void printer_log_error(struct printer *p, const char *name, const char *c
     nd_log(NDLS_COLLECTORS, NDLP_ERR, "GetPrinters: %s failed for printer '%s' (error %lu)", call, name, err);
 }
 
-// Reads the queue of one printer. Returns false when the job list could not be read; status charts then get a gap.
+// Reads the job list of an open printer. Returns false when it could not be read; status charts then get a gap.
 static bool printer_read_jobs(
     struct printer *p,
     const char *name,
-    const PRINTER_INFO_2W *info,
+    HANDLE handle,
+    DWORD queued,
     const JOB_INFO_1W **jobs,
     DWORD *jobs_count)
 {
     *jobs = NULL;
     *jobs_count = 0;
 
-    // An empty queue needs no OpenPrinter; for a printer connection it can contact the print server.
-    if (!info->cJobs)
+    if (!queued)
         return true;
 
-    HANDLE handle = NULL;
-    if (!OpenPrinterW(info->pPrinterName, &handle, NULL)) {
-        DWORD err = GetLastError();
-        // A printer deleted after enumeration is treated as missing for this cycle, not as idle.
-        if (err != ERROR_INVALID_PRINTER_NAME)
-            printer_log_error(p, name, "OpenPrinterW", err);
-        return false;
-    }
-
     DWORD err = spooler_enum(&jobs_buffer, spooler_enum_jobs_call, handle, sizeof(JOB_INFO_1W), jobs_count);
-    ClosePrinter(handle);
-
     if (err != ERROR_SUCCESS) {
         printer_log_error(p, name, "EnumJobsW", err);
         *jobs_count = 0;
@@ -393,14 +394,38 @@ static bool printer_read_jobs(
     return true;
 }
 
-static void printer_collect(struct printer *p, const char *name, const PRINTER_INFO_2W *info, int update_every)
+static void printer_collect(struct printer *p, const char *name, const PRINTER_INFO_4W *entry, int update_every)
 {
-    // cJobs comes from the successful enumeration, so it is kept even if the job list cannot be read.
+    // Only selected printers are opened; for a printer connection this can contact the print server.
+    HANDLE handle = NULL;
+    if (!OpenPrinterW(entry->pPrinterName, &handle, NULL)) {
+        DWORD err = GetLastError();
+        // A printer deleted after enumeration is treated as missing for this cycle, not as idle.
+        if (err != ERROR_INVALID_PRINTER_NAME)
+            printer_log_error(p, name, "OpenPrinterW", err);
+        return;
+    }
+
+    DWORD returned = 0;
+    DWORD err = spooler_enum(
+        &printer_info_buffer, spooler_get_printer_call, handle, sizeof(PRINTER_INFO_2W), &returned);
+    if (err != ERROR_SUCCESS) {
+        printer_log_error(p, name, "GetPrinterW", err);
+        ClosePrinter(handle);
+        return;
+    }
+
+    const PRINTER_INFO_2W *info = (const PRINTER_INFO_2W *)printer_info_buffer.data;
+
+    // The queue length is valid even if the job list below cannot be read.
     printer_chart_jobs(p, name, info->cJobs, update_every);
 
     const JOB_INFO_1W *jobs;
     DWORD jobs_count;
-    if (!printer_read_jobs(p, name, info, &jobs, &jobs_count))
+    bool jobs_ok = printer_read_jobs(p, name, handle, info->cJobs, &jobs, &jobs_count);
+    ClosePrinter(handle);
+
+    if (!jobs_ok)
         return;
     p->last_error = ERROR_SUCCESS;
 
@@ -445,7 +470,7 @@ int do_GetPrinters(int update_every, usec_t dt __maybe_unused)
     }
 
     DWORD count = 0;
-    DWORD err = spooler_enum(&printers_buffer, spooler_enum_printers_call, NULL, sizeof(PRINTER_INFO_2W), &count);
+    DWORD err = spooler_enum(&printers_buffer, spooler_enum_printers_call, NULL, sizeof(PRINTER_INFO_4W), &count);
     if (err != ERROR_SUCCESS) {
         // Keep existing charts: a failed enumeration (for example a stopped Spooler) proves nothing about printers.
         if (err != last_enum_error)
@@ -455,7 +480,7 @@ int do_GetPrinters(int update_every, usec_t dt __maybe_unused)
     }
     last_enum_error = ERROR_SUCCESS;
 
-    const PRINTER_INFO_2W *infos = (const PRINTER_INFO_2W *)printers_buffer.data;
+    const PRINTER_INFO_4W *infos = (const PRINTER_INFO_4W *)printers_buffer.data;
     PRINTER_SAMPLE *samples = callocz(count ? count : 1, sizeof(*samples));
     size_t samples_count = 0;
     bool complete = true;
@@ -517,6 +542,8 @@ void do_GetPrinters_cleanup(void)
 
     freez(printers_buffer.data);
     printers_buffer = (SPOOLER_BUFFER){0};
+    freez(printer_info_buffer.data);
+    printer_info_buffer = (SPOOLER_BUFFER){0};
     freez(jobs_buffer.data);
     jobs_buffer = (SPOOLER_BUFFER){0};
 }
