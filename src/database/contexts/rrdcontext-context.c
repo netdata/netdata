@@ -15,11 +15,32 @@ inline bool rrdcontext_acquired_belongs_to_host(RRDCONTEXT_ACQUIRED *rca, RRDHOS
 // ----------------------------------------------------------------------------
 // RRDCONTEXT
 
+void rrdcontext_hub_strings_update_unsafe(RRDCONTEXT *rc) {
+    rc->hub.id = string2str(rc->id);
+
+    string_freez(rc->hub_strings.title);
+    rc->hub_strings.title = string_dup(rc->title);
+    rc->hub.title = string2str(rc->hub_strings.title);
+
+    string_freez(rc->hub_strings.units);
+    rc->hub_strings.units = string_dup(rc->units);
+    rc->hub.units = string2str(rc->hub_strings.units);
+
+    string_freez(rc->hub_strings.family);
+    rc->hub_strings.family = string_dup(rc->family);
+    rc->hub.family = string2str(rc->hub_strings.family);
+}
+
 static void rrdcontext_freez(RRDCONTEXT *rc) {
     string_freez(rc->id);
     string_freez(rc->title);
     string_freez(rc->units);
     string_freez(rc->family);
+
+    string_freez(rc->hub_strings.title);
+    string_freez(rc->hub_strings.units);
+    string_freez(rc->hub_strings.family);
+    memset(&rc->hub_strings, 0, sizeof(rc->hub_strings));
 }
 
 static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdhost) {
@@ -44,19 +65,17 @@ static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
         string_freez(rc->id);
         rc->id = string_strdupz(rc->hub.id);
-        rc->hub.id = string2str(rc->id);
 
         string_freez(rc->title);
         rc->title = string_strdupz(rc->hub.title);
-        rc->hub.title = string2str(rc->title);
 
         string_freez(rc->units);
         rc->units = string_strdupz(rc->hub.units);
-        rc->hub.units = string2str(rc->units);
 
         string_freez(rc->family);
         rc->family = string_strdupz(rc->hub.family);
-        rc->hub.family = string2str(rc->family);
+
+        rrdcontext_hub_strings_update_unsafe(rc);
 
         rc->chart_type = rrdset_type_id(rc->hub.chart_type);
         rc->hub.chart_type = rrdset_type_name(rc->chart_type);

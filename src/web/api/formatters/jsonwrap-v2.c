@@ -36,7 +36,7 @@ static void query_target_combined_chart_type(BUFFER *wb, QUERY_TARGET *qt, size_
 
 static void query_target_title(BUFFER *wb, QUERY_TARGET *qt, size_t contexts) {
     if(contexts == 1) {
-        buffer_json_member_add_string(wb, "title", rrdcontext_acquired_title(qt->contexts.array[0].rca));
+        buffer_json_member_add_string(wb, "title", string2str(qt->contexts.array[0].title));
     }
     else if(contexts > 1) {
         BUFFER *t = buffer_create(0, NULL);
@@ -111,20 +111,20 @@ static void query_target_combined_units_v2(BUFFER *wb, QUERY_TARGET *qt, size_t 
         char units_buf[64];
         buffer_json_member_add_string(wb, "units",
             query_target_rate_adjusted_units_for(
-                qt, rates, rrdcontext_acquired_units(qt->contexts.array[0].rca), units_buf, sizeof(units_buf)));
+                qt, rates, string2str(qt->contexts.array[0].units), units_buf, sizeof(units_buf)));
     }
     else if(contexts > 1) {
         DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
         for(size_t c = 0; c < qt->contexts.used ;c++) {
             char ub[64];
             dictionary_set(dict, query_target_rate_adjusted_units_for(
-                qt, rates, rrdcontext_acquired_units(qt->contexts.array[c].rca), ub, sizeof(ub)), NULL, 0);
+                qt, rates, string2str(qt->contexts.array[c].units), ub, sizeof(ub)), NULL, 0);
         }
 
         if(dictionary_entries(dict) == 1) {
             char ub[64];
             buffer_json_member_add_string(wb, "units", query_target_rate_adjusted_units_for(
-                qt, rates, rrdcontext_acquired_units(qt->contexts.array[0].rca), ub, sizeof(ub)));
+                qt, rates, string2str(qt->contexts.array[0].units), ub, sizeof(ub)));
         }
         else
             combined_units_to_json(wb, dict, false);

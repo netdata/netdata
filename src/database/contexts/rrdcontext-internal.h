@@ -340,6 +340,15 @@ typedef struct rrdcontext {
 
     VERSIONED_CONTEXT_DATA hub;
 
+    // what hub.title/units/family point to: the last values sent to the hub. The context's own strings are
+    // replaced and freed by rrdcontext_merge_with() while hub still describes the last message, so the hub
+    // keeps its own references (rrdcontext_hub_strings_update_unsafe()). The id never changes.
+    struct {
+        STRING *title;
+        STRING *units;
+        STRING *family;
+    } hub_strings;
+
     DICTIONARY *rrdinstances;
     RRDHOST *rrdhost;
 
@@ -523,6 +532,10 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 
 #define rrdcontext_lock(rc) spinlock_lock(&((rc)->spinlock))
 #define rrdcontext_unlock(rc) spinlock_unlock(&((rc)->spinlock))
+
+// point rc->hub's strings to the context's current ones; the caller holds rrdcontext_lock(rc)
+// (or the context is not published yet)
+void rrdcontext_hub_strings_update_unsafe(RRDCONTEXT *rc);
 
 void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
 void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function);

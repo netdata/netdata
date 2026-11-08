@@ -129,8 +129,7 @@ void query_target_release(QUERY_TARGET *qt) {
     // release the contexts
     for(size_t i = 0, used = qt->contexts.used; i < used ;i++) {
         QUERY_CONTEXT *qc = query_context(qt, i);
-        rrdcontext_release(qc->rca);
-        qc->rca = NULL;
+        query_context_release(qc);
     }
     qt->contexts.used = 0;
 
@@ -435,11 +434,13 @@ static inline bool rrdmetric_retention_matches_query(QUERY_TARGET *qt, RRDMETRIC
 }
 
 static inline void query_dimension_release(QUERY_DIMENSION *qd) {
+    string_freez(qd->name);
+    qd->name = NULL;
     rrdmetric_release(qd->rma);
     qd->rma = NULL;
 }
 
-static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma, QUERY_STATUS status, size_t priority) {
+static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma, STRING *name, QUERY_STATUS status, size_t priority) {
     if(qt->dimensions.used == qt->dimensions.size) {
         size_t old_mem = qt->dimensions.size * sizeof(*qt->dimensions.array);
         qt->dimensions.size = query_target_realloc_size(qt->dimensions.size, 4);
@@ -453,20 +454,19 @@ static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQ
 
     qd->slot = qt->dimensions.used++;
     qd->rma = rrdmetric_acquired_dup(rma);
+    qd->name = string_dup(name);
     qd->status = status;
     qd->priority = priority;
 
     return qd;
 }
 
-static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
-                                RRDMETRIC_ACQUIRED *rma, bool queryable_instance, size_t *metrics_added, size_t priority) {
+static bool query_dimension_add_named(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
+                                      RRDMETRIC_ACQUIRED *rma, STRING *name, bool queryable_instance,
+                                      size_t *metrics_added, size_t priority) {
     QUERY_TARGET *qt = qtl->qt;
-
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
-    if(rrd_flag_is_deleted(rm))
-        return false;
-    
+
     // Check scope_dimensions first - if it doesn't match, skip entirely
     if(qt->dimensions.scope_pattern) {
         SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
@@ -474,8 +474,8 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
         if(qtl->match_ids)
             ret = simple_pattern_matches_string_extract(qt->dimensions.scope_pattern, rm->id, NULL, 0);
             
-        if(ret == SP_NOT_MATCHED && qtl->match_names && (rm->name != rm->id || !qtl->match_ids))
-            ret = simple_pattern_matches_string_extract(qt->dimensions.scope_pattern, rm->name, NULL, 0);
+        if(ret == SP_NOT_MATCHED && qtl->match_names && (name != rm->id || !qtl->match_ids))
+            ret = simple_pattern_matches_string_extract(qt->dimensions.scope_pattern, name, NULL, 0);
             
         if(ret != SP_MATCHED_POSITIVE)
             return false;  // Skip this dimension entirely - not in scope
@@ -506,8 +506,8 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             if(qtl->match_ids)
                 ret = simple_pattern_matches_string_extract(qt->query.pattern, rm->id, NULL, 0);
 
-            if(ret == SP_NOT_MATCHED && qtl->match_names && (rm->name != rm->id || !qtl->match_ids))
-                ret = simple_pattern_matches_string_extract(qt->query.pattern, rm->name, NULL, 0);
+            if(ret == SP_NOT_MATCHED && qtl->match_names && (name != rm->id || !qtl->match_ids))
+                ret = simple_pattern_matches_string_extract(qt->query.pattern, name, NULL, 0);
 
             if(ret == SP_MATCHED_POSITIVE) {
                 needed = true;
@@ -586,8 +586,20 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
     if(undo)
         return false;
 
-    query_dimension_allocate(qt, rma, status, priority);
+    query_dimension_allocate(qt, rma, name, status, priority);
     return true;
+}
+
+static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
+                                RRDMETRIC_ACQUIRED *rma, bool queryable_instance, size_t *metrics_added, size_t priority) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    if(rrd_flag_is_deleted(rm))
+        return false;
+
+    STRING *name = rrdmetric_acquired_name_dup(rma);
+    bool added = query_dimension_add_named(qtl, qn, qc, qi, rma, name, queryable_instance, metrics_added, priority);
+    string_freez(name);
+    return added;
 }
 
 static inline STRING *rrdinstance_create_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
@@ -598,12 +610,11 @@ static inline STRING *rrdinstance_create_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
     return string_dup(ri->id);
 }
 
-static inline STRING *rrdinstance_create_name_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
-    if(unlikely(!ria))
+static inline STRING *rrdinstance_create_name_fqdn_v1(QUERY_INSTANCE *qi) {
+    if(unlikely(!qi->ria))
         return NULL;
 
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return string_dup(ri->name);
+    return string_dup(qi->name);
 }
 
 static inline STRING *rrdinstance_create_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
@@ -617,14 +628,13 @@ static inline STRING *rrdinstance_create_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
     return string_strdupz(buffer);
 }
 
-static inline STRING *rrdinstance_create_name_fqdn_v2(
-    RRDINSTANCE_ACQUIRED *ria, const STRING *host_hostname) {
-    if(unlikely(!ria))
+static inline STRING *rrdinstance_create_name_fqdn_v2(QUERY_INSTANCE *qi, const STRING *host_hostname) {
+    if(unlikely(!qi->ria))
         return NULL;
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_name(ria), string2str(host_hostname));
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", query_instance_name(qi), string2str(host_hostname));
     return string_strdupz(buffer);
 }
 
@@ -643,27 +653,27 @@ inline STRING *query_instance_name_fqdn(
     QUERY_INSTANCE *qi, size_t version, const STRING *host_hostname) {
     if(!qi->name_fqdn) {
         if (version <= 1)
-            qi->name_fqdn = rrdinstance_create_name_fqdn_v1(qi->ria);
+            qi->name_fqdn = rrdinstance_create_name_fqdn_v1(qi);
         else
-            qi->name_fqdn = rrdinstance_create_name_fqdn_v2(qi->ria, host_hostname);
+            qi->name_fqdn = rrdinstance_create_name_fqdn_v2(qi, host_hostname);
     }
 
     return qi->name_fqdn;
 }
 
-const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca) {
+// the context's title, units and family are replaced and freed by rrdcontext_merge_with() under the context
+// lock while the context is in use: readers take their own reference under the same lock
+STRING *rrdcontext_acquired_units_dup(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-    return string2str(rc->units);
+    rrdcontext_lock(rc);
+    STRING *units = string_dup(rc->units);
+    rrdcontext_unlock(rc);
+    return units;
 }
 
 RRDSET_TYPE rrdcontext_acquired_chart_type(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     return rc->chart_type;
-}
-
-const char *rrdcontext_acquired_title(RRDCONTEXT_ACQUIRED *rca) {
-    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-    return string2str(rc->title);
 }
 
 static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_unused,
@@ -763,6 +773,12 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
 }
 
 static inline void query_instance_strings_free(QUERY_INSTANCE *qi) {
+    string_freez(qi->name);
+    qi->name = NULL;
+
+    string_freez(qi->units);
+    qi->units = NULL;
+
     string_freez(qi->id_fqdn);
     qi->id_fqdn = NULL;
 
@@ -809,6 +825,13 @@ static inline QUERY_INSTANCE *query_instance_allocate(QUERY_TARGET *qt, RRDINSTA
     qi->slot = qt->instances.used;
     qt->instances.used++;
     qi->ria = rrdinstance_acquired_dup(ria);
+
+    // our own references: the instance's strings are replaced while the query runs
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    spinlock_lock(&ri->spinlock);
+    qi->name = string_dup(ri->name);
+    qi->units = string_dup(ri->units);
+    spinlock_unlock(&ri->spinlock);
     qi->query_host_id = qn_slot;
 
     return qi;
@@ -827,10 +850,13 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED 
     if(instances_sp) {
         ret = SP_NOT_MATCHED;
 
+        // the name is replaced while we use it: match our own reference
+        STRING *name = match_names ? rrdinstance_acquired_name_dup(ria) : NULL;
+
         if(match_ids)
             ret = simple_pattern_matches_string_extract(instances_sp, ri->id, NULL, 0);
-        if (ret == SP_NOT_MATCHED && match_names && (ri->name != ri->id || !match_ids))
-            ret = simple_pattern_matches_string_extract(instances_sp, ri->name, NULL, 0);
+        if (ret == SP_NOT_MATCHED && match_names && (name != ri->id || !match_ids))
+            ret = simple_pattern_matches_string_extract(instances_sp, name, NULL, 0);
 
         // the fqdn forms are formatted on the stack, the same way query_instance_id_fqdn() and
         // query_instance_name_fqdn() build them, without interning; in v1 they are the id and the
@@ -843,10 +869,11 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED 
             ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
         }
         if (ret == SP_NOT_MATCHED && match_names && version >= 2) {
-            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s",
-                      rrdinstance_acquired_name(ria), string2str(host_hostname));
+            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", string2str(name), string2str(host_hostname));
             ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
         }
+
+        string_freez(name);
 
         if (ret == SP_NOT_MATCHED && match_ids && host_node_id_str[0]) {
             snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(ria), host_node_id_str);
@@ -951,6 +978,10 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 }
 
 static inline void query_context_release(QUERY_CONTEXT *qc) {
+    string_freez(qc->title);
+    qc->title = NULL;
+    string_freez(qc->units);
+    qc->units = NULL;
     rrdcontext_release(qc->rca);
     qc->rca = NULL;
 }
@@ -968,6 +999,13 @@ static inline QUERY_CONTEXT *query_context_allocate(QUERY_TARGET *qt, RRDCONTEXT
     memset(qc, 0, sizeof(*qc));
     qc->slot = qt->contexts.used++;
     qc->rca =  rrdcontext_acquired_dup(rca);
+
+    // our own references: the context's strings are replaced while the query runs
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    rrdcontext_lock(rc);
+    qc->title = string_dup(rc->title);
+    qc->units = string_dup(rc->units);
+    rrdcontext_unlock(rc);
 
     return qc;
 }
@@ -1459,6 +1497,28 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     return qt;
 }
 
+// true when the dimension matches the pattern (or there is no pattern) by id or by name
+static bool query_metric_name_matches(RRDMETRIC_ACQUIRED *rma, RRDMETRIC *rm, SIMPLE_PATTERN *sp,
+                                      bool match_ids, bool match_names) {
+    if(!sp)
+        return true;
+
+    SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
+
+    if (match_ids)
+        ret = simple_pattern_matches_string_extract(sp, rm->id, NULL, 0);
+
+    if (ret == SP_NOT_MATCHED && match_names) {
+        // the name is replaced while we use it: match our own reference
+        STRING *name = rrdmetric_acquired_name_dup(rma);
+        if (name != rm->id || !match_ids)
+            ret = simple_pattern_matches_string_extract(sp, name, NULL, 0);
+        string_freez(name);
+    }
+
+    return ret == SP_MATCHED_POSITIVE;
+}
+
 ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                                             SIMPLE_PATTERN *scope_instances_sp,
                                             struct pattern_array *scope_labels_pa,
@@ -1533,36 +1593,14 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                             if(rrd_flag_is_deleted(rm))
                                 continue;
 
-                            // Check scope_dimensions first - if it doesn't match, skip entirely
-                            if(scope_dimensions_sp) {
-                                SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
+                            RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item;
 
-                                if (match_ids)
-                                    ret = simple_pattern_matches_string_extract(scope_dimensions_sp, rm->id, NULL, 0);
-
-                                if (ret == SP_NOT_MATCHED && match_names && (rm->name != rm->id || !match_ids))
-                                    ret = simple_pattern_matches_string_extract(scope_dimensions_sp, rm->name, NULL, 0);
-
-                                if(ret != SP_MATCHED_POSITIVE)
-                                    continue;
-                            }
-
-                            if(dimensions_sp) {
-                                SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
-
-                                if (match_ids)
-                                    ret = simple_pattern_matches_string_extract(dimensions_sp, rm->id, NULL, 0);
-
-                                if (ret == SP_NOT_MATCHED && match_names && (rm->name != rm->id || !match_ids))
-                                    ret = simple_pattern_matches_string_extract(dimensions_sp, rm->name, NULL, 0);
-
-                                if(ret != SP_MATCHED_POSITIVE)
-                                    continue;
-                            }
+                            if(!query_metric_name_matches(rma, rm, scope_dimensions_sp, match_ids, match_names) ||
+                               !query_metric_name_matches(rma, rm, dimensions_sp, match_ids, match_names))
+                                continue;
 
                             dfe_unlock(rm);
 
-                            RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item;
                             ssize_t ret = cb(data, rc->rrdhost, rca, ria, rma);
 
                             if(ret < 0) {

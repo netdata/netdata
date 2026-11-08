@@ -365,7 +365,9 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
             buffer_json_member_add_object(wb, "dimensions");
             charts++;
         }
-        buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
+        STRING *dim_name = rrdmetric_acquired_name_dup(t->rma);
+        buffer_json_member_add_double(wb, string2str(dim_name), t->value);
+        string_freez(dim_name);
         total_dimensions++;
     }
     dfe_done(t);
@@ -458,7 +460,9 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
         charts_total_weight += t->value;
         chart_dims++;
         if(!limit || t->selected) {
-            buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
+            STRING *dim_name = rrdmetric_acquired_name_dup(t->rma);
+            buffer_json_member_add_double(wb, string2str(dim_name), t->value);
+            string_freez(dim_name);
             total_dimensions++;
         }
     }
@@ -1013,11 +1017,13 @@ struct dict_unique_node {
     usec_t duration_ut;
 };
 
+// the dictionaries below own their units and names: the objects' own strings are replaced while we use them
+
 struct dict_unique_name_units {
     bool existing;
     bool exposed;
     uint32_t i;
-    const char *units;
+    STRING *units;
 };
 
 struct dict_unique_id_name {
@@ -1025,8 +1031,20 @@ struct dict_unique_id_name {
     bool exposed;
     uint32_t i;
     const char *id;
-    const char *name;
+    STRING *name;
 };
+
+static void dict_unique_name_units_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct dict_unique_name_units *dun = value;
+    string_freez(dun->units);
+    dun->units = NULL;
+}
+
+static void dict_unique_id_name_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct dict_unique_id_name *dun = value;
+    string_freez(dun->name);
+    dun->name = NULL;
+}
 
 static inline struct dict_unique_node *dict_unique_node_add(DICTIONARY *dict, RRDHOST *host, ssize_t *max_id) {
     struct dict_unique_node *dun = dictionary_set(dict, host->machine_guid, NULL, sizeof(struct dict_unique_node));
@@ -1040,9 +1058,12 @@ static inline struct dict_unique_node *dict_unique_node_add(DICTIONARY *dict, RR
     return dun;
 }
 
-static inline struct dict_unique_name_units *dict_unique_name_units_add(DICTIONARY *dict, const char *name, const char *units, ssize_t *max_id) {
+// takes ownership of units
+static inline struct dict_unique_name_units *dict_unique_name_units_add(DICTIONARY *dict, const char *name, STRING *units, ssize_t *max_id) {
     struct dict_unique_name_units *dun = dictionary_set(dict, name, NULL, sizeof(struct dict_unique_name_units));
-    if(!dun->existing) {
+    if(dun->existing)
+        string_freez(units);
+    else {
         dun->units = units;
         dun->existing = true;
         dun->i = *max_id;
@@ -1052,11 +1073,14 @@ static inline struct dict_unique_name_units *dict_unique_name_units_add(DICTIONA
     return dun;
 }
 
-static inline struct dict_unique_id_name *dict_unique_id_name_add(DICTIONARY *dict, const char *id, const char *name, ssize_t *max_id) {
+// takes ownership of name
+static inline struct dict_unique_id_name *dict_unique_id_name_add(DICTIONARY *dict, const char *id, STRING *name, ssize_t *max_id) {
     char key[1024 + 1];
-    snprintfz(key, sizeof(key) - 1, "%s:%s", id, name);
+    snprintfz(key, sizeof(key) - 1, "%s:%s", id, string2str(name));
     struct dict_unique_id_name *dun = dictionary_set(dict, key, NULL, sizeof(struct dict_unique_id_name));
-    if(!dun->existing) {
+    if(dun->existing)
+        string_freez(name);
+    else {
         dun->existing = true;
         dun->i = *max_id;
         (*max_id)++;
@@ -1093,6 +1117,9 @@ static size_t registered_results_to_json_multinode_no_group_by(
     DICTIONARY *dict_contexts = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_name_units));
     DICTIONARY *dict_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
     DICTIONARY *dict_dimensions = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
+    dictionary_register_delete_callback(dict_contexts, dict_unique_name_units_delete_cb, NULL);
+    dictionary_register_delete_callback(dict_instances, dict_unique_id_name_delete_cb, NULL);
+    dictionary_register_delete_callback(dict_dimensions, dict_unique_id_name_delete_cb, NULL);
 
     buffer_json_member_add_array(wb, "result");
 
@@ -1154,7 +1181,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
             last_rca = t->rca;
             context_dun = (!limit || t->context_selected) ?
                 dict_unique_name_units_add(dict_contexts, rrdcontext_acquired_id(t->rca),
-                                           rrdcontext_acquired_units(t->rca), &ci_max) : NULL;
+                                           rrdcontext_acquired_units_dup(t->rca), &ci_max) : NULL;
             ci = context_dun ? (ssize_t)context_dun->i : -1;
         }
 
@@ -1162,12 +1189,12 @@ static size_t registered_results_to_json_multinode_no_group_by(
         if(t->ria != last_ria) {
             last_ria = t->ria;
             instance_dun = (!limit || t->instance_selected) ?
-                dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max) : NULL;
+                dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name_dup(t->ria), &ii_max) : NULL;
             ii = instance_dun ? (ssize_t)instance_dun->i : -1;
         }
 
         if(!limit || t->selected) {
-            dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name(t->rma), &di_max);
+            dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name_dup(t->rma), &di_max);
             di = dimension_dun->i;
             struct aggregated_weight aw = {
                 .min = t->value,
@@ -1240,7 +1267,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "id", dun_dfe.name);
-            buffer_json_member_add_string(wb, "units", dun->units);
+            buffer_json_member_add_string(wb, "units", string2str(dun->units));
             buffer_json_member_add_int64(wb, "ci", dun->i);
             buffer_json_object_close(wb);
         }
@@ -1257,8 +1284,8 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "id", dun->id);
-            if(dun->id != dun->name)
-                buffer_json_member_add_string(wb, "nm", dun->name);
+            if(dun->id != string2str(dun->name))
+                buffer_json_member_add_string(wb, "nm", string2str(dun->name));
             buffer_json_member_add_int64(wb, "ii", dun->i);
             buffer_json_object_close(wb);
         }
@@ -1275,8 +1302,8 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "id", dun->id);
-            if(dun->id != dun->name)
-                buffer_json_member_add_string(wb, "nm", dun->name);
+            if(dun->id != string2str(dun->name))
+                buffer_json_member_add_string(wb, "nm", string2str(dun->name));
             buffer_json_member_add_int64(wb, "di", dun->i);
             buffer_json_object_close(wb);
         }
@@ -1340,8 +1367,10 @@ static size_t registered_results_to_json_multinode_group_by(
         buffer_flush(name);
 
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_DIMENSION) {
-            buffer_strcat(key, rrdmetric_acquired_name(t->rma));
-            buffer_strcat(name, rrdmetric_acquired_name(t->rma));
+            STRING *dim_name = rrdmetric_acquired_name_dup(t->rma);
+            buffer_strcat(key, string2str(dim_name));
+            buffer_strcat(name, string2str(dim_name));
+            string_freez(dim_name);
         }
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_INSTANCE) {
             if(buffer_strlen(key)) {
@@ -1350,7 +1379,9 @@ static size_t registered_results_to_json_multinode_group_by(
             }
 
             buffer_strcat(key, rrdinstance_acquired_id(t->ria));
-            buffer_strcat(name, rrdinstance_acquired_name(t->ria));
+            STRING *instance_name = rrdinstance_acquired_name_dup(t->ria);
+            buffer_strcat(name, string2str(instance_name));
+            string_freez(instance_name);
 
             if(!(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_NODE)) {
                 buffer_fast_strcat(key, "@", 1);
@@ -1383,8 +1414,10 @@ static size_t registered_results_to_json_multinode_group_by(
                 buffer_fast_strcat(name, ",", 1);
             }
 
-            buffer_strcat(key, rrdcontext_acquired_units(t->rca));
-            buffer_strcat(name, rrdcontext_acquired_units(t->rca));
+            STRING *units = rrdcontext_acquired_units_dup(t->rca);
+            buffer_strcat(key, string2str(units));
+            buffer_strcat(name, string2str(units));
+            string_freez(units);
         }
 
         struct aggregated_weight *aw = dictionary_set(group_by, buffer_tostring(key), NULL, sizeof(struct aggregated_weight));
@@ -2195,7 +2228,9 @@ static int registered_results_to_json_mcp_callback(const DICTIONARY_ITEM *item _
     buffer_json_add_array_item_string(wb, rrdinstance_acquired_id(t->ria));
     
     // Add dimension
-    buffer_json_add_array_item_string(wb, rrdmetric_acquired_name(t->rma));
+    STRING *dim_name = rrdmetric_acquired_name_dup(t->rma);
+    buffer_json_add_array_item_string(wb, string2str(dim_name));
+    string_freez(dim_name);
     
     // Add labels (as object or null)
     RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire(t->ria);
