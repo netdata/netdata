@@ -956,7 +956,8 @@ jobs:
         id: check
         if: needs.file-check.outputs.run == 'true'
         run: |
-          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host \
+          [ -f ./latest/Manifest.sig ] || export MANIFEST_UNSIGNED=1
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e MANIFEST_UNSIGNED --network host \
                  -v "$PWD":/netdata -w /netdata \
                  ubuntu:latest /bin/sh -x /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
