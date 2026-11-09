@@ -418,16 +418,9 @@ modules:
             otel.<metric name>.
       scopes:
         - name: global
-          description: The plugin itself, with charts of the spans and log records that it receives.
+          description: The plugin itself, with charts of the log records and spans that it receives.
           labels: []
           metrics:
-            - name: netdata.otel.spans
-              description: OpenTelemetry spans received
-              unit: spans/s
-              chart_type: stacked
-              dimensions:
-                - name: accepted
-                - name: rejected
             - name: netdata.otel.log_records
               description: OpenTelemetry log records received
               unit: records/s
@@ -435,11 +428,18 @@ modules:
               dimensions:
                 - name: accepted
                 - name: rejected
+            - name: netdata.otel.spans
+              description: OpenTelemetry spans received
+              unit: spans/s
+              chart_type: stacked
+              dimensions:
+                - name: accepted
+                - name: rejected
         - name: signal
-          description: One signal, traces or logs, that the per-service charts are made from, when `derived_metrics.enabled` is `true`.
+          description: One signal, logs or traces, that the per-service charts are made from, when `derived_metrics.enabled` is `true`.
           labels:
             - name: signal
-              description: The signal that the per-service metrics are made from, `traces` or `logs`.
+              description: The signal that the per-service metrics are made from, `logs` or `traces`.
           metrics:
             - name: netdata.otel.derived_services
               description: Services with derived charts
@@ -447,6 +447,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: services
+            - name: netdata.otel.derived_expired_services
+              description: Services removed after 15 minutes without data
+              unit: services/s
+              chart_type: line
+              dimensions:
+                - name: expired
             - name: netdata.otel.derived_adjusted_records
               description: Records counted in another time slot or chart set
               unit: records/s
@@ -455,12 +461,6 @@ modules:
                 - name: late
                 - name: future
                 - name: overflowed
-            - name: netdata.otel.derived_expired_services
-              description: Services removed after 15 minutes without data
-              unit: services/s
-              chart_type: line
-              dimensions:
-                - name: expired
         - name: service
           description: One service, identified by its resource attributes and tenant, when `derived_metrics.enabled` is `true`.
           labels:
@@ -475,6 +475,18 @@ modules:
             - name: otel.metric.overflow
               description: Set to `true` only on the chart set that holds the services over `derived_metrics.max_services`.
           metrics:
+            - name: otel_service.log_records
+              description: Service log records by severity
+              unit: records/s
+              chart_type: stacked
+              dimensions:
+                - name: fatal
+                - name: error
+                - name: warn
+                - name: info
+                - name: debug
+                - name: trace
+                - name: unspecified
             - name: otel_service.requests
               description: Service requests
               unit: requests/s
@@ -514,15 +526,3 @@ modules:
                 - name: "7.5"
                 - name: "10"
                 - name: "+Inf"
-            - name: otel_service.log_records
-              description: Service log records by severity
-              unit: records/s
-              chart_type: stacked
-              dimensions:
-                - name: fatal
-                - name: error
-                - name: warn
-                - name: info
-                - name: debug
-                - name: trace
-                - name: unspecified

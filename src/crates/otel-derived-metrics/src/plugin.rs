@@ -40,40 +40,40 @@ columns! {
 /// The plugin's ingest outcomes: one label-less entity.
 pub(crate) struct Plugin {
     pub(crate) metrics: MetricSet,
-    spans: Counter<Acceptance>,
     log_records: Counter<Acceptance>,
+    spans: Counter<Acceptance>,
 }
 
 impl Plugin {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
-        let spans = builder.counter::<Acceptance>(ChartDescriptor {
-            title: "OpenTelemetry spans received".into(),
-            units: "spans/s".into(),
-            family: "ingest".into(),
-            context: "netdata.otel.spans".into(),
-            chart_type: ChartType::Stacked,
-            priority: 150_000,
-        })?;
         let log_records = builder.counter::<Acceptance>(ChartDescriptor {
             title: "OpenTelemetry log records received".into(),
             units: "records/s".into(),
             family: "ingest".into(),
             context: "netdata.otel.log_records".into(),
             chart_type: ChartType::Stacked,
+            priority: 150_000,
+        })?;
+        let spans = builder.counter::<Acceptance>(ChartDescriptor {
+            title: "OpenTelemetry spans received".into(),
+            units: "spans/s".into(),
+            family: "ingest".into(),
+            context: "netdata.otel.spans".into(),
+            chart_type: ChartType::Stacked,
             priority: 150_001,
         })?;
         Ok(Self {
             metrics: builder.build()?,
-            spans,
             log_records,
+            spans,
         })
     }
 
     pub(crate) fn ingest(&self, signal: Signal, accepted: u64, rejected: u64, now: u64) -> Batch {
         let counter = match signal {
-            Signal::Traces => self.spans,
             Signal::Logs => self.log_records,
+            Signal::Traces => self.spans,
         };
         let mut batch = Batch::new(&self.metrics);
         batch
@@ -99,8 +99,8 @@ impl Plugin {
 pub(crate) struct Derivation {
     pub(crate) metrics: MetricSet,
     services: Gauge<Services>,
-    adjusted: CumulativeCounter<Adjustment>,
     expired: CumulativeCounter<Expired>,
+    adjusted: CumulativeCounter<Adjustment>,
 }
 
 impl Derivation {
@@ -114,6 +114,14 @@ impl Derivation {
             chart_type: ChartType::Line,
             priority: 150_010,
         })?;
+        let expired = builder.cumulative_counter::<Expired>(ChartDescriptor {
+            title: "Services removed after 15 minutes without data".into(),
+            units: "services/s".into(),
+            family: "derived metrics".into(),
+            context: "netdata.otel.derived_expired_services".into(),
+            chart_type: ChartType::Line,
+            priority: 150_011,
+        })?;
         let adjusted = builder.cumulative_counter::<Adjustment>(ChartDescriptor {
             title: "Records counted in another time slot or chart set".into(),
             units: "records/s".into(),
@@ -121,21 +129,13 @@ impl Derivation {
             context: "netdata.otel.derived_adjusted_records".into(),
             // One record can be both late and overflowed.
             chart_type: ChartType::Line,
-            priority: 150_011,
-        })?;
-        let expired = builder.cumulative_counter::<Expired>(ChartDescriptor {
-            title: "Services removed after 15 minutes without data".into(),
-            units: "services/s".into(),
-            family: "derived metrics".into(),
-            context: "netdata.otel.derived_expired_services".into(),
-            chart_type: ChartType::Line,
             priority: 150_012,
         })?;
         Ok(Self {
             metrics: builder.build()?,
             services,
-            adjusted,
             expired,
+            adjusted,
         })
     }
 

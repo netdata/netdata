@@ -56,7 +56,7 @@ impl ServiceLogs {
             family: "logs".into(),
             context: "otel_service.log_records".into(),
             chart_type: ChartType::Stacked,
-            priority: 60_010,
+            priority: 60_000,
         })?;
         Ok(Self {
             metrics: builder.build()?,

@@ -58,7 +58,7 @@ impl Services {
             family: "requests".into(),
             context: "otel_service.requests".into(),
             chart_type: ChartType::Stacked,
-            priority: 60_000,
+            priority: 60_010,
         })?;
         // Charts `otel_service.request_duration_avg`,
         // `otel_service.request_duration_max` and
@@ -71,7 +71,7 @@ impl Services {
                 family: "requests".into(),
                 context: "otel_service.request_duration".into(),
                 chart_type: ChartType::Line,
-                priority: 60_001,
+                priority: 60_011,
             },
             "requests/s".into(),
         )?;
