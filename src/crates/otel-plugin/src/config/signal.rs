@@ -72,68 +72,6 @@ pub(super) struct IngestOverride {
     pub(super) future_skew: Option<Duration>,
 }
 
-/// A count or `auto` (`None`): `malloc_arena_max` (auto = one arena per runtime
-/// worker thread). Accepts a YAML integer or string, and parses from an env value or
-/// the worker's `--malloc-arena-max` argument.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct AutoCount(pub(crate) Option<usize>);
-
-impl std::str::FromStr for AutoCount {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim();
-        if s.eq_ignore_ascii_case("auto") {
-            return Ok(Self(None));
-        }
-        s.parse::<usize>()
-            .map(|n| Self(Some(n)))
-            .map_err(|_| format!("expected a positive integer or \"auto\", got \"{s}\""))
-    }
-}
-
-impl<'de> Deserialize<'de> for AutoCount {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        // A visitor rather than an untagged enum, so `-1` or `2.5` get the
-        // same message as a bad string instead of serde's generic variant error.
-        struct Visitor;
-
-        impl serde::de::Visitor<'_> for Visitor {
-            type Value = AutoCount;
-
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("a positive integer or \"auto\"")
-            }
-
-            fn visit_u64<E: serde::de::Error>(self, n: u64) -> Result<Self::Value, E> {
-                usize::try_from(n).map(|n| AutoCount(Some(n))).map_err(|_| {
-                    E::custom(format!("expected a positive integer or \"auto\", got {n}"))
-                })
-            }
-
-            fn visit_i64<E: serde::de::Error>(self, n: i64) -> Result<Self::Value, E> {
-                u64::try_from(n)
-                    .map_err(|_| {
-                        E::custom(format!("expected a positive integer or \"auto\", got {n}"))
-                    })
-                    .and_then(|n| self.visit_u64(n))
-            }
-
-            fn visit_f64<E: serde::de::Error>(self, n: f64) -> Result<Self::Value, E> {
-                Err(E::custom(format!(
-                    "expected a positive integer or \"auto\", got {n}"
-                )))
-            }
-
-            fn visit_str<E: serde::de::Error>(self, s: &str) -> Result<Self::Value, E> {
-                s.parse().map_err(E::custom)
-            }
-        }
-
-        d.deserialize_any(Visitor)
-    }
-}
-
 /// Deserialize an optional humantime `Duration` (e.g. `"24h"`, `"10m"`) from
 /// the YAML override file. The override types are never serialized — only the
 /// merged `PluginConfig` crosses the bincode IPC, via `otel_bridge::config`'s

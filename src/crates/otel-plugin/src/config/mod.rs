@@ -32,7 +32,6 @@ use serde::Deserialize;
 use derived_metrics::DerivedMetricsOverride;
 use metrics::MetricsOverride;
 use receivers::{DeprecatedEndpointOverride, ReceiversOverride};
-pub(crate) use signal::AutoCount;
 use signal::{AuthOverride, RemoteStorageOverride, SignalOverride};
 
 /// Standard-install fallback when the agent's log directory is unknown.
@@ -378,10 +377,9 @@ fn validate_listener(prefix: &str, listener: &ProtocolConfig) -> Result<()> {
 /// absolute (the per-signal dirs join onto it); `remote_storage.uri` must be
 /// non-empty when storage is enabled; at least one OTLP listener must be
 /// enabled, each enabled one must pass [`validate_listener`], and two enabled
-/// listeners must not overlap (two listeners cannot bind one socket); each
+/// listeners must not overlap (two listeners cannot bind one socket); and each
 /// signal's retention must satisfy the catalog-horizon invariant
-/// (`otel-bridge/src/config.rs` `RetentionPolicy::validate`); and an explicit
-/// `malloc_arena_max` must be at least 1.
+/// (`otel-bridge/src/config.rs` `RetentionPolicy::validate`).
 fn validate(config: &PluginConfig) -> Result<()> {
     if config.base_dir.as_os_str().is_empty() {
         anyhow::bail!("base_dir must be set (the mandatory root for all signal storage)");
@@ -452,10 +450,6 @@ fn validate(config: &PluginConfig) -> Result<()> {
         .validate()
         .map_err(|e| anyhow::anyhow!("traces.{e}"))?;
 
-    if config.malloc_arena_max == Some(0) {
-        anyhow::bail!("malloc_arena_max must be \"auto\" or at least 1");
-    }
-
     Ok(())
 }
 
@@ -485,8 +479,6 @@ pub(crate) struct ConfigOverride {
     derived_metrics: Option<DerivedMetricsOverride>,
     #[serde(default)]
     base_dir: Option<PathBuf>,
-    #[serde(default)]
-    malloc_arena_max: Option<AutoCount>,
     #[serde(default)]
     remote_storage: Option<RemoteStorageOverride>,
     #[serde(default)]
@@ -533,7 +525,6 @@ impl ConfigOverride {
             || self.metrics.is_some()
             || self.derived_metrics.is_some()
             || self.base_dir.is_some()
-            || self.malloc_arena_max.is_some()
             || self.remote_storage.is_some()
             || self.auth.is_some()
             || self.logs.is_some()
@@ -556,9 +547,6 @@ fn apply_overrides(config: &mut PluginConfig, o: &ConfigOverride) {
     }
     if let Some(b) = &o.base_dir {
         config.base_dir = b.clone();
-    }
-    if let Some(AutoCount(m)) = o.malloc_arena_max {
-        config.malloc_arena_max = m;
     }
     if let Some(s) = &o.remote_storage {
         signal::apply_remote_storage(&mut config.remote_storage, s);
@@ -2013,31 +2001,6 @@ logs:
     }
 
     #[test]
-    fn malloc_arena_max_defaults_to_auto_and_layers() {
-        assert_eq!(resolved_stock().malloc_arena_max, None);
-        assert_eq!(
-            resolve_with_user("malloc_arena_max: 2\n")
-                .unwrap()
-                .malloc_arena_max,
-            Some(2)
-        );
-        let config = resolve_layers(
-            Some("malloc_arena_max: 2\n"),
-            &[("NETDATA_OTEL_CFG_MALLOC_ARENA_MAX", "auto")],
-        )
-        .unwrap();
-        assert_eq!(config.malloc_arena_max, None, "env auto wins over user 2");
-        for yaml in [
-            "malloc_arena_max: 0\n",
-            "malloc_arena_max: -1\n",
-            "malloc_arena_max: lots\n",
-        ] {
-            let err = resolve_with_user(yaml).unwrap_err();
-            assert!(format!("{err:#}").contains("auto"), "{yaml}: {err:#}");
-        }
-    }
-
-    #[test]
     fn env_override_logs_bool() {
         let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_LOGS_CRC_ENABLED", "yes")]))
             .unwrap();
@@ -2394,9 +2357,6 @@ logs:
         assert_eq!(config.metrics.max_new_charts_per_request, 100);
 
         assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v2"));
-
-        assert_eq!(config.malloc_arena_max, None, "stock ships `auto`");
-        assert!(substituted.contains("\nmalloc_arena_max: auto\n"));
 
         assert!(!config.remote_storage.enabled);
         assert_eq!(
