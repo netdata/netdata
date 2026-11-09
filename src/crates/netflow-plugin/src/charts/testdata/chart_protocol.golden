@@ -1,16 +1,16 @@
-CHART netdata.netflow.input_packets '' 'Netflow UDP Input Packets' 'packets/s' 'netflow' 'netdata.netflow.input_packets' line 1000 1 'store_first'
+CHART netdata.netflow.input_packets '' 'Netflow UDP Input Packets' 'packets/s' 'input' 'netdata.netflow.input_packets' line 160000 1 'store_first'
 DIMENSION udp_received 'udp_received' absolute 1 1 'type=float'
 DIMENSION kernel_dropped 'kernel_dropped' absolute 1 1 'type=float'
 DIMENSION empty 'empty' absolute 1 1 'type=float'
-CHART netdata.netflow.input_bytes '' 'Netflow Input Bytes' 'bytes/s' 'netflow' 'netdata.netflow.input_bytes' line 1000 1 'store_first'
+CHART netdata.netflow.input_bytes '' 'Netflow Input Bytes' 'bytes/s' 'input' 'netdata.netflow.input_bytes' line 160001 1 'store_first'
 DIMENSION udp_received 'udp_received' absolute 1 1 'type=float'
-CHART netdata.netflow.protocol_packets '' 'Netflow Protocol Packets' 'packets/s' 'netflow' 'netdata.netflow.protocol_packets' stacked 1000 1 'store_first'
+CHART netdata.netflow.protocol_packets '' 'Netflow Protocol Packets' 'packets/s' 'input' 'netdata.netflow.protocol_packets' stacked 160002 1 'store_first'
 DIMENSION netflow_v5 'netflow_v5' absolute 1 1 'type=float'
 DIMENSION netflow_v7 'netflow_v7' absolute 1 1 'type=float'
 DIMENSION netflow_v9 'netflow_v9' absolute 1 1 'type=float'
 DIMENSION ipfix 'ipfix' absolute 1 1 'type=float'
 DIMENSION sflow 'sflow' absolute 1 1 'type=float'
-CHART netdata.netflow.flow_sets '' 'Netflow Sets' 'sets/s' 'netflow' 'netdata.netflow.flow_sets' stacked 1000 1 'store_first'
+CHART netdata.netflow.flow_sets '' 'Netflow Sets' 'sets/s' 'decoding' 'netdata.netflow.flow_sets' stacked 160100 1 'store_first'
 DIMENSION v9_data 'v9_data' absolute 1 1 'type=float'
 DIMENSION v9_options_data 'v9_options_data' absolute 1 1 'type=float'
 DIMENSION v9_templates 'v9_templates' absolute 1 1 'type=float'
@@ -23,28 +23,28 @@ DIMENSION ipfix_templates 'ipfix_templates' absolute 1 1 'type=float'
 DIMENSION ipfix_options_templates 'ipfix_options_templates' absolute 1 1 'type=float'
 DIMENSION ipfix_missing_template 'ipfix_missing_template' absolute 1 1 'type=float'
 DIMENSION ipfix_ignored 'ipfix_ignored' absolute 1 1 'type=float'
-CHART netdata.netflow.templates '' 'Netflow Template Definitions' 'templates/s' 'netflow' 'netdata.netflow.templates' stacked 1000 1 'store_first'
+CHART netdata.netflow.templates '' 'Netflow Template Definitions' 'templates/s' 'decoding' 'netdata.netflow.templates' stacked 160101 1 'store_first'
 DIMENSION v9_data 'v9_data' absolute 1 1 'type=float'
 DIMENSION v9_options 'v9_options' absolute 1 1 'type=float'
 DIMENSION ipfix_data 'ipfix_data' absolute 1 1 'type=float'
 DIMENSION ipfix_options 'ipfix_options' absolute 1 1 'type=float'
-CHART netdata.netflow.flow_records '' 'Netflow Decoded Data Records' 'records/s' 'netflow' 'netdata.netflow.flow_records' stacked 1000 1 'store_first'
+CHART netdata.netflow.flow_records '' 'Netflow Decoded Data Records' 'records/s' 'decoding' 'netdata.netflow.flow_records' stacked 160102 1 'store_first'
 DIMENSION netflow_v5 'netflow_v5' absolute 1 1 'type=float'
 DIMENSION netflow_v7 'netflow_v7' absolute 1 1 'type=float'
 DIMENSION netflow_v9 'netflow_v9' absolute 1 1 'type=float'
 DIMENSION ipfix 'ipfix' absolute 1 1 'type=float'
-CHART netdata.netflow.options_records '' 'Netflow Options Records' 'records/s' 'netflow' 'netdata.netflow.options_records' stacked 1000 1 'store_first'
+CHART netdata.netflow.options_records '' 'Netflow Options Records' 'records/s' 'decoding' 'netdata.netflow.options_records' stacked 160103 1 'store_first'
 DIMENSION netflow_v9 'netflow_v9' absolute 1 1 'type=float'
 DIMENSION ipfix 'ipfix' absolute 1 1 'type=float'
 DIMENSION sampling_data 'sampling_data' absolute 1 1 'type=float'
-CHART netdata.netflow.sflow_samples '' 'sFlow Samples' 'samples/s' 'netflow' 'netdata.netflow.sflow_samples' stacked 1000 1 'store_first'
+CHART netdata.netflow.sflow_samples '' 'sFlow Samples' 'samples/s' 'decoding' 'netdata.netflow.sflow_samples' stacked 160104 1 'store_first'
 DIMENSION flow 'flow' absolute 1 1 'type=float'
 DIMENSION counter 'counter' absolute 1 1 'type=float'
 DIMENSION discarded_packet 'discarded_packet' absolute 1 1 'type=float'
 DIMENSION rt_metric 'rt_metric' absolute 1 1 'type=float'
 DIMENSION rt_flow 'rt_flow' absolute 1 1 'type=float'
 DIMENSION unknown 'unknown' absolute 1 1 'type=float'
-CHART netdata.netflow.decoder_exceptions '' 'Netflow Decoder Exceptions' 'events/s' 'netflow' 'netdata.netflow.decoder_exceptions' line 1000 1 'store_first'
+CHART netdata.netflow.decoder_exceptions '' 'Netflow Decoder Exceptions' 'events/s' 'decoding' 'netdata.netflow.decoder_exceptions' line 160105 1 'store_first'
 DIMENSION udp_receive_errors 'udp_receive_errors' absolute 1 1 'type=float'
 DIMENSION udp_socket_setup_errors 'udp_socket_setup_errors' absolute 1 1 'type=float'
 DIMENSION parse_errors 'parse_errors' absolute 1 1 'type=float'
@@ -55,33 +55,39 @@ DIMENSION partial_counter_records 'partial_counter_records' absolute 1 1 'type=f
 DIMENSION decapsulation_failed_records 'decapsulation_failed_records' absolute 1 1 'type=float'
 DIMENSION unsupported_data_sets 'unsupported_data_sets' absolute 1 1 'type=float'
 DIMENSION ipfix_zero_reverse_records 'ipfix_zero_reverse_records' absolute 1 1 'type=float'
-CHART netdata.netflow.flow_rows '' 'Netflow Row Pipeline' 'rows/s' 'netflow' 'netdata.netflow.flow_rows' line 1000 1 'store_first'
+CHART netdata.netflow.decoder_scopes '' 'Netflow Decoder Scope Counts' 'scopes' 'decoding' 'netdata.netflow.decoder_scopes' line 160106 1 'store_first'
+DIMENSION v9_sources 'v9_sources' absolute 1 1 'type=float'
+DIMENSION ipfix_sources 'ipfix_sources' absolute 1 1 'type=float'
+DIMENSION legacy_sources 'legacy_sources' absolute 1 1 'type=float'
+DIMENSION namespaces 'namespaces' absolute 1 1 'type=float'
+DIMENSION hydrated_sources 'hydrated_sources' absolute 1 1 'type=float'
+CHART netdata.netflow.flow_rows '' 'Netflow Row Pipeline' 'rows/s' 'decoding' 'netdata.netflow.flow_rows' line 160107 1 'store_first'
 DIMENSION decoded 'decoded' absolute 1 1 'type=float'
 DIMENSION classifier_filtered 'classifier_filtered' absolute 1 1 'type=float'
 DIMENSION journaled 'journaled' absolute 1 1 'type=float'
 DIMENSION write_failed 'write_failed' absolute 1 1 'type=float'
-CHART netdata.netflow.nsel_events '' 'Cisco NSEL Events' 'records/s' 'netflow' 'netdata.netflow.nsel_events' stacked 1000 1 'store_first'
+CHART netdata.netflow.nsel_events '' 'Cisco NSEL Events' 'records/s' 'cisco nsel' 'netdata.netflow.nsel_events' stacked 160200 1 'store_first'
 DIMENSION update 'update' absolute 1 1 'type=float'
 DIMENSION create 'create' absolute 1 1 'type=float'
 DIMENSION teardown 'teardown' absolute 1 1 'type=float'
 DIMENSION denied 'denied' absolute 1 1 'type=float'
 DIMENSION unsupported 'unsupported' absolute 1 1 'type=float'
 DIMENSION malformed 'malformed' absolute 1 1 'type=float'
-CHART netdata.netflow.nsel_rows '' 'Cisco NSEL Rows' 'rows/s' 'netflow' 'netdata.netflow.nsel_rows' stacked 1000 1 'store_first'
+CHART netdata.netflow.nsel_rows '' 'Cisco NSEL Rows' 'rows/s' 'cisco nsel' 'netdata.netflow.nsel_rows' stacked 160201 1 'store_first'
 DIMENSION forward 'forward' absolute 1 1 'type=float'
 DIMENSION reverse 'reverse' absolute 1 1 'type=float'
-CHART netdata.netflow.nsel_exceptions '' 'Cisco NSEL Exceptions' 'events/s' 'netflow' 'netdata.netflow.nsel_exceptions' line 1000 1 'store_first'
+CHART netdata.netflow.nsel_exceptions '' 'Cisco NSEL Exceptions' 'events/s' 'cisco nsel' 'netdata.netflow.nsel_exceptions' line 160202 1 'store_first'
 DIMENSION counterless_updates 'counterless_updates' absolute 1 1 'type=float'
 DIMENSION partial_counter_directions 'partial_counter_directions' absolute 1 1 'type=float'
 DIMENSION zero_responder 'zero_responder' absolute 1 1 'type=float'
-CHART netdata.netflow.raw_journal_ops '' 'Netflow Raw Journal Operations' 'ops/s' 'netflow' 'netdata.netflow.raw_journal_ops' line 1000 1 'store_first'
+CHART netdata.netflow.raw_journal_ops '' 'Netflow Raw Journal Operations' 'ops/s' 'storage' 'netdata.netflow.raw_journal_ops' line 160300 1 'store_first'
 DIMENSION entries_written 'entries_written' absolute 1 1 'type=float'
 DIMENSION write_errors 'write_errors' absolute 1 1 'type=float'
 DIMENSION sync_calls 'sync_calls' absolute 1 1 'type=float'
 DIMENSION sync_errors 'sync_errors' absolute 1 1 'type=float'
-CHART netdata.netflow.raw_journal_bytes '' 'Netflow Raw Journal Logical Bytes' 'bytes/s' 'netflow' 'netdata.netflow.raw_journal_bytes' line 1000 1 'store_first'
+CHART netdata.netflow.raw_journal_bytes '' 'Netflow Raw Journal Logical Bytes' 'bytes/s' 'storage' 'netdata.netflow.raw_journal_bytes' line 160301 1 'store_first'
 DIMENSION logical_written 'logical_written' absolute 1 1 'type=float'
-CHART netdata.netflow.materialized_tier_ops '' 'Netflow Materialized Tier Operations' 'ops/s' 'netflow' 'netdata.netflow.materialized_tier_ops' line 1000 1 'store_first'
+CHART netdata.netflow.materialized_tier_ops '' 'Netflow Materialized Tier Operations' 'ops/s' 'storage' 'netdata.netflow.materialized_tier_ops' line 160302 1 'store_first'
 DIMENSION minute_1_rows 'minute_1_rows' absolute 1 1 'type=float'
 DIMENSION minute_5_rows 'minute_5_rows' absolute 1 1 'type=float'
 DIMENSION hour_1_rows 'hour_1_rows' absolute 1 1 'type=float'
@@ -89,54 +95,48 @@ DIMENSION flushes 'flushes' absolute 1 1 'type=float'
 DIMENSION write_errors 'write_errors' absolute 1 1 'type=float'
 DIMENSION sync_calls 'sync_calls' absolute 1 1 'type=float'
 DIMENSION sync_errors 'sync_errors' absolute 1 1 'type=float'
-CHART netdata.netflow.materialized_tier_bytes '' 'Netflow Materialized Tier Logical Bytes' 'bytes/s' 'netflow' 'netdata.netflow.materialized_tier_bytes' stacked 1000 1 'store_first'
+CHART netdata.netflow.materialized_tier_bytes '' 'Netflow Materialized Tier Logical Bytes' 'bytes/s' 'storage' 'netdata.netflow.materialized_tier_bytes' stacked 160303 1 'store_first'
 DIMENSION minute_1_logical_written 'minute_1_logical_written' absolute 1 1 'type=float'
 DIMENSION minute_5_logical_written 'minute_5_logical_written' absolute 1 1 'type=float'
 DIMENSION hour_1_logical_written 'hour_1_logical_written' absolute 1 1 'type=float'
-CHART netdata.netflow.tier_commit_age '' 'Netflow Tier Commit Age' 'seconds' 'netflow' 'netdata.netflow.tier_commit_age' line 1000 1 'store_first'
+CHART netdata.netflow.tier_commit_age '' 'Netflow Tier Commit Age' 'seconds' 'storage' 'netdata.netflow.tier_commit_age' line 160304 1 'store_first'
 DIMENSION minute_1 'minute_1' absolute 1 1 'type=float'
 DIMENSION minute_5 'minute_5' absolute 1 1 'type=float'
 DIMENSION hour_1 'hour_1' absolute 1 1 'type=float'
-CHART netdata.netflow.tier_commit_duration '' 'Netflow Tier Commit Duration' 'microseconds' 'netflow' 'netdata.netflow.tier_commit_duration' line 1000 1 'store_first'
+CHART netdata.netflow.tier_commit_duration '' 'Netflow Tier Commit Duration' 'microseconds' 'storage' 'netdata.netflow.tier_commit_duration' line 160305 1 'store_first'
 DIMENSION minute_1 'minute_1' absolute 1 1 'type=float'
 DIMENSION minute_5 'minute_5' absolute 1 1 'type=float'
 DIMENSION hour_1 'hour_1' absolute 1 1 'type=float'
-CHART netdata.netflow.tier_commit_batches '' 'Netflow Tier Commit Batches' 'batches/s' 'netflow' 'netdata.netflow.tier_commit_batches' line 1000 1 'store_first'
+CHART netdata.netflow.tier_commit_batches '' 'Netflow Tier Commit Batches' 'batches/s' 'storage' 'netdata.netflow.tier_commit_batches' line 160306 1 'store_first'
 DIMENSION minute_1 'minute_1' absolute 1 1 'type=float'
 DIMENSION minute_5 'minute_5' absolute 1 1 'type=float'
 DIMENSION hour_1 'hour_1' absolute 1 1 'type=float'
-CHART netdata.netflow.tier_commit_stretched '' 'Netflow Tier Commit Stretched Windows' 'events/s' 'netflow' 'netdata.netflow.tier_commit_stretched' line 1000 1 'store_first'
+CHART netdata.netflow.tier_commit_stretched '' 'Netflow Tier Commit Stretched Windows' 'events/s' 'storage' 'netdata.netflow.tier_commit_stretched' line 160307 1 'store_first'
 DIMENSION minute_1 'minute_1' absolute 1 1 'type=float'
 DIMENSION minute_5 'minute_5' absolute 1 1 'type=float'
 DIMENSION hour_1 'hour_1' absolute 1 1 'type=float'
-CHART netdata.netflow.open_tiers '' 'Netflow Open Tier Rows' 'rows' 'netflow' 'netdata.netflow.open_tiers' stacked 1000 1 'store_first'
-DIMENSION minute_1 'minute_1' absolute 1 1 'type=float'
-DIMENSION minute_5 'minute_5' absolute 1 1 'type=float'
-DIMENSION hour_1 'hour_1' absolute 1 1 'type=float'
-CHART netdata.netflow.journal_io_ops '' 'Netflow Journal Auxiliary I/O Operations' 'ops/s' 'netflow' 'netdata.netflow.journal_io_ops' line 1000 1 'store_first'
+CHART netdata.netflow.journal_io_ops '' 'Netflow Journal Auxiliary I/O Operations' 'ops/s' 'storage' 'netdata.netflow.journal_io_ops' line 160308 1 'store_first'
 DIMENSION decoder_state_persist_calls 'decoder_state_persist_calls' absolute 1 1 'type=float'
 DIMENSION decoder_state_write_errors 'decoder_state_write_errors' absolute 1 1 'type=float'
 DIMENSION decoder_state_move_errors 'decoder_state_move_errors' absolute 1 1 'type=float'
 DIMENSION facet_active_update_errors 'facet_active_update_errors' absolute 1 1 'type=float'
 DIMENSION facet_lifecycle_errors 'facet_lifecycle_errors' absolute 1 1 'type=float'
 DIMENSION facet_persist_errors 'facet_persist_errors' absolute 1 1 'type=float'
-CHART netdata.netflow.journal_io_bytes '' 'Netflow Journal Auxiliary I/O Bytes' 'bytes/s' 'netflow' 'netdata.netflow.journal_io_bytes' line 1000 1 'store_first'
+CHART netdata.netflow.journal_io_bytes '' 'Netflow Journal Auxiliary I/O Bytes' 'bytes/s' 'storage' 'netdata.netflow.journal_io_bytes' line 160309 1 'store_first'
 DIMENSION decoder_state_persist_bytes 'decoder_state_persist_bytes' absolute 1 1 'type=float'
-CHART netdata.netflow.decoder_scopes '' 'Netflow Decoder Scope Counts' 'scopes' 'netflow' 'netdata.netflow.decoder_scopes' line 1000 1 'store_first'
-DIMENSION v9_sources 'v9_sources' absolute 1 1 'type=float'
-DIMENSION ipfix_sources 'ipfix_sources' absolute 1 1 'type=float'
-DIMENSION legacy_sources 'legacy_sources' absolute 1 1 'type=float'
-DIMENSION namespaces 'namespaces' absolute 1 1 'type=float'
-DIMENSION hydrated_sources 'hydrated_sources' absolute 1 1 'type=float'
-CHART netdata.netflow.facet_values '' 'Netflow Facet Values' 'values' 'netflow' 'netdata.netflow.facet_values' line 1000 1 'store_first'
-DIMENSION total 'total' absolute 1 1 'type=float'
-DIMENSION exposed 'exposed' absolute 1 1 'type=float'
-CHART netdata.netflow.facet_fields '' 'Netflow Facet Fields' 'fields' 'netflow' 'netdata.netflow.facet_fields' line 1000 1 'store_first'
-DIMENSION populated 'populated' absolute 1 1 'type=float'
-DIMENSION autocomplete 'autocomplete' absolute 1 1 'type=float'
-CHART netdata.netflow.tier_index_entries '' 'Netflow Tier Index Entries' 'entries' 'netflow' 'netdata.netflow.tier_index_entries' line 1000 1 'store_first'
+CHART netdata.netflow.open_tiers '' 'Netflow Open Tier Rows' 'rows' 'state' 'netdata.netflow.open_tiers' stacked 160400 1 'store_first'
+DIMENSION minute_1 'minute_1' absolute 1 1 'type=float'
+DIMENSION minute_5 'minute_5' absolute 1 1 'type=float'
+DIMENSION hour_1 'hour_1' absolute 1 1 'type=float'
+CHART netdata.netflow.tier_index_entries '' 'Netflow Tier Index Entries' 'entries' 'state' 'netdata.netflow.tier_index_entries' line 160401 1 'store_first'
 DIMENSION hours 'hours' absolute 1 1 'type=float'
 DIMENSION flows 'flows' absolute 1 1 'type=float'
+CHART netdata.netflow.facet_values '' 'Netflow Facet Values' 'values' 'state' 'netdata.netflow.facet_values' line 160402 1 'store_first'
+DIMENSION total 'total' absolute 1 1 'type=float'
+DIMENSION exposed 'exposed' absolute 1 1 'type=float'
+CHART netdata.netflow.facet_fields '' 'Netflow Facet Fields' 'fields' 'state' 'netdata.netflow.facet_fields' line 160403 1 'store_first'
+DIMENSION populated 'populated' absolute 1 1 'type=float'
+DIMENSION autocomplete 'autocomplete' absolute 1 1 'type=float'
 BEGIN netdata.netflow.input_packets 1000000
 SET udp_received =
 SET kernel_dropped =
@@ -202,6 +202,13 @@ SET partial_counter_records =
 SET decapsulation_failed_records =
 SET unsupported_data_sets =
 SET ipfix_zero_reverse_records =
+END 1700000001 0 1
+BEGIN netdata.netflow.decoder_scopes 1000000
+SET v9_sources = 0
+SET ipfix_sources = 0
+SET legacy_sources = 0
+SET namespaces = 0
+SET hydrated_sources = 0
 END 1700000001 0 1
 BEGIN netdata.netflow.flow_rows 1000000
 SET decoded =
@@ -269,11 +276,6 @@ SET minute_1 =
 SET minute_5 =
 SET hour_1 =
 END 1700000001 0 1
-BEGIN netdata.netflow.open_tiers 1000000
-SET minute_1 = 0
-SET minute_5 = 0
-SET hour_1 = 0
-END 1700000001 0 1
 BEGIN netdata.netflow.journal_io_ops 1000000
 SET decoder_state_persist_calls =
 SET decoder_state_write_errors =
@@ -285,12 +287,14 @@ END 1700000001 0 1
 BEGIN netdata.netflow.journal_io_bytes 1000000
 SET decoder_state_persist_bytes =
 END 1700000001 0 1
-BEGIN netdata.netflow.decoder_scopes 1000000
-SET v9_sources = 0
-SET ipfix_sources = 0
-SET legacy_sources = 0
-SET namespaces = 0
-SET hydrated_sources = 0
+BEGIN netdata.netflow.open_tiers 1000000
+SET minute_1 = 0
+SET minute_5 = 0
+SET hour_1 = 0
+END 1700000001 0 1
+BEGIN netdata.netflow.tier_index_entries 1000000
+SET hours = 0
+SET flows = 0
 END 1700000001 0 1
 BEGIN netdata.netflow.facet_values 1000000
 SET total = 0
@@ -299,10 +303,6 @@ END 1700000001 0 1
 BEGIN netdata.netflow.facet_fields 1000000
 SET populated = 0
 SET autocomplete = 0
-END 1700000001 0 1
-BEGIN netdata.netflow.tier_index_entries 1000000
-SET hours = 0
-SET flows = 0
 END 1700000001 0 1
 BEGIN netdata.netflow.input_packets 1000000
 SET udp_received = 0
@@ -370,6 +370,13 @@ SET decapsulation_failed_records = 0
 SET unsupported_data_sets = 0
 SET ipfix_zero_reverse_records = 0
 END 1700000002 0 1
+BEGIN netdata.netflow.decoder_scopes 1000000
+SET v9_sources = 0
+SET ipfix_sources = 0
+SET legacy_sources = 0
+SET namespaces = 0
+SET hydrated_sources = 0
+END 1700000002 0 1
 BEGIN netdata.netflow.flow_rows 1000000
 SET decoded = 0
 SET classifier_filtered = 0
@@ -436,11 +443,6 @@ SET minute_1 = 0
 SET minute_5 = 0
 SET hour_1 = 0
 END 1700000002 0 1
-BEGIN netdata.netflow.open_tiers 1000000
-SET minute_1 = 0
-SET minute_5 = 0
-SET hour_1 = 0
-END 1700000002 0 1
 BEGIN netdata.netflow.journal_io_ops 1000000
 SET decoder_state_persist_calls = 0
 SET decoder_state_write_errors = 0
@@ -452,12 +454,14 @@ END 1700000002 0 1
 BEGIN netdata.netflow.journal_io_bytes 1000000
 SET decoder_state_persist_bytes = 0
 END 1700000002 0 1
-BEGIN netdata.netflow.decoder_scopes 1000000
-SET v9_sources = 0
-SET ipfix_sources = 0
-SET legacy_sources = 0
-SET namespaces = 0
-SET hydrated_sources = 0
+BEGIN netdata.netflow.open_tiers 1000000
+SET minute_1 = 0
+SET minute_5 = 0
+SET hour_1 = 0
+END 1700000002 0 1
+BEGIN netdata.netflow.tier_index_entries 1000000
+SET hours = 0
+SET flows = 0
 END 1700000002 0 1
 BEGIN netdata.netflow.facet_values 1000000
 SET total = 0
@@ -467,18 +471,14 @@ BEGIN netdata.netflow.facet_fields 1000000
 SET populated = 0
 SET autocomplete = 0
 END 1700000002 0 1
-BEGIN netdata.netflow.tier_index_entries 1000000
-SET hours = 0
-SET flows = 0
-END 1700000002 0 1
-CHART netdata.netflow.memory_resident_bytes '' 'Netflow Process Memory' 'bytes' 'netflow' 'netdata.netflow.memory_resident_bytes' line 1000 10 'store_first'
+CHART netdata.netflow.memory_resident_bytes '' 'Netflow Process Memory' 'bytes' 'memory' 'netdata.netflow.memory_resident_bytes' line 160500 10 'store_first'
 DIMENSION rss 'rss' absolute 1 1 'type=float'
 DIMENSION hwm 'hwm' absolute 1 1 'type=float'
 DIMENSION rss_anon 'rss_anon' absolute 1 1 'type=float'
 DIMENSION rss_file 'rss_file' absolute 1 1 'type=float'
 DIMENSION rss_shmem 'rss_shmem' absolute 1 1 'type=float'
 DIMENSION anon_huge_pages 'anon_huge_pages' absolute 1 1 'type=float'
-CHART netdata.netflow.memory_resident_mapping_bytes '' 'Netflow Resident Mapping Breakdown' 'bytes' 'netflow' 'netdata.netflow.memory_resident_mapping_bytes' stacked 1000 10 'store_first'
+CHART netdata.netflow.memory_resident_mapping_bytes '' 'Netflow Resident Mapping Breakdown' 'bytes' 'memory' 'netdata.netflow.memory_resident_mapping_bytes' stacked 160501 10 'store_first'
 DIMENSION heap 'heap' absolute 1 1 'type=float'
 DIMENSION anon_other 'anon_other' absolute 1 1 'type=float'
 DIMENSION journal_raw 'journal_raw' absolute 1 1 'type=float'
@@ -489,13 +489,13 @@ DIMENSION geoip_asn 'geoip_asn' absolute 1 1 'type=float'
 DIMENSION geoip_geo 'geoip_geo' absolute 1 1 'type=float'
 DIMENSION other_file 'other_file' absolute 1 1 'type=float'
 DIMENSION shmem 'shmem' absolute 1 1 'type=float'
-CHART netdata.netflow.memory_allocator_bytes '' 'Netflow Allocator Memory' 'bytes' 'netflow' 'netdata.netflow.memory_allocator_bytes' line 1000 10 'store_first'
+CHART netdata.netflow.memory_allocator_bytes '' 'Netflow Allocator Memory' 'bytes' 'memory' 'netdata.netflow.memory_allocator_bytes' line 160502 10 'store_first'
 DIMENSION heap_in_use 'heap_in_use' absolute 1 1 'type=float'
 DIMENSION heap_free 'heap_free' absolute 1 1 'type=float'
 DIMENSION heap_arena 'heap_arena' absolute 1 1 'type=float'
 DIMENSION mmap_in_use 'mmap_in_use' absolute 1 1 'type=float'
 DIMENSION releasable 'releasable' absolute 1 1 'type=float'
-CHART netdata.netflow.memory_accounted_bytes '' 'Netflow Accounted Memory' 'bytes' 'netflow' 'netdata.netflow.memory_accounted_bytes' stacked 1000 10 'store_first'
+CHART netdata.netflow.memory_accounted_bytes '' 'Netflow Accounted Memory' 'bytes' 'memory' 'netdata.netflow.memory_accounted_bytes' stacked 160503 10 'store_first'
 DIMENSION facet_archived 'facet_archived' absolute 1 1 'type=float'
 DIMENSION facet_active 'facet_active' absolute 1 1 'type=float'
 DIMENSION facet_active_contributions 'facet_active_contributions' absolute 1 1 'type=float'
@@ -506,7 +506,7 @@ DIMENSION open_tiers 'open_tiers' absolute 1 1 'type=float'
 DIMENSION geoip_asn 'geoip_asn' absolute 1 1 'type=float'
 DIMENSION geoip_geo 'geoip_geo' absolute 1 1 'type=float'
 DIMENSION unaccounted 'unaccounted' absolute 1 1 'type=float'
-CHART netdata.netflow.memory_tier_index_bytes '' 'Netflow Tier Index Memory Breakdown' 'bytes' 'netflow' 'netdata.netflow.memory_tier_index_bytes' stacked 1000 10 'store_first'
+CHART netdata.netflow.memory_tier_index_bytes '' 'Netflow Tier Index Memory Breakdown' 'bytes' 'memory' 'netdata.netflow.memory_tier_index_bytes' stacked 160504 10 'store_first'
 DIMENSION row_storage 'row_storage' absolute 1 1 'type=float'
 DIMENSION field_stores 'field_stores' absolute 1 1 'type=float'
 DIMENSION flow_lookup 'flow_lookup' absolute 1 1 'type=float'
