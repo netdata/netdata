@@ -121,7 +121,7 @@ pub use format::{FileEvent, Message};
 pub use reader::{Frame, FrameBoundary, FrameRange, Reader, scan_frame_boundaries};
 pub use registry::{File, Registry};
 pub use seq::{DEFAULT_RESERVE_BATCH, SeqAllocator, read_seq_highwater, write_seq_highwater};
-pub use writer::{FileStamp, FrameMeta, Writer};
+pub use writer::{FileStamp, FrameMeta, SyncTarget, SyncTicket, Writer};
 // Re-exported so callers of `Writer::new` can name the identity types it takes
 // (and the shared test fixture) without a direct `file-registry` dependency;
 // wal-internal tests reach the fixture as `crate::test_identity()`.

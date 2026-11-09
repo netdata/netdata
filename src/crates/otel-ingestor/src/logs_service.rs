@@ -345,6 +345,9 @@ pub struct NetdataLogsService {
     /// region, so tenants ingest in parallel and same-tenant requests overlap
     /// everything before that region.
     writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
+    /// One fsync round at a time per tenant; requests that arrive during a
+    /// round wait here, and one round after it covers them all.
+    sync_gates: crate::wal_sync::SyncGates,
     /// Canonical `ServiceStream` per `(tenant, ns_hash)`. First write
     /// wins; subsequent writes whose stream doesn't match are rejected via
     /// `partial_success`. In-memory only — on restart the table is empty and
@@ -391,6 +394,7 @@ impl NetdataLogsService {
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
+            sync_gates: crate::wal_sync::SyncGates::default(),
             canonical: Mutex::new(HashMap::new()),
             clock,
             sender,
@@ -762,7 +766,14 @@ impl NetdataLogsService {
                 )
             }
         };
-        {
+        // The writer lock covers the writes and the event sends, not the
+        // fsyncs: holding it across them serialized every request of the
+        // tenant behind the slowest fsync. Events still go out under the lock,
+        // so each file's Created/Synced/Closed reach the ledger in order.
+        // Fsync rounds take turns at the tenant's sync gate; a request whose
+        // bytes an earlier round already made durable skips its own
+        // (`wal_sync::make_durable`).
+        let target = {
             let mut writer = writer.lock().unwrap();
             for p in &prepared {
                 let ingestion_ns = self.clock.lock().unwrap().now_ns();
@@ -790,24 +801,20 @@ impl NetdataLogsService {
                         Status::internal("WAL write error")
                     })?;
             }
-            writer.sync_all().map_err(|e| {
-                tracing::error!(%e, "failed to sync WAL");
-                Status::internal("WAL sync error")
-            })?;
-            // Drain AND forward the lifecycle events while STILL holding the
-            // writer lock, so drain+send is atomic per tenant: a file's
-            // Created→Synced→Closed reach the single ledger channel in
-            // lock-acquisition (== logical) order. Sending after releasing the
-            // lock would let a concurrent op on the same tenant (another export,
-            // or the idle-rotation sweep) interleave its events. `send_events`
-            // is synchronous and non-blocking (unbounded channel), so no
-            // `.await` is held under the lock.
+            let target = writer.sync_target();
             let events = writer.take_all_events();
-            // `send_events` takes the tenant by value and the core only
-            // borrows it, so clone here — the last use of the id in this
-            // request either way.
             self.sender.send_events(tenant_id.clone(), events);
-        }
+            target
+        };
+        crate::wal_sync::make_durable(
+            writer,
+            self.sync_gates.gate(tenant_id),
+            Arc::clone(&self.sender),
+            tenant_id.clone(),
+            target,
+            "logs",
+        )
+        .await?;
         if let (Some(derived), Some(batch)) = (&self.derived, derived_batch) {
             derived.commit_logs(batch);
         }
@@ -1629,6 +1636,57 @@ mod tests {
         assert_eq!(sum("rejected"), 1.0);
         assert!(out.contains("CLABEL 'resource.attributes.service.namespace' 'prod' 1"));
         assert!(out.contains("'otel_service.log_records'"));
+    }
+
+    /// A request whose bytes an earlier fsync round already covered skips its
+    /// own round but still counts in the derived metrics.
+    #[tokio::test]
+    async fn derived_metrics_count_a_request_an_earlier_round_covered() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let tenant = TenantId::default_tenant();
+        let derived = Arc::new(
+            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let mut service = test_service(tmp.path().to_path_buf());
+        service.set_derived_metrics(Arc::clone(&derived));
+        let request = |n| {
+            let mut r = rl(Some("prod"), Some("api"), n);
+            for record in &mut r.scope_logs[0].log_records {
+                record.time_unix_nano = now;
+                record.severity_number = 9;
+            }
+            ExportLogsServiceRequest {
+                resource_logs: vec![r],
+            }
+        };
+
+        // Both requests write, then wait for the gate; the round that gets it
+        // first covers the other's bytes too.
+        let held = service.sync_gates.gate(&tenant).lock_owned().await;
+        let (a, b, ()) = tokio::join!(
+            service.export_logs(&tenant, request(2)),
+            service.export_logs(&tenant, request(3)),
+            async {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                drop(held);
+            },
+        );
+        a.unwrap();
+        b.unwrap();
+
+        let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
+        let sum = |dimension: &str| -> f64 {
+            let prefix = format!("SET {dimension} = ");
+            out.lines()
+                .filter_map(|l| l.strip_prefix(&prefix))
+                .map(|v| netdata_plugin_protocol::read_float_value(v).unwrap())
+                .sum()
+        };
+        assert_eq!(sum("accepted"), 5.0);
     }
 
     #[tokio::test]
