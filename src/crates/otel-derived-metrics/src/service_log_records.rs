@@ -9,6 +9,7 @@
 //! observed time).
 
 use crate::service::{service_labels, service_settings};
+use crate::shared_aggregator::SharedAggregator;
 use netdata_plugin_metrics::{
     Batch, BatchEntity, ChartDescriptor, ChartType, Counter, MetricSet, MetricSetBuilder, columns,
 };
@@ -42,7 +43,8 @@ impl Severity {
 }
 
 pub(crate) struct ServiceLogRecords {
-    pub(crate) metric_set: MetricSet,
+    metric_set: MetricSet,
+    pub(crate) aggregator: SharedAggregator,
     records: Counter<Severity>,
 }
 
@@ -57,10 +59,18 @@ impl ServiceLogRecords {
             chart_type: ChartType::Stacked,
             priority: 60_000,
         })?;
+        let metric_set = builder.build()?;
+        let aggregator = SharedAggregator::new(&metric_set);
         Ok(Self {
-            metric_set: builder.build()?,
+            metric_set,
+            aggregator,
             records,
         })
+    }
+
+    /// An empty batch for the log records of one export request.
+    pub(crate) fn batch(&self) -> Batch {
+        Batch::new(&self.metric_set)
     }
 
     /// Record the log records of `request` into `batch`.
@@ -94,7 +104,7 @@ impl ServiceLogRecords {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netdata_plugin_metrics::{Aggregator, Column};
+    use netdata_plugin_metrics::Column;
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
@@ -150,13 +160,12 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let mut aggregator = Aggregator::new(&log_records.metric_set);
-        let mut batch = Batch::new(&log_records.metric_set);
+        let mut batch = log_records.batch();
         log_records.record(&mut batch, "default", &request);
-        aggregator.merge(batch, 100);
-        let out = netdata_plugin_protocol::readable_chart_stream(
-            &aggregator.emit(106, usize::MAX).concat(),
-        );
+        log_records.aggregator.merge(batch, 100);
+        let mut chunks = Vec::new();
+        log_records.aggregator.emit(106, &mut chunks);
+        let out = netdata_plugin_protocol::readable_chart_stream(&chunks.concat());
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'checkout' 1\n"));
         assert!(out.contains(

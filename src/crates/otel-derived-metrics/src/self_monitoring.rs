@@ -2,6 +2,7 @@
 //! when derived metrics are enabled, how their derivation behaves. Counted at
 //! arrival time, so the metric sets have no lateness.
 
+use crate::shared_aggregator::SharedAggregator;
 use netdata_plugin_metrics::{
     Batch, ChartDescriptor, ChartType, Counter, CumulativeCounter, Gauge, Labels, MetricSet,
     MetricSetBuilder, Settings, Stats, columns,
@@ -39,7 +40,8 @@ columns! {
 
 /// The plugin's ingest outcomes: one label-less entity.
 pub(crate) struct IngestOutcomes {
-    pub(crate) metric_set: MetricSet,
+    metric_set: MetricSet,
+    aggregator: SharedAggregator,
     log_records: Counter<Acceptance>,
     spans: Counter<Acceptance>,
 }
@@ -63,14 +65,19 @@ impl IngestOutcomes {
             chart_type: ChartType::Stacked,
             priority: 150_001,
         })?;
+        let metric_set = builder.build()?;
+        let aggregator = SharedAggregator::new(&metric_set);
         Ok(Self {
-            metric_set: builder.build()?,
+            metric_set,
+            aggregator,
             log_records,
             spans,
         })
     }
 
-    pub(crate) fn ingest(&self, signal: Signal, accepted: u64, rejected: u64, now: u64) -> Batch {
+    /// Count the outcome of one export request of `signal` at `now` (Unix
+    /// seconds): records stored and records rejected.
+    pub(crate) fn record(&self, signal: Signal, accepted: u64, rejected: u64, now: u64) {
         let counter = match signal {
             Signal::Logs => self.log_records,
             Signal::Traces => self.spans,
@@ -81,13 +88,19 @@ impl IngestOutcomes {
             .record(now)
             .add(counter, Acceptance::Accepted, accepted as f64)
             .add(counter, Acceptance::Rejected, rejected as f64);
-        batch
+        self.aggregator.merge(batch, now);
+    }
+
+    /// Add to `chunks` the windows that ended before `now` (Unix seconds).
+    pub(crate) fn emit(&self, now: u64, chunks: &mut Vec<Vec<u8>>) {
+        self.aggregator.merge(self.heartbeat(now), now);
+        self.aggregator.emit(now, chunks);
     }
 
     /// An empty event at `now`: emitted as zeros, it keeps the ingest chart
     /// instances defined from the first tick and never lets them expire while
     /// the plugin runs.
-    pub(crate) fn heartbeat(&self, now: u64) -> Batch {
+    fn heartbeat(&self, now: u64) -> Batch {
         let mut batch = Batch::new(&self.metric_set);
         batch.entity(Labels::new()).record(now);
         batch
@@ -97,7 +110,8 @@ impl IngestOutcomes {
 /// How the per-service derivation of each signal behaves: one entity per
 /// signal, labelled `signal`, fed from its aggregator's statistics every tick.
 pub(crate) struct DerivationHealth {
-    pub(crate) metric_set: MetricSet,
+    metric_set: MetricSet,
+    aggregator: SharedAggregator,
     services: Gauge<Services>,
     expired: CumulativeCounter<Expired>,
     adjusted: CumulativeCounter<Adjustment>,
@@ -131,16 +145,36 @@ impl DerivationHealth {
             chart_type: ChartType::Line,
             priority: 150_012,
         })?;
+        let metric_set = builder.build()?;
+        let aggregator = SharedAggregator::new(&metric_set);
         Ok(Self {
-            metric_set: builder.build()?,
+            metric_set,
+            aggregator,
             services,
             expired,
             adjusted,
         })
     }
 
+    /// Record the statistics each signal's aggregator has at `now` (Unix
+    /// seconds), then add to `chunks` the windows that ended before `now`: a
+    /// tick charts the statistics the tick before it recorded.
+    pub(crate) fn emit(
+        &self,
+        now: u64,
+        signal_stats: [(Signal, Stats); 2],
+        chunks: &mut Vec<Vec<u8>>,
+    ) {
+        let mut batch = Batch::new(&self.metric_set);
+        for (signal, stats) in signal_stats {
+            self.record(&mut batch, signal, &stats, now);
+        }
+        self.aggregator.merge(batch, now);
+        self.aggregator.emit(now, chunks);
+    }
+
     /// Record the statistics of `signal`'s aggregator at `now` into `batch`.
-    pub(crate) fn record(&self, batch: &mut Batch, signal: Signal, stats: &Stats, now: u64) {
+    fn record(&self, batch: &mut Batch, signal: Signal, stats: &Stats, now: u64) {
         let mut labels = Labels::new();
         labels.insert("signal", signal_name(signal));
         batch
@@ -176,17 +210,19 @@ fn signal_name(signal: Signal) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netdata_plugin_metrics::Aggregator;
+
+    fn readable(chunks: Vec<Vec<u8>>) -> String {
+        netdata_plugin_protocol::readable_chart_stream(&chunks.concat())
+    }
 
     #[test]
     fn ingest_outcomes_render_per_signal() {
         let outcomes = IngestOutcomes::new().unwrap();
-        let mut aggregator = Aggregator::new(&outcomes.metric_set);
-        aggregator.merge(outcomes.ingest(Signal::Traces, 7, 2, 100), 100);
-        aggregator.merge(outcomes.ingest(Signal::Logs, 3, 0, 100), 100);
-        let out = netdata_plugin_protocol::readable_chart_stream(
-            &aggregator.emit(101, usize::MAX).concat(),
-        );
+        outcomes.record(Signal::Traces, 7, 2, 100);
+        outcomes.record(Signal::Logs, 3, 0, 100);
+        let mut chunks = Vec::new();
+        outcomes.emit(101, &mut chunks);
+        let out = readable(chunks);
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains(
             "BEGIN netdata.otel.spans 1000000\nSET accepted = 7\nSET rejected = 2\nEND 101 0 1\n"
@@ -200,11 +236,10 @@ mod tests {
     #[test]
     fn the_heartbeat_keeps_the_charts_defined_without_traffic() {
         let outcomes = IngestOutcomes::new().unwrap();
-        let mut aggregator = Aggregator::new(&outcomes.metric_set);
-        aggregator.merge(outcomes.heartbeat(100), 100);
-        let out = netdata_plugin_protocol::readable_chart_stream(
-            &aggregator.emit(101, usize::MAX).concat(),
-        );
+        let mut chunks = Vec::new();
+        outcomes.emit(100, &mut chunks);
+        outcomes.emit(101, &mut chunks);
+        let out = readable(chunks);
         assert!(out.contains("CHART netdata.otel.spans "));
         assert!(out.contains("SET accepted = 0\nSET rejected = 0\n"));
     }
@@ -212,33 +247,27 @@ mod tests {
     #[test]
     fn derivation_charts_one_entity_per_signal_with_increases() {
         let health = DerivationHealth::new().unwrap();
-        let mut aggregator = Aggregator::new(&health.metric_set);
-        let mut tick = |stats: Stats, now: u64| {
-            let mut batch = Batch::new(&health.metric_set);
-            health.record(&mut batch, Signal::Traces, &stats, now);
-            health.record(&mut batch, Signal::Logs, &Stats::default(), now);
-            aggregator.merge(batch, now);
-            netdata_plugin_protocol::readable_chart_stream(
-                &aggregator.emit(now + 1, usize::MAX).concat(),
-            )
+        let tick = |traces: Stats, now: u64| {
+            let signal_stats = [(Signal::Traces, traces), (Signal::Logs, Stats::default())];
+            let mut chunks = Vec::new();
+            health.emit(now, signal_stats, &mut chunks);
+            readable(chunks)
         };
-        let first = tick(
-            Stats {
-                late_events: 5,
-                ..Stats::default()
-            },
-            100,
-        );
-        let second = tick(
-            Stats {
-                entities: 3,
-                late_events: 7,
-                future_events: 1,
-                overflowed_events: 4,
-                expired_entities: 1,
-            },
-            101,
-        );
+        let earlier = Stats {
+            late_events: 5,
+            ..Stats::default()
+        };
+        let later = Stats {
+            entities: 3,
+            late_events: 7,
+            future_events: 1,
+            overflowed_events: 4,
+            expired_entities: 1,
+        };
+        // A tick charts the statistics the tick before it recorded.
+        assert_eq!(tick(earlier, 100), "");
+        let first = tick(later, 101);
+        let second = tick(later, 102);
         netdata_plugin_protocol::validate_chart_stream(format!("{first}{second}").as_bytes())
             .unwrap();
         assert_eq!(first.matches("CLABEL 'signal' 'traces' 1").count(), 3);

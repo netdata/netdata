@@ -7,6 +7,7 @@
 //! `ot=th` sampling threshold implies.
 
 use crate::service::{service_labels, service_settings};
+use crate::shared_aggregator::SharedAggregator;
 use netdata_plugin_metrics::{
     Batch, BatchEntity, ChartDescriptor, ChartType, Counter, Histogram, MetricSet,
     MetricSetBuilder, columns,
@@ -30,7 +31,8 @@ columns! {
 }
 
 pub(crate) struct ServiceRequests {
-    pub(crate) metric_set: MetricSet,
+    metric_set: MetricSet,
+    pub(crate) aggregator: SharedAggregator,
     requests: Counter<Outcome>,
     duration: Histogram,
 }
@@ -61,11 +63,19 @@ impl ServiceRequests {
             },
             "requests/s".into(),
         )?;
+        let metric_set = builder.build()?;
+        let aggregator = SharedAggregator::new(&metric_set);
         Ok(Self {
-            metric_set: builder.build()?,
+            metric_set,
+            aggregator,
             requests,
             duration,
         })
+    }
+
+    /// An empty batch for the spans of one export request.
+    pub(crate) fn batch(&self) -> Batch {
+        Batch::new(&self.metric_set)
     }
 
     /// Record the requests among the spans of `request` into `batch`.
@@ -145,7 +155,6 @@ fn adjusted_count(trace_state: &str) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use netdata_plugin_metrics::Aggregator;
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
     use opentelemetry_proto::tonic::resource::v1::Resource;
@@ -200,14 +209,15 @@ mod tests {
         }
     }
 
-    fn render(requests: &ServiceRequests, request: &ExportTraceServiceRequest) -> String {
-        let mut aggregator = Aggregator::new(&requests.metric_set);
-        let mut batch = Batch::new(&requests.metric_set);
+    /// What a new set emits at second 110 for `request`, merged at second 100.
+    fn render(request: &ExportTraceServiceRequest) -> String {
+        let requests = ServiceRequests::new(10).unwrap();
+        let mut batch = requests.batch();
         requests.record(&mut batch, "default", request);
-        aggregator.merge(batch, 100);
-        let out = netdata_plugin_protocol::readable_chart_stream(
-            &aggregator.emit(110, usize::MAX).concat(),
-        );
+        requests.aggregator.merge(batch, 100);
+        let mut chunks = Vec::new();
+        requests.aggregator.emit(110, &mut chunks);
+        let out = netdata_plugin_protocol::readable_chart_stream(&chunks.concat());
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         out
     }
@@ -222,21 +232,17 @@ mod tests {
 
     #[test]
     fn counts_roots_servers_and_consumers_only() {
-        let requests = ServiceRequests::new(10).unwrap();
-        let out = render(
-            &requests,
-            &request(
-                vec![attr("service.name", "checkout")],
-                vec![
-                    span(false, SpanKind::Internal, false, 95, 250, ""),
-                    span(true, SpanKind::Server, true, 95, 500, ""),
-                    span(true, SpanKind::Consumer, false, 95, 750, ""),
-                    span(true, SpanKind::Client, true, 95, 400, ""),
-                    span(true, SpanKind::Internal, false, 95, 500, ""),
-                    span(true, SpanKind::Producer, false, 95, 600, ""),
-                ],
-            ),
-        );
+        let out = render(&request(
+            vec![attr("service.name", "checkout")],
+            vec![
+                span(false, SpanKind::Internal, false, 95, 250, ""),
+                span(true, SpanKind::Server, true, 95, 500, ""),
+                span(true, SpanKind::Consumer, false, 95, 750, ""),
+                span(true, SpanKind::Client, true, 95, 400, ""),
+                span(true, SpanKind::Internal, false, 95, 500, ""),
+                span(true, SpanKind::Producer, false, 95, 600, ""),
+            ],
+        ));
         let success = values(&out, "success");
         let error = values(&out, "error");
         // The entity's first emitted window is the one its spans ended in.
@@ -255,18 +261,14 @@ mod tests {
 
     #[test]
     fn service_identity_labels() {
-        let requests = ServiceRequests::new(10).unwrap();
-        let out = render(
-            &requests,
-            &request(
-                vec![
-                    attr("service.name", "checkout"),
-                    attr("service.namespace", "shop"),
-                    attr("deployment.environment", "staging"),
-                ],
-                vec![span(false, SpanKind::Server, false, 95, 10, "")],
-            ),
-        );
+        let out = render(&request(
+            vec![
+                attr("service.name", "checkout"),
+                attr("service.namespace", "shop"),
+                attr("deployment.environment", "staging"),
+            ],
+            vec![span(false, SpanKind::Server, false, 95, 10, "")],
+        ));
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'checkout' 1\n"));
         assert!(out.contains("CLABEL 'resource.attributes.service.namespace' 'shop' 1\n"));
         assert!(
@@ -275,13 +277,10 @@ mod tests {
         assert!(out.contains("CLABEL 'tenant' 'default' 1\n"));
         assert!(out.contains("CHART otel_service.requests_"));
 
-        let unnamed = render(
-            &requests,
-            &request(
-                vec![],
-                vec![span(false, SpanKind::Server, false, 95, 10, "")],
-            ),
-        );
+        let unnamed = render(&request(
+            vec![],
+            vec![span(false, SpanKind::Server, false, 95, 10, "")],
+        ));
         assert!(
             unnamed.contains("CLABEL 'resource.attributes.service.name' 'unknown_service' 1\n")
         );
@@ -291,30 +290,22 @@ mod tests {
 
     #[test]
     fn an_all_zero_parent_id_marks_a_root() {
-        let requests = ServiceRequests::new(10).unwrap();
         let mut root = span(false, SpanKind::Internal, false, 95, 10, "");
         root.parent_span_id = vec![0; 8];
-        let out = render(
-            &requests,
-            &request(vec![attr("service.name", "a")], vec![root]),
-        );
+        let out = render(&request(vec![attr("service.name", "a")], vec![root]));
         assert_eq!(values(&out, "success")[0], "1");
     }
 
     #[test]
     fn blank_identity_values_fall_back() {
-        let requests = ServiceRequests::new(10).unwrap();
-        let out = render(
-            &requests,
-            &request(
-                vec![
-                    attr("service.name", "  "),
-                    attr("deployment.environment.name", ""),
-                    attr("deployment.environment", "prod"),
-                ],
-                vec![span(false, SpanKind::Server, false, 95, 10, "")],
-            ),
-        );
+        let out = render(&request(
+            vec![
+                attr("service.name", "  "),
+                attr("deployment.environment.name", ""),
+                attr("deployment.environment", "prod"),
+            ],
+            vec![span(false, SpanKind::Server, false, 95, 10, "")],
+        ));
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'unknown_service' 1\n"));
         assert!(
             out.contains("CLABEL 'resource.attributes.deployment.environment.name' 'prod' 1\n")
@@ -333,14 +324,10 @@ mod tests {
         assert_eq!(adjusted_count("ot=th:ffffffffffffff"), (1u64 << 56) as f64);
         assert_eq!(adjusted_count("ot=th:fffffffffffffc"), (1u64 << 54) as f64);
 
-        let requests = ServiceRequests::new(10).unwrap();
-        let out = render(
-            &requests,
-            &request(
-                vec![attr("service.name", "a")],
-                vec![span(false, SpanKind::Server, false, 95, 10, "ot=th:8")],
-            ),
-        );
+        let out = render(&request(
+            vec![attr("service.name", "a")],
+            vec![span(false, SpanKind::Server, false, 95, 10, "ot=th:8")],
+        ));
         assert_eq!(values(&out, "success")[0], "2");
     }
 }

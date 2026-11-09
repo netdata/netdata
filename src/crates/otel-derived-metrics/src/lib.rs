@@ -3,11 +3,11 @@
 //! records by severity, and the plugin's own ingest outcomes and derivation
 //! health (self-monitoring).
 //!
-//! [`DerivedMetrics`] owns one `netdata_plugin_metrics::Aggregator` per metric
-//! set, each behind its own mutex, so recording from export requests never
-//! waits on the OTLP metrics `ChartManager` lock. An export request records
-//! into a request-local batch while it prepares its frames and commits the
-//! batch only after its write is durable, so a retried request is not counted
+//! Each of these is a metric set that owns its aggregator behind its own
+//! lock, so recording from export requests never waits on another set, nor on
+//! the OTLP metrics `ChartManager` lock. An export request records into a
+//! request-local batch while it prepares its frames and commits the batch
+//! only after its write is durable, so a retried request is not counted
 //! twice. The ingestor calls [`DerivedMetrics::emit`] once per second; the
 //! chunks it returns travel to the supervisor as chart data.
 
@@ -15,13 +15,16 @@ mod self_monitoring;
 mod service;
 mod service_log_records;
 mod service_requests;
+mod shared_aggregator;
 
-use netdata_plugin_metrics::{Aggregator, Batch};
+use netdata_plugin_metrics::Batch;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use otel_bridge::config::DerivedMetricsConfig;
 use otel_bridge::signals::Signal;
-use std::sync::Mutex;
+use self_monitoring::{DerivationHealth, IngestOutcomes};
+use service_log_records::ServiceLogRecords;
+use service_requests::ServiceRequests;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Largest chunk [`DerivedMetrics::emit`] returns: far below the 16 MiB IPC
@@ -34,28 +37,17 @@ pub struct SpansBatch(Batch);
 /// The log records of one export request, recorded but not yet counted.
 pub struct LogsBatch(Batch);
 
-/// Merge a batch whose records are durable.
-fn commit(aggregator: &Mutex<Aggregator>, batch: Batch) {
-    if !batch.is_empty() {
-        aggregator.lock().unwrap().merge(batch, unix_now());
-    }
-}
-
 /// The per-service metric sets and their health: present when derived metrics
 /// are enabled.
 struct PerServiceMetrics {
-    requests: service_requests::ServiceRequests,
-    requests_aggregator: Mutex<Aggregator>,
-    log_records: service_log_records::ServiceLogRecords,
-    log_records_aggregator: Mutex<Aggregator>,
-    health: self_monitoring::DerivationHealth,
-    health_aggregator: Mutex<Aggregator>,
+    requests: ServiceRequests,
+    log_records: ServiceLogRecords,
+    health: DerivationHealth,
 }
 
 pub struct DerivedMetrics {
     per_service: Option<PerServiceMetrics>,
-    ingest_outcomes: self_monitoring::IngestOutcomes,
-    ingest_outcomes_aggregator: Mutex<Aggregator>,
+    ingest_outcomes: IngestOutcomes,
 }
 
 impl DerivedMetrics {
@@ -64,26 +56,17 @@ impl DerivedMetrics {
     /// A metric set that the plugin declares wrongly.
     pub fn new(config: &DerivedMetricsConfig) -> Result<Self, netdata_plugin_metrics::Error> {
         let per_service = if config.enabled {
-            let requests = service_requests::ServiceRequests::new(config.max_services)?;
-            let log_records = service_log_records::ServiceLogRecords::new(config.max_services)?;
-            let health = self_monitoring::DerivationHealth::new()?;
             Some(PerServiceMetrics {
-                requests_aggregator: Mutex::new(Aggregator::new(&requests.metric_set)),
-                requests,
-                log_records_aggregator: Mutex::new(Aggregator::new(&log_records.metric_set)),
-                log_records,
-                health_aggregator: Mutex::new(Aggregator::new(&health.metric_set)),
-                health,
+                requests: ServiceRequests::new(config.max_services)?,
+                log_records: ServiceLogRecords::new(config.max_services)?,
+                health: DerivationHealth::new()?,
             })
         } else {
             None
         };
-        let ingest_outcomes = self_monitoring::IngestOutcomes::new()?;
-        let ingest_outcomes_aggregator = Mutex::new(Aggregator::new(&ingest_outcomes.metric_set));
         Ok(Self {
             per_service,
-            ingest_outcomes,
-            ingest_outcomes_aggregator,
+            ingest_outcomes: IngestOutcomes::new()?,
         })
     }
 
@@ -91,7 +74,7 @@ impl DerivedMetrics {
     /// metrics are disabled.
     pub fn spans_batch(&self) -> Option<SpansBatch> {
         let per_service = self.per_service.as_ref()?;
-        Some(SpansBatch(Batch::new(&per_service.requests.metric_set)))
+        Some(SpansBatch(per_service.requests.batch()))
     }
 
     /// Record the requests among the spans of `request`, a normalized group
@@ -110,7 +93,7 @@ impl DerivedMetrics {
     /// Count a batch once its spans are durable.
     pub fn commit_spans(&self, batch: SpansBatch) {
         if let Some(per_service) = &self.per_service {
-            commit(&per_service.requests_aggregator, batch.0);
+            per_service.requests.aggregator.merge(batch.0, unix_now());
         }
     }
 
@@ -118,7 +101,7 @@ impl DerivedMetrics {
     /// derived metrics are disabled.
     pub fn logs_batch(&self) -> Option<LogsBatch> {
         let per_service = self.per_service.as_ref()?;
-        Some(LogsBatch(Batch::new(&per_service.log_records.metric_set)))
+        Some(LogsBatch(per_service.log_records.batch()))
     }
 
     /// Record the log records of `request`, a normalized group of an export
@@ -139,19 +122,18 @@ impl DerivedMetrics {
     /// Count a batch once its log records are durable.
     pub fn commit_logs(&self, batch: LogsBatch) {
         if let Some(per_service) = &self.per_service {
-            commit(&per_service.log_records_aggregator, batch.0);
+            per_service
+                .log_records
+                .aggregator
+                .merge(batch.0, unix_now());
         }
     }
 
     /// Count the outcome of one export request of `signal`: records stored
     /// and records rejected (reported to the sender as a partial success).
     pub fn record_ingest(&self, signal: Signal, accepted: u64, rejected: u64) {
-        let now = unix_now();
-        let batch = self.ingest_outcomes.ingest(signal, accepted, rejected, now);
-        self.ingest_outcomes_aggregator
-            .lock()
-            .unwrap()
-            .merge(batch, now);
+        self.ingest_outcomes
+            .record(signal, accepted, rejected, unix_now());
     }
 
     /// Emit every window whose allowed lateness has passed by `now` (Unix
@@ -159,24 +141,15 @@ impl DerivedMetrics {
     pub fn emit(&self, now: u64) -> Vec<Vec<u8>> {
         let mut chunks = Vec::new();
         if let Some(per_service) = &self.per_service {
-            let mut batch = Batch::new(&per_service.health.metric_set);
-            for (signal, aggregator) in [
-                (Signal::Traces, &per_service.requests_aggregator),
-                (Signal::Logs, &per_service.log_records_aggregator),
-            ] {
-                let mut aggregator = aggregator.lock().unwrap();
-                chunks.extend(aggregator.emit(now, MAX_CHUNK_BYTES));
-                per_service
-                    .health
-                    .record(&mut batch, signal, &aggregator.stats(), now);
-            }
-            let mut health_aggregator = per_service.health_aggregator.lock().unwrap();
-            health_aggregator.merge(batch, now);
-            chunks.extend(health_aggregator.emit(now, MAX_CHUNK_BYTES));
+            let requests_stats = per_service.requests.aggregator.emit(now, &mut chunks);
+            let log_records_stats = per_service.log_records.aggregator.emit(now, &mut chunks);
+            let signal_stats = [
+                (Signal::Traces, requests_stats),
+                (Signal::Logs, log_records_stats),
+            ];
+            per_service.health.emit(now, signal_stats, &mut chunks);
         }
-        let mut ingest_outcomes_aggregator = self.ingest_outcomes_aggregator.lock().unwrap();
-        ingest_outcomes_aggregator.merge(self.ingest_outcomes.heartbeat(now), now);
-        chunks.extend(ingest_outcomes_aggregator.emit(now, MAX_CHUNK_BYTES));
+        self.ingest_outcomes.emit(now, &mut chunks);
         chunks
     }
 }
