@@ -113,7 +113,9 @@ func (c *Client) tryConnect() ClientState {
 		// When the call deadline ends the wait first, SHM is not at fault
 		// and stays enabled for the next connect.
 		callLeft := time.Duration(c.opRemainingMs()) * time.Millisecond
-		callBound := callLeft < c.shmAttachTimeout
+		// The remaining time is rounded up, so a tie means the call deadline
+		// comes first.
+		callBound := callLeft <= c.shmAttachTimeout
 		deadline := time.Now().Add(min(callLeft, c.shmAttachTimeout))
 		for {
 			shm, serr := posix.ShmClientAttach(c.runDir, c.serviceName, session.SessionID)
@@ -158,7 +160,10 @@ func (c *Client) tryConnect() ClientState {
 	return StateReady
 }
 
-func (c *Client) transportSend(hdr *protocol.Header, payload []byte) error {
+// transportSend sends via the active transport. The baseline send ends at
+// timeoutMs (0 = no deadline) or on abort; the SHM send never waits for the
+// peer.
+func (c *Client) transportSend(hdr *protocol.Header, payload []byte, timeoutMs uint32) error {
 	payloadLen, err := checkedLookupU32(len(payload))
 	if err != nil {
 		c.noteRequestCapacity(^uint32(0))
@@ -201,7 +206,13 @@ func (c *Client) transportSend(hdr *protocol.Header, payload []byte) error {
 	if c.session == nil {
 		return protocol.ErrTransport
 	}
-	if err := c.session.Send(hdr, payload); err != nil {
+	if err := c.session.SendTimeout(hdr, payload, timeoutMs, c.abortSignal()); err != nil {
+		if errors.Is(err, posix.ErrTimeout) {
+			return protocol.ErrTimeout
+		}
+		if errors.Is(err, posix.ErrAborted) {
+			return protocol.ErrAborted
+		}
 		if errors.Is(err, posix.ErrLimitExceeded) {
 			c.noteRequestCapacity(payloadLen)
 			return protocol.ErrOverflow
@@ -271,6 +282,10 @@ func (c *Client) transportReceiveWithControl(timeoutMs uint32, abortCh <-chan st
 				}
 				if errors.Is(err, posix.ErrShmMsgTooLarge) {
 					return protocol.Header{}, nil, protocol.ErrOverflow
+				}
+				// A zero-length or corrupt slot is a truncated message.
+				if errors.Is(err, posix.ErrShmBadHeader) {
+					return protocol.Header{}, nil, protocol.ErrTruncated
 				}
 				return protocol.Header{}, nil, protocol.ErrTransport
 			}

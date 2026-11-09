@@ -123,12 +123,6 @@ func connectAndHandshake(fd int, path string, config *ClientConfig, wait receive
 	if err != nil {
 		return nil, err
 	}
-	// A server may only lower our proposal; a larger size could exceed what
-	// this side's kernel accepts as one datagram.
-	if ack.AgreedPacketSize <= protocol.HeaderSize || ack.AgreedPacketSize > pktSize {
-		return nil, wrapErr(ErrProtocol, "agreed packet_size out of range")
-	}
-
 	return &Session{
 		fd:                      fd,
 		role:                    RoleClient,

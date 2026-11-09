@@ -790,6 +790,10 @@ func (c *WinShmContext) WinShmReceive(buf []byte, timeoutMs uint32) (int, error)
 	if int(mlen) > maxCopy {
 		return int(mlen), ErrWinShmMsgTooLarge
 	}
+	// Send rejects zero-length messages, so one here is corruption.
+	if mlen == 0 {
+		return 0, fmt.Errorf("%w: zero-length message", ErrWinShmBadHeader)
+	}
 
 	return int(mlen), nil
 }

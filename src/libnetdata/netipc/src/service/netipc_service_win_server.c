@@ -78,6 +78,10 @@ nipc_error_t nipc_service_platform_server_init_raw(
   if (ierr != NIPC_OK)
     return ierr;
   server->base_config = *config;
+  /* 0 selects the baseline profile, as in the transport handshake; the
+   * accept path masks profiles and would otherwise reject every client. */
+  if (server->base_config.supported_profiles == 0)
+    server->base_config.supported_profiles = NIPC_PROFILE_BASELINE;
   server->auth_token = config->auth_token;
   ierr = nipc_service_common_server_alloc_sessions(
       server, nipc_service_win_calloc,
@@ -149,11 +153,21 @@ void nipc_server_run(nipc_managed_server_t *server) {
    * released the listener and the session lock. */
   if (server_stop_requested(server))
     return;
+  /* running is set before the stop check: a stop the check misses clears
+   * it afterwards. The loop is published, then the stop is checked; drain
+   * and destroy publish the stop, then check the loop. Interlocked calls
+   * are full barriers, so at least one side sees the other: either they
+   * wait for this loop, or it sees the stop and leaves the listener to
+   * them. */
   InterlockedExchange(&server->accept_loop_thread_id, (LONG)GetCurrentThreadId());
-  InterlockedExchange(&server->accept_loop_active, 1);
   InterlockedExchange(&server->running, 1);
-  if (server_stop_requested(server))
+  InterlockedExchange(&server->accept_loop_active, 1);
+  if (server_stop_requested(server)) {
     InterlockedExchange(&server->running, 0);
+    InterlockedExchange(&server->accept_loop_active, 0);
+    InterlockedExchange(&server->accept_loop_thread_id, 0);
+    return;
+  }
 
   while (InterlockedCompareExchange(&server->running, 0, 0)) {
     /* The handshake runs on the session thread, so a client that never

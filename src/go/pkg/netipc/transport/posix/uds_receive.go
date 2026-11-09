@@ -113,6 +113,10 @@ func (s *Session) ReceiveTimeout(buf []byte, timeoutMs uint32, abortCh <-chan st
 	if s.fd < 0 {
 		return protocol.Header{}, nil, wrapErr(ErrBadParam, "session closed")
 	}
+	// Rejected before any byte is read, so the session stays usable.
+	if len(buf) < protocol.HeaderSize {
+		return protocol.Header{}, nil, wrapErr(ErrBadParam, "receive buffer too small")
+	}
 
 	s.initReceiveFns()
 	s.recvControl = timeoutMs != 0 || abortCh != nil
@@ -147,7 +151,7 @@ func (s *Session) initReceiveFns() {
 		if s.role == RoleServer {
 			maxPayload, maxItems = s.MaxRequestPayloadBytes, s.MaxRequestBatchItems
 		}
-		n, err := streamRecvSessionPacket(s.fd, &s.pending, dst, s.streamFirst, s.PacketSize, maxPayload, maxItems, waitp)
+		n, err := streamRecvSessionPacket(s.fd, &s.pending, dst, s.streamFirst, s.PacketSize, maxPayload, maxItems, waitp, &s.streamConsumed)
 		s.streamFirst = false
 		return n, err
 	}
@@ -158,9 +162,10 @@ func (s *Session) initReceiveFns() {
 // inside a message.
 var errRecvFailed = wrapErr(ErrRecv, "an earlier receive failed inside a message")
 
-// receiveStream receives on a stream socket. A timeout or abort before the
-// first byte leaves the stream on a packet boundary. A failure after it does
-// not: the rest of the message is still queued, so every later receive fails.
+// receiveStream receives on a stream socket. A failure before the first byte
+// (a timeout or abort, also one that fires after the wait below) leaves the
+// stream on a packet boundary. A failure after it does not: the rest of the
+// message is still queued, so every later receive fails.
 // The session records that instead of shutting the read side, whose effect
 // differs by OS (FreeBSD 15 fails the peer's sends, FreeBSD 14 still returns
 // queued bytes). Sends stay valid; they always write whole messages.
@@ -174,8 +179,9 @@ func (s *Session) receiveStream(buf []byte) (protocol.Header, []byte, error) {
 		}
 	}
 	s.streamFirst = true
+	s.streamConsumed = false
 	hdr, payload, err := s.receiveFraming(buf, s.recvStreamFn, true)
-	if err != nil {
+	if err != nil && s.streamConsumed {
 		s.recvFailed = true
 		// Queued bytes are part of the abandoned stream too.
 		s.pending = pendingQueue{}

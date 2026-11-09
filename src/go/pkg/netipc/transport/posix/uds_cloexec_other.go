@@ -2,7 +2,11 @@
 
 package posix
 
-import "syscall"
+import (
+	"syscall"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/syspoll"
+)
 
 // Sockets must not leak into children a consumer forks and execs: an
 // inherited session socket keeps the peer from ever seeing EOF, which is the
@@ -20,12 +24,47 @@ func udsSocket() (int, error) {
 	return fd, err
 }
 
-// accept may block, so it cannot hold ForkLock; the flag follows at once.
+// prepareListener makes the listener non-blocking, so acceptCloexec can hold
+// ForkLock across accept and the close-on-exec flag without blocking in it.
+func prepareListener(fd int) error {
+	return syscall.SetNonblock(fd, true)
+}
+
+// acceptCloexec accepts under ForkLock, as Go's net package does: a fork
+// between accept and the close-on-exec flag would leak the connection into
+// the child. The listener is non-blocking, so the wait for a client polls
+// without the lock.
 func acceptCloexec(fd int) (int, error) {
-	nfd, _, err := syscall.Accept(fd)
-	if err == nil {
-		syscall.CloseOnExec(nfd)
-		setNoSigpipe(nfd)
+	for {
+		syscall.ForkLock.RLock()
+		nfd, _, err := syscall.Accept(fd)
+		if err == nil {
+			syscall.CloseOnExec(nfd)
+		}
+		syscall.ForkLock.RUnlock()
+
+		switch {
+		case err == nil:
+			// A BSD socket inherits O_NONBLOCK from its listener; sessions
+			// expect a blocking descriptor.
+			if err := syscall.SetNonblock(nfd, false); err != nil {
+				_ = syscall.Close(nfd)
+				return -1, err
+			}
+			setNoSigpipe(nfd)
+			return nfd, nil
+		case err == syscall.EINTR:
+			continue
+		case err != syscall.EAGAIN && err != syscall.EWOULDBLOCK:
+			return -1, err
+		}
+
+		pfd := syspoll.PollFd{Fd: int32(fd), Events: syspoll.In} // #nosec G115 -- fd is an open descriptor.
+		if _, errno := syspoll.Poll(&pfd, -1); errno != 0 && errno != syscall.EINTR {
+			return -1, errno
+		}
+		if pfd.Revents&syspoll.Nval != 0 {
+			return -1, syscall.EBADF
+		}
 	}
-	return nfd, err
 }

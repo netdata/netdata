@@ -106,7 +106,9 @@ func (c *Client) tryConnect() ClientState {
 		// When the call deadline ends the wait first, WinSHM is not at
 		// fault and stays enabled for the next connect.
 		callLeft := time.Duration(c.opRemainingMs()) * time.Millisecond
-		callBound := callLeft < c.shmAttachTimeout
+		// The remaining time is rounded up, so a tie means the call deadline
+		// comes first.
+		callBound := callLeft <= c.shmAttachTimeout
 		deadline := time.Now().Add(min(callLeft, c.shmAttachTimeout))
 		for {
 			shm, serr := windows.WinShmClientAttach(
@@ -156,7 +158,10 @@ func (c *Client) tryConnect() ClientState {
 	return StateReady
 }
 
-func (c *Client) transportSend(hdr *protocol.Header, payload []byte) error {
+// transportSend sends via the active transport. The baseline send ends at
+// timeoutMs (0 = no deadline) or on abort; the SHM send never waits for the
+// peer.
+func (c *Client) transportSend(hdr *protocol.Header, payload []byte, timeoutMs uint32) error {
 	if c.shm != nil {
 		if len(payload) > int(c.sessionMaxRequestPayloadBytes()) {
 			c.noteRequestCapacity(uint32(len(payload)))
@@ -189,7 +194,13 @@ func (c *Client) transportSend(hdr *protocol.Header, payload []byte) error {
 	if c.session == nil {
 		return protocol.ErrTransport
 	}
-	if err := c.session.Send(hdr, payload); err != nil {
+	if err := c.session.SendTimeout(hdr, payload, timeoutMs, c.abortSignal()); err != nil {
+		if errors.Is(err, windows.ErrTimeout) {
+			return protocol.ErrTimeout
+		}
+		if errors.Is(err, windows.ErrAborted) {
+			return protocol.ErrAborted
+		}
 		if errors.Is(err, windows.ErrLimitExceeded) {
 			c.noteRequestCapacity(uint32(len(payload)))
 			return protocol.ErrOverflow

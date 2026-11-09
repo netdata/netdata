@@ -457,9 +457,10 @@ func TestShmChaosForgedLength(t *testing.T) {
 		mlen, recvErr := srv.ShmReceive(buf, 1000)
 
 		if forgedLen == 0 {
-			// Zero-length: no copy, no error, returns 0 bytes
-			if recvErr != nil {
-				t.Errorf("forged req_len=0: unexpected error: %v", recvErr)
+			// Zero-length: send rejects it, so it is corruption (spec,
+			// level1-posix-shm.md "Server receives a request", step 4).
+			if !errors.Is(recvErr, ErrShmBadHeader) {
+				t.Errorf("forged req_len=0: got err=%v, want ErrShmBadHeader", recvErr)
 			}
 			if mlen != 0 {
 				t.Errorf("forged req_len=0: got mlen=%d, want 0", mlen)
@@ -500,8 +501,8 @@ func TestShmChaosForgedLength(t *testing.T) {
 		mlen, recvErr := client.ShmReceive(buf, 1000)
 
 		if forgedLen == 0 {
-			if recvErr != nil {
-				t.Errorf("forged resp_len=0: unexpected error: %v", recvErr)
+			if !errors.Is(recvErr, ErrShmBadHeader) {
+				t.Errorf("forged resp_len=0: got err=%v, want ErrShmBadHeader", recvErr)
 			}
 			if mlen != 0 {
 				t.Errorf("forged resp_len=0: got mlen=%d, want 0", mlen)

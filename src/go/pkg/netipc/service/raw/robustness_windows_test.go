@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -522,5 +523,138 @@ func TestWinRobustShmAttachStopsWhenServerClosesSession(t *testing.T) {
 	}
 	if !usesShm {
 		t.Error("refused client must still use WinSHM")
+	}
+}
+
+// A worker whose thread handle cannot be opened could not be cancelled at
+// stop, so the server refuses its connection before HELLO_ACK and keeps
+// serving the next one.
+func TestWinRobustWorkerWithoutThreadHandleRefused(t *testing.T) {
+	// Installed before the server starts, restored after it stopped.
+	var failing atomic.Bool
+	failing.Store(true)
+	open := openWorkerThread
+	openWorkerThread = func(tid uintptr) syscall.Handle {
+		if failing.Load() {
+			return 0
+		}
+		return open(tid)
+	}
+	defer func() { openWorkerThread = open }()
+
+	svc := uniqueWinService("go_win_rob_nothread")
+	ts := startTestServerWin(svc, protocol.MethodIncrement, winPingPongIncrementDispatch())
+	defer ts.stop()
+
+	refused := NewIncrementClient(winTestRunDir, svc, testWinClientConfig())
+	refused.Refresh()
+	ready := refused.Ready()
+	refused.Close()
+	if ready {
+		t.Fatal("client became ready although its worker had no thread handle")
+	}
+
+	failing.Store(false)
+	c := NewIncrementClient(winTestRunDir, svc, testWinClientConfig())
+	defer c.Close()
+	c.Refresh()
+	if v, err := c.CallIncrement(1); err != nil || v != 2 {
+		t.Fatalf("call after the refused connection = %d, %v", v, err)
+	}
+}
+
+const (
+	winStalledReaderRequestBytes = 8 * 1024 * 1024
+	winStalledReaderPids         = 1024 * 1024
+)
+
+// startWinStalledReader completes the handshake and never reads. It closes
+// started once the request's first bytes arrived, then holds the session
+// until release is closed.
+func startWinStalledReader(t *testing.T, svc string, started, release chan struct{}) chan struct{} {
+	t.Helper()
+	cfg := testWinServerConfig()
+	cfg.MaxRequestPayloadBytes = winStalledReaderRequestBytes
+	listener, err := windows.Listen(winTestRunDir, svc, cfg)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer listener.Close()
+		session, err := listener.Accept()
+		if err != nil {
+			close(started)
+			return
+		}
+		defer session.Close()
+		if readable, err := session.WaitReadable(10_000); err != nil || !readable {
+			t.Errorf("no request bytes arrived: readable=%v err=%v", readable, err)
+		}
+		close(started)
+		select {
+		case <-release:
+		case <-time.After(10 * time.Second):
+		}
+	}()
+	return done
+}
+
+// A request the server never reads ends at the call deadline, or on abort,
+// instead of blocking in the write.
+func TestWinRobustSendBoundedByDeadlineAndAbort(t *testing.T) {
+	pids := make([]uint32, winStalledReaderPids)
+	for i := range pids {
+		pids[i] = uint32(i + 1) // #nosec G115 -- bounded by winStalledReaderPids.
+	}
+	for _, useAbort := range []bool{false, true} {
+		name := "send_deadline"
+		if useAbort {
+			name = "send_abort"
+		}
+		t.Run(name, func(t *testing.T) {
+			svc := uniqueWinService("go_winrob_" + name)
+			started := make(chan struct{})
+			release := make(chan struct{})
+			done := startWinStalledReader(t, svc, started, release)
+
+			ccfg := testWinClientConfig()
+			ccfg.MaxRequestPayloadBytes = winStalledReaderRequestBytes
+			client := NewAppsLookupClient(winTestRunDir, svc, ccfg)
+			client.SetLookupLogicalConfig(LookupLogicalConfig{MaxItems: winStalledReaderPids})
+			waitWinClientReady(t, client)
+
+			timeoutMs := uint32(200)
+			if useAbort {
+				timeoutMs = 30_000
+			}
+			start := time.Now()
+			result := make(chan error, 1)
+			go func() {
+				_, err := client.CallAppsLookupWithTimeout(pids, timeoutMs)
+				result <- err
+			}()
+			if useAbort {
+				<-started
+				client.Abort()
+			}
+			err := <-result
+			elapsed := time.Since(start)
+			close(release)
+			<-done
+			client.Close()
+
+			want := protocol.ErrTimeout
+			if useAbort {
+				want = protocol.ErrAborted
+			}
+			if !errors.Is(err, want) {
+				t.Fatalf("blocked send = %v, want %v", err, want)
+			}
+			if elapsed > 5*time.Second {
+				t.Fatalf("blocked send took %v", elapsed)
+			}
+		})
 	}
 }

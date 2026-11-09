@@ -63,18 +63,25 @@ static int uds_socket_cloexec(void)
     return fd;
 }
 
+/* A signal that interrupts the wait is retried: it must not end the
+ * server's accept loop. */
 static int accept_cloexec(int listen_fd)
 {
+    int fd;
 #if defined(SOCK_CLOEXEC) && (defined(__linux__) || defined(__FreeBSD__))
-    return accept4(listen_fd, NULL, NULL, SOCK_CLOEXEC);
+    do {
+        fd = accept4(listen_fd, NULL, NULL, SOCK_CLOEXEC);
+    } while (fd < 0 && errno == EINTR);
 #else
-    int fd = accept(listen_fd, NULL, NULL);
+    do {
+        fd = accept(listen_fd, NULL, NULL);
+    } while (fd < 0 && errno == EINTR);
     if (fd >= 0) {
         (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
         uds_set_nosigpipe(fd);
     }
-    return fd;
 #endif
+    return fd;
 }
 
 static int fill_sockaddr_path(struct sockaddr_un *addr, const char *path);
@@ -99,9 +106,11 @@ static int remove_bind_dir(const char *dir, const char *tmp)
  * 0777 & ~umask. The socket is bound inside a private 0700 directory,
  * narrowed to owner-only there, then renamed into place, so it is never
  * reachable with a wider mode and the process-global umask is untouched.
- * After mkdir() every step but bind() goes through a descriptor of the
- * directory, so a directory swapped in at the same path makes the listen
- * fail instead of placing a socket someone else can reach.
+ * fchmodat() and open() resolve the directory by path without following a
+ * symlink, and the owner check on the opened descriptor refuses a directory
+ * another account swapped in. After that check every step but bind() goes
+ * through the descriptor, so a later swap makes the listen fail instead of
+ * placing a socket someone else can reach.
  * Returns 0, -1 on a socket error, -2 if the bind path is too long. */
 static int bind_owner_only_socket(int fd, const char *run_dir,
                                   const char *service_name, const char *path)
@@ -244,6 +253,10 @@ int nipc_uds_build_socket_path(char *dst, size_t dst_len,
                                const char *run_dir,
                                const char *service_name)
 {
+    /* An empty run_dir would put the socket at "/<name>". */
+    if (!run_dir || run_dir[0] == '\0')
+        return -2;
+
     char socket_name[sizeof(((struct sockaddr_un *)0)->sun_path)];
     int name_rc = nipc_uds_build_socket_name(socket_name, sizeof(socket_name),
                                              service_name);
@@ -326,6 +339,48 @@ void nipc_uds_set_listen_hook_for_tests(void (*hook)(void *user), void *user)
     g_listen_hook = hook;
 }
 
+static void (*g_lock_publish_hook)(const char *tmp_path, void *user);
+static void *g_lock_publish_hook_user;
+
+void nipc_uds_set_lock_publish_hook_for_tests(
+    void (*hook)(const char *tmp_path, void *user), void *user)
+{
+    g_lock_publish_hook_user = user;
+    g_lock_publish_hook = hook;
+}
+
+/* A file created under a umask without owner bits stays unopenable if the
+ * process dies before fchmod(), so a missing lock gets its name only once it
+ * is 0600. Best effort: the caller's creating open covers every failure,
+ * such as a filesystem without hard links, and a losing link() means another
+ * starter published the file first. */
+static void publish_endpoint_lock(const char *lock_path)
+{
+    static unsigned seq;
+    char tmp[sizeof(((struct sockaddr_un *)0)->sun_path) + 64];
+    int n = snprintf(tmp, sizeof(tmp), "%s.%ld.%u.tmp", lock_path,
+                     (long)getpid(),
+                     __atomic_fetch_add(&seq, 1u, __ATOMIC_RELAXED));
+    if (n < 0 || (size_t)n >= sizeof(tmp))
+        return;
+
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
+                  0600);
+    if (fd < 0)
+        return;
+    int restricted = fchmod(fd, S_IRUSR | S_IWUSR) == 0;
+    close(fd);
+    if (restricted) {
+        if (g_lock_publish_hook)
+            g_lock_publish_hook(tmp, g_lock_publish_hook_user);
+        /* A (void) cast does not silence warn_unused_result under
+         * _FORTIFY_SOURCE; a failed link() is handled by the caller. */
+        int linked = link(tmp, lock_path);
+        (void)linked;
+    }
+    unlink(tmp);
+}
+
 /* Take the endpoint lock {run_dir}/{service_name}.lock. A server's socket
  * file exists from bind() until listen(), and connects in that window are
  * refused just as for a dead server's leftover file, so a connect probe
@@ -344,12 +399,16 @@ static int acquire_endpoint_lock(const char *run_dir, const char *service_name,
     if (n < 0 || (size_t)n >= sizeof(lock_path))
         return -1;
 
-    /* The file takes 0600 & ~umask. A umask without owner read or write
-     * would leave it unopenable read-write, so a narrower open follows
-     * (flock() works on any access mode) and fchmod() restores 0600 for the
-     * next starter. fchmod() fails only for a file another account owns,
-     * which the lock still works on. */
-    int fd = open(lock_path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+    /* A file left with mode bits missing, by an older build or a fallback
+     * create under a umask without owner read or write, may not reopen
+     * read-write, so a narrower open follows (flock() works on any access
+     * mode) and fchmod() restores 0600 for the next starter. fchmod() fails
+     * only for a file another account owns, which the lock still works on. */
+    int fd = open(lock_path, O_RDWR | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0 && errno == ENOENT) {
+        publish_endpoint_lock(lock_path);
+        fd = open(lock_path, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+    }
     if (fd < 0 && errno == EACCES)
         fd = open(lock_path, O_WRONLY | O_CLOEXEC | O_NOFOLLOW);
     if (fd < 0 && errno == EACCES)
@@ -384,8 +443,12 @@ nipc_uds_error_t nipc_uds_listen(const char *run_dir,
                                   const nipc_uds_server_config_t *config,
                                   nipc_uds_listener_t *out)
 {
+    if (!out)
+        return NIPC_UDS_ERR_BAD_PARAM;
     memset(out, 0, sizeof(*out));
     out->fd = -1;
+    if (!config)
+        return NIPC_UDS_ERR_BAD_PARAM;
 
     char path[sizeof(((struct sockaddr_un *)0)->sun_path)];
     int path_rc = nipc_uds_build_socket_path(path, sizeof(path), run_dir,
@@ -605,8 +668,12 @@ nipc_uds_error_t nipc_uds_connect_timeout(const char *run_dir,
                                            int abort_fd,
                                            nipc_uds_session_t *out)
 {
+    if (!out)
+        return NIPC_UDS_ERR_BAD_PARAM;
     memset(out, 0, sizeof(*out));
     out->fd = -1;
+    if (!config)
+        return NIPC_UDS_ERR_BAD_PARAM;
 
     uint64_t deadline_ms = timeout_ms ? connect_monotonic_ms() + timeout_ms : 0;
 
@@ -680,7 +747,7 @@ void nipc_uds_close_session(nipc_uds_session_t *session)
     nipc_uds_pending_free(session);
 }
 
-void nipc_uds_close_listener(nipc_uds_listener_t *listener)
+void nipc_uds_stop_listening(nipc_uds_listener_t *listener)
 {
     if (!listener)
         return;
@@ -694,6 +761,14 @@ void nipc_uds_close_listener(nipc_uds_listener_t *listener)
         unlink(listener->path);
         listener->path[0] = '\0';
     }
+}
+
+void nipc_uds_close_listener(nipc_uds_listener_t *listener)
+{
+    if (!listener)
+        return;
+
+    nipc_uds_stop_listening(listener);
 
     /* Release the endpoint only after its socket file is gone. */
     if (listener->has_lock) {

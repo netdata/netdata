@@ -241,8 +241,21 @@ impl ShmContext {
             return Err(ShmError::Open(errno()));
         }
         // The file takes 0600 & ~umask; a umask without owner read or write
-        // would stop the client from attaching read-write.
-        unsafe { libc::fchmod(fd, libc::S_IRUSR | libc::S_IWUSR) };
+        // would stop the client from attaching read-write. A region the
+        // client cannot attach is not created: the session then drops SHM.
+        loop {
+            if unsafe { libc::fchmod(fd, libc::S_IRUSR | libc::S_IWUSR) } == 0 {
+                break;
+            }
+            let e = errno();
+            if e != libc::EINTR {
+                unsafe {
+                    libc::close(fd);
+                    libc::unlink(c_path.as_ptr());
+                }
+                return Err(ShmError::Open(e));
+            }
+        }
 
         if let Err(e) = allocate_region(fd, region_size) {
             unsafe {
@@ -812,6 +825,9 @@ fn validate_service_name(name: &str) -> Result<(), ShmError> {
 }
 
 fn build_shm_path(run_dir: &str, service_name: &str, session_id: u64) -> Result<PathBuf, ShmError> {
+    if run_dir.is_empty() {
+        return Err(ShmError::BadParam("empty run_dir".into()));
+    }
     validate_service_name(service_name)?;
     let path = Path::new(run_dir).join(format!("{service_name}-{session_id:016x}.ipcshm"));
     if path.to_string_lossy().len() >= 256 {

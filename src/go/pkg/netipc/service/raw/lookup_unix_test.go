@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1042,6 +1043,75 @@ func TestLookupCallsReconnectForRequestCapacityGrowth(t *testing.T) {
 		}
 		if client.Status().ReconnectCount == 0 {
 			t.Fatal("cgroups lookup capacity retry did not reconnect")
+		}
+	})
+}
+
+// A capacity reconnect that fails ends the lookup with the reconnect's
+// error, as in C and Rust: here a socket that never answers HELLO, so the
+// lookup deadline ends it.
+func TestLookupCapacityReconnectFailureReported(t *testing.T) {
+	t.Run("apps", func(t *testing.T) {
+		svc := uniqueUnixService("go_svc_apps_lookup_capacity_fail")
+		cfg := testServerConfig()
+		cfg.MaxRequestPayloadBytes = 256
+		ts := startLookupTestServerWithConfig(svc, protocol.MethodAppsLookup, AppsLookupDispatch(testAppsLookupHandler), cfg, 8)
+		ccfg := testClientConfig()
+		ccfg.MaxRequestPayloadBytes = 256
+		client := NewAppsLookupClient(testRunDir, svc, ccfg)
+		defer client.Close()
+		refreshUnixClientReady(t, client)
+		ts.stop()
+		fd := rawListener(t, svc)
+		defer syscall.Close(fd)
+		defer cleanupAll(svc)
+		client.session.MaxRequestPayloadBytes = 8
+
+		if _, err := client.CallAppsLookupWithTimeout([]uint32{1234}, 100); !errors.Is(err, protocol.ErrTimeout) {
+			t.Fatalf("apps lookup with a failed capacity reconnect = %v, want ErrTimeout", err)
+		}
+	})
+
+	t.Run("cgroups", func(t *testing.T) {
+		svc := uniqueUnixService("go_svc_cgroups_lookup_capacity_fail")
+		cfg := testServerConfig()
+		cfg.MaxRequestPayloadBytes = 256
+		ts := startLookupTestServerWithConfig(svc, protocol.MethodCgroupsLookup, CgroupsLookupDispatch(testCgroupsLookupHandler), cfg, 8)
+		ccfg := testClientConfig()
+		ccfg.MaxRequestPayloadBytes = 256
+		client := NewCgroupsLookupClient(testRunDir, svc, ccfg)
+		defer client.Close()
+		refreshUnixClientReady(t, client)
+		ts.stop()
+		fd := rawListener(t, svc)
+		defer syscall.Close(fd)
+		defer cleanupAll(svc)
+		client.session.MaxRequestPayloadBytes = 8
+
+		if _, err := client.CallCgroupsLookupWithTimeout([][]byte{[]byte("/known")}, 100); !errors.Is(err, protocol.ErrTimeout) {
+			t.Fatalf("cgroups lookup with a failed capacity reconnect = %v, want ErrTimeout", err)
+		}
+	})
+
+	// The item fits the client's limit, so a failed reconnect is an error,
+	// not an oversized item.
+	t.Run("cgroups endpoint gone", func(t *testing.T) {
+		svc := uniqueUnixService("go_svc_cgroups_lookup_capacity_gone")
+		cfg := testServerConfig()
+		cfg.MaxRequestPayloadBytes = 256
+		ts := startLookupTestServerWithConfig(svc, protocol.MethodCgroupsLookup, CgroupsLookupDispatch(testCgroupsLookupHandler), cfg, 8)
+		ccfg := testClientConfig()
+		ccfg.MaxRequestPayloadBytes = 256
+		client := NewCgroupsLookupClient(testRunDir, svc, ccfg)
+		defer client.Close()
+		refreshUnixClientReady(t, client)
+		ts.stop()
+		cleanupAll(svc)
+		client.session.MaxRequestPayloadBytes = 8
+
+		view, err := client.CallCgroupsLookup([][]byte{[]byte("/known")})
+		if !errors.Is(err, protocol.ErrOverflow) {
+			t.Fatalf("cgroups lookup after its endpoint left = view %+v, err %v; want ErrOverflow", view, err)
 		}
 	})
 }

@@ -200,6 +200,157 @@ func TestPipeConnectWaitsForBusyPipe(t *testing.T) {
 	server.Close()
 }
 
+func TestPipeConnectRetriesStolenInstance(t *testing.T) {
+	service := uniquePipeService(t)
+	listener := startListener(t, testPipeRunDir, service, defaultServerConfig())
+	defer listener.Close()
+
+	pipeName, err := BuildPipeName(testPipeRunDir, service)
+	if err != nil {
+		t.Fatalf("BuildPipeName: %v", err)
+	}
+	holder, err := createClientPipe(&pipeName[0])
+	if err != nil {
+		t.Fatalf("holder: %v", err)
+	}
+	defer syscall.CloseHandle(holder)
+
+	busy := make(chan struct{})
+	var busyOnce sync.Once
+	connectBusyHook = func() { busyOnce.Do(func() { close(busy) }) }
+	defer func() { connectBusyHook = nil }()
+	// Once waitNamedPipe reports the instance the server created on accept,
+	// a third client takes it first, once.
+	thief := syscall.InvalidHandle
+	var thiefErr error
+	stolen := make(chan struct{})
+	var stealOnce sync.Once
+	connectWaitedHook = func() {
+		stealOnce.Do(func() {
+			thief, thiefErr = createClientPipe(&pipeName[0])
+			close(stolen)
+		})
+	}
+	defer func() { connectWaitedHook = nil }()
+
+	// Accept the holder, then the thief, then the retrying client.
+	done := make(chan struct{})
+	accepted := make(chan *Session, 1)
+	go func() {
+		defer close(accepted)
+		select {
+		case <-busy:
+		case <-done:
+			return
+		}
+		first, err := listener.AcceptPending()
+		if err != nil {
+			return
+		}
+		defer first.Close()
+		select {
+		case <-stolen:
+		case <-done:
+			return
+		}
+		second, err := listener.AcceptPending()
+		if err != nil {
+			return
+		}
+		defer second.Close()
+		third, err := listener.AcceptPending()
+		if err != nil {
+			return
+		}
+		if session, err := third.Handshake(3, defaultServerConfig(), 10000, nil); err == nil {
+			accepted <- session
+		}
+	}()
+
+	client, err := Connect(testPipeRunDir, service, defaultClientConfigPtr())
+	if err != nil {
+		close(done)
+		t.Fatalf("connect after the instance was taken: %v", err)
+	}
+	defer client.Close()
+	if thiefErr != nil {
+		t.Fatalf("thief: %v", thiefErr)
+	}
+	defer syscall.CloseHandle(thief)
+
+	server, ok := <-accepted
+	if !ok {
+		t.Fatal("server did not accept the retrying client")
+	}
+	server.Close()
+}
+
+// A failed replacement instance drops the accepted client and keeps the
+// listener's instance, so the next client is still accepted.
+func TestPipeAcceptSurvivesFailedInstance(t *testing.T) {
+	service := uniquePipeService(t)
+	listener := startListener(t, testPipeRunDir, service, defaultServerConfig())
+	defer listener.Close()
+
+	pipeName, err := BuildPipeName(testPipeRunDir, service)
+	if err != nil {
+		t.Fatalf("BuildPipeName: %v", err)
+	}
+	dropped, err := createClientPipe(&pipeName[0])
+	if err != nil {
+		t.Fatalf("first client: %v", err)
+	}
+	defer syscall.CloseHandle(dropped)
+
+	failNextInstances.Store(1)
+	_, err = listener.AcceptPending()
+	failNextInstances.Store(0)
+	if !errors.Is(err, ErrCreatePipe) {
+		t.Fatalf("AcceptPending = %v, want ErrCreatePipe", err)
+	}
+	if _, err := peekNamedPipeAvailable(dropped); err == nil {
+		t.Fatal("first client is still connected")
+	}
+
+	// The disconnected instance takes no client until accept listens on it
+	// again, so the next client finds the pipe busy first.
+	busy := make(chan struct{})
+	var busyOnce sync.Once
+	connectBusyHook = func() { busyOnce.Do(func() { close(busy) }) }
+	defer func() { connectBusyHook = nil }()
+
+	done := make(chan struct{})
+	accepted := make(chan *Session, 1)
+	go func() {
+		defer close(accepted)
+		select {
+		case <-busy:
+		case <-done:
+			return
+		}
+		pending, err := listener.AcceptPending()
+		if err != nil {
+			return
+		}
+		if session, err := pending.Handshake(1, defaultServerConfig(), 10000, nil); err == nil {
+			accepted <- session
+		}
+	}()
+
+	client, err := ConnectTimeout(testPipeRunDir, service, defaultClientConfigPtr(), 10000, nil)
+	if err != nil {
+		close(done)
+		t.Fatalf("next client connect: %v", err)
+	}
+	defer client.Close()
+
+	server, ok := <-accepted
+	if !ok {
+		t.Fatal("server did not accept the next client")
+	}
+	server.Close()
+}
+
 func TestPipeWaitReadable(t *testing.T) {
 	client, server := sessionPair(t, defaultServerConfig(), defaultClientConfig())
 

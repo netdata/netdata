@@ -15,10 +15,12 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/syspoll"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
 )
@@ -618,5 +620,176 @@ func clientNoticesCrashedServer(t *testing.T, shm bool) {
 	}
 	if !errors.Is(r.err, protocol.ErrDisconnected) {
 		t.Errorf("call must report the server as disconnected: err=%v", r.err)
+	}
+}
+
+// Run closes the listening socket when its loop exits; the endpoint lock
+// stays held until every worker has exited.
+func TestRobustShutdownClosesSocketBeforeEndpoint(t *testing.T) {
+	svc := robustService("shut_order")
+	ensureRunDir()
+	cleanupAll(svc)
+	defer cleanupAll(svc)
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var enteredOnce sync.Once
+	handler := IncrementDispatch(func(v uint64) (uint64, bool) {
+		enteredOnce.Do(func() { close(entered) })
+		<-release
+		return v + 1, true
+	})
+	s := NewServerWithWorkers(testRunDir, svc, testServerConfig(), protocol.MethodIncrement, handler, 1)
+	doneCh := runServerForTest(s)
+
+	c := NewIncrementClient(testRunDir, svc, testClientConfig())
+	defer c.Close()
+	c.Refresh()
+	if !c.Ready() {
+		s.Stop()
+		waitClosed(doneCh, "server Run")
+		t.Fatalf("client not ready: %+v", c.Status())
+	}
+	callErr := make(chan error, 1)
+	go func() {
+		_, err := c.CallIncrementWithTimeout(1, 10000)
+		callErr <- err
+	}()
+	waitClosed(entered, "increment handler")
+
+	// Run returns only after the workers exit. After its grace the server
+	// shuts the blocked worker's socket, which fails the call; the worker
+	// itself stays in the handler.
+	s.Stop()
+	if err := <-callErr; err == nil {
+		t.Error("blocked call succeeded; want a failure once its socket is shut")
+	}
+	_, statErr := os.Stat(testRunDir + "/" + svc + ".sock")
+	socketGone := errors.Is(statErr, os.ErrNotExist)
+	other, listenErr := posix.Listen(testRunDir, svc, testServerConfig())
+	if listenErr == nil {
+		other.Close()
+	}
+
+	close(release)
+	waitClosed(doneCh, "server Run")
+	free, freeErr := posix.Listen(testRunDir, svc, testServerConfig())
+	if freeErr == nil {
+		free.Close()
+	}
+
+	if !socketGone {
+		t.Errorf("socket file still present after the accept loop exited: stat err=%v", statErr)
+	}
+	if listenErr == nil {
+		t.Error("endpoint taken by another server while a worker still runs")
+	}
+	if freeErr != nil {
+		t.Errorf("endpoint not free once the server stopped: %v", freeErr)
+	}
+}
+
+const (
+	stalledReaderRequestBytes = 8 * 1024 * 1024
+	stalledReaderPids         = 1024 * 1024
+)
+
+// startStalledReader completes the handshake and never reads. It closes
+// started once the request's first bytes arrived, then holds the session
+// until release is closed.
+func startStalledReader(t *testing.T, svc string, started, release chan struct{}) chan struct{} {
+	t.Helper()
+	ensureRunDir()
+	cleanupAll(svc)
+	cfg := testServerConfig()
+	cfg.MaxRequestPayloadBytes = stalledReaderRequestBytes
+	listener, err := posix.Listen(testRunDir, svc, cfg)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer listener.Close()
+		session, err := listener.Accept()
+		if err != nil {
+			close(started)
+			return
+		}
+		defer session.Close()
+		pfd := syspoll.PollFd{Fd: int32(session.Fd()), Events: syspoll.In} // #nosec G115 -- test fds are small.
+		// The Go runtime's preemption signal can interrupt a raw poll.
+		n, errno := syspoll.Poll(&pfd, 10_000)
+		for errno == syscall.EINTR {
+			n, errno = syspoll.Poll(&pfd, 10_000)
+		}
+		if errno != 0 || n == 0 || pfd.Revents&syspoll.In == 0 {
+			t.Errorf("no request bytes arrived: n=%d revents=%#x errno=%v", n, pfd.Revents, errno)
+		}
+		close(started)
+		select {
+		case <-release:
+		case <-time.After(testWaitLimit):
+		}
+	}()
+	return done
+}
+
+// A request the server never reads ends at the call deadline, or on abort,
+// instead of blocking in the send.
+func TestRobustSendBoundedByDeadlineAndAbort(t *testing.T) {
+	pids := make([]uint32, stalledReaderPids)
+	for i := range pids {
+		pids[i] = uint32(i + 1) // #nosec G115 -- bounded by stalledReaderPids.
+	}
+	for _, useAbort := range []bool{false, true} {
+		name := "send_deadline"
+		if useAbort {
+			name = "send_abort"
+		}
+		t.Run(name, func(t *testing.T) {
+			svc := robustService(name)
+			defer cleanupAll(svc)
+			started := make(chan struct{})
+			release := make(chan struct{})
+			done := startStalledReader(t, svc, started, release)
+
+			ccfg := testClientConfig()
+			ccfg.MaxRequestPayloadBytes = stalledReaderRequestBytes
+			client := NewAppsLookupClient(testRunDir, svc, ccfg)
+			client.SetLookupLogicalConfig(LookupLogicalConfig{MaxItems: stalledReaderPids})
+			refreshUnixClientReady(t, client)
+
+			timeoutMs := uint32(200)
+			if useAbort {
+				timeoutMs = 30_000
+			}
+			start := time.Now()
+			result := make(chan error, 1)
+			go func() {
+				_, err := client.CallAppsLookupWithTimeout(pids, timeoutMs)
+				result <- err
+			}()
+			if useAbort {
+				<-started
+				client.Abort()
+			}
+			err := <-result
+			elapsed := time.Since(start)
+			close(release)
+			<-done
+			client.Close()
+
+			want := protocol.ErrTimeout
+			if useAbort {
+				want = protocol.ErrAborted
+			}
+			if !errors.Is(err, want) {
+				t.Fatalf("blocked send = %v, want %v", err, want)
+			}
+			if elapsed > 5*time.Second {
+				t.Fatalf("blocked send took %v", elapsed)
+			}
+		})
 	}
 }

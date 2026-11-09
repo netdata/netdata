@@ -252,13 +252,15 @@ static nipc_np_error_t raw_send(HANDLE pipe, const void *data, size_t len) {
   return NIPC_NP_OK;
 }
 
+typedef struct receive_wait receive_wait_t;
 static nipc_np_error_t pipe_send(nipc_np_session_t *s, const void *data,
-                                 size_t len);
+                                 size_t len, const receive_wait_t *wait);
 
 /* Send header + payload as one pipe message (concatenated). */
 static nipc_np_error_t raw_send_msg(nipc_np_session_t *session, const void *hdr,
                                     size_t hdr_len, const void *payload,
-                                    size_t payload_len) {
+                                    size_t payload_len,
+                                    const receive_wait_t *wait) {
   /* Named Pipes don't support scatter-gather like sendmsg.
    * Concatenate into one buffer for a single WriteFile call. */
   size_t total = hdr_len + payload_len;
@@ -279,7 +281,7 @@ static nipc_np_error_t raw_send_msg(nipc_np_session_t *session, const void *hdr,
   if (payload && payload_len > 0)
     memcpy(buf + hdr_len, payload, payload_len);
 
-  nipc_np_error_t err = pipe_send(session, buf, total);
+  nipc_np_error_t err = pipe_send(session, buf, total, wait);
 
   if (allocated)
     free(buf);
@@ -326,7 +328,9 @@ static int overlapped_recv(HANDLE pipe, HANDLE event, void *buf, size_t buf_len,
   ov.hEvent = event;
   DWORD read = 0;
   *bytes_read = 0;
-  if (!ReadFile(pipe, buf, (DWORD)buf_len, &read, &ov)) {
+  /* Overlapped I/O takes no byte-count pointer (Win32 docs); the count
+   * comes from GetOverlappedResult. */
+  if (!ReadFile(pipe, buf, (DWORD)buf_len, NULL, &ov)) {
     DWORD err = GetLastError();
     if (err != ERROR_IO_PENDING)
       return is_disconnect_error(err) ? 0 : -1;
@@ -351,8 +355,9 @@ static int pipe_recv(const nipc_np_session_t *s, void *buf, size_t buf_len,
  * when WriteFile completed at once. */
 static nipc_np_error_t start_overlapped_send(HANDLE pipe, OVERLAPPED *ov,
                                              const void *data, size_t len) {
-  DWORD written = 0;
-  if (!WriteFile(pipe, data, (DWORD)len, &written, ov)) {
+  /* No byte-count pointer: the write may still be pending when this
+   * returns; finish_overlapped_send() gets the count. */
+  if (!WriteFile(pipe, data, (DWORD)len, NULL, ov)) {
     DWORD err = GetLastError();
     if (err != ERROR_IO_PENDING)
       return send_error(err);
@@ -499,6 +504,34 @@ static size_t pending_bound(uint32_t max_response_payload, uint32_t packet_size,
   return per_response * inflight;
 }
 
+struct receive_wait {
+  bool infinite;
+  ULONGLONG deadline;
+  HANDLE abort_event;
+};
+
+
+static receive_wait_t receive_wait_init(uint32_t timeout_ms,
+                                        HANDLE abort_event) {
+  receive_wait_t wait = {
+      .infinite = (timeout_ms == 0),
+      .deadline = 0,
+      .abort_event = abort_event,
+  };
+  if (!wait.infinite)
+    wait.deadline = GetTickCount64() + timeout_ms;
+  return wait;
+}
+
+static bool receive_wait_expired(const receive_wait_t *wait) {
+  return !wait->infinite && GetTickCount64() >= wait->deadline;
+}
+
+static bool receive_wait_aborted(const receive_wait_t *wait) {
+  return wait->abort_event &&
+         WaitForSingleObject(wait->abort_event, 0) == WAIT_OBJECT_0;
+}
+
 /* How long a stalled pipelined send keeps yielding before it sleeps. */
 #define NP_PROGRESS_YIELD_US 1000u
 
@@ -510,12 +543,61 @@ static ULONGLONG progress_now_us(void) {
   return c / f * 1000000u + c % f * 1000000u / f;
 }
 
+/* A posted write that ends on the deadline or abort is cancelled and the
+ * session broken, since part of the message may be on the wire. */
+static nipc_np_error_t send_wait_ended(nipc_np_session_t *s, OVERLAPPED *ov,
+                                       const receive_wait_t *wait) {
+  nipc_np_error_t err = NIPC_NP_OK;
+  if (receive_wait_aborted(wait))
+    err = NIPC_NP_ERR_ABORTED;
+  else if (receive_wait_expired(wait))
+    err = NIPC_NP_ERR_TIMEOUT;
+  if (err != NIPC_NP_OK) {
+    cancel_overlapped_send(s->pipe, ov);
+    break_session(s);
+  }
+  return err;
+}
+
+/* Wait for a posted write until it completes, the deadline passes or the
+ * abort event is signaled. */
+static nipc_np_error_t finish_overlapped_send_wait(nipc_np_session_t *s,
+                                                   OVERLAPPED *ov, size_t len,
+                                                   const receive_wait_t *wait) {
+  for (;;) {
+    DWORD written = 0;
+    if (GetOverlappedResult(s->pipe, ov, &written, FALSE))
+      return written == (DWORD)len ? NIPC_NP_OK : NIPC_NP_ERR_SEND;
+    DWORD gle = GetLastError();
+    if (gle != ERROR_IO_INCOMPLETE)
+      return send_error(gle);
+    nipc_np_error_t err = send_wait_ended(s, ov, wait);
+    if (err != NIPC_NP_OK)
+      return err;
+
+    HANDLE handles[2] = {s->write_event, wait->abort_event};
+    DWORD count = wait->abort_event ? 2 : 1;
+    DWORD ms = INFINITE;
+    if (!wait->infinite) {
+      ULONGLONG now = GetTickCount64();
+      ULONGLONG left = wait->deadline > now ? wait->deadline - now : 0;
+      ms = left >= INFINITE ? INFINITE - 1 : (DWORD)left;
+    }
+    if (WaitForMultipleObjects(count, handles, FALSE, ms) == WAIT_FAILED) {
+      cancel_overlapped_send(s->pipe, ov);
+      break_session(s);
+      return NIPC_NP_ERR_SEND;
+    }
+  }
+}
+
 /* Write one packet with the session's handle kind. A client with
  * progress_bound set (more than one request in flight) reads what the server
  * sent into the pending queue until its write completes, so both sides keep
- * making progress. No timeout: it waits as long as a blocking write would. */
+ * making progress. Without a wait it waits as long as a blocking write
+ * would; with one it also ends at the deadline or abort. */
 static nipc_np_error_t pipe_send(nipc_np_session_t *s, const void *data,
-                                 size_t len) {
+                                 size_t len, const receive_wait_t *wait) {
   if (!s->write_event)
     return raw_send(s->pipe, data, len);
 
@@ -525,7 +607,8 @@ static nipc_np_error_t pipe_send(nipc_np_session_t *s, const void *data,
   if (err != NIPC_NP_OK)
     return err;
   if (s->progress_bound == 0)
-    return finish_overlapped_send(s->pipe, &ov, len);
+    return wait ? finish_overlapped_send_wait(s, &ov, len, wait)
+                : finish_overlapped_send(s->pipe, &ov, len);
 
   bool eof = false;
   ULONGLONG yield_until = progress_now_us() + NP_PROGRESS_YIELD_US;
@@ -537,6 +620,11 @@ static nipc_np_error_t pipe_send(nipc_np_session_t *s, const void *data,
       cancel_overlapped_send(s->pipe, &ov);
       break_session(s);
       return NIPC_NP_ERR_SEND;
+    }
+    if (wait) {
+      err = send_wait_ended(s, &ov, wait);
+      if (err != NIPC_NP_OK)
+        return err;
     }
     if (!eof) {
       bool drained = false;
@@ -622,34 +710,6 @@ static nipc_np_error_t wait_readable(HANDLE pipe, uint32_t timeout_ms,
 
     Sleep(1);
   }
-}
-
-typedef struct {
-  bool infinite;
-  ULONGLONG deadline;
-  HANDLE abort_event;
-} receive_wait_t;
-
-
-static receive_wait_t receive_wait_init(uint32_t timeout_ms,
-                                        HANDLE abort_event) {
-  receive_wait_t wait = {
-      .infinite = (timeout_ms == 0),
-      .deadline = 0,
-      .abort_event = abort_event,
-  };
-  if (!wait.infinite)
-    wait.deadline = GetTickCount64() + timeout_ms;
-  return wait;
-}
-
-static bool receive_wait_expired(const receive_wait_t *wait) {
-  return !wait->infinite && GetTickCount64() >= wait->deadline;
-}
-
-static bool receive_wait_aborted(const receive_wait_t *wait) {
-  return wait->abort_event &&
-         WaitForSingleObject(wait->abort_event, 0) == WAIT_OBJECT_0;
 }
 
 static nipc_np_error_t wait_readable_for_receive(HANDLE pipe,
@@ -907,11 +967,22 @@ static nipc_np_error_t client_handshake(HANDLE pipe,
     return NIPC_NP_ERR_INCOMPATIBLE;
   if (perr != NIPC_OK)
     return NIPC_NP_ERR_PROTOCOL;
+  /* HELLO_ACK is exactly one 48-byte payload; extra bytes would otherwise
+   * be ignored. */
+  if (ack_hdr.payload_len != sizeof(nipc_hello_ack_t) ||
+      (size_t)bytes_read != NIPC_HEADER_LEN + sizeof(nipc_hello_ack_t))
+    return NIPC_NP_ERR_PROTOCOL;
 
   /* The server must pick exactly one of the profiles this client offered. */
   if (ack.selected_profile == 0 ||
       (ack.selected_profile & (ack.selected_profile - 1)) != 0 ||
       (ack.selected_profile & hello.supported_profiles) == 0)
+    return NIPC_NP_ERR_PROTOCOL;
+
+  /* The agreed packet size is at most what this client proposed, and must
+   * leave room for a payload after the header. */
+  if (ack.agreed_packet_size <= NIPC_HEADER_LEN ||
+      ack.agreed_packet_size > pkt_size)
     return NIPC_NP_ERR_PROTOCOL;
 
   /* Fill session */
@@ -982,6 +1053,10 @@ static nipc_np_error_t server_handshake(HANDLE pipe,
     return NIPC_NP_ERR_INCOMPATIBLE;
   }
   if (perr != NIPC_OK)
+    return NIPC_NP_ERR_PROTOCOL;
+  /* HELLO is exactly one 44-byte payload, as HELLO_ACK is 48. */
+  if (hdr.payload_len != NIPC_HELLO_WIRE_SIZE ||
+      (size_t)bytes_read != NIPC_HEADER_LEN + NIPC_HELLO_WIRE_SIZE)
     return NIPC_NP_ERR_PROTOCOL;
 
   /* Compute intersection */
@@ -1142,6 +1217,23 @@ nipc_np_error_t nipc_np_listen(const char *run_dir, const char *service_name,
 /*  Public API: accept                                                 */
 /* ------------------------------------------------------------------ */
 
+static volatile LONG g_fail_next_instances;
+
+void nipc_np_fail_next_instances_for_tests(int count) {
+  InterlockedExchange(&g_fail_next_instances, count);
+}
+
+static bool fail_next_instance(void) {
+  for (;;) {
+    LONG left = g_fail_next_instances;
+    if (left <= 0)
+      return false;
+    if (InterlockedCompareExchange(&g_fail_next_instances, left - 1, left) ==
+        left)
+      return true;
+  }
+}
+
 nipc_np_error_t nipc_np_accept_pending(nipc_np_listener_t *listener,
                                        HANDLE *pipe_out) {
   if (!listener || !pipe_out)
@@ -1166,10 +1258,13 @@ nipc_np_error_t nipc_np_accept_pending(nipc_np_listener_t *listener,
 
   /* Create a new pipe instance for the next client. */
   uint32_t buf_size = pipe_buffer_size(listener->config.packet_size);
-  HANDLE next = create_pipe_instance(listener->pipe_name, buf_size, FALSE);
+  HANDLE next = fail_next_instance()
+                    ? INVALID_HANDLE_VALUE
+                    : create_pipe_instance(listener->pipe_name, buf_size, FALSE);
   if (next == INVALID_HANDLE_VALUE) {
-    /* Cannot create next instance — close the session pipe too. */
-    CloseHandle(session_pipe);
+    /* Without a next instance, drop this client and keep its instance as
+     * the listener's, so a later accept listens on it again. */
+    DisconnectNamedPipe(session_pipe);
     return NIPC_NP_ERR_CREATE_PIPE;
   }
   listener->pipe = next;
@@ -1253,6 +1348,15 @@ void nipc_np_set_connect_busy_hook_for_tests(void (*hook)(void *user),
   g_connect_busy_user = user;
 }
 
+static void (*g_connect_waited_hook)(void *user);
+static void *g_connect_waited_user;
+
+void nipc_np_set_connect_waited_hook_for_tests(void (*hook)(void *user),
+                                               void *user) {
+  g_connect_waited_hook = hook;
+  g_connect_waited_user = user;
+}
+
 /* SECURITY_IDENTIFICATION lets the server identify the client but never act
  * as it. Overlapped, so a pipelining send can read while its write waits. */
 static HANDLE create_client_pipe(const wchar_t *pipe_name) {
@@ -1270,12 +1374,22 @@ static HANDLE create_client_pipe(const wchar_t *pipe_name) {
 
 /* A server has no free pipe instance between accepting one client and
  * creating the next instance, and connects in that window fail with
- * ERROR_PIPE_BUSY. Wait, bounded by NIPC_NP_CONNECT_BUSY_WAIT_MS and the
- * caller's deadline, for an instance, then try once more. */
+ * ERROR_PIPE_BUSY. WaitNamedPipeW does not reserve the instance it reports,
+ * so another client can take it first: wait and retry, bounded by
+ * NIPC_NP_CONNECT_BUSY_WAIT_MS and the caller's deadline. An abort or an
+ * expired deadline ends the connect before the pipe is opened. */
 static HANDLE open_client_pipe(const wchar_t *pipe_name,
                                const receive_wait_t *wait,
                                nipc_np_error_t *err_out) {
   *err_out = NIPC_NP_ERR_CONNECT;
+  if (receive_wait_aborted(wait)) {
+    *err_out = NIPC_NP_ERR_ABORTED;
+    return INVALID_HANDLE_VALUE;
+  }
+  if (receive_wait_expired(wait)) {
+    *err_out = NIPC_NP_ERR_TIMEOUT;
+    return INVALID_HANDLE_VALUE;
+  }
   HANDLE h = create_client_pipe(pipe_name);
   if (h != INVALID_HANDLE_VALUE || GetLastError() != ERROR_PIPE_BUSY)
     return h;
@@ -1300,10 +1414,17 @@ static HANDLE open_client_pipe(const wchar_t *pipe_name,
     ULONGLONG left = busy_deadline - now;
     DWORD slice = left < NP_CONNECT_BUSY_SLICE_MS ? (DWORD)left
                                                   : NP_CONNECT_BUSY_SLICE_MS;
-    if (WaitNamedPipeW(pipe_name, slice))
-      return create_client_pipe(pipe_name);
-    if (GetLastError() != ERROR_SEM_TIMEOUT)
-      return INVALID_HANDLE_VALUE;
+    if (!WaitNamedPipeW(pipe_name, slice)) {
+      if (GetLastError() != ERROR_SEM_TIMEOUT)
+        return INVALID_HANDLE_VALUE;
+      continue;
+    }
+    if (g_connect_waited_hook)
+      g_connect_waited_hook(g_connect_waited_user);
+    h = create_client_pipe(pipe_name);
+    if (h != INVALID_HANDLE_VALUE || GetLastError() != ERROR_PIPE_BUSY)
+      return h;
+    /* Another client took the instance first. */
   }
 }
 
@@ -1437,8 +1558,9 @@ void nipc_np_close_listener(nipc_np_listener_t *listener) {
 /*  Public API: send                                                   */
 /* ------------------------------------------------------------------ */
 
-nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
-                             const void *payload, size_t payload_len) {
+static nipc_np_error_t np_send(nipc_np_session_t *session, nipc_header_t *hdr,
+                               const void *payload, size_t payload_len,
+                               const receive_wait_t *wait) {
   if (!session || session->pipe == INVALID_HANDLE_VALUE)
     return NIPC_NP_ERR_BAD_PARAM;
 
@@ -1500,7 +1622,7 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
     uint8_t hdr_buf[NIPC_HEADER_LEN];
     nipc_header_encode(hdr, hdr_buf, sizeof(hdr_buf));
     nipc_np_error_t err = raw_send_msg(session, hdr_buf, NIPC_HEADER_LEN,
-                                       payload, payload_len);
+                                       payload, payload_len, wait);
     if (err != NIPC_NP_OK && tracked) {
       if (err == NIPC_NP_ERR_SEND || err == NIPC_NP_ERR_DISCONNECTED)
         inflight_fail_all(session);
@@ -1539,7 +1661,7 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
   nipc_header_encode(hdr, hdr_buf, sizeof(hdr_buf));
 
   nipc_np_error_t err = raw_send_msg(session, hdr_buf, NIPC_HEADER_LEN,
-                                     payload, first_chunk_payload);
+                                     payload, first_chunk_payload, wait);
   if (err != NIPC_NP_OK) {
     if (tracked) {
       if (err == NIPC_NP_ERR_SEND || err == NIPC_NP_ERR_DISCONNECTED)
@@ -1575,7 +1697,7 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
     nipc_chunk_header_encode(&chk, chk_buf, sizeof(chk_buf));
 
     err =
-        raw_send_msg(session, chk_buf, NIPC_HEADER_LEN, src, this_chunk);
+        raw_send_msg(session, chk_buf, NIPC_HEADER_LEN, src, this_chunk, wait);
     if (err != NIPC_NP_OK) {
       if (tracked) {
         if (err == NIPC_NP_ERR_SEND || err == NIPC_NP_ERR_DISCONNECTED)
@@ -1591,6 +1713,21 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
   }
 
   return NIPC_NP_OK;
+}
+
+nipc_np_error_t nipc_np_send(nipc_np_session_t *session, nipc_header_t *hdr,
+                             const void *payload, size_t payload_len) {
+  return np_send(session, hdr, payload, payload_len, NULL);
+}
+
+nipc_np_error_t nipc_np_send_timeout(nipc_np_session_t *session,
+                                     nipc_header_t *hdr, const void *payload,
+                                     size_t payload_len, uint32_t timeout_ms,
+                                     HANDLE abort_event) {
+  if (timeout_ms == 0 && !abort_event)
+    return np_send(session, hdr, payload, payload_len, NULL);
+  receive_wait_t wait = receive_wait_init(timeout_ms, abort_event);
+  return np_send(session, hdr, payload, payload_len, &wait);
 }
 
 /* ------------------------------------------------------------------ */

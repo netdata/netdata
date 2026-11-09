@@ -84,6 +84,11 @@ type PendingConn struct {
 	handle syscall.Handle
 }
 
+// failNextInstances, when set by tests, fails that many creations of a
+// replacement pipe instance in AcceptPending, as CreateNamedPipeW can under
+// resource exhaustion.
+var failNextInstances atomic.Int32
+
 // AcceptPending waits for one client connection without reading HELLO.
 func (l *Listener) AcceptPending() (*PendingConn, error) {
 	l.mu.Lock()
@@ -117,13 +122,18 @@ func (l *Listener) AcceptPending() (*PendingConn, error) {
 	}
 
 	bufSize := pipeBufferSize(l.config.PacketSize)
-	next, perr := createPipeInstance(l.pipeName, bufSize, false)
+	var next syscall.Handle
+	var perr error
+	if failNextInstances.Load() > 0 && failNextInstances.Add(-1) >= 0 {
+		perr = wrapErr(ErrCreatePipe, "test: replacement instance failed")
+	} else {
+		next, perr = createPipeInstance(l.pipeName, bufSize, false)
+	}
 	if perr != nil {
-		if l.handle == sessionHandle {
-			l.handle = syscall.InvalidHandle
-		}
+		// Without a next instance, drop this client and keep its instance as
+		// the listener's, so a later accept listens on it again.
+		disconnectNamedPipe(sessionHandle)
 		l.mu.Unlock()
-		syscall.CloseHandle(sessionHandle)
 		return nil, perr
 	}
 	l.handle = next

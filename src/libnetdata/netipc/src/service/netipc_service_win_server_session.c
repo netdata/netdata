@@ -215,8 +215,12 @@ static void server_destroy_win_shm(nipc_win_shm_ctx_t **shm) {
 static bool server_prepare_accept_config(nipc_managed_server_t *server,
                                          nipc_np_server_config_t *cfg_out) {
     *cfg_out = server->base_config;
-    cfg_out->max_request_payload_bytes = server->learned_request_payload_bytes;
-    cfg_out->max_response_payload_bytes = server->learned_response_payload_bytes;
+    /* Workers grow these concurrently (InterlockedCompareExchange); read
+     * them with the same interlocked access. */
+    cfg_out->max_request_payload_bytes = (uint32_t)InterlockedCompareExchange(
+        (volatile LONG *)&server->learned_request_payload_bytes, 0, 0);
+    cfg_out->max_response_payload_bytes = (uint32_t)InterlockedCompareExchange(
+        (volatile LONG *)&server->learned_response_payload_bytes, 0, 0);
 
     uint32_t shm_profiles =
             cfg_out->supported_profiles &

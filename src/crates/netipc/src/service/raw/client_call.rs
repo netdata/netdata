@@ -134,7 +134,13 @@ impl RawClient {
             ..Header::default()
         };
 
-        self.transport_send_request_buf(&mut hdr, req_len)?;
+        self.transport_send_request_buf(&mut hdr, req_len, timeout_ms)?;
+        // The send may have waited for buffer space: the receive gets what
+        // is left of the call deadline.
+        let timeout_ms = self.op_remaining_ms();
+        if timeout_ms == 0 {
+            return Err(NipcError::Timeout);
+        }
         let (resp_hdr, response) = self.transport_receive(timeout_ms)?;
 
         if resp_hdr.kind != KIND_RESPONSE {
@@ -177,14 +183,17 @@ impl RawClient {
     ) -> Result<(), NipcError> {
         let req = self.request_scratch(payload.len());
         req.copy_from_slice(payload);
-        self.transport_send_request_buf(hdr, payload.len())
+        self.transport_send_request_buf(hdr, payload.len(), 0)
     }
 
     /// Send via the active transport (SHM if available, baseline otherwise).
+    /// The baseline send ends at `timeout_ms` (0 = no deadline) or on
+    /// abort; the SHM send never waits for the peer.
     pub(super) fn transport_send_request_buf(
         &mut self,
         hdr: &mut Header,
         req_len: usize,
+        timeout_ms: u32,
     ) -> Result<(), NipcError> {
         #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
         let max_request_payload_bytes = self.session_max_request_payload_bytes();
@@ -259,10 +268,23 @@ impl RawClient {
 
         let send_result = {
             let session = self.session.as_mut().ok_or(NipcError::Transport)?;
-            session.send(hdr, &self.request_buf[..req_len])
+            session.send_with_control(
+                hdr,
+                &self.request_buf[..req_len],
+                timeout_ms,
+                Some(self.abort_requested.as_ref()),
+            )
         };
         match send_result {
             Ok(()) => Ok(()),
+            #[cfg(unix)]
+            Err(crate::transport::posix::UdsError::Timeout) => Err(NipcError::Timeout),
+            #[cfg(unix)]
+            Err(crate::transport::posix::UdsError::Aborted) => Err(NipcError::Aborted),
+            #[cfg(windows)]
+            Err(crate::transport::windows::NpError::Timeout) => Err(NipcError::Timeout),
+            #[cfg(windows)]
+            Err(crate::transport::windows::NpError::Aborted) => Err(NipcError::Aborted),
             #[cfg(unix)]
             Err(crate::transport::posix::UdsError::LimitExceeded) => {
                 self.client_note_request_capacity(req_len as u32);

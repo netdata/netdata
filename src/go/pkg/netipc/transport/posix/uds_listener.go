@@ -14,6 +14,7 @@ import (
 // Listener is a listening UDS endpoint.
 type Listener struct {
 	mu            sync.Mutex
+	stopMu        sync.Mutex
 	fd            int
 	config        ServerConfig
 	path          string
@@ -76,6 +77,12 @@ func Listen(runDir, serviceName string, config ServerConfig) (*Listener, error) 
 		_ = os.Remove(path)
 		releaseEndpointLock(lock)
 		return nil, wrapErr(ErrSocket, "listen: "+err.Error())
+	}
+	if err := prepareListener(fd); err != nil {
+		_ = syscall.Close(fd)
+		_ = os.Remove(path)
+		releaseEndpointLock(lock)
+		return nil, wrapErr(ErrSocket, "listener flags: "+err.Error())
 	}
 
 	return &Listener{
@@ -200,15 +207,34 @@ func (p *PendingConn) Close() {
 	}
 }
 
-// Close closes the listener, stops accepting, and unlinks the socket file.
+// Close stops listening if it still is, then releases the endpoint lock.
 func (l *Listener) Close() {
+	l.StopListening()
+
+	l.mu.Lock()
+	lock := l.lock
+	l.lock = nil
+	l.mu.Unlock()
+	// Release the endpoint only after its socket file is gone.
+	if lock != nil {
+		releaseEndpointLock(lock)
+	}
+}
+
+// StopListening closes the listening socket and removes the socket file,
+// keeping the endpoint lock until Close, so no other server takes the
+// endpoint while this one still serves its sessions. Idempotent.
+func (l *Listener) StopListening() {
+	// A concurrent caller waits for the unlink, so Close cannot release the
+	// endpoint while another Close is still removing the socket file.
+	l.stopMu.Lock()
+	defer l.stopMu.Unlock()
+
 	l.mu.Lock()
 	fd := l.fd
 	path := l.path
-	lock := l.lock
 	l.fd = -1
 	l.path = ""
-	l.lock = nil
 	l.mu.Unlock()
 
 	if fd >= 0 {
@@ -216,9 +242,5 @@ func (l *Listener) Close() {
 	}
 	if path != "" {
 		_ = os.Remove(path)
-	}
-	// Release the endpoint only after its socket file is gone.
-	if lock != nil {
-		releaseEndpointLock(lock)
 	}
 }

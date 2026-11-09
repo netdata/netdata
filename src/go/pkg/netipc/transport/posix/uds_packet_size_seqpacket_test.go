@@ -3,6 +3,7 @@
 package posix
 
 import (
+	"errors"
 	"syscall"
 	"testing"
 
@@ -55,5 +56,57 @@ func TestPacketSizeLimitMatchesKernelDatagramLimit(t *testing.T) {
 		}
 		syscall.Close(fds[0])
 		syscall.Close(fds[1])
+	}
+}
+
+// A datagram longer than its header declares is a protocol error. The
+// pending queue, filled while a send waits for buffer space, must keep the
+// whole datagram so its receive rejects it as the direct receive does,
+// instead of storing it cut to PacketSize and accepting it.
+func TestPendingOversizedDatagramRejected(t *testing.T) {
+	fds, err := syscall.Socketpair(syscall.AF_UNIX, sockType, 0)
+	if err != nil {
+		t.Fatalf("socketpair: %v", err)
+	}
+	defer syscall.Close(fds[1])
+	s := &Session{
+		fd:                     fds[0],
+		role:                   RoleServer,
+		PacketSize:             2 * protocol.HeaderSize,
+		MaxRequestPayloadBytes: 1024,
+		MaxRequestBatchItems:   1,
+	}
+	s.initReceiveFns()
+	defer s.Close()
+
+	// The header declares exactly PacketSize; 16 more bytes follow.
+	dgram := make([]byte, 2*protocol.HeaderSize+16)
+	hdr := protocol.Header{
+		Magic: protocol.MagicMsg, Version: protocol.Version,
+		HeaderLen: protocol.HeaderSize, Kind: protocol.KindRequest,
+		Code: 1, ItemCount: 1, MessageID: 1, PayloadLen: protocol.HeaderSize,
+	}
+	hdr.Encode(dgram[:protocol.HeaderSize])
+	rbuf := make([]byte, 256)
+
+	if _, err := syscall.Write(fds[1], dgram); err != nil {
+		t.Fatalf("direct datagram: %v", err)
+	}
+	if _, _, err := s.Receive(rbuf); !errors.Is(err, ErrProtocol) {
+		t.Fatalf("direct receive: expected ErrProtocol, got %v", err)
+	}
+
+	if _, err := syscall.Write(fds[1], dgram); err != nil {
+		t.Fatalf("queued datagram: %v", err)
+	}
+	eof := false
+	if err := s.pending.drain(s.fd, int(s.PacketSize), 4096, &eof); err != nil || eof || !s.pending.queued() {
+		t.Fatalf("drain: err %v eof %v queued %v", err, eof, s.pending.queued())
+	}
+	if _, _, err := s.Receive(rbuf); !errors.Is(err, ErrProtocol) {
+		t.Fatalf("pending receive: expected ErrProtocol, got %v", err)
+	}
+	if s.pending.queued() {
+		t.Fatal("pending queue not consumed")
 	}
 }

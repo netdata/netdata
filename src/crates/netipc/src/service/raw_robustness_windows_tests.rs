@@ -417,9 +417,12 @@ fn test_robust_win_abort_ends_refresh_waiting_for_hello_ack() {
         let _ = worker_tx.send(client.ready());
         client.close();
     });
-    let connected = unsafe { ConnectNamedPipe(pipe, ptr::null_mut()) } != 0
-        || unsafe { GetLastError() } == ERROR_PIPE_CONNECTED;
-    assert!(connected, "client connected to the fake server");
+    // A client that never connects must fail the test, not hang it.
+    let (connected, _connect) = within(Duration::from_secs(5), move || {
+        let ok = unsafe { ConnectNamedPipe(pipe, ptr::null_mut()) } != 0;
+        ok || unsafe { GetLastError() } == ERROR_PIPE_CONNECTED
+    });
+    assert_eq!(connected, Some(true), "client connected to the fake server");
     abort.abort();
     let ready = worker_rx.recv_timeout(Duration::from_secs(2));
 
@@ -620,4 +623,100 @@ fn test_robust_win_shm_attach_stops_when_server_closes_session() {
     );
     assert!(ready, "refused client must connect once the worker is free");
     assert!(uses_shm, "refused client must still use WinSHM");
+}
+
+// ---------------------------------------------------------------------------
+// Bounded send: a request the server never reads ends at the call deadline,
+// or on abort, instead of blocking in the write.
+// ---------------------------------------------------------------------------
+
+const STALLED_READER_REQUEST_BYTES: u32 = 8 * 1024 * 1024;
+const STALLED_READER_PIDS: u32 = 1024 * 1024;
+
+/// Completes the handshake and never reads. Sends on `started` once the
+/// request's first bytes arrived, then holds the session until `release`.
+fn start_stalled_reader(
+    svc: &str,
+    started: mpsc::Sender<()>,
+    release: mpsc::Receiver<()>,
+) -> thread::JoinHandle<()> {
+    ensure_run_dir();
+    let cfg = ServerConfig {
+        max_request_payload_bytes: STALLED_READER_REQUEST_BYTES,
+        ..server_config()
+    };
+    let mut listener = NpListener::bind(TEST_RUN_DIR, svc, cfg).expect("bind");
+    thread::spawn(move || {
+        let Ok(session) = listener.accept() else {
+            let _ = started.send(());
+            return;
+        };
+        let _ = session.wait_readable(10_000);
+        let _ = started.send(());
+        let _ = release.recv_timeout(server::TEST_WAIT_LIMIT);
+        drop(session);
+        drop(listener);
+    })
+}
+
+#[test]
+fn test_win_robust_send_bounded_by_deadline_and_abort() {
+    let pids: Vec<u32> = (1..=STALLED_READER_PIDS).collect();
+    for use_abort in [false, true] {
+        let svc = unique_service(if use_abort {
+            "rs_winrob_send_abort"
+        } else {
+            "rs_winrob_send_deadline"
+        });
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let server = start_stalled_reader(&svc, started_tx, release_rx);
+
+        let mut client = apps_lookup_client(
+            &svc,
+            ClientConfig {
+                max_request_payload_bytes: STALLED_READER_REQUEST_BYTES,
+                ..client_config()
+            },
+        );
+        client.set_lookup_logical_config(LookupLogicalConfig {
+            max_items: STALLED_READER_PIDS,
+            ..LookupLogicalConfig::default()
+        });
+        client.refresh();
+        assert!(client.ready(), "client ready against the stalled reader");
+
+        let abort = client.abort_handle();
+        let timeout_ms = if use_abort { 30_000 } else { 200 };
+        let start = Instant::now();
+        let call_pids = pids.clone();
+        let call = thread::spawn(move || {
+            let result = client
+                .call_apps_lookup_with_timeout(&call_pids, timeout_ms)
+                .map(|_| ());
+            client.close();
+            result
+        });
+        if use_abort {
+            started_rx
+                .recv_timeout(server::TEST_WAIT_LIMIT)
+                .expect("request started");
+            abort.abort();
+        }
+        let result = call.join().expect("call join");
+        let elapsed = start.elapsed();
+        let _ = release_tx.send(());
+        server.join().expect("server join");
+
+        let expected = if use_abort {
+            NipcError::Aborted
+        } else {
+            NipcError::Timeout
+        };
+        assert_eq!(result, Err(expected), "blocked send result");
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "blocked send ends promptly: {elapsed:?}"
+        );
+    }
 }

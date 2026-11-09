@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
@@ -306,8 +307,15 @@ func connectRawNamedPipe(handle syscall.Handle) error {
 func (s *winHelloAckServer) wait(t *testing.T) {
 	t.Helper()
 
-	if err := <-s.doneCh; err != nil {
-		t.Fatalf("raw windows hello_ack server failed: %v", err)
+	// A client that never connects leaves the server in ConnectNamedPipe:
+	// fail instead of hanging.
+	select {
+	case err := <-s.doneCh:
+		if err != nil {
+			t.Fatalf("raw windows hello_ack server failed: %v", err)
+		}
+	case <-time.After(testWaitLimit):
+		t.Fatalf("raw windows hello_ack server did not finish within %v", testWaitLimit)
 	}
 	if got := s.accepted.Load(); got != 1 {
 		t.Fatalf("expected exactly one raw handshake accept, got %d", got)
@@ -370,8 +378,13 @@ func startRawWinSessionServerN(t *testing.T, service string, cfg windows.ServerC
 
 func (s *winRawSessionServer) wait(t *testing.T) {
 	t.Helper()
-	if err := <-s.doneCh; err != nil {
-		t.Fatalf("raw windows session server failed: %v", err)
+	select {
+	case err := <-s.doneCh:
+		if err != nil {
+			t.Fatalf("raw windows session server failed: %v", err)
+		}
+	case <-time.After(testWaitLimit):
+		t.Fatalf("raw windows session server did not finish within %v", testWaitLimit)
 	}
 }
 

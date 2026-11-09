@@ -26,6 +26,10 @@ type ClientConfig transportconfig.TypedConfig
 
 type ServerConfig transportconfig.TypedConfig
 
+// HandlerFunc is the typed callback used by the apps-lookup service.
+// The request borrows the receive buffer and the builder writes into the
+// response buffer; both are valid only during the call, so copy what you
+// keep.
 type HandlerFunc = func(*protocol.AppsLookupRequestView, *protocol.AppsLookupBuilder) bool
 
 type Handler struct {

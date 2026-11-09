@@ -31,7 +31,9 @@ impl RawClient {
                     // When the call deadline ends the wait first, WinSHM is
                     // not at fault and stays enabled for the next connect.
                     let call_left = std::time::Duration::from_millis(self.op_remaining_ms() as u64);
-                    let call_bound = call_left < self.shm_attach_timeout;
+                    // The remaining time is rounded up, so a tie means the
+                    // call deadline comes first.
+                    let call_bound = call_left <= self.shm_attach_timeout;
                     let deadline =
                         std::time::Instant::now() + call_left.min(self.shm_attach_timeout);
                     loop {

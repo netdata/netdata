@@ -481,9 +481,9 @@ func TestCheckShmStaleVariants(t *testing.T) {
 		t.Fatalf("legacy stale file should be removed, stat err = %v", err)
 	}
 
-	unreadablePath := writeRawShmRegionFile(t, runDir, "go_shm_check_unreadable", 5, validSize, func(data []byte) {
-		fillShmHeader(data, int32(os.Getpid()), 1, reqOff, reqCap, respOff, respCap)
-	})
+	// The header has no magic: a non-root run fails to open the file, and
+	// root, which opens a mode-000 file, finds no region. Both reclaim it.
+	unreadablePath := writeRawShmRegionFile(t, runDir, "go_shm_check_unreadable", 5, validSize, func([]byte) {})
 	if err := os.Chmod(unreadablePath, 0); err != nil {
 		t.Fatalf("chmod unreadable stale file: %v", err)
 	}
@@ -589,5 +589,11 @@ func TestShmCleanupStaleMissingDirAndUnrelatedFile(t *testing.T) {
 
 	if _, err := os.Stat(unrelatedPath); err != nil {
 		t.Fatalf("unrelated file should remain after cleanup, stat err = %v", err)
+	}
+}
+
+func TestShmEmptyRunDirRejected(t *testing.T) {
+	if _, err := ShmServerCreate("", "go_shm_empty_dir", 1, 1024, 1024); !errors.Is(err, ErrShmBadParam) {
+		t.Errorf("ShmServerCreate with empty run_dir: err = %v, want ErrShmBadParam", err)
 	}
 }

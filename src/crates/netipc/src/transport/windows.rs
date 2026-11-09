@@ -54,8 +54,10 @@ mod ffi {
     pub const ERROR_SEM_TIMEOUT: DWORD = 121;
     pub const FILE_FLAG_OVERLAPPED: DWORD = 0x40000000;
     pub const ERROR_IO_PENDING: DWORD = 997;
+    pub const ERROR_IO_INCOMPLETE: DWORD = 996;
     pub const WAIT_OBJECT_0: DWORD = 0;
     pub const WAIT_TIMEOUT: DWORD = 258;
+    pub const WAIT_FAILED: DWORD = 0xFFFF_FFFF;
 
     /// OVERLAPPED; the offset union is unused for pipes.
     #[repr(C)]
@@ -123,6 +125,8 @@ mod ffi {
         pub fn SwitchToThread() -> BOOL;
 
         pub fn WaitNamedPipeW(lpNamedPipeName: LPCWSTR, nTimeOut: DWORD) -> BOOL;
+
+        pub fn DisconnectNamedPipe(hNamedPipe: HANDLE) -> BOOL;
 
         pub fn SetNamedPipeHandleState(
             hNamedPipe: HANDLE,
@@ -283,6 +287,9 @@ impl FramingError for NpError {
     }
     fn fails_session(&self) -> bool {
         matches!(self, NpError::Send(_) | NpError::Disconnected)
+    }
+    fn is_recv_failure(&self) -> bool {
+        matches!(self, NpError::Recv(_) | NpError::Disconnected)
     }
 }
 
@@ -593,12 +600,14 @@ fn overlapped_read(
 ) -> Result<usize, NpError> {
     let mut ov = new_overlapped(event);
     let mut read: u32 = 0;
+    // Overlapped I/O takes no byte-count pointer (Win32 docs); the count
+    // comes from GetOverlappedResult.
     let ok = unsafe {
         ffi::ReadFile(
             handle,
             buf.as_mut_ptr() as ffi::LPVOID,
             buf.len() as u32,
-            &mut read,
+            core::ptr::null_mut(),
             &mut ov as *mut ffi::OVERLAPPED as *mut core::ffi::c_void,
         )
     };
@@ -625,13 +634,14 @@ fn start_overlapped_write(
     ov: &mut ffi::OVERLAPPED,
     data: &[u8],
 ) -> Result<(), NpError> {
-    let mut written: u32 = 0;
+    // No byte-count pointer: the write may still be pending when this
+    // returns; finish_overlapped_write gets the count.
     let ok = unsafe {
         ffi::WriteFile(
             handle,
             data.as_ptr() as ffi::LPCVOID,
             data.len() as u32,
-            &mut written,
+            core::ptr::null_mut(),
             ov as *mut ffi::OVERLAPPED as *mut core::ffi::c_void,
         )
     };
@@ -839,6 +849,7 @@ fn peek_available(handle: ffi::HANDLE) -> Result<u32, NpError> {
 /// the write completes, so both sides keep making progress. No timeout: it
 /// waits as long as a blocking write would.
 #[cfg(windows)]
+#[allow(clippy::too_many_arguments)]
 fn write_packet(
     handle: ffi::HANDLE,
     io: Option<&PipeIo>,
@@ -846,6 +857,7 @@ fn write_packet(
     bound: usize,
     read_len: usize,
     data: &[u8],
+    wait: Option<&ReceiveWait<'_>>,
     broken: &mut bool,
 ) -> Result<(), NpError> {
     let Some(io) = io else {
@@ -854,7 +866,10 @@ fn write_packet(
     let mut ov = new_overlapped(io.write_event);
     start_overlapped_write(handle, &mut ov, data)?;
     if bound == 0 {
-        return finish_overlapped_write(handle, &mut ov, data);
+        return match wait {
+            Some(wait) => finish_overlapped_write_wait(handle, io, &mut ov, data, wait, broken),
+            None => finish_overlapped_write(handle, &mut ov, data),
+        };
     }
     let mut eof = false;
     let mut yield_until = Instant::now() + PROGRESS_YIELD;
@@ -867,6 +882,13 @@ fn write_packet(
                 cancel_overlapped_write(handle, &mut ov);
                 *broken = true;
                 return Err(NpError::Send(err));
+            }
+        }
+        if let Some(wait) = wait {
+            if let Err(e) = wait.wait_slice_ms() {
+                cancel_overlapped_write(handle, &mut ov);
+                *broken = true;
+                return Err(e);
             }
         }
         if !eof {
@@ -896,6 +918,47 @@ fn write_packet(
         }
         unsafe {
             ffi::WaitForSingleObject(io.write_event, 1);
+        }
+    }
+}
+
+/// Wait for a posted write until it completes, the deadline passes or the
+/// abort flag is set. A write that ends early is cancelled and the session
+/// broken, since part of the message may be on the wire.
+#[cfg(windows)]
+fn finish_overlapped_write_wait(
+    handle: ffi::HANDLE,
+    io: &PipeIo,
+    ov: &mut ffi::OVERLAPPED,
+    data: &[u8],
+    wait: &ReceiveWait<'_>,
+    broken: &mut bool,
+) -> Result<(), NpError> {
+    loop {
+        let mut written: u32 = 0;
+        if unsafe { ffi::GetOverlappedResult(handle, ov, &mut written, 0) } != 0 {
+            if written != data.len() as u32 {
+                return Err(NpError::Send(0));
+            }
+            return Ok(());
+        }
+        let err = last_error();
+        if err != ffi::ERROR_IO_INCOMPLETE {
+            return Err(send_error(err));
+        }
+        let slice = match wait.wait_slice_ms() {
+            Ok(ms) => ms,
+            Err(e) => {
+                cancel_overlapped_write(handle, ov);
+                *broken = true;
+                return Err(e);
+            }
+        };
+        if unsafe { ffi::WaitForSingleObject(io.write_event, slice) } == ffi::WAIT_FAILED {
+            let err = last_error();
+            cancel_overlapped_write(handle, ov);
+            *broken = true;
+            return Err(NpError::Send(err));
         }
     }
 }
@@ -1235,6 +1298,22 @@ impl NpSession {
     /// Send one logical message. Fills magic/version/header_len/payload_len.
     /// Chunked transparently if message exceeds packet_size.
     pub fn send(&mut self, hdr: &mut Header, payload: &[u8]) -> Result<(), NpError> {
+        self.send_with_control(hdr, payload, 0, None)
+    }
+
+    /// `send` with an optional deadline and abort flag for a client session.
+    /// `timeout_ms == 0` waits without a deadline. If the deadline passes or
+    /// `abort` is set before a write completes, the write is cancelled, the
+    /// session is closed (later calls fail with `BadParam`) and the call
+    /// returns `NpError::Timeout` or `NpError::Aborted`, since part of the
+    /// message may be on the wire.
+    pub fn send_with_control(
+        &mut self,
+        hdr: &mut Header,
+        payload: &[u8],
+        timeout_ms: u32,
+        abort: Option<&AtomicBool>,
+    ) -> Result<(), NpError> {
         if self.handle == ffi::INVALID_HANDLE_VALUE {
             return Err(NpError::BadParam("session closed".into()));
         }
@@ -1258,6 +1337,8 @@ impl NpSession {
         let pending = &mut self.pending;
         let read_len = self.packet_size as usize;
         let send_buf = &mut self.send_buf;
+        let wait =
+            (timeout_ms != 0 || abort.is_some()).then(|| ReceiveWait::new(timeout_ms, abort));
         let mut broken = false;
         let result =
             framing::send_message(framing, &mut self.inflight_ids, hdr, payload, |h, p| {
@@ -1274,6 +1355,7 @@ impl NpSession {
                     bound,
                     read_len,
                     &send_buf[..total],
+                    wait.as_ref(),
                     &mut broken,
                 )
             });
@@ -1366,6 +1448,10 @@ pub struct NpListener {
     config: ServerConfig,
     pipe_name: Vec<u16>,
     next_session_id: AtomicU64,
+    /// Fails this many creations of a replacement pipe instance in accept,
+    /// as `CreateNamedPipeW` can under resource exhaustion.
+    #[cfg(test)]
+    fail_next_instances: u32,
 }
 
 #[cfg(windows)]
@@ -1383,6 +1469,8 @@ impl NpListener {
             config,
             pipe_name,
             next_session_id: AtomicU64::new(1),
+            #[cfg(test)]
+            fail_next_instances: 0,
         })
     }
 
@@ -1440,13 +1528,20 @@ impl NpListener {
 
         // Create new pipe instance for next client
         let buf_size = pipe_buffer_size(self.config.packet_size);
+        #[cfg(test)]
+        if self.fail_next_instances > 0 {
+            self.fail_next_instances -= 1;
+            unsafe { ffi::DisconnectNamedPipe(session_handle) };
+            // ERROR_NO_SYSTEM_RESOURCES
+            return Err(NpError::CreatePipe(1450));
+        }
         let next = match create_pipe_instance(&self.pipe_name, buf_size, false) {
             Ok(h) => h,
             Err(e) => {
-                // Failed to create replacement instance; close the accepted
-                // client to avoid an orphaned connection.
-                close_handle(session_handle);
-                self.handle = ffi::INVALID_HANDLE_VALUE;
+                // Without a next instance, drop this client and keep its
+                // instance as the listener's, so a later accept listens on
+                // it again.
+                unsafe { ffi::DisconnectNamedPipe(session_handle) };
                 return Err(e);
             }
         };
@@ -1496,10 +1591,19 @@ fn create_client_pipe(pipe_name: &[u16]) -> ffi::HANDLE {
     }
 }
 
+/// Test hook called with the pipe name. Tests run in parallel, so a hook
+/// ignores every pipe but its own test's.
+#[cfg(all(windows, test))]
+pub(crate) type ConnectHook = std::sync::Mutex<Option<Box<dyn Fn(&[u16]) + Send>>>;
+
 /// Runs whenever a connect finds every pipe instance busy, before it waits.
 #[cfg(all(windows, test))]
-pub(crate) static CONNECT_BUSY_HOOK: std::sync::Mutex<Option<Box<dyn Fn() + Send>>> =
-    std::sync::Mutex::new(None);
+pub(crate) static CONNECT_BUSY_HOOK: ConnectHook = std::sync::Mutex::new(None);
+
+/// Runs whenever `WaitNamedPipeW` reports a free instance, before the connect
+/// retries `CreateFileW`, so a test can take that instance first.
+#[cfg(all(windows, test))]
+pub(crate) static CONNECT_WAITED_HOOK: ConnectHook = std::sync::Mutex::new(None);
 
 /// Longest single busy-pipe wait, so an abort ends it promptly.
 #[cfg(windows)]
@@ -1508,9 +1612,19 @@ const CONNECT_BUSY_SLICE_MS: u64 = 100;
 /// A server has no free pipe instance between accepting one client and
 /// creating the next instance, and connects in that window fail with
 /// ERROR_PIPE_BUSY. Wait, bounded by `CONNECT_BUSY_WAIT_MS` and the caller's
-/// deadline, for an instance, then try once more.
+/// deadline, for an instance and retry: `WaitNamedPipeW` does not reserve it,
+/// so another client may take it first.
 #[cfg(windows)]
 fn open_client_pipe(pipe_name: &[u16], wait: &ReceiveWait<'_>) -> Result<ffi::HANDLE, NpError> {
+    if wait.aborted() {
+        return Err(NpError::Aborted);
+    }
+    if wait
+        .deadline
+        .is_some_and(|deadline| Instant::now() >= deadline)
+    {
+        return Err(NpError::Timeout);
+    }
     let handle = create_client_pipe(pipe_name);
     if handle != ffi::INVALID_HANDLE_VALUE {
         return Ok(handle);
@@ -1521,7 +1635,7 @@ fn open_client_pipe(pipe_name: &[u16], wait: &ReceiveWait<'_>) -> Result<ffi::HA
     }
     #[cfg(test)]
     if let Some(hook) = CONNECT_BUSY_HOOK.lock().unwrap().as_ref() {
-        hook();
+        hook(pipe_name);
     }
 
     let mut busy_deadline = Instant::now() + Duration::from_millis(CONNECT_BUSY_WAIT_MS as u64);
@@ -1542,11 +1656,20 @@ fn open_client_pipe(pipe_name: &[u16], wait: &ReceiveWait<'_>) -> Result<ffi::HA
         let left = busy_deadline.duration_since(now).as_millis().max(1) as u64;
         let slice = left.min(CONNECT_BUSY_SLICE_MS) as u32;
         if unsafe { ffi::WaitNamedPipeW(pipe_name.as_ptr(), slice) } != 0 {
-            let handle = create_client_pipe(pipe_name);
-            if handle == ffi::INVALID_HANDLE_VALUE {
-                return Err(NpError::Connect(last_error()));
+            #[cfg(test)]
+            if let Some(hook) = CONNECT_WAITED_HOOK.lock().unwrap().as_ref() {
+                hook(pipe_name);
             }
-            return Ok(handle);
+            let handle = create_client_pipe(pipe_name);
+            if handle != ffi::INVALID_HANDLE_VALUE {
+                return Ok(handle);
+            }
+            let err = last_error();
+            if err != ffi::ERROR_PIPE_BUSY {
+                return Err(NpError::Connect(err));
+            }
+            // Another client took the instance first.
+            continue;
         }
         let err = last_error();
         if err != ffi::ERROR_SEM_TIMEOUT {
@@ -1741,6 +1864,7 @@ fn client_handshake(
         0,
         0,
         &framing::hello_packet(&hello),
+        None,
         &mut false,
     )?;
 
@@ -1765,8 +1889,15 @@ fn client_handshake(
 
     // Reject packet sizes too small for a header
     if ack.agreed_packet_size <= HEADER_SIZE as u32 {
-        return Err(NpError::Handshake(
+        return Err(NpError::Protocol(
             "agreed packet_size <= HEADER_SIZE".into(),
+        ));
+    }
+    // A server may only lower our proposal: buffers and chunking on this side
+    // are sized from it.
+    if ack.agreed_packet_size > pkt_size {
+        return Err(NpError::Protocol(
+            "agreed packet_size exceeds proposal".into(),
         ));
     }
 
@@ -2040,6 +2171,61 @@ mod tests {
         assert!(matches!(result, Err(NpError::PipeName(_))));
     }
 
+    /// Serve one HELLO_ACK with `selected` and the agreed packet size
+    /// `agreed(proposal)`, then close; returns the server thread.
+    #[cfg(windows)]
+    fn fake_hello_ack_server(
+        svc: &str,
+        selected: u32,
+        agreed: fn(u32) -> u32,
+    ) -> thread::JoinHandle<()> {
+        let pipe_name = build_pipe_name(TEST_RUN_DIR, svc).expect("pipe name");
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+        let server = thread::spawn(move || {
+            let handle =
+                create_pipe_instance(&pipe_name, pipe_buffer_size(DEFAULT_PACKET_SIZE), true)
+                    .expect("create pipe");
+            ready_tx.send(()).expect("signal ready");
+            unsafe { ffi::ConnectNamedPipe(handle, std::ptr::null_mut()) };
+
+            let mut buf = [0u8; 128];
+            let n = raw_recv(handle, &mut buf).expect("recv hello");
+            let hello = Hello::decode(&buf[HEADER_SIZE..n]).expect("decode hello");
+            let ack = HelloAck {
+                layout_version: 1,
+                server_supported_profiles: PROFILE_BASELINE | protocol::PROFILE_SHM_HYBRID,
+                intersection_profiles: PROFILE_BASELINE,
+                selected_profile: selected,
+                agreed_max_request_payload_bytes: hello.max_request_payload_bytes,
+                agreed_max_request_batch_items: hello.max_request_batch_items,
+                agreed_max_response_payload_bytes: hello.max_response_payload_bytes,
+                agreed_max_response_batch_items: hello.max_response_batch_items,
+                agreed_packet_size: agreed(hello.packet_size),
+                session_id: 1,
+                ..HelloAck::default()
+            };
+            let mut pkt = [0u8; HEADER_SIZE + HELLO_ACK_PAYLOAD_SIZE];
+            Header {
+                magic: MAGIC_MSG,
+                version: VERSION,
+                header_len: protocol::HEADER_LEN,
+                kind: protocol::KIND_CONTROL,
+                flags: 0,
+                code: protocol::CODE_HELLO_ACK,
+                transport_status: protocol::STATUS_OK,
+                payload_len: HELLO_ACK_PAYLOAD_SIZE as u32,
+                item_count: 1,
+                message_id: 0,
+            }
+            .encode(&mut pkt[..HEADER_SIZE]);
+            ack.encode(&mut pkt[HEADER_SIZE..]);
+            raw_write(handle, &pkt).expect("send ack");
+            close_handle(handle);
+        });
+        ready_rx.recv().expect("server ready");
+        server
+    }
+
     #[cfg(windows)]
     #[test]
     fn test_connect_rejects_selected_profile_not_offered() {
@@ -2051,51 +2237,7 @@ mod tests {
             PROFILE_BASELINE | protocol::PROFILE_SHM_HYBRID,
         ] {
             let svc = unique_service("rs_ack_selected");
-            let pipe_name = build_pipe_name(TEST_RUN_DIR, &svc).expect("pipe name");
-            let (ready_tx, ready_rx) = std::sync::mpsc::channel();
-            let server = thread::spawn(move || {
-                let handle =
-                    create_pipe_instance(&pipe_name, pipe_buffer_size(DEFAULT_PACKET_SIZE), true)
-                        .expect("create pipe");
-                ready_tx.send(()).expect("signal ready");
-                unsafe { ffi::ConnectNamedPipe(handle, std::ptr::null_mut()) };
-
-                let mut buf = [0u8; 128];
-                let n = raw_recv(handle, &mut buf).expect("recv hello");
-                let hello = Hello::decode(&buf[HEADER_SIZE..n]).expect("decode hello");
-                let ack = HelloAck {
-                    layout_version: 1,
-                    server_supported_profiles: PROFILE_BASELINE | protocol::PROFILE_SHM_HYBRID,
-                    intersection_profiles: PROFILE_BASELINE,
-                    selected_profile: selected,
-                    agreed_max_request_payload_bytes: hello.max_request_payload_bytes,
-                    agreed_max_request_batch_items: hello.max_request_batch_items,
-                    agreed_max_response_payload_bytes: hello.max_response_payload_bytes,
-                    agreed_max_response_batch_items: hello.max_response_batch_items,
-                    agreed_packet_size: hello.packet_size,
-                    session_id: 1,
-                    ..HelloAck::default()
-                };
-                let mut pkt = [0u8; HEADER_SIZE + HELLO_ACK_PAYLOAD_SIZE];
-                Header {
-                    magic: MAGIC_MSG,
-                    version: VERSION,
-                    header_len: protocol::HEADER_LEN,
-                    kind: protocol::KIND_CONTROL,
-                    flags: 0,
-                    code: protocol::CODE_HELLO_ACK,
-                    transport_status: protocol::STATUS_OK,
-                    payload_len: HELLO_ACK_PAYLOAD_SIZE as u32,
-                    item_count: 1,
-                    message_id: 0,
-                }
-                .encode(&mut pkt[..HEADER_SIZE]);
-                ack.encode(&mut pkt[HEADER_SIZE..]);
-                raw_write(handle, &pkt).expect("send ack");
-                close_handle(handle);
-            });
-
-            ready_rx.recv().expect("server ready");
+            let server = fake_hello_ack_server(&svc, selected, |proposal| proposal);
             let err = match NpSession::connect(TEST_RUN_DIR, &svc, &default_client_config()) {
                 Ok(_) => panic!("HELLO_ACK selecting 0x{selected:x} should fail"),
                 Err(err) => err,
@@ -2103,6 +2245,27 @@ mod tests {
             assert!(
                 matches!(&err, NpError::Protocol(msg) if msg.contains("not offered")),
                 "selected 0x{selected:x}: {err:?}"
+            );
+            server.join().expect("server join");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_connect_rejects_agreed_packet_size_out_of_range() {
+        ensure_run_dir();
+        // A server may only lower the proposal, and must leave payload room.
+        let cases: [fn(u32) -> u32; 2] = [|proposal| proposal + 1, |_| HEADER_SIZE as u32];
+        for agreed in cases {
+            let svc = unique_service("rs_ack_pkt");
+            let server = fake_hello_ack_server(&svc, PROFILE_BASELINE, agreed);
+            let err = match NpSession::connect(TEST_RUN_DIR, &svc, &default_client_config()) {
+                Ok(_) => panic!("HELLO_ACK with an out-of-range packet size should fail"),
+                Err(err) => err,
+            };
+            assert!(
+                matches!(&err, NpError::Protocol(msg) if msg.contains("packet_size")),
+                "{err:?}"
             );
             server.join().expect("server join");
         }
@@ -2685,9 +2848,15 @@ mod tests {
         server.join().expect("server join");
     }
 
+    /// The connect hooks are process-wide: tests that set them run one at
+    /// a time.
+    #[cfg(windows)]
+    static CONNECT_HOOK_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[cfg(windows)]
     #[test]
     fn test_connect_waits_for_busy_pipe() {
+        let _hooks = CONNECT_HOOK_TESTS.lock().unwrap_or_else(|e| e.into_inner());
         ensure_run_dir();
         let svc = unique_service("rs_busy");
         let mut listener =
@@ -2704,8 +2873,11 @@ mod tests {
         );
 
         let (busy_tx, busy_rx) = std::sync::mpsc::channel::<()>();
-        *CONNECT_BUSY_HOOK.lock().unwrap() = Some(Box::new(move || {
-            let _ = busy_tx.send(());
+        let busy_name = pipe_name.clone();
+        *CONNECT_BUSY_HOOK.lock().unwrap() = Some(Box::new(move |name| {
+            if name == busy_name.as_slice() {
+                let _ = busy_tx.send(());
+            }
         }));
 
         // Accept the holder once the second client found the pipe busy, then
@@ -2733,6 +2905,147 @@ mod tests {
 
         session.close();
         close_handle(holder);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_connect_retries_stolen_instance() {
+        let _hooks = CONNECT_HOOK_TESTS.lock().unwrap_or_else(|e| e.into_inner());
+        ensure_run_dir();
+        let svc = unique_service("rs_stolen");
+        let mut listener =
+            NpListener::bind(TEST_RUN_DIR, &svc, default_server_config()).expect("bind");
+
+        let pipe_name = build_pipe_name(TEST_RUN_DIR, &svc).expect("pipe name");
+        let holder = create_client_pipe(&pipe_name);
+        assert_ne!(
+            holder,
+            ffi::INVALID_HANDLE_VALUE,
+            "holder takes the only instance"
+        );
+
+        let (busy_tx, busy_rx) = std::sync::mpsc::channel::<()>();
+        let busy_name = pipe_name.clone();
+        *CONNECT_BUSY_HOOK.lock().unwrap() = Some(Box::new(move |name| {
+            if name == busy_name.as_slice() {
+                let _ = busy_tx.send(());
+            }
+        }));
+        // Once WaitNamedPipeW reports the instance the server created on
+        // accept, a third client takes it first, once.
+        let (thief_tx, thief_rx) = std::sync::mpsc::channel::<ffi::HANDLE>();
+        let thief_name = pipe_name.clone();
+        let stolen = std::sync::atomic::AtomicBool::new(false);
+        *CONNECT_WAITED_HOOK.lock().unwrap() = Some(Box::new(move |name| {
+            if name == thief_name.as_slice()
+                && !stolen.swap(true, std::sync::atomic::Ordering::SeqCst)
+            {
+                let _ = thief_tx.send(create_client_pipe(&thief_name));
+            }
+        }));
+
+        // Accept the holder, then the thief, then the retrying client.
+        let server = thread::spawn(move || {
+            busy_rx.recv().ok()?;
+            let first = listener.accept_pending().ok()?;
+            let thief = thief_rx.recv().ok()?;
+            let second = listener.accept_pending().ok()?;
+            let third = listener.accept_pending().ok()?;
+            let session = third
+                .handshake(3, &default_server_config(), 10_000, None)
+                .ok()?;
+            drop(first);
+            drop(second);
+            Some((session, thief))
+        });
+
+        let result = NpSession::connect(TEST_RUN_DIR, &svc, &default_client_config());
+        // Dropping the hooks releases the server thread if connect never got there.
+        *CONNECT_BUSY_HOOK.lock().unwrap() = None;
+        *CONNECT_WAITED_HOOK.lock().unwrap() = None;
+        if result.is_err() {
+            close_handle(holder);
+        }
+        let mut session = result.expect("connect retries after the instance was taken");
+        let (_accepted, thief) = server
+            .join()
+            .expect("server join")
+            .expect("server accepted the retrying client");
+        assert_ne!(
+            thief,
+            ffi::INVALID_HANDLE_VALUE,
+            "thief took the freed instance"
+        );
+
+        session.close();
+        close_handle(thief);
+        close_handle(holder);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_accept_survives_failed_instance() {
+        let _hooks = CONNECT_HOOK_TESTS.lock().unwrap_or_else(|e| e.into_inner());
+        ensure_run_dir();
+        let svc = unique_service("rs_failinst");
+        let mut listener =
+            NpListener::bind(TEST_RUN_DIR, &svc, default_server_config()).expect("bind");
+
+        let pipe_name = build_pipe_name(TEST_RUN_DIR, &svc).expect("pipe name");
+        let dropped = create_client_pipe(&pipe_name);
+        assert_ne!(dropped, ffi::INVALID_HANDLE_VALUE, "first client connects");
+
+        listener.fail_next_instances = 1;
+        let result = listener.accept_pending();
+        assert!(matches!(result, Err(NpError::CreatePipe(_))));
+        assert_ne!(
+            listener.handle,
+            ffi::INVALID_HANDLE_VALUE,
+            "listener keeps its instance"
+        );
+        let mut avail: ffi::DWORD = 0;
+        let peek = unsafe {
+            ffi::PeekNamedPipe(
+                dropped,
+                ptr::null_mut(),
+                0,
+                ptr::null_mut(),
+                &mut avail,
+                ptr::null_mut(),
+            )
+        };
+        assert_eq!(peek, 0, "first client was disconnected");
+
+        // The disconnected instance takes no client until accept listens on
+        // it again, so the next client finds the pipe busy first.
+        let (busy_tx, busy_rx) = std::sync::mpsc::channel::<()>();
+        let busy_name = pipe_name.clone();
+        *CONNECT_BUSY_HOOK.lock().unwrap() = Some(Box::new(move |name| {
+            if name == busy_name.as_slice() {
+                let _ = busy_tx.send(());
+            }
+        }));
+        let server = thread::spawn(move || {
+            busy_rx.recv().ok()?;
+            let pending = listener.accept_pending().ok()?;
+            pending
+                .handshake(1, &default_server_config(), 10_000, None)
+                .ok()
+        });
+
+        let result = NpSession::connect_with_timeout(
+            TEST_RUN_DIR,
+            &svc,
+            &default_client_config(),
+            10_000,
+            None,
+        );
+        *CONNECT_BUSY_HOOK.lock().unwrap() = None;
+        close_handle(dropped);
+        let mut session = result.expect("next client connects");
+        let accepted = server.join().expect("server join");
+        assert!(accepted.is_some(), "server accepted the next client");
+        session.close();
     }
 
     #[cfg(windows)]

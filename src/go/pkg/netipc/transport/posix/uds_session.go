@@ -24,7 +24,7 @@ type ClientConfig struct {
 	MaxResponsePayloadBytes uint32
 	MaxResponseBatchItems   uint32
 	AuthToken               uint64
-	PacketSize              uint32 // 0 = kernel limit; capped at SO_SNDBUF-32 and 256 KiB
+	PacketSize              uint32 // 0 = transport limit (SEQPACKET: SO_SNDBUF-32; stream: 256 KiB); capped at 256 KiB
 }
 
 // ServerConfig configures a listener and its accepted sessions.
@@ -36,11 +36,12 @@ type ServerConfig struct {
 	MaxResponsePayloadBytes uint32
 	MaxResponseBatchItems   uint32
 	AuthToken               uint64
-	PacketSize              uint32 // 0 = kernel limit; capped at SO_SNDBUF-32 and 256 KiB
+	PacketSize              uint32 // 0 = transport limit (SEQPACKET: SO_SNDBUF-32; stream: 256 KiB); capped at 256 KiB
 	Backlog                 int    // 0 = default (16)
 }
 
-// Session is a connected UDS SEQPACKET session (client or server side).
+// Session is a connected UDS session (client or server side): SEQPACKET, or
+// the stream baseline on macOS and FreeBSD.
 type Session struct {
 	fd   int
 	role Role
@@ -62,18 +63,24 @@ type Session struct {
 	pending pendingQueue
 	// Queue bound of the send in progress; 0 sends with a blocking call.
 	progressBound int
+	// sendWait bounds the send in progress when sendBounded is set;
+	// otherwise the send waits without a deadline.
+	sendWait    receiveWait
+	sendBounded bool
 	// Stream baseline: a receive failed after reading part of a message, so
 	// the stream is off a packet boundary and every later receive fails.
 	recvFailed bool
 
 	// Receive state of the call in progress, read by closures built once
 	// per session (receiveFns), so a receive allocates nothing.
-	recvWait      receiveWait
-	recvControl   bool
-	streamFirst   bool
-	recvPacketFn  func([]byte) (int, error)
-	recvStreamFn  func([]byte) (int, error)
-	failInflights func()
+	recvWait    receiveWait
+	recvControl bool
+	streamFirst bool
+	// Stream baseline: a byte of the message in progress has been taken.
+	streamConsumed bool
+	recvPacketFn   func([]byte) (int, error)
+	recvStreamFn   func([]byte) (int, error)
+	failInflights  func()
 }
 
 // pendingQueue holds inbound bytes a pipelined client send read while it
@@ -105,8 +112,9 @@ func (q *pendingQueue) consumed() {
 
 // drain reads without blocking until the socket has nothing more to read,
 // EOF or an error (both set *eof). Queued bytes beyond bound fail with
-// ErrProtocol. A datagram larger than readLen is stored truncated, and the
-// receive path rejects it.
+// ErrProtocol. Each datagram is stored whole, so its later receive sees what
+// a direct receive sees: one longer than readLen, a protocol violation, is
+// rejected there instead of being stored cut short.
 func (q *pendingQueue) drain(fd, readLen, bound int, eof *bool) error {
 	if q.head > 0 {
 		n := copy(q.buf, q.buf[q.head:])
@@ -115,8 +123,31 @@ func (q *pendingQueue) drain(fd, readLen, bound int, eof *bool) error {
 	}
 	rec := pendingRecordLen()
 	for {
+		size := readLen
+		if rec > 0 {
+			// MSG_TRUNC reports the full length on Linux 3.4 and later;
+			// older kernels report at most the probe length.
+			var probe [1]byte
+			full, _, _, _, err := syscall.Recvmsg(fd, probe[:], nil,
+				syscall.MSG_DONTWAIT|syscall.MSG_PEEK|syscall.MSG_TRUNC)
+			if err == syscall.EINTR {
+				continue
+			}
+			if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
+				return nil
+			}
+			if err != nil || full <= 0 {
+				// EOF or a socket error: the retried send reports it.
+				*eof = true
+				return nil
+			}
+			if full > bound {
+				return wrapErr(ErrProtocol, "inbound bytes exceed the in-flight responses")
+			}
+			size = max(size, full)
+		}
 		start := len(q.buf)
-		q.buf = append(q.buf, make([]byte, rec+readLen)...)
+		q.buf = append(q.buf, make([]byte, rec+size)...)
 		n, _, _, _, err := syscall.Recvmsg(fd, q.buf[start+rec:], nil, syscall.MSG_DONTWAIT)
 		if err != nil || n <= 0 {
 			q.buf = q.buf[:start]
@@ -131,7 +162,7 @@ func (q *pendingQueue) drain(fd, readLen, bound int, eof *bool) error {
 			return nil
 		}
 		if rec > 0 {
-			binary.NativeEndian.PutUint32(q.buf[start:], uint32(n)) // #nosec G115 -- n <= readLen, a uint32 packet size.
+			binary.NativeEndian.PutUint32(q.buf[start:], uint32(n)) // #nosec G115 -- n <= bound, the in-flight response bytes.
 		}
 		q.buf = q.buf[:start+rec+n]
 		if len(q.buf) > bound {

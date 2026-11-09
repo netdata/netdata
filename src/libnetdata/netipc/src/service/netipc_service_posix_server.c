@@ -23,37 +23,32 @@
 /*  Internal: managed server session handler                           */
 /* ------------------------------------------------------------------ */
 
-static void server_accept_loop_mark_active(nipc_managed_server_t *server) {
-  if (!server || !server->sessions)
-    return;
-
-  pthread_mutex_lock(&server->sessions_lock);
+/* Run and drain/destroy meet without the session lock, which drain and
+ * destroy free: run publishes acceptor_started and then reads
+ * stop_requested; a stop publishes stop_requested and then reads
+ * acceptor_started. Both are sequentially consistent, so at least one side
+ * sees the other: either the stop waits for the loop, or run sees the stop
+ * and returns without touching the server again. */
+static bool server_accept_loop_enter(nipc_managed_server_t *server) {
   server->acceptor_thread = pthread_self();
-  server->acceptor_started = true;
-  pthread_mutex_unlock(&server->sessions_lock);
+  __atomic_store_n(&server->acceptor_started, true, __ATOMIC_SEQ_CST);
+  if (!__atomic_load_n(&server->stop_requested, __ATOMIC_SEQ_CST))
+    return true;
+  __atomic_store_n(&server->acceptor_started, false, __ATOMIC_SEQ_CST);
+  return false;
 }
 
-static void server_accept_loop_mark_inactive(nipc_managed_server_t *server) {
-  if (!server || !server->sessions)
-    return;
-
-  pthread_mutex_lock(&server->sessions_lock);
-  server->acceptor_started = false;
-  pthread_mutex_unlock(&server->sessions_lock);
+/* The loop's last access to the server. */
+static void server_accept_loop_leave(nipc_managed_server_t *server) {
+  __atomic_store_n(&server->acceptor_started, false, __ATOMIC_SEQ_CST);
 }
 
 static void server_wait_accept_loop_inactive(nipc_managed_server_t *server) {
-  if (!server || !server->sessions)
-    return;
-
   for (;;) {
-    pthread_mutex_lock(&server->sessions_lock);
-    bool active = server->acceptor_started;
-    bool current_thread =
-        active && pthread_equal(server->acceptor_thread, pthread_self());
-    pthread_mutex_unlock(&server->sessions_lock);
-
-    if (!active || current_thread)
+    if (!__atomic_load_n(&server->acceptor_started, __ATOMIC_SEQ_CST))
+      return;
+    /* Called from the loop's own thread, there is nothing to wait for. */
+    if (pthread_equal(server->acceptor_thread, pthread_self()))
       return;
     nipc_service_posix_sleep_us(1000);
   }
@@ -86,6 +81,10 @@ nipc_error_t nipc_service_platform_server_init_raw(
   if (ierr != NIPC_OK)
     return ierr;
   server->base_config = *config;
+  /* 0 selects the baseline profile, as in the transport handshake; the
+   * accept path masks profiles and would otherwise reject every client. */
+  if (server->base_config.supported_profiles == 0)
+    server->base_config.supported_profiles = NIPC_PROFILE_BASELINE;
   ierr = nipc_service_common_server_alloc_sessions(
       server, nipc_service_posix_calloc,
       NIPC_POSIX_SERVICE_TEST_FAULT_SERVER_SESSIONS_CALLOC_INTERNAL);
@@ -122,8 +121,8 @@ nipc_server_init_raw_for_tests(nipc_managed_server_t *server,
 }
 
 static void server_request_stop(nipc_managed_server_t *server) {
-  __atomic_store_n(&server->stop_requested, true, __ATOMIC_RELEASE);
-  __atomic_store_n(&server->running, false, __ATOMIC_RELEASE);
+  __atomic_store_n(&server->stop_requested, true, __ATOMIC_SEQ_CST);
+  __atomic_store_n(&server->running, false, __ATOMIC_SEQ_CST);
 }
 
 static bool server_stop_requested(nipc_managed_server_t *server) {
@@ -157,12 +156,13 @@ void nipc_server_run(nipc_managed_server_t *server) {
    * already have released the listener and the session lock. */
   if (server_stop_requested(server))
     return;
-  __atomic_store_n(&server->running, true, __ATOMIC_RELEASE);
-  if (server_stop_requested(server)) {
-    __atomic_store_n(&server->running, false, __ATOMIC_RELEASE);
+  /* running is set before the stop check: a stop the check misses clears
+   * it afterwards. */
+  __atomic_store_n(&server->running, true, __ATOMIC_SEQ_CST);
+  if (!server_accept_loop_enter(server)) {
+    __atomic_store_n(&server->running, false, __ATOMIC_SEQ_CST);
     return;
   }
-  server_accept_loop_mark_active(server);
 
   while (__atomic_load_n(&server->running, __ATOMIC_RELAXED)) {
     /* Poll the listener fd before blocking on accept */
@@ -253,7 +253,10 @@ void nipc_server_run(nipc_managed_server_t *server) {
     }
   }
 
-  server_accept_loop_mark_inactive(server);
+  /* Run owns the listening socket. The endpoint lock stays held until
+   * drain or destroy has joined the workers. */
+  nipc_uds_stop_listening(&server->listener);
+  server_accept_loop_leave(server);
 }
 
 void nipc_server_stop(nipc_managed_server_t *server) {
@@ -278,14 +281,17 @@ static void server_join_sessions(nipc_managed_server_t *server) {
   pthread_mutex_destroy(&server->sessions_lock);
 }
 
-bool nipc_server_drain(nipc_managed_server_t *server, uint32_t timeout_ms) {
-  /* 1. Stop accepting new clients.
-   * Do NOT close the listener here — the run loop may still be
-   * polling on listener.fd. Setting the flag is enough; the run
-   * loop will exit on its next poll timeout (100ms). The listener
-   * is closed later by nipc_server_destroy(). */
+/* Stop accepting: the run loop closes the socket when it notices the stop;
+ * this closes it when no loop ran. */
+static void server_stop_accepting(nipc_managed_server_t *server) {
   server_request_stop(server);
   server_wait_accept_loop_inactive(server);
+  nipc_uds_stop_listening(&server->listener);
+}
+
+bool nipc_server_drain(nipc_managed_server_t *server, uint32_t timeout_ms) {
+  /* 1. Stop accepting new clients */
+  server_stop_accepting(server);
 
   /* 2. Wait for in-flight sessions, 3. join them (finished or not) */
   bool all_drained = true;
@@ -294,20 +300,20 @@ bool nipc_server_drain(nipc_managed_server_t *server, uint32_t timeout_ms) {
     server_join_sessions(server);
   }
 
+  /* 4. Release the endpoint once no session of this server runs. */
+  nipc_uds_close_listener(&server->listener);
   server->worker_count = 0;
   return all_drained;
 }
 
 void nipc_server_destroy(nipc_managed_server_t *server) {
-  server_request_stop(server);
-  /* The accept loop polls the listener until it notices the stop. */
-  server_wait_accept_loop_inactive(server);
-  nipc_uds_close_listener(&server->listener);
+  server_stop_accepting(server);
 
   if (server->sessions) {
     (void)nipc_service_posix_server_wait_sessions(server, server->stop_grace_ms);
     server_join_sessions(server);
   }
 
+  nipc_uds_close_listener(&server->listener);
   server->worker_count = 0;
 }

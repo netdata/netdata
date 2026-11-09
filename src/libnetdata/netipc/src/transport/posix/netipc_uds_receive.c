@@ -27,7 +27,7 @@ nipc_uds_wait_t nipc_uds_wait_init(uint32_t timeout_ms, int abort_fd)
     return wait;
 }
 
-static int receive_wait_timeout(const nipc_uds_wait_t *wait)
+int nipc_uds_wait_timeout(const nipc_uds_wait_t *wait)
 {
     if (wait->infinite)
         return -1;
@@ -57,7 +57,7 @@ nipc_uds_error_t nipc_uds_wait_for_readable(int fd, const nipc_uds_wait_t *wait)
             nfds = 2;
         }
 
-        int timeout = receive_wait_timeout(wait);
+        int timeout = nipc_uds_wait_timeout(wait);
         if (timeout == 0)
             return NIPC_UDS_ERR_TIMEOUT;
 
@@ -156,17 +156,23 @@ static nipc_uds_error_t track_inbound_response(nipc_uds_session_t *session,
 }
 
 #if NIPC_UDS_STREAM
-/* Reads len bytes, from the pending queue first, then the socket. */
+/* Reads len bytes, from the pending queue first, then the socket. When
+ * consumed is set, it records whether any byte was taken, also on failure. */
 static nipc_uds_error_t session_read_exact(nipc_uds_session_t *session,
                                            void *dst, size_t len,
                                            const nipc_uds_wait_t *wait,
-                                           bool mid_packet)
+                                           bool mid_packet, bool *consumed)
 {
     size_t got = nipc_uds_pending_take(session, dst, len);
-    if (got == len)
-        return NIPC_UDS_OK;
-    return nipc_uds_stream_read_exact(session->fd, (uint8_t *)dst + got,
-                                      len - got, wait, mid_packet || got > 0);
+    size_t read = 0;
+    nipc_uds_error_t err = NIPC_UDS_OK;
+    if (got < len)
+        err = nipc_uds_stream_read_exact(session->fd, (uint8_t *)dst + got,
+                                         len - got, wait, mid_packet || got > 0,
+                                         &read);
+    if (consumed)
+        *consumed = got + read > 0;
+    return err;
 }
 
 /* nipc_uds_stream_recv_packet() through the pending queue. */
@@ -180,12 +186,13 @@ static nipc_uds_error_t session_recv_packet(nipc_uds_session_t *session,
         return NIPC_UDS_ERR_BAD_PARAM;
 
     nipc_uds_error_t err = session_read_exact(session, buf, NIPC_HEADER_LEN,
-                                              wait, false);
+                                              wait, false, NULL);
     if (err != NIPC_UDS_OK)
         return err;
 
     size_t body = nipc_uds_stream_body_len(buf, buf_len, session->packet_size);
-    err = session_read_exact(session, buf + NIPC_HEADER_LEN, body, wait, true);
+    err = session_read_exact(session, buf + NIPC_HEADER_LEN, body, wait, true,
+                             NULL);
     if (err != NIPC_UDS_OK)
         return err;
 
@@ -214,15 +221,14 @@ static nipc_uds_error_t receive_first_packet(nipc_uds_session_t *session,
                                              size_t buf_size,
                                              nipc_header_t *hdr_out,
                                              ssize_t *received_out,
-                                             const nipc_uds_wait_t *wait)
+                                             const nipc_uds_wait_t *wait,
+                                             bool *consumed)
 {
 #if NIPC_UDS_STREAM
     /* The header is checked before its body is read: a stream peer that
      * declares too much is rejected without waiting for those bytes. */
-    if (buf_size < NIPC_HEADER_LEN)
-        return NIPC_UDS_ERR_PROTOCOL;
     nipc_uds_error_t serr = session_read_exact(
-        session, buf, NIPC_HEADER_LEN, wait, false);
+        session, buf, NIPC_HEADER_LEN, wait, false, consumed);
     if (serr == NIPC_UDS_ERR_RECV)
         nipc_uds_inflight_fail_all(session);
     if (serr != NIPC_UDS_OK)
@@ -235,13 +241,14 @@ static nipc_uds_error_t receive_first_packet(nipc_uds_session_t *session,
 
     size_t body = nipc_uds_stream_body_len(buf, buf_size, session->packet_size);
     serr = session_read_exact(session, (uint8_t *)buf + NIPC_HEADER_LEN,
-                              body, wait, true);
+                              body, wait, true, NULL);
     if (serr == NIPC_UDS_ERR_RECV)
         nipc_uds_inflight_fail_all(session);
     if (serr != NIPC_UDS_OK)
         return serr;
     ssize_t n = (ssize_t)(NIPC_HEADER_LEN + body);
 #else
+    (void)consumed;
     nipc_uds_error_t werr;
     ssize_t n = session_recv_packet(session, buf, buf_size, wait, &werr);
     if (werr != NIPC_UDS_OK)
@@ -357,8 +364,8 @@ static nipc_uds_error_t receive_one_chunk(nipc_uds_session_t *session,
         chunk_data > hdr->payload_len - *assembled)
         return NIPC_UDS_ERR_CHUNK;
 
-	memcpy(&session->recv_buf[*assembled], &pkt_buf[NIPC_HEADER_LEN],
-	       chunk_data);
+    memcpy(&session->recv_buf[*assembled], &pkt_buf[NIPC_HEADER_LEN],
+           chunk_data);
     *assembled += chunk_data;
     return NIPC_UDS_OK;
 }
@@ -372,11 +379,11 @@ static nipc_uds_error_t receive_chunked_payload(nipc_uds_session_t *session,
                                                 size_t *payload_len_out,
                                                 const nipc_uds_wait_t *wait)
 {
-	size_t first_payload_bytes = (size_t)first_packet_len - NIPC_HEADER_LEN;
+    size_t first_payload_bytes = (size_t)first_packet_len - NIPC_HEADER_LEN;
     if (first_payload_bytes > hdr->payload_len)
         return NIPC_UDS_ERR_CHUNK;
 
-	nipc_uds_error_t err = ensure_recv_buf(session, hdr->payload_len);
+    nipc_uds_error_t err = ensure_recv_buf(session, hdr->payload_len);
     if (err != NIPC_UDS_OK)
         return err;
 
@@ -414,11 +421,12 @@ static nipc_uds_error_t receive_message(nipc_uds_session_t *session,
                                         nipc_header_t *hdr_out,
                                         const void **payload_out,
                                         size_t *payload_len_out,
-                                        const nipc_uds_wait_t *wait)
+                                        const nipc_uds_wait_t *wait,
+                                        bool *consumed)
 {
     ssize_t n;
     nipc_uds_error_t err = receive_first_packet(session, buf, buf_size,
-                                                hdr_out, &n, wait);
+                                                hdr_out, &n, wait, consumed);
     if (err != NIPC_UDS_OK)
         return err;
 
@@ -464,15 +472,18 @@ nipc_uds_error_t nipc_uds_receive_timeout(nipc_uds_session_t *session,
                                            uint32_t timeout_ms,
                                            int abort_fd)
 {
-    if (!session || session->fd < 0)
+    /* A buffer too small for a header is rejected before any byte is
+     * read, so the session stays usable. */
+    if (!session || session->fd < 0 || !buf || buf_size < NIPC_HEADER_LEN)
         return NIPC_UDS_ERR_BAD_PARAM;
 
     nipc_uds_wait_t wait = nipc_uds_wait_init(timeout_ms, abort_fd);
 
 #if NIPC_UDS_STREAM
-    /* A timeout or abort before the first byte leaves the stream on a packet
-     * boundary. A failure after it does not: the rest of the message is still
-     * queued, so every later receive fails. The session records that instead
+    /* A failure before the first byte (a timeout or abort, also one that
+     * fires after the wait below) leaves the stream on a packet boundary.
+     * A failure after it does not: the rest of the message is still queued,
+     * so every later receive fails. The session records that instead
      * of shutting the read side, whose effect differs by OS (FreeBSD 15 fails
      * the peer's sends, FreeBSD 14 still returns queued bytes). Sends stay
      * valid; they always write whole messages. */
@@ -484,10 +495,11 @@ nipc_uds_error_t nipc_uds_receive_timeout(nipc_uds_session_t *session,
             return werr;
     }
 
+    bool consumed = true;
     nipc_uds_error_t err = receive_message(session, buf, buf_size, hdr_out,
                                            payload_out, payload_len_out,
-                                           &wait);
-    if (err != NIPC_UDS_OK) {
+                                           &wait, &consumed);
+    if (err != NIPC_UDS_OK && consumed) {
         session->recv_failed = true;
         /* Queued bytes are part of the abandoned stream too. */
         nipc_uds_pending_free(session);
@@ -495,6 +507,6 @@ nipc_uds_error_t nipc_uds_receive_timeout(nipc_uds_session_t *session,
     return err;
 #else
     return receive_message(session, buf, buf_size, hdr_out, payload_out,
-                           payload_len_out, &wait);
+                           payload_len_out, &wait, NULL);
 #endif
 }

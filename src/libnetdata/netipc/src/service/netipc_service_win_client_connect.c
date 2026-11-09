@@ -131,7 +131,9 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
             uint32_t attach_ms = nipc_service_common_client_op_remaining_ms(ctx);
             /* When the call deadline ends the wait first, WinSHM is not at
              * fault and stays enabled for the next connect. */
-            bool call_bound = attach_ms < ctx->shm_attach_timeout_ms;
+            /* The remaining time is rounded up, so a tie means the call
+             * deadline comes first. */
+            bool call_bound = attach_ms <= ctx->shm_attach_timeout_ms;
             if (!call_bound)
                 attach_ms = ctx->shm_attach_timeout_ms;
             ULONGLONG deadline_ms = GetTickCount64() + attach_ms;

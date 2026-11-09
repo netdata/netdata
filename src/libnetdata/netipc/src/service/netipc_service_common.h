@@ -23,9 +23,10 @@ typedef struct {
 
 typedef nipc_error_t (*nipc_service_common_attempt_fn)(nipc_client_ctx_t *ctx,
                                                        void *state);
+/* Sends within timeout_ms (0 = no deadline), ending early on abort. */
 typedef nipc_error_t (*nipc_service_common_transport_send_fn)(
     nipc_client_ctx_t *ctx, nipc_header_t *hdr, const void *payload,
-    size_t payload_len);
+    size_t payload_len, uint32_t timeout_ms);
 typedef nipc_error_t (*nipc_service_common_transport_receive_fn)(
     nipc_client_ctx_t *ctx, void *buf, size_t buf_size, nipc_header_t *hdr_out,
     const void **payload_out, size_t *payload_len_out, uint32_t timeout_ms);

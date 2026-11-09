@@ -38,11 +38,13 @@
 #define NIPC_UDS_SEND_FLAGS 0
 #endif
 
-/* Profiles this platform can provide. POSIX SHM needs a futex-style wait
- * (Linux futex, FreeBSD _umtx_op), so other POSIX systems offer and accept
- * the baseline profile only. */
+/* Profiles this platform can provide; unassigned bits are never offered or
+ * accepted. POSIX SHM needs a futex-style wait (Linux futex, FreeBSD
+ * _umtx_op), so other POSIX systems offer and accept the baseline profile
+ * only. */
 #if defined(__linux__) || defined(__FreeBSD__)
-#define NIPC_UDS_PLATFORM_PROFILES 0xFFFFFFFFu
+#define NIPC_UDS_PLATFORM_PROFILES                                            \
+    (NIPC_PROFILE_BASELINE | NIPC_PROFILE_SHM_HYBRID | NIPC_PROFILE_SHM_FUTEX)
 #else
 #define NIPC_UDS_PLATFORM_PROFILES NIPC_PROFILE_BASELINE
 #endif
@@ -70,6 +72,8 @@ typedef struct {
 } nipc_uds_wait_t;
 
 nipc_uds_wait_t nipc_uds_wait_init(uint32_t timeout_ms, int abort_fd);
+/* Poll timeout left: -1 without a deadline, 0 once it passed. */
+int nipc_uds_wait_timeout(const nipc_uds_wait_t *wait);
 nipc_uds_error_t nipc_uds_wait_for_readable(int fd, const nipc_uds_wait_t *wait);
 
 /* Stream-socket packet I/O (used by sessions on macOS and FreeBSD; built
@@ -80,10 +84,11 @@ nipc_uds_error_t nipc_uds_wait_for_readable(int fd, const nipc_uds_wait_t *wait)
  * nipc_uds_stream_read_exact() reads len bytes, waiting before each read
  * when wait is set (NULL blocks). EOF before the first byte is RECV (the
  * peer disconnected between packets); EOF inside a packet (any byte read,
- * or mid_packet) is PROTOCOL (the peer sent a truncated packet). */
+ * or mid_packet) is PROTOCOL (the peer sent a truncated packet). When
+ * got_out is set, it receives the bytes read, also on failure. */
 nipc_uds_error_t nipc_uds_stream_read_exact(int fd, void *dst, size_t len,
                                            const nipc_uds_wait_t *wait,
-                                           bool mid_packet);
+                                           bool mid_packet, size_t *got_out);
 /* Bytes that follow a received 32-byte header: min(payload_len,
  * packet_size - 32) after an outer header, chunk_payload_len after a
  * continuation header, none after any other magic. packet_size 0

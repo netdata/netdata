@@ -21,6 +21,7 @@ import (
 	"unsafe"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
 
 // ---------------------------------------------------------------------------
@@ -54,9 +55,9 @@ const (
 	shmMaxPath = 256
 )
 
-// platformProfiles leaves the handshake profiles unrestricted: this system
-// provides every POSIX profile.
-const platformProfiles = 0
+// platformProfiles is every POSIX profile this system provides; unassigned
+// bits are never offered or accepted.
+const platformProfiles = protocol.ProfileBaseline | protocol.ProfileSHMHybrid | protocol.ProfileSHMFutex
 
 // ---------------------------------------------------------------------------
 //  SHM context
@@ -147,8 +148,19 @@ func shmServerCreate(runDir, serviceName string, sessionID uint64, reqCapacity, 
 	}
 	fd := int(f.Fd())
 	// The file takes 0600 & ~umask; a umask without owner read or write would
-	// stop the client from attaching read-write.
-	_ = syscall.Fchmod(fd, 0o600)
+	// stop the client from attaching read-write. A region the client cannot
+	// attach is not created: the session then drops SHM.
+	for {
+		err = syscall.Fchmod(fd, 0o600)
+		if err != syscall.EINTR {
+			break
+		}
+	}
+	if err != nil {
+		_ = f.Close()
+		_ = os.Remove(path)
+		return nil, fmt.Errorf("%w: fchmod: %v", ErrShmOpen, err)
+	}
 
 	if err := shmPreallocate(fd, int64(regionSize), fallocate); err != nil {
 		_ = f.Close()
@@ -567,6 +579,10 @@ func (c *ShmContext) ShmReceive(buf []byte, timeoutMs uint32) (int, error) {
 	if uint64(mlen) > uint64(maxCopy) {
 		return int(mlen), ErrShmMsgTooLarge
 	}
+	// Send rejects zero-length messages, so one here is corruption.
+	if mlen == 0 {
+		return 0, fmt.Errorf("%w: zero-length message", ErrShmBadHeader)
+	}
 
 	return int(mlen), nil
 }
@@ -600,6 +616,9 @@ func validateShmServiceName(name string) error {
 }
 
 func buildShmPath(runDir, serviceName string, sessionID uint64) (string, error) {
+	if runDir == "" {
+		return "", fmt.Errorf("%w: empty run_dir", ErrShmBadParam)
+	}
 	if err := validateShmServiceName(serviceName); err != nil {
 		return "", err
 	}

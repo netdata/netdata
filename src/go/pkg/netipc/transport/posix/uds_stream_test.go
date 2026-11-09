@@ -164,7 +164,7 @@ func TestStreamSessionPacketChecksTheFirstHeaderFirst(t *testing.T) {
 	if err := streamSendAll(a, streamOuter(200, nil), nil); err != nil {
 		t.Fatalf("send: %v", err)
 	}
-	if n, err := streamRecvSessionPacket(b, nil, buf, true, 256, 100, 1, nil); n != protocol.HeaderSize || err != nil {
+	if n, err := streamRecvSessionPacket(b, nil, buf, true, 256, 100, 1, nil, new(bool)); n != protocol.HeaderSize || err != nil {
 		t.Fatalf("over-limit header = %d, %v; want header only", n, err)
 	}
 
@@ -174,7 +174,7 @@ func TestStreamSessionPacketChecksTheFirstHeaderFirst(t *testing.T) {
 	if err := streamSendAll(a, badVersion, nil); err != nil {
 		t.Fatalf("send: %v", err)
 	}
-	if n, err := streamRecvSessionPacket(b, nil, buf, true, 256, 100, 1, nil); n != protocol.HeaderSize || err != nil {
+	if n, err := streamRecvSessionPacket(b, nil, buf, true, 256, 100, 1, nil, new(bool)); n != protocol.HeaderSize || err != nil {
 		t.Fatalf("undecodable header = %d, %v; want header only", n, err)
 	}
 
@@ -182,7 +182,7 @@ func TestStreamSessionPacketChecksTheFirstHeaderFirst(t *testing.T) {
 	if err := streamSendAll(a, streamContinuation(3, []byte("abc")), nil); err != nil {
 		t.Fatalf("send: %v", err)
 	}
-	if n, err := streamRecvSessionPacket(b, nil, buf, true, 256, 100, 1, nil); n != protocol.HeaderSize || err != nil {
+	if n, err := streamRecvSessionPacket(b, nil, buf, true, 256, 100, 1, nil, new(bool)); n != protocol.HeaderSize || err != nil {
 		t.Fatalf("continuation first = %d, %v; want header only", n, err)
 	}
 	// Its body is still queued; read it off as a raw packet body.
@@ -195,7 +195,7 @@ func TestStreamSessionPacketChecksTheFirstHeaderFirst(t *testing.T) {
 		t.Fatalf("send: %v", err)
 	}
 	_ = syscall.Shutdown(a, syscall.SHUT_WR)
-	if _, err := streamRecvSessionPacket(b, nil, buf, false, 256, 100, 1, nil); !errors.Is(err, ErrChunk) {
+	if _, err := streamRecvSessionPacket(b, nil, buf, false, 256, 100, 1, nil, new(bool)); !errors.Is(err, ErrChunk) {
 		t.Fatalf("truncated continuation: %v, want ErrChunk", err)
 	}
 	syscall.Close(a)

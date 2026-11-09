@@ -320,9 +320,18 @@ func (c *Client) doRawCallWithTimeout(methodCode uint16, reqPayload []byte, time
 	}
 	hdr := &c.requestHdr
 
-	if err := c.transportSend(hdr, reqPayload); err != nil {
+	attemptDeadline := monotime.After(time.Duration(waitMs) * time.Millisecond)
+	if err := c.transportSend(hdr, reqPayload, waitMs); err != nil {
 		return protocol.Header{}, nil, err
 	}
+
+	// The send may have waited for buffer space: the receive gets what is
+	// left of this attempt's budget.
+	left := time.Duration(attemptDeadline - monotime.Now())
+	if left <= 0 {
+		return protocol.Header{}, nil, protocol.ErrTimeout
+	}
+	waitMs = uint32((left + time.Millisecond - 1) / time.Millisecond) // #nosec G115 -- left is below the uint32 budget it started from.
 
 	respHdr, payload, err := c.transportReceiveWithControl(waitMs, c.abortSignal())
 	if err != nil {

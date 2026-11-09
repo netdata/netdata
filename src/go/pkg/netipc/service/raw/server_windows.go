@@ -203,6 +203,12 @@ func (s *Server) serveConnection(pending *windows.PendingConn) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	thread := s.trackWorkerThread()
+	if thread == 0 {
+		// Stop could not cancel this worker's blocking pipe I/O: refuse the
+		// connection before HELLO_ACK, as at worker capacity.
+		pending.Close()
+		return
+	}
 	defer s.untrackWorkerThread(thread)
 
 	sessionID, acceptCfg := s.prepareAcceptConfig()
@@ -251,12 +257,18 @@ var (
 	threadTerminateAccess   = uintptr(0x0001)
 )
 
+// openWorkerThread opens a cancellable handle to thread tid, 0 on failure.
+// Tests replace it to fail.
+var openWorkerThread = func(tid uintptr) syscall.Handle {
+	h, _, _ := procOpenThread.Call(threadTerminateAccess, 0, tid)
+	return syscall.Handle(h)
+}
+
 // trackWorkerThread opens a handle to the calling (locked) OS thread and
 // registers it for cancellation. Returns 0 if the handle cannot be opened.
 func (s *Server) trackWorkerThread() syscall.Handle {
 	tid, _, _ := procGetCurrentThreadID.Call()
-	h, _, _ := procOpenThread.Call(threadTerminateAccess, 0, tid)
-	thread := syscall.Handle(h)
+	thread := openWorkerThread(tid)
 	if thread == 0 {
 		return 0
 	}

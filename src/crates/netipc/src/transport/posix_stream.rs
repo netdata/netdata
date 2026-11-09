@@ -45,22 +45,33 @@ pub(super) fn read_exact(
     wait: Option<&ReceiveWait<'_>>,
     mid_packet: bool,
 ) -> Result<(), UdsError> {
-    let mut got = 0;
-    while got < dst.len() {
+    read_exact_counted(fd, dst, wait, mid_packet, &mut 0)
+}
+
+/// `read_exact` that records in `got` the bytes it read, also on failure.
+fn read_exact_counted(
+    fd: RawFd,
+    dst: &mut [u8],
+    wait: Option<&ReceiveWait<'_>>,
+    mid_packet: bool,
+    got: &mut usize,
+) -> Result<(), UdsError> {
+    *got = 0;
+    while *got < dst.len() {
         if let Some(wait) = wait {
             wait_fd_readable(fd, wait)?;
         }
         #[cfg(test)]
-        let end = if short_io::take(&short_io::RECV) && dst.len() - got > 1 {
-            got + 1
+        let end = if short_io::take(&short_io::RECV) && dst.len() - *got > 1 {
+            *got + 1
         } else {
             dst.len()
         };
         #[cfg(not(test))]
         let end = dst.len();
-        match raw_recv(fd, &mut dst[got..end]) {
-            Ok(n) => got += n,
-            Err(UdsError::Recv(0)) if mid_packet || got > 0 => {
+        match raw_recv(fd, &mut dst[*got..end]) {
+            Ok(n) => *got += n,
+            Err(UdsError::Recv(0)) if mid_packet || *got > 0 => {
                 return Err(UdsError::Protocol("truncated packet".into()));
             }
             Err(e) => return Err(e),
@@ -85,19 +96,25 @@ pub(super) fn recv_packet(
     Ok(HEADER_SIZE + body)
 }
 
-/// `read_exact` that takes the session's pending bytes first.
+/// `read_exact` that takes the session's pending bytes first. Sets
+/// `consumed` when it takes any byte, also on failure.
 fn read_exact_pending(
     fd: RawFd,
     pending: &mut Pending,
     dst: &mut [u8],
     wait: Option<&ReceiveWait<'_>>,
     mid_packet: bool,
+    consumed: &mut bool,
 ) -> Result<(), UdsError> {
     let got = pending.take(dst);
+    *consumed |= got > 0;
     if got == dst.len() {
         return Ok(());
     }
-    read_exact(fd, &mut dst[got..], wait, mid_packet || got > 0)
+    let mut read = 0;
+    let result = read_exact_counted(fd, &mut dst[got..], wait, mid_packet || got > 0, &mut read);
+    *consumed |= read > 0;
+    result
 }
 
 /// Read one packet of a session's message, from its pending bytes first. The first packet's header is
@@ -105,6 +122,7 @@ fn read_exact_pending(
 /// declares more than this direction's limits, comes back alone so the
 /// framing rejects it without waiting for bytes a stream peer may never
 /// send. A truncated continuation is a chunk error, as on SEQPACKET.
+/// `consumed` is set once any byte of the message has been taken.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn recv_session_packet(
     fd: RawFd,
@@ -115,12 +133,13 @@ pub(super) fn recv_session_packet(
     max_payload: u32,
     max_items: u32,
     wait: Option<&ReceiveWait<'_>>,
+    consumed: &mut bool,
 ) -> Result<usize, UdsError> {
     if buf.len() < HEADER_SIZE {
         return Err(UdsError::Protocol("packet too short for header".into()));
     }
     let result = (|| {
-        read_exact_pending(fd, pending, &mut buf[..HEADER_SIZE], wait, false)?;
+        read_exact_pending(fd, pending, &mut buf[..HEADER_SIZE], wait, false, consumed)?;
         let hdr = &buf[..HEADER_SIZE];
         if first
             && Header::decode(hdr).map_or(true, |h| {
@@ -136,6 +155,7 @@ pub(super) fn recv_session_packet(
             &mut buf[HEADER_SIZE..HEADER_SIZE + body],
             wait,
             true,
+            consumed,
         )?;
         Ok(HEADER_SIZE + body)
     })();
@@ -368,7 +388,8 @@ mod tests {
                 256,
                 100,
                 1,
-                None
+                None,
+                &mut false
             )
             .unwrap(),
             HEADER_SIZE
@@ -387,7 +408,8 @@ mod tests {
                 256,
                 100,
                 1,
-                None
+                None,
+                &mut false
             )
             .unwrap(),
             HEADER_SIZE
@@ -404,7 +426,8 @@ mod tests {
                 256,
                 100,
                 1,
-                None
+                None,
+                &mut false
             )
             .unwrap(),
             HEADER_SIZE
@@ -424,7 +447,8 @@ mod tests {
                 256,
                 100,
                 1,
-                None
+                None,
+                &mut false
             ),
             Err(UdsError::Chunk(_))
         ));

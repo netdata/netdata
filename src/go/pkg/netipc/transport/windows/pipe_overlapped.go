@@ -27,6 +27,7 @@ const progressYield = time.Millisecond
 const (
 	_FILE_FLAG_OVERLAPPED = 0x40000000
 	_ERROR_IO_PENDING     = 997
+	_ERROR_IO_INCOMPLETE  = 996
 	_WAIT_OBJECT_0        = 0
 )
 
@@ -112,7 +113,9 @@ func overlappedRead(handle syscall.Handle, io *pipeIO, buf []byte) (int, error) 
 	io.readBuf = buf
 	defer func() { io.readBuf = nil }()
 	var read uint32
-	err := syscall.ReadFile(handle, buf, &read, ov)
+	// Overlapped I/O takes no byte-count pointer (Win32 docs); the count
+	// comes from GetOverlappedResult.
+	err := syscall.ReadFile(handle, buf, nil, ov)
 	if err != nil && err != syscall.Errno(_ERROR_IO_PENDING) {
 		return 0, recvError(err)
 	}
@@ -129,8 +132,9 @@ func overlappedRead(handle syscall.Handle, io *pipeIO, buf []byte) (int, error) 
 // finishOverlappedWrite, also when WriteFile completed at once.
 func startOverlappedWrite(handle syscall.Handle, io *pipeIO, data []byte) error {
 	io.writeBuf = data
-	var written uint32
-	err := syscall.WriteFile(handle, data, &written, &io.write)
+	// No byte-count pointer: the write may still be pending when this
+	// returns; finishOverlappedWrite gets the count.
+	err := syscall.WriteFile(handle, data, nil, &io.write)
 	if err != nil && err != syscall.Errno(_ERROR_IO_PENDING) {
 		io.writeBuf = nil
 		return sendError(err)
@@ -164,9 +168,49 @@ func (s *Session) writePacket(msg []byte) error {
 		return rawWrite(s.handle, msg)
 	}
 	if s.progressBound == 0 {
+		if s.sendBounded {
+			return s.overlappedWriteWait(msg)
+		}
 		return overlappedWrite(s.handle, s.io, msg)
 	}
 	return s.writeWithProgress(msg)
+}
+
+// overlappedWriteWait posts the write and waits until it completes, the
+// deadline passes or the abort channel is closed. A write that ends early is
+// cancelled and the session broken, since part of the message may be on the
+// wire.
+func (s *Session) overlappedWriteWait(msg []byte) error {
+	if err := startOverlappedWrite(s.handle, s.io, msg); err != nil {
+		return err
+	}
+	ov := &s.io.write
+	for {
+		var written uint32
+		err := getOverlappedResult(s.handle, ov, &written, false)
+		if err == nil {
+			s.io.writeBuf = nil
+			if written != uint32(len(msg)) { // #nosec G115 -- messages are bounded by the uint32 packet size.
+				return wrapErr(ErrSend, fmt.Sprintf("short write: %d/%d", written, len(msg)))
+			}
+			return nil
+		}
+		if err != syscall.Errno(_ERROR_IO_INCOMPLETE) {
+			s.io.writeBuf = nil
+			return sendError(err)
+		}
+		ms, werr := s.sendWait.waitMs()
+		if werr != nil {
+			s.cancelWrite()
+			s.breakSession()
+			return werr
+		}
+		if _, err := syscall.WaitForSingleObject(ov.HEvent, ms); err != nil {
+			s.cancelWrite()
+			s.breakSession()
+			return wrapErr(ErrSend, fmt.Sprintf("WaitForSingleObject: %v", err))
+		}
+	}
 }
 
 // readPacket reads one wire packet from the session's handle.
@@ -179,7 +223,8 @@ func (s *Session) readPacket(dst []byte) (int, error) {
 
 // writeWithProgress posts the write and, until it completes, reads what the
 // server sent into the pending queue, so both sides keep making progress.
-// No timeout: it waits as long as a blocking write would.
+// Without sendWait it waits as long as a blocking write would; with one it
+// ends at the deadline or abort.
 func (s *Session) writeWithProgress(msg []byte) error {
 	ov := &s.io.write
 	if err := startOverlappedWrite(s.handle, s.io, msg); err != nil {
@@ -196,6 +241,13 @@ func (s *Session) writeWithProgress(msg []byte) error {
 			s.cancelWrite()
 			s.breakSession()
 			return wrapErr(ErrSend, fmt.Sprintf("WaitForSingleObject: %v", werr))
+		}
+		if s.sendBounded {
+			if _, err := s.sendWait.waitMs(); err != nil {
+				s.cancelWrite()
+				s.breakSession()
+				return err
+			}
 		}
 		if !eof {
 			drained, derr := s.drainPending(&eof)

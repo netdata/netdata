@@ -1,5 +1,5 @@
 /*
- * netipc_shm.h - L1 POSIX SHM transport (Linux only).
+ * netipc_shm.h - L1 POSIX SHM transport (Linux and FreeBSD).
  *
  * Shared memory data plane with spin+futex synchronization.
  * The SHM region carries the same outer protocol envelope as the UDS
@@ -54,7 +54,7 @@ typedef enum {
     NIPC_SHM_ERR_BAD_PARAM,         /* invalid argument */
     NIPC_SHM_ERR_PEER_DEAD,         /* owner process has exited */
     NIPC_SHM_ERR_ALLOCATE,          /* backing allocation failed; errno preserved */
-    NIPC_SHM_ERR_UNSUPPORTED,       /* no POSIX SHM on this platform (Linux only) */
+    NIPC_SHM_ERR_UNSUPPORTED,       /* no POSIX SHM on this platform (Linux and FreeBSD only) */
 } nipc_shm_error_t;
 
 /* ------------------------------------------------------------------ */

@@ -197,11 +197,22 @@ func ClientHandshake(config ClientHandshakeConfig) (protocol.HelloAck, error) {
 		}
 		return protocol.HelloAck{}, config.ErrProtocol("ack payload: " + err.Error())
 	}
+	// HELLO_ACK is exactly one 48-byte payload: extra bytes in the packet, or
+	// a declared length a stream peer may still be sending, would otherwise be
+	// read as the session's first message.
+	if ackHdr.PayloadLen != HelloAckPayloadSize || n != protocol.HeaderSize+HelloAckPayloadSize {
+		return protocol.HelloAck{}, config.ErrProtocol("ack payload length mismatch")
+	}
 
 	offered, _ := profiles(config.Hello.SupportedProfiles, 0, config.Hello.PlatformProfiles)
 	selected := ack.SelectedProfile
 	if selected == 0 || selected&(selected-1) != 0 || selected&offered == 0 {
 		return protocol.HelloAck{}, config.ErrProtocol("selected profile was not offered")
+	}
+	// A server may only lower our proposal: this side sizes its buffers, and
+	// on SEQPACKET its datagrams, from it. A packet must hold a payload byte.
+	if ack.AgreedPacketSize <= protocol.HeaderSize || ack.AgreedPacketSize > config.Hello.PacketSize {
+		return protocol.HelloAck{}, config.ErrProtocol("agreed packet_size out of range")
 	}
 
 	return ack, nil
@@ -255,7 +266,7 @@ func ServerHandshake(config ServerHandshakeConfig) (protocol.HelloAck, error) {
 		return protocol.HelloAck{}, config.ErrRecv("hello recv: " + err.Error())
 	}
 
-	_, err = DecodeControlHeader(buf[:n], protocol.CodeHello)
+	hdr, err := DecodeControlHeader(buf[:n], protocol.CodeHello)
 	if err != nil {
 		if errors.Is(err, protocol.ErrBadVersion) &&
 			HeaderVersionIncompatible(buf[:n], protocol.CodeHello) {
@@ -276,6 +287,10 @@ func ServerHandshake(config ServerHandshakeConfig) (protocol.HelloAck, error) {
 			return protocol.HelloAck{}, config.ErrIncompatible("hello payload layout version mismatch")
 		}
 		return protocol.HelloAck{}, config.ErrProtocol("hello payload: " + err.Error())
+	}
+	// HELLO is exactly one 44-byte payload, as HELLO_ACK is 48.
+	if hdr.PayloadLen != HelloPayloadSize || n != protocol.HeaderSize+HelloPayloadSize {
+		return protocol.HelloAck{}, config.ErrProtocol("hello payload length mismatch")
 	}
 
 	ack, status, ok := NegotiateHello(hello, config.ServerHelloConfig)

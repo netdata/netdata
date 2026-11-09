@@ -93,11 +93,15 @@ func (c *Client) CallIncrementBatchWithTimeout(values []uint64, timeoutMs uint32
 		}
 		hdr := &c.requestHdr
 
-		if err := c.transportSend(hdr, reqPayload); err != nil {
+		waitMs := c.opRemainingMs()
+		if waitMs == 0 {
+			return protocol.ErrTimeout
+		}
+		if err := c.transportSend(hdr, reqPayload, waitMs); err != nil {
 			return err
 		}
 
-		waitMs := c.opRemainingMs()
+		waitMs = c.opRemainingMs()
 		if waitMs == 0 {
 			return protocol.ErrTimeout
 		}

@@ -63,18 +63,25 @@ func streamBodyLen(hdr []byte, bufLen int, packetSize uint32) int {
 // blocks). EOF before the first byte is a disconnect (ErrRecv); EOF inside a
 // packet (any byte read, or midPacket) is a truncated packet (ErrProtocol).
 func streamReadExact(fd int, dst []byte, wait *receiveWait, midPacket bool) error {
-	got := 0
-	for got < len(dst) {
+	var got int
+	return streamReadExactCounted(fd, dst, wait, midPacket, &got)
+}
+
+// streamReadExactCounted is streamReadExact that adds to *got the bytes it
+// reads, also on failure.
+func streamReadExactCounted(fd int, dst []byte, wait *receiveWait, midPacket bool, got *int) error {
+	start := *got
+	for done := 0; done < len(dst); done = *got - start {
 		if wait != nil {
 			if err := pollReadableForReceive(fd, *wait); err != nil {
 				return err
 			}
 		}
-		limit, eintr := streamTestHook(false, len(dst)-got)
+		limit, eintr := streamTestHook(false, len(dst)-done)
 		n := 0
 		var err error = syscall.EINTR
 		if !eintr {
-			n, _, _, _, err = syscall.Recvmsg(fd, dst[got:got+limit], nil, 0)
+			n, _, _, _, err = syscall.Recvmsg(fd, dst[done:done+limit], nil, 0)
 		}
 		if errors.Is(err, syscall.EINTR) {
 			continue
@@ -83,12 +90,12 @@ func streamReadExact(fd int, dst []byte, wait *receiveWait, midPacket bool) erro
 			return wrapErr(ErrRecv, err.Error())
 		}
 		if n == 0 {
-			if midPacket || got > 0 {
+			if midPacket || done > 0 {
 				return wrapErr(ErrProtocol, "truncated packet")
 			}
 			return wrapErr(ErrRecv, "peer disconnected")
 		}
-		got += n
+		*got += n
 	}
 	return nil
 }
@@ -111,15 +118,24 @@ func streamRecvPacket(fd int, buf []byte, packetSize uint32, wait *receiveWait) 
 
 // streamReadExactPending is streamReadExact that takes the session's
 // pending bytes first; a nil pending reads only the socket.
-func streamReadExactPending(fd int, pending *pendingQueue, dst []byte, wait *receiveWait, midPacket bool) error {
+// It sets *consumed when it takes any byte, also on failure.
+func streamReadExactPending(fd int, pending *pendingQueue, dst []byte, wait *receiveWait, midPacket bool, consumed *bool) error {
 	got := 0
 	if pending != nil {
 		got = pending.take(dst)
 	}
+	if got > 0 {
+		*consumed = true
+	}
 	if got == len(dst) {
 		return nil
 	}
-	return streamReadExact(fd, dst[got:], wait, midPacket || got > 0)
+	read := 0
+	err := streamReadExactCounted(fd, dst[got:], wait, midPacket || got > 0, &read)
+	if read > 0 {
+		*consumed = true
+	}
+	return err
 }
 
 // streamRecvSessionPacket reads one packet of a session's message, from its
@@ -128,13 +144,13 @@ func streamReadExactPending(fd int, pending *pendingQueue, dst []byte, wait *rec
 // outer header, or declares more than this direction's limits, comes back
 // alone so the framing rejects it without waiting for bytes a stream peer
 // may never send. A truncated continuation is a chunk error, as on
-// SEQPACKET.
-func streamRecvSessionPacket(fd int, pending *pendingQueue, buf []byte, first bool, packetSize, maxPayload, maxItems uint32, wait *receiveWait) (int, error) {
+// SEQPACKET. *consumed is set once any byte of the message has been taken.
+func streamRecvSessionPacket(fd int, pending *pendingQueue, buf []byte, first bool, packetSize, maxPayload, maxItems uint32, wait *receiveWait, consumed *bool) (int, error) {
 	if len(buf) < protocol.HeaderSize {
 		return 0, wrapErr(ErrProtocol, "packet too short for header")
 	}
 	n, err := func() (int, error) {
-		if err := streamReadExactPending(fd, pending, buf[:protocol.HeaderSize], wait, false); err != nil {
+		if err := streamReadExactPending(fd, pending, buf[:protocol.HeaderSize], wait, false, consumed); err != nil {
 			return 0, err
 		}
 		hdr := buf[:protocol.HeaderSize]
@@ -145,7 +161,7 @@ func streamRecvSessionPacket(fd int, pending *pendingQueue, buf []byte, first bo
 			}
 		}
 		end := protocol.HeaderSize + streamBodyLen(hdr, len(buf), packetSize)
-		if err := streamReadExactPending(fd, pending, buf[protocol.HeaderSize:end], wait, true); err != nil {
+		if err := streamReadExactPending(fd, pending, buf[protocol.HeaderSize:end], wait, true, consumed); err != nil {
 			return 0, err
 		}
 		return end, nil

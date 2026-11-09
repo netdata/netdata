@@ -39,7 +39,8 @@ static nipc_error_t pipe_failure(nipc_client_ctx_t *ctx, nipc_np_error_t werr,
 static nipc_error_t transport_send(nipc_client_ctx_t *ctx,
                                     nipc_header_t *hdr,
                                     const void *payload,
-                                    size_t payload_len)
+                                    size_t payload_len,
+                                    uint32_t timeout_ms)
 {
     if (payload_len > UINT32_MAX)
         return NIPC_ERR_OVERFLOW;
@@ -65,16 +66,24 @@ static nipc_error_t transport_send(nipc_client_ctx_t *ctx,
                    : NIPC_ERR_TRANSPORT;
     }
 
-    /* Named Pipe path */
-    nipc_np_error_t uerr = nipc_np_send(&ctx->session, hdr,
-                                          payload, payload_len);
-    if (uerr == NIPC_NP_ERR_LIMIT_EXCEEDED) {
+    /* Named Pipe path. The SHM send above never waits for the peer. */
+    nipc_np_error_t uerr = nipc_np_send_timeout(
+        &ctx->session, hdr, payload, payload_len, timeout_ms,
+        ctx->abort_event);
+    switch (uerr) {
+    case NIPC_NP_OK:
+        return NIPC_OK;
+    case NIPC_NP_ERR_LIMIT_EXCEEDED:
         nipc_service_common_client_note_request_capacity(
             ctx, (uint32_t)payload_len);
         return NIPC_ERR_OVERFLOW;
+    case NIPC_NP_ERR_TIMEOUT:
+        return NIPC_ERR_TIMEOUT;
+    case NIPC_NP_ERR_ABORTED:
+        return NIPC_ERR_ABORTED;
+    default:
+        return pipe_failure(ctx, uerr, NIPC_ERR_TRANSPORT);
     }
-    return (uerr == NIPC_NP_OK) ? NIPC_OK
-                                : pipe_failure(ctx, uerr, NIPC_ERR_TRANSPORT);
 }
 
 static nipc_error_t transport_receive(nipc_client_ctx_t *ctx,

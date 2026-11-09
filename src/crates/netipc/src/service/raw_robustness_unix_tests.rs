@@ -805,3 +805,163 @@ fn test_robust_shm_attach_stops_when_server_closes_session() {
     assert!(ready, "refused client must connect once the worker is free");
     assert!(uses_shm, "refused client must still use SHM");
 }
+
+// ---------------------------------------------------------------------------
+// Shutdown order: run closes the listening socket when its loop exits; the
+// endpoint lock stays held until every worker has exited.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_robust_shutdown_closes_socket_before_endpoint() {
+    let svc = unique_service("rs_rob_shut_order");
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let entered_tx = std::sync::Mutex::new(entered_tx);
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = std::sync::Mutex::new(release_rx);
+    let handler = increment_dispatch(Arc::new(move |v| {
+        let _ = entered_tx.lock().unwrap().send(());
+        let _ = release_rx.lock().unwrap().recv();
+        Some(v + 1)
+    }));
+    let mut server = start_server(&svc, server_config(), METHOD_INCREMENT, handler, 1);
+
+    let call_svc = svc.clone();
+    let call = thread::spawn(move || {
+        let mut client = increment_client(&call_svc, client_config());
+        client.refresh();
+        let result = client.call_increment_with_timeout(1, 10_000);
+        client.close();
+        result
+    });
+    entered_rx
+        .recv_timeout(server::TEST_WAIT_LIMIT)
+        .expect("handler entered");
+
+    // stop() returns only after the workers exit, so it runs aside.
+    let stopper = thread::spawn(move || server.stop());
+    // After its grace the server shuts the blocked worker's socket, which
+    // fails the call; the worker itself stays in the handler.
+    assert!(
+        call.join().expect("call join").is_err(),
+        "blocked call fails"
+    );
+
+    let socket = std::path::Path::new(TEST_RUN_DIR).join(format!("{svc}.sock"));
+    let socket_gone = !socket.exists();
+    let held = UdsListener::bind(TEST_RUN_DIR, &svc, server_config()).is_err();
+
+    release_tx.send(()).expect("release handler");
+    stopper.join().expect("stopper join");
+    let free = UdsListener::bind(TEST_RUN_DIR, &svc, server_config()).is_ok();
+    cleanup_all(&svc);
+
+    assert!(
+        socket_gone,
+        "socket file removed once the accept loop exits"
+    );
+    assert!(held, "endpoint held while a worker runs");
+    assert!(free, "endpoint free once the server stopped");
+}
+
+// ---------------------------------------------------------------------------
+// Bounded send: a request the server never reads ends at the call deadline,
+// or on abort, instead of blocking in the send.
+// ---------------------------------------------------------------------------
+
+const STALLED_READER_REQUEST_BYTES: u32 = 8 * 1024 * 1024;
+const STALLED_READER_PIDS: u32 = 1024 * 1024;
+
+/// Completes the handshake and never reads. Sends on `started` once the
+/// request's first bytes arrived, then holds the session until `release`.
+fn start_stalled_reader(
+    svc: &str,
+    started: mpsc::Sender<()>,
+    release: mpsc::Receiver<()>,
+) -> thread::JoinHandle<()> {
+    ensure_run_dir();
+    cleanup_all(svc);
+    let cfg = ServerConfig {
+        max_request_payload_bytes: STALLED_READER_REQUEST_BYTES,
+        ..server_config()
+    };
+    let listener = UdsListener::bind(TEST_RUN_DIR, svc, cfg).expect("bind");
+    thread::spawn(move || {
+        let Ok(session) = listener.accept() else {
+            let _ = started.send(());
+            return;
+        };
+        let mut pfd = libc::pollfd {
+            fd: session.fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        unsafe { libc::poll(&mut pfd, 1, 10_000) };
+        let _ = started.send(());
+        let _ = release.recv_timeout(server::TEST_WAIT_LIMIT);
+        drop(session);
+        drop(listener);
+    })
+}
+
+#[test]
+fn test_robust_send_bounded_by_deadline_and_abort() {
+    let pids: Vec<u32> = (1..=STALLED_READER_PIDS).collect();
+    for use_abort in [false, true] {
+        let svc = unique_service(if use_abort {
+            "rs_rob_send_abort"
+        } else {
+            "rs_rob_send_deadline"
+        });
+        let (started_tx, started_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let server = start_stalled_reader(&svc, started_tx, release_rx);
+
+        let mut client = apps_lookup_client(
+            &svc,
+            ClientConfig {
+                max_request_payload_bytes: STALLED_READER_REQUEST_BYTES,
+                ..client_config()
+            },
+        );
+        client.set_lookup_logical_config(LookupLogicalConfig {
+            max_items: STALLED_READER_PIDS,
+            ..LookupLogicalConfig::default()
+        });
+        client.refresh();
+        assert!(client.ready(), "client ready against the stalled reader");
+
+        let abort = client.abort_handle();
+        let timeout_ms = if use_abort { 30_000 } else { 200 };
+        let start = Instant::now();
+        let call_pids = pids.clone();
+        let call = thread::spawn(move || {
+            let result = client
+                .call_apps_lookup_with_timeout(&call_pids, timeout_ms)
+                .map(|_| ());
+            client.close();
+            result
+        });
+        if use_abort {
+            started_rx
+                .recv_timeout(server::TEST_WAIT_LIMIT)
+                .expect("request started");
+            abort.abort();
+        }
+        let result = call.join().expect("call join");
+        let elapsed = start.elapsed();
+        let _ = release_tx.send(());
+        server.join().expect("server join");
+        cleanup_all(&svc);
+
+        let expected = if use_abort {
+            NipcError::Aborted
+        } else {
+            NipcError::Timeout
+        };
+        assert_eq!(result, Err(expected), "blocked send result");
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "blocked send ends promptly: {elapsed:?}"
+        );
+    }
+}

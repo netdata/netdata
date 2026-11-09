@@ -119,25 +119,32 @@ ssize_t nipc_uds_raw_recv(int fd, void *buf, size_t buf_len)
 
 nipc_uds_error_t nipc_uds_stream_read_exact(int fd, void *dst, size_t len,
                                            const nipc_uds_wait_t *wait,
-                                           bool mid_packet)
+                                           bool mid_packet, size_t *got_out)
 {
     uint8_t *p = dst;
     size_t got = 0;
+    nipc_uds_error_t err = NIPC_UDS_OK;
     while (got < len) {
         if (wait) {
-            nipc_uds_error_t werr = nipc_uds_wait_for_readable(fd, wait);
-            if (werr != NIPC_UDS_OK)
-                return werr;
+            err = nipc_uds_wait_for_readable(fd, wait);
+            if (err != NIPC_UDS_OK)
+                break;
         }
         ssize_t n = nipc_uds_raw_recv(fd, p + got, len - got);
-        if (n == 0)
-            return (mid_packet || got > 0) ? NIPC_UDS_ERR_PROTOCOL
-                                           : NIPC_UDS_ERR_RECV;
-        if (n < 0)
-            return NIPC_UDS_ERR_RECV;
+        if (n == 0) {
+            err = (mid_packet || got > 0) ? NIPC_UDS_ERR_PROTOCOL
+                                          : NIPC_UDS_ERR_RECV;
+            break;
+        }
+        if (n < 0) {
+            err = NIPC_UDS_ERR_RECV;
+            break;
+        }
         got += (size_t)n;
     }
-    return NIPC_UDS_OK;
+    if (got_out)
+        *got_out = got;
+    return err;
 }
 
 size_t nipc_uds_stream_body_len(const void *hdr, size_t buf_len,
@@ -175,12 +182,13 @@ nipc_uds_error_t nipc_uds_stream_recv_packet(int fd, void *buf, size_t buf_len,
 
     uint8_t *p = buf;
     nipc_uds_error_t err = nipc_uds_stream_read_exact(fd, p, NIPC_HEADER_LEN,
-                                                      wait, false);
+                                                      wait, false, NULL);
     if (err != NIPC_UDS_OK)
         return err;
 
     size_t body = nipc_uds_stream_body_len(p, buf_len, packet_size);
-    err = nipc_uds_stream_read_exact(fd, p + NIPC_HEADER_LEN, body, wait, true);
+    err = nipc_uds_stream_read_exact(fd, p + NIPC_HEADER_LEN, body, wait, true,
+                                     NULL);
     if (err != NIPC_UDS_OK)
         return err;
 
@@ -266,10 +274,31 @@ static nipc_uds_error_t pending_reserve(nipc_uds_session_t *s, size_t need)
 nipc_uds_error_t nipc_uds_pending_drain(nipc_uds_session_t *s, size_t bound,
                                         bool *eof)
 {
-    /* A datagram larger than packet_size is a protocol violation; it is
-     * stored truncated and the receive path rejects it. */
-    size_t read_len = s->packet_size;
     for (;;) {
+        size_t read_len = s->packet_size;
+#if !NIPC_UDS_STREAM
+        /* Each datagram is stored whole, so its later receive sees what a
+         * direct receive sees: one longer than packet_size, a protocol
+         * violation, is rejected there instead of being stored cut short.
+         * MSG_TRUNC reports the full length on Linux 3.4 and later; older
+         * kernels report at most the probe length. */
+        uint8_t probe;
+        ssize_t full = recv(s->fd, &probe, sizeof(probe),
+                            MSG_DONTWAIT | MSG_PEEK | MSG_TRUNC);
+        if (full < 0 && errno == EINTR)
+            continue;
+        if (full < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+            return NIPC_UDS_OK;
+        if (full <= 0) {
+            /* EOF or a socket error: the retried send reports it. */
+            *eof = true;
+            return NIPC_UDS_OK;
+        }
+        if ((size_t)full > bound)
+            return NIPC_UDS_ERR_PROTOCOL;
+        if ((size_t)full > read_len)
+            read_len = (size_t)full;
+#endif
         nipc_uds_error_t err = pending_reserve(
             s, NIPC_UDS_PENDING_RECORD_LEN + read_len);
         if (err != NIPC_UDS_OK)

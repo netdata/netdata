@@ -53,6 +53,16 @@ func (c *Client) ensureReadyForLogicalLookup() error {
 	return nil
 }
 
+// lookupRequestCapacityCanReconnect reports whether a reconnect can give the
+// session room for required request bytes: they fit the client's limit.
+func (c *Client) lookupRequestCapacityCanReconnect(required int) bool {
+	maxRequestPayloadBytes := c.config.MaxRequestPayloadBytes
+	if maxRequestPayloadBytes == 0 {
+		maxRequestPayloadBytes = protocol.MaxPayloadDefault
+	}
+	return required >= 0 && uint64(required) <= uint64(maxRequestPayloadBytes)
+}
+
 // ensureLookupRequestCapacity reconnects for a larger request capacity when
 // needed, bounded by the lookup deadline.
 func (c *Client) ensureLookupRequestCapacity(required int, deadline int64) error {

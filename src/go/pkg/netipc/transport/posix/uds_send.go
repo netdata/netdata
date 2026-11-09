@@ -20,20 +20,37 @@ import (
 // HeaderLen/PayloadLen. If the total message exceeds PacketSize,
 // it is chunked transparently.
 func (s *Session) Send(hdr *protocol.Header, payload []byte) error {
+	return s.SendTimeout(hdr, payload, 0, nil)
+}
+
+// SendTimeout is Send with an optional deadline and abort channel for a
+// client session. timeoutMs == 0 waits without a deadline. While the socket
+// lacks buffer space the send reads the peer's bytes as a pipelined send
+// does. If the deadline passes or abortCh is closed before the message is
+// sent, it returns ErrTimeout or ErrAborted and shuts the session down,
+// since part of the message may be on the wire.
+func (s *Session) SendTimeout(hdr *protocol.Header, payload []byte, timeoutMs uint32, abortCh <-chan struct{}) error {
 	if s.fd < 0 {
 		return wrapErr(ErrBadParam, "session closed")
 	}
 
-	// One request in flight (every typed call) keeps the plain blocking
-	// send; only a pipelining client can deadlock with a server blocked
-	// sending to it.
+	// A client send with a deadline or abort, or with another request in
+	// flight (a pipelining client can deadlock with a server blocked sending
+	// to it), waits in the progress loop; anything else keeps the plain
+	// blocking send.
+	s.sendBounded = s.role == RoleClient && (timeoutMs != 0 || abortCh != nil)
+	if s.sendBounded {
+		s.sendWait = newReceiveWait(timeoutMs, abortCh)
+	}
 	inflight := len(s.inflightIDs)
 	if s.role == RoleClient && hdr.Kind == protocol.KindRequest {
 		inflight++
 	}
 	s.progressBound = 0
-	if s.role == RoleClient && inflight > 1 {
-		s.progressBound = pendingBound(s.MaxResponsePayloadBytes, s.PacketSize, inflight)
+	if s.role == RoleClient && (inflight > 1 || s.sendBounded) {
+		// A bounded send of an untracked message can run with nothing in
+		// flight; it still gets one response's room.
+		s.progressBound = pendingBound(s.MaxResponsePayloadBytes, s.PacketSize, max(inflight, 1))
 	}
 
 	return framing.SessionSend(framing.SessionSendConfig{
@@ -98,8 +115,9 @@ func (s *Session) sendSessionPacket(hdr, payload []byte) error {
 			return wrapErr(ErrSend, rerr.Error())
 		}
 	}
-	if errors.Is(err, ErrProtocol) {
-		// Inbound bytes were dropped: the session cannot continue.
+	if errors.Is(err, ErrProtocol) || errors.Is(err, ErrTimeout) || errors.Is(err, ErrAborted) {
+		// Inbound bytes were dropped, or the message stopped part way: the
+		// session cannot continue.
 		_ = syscall.Shutdown(s.fd, syscall.SHUT_RDWR)
 		s.failAllInflight()
 	}
@@ -108,8 +126,8 @@ func (s *Session) sendSessionPacket(hdr, payload []byte) error {
 
 // sendWithProgress sends one packet without blocking; while the socket is
 // full, it reads what the peer sent into the pending queue, so both peers
-// keep making progress. No timeout: it waits as long as a blocking send
-// would.
+// keep making progress. Without sendWait it waits as long as a blocking send
+// would; with one it ends at the deadline or abort.
 func (s *Session) sendWithProgress(hdr, payload []byte) error {
 	const maxInt32 = 1<<31 - 1
 	if s.fd < 0 || s.fd > maxInt32 {
@@ -176,11 +194,24 @@ func (s *Session) sendWithProgress(hdr, payload []byte) error {
 		if !eof {
 			pfd.Events |= syspoll.In
 		}
-		if rc, perr := syspoll.Poll(&pfd, -1); rc < 0 {
+		waitMs := -1
+		if s.sendBounded {
+			ms, werr := s.sendWait.waitMs()
+			if werr != nil {
+				return werr
+			}
+			waitMs = ms
+		}
+		rc, perr := syspoll.Poll(&pfd, waitMs)
+		if rc < 0 {
 			if perr == syscall.EINTR {
 				continue
 			}
 			return wrapErr(ErrSend, perr.Error())
+		}
+		if rc == 0 {
+			// waitMs() reports the deadline and the abort channel.
+			continue
 		}
 		if !eof && pfd.Revents&(syspoll.In|syspoll.Hup|syspoll.Err) != 0 {
 			if err := s.pending.drain(s.fd, int(s.PacketSize), s.progressBound, &eof); err != nil {

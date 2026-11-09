@@ -160,6 +160,9 @@ func (s *Server) Run() error {
 	}
 
 	s.markStopped()
+	// Close the socket now; the deferred Close releases the endpoint lock
+	// after the workers have exited.
+	listener.StopListening()
 	s.stopSessionWorkers()
 
 	return nil

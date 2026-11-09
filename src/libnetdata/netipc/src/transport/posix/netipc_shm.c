@@ -177,6 +177,9 @@ static int build_shm_path(char *dst, size_t dst_len,
                            const char *run_dir, const char *service_name,
                            uint64_t session_id)
 {
+    if (!run_dir || run_dir[0] == '\0')
+        return -2;
+
     char shm_name[256];
     int name_rc = build_shm_name(shm_name, sizeof(shm_name), service_name,
                                  session_id);
@@ -499,8 +502,20 @@ nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
         return NIPC_SHM_ERR_OPEN;
     }
     /* The file takes 0600 & ~umask; a umask without owner read or write
-     * would stop the client from attaching read-write. */
-    (void)fchmod(fd, S_IRUSR | S_IWUSR);
+     * would stop the client from attaching read-write. A region the client
+     * cannot attach is not created: the session then drops SHM. */
+    int chmod_rc;
+    do {
+        chmod_rc = fchmod(fd, S_IRUSR | S_IWUSR);
+    } while (chmod_rc < 0 && errno == EINTR);
+    if (chmod_rc < 0) {
+        int chmod_errno = errno;
+        close(fd);
+        unlinkat(dir_fd, shm_name, 0);
+        close(dir_fd);
+        errno = chmod_errno;
+        return NIPC_SHM_ERR_OPEN;
+    }
 
     int allocate_rc;
     do {

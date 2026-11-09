@@ -12,6 +12,12 @@ func udsSocket() (int, error) {
 	return syscall.Socket(syscall.AF_UNIX, sockType|syscall.SOCK_CLOEXEC, 0)
 }
 
+// prepareListener leaves the listener blocking: accept4 sets the flag
+// atomically.
+func prepareListener(int) error {
+	return nil
+}
+
 func acceptCloexec(fd int) (int, error) {
 	nfd, _, err := syscall.Accept4(fd, syscall.SOCK_CLOEXEC)
 	return nfd, err

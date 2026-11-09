@@ -350,14 +350,19 @@ static bool server_prepare_profile(void *user, uint32_t profile,
 }
 
 /* Wait for HELLO without outliving a server stop or the handshake
- * deadline. */
-static bool server_wait_hello(nipc_managed_server_t *server, int fd)
+ * deadline. The clock bounds the wait, so time lost to EINTR counts and the
+ * last slice ends at the deadline. */
+static bool server_wait_hello(nipc_managed_server_t *server, int fd,
+                              uint64_t deadline_ms)
 {
-    uint32_t waited = 0;
-    while (__atomic_load_n(&server->running, __ATOMIC_RELAXED) &&
-           waited < server->handshake_ms) {
+    while (__atomic_load_n(&server->running, __ATOMIC_RELAXED)) {
+        uint64_t now = nipc_service_platform_monotonic_ms();
+        if (now >= deadline_ms)
+            return false;
+        uint64_t left = deadline_ms - now;
+        int slice = left < server->poll_ms ? (int)left : (int)server->poll_ms;
         struct pollfd pfd = { .fd = fd, .events = POLLIN };
-        int ret = poll(&pfd, 1, (int)server->poll_ms);
+        int ret = poll(&pfd, 1, slice);
         if (ret < 0) {
             if (errno == EINTR)
                 continue;
@@ -365,7 +370,6 @@ static bool server_wait_hello(nipc_managed_server_t *server, int fd)
         }
         if (ret > 0)
             return true;
-        waited += server->poll_ms;
     }
     return false;
 }
@@ -384,15 +388,22 @@ static bool server_session_handshake(nipc_managed_server_t *server,
     if (server->test_event_hook)
         server->test_event_hook(server->test_event_user,
                                 NIPC_SERVER_TEST_EVENT_HANDSHAKE_STARTED);
-    if (!server_wait_hello(server, fd)) {
+    uint64_t deadline_ms =
+        nipc_service_platform_monotonic_ms() + server->handshake_ms;
+    if (!server_wait_hello(server, fd, deadline_ms)) {
         close(fd);
         return false;
     }
 
-    /* HELLO is readable, so this does not block on the client. */
+    /* HELLO has started to arrive; a stream peer may still be sending the
+     * rest, which the remaining handshake time bounds. */
+    uint64_t now = nipc_service_platform_monotonic_ms();
+    uint64_t left = now < deadline_ms ? deadline_ms - now : 1;
     server_shm_prepare_t prep = { .server = server, .session_id = sctx->id };
     nipc_uds_session_t session;
-    if (nipc_uds_accept_handshake_prepared(fd, &cfg, sctx->id, server->poll_ms,
+    if (nipc_uds_accept_handshake_prepared(fd, &cfg, sctx->id,
+                                           left > UINT32_MAX ? UINT32_MAX
+                                                             : (uint32_t)left,
                                            server_prepare_profile, &prep,
                                            &session) != NIPC_UDS_OK) {
         server_destroy_precreated_shm(&prep.shm);

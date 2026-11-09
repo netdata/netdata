@@ -93,6 +93,11 @@ func validateServiceName(name string) error {
 
 // buildSocketPath constructs {runDir}/{serviceName}.sock and validates length.
 func buildSocketPath(runDir, serviceName string) (string, error) {
+	// An empty runDir would put the socket in the working directory and
+	// the lock at "/<name>.lock".
+	if runDir == "" {
+		return "", wrapErr(ErrBadParam, "empty run_dir")
+	}
 	if err := validateServiceName(serviceName); err != nil {
 		return "", err
 	}

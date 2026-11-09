@@ -12,8 +12,22 @@ import (
 
 // Send sends one logical message. Fills magic/version/header_len/payload_len.
 func (s *Session) Send(hdr *protocol.Header, payload []byte) error {
+	return s.SendTimeout(hdr, payload, 0, nil)
+}
+
+// SendTimeout is Send with an optional deadline and abort channel for a
+// client session. timeoutMs == 0 waits without a deadline. If the deadline
+// passes or abortCh is closed before a write completes, the write is
+// cancelled, the session is closed (later calls fail with ErrBadParam) and
+// it returns ErrTimeout or ErrAborted, since part of the message may be on
+// the wire.
+func (s *Session) SendTimeout(hdr *protocol.Header, payload []byte, timeoutMs uint32, abortCh <-chan struct{}) error {
 	if s.handle == syscall.InvalidHandle {
 		return wrapErr(ErrBadParam, "session closed")
+	}
+	s.sendBounded = s.io != nil && (timeoutMs != 0 || abortCh != nil)
+	if s.sendBounded {
+		s.sendWait = newReceiveWait(timeoutMs, abortCh)
 	}
 
 	// One request in flight (every typed call) writes without draining;

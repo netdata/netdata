@@ -22,6 +22,8 @@ func TestListenBindDir(t *testing.T) {
 	}
 
 	listener := startListener(t, runDir, service, defaultServerConfig())
+	// Close is idempotent: an early failure below still releases the endpoint.
+	t.Cleanup(listener.Close)
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat socket: %v", err)

@@ -18,10 +18,12 @@ import (
 // {serviceName}.d, narrowed to owner-only there, then renamed into place, so
 // it is never reachable with a wider mode and the process-global umask is
 // untouched. The caller holds the endpoint lock, so a leftover directory
-// belongs to a crashed server and is removed first. After the directory is
-// created, every step but bind() goes through a descriptor of it, so a
-// directory swapped in at the same path makes the listen fail instead of
-// placing a socket someone else can reach.
+// belongs to a crashed server and is removed first. fchmodat() and open()
+// resolve the directory by path without following a symlink, and the owner
+// check on the opened descriptor refuses a directory another account swapped
+// in. After that check every step but bind() goes through the descriptor, so
+// a later swap makes the listen fail instead of placing a socket someone else
+// can reach.
 func bindOwnerOnly(fd int, runDir, serviceName, path string) error {
 	dir := filepath.Join(runDir, serviceName+".d")
 	tmp := filepath.Join(dir, "s")

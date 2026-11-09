@@ -43,7 +43,7 @@ impl ManagedServer {
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         crate::transport::shm::cleanup_stale(&self.run_dir, &self.service_name);
 
-        let listener = UdsListener::bind(
+        let mut listener = UdsListener::bind(
             &self.run_dir,
             &self.service_name,
             self.server_config.clone(),
@@ -157,7 +157,11 @@ impl ManagedServer {
 
         self.stop_requested.store(true, Ordering::Release);
         self.running.store(false, Ordering::Release);
+        // Close the socket now; the endpoint lock drops with the listener,
+        // after the workers have exited.
+        listener.stop_listening();
         stop_workers(workers, self.timings.stop_grace);
+        drop(listener);
 
         Ok(())
     }

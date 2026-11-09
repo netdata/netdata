@@ -202,6 +202,12 @@ nipc_uds_error_t nipc_uds_client_handshake(int fd,
     return NIPC_UDS_ERR_INCOMPATIBLE;
   if (perr != NIPC_OK)
     return NIPC_UDS_ERR_PROTOCOL;
+  /* HELLO_ACK is exactly one 48-byte payload: extra bytes in the packet, or
+   * a declared length a stream peer may still be sending, would otherwise
+   * be read as the session's first message. */
+  if (ack_hdr.payload_len != sizeof(nipc_hello_ack_t) ||
+      (size_t)n != NIPC_HEADER_LEN + sizeof(nipc_hello_ack_t))
+    return NIPC_UDS_ERR_PROTOCOL;
 
   /* The server must pick exactly one of the profiles this client offered. */
   if (ack.selected_profile == 0 ||
@@ -275,6 +281,10 @@ nipc_uds_error_t nipc_uds_server_handshake(int fd,
     return NIPC_UDS_ERR_INCOMPATIBLE;
   }
   if (perr != NIPC_OK)
+    return NIPC_UDS_ERR_PROTOCOL;
+  /* HELLO is exactly one 44-byte payload, as HELLO_ACK is 48. */
+  if (hdr.payload_len != NIPC_HELLO_WIRE_SIZE ||
+      (size_t)n != NIPC_HEADER_LEN + NIPC_HELLO_WIRE_SIZE)
     return NIPC_UDS_ERR_PROTOCOL;
 
   uint32_t intersection = hello.supported_profiles & s_profiles;

@@ -305,6 +305,22 @@ nipc_np_error_t nipc_np_send(nipc_np_session_t *session,
                               size_t payload_len);
 
 /*
+ * nipc_np_send() with an optional deadline and abort event for a client
+ * session. timeout_ms == 0 waits without a deadline; abort_event == NULL
+ * disables abort waiting. If the deadline passes or abort_event is signaled
+ * before a write completes, the write is cancelled, the session is closed
+ * (later calls fail with NIPC_NP_ERR_BAD_PARAM) and the call returns
+ * NIPC_NP_ERR_TIMEOUT or NIPC_NP_ERR_ABORTED, since part of the message may
+ * already be on the wire.
+ */
+nipc_np_error_t nipc_np_send_timeout(nipc_np_session_t *session,
+                                      nipc_header_t *hdr,
+                                      const void *payload,
+                                      size_t payload_len,
+                                      uint32_t timeout_ms,
+                                      HANDLE abort_event);
+
+/*
  * Receive one logical message. Blocks until a complete message arrives.
  *
  * On success:
@@ -383,6 +399,16 @@ static inline HANDLE nipc_np_listener_handle(const nipc_np_listener_t *l) {
  * it waits for one. NULL removes the hook. */
 void nipc_np_set_connect_busy_hook_for_tests(void (*hook)(void *user),
                                              void *user);
+
+/* Call hook(user) whenever WaitNamedPipeW reports a free instance, before
+ * the connect retries CreateFileW, so a test can take that instance first.
+ * NULL removes the hook. */
+void nipc_np_set_connect_waited_hook_for_tests(void (*hook)(void *user),
+                                               void *user);
+
+/* Fail the next `count` creations of a replacement pipe instance in accept,
+ * as CreateNamedPipeW can under resource exhaustion. */
+void nipc_np_fail_next_instances_for_tests(int count);
 
 /* Clients trust only pipes owned by this SID string instead of their own
  * account, SYSTEM and Administrators. NULL restores the default. */

@@ -71,6 +71,10 @@ type Session struct {
 	pending pendingQueue
 	// Queue bound of the send in progress; 0 writes without draining.
 	progressBound int
+	// sendWait bounds the send in progress when sendBounded is set;
+	// otherwise the send waits without a deadline.
+	sendWait    receiveWait
+	sendBounded bool
 
 	// Receive state of the call in progress, read by closures built once
 	// per session (initReceiveFns), so a receive allocates nothing.
@@ -191,6 +195,10 @@ const ConnectBusyWaitMs = 1000
 // pipe instance busy, before it waits.
 var connectBusyHook func()
 
+// connectWaitedHook, when set by tests, runs whenever waitNamedPipe reports a
+// free instance, before the connect retries, so a test can take it first.
+var connectWaitedHook func()
+
 // createClientPipe opens with SECURITY_IDENTIFICATION, so the server can
 // identify the client but never act as it, and overlapped, so a pipelining
 // send can read while its write waits.
@@ -206,9 +214,12 @@ const connectBusySliceMs = 100
 // openClientPipe opens the client end of a pipe. A server has no free pipe
 // instance between accepting one client and creating the next instance, and
 // connects in that window fail with ERROR_PIPE_BUSY. Wait, bounded by
-// ConnectBusyWaitMs and the caller's deadline, for an instance, then try once
-// more.
+// ConnectBusyWaitMs and the caller's deadline, for an instance and retry:
+// waitNamedPipe does not reserve it, so another client may take it first.
 func openClientPipe(name *uint16, wait receiveWait) (syscall.Handle, error) {
+	if _, werr := wait.waitMs(); werr != nil {
+		return syscall.InvalidHandle, werr
+	}
 	handle, err := createClientPipe(name)
 	if errno, ok := err.(syscall.Errno); !ok || errno != _ERROR_PIPE_BUSY {
 		if err != nil {
@@ -239,11 +250,18 @@ func openClientPipe(name *uint16, wait receiveWait) (syscall.Handle, error) {
 		slice := boundedReceiveWaitMs(left, connectBusySliceMs)
 		werr := waitNamedPipe(name, slice)
 		if werr == nil {
+			if connectWaitedHook != nil {
+				connectWaitedHook()
+			}
 			handle, err = createClientPipe(name)
-			if err != nil {
+			if err == nil {
+				return handle, nil
+			}
+			if errno, ok := err.(syscall.Errno); !ok || errno != _ERROR_PIPE_BUSY {
 				return handle, wrapErr(ErrConnect, err.Error())
 			}
-			return handle, nil
+			// Another client took the instance first.
+			continue
 		}
 		if errno, ok := werr.(syscall.Errno); !ok || errno != _ERROR_SEM_TIMEOUT {
 			return syscall.InvalidHandle, wrapErr(ErrConnect, werr.Error())

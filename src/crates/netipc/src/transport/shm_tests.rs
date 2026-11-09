@@ -1499,6 +1499,14 @@ fn test_shm_fds_are_cloexec() {
     assert!(client_ok, "client SHM fd must be close-on-exec");
 }
 
+#[test]
+fn test_empty_run_dir_rejected() {
+    assert!(matches!(
+        ShmContext::server_create("", "rs_shm_empty_dir", 1, 1024, 1024),
+        Err(ShmError::BadParam(_))
+    ));
+}
+
 const UMASK_HELPER_ENV: &str = "NETIPC_SHM_UMASK_HELPER";
 const UMASK_HELPER_TEST: &str = "transport::shm::tests::shm_umask_helper_process";
 

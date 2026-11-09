@@ -931,6 +931,71 @@ func TestProfileSelection(t *testing.T) {
 	}
 }
 
+// An unassigned profile bit offered and preferred by both peers is never
+// selected: they would otherwise run baseline under that label.
+func TestUnassignedProfileBitNotSelected(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	defer os.Remove(filepath.Join(runDir, service+".sock"))
+
+	const unassigned = 0x10
+	sCfg := defaultServerConfig()
+	sCfg.SupportedProfiles = protocol.ProfileBaseline | unassigned
+	sCfg.PreferredProfiles = unassigned
+	listener := startListener(t, runDir, service, sCfg)
+	defer listener.Close()
+
+	acceptCh := acceptAsync(listener)
+
+	cCfg := defaultClientConfig()
+	cCfg.SupportedProfiles = protocol.ProfileBaseline | unassigned
+	cCfg.PreferredProfiles = unassigned
+	client, err := Connect(runDir, service, &cCfg)
+	if err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer client.Close()
+
+	sr := <-acceptCh
+	if sr.err != nil {
+		t.Fatalf("Accept failed: %v", sr.err)
+	}
+	defer sr.session.Close()
+
+	if client.SelectedProfile != protocol.ProfileBaseline || sr.session.SelectedProfile != protocol.ProfileBaseline {
+		t.Errorf("selected = 0x%x/0x%x, want baseline", client.SelectedProfile, sr.session.SelectedProfile)
+	}
+}
+
+// A deadline-bounded send of an untracked message with nothing in flight
+// still has room for one response in its pending queue.
+func TestBoundedControlSendIdle(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	defer os.Remove(filepath.Join(runDir, service+".sock"))
+
+	listener := startListener(t, runDir, service, defaultServerConfig())
+	defer listener.Close()
+	acceptCh := acceptAsync(listener)
+
+	cCfg := defaultClientConfig()
+	client, err := Connect(runDir, service, &cCfg)
+	if err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer client.Close()
+	sr := <-acceptCh
+	if sr.err != nil {
+		t.Fatalf("Accept failed: %v", sr.err)
+	}
+	defer sr.session.Close()
+
+	hdr := protocol.Header{Kind: protocol.KindControl, MessageID: 1}
+	if err := client.SendTimeout(&hdr, nil, 5000, nil); err != nil {
+		t.Fatalf("bounded control send: %v", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 //  Test: Empty payload
 // ---------------------------------------------------------------------------
@@ -1967,6 +2032,12 @@ func TestListenerAndSessionSocketsAreCloexec(t *testing.T) {
 		if err != nil || flags&syscall.FD_CLOEXEC == 0 {
 			t.Errorf("%s socket fd %d must be close-on-exec (flags=%#x err=%v)", name, fd, flags, err)
 		}
+	}
+	// Where the listener is non-blocking (accept under ForkLock), the
+	// accepted socket inherits O_NONBLOCK on BSD; sessions must block.
+	status, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(res.session.Fd()), syscall.F_GETFL, 0)
+	if errno != 0 || status&syscall.O_NONBLOCK != 0 {
+		t.Errorf("accepted socket must be blocking (status=%#x err=%v)", status, errno)
 	}
 }
 

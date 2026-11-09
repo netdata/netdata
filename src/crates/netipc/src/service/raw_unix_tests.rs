@@ -644,21 +644,39 @@ fn start_raw_hello_ack_server(service: &str, packet: Vec<u8>) -> RawHelloAckServ
             return Err(format!("accept: {}", std::io::Error::last_os_error()));
         }
 
+        // A stream socket may return the HELLO in parts: read all of it.
+        let hello_len =
+            crate::protocol::HEADER_SIZE + crate::transport::framing::HELLO_PAYLOAD_SIZE;
         let mut hello_buf = [0u8; crate::protocol::HEADER_SIZE + 128];
-        let n = unsafe {
-            libc::recv(
-                client_fd,
-                hello_buf.as_mut_ptr() as *mut libc::c_void,
-                hello_buf.len(),
-                0,
-            )
-        };
+        let mut got = 0usize;
+        let mut n: isize = 0;
+        while got < hello_len {
+            n = unsafe {
+                libc::recv(
+                    client_fd,
+                    hello_buf[got..].as_mut_ptr() as *mut libc::c_void,
+                    hello_len - got,
+                    0,
+                )
+            };
+            if n <= 0 {
+                break;
+            }
+            got += n as usize;
+        }
         if n < 0 {
             unsafe {
                 libc::close(client_fd);
                 libc::close(fd);
             }
             return Err(format!("recv: {}", std::io::Error::last_os_error()));
+        }
+        if got < hello_len {
+            unsafe {
+                libc::close(client_fd);
+                libc::close(fd);
+            }
+            return Err(format!("truncated HELLO: {got} of {hello_len} bytes"));
         }
 
         let wrote = unsafe {

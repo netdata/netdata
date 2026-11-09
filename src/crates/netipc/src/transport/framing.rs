@@ -28,6 +28,9 @@ pub(crate) trait FramingError: Sized {
     /// True when a failed send leaves the session unusable, so every
     /// in-flight request fails with it.
     fn fails_session(&self) -> bool;
+    /// True when a failed receive means the peer is gone, so every in-flight
+    /// request fails with it. A timeout or abort leaves them pending.
+    fn is_recv_failure(&self) -> bool;
 }
 
 /// One direction of an established session: the limits for the messages
@@ -213,9 +216,9 @@ pub(crate) fn receive_message<'a, E: FramingError>(
     pkt_buf: &mut Vec<u8>,
     mut read: impl FnMut(&mut [u8]) -> Result<usize, E>,
 ) -> Result<(Header, &'a [u8]), E> {
-    // Read first packet. A failed read ends the session's pending requests.
-    let n = read(first).inspect_err(|_| {
-        if f.client {
+    // Read first packet. A lost peer ends the session's pending requests.
+    let n = read(first).inspect_err(|e| {
+        if f.client && e.is_recv_failure() {
             inflight.clear();
         }
     })?;
@@ -295,8 +298,8 @@ pub(crate) fn receive_message<'a, E: FramingError>(
 
     let mut ci = 1u32;
     while assembled < needed {
-        let cn = read(pkt_buf).inspect_err(|_| {
-            if f.client {
+        let cn = read(pkt_buf).inspect_err(|e| {
+            if f.client && e.is_recv_failure() {
                 inflight.clear();
             }
         })?;
@@ -444,6 +447,14 @@ pub(crate) fn parse_hello_ack<E: FramingError>(buf: &[u8], offered: u32) -> Resu
         }
         Err(e) => return Err(E::protocol(format!("ack payload: {e}"))),
     };
+    // HELLO_ACK is exactly one 48-byte payload: extra bytes in the packet, or
+    // a declared length a stream peer may still be sending, would otherwise
+    // be read as the session's first message.
+    if ack_hdr.payload_len as usize != HELLO_ACK_PAYLOAD_SIZE
+        || buf.len() != HEADER_SIZE + HELLO_ACK_PAYLOAD_SIZE
+    {
+        return Err(E::protocol("ack payload length mismatch".into()));
+    }
 
     if !super::selected_profile_offered(ack.selected_profile, offered) {
         return Err(E::protocol("selected profile was not offered".into()));
@@ -510,6 +521,12 @@ pub(crate) fn server_negotiate<E: FramingError>(
         }
         Err(e) => return Err(E::protocol(format!("hello payload: {e}"))),
     };
+    // HELLO is exactly one 44-byte payload, as HELLO_ACK is 48.
+    if hdr.payload_len as usize != HELLO_PAYLOAD_SIZE
+        || buf.len() != HEADER_SIZE + HELLO_PAYLOAD_SIZE
+    {
+        return Err(E::protocol("hello payload length mismatch".into()));
+    }
 
     let mut s_profiles = offer.supported_profiles;
     let mut intersection = hello.supported_profiles & s_profiles;
@@ -631,6 +648,64 @@ mod tests {
         assert!(hello_ack_layout_incompatible(&ack_buf));
     }
 
+    /// `pkt` with 16 more bytes, the header declaring them too when `declare`.
+    fn padded(pkt: &[u8], declare: bool) -> Vec<u8> {
+        let mut out = pkt.to_vec();
+        out.extend_from_slice(&[0u8; 16]);
+        if declare {
+            let len = (pkt.len() - HEADER_SIZE + 16) as u32;
+            out[16..20].copy_from_slice(&len.to_ne_bytes());
+        }
+        out
+    }
+
+    /// HELLO and HELLO_ACK are exactly 44 and 48 payload bytes: a packet with
+    /// more, declared or not, is a protocol error.
+    #[test]
+    fn test_handshake_payload_length_exact() {
+        let ack = HelloAck {
+            layout_version: 1,
+            selected_profile: protocol::PROFILE_BASELINE,
+            agreed_packet_size: 4096,
+            ..HelloAck::default()
+        };
+        let pkt = hello_ack_packet(&ack, protocol::STATUS_OK);
+        assert!(parse_hello_ack::<TestError>(&pkt, protocol::PROFILE_BASELINE).is_ok());
+        for declare in [false, true] {
+            assert!(matches!(
+                parse_hello_ack::<TestError>(&padded(&pkt, declare), protocol::PROFILE_BASELINE),
+                Err(TestError::Protocol(_))
+            ));
+        }
+
+        let offer = ServerOffer {
+            packet_size: 4096,
+            supported_profiles: protocol::PROFILE_BASELINE,
+            preferred_profiles: 0,
+            max_request_payload_bytes: 1024,
+            max_response_payload_bytes: 1024,
+            auth_token: 0,
+        };
+        let hello = Hello {
+            layout_version: 1,
+            supported_profiles: protocol::PROFILE_BASELINE,
+            max_request_payload_bytes: 1024,
+            max_request_batch_items: 1,
+            max_response_payload_bytes: 1024,
+            max_response_batch_items: 1,
+            packet_size: 4096,
+            ..Hello::default()
+        };
+        let pkt = hello_packet(&hello);
+        assert!(server_negotiate::<TestError>(&pkt, &offer, 1, None, |_| Ok(())).is_ok());
+        for declare in [false, true] {
+            assert!(matches!(
+                server_negotiate::<TestError>(&padded(&pkt, declare), &offer, 1, None, |_| Ok(())),
+                Err(TestError::Protocol(_))
+            ));
+        }
+    }
+
     #[test]
     fn test_highest_bit() {
         assert_eq!(highest_bit(0), 0);
@@ -679,6 +754,9 @@ mod tests {
             TestError::Other
         }
         fn fails_session(&self) -> bool {
+            false
+        }
+        fn is_recv_failure(&self) -> bool {
             false
         }
     }

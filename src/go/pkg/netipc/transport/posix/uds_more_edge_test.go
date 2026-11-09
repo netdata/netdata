@@ -1126,8 +1126,10 @@ func TestListenOverLeftoverLockModes(t *testing.T) {
 			t.Fatalf("listen over a %o lock: %v", mode, err)
 		}
 		info, err := os.Stat(lock)
-		if err != nil || info.Mode().Perm() != 0o600 {
-			t.Errorf("lock mode after listen over %o = %v (err %v), want 0600", mode, info.Mode().Perm(), err)
+		if err != nil {
+			t.Errorf("stat lock after listen over %o: %v", mode, err)
+		} else if info.Mode().Perm() != 0o600 {
+			t.Errorf("lock mode after listen over %o = %v, want 0600", mode, info.Mode().Perm())
 		}
 		if second, err := Listen(runDir, service, defaultServerConfig()); !errors.Is(err, ErrAddrInUse) {
 			if second != nil {
@@ -1138,6 +1140,108 @@ func TestListenOverLeftoverLockModes(t *testing.T) {
 		first.Close()
 		_ = os.Remove(lock)
 	}
+}
+
+// An empty run_dir is a caller error: Go would otherwise put the socket in
+// the working directory and the lock at "/<name>.lock".
+func TestEmptyRunDirRejected(t *testing.T) {
+	if l, err := Listen("", "go_empty_run_dir", defaultServerConfig()); !errors.Is(err, ErrBadParam) {
+		if l != nil {
+			l.Close()
+		}
+		t.Errorf("Listen with empty run_dir: err = %v, want ErrBadParam", err)
+	}
+	if s, err := Connect("", "go_empty_run_dir", defaultClientConfigPtr()); !errors.Is(err, ErrBadParam) {
+		if s != nil {
+			s.Close()
+		}
+		t.Errorf("Connect with empty run_dir: err = %v, want ErrBadParam", err)
+	}
+}
+
+const lockUmaskHelperEnv = "NETIPC_LOCK_UMASK_HELPER"
+
+// The umask is process-wide, so the restrictive-umask case runs in a child
+// test process instead of the parallel test runner.
+func TestListenLockUnderRestrictiveUmask(t *testing.T) {
+	testRunDir(t)
+	for _, mask := range []string{"477", "277", "777"} {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestLockUmaskHelperProcess$", "-test.v")
+		cmd.Env = append(os.Environ(), lockUmaskHelperEnv+"="+mask)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("endpoint lock under umask %s failed: %v\n%s", mask, err, out)
+		}
+	}
+}
+
+// TestLockUmaskHelperProcess is the child entry point; it is inert unless
+// spawned by TestListenLockUnderRestrictiveUmask.
+func TestLockUmaskHelperProcess(t *testing.T) {
+	maskText := os.Getenv(lockUmaskHelperEnv)
+	if maskText == "" {
+		return
+	}
+	var mask int
+	if _, err := fmt.Sscanf(maskText, "%o", &mask); err != nil {
+		t.Fatalf("mask %q: %v", maskText, err)
+	}
+	runDir := testRunDir(t)
+	service := "go_lock_umask_" + maskText
+	lock := filepath.Join(runDir, service+".lock")
+	_ = os.Remove(lock)
+	_ = os.Remove(filepath.Join(runDir, service+".sock"))
+
+	var published []string
+	var tmpMode os.FileMode
+	lockVisible := false
+	hook := func(tmp string) {
+		published = append(published, tmp)
+		if info, err := os.Stat(tmp); err == nil {
+			tmpMode = info.Mode().Perm()
+		}
+		_, err := os.Lstat(lock)
+		lockVisible = err == nil
+	}
+	lockPublishHook.Store(&hook)
+
+	func() {
+		// Restore the umask before exit so files the process writes then
+		// (coverage data) keep their normal mode.
+		defer syscall.Umask(syscall.Umask(mask))
+		first, err := Listen(runDir, service, defaultServerConfig())
+		lockPublishHook.Store(nil)
+		if err != nil {
+			t.Fatalf("listen under umask %o: %v", mask, err)
+		}
+		if second, err := Listen(runDir, service, defaultServerConfig()); !errors.Is(err, ErrAddrInUse) {
+			if second != nil {
+				second.Close()
+			}
+			t.Errorf("second server under umask %o: err = %v, want ErrAddrInUse", mask, err)
+		}
+		first.Close()
+		again, err := Listen(runDir, service, defaultServerConfig())
+		if err != nil {
+			t.Fatalf("restart under umask %o: %v", mask, err)
+		}
+		again.Close()
+	}()
+
+	info, err := os.Stat(lock)
+	if err != nil {
+		t.Fatalf("lock stat: %v", err)
+	}
+	if mode := info.Mode().Perm(); mode != 0o600 {
+		t.Errorf("lock mode under umask %o = %o, want 600", mask, mode)
+	}
+	if len(published) != 1 || tmpMode != 0o600 || lockVisible {
+		t.Fatalf("publish: names=%v mode=%o lock visible=%v, want one name, 600, false",
+			published, tmpMode, lockVisible)
+	}
+	if _, err := os.Lstat(published[0]); err == nil {
+		t.Errorf("temporary name %s was left behind", published[0])
+	}
+	_ = os.Remove(lock)
 }
 
 // A child that shares the lock's open file description (as a child forked
@@ -1214,5 +1318,40 @@ func TestServerHandshakeWaitKeepsTimeoutAndAbort(t *testing.T) {
 		if !errors.Is(err, tc.want) {
 			t.Errorf("%s: %v, want %v", tc.name, err, tc.want)
 		}
+	}
+}
+
+// A receive into a buffer too small for a header fails without reading a
+// byte, so the message stays queued and the session stays usable.
+func TestReceiveUndersizedBufferKeepsSession(t *testing.T) {
+	fds, err := syscall.Socketpair(syscall.AF_UNIX, sockType, 0)
+	if err != nil {
+		t.Fatalf("socketpair: %v", err)
+	}
+	newSession := func(fd int) *Session {
+		return &Session{
+			fd:                     fd,
+			role:                   RoleServer,
+			PacketSize:             4096,
+			MaxRequestPayloadBytes: 1024,
+			MaxRequestBatchItems:   1,
+		}
+	}
+	rx, tx := newSession(fds[0]), newSession(fds[1])
+	defer rx.Close()
+	defer tx.Close()
+
+	payload := []byte{1, 2, 3, 4, 5, 6, 7, 8}
+	hdr := protocol.Header{Kind: protocol.KindRequest, Code: 1, ItemCount: 1, MessageID: 7}
+	if err := tx.Send(&hdr, payload); err != nil {
+		t.Fatalf("send: %v", err)
+	}
+
+	if _, _, err := rx.Receive(make([]byte, protocol.HeaderSize-1)); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("undersized buffer: expected ErrBadParam, got %v", err)
+	}
+	h, p, err := rx.ReceiveTimeout(make([]byte, 256), 1000, nil)
+	if err != nil || h.MessageID != 7 || string(p) != string(payload) {
+		t.Fatalf("request still received: hdr %+v payload %v err %v", h, p, err)
 	}
 }

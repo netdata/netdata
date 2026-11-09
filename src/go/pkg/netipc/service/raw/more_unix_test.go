@@ -721,7 +721,7 @@ func TestUnixClientTransportWithoutSession(t *testing.T) {
 		TransportStatus: protocol.StatusOK,
 	}
 
-	if err := client.transportSend(&hdr, nil); !errors.Is(err, protocol.ErrTransport) {
+	if err := client.transportSend(&hdr, nil, 0); !errors.Is(err, protocol.ErrTransport) {
 		t.Fatalf("transportSend without session = %v, want ErrTransport", err)
 	}
 	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTransport) {

@@ -362,9 +362,18 @@ nipc_error_t nipc_service_common_do_raw_call(
   hdr.message_id = (uint64_t)(ctx->call_count + 1);
   hdr.transport_status = NIPC_STATUS_OK;
 
-  nipc_error_t err = send_fn(ctx, &hdr, request_payload, request_len);
+  uint64_t attempt_deadline = nipc_service_platform_monotonic_ms() + timeout_ms;
+  nipc_error_t err =
+      send_fn(ctx, &hdr, request_payload, request_len, timeout_ms);
   if (err != NIPC_OK)
     return err;
+
+  /* The send may have waited for buffer space: the receive gets what is
+   * left of this attempt's budget. */
+  uint64_t now = nipc_service_platform_monotonic_ms();
+  if (now >= attempt_deadline)
+    return NIPC_ERR_TIMEOUT;
+  timeout_ms = (uint32_t)(attempt_deadline - now);
 
   nipc_header_t resp_hdr;
   err = receive_fn(ctx, ctx->response_buf, ctx->response_buf_size, &resp_hdr,
@@ -563,7 +572,8 @@ void nipc_service_common_server_note_request_capacity(
   if (grown > server->request_payload_growth_ceiling)
     grown = server->request_payload_growth_ceiling;
 #if defined(_WIN32) || defined(__MSYS__)
-  uint32_t current = server->learned_request_payload_bytes;
+  uint32_t current = (uint32_t)InterlockedCompareExchange(
+      (volatile LONG *)&server->learned_request_payload_bytes, 0, 0);
   while (grown > current) {
     uint32_t previous = (uint32_t)InterlockedCompareExchange(
         (volatile LONG *)&server->learned_request_payload_bytes, (LONG)grown,
@@ -589,7 +599,8 @@ void nipc_service_common_server_note_response_capacity(
   if (grown > server->response_payload_growth_ceiling)
     grown = server->response_payload_growth_ceiling;
 #if defined(_WIN32) || defined(__MSYS__)
-  uint32_t current = server->learned_response_payload_bytes;
+  uint32_t current = (uint32_t)InterlockedCompareExchange(
+      (volatile LONG *)&server->learned_response_payload_bytes, 0, 0);
   while (grown > current) {
     uint32_t previous = (uint32_t)InterlockedCompareExchange(
         (volatile LONG *)&server->learned_response_payload_bytes, (LONG)grown,

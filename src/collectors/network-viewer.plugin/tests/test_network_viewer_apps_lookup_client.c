@@ -510,6 +510,64 @@ cleanup_server:
     return ok;
 }
 
+static bool pid_is_cached(uint32_t pid)
+{
+    char key[16];
+    nv_apps_lookup_pid_key(pid, key);
+    return dictionary_get(apps_lookup_cache, key) != NULL;
+}
+
+// OVERSIZED_ITEM and an escaped PAYLOAD_EXCEEDED carry KNOWN cgroup status
+// with empty fields; neither may be cached as enrichment data.
+static bool run_overflow_status_test(void)
+{
+    uint8_t buf[4096];
+    nipc_apps_lookup_builder_t builder;
+    nipc_apps_lookup_builder_init(&builder, buf, sizeof(buf), 3, 1);
+
+    bool ok =
+        expect_ok(nipc_apps_lookup_builder_add(
+                      &builder, NIPC_PID_LOOKUP_KNOWN, NIPC_APPS_CGROUP_KNOWN, NIPC_ORCHESTRATOR_DOCKER,
+                      500, 1, 1000, 523456789, "proc-e", 6, "/docker/e", 9, "e-container", 11, NULL, 0) == NIPC_OK,
+                  "known item build failed") &&
+        expect_ok(nipc_apps_lookup_builder_add(
+                      &builder, NIPC_PID_LOOKUP_OVERSIZED_ITEM, 0, 0,
+                      600, 0, NIPC_UID_UNSET, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0) == NIPC_OK,
+                  "oversized item build failed") &&
+        expect_ok(nipc_apps_lookup_builder_add(
+                      &builder, NIPC_PID_LOOKUP_PAYLOAD_EXCEEDED, 0, 0,
+                      700, 0, NIPC_UID_UNSET, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0) == NIPC_OK,
+                  "payload-exceeded item build failed");
+    if (!ok)
+        return false;
+
+    size_t len = nipc_apps_lookup_builder_finish(&builder);
+    nipc_apps_lookup_resp_view_t response;
+    if (!expect_ok(len > 0 && nipc_apps_lookup_resp_decode(buf, len, &response) == NIPC_OK,
+                   "overflow status response encode/decode failed"))
+        return false;
+
+    nv_apps_lookup_cache_create();
+    uint64_t failed_before = counter_value(&apps_lookup_requests_failed);
+    uint64_t unknown_before = counter_value(&apps_lookup_cache_misses_unknown);
+
+    nv_apps_lookup_apply_response(NULL, 0, &response);
+
+    ok = expect_ok(pid_is_cached(500), "known PID was not cached") &&
+         expect_ok(!pid_is_cached(600), "OVERSIZED_ITEM PID was cached as enrichment data") &&
+         expect_ok(!pid_is_cached(700), "PAYLOAD_EXCEEDED PID was cached as enrichment data") &&
+         expect_ok(counter_value(&apps_lookup_cache_misses_unknown) == unknown_before + 1,
+                   "OVERSIZED_ITEM was not counted as an unknown miss") &&
+         expect_ok(counter_value(&apps_lookup_requests_failed) == failed_before + 1,
+                   "PAYLOAD_EXCEEDED was not counted as a failed item");
+
+    // The roundtrip test expects zero failures from its own run.
+    __atomic_store_n(&apps_lookup_requests_failed, failed_before, __ATOMIC_RELEASE);
+    __atomic_store_n(&apps_lookup_cache_misses_unknown, unknown_before, __ATOMIC_RELEASE);
+    nv_apps_lookup_cache_destroy();
+    return ok;
+}
+
 int main(void)
 {
     char temp_dir[] = "./network-viewer-apps-lookup-test.XXXXXX";
@@ -522,8 +580,14 @@ int main(void)
     }
     test_run_dir = temp_dir;
 
-    ok = run_roundtrip_test(temp_dir) && run_abort_during_call_test(temp_dir);
+    ok = run_overflow_status_test() && run_roundtrip_test(temp_dir) && run_abort_during_call_test(temp_dir);
 
+    {
+        // NetIPC keeps the endpoint lock file after the server stops.
+        char lock_path[FILENAME_MAX + 1];
+        snprintfz(lock_path, sizeof(lock_path) - 1, "%s/%s.lock", temp_dir, NV_APPS_LOOKUP_SERVICE_NAME);
+        (void)unlink(lock_path);
+    }
     (void)rmdir(temp_dir);
     return ok ? 0 : 1;
 }
