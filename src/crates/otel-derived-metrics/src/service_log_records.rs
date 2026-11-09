@@ -1,15 +1,14 @@
 //! Per-service charts from logs: log records per second by severity.
 //!
-//! Services are identified as for spans (`services::service_labels`), so a
-//! service's log and request charts carry the same labels and the same
-//! chart id suffix.
+//! Services are identified as in [`crate::service`], so a service's log and
+//! request charts carry the same labels and the same chart id suffix.
 //! The severity comes from the record's severity number alone (OTel ranges
 //! 1-4 trace, 5-8 debug, 9-12 info, 13-16 warn, 17-20 error, 21-24 fatal);
 //! anything else, including a record with only a severity text, is
 //! `unspecified`. A record counts at its resolved time (its own time, else its
 //! observed time).
 
-use crate::services::{service_labels, service_settings};
+use crate::service::{service_labels, service_settings};
 use netdata_plugin_metrics::{
     Batch, BatchEntity, ChartDescriptor, ChartType, Counter, MetricSet, MetricSetBuilder, columns,
 };
@@ -42,12 +41,12 @@ impl Severity {
     }
 }
 
-pub(crate) struct ServiceLogs {
-    pub(crate) metrics: MetricSet,
+pub(crate) struct ServiceLogRecords {
+    pub(crate) metric_set: MetricSet,
     records: Counter<Severity>,
 }
 
-impl ServiceLogs {
+impl ServiceLogRecords {
     pub(crate) fn new(max_services: usize) -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(service_settings(max_services))?;
         let records = builder.counter::<Severity>(ChartDescriptor {
@@ -59,7 +58,7 @@ impl ServiceLogs {
             priority: 60_000,
         })?;
         Ok(Self {
-            metrics: builder.build()?,
+            metric_set: builder.build()?,
             records,
         })
     }
@@ -125,7 +124,7 @@ mod tests {
 
     #[test]
     fn counts_records_per_service_and_severity() {
-        let logs = ServiceLogs::new(10).unwrap();
+        let log_records = ServiceLogRecords::new(10).unwrap();
         let record = |severity: i32| LogRecord {
             time_unix_nano: 95_000_000_000,
             severity_number: severity,
@@ -151,9 +150,9 @@ mod tests {
                 ..Default::default()
             }],
         };
-        let mut aggregator = Aggregator::new(&logs.metrics);
-        let mut batch = Batch::new(&logs.metrics);
-        logs.record(&mut batch, "default", &request);
+        let mut aggregator = Aggregator::new(&log_records.metric_set);
+        let mut batch = Batch::new(&log_records.metric_set);
+        log_records.record(&mut batch, "default", &request);
         aggregator.merge(batch, 100);
         let out = netdata_plugin_protocol::readable_chart_stream(
             &aggregator.emit(106, usize::MAX).concat(),

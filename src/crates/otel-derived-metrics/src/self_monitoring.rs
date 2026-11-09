@@ -38,13 +38,13 @@ columns! {
 }
 
 /// The plugin's ingest outcomes: one label-less entity.
-pub(crate) struct Plugin {
-    pub(crate) metrics: MetricSet,
+pub(crate) struct IngestOutcomes {
+    pub(crate) metric_set: MetricSet,
     log_records: Counter<Acceptance>,
     spans: Counter<Acceptance>,
 }
 
-impl Plugin {
+impl IngestOutcomes {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
         let log_records = builder.counter::<Acceptance>(ChartDescriptor {
@@ -64,7 +64,7 @@ impl Plugin {
             priority: 150_001,
         })?;
         Ok(Self {
-            metrics: builder.build()?,
+            metric_set: builder.build()?,
             log_records,
             spans,
         })
@@ -75,7 +75,7 @@ impl Plugin {
             Signal::Logs => self.log_records,
             Signal::Traces => self.spans,
         };
-        let mut batch = Batch::new(&self.metrics);
+        let mut batch = Batch::new(&self.metric_set);
         batch
             .entity(Labels::new())
             .record(now)
@@ -88,7 +88,7 @@ impl Plugin {
     /// instances defined from the first tick and never lets them expire while
     /// the plugin runs.
     pub(crate) fn heartbeat(&self, now: u64) -> Batch {
-        let mut batch = Batch::new(&self.metrics);
+        let mut batch = Batch::new(&self.metric_set);
         batch.entity(Labels::new()).record(now);
         batch
     }
@@ -96,14 +96,14 @@ impl Plugin {
 
 /// How the per-service derivation of each signal behaves: one entity per
 /// signal, labelled `signal`, fed from its aggregator's statistics every tick.
-pub(crate) struct Derivation {
-    pub(crate) metrics: MetricSet,
+pub(crate) struct DerivationHealth {
+    pub(crate) metric_set: MetricSet,
     services: Gauge<Services>,
     expired: CumulativeCounter<Expired>,
     adjusted: CumulativeCounter<Adjustment>,
 }
 
-impl Derivation {
+impl DerivationHealth {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
         let services = builder.gauge::<Services>(ChartDescriptor {
@@ -132,7 +132,7 @@ impl Derivation {
             priority: 150_012,
         })?;
         Ok(Self {
-            metrics: builder.build()?,
+            metric_set: builder.build()?,
             services,
             expired,
             adjusted,
@@ -180,10 +180,10 @@ mod tests {
 
     #[test]
     fn ingest_outcomes_render_per_signal() {
-        let plugin = Plugin::new().unwrap();
-        let mut aggregator = Aggregator::new(&plugin.metrics);
-        aggregator.merge(plugin.ingest(Signal::Traces, 7, 2, 100), 100);
-        aggregator.merge(plugin.ingest(Signal::Logs, 3, 0, 100), 100);
+        let outcomes = IngestOutcomes::new().unwrap();
+        let mut aggregator = Aggregator::new(&outcomes.metric_set);
+        aggregator.merge(outcomes.ingest(Signal::Traces, 7, 2, 100), 100);
+        aggregator.merge(outcomes.ingest(Signal::Logs, 3, 0, 100), 100);
         let out = netdata_plugin_protocol::readable_chart_stream(
             &aggregator.emit(101, usize::MAX).concat(),
         );
@@ -199,9 +199,9 @@ mod tests {
 
     #[test]
     fn the_heartbeat_keeps_the_charts_defined_without_traffic() {
-        let plugin = Plugin::new().unwrap();
-        let mut aggregator = Aggregator::new(&plugin.metrics);
-        aggregator.merge(plugin.heartbeat(100), 100);
+        let outcomes = IngestOutcomes::new().unwrap();
+        let mut aggregator = Aggregator::new(&outcomes.metric_set);
+        aggregator.merge(outcomes.heartbeat(100), 100);
         let out = netdata_plugin_protocol::readable_chart_stream(
             &aggregator.emit(101, usize::MAX).concat(),
         );
@@ -211,12 +211,12 @@ mod tests {
 
     #[test]
     fn derivation_charts_one_entity_per_signal_with_increases() {
-        let derivation = Derivation::new().unwrap();
-        let mut aggregator = Aggregator::new(&derivation.metrics);
+        let health = DerivationHealth::new().unwrap();
+        let mut aggregator = Aggregator::new(&health.metric_set);
         let mut tick = |stats: Stats, now: u64| {
-            let mut batch = Batch::new(&derivation.metrics);
-            derivation.record(&mut batch, Signal::Traces, &stats, now);
-            derivation.record(&mut batch, Signal::Logs, &Stats::default(), now);
+            let mut batch = Batch::new(&health.metric_set);
+            health.record(&mut batch, Signal::Traces, &stats, now);
+            health.record(&mut batch, Signal::Logs, &Stats::default(), now);
             aggregator.merge(batch, now);
             netdata_plugin_protocol::readable_chart_stream(
                 &aggregator.emit(now + 1, usize::MAX).concat(),

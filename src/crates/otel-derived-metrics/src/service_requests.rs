@@ -1,36 +1,25 @@
-//! Per-service charts: request rate, errors and duration from spans.
+//! Per-service charts from spans: request rate, errors and duration.
 //!
-//! A service is identified by the OTel resource attributes `service.namespace`
-//! and `service.name`, kept apart by tenant and deployment environment
-//! (`deployment.environment.name`, or the deprecated `deployment.environment`).
-//! A request is a span that is a trace root (no parent id, or the all-zero
-//! one, which storage also treats as unset), or of kind SERVER or CONSUMER; it
-//! failed when its status is ERROR. It counts at its end time, weighted by the
-//! adjusted count its `ot=th` sampling threshold implies.
+//! Services are identified as in [`crate::service`]. A request is a span that
+//! is a trace root (no parent id, or the all-zero one, which storage also
+//! treats as unset), or of kind SERVER or CONSUMER; it failed when its status
+//! is ERROR. It counts at its end time, weighted by the adjusted count its
+//! `ot=th` sampling threshold implies.
 
+use crate::service::{service_labels, service_settings};
 use netdata_plugin_metrics::{
-    Batch, BatchEntity, CardinalityLimit, ChartDescriptor, ChartType, Counter, Histogram, Labels,
-    MetricSet, MetricSetBuilder, Settings, columns,
+    Batch, BatchEntity, ChartDescriptor, ChartType, Counter, Histogram, MetricSet,
+    MetricSetBuilder, columns,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
-use opentelemetry_proto::tonic::common::v1::KeyValue;
-use opentelemetry_proto::tonic::common::v1::any_value::Value;
-use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
 use opentelemetry_proto::tonic::trace::v1::status::StatusCode;
-use std::time::Duration;
 
 /// Bucket bounds in seconds: the OTel semantic conventions' advice for
 /// `http.server.request.duration`.
 const DURATION_BOUNDS: &[f64] = &[
     0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0,
 ];
-
-/// How long after its end a window waits before it is emitted, so spans and
-/// log records that arrive late still count in it. SDKs and collectors export
-/// them in batches every few seconds (5 s by default for spans), so emitting a
-/// second as soon as it ends would show each batch as one spike.
-const ALLOWED_LATENESS: Duration = Duration::from_secs(10);
 
 columns! {
     /// How a request ended.
@@ -40,16 +29,13 @@ columns! {
     }
 }
 
-/// Value of `service.name` when a resource has none (the SDK default prefix).
-const UNKNOWN_SERVICE: &str = "unknown_service";
-
-pub(crate) struct Services {
-    pub(crate) metrics: MetricSet,
+pub(crate) struct ServiceRequests {
+    pub(crate) metric_set: MetricSet,
     requests: Counter<Outcome>,
     duration: Histogram,
 }
 
-impl Services {
+impl ServiceRequests {
     pub(crate) fn new(max_services: usize) -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(service_settings(max_services))?;
         let requests = builder.counter::<Outcome>(ChartDescriptor {
@@ -76,7 +62,7 @@ impl Services {
             "requests/s".into(),
         )?;
         Ok(Self {
-            metrics: builder.build()?,
+            metric_set: builder.build()?,
             requests,
             duration,
         })
@@ -130,67 +116,6 @@ impl Services {
     }
 }
 
-/// The settings of a per-service metric set: late spans and log records still
-/// count in their second, and services over `max_services` share the
-/// overflow entity.
-pub(crate) fn service_settings(max_services: usize) -> Settings {
-    let mut overflow_labels = Labels::new();
-    overflow_labels.insert("otel.metric.overflow", "true");
-    Settings {
-        allowed_lateness: ALLOWED_LATENESS,
-        cardinality_limit: Some(CardinalityLimit {
-            max_entities: max_services,
-            overflow_labels,
-        }),
-        ..Settings::default()
-    }
-}
-
-/// The labels of the service a resource belongs to.
-pub(crate) fn service_labels(tenant: &str, resource: Option<&Resource>) -> Labels {
-    let attributes: &[KeyValue] = resource.map_or(&[], |r| &r.attributes);
-    let mut name = None;
-    let mut namespace = None;
-    let mut environment = None;
-    let mut deprecated_environment = None;
-    for kv in attributes {
-        let slot = match kv.key.as_str() {
-            "service.name" => &mut name,
-            "service.namespace" => &mut namespace,
-            "deployment.environment.name" => &mut environment,
-            "deployment.environment" => &mut deprecated_environment,
-            _ => continue,
-        };
-        if let Some(Value::StringValue(v)) = kv.value.as_ref().and_then(|v| v.value.as_ref()) {
-            *slot = Some(v.as_str());
-        }
-    }
-    let mut labels = Labels::new();
-    labels.insert(
-        "resource.attributes.service.name",
-        name.filter(|n| !is_blank(n)).unwrap_or(UNKNOWN_SERVICE),
-    );
-    labels.insert(
-        "resource.attributes.service.namespace",
-        namespace.unwrap_or_default(),
-    );
-    labels.insert(
-        "resource.attributes.deployment.environment.name",
-        environment
-            .filter(|e| !is_blank(e))
-            .or(deprecated_environment)
-            .unwrap_or_default(),
-    );
-    labels.insert("tenant", tenant);
-    labels
-}
-
-/// Blank as the agent sees label values: whitespace and control characters
-/// only (it would store `[none]`).
-fn is_blank(value: &str) -> bool {
-    value.chars().all(|c| c.is_whitespace() || c.is_control())
-}
-
 /// The number of spans a sampled span stands for, from the `th` (rejection
 /// threshold) field of the `ot` entry in its W3C tracestate: `2^56 / (2^56 -
 /// threshold)`, the threshold being up to 14 hex digits padded on the right.
@@ -221,7 +146,9 @@ fn adjusted_count(trace_state: &str) -> f64 {
 mod tests {
     use super::*;
     use netdata_plugin_metrics::Aggregator;
-    use opentelemetry_proto::tonic::common::v1::AnyValue;
+    use opentelemetry_proto::tonic::common::v1::any_value::Value;
+    use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
+    use opentelemetry_proto::tonic::resource::v1::Resource;
     use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
 
     fn attr(key: &str, value: &str) -> KeyValue {
@@ -273,10 +200,10 @@ mod tests {
         }
     }
 
-    fn render(services: &Services, request: &ExportTraceServiceRequest) -> String {
-        let mut aggregator = Aggregator::new(&services.metrics);
-        let mut batch = Batch::new(&services.metrics);
-        services.record(&mut batch, "default", request);
+    fn render(requests: &ServiceRequests, request: &ExportTraceServiceRequest) -> String {
+        let mut aggregator = Aggregator::new(&requests.metric_set);
+        let mut batch = Batch::new(&requests.metric_set);
+        requests.record(&mut batch, "default", request);
         aggregator.merge(batch, 100);
         let out = netdata_plugin_protocol::readable_chart_stream(
             &aggregator.emit(110, usize::MAX).concat(),
@@ -295,9 +222,9 @@ mod tests {
 
     #[test]
     fn counts_roots_servers_and_consumers_only() {
-        let services = Services::new(10).unwrap();
+        let requests = ServiceRequests::new(10).unwrap();
         let out = render(
-            &services,
+            &requests,
             &request(
                 vec![attr("service.name", "checkout")],
                 vec![
@@ -328,9 +255,9 @@ mod tests {
 
     #[test]
     fn service_identity_labels() {
-        let services = Services::new(10).unwrap();
+        let requests = ServiceRequests::new(10).unwrap();
         let out = render(
-            &services,
+            &requests,
             &request(
                 vec![
                     attr("service.name", "checkout"),
@@ -349,7 +276,7 @@ mod tests {
         assert!(out.contains("CHART otel_service.requests_"));
 
         let unnamed = render(
-            &services,
+            &requests,
             &request(
                 vec![],
                 vec![span(false, SpanKind::Server, false, 95, 10, "")],
@@ -364,11 +291,11 @@ mod tests {
 
     #[test]
     fn an_all_zero_parent_id_marks_a_root() {
-        let services = Services::new(10).unwrap();
+        let requests = ServiceRequests::new(10).unwrap();
         let mut root = span(false, SpanKind::Internal, false, 95, 10, "");
         root.parent_span_id = vec![0; 8];
         let out = render(
-            &services,
+            &requests,
             &request(vec![attr("service.name", "a")], vec![root]),
         );
         assert_eq!(values(&out, "success")[0], "1");
@@ -376,9 +303,9 @@ mod tests {
 
     #[test]
     fn blank_identity_values_fall_back() {
-        let services = Services::new(10).unwrap();
+        let requests = ServiceRequests::new(10).unwrap();
         let out = render(
-            &services,
+            &requests,
             &request(
                 vec![
                     attr("service.name", "  "),
@@ -406,9 +333,9 @@ mod tests {
         assert_eq!(adjusted_count("ot=th:ffffffffffffff"), (1u64 << 56) as f64);
         assert_eq!(adjusted_count("ot=th:fffffffffffffc"), (1u64 << 54) as f64);
 
-        let services = Services::new(10).unwrap();
+        let requests = ServiceRequests::new(10).unwrap();
         let out = render(
-            &services,
+            &requests,
             &request(
                 vec![attr("service.name", "a")],
                 vec![span(false, SpanKind::Server, false, 95, 10, "ot=th:8")],

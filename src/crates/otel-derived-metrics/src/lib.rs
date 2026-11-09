@@ -11,9 +11,10 @@
 //! twice. The ingestor calls [`DerivedMetrics::emit`] once per second; the
 //! chunks it returns travel to the supervisor as chart data.
 
-mod logs;
-mod plugin;
-mod services;
+mod self_monitoring;
+mod service;
+mod service_log_records;
+mod service_requests;
 
 use netdata_plugin_metrics::{Aggregator, Batch};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
@@ -40,19 +41,21 @@ fn commit(aggregator: &Mutex<Aggregator>, batch: Batch) {
     }
 }
 
-struct Enabled {
-    services: services::Services,
-    service_aggregator: Mutex<Aggregator>,
-    logs: logs::ServiceLogs,
-    logs_aggregator: Mutex<Aggregator>,
-    derivation: plugin::Derivation,
-    derivation_aggregator: Mutex<Aggregator>,
+/// The per-service metric sets and their health: present when derived metrics
+/// are enabled.
+struct PerServiceMetrics {
+    requests: service_requests::ServiceRequests,
+    requests_aggregator: Mutex<Aggregator>,
+    log_records: service_log_records::ServiceLogRecords,
+    log_records_aggregator: Mutex<Aggregator>,
+    health: self_monitoring::DerivationHealth,
+    health_aggregator: Mutex<Aggregator>,
 }
 
 pub struct DerivedMetrics {
-    enabled: Option<Enabled>,
-    plugin: plugin::Plugin,
-    plugin_aggregator: Mutex<Aggregator>,
+    per_service: Option<PerServiceMetrics>,
+    ingest_outcomes: self_monitoring::IngestOutcomes,
+    ingest_outcomes_aggregator: Mutex<Aggregator>,
 }
 
 impl DerivedMetrics {
@@ -60,35 +63,35 @@ impl DerivedMetrics {
     ///
     /// A metric set that the plugin declares wrongly.
     pub fn new(config: &DerivedMetricsConfig) -> Result<Self, netdata_plugin_metrics::Error> {
-        let enabled = if config.enabled {
-            let services = services::Services::new(config.max_services)?;
-            let logs = logs::ServiceLogs::new(config.max_services)?;
-            let derivation = plugin::Derivation::new()?;
-            Some(Enabled {
-                service_aggregator: Mutex::new(Aggregator::new(&services.metrics)),
-                services,
-                logs_aggregator: Mutex::new(Aggregator::new(&logs.metrics)),
-                logs,
-                derivation_aggregator: Mutex::new(Aggregator::new(&derivation.metrics)),
-                derivation,
+        let per_service = if config.enabled {
+            let requests = service_requests::ServiceRequests::new(config.max_services)?;
+            let log_records = service_log_records::ServiceLogRecords::new(config.max_services)?;
+            let health = self_monitoring::DerivationHealth::new()?;
+            Some(PerServiceMetrics {
+                requests_aggregator: Mutex::new(Aggregator::new(&requests.metric_set)),
+                requests,
+                log_records_aggregator: Mutex::new(Aggregator::new(&log_records.metric_set)),
+                log_records,
+                health_aggregator: Mutex::new(Aggregator::new(&health.metric_set)),
+                health,
             })
         } else {
             None
         };
-        let plugin = plugin::Plugin::new()?;
-        let plugin_aggregator = Mutex::new(Aggregator::new(&plugin.metrics));
+        let ingest_outcomes = self_monitoring::IngestOutcomes::new()?;
+        let ingest_outcomes_aggregator = Mutex::new(Aggregator::new(&ingest_outcomes.metric_set));
         Ok(Self {
-            enabled,
-            plugin,
-            plugin_aggregator,
+            per_service,
+            ingest_outcomes,
+            ingest_outcomes_aggregator,
         })
     }
 
     /// A batch for the spans of one export request; `None` when derived
     /// metrics are disabled.
     pub fn spans_batch(&self) -> Option<SpansBatch> {
-        let enabled = self.enabled.as_ref()?;
-        Some(SpansBatch(Batch::new(&enabled.services.metrics)))
+        let per_service = self.per_service.as_ref()?;
+        Some(SpansBatch(Batch::new(&per_service.requests.metric_set)))
     }
 
     /// Record the requests among the spans of `request`, a normalized group
@@ -99,23 +102,23 @@ impl DerivedMetrics {
         tenant: &str,
         request: &ExportTraceServiceRequest,
     ) {
-        if let Some(enabled) = &self.enabled {
-            enabled.services.record(&mut batch.0, tenant, request);
+        if let Some(per_service) = &self.per_service {
+            per_service.requests.record(&mut batch.0, tenant, request);
         }
     }
 
     /// Count a batch once its spans are durable.
     pub fn commit_spans(&self, batch: SpansBatch) {
-        if let Some(enabled) = &self.enabled {
-            commit(&enabled.service_aggregator, batch.0);
+        if let Some(per_service) = &self.per_service {
+            commit(&per_service.requests_aggregator, batch.0);
         }
     }
 
     /// A batch for the log records of one export request; `None` when
     /// derived metrics are disabled.
     pub fn logs_batch(&self) -> Option<LogsBatch> {
-        let enabled = self.enabled.as_ref()?;
-        Some(LogsBatch(Batch::new(&enabled.logs.metrics)))
+        let per_service = self.per_service.as_ref()?;
+        Some(LogsBatch(Batch::new(&per_service.log_records.metric_set)))
     }
 
     /// Record the log records of `request`, a normalized group of an export
@@ -126,15 +129,17 @@ impl DerivedMetrics {
         tenant: &str,
         request: &ExportLogsServiceRequest,
     ) {
-        if let Some(enabled) = &self.enabled {
-            enabled.logs.record(&mut batch.0, tenant, request);
+        if let Some(per_service) = &self.per_service {
+            per_service
+                .log_records
+                .record(&mut batch.0, tenant, request);
         }
     }
 
     /// Count a batch once its log records are durable.
     pub fn commit_logs(&self, batch: LogsBatch) {
-        if let Some(enabled) = &self.enabled {
-            commit(&enabled.logs_aggregator, batch.0);
+        if let Some(per_service) = &self.per_service {
+            commit(&per_service.log_records_aggregator, batch.0);
         }
     }
 
@@ -142,33 +147,36 @@ impl DerivedMetrics {
     /// and records rejected (reported to the sender as a partial success).
     pub fn record_ingest(&self, signal: Signal, accepted: u64, rejected: u64) {
         let now = unix_now();
-        let batch = self.plugin.ingest(signal, accepted, rejected, now);
-        self.plugin_aggregator.lock().unwrap().merge(batch, now);
+        let batch = self.ingest_outcomes.ingest(signal, accepted, rejected, now);
+        self.ingest_outcomes_aggregator
+            .lock()
+            .unwrap()
+            .merge(batch, now);
     }
 
     /// Emit every window whose allowed lateness has passed by `now` (Unix
     /// seconds), in chunks of at most [`MAX_CHUNK_BYTES`].
     pub fn emit(&self, now: u64) -> Vec<Vec<u8>> {
         let mut chunks = Vec::new();
-        if let Some(enabled) = &self.enabled {
-            let mut batch = Batch::new(&enabled.derivation.metrics);
+        if let Some(per_service) = &self.per_service {
+            let mut batch = Batch::new(&per_service.health.metric_set);
             for (signal, aggregator) in [
-                (Signal::Traces, &enabled.service_aggregator),
-                (Signal::Logs, &enabled.logs_aggregator),
+                (Signal::Traces, &per_service.requests_aggregator),
+                (Signal::Logs, &per_service.log_records_aggregator),
             ] {
                 let mut aggregator = aggregator.lock().unwrap();
                 chunks.extend(aggregator.emit(now, MAX_CHUNK_BYTES));
-                enabled
-                    .derivation
+                per_service
+                    .health
                     .record(&mut batch, signal, &aggregator.stats(), now);
             }
-            let mut derivation_aggregator = enabled.derivation_aggregator.lock().unwrap();
-            derivation_aggregator.merge(batch, now);
-            chunks.extend(derivation_aggregator.emit(now, MAX_CHUNK_BYTES));
+            let mut health_aggregator = per_service.health_aggregator.lock().unwrap();
+            health_aggregator.merge(batch, now);
+            chunks.extend(health_aggregator.emit(now, MAX_CHUNK_BYTES));
         }
-        let mut plugin_aggregator = self.plugin_aggregator.lock().unwrap();
-        plugin_aggregator.merge(self.plugin.heartbeat(now), now);
-        chunks.extend(plugin_aggregator.emit(now, MAX_CHUNK_BYTES));
+        let mut ingest_outcomes_aggregator = self.ingest_outcomes_aggregator.lock().unwrap();
+        ingest_outcomes_aggregator.merge(self.ingest_outcomes.heartbeat(now), now);
+        chunks.extend(ingest_outcomes_aggregator.emit(now, MAX_CHUNK_BYTES));
         chunks
     }
 }
