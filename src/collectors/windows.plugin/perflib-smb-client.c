@@ -317,13 +317,23 @@ static bool smb_client_parse_instance(const char *name, char *server, char *shar
     return true;
 }
 
-static void smb_client_charts_create(struct smb_client_share *share, const char *server, const char *share_name, int update_every)
+static void smb_client_charts_create(
+    struct smb_client_share *share,
+    const char *instance,
+    const char *server,
+    const char *share_name,
+    int update_every)
 {
+    // Sanitizing merges the server/share boundary and maps symbols such as '$' to '_', so distinct shares
+    // (e.g. "C$" and "C_") could share chart IDs. A hash of the raw instance name keeps them apart across restarts.
+    uint32_t instance_hash = (uint32_t)XXH3_64bits(instance, strlen(instance));
+
     for (size_t c = 0; c < SMBC_CHARTS; c++) {
         const struct smb_client_chart_definition *def = &smb_client_charts[c];
 
         char id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(id, sizeof(id), "smb_client_%s_%s_%s", server, share_name, def->suffix);
+        snprintfz(
+            id, sizeof(id), "smb_client_%s_%s_%08x_%s", server, share_name, (unsigned)instance_hash, def->suffix);
         netdata_fix_chart_name(id);
 
         RRDSET *st = rrdset_create_localhost(
@@ -472,7 +482,7 @@ static void do_smb_client_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
             perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->counters[c]);
 
         if (unlikely(!share->st[0]))
-            smb_client_charts_create(share, server, share_name, update_every);
+            smb_client_charts_create(share, windows_shared_buffer, server, share_name, update_every);
 
         smb_client_charts_update(share);
     }
