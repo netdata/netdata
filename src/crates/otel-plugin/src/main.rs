@@ -17,7 +17,6 @@
 //! the supervisor, and configuration loading.
 mod config;
 mod lifeline;
-mod startup_keepalive;
 mod supervisor;
 
 use anyhow::Context;
