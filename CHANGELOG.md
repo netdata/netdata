@@ -430,6 +430,9 @@
 - Regenerate integrations docs ([#24640](https://github.com/netdata/netdata/issues/24640))
 - Libnetdata, local-listeners: fix unchecked test wait and zero-total report division ([#24639](https://github.com/netdata/netdata/issues/24639))
 - Netdatacli: add dyncfg-tree; support bundle reads the tree through it ([#24586](https://github.com/netdata/netdata/issues/24586))
+- Contexts: merge collected instance metadata under the context lock ([#24645](https://github.com/netdata/netdata/issues/24645))
+- Sqlite: report why the metadata database failed to initialize ([#24642](https://github.com/netdata/netdata/issues/24642))
+- Missing BSD metrics ([#24617](https://github.com/netdata/netdata/issues/24617))
 
 ## [2.12.0] - 2026-09-30
 
