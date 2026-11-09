@@ -40,41 +40,40 @@ pub(crate) fn service_settings(max_services: usize) -> Settings {
 
 /// The labels of the service a resource belongs to.
 pub(crate) fn service_labels(tenant: &str, resource: Option<&Resource>) -> Labels {
-    let attributes: &[KeyValue] = resource.map_or(&[], |r| &r.attributes);
-    let mut name = None;
-    let mut namespace = None;
-    let mut environment = None;
-    let mut deprecated_environment = None;
-    for kv in attributes {
-        let slot = match kv.key.as_str() {
-            "service.name" => &mut name,
-            "service.namespace" => &mut namespace,
-            "deployment.environment.name" => &mut environment,
-            "deployment.environment" => &mut deprecated_environment,
-            _ => continue,
-        };
-        if let Some(Value::StringValue(v)) = kv.value.as_ref().and_then(|v| v.value.as_ref()) {
-            *slot = Some(v.as_str());
-        }
-    }
+    let attributes: &[KeyValue] = resource.map_or(&[], |resource| &resource.attributes);
+    let name = string_attribute(attributes, "service.name")
+        .filter(|name| !is_blank(name))
+        .unwrap_or(UNKNOWN_SERVICE);
+    let namespace = string_attribute(attributes, "service.namespace").unwrap_or_default();
+    let environment = string_attribute(attributes, "deployment.environment.name")
+        .filter(|environment| !is_blank(environment))
+        .or_else(|| string_attribute(attributes, "deployment.environment"))
+        .unwrap_or_default();
+
     let mut labels = Labels::new();
-    labels.insert(
-        "resource.attributes.service.name",
-        name.filter(|n| !is_blank(n)).unwrap_or(UNKNOWN_SERVICE),
-    );
-    labels.insert(
-        "resource.attributes.service.namespace",
-        namespace.unwrap_or_default(),
-    );
+    labels.insert("resource.attributes.service.name", name);
+    labels.insert("resource.attributes.service.namespace", namespace);
     labels.insert(
         "resource.attributes.deployment.environment.name",
-        environment
-            .filter(|e| !is_blank(e))
-            .or(deprecated_environment)
-            .unwrap_or_default(),
+        environment,
     );
     labels.insert("tenant", tenant);
     labels
+}
+
+/// The string value of the attribute `key`; of the last one when a sender
+/// repeats the key. `None` when no attribute has that key and a string value.
+fn string_attribute<'a>(attributes: &'a [KeyValue], key: &str) -> Option<&'a str> {
+    for attribute in attributes.iter().rev() {
+        if attribute.key != key {
+            continue;
+        }
+        let value = attribute.value.as_ref().and_then(|any| any.value.as_ref());
+        if let Some(Value::StringValue(string)) = value {
+            return Some(string);
+        }
+    }
+    None
 }
 
 /// Blank as the agent sees label values: whitespace and control characters

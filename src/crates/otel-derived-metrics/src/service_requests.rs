@@ -9,10 +9,10 @@
 use crate::service::{service_labels, service_settings};
 use crate::shared_aggregator::SharedAggregator;
 use netdata_plugin_metrics::{
-    Batch, BatchEntity, ChartDescriptor, ChartType, Counter, Histogram, MetricSet,
-    MetricSetBuilder, columns,
+    Batch, ChartDescriptor, ChartType, Counter, Histogram, MetricSet, MetricSetBuilder, columns,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use opentelemetry_proto::tonic::trace::v1::Span;
 use opentelemetry_proto::tonic::trace::v1::span::SpanKind;
 use opentelemetry_proto::tonic::trace::v1::status::StatusCode;
 
@@ -86,70 +86,85 @@ impl ServiceRequests {
         request: &ExportTraceServiceRequest,
     ) {
         for resource_spans in &request.resource_spans {
-            let mut entity: Option<BatchEntity<'_>> = None;
+            // A service without a request here gets no event, and an entity
+            // without events never reaches the aggregator.
+            let labels = service_labels(tenant, resource_spans.resource.as_ref());
+            let mut service = batch.entity(labels);
             for scope_spans in &resource_spans.scope_spans {
                 for span in &scope_spans.spans {
-                    let is_request = span.parent_span_id.iter().all(|&b| b == 0)
-                        || span.kind == SpanKind::Server as i32
-                        || span.kind == SpanKind::Consumer as i32;
-                    if !is_request {
+                    if !is_request(span) {
                         continue;
                     }
-                    if entity.is_none() {
-                        entity = Some(
-                            batch.entity(service_labels(tenant, resource_spans.resource.as_ref())),
-                        );
-                    }
-                    let entity = entity.as_mut().expect("set above");
                     let start = span.start_time_unix_nano;
+                    // A span that ends before it starts has no duration.
                     let end = span.end_time_unix_nano.max(start);
-                    let failed = span
-                        .status
-                        .as_ref()
-                        .is_some_and(|s| s.code == StatusCode::Error as i32);
+                    let duration_seconds = (end - start) as f64 / 1e9;
                     let weight = adjusted_count(&span.trace_state);
-                    entity
+                    service
                         .record(end / 1_000_000_000)
-                        .add(
-                            self.requests,
-                            if failed {
-                                Outcome::Error
-                            } else {
-                                Outcome::Success
-                            },
-                            weight,
-                        )
-                        .observe(self.duration, (end - start) as f64 / 1e9, weight);
+                        .add(self.requests, outcome(span), weight)
+                        .observe(self.duration, duration_seconds, weight);
                 }
             }
         }
     }
 }
 
-/// The number of spans a sampled span stands for, from the `th` (rejection
-/// threshold) field of the `ot` entry in its W3C tracestate: `2^56 / (2^56 -
-/// threshold)`, the threshold being up to 14 hex digits padded on the right.
-/// 1 when the span carries no valid threshold.
-fn adjusted_count(trace_state: &str) -> f64 {
-    let threshold = trace_state
-        .split(',')
-        .filter_map(|member| member.trim().strip_prefix("ot="))
-        .flat_map(|ot| ot.split(';'))
-        .find_map(|field| field.strip_prefix("th:"));
-    let Some(hex) = threshold else {
-        return 1.0;
-    };
-    if hex.is_empty() || hex.len() > 14 {
-        return 1.0;
+/// Whether `span` is a request: a trace root (no parent id, or the all-zero
+/// one, which storage also treats as unset), or a span of kind SERVER or
+/// CONSUMER.
+fn is_request(span: &Span) -> bool {
+    let is_root = span.parent_span_id.iter().all(|&byte| byte == 0);
+    is_root || matches!(span.kind(), SpanKind::Server | SpanKind::Consumer)
+}
+
+/// How the request `span` ended: in error when its status is ERROR.
+fn outcome(span: &Span) -> Outcome {
+    let failed = span
+        .status
+        .as_ref()
+        .is_some_and(|status| status.code() == StatusCode::Error);
+    if failed {
+        Outcome::Error
+    } else {
+        Outcome::Success
     }
-    let Ok(value) = u64::from_str_radix(hex, 16) else {
+}
+
+/// The number of spans a sampled span stands for: `2^56 / (2^56 -
+/// threshold)` for the rejection threshold in its tracestate, 1 when it
+/// carries no valid one.
+fn adjusted_count(trace_state: &str) -> f64 {
+    const THRESHOLD_RANGE: u64 = 1 << 56;
+    let Some(threshold) = rejection_threshold(trace_state) else {
         return 1.0;
     };
-    let threshold = value << (4 * (14 - hex.len()));
     // Subtract in integers: near 2^56 the threshold has no exact f64, and
     // the difference would round to zero.
-    const MAX: u64 = 1 << 56;
-    MAX as f64 / (MAX - threshold) as f64
+    THRESHOLD_RANGE as f64 / (THRESHOLD_RANGE - threshold) as f64
+}
+
+/// The rejection threshold of a sampled span, below 2^56: the `th` field of
+/// the `ot` entry in its W3C tracestate, 1 to 14 hex digits padded on the
+/// right. `None` when the tracestate has no such field, or its value is not
+/// valid.
+fn rejection_threshold(trace_state: &str) -> Option<u64> {
+    for member in trace_state.split(',') {
+        let Some(ot_fields) = member.trim().strip_prefix("ot=") else {
+            continue;
+        };
+        for field in ot_fields.split(';') {
+            let Some(hex) = field.strip_prefix("th:") else {
+                continue;
+            };
+            if hex.is_empty() || hex.len() > 14 {
+                return None;
+            }
+            let digits = u64::from_str_radix(hex, 16).ok()?;
+            return Some(digits << (4 * (14 - hex.len())));
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -158,7 +173,7 @@ mod tests {
     use opentelemetry_proto::tonic::common::v1::any_value::Value;
     use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue};
     use opentelemetry_proto::tonic::resource::v1::Resource;
-    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
+    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Status};
 
     fn attr(key: &str, value: &str) -> KeyValue {
         KeyValue {
@@ -257,6 +272,15 @@ mod tests {
         // Later windows of the same service: true zeros, no duration.
         assert_eq!(success[1], "0");
         assert_eq!(values(&out, "avg")[1], "");
+    }
+
+    #[test]
+    fn a_service_without_requests_gets_no_charts() {
+        let out = render(&request(
+            vec![attr("service.name", "caller")],
+            vec![span(true, SpanKind::Client, false, 95, 10, "")],
+        ));
+        assert_eq!(out, "");
     }
 
     #[test]
