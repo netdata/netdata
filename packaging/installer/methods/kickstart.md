@@ -181,11 +181,18 @@ Systems such as XCP-ng and XOA ship Netdata through their own package repositori
 ## Release signature verification
 
 Static installs and local builds require a valid OpenPGP signature for the release
-`Manifest`, as well as matching archive hashes. Install any one of `gpg`, `gpgv`,
-`sq`, `sqv`, `rnp`, or `enc` before running kickstart. The script reuses the Netdata
-repository key from your GPG keyring when available, or downloads it from
-`https://repository.netdata.cloud/netdatabot.gpg.key` into temporary storage.
-Downloaded keys are never imported into your personal keyring.
+`Manifest`, as well as matching archive hashes. Install `gpg` or `sq` before running
+kickstart. The script reuses the Netdata repository key from your GPG keyring when
+available, or downloads it from `https://repository.netdata.cloud/netdatabot.gpg.key`
+into temporary storage and checks that it matches the expected fingerprint
+`6E155DC153906B73765A74A99DD4A74CECFA8F4F`. Downloaded keys are never imported into
+your personal keyring.
+
+If neither `gpg` nor `sq` is installed, the script can verify signatures with `gpgv`,
+`sqv`, `rnp`, or `enc`, but these cannot check the downloaded key's fingerprint, so
+anyone able to tamper with the key download could supply their own key. In that case
+the script asks for confirmation, and fails when running non-interactively. Pass
+`--allow-unverified-release-keys` to accept this risk without a prompt.
 
 To explicitly disable release authentication, pass
 `--no-release-signature-verification`. This is required for historical releases

@@ -65,6 +65,7 @@ RELEASE_ARTIFACT_URL_PREFIX="https://artifacts.netdata.cloud"
 
 DRY_RUN=0
 NETDATA_VERIFY_RELEASE_SIGNATURES=1
+NETDATA_ALLOW_UNVERIFIED_RELEASE_KEYS=0
 SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
@@ -221,6 +222,7 @@ USAGE: kickstart.sh [options]
   --static-only                    Only install if a static build is available.
   --build-only                     Only install using a local build.
   --no-release-signature-verification Skip release authentication (unsafe; permits tampered releases).
+  --allow-unverified-release-keys  Accept a downloaded release signing key whose fingerprint cannot be checked (only gpg and sq can check it).
   --install-type <type>            Specify what installation type to use (native, static, build, auto, or any).
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
@@ -1002,14 +1004,15 @@ verify_release_signature() (
   fi
 
   signature_tool=""
-  for candidate in gpg gpgv sq sqv rnp enc; do
+  # gpg and sq come first because only they can check a downloaded key's fingerprint.
+  for candidate in gpg sq gpgv sqv rnp enc; do
     if command -v "${candidate}" >/dev/null 2>&1; then
       signature_tool="${candidate}"
       break
     fi
   done
   if [ -z "${signature_tool}" ]; then
-    fatal "Release signature verification requires gpg, gpgv, sq, sqv, rnp, or enc. Install one of these tools or explicitly pass --no-release-signature-verification. Skipping verification is unsafe: tampered releases may execute malicious code on this system." F0531
+    fatal "Release signature verification requires gpg or sq. Install one of these tools or explicitly pass --no-release-signature-verification. Skipping verification is unsafe: tampered releases may execute malicious code on this system." F0531
   fi
 
   # download() uses global variables; this subshell keeps its callers' state intact.
@@ -1030,12 +1033,61 @@ verify_release_signature() (
   fi
   if [ ! -s "${signature_key}" ]; then
     download "https://repository.netdata.cloud/netdatabot.gpg.key" "${signature_key}" || fatal "Unable to fetch release signing key. ${BADNET_MSG}" F0531
+
+    # A downloaded key is only trusted if it is exactly the pinned certificate.
+    case "${signature_tool}" in
+      gpg|sq)
+        if ! check_release_key_fingerprint "${signature_tool}" "${signature_key}" "${signature_fingerprint}" "${signature_dir}"; then
+          fatal "The downloaded release signing key does not match the expected fingerprint ${signature_fingerprint}. Refusing to install an unauthenticated release." F0533
+        fi
+        ;;
+      *) confirm_unverified_release_key "${signature_tool}" ;;
+    esac
   fi
 
   if ! verify_openpgp_signature "${signature_tool}" "${signature_key}" "${signature_file}" "${signature_manifest}" "${signature_dir}"; then
     fatal "Release Manifest signature verification failed. Refusing to install an unauthenticated release." F0535
   fi
 )
+
+# Arguments: tool, public key file, expected primary fingerprint, private work dir.
+# Succeeds only if the file holds exactly one certificate with that fingerprint,
+# so an extra attacker-supplied certificate cannot ride along with the real one.
+check_release_key_fingerprint() (
+  case "${1}" in
+    gpg)
+      mkdir "${4}/keycheck" && chmod 700 "${4}/keycheck" || return 1
+      gpg --no-options --homedir "${4}/keycheck" --batch --with-colons --import-options show-only --import "${2}" 2>/dev/null |
+        awk -F: -v want="${3}" '
+          $1 == "pub" { certs++; primary = 1; next }
+          $1 == "fpr" && primary { fpr = toupper($10); primary = 0 }
+          END { exit !(certs == 1 && fpr == want) }
+        '
+      ;;
+    sq)
+      { sq --home none inspect "${2}" 2>/dev/null || sq inspect "${2}" 2>/dev/null; } |
+        awk -v want="${3}" '
+          $1 == "Fingerprint:" { certs++; fpr = toupper($2) }
+          END { exit !(certs == 1 && fpr == want) }
+        '
+      ;;
+    *) return 1 ;;
+  esac
+)
+
+# Only gpg and sq can check a downloaded key's fingerprint; other tools trust
+# whatever key the server returned, so require explicit consent.
+confirm_unverified_release_key() {
+  risk="Only ${1} is available to verify release signatures, and it cannot check that the release signing key downloaded from repository.netdata.cloud is the genuine Netdata key. Anyone able to tamper with that download could supply their own key and a matching signature for a malicious release. Install gpg or sq to avoid this risk."
+
+  if [ "${NETDATA_ALLOW_UNVERIFIED_RELEASE_KEYS}" -eq 1 ]; then
+    warning "${risk} Continuing because --allow-unverified-release-keys was specified."
+  elif [ "${INTERACTIVE}" -eq 0 ]; then
+    fatal "${risk} Pass --allow-unverified-release-keys to accept this risk when running non-interactively." F0534
+  elif ! confirm "${risk} Do you want to continue anyway?"; then
+    fatal "Aborting because the release signing key could not be verified." F0534
+  fi
+}
 
 # Arguments: tool, public key, detached signature, signed data, private work dir.
 # Every adapter is noninteractive and confined to the supplied key/work directory.
@@ -3607,6 +3659,7 @@ parse_args() {
       "--static-only") NETDATA_REQUESTED_INSTALL_TYPE="static" ;;
       "--build-only") NETDATA_REQUESTED_INSTALL_TYPE="build" ;;
       "--no-release-signature-verification") NETDATA_VERIFY_RELEASE_SIGNATURES=0 ;;
+      "--allow-unverified-release-keys") NETDATA_ALLOW_UNVERIFIED_RELEASE_KEYS=1 ;;
       "--install-type")
         case "${2}" in
           native|static|build|auto|any) NETDATA_REQUESTED_INSTALL_TYPE="${2}" ;;
