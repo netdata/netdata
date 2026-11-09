@@ -237,13 +237,23 @@ async fn async_main_with_keepalive(
         &config.enrichment.geoip.asn_database,
         &config.enrichment.geoip.geo_database,
     );
-    let _charts_task = charts::NetflowCharts::new(&mut runtime, &config.charts).spawn_sampler(
+    let charts = match charts::NetflowCharts::new(&config.charts) {
+        Ok(charts) => charts,
+        Err(err) => {
+            tracing::error!("failed to declare the netflow charts: {err}");
+            return 1;
+        }
+    };
+    let publish_charts = CancellationToken::new();
+    let _charts_task = charts.spawn_sampler(
         Arc::clone(&metrics),
         Arc::clone(&open_tiers),
         Arc::clone(&tier_flow_indexes),
         Arc::clone(&facet_runtime),
         resident_mapping_paths,
         config.charts.clone(),
+        runtime.writer(),
+        publish_charts.clone(),
         shutdown.clone(),
     );
 
@@ -403,12 +413,12 @@ async fn async_main_with_keepalive(
     let mut ingest_task = ingest_task;
     let mut ingest_task_finished = false;
 
-    // `runtime.run()` publishes: it declares the Function and starts the chart
-    // registry. The Agent counts either as collected data. A plugin that exits
-    // with an error before collecting anything is disabled; one that collected
-    // something is restarted every 10 * update_every seconds, and a startup
-    // failure that follows publication collects something on every run, so
-    // the restarts never stop. So nothing is published until the ingest
+    // `runtime.run()` publishes the Function, and `publish_charts` starts the
+    // chart updates. The Agent counts either as collected data. A plugin that
+    // exits with an error before collecting anything is disabled; one that
+    // collected something is restarted every 10 * update_every seconds, and a
+    // startup failure that follows publication collects something on every
+    // run, so the restarts never stop. So nothing is published until the ingest
     // service has finished its fallible startup (tier rebuild, every listener
     // bound). The startup worker covers this wait and all earlier blocking
     // initialization; stop and join it before handing publication to runtime.
@@ -452,6 +462,7 @@ async fn async_main_with_keepalive(
     }
 
     if ingest_started {
+        publish_charts.cancel();
         tokio::select! {
             result = runtime.run() => {
                 if let Err(err) = result {

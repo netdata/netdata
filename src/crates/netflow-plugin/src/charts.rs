@@ -2,9 +2,6 @@ use crate::facet_runtime::{FacetCardinalitySnapshot, FacetMemoryBreakdown, Facet
 use crate::ingest::IngestMetrics;
 use crate::plugin_config::ChartsConfig;
 use crate::tiering::{OpenTierState, TierFlowIndexCardinality, TierFlowIndexStore};
-use netdata_plugin_rt::{ChartHandle, NetdataChart};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::Ordering;
