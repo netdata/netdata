@@ -689,8 +689,8 @@ impl NetdataLogsService {
                 fallback_base_ns,
                 Some(bounds),
                 |request| {
-                    if let (Some(derived), Some(batch)) = (&self.derived, derived_batch.as_mut()) {
-                        derived.record_logs(batch, tenant_id.as_str(), request);
+                    if let Some(batch) = derived_batch.as_mut() {
+                        batch.record(tenant_id.as_str(), request);
                     }
                 },
             )
@@ -808,8 +808,8 @@ impl NetdataLogsService {
             // request either way.
             self.sender.send_events(tenant_id.clone(), events);
         }
-        if let (Some(derived), Some(batch)) = (&self.derived, derived_batch) {
-            derived.commit_logs(batch);
+        if let Some(batch) = derived_batch {
+            batch.commit();
         }
 
         Ok(ExportLogsServiceResponse {

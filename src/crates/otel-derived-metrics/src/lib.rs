@@ -6,10 +6,11 @@
 //! Each of these is a metric set that owns its aggregator behind its own
 //! lock, so recording from export requests never waits on another set, nor on
 //! the OTLP metrics `ChartManager` lock. An export request records into a
-//! request-local batch while it prepares its frames and commits the batch
-//! only after its write is durable, so a retried request is not counted
-//! twice. The ingestor calls [`DerivedMetrics::emit`] once per second; the
-//! chunks it returns travel to the supervisor as chart data.
+//! request-local batch ([`SpansBatch`], [`LogsBatch`]) while it prepares its
+//! frames and commits the batch only after its write is durable, so a retried
+//! request is not counted twice. The ingestor calls [`DerivedMetrics::emit`]
+//! once per second; the chunks it returns travel to the supervisor as chart
+//! data.
 
 mod self_monitoring;
 mod service;
@@ -31,11 +32,46 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// frame limit, so one tick can never fail the ingestor's send.
 pub const MAX_CHUNK_BYTES: usize = 1 << 20;
 
-/// The spans of one export request, recorded but not yet counted.
-pub struct SpansBatch(Batch);
+/// The spans of one export request, recorded but not yet counted. Commit the
+/// batch once the spans are durable; a dropped batch counts nothing.
+pub struct SpansBatch<'a> {
+    requests: &'a ServiceRequests,
+    batch: Batch,
+}
+
+impl SpansBatch<'_> {
+    /// Record the requests among the spans of `request`, a normalized group
+    /// of an export request of `tenant`.
+    pub fn record(&mut self, tenant: &str, request: &ExportTraceServiceRequest) {
+        self.requests.record(&mut self.batch, tenant, request);
+    }
+
+    /// Count the batch: its spans are durable.
+    pub fn commit(self) {
+        self.requests.aggregator.merge(self.batch, unix_now());
+    }
+}
 
 /// The log records of one export request, recorded but not yet counted.
-pub struct LogsBatch(Batch);
+/// Commit the batch once the log records are durable; a dropped batch counts
+/// nothing.
+pub struct LogsBatch<'a> {
+    log_records: &'a ServiceLogRecords,
+    batch: Batch,
+}
+
+impl LogsBatch<'_> {
+    /// Record the log records of `request`, a normalized group of an export
+    /// request of `tenant`.
+    pub fn record(&mut self, tenant: &str, request: &ExportLogsServiceRequest) {
+        self.log_records.record(&mut self.batch, tenant, request);
+    }
+
+    /// Count the batch: its log records are durable.
+    pub fn commit(self) {
+        self.log_records.aggregator.merge(self.batch, unix_now());
+    }
+}
 
 /// The per-service metric sets and their health: present when derived metrics
 /// are enabled.
@@ -72,61 +108,22 @@ impl DerivedMetrics {
 
     /// A batch for the spans of one export request; `None` when derived
     /// metrics are disabled.
-    pub fn spans_batch(&self) -> Option<SpansBatch> {
-        let per_service = self.per_service.as_ref()?;
-        Some(SpansBatch(per_service.requests.batch()))
-    }
-
-    /// Record the requests among the spans of `request`, a normalized group
-    /// of an export request of `tenant`.
-    pub fn record_spans(
-        &self,
-        batch: &mut SpansBatch,
-        tenant: &str,
-        request: &ExportTraceServiceRequest,
-    ) {
-        if let Some(per_service) = &self.per_service {
-            per_service.requests.record(&mut batch.0, tenant, request);
-        }
-    }
-
-    /// Count a batch once its spans are durable.
-    pub fn commit_spans(&self, batch: SpansBatch) {
-        if let Some(per_service) = &self.per_service {
-            per_service.requests.aggregator.merge(batch.0, unix_now());
-        }
+    pub fn spans_batch(&self) -> Option<SpansBatch<'_>> {
+        let requests = &self.per_service.as_ref()?.requests;
+        Some(SpansBatch {
+            requests,
+            batch: requests.batch(),
+        })
     }
 
     /// A batch for the log records of one export request; `None` when
     /// derived metrics are disabled.
-    pub fn logs_batch(&self) -> Option<LogsBatch> {
-        let per_service = self.per_service.as_ref()?;
-        Some(LogsBatch(per_service.log_records.batch()))
-    }
-
-    /// Record the log records of `request`, a normalized group of an export
-    /// request of `tenant`.
-    pub fn record_logs(
-        &self,
-        batch: &mut LogsBatch,
-        tenant: &str,
-        request: &ExportLogsServiceRequest,
-    ) {
-        if let Some(per_service) = &self.per_service {
-            per_service
-                .log_records
-                .record(&mut batch.0, tenant, request);
-        }
-    }
-
-    /// Count a batch once its log records are durable.
-    pub fn commit_logs(&self, batch: LogsBatch) {
-        if let Some(per_service) = &self.per_service {
-            per_service
-                .log_records
-                .aggregator
-                .merge(batch.0, unix_now());
-        }
+    pub fn logs_batch(&self) -> Option<LogsBatch<'_>> {
+        let log_records = &self.per_service.as_ref()?.log_records;
+        Some(LogsBatch {
+            log_records,
+            batch: log_records.batch(),
+        })
     }
 
     /// Count the outcome of one export request of `signal`: records stored
@@ -210,16 +207,16 @@ mod tests {
         let now = unix_now();
 
         let mut spans = derived.spans_batch().unwrap();
-        derived.record_spans(&mut spans, "default", &one_span(now));
-        derived.commit_spans(spans);
+        spans.record("default", &one_span(now));
+        spans.commit();
 
         let mut logs = derived.logs_batch().unwrap();
-        derived.record_logs(&mut logs, "default", &one_log_record(now));
-        derived.commit_logs(logs);
+        logs.record("default", &one_log_record(now));
+        logs.commit();
 
         // A request that failed drops its batch: never counted.
         let mut dropped = derived.spans_batch().unwrap();
-        derived.record_spans(&mut dropped, "default", &one_span(now));
+        dropped.record("default", &one_span(now));
         drop(dropped);
 
         // Past the services' 10 s lateness.
