@@ -41,8 +41,6 @@ pub(super) struct SignalOverride {
     pub(super) catalog: Option<CatalogOverride>,
     #[serde(default)]
     pub(super) ingest: Option<IngestOverride>,
-    #[serde(default)]
-    pub(super) indexers: Option<IndexersOverride>,
     /// Where the former plugin's journal files live, for the read-only
     /// legacy-logs viewer. Declared so strict parsing accepts it; valid under
     /// `logs:` only — `traces.journal_dir` is rejected at resolve by
@@ -72,79 +70,6 @@ pub(super) struct IngestOverride {
     pub(super) max_age: Option<Duration>,
     #[serde(default, deserialize_with = "opt_humantime")]
     pub(super) future_skew: Option<Duration>,
-}
-
-/// Partial [`otel_bridge::config::IndexersTuning`]: seal concurrency bounds.
-#[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct IndexersOverride {
-    #[serde(default)]
-    pub(super) min: Option<usize>,
-    #[serde(default)]
-    pub(super) max: Option<AutoCount>,
-}
-
-/// A count or `auto` (`None`): `indexers.max` (auto = one seal per ledger
-/// worker thread) and `malloc_arena_max` (auto = one arena per runtime worker
-/// thread). Accepts a YAML integer or string, and parses from an env value or
-/// the worker's `--malloc-arena-max` argument.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct AutoCount(pub(crate) Option<usize>);
-
-impl std::str::FromStr for AutoCount {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim();
-        if s.eq_ignore_ascii_case("auto") {
-            return Ok(Self(None));
-        }
-        s.parse::<usize>()
-            .map(|n| Self(Some(n)))
-            .map_err(|_| format!("expected a positive integer or \"auto\", got \"{s}\""))
-    }
-}
-
-impl<'de> Deserialize<'de> for AutoCount {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        // A visitor rather than an untagged enum, so `-1` or `2.5` get the
-        // same message as a bad string instead of serde's generic variant error.
-        struct Visitor;
-
-        impl serde::de::Visitor<'_> for Visitor {
-            type Value = AutoCount;
-
-            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("a positive integer or \"auto\"")
-            }
-
-            fn visit_u64<E: serde::de::Error>(self, n: u64) -> Result<Self::Value, E> {
-                usize::try_from(n).map(|n| AutoCount(Some(n))).map_err(|_| {
-                    E::custom(format!("expected a positive integer or \"auto\", got {n}"))
-                })
-            }
-
-            fn visit_i64<E: serde::de::Error>(self, n: i64) -> Result<Self::Value, E> {
-                u64::try_from(n)
-                    .map_err(|_| {
-                        E::custom(format!("expected a positive integer or \"auto\", got {n}"))
-                    })
-                    .and_then(|n| self.visit_u64(n))
-            }
-
-            fn visit_f64<E: serde::de::Error>(self, n: f64) -> Result<Self::Value, E> {
-                Err(E::custom(format!(
-                    "expected a positive integer or \"auto\", got {n}"
-                )))
-            }
-
-            fn visit_str<E: serde::de::Error>(self, s: &str) -> Result<Self::Value, E> {
-                s.parse().map_err(E::custom)
-            }
-        }
-
-        d.deserialize_any(Visitor)
-    }
 }
 
 /// Deserialize an optional humantime `Duration` (e.g. `"24h"`, `"10m"`) from
@@ -202,7 +127,6 @@ impl SignalOverride {
             || self.retention.is_some()
             || self.catalog.as_ref().is_some_and(|c| c.has_any())
             || self.ingest.as_ref().is_some_and(|i| i.has_any())
-            || self.indexers.as_ref().is_some_and(|i| i.has_any())
             || self.journal_dir.is_some()
     }
 }
@@ -231,13 +155,6 @@ impl IngestOverride {
     /// True when any field is set — feeds [`SignalOverride::has_any`].
     pub(super) fn has_any(&self) -> bool {
         self.max_age.is_some() || self.future_skew.is_some()
-    }
-}
-
-impl IndexersOverride {
-    /// True when any field is set — feeds [`SignalOverride::has_any`].
-    pub(super) fn has_any(&self) -> bool {
-        self.min.is_some() || self.max.is_some()
     }
 }
 
@@ -272,14 +189,6 @@ pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
         }
         if let Some(v) = i.future_skew {
             config.ingest.future_skew = v;
-        }
-    }
-    if let Some(i) = &o.indexers {
-        if let Some(v) = i.min {
-            config.indexers.min = v;
-        }
-        if let Some(AutoCount(v)) = i.max {
-            config.indexers.max = v;
         }
     }
 }

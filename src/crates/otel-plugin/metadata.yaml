@@ -218,14 +218,6 @@ modules:
                 - the download cache for remote storage (the `remote-read` subdirectory, limited by `remote_storage.read_cache_max_size`).
               default_value: "/var/log/netdata/otel/v2"
               required: false
-            # Applied by the supervisor's worker spawn (`--malloc-arena-max`),
-            # main.rs `set_glibc_arenas_for_process`; glibc builds only.
-            - name: malloc_arena_max
-              description: glibc malloc arenas for the plugin's ingestion and storage processes, or `auto` for one per CPU.
-              detailed_description: |
-                This setting replaces the Agent's `glibc malloc arena max for plugins` option in `netdata.conf` for these two processes. With `auto`, their threads do not wait on each other's memory allocations, which ingestion throughput depends on. Set a number to cap the arenas; fewer arenas can lower memory fragmentation and use, at the cost of ingestion throughput. It has no effect on systems whose C library is not glibc.
-              default_value: "auto"
-              required: false
             - name: logs.rotation.default.max_file_size
               description: File size at which incoming logs start a new file.
               default_value: "25MB"
@@ -247,16 +239,6 @@ modules:
             - name: logs.retention.default.max_age
               description: Maximum age of stored log files.
               default_value: "7 days"
-              required: false
-            - name: logs.indexers.min
-              description: Minimum number of log files the plugin indexes in parallel while files are waiting to be indexed.
-              default_value: 1
-              required: false
-            - name: logs.indexers.max
-              description: Maximum number of log files the plugin indexes in parallel, or `auto` for one per ledger worker thread (one per CPU by default, and never below `min`).
-              detailed_description: |
-                Each file being indexed uses one CPU core and holds the file's index in memory. The plugin starts with `logs.indexers.min` and changes the number of parallel indexers by at most one every 10 seconds: it adds one when enough finished files are waiting to keep one more indexer busy, for example after a restart, and removes one when the backlog shrinks by the same amount. Lower this value to limit CPU and memory use during a backlog; data waiting to be indexed after a restart cannot be queried until it is indexed.
-              default_value: "auto"
               required: false
             - name: traces.rotation.default.max_file_size
               description: File size at which incoming spans start a new file.
@@ -281,16 +263,6 @@ modules:
             - name: traces.retention.default.max_age
               description: Maximum age of stored trace files, measured on the start time of the newest span in each file.
               default_value: "7 days"
-              required: false
-            - name: traces.indexers.min
-              description: Minimum number of trace files the plugin indexes in parallel while files are waiting to be indexed.
-              default_value: 1
-              required: false
-            - name: traces.indexers.max
-              description: Maximum number of trace files the plugin indexes in parallel, or `auto` for one per ledger worker thread (one per CPU by default, and never below `min`).
-              detailed_description: |
-                Each file being indexed uses one CPU core and holds the file's index in memory. The plugin starts with `traces.indexers.min` and changes the number of parallel indexers by at most one every 10 seconds: it adds one when enough finished files are waiting to keep one more indexer busy, for example after a restart, and removes one when the backlog shrinks by the same amount. Lower this value to limit CPU and memory use during a backlog; data waiting to be indexed after a restart cannot be queried until it is indexed.
-              default_value: "auto"
               required: false
             # Cache and download claims are file-lifecycle behavior: the shared
             # `{base_dir}/remote-read` cache and the 30s + 1 MiB/s (5 min cap)

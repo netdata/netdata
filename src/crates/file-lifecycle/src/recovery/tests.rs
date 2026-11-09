@@ -12,7 +12,8 @@
 //!   the install oracle's per-entry arm priority;
 //!   `rotated_catalog_passes_validate_catalog` pins a real builder-rotation
 //!   round-trip.
-//! - `local` (per-tenant replay): `holds_seq_*` pins the routing predicate;
+//! - `local` (per-tenant replay): `recover_unindexed_*` pins skip-and-orphan
+//!   on a failed seal plus the `holds_seq` routing predicate;
 //!   `recover_retention_*` pins SFST eviction gated on `is_remote_cataloged`
 //!   (ungated with storage disabled); `seed_*` pins replay of local catalogs
 //!   into uploaded/rotated state and the D-P8.1 corrupt-catalog matrix
@@ -26,8 +27,8 @@
 //!   per-catalog stat confirm/re-upload pass, its per-identity seq floor, and
 //!   the `remote_cataloged` seeds that gate `recover_retention` eviction.
 //!
-//! Not pinned here: `recover_orphaned_wals` and `recover_unuploaded` have no
-//! direct test, and the caller wiring
+//! Not pinned here: `recover_orphaned_wals`, `drain_wal_deletes` and
+//! `recover_unuploaded` have no direct test, and the caller wiring
 //! (otel-ledger `build_pipeline`: pass order, STARTUP_REMOTE_BUDGET, the
 //! remote_ok skip policy) is exercised only through the Err/skip contracts the
 //! passes themselves expose.
@@ -1368,6 +1369,149 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
         0,
         "an unparseable remote key must be skipped, not enqueued"
     );
+
+    cancel.cancel();
+}
+
+// ── recover_unindexed: skip-and-orphan on seal failure ──────────────────
+
+/// Indexer mock that fails every request — drives the skip-and-orphan path
+/// without needing an undecodable fixture.
+struct FailingIndexer;
+
+impl crate::component::Component for FailingIndexer {
+    type Request = crate::ipc::IndexerRequest;
+    type Response = crate::ipc::IndexerResponse;
+    type Args = ();
+
+    async fn run(
+        _args: (),
+        mut rx: tokio::sync::mpsc::UnboundedReceiver<Self::Request>,
+        tx: tokio::sync::mpsc::UnboundedSender<Self::Response>,
+        _cancel: tokio_util::sync::CancellationToken,
+    ) {
+        while let Some(req) = rx.recv().await {
+            let crate::ipc::IndexerRequest::Index { wal_path, .. } = req;
+            let _ = tx.send(crate::ipc::IndexerResponse::IndexFailed {
+                path: wal_path,
+                error: "mock: undecodable".into(),
+            });
+        }
+    }
+}
+
+/// Cleaner mock that panics on any request — the failure path must send
+/// none (no `DeleteWalFile` for an orphan: the file is kept on disk).
+struct IdleCleaner;
+
+impl crate::component::Component for IdleCleaner {
+    type Request = crate::ipc::CleanerRequest;
+    type Response = crate::ipc::CleanerResponse;
+    type Args = ();
+
+    async fn run(
+        _args: (),
+        mut rx: tokio::sync::mpsc::UnboundedReceiver<Self::Request>,
+        _tx: tokio::sync::mpsc::UnboundedSender<Self::Response>,
+        _cancel: tokio_util::sync::CancellationToken,
+    ) {
+        if let Some(req) = rx.recv().await {
+            panic!("the orphan path must send no cleaner requests, got: {req:?}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn recover_unindexed_orphans_unsealable_wals() {
+    // Pins `recover_unindexed`'s orphan policy on a failed seal: the pass
+    // returns Ok (not fatal), the WAL entry is untracked (the planner never
+    // sees it), the seq is not routable (`holds_seq`), the bytes stay on
+    // disk, and the next restart re-discovers and re-orphans the file.
+    //
+    // Setup: a real archived WAL file, tracked by directory recovery.
+    let wal_dir = tempfile::tempdir().unwrap();
+    let seq_alloc = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(
+        wal_dir.path(),
+        wal::Config::default(),
+        seq_alloc,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: 7,
+        },
+        ident(),
+    )
+    .unwrap();
+    writer
+        .write_frame(
+            1,
+            &[],
+            b"junk",
+            wal::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: file_registry::TimestampNs(1),
+                log_ts_range: None,
+            },
+        )
+        .unwrap();
+    writer.shutdown_all().unwrap();
+
+    let mut wal_reg = wal::Registry::new(wal_dir.path());
+    wal_reg.recover().unwrap();
+    let sfst_dir = tempfile::tempdir().unwrap();
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut registry = Registry::new(
+        wal_reg,
+        sfst::Registry::new(sfst_dir.path()),
+        otel_catalog::Registry::new(catalog_dir.path(), TenantId::from("tenant1")),
+    );
+
+    let ids = registry.unindexed_ids();
+    assert_eq!(ids.len(), 1, "one archived unindexed WAL");
+    let wal_path = registry.wal.file_path(ids[0]);
+    let seq = ids[0].seq;
+
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut indexer =
+        crate::component::ComponentHandle::spawn::<FailingIndexer>((), cancel.clone());
+    let mut cleaner = crate::component::ComponentHandle::spawn::<IdleCleaner>((), cancel.clone());
+
+    // A seal failure must not fail recovery: the pass skips the file and
+    // startup proceeds.
+    recover_unindexed(&mut registry, &mut indexer, &mut cleaner)
+        .await
+        .expect("seal failures are skipped, not fatal");
+
+    // The entry is untracked (the planner never sees it)...
+    assert!(registry.wal.get(seq).is_none(), "WAL entry untracked");
+    assert!(registry.unindexed_ids().is_empty());
+    // ...the routing predicate drops it (no dangling seq_to_tenant entry)...
+    assert!(!registry.holds_seq(seq), "orphan seq must not be routable");
+    // ...and the bytes stay on disk (keep-orphans policy).
+    assert!(wal_path.exists(), "orphan file kept on disk");
+
+    // Second restart: the orphan is re-discovered (its header is valid),
+    // the seal is retried, and it re-orphans — the self-healing loop the
+    // policy promises, not a one-shot skip.
+    let mut wal_reg2 = wal::Registry::new(wal_dir.path());
+    wal_reg2.recover().unwrap();
+    let sfst_dir2 = tempfile::tempdir().unwrap();
+    let catalog_dir2 = tempfile::tempdir().unwrap();
+    let mut registry2 = Registry::new(
+        wal_reg2,
+        sfst::Registry::new(sfst_dir2.path()),
+        otel_catalog::Registry::new(catalog_dir2.path(), TenantId::from("tenant1")),
+    );
+    assert_eq!(
+        registry2.unindexed_ids(),
+        vec![ids[0]],
+        "orphan re-discovered on restart"
+    );
+    recover_unindexed(&mut registry2, &mut indexer, &mut cleaner)
+        .await
+        .expect("re-orphaning is not fatal either");
+    assert!(registry2.wal.get(seq).is_none(), "re-untracked");
+    assert!(wal_path.exists(), "orphan still on disk after second cycle");
 
     cancel.cancel();
 }

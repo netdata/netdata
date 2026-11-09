@@ -32,7 +32,6 @@ use serde::Deserialize;
 use derived_metrics::DerivedMetricsOverride;
 use metrics::MetricsOverride;
 use receivers::{DeprecatedEndpointOverride, ReceiversOverride};
-pub(crate) use signal::AutoCount;
 use signal::{AuthOverride, RemoteStorageOverride, SignalOverride};
 
 /// Standard-install fallback when the agent's log directory is unknown.
@@ -378,12 +377,9 @@ fn validate_listener(prefix: &str, listener: &ProtocolConfig) -> Result<()> {
 /// absolute (the per-signal dirs join onto it); `remote_storage.uri` must be
 /// non-empty when storage is enabled; at least one OTLP listener must be
 /// enabled, each enabled one must pass [`validate_listener`], and two enabled
-/// listeners must not overlap (two listeners cannot bind one socket); each
+/// listeners must not overlap (two listeners cannot bind one socket); and each
 /// signal's retention must satisfy the catalog-horizon invariant
-/// (`otel-bridge/src/config.rs` `RetentionPolicy::validate`); and
-/// each signal's `indexers.min` must be at least 1, with an explicit
-/// `indexers.max` no lower than `min` ([`validate_indexers`]); and an explicit
-/// `malloc_arena_max` must be at least 1.
+/// (`otel-bridge/src/config.rs` `RetentionPolicy::validate`).
 fn validate(config: &PluginConfig) -> Result<()> {
     if config.base_dir.as_os_str().is_empty() {
         anyhow::bail!("base_dir must be set (the mandatory root for all signal storage)");
@@ -454,30 +450,6 @@ fn validate(config: &PluginConfig) -> Result<()> {
         .validate()
         .map_err(|e| anyhow::anyhow!("traces.{e}"))?;
 
-    validate_indexers("logs", &config.logs.indexers)?;
-    validate_indexers("traces", &config.traces.indexers)?;
-
-    if config.malloc_arena_max == Some(0) {
-        anyhow::bail!("malloc_arena_max must be \"auto\" or at least 1");
-    }
-
-    Ok(())
-}
-
-/// Seal concurrency bounds: at least one seal, and an explicit `max` that does
-/// not undercut `min`. Hard errors rather than clamps, like the retention check.
-fn validate_indexers(signal: &str, t: &otel_bridge::config::IndexersTuning) -> Result<()> {
-    if t.min == 0 {
-        anyhow::bail!("{signal}.indexers.min must be at least 1");
-    }
-    if let Some(max) = t.max {
-        if max < t.min {
-            anyhow::bail!(
-                "{signal}.indexers.max ({max}) must be \"auto\" or at least {signal}.indexers.min ({})",
-                t.min
-            );
-        }
-    }
     Ok(())
 }
 
@@ -507,8 +479,6 @@ pub(crate) struct ConfigOverride {
     derived_metrics: Option<DerivedMetricsOverride>,
     #[serde(default)]
     base_dir: Option<PathBuf>,
-    #[serde(default)]
-    malloc_arena_max: Option<AutoCount>,
     #[serde(default)]
     remote_storage: Option<RemoteStorageOverride>,
     #[serde(default)]
@@ -555,7 +525,6 @@ impl ConfigOverride {
             || self.metrics.is_some()
             || self.derived_metrics.is_some()
             || self.base_dir.is_some()
-            || self.malloc_arena_max.is_some()
             || self.remote_storage.is_some()
             || self.auth.is_some()
             || self.logs.is_some()
@@ -578,9 +547,6 @@ fn apply_overrides(config: &mut PluginConfig, o: &ConfigOverride) {
     }
     if let Some(b) = &o.base_dir {
         config.base_dir = b.clone();
-    }
-    if let Some(AutoCount(m)) = o.malloc_arena_max {
-        config.malloc_arena_max = m;
     }
     if let Some(s) = &o.remote_storage {
         signal::apply_remote_storage(&mut config.remote_storage, s);
@@ -2035,90 +2001,6 @@ logs:
     }
 
     #[test]
-    fn indexers_default_to_one_min_and_auto_max() {
-        let config = resolved_stock();
-        for t in [&config.logs.indexers, &config.traces.indexers] {
-            assert_eq!(t.min, 1);
-            assert_eq!(t.max, None);
-        }
-    }
-
-    #[test]
-    fn malloc_arena_max_defaults_to_auto_and_layers() {
-        assert_eq!(resolved_stock().malloc_arena_max, None);
-        assert_eq!(
-            resolve_with_user("malloc_arena_max: 2\n")
-                .unwrap()
-                .malloc_arena_max,
-            Some(2)
-        );
-        let config = resolve_layers(
-            Some("malloc_arena_max: 2\n"),
-            &[("NETDATA_OTEL_CFG_MALLOC_ARENA_MAX", "auto")],
-        )
-        .unwrap();
-        assert_eq!(config.malloc_arena_max, None, "env auto wins over user 2");
-        for yaml in [
-            "malloc_arena_max: 0\n",
-            "malloc_arena_max: -1\n",
-            "malloc_arena_max: lots\n",
-        ] {
-            let err = resolve_with_user(yaml).unwrap_err();
-            assert!(format!("{err:#}").contains("auto"), "{yaml}: {err:#}");
-        }
-    }
-
-    #[test]
-    fn indexers_from_user_yaml_accept_count_and_auto() {
-        let config = resolve_with_user(
-            "logs:\n  indexers:\n    min: 2\n    max: 6\ntraces:\n  indexers:\n    max: auto\n",
-        )
-        .unwrap();
-        assert_eq!(config.logs.indexers.min, 2);
-        assert_eq!(config.logs.indexers.max, Some(6));
-        assert_eq!(config.traces.indexers.min, 1);
-        assert_eq!(config.traces.indexers.max, None);
-    }
-
-    #[test]
-    fn indexers_from_env_override_user_yaml() {
-        let config = resolve_layers(
-            Some("logs:\n  indexers:\n    max: 6\n"),
-            &[
-                ("NETDATA_OTEL_CFG_LOGS_INDEXERS_MIN", "3"),
-                ("NETDATA_OTEL_CFG_LOGS_INDEXERS_MAX", "auto"),
-                ("NETDATA_OTEL_CFG_TRACES_INDEXERS_MAX", "4"),
-            ],
-        )
-        .unwrap();
-        assert_eq!(config.logs.indexers.min, 3);
-        assert_eq!(config.logs.indexers.max, None, "env auto wins over user 6");
-        assert_eq!(config.traces.indexers.max, Some(4));
-    }
-
-    #[test]
-    fn indexers_invalid_bounds_are_rejected() {
-        for (yaml, needle) in [
-            ("logs:\n  indexers:\n    min: 0\n", "logs.indexers.min"),
-            (
-                "traces:\n  indexers:\n    min: 4\n    max: 2\n",
-                "traces.indexers.max",
-            ),
-            ("logs:\n  indexers:\n    max: lots\n", "auto"),
-            ("logs:\n  indexers:\n    max: -1\n", "\"auto\", got -1"),
-            ("logs:\n  indexers:\n    max: 2.5\n", "\"auto\", got 2.5"),
-            ("logs:\n  indexers:\n    workers: 2\n", "workers"),
-        ] {
-            let err = resolve_with_user(yaml).unwrap_err();
-            assert!(format!("{err:#}").contains(needle), "{yaml}: {err:#}");
-        }
-        let err =
-            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_LOGS_INDEXERS_MAX", "many")]))
-                .unwrap_err();
-        assert!(format!("{err:#}").contains("INDEXERS_MAX"), "{err:#}");
-    }
-
-    #[test]
     fn env_override_logs_bool() {
         let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_LOGS_CRC_ENABLED", "yes")]))
             .unwrap();
@@ -2475,16 +2357,6 @@ logs:
         assert_eq!(config.metrics.max_new_charts_per_request, 100);
 
         assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v2"));
-
-        // The stock file spells out the indexer defaults (`max: auto`), which
-        // metadata.yaml documents as mirroring it.
-        let defaults = otel_bridge::config::IndexersTuning::default();
-        for t in [&config.logs.indexers, &config.traces.indexers] {
-            assert_eq!((t.min, t.max), (defaults.min, defaults.max));
-        }
-        assert_eq!(substituted.matches("\n  indexers:\n").count(), 2);
-        assert_eq!(config.malloc_arena_max, None, "stock ships `auto`");
-        assert!(substituted.contains("\nmalloc_arena_max: auto\n"));
 
         assert!(!config.remote_storage.enabled);
         assert_eq!(

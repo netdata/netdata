@@ -23,10 +23,10 @@
 //! Recovery limits shape both: the WAL format carries no footer, so
 //! [`Registry::recover`] restores identity and header facts but not the
 //! log-data range or the durable prefix — those exist only as in-process
-//! event state. At startup the ledger (otel-ledger's `build_pipeline`)
-//! queues recovered files to be re-indexed whole; the resulting SFST's
-//! summary carries the authoritative range, and an SFST always wins over its
-//! WAL in the query path.
+//! event state. Startup recovery (file-lifecycle's `recover_unindexed`)
+//! re-indexes recovered files whole; the resulting SFST's summary carries
+//! the authoritative range, and an SFST always wins over its WAL in the
+//! query path.
 //!
 //! Consumers (grep-verified): `file-lifecycle` composes one registry per
 //! tenant (its `Registry::wal` field), forwards events via `apply_wal_event`,
