@@ -9,7 +9,8 @@
 use crate::service::{service_labels, service_settings};
 use crate::shared_aggregator::SharedAggregator;
 use netdata_plugin_metrics::{
-    Batch, ChartDescriptor, ChartType, Counter, Histogram, MetricSet, MetricSetBuilder, columns,
+    Batch, ChartDescriptor, ChartType, Counter, Histogram, MetricSet, MetricSetBuilder, Stats,
+    columns,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::trace::v1::Span;
@@ -32,7 +33,7 @@ columns! {
 
 pub(crate) struct ServiceRequests {
     metric_set: MetricSet,
-    pub(crate) aggregator: SharedAggregator,
+    aggregator: SharedAggregator,
     requests: Counter<Outcome>,
     duration: Histogram,
 }
@@ -78,14 +79,14 @@ impl ServiceRequests {
         Batch::new(&self.metric_set)
     }
 
-    /// Record the requests among the spans of `request` into `batch`.
+    /// Record the requests among the spans of `export` into `batch`.
     pub(crate) fn record(
         &self,
         batch: &mut Batch,
         tenant: &str,
-        request: &ExportTraceServiceRequest,
+        export: &ExportTraceServiceRequest,
     ) {
-        for resource_spans in &request.resource_spans {
+        for resource_spans in &export.resource_spans {
             // A service without a request here gets no event, and an entity
             // without events never reaches the aggregator.
             let labels = service_labels(tenant, resource_spans.resource.as_ref());
@@ -107,6 +108,18 @@ impl ServiceRequests {
                 }
             }
         }
+    }
+
+    /// Merge `batch` at `now` (Unix seconds): its spans are durable.
+    pub(crate) fn commit(&self, batch: Batch, now: u64) {
+        self.aggregator.merge(batch, now);
+    }
+
+    /// Add to `chunks` every window whose allowed lateness has passed by `now`
+    /// (Unix seconds). Returns the aggregator's statistics as this emit
+    /// leaves them.
+    pub(crate) fn emit(&self, now: u64, chunks: &mut Vec<Vec<u8>>) -> Stats {
+        self.aggregator.emit(now, chunks)
     }
 }
 
@@ -212,7 +225,8 @@ mod tests {
         span
     }
 
-    fn request(attributes: Vec<KeyValue>, spans: Vec<Span>) -> ExportTraceServiceRequest {
+    /// An export of one resource with `attributes` and `spans`.
+    fn export(attributes: Vec<KeyValue>, spans: Vec<Span>) -> ExportTraceServiceRequest {
         ExportTraceServiceRequest {
             resource_spans: vec![ResourceSpans {
                 resource: Some(Resource {
@@ -228,14 +242,15 @@ mod tests {
         }
     }
 
-    /// What a new set emits at second 110 for `request`, merged at second 100.
-    fn render(request: &ExportTraceServiceRequest) -> String {
+    /// What a new set emits at second 110 for `export`, committed at second
+    /// 100.
+    fn render(export: &ExportTraceServiceRequest) -> String {
         let requests = ServiceRequests::new(10).unwrap();
         let mut batch = requests.batch();
-        requests.record(&mut batch, "default", request);
-        requests.aggregator.merge(batch, 100);
+        requests.record(&mut batch, "default", export);
+        requests.commit(batch, 100);
         let mut chunks = Vec::new();
-        requests.aggregator.emit(110, &mut chunks);
+        requests.emit(110, &mut chunks);
         let out = netdata_plugin_protocol::readable_chart_stream(&chunks.concat());
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         out
@@ -251,7 +266,7 @@ mod tests {
 
     #[test]
     fn counts_roots_servers_and_consumers_only() {
-        let out = render(&request(
+        let out = render(&export(
             vec![attr("service.name", "checkout")],
             vec![
                 root(span(SpanKind::Internal, 250)),
@@ -280,23 +295,25 @@ mod tests {
 
     #[test]
     fn a_service_without_requests_gets_no_charts() {
-        let mut export = request(
+        let caller = export(
             vec![attr("service.name", "caller")],
             vec![span(SpanKind::Client, 10)],
         );
-        let callee = request(
+        let callee = export(
             vec![attr("service.name", "callee")],
             vec![span(SpanKind::Server, 10)],
         );
-        export.resource_spans.extend(callee.resource_spans);
-        let out = render(&export);
+        let both = ExportTraceServiceRequest {
+            resource_spans: [caller.resource_spans, callee.resource_spans].concat(),
+        };
+        let out = render(&both);
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'callee' 1\n"));
         assert!(!out.contains("'caller'"));
     }
 
     #[test]
     fn service_identity_labels() {
-        let out = render(&request(
+        let out = render(&export(
             vec![
                 attr("service.name", "checkout"),
                 attr("service.namespace", "shop"),
@@ -312,7 +329,7 @@ mod tests {
         assert!(out.contains("CLABEL 'tenant' 'default' 1\n"));
         assert!(out.contains("CHART otel_service.requests_"));
 
-        let unnamed = render(&request(vec![], vec![root(span(SpanKind::Server, 10))]));
+        let unnamed = render(&export(vec![], vec![root(span(SpanKind::Server, 10))]));
         assert!(
             unnamed.contains("CLABEL 'resource.attributes.service.name' 'unknown_service' 1\n")
         );
@@ -324,13 +341,13 @@ mod tests {
     fn an_all_zero_parent_id_marks_a_root() {
         let mut zero_parent = span(SpanKind::Internal, 10);
         zero_parent.parent_span_id = vec![0; 8];
-        let out = render(&request(vec![attr("service.name", "a")], vec![zero_parent]));
+        let out = render(&export(vec![attr("service.name", "a")], vec![zero_parent]));
         assert_eq!(values(&out, "success")[0], "1");
     }
 
     #[test]
     fn blank_identity_values_fall_back() {
-        let out = render(&request(
+        let out = render(&export(
             vec![
                 attr("service.name", "  "),
                 attr("deployment.environment.name", ""),
@@ -356,7 +373,7 @@ mod tests {
         assert_eq!(adjusted_count("ot=th:ffffffffffffff"), (1u64 << 56) as f64);
         assert_eq!(adjusted_count("ot=th:fffffffffffffc"), (1u64 << 54) as f64);
 
-        let out = render(&request(
+        let out = render(&export(
             vec![attr("service.name", "a")],
             vec![Span {
                 trace_state: "ot=th:8".to_string(),

@@ -11,7 +11,7 @@
 use crate::service::{service_labels, service_settings};
 use crate::shared_aggregator::SharedAggregator;
 use netdata_plugin_metrics::{
-    Batch, ChartDescriptor, ChartType, Counter, MetricSet, MetricSetBuilder, columns,
+    Batch, ChartDescriptor, ChartType, Counter, MetricSet, MetricSetBuilder, Stats, columns,
 };
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 
@@ -44,7 +44,7 @@ impl Severity {
 
 pub(crate) struct ServiceLogRecords {
     metric_set: MetricSet,
-    pub(crate) aggregator: SharedAggregator,
+    aggregator: SharedAggregator,
     records: Counter<Severity>,
 }
 
@@ -73,14 +73,14 @@ impl ServiceLogRecords {
         Batch::new(&self.metric_set)
     }
 
-    /// Record the log records of `request` into `batch`.
+    /// Record the log records of `export` into `batch`.
     pub(crate) fn record(
         &self,
         batch: &mut Batch,
         tenant: &str,
-        request: &ExportLogsServiceRequest,
+        export: &ExportLogsServiceRequest,
     ) {
-        for resource_logs in &request.resource_logs {
+        for resource_logs in &export.resource_logs {
             let labels = service_labels(tenant, resource_logs.resource.as_ref());
             let mut service = batch.entity(labels);
             for scope_logs in &resource_logs.scope_logs {
@@ -92,6 +92,18 @@ impl ServiceLogRecords {
                 }
             }
         }
+    }
+
+    /// Merge `batch` at `now` (Unix seconds): its log records are durable.
+    pub(crate) fn commit(&self, batch: Batch, now: u64) {
+        self.aggregator.merge(batch, now);
+    }
+
+    /// Add to `chunks` every window whose allowed lateness has passed by `now`
+    /// (Unix seconds). Returns the aggregator's statistics as this emit
+    /// leaves them.
+    pub(crate) fn emit(&self, now: u64, chunks: &mut Vec<Vec<u8>>) -> Stats {
+        self.aggregator.emit(now, chunks)
     }
 }
 
@@ -135,7 +147,7 @@ mod tests {
             severity_text: "ignored".to_string(),
             ..Default::default()
         };
-        let request = ExportLogsServiceRequest {
+        let export = ExportLogsServiceRequest {
             resource_logs: vec![ResourceLogs {
                 resource: Some(Resource {
                     attributes: vec![KeyValue {
@@ -155,10 +167,10 @@ mod tests {
             }],
         };
         let mut batch = log_records.batch();
-        log_records.record(&mut batch, "default", &request);
-        log_records.aggregator.merge(batch, 100);
+        log_records.record(&mut batch, "default", &export);
+        log_records.commit(batch, 100);
         let mut chunks = Vec::new();
-        log_records.aggregator.emit(106, &mut chunks);
+        log_records.emit(106, &mut chunks);
         let out = netdata_plugin_protocol::readable_chart_stream(&chunks.concat());
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'checkout' 1\n"));

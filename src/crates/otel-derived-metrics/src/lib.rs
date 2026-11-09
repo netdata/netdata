@@ -35,20 +35,21 @@ pub const MAX_CHUNK_BYTES: usize = 1 << 20;
 /// The spans of one export request, recorded but not yet counted. Commit the
 /// batch once the spans are durable; a dropped batch counts nothing.
 pub struct SpansBatch<'a> {
-    requests: &'a ServiceRequests,
+    service_requests: &'a ServiceRequests,
     batch: Batch,
 }
 
 impl SpansBatch<'_> {
-    /// Record the requests among the spans of `request`, a normalized group
-    /// of an export request of `tenant`.
-    pub fn record(&mut self, tenant: &str, request: &ExportTraceServiceRequest) {
-        self.requests.record(&mut self.batch, tenant, request);
+    /// Record the requests among the spans of `export`, a normalized group of
+    /// an export request of `tenant`.
+    pub fn record(&mut self, tenant: &str, export: &ExportTraceServiceRequest) {
+        self.service_requests
+            .record(&mut self.batch, tenant, export);
     }
 
     /// Count the batch: its spans are durable.
     pub fn commit(self) {
-        self.requests.aggregator.merge(self.batch, unix_now());
+        self.service_requests.commit(self.batch, unix_now());
     }
 }
 
@@ -56,20 +57,21 @@ impl SpansBatch<'_> {
 /// Commit the batch once the log records are durable; a dropped batch counts
 /// nothing.
 pub struct LogsBatch<'a> {
-    log_records: &'a ServiceLogRecords,
+    service_log_records: &'a ServiceLogRecords,
     batch: Batch,
 }
 
 impl LogsBatch<'_> {
-    /// Record the log records of `request`, a normalized group of an export
+    /// Record the log records of `export`, a normalized group of an export
     /// request of `tenant`.
-    pub fn record(&mut self, tenant: &str, request: &ExportLogsServiceRequest) {
-        self.log_records.record(&mut self.batch, tenant, request);
+    pub fn record(&mut self, tenant: &str, export: &ExportLogsServiceRequest) {
+        self.service_log_records
+            .record(&mut self.batch, tenant, export);
     }
 
     /// Count the batch: its log records are durable.
     pub fn commit(self) {
-        self.log_records.aggregator.merge(self.batch, unix_now());
+        self.service_log_records.commit(self.batch, unix_now());
     }
 }
 
@@ -109,20 +111,20 @@ impl DerivedMetrics {
     /// A batch for the spans of one export request; `None` when derived
     /// metrics are disabled.
     pub fn spans_batch(&self) -> Option<SpansBatch<'_>> {
-        let requests = &self.per_service.as_ref()?.requests;
+        let service_requests = &self.per_service.as_ref()?.requests;
         Some(SpansBatch {
-            requests,
-            batch: requests.batch(),
+            service_requests,
+            batch: service_requests.batch(),
         })
     }
 
     /// A batch for the log records of one export request; `None` when
     /// derived metrics are disabled.
     pub fn logs_batch(&self) -> Option<LogsBatch<'_>> {
-        let log_records = &self.per_service.as_ref()?.log_records;
+        let service_log_records = &self.per_service.as_ref()?.log_records;
         Some(LogsBatch {
-            log_records,
-            batch: log_records.batch(),
+            service_log_records,
+            batch: service_log_records.batch(),
         })
     }
 
@@ -138,8 +140,8 @@ impl DerivedMetrics {
     pub fn emit(&self, now: u64) -> Vec<Vec<u8>> {
         let mut chunks = Vec::new();
         if let Some(per_service) = &self.per_service {
-            let requests_stats = per_service.requests.aggregator.emit(now, &mut chunks);
-            let log_records_stats = per_service.log_records.aggregator.emit(now, &mut chunks);
+            let requests_stats = per_service.requests.emit(now, &mut chunks);
+            let log_records_stats = per_service.log_records.emit(now, &mut chunks);
             let signal_stats = [
                 (Signal::Traces, requests_stats),
                 (Signal::Logs, log_records_stats),
