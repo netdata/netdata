@@ -425,6 +425,14 @@
 - Chore(go.d/x509check): migrate to framework v2 ([#24634](https://github.com/netdata/netdata/issues/24634))
 - Feat(go.d/x509check): add tls_server_name option ([#24636](https://github.com/netdata/netdata/issues/24636))
 - Regenerate integrations docs ([#24635](https://github.com/netdata/netdata/issues/24635))
+- Query: clamp resampling time and cap initial time-group buffers ([#24630](https://github.com/netdata/netdata/issues/24630))
+- Refactor(go.d/x509check): replace cfssl with a context-aware revocation check ([#24637](https://github.com/netdata/netdata/issues/24637))
+- Regenerate integrations docs ([#24640](https://github.com/netdata/netdata/issues/24640))
+- Libnetdata, local-listeners: fix unchecked test wait and zero-total report division ([#24639](https://github.com/netdata/netdata/issues/24639))
+- Netdatacli: add dyncfg-tree; support bundle reads the tree through it ([#24586](https://github.com/netdata/netdata/issues/24586))
+- Contexts: merge collected instance metadata under the context lock ([#24645](https://github.com/netdata/netdata/issues/24645))
+- Sqlite: report why the metadata database failed to initialize ([#24642](https://github.com/netdata/netdata/issues/24642))
+- Missing BSD metrics ([#24617](https://github.com/netdata/netdata/issues/24617))
 
 ## [2.12.0] - 2026-09-30
 
