@@ -20,41 +20,43 @@ whole seconds, when enabled.
 
 ## The charts
 
-| Chart | Type | What it shows |
-|---|---|---|
-| `netdata.netflow.input_packets` | line, packets/s | UDP datagrams received, empty datagrams, and Linux socket-buffer drops |
-| `netdata.netflow.input_bytes` | line, bytes/s | UDP byte rate |
-| `netdata.netflow.protocol_packets` | stacked, packets/s | Successfully identified v5, v7, v9, IPFIX, and sFlow packets |
-| `netdata.netflow.flow_sets` | stacked, sets/s | NetFlow v9 and IPFIX Data, Options Data, Template, missing-template, and ignored Sets |
-| `netdata.netflow.templates` | stacked, templates/s | Data and Options Template definitions received over v9 and IPFIX |
-| `netdata.netflow.flow_records` | stacked, records/s | v5, v7, v9, and IPFIX Data Records decoded |
-| `netdata.netflow.options_records` | stacked, records/s | v9/IPFIX Options Records and sampling configuration sent in Data Records |
-| `netdata.netflow.sflow_samples` | stacked, samples/s | sFlow flow, counter, discarded-packet, real-time, and unknown samples |
-| `netdata.netflow.decoder_exceptions` | line, events/s | Receive, parse, template, disabled-protocol, eviction, counter, decapsulation, and unsupported-data exceptions |
-| `netdata.netflow.flow_rows` | line, rows/s | Decoded rows and their final filtered, journaled, or write-failed outcomes |
-| `netdata.netflow.nsel_events` | stacked, records/s | Cisco NSEL update, create, teardown, deny, unsupported, and malformed records |
-| `netdata.netflow.nsel_rows` | stacked, rows/s | Forward and reverse rows emitted from NSEL updates |
-| `netdata.netflow.nsel_exceptions` | line, events/s | Counterless updates, partial counter directions, and suppressed zero responders |
-| `netdata.netflow.raw_journal_ops` | line, ops/s | Raw journal: writes, sync calls, errors |
-| `netdata.netflow.raw_journal_bytes` | line, bytes/s | Raw journal logical bytes written |
-| `netdata.netflow.materialized_tier_ops` | line, ops/s | Rollup tiers: rows produced per tier, flushes, errors |
-| `netdata.netflow.materialized_tier_bytes` | stacked, bytes/s | Rollup tier byte rate, broken down by tier |
-| `netdata.netflow.tier_commit_age` | line, seconds | Time since each tier worker completed a commit |
-| `netdata.netflow.tier_commit_duration` | line, microseconds | Duration of each tier's most recent commit |
-| `netdata.netflow.tier_commit_batches` | line, batches/s | Completed commit batches per tier |
-| `netdata.netflow.tier_commit_stretched` | line, events/s | Tier commits that exceeded their planned window |
-| `netdata.netflow.open_tiers` | stacked, rows | Rows currently open per tier |
-| `netdata.netflow.journal_io_ops` | line, ops/s | Decoder-state persistence and facet-index operations/errors |
-| `netdata.netflow.journal_io_bytes` | line, bytes/s | Decoder-state persist byte rate |
-| `netdata.netflow.decoder_scopes` | line, scopes | Distinct (exporter, observation domain) scopes the decoder tracks |
-| `netdata.netflow.facet_values` | line, values | Published facet value cardinality |
-| `netdata.netflow.facet_fields` | line, fields | Populated and autocomplete-backed facet fields |
-| `netdata.netflow.tier_index_entries` | line, entries | Tier-index hours and rollup-flow entries |
-| `netdata.netflow.memory_resident_bytes` | line, bytes | Optional diagnostics: process RSS, peak RSS, breakdown |
-| `netdata.netflow.memory_resident_mapping_bytes` | stacked, bytes | Optional diagnostics: RSS broken down by mapping type |
-| `netdata.netflow.memory_allocator_bytes` | line, bytes | Optional diagnostics: allocator-internal stats |
-| `netdata.netflow.memory_accounted_bytes` | stacked, bytes | Optional diagnostics: RSS attributed to known components, plus `unaccounted` |
-| `netdata.netflow.memory_tier_index_bytes` | stacked, bytes | Optional diagnostics: tier-index memory drilldown |
+The dashboard shows the charts under **Netdata > Plugins > netflow**, in six groups that follow the data path: input, decoding, cisco nsel, storage, state, and memory. The table lists them in that order.
+
+| Group | Chart | Type | What it shows |
+|---|---|---|---|
+| input | `netdata.netflow.input_packets` | line, packets/s | UDP datagrams received, empty datagrams, and Linux socket-buffer drops |
+| input | `netdata.netflow.input_bytes` | line, bytes/s | UDP byte rate |
+| input | `netdata.netflow.protocol_packets` | stacked, packets/s | Successfully identified v5, v7, v9, IPFIX, and sFlow packets |
+| decoding | `netdata.netflow.flow_sets` | stacked, sets/s | NetFlow v9 and IPFIX Data, Options Data, Template, missing-template, and ignored Sets |
+| decoding | `netdata.netflow.templates` | stacked, templates/s | Data and Options Template definitions received over v9 and IPFIX |
+| decoding | `netdata.netflow.flow_records` | stacked, records/s | v5, v7, v9, and IPFIX Data Records decoded |
+| decoding | `netdata.netflow.options_records` | stacked, records/s | v9/IPFIX Options Records and sampling configuration sent in Data Records |
+| decoding | `netdata.netflow.sflow_samples` | stacked, samples/s | sFlow flow, counter, discarded-packet, real-time, and unknown samples |
+| decoding | `netdata.netflow.decoder_exceptions` | line, events/s | Receive, parse, template, disabled-protocol, eviction, counter, decapsulation, and unsupported-data exceptions |
+| decoding | `netdata.netflow.decoder_scopes` | line, scopes | Distinct (exporter, observation domain) scopes the decoder tracks |
+| decoding | `netdata.netflow.flow_rows` | line, rows/s | Decoded rows and their final filtered, journaled, or write-failed outcomes |
+| cisco nsel | `netdata.netflow.nsel_events` | stacked, records/s | Cisco NSEL update, create, teardown, deny, unsupported, and malformed records |
+| cisco nsel | `netdata.netflow.nsel_rows` | stacked, rows/s | Forward and reverse rows emitted from NSEL updates |
+| cisco nsel | `netdata.netflow.nsel_exceptions` | line, events/s | Counterless updates, partial counter directions, and suppressed zero responders |
+| storage | `netdata.netflow.raw_journal_ops` | line, ops/s | Raw journal: writes, sync calls, errors |
+| storage | `netdata.netflow.raw_journal_bytes` | line, bytes/s | Raw journal logical bytes written |
+| storage | `netdata.netflow.materialized_tier_ops` | line, ops/s | Rollup tiers: rows produced per tier, flushes, errors |
+| storage | `netdata.netflow.materialized_tier_bytes` | stacked, bytes/s | Rollup tier byte rate, broken down by tier |
+| storage | `netdata.netflow.tier_commit_age` | line, seconds | Time since each tier worker completed a commit |
+| storage | `netdata.netflow.tier_commit_duration` | line, microseconds | Duration of each tier's most recent commit |
+| storage | `netdata.netflow.tier_commit_batches` | line, batches/s | Completed commit batches per tier |
+| storage | `netdata.netflow.tier_commit_stretched` | line, events/s | Tier commits that exceeded their planned window |
+| storage | `netdata.netflow.journal_io_ops` | line, ops/s | Decoder-state persistence and facet-index operations/errors |
+| storage | `netdata.netflow.journal_io_bytes` | line, bytes/s | Decoder-state persist byte rate |
+| state | `netdata.netflow.open_tiers` | stacked, rows | Rows currently open per tier |
+| state | `netdata.netflow.tier_index_entries` | line, entries | Tier-index hours and rollup-flow entries |
+| state | `netdata.netflow.facet_values` | line, values | Published facet value cardinality |
+| state | `netdata.netflow.facet_fields` | line, fields | Populated and autocomplete-backed facet fields |
+| memory | `netdata.netflow.memory_resident_bytes` | line, bytes | Optional diagnostics: process RSS, peak RSS, breakdown |
+| memory | `netdata.netflow.memory_resident_mapping_bytes` | stacked, bytes | Optional diagnostics: RSS broken down by mapping type |
+| memory | `netdata.netflow.memory_allocator_bytes` | line, bytes | Optional diagnostics: allocator-internal stats |
+| memory | `netdata.netflow.memory_accounted_bytes` | stacked, bytes | Optional diagnostics: RSS attributed to known components, plus `unaccounted` |
+| memory | `netdata.netflow.memory_tier_index_bytes` | stacked, bytes | Optional diagnostics: tier-index memory drilldown |
 
 ## Reading the most useful charts
 
@@ -170,7 +172,7 @@ These charts do not include:
 
 ## Where these are NOT shown
 
-These charts are **not** in the Network Flows view. Look for them on the standard Netdata charts page, in the family `netflow`. The Network Flows view itself shows traffic data, not plugin health.
+These charts are **not** in the Network Flows view. Look for them on the standard Netdata charts page, under **Netdata > Plugins > netflow**. The Network Flows view itself shows traffic data, not plugin health.
 
 ## What's next
 

@@ -12,6 +12,7 @@ placements:
         title: Input
         items:
           - netdata.netflow.input_packets
+          - netdata.netflow.input_bytes
           - netdata.netflow.protocol_packets
       - type: group
         id: decoding
@@ -23,6 +24,7 @@ placements:
           - netdata.netflow.options_records
           - netdata.netflow.sflow_samples
           - netdata.netflow.decoder_exceptions
+          - netdata.netflow.decoder_scopes
           - netdata.netflow.flow_rows
       - type: group
         id: cisco-nsel
@@ -32,7 +34,33 @@ placements:
           - netdata.netflow.nsel_rows
           - netdata.netflow.nsel_exceptions
       - type: group
+        id: storage
+        title: Storage
+        items:
+          - netdata.netflow.raw_journal_ops
+          - netdata.netflow.raw_journal_bytes
+          - netdata.netflow.materialized_tier_ops
+          - netdata.netflow.materialized_tier_bytes
+          - netdata.netflow.tier_commit_age
+          - netdata.netflow.tier_commit_duration
+          - netdata.netflow.tier_commit_batches
+          - netdata.netflow.tier_commit_stretched
+          - netdata.netflow.journal_io_ops
+          - netdata.netflow.journal_io_bytes
+      - type: group
         id: state
         title: Collector State
         items:
-          - netdata.netflow.journal_io_ops
+          - netdata.netflow.open_tiers
+          - netdata.netflow.tier_index_entries
+          - netdata.netflow.facet_values
+          - netdata.netflow.facet_fields
+      - type: group
+        id: memory
+        title: Memory Diagnostics
+        items:
+          - netdata.netflow.memory_resident_bytes
+          - netdata.netflow.memory_resident_mapping_bytes
+          - netdata.netflow.memory_allocator_bytes
+          - netdata.netflow.memory_accounted_bytes
+          - netdata.netflow.memory_tier_index_bytes
