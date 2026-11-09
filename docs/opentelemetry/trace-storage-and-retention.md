@@ -108,7 +108,8 @@ in the list too, until those files leave retention.
 ## Service map
 
 The Agent also builds a service map from the spans that it receives. Open it from the **Topology** section of the
-**Live** view (Function `topology:tracing`). The map shows:
+**Live** view (Function `topology:tracing`). Viewing the map has the same requirements as viewing traces: a signed-in
+Netdata Cloud user of the Agent's Space and a paid plan. The Agent builds the map on all plans. The map shows:
 
 - each instrumented service (one per `service.name`, and per `service.namespace` when it is set);
 - the calls between these services;

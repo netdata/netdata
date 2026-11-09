@@ -213,8 +213,13 @@ impl RawFunctionHandler for TopologyFunction {
         let mut d = FunctionDeclaration::new(FUNCTION_NAME, HELP);
         d.global = true;
         d.tags = Some("top".to_string());
-        d.access =
-            Some(HttpAccess::SIGNED_ID | HttpAccess::SAME_SPACE | HttpAccess::SENSITIVE_DATA);
+        // Like `otel-traces`, whose data the map is built from: a paid plan.
+        d.access = Some(
+            HttpAccess::SIGNED_ID
+                | HttpAccess::SAME_SPACE
+                | HttpAccess::COMMERCIAL_SPACE
+                | HttpAccess::SENSITIVE_DATA,
+        );
         d
     }
 }
