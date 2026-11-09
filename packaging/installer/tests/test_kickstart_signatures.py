@@ -95,6 +95,28 @@ download() {
             self.assertIn(message, result.stdout + result.stderr)
             self.assertFalse((self.root / 'fetches').exists())
 
+    def test_offline_opt_out_is_silent(self):
+        result = self.run_shell('verify_release_signature', './',
+                                NETDATA_VERIFY_RELEASE_SIGNATURES='0',
+                                NETDATA_OFFLINE_INSTALL_SOURCE=str(self.root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout + result.stderr, '')
+        self.assertFalse((self.root / 'fetches').exists())
+
+    def test_generated_offline_wrapper_disables_verification(self):
+        start = SOURCE.index('    cat > "install.sh" <<-EOF')
+        end = SOURCE.index('    chmod +x "install.sh"', start)
+        subprocess.run(['/bin/sh', '-c', SOURCE[start:end]], cwd=self.root, check=True)
+        kickstart = self.root / 'kickstart.sh'
+        kickstart.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        kickstart.chmod(0o755)
+        result = subprocess.run(['/bin/sh', str(self.root / 'install.sh'), '--non-interactive'],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [
+            '--offline-install-source', str(self.root),
+            '--no-release-signature-verification', '--non-interactive'])
+
     def test_unsigned_release_rejected(self):
         result = self.run_shell('verify_release_signature', 'https://example.invalid',
                                 NETDATA_VERIFY_RELEASE_SIGNATURES='1', DRY_RUN='0',

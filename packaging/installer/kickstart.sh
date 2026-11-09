@@ -990,7 +990,9 @@ get_redirect() {
 # here, and OpenPGP command adapters in verify_openpgp_signature below.
 verify_release_signature() (
   if [ "${NETDATA_VERIFY_RELEASE_SIGNATURES}" -eq 0 ]; then
-    warning "Release signature verification is disabled. Tampered releases may execute malicious code on this system."
+    if [ -z "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      warning "Release signature verification is disabled. Tampered releases may execute malicious code on this system."
+    fi
     return 0
   fi
 
@@ -3266,7 +3268,7 @@ prepare_offline_install_source() {
     cat > "install.sh" <<-EOF
 	#!/bin/sh
 	dir=\$(CDPATH= cd -- "\$(dirname -- "\$0")" && pwd)
-	"\${dir}/kickstart.sh" --offline-install-source "\${dir}" \${@}
+	"\${dir}/kickstart.sh" --offline-install-source "\${dir}" --no-release-signature-verification \${@}
 	EOF
     chmod +x "install.sh"
   else
