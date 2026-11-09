@@ -179,3 +179,104 @@ fn unix_now() -> u64 {
         .expect("system clock before UNIX epoch")
         .as_secs()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
+    use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+
+    /// An export request with one root span that ended at `seconds`.
+    fn one_span(seconds: u64) -> ExportTraceServiceRequest {
+        ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    spans: vec![Span {
+                        start_time_unix_nano: seconds * 1_000_000_000,
+                        end_time_unix_nano: seconds * 1_000_000_000,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        }
+    }
+
+    /// An export request with one log record of `seconds`.
+    fn one_log_record(seconds: u64) -> ExportLogsServiceRequest {
+        ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                scope_logs: vec![ScopeLogs {
+                    log_records: vec![LogRecord {
+                        time_unix_nano: seconds * 1_000_000_000,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        }
+    }
+
+    fn readable(chunks: Vec<Vec<u8>>) -> String {
+        netdata_plugin_protocol::readable_chart_stream(&chunks.concat())
+    }
+
+    #[test]
+    fn counts_committed_batches_and_charts_the_derivation() {
+        let derived = DerivedMetrics::new(&DerivedMetricsConfig::default()).unwrap();
+        let now = unix_now();
+
+        let mut spans = derived.spans_batch().unwrap();
+        derived.record_spans(&mut spans, "default", &one_span(now));
+        derived.commit_spans(spans);
+
+        let mut logs = derived.logs_batch().unwrap();
+        derived.record_logs(&mut logs, "default", &one_log_record(now));
+        derived.commit_logs(logs);
+
+        // A request that failed drops its batch: never counted.
+        let mut dropped = derived.spans_batch().unwrap();
+        derived.record_spans(&mut dropped, "default", &one_span(now));
+        drop(dropped);
+
+        // Past the services' 10 s lateness.
+        let first = readable(derived.emit(now + 13));
+        assert!(first.contains("CHART otel_service.requests_"));
+        assert_eq!(first.matches("SET success = 1\n").count(), 1);
+        assert!(!first.contains("SET success = 2\n"));
+        assert!(first.contains("CHART otel_service.log_records_"));
+        assert_eq!(first.matches("SET unspecified = 1\n").count(), 1);
+
+        // Each tick charts the statistics the tick before it read: one
+        // service per signal.
+        let second = readable(derived.emit(now + 14));
+        assert!(second.contains("CHART netdata.otel.derived_services_"));
+        assert_eq!(second.matches("SET services = 1\n").count(), 2);
+        netdata_plugin_protocol::validate_chart_stream(format!("{first}{second}").as_bytes())
+            .unwrap();
+    }
+
+    #[test]
+    fn disabled_keeps_only_the_ingest_outcomes() {
+        let config = DerivedMetricsConfig {
+            enabled: false,
+            ..DerivedMetricsConfig::default()
+        };
+        let derived = DerivedMetrics::new(&config).unwrap();
+        assert!(derived.spans_batch().is_none());
+        assert!(derived.logs_batch().is_none());
+
+        let now = unix_now();
+        derived.record_ingest(Signal::Logs, 3, 1);
+
+        let out = readable(derived.emit(now + 2));
+        netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
+        assert!(out.contains("CHART netdata.otel.log_records "));
+        assert!(out.contains("SET accepted = 3\nSET rejected = 1\n"));
+        assert!(out.contains("CHART netdata.otel.spans "));
+        assert!(!out.contains("otel_service."));
+        assert!(!out.contains("netdata.otel.derived_"));
+    }
+}
