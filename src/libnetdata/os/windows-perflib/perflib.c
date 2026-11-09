@@ -782,6 +782,10 @@ PERF_OBJECT_TYPE *perflibFindObjectTypeByName(PERF_DATA_BLOCK *pDataBlock, const
     return NULL;
 }
 
+PERF_COUNTER_DEFINITION *perflibForEachCounterDefinition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_COUNTER_DEFINITION *lastCounterDefinition) {
+    return getCounterDefinition(pDataBlock, pObjectType, lastCounterDefinition);
+}
+
 PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *lastInstance) {
     if(!ObjectTypeHasInstances(pDataBlock, pObjectType))
         return NULL;
