@@ -505,6 +505,26 @@ fn a_client_nested_through_an_internal_span_is_one_call() {
     }
 }
 
+#[test]
+fn a_client_nested_under_many_internal_spans_is_one_call() {
+    // Frameworks can wrap one client call in many INTERNAL spans.
+    let mut spans = vec![span(Kind::Client, "cart", 1, None)];
+    for id in 2..=21 {
+        spans.push(span(Kind::Internal, "cart", id, Some(id - 1)));
+    }
+    spans.push(span(Kind::Client, "cart", 22, Some(21)));
+    let (edges, _, engine) = run(spans);
+    let expected = HashMap::from([(
+        Edge {
+            caller: Node::Service(service("cart")),
+            callee: Node::Peer(peer("redis")),
+        },
+        (1, 0),
+    )]);
+    assert_eq!(calls(&edges), expected);
+    assert_eq!(engine.in_flight(), 0);
+}
+
 /// Random arrival orders, duplicates, self-calls, resends after expiry,
 /// capacity limits and backward clock steps: the pairing store's size never
 /// drifts, stays near its cap, and drains to zero.

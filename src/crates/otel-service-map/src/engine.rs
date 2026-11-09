@@ -308,6 +308,9 @@ fn ingest_span(
     }
 
     // A root callee needs no pairing; count it before the capacity check.
+    // Its id is then not kept while the store is full, so a resend in that
+    // state counts again: a rare double count, worth keeping root calls
+    // under load.
     if facts.kind.is_callee() && facts.parent_span_id.is_none() {
         let edge = Edge {
             caller: Node::UnknownCaller,
@@ -375,8 +378,10 @@ fn ingest_span(
     *in_flight += 1;
 }
 
-/// How many INTERNAL spans a nested client call may sit under.
-const MAX_INTERNAL_DEPTH: usize = 16;
+/// How many INTERNAL spans a nested client call may sit under. The bound
+/// only stops a walk around a parent-id cycle; frameworks can wrap one call
+/// in a deep chain of INTERNAL spans, so keep it well above that.
+const MAX_INTERNAL_DEPTH: usize = 64;
 
 /// Marks the nearest CLIENT/PRODUCER ancestor of a caller span, reached
 /// through INTERNAL spans from `parent`, as an outer caller span: a nested
