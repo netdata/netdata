@@ -185,27 +185,31 @@ mod tests {
         }
     }
 
-    fn span(
-        parent: bool,
-        kind: SpanKind,
-        error: bool,
-        end_s: u64,
-        millis: u64,
-        trace_state: &str,
-    ) -> Span {
-        let end = end_s * 1_000_000_000;
+    /// A child span of `kind` that took `millis` and ended at second 95.
+    fn span(kind: SpanKind, millis: u64) -> Span {
+        let end = 95 * 1_000_000_000;
         Span {
-            parent_span_id: if parent { vec![1; 8] } else { Vec::new() },
+            parent_span_id: vec![1; 8],
             kind: kind as i32,
             start_time_unix_nano: end - millis * 1_000_000,
             end_time_unix_nano: end,
-            trace_state: trace_state.to_string(),
-            status: error.then(|| Status {
-                code: StatusCode::Error as i32,
-                ..Default::default()
-            }),
             ..Default::default()
         }
+    }
+
+    /// `span` as a trace root.
+    fn root(mut span: Span) -> Span {
+        span.parent_span_id.clear();
+        span
+    }
+
+    /// `span` with status ERROR.
+    fn failed(mut span: Span) -> Span {
+        span.status = Some(Status {
+            code: StatusCode::Error as i32,
+            ..Default::default()
+        });
+        span
     }
 
     fn request(attributes: Vec<KeyValue>, spans: Vec<Span>) -> ExportTraceServiceRequest {
@@ -250,12 +254,12 @@ mod tests {
         let out = render(&request(
             vec![attr("service.name", "checkout")],
             vec![
-                span(false, SpanKind::Internal, false, 95, 250, ""),
-                span(true, SpanKind::Server, true, 95, 500, ""),
-                span(true, SpanKind::Consumer, false, 95, 750, ""),
-                span(true, SpanKind::Client, true, 95, 400, ""),
-                span(true, SpanKind::Internal, false, 95, 500, ""),
-                span(true, SpanKind::Producer, false, 95, 600, ""),
+                root(span(SpanKind::Internal, 250)),
+                failed(span(SpanKind::Server, 500)),
+                span(SpanKind::Consumer, 750),
+                failed(span(SpanKind::Client, 400)),
+                span(SpanKind::Internal, 500),
+                span(SpanKind::Producer, 600),
             ],
         ));
         let success = values(&out, "success");
@@ -278,7 +282,7 @@ mod tests {
     fn a_service_without_requests_gets_no_charts() {
         let out = render(&request(
             vec![attr("service.name", "caller")],
-            vec![span(true, SpanKind::Client, false, 95, 10, "")],
+            vec![span(SpanKind::Client, 10)],
         ));
         assert_eq!(out, "");
     }
@@ -291,7 +295,7 @@ mod tests {
                 attr("service.namespace", "shop"),
                 attr("deployment.environment", "staging"),
             ],
-            vec![span(false, SpanKind::Server, false, 95, 10, "")],
+            vec![root(span(SpanKind::Server, 10))],
         ));
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'checkout' 1\n"));
         assert!(out.contains("CLABEL 'resource.attributes.service.namespace' 'shop' 1\n"));
@@ -301,10 +305,7 @@ mod tests {
         assert!(out.contains("CLABEL 'tenant' 'default' 1\n"));
         assert!(out.contains("CHART otel_service.requests_"));
 
-        let unnamed = render(&request(
-            vec![],
-            vec![span(false, SpanKind::Server, false, 95, 10, "")],
-        ));
+        let unnamed = render(&request(vec![], vec![root(span(SpanKind::Server, 10))]));
         assert!(
             unnamed.contains("CLABEL 'resource.attributes.service.name' 'unknown_service' 1\n")
         );
@@ -314,9 +315,9 @@ mod tests {
 
     #[test]
     fn an_all_zero_parent_id_marks_a_root() {
-        let mut root = span(false, SpanKind::Internal, false, 95, 10, "");
-        root.parent_span_id = vec![0; 8];
-        let out = render(&request(vec![attr("service.name", "a")], vec![root]));
+        let mut span = span(SpanKind::Internal, 10);
+        span.parent_span_id = vec![0; 8];
+        let out = render(&request(vec![attr("service.name", "a")], vec![span]));
         assert_eq!(values(&out, "success")[0], "1");
     }
 
@@ -328,7 +329,7 @@ mod tests {
                 attr("deployment.environment.name", ""),
                 attr("deployment.environment", "prod"),
             ],
-            vec![span(false, SpanKind::Server, false, 95, 10, "")],
+            vec![root(span(SpanKind::Server, 10))],
         ));
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'unknown_service' 1\n"));
         assert!(
@@ -350,7 +351,10 @@ mod tests {
 
         let out = render(&request(
             vec![attr("service.name", "a")],
-            vec![span(false, SpanKind::Server, false, 95, 10, "ot=th:8")],
+            vec![Span {
+                trace_state: "ot=th:8".to_string(),
+                ..root(span(SpanKind::Server, 10))
+            }],
         ));
         assert_eq!(values(&out, "success")[0], "2");
     }
