@@ -6,7 +6,9 @@
 //! `remapped-name=original-name` pairs in journal entries tagged with
 //! [`REMAPPING_MARKER`]. `JournalReader::load_remappings` (in
 //! `src/crates/journal-core/src/file/reader.rs`) rebuilds a [`FieldMap`] from
-//! those entries so queries can use the original names again.
+//! those entries so queries can use the original names again. It keeps only
+//! remapped names in the former encoder's 35-byte `ND_` + 32-hex shape and
+//! drops the other encoded shapes (see its name-shape gate).
 use crate::collections::{HashMap, HashSet};
 
 /// The journal item that tags a remapping bookkeeping entry.

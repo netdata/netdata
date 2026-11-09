@@ -91,7 +91,8 @@ long before the 7-day `max_age`. For longer retention, keep `max_age` short, ena
 storage for one day's index size × the time you keep objects there; the Agent does not delete offloaded files, so
 expire them with the object storage's own lifecycle rules. Add headroom for the active write-ahead log
 (`max_file_size`) and, when offloading is enabled, for the download cache, which logs and traces share. The service
-map adds at most 256 MiB under `<base_dir>/service-map/`.
+map uses about 256 MiB under `<base_dir>/service-map/`. The Agent checks this size every 10 minutes, so the
+directory can be larger for a short time.
 
 ## Exploring traces
 

@@ -55,7 +55,7 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
     "skip_overview",
 ];
 
-/// The raw top-level shape: the three mode selectors and supported
+/// The raw top-level shape: the four mode selectors and supported
 /// Functions fields captured presence-preserving (see [`present`]),
 /// plus `tenant`. Private on purpose: deserialized only through
 /// [`OtelTracesRequest`]'s manual `Deserialize` (which enforces a

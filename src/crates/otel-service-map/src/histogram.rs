@@ -3,9 +3,10 @@
 //! Values below 128 are exact. Above that, each power of two is split into
 //! 64 equal buckets, so a bucket's width is at most 1/64 of its lower bound
 //! and its midpoint is within ~0.8% of any value it holds. Only non-empty
-//! buckets are stored: an edge's per-minute histogram stays a few dozen
-//! entries, and histograms merge by adding counts, so percentiles over any
-//! window are computed after merging minutes.
+//! buckets are stored, so an edge's per-minute histogram holds one entry per
+//! occupied bucket: a handful for steady latencies, up to 64 per power of
+//! two they span for spread ones. Histograms merge by adding counts, so
+//! percentiles over any window are computed after merging minutes.
 
 use std::collections::BTreeMap;
 

@@ -230,7 +230,7 @@ charts:
 | Key | CLI flag | Default | Notes |
 |---|---|---|---|
 | `memory_diagnostics.enabled` | — | `false` | Publishes the five `netdata.netflow.memory_*` charts. They read the process memory maps and estimate the size of in-memory structures, so they cost more than the default charts. Turn them on only when you need byte-level memory attribution. |
-| `memory_diagnostics.interval` | — | `10s` | How often the memory diagnostics charts update. Must be at least `1s`. A value that is not whole seconds is rounded up to whole seconds. |
+| `memory_diagnostics.interval` | — | `10s` | How often the memory diagnostics charts update. When `enabled` is `true`, it must be at least `1s`. A value that is not whole seconds is rounded up to whole seconds. |
 
 The charts section has no CLI flag — it is YAML-only.
 

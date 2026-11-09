@@ -27,9 +27,10 @@ module_name: otel
 # here. The plugin also has fixed contexts: the per-service charts derived from
 # traces and logs (`otel_service.*`) and its own operation charts
 # (`netdata.otel.*`), both listed in metadata.yaml. They are not placed here
-# because the taxonomy has no level for a plugin's own charts under the
-# `netdata` section; the dashboard places them by context. The reason below is
-# republished in integrations/taxonomy.json under `opted_out_collectors`.
+# because a file declares either `placements` or `taxonomy_optout`, and the
+# dynamic charts need the opt-out; the dashboard places them by context. The
+# reason below is republished in integrations/taxonomy.json under
+# `opted_out_collectors`.
 taxonomy_optout:
   reason: >-
     otel.plugin creates most metric charts dynamically from incoming OTLP

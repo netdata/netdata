@@ -4,8 +4,10 @@
 //! The ingestor hands every accepted OTLP traces export request to this crate
 //! and forgets about it; everything else (pairing CLIENT and SERVER spans,
 //! per-minute aggregates, their files, the `topology:tracing` Function) lives
-//! here. The crate reads no WAL or SFST data and the ingestion, indexing and
-//! query code knows nothing about it, so either side can change alone.
+//! here. The crate reads no WAL or SFST data. The ingestor starts it and
+//! registers its Function, but its export path only calls the
+//! `TraceObserver` trait, and the indexing and query code does not use it,
+//! so either side can change alone.
 
 pub mod engine;
 pub mod facts;

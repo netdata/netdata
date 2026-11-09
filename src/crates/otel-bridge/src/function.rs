@@ -240,8 +240,9 @@ pub trait FunctionHandler: Send + Sync + 'static {
     /// The future is selected against the cancellation token: once the driver
     /// cancels, the handler future is dropped where it is currently parked.
     /// Check `ctx.cancellation.is_cancelled()` in synchronous stretches that
-    /// never await. An `Err` is surfaced to the caller as a 500 result
-    /// (mapping on `HandlerAdapter::handle_raw`).
+    /// never await. An `Err` is surfaced to the caller as a 400 result for
+    /// `NetdataPluginError::BadRequest` and a 500 result otherwise (mapping
+    /// on `HandlerAdapter::handle_raw`).
     async fn on_call(
         &self,
         ctx: FunctionCallContext,

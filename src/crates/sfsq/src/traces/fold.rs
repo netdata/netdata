@@ -28,8 +28,9 @@
 //!   finished inside its source and handed to the caller's sink at
 //!   once; the rest fold in a remainder map capped at
 //!   [`SourceFoldSpec::remainder_cap`] traces and reach the sink at the
-//!   end. Memory: the filter, the capped map and one source, never a
-//!   map of every trace.
+//!   end. Memory: the filter, the capped map and one sealed source, plus
+//!   every prefix tail's decoded scan, kept from pass 1 for pass 2; never
+//!   a map of every trace.
 //! - Remainder overflow: a trace absent from a full remainder map is
 //!   handed over per source, as its own trace (a long trace stored in
 //!   several files then counts once per file, with its file-local

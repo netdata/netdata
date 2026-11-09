@@ -1,7 +1,7 @@
 //! Per-minute aggregates: one entry per (caller, callee) edge, with the
 //! caller's (client side) and the callee's (server side) view kept apart,
-//! plus the minute's loss counters. Everything here merges by addition, so a
-//! window's map is the merge of its minutes.
+//! plus the minute's loss counters. Counts and histograms merge by addition
+//! and `max_us` by maximum, so a window's map is the merge of its minutes.
 
 use std::collections::HashMap;
 

@@ -1,4 +1,4 @@
-//! `sfsq-cli trace` / `suggest` / `overview` / `search` — the
+//! `sfsq-cli trace` / `suggest` / `overview` / `search` / `explore` — the
 //! `sfsq::traces` engine from the terminal, without a running agent. Each
 //! subcommand takes an explicit file list (`--sfst` sealed files, `--wal`
 //! traces WALs) instead of the logs front door's directory discovery;
@@ -6,8 +6,9 @@
 //! lists keys, or one key's values, matching a term (and prints its time,
 //! for measurements), `overview`
 //! builds the list's heatmap grid (for measurements), `search` filters
-//! whole traces. `search`, `overview` and `trace` take the search bar's
-//! tokens ([`TokenArgs`]); `trace` marks the spans they match.
+//! whole traces, `explore` serves the span view (spans per bucket and a
+//! page of spans). `search`, `overview`, `explore` and `trace` take the
+//! search bar's tokens ([`TokenArgs`]); `trace` marks the spans they match.
 //!
 //! WAL inputs are served as tail scans over the file's full frame range —
 //! right for shut-down or recovered WALs (the dev case); an actively

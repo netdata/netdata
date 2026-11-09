@@ -9,7 +9,11 @@
 //! handler — lives in a [`Pipeline`] per signal (today logs + traces); the
 //! wire `pipeline_id` is decoded to a `Signal` at each boundary, after
 //! which routing is total. Adding a signal means adding a `Pipeline` (and
-//! widening `PerSignal`), not reworking the shell.
+//! widening `PerSignal`), not reworking the shell. One exception: the
+//! traces chunk prebuilder (`traces_prebuilder`) is traces-only state on
+//! the shell; it shares the traces WAL prefixes with the traces pipeline,
+//! and the ingestor and indexer handlers reach it by matching
+//! `Signal::Traces`.
 //!
 //! Routing:
 //! - writer events → `Signal::try_from(msg.event.pipeline_id())` →

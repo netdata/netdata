@@ -1,7 +1,7 @@
 //! Query-level result status — the no-silent-degrade contract.
 //!
-//! Every traces operation — trace-by-id, search, overview,
-//! attribute names/values, suggest — returns a [`QueryStatus`] beside
+//! Every traces operation — trace-by-id, search, overview, suggest,
+//! explore — returns a [`QueryStatus`] beside
 //! its data:
 //! [`Complete`](QueryStatus::Complete) means every relevant source was
 //! successfully and fully examined; [`Partial`](QueryStatus::Partial)
@@ -14,9 +14,12 @@
 //! Consumers render it, never reinterpret it: the CLI prints the set,
 //! and the ledger's `to_*_result` adapters map it 1:1 onto the wire
 //! `StatusWire` (search pagination additionally requires
-//! [`QueryStatus::is_complete`] before it emits a next cursor). The one
-//! reason a consumer adds is [`DroppedFields`](PartialReason::DroppedFields),
-//! for the names it leaves out of what it emits.
+//! [`QueryStatus::is_complete`] before it emits a next cursor). The
+//! reasons a consumer adds are [`DroppedFields`](PartialReason::DroppedFields),
+//! for the names it leaves out of what it emits, and the ledger's own
+//! [`SourceFailure`](PartialReason::SourceFailure) (a WAL its capture
+//! refused) and [`Busy`](PartialReason::Busy) (a request refused under
+//! load).
 
 use std::collections::BTreeSet;
 

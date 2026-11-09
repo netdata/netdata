@@ -208,7 +208,7 @@ pub enum SourceSetError {
 /// adjacent ranges are fine), and no in-memory chunk without its
 /// coverage. The one gate every operation runs before any I/O —
 /// `trace_by_id`, `search` (for both of its sets), `overview`,
-/// `suggest` — so a bad set is a
+/// `suggest`, `explore` — so a bad set is a
 /// request error, never a mid-query surprise.
 pub fn validate_sources(sources: &[TraceSource]) -> Result<(), SourceSetError> {
     let mut seen: HashSet<&SourceId> = HashSet::with_capacity(sources.len());

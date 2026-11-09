@@ -589,9 +589,9 @@ impl Flattener {
     /// - the clean name (`kind`, `status.code`) carries the user-facing **label**
     ///   (`SERVER`, `ERROR`, …) — what an operator queries; a variant unknown to
     ///   this build is labelled with its decimal number, so the label is total;
-    /// - the `_`-prefixed name (`_kind`, `_status_code`) carries the raw **int**,
-    ///   for the seal's rollup and other internal readers; it never surfaces as
-    ///   a key.
+    /// - the `_`-prefixed name (`_kind`, `_status_code`) carries the raw **int**
+    ///   for internal use (the seal's rollup reads `_kind`, and takes the status
+    ///   from the `status.code` label); it never surfaces as a key.
     ///
     /// Defaults are stored too (`UNSPECIFIED` kind; `UNSET` status — also what
     /// an absent status object means), so they stay filterable and enumerable.

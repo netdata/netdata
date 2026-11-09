@@ -110,9 +110,10 @@ where
 }
 
 /// Header configuration for a journal file, consumed only by `create`.
-/// Defaults: 64 KiB windows, 4096 data / 512 field hash-table buckets,
-/// keyed hash enabled. `file_id` is a fresh UUIDv4 per options value (not
-/// settable); `boot_id` is stored in the header's `tail_entry_boot_id`.
+/// Defaults: 64 KiB windows, 4096 data / 512 field hash-table buckets;
+/// `create` always enables the keyed hash. `file_id` is a fresh UUIDv4 per
+/// options value (not settable); `boot_id` is stored in the header's
+/// `tail_entry_boot_id`.
 #[derive(Debug, Clone)]
 pub struct JournalFileOptions {
     machine_id: uuid::Uuid,
@@ -122,7 +123,6 @@ pub struct JournalFileOptions {
     window_size: u64,
     data_hash_table_buckets: usize,
     field_hash_table_buckets: usize,
-    enable_keyed_hash: bool,
 }
 
 impl JournalFileOptions {
@@ -138,7 +138,6 @@ impl JournalFileOptions {
             window_size: 64 * 1024,
             data_hash_table_buckets: 4096,
             field_hash_table_buckets: 512,
-            enable_keyed_hash: true,
         }
     }
 
@@ -713,7 +712,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
     }
 
     /// Creates a journal file at `file`'s path, truncating anything already
-    /// there. Writes the header (`LPKSHHRH`, `KeyedHash` flag per options,
+    /// there. Writes the header (`LPKSHHRH`, `KeyedHash` flag,
     /// hash-table locations/sizes, IDs, state ONLINE), stamps both
     /// hash-table object headers, then syncs. The arena spans the header
     /// through the end of the field hash table; `n_objects` counts the two
@@ -740,9 +739,7 @@ impl<M: MemoryMapMut> JournalFile<M> {
         let mut header = JournalHeader::default();
         header.signature = *b"LPKSHHRH";
 
-        if options.enable_keyed_hash {
-            header.incompatible_flags |= HeaderIncompatibleFlags::KeyedHash as u32;
-        }
+        header.incompatible_flags |= HeaderIncompatibleFlags::KeyedHash as u32;
 
         header.data_hash_table_offset = NonZeroU64::new(data_hash_table_offset);
         header.data_hash_table_size = NonZeroU64::new(data_hash_table_size as u64);

@@ -8,7 +8,8 @@
 //! Windows are built at the boundary — the CLI's paired
 //! `--start-ns`/`--end-ns`, the ledger's canonicalized wire window (the
 //! ledger owns that canonicalization; this is the engine's type) — and
-//! inside the engine by the overview alone, from its grid geometry.
+//! inside the engine by the overview and explore, from their grid
+//! geometry.
 //! Every other windowed operation receives an already-validated
 //! window; how an invalid one surfaces is the [`WindowError`] wrap
 //! below.
@@ -25,10 +26,10 @@ pub struct TimeWindow {
 
 /// An invalid window is a request error on whichever operation received
 /// it: the windowed operations' request-error enums (search, overview,
-/// attributes) wrap this via `#[from]` — the per-op wrap pattern.
-/// Search and attributes never construct a window (only the overview
-/// does, from its grid), so their variant keeps the error surface
-/// uniform.
+/// explore, suggest) wrap this via `#[from]` — the per-op wrap pattern.
+/// Search and suggest never construct a window (only the overview and
+/// explore do, from their grids), so their variant keeps the error
+/// surface uniform.
 #[derive(Debug, thiserror::Error)]
 pub enum WindowError {
     #[error("invalid time window [{start_ns}, {end_ns}): start must be before end")]

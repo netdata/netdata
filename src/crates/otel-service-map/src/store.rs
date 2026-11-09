@@ -417,7 +417,29 @@ mod tests {
         let tenant = dir.path().join(tenant_dir("default"));
         let file_size = fs::metadata(tenant.join("4.smh")).unwrap().len();
         fs::write(tenant.join("9.tmp"), b"partial").unwrap();
+        let left = || {
+            let mut names: Vec<String> = fs::read_dir(&tenant)
+                .unwrap()
+                .map(|e| e.unwrap().file_name().into_string().unwrap())
+                .collect();
+            names.sort();
+            names
+        };
 
+        // At hour 5 with no size pressure, only the age limit applies: hour 0
+        // goes, and so does the stray temp file.
+        let store = Store::open(
+            dir.path(),
+            Retention {
+                max_age_minutes: 4 * 60,
+                max_bytes: u64::MAX,
+            },
+        )
+        .unwrap();
+        store.enforce_retention(5 * 60).unwrap();
+        assert_eq!(left(), vec!["1.smh", "2.smh", "3.smh", "4.smh"]);
+
+        // With room for two files, the oldest hours go until the rest fit.
         let store = Store::open(
             dir.path(),
             Retention {
@@ -426,14 +448,8 @@ mod tests {
             },
         )
         .unwrap();
-        // Now at hour 4: hour 0 is too old; of hours 1-4 the two oldest go.
-        store.enforce_retention(4 * 60 + 30).unwrap();
-        let mut left: Vec<String> = fs::read_dir(&tenant)
-            .unwrap()
-            .map(|e| e.unwrap().file_name().into_string().unwrap())
-            .collect();
-        left.sort();
-        assert_eq!(left, vec!["3.smh", "4.smh"]);
+        store.enforce_retention(5 * 60).unwrap();
+        assert_eq!(left(), vec!["3.smh", "4.smh"]);
     }
 
     #[test]
