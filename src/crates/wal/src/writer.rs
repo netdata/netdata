@@ -43,7 +43,7 @@ use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock, mpsc};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use file_registry::FileDir;
@@ -88,16 +88,6 @@ struct ActiveFile {
     /// path, which writes no sync first.
     synced_up_to: ByteSize,
     synced_entry_count: u64,
-}
-
-impl ActiveFile {
-    /// Record the just-fsynced prefix as durable, so a later `Closed` (which
-    /// may not be preceded by a fresh sync on the `Drop` path) reports the
-    /// durable value, not unsynced tail bytes.
-    fn mark_synced(&mut self) {
-        self.synced_up_to = self.bytes_written;
-        self.synced_entry_count = self.log_entry_count;
-    }
 }
 
 /// The two opaque identifiers a writer stamps into every file it produces:
@@ -305,7 +295,12 @@ impl Stream {
         if let Some(active) = &mut self.active {
             active.writer.flush()?;
             active.writer.get_ref().sync_all()?;
-            active.mark_synced();
+
+            // The just-fsynced prefix is now durable; remember it so a later
+            // `Closed` (which may not be preceded by a fresh sync on the `Drop`
+            // path) reports the durable value, not unsynced tail bytes.
+            active.synced_up_to = active.bytes_written;
+            active.synced_entry_count = active.log_entry_count;
         }
         Ok(())
     }
@@ -315,13 +310,6 @@ impl Stream {
     /// — the event re-reports the accumulated state (not a delta).
     fn sync(&mut self) -> Result<()> {
         self.sync_data()?;
-        self.queue_synced();
-        Ok(())
-    }
-
-    /// Queue the `Synced` event for the active file (if any), reporting the
-    /// durable state recorded by the last `sync_data`.
-    fn queue_synced(&mut self) {
         if let Some(active) = &self.active {
             let event = FileEvent::Synced {
                 file_id: active.file_id,
@@ -333,6 +321,7 @@ impl Stream {
             };
             self.pending_events.push(event);
         }
+        Ok(())
     }
 
     fn shutdown(&mut self) -> Result<Vec<FileEvent>> {
@@ -510,163 +499,6 @@ impl Config {
     }
 }
 
-/// Threads that run the concurrent fsyncs of [`Writer::sync_all`]. They spend
-/// their time blocked in fsync, so this bounds how many files sync at once,
-/// not CPU use.
-const SYNC_THREADS: usize = 64;
-
-/// One fsync for the pool: a duplicate handle of the file, its position in
-/// the caller's batch, and where to send the result.
-type SyncJob = (File, usize, mpsc::Sender<(usize, std::io::Result<()>)>);
-
-/// The queue of a long-lived pool of fsync threads, started on first use.
-/// Idle threads block (one in `recv`, the rest on the queue's mutex) rather
-/// than spin: starting threads per call, or a work-stealing pool that spins
-/// while idle, costs more CPU than the overlap gains. `None` if no thread
-/// could start: syncs then run in turn.
-fn sync_queue() -> Option<&'static mpsc::Sender<SyncJob>> {
-    static QUEUE: OnceLock<Option<mpsc::Sender<SyncJob>>> = OnceLock::new();
-    QUEUE
-        .get_or_init(|| {
-            let (tx, rx) = mpsc::channel::<SyncJob>();
-            let rx = Arc::new(Mutex::new(rx));
-            let started = (0..SYNC_THREADS)
-                .filter(|i| {
-                    let rx = Arc::clone(&rx);
-                    std::thread::Builder::new()
-                        .name(format!("wal-sync-{i}"))
-                        .spawn(move || {
-                            loop {
-                                let job = rx.lock().unwrap_or_else(|e| e.into_inner()).recv();
-                                let Ok((file, index, reply)) = job else {
-                                    return;
-                                };
-                                let _ = reply.send((index, file.sync_all()));
-                            }
-                        })
-                        .inspect_err(|e| tracing::warn!(%e, "WAL sync thread failed to start"))
-                        .is_ok()
-                })
-                .count();
-            (started > 0).then_some(tx)
-        })
-        .as_ref()
-}
-
-/// Run `sync_data` on every stream — the fsyncs concurrently when there is
-/// more than one — and return the results in `streams` order. Buffers are
-/// flushed first, in turn: a `write`, not a wait on the disk.
-fn sync_data_concurrently(streams: &mut [&mut Stream]) -> Vec<Result<()>> {
-    // Checked first so a writer with a single active file never starts the pool.
-    let queue = if streams.len() > 1 {
-        sync_queue()
-    } else {
-        None
-    };
-    let Some(queue) = queue else {
-        return streams.iter_mut().map(|s| s.sync_data()).collect();
-    };
-
-    let mut results: Vec<Option<Result<()>>> = Vec::with_capacity(streams.len());
-    let (reply_tx, reply_rx) = mpsc::channel();
-    for (index, stream) in streams.iter_mut().enumerate() {
-        let Some(active) = stream.active.as_mut() else {
-            results.push(Some(Ok(())));
-            continue;
-        };
-        if let Err(e) = active.writer.flush() {
-            results.push(Some(Err(e.into())));
-            continue;
-        }
-        // No spare descriptor for the pool (e.g. EMFILE): sync this file here.
-        let Ok(file) = active.writer.get_ref().try_clone() else {
-            results.push(Some(active.writer.get_ref().sync_all().map_err(Into::into)));
-            continue;
-        };
-        results.push(match queue.send((file, index, reply_tx.clone())) {
-            Ok(()) => None,
-            Err(mpsc::SendError((file, ..))) => Some(file.sync_all().map_err(Into::into)),
-        });
-    }
-    drop(reply_tx);
-    // Ends when every job has replied, or early if a job was dropped unanswered.
-    while let Ok((index, result)) = reply_rx.recv() {
-        results[index] = Some(result.map_err(Into::into));
-    }
-
-    streams
-        .iter_mut()
-        .zip(results)
-        .map(|(stream, result)| {
-            let result = result.unwrap_or_else(|| {
-                Err(std::io::Error::other("WAL sync thread exited without a result").into())
-            });
-            if let (Ok(()), Some(active)) = (&result, stream.active.as_mut()) {
-                active.mark_synced();
-            }
-            result
-        })
-        .collect()
-}
-
-/// One stream's part of a split sync: the file and prefix flushed by
-/// [`Writer::begin_sync`], and the fsync's result once it ran.
-struct PendingSync {
-    part_key: u64,
-    file_id: FileId,
-    /// A duplicate handle to fsync; `None` when `begin_sync` already synced.
-    file: Option<File>,
-    up_to: ByteSize,
-    entry_count: u64,
-    frame_count: u64,
-    min_timestamp_ns: TimestampNs,
-    max_timestamp_ns: TimestampNs,
-    result: Option<Result<()>>,
-}
-
-/// The end of every active file at one moment ([`Writer::sync_target`]).
-pub struct SyncTarget {
-    items: Vec<(u64, FileId, ByteSize)>,
-}
-
-/// A sync begun under the caller's lock ([`Writer::begin_sync`]), fsynced
-/// without it ([`SyncTicket::fsync`], blocking) and completed under it again
-/// ([`Writer::finish_sync`]).
-pub struct SyncTicket {
-    items: Vec<PendingSync>,
-    first_error: Option<crate::Error>,
-}
-
-impl SyncTicket {
-    /// fsync every file of the ticket, concurrently on the sync pool when
-    /// there is more than one. Blocks until all are done.
-    pub fn fsync(mut self) -> Self {
-        let pending = self.items.iter().filter(|i| i.file.is_some()).count();
-        let queue = if pending > 1 { sync_queue() } else { None };
-        let (reply_tx, reply_rx) = mpsc::channel();
-        for (index, item) in self.items.iter_mut().enumerate() {
-            let Some(file) = item.file.take() else {
-                continue;
-            };
-            let unsent = match queue {
-                Some(queue) => match queue.send((file, index, reply_tx.clone())) {
-                    Ok(()) => None,
-                    Err(mpsc::SendError((file, ..))) => Some(file),
-                },
-                None => Some(file),
-            };
-            if let Some(file) = unsent {
-                item.result = Some(file.sync_all().map_err(Into::into));
-            }
-        }
-        drop(reply_tx);
-        while let Ok((index, result)) = reply_rx.recv() {
-            self.items[index].result = Some(result.map_err(Into::into));
-        }
-        self
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Writer
 // ---------------------------------------------------------------------------
@@ -796,138 +628,11 @@ impl Writer {
     /// Flush and fsync every stream with an active file, queuing a `Synced`
     /// event for each — including streams that saw no new bytes since their
     /// last sync (the event re-reports the accumulated state).
-    ///
-    /// The fsyncs run concurrently. On journaling filesystems (ext4, XFS) each
-    /// fsync waits for a journal commit and concurrent waiters share one, so
-    /// N active files cost about one commit instead of N back to back. Every
-    /// stream is attempted; a `Synced` event is queued for each stream whose
-    /// own fsync succeeded (its durable prefix advances only then), and the
-    /// first error, if any, is returned.
     pub fn sync_all(&mut self) -> Result<()> {
-        let mut active: Vec<&mut Stream> = self
-            .streams
-            .values_mut()
-            .filter(|s| s.active.is_some())
-            .collect();
-        let results = sync_data_concurrently(&mut active);
-        let mut first_error = None;
-        for (stream, result) in active.into_iter().zip(results) {
-            match result {
-                Ok(()) => stream.queue_synced(),
-                Err(e) => {
-                    first_error.get_or_insert(e);
-                }
-            }
+        for stream in self.streams.values_mut() {
+            stream.sync()?;
         }
-        first_error.map_or(Ok(()), Err)
-    }
-
-    /// Where every active file ends now: what a caller has written and needs
-    /// durable. Pair with [`is_covered`](Self::is_covered) to skip a sync
-    /// that another caller's completed sync already made redundant.
-    pub fn sync_target(&self) -> SyncTarget {
-        SyncTarget {
-            items: self
-                .streams
-                .iter()
-                .filter_map(|(part_key, stream)| {
-                    let active = stream.active.as_ref()?;
-                    Some((*part_key, active.file_id, active.bytes_written))
-                })
-                .collect(),
-        }
-    }
-
-    /// Whether every byte of `target` is already durable: each file either
-    /// has its recorded prefix at or past the target, or is no longer
-    /// active (rotation fsyncs a file before closing it).
-    pub fn is_covered(&self, target: &SyncTarget) -> bool {
-        target.items.iter().all(|(part_key, file_id, up_to)| {
-            match self.streams.get(part_key).and_then(|s| s.active.as_ref()) {
-                Some(active) if active.file_id == *file_id => active.synced_up_to >= *up_to,
-                _ => true,
-            }
-        })
-    }
-
-    /// First step of a sync split around the caller's lock: flush every
-    /// active stream's buffer and record what is now written, so the fsync
-    /// itself ([`SyncTicket::fsync`]) can run without the lock. Complete it
-    /// with [`finish_sync`](Self::finish_sync). Frames written before this
-    /// call are durable once the ticket's fsyncs succeed.
-    pub fn begin_sync(&mut self) -> SyncTicket {
-        let mut items = Vec::new();
-        let mut first_error = None;
-        for (part_key, stream) in self.streams.iter_mut() {
-            let Some(active) = stream.active.as_mut() else {
-                continue;
-            };
-            if let Err(e) = active.writer.flush() {
-                first_error.get_or_insert(e.into());
-                continue;
-            }
-            let (file, result) = match active.writer.get_ref().try_clone() {
-                Ok(file) => (Some(file), None),
-                // No spare descriptor: sync here, under the caller's lock.
-                Err(_) => match active.writer.get_ref().sync_all() {
-                    Ok(()) => (None, Some(Ok(()))),
-                    Err(e) => {
-                        first_error.get_or_insert(e.into());
-                        continue;
-                    }
-                },
-            };
-            items.push(PendingSync {
-                part_key: *part_key,
-                file_id: active.file_id,
-                file,
-                up_to: active.bytes_written,
-                entry_count: active.log_entry_count,
-                frame_count: active.frame_count,
-                min_timestamp_ns: active.min_timestamp_ns,
-                max_timestamp_ns: active.max_timestamp_ns,
-                result,
-            });
-        }
-        SyncTicket { items, first_error }
-    }
-
-    /// Last step of a split sync: record the fsynced prefixes and queue a
-    /// `Synced` for each. A file another caller rotated meanwhile is skipped
-    /// (its `Closed` carries the prefix the rotation fsynced), and so is a
-    /// prefix older than one already recorded, so the durable prefix and the
-    /// `Synced` events never move backwards. Returns the first error.
-    pub fn finish_sync(&mut self, ticket: SyncTicket) -> Result<()> {
-        let mut first_error = ticket.first_error;
-        for item in ticket.items {
-            let result = item.result.unwrap_or_else(|| {
-                Err(std::io::Error::other("WAL sync thread exited without a result").into())
-            });
-            if let Err(e) = result {
-                first_error.get_or_insert(e);
-                continue;
-            }
-            let Some(stream) = self.streams.get_mut(&item.part_key) else {
-                continue;
-            };
-            let Some(active) = stream.active.as_mut() else {
-                continue;
-            };
-            if active.file_id != item.file_id || item.up_to < active.synced_up_to {
-                continue;
-            }
-            active.synced_up_to = item.up_to;
-            active.synced_entry_count = item.entry_count;
-            stream.pending_events.push(FileEvent::Synced {
-                file_id: item.file_id,
-                valid_up_to: item.up_to,
-                frame_count: item.frame_count,
-                entry_count: item.entry_count,
-                min_timestamp_ns: item.min_timestamp_ns,
-                max_timestamp_ns: item.max_timestamp_ns,
-            });
-        }
-        first_error.map_or(Ok(()), Err)
+        Ok(())
     }
 
     /// Rotate every stream whose active file has met a rotation threshold as
@@ -1221,62 +926,6 @@ mod tests {
     }
 
     #[test]
-    fn sync_all_syncs_every_active_stream() {
-        // More streams than SYNC_THREADS, so some threads sync several.
-        let tmp = tempfile::tempdir().unwrap();
-        let mut writer = test_writer(tmp.path());
-        let streams = SYNC_THREADS as u64 + 5;
-        for label in 0..streams {
-            writer
-                .write_frame(
-                    pk(label),
-                    &[],
-                    b"payload",
-                    crate::FrameMeta {
-                        entry_count: 1,
-                        ingestion_ns: TimestampNs(label + 1),
-                        log_ts_range: None,
-                    },
-                )
-                .unwrap();
-        }
-        writer.take_all_events();
-
-        writer.sync_all().unwrap();
-
-        let mut synced: Vec<(u64, ByteSize, u64)> = writer
-            .take_all_events()
-            .iter()
-            .filter_map(|e| match e {
-                FileEvent::Synced {
-                    file_id,
-                    valid_up_to,
-                    entry_count,
-                    ..
-                } => Some((file_id.part_key, *valid_up_to, *entry_count)),
-                _ => None,
-            })
-            .collect();
-        synced.sort();
-        let mut expected: Vec<u64> = (0..streams).map(pk).collect();
-        expected.sort();
-        assert_eq!(synced.iter().map(|s| s.0).collect::<Vec<_>>(), expected);
-        for (_, valid_up_to, entry_count) in synced {
-            assert_eq!(entry_count, 1);
-            assert!(valid_up_to.0 > HEADER_SIZE as u64);
-        }
-
-        // A second pass re-reports every stream, as the sequential pass did.
-        writer.sync_all().unwrap();
-        let resynced = writer
-            .take_all_events()
-            .iter()
-            .filter(|e| matches!(e, FileEvent::Synced { .. }))
-            .count();
-        assert_eq!(resynced, streams as usize);
-    }
-
-    #[test]
     fn accumulates_log_ts_range_across_frames() {
         let tmp = tempfile::tempdir().unwrap();
         let mut writer = test_writer(tmp.path());
@@ -1443,165 +1092,5 @@ mod tests {
         seqs.sort();
         // Sequences must be distinct (1, 2) — not both 1.
         assert_eq!(seqs, vec![1, 2]);
-    }
-
-    // --- split sync: sync_target / is_covered / begin_sync / finish_sync ---
-
-    fn write_one(writer: &mut Writer, label: u64, payload: &[u8], ingestion_ns: u64) {
-        writer
-            .write_frame(
-                pk(label),
-                &[],
-                payload,
-                crate::FrameMeta {
-                    entry_count: 1,
-                    ingestion_ns: TimestampNs(ingestion_ns),
-                    log_ts_range: None,
-                },
-            )
-            .unwrap();
-    }
-
-    /// `(part_key, valid_up_to)` of every `Synced` in `events`, sorted.
-    fn synced_of(events: &[FileEvent]) -> Vec<(u64, ByteSize)> {
-        let mut synced: Vec<_> = events
-            .iter()
-            .filter_map(|e| match e {
-                FileEvent::Synced {
-                    file_id,
-                    valid_up_to,
-                    ..
-                } => Some((file_id.part_key, *valid_up_to)),
-                _ => None,
-            })
-            .collect();
-        synced.sort();
-        synced
-    }
-
-    fn split_sync(writer: &mut Writer) -> Result<()> {
-        let ticket = writer.begin_sync().fsync();
-        writer.finish_sync(ticket)
-    }
-
-    #[test]
-    fn split_sync_matches_sync_all() {
-        // begin/fsync/finish reports the same Synced prefixes as sync_all.
-        let tmp_a = tempfile::tempdir().unwrap();
-        let tmp_b = tempfile::tempdir().unwrap();
-        let mut split = test_writer(tmp_a.path());
-        let mut whole = test_writer(tmp_b.path());
-        for label in 0..SYNC_THREADS as u64 + 3 {
-            write_one(&mut split, label, b"payload", label + 1);
-            write_one(&mut whole, label, b"payload", label + 1);
-        }
-        split.take_all_events();
-        whole.take_all_events();
-
-        split_sync(&mut split).unwrap();
-        whole.sync_all().unwrap();
-
-        let a = synced_of(&split.take_all_events());
-        assert_eq!(a, synced_of(&whole.take_all_events()));
-        assert_eq!(a.len(), SYNC_THREADS + 3);
-    }
-
-    #[test]
-    fn is_covered_tracks_the_durable_prefix() {
-        let tmp = tempfile::tempdir().unwrap();
-        let mut writer = test_writer(tmp.path());
-        write_one(&mut writer, 1, b"one", 1);
-        write_one(&mut writer, 2, b"two", 2);
-        let target = writer.sync_target();
-        assert!(!writer.is_covered(&target), "nothing synced yet");
-
-        split_sync(&mut writer).unwrap();
-        assert!(writer.is_covered(&target), "the sync covered both files");
-
-        // Bytes written after the sync need a new round.
-        write_one(&mut writer, 2, b"more", 3);
-        let later = writer.sync_target();
-        assert!(writer.is_covered(&target), "an older target stays covered");
-        assert!(!writer.is_covered(&later));
-        split_sync(&mut writer).unwrap();
-        assert!(writer.is_covered(&later));
-    }
-
-    #[test]
-    fn finish_sync_skips_a_file_rotated_meanwhile() {
-        // Rotation fsyncs and seals the file while the ticket is out: its
-        // Closed carries the prefix, so finish_sync adds no Synced for it,
-        // and the target counts as covered.
-        let tmp = tempfile::tempdir().unwrap();
-        let mut writer = test_writer(tmp.path());
-        let hour_ns: u64 = 3600 * 1_000_000_000;
-        write_one(&mut writer, 1, b"old", 1);
-        write_one(&mut writer, 2, b"new", hour_ns + 1);
-        writer.take_all_events();
-
-        let target = writer.sync_target();
-        let ticket = writer.begin_sync();
-        assert_eq!(writer.rotate_expired(TimestampNs(hour_ns + 2)).unwrap(), 1);
-        let events = writer.take_all_events();
-        assert!(
-            events.iter().any(
-                |e| matches!(e, FileEvent::Closed { file_id, .. } if file_id.part_key == pk(1))
-            )
-        );
-
-        writer.finish_sync(ticket.fsync()).unwrap();
-        let synced = synced_of(&writer.take_all_events());
-        assert_eq!(synced.iter().map(|s| s.0).collect::<Vec<_>>(), vec![pk(2)]);
-        assert!(writer.is_covered(&target));
-    }
-
-    #[test]
-    fn finish_sync_never_moves_the_prefix_backwards() {
-        // Two rounds finishing out of order: the older one is dropped.
-        let tmp = tempfile::tempdir().unwrap();
-        let mut writer = test_writer(tmp.path());
-        write_one(&mut writer, 1, b"first", 1);
-        let first = writer.begin_sync();
-        write_one(&mut writer, 1, b"second", 2);
-        let second = writer.begin_sync();
-        writer.take_all_events();
-
-        writer.finish_sync(second.fsync()).unwrap();
-        let newer = synced_of(&writer.take_all_events());
-        assert_eq!(newer.len(), 1);
-
-        writer.finish_sync(first.fsync()).unwrap();
-        assert!(
-            synced_of(&writer.take_all_events()).is_empty(),
-            "an older prefix must not be reported after a newer one"
-        );
-        let target = writer.sync_target();
-        assert!(
-            writer.is_covered(&target),
-            "the newer prefix stays recorded"
-        );
-        assert_eq!(target.items[0].2, newer[0].1);
-    }
-
-    #[test]
-    fn finish_sync_reports_a_failed_fsync() {
-        // A failed fsync (or a sync thread that exited without a result)
-        // records nothing and returns the error; the bytes stay uncovered.
-        for result in [Some(Err(std::io::Error::other("injected").into())), None] {
-            let tmp = tempfile::tempdir().unwrap();
-            let mut writer = test_writer(tmp.path());
-            write_one(&mut writer, 1, b"data", 1);
-            writer.take_all_events();
-            let target = writer.sync_target();
-
-            let mut ticket = writer.begin_sync();
-            assert_eq!(ticket.items.len(), 1);
-            ticket.items[0].file = None;
-            ticket.items[0].result = result;
-
-            assert!(writer.finish_sync(ticket).is_err());
-            assert!(synced_of(&writer.take_all_events()).is_empty());
-            assert!(!writer.is_covered(&target));
-        }
     }
 }

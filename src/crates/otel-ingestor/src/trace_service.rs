@@ -139,9 +139,6 @@ pub struct NetdataTracesService {
     /// region, so tenants ingest in parallel (same discipline as the logs
     /// service).
     writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
-    /// One fsync round at a time per tenant; requests that arrive during a
-    /// round wait here, and one round after it covers them all.
-    sync_gates: crate::wal_sync::SyncGates,
     /// Process-wide monotonic clock, shared across tenants, streams, and
     /// signals (lib.rs creates one instance for logs + traces): the WAL writer
     /// stamps per-frame `ingestion_ns` from it, so one clock keeps frame
@@ -186,7 +183,6 @@ impl NetdataTracesService {
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
-            sync_gates: crate::wal_sync::SyncGates::default(),
             clock,
             sender,
             wal_base_dir,
@@ -460,14 +456,7 @@ impl NetdataTracesService {
                 )
             }
         };
-        // The writer lock covers the writes and the event sends, not the
-        // fsyncs: holding it across them serialized every request of the
-        // tenant behind the slowest fsync. Events still go out under the lock,
-        // so each file's Created/Synced/Closed reach the ledger in order.
-        // Fsync rounds take turns at the tenant's sync gate; a request whose
-        // bytes an earlier round already made durable skips its own
-        // (`wal_sync::make_durable`).
-        let target = {
+        {
             let mut writer = writer.lock().unwrap();
             for p in &prepared {
                 let ingestion_ns = self.clock.lock().unwrap().now_ns();
@@ -495,20 +484,22 @@ impl NetdataTracesService {
                         Status::internal("WAL write error")
                     })?;
             }
-            let target = writer.sync_target();
+            writer.sync_all().map_err(|e| {
+                tracing::error!(%e, "failed to sync traces WAL");
+                Status::internal("WAL sync error")
+            })?;
+            // Drain AND forward the lifecycle events while STILL holding the
+            // writer lock, so drain+send is atomic per tenant: a file's
+            // Created→Synced→Closed reach the one ledger channel in the order
+            // the lock serialized their writes. `send_events` is synchronous
+            // and non-blocking (unbounded channel), so no `.await` under the
+            // lock.
             let events = writer.take_all_events();
+            // `send_events` takes the tenant by value and the core only
+            // borrows it, so clone here — the last use of the id in this
+            // request either way.
             self.sender.send_events(tenant_id.clone(), events);
-            target
-        };
-        crate::wal_sync::make_durable(
-            writer,
-            self.sync_gates.gate(tenant_id),
-            Arc::clone(&self.sender),
-            tenant_id.clone(),
-            target,
-            "traces",
-        )
-        .await?;
+        }
 
         for observation in observations {
             observation.commit();
@@ -721,44 +712,6 @@ mod tests {
         assert!(out.contains("CLABEL 'resource.attributes.service.name' 'unknown_service' 1"));
         assert_eq!(sum_of(&out, "accepted"), 3.0);
         assert_eq!(sum_of(&out, "rejected"), 2.0);
-    }
-
-    /// A request whose bytes an earlier fsync round already covered skips its
-    /// own round but still counts in the derived metrics and still commits its
-    /// observations.
-    #[tokio::test]
-    async fn a_request_an_earlier_round_covered_still_records() {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-        let tenant = TenantId::default_tenant();
-        let derived = Arc::new(
-            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
-        );
-        let tmp = tempfile::tempdir().unwrap();
-        let mut service = test_service(tmp.path().to_path_buf());
-        service.set_derived_metrics(Arc::clone(&derived));
-        let recorder = Arc::new(Recorder::default());
-        service.add_observer(recorder.clone());
-
-        // Both requests write, then wait for the gate; the round that gets it
-        // first covers the other's bytes too.
-        let held = service.sync_gates.gate(&tenant).lock_owned().await;
-        let (a, b, ()) = tokio::join!(
-            service.export_traces(&tenant, spans_req(2, now)),
-            service.export_traces(&tenant, spans_req(3, now)),
-            async {
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                drop(held);
-            },
-        );
-        a.unwrap();
-        b.unwrap();
-
-        let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
-        assert_eq!(sum_of(&out, "accepted"), 5.0);
-        assert_eq!(recorder.committed.lock().unwrap().len(), 2);
     }
 
     #[tokio::test]
