@@ -67,11 +67,18 @@ fn parse(args: &[String], payload: Option<&[u8]>, now_s: u64) -> Result<Parsed, 
     };
     // GET callers pass `info` and `key:value` words instead of a body; the
     // UI's info call also carries a window, which info ignores.
+    let seconds = |key: &str, v: &str| {
+        v.parse::<i64>().map(Some).map_err(|_| {
+            format!("{key} ({v:?}) is not a number: use unix seconds or negative relative seconds")
+        })
+    };
     for arg in args {
         match arg.split_once(':') {
             None if arg == "info" => request.info = Some(Value::Bool(true)),
-            Some(("after", v)) if request.after.is_none() => request.after = v.parse().ok(),
-            Some(("before", v)) if request.before.is_none() => request.before = v.parse().ok(),
+            Some(("after", v)) if request.after.is_none() => request.after = seconds("after", v)?,
+            Some(("before", v)) if request.before.is_none() => {
+                request.before = seconds("before", v)?
+            }
             Some(("tenant", v)) if request.tenant.is_none() => request.tenant = Some(v.to_string()),
             _ => {}
         }
@@ -297,6 +304,18 @@ mod tests {
                 Err(()),
             ),
             ("bad body", vec![], Some("{"), Err(())),
+            (
+                "get after not a number",
+                args(&["after:abc"]),
+                None,
+                Err(()),
+            ),
+            (
+                "get before not a number",
+                args(&["before:1.5"]),
+                None,
+                Err(()),
+            ),
             (
                 "before far in the future",
                 vec![],

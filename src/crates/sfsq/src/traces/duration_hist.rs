@@ -75,7 +75,9 @@ impl DurationHistogram {
         (lo, lo + (width - 1))
     }
 
+    /// Negative durations count as 0, in the bins and the range alike.
     pub(crate) fn record(&mut self, duration_ns: i64) {
+        let duration_ns = duration_ns.max(0);
         let bin = &mut self.counts[Self::bin(duration_ns)];
         *bin = bin.saturating_add(1);
         self.n += 1;
@@ -265,5 +267,13 @@ mod tests {
         let h = DurationHistogram::new();
         assert_eq!(h.percentile(50), None);
         assert_eq!(h.percentiles(), None);
+    }
+
+    #[test]
+    fn negative_durations_count_as_zero() {
+        let mut h = DurationHistogram::new();
+        h.record(-5);
+        assert_eq!(h.percentile(50), Some(0));
+        assert_eq!(h.percentile(100), Some(0));
     }
 }

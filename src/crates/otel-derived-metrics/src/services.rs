@@ -211,8 +211,10 @@ fn adjusted_count(trace_state: &str) -> f64 {
         return 1.0;
     };
     let threshold = value << (4 * (14 - hex.len()));
-    const MAX: f64 = (1u64 << 56) as f64;
-    MAX / (MAX - threshold as f64)
+    // Subtract in integers: near 2^56 the threshold has no exact f64, and
+    // the difference would round to zero.
+    const MAX: u64 = 1 << 56;
+    MAX as f64 / (MAX - threshold) as f64
 }
 
 #[cfg(test)]
@@ -400,6 +402,9 @@ mod tests {
         assert_eq!(adjusted_count("vendor=x,ot=rv:1234;th:c"), 4.0);
         assert_eq!(adjusted_count("ot=th:zz"), 1.0);
         assert_eq!(adjusted_count("ot=th:123456789abcdef"), 1.0);
+        // Near 2^56 the threshold has no exact f64; the weight stays finite.
+        assert_eq!(adjusted_count("ot=th:ffffffffffffff"), (1u64 << 56) as f64);
+        assert_eq!(adjusted_count("ot=th:fffffffffffffc"), (1u64 << 54) as f64);
 
         let services = Services::new(10).unwrap();
         let out = render(

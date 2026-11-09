@@ -39,8 +39,10 @@ pub(crate) fn newest_first(sources: &mut [TraceSource]) {
 pub(crate) fn complete_after(unvisited: &[TraceSource]) -> Option<u32> {
     let mut newest = None;
     for source in unvisited {
-        let t = newest_s(source)?;
-        newest = newest.max(Some(t.saturating_add(1)));
+        // No second follows the last one, so a source ending there leaves
+        // nothing to claim.
+        let t = newest_s(source)?.checked_add(1)?;
+        newest = newest.max(Some(t));
     }
     newest
 }
@@ -119,5 +121,10 @@ mod tests {
         );
         assert_eq!(complete_after(&[tail("t")]), None);
         assert_eq!(complete_after(&[sealed("a", 100), tail("t")]), None);
+        // No second follows the last one, so nothing can be claimed.
+        assert_eq!(
+            complete_after(&[sealed("a", 100), sealed("b", u32::MAX)]),
+            None
+        );
     }
 }

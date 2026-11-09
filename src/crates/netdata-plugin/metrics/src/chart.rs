@@ -210,10 +210,24 @@ fn ends_like_entity_suffix(context: &str) -> bool {
 /// and releases, so an entity keeps its chart ids over restarts.
 pub(crate) fn stable_hash(labels: &Labels) -> u64 {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut feed = |b: u8| {
+        hash ^= u64::from(b);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    };
     for (key, value) in labels.iter() {
-        for b in key.bytes().chain([0]).chain(value.bytes()).chain([0]) {
-            hash ^= u64::from(b);
-            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        for text in [key, value] {
+            for b in text.bytes() {
+                // NUL ends each text, so a NUL inside one is fed as 0xFF 0x01
+                // (0xFF never occurs in UTF-8): label sets stay distinct, and
+                // a NUL-free set keeps its chart ids.
+                if b == 0 {
+                    feed(0xFF);
+                    feed(0x01);
+                } else {
+                    feed(b);
+                }
+            }
+            feed(0);
         }
     }
     hash
@@ -221,4 +235,19 @@ pub(crate) fn stable_hash(labels: &Labels) -> u64 {
 
 fn is_id_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'-'
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_nul_inside_a_label_does_not_join_two_labels() {
+        let mut joined = Labels::new();
+        joined.insert("a", "x\0b\0y");
+        let mut split = Labels::new();
+        split.insert("a", "x");
+        split.insert("b", "y");
+        assert_ne!(stable_hash(&joined), stable_hash(&split));
+    }
 }

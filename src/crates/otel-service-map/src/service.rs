@@ -147,6 +147,19 @@ impl ServiceMap {
     }
 }
 
+/// Moves the batches `commit` could not hand over into the engine's loss
+/// counters.
+fn record_handoff_drops(shared: &Shared, now_ns: u64) {
+    let drops = std::mem::take(&mut *shared.handoff_drops.lock().expect("drops lock"));
+    if drops.is_empty() {
+        return;
+    }
+    let mut engine = shared.engine.lock().expect("engine lock");
+    for (tenant, n) in drops {
+        engine.note_handoff_drops(&tenant, n, now_ns);
+    }
+}
+
 fn now_ns() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -173,14 +186,8 @@ async fn run(
             }
             _ = tick.tick() => {
                 let now = now_ns();
-                let drops = std::mem::take(&mut *shared.handoff_drops.lock().expect("drops lock"));
-                {
-                    let mut engine = shared.engine.lock().expect("engine lock");
-                    for (tenant, n) in drops {
-                        engine.note_handoff_drops(&tenant, n, now);
-                    }
-                    engine.expire(now);
-                }
+                record_handoff_drops(&shared, now);
+                shared.engine.lock().expect("engine lock").expire(now);
                 // The flush runs beside the loop, one at a time, so a slow
                 // write or a long query holding the flush gate does not stop
                 // pairing and expiry; a minute whose flush is still busy
@@ -201,7 +208,10 @@ async fn run(
             _ = &mut stop => break,
         }
     }
-    // Spans already handed over are counted before the final write.
+    // Close the queue first, so a commit racing the shutdown fails and is
+    // counted as a drop instead of vanishing with the queue; then count the
+    // spans already handed over and the drops before the final write.
+    rx.close();
     while let Ok(p) = rx.try_recv() {
         let mut engine = shared.engine.lock().expect("engine lock");
         engine.ingest(&p.tenant, p.extracted.spans, p.extracted.invalid, now_ns());
@@ -209,6 +219,7 @@ async fn run(
     if let Some(running) = flushing {
         let _ = running.await;
     }
+    record_handoff_drops(&shared, now_ns());
     let shared = shared.clone();
     let _ = tokio::task::spawn_blocking(move || flush(&shared, now_ns(), false, true)).await;
 }
@@ -331,6 +342,31 @@ mod tests {
             .get("default")
             .unwrap();
         assert_eq!(dropped, 4);
+        map.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn shutdown_counts_queued_spans_and_drops() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config::new(dir.path());
+        config.queue_capacity = 1;
+        let map = ServiceMap::start(config).unwrap();
+        // Let the engine task take its first, immediate tick, so only the
+        // stop path can record the drops below.
+        tokio::task::yield_now().await;
+        let now = now_ns();
+        let now_s = now / 1_000_000_000;
+        let req = request("frontend", vec![root_server(1, now - 1_000_000_000)]);
+        for _ in 0..5 {
+            let prepared = map.prepare("default", &req);
+            map.commit(prepared);
+        }
+        map.shutdown().await;
+
+        let map = ServiceMap::start(Config::new(dir.path())).unwrap();
+        let view = map.view("default", now_s - 600, now_s + 60).await.unwrap();
+        assert_eq!(view.edges.values().map(|e| e.server.calls).sum::<u64>(), 1);
+        assert_eq!(view.losses.handoff_drops, 4);
         map.shutdown().await;
     }
 }

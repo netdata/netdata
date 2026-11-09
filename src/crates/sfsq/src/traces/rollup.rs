@@ -201,6 +201,7 @@ pub fn tail_trace_parts(scan: &TraceWalScan) -> Vec<TracePart> {
     let status_field = BuiltinField::Status
         .dictionary_field()
         .expect("Status is dictionary-backed");
+    let service_field = resource_service_field();
     struct Acc<'s> {
         max_start_ns: i64,
         root: Option<RootPick<'s>>,
@@ -220,7 +221,7 @@ pub fn tail_trace_parts(scan: &TraceWalScan) -> Vec<TracePart> {
         if span.parent_span_id.is_unset() {
             RootPick::offer(&mut acc.root, span);
         }
-        let service = root_facets(span).0;
+        let service = span_field(span, &service_field);
         let error = u64::from(span_field(span, status_field) == Some("ERROR"));
         match acc.services.iter_mut().find(|(s, ..)| *s == service) {
             Some((_, spans, errors)) => {

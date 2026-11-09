@@ -135,7 +135,8 @@ pub struct ChartLine<'a> {
     pub chart_type: ChartType,
     /// Dashboard order; lower comes first. The agent reads it as an `int`.
     pub priority: i32,
-    /// Collection interval in seconds.
+    /// Collection interval in seconds, 1..=`i32::MAX`: the agent reads an
+    /// `int` and takes 0 as its own default. Debug builds assert it.
     pub update_every: u64,
     pub options: ChartOptions,
 }
@@ -161,6 +162,11 @@ pub fn write_chart(buf: &mut impl BufMut, chart: &ChartLine<'_>) {
         is_valid_chart_id(chart.id),
         "invalid chart id {:?}",
         chart.id
+    );
+    debug_assert!(
+        (1..=i32::MAX as u64).contains(&chart.update_every),
+        "update_every {} is outside 1..=i32::MAX",
+        chart.update_every
     );
     buf.put_slice(b"CHART ");
     buf.put_slice(chart.id.as_bytes());
@@ -246,6 +252,7 @@ pub fn write_clabel_commit(buf: &mut impl BufMut) {
 /// The agent reads `microseconds` as the time since the chart's previous
 /// update; 0 makes it measure that on its own clock.
 pub fn write_begin(buf: &mut impl BufMut, chart_id: &str, microseconds: u64) {
+    debug_assert!(is_valid_chart_id(chart_id), "invalid chart id {chart_id:?}");
     buf.put_slice(b"BEGIN ");
     buf.put_slice(chart_id.as_bytes());
     buf.put_u8(b' ');
