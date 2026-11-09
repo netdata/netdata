@@ -29,7 +29,7 @@ The plugin won't come up at all, or starts and immediately exits.
 | Required GeoIP DB missing (`optional: false`) | Same log search. Look for `failed to load database`. Either fix the path or set `optional: true`. |
 | Listen address conflict | Look for `failed to bind`, followed by the Agent's `exited with error code 1 and haven't collected any data. Disabling it.` Another process is on one of the configured ports (stock defaults: `2055` and `6343`); find it with `sudo ss -unlp`. The plugin publishes nothing until every listener is bound. On its first start since Netdata started it exits once and stays disabled until you restart Netdata; if it had been running earlier, the Agent retries it every 10 seconds (10 × the plugin's `update every`) and disables it after more than 10 failed starts. |
 | Validation error | Look for `must be greater than 0` and similar. The plugin validates the full config at startup. |
-| Slow startup rebuild | Look for `timed out scanning raw flows for tier rebuild`. At startup the plugin first rebuilds its 1-minute, 5-minute and 1-hour tiers from up to the last hour of raw flows, then binds its listeners; the Network Flows view and the `netflow.*` charts appear only after both finish, which the plugin logs as `declaring function: flows:netflow`. If scanning the raw flows takes longer than 30 seconds, the plugin exits; on its first start since Netdata started, the Agent then disables it until you restart Netdata. |
+| Slow startup rebuild | Look for `timed out scanning raw flows for tier rebuild`. At startup the plugin first rebuilds its 1-minute, 5-minute and 1-hour tiers from up to the last hour of raw flows, then binds its listeners; the Network Flows view and the `netdata.netflow.*` charts appear only after both finish, which the plugin logs as `declaring function: flows:netflow`. If scanning the raw flows takes longer than 30 seconds, the plugin exits; on its first start since Netdata started, the Agent then disables it until you restart Netdata. |
 | `enabled: false` was set | Look for `netflow plugin disabled by config`. The plugin honours this and shuts down cleanly — looks like "not running" if you don't read the log. |
 
 **Recovery:**
@@ -72,14 +72,14 @@ If nothing matches, the plugin isn't listening. See "doesn't start" above.
 
 Open the plugin health charts on the standard Netdata charts page:
 
-- `netflow.input_packets` `udp_received` rising — datagrams are reaching the listener.
-- `netflow.protocol_packets` not rising — none of those datagrams decode as v5, v7, v9, IPFIX, or sFlow. Check `parse_errors` in `netflow.decoder_exceptions`, then capture a small UDP sample with `tcpdump -w`.
+- `netdata.netflow.input_packets` `udp_received` rising — datagrams are reaching the listener.
+- `netdata.netflow.protocol_packets` not rising — none of those datagrams decode as v5, v7, v9, IPFIX, or sFlow. Check `parse_errors` in `netdata.netflow.decoder_exceptions`, then capture a small UDP sample with `tcpdump -w`.
 - A protocol dimension rising together with `disabled_protocol_packets` — valid traffic is arriving, but that protocol is disabled in `netflow.yaml`.
-- `netflow.flow_records` rising but `netflow.flow_rows` `journaled` not rising — follow the row chart and decoder exceptions to find filtering, intentional suppression, or journal failure.
+- `netdata.netflow.flow_records` rising but `netdata.netflow.flow_rows` `journaled` not rising — follow the row chart and decoder exceptions to find filtering, intentional suppression, or journal failure.
 
 ### sFlow packets arrive, but no sFlow rows appear
 
-sFlow datagrams can carry flow samples, counter samples, or both. Netdata's Network Flows view creates flow rows from sFlow flow samples only. Counter-only sFlow traffic is valid: `netflow.protocol_packets` shows `sflow` increasing and `netflow.sflow_samples` shows `counter` samples, but there are no source/destination flow rows to display.
+sFlow datagrams can carry flow samples, counter samples, or both. Netdata's Network Flows view creates flow rows from sFlow flow samples only. Counter-only sFlow traffic is valid: `netdata.netflow.protocol_packets` shows `sflow` increasing and `netdata.netflow.sflow_samples` shows `counter` samples, but there are no source/destination flow rows to display.
 
 Capture a small sample and check the sFlow sample types:
 
@@ -100,7 +100,7 @@ Counters show received traffic but you suspect data loss.
 
 **Template errors (NetFlow v9, IPFIX):**
 
-Watch `v9_missing_template` and `ipfix_missing_template` in `netflow.flow_sets`. If either is climbing, the exporter is sending Data Sets before their templates are available. Either:
+Watch `v9_missing_template` and `ipfix_missing_template` in `netdata.netflow.flow_sets`. If either is climbing, the exporter is sending Data Sets before their templates are available. Either:
 
 - The exporter restarted and the plugin's template cache is stale. Wait for the exporter to send the next template (the cadence depends on the exporter's `template-refresh` configuration — vendor defaults vary widely), or restart the exporter to force an immediate template refresh.
 - Templates are sent rarely. Cisco IOS / IOS-XE Flexible NetFlow ships a default `template data timeout` of **600 seconds (10 minutes)**; Juniper and others have their own defaults, often longer. After a plugin restart, you'll see template errors until the next template re-send. **Fix on the router side**: lower the template refresh interval to 60 seconds (the [Quick Start](/docs/npm/network-flows/quick-start.md) configurations show this).
@@ -117,13 +117,13 @@ NSEL exporter records and stored traffic rows are intentionally not one-to-one:
 - One update can create two rows: initiator traffic in the reported direction and nonzero responder traffic with endpoints swapped.
 - An all-zero initiator direction remains visible. An all-zero responder direction is suppressed and diagnosed. A direction with only bytes or only packets is stored with zero for the missing member and diagnosed as partial.
 
-Use `netflow.nsel_events` for received event types, `netflow.nsel_rows` for emitted directions, and `netflow.nsel_exceptions` for malformed counter outcomes and suppressed zero responders.
+Use `netdata.netflow.nsel_events` for received event types, `netdata.netflow.nsel_rows` for emitted directions, and `netdata.netflow.nsel_exceptions` for malformed counter outcomes and suppressed zero responders.
 
-If `v9_missing_template` rises in `netflow.flow_sets`, check the v9 template refresh cadence. On first startup, Netdata cannot decode data received before the first template. Learned templates are persisted for later restarts, but v9 streams are separated by exporter IP, UDP source port, and Source ID; a new source port needs its own template.
+If `v9_missing_template` rises in `netdata.netflow.flow_sets`, check the v9 template refresh cadence. On first startup, Netdata cannot decode data received before the first template. Learned templates are persisted for later restarts, but v9 streams are separated by exporter IP, UDP source port, and Source ID; a new source port needs its own template.
 
 **UDP kernel drops:**
 
-On Linux, watch `kernel_dropped` in `netflow.input_packets`. It is the sum of the kernel drop counters for the plugin's exact listener sockets. You can verify it at the OS level:
+On Linux, watch `kernel_dropped` in `netdata.netflow.input_packets`. It is the sum of the kernel drop counters for the plugin's exact listener sockets. You can verify it at the OS level:
 
 ```bash
 sudo ss -uamn sport = :2055        # inspect the d<N> field inside skmem:(...)
@@ -189,7 +189,7 @@ top -p $(pgrep -f netflow-plugin)
 
 If `netflow-plugin` is using a lot of CPU:
 
-- Check `netflow.input_packets` — high `udp_received` rate? You're at the limit of what one core can do for the post-decode hot path. Each instance is single-process; you can't scale horizontally on one host.
+- Check `netdata.netflow.input_packets` — high `udp_received` rate? You're at the limit of what one core can do for the post-decode hot path. Each instance is single-process; you can't scale horizontally on one host.
 - If `udp_received` is moderate but CPU is high, classifier rules with complex regex might be the cause. Check `enrichment.classifier_cache_duration` — if too short, classifiers re-evaluate too often.
 - Investigate with `perf top` or similar to find the hot function.
 
@@ -199,24 +199,24 @@ See [Sizing and Capacity Planning](/docs/npm/network-flows/sizing-capacity.md) f
 
 ```bash
 # Watch default lightweight state-cardinality charts over time
-# netflow.facet_values
-# netflow.tier_index_entries
-# netflow.open_tiers
+# netdata.netflow.facet_values
+# netdata.netflow.tier_index_entries
+# netdata.netflow.open_tiers
 ```
 
-- If `netflow.facet_values` climbs, facet vocabulary is growing.
-- If `netflow.tier_index_entries` or `netflow.open_tiers` climbs, ingest is outpacing tier flushes. Check `netflow.materialized_tier_ops` for `flushes` rate and `*_errors`.
-- If you need byte-level attribution, enable `charts.memory_diagnostics` in `netflow.yaml` and inspect `netflow.memory_resident_bytes` and `netflow.memory_accounted_bytes`.
-- If `netflow.decoder_scopes` is growing without bound, your exporter is rotating template IDs. Investigate per-router behaviour.
+- If `netdata.netflow.facet_values` climbs, facet vocabulary is growing.
+- If `netdata.netflow.tier_index_entries` or `netdata.netflow.open_tiers` climbs, ingest is outpacing tier flushes. Check `netdata.netflow.materialized_tier_ops` for `flushes` rate and `*_errors`.
+- If you need byte-level attribution, enable `charts.memory_diagnostics` in `netflow.yaml` and inspect `netdata.netflow.memory_resident_bytes` and `netdata.netflow.memory_accounted_bytes`.
+- If `netdata.netflow.decoder_scopes` is growing without bound, your exporter is rotating template IDs. Investigate per-router behaviour.
 
 **Tier commit worker health:**
 
 Rollup tiers (1m / 5m / 1h) are committed to disk by dedicated worker threads so the receive path never blocks on tier disk I/O. Four charts expose their health:
 
-- `netflow.tier_commit_age` — seconds since each tier's worker last completed a claim cycle. This tracks worker liveness, not tier traffic: it stays low even on an idle tier. A steadily climbing age means the worker is stuck (most likely blocked on disk I/O) — check disk latency on the journal volume.
-- `netflow.tier_commit_duration` — how long the last commit batch took, fsync included. Sustained growth means the disk is falling behind the rollup volume.
-- `netflow.tier_commit_batches` — commit batches per second; each tier normally commits once per its bucket interval.
-- `netflow.tier_commit_stretched` — commit windows that carried more than one closed bucket because the worker missed an anniversary. Occasional events after a restart (catch-up) are normal; a steady rate means the disk cannot keep up with the rollup cadence. Data is not lost — windows stretch (a 1m rollup may become a 70-80s rollup) — but investigate disk throughput.
+- `netdata.netflow.tier_commit_age` — seconds since each tier's worker last completed a claim cycle. This tracks worker liveness, not tier traffic: it stays low even on an idle tier. A steadily climbing age means the worker is stuck (most likely blocked on disk I/O) — check disk latency on the journal volume.
+- `netdata.netflow.tier_commit_duration` — how long the last commit batch took, fsync included. Sustained growth means the disk is falling behind the rollup volume.
+- `netdata.netflow.tier_commit_batches` — commit batches per second; each tier normally commits once per its bucket interval.
+- `netdata.netflow.tier_commit_stretched` — commit windows that carried more than one closed bucket because the worker missed an anniversary. Occasional events after a restart (catch-up) are normal; a steady rate means the disk cannot keep up with the rollup cadence. Data is not lost — windows stretch (a 1m rollup may become a 70-80s rollup) — but investigate disk throughput.
 
 Note: the live (open) tier rows shown by queries refresh on a 1-second cadence, so the current minute's in-progress rollup can lag the raw tier by up to one second.
 
@@ -270,8 +270,8 @@ sudo tcpdump -w /tmp/flow-sample.cap -c 200 'udp port 2055 or udp port 6343'
 Collect this before opening a bug report:
 
 - Plugin version (`netdata -V` from the running daemon).
-- Samples of `netflow.input_packets`, `netflow.protocol_packets`, `netflow.decoder_exceptions`, and `netflow.flow_rows` for the failure window. For v9/IPFIX include `netflow.flow_sets`; for sFlow or NSEL include their protocol-specific charts.
-- A sample of `netflow.facet_values`, `netflow.tier_index_entries`, and `netflow.open_tiers` if performance-related. Include `netflow.memory_resident_bytes` only if memory diagnostics were enabled.
+- Samples of `netdata.netflow.input_packets`, `netdata.netflow.protocol_packets`, `netdata.netflow.decoder_exceptions`, and `netdata.netflow.flow_rows` for the failure window. For v9/IPFIX include `netdata.netflow.flow_sets`; for sFlow or NSEL include their protocol-specific charts.
+- A sample of `netdata.netflow.facet_values`, `netdata.netflow.tier_index_entries`, and `netdata.netflow.open_tiers` if performance-related. Include `netdata.netflow.memory_resident_bytes` only if memory diagnostics were enabled.
 - A small packet-capture file (`tcpdump -w` from the agent's interface) reproducing the issue.
 - Sanitised `netflow.yaml` (redact internal IPs, customer names, secrets).
 - Relevant log lines from `journalctl --namespace netdata`.
