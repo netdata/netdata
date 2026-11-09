@@ -361,6 +361,25 @@ mod tests {
         assert_eq!(ok("t".into(), &json!({})).status, 200);
     }
 
+    /// The paid-plan gate of `otel-traces`, whose data the map is built from:
+    /// dropping a flag here must fail a test.
+    #[tokio::test]
+    async fn declaration_requires_a_paid_plan() {
+        let dir = tempfile::tempdir().unwrap();
+        let map = Arc::new(ServiceMap::start(crate::service::Config::new(dir.path())).unwrap());
+        let d = TopologyFunction::new(map.clone()).declaration();
+        assert_eq!(
+            d.access,
+            Some(
+                HttpAccess::SIGNED_ID
+                    | HttpAccess::SAME_SPACE
+                    | HttpAccess::COMMERCIAL_SPACE
+                    | HttpAccess::SENSITIVE_DATA
+            )
+        );
+        map.shutdown().await;
+    }
+
     #[tokio::test]
     async fn answers_info_and_a_window() {
         let dir = tempfile::tempdir().unwrap();
