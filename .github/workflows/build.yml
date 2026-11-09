@@ -823,8 +823,8 @@ jobs:
         env:
           NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
         run: |
-          [ -x ./latest/Manifest.sig ] && export MANIFEST_SIGNED=1
-          sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait ${MANIFEST_SIGNED:+--no-release-signature-verification}
+          [ -f ./latest/Manifest.sig ] || export MANIFEST_UNSIGNED=1
+          sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait ${MANIFEST_UNSIGNED:+--no-release-signature-verification}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
@@ -889,8 +889,8 @@ jobs:
         env:
           NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
         run: |
-          [ -x ./latest/Manifest.sig ] && export MANIFEST_SIGNED=1
-          sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry ${MANIFEST_SIGNED:+--no-release-signature-verification}
+          [ -f ./latest/Manifest.sig ] || export MANIFEST_UNSIGNED=1
+          sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry ${MANIFEST_UNSIGNED:+--no-release-signature-verification}
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
