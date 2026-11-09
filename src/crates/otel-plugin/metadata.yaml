@@ -218,6 +218,14 @@ modules:
                 - the download cache for remote storage (the `remote-read` subdirectory, limited by `remote_storage.read_cache_max_size`).
               default_value: "/var/log/netdata/otel/v2"
               required: false
+            # Applied by the supervisor's worker spawn (`--malloc-arena-max`),
+            # main.rs `set_glibc_arenas_for_process`; glibc builds only.
+            - name: malloc_arena_max
+              description: glibc malloc arenas for the plugin's ingestion and storage processes, or `auto` for one per CPU.
+              detailed_description: |
+                This setting replaces the Agent's `glibc malloc arena max for plugins` option in `netdata.conf` for these two processes. With `auto`, their threads do not wait on each other's memory allocations, which ingestion throughput depends on. Set a number to cap the arenas; fewer arenas can lower memory fragmentation and use, at the cost of ingestion throughput. It has no effect on systems whose C library is not glibc.
+              default_value: "auto"
+              required: false
             - name: logs.rotation.default.max_file_size
               description: File size at which incoming logs start a new file.
               default_value: "25MB"

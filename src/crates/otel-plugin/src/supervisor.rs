@@ -677,6 +677,7 @@ async fn spawn_worker<S, R>(
     self_exe: &std::path::Path,
     sock: &SocketGuard,
     name: &'static str,
+    worker_args: &[&str],
 ) -> anyhow::Result<(Connection<S, R>, ChildGuard)>
 where
     S: serde::Serialize + Send + 'static,
@@ -690,7 +691,9 @@ where
     tracing::info!("spawning {name} socket={}", sock.path());
 
     let child = Command::new(self_exe)
-        .args(["worker", name, "--socket", sock.path()])
+        .arg("worker")
+        .args(worker_args)
+        .args([name, "--socket", sock.path()])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
@@ -788,10 +791,14 @@ pub async fn run() -> anyhow::Result<()> {
     // Spawn the ledger first: it listens on the writer socket, and on startup
     // the ingestor connects to that socket to stream records to it. Reversing
     // the order would race the ingestor against a not-yet-listening ledger.
-    let (ledger_conn, ledger_child) = spawn_worker(&self_exe, &ledger_sock, "ledger").await?;
+    let arenas = arena_args(plugin_config.malloc_arena_max);
+    let arenas: Vec<&str> = arenas.iter().map(String::as_str).collect();
+    let (ledger_conn, ledger_child) =
+        spawn_worker(&self_exe, &ledger_sock, "ledger", &arenas).await?;
     let (ingestor_conn, ingestor_child) =
-        spawn_worker(&self_exe, &ingestor_sock, "ingestor").await?;
-    let (legacy_conn, legacy_child) = spawn_worker(&self_exe, &legacy_sock, "legacy-logs").await?;
+        spawn_worker(&self_exe, &ingestor_sock, "ingestor", &arenas).await?;
+    let (legacy_conn, legacy_child) =
+        spawn_worker(&self_exe, &legacy_sock, "legacy-logs", &[]).await?;
 
     let mut supervisor = Supervisor {
         ingestor: ingestor_conn,
@@ -866,9 +873,22 @@ pub async fn run() -> anyhow::Result<()> {
     }
 }
 
+/// The worker arguments that carry `malloc_arena_max` to the ingestor and
+/// ledger, which must apply it before they start any thread (`main.rs`).
+fn arena_args(malloc_arena_max: Option<usize>) -> [String; 2] {
+    let value = malloc_arena_max.map_or_else(|| "auto".to_string(), |n| n.to_string());
+    ["--malloc-arena-max".to_string(), value]
+}
+
 #[cfg(test)]
 mod tests {
-    use super::resolve_identity;
+    use super::{arena_args, resolve_identity};
+
+    #[test]
+    fn arena_args_carry_auto_or_the_count() {
+        assert_eq!(arena_args(None), ["--malloc-arena-max", "auto"]);
+        assert_eq!(arena_args(Some(4)), ["--malloc-arena-max", "4"]);
+    }
 
     #[test]
     fn resolve_identity_accepts_dashed_form() {

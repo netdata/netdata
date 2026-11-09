@@ -75,6 +75,12 @@ pub struct PluginConfig {
     /// shipped stock logs tuning.
     #[serde(default)]
     pub traces: SignalConfig,
+    /// glibc malloc arena limit (`M_ARENA_MAX`) for the ingestor and ledger
+    /// workers; `None` (`auto` in YAML) is one per runtime worker thread. The
+    /// supervisor passes it on each worker's command line, because it must be
+    /// set before the worker starts any thread; ignored off glibc.
+    #[serde(default, with = "opt_auto_count")]
+    pub malloc_arena_max: Option<usize>,
     /// Socket path for WAL event IPC between ingestor and ledger: the
     /// ingestor connects to it and the ledger accepts its single writer
     /// connection. Set by the supervisor at runtime, not present in YAML
@@ -1282,6 +1288,76 @@ traces:
             back.resolve("default").horizon,
             Duration::from_secs(1234 * 86_400)
         );
+    }
+}
+
+/// Serde for an optional count whose `None` is spelled `auto`, dual-mode like
+/// `opt_duration`: in human-readable formats (YAML) a count, `auto` or null; a
+/// plain `Option<usize>` otherwise (bincode IPC has no self-describing types).
+mod opt_auto_count {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(val: &Option<usize>, s: S) -> Result<S::Ok, S::Error> {
+        match (s.is_human_readable(), val) {
+            (true, None) => "auto".serialize(s),
+            _ => val.serialize(s),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<usize>, D::Error> {
+        if !d.is_human_readable() {
+            return Option::<usize>::deserialize(d);
+        }
+
+        struct Visitor;
+
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = Option<usize>;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a positive integer or \"auto\"")
+            }
+
+            fn visit_u64<E: serde::de::Error>(self, n: u64) -> Result<Self::Value, E> {
+                usize::try_from(n)
+                    .map(Some)
+                    .map_err(|_| E::custom(format!("{n} is too large")))
+            }
+
+            fn visit_i64<E: serde::de::Error>(self, n: i64) -> Result<Self::Value, E> {
+                u64::try_from(n)
+                    .map_err(|_| {
+                        E::custom(format!("expected a positive integer or \"auto\", got {n}"))
+                    })
+                    .and_then(|n| self.visit_u64(n))
+            }
+
+            fn visit_f64<E: serde::de::Error>(self, n: f64) -> Result<Self::Value, E> {
+                Err(E::custom(format!(
+                    "expected a positive integer or \"auto\", got {n}"
+                )))
+            }
+
+            fn visit_str<E: serde::de::Error>(self, s: &str) -> Result<Self::Value, E> {
+                if s.trim().eq_ignore_ascii_case("auto") {
+                    Ok(None)
+                } else {
+                    Err(E::custom(format!(
+                        "expected a positive integer or \"auto\", got \"{s}\""
+                    )))
+                }
+            }
+
+            fn visit_none<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+                Ok(None)
+            }
+
+            fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
+                Ok(None)
+            }
+        }
+
+        d.deserialize_any(Visitor)
     }
 }
 
