@@ -3792,6 +3792,7 @@ dependencies = [
  "ferryboat",
  "file-registry",
  "humantime",
+ "libc",
  "netdata-plugin-protocol",
  "netdata-plugin-rt",
  "netdata-plugin-types",

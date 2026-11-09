@@ -69,6 +69,7 @@ mod otlp_json;
 mod output;
 mod tenant;
 mod trace_service;
+mod wal_sync;
 
 use chart_config::ChartConfigManager;
 use logs_service::NetdataLogsService;
