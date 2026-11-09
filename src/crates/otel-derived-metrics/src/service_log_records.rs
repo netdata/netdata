@@ -81,6 +81,9 @@ impl ServiceLogRecords {
         export: &ExportLogsServiceRequest,
     ) {
         for resource_logs in &export.resource_logs {
+            // As in `ServiceRequests::record`: a service without a log record
+            // here never reaches the aggregator, but takes its place in the
+            // batch.
             let labels = service_labels(tenant, resource_logs.resource.as_ref());
             let mut service = batch.entity(labels);
             for scope_logs in &resource_logs.scope_logs {

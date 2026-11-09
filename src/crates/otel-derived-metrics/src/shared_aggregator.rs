@@ -1,12 +1,12 @@
-//! The aggregator of one metric set, shared by the export requests and the
-//! tick.
+//! The aggregator of one metric set, behind its own lock.
 
 use crate::MAX_CHUNK_BYTES;
 use netdata_plugin_metrics::{Aggregator, Batch, MetricSet, Stats};
 use std::sync::Mutex;
 
-/// An [`Aggregator`] behind its own lock: export requests merge into it while
-/// the tick emits from it. Each call holds the lock for its own length only.
+/// An [`Aggregator`] behind its own lock: the tick emits from it, and
+/// whichever tasks record into its metric set (export requests, the tick
+/// itself) merge into it. Each call holds the lock for its own length only.
 pub(crate) struct SharedAggregator(Mutex<Aggregator>);
 
 impl SharedAggregator {

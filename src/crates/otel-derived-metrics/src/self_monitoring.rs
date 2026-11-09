@@ -91,7 +91,8 @@ impl IngestOutcomes {
         self.aggregator.merge(batch, now);
     }
 
-    /// Add to `chunks` the windows that ended before `now` (Unix seconds).
+    /// Record the heartbeat at `now` (Unix seconds), then add to `chunks`
+    /// every window that ended by `now`.
     pub(crate) fn emit(&self, now: u64, chunks: &mut Vec<Vec<u8>>) {
         self.aggregator.merge(self.heartbeat(now), now);
         self.aggregator.emit(now, chunks);
@@ -157,7 +158,7 @@ impl DerivationHealth {
     }
 
     /// Record the statistics each signal's aggregator has at `now` (Unix
-    /// seconds), then add to `chunks` the windows that ended before `now`: a
+    /// seconds), then add to `chunks` every window that ended by `now`: a
     /// tick charts the statistics the tick before it recorded.
     pub(crate) fn emit(
         &self,

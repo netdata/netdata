@@ -83,6 +83,9 @@ struct PerServiceMetrics {
     health: DerivationHealth,
 }
 
+/// The metric sets the plugin derives. Export requests record into its
+/// batches and report their outcomes with [`Self::record_ingest`]; the tick
+/// calls [`Self::emit`].
 pub struct DerivedMetrics {
     per_service: Option<PerServiceMetrics>,
     ingest_outcomes: IngestOutcomes,

@@ -57,8 +57,9 @@ impl EntityRows {
 /// twice.
 pub struct Batch {
     set: MetricSet,
-    /// By labels, in first-event order: the aggregator admits new entities in
-    /// this order until its cardinality limit is reached.
+    /// By labels, in first-lookup order ([`Batch::entity`]): the aggregator
+    /// admits the new entities that have events in this order until its
+    /// cardinality limit is reached.
     pub(crate) entities: IndexMap<Labels, EntityRows>,
 }
 

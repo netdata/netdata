@@ -1,10 +1,9 @@
 //! Per-service charts from spans: request rate, errors and duration.
 //!
 //! Services are identified as in [`crate::service`]. A request is a span that
-//! is a trace root (no parent id, or the all-zero one, which storage also
-//! treats as unset), or of kind SERVER or CONSUMER; it failed when its status
-//! is ERROR. It counts at its end time, weighted by the adjusted count its
-//! `ot=th` sampling threshold implies.
+//! is a trace root, or of kind SERVER or CONSUMER (`is_request` has the exact
+//! rule); it failed when its status is ERROR. It counts at its end time,
+//! weighted by the adjusted count its `ot=th` sampling threshold implies.
 
 use crate::service::{service_labels, service_settings};
 use crate::shared_aggregator::SharedAggregator;
@@ -87,8 +86,9 @@ impl ServiceRequests {
         export: &ExportTraceServiceRequest,
     ) {
         for resource_spans in &export.resource_spans {
-            // A service without a request here gets no event, and an entity
-            // without events never reaches the aggregator.
+            // Looked up before its first request: a service without one here
+            // gets no event and never reaches the aggregator. It still takes
+            // its place in the batch, the order new services are admitted in.
             let labels = service_labels(tenant, resource_spans.resource.as_ref());
             let mut service = batch.entity(labels);
             for scope_spans in &resource_spans.scope_spans {

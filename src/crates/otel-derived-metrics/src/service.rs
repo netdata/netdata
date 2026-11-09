@@ -61,8 +61,9 @@ pub(crate) fn service_labels(tenant: &str, resource: Option<&Resource>) -> Label
     labels
 }
 
-/// The string value of the attribute `key`; of the last one when a sender
-/// repeats the key. `None` when no attribute has that key and a string value.
+/// The string value of the last attribute `key` that has one (a sender
+/// should not repeat a key). `None` when no attribute `key` has a string
+/// value.
 fn string_attribute<'a>(attributes: &'a [KeyValue], key: &str) -> Option<&'a str> {
     for attribute in attributes.iter().rev() {
         if attribute.key != key {
