@@ -42,6 +42,7 @@ use serde::de::DeserializeOwned;
 use serde_json::json;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tokio_util::task::AbortOnDropHandle;
 use tracing::{error, info};
 
 /// Progress-emission cadence: 250ms wall-clock, matching the 250ms
@@ -341,8 +342,10 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
         // is delayed one full interval, so a call that finishes inside 250ms
         // emits no spurious progress. `MissedTickBehavior::Skip` drops missed
         // ticks rather than burst-emitting stale progress after a stall.
+        // Dropping the handle aborts the ticker, so a handler that panics past
+        // the select stops it too.
         let first = tokio::time::Instant::now() + PROGRESS_INTERVAL;
-        let ticker = tokio::spawn(async move {
+        let ticker = AbortOnDropHandle::new(tokio::spawn(async move {
             let mut interval = tokio::time::interval_at(first, PROGRESS_INTERVAL);
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
@@ -363,7 +366,7 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                     break;
                 }
             }
-        });
+        }));
 
         let handler = self.handler.clone();
 
@@ -376,7 +379,7 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
             }
         };
 
-        ticker.abort();
+        drop(ticker);
 
         // `expires` is the epoch-seconds expiry the agent puts on the proxied
         // response (its HTTP `Expires` header): success grants a short 2s TTL,
@@ -521,6 +524,58 @@ mod tests {
         fn declaration(&self) -> FunctionDeclaration {
             FunctionDeclaration::new("test-slow", "test slow indeterminate handler")
         }
+    }
+
+    struct PanickingHandler;
+
+    #[async_trait]
+    impl FunctionHandler for PanickingHandler {
+        type Request = serde_json::Value;
+        type Response = serde_json::Value;
+
+        async fn on_call(
+            &self,
+            _ctx: FunctionCallContext,
+            _request: Self::Request,
+        ) -> Result<Self::Response> {
+            tokio::time::sleep(Duration::from_millis(400)).await;
+            panic!("a handler bug");
+        }
+
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new("test-panic", "test panicking handler")
+        }
+    }
+
+    // A handler that panics must not leave its progress ticker running: the
+    // agent logs an error for every progress of a transaction it closed.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_panicking_handler_stops_its_progress_ticker() {
+        let adapter = HandlerAdapter::new(PanickingHandler);
+        let (outbound_tx, mut outbound_rx) = mpsc::unbounded_channel();
+        let ctx = Arc::new(FunctionContext {
+            function_call: Box::new(FunctionCall {
+                transaction: "tx-panic".to_string(),
+                timeout: 60,
+                name: "test-panic".to_string(),
+                args: Vec::new(),
+                access: None,
+                source: None,
+                payload: None,
+            }),
+            cancellation_token: CancellationToken::new(),
+            outbound_tx,
+        });
+
+        let task = tokio::spawn(async move { adapter.handle_raw(ctx).await });
+        assert!(task.await.expect_err("the handler panics").is_panic());
+        while let Ok(Message::FunctionProgressResponse(_)) = outbound_rx.try_recv() {}
+
+        tokio::time::sleep(Duration::from_millis(800)).await;
+        assert!(
+            outbound_rx.try_recv().is_err(),
+            "the progress ticker outlived its call"
+        );
     }
 
     // The ticker must emit during the indeterminate (pre-set_total) phase, and

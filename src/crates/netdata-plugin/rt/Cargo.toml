@@ -14,7 +14,7 @@ netdata-plugin-protocol = { workspace = true }
 
 # Async runtime and tokio utilities
 tokio = { workspace = true }
-tokio-util = { workspace = true }
+tokio-util = { workspace = true, features = ["rt"] }
 
 async-trait = { workspace = true }
 futures = { workspace = true }

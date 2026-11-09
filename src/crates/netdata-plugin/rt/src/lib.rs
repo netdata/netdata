@@ -125,6 +125,7 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{Mutex, mpsc};
 use tokio_util::sync::CancellationToken;
+use tokio_util::task::AbortOnDropHandle;
 use tracing::{error, info, instrument, trace, warn};
 
 pub mod netdata_env;
@@ -552,12 +553,14 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
 
         // Progress ticker: samples the counters once a second (missed ticks
         // are skipped, not bursted) and pushes FUNCTION_PROGRESS while the
-        // call runs; aborted below as soon as it completes.
+        // call runs; aborted below as soon as it completes. Dropping the
+        // handle aborts it, so a handler that panics past the select stops it
+        // too.
         let progress = call_ctx.progress.clone();
         let ticker_tx = ctx.outbound_tx.clone();
         let ticker_transaction = transaction.clone();
 
-        let ticker = tokio::spawn(async move {
+        let ticker = AbortOnDropHandle::new(tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
@@ -585,7 +588,7 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                     }
                 }
             }
-        });
+        }));
 
         let handler = self.handler.clone();
 
@@ -598,7 +601,7 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
             }
         };
 
-        ticker.abort();
+        drop(ticker);
 
         let current_timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

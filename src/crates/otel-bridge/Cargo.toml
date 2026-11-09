@@ -16,7 +16,7 @@ netdata-plugin-types = { workspace = true }
 
 # Async runtime and tokio utilities
 tokio = { workspace = true }
-tokio-util = { workspace = true }
+tokio-util = { workspace = true, features = ["rt"] }
 
 async-trait = { workspace = true }
 bytesize = { workspace = true }
