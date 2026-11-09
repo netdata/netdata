@@ -81,54 +81,59 @@ impl NetflowCharts {
         W: AsyncWrite + Unpin + Send + 'static,
     {
         tokio::spawn(async move {
-            // Tick in the middle of each second: a tick records into the
-            // window of its second, and a tick that runs late still lands in
-            // it, so no window is left without a sample.
-            let mut interval = tokio::time::interval_at(
-                tokio::time::Instant::now() + delay_to_mid_second(SystemTime::now()),
-                Duration::from_secs(1),
-            );
             let mut open_tier_sample = OpenTierSamplerState::default();
             let mut tier_index_cardinality = TierFlowIndexCardinality::default();
             let mut memory_diagnostics_state =
                 MemoryDiagnosticsSamplerState::new(config.memory_diagnostics.interval);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+            let mut write_failing = false;
 
             loop {
+                // Wake in the middle of each second and take the time first:
+                // the sample belongs to the window of that second however long
+                // sampling takes, and aiming at the wall clock on every pass
+                // keeps the phase after clock steps or a suspend.
                 tokio::select! {
                     _ = shutdown.cancelled() => break,
-                    _ = interval.tick() => {
-                        sample_udp_kernel_drops(metrics.as_ref());
-                        open_tier_sample = sample_open_tier_state(open_tiers.as_ref(), open_tier_sample);
-                        tier_index_cardinality = sample_tier_index_cardinality(
-                            tier_flow_indexes.as_ref(),
-                            tier_index_cardinality,
-                        );
-                        let memory_diagnostics = sample_memory_diagnostics_if_due(
-                            config.memory_diagnostics.enabled,
-                            &mut memory_diagnostics_state,
-                            open_tiers.as_ref(),
-                            tier_flow_indexes.as_ref(),
-                            facet_runtime.as_ref(),
-                            &resident_mapping_paths,
-                        );
-                        if !publish.is_cancelled() {
-                            continue;
+                    _ = tokio::time::sleep(delay_to_mid_second(SystemTime::now())) => {}
+                }
+                let now = unix_seconds(SystemTime::now());
+
+                sample_udp_kernel_drops(metrics.as_ref());
+                open_tier_sample = sample_open_tier_state(open_tiers.as_ref(), open_tier_sample);
+                tier_index_cardinality = sample_tier_index_cardinality(
+                    tier_flow_indexes.as_ref(),
+                    tier_index_cardinality,
+                );
+                let memory_diagnostics = sample_memory_diagnostics_if_due(
+                    config.memory_diagnostics.enabled,
+                    &mut memory_diagnostics_state,
+                    open_tiers.as_ref(),
+                    tier_flow_indexes.as_ref(),
+                    facet_runtime.as_ref(),
+                    &resident_mapping_paths,
+                );
+                if !publish.is_cancelled() {
+                    continue;
+                }
+
+                let snapshot = NetflowChartsSnapshot::collect(
+                    metrics.as_ref(),
+                    open_tier_sample.counts,
+                    tier_index_cardinality,
+                    facet_runtime.cardinality_snapshot(),
+                    memory_diagnostics,
+                );
+                self.record(&snapshot, now);
+                for chunk in self.emit(now) {
+                    match writer.lock().await.write_raw(&chunk).await {
+                        Ok(()) => write_failing = false,
+                        // Once per run of failures: a closed stdout fails
+                        // every second until the runtime stops.
+                        Err(err) if !write_failing => {
+                            write_failing = true;
+                            tracing::error!("writing the netflow charts: {err}");
                         }
-                        let snapshot = NetflowChartsSnapshot::collect(
-                            metrics.as_ref(),
-                            open_tier_sample.counts,
-                            tier_index_cardinality,
-                            facet_runtime.cardinality_snapshot(),
-                            memory_diagnostics,
-                        );
-                        let now = unix_seconds(SystemTime::now());
-                        self.record(&snapshot, now);
-                        for chunk in self.emit(now) {
-                            if let Err(err) = writer.lock().await.write_raw(&chunk).await {
-                                tracing::error!("writing the netflow charts: {err}");
-                            }
-                        }
+                        Err(_) => {}
                     }
                 }
             }
@@ -149,7 +154,7 @@ fn delay_to_mid_second(now: SystemTime) -> Duration {
             Duration::from_nanos(u64::from(since_epoch.subsec_nanos()))
         });
     let mid = Duration::from_millis(500);
-    if subsec <= mid {
+    if subsec < mid {
         mid - subsec
     } else {
         Duration::from_secs(1) + mid - subsec

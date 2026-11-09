@@ -831,7 +831,8 @@ where
     /// publication collects something on every run, so it is restarted forever. Call `run()`
     /// only after every fallible startup step (binding listeners, opening storage) has succeeded,
     /// and send `PLUGIN_KEEPALIVE` through [`writer`](Self::writer) while waiting for them: the
-    /// Agent gives up on a plugin that stays silent for two minutes.
+    /// Agent gives up on a plugin that stays silent for two minutes. Chart text the plugin writes
+    /// through [`writer`](Self::writer) publishes it too: start it at the same point as `run()`.
     pub async fn run(mut self) -> Result<()> {
         info!("starting plugin runtime: {}", self.plugin_name);
 

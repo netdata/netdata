@@ -48,6 +48,63 @@ fn memory_charts_are_declared_only_when_enabled() {
     assert!(enabled.contains("BEGIN netdata.netflow.memory_resident_bytes 2000000\n"));
 }
 
+/// Sampling runs from the start, but chart text goes out only once `publish`
+/// is cancelled: before that the plugin has not finished its startup.
+#[tokio::test]
+async fn the_sampler_writes_charts_only_after_publication() {
+    use tokio::io::AsyncReadExt;
+
+    let tmp = tempfile::tempdir().expect("create chart sampler tempdir");
+    let (stdout, mut agent) = tokio::io::duplex(1 << 20);
+    let writer = Arc::new(tokio::sync::Mutex::new(
+        netdata_plugin_protocol::MessageWriter::new(stdout),
+    ));
+    let publish = CancellationToken::new();
+    let shutdown = CancellationToken::new();
+    let config = ChartsConfig::default();
+    let sampler = NetflowCharts::new(&config)
+        .expect("the netflow charts are valid")
+        .spawn_sampler(
+            Arc::new(IngestMetrics::default()),
+            Arc::new(RwLock::new(OpenTierState::default())),
+            Arc::new(RwLock::new(TierFlowIndexStore::default())),
+            Arc::new(FacetRuntime::new(tmp.path())),
+            ProcessResidentMappingPaths::new(
+                &tmp.path().join("raw"),
+                &tmp.path().join("1m"),
+                &tmp.path().join("5m"),
+                &tmp.path().join("1h"),
+                &[],
+                &[],
+            ),
+            config,
+            writer,
+            publish.clone(),
+            shutdown.clone(),
+        );
+
+    // At least one sampling pass, unpublished.
+    tokio::time::sleep(Duration::from_millis(1_600)).await;
+    let mut buf = vec![0; 1 << 20];
+    let before = tokio::time::timeout(Duration::from_millis(50), agent.read(&mut buf)).await;
+    assert!(before.is_err(), "chart text before publication");
+
+    // The first sample after publication opens a window; the next closes it.
+    publish.cancel();
+    let read = tokio::time::timeout(Duration::from_secs(10), agent.read(&mut buf))
+        .await
+        .expect("chart text within 10 s of publication")
+        .expect("read the chart text");
+    let text = String::from_utf8_lossy(&buf[..read]);
+    assert!(
+        text.contains("CHART netdata.netflow.input_packets "),
+        "{text}"
+    );
+
+    shutdown.cancel();
+    sampler.await.expect("the sampler stops on shutdown");
+}
+
 #[test]
 fn snapshot_collects_current_metric_totals_and_open_rows() {
     let metrics = IngestMetrics::default();
