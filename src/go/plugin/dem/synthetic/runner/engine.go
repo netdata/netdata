@@ -39,14 +39,15 @@ type ArtifactStore interface {
 
 type Engine struct {
 	*executionOwner
-	source    Source
-	history   historyWriter
-	artifacts ArtifactStore
-	start     startFunc
-	platform  func() error
+	source     Source
+	history    historyWriter
+	unrecorded bool
+	artifacts  ArtifactStore
+	start      startFunc
+	platform   func() error
 }
 
-// Candidate qualification and monitoring share admission and fail-stop state.
+// Qualification, rehearsal and monitoring share admission and fail-stop state.
 // Keep sync.Once on this shared owner; never copy it into a candidate view.
 type executionOwner struct {
 	admission  chan struct{}
@@ -72,10 +73,11 @@ func New(source Source, history historyWriter, artifacts ArtifactStore) *Engine 
 	}
 }
 
-func (e *Engine) qualificationView(source Source, artifacts ArtifactStore) *Engine {
+func (e *Engine) unrecordedView(source Source, artifacts ArtifactStore) *Engine {
 	return &Engine{
 		executionOwner: e.executionOwner,
 		source:         source,
+		unrecorded:     true,
 		artifacts:      artifacts,
 		start:          e.start,
 		platform:       e.platform,
@@ -319,6 +321,9 @@ func (e *Engine) complete(run *synthetic.Run, captures []synthetic.Capture, reda
 }
 
 func (e *Engine) save(ctx context.Context, phase string, run *synthetic.Run, redact *textRedactor) {
+	if e.unrecorded {
+		return
+	}
 	if e.history == nil {
 		run.HistoryError = joinText(run.HistoryError, "history owner is unavailable")
 		return

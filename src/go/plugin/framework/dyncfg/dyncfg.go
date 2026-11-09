@@ -51,10 +51,16 @@ const (
 )
 
 // Testable is an optional operational-test capability for configured resources.
+// Explicit collector tests call Test after Init, instead of Check. Collectors
+// without this capability use Check; activation always uses Init and Check.
 // Implementations must honor ctx and release resources acquired by the test.
-// They must return failures for caller-side sanitization instead of logging raw
+// They must return failures for caller-specific error handling instead of logging raw
 // user configuration, credentials, or endpoint material. NewPublicError may
 // attach a static, code-authored explanation that is safe to render publicly.
+// Collectors must return response-safe error text: without secret references,
+// their lifecycle errors are returned as-is. With secret references, collector
+// sanitization replaces error text, including NewPublicError explanations, and
+// does not preserve ErrTestUnsupported identity. Either case remains a failure.
 // Test may return ErrTestUnsupported when a valid configured instance cannot
 // safely perform an operational test.
 type Testable interface {

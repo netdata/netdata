@@ -1742,6 +1742,12 @@ actor:
   endpoint IPs stay evidence and display fields because vendor profiles expose
   them asymmetrically, and parallel sessions of one pair in one routing
   instance remain `actor_bgp_peers` detail rows under one graph relationship.
+  The optional device-local `process_id` is retained in those detail rows and does
+  not change graph identity. Process-scoped source rows with explicit process,
+  routing instance and neighbor may omit an unproved remote AS; a row without
+  established state contributes inventory only. Preserve nonblank process and routing-instance
+  identifiers byte-for-byte in inventory and relationship evidence. Absence/default handling
+  must not trim an otherwise nonblank identifier; IP/ASN normalization is a separate rule.
 
 Every logical-L3 and control-plane type (`l3_subnet`, `l3_subnet_membership`,
 `ospf_adjacency`, `bgp_adjacency`) is excluded from `actor_port_links`, which

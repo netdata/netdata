@@ -97,13 +97,20 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
     rrdhost_init();
 
     if (unlikely(sql_init_meta_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
+        char reason[256];
+        int os_errno = 0;
+        sql_init_meta_failure_reason(reason, sizeof(reason), &os_errno);
+
         if (default_rrd_memory_mode == RRD_DB_MODE_DBENGINE) {
             set_late_analytics_variables(system_info);
-            fatal("Failed to initialize SQLite");
+            // report the OS error SQLite saw, not whatever errno the startup code left behind
+            errno = os_errno;
+            fatal("Failed to initialize SQLite metadata database: %s", reason);
         }
 
-        nd_log(NDLS_DAEMON, NDLP_DEBUG,
-               "Skipping SQLITE metadata initialization since memory mode is not dbengine");
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "Failed to initialize SQLite metadata database: %s; continuing without it since memory mode is not dbengine",
+               reason);
     }
 
     if (unlikely(sql_init_context_database(system_info ? 0 : 1))) {

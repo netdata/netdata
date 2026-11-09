@@ -21,6 +21,9 @@ import (
 )
 
 type Config struct {
+	// LogKeyPrefix isolates warning budgets when collectors share a logger.
+	// Callers must keep it stable across refreshes and exclude credentials.
+	LogKeyPrefix        string
 	SnmpClient          gosnmp.Handler
 	Profiles            []*ddsnmp.Profile
 	Log                 *logger.Logger
@@ -31,6 +34,7 @@ type Config struct {
 
 func New(cfg Config) *Collector {
 	coll := &Collector{
+		logKeyPrefix:              cfg.LogKeyPrefix,
 		log:                       cfg.Log.With(slog.String("ddsnmp", "collector")),
 		profiles:                  make(map[string]*profileState),
 		missingOIDs:               make(map[string]bool),
@@ -57,6 +61,7 @@ func New(cfg Config) *Collector {
 	coll.deviceMetadataCollector = newDeviceMetadataCollector(cfg.SnmpClient, coll.missingOIDs, coll.log, cfg.SysObjectID)
 	coll.scalarCollector = newScalarCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
 	coll.tableCollector = newTableCollector(cfg.SnmpClient, coll.missingOIDs, coll.tableCache, coll.log, cfg.DisableBulkWalk)
+	coll.tableCollector.logKeyPrefix = cfg.LogKeyPrefix
 	coll.vmetricsCollector = newVirtualMetricsCollector(coll.log)
 
 	return coll
@@ -67,6 +72,7 @@ type (
 		failures                  ddsnmp.CollectionFailures
 		requests                  snmpRequestState
 		log                       *logger.Logger
+		logKeyPrefix              string
 		profiles                  map[string]*profileState
 		missingOIDs               map[string]bool
 		negative                  negativeEvidence
@@ -449,7 +455,7 @@ func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollectio
 	now := time.Now()
 	licenseRows, err := c.collectLicenseRowsObserved(ps.profile, &pm.Stats, profile.acquisition)
 	if err != nil {
-		c.log.Limit(licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
 			Warningf("failed to collect licensing rows for profile %q: %v", ps.profile.SourceFile, err)
 	}
 	pm.LicenseRows = append(pm.LicenseRows, licenseRows...)
@@ -465,7 +471,7 @@ func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollectio
 	}
 	if err != nil {
 		pm.BGPCollectError = err
-		c.log.Limit(bgpRowsFailedLogKey+ps.profile.SourceFile, 1, bgpRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+bgpRowsFailedLogKey+ps.profile.SourceFile, 1, bgpRowsErrorLogEvery).
 			Warningf("failed to collect BGP rows for profile %q: %v", ps.profile.SourceFile, err)
 	}
 	pm.BGPRows = append(pm.BGPRows, bgpRows...)
@@ -501,39 +507,20 @@ func sanitizeMetricMetadata(m *ddsnmp.Metric) {
 	m.Description = metricMetaReplacer.Replace(m.Description)
 	m.Family = metricMetaReplacer.Replace(m.Family)
 	m.Unit = metricMetaReplacer.Replace(m.Unit)
-	for k, v := range m.Tags {
-		// Remove tags prefixed with "rm:", which are intended for temporary use during transforms
-		// and should not appear in the final exported metric.
-		if strings.HasPrefix(k, "rm:") {
-			delete(m.Tags, k)
-			continue
-		}
-		m.Tags[k] = metricMetaReplacer.Replace(v)
-	}
+	removeTemporaryTags(m.Tags)
 }
 
 func sanitizeLicenseRow(row *ddsnmp.LicenseRow) {
-	row.ID = metricMetaReplacer.Replace(row.ID)
 	row.Name = metricMetaReplacer.Replace(row.Name)
 	row.Feature = metricMetaReplacer.Replace(row.Feature)
 	row.Component = metricMetaReplacer.Replace(row.Component)
 	row.Type = metricMetaReplacer.Replace(row.Type)
 	row.Impact = metricMetaReplacer.Replace(row.Impact)
 	row.State.Raw = metricMetaReplacer.Replace(row.State.Raw)
-	for k, v := range row.Tags {
-		if strings.HasPrefix(k, "rm:") {
-			delete(row.Tags, k)
-			continue
-		}
-		row.Tags[k] = metricMetaReplacer.Replace(v)
-	}
+	removeTemporaryTags(row.Tags)
 }
 
 func sanitizeBGPRow(row *ddsnmp.BGPRow) {
-	row.RowKey = metricMetaReplacer.Replace(row.RowKey)
-	row.Identity.RoutingInstance = metricMetaReplacer.Replace(row.Identity.RoutingInstance)
-	row.Identity.Neighbor = metricMetaReplacer.Replace(row.Identity.Neighbor)
-	row.Identity.RemoteAS = metricMetaReplacer.Replace(row.Identity.RemoteAS)
 	row.Descriptors.LocalAddress = metricMetaReplacer.Replace(row.Descriptors.LocalAddress)
 	row.Descriptors.LocalAS = metricMetaReplacer.Replace(row.Descriptors.LocalAS)
 	row.Descriptors.LocalIdentifier = metricMetaReplacer.Replace(row.Descriptors.LocalIdentifier)
@@ -573,12 +560,17 @@ func sanitizeBGPRow(row *ddsnmp.BGPRow) {
 	sanitizeBGPInt64(&row.Device.Peers)
 	sanitizeBGPInt64(&row.Device.InternalPeers)
 	sanitizeBGPInt64(&row.Device.ExternalPeers)
-	for k, v := range row.Tags {
-		if strings.HasPrefix(k, "rm:") {
-			delete(row.Tags, k)
-			continue
+	removeTemporaryTags(row.Tags)
+}
+
+// Semantic tags and typed IDs must retain their exact bytes until machine identity
+// is built. The chart renderer owns wire sanitation; only transform-local tags
+// are removed here.
+func removeTemporaryTags(tags map[string]string) {
+	for key := range tags {
+		if strings.HasPrefix(key, "rm:") {
+			delete(tags, key)
 		}
-		row.Tags[k] = metricMetaReplacer.Replace(v)
 	}
 }
 

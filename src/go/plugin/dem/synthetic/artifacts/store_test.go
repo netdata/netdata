@@ -302,7 +302,7 @@ func TestTemporaryClosePreservesUnverifiedWork(t *testing.T) {
 	require.NoError(t, err)
 	actual, err := os.Readlink(work)
 	require.NoError(t, err)
-	require.NoError(t, s.Close())
+	require.ErrorContains(t, s.Close(), "temporary artifact store cleanup is incomplete")
 	_, err = os.Stat(work)
 	require.NoError(t, err)
 	// This fixture owns the simulated work; no child process was started.

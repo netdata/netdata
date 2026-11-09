@@ -11,32 +11,106 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func TestLongestCommonPrefix(t *testing.T) {
-	tests := map[string]struct {
-		oids     []string
-		expected string
-	}{
-		"if_x_table": {
-			oids: []string{
-				"1.3.6.1.2.1.31.1.1.1.1",
-				"1.3.6.1.2.1.31.1.1.1.18",
-			},
-			expected: "1.3.6.1.2.1.31.1.1.1",
+func TestPrepareIndexFromDependencies(t *testing.T) {
+	row := ddprofiledefinition.MetricsConfig{
+		Table: ddprofiledefinition.SymbolConfig{
+			OID:  "1.1.1.7",
+			Name: "source",
 		},
-		"juniper_table": {
-			oids: []string{
-				"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.11",
-				"1.3.6.1.4.1.2636.5.1.1.2.1.1.1.14",
+		Symbols: []ddprofiledefinition.SymbolConfig{{OID: "1.1.1", Name: "value"}},
+		MetricTags: []ddprofiledefinition.MetricTagConfig{{
+			Tag: "label", Table: "labels", Symbol: ddprofiledefinition.SymbolConfigCompat{
+				OID:  "1.4.1",
+				Name: "label",
 			},
-			expected: "1.3.6.1.4.1.2636.5.1.1.2.1.1.1",
-		},
+			IndexFrom: []ddprofiledefinition.MetricTagIndexSource{
+				{Table: "link", Symbol: ddprofiledefinition.SymbolConfig{
+					OID:  "1.2.1",
+					Name: "link",
+				}},
+				{Table: "alias", Symbol: ddprofiledefinition.SymbolConfig{
+					OID:  "1.3.1",
+					Name: "alias",
+				}},
+			},
+		}},
 	}
+	for _, topology := range []bool{false, true} {
+		profile := &Profile{
+			Definition: &ddprofiledefinition.ProfileDefinition{},
+		}
+		if topology {
+			profile.Definition.Topology = []ddprofiledefinition.TopologyConfig{
+				{Kind: ddprofiledefinition.KindIfName, MetricsConfig: row.Clone()},
+			}
+		} else {
+			profile.Definition.Metrics = []ddprofiledefinition.MetricsConfig{row.Clone()}
+		}
+		handleCrossTableTagsWithoutMetrics(profile)
+		got := make(map[string]string)
+		for _, metric := range profile.Definition.Metrics {
+			got[metric.Table.Name] = metric.Table.OID
+		}
+		for _, metric := range profile.Definition.Topology {
+			assert.Equal(t, ddprofiledefinition.KindIfName, metric.Kind)
+			got[metric.Table.Name] = metric.Table.OID
+		}
+		assert.Equal(
+			t,
+			map[string]string{"source": "1.1.1.7", "link": "1.2.1", "alias": "1.3.1", "labels": "1.4.1"},
+			got,
+			"value-derived keys must not inherit the source table's fixed index prefix",
+		)
+		before := profile.Definition.Clone()
+		handleCrossTableTagsWithoutMetrics(profile)
+		assert.Equal(t, before, profile.Definition, "preparation is idempotent")
+	}
+}
 
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, longestCommonPrefix(tc.oids))
-		})
+func TestIndexFromSurvivesInheritanceAndConsumerProjection(t *testing.T) {
+	base := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{
+			Metrics: []ddprofiledefinition.MetricsConfig{{
+				Table: ddprofiledefinition.SymbolConfig{
+					OID:  "1.1",
+					Name: "source",
+				},
+				Symbols: []ddprofiledefinition.SymbolConfig{{OID: "1.1.1", Name: "value"}},
+				MetricTags: []ddprofiledefinition.MetricTagConfig{{
+					Tag: "label", Table: "labels", Symbol: ddprofiledefinition.SymbolConfigCompat{
+						OID:  "1.3.1",
+						Name: "label",
+					},
+					IndexFrom: []ddprofiledefinition.MetricTagIndexSource{
+						{Table: "link", Symbol: ddprofiledefinition.SymbolConfig{
+							OID:  "1.2.1",
+							Name: "link",
+							Mapping: ddprofiledefinition.MappingConfig{
+								Items: map[string]string{"1": "2"},
+							},
+						}},
+					},
+				}},
+			}},
+		},
 	}
+	child := &Profile{
+		Definition: &ddprofiledefinition.ProfileDefinition{},
+	}
+	require.NoError(t, child.merge(base))
+	resolved := &ResolvedProfileSet{
+		profiles: []*Profile{child},
+	}
+	first := resolved.Project(ConsumerMetrics).Profiles()
+	second := resolved.Project(ConsumerMetrics).Profiles()
+	require.Len(t, first, 1)
+	require.Len(t, second, 1)
+	first[0].Definition.Metrics[0].MetricTags[0].IndexFrom[0].Symbol.Mapping.Items["1"] = "changed"
+	assert.Equal(t, "2", second[0].Definition.Metrics[0].MetricTags[0].IndexFrom[0].Symbol.Mapping.Items["1"])
+	handleCrossTableTagsWithoutMetrics(second[0])
+	require.Len(t, second[0].Definition.Metrics, 3)
+	assert.Equal(t, "labels", second[0].Definition.Metrics[1].Table.Name)
+	assert.Equal(t, "link", second[0].Definition.Metrics[2].Table.Name)
 }
 
 func TestHandleCrossTableTagsWithoutMetrics(t *testing.T) {
@@ -368,4 +442,31 @@ func TestLoadProfileByName_LegacyTableMetricTypes(t *testing.T) {
 			require.True(t, found, "missing stock symbol %s", tc.symbol)
 		})
 	}
+}
+
+func TestPreparePreservesDecodedIndexTag(t *testing.T) {
+	length := uint(48)
+	tag := ddprofiledefinition.MetricTagConfig{
+		Tag:    "row_name",
+		Symbol: ddprofiledefinition.SymbolConfigCompat{Format: "string"},
+		IndexDecode: &ddprofiledefinition.MetricIndexDecode{
+			Components: []ddprofiledefinition.MetricIndexComponent{
+				{Type: "integer"},
+				{Type: "octet_string", Length: &length},
+			},
+			Component: 2,
+		},
+	}
+	profile := &Profile{Definition: &ddprofiledefinition.ProfileDefinition{
+		Metrics: []ddprofiledefinition.MetricsConfig{{
+			Table:      ddprofiledefinition.SymbolConfig{OID: "1.2", Name: "rows"},
+			Symbols:    []ddprofiledefinition.SymbolConfig{{OID: "1.2.1", Name: "value"}},
+			MetricTags: []ddprofiledefinition.MetricTagConfig{tag},
+		}},
+	}}
+	require.NoError(t, ddprofiledefinition.ValidateEnrichProfile(profile.Definition))
+	handleCrossTableTagsWithoutMetrics(profile)
+	require.Len(t, profile.Definition.Metrics, 1)
+	assert.Equal(t, tag, profile.Definition.Metrics[0].MetricTags[0])
+	assert.True(t, profile.Definition.Metrics[0].MetricTags[0].IsIndexTag())
 }

@@ -4,64 +4,58 @@ package x509check
 
 import (
 	"context"
+	"crypto/x509"
 	_ "embed"
-	"errors"
 	"fmt"
 	"time"
 
-	cfssllog "github.com/cloudflare/cfssl/log"
-
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 //go:embed "config_schema.json"
 var configSchema string
 
+//go:embed "charts.yaml"
+var chartTemplateYAML string
+
 func init() {
-	cfssllog.Level = cfssllog.LevelFatal
 	collectorapi.Register("x509check", collectorapi.Creator{
 		JobConfigSchema: configSchema,
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		Create: func() collectorapi.CollectorV1 { return New() },
-		Config: func() any { return &Config{} },
+		CreateV2:   func() collectorapi.CollectorV2 { return New() },
+		Config:     func() any { return &Config{} },
+		StoreFirst: true,
 	})
 }
 
 func New() *Collector {
+	store := metrix.NewCollectorStore()
 	return &Collector{
 		Config: Config{
-			Timeout:        confopt.Duration(time.Second * 2),
-			CheckFullChain: false,
+			Timeout: confopt.Duration(time.Second * 2),
 		},
-
-		charts:    &collectorapi.Charts{},
-		seenCerts: make(map[string]bool),
+		store:            store,
+		metrics:          newCollectorMetrics(store),
+		now:              time.Now,
+		revocationStatus: newRevocationChecker().status,
 	}
-}
-
-type Config struct {
-	Vnode            string           `yaml:"vnode,omitempty"         json:"vnode"`
-	UpdateEvery      int              `yaml:"update_every,omitempty"  json:"update_every"`
-	Source           string           `yaml:"source"                  json:"source"`
-	Timeout          confopt.Duration `yaml:"timeout,omitempty"       json:"timeout"`
-	CheckFullChain   bool             `yaml:"check_full_chain"        json:"check_full_chain"`
-	CheckRevocation  bool             `yaml:"check_revocation_status" json:"check_revocation_status"`
-	tlscfg.TLSConfig `yaml:",inline" json:""`
 }
 
 type Collector struct {
 	collectorapi.Base
 	Config `yaml:",inline" json:""`
 
-	charts *collectorapi.Charts
+	provider certificateProvider
 
-	prov provider
+	store   metrix.CollectorStore
+	metrics collectorMetrics
 
-	seenCerts map[string]bool
+	now              func() time.Time
+	revocationStatus func(ctx context.Context, cert *x509.Certificate, now time.Time) (revoked, ok bool, err error)
 }
 
 func (c *Collector) Configuration() any {
@@ -70,43 +64,33 @@ func (c *Collector) Configuration() any {
 
 func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
-		return fmt.Errorf("config validation: %v", err)
+		return fmt.Errorf("config validation: %w", err)
 	}
 
-	prov, err := c.initProvider(ctx)
+	provider, err := c.initCertificateProvider(ctx)
 	if err != nil {
-		return fmt.Errorf("certificate provider init: %v", err)
+		return fmt.Errorf("certificate provider init: %w", err)
 	}
-	c.prov = prov
+	c.provider = provider
 
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
-	if err != nil {
-		return err
-	}
-	if len(mx) == 0 {
-		return errors.New("no metrics collected")
-	}
-	return nil
+func (c *Collector) Check(ctx context.Context) error {
+	_, err := c.fetchCertificates(ctx)
+	return err
 }
 
-func (c *Collector) Charts() *collectorapi.Charts {
-	return c.charts
-}
-
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
-	if err != nil {
-		c.Error(err)
-	}
-
-	if len(mx) == 0 {
-		return nil
-	}
-	return mx
+func (c *Collector) Collect(ctx context.Context) error {
+	return c.collect(ctx)
 }
 
 func (c *Collector) Cleanup(context.Context) {}
+
+func (c *Collector) MetricStore() metrix.CollectorStore {
+	return c.store
+}
+
+func (c *Collector) ChartTemplateYAML() string {
+	return chartTemplateYAML
+}

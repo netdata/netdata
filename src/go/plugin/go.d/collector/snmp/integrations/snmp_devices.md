@@ -510,6 +510,8 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
 
+Stock profiles that identify interfaces by IF-MIB `ifName` also attach the interface alias (IF-MIB `ifAlias`, the description an administrator assigns to a port) as the `if_alias` label, so you can filter and group interfaces by it. An interface without an alias shows `[none]`. The alias is read when the chart is created, so a change on the device appears after the collector restarts.
+
 Supported licensing profiles also emit a small set of shared **device-level licensing contexts**:
 
 - `snmp.license.remaining_time`: earliest remaining time to expiry across monitored licenses and subscriptions on the device
@@ -550,6 +552,7 @@ If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or
 - `snmp.bgp.devices.peer_counts` for device-level peer/session counts
 - `snmp.bgp.devices.peer_states` for device-level peer-state summaries where the source MIB exposes canonical peer rows
 - Rich peer diagnostics live in the Live function `snmp:bgp-peers`, not in charted time-series
+- Process-scoped rows retain the BGP process and routing instance. AS, BGP version and description remain blank when their association cannot be proved.
 
 **BGP capability notes**
 
@@ -618,7 +621,7 @@ Data is sourced from the IF-MIB (RFC 2863) interface counters and is cached from
 | Name | `Snmp:interfaces` |
 | Require Cloud | no |
 | Performance | Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many interfaces may return many rows |
-| Security | Exposes interface names, operational status, and traffic counters only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed |
+| Security | Exposes interface names, aliases, operational status, and traffic counters only:<br/>• Aliases are free text set by device administrators and may describe sites, circuits, or connected equipment<br/>• No packet payloads or authentication credentials are exposed<br/>• No other device configuration is exposed |
 | Availability | Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet |
 
 #### Prerequisites
@@ -638,6 +641,7 @@ Network interface metrics from cached SNMP data, including traffic rates, packet
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
 | Interface | string |  |  | Network interface name or identifier (e.g., eth0, GigabitEthernet1/0/1, Vlan100) |
+| Alias | string |  |  | Interface alias (IF-MIB ifAlias), the description an administrator assigns to a port (e.g., "Uplink to core switch"). Empty when the device reports no alias. A change on the device appears within about an hour, when the collector re-reads the interface table. |
 | Type | string |  |  | IANA-assigned interface type from IF-MIB (e.g., ethernetCsmacd, ieee80211, softwareLoopback) |
 | Type Group | string |  |  | Custom categorization mapping IANA interface types into practical groups: Ethernet (physical Ethernet interfaces), Aggregation (LAG/port-channels, bonds), Virtual (VLANs, loopbacks), or Other (all remaining types) |
 | Admin Status | string |  |  | Administrative state configured on the interface: up (enabled for use), down (administratively disabled), or testing (currently in test mode). Different from operational status. |
@@ -696,10 +700,11 @@ Current BGP peer and peer-family details from cached normalized SNMP data. Each 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
 | Scope | string |  |  | Whether the row represents a peer or a peer-family. |
+| Process ID | string |  |  | BGP process identifier when exposed by the source MIB; blank when unavailable. |
 | Routing Instance | string |  |  | Routing-instance / VRF identifier when exposed by the source MIB. |
 | Neighbor | string |  |  | Remote peer address. |
 | Local Address | string |  |  | Local address used for the BGP session when exposed by the source MIB. |
-| Remote AS | string |  |  | Remote Autonomous System number. |
+| Remote AS | string |  |  | Remote Autonomous System number when its association with the peer is known. |
 | Peer Description | string |  |  | Peer description or label when exposed by the source MIB. |
 | Family | string |  |  | Address-family / SAFI scope for peer-family rows. |
 | Admin Status | string |  |  | Whether the peer is administratively enabled. |

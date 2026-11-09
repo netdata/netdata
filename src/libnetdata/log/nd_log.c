@@ -149,12 +149,14 @@ static void nd_log_fatal_hook(struct log_field *fields, size_t fields_max __mayb
     if(!fatal_hook_cb)
         return;
 
-    const char *filename = log_field_strdupz(&fields[NDF_FILE]);
-    const char *message = log_field_strdupz(&fields[NDF_MESSAGE]);
-    const char *function = log_field_strdupz(&fields[NDF_FUNC]);
-    const char *stack_trace = log_field_strdupz(&fields[NDF_STACK_TRACE]);
-    const char *errno_str = log_field_strdupz(&fields[NDF_ERRNO]);
-    long line = log_field_to_int64(&fields[NDF_LINE]);
+    // only fields set for this event: an unset field still holds the value of an earlier log line on this thread
+    // (e.g. the errno of the previous error), and the annotators format it regardless
+    const char *filename = fields[NDF_FILE].entry.set ? log_field_strdupz(&fields[NDF_FILE]) : NULL;
+    const char *message = fields[NDF_MESSAGE].entry.set ? log_field_strdupz(&fields[NDF_MESSAGE]) : NULL;
+    const char *function = fields[NDF_FUNC].entry.set ? log_field_strdupz(&fields[NDF_FUNC]) : NULL;
+    const char *stack_trace = fields[NDF_STACK_TRACE].entry.set ? log_field_strdupz(&fields[NDF_STACK_TRACE]) : NULL;
+    const char *errno_str = fields[NDF_ERRNO].entry.set ? log_field_strdupz(&fields[NDF_ERRNO]) : NULL;
+    long line = fields[NDF_LINE].entry.set ? log_field_to_int64(&fields[NDF_LINE]) : 0;
 
     fatal_hook_cb(filename, function, message, errno_str, stack_trace, line);
 }

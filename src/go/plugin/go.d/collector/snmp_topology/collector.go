@@ -541,9 +541,14 @@ func (c *Collector) refreshDeviceTopology(
 	}
 
 	coll := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient:          snmpClient,
-		Profiles:            profiles,
-		Log:                 c.Logger,
+		SnmpClient: snmpClient,
+		Profiles:   profiles,
+		Log: c.Logger.With(
+			slog.String("device", dev.Hostname),
+			slog.String("registration", attemptID.RegistrationID.String()),
+			slog.String("context", "main"),
+		),
+		LogKeyPrefix:        "snmp_topology:registration:" + attemptID.RegistrationID.String() + ":main:",
 		SysObjectID:         dev.SysObjectID,
 		DisableBulkWalk:     dev.DisableBulkWalk,
 		AcquisitionObserver: mainObserver,

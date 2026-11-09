@@ -601,6 +601,12 @@ Inner RESTART selects and pins the exposed stored config in its resource lane; i
 independent invocation lane. SCHEMA comes from the module registry. USERCONFIG and TEST use caller payloads. Tentative
 proposals, rejected edits and late old outcomes cannot acquire exposure.
 
+Collector TEST resolves the submitted configuration and secrets, checks named dependencies, and initializes a
+throwaway V1 or V2 collector. It invokes `dyncfg.Testable.Test(ctx)` when implemented, otherwise `Check(ctx)`.
+The selected operation's error is returned without falling back to another operation, and cleanup follows the
+existing contained config-operation lifetime. Secret redaction applies to either operation. TEST never starts Run
+or collection; candidate activation remains Init/Check and does not invoke the optional Test capability.
+
 `joboutput/{dyncfg_jobs,dyncfg_prepare,dyncfg_restart,candidate_execution}.go` and `composition/dyncfg.go` own these
 command and projection boundaries.
 

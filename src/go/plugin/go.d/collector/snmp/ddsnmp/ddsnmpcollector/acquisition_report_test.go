@@ -329,6 +329,29 @@ func TestCollector_AcquisitionProfileDigestUsesRoutesNotSourcePath(t *testing.T)
 	assert.NotEqual(t, digestA, digestChangedRoute)
 }
 
+func TestAcquisitionProfileRouteDigestIncludesIndexFromSources(t *testing.T) {
+	base := indexFromCacheProfile()
+	want := acquisitionProfileRouteDigest(base)
+	for name, change := range map[string]func(*ddprofiledefinition.MetricTagConfig){
+		"first column":  func(tag *ddprofiledefinition.MetricTagConfig) { tag.IndexFrom[0].Symbol.OID += ".9" },
+		"second column": func(tag *ddprofiledefinition.MetricTagConfig) { tag.IndexFrom[1].Symbol.OID += ".9" },
+		"table name":    func(tag *ddprofiledefinition.MetricTagConfig) { tag.IndexFrom[0].Table = "other" },
+		"order": func(tag *ddprofiledefinition.MetricTagConfig) {
+			tag.IndexFrom[0], tag.IndexFrom[1] = tag.IndexFrom[1], tag.IndexFrom[0]
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			profile := &ddsnmp.Profile{
+				SourceFile: base.SourceFile,
+				Definition: base.Definition.Clone(),
+			}
+			change(&profile.Definition.Metrics[0].MetricTags[0])
+			assert.NotEqual(t, want, acquisitionProfileRouteDigest(profile))
+		})
+	}
+	assert.Equal(t, want, acquisitionProfileRouteDigest(base))
+}
+
 func TestAcquisitionProfileRouteDigestIncludesOrdinaryMetrics(t *testing.T) {
 	profile := &ddsnmp.Profile{
 		Definition: &ddprofiledefinition.ProfileDefinition{

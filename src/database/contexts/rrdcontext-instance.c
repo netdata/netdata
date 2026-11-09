@@ -227,6 +227,11 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
+    // the metadata the context worker merges into the context is swapped under the instance spinlock:
+    // rrdcontext_update_from_collected_rrdinstance() takes its references under the same lock,
+    // before rrdinstance_free(ri_new) below releases the old strings
+    spinlock_lock(&ri->spinlock);
+
     if(ri->title != ri_new->title) {
         SWAP(ri->title, ri_new->title);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
@@ -259,8 +264,6 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
 
     // a chart re-created with the same id takes the instance over, even while the old chart still exists:
     // the old chart's teardown (rrdinstance_rrdset_is_freed()) then finds it is no longer the owner
-    spinlock_lock(&ri->spinlock);
-
     RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
     if(ri_new->rrdset && st != ri_new->rrdset) {
         st = ri_new->rrdset;

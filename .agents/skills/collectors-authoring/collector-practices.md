@@ -28,7 +28,9 @@ Labels — is the model. Every dashboard-shaping mechanism (§3) feeds into it.
 
 Chart `context`, chart IDs, dimension IDs, instance labels — once shipped, they bind health alerts, dashboards, exports,
 anomaly detection, ML jobs, streaming consumers, and Netdata Cloud. Renaming silently breaks all of them. Treat them as
-permanent.
+permanent outside an approved change. The explicit V1-to-V2 migration exception is owned by
+`src/go/plugin/go.d/docs/migrate-v1-to-v2.md#chart-and-dimension-ids`: normal V2 IDs are allowed while contexts and
+dimension names remain stable.
 
 ### 1.4 Gaps are data
 

@@ -331,6 +331,7 @@ type diagnosticBGPFact struct {
 	RowKey          string            `json:"row_key"`
 	StructuralID    string            `json:"structural_id"`
 	Kind            string            `json:"kind"`
+	ProcessID       string            `json:"process_id"`
 	RoutingInstance string            `json:"routing_instance"`
 	Neighbor        string            `json:"neighbor"`
 	RemoteAS        string            `json:"remote_as"`

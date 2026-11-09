@@ -33,6 +33,7 @@ import (
 type Executor interface {
 	Check(context.Context, synthetic.Kind) error
 	Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution
+	Rehearse(context.Context, synthetic.Request) error
 }
 
 type Dependencies struct {

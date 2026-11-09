@@ -19,7 +19,7 @@ import (
 func TestVLANPreClientCancellationDoesNotReportCollectionFailure(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, progress, err := collectTopologyVLANContext(ctx, newTestSNMPTopologyCollector(), ddsnmp.DeviceConnectionInfo{}, "100", nil, nil)
+	_, progress, err := collectTopologyVLANContext(ctx, newTestSNMPTopologyCollector(), 1, ddsnmp.DeviceConnectionInfo{}, "100", nil, nil)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, topologydiag.AcquisitionPhaseNotObserved, progress.client.Outcome)
 	require.Equal(t, topologydiag.AcquisitionPhaseNotObserved, progress.connect.Outcome)

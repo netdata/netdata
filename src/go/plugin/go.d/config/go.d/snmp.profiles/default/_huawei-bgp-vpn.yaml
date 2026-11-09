@@ -4,7 +4,11 @@
 # instance ID, AFI, SAFI, peer address type, and peer address. The index
 # components are not-accessible in Huawei's MIB reference, so AFI/SAFI and
 # peer address descriptors are index-derived or resolved through typed
-# cross-table sources.
+# cross-table sources. hwBgpPeerDescription and hwBgpPeerGRStatus are
+# notification-only. The readable session-extension table has a VPN-ID index,
+# whose equality to the family peer-instance index is not specified.
+# Statistics retain their independent process/VPN/address identity without AS,
+# version or description: the other tables do not identify their BGP process.
 #
 # https://mibbrowser.online/mibdb_search.php?mib=HUAWEI-BGP-VPN-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/huawei/HUAWEI-BGP-VPN-MIB
@@ -68,8 +72,6 @@ bgp:
           16: dns
       bgp_version:
         symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.1, name: huawei.hwBgpPeerNegotiatedVersion }
-      description:
-        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12, name: huawei.hwBgpPeerDescription }
     admin:
       enabled:
         symbol:
@@ -105,16 +107,6 @@ bgp:
           name: huawei.hwBgpPeerLastErrorSubcode
           format: hex
           extract_value: '^[0-9a-f]{2}([0-9a-f]{2})'
-    graceful_restart:
-      state:
-        symbol:
-          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.8
-          name: huawei.hwBgpPeerGRStatus
-          mapping:
-            1: peer_not_being_helped
-            2: peer_restarting
-            3: peer_finish_restart
-            4: peer_helping
     reasons:
       unavailability:
         symbol:
@@ -150,9 +142,6 @@ bgp:
       bgp_version:
         table: hwBgpPeerTable
         symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.1, name: huawei.hwBgpPeerNegotiatedVersion }
-      description:
-        table: hwBgpPeerTable
-        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12, name: huawei.hwBgpPeerDescription }
     routes:
       total:
         received:
@@ -209,6 +198,8 @@ bgp:
       name: hwBgpPeerStatisticTable
       OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7
     identity:
+      process_id:
+        index: 1
       routing_instance:
         index: 2
       neighbor:
@@ -216,28 +207,12 @@ bgp:
           - start: 3
         name: huawei.hwBgpPeerStatisticRemoteAddr
         format: ip_address
-      remote_as:
-        table: hwBgpPeerTable
-        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2, name: huawei.hwBgpPeerRemoteAs, format: uint32 }
-        lookup_symbol: &huawei_bgp_peer_remote_addr_lookup
-          OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4
-          name: huawei.hwBgpPeerRemoteAddr
-          extract_value: '^(?:[^.]+\.){2}(?:4|16)\.(.*)$'
-          format: ip_address
     descriptors:
       peer_type:
         index: 3
         mapping:
           4: ipv4
           16: ipv6
-      bgp_version:
-        table: hwBgpPeerTable
-        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.1, name: huawei.hwBgpPeerNegotiatedVersion }
-        lookup_symbol: *huawei_bgp_peer_remote_addr_lookup
-      description:
-        table: hwBgpPeerTable
-        symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.2.1.12, name: huawei.hwBgpPeerDescription }
-        lookup_symbol: *huawei_bgp_peer_remote_addr_lookup
     transitions:
       established:
         symbol: { OID: 1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4, name: huawei.hwBgpPeerFsmEstablishedTransitions }

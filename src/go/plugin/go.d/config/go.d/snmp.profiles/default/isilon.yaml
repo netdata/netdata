@@ -312,8 +312,13 @@ metrics:
     metric_tags:
       - tag: quota_domain_id
         symbol:
-          OID: 1.3.6.1.4.1.12124.1.12.1.1.1
           name: quotaDomainID
+          format: octet_string
+        index_decode:
+          components:
+            - type: octet_string
+              length: 48
+          component: 1
       - tag: quota_type
         symbol:
           OID: 1.3.6.1.4.1.12124.1.12.1.1.2

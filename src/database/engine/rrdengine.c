@@ -1267,24 +1267,6 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 }
 
 
-static void after_weights_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
-{
-    ;
-}
-
-static void *weights_worker(
-    struct rrdengine_instance *ctx __maybe_unused,
-    void *data,
-    struct completion *completion,
-    uv_work_t *req __maybe_unused)
-{
-    worker_is_busy(UV_EVENT_WEIGHTS_CALCULATION);
-    query_weights_worker_thread(data);
-    completion_mark_complete(completion);
-    worker_is_idle();
-    return NULL;
-}
-
 static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
 {
     check_and_schedule_db_rotation(ctx);
@@ -2579,10 +2561,9 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx, void 
 // already is over pgc_max_flushers(). flush_inline() in cache.c never runs on pool threads, for
 // the same reason. Everything here runs on the event loop thread.
 //
-// The budget does NOT guarantee free threads for extent writes: other pool jobs that block on
-// dbengine are not counted - Cloud queries (aclk_run_query_job()) and weights (weights_worker())
-// wait for EXTENT_READs that need a pool thread too - and together with the waiters here they
-// can still fill a small pool.
+// Jobs that run data queries - and so wait on query preparation and extent reads, which run on this
+// pool too - MUST NOT run on the pool: Cloud queries and parallel weights have their own threads
+// (nd_work_queue) for that reason.
 
 static size_t extent_waiters_max(void) {
     int max = libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS;
@@ -3038,7 +3019,6 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY,                      "ctx flush all");
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
     worker_register_job_name(RRDENG_OPCODE_SHUTDOWN_EVLOOP,                          "dbengine shutdown");
-    worker_register_job_name(RRDENG_OPCODE_PARALLEL_WEIGHT,                          "parallel weight");
     worker_register_job_name(RRDENG_OPCODE_MRG_LOAD,                                 "mrg tier load");
 
 
@@ -3054,7 +3034,6 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_SHUTDOWN,         "ctx shutdown cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_FLUSH_DIRTY,      "ctx flush dirty cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_QUIESCE,          "ctx quiesce cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_PARALLEL_WEIGHT,      "parallel weight cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_MRG_LOAD,             "mrg tier load cb");
 
     // special jobs
@@ -3101,11 +3080,6 @@ void dbengine_event_loop(void* arg) {
             switch (opcode) {
                 case RRDENG_OPCODE_MRG_LOAD:
                     work_dispatch(NULL, cmd.data, cmd.completion, cmd.opcode, tier_mrg_load, NULL);
-                    break;
-
-                case RRDENG_OPCODE_PARALLEL_WEIGHT:;
-
-                    work_dispatch(NULL, cmd.data, cmd.completion, cmd.opcode, weights_worker, after_weights_worker);
                     break;
 
                 case RRDENG_OPCODE_EXTENT_READ:

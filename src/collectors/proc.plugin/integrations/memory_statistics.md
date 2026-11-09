@@ -124,7 +124,7 @@ Metrics:
 |:------|:------------|:----------|:----|
 | mem.swapio | Swap I/O | in, out | KiB/s |
 | system.pgpgio | Memory Paged from/to disk | in, out | KiB/s |
-| system.pgfaults | Memory Page Faults | minor, major | faults/s |
+| mem.pgfaults | Memory Page Faults | minor, major | faults/s |
 | mem.balloon | Memory Ballooning Operations | inflate, deflate, migrate | KiB/s |
 | mem.zswapio | ZSwap I/O | in, out | KiB/s |
 | mem.ksm_cow | KSM Copy On Write Operations | swapin, write | KiB/s |

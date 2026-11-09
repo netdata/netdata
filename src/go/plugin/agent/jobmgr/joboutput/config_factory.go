@@ -16,6 +16,7 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"gopkg.in/yaml.v2"
 )
 
@@ -104,11 +105,17 @@ func (cmf *ConfigModuleFactory) Test(ctx context.Context, config confgroup.Confi
 		}
 		return fmt.Errorf("job output: collector initialization: %w", err)
 	}
-	if err := probe.module.Check(ctx); err != nil {
+	operation := probe.module.Check
+	phase := "check"
+	if testable, ok := probe.module.(dyncfg.Testable); ok {
+		operation = testable.Test
+		phase = "test"
+	}
+	if err := operation(ctx); err != nil {
 		if redactLifecycle {
 			err = redactResolvedLifecycleError(err)
 		}
-		return fmt.Errorf("job output: collector check: %w", err)
+		return fmt.Errorf("job output: collector %s: %w", phase, err)
 	}
 	return nil
 }
