@@ -202,6 +202,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [eBPF SWAP](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_swap.md) | Monitor Linux swap reads and writes by tracing kernel swap I/O functions with eBPF. |
 | [Entropy](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/entropy.md) | Entropy, a measure of the randomness or unpredictability of data. |
 | [FreeBSD RCTL-RACCT](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/freebsd_rctl-racct.md) | Keep an eye on FreeBSD Resource Container metrics for optimized resource management and performance. |
+| [hw.acpi.battery](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/hw.acpi.battery.md) | Read the remaining battery capacity that the ACPI battery driver reports for all batteries combined. |
 | [hw.intrcnt](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/hw.intrcnt.md) | Get total number of interrupts |
 | [IBM i (AS/400)](https://github.com/netdata/netdata/blob/master/src/go/plugin/ibm.d/modules/as400/integrations/ibm_i_as-400.md) | Monitors IBM i (AS/400) systems using SQL services and CL commands to expose CPU, memory, storage, job, and subsystem activity. |
 | [Inter Process Communication](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/inter_process_communication.md) | IPC stands for Inter-Process Communication. |
@@ -247,6 +248,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [vm.stats.vm.v_pgfaults](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.stats.vm.v_pgfaults.md) | Collect memory page faults events. |
 | [vm.stats.vm.v_swappgs](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.stats.vm.v_swappgs.md) | The metric swap amount of data read from and written to SWAP. |
 | [vm.swap_info](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.swap_info.md) | Collect information about SWAP memory. |
+| [vm.swap_reserved](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.swap_reserved.md) | Read how much anonymous memory the kernel has reserved for running processes. |
 | [vm.vmtotal](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.vmtotal.md) | Collect Virtual Memory information from host. |
 | [Windows Services](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/integrations/windows_services.md) | This integration monitors resource utilization grouped by Windows Service. |
 | [Windows Services](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/windows_services.md) | This collector monitors Windows Services Status and States. |
