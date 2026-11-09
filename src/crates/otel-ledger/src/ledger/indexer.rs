@@ -26,9 +26,9 @@ enum Indexed {
     /// the empty index file, so nothing is uploaded, cataloged, or
     /// re-discovered at the next restart. An empty file carries no queryable
     /// data; tracking it would only add a bogus `(0, 0)` timestamp range to
-    /// the inventory. A frame-less WAL reaches here after a crash/rotation,
-    /// including through the startup backlog `build_pipeline` queues
-    /// (`ledger/pipeline.rs`).
+    /// the inventory. A frame-less WAL reaches here after a crash/rotation
+    /// (startup recovery suppresses those the same way:
+    /// `recover_unindexed`, `file-lifecycle/src/recovery/local.rs`).
     Empty {
         tenant_id: TenantId,
         file_id: FileId,
@@ -50,10 +50,9 @@ impl Ledger {
     pub(super) async fn handle_indexer_resp(&mut self, signal: Signal, resp: IndexerResponse) {
         let (seq, summary, size) = match resp {
             IndexerResponse::IndexFailed { path, error } => {
-                // The entry stays tracked and the next restart retries the
-                // seal; the bytes are never deleted. A WAL closed in this run
-                // stays queryable meanwhile; one recovered at startup does not
-                // (its time range is unknown until sealed).
+                // Intentional divergence from `recover_unindexed`: at runtime
+                // the entry stays tracked (and queryable as a WAL) until the
+                // next restart's recovery retries the seal and orphans it.
                 tracing::error!(path = %path.display(), "indexing failed: {error}");
                 return;
             }

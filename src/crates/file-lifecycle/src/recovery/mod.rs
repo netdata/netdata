@@ -9,11 +9,12 @@
 //!    seq high-water to the remote max, download every own-machine catalog
 //!    missing locally — and returns the remote-discovered tenant set.
 //! 2. `local` — per tenant: local-disk replay through the normal component
-//!    path ([`crate::component::batch_recover`], so recovery and steady state
-//!    share one code path): delete WALs that already have an SFST, seed
-//!    uploaded/rotated state from local catalog files, and evict per
-//!    retention policy. WALs with no SFST are not sealed during recovery; the
-//!    pipeline builder queues them on the live indexer after wiring.
+//!    path ([`crate::component::batch_recover`] /
+//!    [`crate::component::drain_pending`], so recovery and steady state share
+//!    one code path): delete WALs that already have an SFST, index WALs that
+//!    do not (unindexable ones stay on disk as untracked orphans), drain the
+//!    cleaner's WAL-delete responses, seed uploaded/rotated state from local
+//!    catalog files, and evict per retention policy.
 //! 3. `remote` — per tenant, only with storage enabled: object-storage
 //!    reconciliation — LIST the remote to mark uploaded SFSTs and re-send
 //!    uploaded-but-uncataloged ones as `AddEntry`, queue un-uploaded SFST

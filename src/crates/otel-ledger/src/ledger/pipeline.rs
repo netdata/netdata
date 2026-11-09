@@ -38,7 +38,10 @@ use file_lifecycle::ipc::{
     CleanerRequest, CleanerResponse, IndexerRequest, IndexerResponse, UploaderRequest,
     UploaderResponse,
 };
-use file_lifecycle::recovery::{recover_orphaned_wals, recover_retention, recover_unuploaded};
+use file_lifecycle::recovery::{
+    drain_wal_deletes, recover_orphaned_wals, recover_retention, recover_unindexed,
+    recover_unuploaded,
+};
 use file_lifecycle::registry::TenantRegistries;
 use file_lifecycle::storage::OpendalStorage;
 
@@ -77,7 +80,7 @@ pub(crate) async fn build_pipeline<F>(
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
     mut uploader: Option<&mut ComponentHandle<UploaderRequest, UploaderResponse>>,
     storage: Option<&OpendalStorage>,
-    indexer: ComponentHandle<IndexerRequest, IndexerResponse>,
+    mut indexer: ComponentHandle<IndexerRequest, IndexerResponse>,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
     make_handler: F,
 ) -> anyhow::Result<Pipeline>
@@ -146,18 +149,17 @@ where
     //
     // Recovery order matters:
     //   1. Delete orphaned WALs (have .sfst, WAL is redundant)
-    //   2. Collect unindexed WALs (no .sfst yet); they are queued on the
-    //      indexer after wiring, so sealing a backlog never delays Ready
-    //   3. Seed rotated / uploaded state from local catalog files
-    //   4. LIST remote (if enabled) → mark uploaded and
+    //   2. Index unindexed WALs (no .sfst yet)
+    //   3. Drain the WAL deletes step 2 sent to the cleaner
+    //   4. Seed rotated / uploaded state from local catalog files
+    //   5. LIST remote (if enabled) → mark uploaded and
     //      re-send uncataloged entries to the catalog builder
-    //   5. Queue uploads of un-uploaded .sfst files (fire-and-forget;
+    //   6. Queue uploads of un-uploaded .sfst files (fire-and-forget;
     //      success → AddEntry, handled once the run loop starts)
-    //   6. Stat local catalogs on the remote; re-upload missing ones
-    //      (only when 4 succeeded — also seeds the eviction gate)
-    //   7. Evaluate retention (rotated state already reflects disk)
+    //   7. Stat local catalogs on the remote; re-upload missing ones
+    //      (only when 5 succeeded — also seeds the eviction gate)
+    //   8. Evaluate retention (rotated state already reflects disk)
     let mut seq_routes: Vec<(u64, TenantId)> = Vec::new();
-    let mut unindexed: Vec<IndexerRequest> = Vec::new();
     for (tenant_id, registry) in registries.iter_mut() {
         for file in registry.wal.archived_files() {
             seq_routes.push((file.id.seq, tenant_id.clone()));
@@ -167,15 +169,8 @@ where
         }
 
         recover_orphaned_wals(registry, cleaner).await?;
-        unindexed.extend(
-            registry
-                .unindexed_ids()
-                .into_iter()
-                .map(|id| IndexerRequest::Index {
-                    wal_path: registry.wal.file_path(id),
-                    sfst_path: registry.sfst.file_path(id),
-                }),
-        );
+        recover_unindexed(registry, &mut indexer, cleaner).await?;
+        drain_wal_deletes(registry, cleaner).await?;
 
         file_lifecycle::recovery::seed_from_catalog_files(
             registry,
@@ -286,10 +281,11 @@ where
 
     for (seq, tenant_id) in seq_routes {
         // Routes were collected before recovery, which may have dropped the
-        // seq since (an SFST the retention pass evicted). A route to a seq
-        // with no entry would dangle for the process lifetime — route only
-        // what survived. Unindexed WALs survive (only SFSTs are evicted), so
-        // their queued seals below resolve to a tenant.
+        // seq since: an unsealable WAL untracked as an orphan, an empty WAL
+        // whose registry entry the cleaner drain removed (its empty SFST is
+        // never tracked), or an SFST the retention pass evicted. A route to
+        // a seq with no entry would dangle for the process lifetime — route
+        // only what survived.
         let survives = registries
             .tenants
             .get(&tenant_id)
@@ -309,9 +305,9 @@ where
     let declaration = handler.declaration();
 
     // Detach the per-pipeline workers' response streams into signal-tagged
-    // forwarders feeding the run-loop's single merged channel. Recovery sends
-    // the indexer nothing; the startup backlog is queued below, after the
-    // split, so its responses reach `handle_indexer_resp`. The catalog builder may still carry in-flight
+    // forwarders feeding the run-loop's single merged channel. The indexer is
+    // fully drained by recovery (`recover_unindexed` → `batch_recover` recvs
+    // every response). The catalog builder may still carry in-flight
     // `EntryAccepted`/`Rotated` responses enqueued fire-and-forget by
     // `reconcile_remote_uploads` (it sends `AddEntry` without recv-ing); those
     // are not lost — `into_parts` moves the live receiver into the forwarder,
@@ -322,22 +318,6 @@ where
     // field to the variant would reject the coercion at compile time.
     let (indexer_tx, indexer_rx) = indexer.into_parts();
     let (catalog_builder_tx, catalog_builder_rx) = catalog_builder.into_parts();
-
-    // The run loop is not polling yet; responses wait in the forwarder's
-    // channel until it starts. Until sealed, a recovered WAL is not
-    // queryable (its time range is unknown after a restart).
-    if !unindexed.is_empty() {
-        tracing::info!(
-            signal = segment,
-            "queued {} unindexed WAL files for background indexing",
-            unindexed.len()
-        );
-    }
-    for req in unindexed {
-        indexer_tx
-            .send(req)
-            .map_err(|_| anyhow::anyhow!("indexer died before startup indexing"))?;
-    }
     spawn_forwarder(
         indexer_rx,
         signal,
