@@ -72,10 +72,7 @@ pub(crate) async fn build_traces_pipeline(
     // The traces seal: decode ng-flatten trace frames (payload format 3)
     // into a trace SFST (full span columns + TIDX + TBLM + EVNB/LNKB).
     let indexer = ComponentHandle::spawn::<Indexer>(
-        crate::indexer::IndexerArgs {
-            seal: ng_index::build_sfst_traces_file,
-            limits: crate::indexer::SealLimits::resolve(&config.index.indexers),
-        },
+        ng_index::build_sfst_traces_file as crate::indexer::SealFn,
         cancel.child_token(),
     );
 

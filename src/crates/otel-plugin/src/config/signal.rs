@@ -41,8 +41,6 @@ pub(super) struct SignalOverride {
     pub(super) catalog: Option<CatalogOverride>,
     #[serde(default)]
     pub(super) ingest: Option<IngestOverride>,
-    #[serde(default)]
-    pub(super) indexers: Option<IndexersOverride>,
     /// Where the former plugin's journal files live, for the read-only
     /// legacy-logs viewer. Declared so strict parsing accepts it; valid under
     /// `logs:` only — `traces.journal_dir` is rejected at resolve by
@@ -74,19 +72,8 @@ pub(super) struct IngestOverride {
     pub(super) future_skew: Option<Duration>,
 }
 
-/// Partial [`otel_bridge::config::IndexersTuning`]: seal concurrency bounds.
-#[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct IndexersOverride {
-    #[serde(default)]
-    pub(super) min: Option<usize>,
-    #[serde(default)]
-    pub(super) max: Option<AutoCount>,
-}
-
-/// A count or `auto` (`None`): `indexers.max` (auto = one seal per ledger
-/// worker thread) and `malloc_arena_max` (auto = one arena per runtime worker
-/// thread). Accepts a YAML integer or string, and parses from an env value or
+/// A count or `auto` (`None`): `malloc_arena_max` (auto = one arena per runtime
+/// worker thread). Accepts a YAML integer or string, and parses from an env value or
 /// the worker's `--malloc-arena-max` argument.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct AutoCount(pub(crate) Option<usize>);
@@ -202,7 +189,6 @@ impl SignalOverride {
             || self.retention.is_some()
             || self.catalog.as_ref().is_some_and(|c| c.has_any())
             || self.ingest.as_ref().is_some_and(|i| i.has_any())
-            || self.indexers.as_ref().is_some_and(|i| i.has_any())
             || self.journal_dir.is_some()
     }
 }
@@ -231,13 +217,6 @@ impl IngestOverride {
     /// True when any field is set — feeds [`SignalOverride::has_any`].
     pub(super) fn has_any(&self) -> bool {
         self.max_age.is_some() || self.future_skew.is_some()
-    }
-}
-
-impl IndexersOverride {
-    /// True when any field is set — feeds [`SignalOverride::has_any`].
-    pub(super) fn has_any(&self) -> bool {
-        self.min.is_some() || self.max.is_some()
     }
 }
 
@@ -272,14 +251,6 @@ pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
         }
         if let Some(v) = i.future_skew {
             config.ingest.future_skew = v;
-        }
-    }
-    if let Some(i) = &o.indexers {
-        if let Some(v) = i.min {
-            config.indexers.min = v;
-        }
-        if let Some(AutoCount(v)) = i.max {
-            config.indexers.max = v;
         }
     }
 }
