@@ -128,6 +128,7 @@ impl PluginConfig {
             index: IndexConfig {
                 dir: root.join("index"),
                 retention: tuning.retention.clone(),
+                indexers: tuning.indexers.clone(),
             },
             catalog: CatalogConfig {
                 dir: root.join("catalog"),
@@ -342,6 +343,9 @@ pub struct SignalConfig {
     /// Ingestion time-bounds: reject out-of-window records per-record.
     #[serde(default)]
     pub ingest: IngestConfig,
+    /// How many WAL files may be sealed into SFSTs concurrently.
+    #[serde(default)]
+    pub indexers: IndexersTuning,
 }
 
 impl Default for SignalConfig {
@@ -356,8 +360,40 @@ impl Default for SignalConfig {
             retention: RetentionPolicy::default(),
             catalog: CatalogTuning::default(),
             ingest: IngestConfig::default(),
+            indexers: IndexersTuning::default(),
         }
     }
+}
+
+/// Seal concurrency bounds for one signal. A seal is CPU-bound and holds a
+/// whole WAL file's index in memory, so the ledger starts with `min` seals and
+/// moves by at most one every 10 s within `[min, max]`: up when the waiting
+/// files would keep one more seal busy, down when one fewer would do
+/// (otel-ledger `indexer.rs`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IndexersTuning {
+    /// Seals that may run regardless of backlog (at least 1).
+    #[serde(default = "default_indexers_min")]
+    pub min: usize,
+    /// Upper bound on concurrent seals; `None` means one per ledger worker
+    /// thread (the CPU count unless the runtime is capped). YAML spells it
+    /// `auto` (the stock file does), or a count.
+    #[serde(default, with = "opt_auto_count")]
+    pub max: Option<usize>,
+}
+
+impl Default for IndexersTuning {
+    fn default() -> Self {
+        Self {
+            min: default_indexers_min(),
+            max: None,
+        }
+    }
+}
+
+fn default_indexers_min() -> usize {
+    1
 }
 
 /// Catalog tuning for one signal (the dir is derived, not configured).
@@ -511,6 +547,8 @@ pub struct IndexConfig {
     pub dir: PathBuf,
     /// Per-tenant retention policy for SFST files (validated; see [`RetentionPolicy`]).
     pub retention: RetentionPolicy,
+    /// Seal concurrency bounds (see [`IndexersTuning`]).
+    pub indexers: IndexersTuning,
 }
 
 /// Catalog file configuration (runtime-only; see [`IndexConfig`]).
@@ -1124,7 +1162,13 @@ traces:
 
     #[test]
     fn lifecycle_for_derives_dirs_and_tuning() {
-        let c = full_config();
+        let mut c = full_config();
+        // Distinct per-signal indexer bounds, so a cross-wired forward shows.
+        c.logs.indexers = IndexersTuning {
+            min: 2,
+            max: Some(5),
+        };
+        c.traces.indexers = IndexersTuning { min: 3, max: None };
 
         let logs = c.lifecycle_for(Signal::Logs);
         assert_eq!(
@@ -1142,6 +1186,10 @@ traces:
         // Tuning carried from the logs section.
         assert!(!logs.wal.compression_enabled);
         assert_eq!(logs.catalog.rotation_count, 7);
+        assert_eq!(
+            (logs.index.indexers.min, logs.index.indexers.max),
+            (2, Some(5))
+        );
         // Storage is NOT carried per-signal — it is global on PluginConfig,
         // owned by the coordinator shell.
 
@@ -1153,6 +1201,10 @@ traces:
         // Per-signal tuning is the traces section, not logs'.
         let traces_rot = traces.wal.rotation.resolve("default");
         assert_eq!(traces_rot.max_entries, 1000);
+        assert_eq!(
+            (traces.index.indexers.min, traces.index.indexers.max),
+            (3, None)
+        );
     }
 
     #[test]
@@ -1231,6 +1283,42 @@ traces:
             bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
         assert_eq!(back.max_age, c.max_age);
         assert_eq!(back.future_skew, c.future_skew);
+    }
+
+    #[test]
+    fn indexers_max_reads_auto_count_or_null_from_yaml() {
+        for (yaml, max) in [
+            ("max: auto\n", None),
+            ("max: AUTO\n", None),
+            ("max: 6\n", Some(6)),
+            ("max: null\n", None),
+            ("min: 2\n", None),
+        ] {
+            let t: IndexersTuning = serde_yaml::from_str(yaml).unwrap();
+            assert_eq!(t.max, max, "{yaml}");
+        }
+        for yaml in ["max: -1\n", "max: 2.5\n", "max: lots\n"] {
+            let err = serde_yaml::from_str::<IndexersTuning>(yaml).unwrap_err();
+            assert!(err.to_string().contains("\"auto\""), "{yaml}: {err}");
+        }
+        let auto = IndexersTuning { min: 1, max: None };
+        assert!(serde_yaml::to_string(&auto).unwrap().contains("max: auto"));
+    }
+
+    #[test]
+    fn indexers_survive_bincode_ipc() {
+        for t in [
+            IndexersTuning {
+                min: 2,
+                max: Some(7),
+            },
+            IndexersTuning { min: 1, max: None },
+        ] {
+            let bytes = bincode::serde::encode_to_vec(&t, bincode::config::standard()).unwrap();
+            let (back, _): (IndexersTuning, usize) =
+                bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+            assert_eq!((back.min, back.max), (t.min, t.max));
+        }
     }
 
     #[test]

@@ -366,7 +366,10 @@ pub(crate) async fn build_logs_pipeline(
 ) -> anyhow::Result<Pipeline> {
     // The logs seal: decode ng-flatten log frames into a full split-FST index.
     let indexer = ComponentHandle::spawn::<Indexer>(
-        ng_index::build_sfst_file as crate::indexer::SealFn,
+        crate::indexer::IndexerArgs {
+            seal: ng_index::build_sfst_file,
+            limits: crate::indexer::SealLimits::resolve(&config.index.indexers),
+        },
         cancel.child_token(),
     );
 
