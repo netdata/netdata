@@ -38,6 +38,8 @@ use otel_bridge::{
 };
 use tokio::process::Command;
 
+use crate::startup_keepalive::StartupKeepalive;
+
 /// Maximum time to wait for a worker to connect after spawning.
 const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -655,6 +657,9 @@ impl StopSignals {
 enum Startup {
     Done(anyhow::Result<(Vec<FunctionDeclaration>, Vec<FunctionDeclaration>)>),
     Stopped(&'static str),
+    /// A startup heartbeat failed: the agent closed our stdout (a broken
+    /// pipe), or another write error or a keepalive panic.
+    KeepaliveFailed(std::io::Error),
 }
 
 /// Guard for one IPC socket file: `new` removes any stale file at the path
@@ -900,6 +905,11 @@ pub async fn run() -> anyhow::Result<()> {
         .await
         .context("failed to write TRUST_DURATIONS to agent")?;
 
+    // Heartbeats until the declarations go out: the handshake below lasts as
+    // long as the ledger's startup recovery.
+    let mut startup_keepalive =
+        StartupKeepalive::start().context("failed to start the startup keepalive")?;
+
     // The ledger is configured first: it must be listening on the writer
     // socket before the ingestor connects to it. Its declarations are
     // forwarded only after the ingestor's handshake also succeeded — bind
@@ -924,6 +934,7 @@ pub async fn run() -> anyhow::Result<()> {
         tokio::select! {
             r = handshake => Startup::Done(r),
             reason = signals.recv() => Startup::Stopped(reason),
+            e = startup_keepalive.failure() => Startup::KeepaliveFailed(e),
         }
     };
     let (ledger_declarations, ingestor_declarations) = match startup {
@@ -932,7 +943,14 @@ pub async fn run() -> anyhow::Result<()> {
             tracing::info!("{reason} during startup, stopping workers");
             return Ok(());
         }
+        Startup::KeepaliveFailed(e) => {
+            return Err(anyhow::Error::new(e).context("startup keepalive failed"));
+        }
     };
+
+    startup_keepalive
+        .stop()
+        .context("startup keepalive failed")?;
 
     supervisor
         .register_declarations(Worker::Ledger, ledger_declarations)
