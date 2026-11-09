@@ -101,7 +101,7 @@ To move a node out of a Room, remove it from that Room's **Nodes** tab. A node's
 
 Only **Admins** and **Managers** can add existing nodes to a Room and remove nodes from a Room. See the [Room Management table in the RBAC reference](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions matrix.
 
-Node memberships are either **STATIC** (added manually) or **RULE** (added automatically by label-based rules). For automated assignment based on host labels instead of manual moves, see [Node Rule-Based Room Assignment](/docs/netdata-cloud/node-rule-based-room-assignment.md).
+A node's Room membership can be **STATIC** (added manually), **RULE** (added automatically by label-based rules), or both. For automated assignment based on host labels instead of manual moves, see [Node Rule-Based Room Assignment](/docs/netdata-cloud/node-rule-based-room-assignment.md).
 
 ### Leaving a Room
 
