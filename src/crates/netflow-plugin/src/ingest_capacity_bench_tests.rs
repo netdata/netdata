@@ -1637,18 +1637,17 @@ fn socket_kernel_drops(listener_inodes: &[u64]) -> Option<u64> {
         return None;
     }
 
-    let mut found = HashSet::with_capacity(listener_inodes.len());
-    let mut drops = 0_u64;
+    let mut found = std::collections::HashMap::with_capacity(listener_inodes.len());
     for path in ["/proc/net/udp", "/proc/net/udp6"] {
         let Ok(contents) = fs::read_to_string(path) else {
             continue;
         };
-        let (file_drops, file_found) =
-            crate::charts::udp::parse_udp_socket_drops(&contents, &listener_inodes);
-        drops = drops.saturating_add(file_drops);
-        found.extend(file_found);
+        found.extend(crate::charts::udp::parse_udp_socket_drops(
+            &contents,
+            &listener_inodes,
+        ));
     }
-    (found.len() == listener_inodes.len()).then_some(drops)
+    (found.len() == listener_inodes.len()).then(|| found.values().copied().map(u64::from).sum())
 }
 
 #[cfg(not(target_os = "linux"))]

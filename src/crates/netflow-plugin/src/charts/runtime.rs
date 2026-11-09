@@ -85,6 +85,7 @@ impl NetflowCharts {
             let mut tier_index_cardinality = TierFlowIndexCardinality::default();
             let mut memory_diagnostics_state =
                 MemoryDiagnosticsSamplerState::new(config.memory_diagnostics.interval);
+            let mut udp_kernel_drops = UdpKernelDrops::default();
             let mut write_failing = false;
 
             loop {
@@ -98,7 +99,7 @@ impl NetflowCharts {
                 }
                 let now = unix_seconds(SystemTime::now());
 
-                sample_udp_kernel_drops(metrics.as_ref());
+                sample_udp_kernel_drops(metrics.as_ref(), &mut udp_kernel_drops);
                 open_tier_sample = sample_open_tier_state(open_tiers.as_ref(), open_tier_sample);
                 tier_index_cardinality = sample_tier_index_cardinality(
                     tier_flow_indexes.as_ref(),

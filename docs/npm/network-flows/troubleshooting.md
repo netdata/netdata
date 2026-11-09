@@ -123,7 +123,7 @@ If `v9_missing_template` rises in `netdata.netflow.flow_sets`, check the v9 temp
 
 **UDP kernel drops:**
 
-On Linux, watch `kernel_dropped` in `netdata.netflow.input_packets`. It is the sum of the kernel drop counters for the plugin's exact listener sockets. You can verify it at the OS level:
+On Linux, watch `kernel_dropped` in `netdata.netflow.input_packets`. It shows how fast the kernel drop counters of the plugin's exact listener sockets increase. The plugin keeps counting correctly when a 32-bit counter wraps. You can verify it at the OS level:
 
 ```bash
 sudo ss -uamn sport = :2055        # inspect the d<N> field inside skmem:(...)

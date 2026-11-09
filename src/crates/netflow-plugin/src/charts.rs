@@ -19,7 +19,7 @@ use metrics::*;
 pub(crate) use process_maps::*;
 pub(crate) use runtime::*;
 use snapshot::*;
-use udp::sample_udp_kernel_drops;
+use udp::{UdpKernelDrops, sample_udp_kernel_drops};
 
 #[cfg(test)]
 mod tests;
