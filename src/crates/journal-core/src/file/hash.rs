@@ -7,8 +7,8 @@
 //! whose header carries `HEADER_INCOMPATIBLE_KEYED_HASH` hashes payloads with
 //! SipHash-2-4 keyed by the header's `file_id`; legacy files use Jenkins
 //! lookup3. Both sides default to keyed for newly created files (systemd:
-//! `$SYSTEMD_JOURNAL_KEYED_HASH` unset means on; this crate always,
-//! `JournalFile::create` in file/file.rs), so the implementations must
+//! `$SYSTEMD_JOURNAL_KEYED_HASH` unset means on; this crate always sets it
+//! in `JournalFile::create`, file/file.rs), so the implementations must
 //! agree bit-for-bit for files written by one side to stay readable by the
 //! other.
 //!

@@ -126,7 +126,7 @@ modules:
               default_value: false
               required: false
             - name: charts.memory_diagnostics.interval
-              description: How often the memory diagnostics charts update. Must be at least `1s`. A value that is not whole seconds is rounded up to whole seconds.
+              description: How often the memory diagnostics charts update. When `enabled` is `true`, it must be at least `1s`. A value that is not whole seconds is rounded up to whole seconds.
               default_value: 10s
               required: false
         examples:
