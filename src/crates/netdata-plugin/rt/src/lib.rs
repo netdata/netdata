@@ -1,9 +1,8 @@
 //! Runtime framework for Netdata plugins that expose Functions: the pluginsd
-//! event loop over stdin/stdout, asynchronous function handlers, and
-//! declarative chart emission.
+//! event loop over stdin/stdout and asynchronous function handlers.
 //!
-//! A plugin builds a [`PluginRuntime`], registers [`FunctionHandler`]s (and
-//! optionally charts), and calls [`PluginRuntime::run`], which drives the whole
+//! A plugin builds a [`PluginRuntime`], registers [`FunctionHandler`]s, and
+//! calls [`PluginRuntime::run`], which drives the whole
 //! lifecycle: it publishes the function declarations, reads calls from stdin,
 //! executes handlers concurrently with cancellation and progress support, and
 //! writes results back over stdout. `run()` also carries the stdout publication
@@ -100,10 +99,6 @@
 //!
 //! ## Crate Layout
 //!
-//! - `charts` — declarative chart types: derive `NetdataChart` (from
-//!   `netdata_plugin_charts_derive`, re-exported here alongside the trait of
-//!   the same name) on a schemars-annotated struct and register it on the
-//!   runtime; a registry task samples the charts and emits the chart protocol.
 //! - `netdata_env` — the `NETDATA_*` environment variables the agent exports
 //!   to plugins (directories, log settings, machine GUID).
 //! - `tracing_setup` — `init_tracing_with_identifier`, which initializes
@@ -131,17 +126,6 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{Mutex, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, instrument, trace, warn};
-
-pub mod charts;
-pub use charts::{
-    ChartDimensions, ChartHandle, ChartMetadata, ChartRegistry, ChartType, DimensionAlgorithm,
-    DimensionMetadata, InstancedChart, TrackedChart,
-};
-
-// The trait and its derive macro share the name `NetdataChart`; they live in
-// different Rust namespaces, so both re-exports can carry the same name.
-pub use charts::NetdataChart;
-pub use netdata_plugin_charts_derive::NetdataChart;
 
 pub mod netdata_env;
 pub use netdata_env::{LogFormat, LogLevel, LogMethod, NetdataEnv, SyslogFacility};
@@ -669,9 +653,7 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
                     expires: 0,
                     format: "application/json".to_string(),
                     payload: serde_json::to_vec_pretty(&error_json).unwrap_or_else(|_| {
-                        format!(r#"{{"error": "Failed to serialize error response"}}"#)
-                            .as_bytes()
-                            .to_vec()
+                        br#"{"error": "Failed to serialize error response"}"#.to_vec()
                     }),
                 }
             }
@@ -736,17 +718,10 @@ where
     outbound_tx: mpsc::UnboundedSender<Message>,
     /// Taken by the writer task spawned in `run`.
     outbound_rx: Option<mpsc::UnboundedReceiver<Message>>,
-
-    /// Created on the first `register_chart`/`register_instanced_chart` call.
-    chart_registry: Option<ChartRegistry<W>>,
-    /// Join handle of the registry task started in `run`; awaited in shutdown.
-    chart_registry_handle: Option<
-        tokio::task::JoinHandle<std::result::Result<(), Box<dyn std::error::Error + Send + Sync>>>,
-    >,
 }
 
 impl PluginRuntime<tokio::io::Stdin, tokio::io::Stdout> {
-    /// Create a plugin runtime over stdin/stdout, ready for handler and chart
+    /// Create a plugin runtime over stdin/stdout, ready for handler
     /// registration. `name` appears in log lines.
     pub fn new(name: &str) -> Self {
         Self::with_streams(name, tokio::io::stdin(), tokio::io::stdout())
@@ -794,8 +769,6 @@ where
             shutdown_token: CancellationToken::default(),
             outbound_tx,
             outbound_rx: Some(outbound_rx),
-            chart_registry: None,
-            chart_registry_handle: None,
         }
     }
 
@@ -803,7 +776,8 @@ where
     ///
     /// External code writes through the same mutex-protected writer the
     /// runtime uses for function results, so all protocol output stays
-    /// serialized on the one stream.
+    /// serialized on the one stream. Chart text, for example from
+    /// `netdata-plugin-metrics`, goes out this way.
     ///
     /// # Example
     ///
@@ -836,63 +810,13 @@ where
         self.function_handlers.insert(name, Arc::new(adapter));
     }
 
-    /// Register a chart for metrics emission.
-    ///
-    /// The chart is sampled every `interval` once `run()` starts: the CHART
-    /// definition is emitted once, then BEGIN/SET/END updates on every tick
-    /// through the shared writer — even when values did not change, so each
-    /// sample interval carries a datapoint; change detection does not gate
-    /// emission. Update the value from anywhere through the returned handle.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let metrics = runtime.register_chart(
-    ///     MyMetrics::default(),
-    ///     Duration::from_secs(1),
-    /// );
-    ///
-    /// // Later, update from anywhere:
-    /// metrics.update(|m| {
-    ///     m.counter += 1;
-    /// });
-    /// ```
-    pub fn register_chart<T>(&mut self, initial: T, interval: Duration) -> ChartHandle<T>
-    where
-        T: NetdataChart + Default + PartialEq + Clone + Send + Sync + 'static,
-    {
-        let registry = self
-            .chart_registry
-            .get_or_insert_with(|| ChartRegistry::new(Arc::clone(&self.writer)));
-        registry.register_chart(initial, interval)
-    }
-
-    /// Register one instance of an instanced chart.
-    ///
-    /// Like [`Self::register_chart`], but `{instance}` placeholders in the
-    /// chart id, name, title, family, and context are replaced with the
-    /// initial value's `instance_id()` before the chart is declared. Call
-    /// once per instance to build per-core/per-disk chart sets; the type must
-    /// implement [`InstancedChart`] by hand — the derive macro does not
-    /// implement it.
-    pub fn register_instanced_chart<T>(&mut self, initial: T, interval: Duration) -> ChartHandle<T>
-    where
-        T: InstancedChart + Default + PartialEq + Send + Sync + 'static,
-    {
-        let registry = self
-            .chart_registry
-            .get_or_insert_with(|| ChartRegistry::new(Arc::clone(&self.writer)));
-        registry.register_instanced_chart(initial, interval)
-    }
-
     /// Start the plugin runtime and process messages until shutdown.
     ///
     /// 1. Installs signal handlers (SIGINT/SIGTERM) that trigger graceful shutdown
-    /// 2. Starts the chart registry task, if charts were registered
-    /// 3. Declares all registered functions to the agent
-    /// 4. Spawns the writer task and enters the main loop, dispatching calls,
+    /// 2. Declares all registered functions to the agent
+    /// 3. Spawns the writer task and enters the main loop, dispatching calls,
     ///    cancels and results until the shutdown token is cancelled or stdin ends
-    /// 5. Cancels in-flight functions (10s grace period) and waits for the
+    /// 4. Cancels in-flight functions (10s grace period) and waits for the
     ///    writer task to drain
     ///
     /// Consumes the runtime; it cannot be reused after `run()`. Protocol write
@@ -912,30 +836,6 @@ where
         info!("starting plugin runtime: {}", self.plugin_name);
 
         self.handle_shutdown_signals();
-
-        // Start chart registry if charts were registered
-        if let Some(registry) = self.chart_registry.take() {
-            let registry_token = registry.cancellation_token();
-            let shutdown_token = self.shutdown_token.clone();
-
-            let handle = tokio::spawn(async move {
-                tokio::select! {
-                    result = registry.run() => {
-                        if let Err(e) = &result {
-                            error!("chart registry error: {}", e);
-                        }
-                        result
-                    }
-                    _ = shutdown_token.cancelled() => {
-                        registry_token.cancel();
-                        Ok(())
-                    }
-                }
-            });
-
-            self.chart_registry_handle = Some(handle);
-            info!("chart registry started");
-        }
 
         self.declare_functions().await?;
 
@@ -1219,8 +1119,8 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
         Ok(())
     }
 
-    /// Graceful shutdown: cancel every in-flight call, drain their results
-    /// for up to 10 seconds, then wait for the chart registry task to finish.
+    /// Graceful shutdown: cancel every in-flight call and drain their results
+    /// for up to 10 seconds.
     ///
     /// Calls that miss the deadline are dropped with `self`: their futures are
     /// never polled again and their results never reach the agent.
@@ -1259,15 +1159,6 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
                         completed, aborted
                     );
                 }
-            }
-        }
-
-        if let Some(handle) = self.chart_registry_handle.take() {
-            info!("waiting for chart registry to finish...");
-            match handle.await {
-                Ok(Ok(())) => info!("chart registry shut down cleanly"),
-                Ok(Err(e)) => warn!("Chart registry error during shutdown: {}", e),
-                Err(e) => warn!("Chart registry task panicked: {}", e),
             }
         }
 

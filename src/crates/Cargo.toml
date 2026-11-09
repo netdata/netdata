@@ -5,7 +5,6 @@ members = [
     # Shared Rust plugin SDK: the pluginsd protocol, the plugin runtime, the
     # config-form schema, derived-metrics charts and the value types any Netdata
     # Rust plugin builds on.
-    "netdata-plugin/charts-derive",
     "netdata-plugin/error",
     "netdata-plugin/metrics",
     "netdata-plugin/protocol",
@@ -70,7 +69,6 @@ collapsible_if = "allow"
 [workspace.dependencies]
 
 # Internal crates: shared Rust plugin SDK.
-netdata-plugin-charts-derive = { path = "netdata-plugin/charts-derive" }
 netdata-plugin-error = { path = "netdata-plugin/error" }
 netdata-plugin-metrics = { path = "netdata-plugin/metrics" }
 netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
@@ -164,10 +162,6 @@ futures-util = { version = "0.3", features = ["sink"] }
 indexmap = "2"
 phf = { version = "0.12", default-features = false }
 phf_codegen = "0.12"
-proc-macro2 = "1.0"
-quote = "1.0"
-syn = "2.0"
-tracing-futures = { version = "0.2.5" }
 tracing-journald = "0.3"
 
 # External crates: OTel only.

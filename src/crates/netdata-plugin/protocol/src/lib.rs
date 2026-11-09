@@ -35,8 +35,8 @@
 //! Chart-protocol lines (CHART, DIMENSION, CLABEL, BEGIN/SET/END) are outside
 //! the message model: the `chart` module encodes them into byte buffers
 //! ([`write_chart`], [`write_set_float`], ...), and consumers deliver those
-//! bytes verbatim with [`MessageWriter::write_raw`] (the `netdata-plugin-rt`
-//! chart registry and the otel-plugin supervisor do this). Bare keywords such
+//! bytes verbatim with [`MessageWriter::write_raw`] (the netflow-plugin
+//! chart sampler and the otel-plugin supervisor do this). Bare keywords such
 //! as `PLUGIN_KEEPALIVE` and `TRUST_DURATIONS` are written the same way.
 //!
 //! Parsing direction is fixed when the parser is built and never re-checked
