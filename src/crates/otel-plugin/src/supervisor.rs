@@ -653,23 +653,6 @@ impl StopSignals {
     }
 }
 
-/// Whether `e` is a write to a closed agent pipe. During startup that means
-/// the agent already stopped this plugin instance, so the supervisor exits 0:
-/// the agent disables a plugin that exits non-zero before its first
-/// successful collection (`plugins_d.c`), which would leave OpenTelemetry
-/// ingestion off until the agent restarts.
-fn is_agent_gone(e: &anyhow::Error) -> bool {
-    e.chain().any(|cause| {
-        let io = cause.downcast_ref::<std::io::Error>().or_else(|| {
-            match cause.downcast_ref::<netdata_plugin_protocol::NetdataPluginError>() {
-                Some(netdata_plugin_protocol::NetdataPluginError::Transport(io)) => Some(io),
-                _ => None,
-            }
-        });
-        io.is_some_and(|io| io.kind() == std::io::ErrorKind::BrokenPipe)
-    })
-}
-
 /// How the startup handshake ended.
 enum Startup {
     Done(anyhow::Result<(Vec<FunctionDeclaration>, Vec<FunctionDeclaration>)>),
@@ -916,14 +899,11 @@ pub async fn run() -> anyhow::Result<()> {
         sockets: [writer_sock, ledger_sock, ingestor_sock, legacy_sock],
     };
 
-    if let Err(e) = supervisor
+    supervisor
         .writer
         .write_raw(b"TRUST_DURATIONS 1\n")
         .await
-        .context("failed to write TRUST_DURATIONS to agent")
-    {
-        return agent_gone_or(e);
-    }
+        .context("failed to write TRUST_DURATIONS to agent")?;
 
     // Heartbeats until the declarations go out: the handshake below lasts as
     // long as the ledger's startup recovery.
@@ -933,8 +913,8 @@ pub async fn run() -> anyhow::Result<()> {
     // The ledger is configured first: it must be listening on the writer
     // socket before the ingestor connects to it. Its declarations are
     // forwarded only after the ingestor's handshake also succeeded — bind
-    // before declare (see `register_declarations`). A handshake failure, a
-    // stop signal or a closed agent pipe returns straight out and ChildGuard
+    // before declare (see `register_declarations`). A handshake failure or a
+    // stop signal returns straight out and ChildGuard
     // SIGKILLs the remaining workers on unwind: the ledger does not read its
     // supervisor connection while it recovers or waits in `accept_writer`, so
     // a graceful Shutdown would not reach it anyway, and legacy-logs treats a
@@ -964,22 +944,20 @@ pub async fn run() -> anyhow::Result<()> {
             return Ok(());
         }
         Startup::KeepaliveFailed(e) => {
-            return agent_gone_or(anyhow::Error::new(e).context("startup keepalive failed"));
+            return Err(anyhow::Error::new(e).context("startup keepalive failed"));
         }
     };
 
-    if let Err(e) = startup_keepalive.stop() {
-        return agent_gone_or(anyhow::Error::new(e).context("startup keepalive failed"));
-    }
+    startup_keepalive
+        .stop()
+        .context("startup keepalive failed")?;
 
-    for (worker, declarations) in [
-        (Worker::Ledger, ledger_declarations),
-        (Worker::Ingestor, ingestor_declarations),
-    ] {
-        if let Err(e) = supervisor.register_declarations(worker, declarations).await {
-            return agent_gone_or(e);
-        }
-    }
+    supervisor
+        .register_declarations(Worker::Ledger, ledger_declarations)
+        .await?;
+    supervisor
+        .register_declarations(Worker::Ingestor, ingestor_declarations)
+        .await?;
 
     // The legacy-logs viewer is best-effort and decoupled from the new pipeline:
     // a configure failure disables it but MUST NOT take down the new pipeline.
@@ -1015,33 +993,14 @@ fn arena_args(malloc_arena_max: Option<usize>) -> [String; 2] {
     ["--malloc-arena-max".to_string(), value]
 }
 
-/// The startup exit for a failed write to the agent: `Ok` (exit 0) when the
-/// agent is gone (see [`is_agent_gone`]), the error otherwise.
-fn agent_gone_or(e: anyhow::Error) -> anyhow::Result<()> {
-    if is_agent_gone(&e) {
-        tracing::info!("agent closed the plugin's stdout during startup ({e:#}), exiting");
-        Ok(())
-    } else {
-        Err(e)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{agent_gone_or, arena_args, is_agent_gone, resolve_identity};
+    use super::{arena_args, resolve_identity};
 
     #[test]
     fn arena_args_carry_auto_or_the_count() {
         assert_eq!(arena_args(None), ["--malloc-arena-max", "auto"]);
         assert_eq!(arena_args(Some(4)), ["--malloc-arena-max", "4"]);
-    }
-
-    #[test]
-    fn only_a_broken_pipe_counts_as_the_agent_leaving() {
-        let io = |kind| anyhow::Error::new(std::io::Error::new(kind, "write failed"));
-        assert!(agent_gone_or(io(std::io::ErrorKind::BrokenPipe)).is_ok());
-        assert!(agent_gone_or(io(std::io::ErrorKind::Other)).is_err());
-        assert!(agent_gone_or(io(std::io::ErrorKind::StorageFull)).is_err());
     }
 
     #[tokio::test]
@@ -1088,20 +1047,6 @@ mod tests {
             .await
             .expect("the first child sees end-of-file")
             .unwrap();
-    }
-
-    #[test]
-    fn broken_pipe_is_recognised_through_the_transport_error() {
-        let pipe = || std::io::Error::new(std::io::ErrorKind::BrokenPipe, "closed");
-        let wrapped = anyhow::Error::new(netdata_plugin_protocol::NetdataPluginError::from(pipe()))
-            .context("failed to declare ledger function to agent");
-        assert!(is_agent_gone(&wrapped));
-        assert!(is_agent_gone(
-            &anyhow::Error::new(pipe()).context("keepalive")
-        ));
-        let other = anyhow::Error::new(std::io::Error::other("disk full"));
-        assert!(!is_agent_gone(&other));
-        assert!(!is_agent_gone(&anyhow::anyhow!("ledger handshake")));
     }
 
     #[test]
