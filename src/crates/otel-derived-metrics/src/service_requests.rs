@@ -280,11 +280,18 @@ mod tests {
 
     #[test]
     fn a_service_without_requests_gets_no_charts() {
-        let out = render(&request(
+        let mut export = request(
             vec![attr("service.name", "caller")],
             vec![span(SpanKind::Client, 10)],
-        ));
-        assert_eq!(out, "");
+        );
+        let callee = request(
+            vec![attr("service.name", "callee")],
+            vec![span(SpanKind::Server, 10)],
+        );
+        export.resource_spans.extend(callee.resource_spans);
+        let out = render(&export);
+        assert!(out.contains("CLABEL 'resource.attributes.service.name' 'callee' 1\n"));
+        assert!(!out.contains("'caller'"));
     }
 
     #[test]
@@ -315,9 +322,9 @@ mod tests {
 
     #[test]
     fn an_all_zero_parent_id_marks_a_root() {
-        let mut span = span(SpanKind::Internal, 10);
-        span.parent_span_id = vec![0; 8];
-        let out = render(&request(vec![attr("service.name", "a")], vec![span]));
+        let mut zero_parent = span(SpanKind::Internal, 10);
+        zero_parent.parent_span_id = vec![0; 8];
+        let out = render(&request(vec![attr("service.name", "a")], vec![zero_parent]));
         assert_eq!(values(&out, "success")[0], "1");
     }
 

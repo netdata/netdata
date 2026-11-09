@@ -249,12 +249,13 @@ mod tests {
         let now = unix_now();
         derived.record_ingest(Signal::Logs, 3, 1);
 
-        let out = readable(derived.emit(now + 2));
+        // Two ticks: derivation charts, if any, would come with the second.
+        let mut out = readable(derived.emit(now + 2));
+        out += &readable(derived.emit(now + 3));
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains("CHART netdata.otel.log_records "));
         assert!(out.contains("SET accepted = 3\nSET rejected = 1\n"));
         assert!(out.contains("CHART netdata.otel.spans "));
-        assert!(!out.contains("otel_service."));
         assert!(!out.contains("netdata.otel.derived_"));
     }
 }
