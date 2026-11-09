@@ -16,7 +16,6 @@
 //! `otel_ledger`, `otel_legacy_logs`); this crate owns only the entry point,
 //! the supervisor, and configuration loading.
 mod config;
-mod lifeline;
 mod supervisor;
 
 use anyhow::Context;
@@ -55,10 +54,6 @@ enum CliCommand {
     /// Run as a worker subprocess of this same executable; spawned by the
     /// supervisor's own re-exec, not an operator command.
     Worker {
-        /// Exit when stdin closes: the supervisor passes a pipe it never
-        /// writes, so end-of-file means the supervisor is gone (`lifeline`).
-        #[arg(long)]
-        lifeline: bool,
         /// glibc malloc arena limit for the ingestor and ledger: a count, or
         /// `auto` (the default) for one per runtime worker thread. Carries
         /// otel.yaml's `malloc_arena_max`; ignored by the other workers.
@@ -207,7 +202,7 @@ async fn async_main(cli: Cli, worker_arenas: Option<Option<usize>>) {
             };
             std::process::exit(code);
         }
-        Some(CliCommand::Worker { lifeline, kind, .. }) => {
+        Some(CliCommand::Worker { kind, .. }) => {
             let syslog_id = match &kind {
                 WorkerKind::Ingestor { .. } => "otel-plugin/ingestor",
                 WorkerKind::Ledger { .. } => "otel-plugin/ledger",
@@ -226,12 +221,6 @@ async fn async_main(cli: Cli, worker_arenas: Option<Option<usize>>) {
                     tracing::warn!("failed to set glibc malloc arenas for {syslog_id}");
                 }
                 None => {}
-            }
-            if lifeline {
-                if let Err(e) = lifeline::exit_when_stdin_closes() {
-                    tracing::error!("failed to start the supervisor lifeline watcher: {e}");
-                    std::process::exit(1);
-                }
             }
             if let Err(e) = run_worker(kind).await {
                 tracing::error!("{e:#}");
@@ -302,35 +291,7 @@ mod tests {
     #[test]
     fn worker_subcommand_still_routes() {
         let cli = parse(&["otel-plugin", "worker", "ingestor", "--socket", "/s"]).unwrap();
-        assert!(matches!(
-            cli.command,
-            Some(CliCommand::Worker {
-                lifeline: false,
-                ..
-            })
-        ));
-    }
-
-    // The argv `supervisor::spawn_worker` builds.
-    #[test]
-    fn worker_lifeline_flag_precedes_the_kind() {
-        let cli = parse(&[
-            "otel-plugin",
-            "worker",
-            "--lifeline",
-            "ledger",
-            "--socket",
-            "/s",
-        ])
-        .unwrap();
-        assert!(matches!(
-            cli.command,
-            Some(CliCommand::Worker {
-                lifeline: true,
-                malloc_arena_max: None,
-                kind: WorkerKind::Ledger { .. }
-            })
-        ));
+        assert!(matches!(cli.command, Some(CliCommand::Worker { .. })));
     }
 
     // otel.yaml's `malloc_arena_max`, as `supervisor::arena_args` passes it.
@@ -340,7 +301,6 @@ mod tests {
             let cli = parse(&[
                 "otel-plugin",
                 "worker",
-                "--lifeline",
                 "--malloc-arena-max",
                 arenas,
                 "ingestor",

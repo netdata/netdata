@@ -82,21 +82,11 @@ fn resolve_identity(value: Option<&str>, var_name: &str) -> anyhow::Result<Machi
 struct ChildGuard {
     child: tokio::process::Child,
     name: &'static str,
-    /// Write end of the worker's stdin lifeline (`crate::lifeline`), never
-    /// written: it closes with this guard or with the supervisor process, and
-    /// the worker exits on the end-of-file. Dropped after `drop` has run, so
-    /// the SIGKILL decision there sees the worker as it was.
-    _lifeline: Option<tokio::process::ChildStdin>,
 }
 
 impl ChildGuard {
-    fn new(mut child: tokio::process::Child, name: &'static str) -> Self {
-        let lifeline = child.stdin.take();
-        Self {
-            child,
-            name,
-            _lifeline: lifeline,
-        }
+    fn new(child: tokio::process::Child, name: &'static str) -> Self {
+        Self { child, name }
     }
 }
 
@@ -565,16 +555,23 @@ impl Supervisor {
     ///
     /// We intentionally do not restart workers — the Netdata agent is
     /// responsible for restarting the entire plugin.
-    async fn run(&mut self, signals: &mut StopSignals) -> anyhow::Result<&'static str> {
+    async fn run(&mut self) -> anyhow::Result<&'static str> {
         // PLUGIN_KEEPALIVE is a benign no-op on the agent side; the point is
         // regular stdout traffic so the agent's 2-minute idle read on this
         // plugin never fires while nothing else is being emitted.
         let mut keepalive = tokio::time::interval(tokio::time::Duration::from_secs(60));
+        let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+            .context("failed to register SIGINT handler")?;
+        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .context("failed to register SIGTERM handler")?;
 
         loop {
             tokio::select! {
-                reason = signals.recv() => {
-                    return Ok(reason);
+                _ = sigint.recv() => {
+                    return Ok("received SIGINT");
+                }
+                _ = sigterm.recv() => {
+                    return Ok("received SIGTERM");
                 }
                 msg = self.reader.recv() => {
                     match msg {
@@ -624,37 +621,6 @@ impl Supervisor {
             }
         }
     }
-}
-
-/// SIGINT/SIGTERM, registered at the very start of [`run`] so a stop request
-/// during worker startup is honoured instead of being queued behind it.
-struct StopSignals {
-    sigint: tokio::signal::unix::Signal,
-    sigterm: tokio::signal::unix::Signal,
-}
-
-impl StopSignals {
-    fn register() -> anyhow::Result<Self> {
-        use tokio::signal::unix::{SignalKind, signal};
-        Ok(Self {
-            sigint: signal(SignalKind::interrupt()).context("failed to register SIGINT handler")?,
-            sigterm: signal(SignalKind::terminate())
-                .context("failed to register SIGTERM handler")?,
-        })
-    }
-
-    async fn recv(&mut self) -> &'static str {
-        tokio::select! {
-            _ = self.sigint.recv() => "received SIGINT",
-            _ = self.sigterm.recv() => "received SIGTERM",
-        }
-    }
-}
-
-/// How the startup handshake ended.
-enum Startup {
-    Done(anyhow::Result<(Vec<FunctionDeclaration>, Vec<FunctionDeclaration>)>),
-    Stopped(&'static str),
 }
 
 /// Guard for one IPC socket file: `new` removes any stale file at the path
@@ -724,59 +690,24 @@ where
 
     tracing::info!("spawning {name} socket={}", sock.path());
 
-    let mut cmd = Command::new(self_exe);
-    cmd.args(["worker", "--lifeline"])
+    let child = Command::new(self_exe)
+        .arg("worker")
         .args(worker_args)
         .args([name, "--socket", sock.path()])
-        .stdin(Stdio::piped())
+        .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::inherit());
-    // A worker must not outlive the supervisor: `ChildGuard` cannot run when
-    // the supervisor is SIGKILLed, and an orphaned ledger keeps its WAL
-    // directory busy while the agent starts the next instance. The stdin pipe
-    // is the portable guard (`crate::lifeline`); std opens it close-on-exec,
-    // so a later worker does not inherit this one's write end. On Linux,
-    // PDEATHSIG also kills the worker at once, even if it is too starved to
-    // run its lifeline thread. PDEATHSIG fires when the forking *thread*
-    // exits; this runs inside `block_on` on the main thread, which lives as
-    // long as the process.
-    #[cfg(target_os = "linux")]
-    {
-        let parent = std::process::id() as libc::pid_t;
-        // SAFETY: the closure runs in the forked child before exec and calls
-        // only the async-signal-safe `prctl` and `getppid`.
-        unsafe {
-            cmd.pre_exec(move || {
-                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                // The supervisor died between fork and prctl.
-                if libc::getppid() != parent {
-                    return Err(std::io::Error::from_raw_os_error(libc::ESRCH));
-                }
-                Ok(())
-            });
-        }
-    }
-    let child = cmd
+        .stderr(Stdio::inherit())
         .spawn()
         .with_context(|| format!("failed to spawn {name} worker"))?;
 
     // Wrap immediately so the child is killed if accept() fails.
-    let mut guard = ChildGuard::new(child, name);
+    let guard = ChildGuard::new(child, name);
 
-    // A worker that dies before connecting fails startup at once instead of
-    // after the whole connect timeout.
-    let conn = tokio::select! {
-        r = tokio::time::timeout(WORKER_CONNECT_TIMEOUT, listener.accept()) => r
-            .map_err(|_| anyhow::anyhow!("{name} failed to connect within {WORKER_CONNECT_TIMEOUT:?}"))
-            .and_then(|r| r.map_err(Into::into))
-            .with_context(|| format!("{name} worker connection failed"))?,
-        status = guard.child.wait() => {
-            let status = status.map_or_else(|e| e.to_string(), |s| s.to_string());
-            anyhow::bail!("{name} worker exited before connecting ({status})");
-        }
-    };
+    let conn = tokio::time::timeout(WORKER_CONNECT_TIMEOUT, listener.accept())
+        .await
+        .map_err(|_| anyhow::anyhow!("{name} failed to connect within {WORKER_CONNECT_TIMEOUT:?}"))
+        .and_then(|r| r.map_err(Into::into))
+        .with_context(|| format!("{name} worker connection failed"))?;
     tracing::info!("{name} worker connected to supervisor");
 
     Ok((conn, guard))
@@ -790,7 +721,6 @@ where
 /// agent quits; workers are shut down on both the graceful and error paths.
 pub async fn run() -> anyhow::Result<()> {
     tracing::info!("starting otel-plugin");
-    let mut signals = StopSignals::register()?;
     let nd_env = netdata_plugin_rt::NetdataEnv::from_environment();
     match serde_json::to_string(&nd_env) {
         Ok(json) => tracing::info!("netdata environment: {json}"),
@@ -861,23 +791,14 @@ pub async fn run() -> anyhow::Result<()> {
     // Spawn the ledger first: it listens on the writer socket, and on startup
     // the ingestor connects to that socket to stream records to it. Reversing
     // the order would race the ingestor against a not-yet-listening ledger.
-    // A stop signal ends the spawning at once; dropping the future drops the
-    // `ChildGuard`s of the workers already started, which kills them.
     let arenas = arena_args(plugin_config.malloc_arena_max);
     let arenas: Vec<&str> = arenas.iter().map(String::as_str).collect();
-    let spawned = async {
-        let ledger = spawn_worker(&self_exe, &ledger_sock, "ledger", &arenas).await?;
-        let ingestor = spawn_worker(&self_exe, &ingestor_sock, "ingestor", &arenas).await?;
-        let legacy = spawn_worker(&self_exe, &legacy_sock, "legacy-logs", &[]).await?;
-        Ok::<_, anyhow::Error>((ledger, ingestor, legacy))
-    };
-    let ((ledger_conn, ledger_child), (ingestor_conn, ingestor_child), (legacy_conn, legacy_child)) = tokio::select! {
-        r = spawned => r?,
-        reason = signals.recv() => {
-            tracing::info!("{reason} while starting workers, stopping");
-            return Ok(());
-        }
-    };
+    let (ledger_conn, ledger_child) =
+        spawn_worker(&self_exe, &ledger_sock, "ledger", &arenas).await?;
+    let (ingestor_conn, ingestor_child) =
+        spawn_worker(&self_exe, &ingestor_sock, "ingestor", &arenas).await?;
+    let (legacy_conn, legacy_child) =
+        spawn_worker(&self_exe, &legacy_sock, "legacy-logs", &[]).await?;
 
     let mut supervisor = Supervisor {
         ingestor: ingestor_conn,
@@ -903,36 +824,20 @@ pub async fn run() -> anyhow::Result<()> {
     // The ledger is configured first: it must be listening on the writer
     // socket before the ingestor connects to it. Its declarations are
     // forwarded only after the ingestor's handshake also succeeded — bind
-    // before declare (see `register_declarations`). A handshake failure or a
-    // stop signal returns straight out and ChildGuard
-    // SIGKILLs the remaining workers on unwind: the ledger does not read its
-    // supervisor connection while it recovers or waits in `accept_writer`, so
-    // a graceful Shutdown would not reach it anyway, and legacy-logs treats a
-    // pre-Configure Shutdown as an error.
-    let startup = {
-        let handshake = async {
-            let ledger = supervisor
-                .configure_ledger(plugin_config.clone())
-                .await
-                .context("ledger configuration failed")?;
-            let ingestor = supervisor
-                .configure_ingestor(plugin_config)
-                .await
-                .context("ingestor configuration failed")?;
-            Ok::<_, anyhow::Error>((ledger, ingestor))
-        };
-        tokio::select! {
-            r = handshake => Startup::Done(r),
-            reason = signals.recv() => Startup::Stopped(reason),
-        }
-    };
-    let (ledger_declarations, ingestor_declarations) = match startup {
-        Startup::Done(r) => r?,
-        Startup::Stopped(reason) => {
-            tracing::info!("{reason} during startup, stopping workers");
-            return Ok(());
-        }
-    };
+    // before declare (see `register_declarations`). A handshake failure here
+    // returns straight out and ChildGuard SIGKILLs the remaining workers on
+    // unwind: the ledger does not read its supervisor connection while it
+    // waits in `accept_writer`, so a graceful Shutdown would not reach it
+    // anyway, and legacy-logs treats a pre-Configure Shutdown as an error.
+    let ledger_declarations = supervisor
+        .configure_ledger(plugin_config.clone())
+        .await
+        .context("ledger configuration failed")?;
+
+    let ingestor_declarations = supervisor
+        .configure_ingestor(plugin_config)
+        .await
+        .context("ingestor configuration failed")?;
 
     supervisor
         .register_declarations(Worker::Ledger, ledger_declarations)
@@ -950,7 +855,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     tracing::info!("workers ready, entering main loop");
 
-    match supervisor.run(&mut signals).await {
+    match supervisor.run().await {
         Ok(reason) => {
             tracing::info!("{reason}, shutting down");
             supervisor.shutdown_workers().await;
@@ -983,52 +888,6 @@ mod tests {
     fn arena_args_carry_auto_or_the_count() {
         assert_eq!(arena_args(None), ["--malloc-arena-max", "auto"]);
         assert_eq!(arena_args(Some(4)), ["--malloc-arena-max", "4"]);
-    }
-
-    #[tokio::test]
-    async fn a_worker_that_dies_before_connecting_fails_fast() {
-        let dir = tempfile::tempdir().unwrap();
-        let sock = super::SocketGuard::new(dir.path(), "ledger");
-        let started = std::time::Instant::now();
-        let err = super::spawn_worker::<otel_bridge::LedgerRequest, otel_bridge::LedgerResponse>(
-            std::path::Path::new("/bin/false"),
-            &sock,
-            "ledger",
-            &[],
-        )
-        .await
-        .err()
-        .expect("startup fails");
-        assert!(
-            format!("{err:#}").contains("exited before connecting"),
-            "{err:#}"
-        );
-        assert!(started.elapsed() < std::time::Duration::from_secs(10));
-    }
-
-    /// The lifeline relies on each worker's stdin pipe being close-on-exec: a
-    /// worker spawned later must not hold an earlier worker's write end open.
-    #[tokio::test]
-    async fn a_lifeline_write_end_is_not_inherited_by_later_children() {
-        use std::process::Stdio;
-        use tokio::process::Command;
-        let mut first = Command::new("cat")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .spawn()
-            .unwrap();
-        let lifeline = first.stdin.take();
-        let _later = Command::new("sleep")
-            .arg("30")
-            .stdin(Stdio::null())
-            .kill_on_drop(true)
-            .spawn()
-            .unwrap();
-        drop(lifeline);
-        tokio::time::timeout(std::time::Duration::from_secs(5), first.wait())
-            .await
-            .expect("the first child sees end-of-file")
-            .unwrap();
     }
 
     #[test]
