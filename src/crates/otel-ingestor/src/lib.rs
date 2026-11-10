@@ -532,7 +532,6 @@ fn create_logs_service(
 ) -> NetdataLogsService {
     NetdataLogsService::new(
         ledger_sender,
-        lifecycle.wal.dir.clone(),
         lifecycle.wal.clone(),
         lifecycle.ingest.clone(),
         seq_allocator,
@@ -559,7 +558,6 @@ fn create_traces_service(
     );
     NetdataTracesService::new(
         ledger_sender,
-        lifecycle.wal.dir.clone(),
         lifecycle.wal.clone(),
         lifecycle.ingest.clone(),
         seq_allocator,

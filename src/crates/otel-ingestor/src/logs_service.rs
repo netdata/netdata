@@ -30,7 +30,6 @@
 //! between exports.
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use file_registry::{Identity, MonotonicClock, TenantId};
@@ -602,10 +601,8 @@ pub struct NetdataLogsService {
 }
 
 impl NetdataLogsService {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         ledger_sender: Arc<LedgerSender>,
-        wal_base_dir: PathBuf,
         wal_config: otel_bridge::config::WalConfig,
         ingest_bounds: otel_bridge::config::IngestConfig,
         seq_allocator: Arc<wal::SeqAllocator>,
@@ -617,7 +614,6 @@ impl NetdataLogsService {
             writers: TenantWriters::new(
                 Signal::Logs,
                 ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
-                wal_base_dir,
                 wal_config,
                 seq_allocator,
                 instance_identity,
@@ -1120,7 +1116,7 @@ mod tests {
             },
         );
         let wal_config = otel_bridge::config::WalConfig {
-            dir: wal_dir.clone(),
+            dir: wal_dir,
             crc_enabled: true,
             compression_enabled: true,
             rotation: otel_bridge::config::RotationPolicy::try_from(rotation)
@@ -1129,7 +1125,6 @@ mod tests {
 
         NetdataLogsService::new(
             sender,
-            wal_dir,
             wal_config,
             ingest,
             Arc::new(wal::SeqAllocator::ephemeral(0)),
@@ -1208,14 +1203,13 @@ mod tests {
             },
         );
         let wal_config = otel_bridge::config::WalConfig {
-            dir: wal_dir.clone(),
+            dir: wal_dir,
             crc_enabled: true,
             compression_enabled: true,
             rotation: otel_bridge::config::RotationPolicy::try_from(rotation).unwrap(),
         };
         let service = NetdataLogsService::new(
             sender,
-            wal_dir.clone(),
             wal_config,
             otel_bridge::config::IngestConfig {
                 max_age: std::time::Duration::from_secs(u64::MAX),

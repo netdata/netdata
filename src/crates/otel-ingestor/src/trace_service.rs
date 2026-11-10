@@ -39,7 +39,6 @@
 //! [`NetdataTracesService::sweep_expired_rotations`] seals quiet streams so
 //! they still get indexed (and uploaded, with remote storage).
 
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use file_registry::{Identity, MonotonicClock, TenantId};
@@ -256,10 +255,8 @@ pub struct NetdataTracesService {
 }
 
 impl NetdataTracesService {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         ledger_sender: Arc<LedgerSender>,
-        wal_base_dir: PathBuf,
         wal_config: otel_bridge::config::WalConfig,
         ingest_bounds: otel_bridge::config::IngestConfig,
         seq_allocator: Arc<wal::SeqAllocator>,
@@ -271,7 +268,6 @@ impl NetdataTracesService {
             writers: TenantWriters::new(
                 Signal::Traces,
                 ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
-                wal_base_dir,
                 wal_config,
                 seq_allocator,
                 instance_identity,
@@ -551,7 +547,7 @@ mod tests {
             },
         );
         let wal_config = otel_bridge::config::WalConfig {
-            dir: wal_dir.clone(),
+            dir: wal_dir,
             crc_enabled: true,
             compression_enabled: true,
             rotation: otel_bridge::config::RotationPolicy::try_from(rotation)
@@ -560,7 +556,6 @@ mod tests {
 
         NetdataTracesService::new(
             sender,
-            wal_dir,
             wal_config,
             ingest,
             Arc::new(wal::SeqAllocator::ephemeral(0)),
@@ -1122,14 +1117,13 @@ mod tests {
             },
         );
         let wal_config = otel_bridge::config::WalConfig {
-            dir: wal_dir.clone(),
+            dir: wal_dir,
             crc_enabled: true,
             compression_enabled: true,
             rotation: otel_bridge::config::RotationPolicy::try_from(rotation).unwrap(),
         };
         let service = NetdataTracesService::new(
             sender,
-            wal_dir,
             wal_config,
             otel_bridge::config::IngestConfig {
                 max_age: std::time::Duration::from_secs(u64::MAX),

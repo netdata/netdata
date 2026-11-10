@@ -836,7 +836,6 @@ mod tests {
 
         let logs = Arc::new(NetdataLogsService::new(
             Arc::clone(&sender),
-            tmp.path().join("logs/wal"),
             wal_config(&tmp.path().join("logs/wal")),
             ingest.clone(),
             Arc::clone(&seq),
@@ -847,7 +846,6 @@ mod tests {
 
         let traces = Arc::new(NetdataTracesService::new(
             sender,
-            tmp.path().join("traces/wal"),
             wal_config(&tmp.path().join("traces/wal")),
             ingest,
             seq,

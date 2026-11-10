@@ -3,7 +3,6 @@
 //! writer, and the periodic idle-rotation sweep asks it to rotate what has
 //! expired.
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use file_registry::{Identity, TenantId, TimestampNs};
@@ -24,8 +23,7 @@ pub(crate) struct TenantWriters {
     /// Stamped into every WAL file: the signal's pipeline id and the format
     /// of its frame payloads.
     file_stamp: wal::FileStamp,
-    /// Each tenant's WAL files live in `base_dir/<tenant>`.
-    base_dir: PathBuf,
+    /// Each tenant's WAL files live in `config.dir/<tenant>`.
     config: otel_bridge::config::WalConfig,
     /// The global seq allocator (lib.rs hands the same one to the logs and
     /// traces services), so file `seq` is unique across signals.
@@ -40,7 +38,6 @@ impl TenantWriters {
     pub(crate) fn new(
         signal: Signal,
         payload_format: u16,
-        base_dir: PathBuf,
         config: otel_bridge::config::WalConfig,
         seq_allocator: Arc<wal::SeqAllocator>,
         instance_identity: Identity,
@@ -52,7 +49,6 @@ impl TenantWriters {
                 pipeline_id: signal.pipeline_id(),
                 payload_format,
             },
-            base_dir,
             config,
             seq_allocator,
             instance_identity,
@@ -68,7 +64,7 @@ impl TenantWriters {
             return Ok(Arc::clone(writer));
         }
 
-        let path = self.base_dir.join(tenant_id.as_str());
+        let path = self.config.dir.join(tenant_id.as_str());
         let writer = wal::Writer::new(
             &path,
             self.resolve_config(tenant_id.as_str()),
@@ -215,7 +211,6 @@ mod tests {
         TenantWriters::new(
             Signal::Logs,
             ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
-            base_dir.to_path_buf(),
             config,
             Arc::new(wal::SeqAllocator::ephemeral(0)),
             Identity::new(
