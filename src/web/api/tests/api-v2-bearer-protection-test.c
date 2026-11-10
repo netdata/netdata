@@ -102,7 +102,7 @@ int main(void) {
         { "wrong claim id", "bearer_protection=off&" TEST_IDENTITY, true, false, false, HTTP_RESP_BAD_REQUEST, true, "different claimed agent" },
         { "wrong node id", "bearer_protection=off&claim_id=c&machine_guid=" TEST_MACHINE_GUID "&node_id=" TEST_MACHINE_GUID, true, true, false, HTTP_RESP_BAD_REQUEST, true, "not matching local UUIDs" },
         { "wrong claim id and invalid value", "bearer_protection=bad&" TEST_IDENTITY, true, false, false, HTTP_RESP_BAD_REQUEST, true, "different claimed agent" },
-        { "wrong node id and invalid value", "bearer_protection=bad&claim_id=c&machine_guid=" TEST_MACHINE_GUID, true, true, false, HTTP_RESP_BAD_REQUEST, true, "not matching local UUIDs" },
+        { "wrong node id and invalid value", "bearer_protection=bad&claim_id=c&machine_guid=" TEST_MACHINE_GUID "&node_id=" TEST_MACHINE_GUID, true, true, false, HTTP_RESP_BAD_REQUEST, true, "not matching local UUIDs" },
     };
 
     int errors = 0;

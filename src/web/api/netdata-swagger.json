@@ -4866,7 +4866,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Bearer protection state successfully changed.",
+            "description": "Current bearer protection state, after applying the requested change if one was given.",
             "content": {
               "application/json": {
                 "schema": {

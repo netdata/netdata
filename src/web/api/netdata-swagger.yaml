@@ -6856,7 +6856,7 @@ paths:
             Example: `node_id=23456789-2345-2345-2345-234567890abc`
       responses:
         "200":
-          description: Bearer protection state successfully changed.
+          description: Current bearer protection state, after applying the requested change if one was given.
           content:
             application/json:
               schema:

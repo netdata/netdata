@@ -3181,7 +3181,7 @@ Per dimension:
 ## `/api/v3/bearer_protection` - COMPLETE ENUMERATED CHECKLIST ✅
 
 **Source Code Locations:**
-- Registration: `src/web/api/web_api_v3.c:225-230`
+- Registration: `src/web/api/web_api_v3.c:227-234`
 - Implementation: `src/web/api/v2/api_v2_bearer.c:21-85`
 
 **Security Configuration:**
@@ -3227,7 +3227,7 @@ Per dimension:
 ## `/api/v3/bearer_get_token` - COMPLETE ENUMERATED CHECKLIST ✅
 
 **Source Code Locations:**
-- Registration: `src/web/api/web_api_v3.c:233-238`
+- Registration: `src/web/api/web_api_v3.c:235-242`
 - Implementation: `src/web/api/v2/api_v2_bearer.c:112-158`
 - Helper Function: `src/web/api/v2/api_v2_bearer.c:87-110`
 - Remote Host Handler: `src/web/api/functions/function-bearer_get_token.c:59-82`
