@@ -149,15 +149,21 @@ For detailed instructions, see [Update your Netdata Docker container](/packaging
 ## Additional Configuration
 
 Source and static installations download updates from `https://artifacts.netdata.cloud/<channel>/latest`,
-where `<channel>` is `stable` or `nightly`. The updater uses `Version` to check the available version and
+where `<channel>` is `stable`, `preview`, or `nightly`. The updater uses `Version` to check the available version and
 `Manifest` to select an archive and verify its size and SHA256 checksum before installation. When the default
-hosting does not provide a Manifest, the updater falls back to GitHub releases, including legacy releases
-with `sha256sums.txt`. Offline sources support both metadata formats.
+hosting does not provide a Manifest, stable and nightly fall back to GitHub releases, including legacy releases
+with `sha256sums.txt`. Preview requires the hosted Manifest and never falls back to GitHub.
+Offline sources support both metadata formats.
+
+Preview follows the latest version published to the preview channel, including prereleases and final releases.
+It preserves the preview channel after installing an update. Native installations detect the `netdata-repo-preview`
+package and use the `netdata-preview` repository. Preview also downloads the updater itself only from artifact hosting.
 
 To use a mirror, set `NETDATA_ARTIFACT_URL_PREFIX` in `netdata-updater.conf` to the directory containing the
 release's `Manifest`, `Version`, and archives. An explicit artifact prefix or offline source is used directly
 without falling back to GitHub for archive downloads. The legacy `NETDATA_BASE_URL` release/repository override
-remains supported; an explicit artifact prefix takes precedence for archive downloads.
+remains supported for stable/nightly releases and native repositories; preview archives use artifact hosting.
+An explicit artifact prefix takes precedence for archive downloads.
 
 ### Control runtime behavior of the updater script
 
