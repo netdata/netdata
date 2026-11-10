@@ -66,6 +66,7 @@ static DICTIONARY *smb_shares = NULL;
 static ND_PDH_QUERY *smb_query = NULL;
 static time_t smb_query_next_attempt = 0;
 static size_t smb_query_failed_samples = 0;
+static bool smb_query_partial = false; // some counters could not be added
 
 static void smb_share_initialize(struct smb_share *share)
 {
@@ -392,6 +393,16 @@ static void smb_query_close(void)
     nd_pdh_query_destroy(smb_query);
     smb_query = NULL;
     smb_query_failed_samples = 0;
+    smb_query_partial = false;
+}
+
+static bool smb_query_has_all_counters(void)
+{
+    for (size_t c = 0; c < SMB_SHARE_COUNTERS_MAX; c++) {
+        if (!nd_pdh_query_has_counter(smb_query, c))
+            return false;
+    }
+    return true;
 }
 
 void do_PerflibSMB_cleanup(void)
@@ -425,16 +436,23 @@ int do_PerflibSMB(int update_every, usec_t dt __maybe_unused)
             return 0;
 
         smb_query = nd_pdh_query_create(SMB_SERVER_SHARES_OBJECT, smb_share_counter_names, SMB_SHARE_COUNTERS_MAX);
-        if (!smb_query) {
-            smb_query_next_attempt = now + SMB_QUERY_RETRY_SECONDS;
+        smb_query_next_attempt = now + SMB_QUERY_RETRY_SECONDS;
+        if (!smb_query)
             return 0;
-        }
+
+        smb_query_partial = !smb_query_has_all_counters();
     }
 
+    // A rebuilt query is created on the next iteration; existing charts stay until a complete sample proves them gone.
     if (do_smb_server_shares(update_every))
         smb_query_failed_samples = 0;
-    else if (++smb_query_failed_samples >= SMB_QUERY_MAX_FAILED_SAMPLES)
-        // Rebuilt on the next iteration; existing charts stay until a complete sample proves them gone.
+    else if (++smb_query_failed_samples >= SMB_QUERY_MAX_FAILED_SAMPLES) {
+        smb_query_close();
+        return 0;
+    }
+
+    // A counter that failed to be added is otherwise never read again; rebuilding retries it.
+    if (smb_query_partial && now_monotonic_sec() >= smb_query_next_attempt)
         smb_query_close();
 
     return 0;

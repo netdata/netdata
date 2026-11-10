@@ -1240,7 +1240,7 @@ modules:
         method_description: |
           It reads the 'SMB Server Shares' performance counters through the Performance Data Helper (PDH), the same
           source as Performance Monitor and `Get-Counter`. The registry view of this object reports some counters
-          under the wrong names on recent Windows builds, so it is not used.
+          under the wrong names on some Windows builds, so it is not used.
       supported_platforms:
         include: ["windows"]
         exclude: []
