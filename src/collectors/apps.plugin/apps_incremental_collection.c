@@ -199,7 +199,7 @@ int incrementally_collect_data_for_pid(pid_t pid, void *ptr) {
 int read_proc_pid_cmdline(struct pid_stat *p) {
     static char cmdline[MAX_CMDLINE];
 
-    // On failure p is left untouched; the caller decides whether the cached cmdline is still valid.
+    // On failure p->cmdline is left unchanged; the caller decides whether the cached cmdline is still valid.
     if(unlikely(!OS_FUNCTION(apps_os_get_pid_cmdline)(p, cmdline, sizeof(cmdline))))
         return 0;
 
