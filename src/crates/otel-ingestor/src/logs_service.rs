@@ -239,16 +239,22 @@ fn build_partial_success(
     if collisions.is_empty() && oversized.is_empty() && out_of_window == 0 {
         return None;
     }
-    let total: i64 = collisions
-        .iter()
-        .map(|c| c.rejected_log_records as i64)
-        .sum::<i64>()
-        + oversized.iter().map(|o| o.log_records as i64).sum::<i64>()
-        + out_of_window as i64;
     Some(ExportLogsPartialSuccess {
-        rejected_log_records: total,
+        rejected_log_records: count_rejected(collisions, oversized, out_of_window) as i64,
         error_message: format_rejection_error(collisions, oversized, out_of_window),
     })
+}
+
+/// The records a request lost, across all three rejection classes. The client
+/// (`partial_success`) and self-monitoring both report this one number.
+fn count_rejected(
+    collisions: &[Collision],
+    oversized: &[OversizedDrop],
+    out_of_window: usize,
+) -> usize {
+    let collided: usize = collisions.iter().map(|c| c.rejected_log_records).sum();
+    let unstorable: usize = oversized.iter().map(|o| o.log_records).sum();
+    collided + unstorable + out_of_window
 }
 
 /// Format the rejected-records detail for `ExportLogsPartialSuccess::error_message`,
@@ -553,30 +559,24 @@ impl NetdataLogsService {
         }
     }
 
-    /// The transport-agnostic OTLP logs export entry point: runs
-    /// [`Self::export_logs_core`] and counts its outcome (records stored and
-    /// records rejected) for self-monitoring. A failed export counts nothing.
-    pub(crate) async fn export_logs(
+    /// The response of a successful export that carried records, counted for
+    /// self-monitoring on the way out: `stored` records are on disk, the rest
+    /// were rejected. Every such exit of [`Self::export_logs`] ends here, so
+    /// a failed export counts nothing.
+    fn counted_response(
         &self,
-        tenant_id: &TenantId,
-        request: ExportLogsServiceRequest,
-    ) -> Result<ExportLogsServiceResponse, Status> {
-        let records: u64 = request
-            .resource_logs
-            .iter()
-            .map(|rl| count_log_records(rl) as u64)
-            .sum();
-        let result = self.export_logs_core(tenant_id, request).await;
-        if let (Some(derived), Ok(response)) = (&self.derived, &result) {
-            if records > 0 {
-                let rejected = response
-                    .partial_success
-                    .as_ref()
-                    .map_or(0, |p| u64::try_from(p.rejected_log_records).unwrap_or(0));
-                derived.record_ingest(Signal::Logs, records.saturating_sub(rejected), rejected);
-            }
+        stored: usize,
+        collisions: &[Collision],
+        oversized: &[OversizedDrop],
+        out_of_window: usize,
+    ) -> ExportLogsServiceResponse {
+        if let Some(derived) = &self.derived {
+            let rejected = count_rejected(collisions, oversized, out_of_window);
+            derived.record_ingest(Signal::Logs, stored as u64, rejected as u64);
         }
-        result
+        ExportLogsServiceResponse {
+            partial_success: build_partial_success(collisions, oversized, out_of_window),
+        }
     }
 
     /// The transport-agnostic OTLP logs export core: everything between
@@ -587,7 +587,7 @@ impl NetdataLogsService {
     /// transports. The caller owns transport concerns (metadata/headers,
     /// request decoding, response framing); this core owns every rejection,
     /// ordering, and durability decision.
-    async fn export_logs_core(
+    pub(crate) async fn export_logs(
         &self,
         tenant_id: &TenantId,
         request: ExportLogsServiceRequest,
@@ -648,9 +648,7 @@ impl NetdataLogsService {
         // collision, or every group was dropped as oversized). Still report the
         // rejected records — collisions and oversized drops — to the client.
         if accepted.is_empty() {
-            return Ok(ExportLogsServiceResponse {
-                partial_success: build_partial_success(&collisions, &oversized, 0),
-            });
+            return Ok(self.counted_response(0, &collisions, &oversized, 0));
         }
 
         // Phase 1 — prepare every frame WITHOUT holding any writer lock:
@@ -722,9 +720,7 @@ impl NetdataLogsService {
         // Every accepted stream was fully rejected as out-of-window: nothing to
         // write, but still report the rejected records to the client.
         if prepared.is_empty() {
-            return Ok(ExportLogsServiceResponse {
-                partial_success: build_partial_success(&collisions, &oversized, out_of_window),
-            });
+            return Ok(self.counted_response(0, &collisions, &oversized, out_of_window));
         }
 
         // Phase 2 — the serialized region, under THIS TENANT's writer lock
@@ -810,9 +806,8 @@ impl NetdataLogsService {
             batch.commit();
         }
 
-        Ok(ExportLogsServiceResponse {
-            partial_success: build_partial_success(&collisions, &oversized, out_of_window),
-        })
+        let stored = prepared.iter().map(|p| p.frame.records).sum();
+        Ok(self.counted_response(stored, &collisions, &oversized, out_of_window))
     }
 }
 

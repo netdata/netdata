@@ -301,26 +301,17 @@ impl NetdataTracesService {
         }
     }
 
-    /// The transport-agnostic OTLP traces export entry point: runs
-    /// [`Self::export_traces_core`] and counts its outcome (spans stored and
-    /// spans rejected) for self-monitoring. A failed export counts nothing.
-    pub(crate) async fn export_traces(
-        &self,
-        tenant_id: &TenantId,
-        request: ExportTraceServiceRequest,
-    ) -> Result<ExportTraceServiceResponse, Status> {
-        let spans = count_spans(&request) as u64;
-        let result = self.export_traces_core(tenant_id, request).await;
-        if let (Some(derived), Ok(response)) = (&self.derived, &result) {
-            if spans > 0 {
-                let rejected = response
-                    .partial_success
-                    .as_ref()
-                    .map_or(0, |p| u64::try_from(p.rejected_spans).unwrap_or(0));
-                derived.record_ingest(Signal::Traces, spans.saturating_sub(rejected), rejected);
-            }
+    /// The response of a successful export that carried spans, counted for
+    /// self-monitoring on the way out: `stored` spans are on disk,
+    /// `out_of_window` spans were rejected. Every such exit of
+    /// [`Self::export_traces`] ends here, so a failed export counts nothing.
+    fn counted_response(&self, stored: usize, out_of_window: usize) -> ExportTraceServiceResponse {
+        if let Some(derived) = &self.derived {
+            derived.record_ingest(Signal::Traces, stored as u64, out_of_window as u64);
         }
-        result
+        ExportTraceServiceResponse {
+            partial_success: build_partial_success(out_of_window),
+        }
     }
 
     /// The transport-agnostic OTLP traces export core: everything between
@@ -331,7 +322,7 @@ impl NetdataTracesService {
     /// transports. The caller owns transport concerns (metadata/headers,
     /// request decoding, response framing); this core owns every rejection,
     /// ordering, and durability decision.
-    async fn export_traces_core(
+    pub(crate) async fn export_traces(
         &self,
         tenant_id: &TenantId,
         request: ExportTraceServiceRequest,
@@ -416,9 +407,7 @@ impl NetdataTracesService {
         // Every span was rejected as out-of-window: nothing to write, but
         // still report the rejected spans to the client.
         if prepared.is_empty() {
-            return Ok(ExportTraceServiceResponse {
-                partial_success: build_partial_success(out_of_window),
-            });
+            return Ok(self.counted_response(0, out_of_window));
         }
 
         // Phase 2 — the serialized region, under THIS TENANT's writer lock
@@ -506,9 +495,8 @@ impl NetdataTracesService {
             batch.commit();
         }
 
-        Ok(ExportTraceServiceResponse {
-            partial_success: build_partial_success(out_of_window),
-        })
+        let stored = prepared.iter().map(|p| p.frame.records).sum();
+        Ok(self.counted_response(stored, out_of_window))
     }
 }
 
