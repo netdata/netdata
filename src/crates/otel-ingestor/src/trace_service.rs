@@ -3,12 +3,13 @@
 //! [`crate::logs_service::NetdataLogsService`]. The logic is
 //! transport-agnostic — it lives on the [`NetdataTracesService::export_traces`]
 //! core, which both the gRPC `TraceService` wrapper and the OTLP/HTTP front
-//! end call. Same two-phase export structure: prepare
+//! end call. Same export structure: prepare
 //! every frame lock-free (normalize + interval time bounds + flatten +
 //! encode, all owned by `ng_flatten::prepare_trace_frame_with`; `Some(bounds)`
 //! here — production enforces the window, while the `ng-ingest` dev tool and
-//! the tests pass `None`), then write + sync + drain-events under the
-//! tenant's writer lock only.
+//! the tests pass `None`), write the frames under the tenant's writer lock
+//! only, then, without the lock and in a task of its own, wait for a sync
+//! round that covers them (`TenantWriter::make_durable`) and count the spans.
 //!
 //! ## Partitioning
 //!
@@ -71,7 +72,7 @@ enum Payload {
     /// As received (still an OTLP request — the frame recipe consumes it).
     Spans(ExportTraceServiceRequest),
     /// Flattened and encoded lock-free (phase 1): one WAL frame, awaiting the
-    /// serialized write+sync region (phase 2). Holds at least one span.
+    /// serialized write region (phase 2). Holds at least one span.
     Frame(ng_flatten::PreparedTraceFrame),
     /// Every span fell outside the ingestion window: nothing to write.
     OutOfWindow,
@@ -238,10 +239,6 @@ pub struct NetdataTracesService {
     /// stamps per-frame `ingestion_ns` from it, so one clock keeps frame
     /// ordering consistent across every stream and signal.
     clock: Arc<Mutex<MonotonicClock>>,
-    /// Shared with the logs ingestion service: the writer → ledger IPC accepts
-    /// exactly one connection (the ledger gap-checks frame sequences per
-    /// signal), so every signal's events MUST funnel through one sender.
-    ledger_sender: Arc<LedgerSender>,
     /// Global ingestion time-bounds: reject spans whose `[start, effective
     /// end]` interval falls outside `[now - max_age, now + future_skew]`.
     /// Applied per span inside `prepare_trace_frame`.
@@ -271,9 +268,9 @@ impl NetdataTracesService {
                 wal_config,
                 seq_allocator,
                 instance_identity,
+                ledger_sender,
             ),
             clock,
-            ledger_sender,
             ingest_bounds,
             auth,
             observers: Vec::new(),
@@ -323,21 +320,7 @@ impl NetdataTracesService {
     /// [`TenantWriters::rotate_expired`].
     pub fn sweep_expired_rotations(&self) {
         let now_ns = self.clock.lock().unwrap().now_ns();
-        self.writers.rotate_expired(now_ns, &self.ledger_sender);
-    }
-
-    /// The response of a successful export that carried spans, counted for
-    /// self-monitoring on the way out: `kept` spans are on disk,
-    /// `out_of_window` spans were rejected. Every such exit of
-    /// [`Self::export_traces`] ends here, so a failed export counts nothing.
-    fn counted_response(&self, kept: usize, out_of_window: usize) -> ExportTraceServiceResponse {
-        if let Some(derived_metrics) = &self.derived_metrics {
-            derived_metrics.record_ingest(Signal::Traces, kept as u64, out_of_window as u64);
-        }
-
-        ExportTraceServiceResponse {
-            partial_success: build_partial_success(out_of_window),
-        }
+        self.writers.rotate_expired(now_ns);
     }
 
     /// The transport-agnostic OTLP traces export core: everything between
@@ -419,49 +402,81 @@ impl NetdataTracesService {
         // Every span was rejected as out-of-window: nothing to write, but
         // still report the rejected spans to the client.
         if kept == 0 {
-            return Ok(self.counted_response(0, out_of_window));
+            return Ok(counted_response(
+                self.derived_metrics.as_deref(),
+                0,
+                out_of_window,
+            ));
         }
 
-        // Phase 2 — the serialized region, under THIS TENANT's writer lock
-        // only (the map lock is held just for lookup/insert): frame writes,
-        // one durability sync (a successful ack implies the frames are on
-        // disk), event drain. All sync code — no `.await` while a guard is
-        // held.
-        let writer = self.writers.writer_for(tenant_id).map_err(|e| {
+        // Phase 2 — the writes, under THIS TENANT's writer lock only (the
+        // map lock is held just for lookup/insert). All sync code: no
+        // `.await` while the guard is held.
+        let tenant_writer = self.writers.writer_for(tenant_id).map_err(|e| {
             tracing::error!(%e, tenant = %tenant_id, "failed to create traces WAL writer");
             Status::internal("WAL writer creation failed")
         })?;
-        {
-            let mut writer = writer.lock().unwrap();
+        let mark = {
+            let mut writer = tenant_writer.lock();
 
             for s in &storable_spans {
                 s.write_to(&mut writer, &self.clock)?;
             }
-            writer.sync_all().map_err(|e| {
+
+            writer.write_mark()
+        };
+
+        // Written: the frames need not stay in memory while the request waits.
+        drop(storable_spans);
+
+        // Phase 3 — wait for a sync round that covers the frames, then count
+        // the spans (a successful ack implies the frames are on disk). This
+        // runs in a task of its own: a client that goes away drops this
+        // request, and the spans it stored must still be synced, announced
+        // to the ledger, observed and counted.
+        let derived_metrics = self.derived_metrics.clone();
+        let stored = tokio::spawn(async move {
+            tenant_writer.make_durable(mark).await.map_err(|e| {
                 tracing::error!(%e, "failed to sync traces WAL");
                 Status::internal("WAL sync error")
             })?;
-            // Drain AND forward the lifecycle events while STILL holding the
-            // writer lock, so drain+send is atomic per tenant: a file's
-            // Created→Synced→Closed reach the one ledger channel in the order
-            // the lock serialized their writes. `send_events` is synchronous
-            // and non-blocking (unbounded channel), so no `.await` under the
-            // lock.
-            let events = writer.take_all_events();
-            // `send_events` takes the tenant by value and the core only
-            // borrows it, so clone here — the last use of the id in this
-            // request either way.
-            self.ledger_sender.send_events(tenant_id.clone(), events);
-        }
+            for observation in observations {
+                observation.commit();
+            }
+            if let Some(batch) = derived_batch {
+                batch.commit();
+            }
 
-        for observation in observations {
-            observation.commit();
-        }
-        if let Some(batch) = derived_batch {
-            batch.commit();
-        }
+            Ok(counted_response(
+                derived_metrics.as_deref(),
+                kept,
+                out_of_window,
+            ))
+        });
 
-        Ok(self.counted_response(kept, out_of_window))
+        stored.await.map_err(|e| {
+            tracing::error!(%e, "the task that syncs and counts a traces export failed");
+            Status::internal("export task failed")
+        })?
+    }
+}
+
+/// The response of a successful export that carried spans, counted for
+/// self-monitoring on the way out: `kept` spans are on disk, `out_of_window`
+/// spans were rejected. Every such exit of
+/// [`NetdataTracesService::export_traces`] ends here, so a failed export
+/// counts nothing.
+fn counted_response(
+    derived_metrics: Option<&DerivedMetrics>,
+    kept: usize,
+    out_of_window: usize,
+) -> ExportTraceServiceResponse {
+    if let Some(derived_metrics) = derived_metrics {
+        derived_metrics.record_ingest(Signal::Traces, kept as u64, out_of_window as u64);
+    }
+
+    ExportTraceServiceResponse {
+        partial_success: build_partial_success(out_of_window),
     }
 }
 
@@ -607,6 +622,55 @@ mod tests {
             .filter_map(|l| l.strip_prefix(&prefix))
             .map(|v| netdata_plugin_protocol::read_float_value(v).unwrap())
             .sum()
+    }
+
+    /// A client that goes away drops its request while it waits for the sync
+    /// round. The spans it stored are still synced, observed and counted.
+    #[tokio::test]
+    async fn a_dropped_export_is_still_synced_and_counted() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let tenant = TenantId::default_tenant();
+        let derived = Arc::new(
+            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
+        );
+        let recorder = Arc::new(Recorder::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let mut service = test_service(tmp.path().to_path_buf());
+        service.set_derived_metrics(Arc::clone(&derived));
+        service.add_observer(recorder.clone());
+
+        // With the tenant's sync turn taken, the export writes its frame and
+        // then has to wait. Polled once and dropped: the client is gone.
+        let tenant_writer = service.writers.writer_for(&tenant).unwrap();
+        let turn = tenant_writer.hold_sync_turn().await;
+        {
+            let export = service.export_traces(&tenant, spans_req(3, now));
+            tokio::pin!(export);
+            tokio::select! {
+                biased;
+                _ = &mut export => panic!("the export must wait for the sync round"),
+                () = std::future::ready(()) => {}
+            }
+        }
+        // Let the task the export left behind run up to the sync turn.
+        tokio::task::yield_now().await;
+        let mark = tenant_writer.lock().write_mark();
+        assert!(!tenant_writer.lock().is_durable(mark));
+        assert!(recorder.committed.lock().unwrap().is_empty());
+
+        // The round runs once the turn is free; taking the turn again waits
+        // for it to end.
+        drop(turn);
+        let _turn = tenant_writer.hold_sync_turn().await;
+
+        assert!(tenant_writer.lock().is_durable(mark));
+        assert_eq!(recorder.committed.lock().unwrap().len(), 1);
+        let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
+        assert_eq!(sum_of(&out, "accepted"), 3.0);
+        assert_eq!(sum_of(&out, "success"), 3.0);
     }
 
     #[tokio::test]
@@ -886,7 +950,7 @@ mod tests {
             .writers
             .writer_for(&TenantId::default_tenant())
             .unwrap();
-        let mut writer = writer.lock().unwrap();
+        let mut writer = writer.lock();
         let bounds = ng_flatten::TimeBounds {
             min_ns: 0,
             max_ns: u64::MAX,
@@ -937,7 +1001,7 @@ mod tests {
             .writers
             .existing(&TenantId::default_tenant())
             .unwrap();
-        let events = writer.lock().unwrap().shutdown_all().unwrap();
+        let events = writer.lock().shutdown_all().unwrap();
         // The Closed event carries the span-start range accumulated from the
         // frame's log_ts_range — span time, not ingestion time.
         assert!(
@@ -1055,7 +1119,7 @@ mod tests {
             .writers
             .existing(&TenantId::default_tenant())
             .unwrap();
-        let events = writer.lock().unwrap().shutdown_all().unwrap();
+        let events = writer.lock().shutdown_all().unwrap();
         assert!(
             events.iter().any(
                 |e| matches!(e, wal::FileEvent::Closed { entry_count, .. } if *entry_count == 1)

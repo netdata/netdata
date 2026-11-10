@@ -17,10 +17,14 @@
 //!    the ingestion time-window; `Some(bounds)` here — production enforces
 //!    the window, `ng-ingest` and the benches pass `None`).
 //! 4. Under the tenant's writer lock: `StorableStream::write_to` writes the
-//!    frames, one `sync_all` makes them durable, and the WAL's lifecycle
-//!    events are drained and forwarded to the ledger over fire-and-forget IPC
-//!    ([`LedgerSender`]); the ledger's per-signal indexer seals the WAL into
-//!    SFST indexes (`ng-index`).
+//!    frames.
+//! 5. Without the lock, in a task of its own so that a client going away
+//!    cannot stop it: `TenantWriter::make_durable` waits for a sync round
+//!    that covers the frames (one round serves every request of the tenant
+//!    that wrote before it began) and forwards the WAL's lifecycle events to
+//!    the ledger over fire-and-forget IPC ([`LedgerSender`]); the ledger's
+//!    per-signal indexer seals the WAL into SFST indexes (`ng-index`). Then
+//!    the records are counted.
 //!
 //! All rejections — collisions, oversized identities, out-of-window records —
 //! are collected in `Rejections` and reported to the sender via OTLP
@@ -144,7 +148,7 @@ enum Payload {
     /// As received and grouped; not flattened yet.
     Records(Vec<ResourceLogs>),
     /// Flattened and encoded lock-free (phase 1): one WAL frame, awaiting the
-    /// serialized write+sync region (phase 2). Holds at least one record.
+    /// serialized write region (phase 2). Holds at least one record.
     Frame(ng_flatten::PreparedLogFrame),
     /// Every record fell outside the ingestion window: nothing to write.
     OutOfWindow,
@@ -587,10 +591,6 @@ pub struct NetdataLogsService {
     /// also reads it to seed fallback timestamps and the ingestion-time
     /// bounds.
     clock: Arc<Mutex<MonotonicClock>>,
-    /// Shared with the traces ingestion service: the writer → ledger IPC accepts
-    /// exactly one connection (the ledger gap-checks frame sequences per signal),
-    /// so every signal's events MUST funnel through one sender.
-    ledger_sender: Arc<LedgerSender>,
     /// Global ingestion time-bounds: reject records whose resolved
     /// timestamp is older than `max_age` or more than `future_skew` ahead.
     /// Applied per record inside `prepare_log_frame`.
@@ -617,10 +617,10 @@ impl NetdataLogsService {
                 wal_config,
                 seq_allocator,
                 instance_identity,
+                ledger_sender,
             ),
             claimed_streams: ClaimedStreams::default(),
             clock,
-            ledger_sender,
             ingest_bounds,
             auth,
             derived_metrics: None,
@@ -663,25 +663,7 @@ impl NetdataLogsService {
     /// [`TenantWriters::rotate_expired`].
     pub fn sweep_expired_rotations(&self) {
         let now_ns = self.clock.lock().unwrap().now_ns();
-        self.writers.rotate_expired(now_ns, &self.ledger_sender);
-    }
-
-    /// The response of a successful export, counted for self-monitoring on
-    /// the way out: `kept` records are on disk, the rest were rejected (an
-    /// empty request counts zero of each). Every successful exit of
-    /// [`Self::export_logs`] ends here, so a failed export counts nothing.
-    fn counted_response(&self, kept: usize, rejections: &Rejections) -> ExportLogsServiceResponse {
-        if let Some(derived_metrics) = &self.derived_metrics {
-            derived_metrics.record_ingest(
-                Signal::Logs,
-                kept as u64,
-                rejections.log_records() as u64,
-            );
-        }
-
-        ExportLogsServiceResponse {
-            partial_success: rejections.partial_success(),
-        }
+        self.writers.rotate_expired(now_ns);
     }
 
     /// The transport-agnostic OTLP logs export core: everything between
@@ -717,7 +699,11 @@ impl NetdataLogsService {
         // was a collision or had an oversized identity. Still report the
         // rejected records to the client.
         if storable_streams.is_empty() {
-            return Ok(self.counted_response(0, &rejections));
+            return Ok(counted_response(
+                self.derived_metrics.as_deref(),
+                0,
+                &rejections,
+            ));
         }
 
         // Phase 1 — prepare every frame WITHOUT holding any writer lock:
@@ -769,47 +755,78 @@ impl NetdataLogsService {
         // Every storable stream was fully rejected as out-of-window: nothing to
         // write, but still report the rejected records to the client.
         if kept == 0 {
-            return Ok(self.counted_response(0, &rejections));
+            return Ok(counted_response(
+                self.derived_metrics.as_deref(),
+                0,
+                &rejections,
+            ));
         }
 
-        // Phase 2 — the serialized region, under THIS TENANT's writer lock
-        // only: frame writes, one durability sync (the ack is only returned
-        // after `sync_all` succeeds, so a 200 implies the frames are on
-        // disk), event drain. All sync code — no `.await` while a guard is
-        // held.
-        let writer = self.writers.writer_for(tenant_id).map_err(|e| {
+        // Phase 2 — the writes, under THIS TENANT's writer lock only. All
+        // sync code: no `.await` while the guard is held. The frame header's
+        // `ingestion_ns` is ticked per frame inside the lock (`write_to`).
+        let tenant_writer = self.writers.writer_for(tenant_id).map_err(|e| {
             tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
             Status::internal("WAL writer creation failed")
         })?;
-        {
-            let mut writer = writer.lock().unwrap();
+        let mark = {
+            let mut writer = tenant_writer.lock();
 
             for s in &storable_streams {
                 s.write_to(&mut writer, &self.clock)?;
             }
-            writer.sync_all().map_err(|e| {
+
+            writer.write_mark()
+        };
+
+        // Written: the frames need not stay in memory while the request waits.
+        drop(storable_streams);
+
+        // Phase 3 — wait for a sync round that covers the frames, then count
+        // the records. The ack is only returned after that round succeeds, so
+        // a 200 implies the frames are on disk. This runs in a task of its
+        // own: a client that goes away drops this request, and the records it
+        // stored must still be synced, announced to the ledger and counted.
+        let derived_metrics = self.derived_metrics.clone();
+        let stored = tokio::spawn(async move {
+            tenant_writer.make_durable(mark).await.map_err(|e| {
                 tracing::error!(%e, "failed to sync WAL");
                 Status::internal("WAL sync error")
             })?;
-            // Drain AND forward the lifecycle events while STILL holding the
-            // writer lock, so drain+send is atomic per tenant: a file's
-            // Created→Synced→Closed reach the single ledger channel in
-            // lock-acquisition (== logical) order. Sending after releasing the
-            // lock would let a concurrent op on the same tenant (another export,
-            // or the idle-rotation sweep) interleave its events. `send_events`
-            // is synchronous and non-blocking (unbounded channel), so no
-            // `.await` is held under the lock.
-            let events = writer.take_all_events();
-            // `send_events` takes the tenant by value and the core only
-            // borrows it, so clone here — the last use of the id in this
-            // request either way.
-            self.ledger_sender.send_events(tenant_id.clone(), events);
-        }
-        if let Some(batch) = derived_batch {
-            batch.commit();
-        }
+            if let Some(batch) = derived_batch {
+                batch.commit();
+            }
 
-        Ok(self.counted_response(kept, &rejections))
+            Ok(counted_response(
+                derived_metrics.as_deref(),
+                kept,
+                &rejections,
+            ))
+        });
+
+        stored.await.map_err(|e| {
+            tracing::error!(%e, "the task that syncs and counts a logs export failed");
+            Status::internal("export task failed")
+        })?
+    }
+}
+
+/// The response of a successful export, counted for self-monitoring on the
+/// way out: `kept` records are on disk, the rest were rejected (an empty
+/// request counts zero of each). Every successful exit of
+/// [`NetdataLogsService::export_logs`] ends here, so a failed export counts
+/// nothing.
+fn counted_response(
+    derived_metrics: Option<&DerivedMetrics>,
+    kept: usize,
+    rejections: &Rejections,
+) -> ExportLogsServiceResponse {
+    if let Some(derived_metrics) = derived_metrics {
+        derived_metrics.record_ingest(Signal::Logs, kept as u64, rejections.log_records() as u64);
+    }
+
+    ExportLogsServiceResponse {
+        partial_success: rejections.partial_success(),
     }
 }
 
@@ -1050,7 +1067,7 @@ mod tests {
         let service = test_service(tmp.path().to_path_buf());
         let tenant = tenant();
         let writer = service.writers.writer_for(&tenant).unwrap();
-        let mut writer = writer.lock().unwrap();
+        let mut writer = writer.lock();
         let bounds = ng_flatten::TimeBounds {
             min_ns: 0,
             max_ns: u64::MAX,
@@ -1162,7 +1179,7 @@ mod tests {
             .writers
             .existing(&TenantId::default_tenant())
             .unwrap();
-        let events = writer.lock().unwrap().shutdown_all().unwrap();
+        let events = writer.lock().shutdown_all().unwrap();
         assert!(
             events.iter().any(|e| matches!(
                 e,
@@ -1484,7 +1501,7 @@ mod tests {
         );
         // The request's other stream is stored.
         let writer = service.writers.existing(&tenant).unwrap();
-        let events = writer.lock().unwrap().shutdown_all().unwrap();
+        let events = writer.lock().shutdown_all().unwrap();
         let entry_counts: Vec<_> = events
             .iter()
             .filter_map(|e| match e {
@@ -1649,6 +1666,61 @@ mod tests {
             .filter_map(|l| l.strip_prefix(&prefix))
             .map(|v| netdata_plugin_protocol::read_float_value(v).unwrap())
             .sum()
+    }
+
+    /// A client that goes away drops its request while it waits for the sync
+    /// round. The records it stored are still synced and counted.
+    #[tokio::test]
+    async fn a_dropped_export_is_still_synced_and_counted() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let tenant = TenantId::default_tenant();
+        let derived = Arc::new(
+            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let mut service = test_service(tmp.path().to_path_buf());
+        service.set_derived_metrics(Arc::clone(&derived));
+        let mut r = rl(Some("prod"), Some("api"), 2);
+        for record in &mut r.scope_logs[0].log_records {
+            record.time_unix_nano = now;
+            record.severity_number = 9;
+        }
+
+        // With the tenant's sync turn taken, the export writes its frames
+        // and then has to wait. Polled once and dropped: the client is gone.
+        let tenant_writer = service.writers.writer_for(&tenant).unwrap();
+        let turn = tenant_writer.hold_sync_turn().await;
+        {
+            let export = service.export_logs(
+                &tenant,
+                ExportLogsServiceRequest {
+                    resource_logs: vec![r],
+                },
+            );
+            tokio::pin!(export);
+            tokio::select! {
+                biased;
+                _ = &mut export => panic!("the export must wait for the sync round"),
+                () = std::future::ready(()) => {}
+            }
+        }
+        // Let the task the export left behind run up to the sync turn.
+        tokio::task::yield_now().await;
+        let mark = tenant_writer.lock().write_mark();
+        assert!(!tenant_writer.lock().is_durable(mark));
+
+        // The round runs once the turn is free; taking the turn again waits
+        // for it to end.
+        drop(turn);
+        let _turn = tenant_writer.hold_sync_turn().await;
+
+        assert!(tenant_writer.lock().is_durable(mark));
+        let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
+        assert_eq!(sum_of(&out, "accepted"), 2.0);
+        assert_eq!(sum_of(&out, "info"), 2.0);
     }
 
     #[tokio::test]
@@ -1887,7 +1959,7 @@ mod tests {
             .writers
             .existing(&TenantId::default_tenant())
             .unwrap();
-        let events = writer.lock().unwrap().shutdown_all().unwrap();
+        let events = writer.lock().shutdown_all().unwrap();
         let bases: Vec<u64> = events
             .iter()
             .filter_map(|e| match e {

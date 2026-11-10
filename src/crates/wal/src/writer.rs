@@ -37,13 +37,13 @@
 //! All methods take `&mut self` with no internal synchronization: the caller
 //! serializes access (the ingestor holds one std mutex per tenant writer).
 //! Everything is synchronous blocking I/O; the ingestor runs the idle sweep
-//! under `spawn_blocking` and the write path inline.
+//! and a sync's fsyncs under `spawn_blocking`, and the writes inline.
 //!
 //! Consumers (grep-verified): `otel-ingestor` (the logs and traces services:
-//! one writer per tenant, per-frame `write_frame`, one `sync_all` per
-//! request, the periodic idle sweep — no production `shutdown_all`; plugin
-//! shutdown drops the writers), `ng-ingest` (dev/bench ingest binaries
-//! through the same path — the only non-test `shutdown_all` callers), and
+//! one writer per tenant, per-frame `write_frame`, split syncs shared by the
+//! tenant's requests, the periodic idle sweep — no production `sync_all` or
+//! `shutdown_all`; plugin shutdown drops the writers), `ng-ingest` (dev/bench
+//! ingest binaries — the only non-test `shutdown_all` callers), and
 //! test fixtures in `sfsq`, `sfsq-cli`, `ng-index`, `otel-ledger`,
 //! `file-lifecycle`, and this crate's own tests.
 use std::collections::HashMap;

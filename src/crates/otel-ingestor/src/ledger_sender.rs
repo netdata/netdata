@@ -29,8 +29,9 @@ use file_registry::TenantId;
 use tokio::sync::mpsc;
 
 /// Sends WAL events to the ledger over that one IPC connection. Shared via a
-/// single `Arc` by both ingestion services and the idle-rotation sweeps —
-/// the ledger accepts a single writer connection, so there is no alternative
+/// single `Arc` by the WAL writers of both signals (`TenantWriters`: their
+/// sync rounds and their idle-rotation sweeps) — the ledger accepts a single
+/// writer connection, so there is no alternative
 /// (`create_shared_writer_state` in `otel-ingestor/src/lib.rs`) — and
 /// sending needs only `&self` and never blocks: a seq bump under a
 /// short-lived `Mutex`, then an unbounded-channel push.
@@ -60,12 +61,12 @@ impl LedgerSender {
     }
 
     /// Queues every event of a `wal::FileEvent` vec for delivery to the
-    /// ledger, tagged with `tenant_id`. Callers drain their writers with
-    /// `wal::Writer::take_all_events` (`wal/src/writer.rs`) and forward
-    /// while still holding the writer lock, so one file's
-    /// Created→Synced→Closed events are enqueued in lifecycle order. Each
-    /// event's `frame_seq` comes from its own signal's counter
-    /// (`event.pipeline_id()`).
+    /// ledger, tagged with `tenant_id`. The one caller (`tenant_writers.rs`)
+    /// drains a writer with `wal::Writer::take_all_events`
+    /// (`wal/src/writer.rs`) and forwards while still holding the writer
+    /// lock, so one file's Created→Synced→Closed events are enqueued in
+    /// lifecycle order. Each event's `frame_seq` comes from its own signal's
+    /// counter (`event.pipeline_id()`).
     pub fn send_events(&self, tenant_id: TenantId, events: Vec<wal::FileEvent>) {
         for event in events {
             let msg = wal::Message {
