@@ -367,12 +367,17 @@ extern "C" {
             if (gr->index + 1 > gr->entries) {
                 gorilla_buffer_t *next_buffer = __atomic_load_n(&gr->buffer->header.next, __ATOMIC_ACQUIRE);
 
-                if (!next_buffer) {
-                    // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n (No more buffers to read from)", gr->length, gr->buffer);
+                if (!next_buffer)
                     return false;
-                }
 
-                // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n", gr->length, gr->buffer);
+                // The writer appends its last values to this buffer before it
+                // links the next one, and they may have landed after the loads
+                // above: read this buffer's entries again before leaving it.
+                gr->entries = __atomic_load_n(&gr->buffer->header.entries, __ATOMIC_ACQUIRE);
+                gr->capacity = __atomic_load_n(&gr->buffer->header.nbits, __ATOMIC_ACQUIRE);
+                if (gr->index + 1 <= gr->entries)
+                    break;
+
                 *gr = gorilla_reader_init(next_buffer);
                 data = gr->buffer->data;
             }
@@ -615,8 +620,10 @@ static int gorilla_unittest_concurrent_readers(void)
 
     std::atomic<bool> done(false);
     std::atomic<int> errors(0);
+    std::atomic<int> started(0);
 
     auto reader = [&]() {
+        started++;
         bool last = false;
         while (!last) {
             last = done.load(std::memory_order_acquire);
@@ -638,6 +645,10 @@ static int gorilla_unittest_concurrent_readers(void)
     };
 
     std::thread r1(reader), r2(reader);
+
+    // make the readers overlap the writer
+    while (started.load() != 2)
+        std::this_thread::yield();
 
     for (size_t i = 0; i < nvalues; i++) {
         if (gorilla_writer_write(&gw, values[i]))
