@@ -25,13 +25,13 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, vnod
 	if reader == nil {
 		return ctx.Err()
 	}
-	var previousVnodeGUID string
+	var previous EventRecord
 	return reader.VisitRange("rum", after, before, func(entry *journal.SnapshotEntry) error {
-		record, rum, err := decodeEvent(entry, previousVnodeGUID)
+		record, rum, err := decodeEvent(entry, &previous)
 		if err != nil {
 			return err
 		}
-		previousVnodeGUID = record.VnodeGUID
+		previous = record
 		if rum && (vnodeGUID == "" || record.VnodeGUID == vnodeGUID) && (site == "" || record.Site == site) && record.ObservedUS/1_000_000 >= after && record.ObservedUS/1_000_000 <= before {
 			visit(record)
 		}
@@ -49,13 +49,13 @@ func (s *Store) matchSession(ctx context.Context, site, session, vnodeGUID strin
 	if reader == nil {
 		return ctx.Err()
 	}
-	var previousVnodeGUID string
+	var previous EventRecord
 	return reader.VisitMatch("DEM_SESSION_ID", session, func(entry *journal.SnapshotEntry) error {
-		record, rum, err := decodeEvent(entry, previousVnodeGUID)
+		record, rum, err := decodeEvent(entry, &previous)
 		if err != nil {
 			return err
 		}
-		previousVnodeGUID = record.VnodeGUID
+		previous = record
 		if rum && (vnodeGUID == "" || record.VnodeGUID == vnodeGUID) && record.SessionID == session && (site == "" || record.Site == site) {
 			visit(record)
 		}

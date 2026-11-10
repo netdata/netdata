@@ -91,8 +91,8 @@ func eventFields(r EventRecord) []journal.Field {
 }
 
 // Read callback-scoped payloads directly and retain only domain strings.
-// previousVnodeGUID already owns its bytes and can safely outlive the callback.
-func decodeEvent(entry *journal.SnapshotEntry, previousVnodeGUID string) (EventRecord, bool, error) {
+// The prior record owns its strings; equal values can reuse them across callbacks.
+func decodeEvent(entry *journal.SnapshotEntry, previous *EventRecord) (EventRecord, bool, error) {
 	var r EventRecord
 	var envelope demjournal.Envelope
 	var revision string
@@ -110,69 +110,64 @@ func decodeEvent(entry *journal.SnapshotEntry, previousVnodeGUID string) (EventR
 			revision = string(value)
 		case "DEM_EXPERIENCE_ID":
 			bit = 1 << 1
-			r.ExperienceID = string(value)
+			r.ExperienceID = reuseEventString(value, previous.ExperienceID)
 		case "DEM_VIEW":
 			bit = 1 << 2
-			r.View = string(value)
+			r.View = reuseEventString(value, previous.View)
 		case "DEM_VIEW_ID":
 			bit = 1 << 3
-			r.ViewID = string(value)
+			r.ViewID = reuseEventString(value, previous.ViewID)
 		case "DEM_METRIC_ID":
 			bit = 1 << 4
-			r.MetricID = string(value)
+			r.MetricID = reuseEventString(value, previous.MetricID)
 		case "DEM_VNODE_GUID":
 			bit = 1 << 20
-			// Reuse the prior owned string when adjacent records share vnode identity.
-			if string(value) == previousVnodeGUID {
-				r.VnodeGUID = previousVnodeGUID
-			} else {
-				r.VnodeGUID = string(value)
-			}
+			r.VnodeGUID = reuseEventString(value, previous.VnodeGUID)
 		case "DEM_SITE":
 			bit = 1 << 5
-			r.Site = string(value)
+			r.Site = reuseEventString(value, previous.Site)
 		case "DEM_SESSION_ID":
 			bit = 1 << 6
-			r.SessionID = string(value)
+			r.SessionID = reuseEventString(value, previous.SessionID)
 		case "DEM_TYPE":
 			bit = 1 << 7
-			r.Type = string(value)
+			r.Type = reuseEventString(value, previous.Type)
 		case "DEM_PAGE":
 			bit = 1 << 8
-			r.Page = string(value)
+			r.Page = reuseEventString(value, previous.Page)
 		case "DEM_TEXT":
 			bit = 1 << 9
-			r.Text = string(value)
+			r.Text = reuseEventString(value, previous.Text)
 		case "DEM_TRACE_ID":
 			bit = 1 << 10
-			r.TraceID = string(value)
+			r.TraceID = reuseEventString(value, previous.TraceID)
 		case "DEM_BROWSER":
 			bit = 1 << 11
-			r.Browser = string(value)
+			r.Browser = reuseEventString(value, previous.Browser)
 		case "DEM_DEVICE":
 			bit = 1 << 12
-			r.Device = string(value)
+			r.Device = reuseEventString(value, previous.Device)
 		case "DEM_COUNTRY":
 			bit = 1 << 13
-			r.Country = string(value)
+			r.Country = reuseEventString(value, previous.Country)
 		case "DEM_VERSION":
 			bit = 1 << 14
-			r.Version = string(value)
+			r.Version = reuseEventString(value, previous.Version)
 		case "DEM_USER_ID":
 			bit = 1 << 15
-			r.UserID = string(value)
+			r.UserID = reuseEventString(value, previous.UserID)
 		case "DEM_FINGERPRINT":
 			bit = 1 << 16
-			r.Fingerprint = string(value)
+			r.Fingerprint = reuseEventString(value, previous.Fingerprint)
 		case "DEM_ERROR_TYPE":
 			bit = 1 << 17
-			r.ErrorType = string(value)
+			r.ErrorType = reuseEventString(value, previous.ErrorType)
 		case "DEM_MESSAGE":
 			bit = 1 << 18
-			r.Message = string(value)
+			r.Message = reuseEventString(value, previous.Message)
 		case "DEM_SAMPLE_STACK":
 			bit = 1 << 19
-			r.SampleStack = string(value)
+			r.SampleStack = reuseEventString(value, previous.SampleStack)
 		default:
 			return envelope.Observe(name, value)
 		}
@@ -208,4 +203,16 @@ func validateEvent(r EventRecord) error {
 		return fmt.Errorf("RUM observation time must not precede epoch")
 	}
 	return nil
+}
+
+// Only the previous event is retained, so reuse needs no growing intern table.
+func reuseEventString(value []byte, previous string) string {
+	// Reject different final bytes before comparing longer suffixes or shared prefixes.
+	if len(value) == len(previous) &&
+		(len(value) == 0 || value[len(value)-1] == previous[len(previous)-1]) &&
+		(len(value) <= 8 || string(value[len(value)-8:]) == previous[len(previous)-8:]) &&
+		string(value) == previous {
+		return previous
+	}
+	return string(value)
 }
