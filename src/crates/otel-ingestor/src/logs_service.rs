@@ -81,11 +81,6 @@ fn extract_stream(rl: &ResourceLogs) -> ServiceStream {
     ServiceStream::new(namespace, name)
 }
 
-/// Total number of log records carried by a single `ResourceLogs`.
-fn count_log_records(rl: &ResourceLogs) -> usize {
-    rl.scope_logs.iter().map(|sl| sl.log_records.len()).sum()
-}
-
 /// One collision: a request group whose stream identity doesn't match the
 /// canonical stream already registered for its `ns_hash`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,7 +111,7 @@ struct StreamGroup {
 fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, StreamGroup> {
     let mut groups: HashMap<ServiceStream, StreamGroup> = HashMap::new();
     for rl in resource_logs {
-        let count = count_log_records(&rl);
+        let count: usize = rl.scope_logs.iter().map(|sl| sl.log_records.len()).sum();
         if count == 0 {
             continue;
         }
