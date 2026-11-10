@@ -10,7 +10,7 @@ list(APPEND DEB_DISTROS debian ubuntu)
 set(DEB_GPG_KEY_SOURCE "https://repo.netdata.cloud/netdatabot.gpg.key")
 
 set(PACKAGE_VERSION 5)
-set(PACKAGE_RELEASE 5)
+set(PACKAGE_RELEASE 6)
 
 set(CPACK_THREADS 0)
 set(CPACK_STRIP_FILES NO)
@@ -18,8 +18,20 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "netdata")
 set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}/packages")
 set(CPACK_PACKAGING_INSTALL_PREFIX "/")
 set(CPACK_PACKAGE_VENDOR "Netdata Inc.")
-set(CPACK_COMPONENT_NETDATA-REPO_PACKAGE_DESCRIPTION "Configuration for the official Netdata Stable package repository.")
-set(CPACK_COMPONENT_NETDATA-REPO-EDGE_PACKAGE_DESCRIPTION "Configuration for the official Netdata Edge package repository.")
+# Stable retains its original package and configuration file names.
+set(REPO_VARIANTS stable edge preview)
+foreach(VARIANT IN LISTS REPO_VARIANTS)
+  if(VARIANT STREQUAL "stable")
+    set(REPO_SUFFIX "")
+  else()
+    set(REPO_SUFFIX "-${VARIANT}")
+  endif()
+  set(REPO_PACKAGE_${VARIANT} "netdata-repo${REPO_SUFFIX}")
+  set(REPO_CONFIG_${VARIANT} "netdata${REPO_SUFFIX}")
+  string(TOUPPER "${REPO_PACKAGE_${VARIANT}}" COMPONENT_NAME)
+  set(CPACK_COMPONENT_${COMPONENT_NAME}_PACKAGE_DESCRIPTION
+      "Configuration for the official Netdata ${VARIANT} package repository.")
+endforeach()
 
 project(netdata-repoconfig VERSION "${PACKAGE_VERSION}.${PACKAGE_RELEASE}"
         DESCRIPTION "Repository configuration for Netdata’s official native packages."
@@ -119,26 +131,23 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
   require_command(GPG gpg)
 
   set(DIST_NAME ${DISTRO})
-  message(STATUS "Generating stable repository configuration for ${DISTRO} ${SUITE}")
-  set(VARIANT stable)
-  configure_file(netdata.sources.in netdata.sources @ONLY)
-  message(STATUS "Generating edge repository configuration for ${DISTRO} ${SUITE}")
-  set(VARIANT edge)
-  configure_file(netdata.sources.in netdata-edge.sources @ONLY)
-  message(STATUS "Preparing changelogs")
-  set(PKG_NAME netdata-repo)
-  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/netdata-repo)
-  configure_file(deb.changelog netdata-repo/changelog @ONLY)
-  set(PKG_NAME netdata-repo-edge)
-  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/netdata-repo-edge)
-  configure_file(deb.changelog netdata-repo-edge/changelog @ONLY)
+  foreach(VARIANT IN LISTS REPO_VARIANTS)
+    message(STATUS "Generating ${VARIANT} repository configuration for ${DISTRO} ${SUITE}")
+    set(PKG_NAME "${REPO_PACKAGE_${VARIANT}}")
+    set(CONFIG_NAME "${REPO_CONFIG_${VARIANT}}")
+    configure_file(netdata.sources.in ${CONFIG_NAME}.sources @ONLY)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/${PKG_NAME})
+    configure_file(deb.changelog ${PKG_NAME}/changelog @ONLY)
 
-  install(FILES ${CMAKE_BINARY_DIR}/netdata.sources
-          DESTINATION etc/apt/sources.list.d
-          COMPONENT netdata-repo)
-  install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.sources
-          DESTINATION etc/apt/sources.list.d
-          COMPONENT netdata-repo-edge)
+    install(FILES ${CMAKE_BINARY_DIR}/${CONFIG_NAME}.sources
+            DESTINATION etc/apt/sources.list.d
+            COMPONENT ${PKG_NAME})
+    install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
+            DESTINATION usr/share/keyrings
+            RENAME netdata-archive-keyring.gpg
+            PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
+            COMPONENT ${PKG_NAME})
+  endforeach()
 
   add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/netdatabot.gpg.key
                      COMMENT "Fetch GPG key from ${DEB_GPG_KEY_SOURCE}"
@@ -153,28 +162,6 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
                     COMMENT "Dearmor ${CMAKE_BINARY_DIR}/netdatabot.gpg.key"
                     DEPENDS ${CMAKE_BINARY_DIR}/netdata.gpg)
 
-#  install(FILES ${CMAKE_SOURCE_DIR}/netdata-deb-repo-priority
-#          DESTINATION etc/apt/preferences.d
-#          RENAME 80netdata
-#          COMPONENT netdata-repo)
-#
-#  install(FILES ${CMAKE_SOURCE_DIR}/netdata-deb-repo-priority
-#          DESTINATION etc/apt/preferences.d
-#          RENAME 80netdata
-#          COMPONENT netdata-repo-edge)
-
-  install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION usr/share/keyrings
-          RENAME netdata-archive-keyring.gpg
-          PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
-          COMPONENT netdata-repo)
-
-  install(FILES ${CMAKE_BINARY_DIR}/netdata.gpg
-          DESTINATION usr/share/keyrings
-          RENAME netdata-archive-keyring.gpg
-          PERMISSIONS OWNER_READ GROUP_READ WORLD_READ
-          COMPONENT netdata-repo-edge)
-
   set(CPACK_DEB_COMPONENT_INSTALL YES)
   set(CPACK_DEBIAN_DEBUGINFO_PACKAGE NO)
   set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS NO)
@@ -186,12 +173,16 @@ if(${DISTRO} IN_LIST DEB_DISTROS)
   set(CPACK_DEBIAN_PACKAGE_SECTION "net")
   set(CPACK_DEBIAN_PACKAGE_VERSION "${PACKAGE_VERSION}")
   set(CPACK_DEBIAN_PACKAGE_RELEASE "${PACKAGE_RELEASE}")
-  set(CPACK_DEBIAN_NETDATA-REPO_PACKAGE_NAME "netdata-repo")
-  set(CPACK_DEBIAN_NETDATA-REPO-EDGE_PACKAGE_NAME "netdata-repo-edge")
-  set(CPACK_DEBIAN_NETDATA-REPO_PACKAGE_CONFLICTS "netdata-repo-edge")
-  set(CPACK_DEBIAN_NETDATA-REPO-EDGE_PACKAGE_CONFLICTS "netdata-repo")
-  set(CPACK_DEBIAN_NETDATA-REPO_PACKAGE_CONTROL_EXTRA "${CMAKE_BINARY_DIR}/netdata-repo/changelog")
-  set(CPACK_DEBIAN_NETDATA-REPO-EDGE_PACKAGE_CONTROL_EXTRA "${CMAKE_BINARY_DIR}/netdata-repo-edge/changelog")
+  foreach(VARIANT IN LISTS REPO_VARIANTS)
+    set(PKG_NAME "${REPO_PACKAGE_${VARIANT}}")
+    string(TOUPPER "${PKG_NAME}" COMPONENT_NAME)
+    set(CONFLICTS netdata-repo netdata-repo-edge netdata-repo-preview)
+    list(REMOVE_ITEM CONFLICTS "${PKG_NAME}")
+    list(JOIN CONFLICTS ", " CONFLICTS)
+    set(CPACK_DEBIAN_${COMPONENT_NAME}_PACKAGE_NAME "${PKG_NAME}")
+    set(CPACK_DEBIAN_${COMPONENT_NAME}_PACKAGE_CONFLICTS "${CONFLICTS}")
+    set(CPACK_DEBIAN_${COMPONENT_NAME}_PACKAGE_CONTROL_EXTRA "${CMAKE_BINARY_DIR}/${PKG_NAME}/changelog")
+  endforeach()
 elseif(${DISTRO} IN_LIST RPM_DISTROS)
   require_command(RPM rpm)
 
@@ -231,19 +222,14 @@ elseif(${DISTRO} IN_LIST RPM_DISTROS)
     endif()
   endif()
 
-  message(STATUS "Generating stable repository configuration for ${DISTRO} ${DISTRO_VERSION}")
-  set(VARIANT stable)
-  configure_file(netdata.repo.${REPO_ID} netdata.repo @ONLY)
-  message(STATUS "Generating edge repository configuration for ${DISTRO} ${DISTRO_VERSION}")
-  set(VARIANT edge)
-  configure_file(netdata.repo.${REPO_ID} netdata-edge.repo @ONLY)
-
-  install(FILES ${CMAKE_BINARY_DIR}/netdata.repo
-          COMPONENT netdata-repo
-          DESTINATION etc/${REPO_CFG_PATH})
-  install(FILES ${CMAKE_BINARY_DIR}/netdata-edge.repo
-          COMPONENT netdata-repo-edge
-          DESTINATION etc/${REPO_CFG_PATH})
+  foreach(VARIANT IN LISTS REPO_VARIANTS)
+    message(STATUS "Generating ${VARIANT} repository configuration for ${DISTRO} ${DISTRO_VERSION}")
+    set(CONFIG_NAME "${REPO_CONFIG_${VARIANT}}")
+    configure_file(netdata.repo.${REPO_ID} ${CONFIG_NAME}.repo @ONLY)
+    install(FILES ${CMAKE_BINARY_DIR}/${CONFIG_NAME}.repo
+            COMPONENT ${REPO_PACKAGE_${VARIANT}}
+            DESTINATION etc/${REPO_CFG_PATH})
+  endforeach()
 
   set(CPACK_RPM_COMPONENT_INSTALL ON)
   set(CPACK_RPM_PACAKGE_AUTOREQPROV OFF)
@@ -255,12 +241,16 @@ elseif(${DISTRO} IN_LIST RPM_DISTROS)
   set(CPACK_RPM_PACKAGE_VERSION "${PACKAGE_VERSION}")
   set(CPACK_RPM_PACKAGE_RELEASE "${PACKAGE_RELEASE}")
   set(CPACK_RPM_PACKAGE_CHANGELOG "${CMAKE_SOURCE_DIR}/rpm.changelog")
-  set(CPACK_RPM_NETDATA-REPO_FILE_NAME "netdata-repo-${PACKAGE_VERSION}-${PACKAGE_RELEASE}.noarch.rpm")
-  set(CPACK_RPM_NETDATA-REPO_PACKAGE_NAME "netdata-repo")
-  set(CPACK_RPM_NETDATA-REPO_PACAKGE_CONFLICTS "netdata-repo-edge")
-  set(CPACK_RPM_NETDATA-REPO-EDGE_FILE_NAME "netdata-repo-edge-${PACKAGE_VERSION}-${PACKAGE_RELEASE}.noarch.rpm")
-  set(CPACK_RPM_NETDATA-REPO-EDGE_PACKAGE_NAME "netdata-repo-edge")
-  set(CPACK_RPM_NETDATA-REPO-EDGE_PACKAGE_CONFLICTS "netdata-repo")
+  foreach(VARIANT IN LISTS REPO_VARIANTS)
+    set(PKG_NAME "${REPO_PACKAGE_${VARIANT}}")
+    string(TOUPPER "${PKG_NAME}" COMPONENT_NAME)
+    set(CONFLICTS netdata-repo netdata-repo-edge netdata-repo-preview)
+    list(REMOVE_ITEM CONFLICTS "${PKG_NAME}")
+    list(JOIN CONFLICTS ", " CONFLICTS)
+    set(CPACK_RPM_${COMPONENT_NAME}_FILE_NAME "${PKG_NAME}-${PACKAGE_VERSION}-${PACKAGE_RELEASE}.noarch.rpm")
+    set(CPACK_RPM_${COMPONENT_NAME}_PACKAGE_NAME "${PKG_NAME}")
+    set(CPACK_RPM_${COMPONENT_NAME}_PACKAGE_CONFLICTS "${CONFLICTS}")
+  endforeach()
 else()
   message(FATAL_ERROR "Unsupported distribution ${DISTRO} ${DISTRO_VERSION}")
 endif()
