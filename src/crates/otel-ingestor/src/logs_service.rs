@@ -233,11 +233,13 @@ impl StorableStream {
             kept: frame.records,
             rejected: frame.rejected,
         };
+
         self.payload = if frame.records == 0 {
             Payload::OutOfWindow
         } else {
             Payload::Frame(frame)
         };
+
         Ok(flattened)
     }
 
@@ -668,6 +670,7 @@ impl NetdataLogsService {
         if let Some(derived_metrics) = &self.derived_metrics {
             derived_metrics.record_ingest(Signal::Logs, stored as u64, rejections.count() as u64);
         }
+
         ExportLogsServiceResponse {
             partial_success: rejections.partial_success(),
         }
@@ -772,6 +775,7 @@ impl NetdataLogsService {
         })?;
         {
             let mut writer = writer.lock().unwrap();
+
             for s in &storable_streams {
                 s.write_to(&mut writer, &self.clock)?;
             }

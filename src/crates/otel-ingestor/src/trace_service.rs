@@ -118,11 +118,13 @@ impl StorableSpans {
             kept: frame.records,
             rejected: frame.rejected,
         };
+
         self.payload = if frame.records == 0 {
             Payload::OutOfWindow
         } else {
             Payload::Frame(frame)
         };
+
         Ok(flattened)
     }
 
@@ -336,6 +338,7 @@ impl NetdataTracesService {
         if let Some(derived_metrics) = &self.derived_metrics {
             derived_metrics.record_ingest(Signal::Traces, stored as u64, out_of_window as u64);
         }
+
         ExportTraceServiceResponse {
             partial_success: build_partial_success(out_of_window),
         }
@@ -434,6 +437,7 @@ impl NetdataTracesService {
         })?;
         {
             let mut writer = writer.lock().unwrap();
+
             for s in &storable_spans {
                 s.write_to(&mut writer, &self.clock)?;
             }

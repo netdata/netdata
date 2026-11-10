@@ -63,6 +63,7 @@ impl TenantWriters {
     /// lock.
     pub(crate) fn writer_for(&self, tenant_id: &TenantId) -> wal::Result<Arc<Mutex<wal::Writer>>> {
         let mut writers = self.writers.lock().unwrap();
+
         if let Some(writer) = writers.get(tenant_id) {
             return Ok(Arc::clone(writer));
         }
@@ -139,9 +140,11 @@ impl TenantWriters {
                 // reach the ledger. Send under the lock (ordering, as in export).
                 let events = w.take_all_events();
                 let forwarded = events.len();
+
                 if forwarded > 0 {
                     ledger_sender.send_events(tenant_id.clone(), events);
                 }
+
                 (result, forwarded)
             };
             match result {
