@@ -754,7 +754,8 @@ retries or repetition; script retry overrides are rejected. Scripts are trusted 
 
 Keep the default `browser_mode: reuse` for normal page/context workflows. Choose `fresh` for raw CDP, browser-wide
 tracing or binding, custom selectors, or local `download.path()`/`video.path()` access. Remote downloads can use
-`saveAs()`. These managed-mode restrictions also apply when launch settings cause an automatic fresh-browser fallback.
+`saveAs()`. A fresh-browser fallback supports ordinary browser APIs, but custom selectors remain disabled by the
+managed Test shim; select `fresh` explicitly for the unrestricted SDK throughout.
 Unsupported operations report an execution error; the workflow is never replayed automatically after performing actions.
 
 ```yaml

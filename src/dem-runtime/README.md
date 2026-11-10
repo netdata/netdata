@@ -171,9 +171,9 @@ Ordinary hooks, fixtures, assertions, pages and browser contexts work in reuse
 mode. Use `browser_mode: fresh` for raw CDP, browser-wide tracing or binding,
 custom selector registration, or APIs requiring local browser artifact paths.
 Remote downloads support `saveAs()`; `download.path()` and `video.path()` require
-fresh mode. Managed-mode restrictions remain active when a worker falls back to
-a fresh browser because of launch settings. Explicit fresh mode exposes the
-ordinary SDK. Context tracing is supported; automatic trace/video capture remains
+fresh mode. A worker that falls back to a fresh browser has ordinary browser
+APIs, but custom selector registration remains disabled by the managed Test shim.
+Explicit fresh mode exposes the ordinary SDK throughout. Context tracing is supported; automatic trace/video capture remains
 disabled. Scripts remain trusted service-account code, not isolated tenants.
 
 Optional failure screenshots use Playwright's own capture path. Only PNG

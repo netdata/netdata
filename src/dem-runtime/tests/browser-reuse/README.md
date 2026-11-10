@@ -32,8 +32,8 @@ progress. Those require integration tests through the actual Agent pool. Timings
 here are diagnostics, not a capacity benchmark.
 
 Managed mode preserves real Test behavior within its browser-control contract.
-Only explicit `browser_mode: fresh` provides the unrestricted fresh-browser API;
-automatic fresh fallback for worker restart or launch options does not remove
-mode-wide authoring restrictions. Remote Playwright downloads use `saveAs()`;
+Explicit `browser_mode: fresh` provides the unrestricted SDK throughout. Automatic
+fresh fallback for worker restart or launch options permits ordinary browser APIs,
+but the managed Test shim still restricts custom selector registration. Remote Playwright downloads use `saveAs()`;
 `download.path()` and `video.path()` require a local fresh browser. Mode errors
 must remain executor errors even if user code catches the original exception.

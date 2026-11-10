@@ -224,6 +224,9 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		Secrets:    request.Secrets,
 	}
 	slot := job.slot
+	// Keep browser startup and required retirement within attempt duration,
+	// whether Chromium belongs to the CLI tree or a separate reusable owner.
+	started := time.Now()
 	req.Browser, err = e.prepareBrowser(attempt, slot, scope, paths)
 	if err != nil {
 		if errors.Is(err, ndexec.ErrTreeNotDrained) {
@@ -263,7 +266,6 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 	}
 	sink := newSink(request.Kind, request.Capture, redact)
 	sink.loan = req.Browser
-	started := time.Now()
 	if state != nil {
 		state("running")
 	}
@@ -291,8 +293,6 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		}
 		run.Error = redact.text(startErr.Error())
 	} else {
-		elapsed := float64(time.Since(started)) / float64(time.Millisecond)
-		run.DurationMS = &elapsed
 		cliDrained = result.Drained
 		drained = cliDrained
 		snapshot := sink.snapshot()
@@ -308,6 +308,8 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		if cliDrained && req.Browser != nil {
 			drained, browserErr = slot.finishLoan(executionErr, snapshot)
 		}
+		elapsed := float64(time.Since(started)) / float64(time.Millisecond)
+		run.DurationMS = &elapsed
 		switch {
 		case !drained:
 			if !cliDrained {
