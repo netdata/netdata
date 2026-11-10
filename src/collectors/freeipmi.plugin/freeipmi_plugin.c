@@ -385,7 +385,7 @@ static int netdata_read_ipmi_sensors(struct ipmi_monitoring_ipmi_config *ipmi_co
 
     if (sdr_cache_directory) {
         if (ipmi_monitoring_ctx_sdr_cache_directory (ctx, sdr_cache_directory) < 0) {
-            collector_error("ipmi_monitoring_ctx_sdr_cache_directory(): %s\n", ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error("ipmi_monitoring_ctx_sdr_cache_directory('%s'): %s", sdr_cache_directory, ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
@@ -518,7 +518,7 @@ static int netdata_get_ipmi_sel_events_count(struct ipmi_monitoring_ipmi_config 
 
     if (sdr_cache_directory) {
         if (ipmi_monitoring_ctx_sdr_cache_directory (ctx, sdr_cache_directory) < 0) {
-            collector_error( "ipmi_monitoring_ctx_sdr_cache_directory(): %s", ipmi_monitoring_ctx_errormsg (ctx));
+            collector_error("ipmi_monitoring_ctx_sdr_cache_directory('%s'): %s", sdr_cache_directory, ipmi_monitoring_ctx_errormsg (ctx));
             goto cleanup;
         }
     }
