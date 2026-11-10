@@ -184,13 +184,14 @@ Some Netdata features are written in Rust and are compiled by Cargo, through Cor
 needs from crates.io and from the Git repositories that host some of them, so a source build needs network access. The
 `cmake` configure step clones Corrosion itself; the crate downloads happen afterwards, while `make` compiles the Rust
 crates. The build log shows them as `Updating crates.io index` and `Updating git repository`, for example
-`netdata/roaring-rs`, and on v2.10 also `netdata/fastant`.
+`netdata/roaring-rs`, and on v2.9 and v2.10 also `netdata/fastant`.
 
 The features that are compiled with Cargo, and the CMake option that turns each one off:
 
 - **OpenTelemetry plugin** (`ENABLE_PLUGIN_OTEL`), on by default.
-- **OTel signal viewer plugin** (`ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER`), on by default. Only the v2.10 release line has
-  this option; from v2.11 the signal viewer is no longer a separate plugin, so `ENABLE_PLUGIN_OTEL=Off` also stops it.
+- **OTel signal viewer plugin** (`ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER`), on by default. Only the v2.9 and v2.10 release
+  lines have this option; from v2.11 the signal viewer is no longer a separate plugin, so `ENABLE_PLUGIN_OTEL=Off` also
+  stops it.
 - **NetFlow/IPFIX/sFlow plugin** (`ENABLE_PLUGIN_NETFLOW`), off by default. This plugin exists only from v2.11.
 - **Journal file reader** (`ENABLE_NETDATA_JOURNAL_FILE_READER`), off by default. Turning it on compiles Netdata's own
   Rust journal reader, so it needs a Rust toolchain; the installer turns it on only with `--internal-systemd-journal`.
@@ -201,13 +202,13 @@ To skip the downloads, disable the features of your release when configuring CMa
 # v2.11 and later
 cmake -S ./ -B build -DENABLE_PLUGIN_OTEL=Off -DENABLE_PLUGIN_NETFLOW=Off -DENABLE_NETDATA_JOURNAL_FILE_READER=Off
 
-# v2.10
+# v2.9 and v2.10
 cmake -S ./ -B build -DENABLE_PLUGIN_OTEL=Off -DENABLE_PLUGIN_OTEL_SIGNAL_VIEWER=Off -DENABLE_NETDATA_JOURNAL_FILE_READER=Off
 ```
 
 If you build through `netdata-installer.sh`, OpenTelemetry is already off by default (from v2.11, macOS builds enable it
 when a suitable Rust toolchain is found), so pass `--disable-plugin-otel` to make it explicit, or `--enable-plugin-otel`
-to opt in. On v2.10, also pass `--disable-plugin-otel-signal-viewer`.
+to opt in. On v2.9 and v2.10, also pass `--disable-plugin-otel-signal-viewer`.
 
 Disabling these features means they are not built: OpenTelemetry collection, the OTel signal viewer, NetFlow/IPFIX/sFlow
 analysis, and Netdata's journal file reader.
