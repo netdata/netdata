@@ -830,8 +830,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         // fixed for this call: an admitted alert gets last_repeat = now, so
         // `last_repeat + repeat_every <= now` is false for it for the rest of this call, and the due
         // set strictly shrinks by one full batch per round.
-        // sizeof(ALARM_ENTRY) is 320 bytes (strings are interned and only refcounted, not copied),
-        // so the transient is bounded at ~320 KB per host regardless of how many alerts are due.
+        // The cap bounds how many entries are held at once. Each costs an ALARM_ENTRY (320 bytes),
+        // a 16-byte slot in the deferred array, and two newly formatted value strings of up to 100
+        // bytes each (its other strings are refcounted copies of existing ones), so a round holds
+        // well under 1 MB per host, regardless of how many alerts are due.
         //
         // ACCEPTED BEHAVIOUR: the state below (rc->last_repeat, times_repeat, RRDCALC_FLAG_RUN_ONCE)
         // is updated during COLLECTION, for the whole batch, before anything is dispatched. If the
