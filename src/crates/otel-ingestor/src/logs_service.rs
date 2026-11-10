@@ -175,7 +175,8 @@ fn check_collisions(
     tenant_id: &TenantId,
     streams: Vec<StorableStream>,
 ) -> CollisionCheck {
-    let mut accepted = Vec::new();
+    // Collisions are rare: nearly every stream is accepted.
+    let mut accepted = Vec::with_capacity(streams.len());
     let mut collisions = Vec::new();
 
     for s in streams {
