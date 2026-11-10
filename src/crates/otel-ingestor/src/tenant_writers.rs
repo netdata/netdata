@@ -46,13 +46,21 @@ impl TenantWriter {
     ///
     /// Lock order: the sync turn, then the writer. The fsyncs run with the
     /// turn held and the writer free, all of the round's files at once.
+    ///
+    /// # Errors
+    ///
+    /// The round's first failure. Also `wal::Error::FramesLost`, when an
+    /// fsync of this writer failed while the frames were not durable yet (an
+    /// earlier round's, a rotation's, the sweep's): the next fsync of the
+    /// file would succeed whatever became of the frames, so the request
+    /// fails and the client sends the records again.
     pub(crate) async fn make_durable(&self, mark: wal::WriteMark) -> wal::Result<()> {
         let _turn = self.sync_turn.lock().await;
 
         let ticket = {
             let mut writer = self.lock();
 
-            if writer.is_durable(mark) {
+            if writer.is_durable(mark)? {
                 return Ok(());
             }
 
@@ -419,7 +427,7 @@ mod tests {
 
         // Had the round lost one of the files, it would have failed.
         writer.make_durable(mark).await.unwrap();
-        assert!(writer.lock().is_durable(mark));
+        assert!(writer.lock().is_durable(mark).unwrap());
     }
 
     #[tokio::test]
@@ -458,7 +466,7 @@ mod tests {
             tokio::join!(writer.make_durable(marks[0]), writer.make_durable(marks[1]));
         first.unwrap();
         second.unwrap();
-        assert!(writer.lock().is_durable(marks[1]));
+        assert!(writer.lock().is_durable(marks[1]).unwrap());
 
         // The one round that ran told the ledger about the file. The sweep,
         // an hour later, seals it: nothing but its `Closed` was still to send.

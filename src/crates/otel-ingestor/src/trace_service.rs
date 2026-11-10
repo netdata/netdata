@@ -658,7 +658,7 @@ mod tests {
         // Let the task the export left behind run up to the sync turn.
         tokio::task::yield_now().await;
         let mark = tenant_writer.lock().write_mark();
-        assert!(!tenant_writer.lock().is_durable(mark));
+        assert!(!tenant_writer.lock().is_durable(mark).unwrap());
         assert!(recorder.committed.lock().unwrap().is_empty());
 
         // The round runs once the turn is free; taking the turn again waits
@@ -666,7 +666,7 @@ mod tests {
         drop(turn);
         let _turn = tenant_writer.hold_sync_turn().await;
 
-        assert!(tenant_writer.lock().is_durable(mark));
+        assert!(tenant_writer.lock().is_durable(mark).unwrap());
         assert_eq!(recorder.committed.lock().unwrap().len(), 1);
         let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
         assert_eq!(sum_of(&out, "accepted"), 3.0);

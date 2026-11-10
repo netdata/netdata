@@ -24,6 +24,13 @@
 //! [`WriteMark`] tells a caller whether a completed sync already covered the
 //! frames it wrote ([`Writer::is_durable`]).
 //!
+//! A failed fsync: the kernel reports a failed write-back once, so the next
+//! fsync of the file succeeds whatever became of the data. The writer
+//! therefore treats the frames that were not durable at that moment as
+//! possibly lost for good (`Writer::frames_in_doubt`): `is_durable` answers
+//! [`Error::FramesLost`](crate::Error::FramesLost) for them, and no later
+//! sync changes that. The file itself is kept and written to as before.
+//!
 //! Events: every lifecycle step (created, synced, closed) is queued per
 //! stream and handed to the caller via [`Writer::take_all_events`]; the
 //! writer never sends anything itself. The caller (the ingestor) drains and
@@ -309,7 +316,7 @@ impl Stream {
     fn sync_data(&mut self) -> Result<()> {
         if let Some(active) = &mut self.active {
             active.writer.flush()?;
-            active.writer.get_ref().sync_all()?;
+            fsync(active.writer.get_ref())?;
 
             // The just-fsynced prefix is now durable; remember it so a later
             // `Closed` (which may not be preceded by a fresh sync on the `Drop`
@@ -546,6 +553,18 @@ impl Stream {
     }
 }
 
+/// fsync a WAL file: the one place the writer does it. A failure is an
+/// [`Error::Fsync`](crate::Error::Fsync), which the [`Writer`] acts on, and a
+/// test can make the next one fail.
+fn fsync(file: &File) -> Result<()> {
+    #[cfg(test)]
+    if tests::FAIL_NEXT_FSYNC.with(|fail| fail.replace(false)) {
+        return Err(crate::Error::Fsync(io::Error::other("injected")));
+    }
+
+    file.sync_all().map_err(crate::Error::Fsync)
+}
+
 /// Local alias for [`FRAME_HEADER_SIZE`] used in the frame-size math below.
 const FRAME_ALIGNMENT_HEADER: usize = FRAME_HEADER_SIZE;
 
@@ -572,10 +591,18 @@ impl Config {
 
 /// A point in a writer's sequence of frames: every frame it had written
 /// when the mark was taken ([`Writer::write_mark`]). A caller that needs its
-/// frames durable takes one after writing them and asks
-/// [`Writer::is_durable`].
+/// frames durable takes one after writing them, without releasing the writer
+/// in between, and asks [`Writer::is_durable`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WriteMark(u64);
+
+/// The frames an fsync failure left in doubt: those numbered above `after`
+/// up to `through`. See [`Writer::frames_in_doubt`].
+#[derive(Clone, Copy)]
+struct LostFrames {
+    after: u64,
+    through: u64,
+}
 
 /// One file of a [`SyncTicket`]: a second handle to the file, and the state
 /// of the file when the sync began.
@@ -591,13 +618,13 @@ pub struct FileSync {
     min_timestamp_ns: TimestampNs,
     max_timestamp_ns: TimestampNs,
     /// `None` until [`FileSync::fsync`] ran.
-    result: Option<io::Result<()>>,
+    result: Option<Result<()>>,
 }
 
 impl FileSync {
     /// fsync the file. Blocks on the disk and needs no lock.
     pub fn fsync(mut self) -> Self {
-        self.result = Some(self.file.sync_all());
+        self.result = Some(fsync(&self.file));
         self
     }
 }
@@ -665,6 +692,8 @@ pub struct Writer {
     /// (see [`WriteMark`]).
     frames_written: u64,
     durable_frames: u64,
+    /// Frames that may be lost: no sync can make them durable any more.
+    lost_frames: Option<LostFrames>,
 }
 
 impl Writer {
@@ -708,6 +737,7 @@ impl Writer {
             streams: HashMap::new(),
             frames_written: 0,
             durable_frames: 0,
+            lost_frames: None,
         })
     }
 
@@ -740,9 +770,14 @@ impl Writer {
                 crate::format::MAX_CONTENT_META_BYTES
             )));
         }
-        let frame_offset = self
+        let written = self
             .get_or_create(partition_key, content_meta)
-            .write_frame(data, meta)?;
+            .write_frame(data, meta);
+        // The fsync of a rotation, before the frame.
+        if let Err(crate::Error::Fsync(_)) = &written {
+            self.frames_in_doubt();
+        }
+        let frame_offset = written?;
 
         self.frames_written += 1;
 
@@ -797,9 +832,50 @@ impl Writer {
         WriteMark(self.frames_written)
     }
 
-    /// Whether a completed sync covers every frame of `mark`.
-    pub fn is_durable(&self, mark: WriteMark) -> bool {
-        self.durable_frames >= mark.0
+    /// Whether a completed sync covers the frames a caller wrote just
+    /// before it took `mark`.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::FramesLost`](crate::Error::FramesLost): an fsync failed
+    /// while those frames were not durable yet.
+    pub fn is_durable(&self, mark: WriteMark) -> Result<bool> {
+        if self.is_lost(mark) {
+            return Err(crate::Error::FramesLost);
+        }
+
+        Ok(self.durable_frames >= mark.0)
+    }
+
+    fn is_lost(&self, mark: WriteMark) -> bool {
+        match self.lost_frames {
+            Some(lost) => lost.after < mark.0 && mark.0 <= lost.through,
+            None => false,
+        }
+    }
+
+    /// An fsync of one of this writer's files failed: every frame that is
+    /// not durable yet is in doubt, and stays so.
+    ///
+    /// The kernel reports a failed write-back once per open file, and all of
+    /// the writer's handles to a file are one open file (a sync's are
+    /// duplicates). So the next fsync of the file succeeds, whoever calls
+    /// it, and its success says nothing about the frames written before the
+    /// failure. Frames of another file are put in doubt too: the writer
+    /// counts frames, not files.
+    ///
+    /// A second failure widens the range up to the frames written by then.
+    /// It can take in frames that became durable in between; their callers
+    /// then get an error they did not need, and send the records again.
+    fn frames_in_doubt(&mut self) {
+        let after = match self.lost_frames {
+            Some(lost) => lost.after,
+            None => self.durable_frames,
+        };
+        self.lost_frames = Some(LostFrames {
+            after,
+            through: self.frames_written,
+        });
     }
 
     /// First step of a split sync, under the caller's lock: flush every
@@ -832,10 +908,19 @@ impl Writer {
     /// `Synced` for every file whose fsync succeeded, and return the first
     /// error. Only a sync without any error makes its [`WriteMark`] durable:
     /// a frame can sit in any of the files.
+    ///
+    /// # Errors
+    ///
+    /// The first file that could not be synced; or
+    /// [`Error::FramesLost`](crate::Error::FramesLost) when all of this sync
+    /// succeeded but another fsync of the writer (a rotation's, the idle
+    /// sweep's) failed while it was out.
     pub fn finish_sync(&mut self, ticket: SyncTicket) -> Result<()> {
         let mut first_error = ticket.error;
+        // A file that never came back may have been fsynced, and failed.
+        let mut fsync_failed = ticket.files.len() != ticket.file_count;
 
-        if ticket.files.len() != ticket.file_count {
+        if fsync_failed {
             first_error
                 .get_or_insert_with(|| io::Error::other("a WAL file's fsync was lost").into());
         }
@@ -848,7 +933,8 @@ impl Writer {
                     }
                 }
                 Some(Err(e)) => {
-                    first_error.get_or_insert(e.into());
+                    fsync_failed = true;
+                    first_error.get_or_insert(e);
                 }
                 None => {
                     first_error.get_or_insert_with(|| {
@@ -858,10 +944,17 @@ impl Writer {
             }
         }
 
+        if fsync_failed {
+            self.frames_in_doubt();
+        }
         if let Some(e) = first_error {
             return Err(e);
         }
         self.durable_frames = self.durable_frames.max(ticket.mark.0);
+
+        if self.is_lost(ticket.mark) {
+            return Err(crate::Error::FramesLost);
+        }
 
         Ok(())
     }
@@ -882,16 +975,23 @@ impl Writer {
     pub fn rotate_expired(&mut self, now_ns: TimestampNs) -> Result<usize> {
         let mut rotated = 0;
         let mut first_err: Option<crate::Error> = None;
+        let mut fsync_failed = false;
         for stream in self.streams.values_mut() {
             match stream.rotate_if_expired(now_ns) {
                 Ok(true) => rotated += 1,
                 Ok(false) => {}
                 Err(e) => {
+                    if matches!(e, crate::Error::Fsync(_)) {
+                        fsync_failed = true;
+                    }
                     if first_err.is_none() {
                         first_err = Some(e);
                     }
                 }
             }
+        }
+        if fsync_failed {
+            self.frames_in_doubt();
         }
         match first_err {
             Some(e) => Err(e),
@@ -916,6 +1016,12 @@ impl Writer {
 mod tests {
     use super::*;
     use crate::Config;
+
+    thread_local! {
+        /// Makes the next [`fsync`] of this test's thread fail.
+        pub(super) static FAIL_NEXT_FSYNC: std::cell::Cell<bool> =
+            const { std::cell::Cell::new(false) };
+    }
 
     fn test_writer(tmp: &std::path::Path) -> Writer {
         let seq = Arc::new(SeqAllocator::ephemeral(0));
@@ -1368,15 +1474,18 @@ mod tests {
     fn a_sync_makes_the_frames_written_before_it_durable() {
         let tmp = tempfile::tempdir().unwrap();
         let mut writer = test_writer(tmp.path());
-        assert!(writer.is_durable(writer.write_mark()), "nothing written");
+        assert!(
+            writer.is_durable(writer.write_mark()).unwrap(),
+            "nothing written"
+        );
 
         write_one(&mut writer, 1, b"one", 1);
         write_one(&mut writer, 2, b"two", 2);
         let mark = writer.write_mark();
-        assert!(!writer.is_durable(mark), "nothing synced yet");
+        assert!(!writer.is_durable(mark).unwrap(), "nothing synced yet");
 
         writer.sync_all().unwrap();
-        assert!(writer.is_durable(mark));
+        assert!(writer.is_durable(mark).unwrap());
         let synced = synced_of(&writer.take_all_events());
         let mut expected = vec![pk(1), pk(2)];
         expected.sort();
@@ -1385,12 +1494,15 @@ mod tests {
         // A frame written after the sync needs another one.
         write_one(&mut writer, 2, b"more", 3);
         let later = writer.write_mark();
-        assert!(writer.is_durable(mark), "an older mark stays durable");
-        assert!(!writer.is_durable(later));
+        assert!(
+            writer.is_durable(mark).unwrap(),
+            "an older mark stays durable"
+        );
+        assert!(!writer.is_durable(later).unwrap());
 
         let ticket = writer.begin_sync().fsync();
         writer.finish_sync(ticket).unwrap();
-        assert!(writer.is_durable(later));
+        assert!(writer.is_durable(later).unwrap());
     }
 
     #[test]
@@ -1420,7 +1532,7 @@ mod tests {
         writer.finish_sync(ticket.fsync()).unwrap();
         let synced = synced_of(&writer.take_all_events());
         assert_eq!(synced.iter().map(|s| s.0).collect::<Vec<_>>(), vec![pk(2)]);
-        assert!(writer.is_durable(mark));
+        assert!(writer.is_durable(mark).unwrap());
     }
 
     #[test]
@@ -1444,7 +1556,10 @@ mod tests {
             synced_of(&writer.take_all_events()).is_empty(),
             "an older prefix must not be reported after a newer one"
         );
-        assert!(writer.is_durable(mark), "the newer sync stays recorded");
+        assert!(
+            writer.is_durable(mark).unwrap(),
+            "the newer sync stays recorded"
+        );
     }
 
     #[test]
@@ -1462,7 +1577,7 @@ mod tests {
         for mut file in ticket.take_files() {
             file = file.fsync();
             if file.partition_key == pk(1) {
-                file.result = Some(Err(io::Error::other("injected")));
+                file.result = Some(Err(crate::Error::Fsync(io::Error::other("injected"))));
             }
             ticket.give_back(file);
         }
@@ -1472,14 +1587,9 @@ mod tests {
         let synced = synced_of(&writer.take_all_events());
         assert_eq!(synced.iter().map(|s| s.0).collect::<Vec<_>>(), vec![pk(2)]);
         assert!(
-            !writer.is_durable(mark),
+            matches!(writer.is_durable(mark), Err(crate::Error::FramesLost)),
             "a frame can sit in the file that failed"
         );
-
-        // The next sync that succeeds covers the frames.
-        writer.sync_all().unwrap();
-        assert!(writer.is_durable(mark));
-        assert_eq!(synced_of(&writer.take_all_events()).len(), 2);
     }
 
     #[test]
@@ -1502,7 +1612,11 @@ mod tests {
 
         assert!(writer.finish_sync(ticket).is_err());
         assert_eq!(synced_of(&writer.take_all_events()).len(), 1);
-        assert!(!writer.is_durable(mark));
+        // The lost fsync may have run, and failed.
+        assert!(matches!(
+            writer.is_durable(mark),
+            Err(crate::Error::FramesLost)
+        ));
     }
 
     #[test]
@@ -1517,6 +1631,100 @@ mod tests {
 
         assert!(writer.finish_sync(ticket).is_err());
         assert!(synced_of(&writer.take_all_events()).is_empty());
-        assert!(!writer.is_durable(mark));
+        assert!(!writer.is_durable(mark).unwrap());
+    }
+
+    /// The kernel reports a failed write-back once: the next fsync of the
+    /// file succeeds although the data may be gone. So a sync that succeeds
+    /// after one that failed must not make the earlier frames durable.
+    #[test]
+    fn a_later_sync_does_not_cover_frames_an_fsync_failure_left_in_doubt() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        write_one(&mut writer, 1, b"durable", 1);
+        let durable = writer.write_mark();
+        writer.sync_all().unwrap();
+        write_one(&mut writer, 1, b"in doubt", 2);
+        let in_doubt = writer.write_mark();
+
+        FAIL_NEXT_FSYNC.set(true);
+        assert!(matches!(writer.sync_all(), Err(crate::Error::Fsync(_))));
+        assert!(matches!(
+            writer.is_durable(in_doubt),
+            Err(crate::Error::FramesLost)
+        ));
+
+        // The next fsync succeeds. The writer does not believe it.
+        assert!(matches!(writer.sync_all(), Err(crate::Error::FramesLost)));
+        assert!(matches!(
+            writer.is_durable(in_doubt),
+            Err(crate::Error::FramesLost)
+        ));
+
+        // What was durable before stays so, and frames written from here on
+        // are judged on their own.
+        assert!(writer.is_durable(durable).unwrap());
+        write_one(&mut writer, 1, b"after", 3);
+        let after = writer.write_mark();
+        assert!(!writer.is_durable(after).unwrap());
+        writer.sync_all().unwrap();
+        assert!(writer.is_durable(after).unwrap());
+    }
+
+    #[test]
+    fn a_failed_rotation_fsync_puts_the_unsynced_frames_in_doubt() {
+        // The frame that makes stream 1 rotate arrives an hour later: the
+        // rotation fsyncs the old file first, and that fsync fails.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        let hour_ns: u64 = 3600 * 1_000_000_000;
+        write_one(&mut writer, 1, b"unsynced", 1);
+        let mark = writer.write_mark();
+
+        FAIL_NEXT_FSYNC.set(true);
+        let rotating_write = writer.write_frame(
+            pk(1),
+            &[],
+            b"next file",
+            crate::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: TimestampNs(hour_ns + 1),
+                log_ts_range: None,
+            },
+        );
+
+        assert!(matches!(rotating_write, Err(crate::Error::Fsync(_))));
+        assert!(matches!(
+            writer.is_durable(mark),
+            Err(crate::Error::FramesLost)
+        ));
+    }
+
+    #[test]
+    fn a_sync_fails_when_the_sweep_fsync_failed_while_it_was_out() {
+        // The sweep's fsync of stream 1's file takes the kernel's error; the
+        // fsyncs of the sync that is out then succeed.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        let hour_ns: u64 = 3600 * 1_000_000_000;
+        write_one(&mut writer, 1, b"old", 1);
+        write_one(&mut writer, 2, b"new", hour_ns + 1);
+        let mark = writer.write_mark();
+
+        let ticket = writer.begin_sync();
+        FAIL_NEXT_FSYNC.set(true);
+        assert!(matches!(
+            writer.rotate_expired(TimestampNs(hour_ns + 2)),
+            Err(crate::Error::Fsync(_))
+        ));
+
+        assert!(matches!(
+            writer.finish_sync(ticket.fsync()),
+            Err(crate::Error::FramesLost)
+        ));
+        assert!(matches!(
+            writer.is_durable(mark),
+            Err(crate::Error::FramesLost)
+        ));
     }
 }

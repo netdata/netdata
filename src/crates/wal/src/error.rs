@@ -6,9 +6,13 @@
 //! variant):
 //!
 //! - `Io`: only the derived `From<std::io::Error>` — `?` on I/O in the
-//!   writer (file creation, header and frame writes, flushes, fsyncs), the
+//!   writer (file creation, header and frame writes, flushes), the
 //!   reader (opens, reads, seeks), the registry (scans, header reads), and
 //!   the seq allocator (high-water envelope writes).
+//! - Writer-side durability: the writer's one fsync site (`fsync` in
+//!   `writer.rs`) raises `Fsync`; `Writer::is_durable` and
+//!   `Writer::finish_sync` raise `FramesLost` for frames a failed fsync left
+//!   in doubt.
 //! - Reader-side format rejection: `FileHeader::from_bytes` (`format.rs`)
 //!   raises `InvalidHeader`, `UnsupportedVersion`, `CrcMismatch`, and
 //!   `UnsupportedCompression`; `Reader` and `scan_frame_boundaries`
@@ -36,7 +40,8 @@ use thiserror::Error;
 ///
 /// Only `Io` carries a `source()` — the wrapped `std::io::Error`; every
 /// other variant is message-only, its field already rendered into the
-/// Display text (a cause, where one existed, is dropped at construction).
+/// Display text (a cause, where one existed, is dropped at construction;
+/// `Fsync` keeps its io::Error as a field and renders it).
 /// Every variant has a construction site today. Display text is a fixed
 /// per-variant template with the field interpolated (CRCs as `{:#010x}`
 /// hex); consumers render it into log lines and gRPC error statuses — there
@@ -157,6 +162,25 @@ pub enum Error {
     /// file untracked. Message-only.
     #[error("unknown sequence {0}: file not tracked")]
     UnknownSequence(u64),
+
+    /// An fsync of a WAL file failed. The kernel reports a failed
+    /// write-back once per open file: the next fsync of the same file
+    /// succeeds although the data may be gone. So the writer treats every
+    /// frame that was not durable yet as in doubt for good (see
+    /// `FramesLost`), whichever fsync got the error — a sync, a rotation's,
+    /// the idle sweep's. Message-only: the io::Error is rendered into the
+    /// text.
+    #[error("fsync failed: {0}")]
+    Fsync(std::io::Error),
+
+    /// The frames asked about were not durable yet when an fsync of their
+    /// writer failed (`Fsync`): they may be lost, and no later sync can
+    /// vouch for them. `Writer::is_durable` returns it for such frames, and
+    /// `Writer::finish_sync` for a sync whose frames another fsync's failure
+    /// put in doubt while it was out. The ingestor fails the request, so
+    /// the client sends the records again. Message-only.
+    #[error("an fsync failed before the frames were durable: they may be lost")]
+    FramesLost,
 }
 
 /// Error side of every fallible WAL API — writer, reader, registry, seq
