@@ -21,7 +21,7 @@ type errorPopulation struct {
 type ErrorChartGroup struct {
 	Fingerprint, Message string
 	Other                bool
-	Count, Lost          uint64
+	Count                uint64
 }
 
 func truncateStack(s string) string {
@@ -70,7 +70,6 @@ func (r *windowRead) rankErrorGroups() []ErrorChartGroup {
 			Fingerprint: key.fingerprint,
 			Message:     g.message,
 			Count:       g.count,
-			Lost:        r.windowLost,
 		})
 	}
 	var count uint64
@@ -82,7 +81,6 @@ func (r *windowRead) rankErrorGroups() []ErrorChartGroup {
 			Fingerprint: Other,
 			Other:       true,
 			Count:       count,
-			Lost:        r.windowLost,
 		})
 	}
 	return out

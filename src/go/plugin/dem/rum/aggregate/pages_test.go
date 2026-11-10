@@ -80,20 +80,19 @@ func TestSessionMeasurementIndependentOfDetailLRU(t *testing.T) {
 	assert.Zero(t, a.Activity().ObservedSessions)
 	assert.Empty(t, a.Pages(""))
 }
-func TestObservedSessionCapacityIsExplicit(t *testing.T) {
+func TestObservedSessionsRetainAllAcceptedActivity(t *testing.T) {
 	a, now := newAgg(time.Minute)
-	for i := range maxWindowObservations + 1 {
+	for i := range 10000 + 1 {
 		b := mk(*now, fmt.Sprint(i), "/")
 		b.Events = nil
 		b.Logs = []beacon.Log{{Message: "accepted activity"}}
 		a.Ingest(b)
 	}
 	s := a.Snapshot()
-	assert.Equal(t, maxWindowObservations, s.ObservedSessions)
-	assert.Positive(t, s.SessionsLost)
-	assert.Positive(t, a.Pages("")[0].SessionsLost)
+	assert.Equal(t, 10001, s.ObservedSessions)
+	assert.Equal(t, 10001, a.Pages("")[0].Sessions)
 	*now = now.Add(time.Minute + time.Second)
-	assert.Zero(t, a.Snapshot().SessionsLost)
+	assert.Zero(t, a.Snapshot().ObservedSessions)
 }
 func TestPageInventoryIncludesEveryRetainedGroup(t *testing.T) {
 	a, now := newAgg(time.Minute)
@@ -102,7 +101,6 @@ func TestPageInventoryIncludesEveryRetainedGroup(t *testing.T) {
 	}
 	pages := a.Pages("")
 	assert.Len(t, pages, 1101)
-	assert.Zero(t, pages[0].Lost)
 }
 func TestSelectorsUseReplacedVitalPopulation(t *testing.T) {
 	a, now := newAgg(time.Minute)

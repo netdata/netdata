@@ -731,7 +731,7 @@ Report identity and replay suppression:
   for every measurement: Faro groups by metadata, so per-item metadata would destroy default batching.
 - Explicit document/view/session lifecycle events and performance entries receive identities before transport;
   retries preserve identical IDs/revisions.
-- Identity evidence lasts at most 30 minutes, subject to capacity and restart. The SDK has no finite maximum delivery
+- Identity evidence lasts 30 minutes unless the runtime restarts. The SDK has no finite maximum delivery
   delay, so this is best-effort replay suppression.
 - Unidentified errors, logs, spans and ordinary custom events have no replay suppression.
 
@@ -784,9 +784,10 @@ OTLP export:
 What `rum/aggregate` stores:
 
 - One canonical latest observation per `(experience, vital)`.
-- Separate bounded activation, view/resource identity, activity and observed-session records.
-- Resource observations and replay evidence have separate retention from document/vital activity, so resource
-  pressure cannot invalidate unrelated measurements.
+- Separate time-retained activation, view/resource identity, activity and observed-session records.
+- Resource observations and replay evidence have separate retention from document/vital activity.
+- Canonical measurements remain exact for the configured receipt window (five minutes by default); replay evidence
+  retains its 30-minute identity horizon. No independent aggregate count/byte cap or approximation applies.
 - Measurement retention is independent of the investigation-session LRU and the live ring.
 
 How reads derive results:
@@ -800,18 +801,22 @@ Cost:
 | Operation | Cost |
 |---|---|
 | Receipt-ordered retention | O(log retained) per changed entry, without scanning retained measurements during ingestion |
-| Snapshots | Scan bounded state and sort populations for percentiles and ranking |
+| Snapshots | Scan window-retained state and sort populations for percentiles and ranking |
 | Sites summary | Scans only its required activity and session populations |
 
-Capacity loss:
+Retention and resources:
 
-- Capacity loss conservatively invalidates affected results and remains visible until the newest relevant loss
-  expires.
-- This constant-space loss episode may include older loss during continuous overload; it is not an exact window-loss
-  count.
-- The drop counter remains cumulative actual loss.
-- Identity loss is scoped to affected measurements. Resource identity loss still invalidates session completeness,
-  because resource-only reports can renew session activity.
+- Canonical receipt heaps expire elapsed entries during accepted ingestion using Agent time, with work proportional
+  to entries actually expiring. Original receipt timestamps and inclusive window boundaries remain unchanged.
+- Read-side cleanup also expires idle state and retains transport/detail housekeeping. Receiver activity timestamp
+  slices are additionally compacted at most once per minute during ingestion, amortizing diagnostic cleanup when
+  publication is delayed. Ingestion MUST NOT scan retained measurements or the detail-session LRU for each beacon.
+  No background expiry worker is required.
+- Memory is O(admitted distinct state and retained bytes over each horizon), plus detail and query state. Heap/map
+  backing allocations may retain high-water capacity after entries expire. This is not a hard process-memory limit
+  or evidence of a qualified full-scale workload.
+- Investigation-session LRU, event/live rings and history/export queues retain their separate limits and actual loss
+  diagnostics. Invalid measurements and receiver rejections remain independently counted.
 
 ### Metrics and alerts
 
@@ -824,8 +829,8 @@ Instruments:
 
 Publication:
 
-- Collector gauges expose current retained population counts and loss evidence on every eligible collection cycle.
-- Percentile gauges are omitted for empty or incomplete populations.
+- Collector gauges expose exact current retained population counts on every eligible collection cycle.
+- Percentile gauges are omitted for empty populations; measured zero remains valid.
 - Measurement gauges are omitted when collection is zero or ingress is unavailable.
 
 Alerts:

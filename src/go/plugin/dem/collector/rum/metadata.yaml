@@ -139,19 +139,11 @@ modules:
                     type: integer
                     unit: ''
                     description: Explicit application-view occurrences in the window.
-                  - name: window_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: sessions_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
                   - name: vnode_guid
                     type: string
                     unit: ''
                     description: Recorded canonical vnode GUID; empty means unassigned.
-            performance: Reads bounded local activity snapshots without contacting the monitored website.
+            performance: Reads current local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
@@ -190,7 +182,7 @@ modules:
                 options: []
             returns:
                 description: All retained document-entry groups, independent of chart top groups. Null values indicate
-                    absent or incomplete measurements; loss fields identify retained capacity-loss evidence.
+                    absent measurements; zero counts describe an observed quiet window.
                 columns:
                   - name: site
                     type: string
@@ -258,31 +250,11 @@ modules:
                     type: integer
                     unit: ''
                     description: Retained observations for CLS.
-                  - name: lcp_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: inp_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: cls_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: window_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: sessions_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
                   - name: vnode_guid
                     type: string
                     unit: ''
                     description: Recorded canonical vnode GUID; empty means unassigned.
-            performance: Reads bounded local activity snapshots without contacting the monitored website.
+            performance: Reads current local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
@@ -825,8 +797,8 @@ modules:
             Charts belong to the configured vnode, or to this Agent when vnode is omitted. Native job identity scopes site charts; display_name is optional metadata.
             The window uses receiver arrival time. Each Web Vital contributes its latest report per document experience;
             percentiles cannot be averaged across times or groups. Population charts show retained observations and ratings.
-            No observations means no percentile. Capacity loss makes affected percentiles and counts unavailable; lost_reports
-            is retained loss evidence, not a denominator or an exact count of missing observations in the window.
+            No observations means no percentile; measured zero remains a valid value. Canonical measurements are retained
+            exactly for the configured receipt window, with no independent aggregate count or byte cap.
 
             Document views count initial activations and back-forward cache restores. Application views count explicit route
             occurrences separately. Observed sessions are distinct browser session identities seen in the window, not concurrent
@@ -865,7 +837,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.fcp
                 description: First Contentful Paint among recent observed document experiences
                 unit: milliseconds
@@ -883,7 +854,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.ttfb
                 description: Time to First Byte among recent observed document experiences
                 unit: milliseconds
@@ -901,7 +871,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.inp
                 description: Interaction to Next Paint among recent observed document experiences
                 unit: milliseconds
@@ -919,7 +888,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.cls
                 description: Cumulative Layout Shift among recent observed document experiences
                 unit: score
@@ -937,7 +905,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.load
                 description: Document load time
                 unit: milliseconds
@@ -968,21 +935,18 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: observed
-                  - name: lost_reports
               - name: rum.dom_content_loaded_handler_population
                 description: DOMContentLoaded handler duration observation population
                 unit: observations
                 chart_type: line
                 dimensions:
                   - name: observed
-                  - name: lost_reports
               - name: rum.same_site_fetch_population
                 description: Same-site fetch and XHR duration observation population
                 unit: observations
                 chart_type: line
                 dimensions:
                   - name: observed
-                  - name: lost_reports
               - name: rum.document_views
                 description: Document views
                 unit: views/s
@@ -1023,13 +987,6 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: views
-              - name: rum.measurement_loss
-                description: Retained capacity-loss evidence for window summaries
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
-                  - name: sessions
               - name: rum.resources
                 description: Reported application resource entries
                 unit: entries/s
@@ -1072,12 +1029,6 @@ modules:
                   - name: sent
                   - name: dropped
                   - name: errors
-              - name: rum.samples_dropped
-                description: Reports lost from bounded measurement state
-                unit: reports/s
-                chart_type: line
-                dimensions:
-                  - name: dropped
               - name: rum.ingress_state
                 description: RUM ingress availability
                 unit: state
@@ -1120,13 +1071,6 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: observed
-                  - name: lost_reports
-              - name: rum.resource_host_loss
-                description: Retained capacity-loss evidence for resource counts by host
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: lost_reports
           - name: site fingerprint
             description: One configured site grouped by fingerprint.
             labels:
@@ -1144,12 +1088,6 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: errors
-              - name: rum.error_group_loss
-                description: Retained capacity-loss evidence for error fingerprints
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: lost_reports
           - name: site browser
             description: One configured site grouped by browser.
             labels:
@@ -1208,17 +1146,6 @@ modules:
                 unit: observations
                 chart_type: line
                 dimensions:
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
-              - name: rum.browser_loss
-                description: Retained capacity-loss evidence by browser
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
                   - name: lcp
                   - name: fcp
                   - name: ttfb
@@ -1287,17 +1214,6 @@ modules:
                   - name: ttfb
                   - name: inp
                   - name: cls
-              - name: rum.device_loss
-                description: Retained capacity-loss evidence by device
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
           - name: site country
             description: One configured site grouped by country.
             labels:
@@ -1356,17 +1272,6 @@ modules:
                 unit: observations
                 chart_type: line
                 dimensions:
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
-              - name: rum.country_loss
-                description: Retained capacity-loss evidence by country
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
                   - name: lcp
                   - name: fcp
                   - name: ttfb
@@ -1435,17 +1340,6 @@ modules:
                   - name: ttfb
                   - name: inp
                   - name: cls
-              - name: rum.page_loss
-                description: Retained capacity-loss evidence by page
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
           - name: site version
             description: One configured site grouped by version.
             labels:
@@ -1509,17 +1403,6 @@ modules:
                   - name: ttfb
                   - name: inp
                   - name: cls
-              - name: rum.version_loss
-                description: Retained capacity-loss evidence by version
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
           - name: site view
             description: One configured site grouped by view.
             labels:
@@ -1538,12 +1421,6 @@ modules:
                 dimensions:
                   - name: views
                   - name: errors
-              - name: rum.view_loss
-                description: Retained capacity-loss evidence by application view
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: lost_reports
     overview:
         additional_permissions:
             description: The Netdata service needs write access to its DEM state directory. Configured TLS and GeoIP
@@ -1566,10 +1443,10 @@ modules:
                 description: Sites are explicitly configured; websites are not discovered automatically.
             limits:
                 description: |
-                    Breakdown charts show current-window top groups. Missing browser observations cannot be reconstructed, and
-                    capacity loss suppresses affected percentiles and window counts. Duplicate detection is best effort across a bounded
-                    30-minute retention period; capacity pressure or restart can shorten it. Quality alerts require at least 30
-                    observations for that metric and complete local measurement state. Quiet traffic alone does not trigger an alert.
+                    Breakdown charts show current-window top groups; page Functions expose all retained document-entry groups.
+                    Missing browser observations cannot be reconstructed. Measurements use the configured window (five minutes by
+                    default); replay evidence is retained for 30 minutes unless the runtime restarts. Later replays can count again.
+                    Quality alerts require at least 30 observations for that metric. Quiet traffic alone does not trigger an alert.
 
                     RUM and synthetic history share the 30-day and 1-GiB defaults in `dem.conf`, including disabled sites and retained
                     machine identities. The byte target counts full journal file sizes including preallocation, with an 8-MiB minimum.
@@ -1583,8 +1460,10 @@ modules:
                     current and future detail while the session remains tracked. Earlier logs and spans are not exported retrospectively;
                     complete sessions or traces are not guaranteed. Export acceptance does not guarantee durable storage.
             performance_impact:
-                description: Resource usage depends on accepted browser traffic and the configured measurement window.
-                    Optional OTLP export and investigation history add network and local disk work.
+                description: Measurement and replay memory grows with admitted distinct state and retained text over the configured
+                    measurement window (five minutes by default) and 30-minute identity horizon. There is no independent aggregate
+                    count or byte cap. Investigation detail has separate session and entry limits. Optional OTLP export and investigation
+                    history add network and local disk work. These retention rules do not establish a qualified full-scale workload.
         multi_instance: true
         supported_platforms:
             exclude: []

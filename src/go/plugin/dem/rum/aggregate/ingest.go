@@ -17,12 +17,14 @@ func (a *Aggregator) Reject(site, reason string) {
 	if site != st.cfg.Name {
 		return
 	}
+	now := a.now()
+	st.expireActivityIfDue(now)
 	st.counters[reason]++
 	switch reason {
 	case beacon.RejectOrigin, beacon.RejectRate, beacon.RejectSize:
-		st.rejected = append(st.rejected, a.now())
+		st.rejected = append(st.rejected, now)
 	case beacon.RejectBot:
-		st.bots = append(st.bots, a.now())
+		st.bots = append(st.bots, now)
 	}
 }
 func (a *Aggregator) Add(counter string, n uint64) {
@@ -39,7 +41,8 @@ type Result struct {
 }
 
 // Ingest never changes its input. Duplicate checks are O(1); accepted receipt
-// inserts/updates are O(log retained) per item. No ingestion path scans retained state.
+// inserts/updates and expired-item removal are O(log retained) per item.
+// Receiver activity timestamps are compacted at most once per minute.
 func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -47,9 +50,12 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	if b.Site != st.cfg.Name {
 		return Result{}
 	}
+	clock := a.now()
+	st.expireMeasurements(clock)
+	st.expireActivityIfDue(clock)
 	now := b.Received
 	if now.IsZero() {
-		now = a.now()
+		now = clock
 	}
 	st.counters[CounterAccepted]++
 	st.accepted = append(st.accepted, now)
@@ -323,35 +329,10 @@ func (st *siteState) admitIdentity(key identityKey, revision uint64, now time.Ti
 		revision: revision,
 		received: now,
 	}
-	if victim := order.capacityVictim(entry); victim != nil {
-		old := victim.(*identity)
-		if st.lastAccepted.Sub(old.received) <= identityRetention {
-			st.loseIdentity(old.key)
-		}
-		if old == entry {
-			return true
-		}
-		delete(index, old.key)
-	}
 	index[key] = order.add(entry)
 	return true
 }
 
-func (st *siteState) loseIdentity(key identityKey) {
-	kind := key.kind
-	if kind == "vital" {
-		kind = key.item
-	}
-	loss := st.identityLoss[kind]
-	if loss == nil {
-		loss = &lossInterval{}
-		st.identityLoss[kind] = loss
-	}
-	loss.add(st.lastAccepted, st.window)
-	// Every newly admitted identity can renew observed-session membership.
-	st.identitySessionLoss.add(st.lastAccepted, st.window)
-	st.counters[CounterSamplesDropped]++
-}
 func (st *siteState) observeVital(experience string, v beacon.Vital, attrs attributes, now time.Time) (attributes, bool) {
 	key := observationKey{experience, v.Name}
 	if el := st.observations[key]; el != nil {
@@ -406,38 +387,12 @@ func (st *siteState) putObservation(v vitalObservation) {
 	}
 	entry := new(vitalObservation)
 	*entry = v
-	if victim := st.observationOrder.capacityVictim(entry); victim != nil {
-		old := victim.(*vitalObservation)
-		if !old.received.Before(st.lastAccepted.Add(-st.window)) {
-			loss := st.vitalLoss[old.key.name]
-			if loss == nil {
-				loss = &lossInterval{}
-				st.vitalLoss[old.key.name] = loss
-			}
-			loss.add(old.received, st.window)
-			st.counters[CounterSamplesDropped]++
-		}
-		if old == entry {
-			return
-		}
-		delete(st.observations, old.key)
-	}
 	st.observations[v.key] = st.observationOrder.add(entry)
 }
 func (st *siteState) appendActivity(v activityObservation) {
-	order, loss := &st.activity, &st.activityLoss
+	order := &st.activity
 	if v.resource != nil {
-		order, loss = &st.resources, &st.resourceLoss
-	}
-	if victim := order.capacityVictim(&v); victim != nil {
-		old := victim.(*activityObservation)
-		if !old.received.Before(st.lastAccepted.Add(-st.window)) {
-			loss.add(old.received, st.window)
-			st.counters[CounterSamplesDropped]++
-		}
-		if old == &v {
-			return
-		}
+		order = &st.resources
 	}
 	order.add(&v)
 }
@@ -445,10 +400,10 @@ func (st *siteState) observeSession(id, page string, now time.Time) {
 	if id == "" {
 		return
 	}
-	st.touchObservedSession(st.sessions, &st.sessionOrder, id, "", now, &st.sessionLoss)
-	st.touchObservedSession(st.pageSessions, &st.pageSessionOrder, strconv.Itoa(len(id))+":"+id+page, page, now, &st.pageSessionLoss)
+	st.touchObservedSession(st.sessions, &st.sessionOrder, id, "", now)
+	st.touchObservedSession(st.pageSessions, &st.pageSessionOrder, strconv.Itoa(len(id))+":"+id+page, page, now)
 }
-func (st *siteState) touchObservedSession(index map[string]*receiptEntry, order *receiptHeap, key, page string, now time.Time, loss *lossInterval) {
+func (st *siteState) touchObservedSession(index map[string]*receiptEntry, order *receiptHeap, key, page string, now time.Time) {
 	if el := index[key]; el != nil {
 		v := el.Value.(*sessionObservation)
 		if now.After(v.received) {
@@ -461,17 +416,6 @@ func (st *siteState) touchObservedSession(index map[string]*receiptEntry, order 
 		key:      key,
 		page:     page,
 		received: now,
-	}
-	if victim := order.capacityVictim(entry); victim != nil {
-		v := victim.(*sessionObservation)
-		if !v.received.Before(st.lastAccepted.Add(-st.window)) {
-			loss.add(v.received, st.window)
-			st.counters[CounterSamplesDropped]++
-		}
-		if v == entry {
-			return
-		}
-		delete(index, v.key)
 	}
 	index[key] = order.add(entry)
 }

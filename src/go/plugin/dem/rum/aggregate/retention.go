@@ -69,15 +69,3 @@ func (h *receiptHeap) add(v receiptObservation) *receiptEntry {
 func (h *receiptHeap) remove(e *receiptEntry) { heap.Remove(h, e.index) }
 func (h *receiptHeap) fix(e *receiptEntry)    { heap.Fix(h, e.index) }
 func (h *receiptHeap) pop() *receiptEntry     { return heap.Pop(h).(*receiptEntry) }
-
-// Capacity is per canonical population. An older incoming observation cannot
-// displace a newer retained one; callers record loss for the actual victim.
-func (h *receiptHeap) capacityVictim(incoming receiptObservation) receiptObservation {
-	if h.Len() < maxWindowObservations {
-		return nil
-	}
-	if incoming.receivedAt().Before(h.oldest().Value.receivedAt()) {
-		return incoming
-	}
-	return h.pop().Value
-}

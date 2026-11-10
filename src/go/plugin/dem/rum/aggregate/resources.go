@@ -27,7 +27,6 @@ type ResourceHostGroup struct {
 	Unknown  bool // Missing host metadata; distinct from a literal host named "unknown".
 	Count    uint64
 	Duration VitalStats
-	Lost     uint64
 }
 
 func isAPICall(pageHost string, r beacon.Resource) bool {
@@ -115,8 +114,7 @@ func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 			Host:     key.host,
 			Unknown:  key.unknown,
 			Count:    g.count,
-			Duration: measurementStats(apiName, g.values, r.resourcesLost),
-			Lost:     r.resourcesLost,
+			Duration: measurementStats(apiName, g.values),
 		})
 	}
 	other := resourcePopulation{}
@@ -132,8 +130,7 @@ func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 			Host:     Other,
 			Other:    true,
 			Count:    other.count,
-			Duration: measurementStats(apiName, other.values, r.resourcesLost),
-			Lost:     r.resourcesLost,
+			Duration: measurementStats(apiName, other.values),
 		})
 	}
 	return out

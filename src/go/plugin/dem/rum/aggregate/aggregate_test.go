@@ -265,43 +265,42 @@ func TestNavigationRevisionAndBFCacheAbsence(t *testing.T) {
 	a.Ingest(b)
 	assert.Equal(t, 1, a.Snapshot().Load.N)
 }
-func TestCanonicalCapacityLossAndRecovery(t *testing.T) {
+func TestCanonicalPopulationExpiresInclusively(t *testing.T) {
 	a, now := newAgg(time.Minute)
-	for i := range maxWindowObservations + 1 {
+	for i := range 10001 {
 		b := mk(*now, "", fmt.Sprint(i), v(beacon.LCP, 100))
 		b.Events = nil
 		a.Ingest(b)
 	}
+	*now = now.Add(time.Minute)
 	s := a.Snapshot()
-	assert.Equal(t, maxWindowObservations, s.Vitals[beacon.LCP].N)
-	assert.Positive(t, s.Vitals[beacon.LCP].Lost)
-	assert.Zero(t, s.Vitals[beacon.LCP].P75)
-	assert.Positive(t, s.Counters[CounterSamplesDropped])
-	*now = now.Add(time.Minute + time.Nanosecond)
-	s = a.Snapshot()
-	assert.Zero(t, s.Vitals[beacon.LCP].N)
-	assert.Zero(t, s.Vitals[beacon.LCP].Lost)
+	assert.Equal(t, 10001, s.Vitals[beacon.LCP].N)
+	assert.Equal(t, 100., s.Vitals[beacon.LCP].P75)
+	*now = now.Add(time.Nanosecond)
+	assert.Zero(t, a.Snapshot().Vitals[beacon.LCP].N)
 }
-func TestLossEpisodeDoesNotClearBeforeNewestLossExpires(t *testing.T) {
+
+func TestPopulationExpiresByEachReceipt(t *testing.T) {
 	a, now := newAgg(time.Minute)
-	for i := range maxWindowObservations {
+	for i := range 10000 {
 		b := mk(*now, "", fmt.Sprint(i), v(beacon.LCP, 100))
 		b.Events = nil
 		a.Ingest(b)
 	}
 	*now = now.Add(30 * time.Second)
 	for i := range 2 {
-		b := mk(*now, "", fmt.Sprint(i+maxWindowObservations), v(beacon.LCP, 100))
+		b := mk(*now, "", fmt.Sprint(i+10000), v(beacon.LCP, 200))
 		b.Events = nil
 		a.Ingest(b)
 	}
 	*now = now.Add(31 * time.Second)
-	// Identity evidence was lost at t+30: possible duplicate admission persists
-	// through t+90 even after all original sample losses age out at t+60.
-	assert.Positive(t, a.Snapshot().Vitals[beacon.LCP].Lost)
+	s := a.Snapshot()
+	assert.Equal(t, 2, s.Vitals[beacon.LCP].N)
+	assert.Equal(t, 200., s.Vitals[beacon.LCP].P75)
 	*now = now.Add(30 * time.Second)
-	assert.Zero(t, a.Snapshot().Vitals[beacon.LCP].Lost)
+	assert.Zero(t, a.Snapshot().Vitals[beacon.LCP].N)
 }
+
 func TestMismatchedIdentityHasNoEffects(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	b := mk(*now, "s", "/", v(beacon.LCP, 10))
@@ -428,33 +427,24 @@ func TestFilteredObservationPreservesOnlyAdmittedTimingEvents(t *testing.T) {
 	assert.Empty(t, result.Observation.Resources)
 }
 
-func TestIdentityCapacityLossInvalidatesObservedSessions(t *testing.T) {
+func TestIdentityRetentionPreventsExpiredSessionReplay(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	old := mk(now.Add(-61*time.Second), "expired", "/old", v(beacon.LCP, 100))
 	old.Events = nil
 	a.Ingest(old)
 	require.Zero(t, a.Snapshot().ObservedSessions)
-	for i := range maxWindowObservations {
+	for i := range 10001 {
 		a.Ingest(&beacon.Beacon{
-			Site:         "s",
-			ExperienceID: fmt.Sprint(i),
-			Received:     *now,
-			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
+			Site: "s", ExperienceID: fmt.Sprint(i), Received: *now,
+			Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
 		})
 	}
 	old.Received = *now
-	a.Ingest(old)
-	snapshot := a.Snapshot()
-	require.Positive(t, snapshot.WindowLost)
-	require.Positive(t, snapshot.SessionsLost, "replay evidence loss also compromises session membership")
-	require.Positive(t, a.Activity().SessionsLost)
+	result := a.Ingest(old)
+	require.Empty(t, result.Observation.Vitals)
+	require.Zero(t, a.Snapshot().ObservedSessions)
+	require.Zero(t, a.Activity().ObservedSessions)
 	for _, page := range a.Pages("") {
-		if page.Page == "/old" {
-			require.Positive(t, page.SessionsLost)
-		}
+		require.NotEqual(t, "/old", page.Page)
 	}
-	*now = now.Add(time.Minute + time.Second)
-	snapshot = a.Snapshot()
-	require.Zero(t, snapshot.SessionsLost)
-	require.Zero(t, snapshot.ObservedSessions)
 }

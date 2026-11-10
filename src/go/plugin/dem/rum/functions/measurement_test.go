@@ -22,23 +22,21 @@ func (s measurementSource) Pages(context.Context, string, string) ([]query.Page,
 	return []query.Page{s.page}, nil
 }
 
-func TestPagePopulationCountsAndIncompleteNulls(t *testing.T) {
+func TestPagePopulationCountsAndAbsentPercentiles(t *testing.T) {
 	for name, tc := range map[string]struct {
 		n    int
-		lost uint64
 		want any
 	}{
-		"absent": {0, 0, nil}, "zero": {1, 0, float64(0)}, "capacity loss": {2, 1, nil},
+		"absent": {0, nil}, "zero": {1, float64(0)}, "large population": {15001, float64(0)},
 	} {
 		t.Run(name, func(t *testing.T) {
 			handler := rumfunctions.New(measurementSource{
 				page: query.Page{
-					Site:         "shop",
-					Page:         "/entry",
-					Sessions:     2,
-					SessionsLost: tc.lost,
-					Lost:         tc.lost,
-					Vitals:       map[string]aggregate.VitalStats{beacon.CLS: {N: tc.n, Lost: tc.lost}},
+					Site:      "shop",
+					Page:      "/entry",
+					Sessions:  2,
+					VnodeGUID: "12345678-1234-4234-8234-123456789abc",
+					Vitals:    map[string]aggregate.VitalStats{beacon.CLS: {N: tc.n}},
 				},
 			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
@@ -50,13 +48,8 @@ func TestPagePopulationCountsAndIncompleteNulls(t *testing.T) {
 			value := func(key string) any { return rows[0][columns[key].(map[string]any)["index"].(int)] }
 			require.Equal(t, tc.want, value("cls_p75"))
 			require.Equal(t, tc.n, value("cls_samples"))
-			require.Equal(t, tc.lost, value("cls_lost"))
-			require.Equal(t, tc.lost, value("window_lost"))
-			if tc.lost != 0 {
-				require.Nil(t, value("sessions"))
-			} else {
-				require.Equal(t, 2, value("sessions"))
-			}
+			require.Equal(t, 2, value("sessions"))
+			require.Equal(t, "12345678-1234-4234-8234-123456789abc", value("vnode_guid"))
 			require.Contains(t, response["help"], "outside chart top-N")
 			require.Contains(t, response["help"], "not people or concurrency")
 		})
@@ -65,10 +58,8 @@ func TestPagePopulationCountsAndIncompleteNulls(t *testing.T) {
 
 type measurementSiteSource struct {
 	metadataFunctionSource
-	serving    bool
-	rate       float64
-	lost       uint64
-	windowLost uint64
+	serving bool
+	rate    float64
 }
 
 func (s measurementSiteSource) Receiver() query.Receiver {
@@ -84,8 +75,6 @@ func (s measurementSiteSource) Sites(context.Context, string) ([]query.Site, err
 		InvestigatedSessions:   7,
 		PageviewsWindow:        2,
 		ApplicationViewsWindow: 4,
-		SessionsLost:           s.lost,
-		WindowLost:             s.windowLost,
 		JSErrorsWindow:         6,
 	}}}, nil
 }
@@ -93,19 +82,16 @@ func TestSiteMeasurementAvailabilityAndDetailPopulation(t *testing.T) {
 	for name, tc := range map[string]struct {
 		serving                    bool
 		rate                       float64
-		lost                       uint64
 		sessions, documents, views any
 	}{
-		"measured":             {true, 1, 0, 3, 2, uint64(4)},
-		"session capacity":     {true, 1, 1, nil, 2, uint64(4)},
-		"receiver unavailable": {false, 1, 0, nil, nil, nil},
-		"measurement disabled": {true, 0, 0, nil, nil, nil},
+		"measured":             {true, 1, 3, 2, uint64(4)},
+		"receiver unavailable": {false, 1, nil, nil, nil},
+		"measurement disabled": {true, 0, nil, nil, nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			handler := rumfunctions.New(measurementSiteSource{
 				serving: tc.serving,
 				rate:    tc.rate,
-				lost:    tc.lost,
 			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 				Method: "rum-sites",
@@ -123,18 +109,15 @@ func TestSiteMeasurementAvailabilityAndDetailPopulation(t *testing.T) {
 	}
 }
 
-func TestPageActivityCountsAreUnavailableWhenPopulationIncomplete(t *testing.T) {
+func TestPageActivityCountsAndOptionalFrustration(t *testing.T) {
 	for name, tc := range map[string]struct {
 		count                 int
-		lost                  uint64
 		capture               bool
 		activity, frustration any
 	}{
-		"complete activity":       {4, 0, true, 4, 4},
-		"complete quiet window":   {0, 0, true, 0, 0},
-		"partial activity":        {4, 1, true, nil, nil},
-		"partial quiet remainder": {0, 1, true, nil, nil},
-		"capture disabled":        {4, 0, false, 4, nil},
+		"observed activity": {4, true, 4, 4},
+		"quiet window":      {0, true, 0, 0},
+		"capture disabled":  {4, false, 4, nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			handler := rumfunctions.New(measurementSource{
@@ -144,7 +127,6 @@ func TestPageActivityCountsAreUnavailableWhenPopulationIncomplete(t *testing.T) 
 					PageviewsWindow:   tc.count,
 					ErrorsWindow:      tc.count,
 					FrustrationWindow: tc.count,
-					Lost:              tc.lost,
 					FrustrationsKnown: tc.capture,
 				},
 			}, nil)
@@ -156,19 +138,18 @@ func TestPageActivityCountsAreUnavailableWhenPopulationIncomplete(t *testing.T) 
 			require.Len(t, rows, 1)
 			columns := response["columns"].(map[string]any)
 			got := map[string]any{}
-			for _, key := range []string{"pageviews_window", "errors_window", "frustration_window", "window_lost"} {
+			for _, key := range []string{"pageviews_window", "errors_window", "frustration_window"} {
 				got[key] = rows[0][columns[key].(map[string]any)["index"].(int)]
 			}
-			require.Equal(t, map[string]any{"pageviews_window": tc.activity, "errors_window": tc.activity, "frustration_window": tc.frustration, "window_lost": tc.lost}, got)
+			require.Equal(t, map[string]any{"pageviews_window": tc.activity, "errors_window": tc.activity, "frustration_window": tc.frustration}, got)
 		})
 	}
 }
 
-func TestSiteActivityCountsAreUnavailableWhenPopulationIncomplete(t *testing.T) {
+func TestSiteActivityCountsAndDetailPopulation(t *testing.T) {
 	handler := rumfunctions.New(measurementSiteSource{
-		serving:    true,
-		rate:       1,
-		windowLost: 1,
+		serving: true,
+		rate:    1,
 	}, nil)
 	response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 		Method: "rum-sites",
@@ -178,11 +159,11 @@ func TestSiteActivityCountsAreUnavailableWhenPopulationIncomplete(t *testing.T) 
 	require.Len(t, rows, 1)
 	columns := response["columns"].(map[string]any)
 	got := map[string]any{}
-	for _, key := range []string{"pageviews_window", "js_errors_window", "application_views_window", "window_lost", "observed_sessions", "investigated_sessions"} {
+	for _, key := range []string{"pageviews_window", "js_errors_window", "application_views_window", "observed_sessions", "investigated_sessions"} {
 		got[key] = rows[0][columns[key].(map[string]any)["index"].(int)]
 	}
 	require.Equal(t, map[string]any{
-		"pageviews_window": nil, "js_errors_window": nil, "application_views_window": nil, "window_lost": uint64(1),
+		"pageviews_window": 2, "js_errors_window": uint64(6), "application_views_window": uint64(4),
 		"observed_sessions": 3, "investigated_sessions": 7,
-	}, got, "activity loss does not change independently complete session populations")
+	}, got, "measurement counts remain distinct from bounded investigation detail")
 }

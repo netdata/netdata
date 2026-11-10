@@ -13,7 +13,7 @@ import (
 var sitesMethod = method{
 	id:      "rum-sites",
 	title:   "RUM Sites",
-	help:    "Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. RUM admitted runtime facts and receipt-window activity. Generation identifies the receiving runtime, not the browser policy version. A vnode GUID change starts a fresh measurement window while retained investigation and live evidence keep their original GUID. Collection enabled is independent of receiver serving state. Install Script URL and Snippet are null without explicit site or receiver public_url; configure public_url to generate installation instructions. Last accepted payload and last rejected-origin timestamps are Unix microseconds, null when never observed in this runtime. Silence is not an installation or health verdict. Rejected/min counts origin, rate and size refusals only; origin observations can include OPTIONS preflight. Last rejected origin is historical evidence even after accepted traffic. Observed sessions count measured browser identities, not people or concurrent visitors; null means capacity loss or measurement is unavailable. Tracked investigated sessions count the bounded detail cache, independently of the measurement window. Activity counts are null while window loss is nonzero; loss counts identify incomplete populations. Capture columns show current policy; retained history may reflect earlier policies. City locations are approximate live activity only; frustration signals are optional interaction heuristics. collector.geoip reports source availability separately from site capture policy: selection is auto or explicit; state is loaded, unavailable or using_previous. Loaded means a supported declared database format and available reader, not complete validation, freshness, accuracy or address coverage. Optional source and database_type identify the active source; build_at, loaded_at and last_checked_at are Unix microseconds omitted when unseen. Build time is database metadata, not provider freshness. Reason is a bounded status code. lookup_errors counts errors for the active source generation, not ordinary unmatched addresses. Worker publication refreshes source and fault changes; receiver collection refreshes the copied lookup count",
+	help:    "Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. RUM admitted runtime facts and receipt-window activity. Generation identifies the receiving runtime, not the browser policy version. A vnode GUID change starts a fresh measurement window while retained investigation and live evidence keep their original GUID. Collection enabled is independent of receiver serving state. Install Script URL and Snippet are null without explicit site or receiver public_url; configure public_url to generate installation instructions. Last accepted payload and last rejected-origin timestamps are Unix microseconds, null when never observed in this runtime. Silence is not an installation or health verdict. Rejected/min counts origin, rate and size refusals only; origin observations can include OPTIONS preflight. Last rejected origin is historical evidence even after accepted traffic. Observed sessions count measured browser identities, not people or concurrent visitors; null means collection or receiver availability prevents measurement. Tracked investigated sessions count the bounded detail cache, independently of the measurement window. Capture columns show current policy; retained history may reflect earlier policies. City locations are approximate live activity only; frustration signals are optional interaction heuristics. collector.geoip reports source availability separately from site capture policy: selection is auto or explicit; state is loaded, unavailable or using_previous. Loaded means a supported declared database format and available reader, not complete validation, freshness, accuracy or address coverage. Optional source and database_type identify the active source; build_at, loaded_at and last_checked_at are Unix microseconds omitted when unseen. Build time is database metadata, not provider freshness. Reason is a bounded status code. lookup_errors counts errors for the active source generation, not ordinary unmatched addresses. Worker publication refreshes source and fault changes; receiver collection refreshes the copied lookup count",
 	sort:    "site",
 	every:   10,
 	columns: rumSitesColumns,
@@ -30,7 +30,6 @@ func (h *Handler) sitesRows(ctx context.Context, now int64, site, vnodeGUID stri
 		}
 		a := s.Activity
 		measurementKnown := s.Sampling.MeasureRate > 0 && receiver.Serving
-		activityKnown := measurementKnown && a.WindowLost == 0
 		measured, investigated := samplingLabels(s.Sampling)
 		var scriptURL, snippet, lastBeaconAt, beaconAge, lastRejectedAt, rejectAge any
 		if s.ScriptURL != "" {
@@ -50,12 +49,12 @@ func (h *Handler) sitesRows(ctx context.Context, now int64, site, vnodeGUID stri
 			[]any{
 				s.Name, s.Label, s.Generation, boolean(s.CollectionEnabled), scriptURL, snippet,
 				strings.Join(s.AllowedOrigins, ","), a.BeaconsPerMin, lastBeaconAt, beaconAge,
-				detail(measurementKnown && a.SessionsLost == 0, a.ObservedSessions),
-				detail(activityKnown, a.PageviewsWindow), detail(activityKnown, a.JSErrorsWindow),
+				detail(measurementKnown, a.ObservedSessions),
+				detail(measurementKnown, a.PageviewsWindow), detail(measurementKnown, a.JSErrorsWindow),
 				a.RejectedPerMin, measured, investigated, a.InvestigatedSessions, a.BotsPerMin,
 				h.redact.Apply(s.Rejected.Origin), lastRejectedAt, rejectAge,
 				s.Capture.Geolocation, boolean(s.Capture.FrustrationSignals),
-				detail(activityKnown, a.ApplicationViewsWindow), a.WindowLost, a.SessionsLost, s.VnodeGUID,
+				detail(measurementKnown, a.ApplicationViewsWindow), s.VnodeGUID,
 			},
 		)
 	}
@@ -64,7 +63,7 @@ func (h *Handler) sitesRows(ctx context.Context, now int64, site, vnodeGUID stri
 }
 
 var rumSitesColumns = map[string]any{
-	"vnode_guid": (funcapi.Column{Index: 26, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
+	"vnode_guid": (funcapi.Column{Index: 24, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
 	"last_rejected_at": (funcapi.Column{
 		Index: 19,
 		Name:  "Last Rejected Origin At",
@@ -252,22 +251,6 @@ var rumSitesColumns = map[string]any{
 	"application_views_window": (funcapi.Column{
 		Index:         23,
 		Name:          "Application Views (window)",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"window_lost": (funcapi.Column{
-		Index:         24,
-		Name:          "Window Observations Lost",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"sessions_lost": (funcapi.Column{
-		Index:         25,
-		Name:          "Session Observations Lost",
 		Type:          funcapi.FieldTypeInteger,
 		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,

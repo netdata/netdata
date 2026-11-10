@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestResourceCapacityDoesNotInvalidateDocumentMeasurements(t *testing.T) {
+func TestResourcePopulationIndependentOfDocumentMeasurements(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	a.Ingest(mk(*now, "document", "/", v(beacon.LCP, 100)))
-	for i := 0; i < maxWindowObservations+1; i++ {
+	for i := 0; i < 10000+1; i++ {
 		a.Ingest(
 			&beacon.Beacon{
 				Site:         "s",
@@ -30,29 +30,29 @@ func TestResourceCapacityDoesNotInvalidateDocumentMeasurements(t *testing.T) {
 	}
 	s := a.Snapshot()
 	assert.EqualValues(t, 1, s.PageviewsWindow)
-	assert.Zero(t, s.WindowLost)
 	assert.Equal(t, 1, s.Vitals[beacon.LCP].N)
-	assert.Zero(t, s.Vitals[beacon.LCP].Lost)
 	assert.Equal(t, 100., s.Vitals[beacon.LCP].P75)
-	assert.Positive(t, s.API.Lost)
-	assert.Positive(t, s.SessionsLost, "resource identity loss can admit replayed session activity")
+	assert.Equal(t, 10001, s.API.N)
+	assert.Equal(t, 10., s.API.P75)
+	assert.Equal(t, 2, s.ObservedSessions)
 }
-func TestIdentityLossOnlyInvalidatesAffectedMeasurements(t *testing.T) {
+func TestVitalPopulationDoesNotInventOtherMeasurements(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
-	for i := 0; i < maxWindowObservations+1; i++ {
+	for i := 0; i < 10000+1; i++ {
 		b := mk(*now, fmt.Sprint(i), "/", v(beacon.FCP, 100))
 		b.Events = nil
 		a.Ingest(b)
 	}
 	s := a.Snapshot()
-	assert.Positive(t, s.Vitals[beacon.FCP].Lost)
-	assert.Zero(t, s.Vitals[beacon.LCP].Lost)
-	assert.Zero(t, s.WindowLost)
-	assert.Zero(t, s.API.Lost)
-	assert.Zero(t, s.Load.Lost)
-	assert.Positive(t, s.SessionsLost)
+	assert.Equal(t, 10001, s.Vitals[beacon.FCP].N)
+	assert.Equal(t, 100., s.Vitals[beacon.FCP].P75)
+	assert.Zero(t, s.Vitals[beacon.LCP].N)
+	assert.Zero(t, s.PageviewsWindow)
+	assert.Zero(t, s.API.N)
+	assert.Zero(t, s.Load.N)
+	assert.Equal(t, 10001, s.ObservedSessions)
 }
-func TestCapacityEvictsExpiredReceiptsBeforeCurrentObservations(t *testing.T) {
+func TestExpiryPreservesCurrentObservations(t *testing.T) {
 	a, now := newAgg(30 * time.Minute)
 	put := func(id string, at time.Time) {
 		b := mk(at, id, "/", v(beacon.LCP, 100))
@@ -60,7 +60,7 @@ func TestCapacityEvictsExpiredReceiptsBeforeCurrentObservations(t *testing.T) {
 		a.Ingest(b)
 	}
 	put("fresh", *now)
-	for i := 0; i < maxWindowObservations-1; i++ {
+	for i := 0; i < 10000-1; i++ {
 		put(fmt.Sprint(i), now.Add(-2*time.Second))
 	}
 	*now = now.Add(30*time.Minute - time.Second)
@@ -68,14 +68,13 @@ func TestCapacityEvictsExpiredReceiptsBeforeCurrentObservations(t *testing.T) {
 	s := a.Snapshot()
 	assert.Equal(t, 2, s.Vitals[beacon.LCP].N)
 	assert.Equal(t, 2, s.ObservedSessions)
-	assert.Zero(t, s.Vitals[beacon.LCP].Lost, "expired observations do not create measurement loss")
 }
-func TestLateRevisionRetainsChronologicalCapacityOrder(t *testing.T) {
+func TestLateRevisionRetainsChronologicalExpiryOrder(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	first := mk(*now, "oldest", "/", v(beacon.LCP, 100))
 	first.Events = nil
 	a.Ingest(first)
-	for i := 0; i < maxWindowObservations-1; i++ {
+	for i := 0; i < 10000-1; i++ {
 		b := mk(now.Add(time.Nanosecond), fmt.Sprint(i), "/", v(beacon.FCP, 100))
 		b.Events = nil
 		a.Ingest(b)
@@ -85,13 +84,10 @@ func TestLateRevisionRetainsChronologicalCapacityOrder(t *testing.T) {
 	b := mk(now.Add(2*time.Nanosecond), "new", "/", v(beacon.FCP, 100))
 	b.Events = nil
 	a.Ingest(b)
+	*now = now.Add(time.Minute + time.Nanosecond)
 	s := a.Snapshot()
-	assert.Zero(
-		t,
-		s.Vitals[beacon.LCP].N,
-		"an older revision receipt does not move the observation past newer receipts",
-	)
-	assert.Equal(t, maxWindowObservations, s.Vitals[beacon.FCP].N)
+	assert.Zero(t, s.Vitals[beacon.LCP].N, "an older revision receipt must not renew expiry")
+	assert.Equal(t, 10000, s.Vitals[beacon.FCP].N)
 }
 func TestLateDominantErrorAndResourceHostEnterTopGroups(t *testing.T) {
 	t.Run("errors", func(t *testing.T) {
@@ -133,14 +129,13 @@ func TestLateDominantErrorAndResourceHostEnterTopGroups(t *testing.T) {
 		assert.EqualValues(t, 200, groups[0].Count)
 		assert.True(t, groups[10].Other)
 		assert.EqualValues(t, 991, groups[10].Count)
-		assert.Zero(t, groups[10].Lost)
 		assert.Equal(t, 991, groups[10].Duration.N)
 	})
 }
 
-func TestOlderIncomingCapacityLossPreservesNewerMeasurementsAndDetail(t *testing.T) {
+func TestOlderIncomingReceiptRetainsMeasurementsAndDetail(t *testing.T) {
 	a, now := newAgg(time.Minute)
-	for i := 0; i < maxWindowObservations; i++ {
+	for i := 0; i < 10000; i++ {
 		b := mk(*now, fmt.Sprint(i), "/", v(beacon.FCP, 100))
 		b.Events = nil
 		a.Ingest(b)
@@ -152,19 +147,18 @@ func TestOlderIncomingCapacityLossPreservesNewerMeasurementsAndDetail(t *testing
 		t,
 		result.Observation.Vitals,
 		1,
-		"measurement capacity must not filter accepted investigation/export detail",
+		"an out-of-order receipt retains accepted investigation/export detail",
 	)
 	assert.Equal(t, "/old", result.Observation.Vitals[0].Origin.PageGroup)
 	s := a.Snapshot()
-	assert.Equal(t, maxWindowObservations, s.Vitals[beacon.FCP].N)
-	assert.Zero(t, s.Vitals[beacon.LCP].N)
-	assert.Zero(t, s.Vitals[beacon.FCP].Lost)
-	assert.Positive(t, s.Vitals[beacon.LCP].Lost)
+	assert.Equal(t, 10000, s.Vitals[beacon.FCP].N)
+	assert.Equal(t, 1, s.Vitals[beacon.LCP].N)
+	assert.Equal(t, 200., s.Vitals[beacon.LCP].P75)
 }
 
-func TestActivitySummaryMatchesSnapshotThroughLossAndExpiry(t *testing.T) {
+func TestActivitySummaryMatchesSnapshotThroughExpiry(t *testing.T) {
 	a, now := newAgg(time.Minute)
-	for i := 0; i < maxWindowObservations+1; i++ {
+	for i := 0; i < 10000+1; i++ {
 		b := mk(*now, fmt.Sprint(i), "/", v(beacon.FCP, 100))
 		b.ViewID = "view"
 		b.View = "view"
@@ -184,8 +178,6 @@ func TestActivitySummaryMatchesSnapshotThroughLossAndExpiry(t *testing.T) {
 		assert.Equal(t, s.ApplicationViewsWindow, activity.ApplicationViewsWindow)
 		assert.Equal(t, s.JSErrorsWindow, activity.JSErrorsWindow)
 		assert.Equal(t, s.ObservedSessions, activity.ObservedSessions)
-		assert.Equal(t, s.WindowLost, activity.WindowLost)
-		assert.Equal(t, s.SessionsLost, activity.SessionsLost)
 	}
 }
 
@@ -224,16 +216,12 @@ func TestFacetsRankAllRetainedGroupsBeforeFolding(t *testing.T) {
 			assert.EqualValues(t, 1091, groups[10].Pageviews)
 		}
 		assert.True(t, groups[10].Other)
-		assert.Zero(t, groups[10].Lost)
 	}
 	pages := a.Pages("")
 	require.Len(t, pages, 1101)
-	for _, page := range pages {
-		assert.Zero(t, page.Lost)
-	}
 }
 
-func TestCapacityDroppedVitalKeepsDocumentOriginInLiveAndHistory(t *testing.T) {
+func TestExpiredVitalKeepsDocumentOriginInLiveAndHistory(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	sink := &fakeHistorySink{}
 	a.SetHistorySink(sink)
@@ -241,23 +229,10 @@ func TestCapacityDroppedVitalKeepsDocumentOriginInLiveAndHistory(t *testing.T) {
 	b.Events = nil
 	b.Browser, b.Device, b.Country, b.AppVersion = "entry-browser", "desktop", "GR", "1"
 	a.Ingest(b)
-	// Navigation occupies two measurement slots but one identity slot, so the
-	// vital's frozen origin survives eviction of its measurement.
-	for i := range maxWindowObservations / 2 {
-		a.Ingest(&beacon.Beacon{
-			Site:         "s",
-			ExperienceID: fmt.Sprintf("navigation-%d", i),
-			Received:     *now,
-			Navigation: &beacon.Navigation{
-				Revision: 1,
-				LoadMS:   20,
-				HasLoad:  true,
-				DCLMS:    10,
-				HasDCL:   true,
-			},
-		})
-	}
-	b.Received = now.Add(-time.Second)
+	// The measurement expires while its identity still owns the frozen origin.
+	*now = now.Add(time.Minute)
+	require.Zero(t, a.Snapshot().Vitals[beacon.LCP].N)
+	b.Received = *now
 	b.PageGroup = "/changed"
 	b.Browser, b.Device, b.Country, b.AppVersion = "new-browser", "mobile", "US", "2"
 	b.UserID, b.View, b.ViewID = "current-user", "checkout", "current-view"
@@ -267,13 +242,13 @@ func TestCapacityDroppedVitalKeepsDocumentOriginInLiveAndHistory(t *testing.T) {
 	require.Len(t, result.Observation.Vitals, 1)
 	assert.Equal(t, "/entry", result.Observation.Vitals[0].Origin.PageGroup)
 	rows, _ := a.Live(0, 100, "")
-	require.Len(t, rows, 2)
-	assert.Equal(t, uint64(2), rows[1].Revision)
-	assert.Equal(t, "/entry", rows[1].Page)
-	assert.Equal(t, "entry-browser", rows[1].Browser)
-	assert.Equal(t, "desktop", rows[1].Device)
-	assert.Equal(t, "GR", rows[1].Country)
-	assert.Equal(t, "checkout", rows[1].View)
+	require.Len(t, rows, 1)
+	assert.Equal(t, uint64(2), rows[0].Revision)
+	assert.Equal(t, "/entry", rows[0].Page)
+	assert.Equal(t, "entry-browser", rows[0].Browser)
+	assert.Equal(t, "desktop", rows[0].Device)
+	assert.Equal(t, "GR", rows[0].Country)
+	assert.Equal(t, "checkout", rows[0].View)
 	require.Len(t, sink.events, 2)
 	retained := sink.events[1]
 	assert.Equal(t, "vital", retained.Type)

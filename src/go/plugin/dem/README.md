@@ -178,7 +178,7 @@ old or partial schemas, detected index damage and quarantined `.journal~` files 
 operator recovery; there is no automatic migration, repair or deletion. External file modification is outside this
 archive-provenance guarantee.
 
-The browser normalization, bounded aggregation, OTLP and query behavior originated in the experimental
+The browser normalization, rolling aggregation, OTLP and query behavior originated in the experimental
 [Netdata digital-experience POC](https://github.com/netdata-labs/dem), commit
 `b3de4662f567dc63d33fee6201f8c2313568301b`. Its private configuration controller, scheduler, protocol emitter and root
 state reconciliation are replaced by the native Agent framework. Embedded third-party asset notices remain beside their source.
@@ -254,19 +254,19 @@ visualization. Later reports retain their own user and application-view context 
 attributed to the original document.
 
 The configured `window` uses receiver arrival time, including for delayed reports. A genuinely newer revision extends
-that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for up to 30 minutes,
-subject to capacity and runtime restart. Identified SDK session lifecycle events follow the same rule, so replay does
+that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for 30 minutes,
+unless the runtime restarts. Identified SDK session lifecycle events follow the same rule, so replay does
 not renew observed-session windows. It is best effort, not exactly-once delivery. Reports arriving after retained
 evidence expires can be counted again. Late observations are not rejected merely to claim perfect deduplication.
 Errors, console logs, spans and ordinary custom events are not covered by this identity-based replay suppression;
 repeated delivery of these records can count again and refresh observed-session activity.
 
-Population charts show retained observations, good/needs-improvement/poor counts and capacity-loss evidence. Percentiles
-are unavailable when there are no observations or the local population is incomplete. A zero CLS or zero timing is a
-valid observation. Lost-report fields conservatively remain nonzero until the latest relevant loss leaves the window;
-they can include older loss from a continuous overload episode. They are neither exact missing-window counts nor part
-of the percentile denominator. The cumulative drop diagnostic counts actual discarded reports. Restart starts fresh
-in-memory windows; retained investigation history is independent.
+Population charts show exact retained observations and good/needs-improvement/poor counts. Percentiles are unavailable
+when there are no observations. A zero CLS or zero timing is a valid observation. Canonical measurements remain in the
+configured receipt window (five minutes by default); replay identities remain for 30 minutes. There is no independent
+aggregate count or byte cap. Memory grows with admitted distinct state and retained text over these horizons, plus
+investigation detail and query state. This is time retention, not a fixed memory guarantee or a qualified full-scale
+workload claim. Restart starts fresh in-memory windows; retained investigation history is independent.
 
 `rum.observed_sessions` counts distinct browser session identities seen in the receipt window. It does not estimate
 people, concurrency or time on site. Page session counts use the same window. JavaScript errors are events: several can
@@ -275,9 +275,8 @@ corresponding measurement and increments an invalid-measurement diagnostic; no t
 
 Breakdown traffic counts and vital populations use the same current window. Top groups and the pooled complement are
 computed from current observations. `bucket=value` distinguishes a literal label named `other` from `bucket=other`.
-The Pages Function exposes all retained document-entry groups, including groups outside the chart top list; loss
-fields reveal bounded-state truncation. Percentiles cannot be averaged across time windows, groups or sites to obtain a
-combined percentile.
+The Pages Function exposes all retained document-entry groups, including groups outside the chart top list. Percentiles
+cannot be averaged across time windows, groups or sites to obtain a combined percentile.
 
 Navigation charts report document load time and **DOMContentLoaded handler duration**. Same-site fetch timing includes
 reported same-site fetch/XHR resource entries, not all backend API requests or server availability. Resource counts

@@ -11,7 +11,6 @@ type SiteActivity struct {
 	ObservedSessions, InvestigatedSessions    int
 	PageviewsWindow                           int
 	JSErrorsWindow, ApplicationViewsWindow    uint64
-	WindowLost, SessionsLost                  uint64
 }
 
 func (a *Aggregator) Activity() SiteActivity {
@@ -46,11 +45,18 @@ func (a *Aggregator) Activity() SiteActivity {
 		PageviewsWindow:        int(documents),
 		JSErrorsWindow:         errors,
 		ApplicationViewsWindow: views,
-		WindowLost:             st.activityLoss.current(now) + st.currentIdentityLoss("document", now) + st.currentIdentityLoss("view", now),
-		SessionsLost:           st.sessionLoss.current(now) + st.identitySessionLoss.current(now),
+	}
+}
+
+// Cleanup cadence follows the one-minute receiver activity window. This bounds
+// timestamp retention during delayed publication without a scan on every beacon.
+func (st *siteState) expireActivityIfDue(now time.Time) {
+	if st.lastActivityExpiry.IsZero() || now.Sub(st.lastActivityExpiry) >= time.Minute {
+		st.evictActivity(now)
 	}
 }
 func (st *siteState) evictActivity(now time.Time) {
+	st.lastActivityExpiry = now
 	cutoff := now.Add(-time.Minute)
 	st.accepted = evictTimes(st.accepted, cutoff)
 	st.rejected = evictTimes(st.rejected, cutoff)

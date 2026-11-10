@@ -12,7 +12,6 @@ type PageInfo struct {
 	Site, Page                              string
 	PageviewsWindow, Sessions, ErrorsWindow int
 	Vitals                                  map[string]VitalStats
-	Lost, SessionsLost                      uint64
 	LCPElement, INPElement, CLSElement      string
 	FrustrationWindow                       int
 	FrustrationsKnown                       bool
@@ -45,8 +44,6 @@ func (a *Aggregator) Pages(vnodeGUID string) []PageInfo {
 			Sessions:          p.sessions,
 			ErrorsWindow:      int(p.errors),
 			Vitals:            r.vitals(p),
-			Lost:              r.windowLost,
-			SessionsLost:      r.pageSessionsLost,
 			LCPElement:        topElement(p.elements, beacon.LCP),
 			INPElement:        topElement(p.elements, beacon.INP),
 			CLSElement:        topElement(p.elements, beacon.CLS),
