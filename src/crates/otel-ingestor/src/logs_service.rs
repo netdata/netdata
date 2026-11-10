@@ -694,10 +694,10 @@ impl NetdataLogsService {
         }
     }
 
-    /// The response of a successful export that carried records, counted for
-    /// self-monitoring on the way out: `stored` records are on disk, the rest
-    /// were rejected. Every such exit of [`Self::export_logs`] ends here, so
-    /// a failed export counts nothing.
+    /// The response of a successful export, counted for self-monitoring on
+    /// the way out: `stored` records are on disk, the rest were rejected (an
+    /// empty request counts zero of each). Every successful exit of
+    /// [`Self::export_logs`] ends here, so a failed export counts nothing.
     fn counted_response(
         &self,
         stored: usize,
@@ -725,14 +725,9 @@ impl NetdataLogsService {
         request: ExportLogsServiceRequest,
     ) -> Result<ExportLogsServiceResponse, Status> {
         // Empty `ResourceLogs` contribute nothing (group_by_stream owns that
-        // rule), so an all-empty request yields no groups.
+        // rule), so an all-empty request yields no groups and leaves at the
+        // first exit below.
         let groups = group_by_stream(request.resource_logs);
-
-        if groups.is_empty() {
-            return Ok(ExportLogsServiceResponse {
-                partial_success: None,
-            });
-        }
 
         // Admit each stream for storage, or record why it is turned away.
         let mut rejections = Rejections::default();
@@ -745,8 +740,9 @@ impl NetdataLogsService {
             }
         }
 
-        // Nothing left to write: every stream was a collision or had an
-        // oversized identity. Still report the rejected records to the client.
+        // Nothing to write: the request carried no records, or every stream
+        // was a collision or had an oversized identity. Still report the
+        // rejected records to the client.
         if accepted.is_empty() {
             return Ok(self.counted_response(0, &rejections));
         }
