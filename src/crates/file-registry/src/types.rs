@@ -458,11 +458,11 @@ impl std::fmt::Display for SeqKey {
 /// [`parse_stem`](Self::parse_stem); the exact field formats and the wire
 /// contracts are in the module docs.
 ///
-/// `partition_key` is an opaque partition key and `pipeline_id` an opaque
-/// signal/pipeline discriminator: this crate never interprets either. The
-/// content plane derives `partition_key` and assigns its meaning (for OTel logs
-/// today, the content plane's service-stream hash); the integration layer
-/// assigns `pipeline_id` and owns the signal↔id mapping (`otel_bridge::signals`).
+/// `partition_key` and `pipeline_id` (a signal/pipeline discriminator) are
+/// opaque: this crate never interprets either. The content plane derives
+/// `partition_key` and assigns its meaning (for OTel logs today, the content
+/// plane's service-stream hash); the integration layer assigns `pipeline_id`
+/// and owns the signal↔id mapping (`otel_bridge::signals`).
 /// `pipeline_id` routes a file to its owning pipeline.
 ///
 /// `seq` is a single per-process counter shared across pipelines, so it alone

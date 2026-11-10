@@ -5,7 +5,7 @@
 //! core, which both the gRPC `TraceService` wrapper and the OTLP/HTTP front
 //! end call. Same two-phase export structure: prepare
 //! every frame lock-free (normalize + interval time bounds + flatten +
-//! encode, all owned by `ng_flatten::prepare_trace_frame`; `Some(bounds)`
+//! encode, all owned by `ng_flatten::prepare_trace_frame_with`; `Some(bounds)`
 //! here — production enforces the window, while the `ng-ingest` dev tool and
 //! the tests pass `None`), then write + sync + drain-events under the
 //! tenant's writer lock only.

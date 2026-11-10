@@ -74,7 +74,7 @@ impl Query {
         range_overlaps(&self.time_range, min_s, max_s)
     }
 
-    /// Whether a file with partition key `partition_key` passes the partition
+    /// Whether a file with `partition_key` passes the partition
     /// filter: an empty [`Query::partition_keys`] matches every partition,
     /// otherwise the key must be in the set.
     ///

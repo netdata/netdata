@@ -145,7 +145,7 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
 }
 
 /// Install one 6-log SFST under `tenant` at sequence `seq`. The fixed
-/// part key (7) never affects a query here: these tests never select
+/// partition key (7) never affects a query here: these tests never select
 /// a stream, so the query's partition filter stays empty. (The remote
 /// tests below use stream-derived ids instead: `track_remote_catalog`
 /// enforces production's partition_key = ns_hash pairing.)

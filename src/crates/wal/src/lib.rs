@@ -58,10 +58,10 @@
 //! - The seq high-water envelope (17-byte `NSEQ`, written through
 //!   `file_registry::durable::write_atomic`): `seq`.
 //!
-//! Opaque to this crate — the content plane assigns and decodes them: the
-//! partition key `partition_key`, the per-file identity blob `content_meta`
-//! (capped at [`MAX_CONTENT_META_BYTES`]), and the frame-codec tag
-//! `payload_format` (`0` reserved, rejected at [`Writer::new`]).
+//! Opaque to this crate — the content plane assigns and decodes them:
+//! `partition_key`, the per-file identity blob `content_meta` (capped at
+//! [`MAX_CONTENT_META_BYTES`]), and the frame-codec tag `payload_format`
+//! (`0` reserved, rejected at [`Writer::new`]).
 //! `pipeline_id` is the numeric signal axis: stamped into every `FileId`,
 //! exposed by [`FileEvent::pipeline_id`], and routed on by the ledger; the
 //! id↔signal mapping lives in `otel_bridge::signals`.

@@ -205,7 +205,7 @@ fn split_many_ways_equals_single_file_under_source_permutations() {
     let oracle = run(vec![sealed_source(dir.path(), &whole_wal, "oracle")]);
     assert_corpus_shape(&oracle);
 
-    // Split 4 ways: two sealed files with DIFFERENT part-key blobs, an
+    // Split 4 ways: two sealed files with DIFFERENT partition_keys, an
     // in-memory chunk, and a WAL tail.
     let wal_a = write_wal(dir.path(), vec![req(&all[0..2])], "stream-a");
     let wal_b = write_wal(dir.path(), vec![req(&all[2..5])], "stream-b");

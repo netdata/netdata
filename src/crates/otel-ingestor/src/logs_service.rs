@@ -11,11 +11,11 @@
 //! 2. `StorableStream::admit` turns each group into a storable stream or
 //!    rejects it: its identity is too large for the substrate's
 //!    `content_meta` caps, or its `ns_hash` is already claimed by a different
-//!    identity (first write wins, per tenant; see `ClaimedStreams`).
+//!    identity (first claim wins, per tenant; see `ClaimedStreams`).
 //! 3. `StorableStream::flatten` prepares each stream's WAL frame, lock-free,
-//!    via `ng_flatten::prepare_log_frame` (normalization + flattening + the
-//!    ingestion time-window; `Some(bounds)` here — production enforces the
-//!    window, `ng-ingest` and the benches pass `None`).
+//!    via `ng_flatten::prepare_log_frame_with` (normalization + flattening +
+//!    the ingestion time-window; `Some(bounds)` here — production enforces
+//!    the window, `ng-ingest` and the benches pass `None`).
 //! 4. Under the tenant's writer lock: `StorableStream::write_to` writes the
 //!    frames, one `sync_all` makes them durable, and the WAL's lifecycle
 //!    events are drained and forwarded to the ledger over fire-and-forget IPC
@@ -293,11 +293,13 @@ struct Flattened {
     rejected: usize,
 }
 
-/// Per tenant, the stream that holds each `ns_hash`: the first identity to
-/// write under a hash claims it, and a different identity that later hashes
-/// to the same value is a collision (first write wins). In-memory only —
-/// after a restart it is empty and the first write of a stream claims its
-/// hash again.
+/// Per tenant, the stream that holds each `ns_hash`: the first identity
+/// admitted under a hash claims it, and a different identity that later
+/// hashes to the same value is a collision (first claim wins). The claim is
+/// taken at admission, before any record is written, so it stays even when
+/// the request then fails or keeps no record. In-memory only — after a
+/// restart it is empty and the first stream admitted under a hash claims it
+/// again.
 ///
 /// The type owns its lock: [`Self::claim`] holds it for one lookup, so no
 /// caller can keep it across other work.
@@ -559,15 +561,16 @@ fn encode_identity_or_drop(
 pub struct NetdataLogsService {
     /// The per-tenant WAL writers of this signal.
     writers: TenantWriters,
-    /// The stream that holds each `(tenant, ns_hash)`. First write wins; a
-    /// later stream with the same hash and another identity is rejected via
-    /// `partial_success`.
+    /// The stream that holds each `(tenant, ns_hash)`. First claim wins (see
+    /// `ClaimedStreams`); a later stream with the same hash and another
+    /// identity is rejected via `partial_success`.
     claimed_streams: ClaimedStreams,
     /// Process-wide monotonic clock, shared across tenants, streams, and
     /// signals (lib.rs creates one instance for logs + traces). The WAL writer
     /// orders frames by the `ingestion_ns` stamped here, so one clock keeps
-    /// that ordering consistent across every stream and signal; `export` also
-    /// reads it to seed fallback timestamps and the ingestion-time bounds.
+    /// that ordering consistent across every stream and signal. `export_logs`
+    /// also reads it to seed fallback timestamps and the ingestion-time
+    /// bounds.
     clock: Arc<Mutex<MonotonicClock>>,
     /// Shared with the traces ingestion service: the writer → ledger IPC accepts
     /// exactly one connection (the ledger gap-checks frame sequences per signal),

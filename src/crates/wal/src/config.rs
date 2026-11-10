@@ -11,8 +11,8 @@
 //!
 //! Producers: the otel-ingestor resolves one per tenant from
 //! `otel_bridge::config::WalConfig` (its `rotation` policy resolved per tenant;
-//! `logs_service.rs`/`trace_service.rs` `resolve_wal_config`, time rotation
-//! always on); the dev/bench `ng-ingest` disables rotation via
+//! `tenant_writers.rs` `TenantWriters::resolve_config`, time rotation always
+//! on); the dev/bench `ng-ingest` disables rotation via
 //! `one_file_config`; tests use `Default` or hand-set limits. `Default` is
 //! the standalone default — the production path overrides every field from
 //! the plugin's per-signal tuning and per-tenant rotation policy

@@ -110,10 +110,10 @@ pub const FRAME_ALIGNMENT: usize = 8;
 /// `payload_format(2)`, then `content_meta` length-prefixed —
 /// `content_meta_len(2) content_meta` — capped at [`MAX_CONTENT_META_BYTES`].
 /// The rest of the page is zero except the last 4 bytes, a CRC32 over
-/// everything before it. The header stores no partition key: the `partition_key`
-/// is the single source of truth in the filename (`FileId`), and
-/// `content_meta` is an opaque content-plane blob (for OTel logs, the encoded
-/// service identity) the WAL never interprets.
+/// everything before it. The header stores no `partition_key`: the filename
+/// (`FileId`) is its single source of truth, and `content_meta` is an opaque
+/// content-plane blob (for OTel logs, the encoded service identity) the WAL
+/// never interprets.
 #[derive(Debug, Clone)]
 pub struct FileHeader {
     pub version: u16,
