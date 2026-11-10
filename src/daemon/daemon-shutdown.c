@@ -466,7 +466,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
 #if defined(FSANITIZE_ADDRESS)
     // a worker still running would use what the teardown frees. Health waits for notifications
-    // with no host lock held, so a health thread that has not exited yet can still be using a host.
+    // without the alert dictionary lock, and rrdhost_free_all() does not take the host pin health
+    // holds, so a health thread that has not exited yet can still be using a host.
     if(!dbengine_drained || !weights_drained || service_is_running(SERVICE_HEALTH))
         fprintf(stderr, "\nWARNING: dbengine, weights or health work may still be running, skipping the teardown.\n");
     else {

@@ -839,14 +839,14 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         // is updated during COLLECTION, for the whole batch, before anything is dispatched. If the
         // host stops being eligible part-way through the drain - rrdhost_should_run_health() goes
         // false the moment the collector goes offline or ingestion stops, i.e. a streaming child
-        // disconnecting - the remaining entries are freed without notifying. A WARNING/CRITICAL
-        // reminder is then DELAYED by up to one repeat_every (last_repeat was advanced, so it is
-        // not lost). A CLEAR reminder is sent only once, gated by RRDCALC_FLAG_RUN_ONCE, so the
-        // drain clears that flag again for a skipped one and it goes out once the host is eligible.
-        // times_repeat stays over-counted by the skipped attempt in both cases. Before this
-        // refactor the mutation and the send were adjacent statements, so the window was
-        // microseconds rather than a whole drain. This is accepted deliberately: the skip only
-        // occurs when health is stopping or is no longer running for this host (it was disabled,
+        // disconnecting - the remaining entries are freed without notifying. A skipped reminder is
+        // then DELAYED by up to one repeat_every (last_repeat was advanced, so it is not lost) and
+        // times_repeat is over-counted by the skipped attempt. Only WARNING/CRITICAL reminders get
+        // here: the one-shot CLEAR branch below is unreachable, because every transition of a
+        // repeating alert to CLEAR sets RRDCALC_FLAG_RUN_ONCE and nothing clears it while the alert
+        // stays CLEAR. Before this refactor the mutation and the send were adjacent statements, so
+        // the window was microseconds rather than a whole drain. This is accepted deliberately: the
+        // skip only occurs when health is stopping or is no longer running for this host (it was disabled,
         // or the host stopped being collected), when notifying it is questionable anyway, and
         // moving the mutations into the drain would invalidate the rounds-termination
         // argument above (an alert unlinked but not yet deleted could be re-collected every round).
@@ -995,13 +995,6 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     netdata_log_debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
                     health_alarm_wait_for_execution(ae);
                 }
-            }
-            else if(ae->flags & HEALTH_ENTRY_RUN_ONCE) {
-                // A skipped CLEAR reminder would never be admitted again (see ACCEPTED BEHAVIOUR
-                // above): re-arm it. Only the health thread writes run_flags, and the reference we
-                // hold keeps drc allocated. last_repeat = now keeps it out of the rest of this call.
-                drc->run_flags &= ~RRDCALC_FLAG_RUN_ONCE;
-                rrdcalc_runtime_snapshot_publish_run_flags(drc);
             }
 
             health_alarm_log_free_one_nochecks_nounlink(ae);
