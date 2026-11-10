@@ -220,6 +220,7 @@ int nd_work_queue_unittest(void);
 int onewayalloc_unittest(void);
 int log_stack_unittest(void);
 int clocks_unittest(void);
+int gorilla_unittest(void);
 int ws_client_unittest(void);
 int mqtt_ng_unittest(void);
 int aclk_timeout_unittest(void);
@@ -547,6 +548,7 @@ int netdata_main(int argc, char **argv) {
                             if (timezone_windows_mapping_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;
+                            if (gorilla_unittest()) return 1;
                             if (ws_client_unittest()) return 1;
                             if (mqtt_ng_unittest()) return 1;
                             if (aclk_http_msg_unittest()) return 1;

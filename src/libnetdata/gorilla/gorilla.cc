@@ -47,34 +47,29 @@ static void gorilla_data_word_store(uint32_t *word, uint32_t value)
     __atomic_store_n(word, value, __ATOMIC_RELAXED);
 }
 
-static void gorilla_data_word_or(uint32_t *word, uint32_t value)
+// Writes the low `nbits` bits of `v` (up to 39 bits, no bits set above them) at bit
+// position `pos`, LSB-first. Bits at and above `pos` are zero in the target words:
+// every word is first entered by a plain store of a value with zeros above it.
+// Only the writer thread stores data words, so no read-modify-write is needed.
+static void bit_buffer_write(uint32_t *buf, uint32_t pos, uint64_t v, uint32_t nbits)
 {
-    __atomic_fetch_or(word, value, __ATOMIC_RELAXED);
-}
+    assert(nbits > 0 && nbits <= 39);
 
-static void bit_buffer_write(uint32_t *buf, size_t pos, uint32_t v, size_t nbits)
-{
-    assert(nbits > 0 && nbits <= bit_size<uint32_t>());
+    const uint32_t index = pos / bit_size<uint32_t>();
+    const uint32_t offset = pos % bit_size<uint32_t>();
 
-    const size_t index = pos / bit_size<uint32_t>();
-    const size_t offset = pos % bit_size<uint32_t>();
+    uint32_t word = (uint32_t) (v << offset);
+    if (offset)
+        word |= gorilla_data_word_load(&buf[index]);
+    gorilla_data_word_store(&buf[index], word);
 
-    if (offset == 0) {
-        gorilla_data_word_store(&buf[index], v);
-    } else {
-        const size_t remaining_bits = bit_size<uint32_t>() - offset;
+    const uint32_t written = bit_size<uint32_t>() - offset;
+    if (nbits > written) {
+        v >>= written;
+        gorilla_data_word_store(&buf[index + 1], (uint32_t) v);
 
-        // write the lower part of the value
-        const uint32_t low_bits_mask = ((uint32_t) 1 << remaining_bits) - 1;
-        const uint32_t lowest_bits_in_value = v & low_bits_mask;
-        gorilla_data_word_or(&buf[index], lowest_bits_in_value << offset);
-
-        if (nbits > remaining_bits) {
-            // write the upper part of the value
-            const uint32_t high_bits_mask = ~low_bits_mask;
-            const uint32_t highest_bits_in_value = (v & high_bits_mask) >> (remaining_bits);
-            gorilla_data_word_store(&buf[index + 1], highest_bits_in_value);
-        }
+        if (nbits > written + bit_size<uint32_t>())
+            gorilla_data_word_store(&buf[index + 2], (uint32_t) (v >> bit_size<uint32_t>()));
     }
 }
 
@@ -122,9 +117,11 @@ gorilla_writer_t gorilla_writer_init(gorilla_buffer_t *gbuf, size_t n)
 
 void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, size_t n)
 {
-    gbuf->header.next = NULL;
-    gbuf->header.entries = 0;
-    gbuf->header.nbits = 0;
+    // readers load these atomically; the release store of the previous
+    // buffer's next pointer below publishes them
+    __atomic_store_n(&gbuf->header.next, (gorilla_buffer_t *) NULL, __ATOMIC_RELAXED);
+    __atomic_store_n(&gbuf->header.entries, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&gbuf->header.nbits, 0, __ATOMIC_RELAXED);
 
     uint32_t capacity = gorilla_buffer_data_bits(n);
 
@@ -133,7 +130,7 @@ void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, siz
     gw->capacity = capacity;
 
     if (gw->last_buffer)
-        gw->last_buffer->header.next = gbuf;
+        __atomic_store_n(&gw->last_buffer->header.next, gbuf, __ATOMIC_RELEASE);
 
     __atomic_store_n(&gw->last_buffer, gbuf, __ATOMIC_RELEASE);
 }
@@ -159,57 +156,50 @@ extern "C" {
         gorilla_header_t *hdr = &gw->last_buffer->header;
         uint32_t *data = gw->last_buffer->data;
 
-        // this is the first number we are writing
-        if (hdr->entries == 0) {
-            if (hdr->nbits + bit_size<uint32_t>() >= gw->capacity)
-                return false;
-            bit_buffer_write(data, hdr->nbits, number, bit_size<uint32_t>());
+        // Single writer: only this thread modifies nbits, entries and the data words.
+        // Readers acquire-load entries, then nbits, so publishing nbits before
+        // entries with plain release stores is enough; no locked RMW is needed.
+        const uint32_t nbits = __atomic_load_n(&hdr->nbits, __ATOMIC_RELAXED);
+        const uint32_t entries = __atomic_load_n(&hdr->entries, __ATOMIC_RELAXED);
 
-            __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>(), __ATOMIC_RELEASE);
-            __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
-            gw->prev_number = number;
-            return true;
+        uint32_t xor_lzc = gw->prev_xor_lzc;
+        uint64_t bits;
+        uint32_t bits_count;
+
+        if (entries == 0) {
+            // the first number is stored as is
+            bits = number;
+            bits_count = bit_size<uint32_t>();
+        }
+        else if (number == gw->prev_number) {
+            // a single 1 bit: same number
+            bits = 1;
+            bits_count = 1;
+        }
+        else {
+            // a 0 bit (different number), then a 1 bit if the XOR's leading zero
+            // count is the previous one, or a 0 bit and the new count in 5 bits,
+            // then the XOR'd value without its leading zeros
+            const uint32_t xor_value = gw->prev_number ^ number;
+            xor_lzc = __builtin_clz(xor_value);
+
+            if (xor_lzc == gw->prev_xor_lzc) {
+                bits = 0x2 | ((uint64_t) xor_value << 2);
+                bits_count = 2 + (bit_size<uint32_t>() - xor_lzc);
+            }
+            else {
+                bits = ((uint64_t) xor_lzc << 2) | ((uint64_t) xor_value << 7);
+                bits_count = 7 + (bit_size<uint32_t>() - xor_lzc);
+            }
         }
 
-        // write true/false based on whether we got the same number or not.
-        if (number == gw->prev_number) {
-            if (hdr->nbits + 1 >= gw->capacity)
-                return false;
-
-            bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(1), 1);
-            __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
-            __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
-            return true;
-        }
-
-        if (hdr->nbits + 1 >= gw->capacity)
+        if (nbits + bits_count >= gw->capacity)
             return false;
-        bit_buffer_write(data, hdr->nbits, static_cast<uint32_t>(0), 1);
-        __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
 
-        uint32_t xor_value = gw->prev_number ^ number;
-        uint32_t xor_lzc = (bit_size<uint32_t>() == 32) ? __builtin_clz(xor_value) : __builtin_clzll(xor_value);
-        uint32_t is_xor_lzc_same = (xor_lzc == gw->prev_xor_lzc) ? 1 : 0;
+        bit_buffer_write(data, nbits, bits, bits_count);
 
-        if (hdr->nbits + 1 >= gw->capacity)
-            return false;
-        bit_buffer_write(data, hdr->nbits, is_xor_lzc_same, 1);
-        __atomic_fetch_add(&hdr->nbits, 1, __ATOMIC_RELEASE);
-
-        if (!is_xor_lzc_same) {
-            size_t bits_needed = (bit_size<uint32_t>() == 32) ? 5 : 6;
-            if ((hdr->nbits + bits_needed) >= gw->capacity)
-                return false;
-            bit_buffer_write(data, hdr->nbits, xor_lzc, bits_needed);
-            __atomic_fetch_add(&hdr->nbits, bits_needed, __ATOMIC_RELEASE);
-        }
-
-        // write the bits of the XOR'd value without the LZC prefix
-        if (hdr->nbits + (bit_size<uint32_t>() - xor_lzc) >= gw->capacity)
-            return false;
-        bit_buffer_write(data, hdr->nbits, xor_value, bit_size<uint32_t>() - xor_lzc);
-        __atomic_fetch_add(&hdr->nbits, bit_size<uint32_t>() - xor_lzc, __ATOMIC_RELEASE);
-        __atomic_fetch_add(&hdr->entries, 1, __ATOMIC_RELEASE);
+        __atomic_store_n(&hdr->nbits, nbits + bits_count, __ATOMIC_RELEASE);
+        __atomic_store_n(&hdr->entries, entries + 1, __ATOMIC_RELEASE);
 
         gw->prev_number = number;
         gw->prev_xor_lzc = xor_lzc;
@@ -454,6 +444,241 @@ void gorilla_writer_aral_unmark(const gorilla_writer_t *gw, struct aral *ar)
 
         curr_gbuf = next_gbuf;
     }
+}
+
+/*
+ * Unit test (netdata -W unittest)
+ */
+
+#include <atomic>
+#include <thread>
+#include <vector>
+
+// one gorilla buffer, 8-byte aligned for the header's next pointer
+struct gorilla_test_buffer {
+    uint64_t words[RRDENG_GORILLA_32BIT_BUFFER_SIZE / sizeof(uint64_t)];
+};
+
+static uint32_t gorilla_test_value(uint32_t i, uint32_t prev, uint32_t *state)
+{
+    *state = *state * 1103515245u + 12345u;
+    uint32_t r = *state;
+
+    switch (i % 5) {
+        case 0:  return prev;                                   // same number
+        case 1:  return prev ^ (1u << (r >> 27));               // single bit, any leading zero count
+        case 2:  return prev ^ (r | 0x80000000u);               // no leading zeros: 39-bit encodings
+        case 3:  return prev ^ ((r >> (r & 31)) | 1);           // random width
+        default: return r;
+    }
+}
+
+// The bit stream of gorilla_test_value(0..99) starting from 0x12345678, as written
+// by the original writer. It pins the encoding: pages on disk depend on it.
+static const uint32_t gorilla_test_golden_words[] = {
+    0x12345678, 0x02000034, 0x4f03c928, 0xb76427e9, 0x004333e9, 0x90100000,
+    0x89cfbae3, 0x6a4d709f, 0x02064e24, 0x46f84514, 0x218015d9, 0x019d16bb,
+    0x01000000, 0xd2bfa1d7, 0x118cd690, 0x8cc33c27, 0x0000d34a, 0x7cf98008,
+    0x8f2d6680, 0x8c1e0650, 0x0805cfe9, 0x9ac82b28, 0xecc24f65, 0x023eed92,
+    0x04000000, 0xbba92018, 0x595aba83, 0xddd74401, 0xc040c9cb, 0xab615c18,
+    0x99a13461, 0xf3bf16be, 0x18020306, 0xc1faaa6d, 0x133f0081, 0x0010c7dd,
+    0x44040000, 0x62d16fd9, 0x3e0c071f, 0x01e719ba, 0x41080400, 0x3b32a330,
+    0xb5cf0138, 0x00079ada, 0xf06af010, 0x901f8fa5, 0x9e2dd697, 0xa0040008,
+    0x1324fd9a, 0x8f3615c2, 0x074dddaa, 0x00000083, 0x4d4cfd01, 0x07a1d09e,
+    0x97677a6c, 0x3e010327, 0xfcadda17, 0xd310e800, 0x00001ccd, 0xc85d8080,
+    0x13786c94, 0xddc316d6, 0x08000061, 0x5f0d5c20, 0x03ae0e05, 0x7d0ecd28,
+    0x00000013, 0xcab48080, 0x58dc4258, 0xc39384d3, 0x000868cb, 0xf4020000,
+    0x71f01371, 0xfc23bb83, 0x0cd0b9a5, 0x08000000, 0xb9dfd438, 0x701596a5,
+    0x0abf1ab3,
+};
+
+static int gorilla_unittest_golden(void)
+{
+    gorilla_test_buffer mem = {};
+    auto *gbuf = reinterpret_cast<gorilla_buffer_t *>(&mem);
+    gorilla_writer_t gw = gorilla_writer_init(gbuf, RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
+
+    std::vector<uint32_t> values;
+    uint32_t state = 1, v = 0x12345678;
+    for (uint32_t i = 0; i < 100; i++) {
+        v = gorilla_test_value(i, v, &state);
+        values.push_back(v);
+        if (!gorilla_writer_write(&gw, v)) {
+            fprintf(stderr, "gorilla golden: write %u failed\n", i);
+            return 1;
+        }
+    }
+
+    const size_t nwords = sizeof(gorilla_test_golden_words) / sizeof(gorilla_test_golden_words[0]);
+    if (gbuf->header.entries != 100 || gbuf->header.nbits != 2524) {
+        fprintf(stderr, "gorilla golden: entries %u nbits %u, expected 100 and 2524\n",
+                gbuf->header.entries, gbuf->header.nbits);
+        return 1;
+    }
+    for (size_t i = 0; i < nwords; i++) {
+        if (gbuf->data[i] != gorilla_test_golden_words[i]) {
+            fprintf(stderr, "gorilla golden: word %zu is 0x%08x, expected 0x%08x\n",
+                    i, gbuf->data[i], gorilla_test_golden_words[i]);
+            return 1;
+        }
+    }
+
+    gorilla_reader_t gr = gorilla_reader_init(gbuf);
+    for (size_t i = 0; i < values.size(); i++) {
+        uint32_t n = 0;
+        if (!gorilla_reader_read(&gr, &n) || n != values[i]) {
+            fprintf(stderr, "gorilla golden: read %zu failed\n", i);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+// Small and full-size buffers, so values land at every bit offset and writes
+// fail at every distance from the end of a buffer.
+static int gorilla_unittest_roundtrip(void)
+{
+    uint32_t seed = 0x5eed;
+
+    for (uint32_t iteration = 0; iteration < 2000; iteration++) {
+        seed = seed * 1103515245u + 12345u;
+        const size_t nvalues = 1 + (seed >> 8) % 2500;
+        const size_t words = (iteration % 2) ? RRDENG_GORILLA_32BIT_BUFFER_SLOTS : 6 + (seed >> 20) % 26;
+
+        std::vector<std::vector<uint64_t>> storage;
+        storage.reserve(nvalues + 1);
+        auto new_buffer = [&]() {
+            storage.emplace_back((words + 1) / 2, 0);
+            return reinterpret_cast<gorilla_buffer_t *>(storage.back().data());
+        };
+
+        std::vector<uint32_t> values(nvalues);
+        uint32_t state = seed, v = seed;
+        for (size_t i = 0; i < nvalues; i++)
+            values[i] = v = gorilla_test_value((uint32_t)(i + iteration), v, &state);
+
+        gorilla_writer_t gw = gorilla_writer_init(new_buffer(), words);
+        for (size_t i = 0; i < nvalues; i++) {
+            const gorilla_header_t before = gw.last_buffer->header;
+
+            if (gorilla_writer_write(&gw, values[i]))
+                continue;
+
+            // a failed write leaves the buffer as it was
+            if (gw.last_buffer->header.nbits != before.nbits || gw.last_buffer->header.entries != before.entries) {
+                fprintf(stderr, "gorilla roundtrip: failed write changed the buffer header\n");
+                return 1;
+            }
+
+            gorilla_writer_add_buffer(&gw, new_buffer(), words);
+            if (!gorilla_writer_write(&gw, values[i])) {
+                fprintf(stderr, "gorilla roundtrip: write to a new buffer failed\n");
+                return 1;
+            }
+        }
+
+        gorilla_reader_t gr = gorilla_writer_get_reader(&gw);
+        for (size_t i = 0; i < nvalues; i++) {
+            uint32_t n = 0;
+            if (!gorilla_reader_read(&gr, &n) || n != values[i]) {
+                fprintf(stderr, "gorilla roundtrip: iteration %u, value %zu of %zu read wrong\n", iteration, i, nvalues);
+                return 1;
+            }
+        }
+
+        uint32_t n = 0;
+        if (gorilla_reader_read(&gr, &n)) {
+            fprintf(stderr, "gorilla roundtrip: read past the last value\n");
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+// Readers decode a page while the writer appends to it, as queries do on hot pages.
+static int gorilla_unittest_concurrent_readers(void)
+{
+    const size_t nvalues = 200000;
+
+    std::vector<uint32_t> values(nvalues);
+    uint32_t state = 7, v = 7;
+    for (size_t i = 0; i < nvalues; i++)
+        values[i] = v = gorilla_test_value((uint32_t)i, v, &state);
+
+    // worst case is 39 bits per value
+    std::vector<gorilla_test_buffer> storage(nvalues * 39 / (RRDENG_GORILLA_32BIT_BUFFER_SIZE * CHAR_BIT / 2) + 2);
+    size_t used = 0;
+
+    gorilla_writer_t gw = gorilla_writer_init(reinterpret_cast<gorilla_buffer_t *>(&storage[used++]), RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
+
+    std::atomic<bool> done(false);
+    std::atomic<int> errors(0);
+
+    auto reader = [&]() {
+        bool last = false;
+        while (!last) {
+            last = done.load(std::memory_order_acquire);
+
+            gorilla_reader_t gr = gorilla_writer_get_reader(&gw);
+            size_t i = 0;
+            uint32_t n;
+            while (i < nvalues && gorilla_reader_read(&gr, &n)) {
+                if (n != values[i]) {
+                    errors++;
+                    return;
+                }
+                i++;
+            }
+
+            if (last && i != nvalues)
+                errors++;
+        }
+    };
+
+    std::thread r1(reader), r2(reader);
+
+    for (size_t i = 0; i < nvalues; i++) {
+        if (gorilla_writer_write(&gw, values[i]))
+            continue;
+
+        if (used == storage.size()) {
+            errors++;
+            break;
+        }
+        gorilla_writer_add_buffer(&gw, reinterpret_cast<gorilla_buffer_t *>(&storage[used++]), RRDENG_GORILLA_32BIT_BUFFER_SLOTS);
+        if (!gorilla_writer_write(&gw, values[i])) {
+            errors++;
+            break;
+        }
+    }
+    done.store(true, std::memory_order_release);
+
+    r1.join();
+    r2.join();
+
+    if (errors)
+        fprintf(stderr, "gorilla concurrent readers: %d errors\n", errors.load());
+
+    return errors ? 1 : 0;
+}
+
+extern "C" int gorilla_unittest(void)
+{
+    fprintf(stderr, "\nrunning gorilla unittest\n");
+
+    int errors = 0;
+    errors += gorilla_unittest_golden();
+    errors += gorilla_unittest_roundtrip();
+    errors += gorilla_unittest_concurrent_readers();
+
+    if (errors)
+        fprintf(stderr, "gorilla unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "gorilla unittest: OK\n");
+
+    return errors;
 }
 
 /*
