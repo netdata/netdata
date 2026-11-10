@@ -12,16 +12,16 @@ import (
 var liveMethod = method{
 	id:      "rum-live",
 	title:   "RUM Live",
-	help:    "Recent observations with an opaque per-site generation cursor. Row kind distinguishes document activations, application views, vital updates and errors. Multiple rows can belong to one experience; vital updates retain metric ID and revision",
+	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Recent observations with an opaque per-site generation cursor. Changing the selected GUID restarts pagination from the retained view for that selection. Row kind distinguishes document activations, application views, vital updates and errors. Multiple rows can belong to one experience; vital updates retain metric ID and revision",
 	sort:    "seq",
 	every:   2,
 	columns: rumLiveColumns,
-	params:  []string{"site", "after"},
+	params:  []string{"site", "vnode", "vnode_guid", "after"},
 }
 
-func (h *Handler) liveRows(ctx context.Context, site, after string) (rows [][]any, next string, err error) {
+func (h *Handler) liveRows(ctx context.Context, site, after, vnodeGUID string) (rows [][]any, next string, err error) {
 	var live []query.LiveEvent
-	live, next, err = h.deps.Live(ctx, site, after, 2000)
+	live, next, err = h.deps.Live(ctx, site, after, 2000, vnodeGUID)
 	for _, r := range live {
 		country := r.Country
 		if country == "" {
@@ -47,7 +47,7 @@ func (h *Handler) liveRows(ctx context.Context, site, after string) (rows [][]an
 				number(r.HasTTFB, r.TTFBMS),
 				number(r.HasCLS, r.CLS),
 				r.Errors,
-				r.Kind, r.ExperienceID, r.View, r.ViewID, r.Vital, r.MetricID, r.Revision,
+				r.Kind, r.ExperienceID, r.View, r.ViewID, r.Vital, r.MetricID, r.Revision, r.VnodeGUID,
 			},
 		)
 	}
@@ -56,6 +56,7 @@ func (h *Handler) liveRows(ctx context.Context, site, after string) (rows [][]an
 }
 
 var rumLiveColumns = map[string]any{
+	"vnode_guid": (funcapi.Column{Index: 24, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
 	"seq": (funcapi.Column{
 		Index:         0,
 		UniqueKey:     true,

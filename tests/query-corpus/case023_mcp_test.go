@@ -380,45 +380,53 @@ func c023MCPAssertEcho(t *testing.T, doc map[string]any, group, expression strin
 
 func c023MCPAssertOptionsError(t *testing.T, response map[string]any, group string) {
 	t.Helper()
+	c023MCPAssertInvalidParams(t, response, "time_group_options for "+group)
+}
+
+// c023MCPAssertInvalidParams checks a structured -32602 INVALID_PARAMS error
+// for the request described by label and returns its message.
+func c023MCPAssertInvalidParams(t *testing.T, response map[string]any, label string) string {
+	t.Helper()
 
 	if result, has := response["result"]; has {
 		if object, ok := result.(map[string]any); ok {
-			t.Errorf("MCP accepted invalid time_group_options for %s: result keys=%v", group, keys(object))
+			t.Errorf("MCP accepted invalid %s: result keys=%v", label, keys(object))
 		} else {
-			t.Errorf("MCP accepted invalid time_group_options for %s: result type=%T", group, result)
+			t.Errorf("MCP accepted invalid %s: result type=%T", label, result)
 		}
-		return
+		return ""
 	}
 	errorObject, ok := response["error"].(map[string]any)
 	if !ok {
-		t.Errorf("MCP invalid time_group_options for %s returned no structured error: %v", group, response)
-		return
+		t.Errorf("MCP invalid %s returned no structured error: %v", label, response)
+		return ""
 	}
 	if got, ok := errorObject["code"].(float64); !ok || got != -32602 {
-		t.Errorf("MCP %s error.code = %v, want -32602 Invalid Params", group, errorObject["code"])
+		t.Errorf("MCP %s error.code = %v, want -32602 Invalid Params", label, errorObject["code"])
 	}
 	message, ok := errorObject["message"].(string)
 	if !ok || message == "" {
-		t.Errorf("MCP %s error.message is empty or malformed: %v", group, errorObject["message"])
+		t.Errorf("MCP %s error.message is empty or malformed: %v", label, errorObject["message"])
 	}
 
 	data, ok := errorObject["data"].(map[string]any)
 	if !ok {
-		t.Errorf("MCP %s error.data is missing or malformed: %v", group, errorObject["data"])
-		return
+		t.Errorf("MCP %s error.data is missing or malformed: %v", label, errorObject["data"])
+		return message
 	}
 	if got := data["status"]; got != "error" {
-		t.Errorf("MCP %s error.data.status = %v, want error", group, got)
+		t.Errorf("MCP %s error.data.status = %v, want error", label, got)
 	}
 	if got := data["code"]; got != "INVALID_PARAMS" {
-		t.Errorf("MCP %s error.data.code = %v, want INVALID_PARAMS", group, got)
+		t.Errorf("MCP %s error.data.code = %v, want INVALID_PARAMS", label, got)
 	}
 	if got, ok := data["codeNumeric"].(float64); !ok || got != 2 {
-		t.Errorf("MCP %s error.data.codeNumeric = %v, want 2", group, data["codeNumeric"])
+		t.Errorf("MCP %s error.data.codeNumeric = %v, want 2", label, data["codeNumeric"])
 	}
 	if got, ok := data["message"].(string); !ok || got == "" {
-		t.Errorf("MCP %s error.data.message is empty or malformed: %v", group, data["message"])
+		t.Errorf("MCP %s error.data.message is empty or malformed: %v", label, data["message"])
 	}
+	return message
 }
 
 func c023MCPPushCadenceFixture(t *testing.T, host, context string) (int64, int64) {
@@ -467,6 +475,95 @@ func c023MCPPushCadenceFixture(t *testing.T, host, context string) (int64, int64
 	return base, second.LastT()
 }
 
+// c023MCPQueryMetricsProperties returns the query_metrics inputSchema properties from tools/list.
+func c023MCPQueryMetricsProperties(t *testing.T, id int, session string) map[string]any {
+	t.Helper()
+
+	toolsList := c023MCPPost(t, id, "tools/list", map[string]any{}, session)
+	toolsResult := c023MCPResult(t, toolsList.Document, "tools/list")
+	tools, ok := toolsResult["tools"].([]any)
+	if !ok || len(tools) == 0 {
+		t.Fatalf("tools/list returned no tools: %v", toolsResult["tools"])
+	}
+	var queryMetrics map[string]any
+	for _, raw := range tools {
+		tool, ok := raw.(map[string]any)
+		if ok && tool["name"] == "query_metrics" {
+			queryMetrics = tool
+			break
+		}
+	}
+	if queryMetrics == nil {
+		t.Fatal("tools/list does not expose query_metrics")
+	}
+	inputSchema := queryObject(t, queryMetrics, "inputSchema", "query_metrics.inputSchema")
+	return queryObject(t, inputSchema, "properties", "query_metrics.inputSchema.properties")
+}
+
+// c023MCPSchemaEnum returns the enum of one query_metrics parameter, in schema order.
+func c023MCPSchemaEnum(t *testing.T, properties map[string]any, parameter string) []string {
+	t.Helper()
+
+	property := queryObject(t, properties, parameter, "query_metrics.inputSchema.properties."+parameter)
+	enum, ok := property["enum"].([]any)
+	if !ok || len(enum) == 0 {
+		t.Fatalf("query_metrics %s enum is missing or empty: %v", parameter, property["enum"])
+	}
+	values := make([]string, 0, len(enum))
+	for _, raw := range enum {
+		value, ok := raw.(string)
+		if !ok || value == "" {
+			t.Fatalf("query_metrics %s enum contains an empty or non-string value: %v", parameter, raw)
+		}
+		values = append(values, value)
+	}
+	return values
+}
+
+// c023MCPAssertEnumError checks that an invalid enum value is rejected with
+// INVALID_PARAMS and that the message names the parameter, does not echo the
+// rejected value and lists exactly the values the schema advertises for it.
+func c023MCPAssertEnumError(t *testing.T, response map[string]any, parameter string, rejected any, advertised []string) {
+	t.Helper()
+
+	message := c023MCPAssertInvalidParams(t, response, parameter)
+	if message == "" {
+		return
+	}
+	if value, ok := rejected.(string); ok && value != "" && strings.Contains(message, value) {
+		t.Errorf("MCP %s error message echoes the rejected value %q: %q", parameter, value, message)
+	}
+	if !strings.Contains(message, "'"+parameter+"'") {
+		t.Errorf("MCP %s error message does not name the parameter: %q", parameter, message)
+	}
+	quoted := make([]string, len(advertised))
+	for i, value := range advertised {
+		quoted[i] = "'" + value + "'"
+	}
+	if want := ": " + strings.Join(quoted, ", ") + "."; !strings.HasSuffix(message, want) {
+		t.Errorf("MCP %s error message does not list exactly the advertised values %v: %q",
+			parameter, advertised, message)
+	}
+}
+
+// c023MCPAssertMissingParam checks that a present JSON null is still reported
+// like an absent required parameter (-32600).
+func c023MCPAssertMissingParam(t *testing.T, response map[string]any, parameter string) {
+	t.Helper()
+
+	errorObject, ok := response["error"].(map[string]any)
+	if !ok {
+		t.Errorf("MCP null %s returned no structured error: %v", parameter, response)
+		return
+	}
+	if got, ok := errorObject["code"].(float64); !ok || got != -32600 {
+		t.Errorf("MCP null %s error.code = %v, want -32600", parameter, errorObject["code"])
+	}
+	if message, _ := errorObject["message"].(string); !strings.Contains(message, "Missing required parameter '"+parameter+"'") {
+		t.Errorf("MCP null %s error.message = %q, want the missing-parameter message", parameter, message)
+	}
+}
+
 func TestCase023MCPQueryMetricsContract(t *testing.T) {
 	for _, contract := range []string{
 		"CASE-023/mcp-protocol-lifecycle",
@@ -482,6 +579,12 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 		"CASE-023/mcp-default-zero-options",
 		"CASE-023/mcp-invalid-options",
 		"CASE-023/mcp-invalid-numeric-options",
+		"CASE-023/mcp-invalid-time-group",
+		"CASE-023/mcp-time-group-null-missing",
+		"CASE-023/mcp-time-group-accepted-names",
+		"CASE-023/mcp-invalid-aggregation",
+		"CASE-023/mcp-aggregation-null-missing",
+		"CASE-023/mcp-aggregation-accepted-names",
 	} {
 		registerContract(t, contract)
 	}
@@ -580,36 +683,9 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 	t.Run("query-tool-schema", func(t *testing.T) {
 		trackContract(t, "CASE-023/mcp-query-tool-schema")
 
-		toolsList := c023MCPPost(t, 2, "tools/list", map[string]any{}, session(t).Session)
-		toolsResult := c023MCPResult(t, toolsList.Document, "tools/list")
-		tools, ok := toolsResult["tools"].([]any)
-		if !ok || len(tools) == 0 {
-			t.Fatalf("tools/list returned no tools: %v", toolsResult["tools"])
-		}
-		var queryMetrics map[string]any
-		for _, raw := range tools {
-			tool, ok := raw.(map[string]any)
-			if ok && tool["name"] == "query_metrics" {
-				queryMetrics = tool
-				break
-			}
-		}
-		if queryMetrics == nil {
-			t.Fatal("tools/list does not expose query_metrics")
-		}
-		inputSchema := queryObject(t, queryMetrics, "inputSchema", "query_metrics.inputSchema")
-		properties := queryObject(t, inputSchema, "properties", "query_metrics.inputSchema.properties")
-		timeGroup := queryObject(t, properties, "time_group", "query_metrics.inputSchema.properties.time_group")
-		enum, ok := timeGroup["enum"].([]any)
-		if !ok || len(enum) == 0 {
-			t.Fatalf("query_metrics time_group enum is missing or empty: %v", timeGroup["enum"])
-		}
-		enumSet := make(map[string]bool, len(enum))
-		for _, raw := range enum {
-			value, ok := raw.(string)
-			if !ok || value == "" {
-				t.Fatalf("query_metrics time_group enum contains an empty or non-string value: %v", raw)
-			}
+		properties := c023MCPQueryMetricsProperties(t, 2, session(t).Session)
+		enumSet := make(map[string]bool)
+		for _, value := range c023MCPSchemaEnum(t, properties, "time_group") {
 			enumSet[value] = true
 		}
 		for _, group := range groups {
@@ -901,4 +977,107 @@ func TestCase023MCPQueryMetricsContract(t *testing.T) {
 			}
 		}
 	})
+
+	// Values the parsers would silently map to a default (or truncate at an
+	// embedded NUL) must be rejected; known names and aliases keep working.
+	invalidEnumValues := []struct {
+		name  string
+		value any
+	}{
+		{name: "unknown", value: "foo"},
+		{name: "empty", value: ""},
+		{name: "wrong-case", value: "MAX"},
+		{name: "leading-nul", value: "\x00max"},
+		{name: "interior-nul", value: "max\x00junk"},
+		{name: "inside-name-nul", value: "ma\x00x"},
+		{name: "trailing-nul", value: "max\x00"},
+		{name: "number", value: 5},
+		{name: "boolean", value: true},
+		{name: "array", value: []any{"max"}},
+		{name: "object", value: map[string]any{"name": "max"}},
+	}
+
+	type acceptedValue struct{ value, canonical string }
+	enumParameters := []struct {
+		parameter, slug string
+		requestID       int
+		accepted        []acceptedValue
+		// echo returns the canonical name the query response reports.
+		echo func(t *testing.T, request map[string]any) any
+	}{
+		{
+			parameter: "time_group", slug: "time-group", requestID: 500,
+			accepted: []acceptedValue{
+				{value: "max", canonical: "max"},
+				{value: "avg", canonical: "average"},
+				{value: "percentile95"},
+			},
+			echo: func(t *testing.T, request map[string]any) any {
+				aggregations := queryObject(t, request, "aggregations", "query request.aggregations")
+				return queryObject(t, aggregations, "time", "query request.aggregations.time")["time_group"]
+			},
+		},
+		{
+			parameter: "aggregation", slug: "aggregation", requestID: 600,
+			accepted: []acceptedValue{
+				{value: "max", canonical: "max"},
+				{value: "avg", canonical: "average"},
+				{value: "percentage", canonical: "percentage"},
+			},
+			echo: func(t *testing.T, request map[string]any) any {
+				aggregations := queryObject(t, request, "aggregations", "query request.aggregations")
+				metrics, ok := aggregations["metrics"].([]any)
+				if !ok || len(metrics) == 0 {
+					t.Fatalf("query request.aggregations.metrics is missing or empty: %v", aggregations["metrics"])
+				}
+				pass, ok := metrics[0].(map[string]any)
+				if !ok {
+					t.Fatalf("query request.aggregations.metrics[0] is malformed: %v", metrics[0])
+				}
+				return pass["aggregation"]
+			},
+		},
+	}
+
+	for _, enum := range enumParameters {
+		call := func(t *testing.T, id int, value any) map[string]any {
+			t.Helper()
+			arguments := baseArguments(standardContext, "bool", fixture.T0, standard.LastT())
+			arguments[enum.parameter] = value
+			return c023MCPCall(t, id, session(t).Session, arguments).Document
+		}
+
+		t.Run("invalid-"+enum.slug, func(t *testing.T) {
+			trackContract(t, "CASE-023/mcp-invalid-"+enum.slug)
+			advertised := c023MCPSchemaEnum(
+				t, c023MCPQueryMetricsProperties(t, enum.requestID, session(t).Session), enum.parameter)
+			for i, invalid := range invalidEnumValues {
+				t.Run(invalid.name, func(t *testing.T) {
+					response := call(t, enum.requestID+1+i, invalid.value)
+					c023MCPAssertEnumError(t, response, enum.parameter, invalid.value, advertised)
+				})
+			}
+		})
+
+		t.Run(enum.slug+"-null-missing", func(t *testing.T) {
+			trackContract(t, "CASE-023/mcp-"+enum.slug+"-null-missing")
+			c023MCPAssertMissingParam(t, call(t, enum.requestID+40, nil), enum.parameter)
+		})
+
+		t.Run(enum.slug+"-accepted-names", func(t *testing.T) {
+			trackContract(t, "CASE-023/mcp-"+enum.slug+"-accepted-names")
+			for i, valid := range enum.accepted {
+				t.Run("accepts-"+valid.value, func(t *testing.T) {
+					doc := c023MCPQueryDocument(t, call(t, enum.requestID+50+i, valid.value))
+					if valid.canonical == "" {
+						return
+					}
+					request := queryObject(t, doc, "request", "query request")
+					if got := enum.echo(t, request); got != valid.canonical {
+						t.Errorf("MCP %s %q echo = %v, want %q", enum.parameter, valid.value, got, valid.canonical)
+					}
+				})
+			}
+		})
+	}
 }

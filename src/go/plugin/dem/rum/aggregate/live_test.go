@@ -18,7 +18,7 @@ func TestLiveSeparatesIdentifiedReportsFromDocumentActivity(t *testing.T) {
 	b.City = "Athens"
 	b.HasGeo = true
 	a.Ingest(b)
-	rows, next := a.Live(0, 100)
+	rows, next := a.Live(0, 100, "")
 	require.Len(t, rows, 3)
 	assert.Equal(t, "document", rows[0].Kind)
 	assert.EqualValues(t, 1, rows[0].Revision)
@@ -32,7 +32,7 @@ func TestLiveSeparatesIdentifiedReportsFromDocumentActivity(t *testing.T) {
 	*now = now.Add(time.Second)
 	b.Received = *now
 	a.Ingest(b)
-	rows, _ = a.Live(next, 100)
+	rows, _ = a.Live(next, 100, "")
 	assert.Empty(t, rows)
 	b.Vitals = b.Vitals[:1]
 	b.Vitals[0].Revision = 2
@@ -41,7 +41,7 @@ func TestLiveSeparatesIdentifiedReportsFromDocumentActivity(t *testing.T) {
 	b.View = "checkout"
 	b.ViewID = "checkout-1"
 	a.Ingest(b)
-	rows, _ = a.Live(next, 100)
+	rows, _ = a.Live(next, 100, "")
 	require.Len(t, rows, 1)
 	assert.Equal(t, "/", rows[0].Page)
 	assert.Equal(t, "checkout", rows[0].View)
@@ -69,7 +69,7 @@ func TestLiveVitalOriginDoesNotMixCountriesAndLocations(t *testing.T) {
 			b := mk(*now, "s", "/entry", v(beacon.LCP, 10))
 			b.Country = tc.originCountry
 			a.Ingest(b)
-			_, cursor := a.Live(0, 100)
+			_, cursor := a.Live(0, 100, "")
 
 			*now = now.Add(time.Second)
 			b.Received = *now
@@ -81,7 +81,7 @@ func TestLiveVitalOriginDoesNotMixCountriesAndLocations(t *testing.T) {
 			b.Errors = []beacon.Error{{Message: "current error"}}
 			a.Ingest(b)
 
-			rows, _ := a.Live(cursor, 100)
+			rows, _ := a.Live(cursor, 100, "")
 			assert.Equal(t, []LiveRow{
 				{
 					Seq: cursor + 1, TS: *now, Site: "s",
@@ -112,14 +112,14 @@ func TestLiveRingAndCursorAcrossWraps(t *testing.T) {
 		b.Errors = []beacon.Error{{Message: itoa(i)}}
 		a.Ingest(b)
 	}
-	rows, next := a.Live(0, 0)
+	rows, next := a.Live(0, 0, "")
 	require.Len(t, rows, liveRingCap)
 	assert.EqualValues(t, 3*liveRingCap, next)
-	rows, _ = a.Live(next+100, 5)
+	rows, _ = a.Live(next+100, 5, "")
 	require.Len(t, rows, 5)
 	assert.EqualValues(t, 2*liveRingCap+1, rows[0].Seq)
 	*now = now.Add(time.Minute + time.Second)
-	rows, _ = a.Live(0, 100)
+	rows, _ = a.Live(0, 100, "")
 	assert.Empty(t, rows)
 }
 func TestInputRemainsImmutableThroughFiltering(t *testing.T) {

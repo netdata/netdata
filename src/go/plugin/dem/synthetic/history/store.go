@@ -21,12 +21,13 @@ func NewStore(journal *demjournal.Store) *Store {
 func (s *Store) Sync(ctx context.Context) error { return s.journal.Sync(ctx) }
 
 type RunFilter struct {
-	JobID   string
-	Kind    synthetic.Kind
-	Outcome synthetic.Outcome
-	After   int64
-	Before  *int64
-	Limit   int
+	JobID     string
+	VnodeGUID string
+	Kind      synthetic.Kind
+	Outcome   synthetic.Outcome
+	After     int64
+	Before    *int64
+	Limit     int
 }
 type RunPage struct {
 	Runs      []synthetic.Run `json:"runs"`
