@@ -88,7 +88,8 @@ func attributePairs(v attributes, pageOnly bool) []groupKey {
 	}
 }
 
-// Page reads derive only the page facet; other materialization belongs to Snapshot.
+// readWindow captures owned values and counts under the aggregator mutex.
+// Its distributions can be sorted after unlocking. Page reads derive only the page facet.
 func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	cutoff := now.Add(-st.window)
 	st.expire(now)
@@ -198,19 +199,14 @@ func expireObservedSessions(index map[string]*receiptEntry, order *receiptHeap, 
 }
 func (a *Aggregator) Snapshot() Snapshot {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	st := &a.site
 	r := st.readWindow(a.now(), false)
+	cfg := st.cfg
 	snap := Snapshot{
-		Name:                   st.cfg.Name,
-		DisplayName:            st.cfg.DisplayName,
-		Vitals:                 r.vitals(&r.global),
+		Name:                   cfg.Name,
+		DisplayName:            cfg.DisplayName,
 		Counters:               map[string]uint64{},
 		ObservedSessions:       r.sessions,
-		Breakdowns:             map[string][]Group{},
-		Load:                   measurementStats(navLoadName, r.global.values[navLoadName]),
-		DCL:                    measurementStats(navDCLName, r.global.values[navDCLName]),
-		API:                    measurementStats(apiName, r.global.values[apiName]),
 		ResourcesSeen:          st.resourcesSeen,
 		FirstPartyResources:    st.firstPartyResources,
 		ThirdPartyResources:    st.thirdPartyResources,
@@ -222,8 +218,15 @@ func (a *Aggregator) Snapshot() Snapshot {
 	for k, v := range st.counters {
 		snap.Counters[k] = v
 	}
+	a.mu.Unlock()
+
+	snap.Vitals = r.vitals(&r.global)
+	snap.Breakdowns = map[string][]Group{}
+	snap.Load = measurementStats(navLoadName, r.global.values[navLoadName])
+	snap.DCL = measurementStats(navDCLName, r.global.values[navDCLName])
+	snap.API = measurementStats(apiName, r.global.values[apiName])
 	for _, kind := range Kinds {
-		snap.Breakdowns[kind] = r.rank(kind, st.topN(kind))
+		snap.Breakdowns[kind] = r.rank(kind, cfg.topN(kind))
 	}
 	snap.ResourceHosts = r.rankResourceHosts()
 	snap.ErrorGroups = r.rankErrorGroups()
@@ -242,12 +245,12 @@ func (r *windowRead) vitals(p *population) map[string]VitalStats {
 	}
 	return out
 }
-func (st *siteState) topN(kind string) int {
+func (cfg SiteCfg) topN(kind string) int {
 	switch kind {
 	case KindPage, KindView:
-		return st.cfg.PageGroups
+		return cfg.PageGroups
 	case KindCountry:
-		return st.cfg.Countries
+		return cfg.Countries
 	case KindBrowser:
 		return browserTopN
 	case KindVersion:

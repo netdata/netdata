@@ -142,7 +142,7 @@ type activityObservation struct {
 	documents, views, errors, frustrations uint64
 	fingerprint, message                   string
 	resource                               *beacon.Resource
-	pageHost                               string
+	api                                    bool
 }
 
 type siteState struct {

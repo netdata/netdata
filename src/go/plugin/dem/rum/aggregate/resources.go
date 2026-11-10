@@ -6,7 +6,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -27,12 +26,6 @@ type ResourceHostGroup struct {
 	Unknown  bool // Missing host metadata; distinct from a literal host named "unknown".
 	Count    uint64
 	Duration VitalStats
-}
-
-func isAPICall(pageHost string, r beacon.Resource) bool {
-	return !r.Self && r.HasDuration && validMeasurement(r.DurationMS) &&
-		(r.Initiator == "fetch" || r.Initiator == "xmlhttprequest") &&
-		isFirstParty(pageHost, r.Host)
 }
 
 // isFirstParty reports whether resHost is the same registrable domain as
@@ -87,7 +80,7 @@ func (r *windowRead) addResource(v *activityObservation) {
 	if resource.HasDuration {
 		g.values = append(g.values, resource.DurationMS)
 	}
-	if isAPICall(v.pageHost, *resource) {
+	if v.api {
 		r.global.values[apiName] = append(r.global.values[apiName], resource.DurationMS)
 	}
 }

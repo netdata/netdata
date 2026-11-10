@@ -227,10 +227,11 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 			st.counters[CounterInvalidMeasurements]++
 		}
 		st.resourcesSeen = true
+		firstParty := isFirstParty(b.PageHost, r.Host)
 		switch {
 		case b.PageHost == "" || r.Host == "":
 			st.unknownResources++
-		case isFirstParty(b.PageHost, r.Host):
+		case firstParty:
 			st.firstPartyResources++
 		default:
 			st.thirdPartyResources++
@@ -239,7 +240,7 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 			received: now,
 			attrs:    attrs,
 			resource: &r,
-			pageHost: b.PageHost,
+			api:      firstParty && r.HasDuration && (r.Initiator == "fetch" || r.Initiator == "xmlhttprequest"),
 		})
 		obs.Resources = append(obs.Resources, r)
 		if i < len(resourceEvents) && resourceEvents[i].ID == r.ID {

@@ -793,6 +793,10 @@ What `rum/aggregate` stores:
 How reads derive results:
 
 - Facet distributions and top-N complements derive from canonical populations at read time.
+- Each read captures owned values/counts and matching configuration under the site mutex, then releases it before
+  percentile sorting, ranking and result construction. Sorting consumes those private arrays without another copy.
+- Resource API eligibility is classified once on admission using the same first-party decision as resource counters;
+  reads reuse that immutable classification.
 - Host/error grouping is bounded by those retained observations and folded only after ranking.
 - Pages reads expose all retained page groups rather than chart top-N only.
 
