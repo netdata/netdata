@@ -207,8 +207,9 @@ func validateEvent(r EventRecord) error {
 
 // Only the previous event is retained, so reuse needs no growing intern table.
 func reuseEventString(value []byte, previous string) string {
-	// Check the last eight bytes before scanning shared prefixes in messages or stacks.
+	// Reject different final bytes before comparing longer suffixes or shared prefixes.
 	if len(value) == len(previous) &&
+		(len(value) == 0 || value[len(value)-1] == previous[len(previous)-1]) &&
 		(len(value) <= 8 || string(value[len(value)-8:]) == previous[len(previous)-8:]) &&
 		string(value) == previous {
 		return previous

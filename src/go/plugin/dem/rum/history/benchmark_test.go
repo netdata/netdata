@@ -18,18 +18,21 @@ import (
 
 // 100,000 rich records span 100 interleaved sites and 24 receipt hours in one
 // journal. Repeated metadata models adjacent browser reports; varying metadata
-// changes every row, including long text with a shared prefix. Both exercise
+// changes every row, including long text with a shared prefix and optional fixed suffix. All exercise
 // broad and narrow reads without changing native candidate selection.
 func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 	const rows = 100_000
 	const start = int64(1_700_000_000)
 	const end = start + 86400
-	for _, varying := range []bool{false, true} {
-		name := "repeated"
-		if varying {
-			name = "varying"
-		}
-		b.Run(name, func(b *testing.B) {
+	for _, workload := range []struct {
+		name, suffix string
+		varying      bool
+	}{
+		{name: "repeated"},
+		{name: "varying", varying: true},
+		{name: "varying_same_suffix", suffix: "!", varying: true},
+	} {
+		b.Run(workload.name, func(b *testing.B) {
 			ctx := context.Background()
 			owner, err := demjournal.Open(ctx, "")
 			if err != nil {
@@ -40,10 +43,10 @@ func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 			text := strings.Repeat("browser fixture detail ", 32)
 			for i := range rows {
 				sequence := i / 100
-				if varying {
+				if workload.varying {
 					sequence = i
 				}
-				value := func(base string) string { return fmt.Sprintf("%s-%d", base, sequence) }
+				value := func(base string) string { return fmt.Sprintf("%s-%d%s", base, sequence, workload.suffix) }
 				r := EventRecord{
 					Site:         fmt.Sprintf("site-%02d", i%100),
 					VnodeGUID:    fmt.Sprintf("%08x-1111-4111-8111-111111111111", i%100/5+1),
