@@ -503,7 +503,7 @@ static inline int read_proc_pid_cmdline(ebpf_pid_data_t *p, char *cmdline)
 
     int ret = 0;
 
-    int fd = open(filename, procfile_open_flags, 0666);
+    int fd = open(filename, procfile_open_flags);
     if (unlikely(fd == -1))
         goto cleanup;
 

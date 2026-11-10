@@ -348,7 +348,7 @@ static NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
                 return NAN;
             }
             if(s[1] == 'u' && s[2] == 'l' && s[3] == 'l') {
-                if(endptr) *endptr = (char *)&s[3];
+                if(endptr) *endptr = (char *)&s[4];
                 return NAN;
             }
             break;
