@@ -116,9 +116,11 @@ fn main() {
     };
 
     let exit_code = runtime.block_on(async_main());
-    if exit_code != 0 {
-        std::process::exit(exit_code);
-    }
+
+    // Not a return: dropping the runtime would wait for its read of stdin,
+    // which tokio cannot cancel. That read ends only when the agent closes the
+    // pipe, and after a SIGTERM the agent does so two minutes later.
+    std::process::exit(exit_code);
 }
 
 async fn async_main() -> i32 {
