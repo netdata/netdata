@@ -177,6 +177,12 @@ async fn main() {
                 tracing::error!("{e:#}");
                 std::process::exit(1);
             }
+
+            // Not a return: the runtime's shutdown would wait for the
+            // supervisor's read of stdin, which tokio cannot cancel. That
+            // read ends only when the agent closes the pipe, and after a
+            // SIGTERM the agent does so two minutes later.
+            std::process::exit(0);
         }
     }
 }
