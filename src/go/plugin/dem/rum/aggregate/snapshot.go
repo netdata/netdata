@@ -37,54 +37,89 @@ type Snapshot struct {
 	ResourceHosts                                              []ResourceHostGroup
 	PageviewsWindow, JSErrorsWindow, ApplicationViewsWindow    uint64
 }
-type groupKey struct {
-	kind, value string
-	other       bool
+
+const (
+	facetBrowser = iota
+	facetDevice
+	facetCountry
+	facetPage
+	facetVersion
+	facetView
+	facetCount
+)
+
+var facetKinds = [facetCount]string{KindBrowser, KindDevice, KindCountry, KindPage, KindVersion, KindView}
+
+type facetValue struct {
+	kind  int
+	value string
 }
 type population struct {
-	values                                 map[string][]float64
+	vitalValues                            *vitalDistributions
 	documents, views, errors, frustrations uint64
 	sessions                               int
 	elements                               []elemSample
 }
+
+// Distributions are allocated only for groups containing vitals. Counts allow
+// exact-sized owned buffers, avoiding repeated growth while ingestion is locked.
+type vitalDistributions struct {
+	counts [vitalCount]int
+	values [vitalCount][]float64
+}
+
+func (p *population) countVital(index int) {
+	if p.vitalValues == nil {
+		p.vitalValues = &vitalDistributions{}
+	}
+	p.vitalValues.counts[index]++
+}
+func (p *population) reserveVitals() {
+	if p.vitalValues == nil {
+		return
+	}
+	for index, count := range p.vitalValues.counts {
+		if count > 0 {
+			p.vitalValues.values[index] = make([]float64, 0, count)
+		}
+	}
+}
+
 type windowRead struct {
 	global         population
-	groups         map[groupKey]*population
+	groups         [facetCount]map[string]*population
+	load, dcl, api []float64
 	resourceGroups map[hostKey]*resourcePopulation
 	errorGroups    map[errorKey]*errorPopulation
 	sessions       int
 }
 
-func newPopulation() *population {
-	return &population{
-		values: map[string][]float64{},
-	}
-}
-func (r *windowRead) group(kind, value string) *population {
+func (r *windowRead) group(kind int, value string) *population {
 	if value == "" {
 		value = unknownValue
 	}
-	key := groupKey{
-		kind:  kind,
-		value: value,
-	}
-	if g := r.groups[key]; g != nil {
+	groups := r.groups[kind]
+	if g := groups[value]; g != nil {
 		return g
 	}
-	g := newPopulation()
-	r.groups[key] = g
+	if groups == nil {
+		groups = make(map[string]*population)
+		r.groups[kind] = groups
+	}
+	g := &population{}
+	groups[value] = g
 	return g
 }
-func attributePairs(v attributes, pageOnly bool) []groupKey {
+func attributePairs(v attributes, pageOnly bool) []facetValue {
 	if pageOnly {
-		return []groupKey{{kind: KindPage, value: v.page}}
+		return []facetValue{{kind: facetPage, value: v.page}}
 	}
-	return []groupKey{
-		{kind: KindBrowser, value: v.browser},
-		{kind: KindDevice, value: v.device},
-		{kind: KindCountry, value: v.country},
-		{kind: KindPage, value: v.page},
-		{kind: KindVersion, value: v.version},
+	return []facetValue{
+		{kind: facetBrowser, value: v.browser},
+		{kind: facetDevice, value: v.device},
+		{kind: facetCountry, value: v.country},
+		{kind: facetPage, value: v.page},
+		{kind: facetVersion, value: v.version},
 	}
 }
 
@@ -94,26 +129,58 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	cutoff := now.Add(-st.window)
 	st.expire(now)
 	r := &windowRead{
-		global:         *newPopulation(),
-		groups:         map[groupKey]*population{},
 		resourceGroups: map[hostKey]*resourcePopulation{},
 		errorGroups:    map[errorKey]*errorPopulation{},
+	}
+	// Count the same retained population before copying. This extra traversal
+	// trades slice growth/copying for exact buffers without persistent accounting.
+	for _, el := range st.observationOrder.entries {
+		v := el.Value.(*vitalObservation)
+		if v.received.Before(cutoff) {
+			continue
+		}
+		index, ok := vitalIndex(v.key.name)
+		if !ok {
+			continue
+		}
+		if !pageOnly {
+			r.global.countVital(index)
+		}
+		for _, kv := range attributePairs(v.attrs, pageOnly) {
+			r.group(kv.kind, kv.value).countVital(index)
+		}
+	}
+	r.global.reserveVitals()
+	for _, groups := range r.groups {
+		for _, g := range groups {
+			g.reserveVitals()
+		}
 	}
 	for _, el := range st.observationOrder.entries {
 		v := el.Value.(*vitalObservation)
 		if v.received.Before(cutoff) {
 			continue
 		}
-		if !pageOnly {
-			r.global.values[v.key.name] = append(r.global.values[v.key.name], v.value)
-		}
-		if _, ok := thresholds[v.key.name]; !ok {
+		index, ok := vitalIndex(v.key.name)
+		if !ok {
+			if !pageOnly {
+				switch v.key.name {
+				case navLoadName:
+					r.load = append(r.load, v.value)
+				case navDCLName:
+					r.dcl = append(r.dcl, v.value)
+				}
+			}
 			continue
+		}
+		if !pageOnly {
+			r.global.vitalValues.values[index] = append(r.global.vitalValues.values[index], v.value)
 		}
 		for _, kv := range attributePairs(v.attrs, pageOnly) {
 			g := r.group(kv.kind, kv.value)
-			g.values[v.key.name] = append(g.values[v.key.name], v.value)
-			if kv.kind == KindPage && v.element != "" {
+			g.vitalValues.values[index] = append(g.vitalValues.values[index], v.value)
+			if pageOnly && v.element != "" &&
+				(v.key.name == beacon.LCP || v.key.name == beacon.INP || v.key.name == beacon.CLS) {
 				g.elements = append(g.elements, elemSample{
 					vital: v.key.name,
 					sel:   v.element,
@@ -139,7 +206,7 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 			g.frustrations += v.frustrations
 		}
 		if !pageOnly && (v.attrs.view != "" || v.views > 0) {
-			g := r.group(KindView, v.attrs.view)
+			g := r.group(facetView, v.attrs.view)
 			g.views += v.views
 			g.errors += v.errors
 		}
@@ -156,7 +223,7 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	for _, el := range st.pageSessionOrder.entries {
 		v := el.Value.(*sessionObservation)
 		if !v.received.Before(cutoff) {
-			r.group(KindPage, v.page).sessions++
+			r.group(facetPage, v.page).sessions++
 		}
 	}
 	return r
@@ -222,26 +289,24 @@ func (a *Aggregator) Snapshot() Snapshot {
 
 	snap.Vitals = r.vitals(&r.global)
 	snap.Breakdowns = map[string][]Group{}
-	snap.Load = measurementStats(navLoadName, r.global.values[navLoadName])
-	snap.DCL = measurementStats(navDCLName, r.global.values[navDCLName])
-	snap.API = measurementStats(apiName, r.global.values[apiName])
-	for _, kind := range Kinds {
-		snap.Breakdowns[kind] = r.rank(kind, cfg.topN(kind))
+	snap.Load = pctStats(r.load)
+	snap.DCL = pctStats(r.dcl)
+	snap.API = pctStats(r.api)
+	for facet, kind := range facetKinds {
+		snap.Breakdowns[kind] = r.rank(facet, cfg.topN(kind))
 	}
 	snap.ResourceHosts = r.rankResourceHosts()
 	snap.ErrorGroups = r.rankErrorGroups()
 	return snap
 }
-func measurementStats(name string, values []float64) VitalStats {
-	if _, ok := thresholds[name]; ok {
-		return stats(name, values)
-	}
-	return pctStats(values)
-}
 func (r *windowRead) vitals(p *population) map[string]VitalStats {
 	out := make(map[string]VitalStats, len(beacon.Vitals))
-	for _, name := range beacon.Vitals {
-		out[name] = measurementStats(name, p.values[name])
+	for index, name := range vitalNames {
+		if p.vitalValues == nil {
+			out[name] = VitalStats{}
+		} else {
+			out[name] = stats(name, p.vitalValues.values[index])
+		}
 	}
 	return out
 }
@@ -259,46 +324,52 @@ func (cfg SiteCfg) topN(kind string) int {
 		return 4
 	}
 }
-func (r *windowRead) rank(kind string, n int) []Group {
-	var keys []groupKey
-	for key := range r.groups {
-		if key.kind == kind {
-			keys = append(keys, key)
-		}
+func (r *windowRead) rank(kind int, n int) []Group {
+	if len(r.groups[kind]) == 0 {
+		return nil
 	}
-	sort.Slice(keys, func(i, j int) bool {
-		a, b := r.groups[keys[i]], r.groups[keys[j]]
-		av, bv := a.documents, b.documents
-		if kind == KindView {
-			av, bv = a.views, b.views
+	type rankedGroup struct {
+		value      string
+		population *population
+	}
+	groups := make([]rankedGroup, 0, len(r.groups[kind]))
+	for value, p := range r.groups[kind] {
+		groups = append(groups, rankedGroup{value, p})
+	}
+	sort.Slice(groups, func(i, j int) bool {
+		a, b := groups[i], groups[j]
+		av, bv := a.population.documents, b.population.documents
+		if kind == facetView {
+			av, bv = a.population.views, b.population.views
 		}
 		if av != bv {
 			return av > bv
 		}
-		return keys[i].value < keys[j].value
+		return a.value < b.value
 	})
-	if n < 0 {
-		n = 0
+	n = max(0, min(n, len(groups)))
+	out := make([]Group, 0, min(n+1, len(groups)))
+	for _, g := range groups[:n] {
+		out = append(out, r.emitGroup(kind, g.value, false, g.population))
 	}
-	if n > len(keys) {
-		n = len(keys)
-	}
-	var out []Group
-	for _, key := range keys[:n] {
-		out = append(out, r.emitGroup(key, r.groups[key]))
-	}
-	other := newPopulation()
-	present := false
-	for _, key := range keys[n:] {
-		mergePopulation(other, r.groups[key])
-		present = true
-	}
-	if present {
-		out = append(out, r.emitGroup(groupKey{
-			kind:  kind,
-			value: Other,
-			other: true,
-		}, other))
+	if n < len(groups) {
+		other := &population{}
+		for _, g := range groups[n:] {
+			if g.population.vitalValues == nil {
+				continue
+			}
+			if other.vitalValues == nil {
+				other.vitalValues = &vitalDistributions{}
+			}
+			for index, values := range g.population.vitalValues.values {
+				other.vitalValues.counts[index] += len(values)
+			}
+		}
+		other.reserveVitals()
+		for _, g := range groups[n:] {
+			mergePopulation(other, g.population)
+		}
+		out = append(out, r.emitGroup(kind, Other, true, other))
 	}
 	return out
 }
@@ -306,21 +377,22 @@ func mergePopulation(dst, src *population) {
 	dst.documents += src.documents
 	dst.views += src.views
 	dst.errors += src.errors
-	for name, values := range src.values {
-		dst.values[name] = append(dst.values[name], values...)
+	if src.vitalValues != nil {
+		for index, values := range src.vitalValues.values {
+			dst.vitalValues.values[index] = append(dst.vitalValues.values[index], values...)
+		}
 	}
 }
-func (r *windowRead) emitGroup(key groupKey, p *population) Group {
+func (r *windowRead) emitGroup(kind int, value string, other bool, p *population) Group {
 	out := Group{
-		Value:            key.value,
-		Other:            key.other,
-		Vitals:           r.vitals(p),
+		Value:            value,
+		Other:            other,
 		Pageviews:        p.documents,
 		ApplicationViews: p.views,
 		JSErrors:         p.errors,
 	}
-	if key.kind == KindView {
-		out.Vitals = nil
+	if kind != facetView {
+		out.Vitals = r.vitals(p)
 	}
 	return out
 }
