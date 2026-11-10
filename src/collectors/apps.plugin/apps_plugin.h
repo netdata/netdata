@@ -639,6 +639,8 @@ struct pid_stat {
     bool is_aggregator:1;           // true when this pid is a process aggregator
 
     bool matched_by_config:1;
+    bool comm_collected:1;          // an empty comm is valid and has no STRING allocation
+    bool identity_changed:1;        // invalidate inherited targets after collection
 
 #if (PROCESSES_HAVE_STATE == 1)
     char state;

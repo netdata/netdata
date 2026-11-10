@@ -31,6 +31,8 @@ permissions:
 
 env:
   TEST_TARGETS: >-
+    apps-stat-test
+    apps-identity-test
     apps-cgroups-path-test
     apps-cgroups-enrichment-test
     apps-lookup-protocol-test
