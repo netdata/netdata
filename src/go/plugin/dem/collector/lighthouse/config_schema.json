@@ -30,10 +30,10 @@
       },
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, in seconds.",
+        "description": "Chart refresh interval, in seconds. Publishes the latest completed observation; it does not start a browser check.",
         "type": "integer",
         "minimum": 1,
-        "default": 1800
+        "default": 10
       },
       "timeout": {
         "title": "Timeout",
@@ -41,6 +41,13 @@
         "type": "number",
         "default": 180,
         "minimum": 0.001
+      },
+      "check_every": {
+        "title": "Check every",
+        "description": "Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1800
       }
     },
     "required": [
@@ -68,6 +75,7 @@
         {
           "title": "Collection",
           "fields": [
+            "check_every",
             "update_every",
             "timeout"
           ]

@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/attemptmetrics"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -22,19 +23,20 @@ var charts string
 var schema string
 
 type Config struct {
+	CheckEvery  int              `yaml:"check_every"       json:"check_every"`
 	Vnode       string           `yaml:"vnode,omitempty" json:"vnode,omitempty"`
-	Name        string           `yaml:"name"         json:"name"`
-	UpdateEvery int              `yaml:"update_every" json:"update_every"`
-	Timeout     confopt.Duration `yaml:"timeout"      json:"timeout"`
-	URL         string           `yaml:"url"          json:"url"`
-	SaveReport  bool             `yaml:"save_report"  json:"save_report"`
+	Name        string           `yaml:"name"              json:"name"`
+	UpdateEvery int              `yaml:"update_every"      json:"update_every"`
+	Timeout     confopt.Duration `yaml:"timeout"           json:"timeout"`
+	URL         string           `yaml:"url"               json:"url"`
+	SaveReport  bool             `yaml:"save_report"       json:"save_report"`
 }
 
 // Executor owns process-wide admission and supervised completion. Drained=false
 // requires process fail-stop even if the collector has already retired.
 type Executor interface {
 	Check(context.Context, model.Kind) error
-	Execute(context.Context, model.Request, func(string)) model.Execution
+	monitor.Executor
 }
 
 type Dependencies struct {
@@ -51,15 +53,14 @@ type Collector struct {
 	request     model.Request
 	initialized bool
 	vnodeGUID   string
-	// Assigned before readiness; retained after retirement for in-flight callbacks.
-	registration *syntheticregistry.Registration
-	terminal     chan error
+	// Assigned before readiness; Run owns cancellation and physical completion.
+	session *monitor.Session
 }
 
 func Creator(deps Dependencies) collectorapi.Creator {
 	return collectorapi.Creator{
 		Defaults: collectorapi.Defaults{
-			UpdateEvery: 1800,
+			UpdateEvery: 10,
 		},
 		CreateV2:        func() collectorapi.CollectorV2 { return New(deps) },
 		Config:          func() any { return &Config{} },
@@ -72,14 +73,14 @@ func New(deps Dependencies) *Collector {
 	meter := store.Write().SnapshotMeter("")
 	return &Collector{
 		Config: Config{
-			UpdateEvery: 1800,
+			CheckEvery:  1800,
+			UpdateEvery: 10,
 			Timeout:     confopt.Duration(3 * time.Minute),
 		},
-		deps:     deps,
-		store:    store,
-		attempt:  attemptmetrics.New(meter),
-		metrics:  newMetrics(meter),
-		terminal: make(chan error, 1),
+		deps:    deps,
+		store:   store,
+		attempt: attemptmetrics.New(meter),
+		metrics: newMetrics(meter),
 	}
 }
 func (c *Collector) Configuration() any                 { return c.Config }

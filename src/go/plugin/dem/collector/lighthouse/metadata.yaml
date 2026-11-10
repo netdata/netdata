@@ -25,7 +25,7 @@ modules:
         metrics_description: Monitor desktop lab performance for a web page with Lighthouse. Inspect the performance
           category score, individual lab timings, layout shift and audit execution outcomes.
         method_description: Audits the configured HTTP or HTTPS page using the Lighthouse desktop preset and
-          sandboxed Chromium at the native job interval. Configuration Test validates preparation without running
+          sandboxed Chromium at the check_every interval. Configuration Test validates preparation without running
           an audit. Lab measurements describe this browser attempt and are not field Core Web Vitals.
       supported_platforms:
         include:
@@ -47,12 +47,12 @@ modules:
           description: Jobs require explicit configuration; no websites or scripts are discovered automatically.
         limits:
           description: Missing scores or timings produce measurement gaps; a measured zero remains zero. Running
-            and waiting attempts do not refresh the prior observation, which becomes stale after two collection
+            and waiting attempts do not refresh the prior observation, which becomes stale after two check
             intervals. HTML reports are disabled unless requested. No stock performance-score threshold alert
             is configured.
         performance_impact:
           description: Each attempt starts a fresh browser and consumes CPU, memory and target website requests.
-            Increasing update_every reduces frequency. Jobs share the process browser.concurrency allowance (default 1), so concurrent
+            Increasing check_every reduces browser frequency; update_every only refreshes charts. Jobs share the process browser.concurrency allowance (default 1), so concurrent
             due jobs can wait. Optional captures consume local disk space.
     setup:
       prerequisites:
@@ -114,9 +114,14 @@ modules:
               default_value: false
               required: false
               group: Diagnosis
-            - name: update_every
-              description: Data collection interval, in seconds.
+            - name: check_every
+              description: Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check.
               default_value: 1800
+              required: false
+              group: Collection
+            - name: update_every
+              description: Chart refresh interval, in seconds. Publishes the latest completed observation; it does not start a browser check.
+              default_value: 10
               required: false
               group: Collection
             - name: timeout
@@ -127,7 +132,7 @@ modules:
             - name: vnode
               description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               detailed_description: Define a static vnode through `dem:vnode` or a YAML file in the Netdata configuration directory’s `vnodes/` directory. Enter its reference name, not its GUID. Leave empty to keep charts on the collecting Agent.
-                Retained runs and captures keep the resolved GUID recorded when the attempt started. Changing the vnode does not relabel existing evidence; records without a GUID remain unassigned.
+                Retained runs and captures keep the GUID resolved when the attempt entered the execution queue, even if the vnode changes before execution starts. Changing the vnode clears the latest observation without relabeling retained evidence; records without a GUID remain unassigned.
               default_value: ''
               required: false
               group: Virtual Node
@@ -148,8 +153,15 @@ modules:
               phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not
               recovery.
     metrics:
-      description: Each native job has its own chart identity. Attempt duration excludes waiting for admission.
-        Missing observations are omitted.
+      description: Charts repeat the latest completed observation until a new check finishes. Observation age and
+        stale state retain its actual freshness; measurements older than two check intervals are omitted.
+        Attempt and occurrence counters count each event once and reset when the native job restarts.
+        These job diagnostics continue across vnode changes; the latest observation, age and last success/failure
+        reset until a check for the new association completes.
+        Coalesced occurrences never ran and do not represent website failures. Queue age tracks the oldest
+        admission wait; scheduling delay describes the selected occurrence at the latest admission.
+        The first check is eligible immediately, followed by a spread first interval of one to two check_every periods
+        and then a fixed cadence. Each native job has its own chart identity. Attempt duration excludes admission waiting.
       availability: []
       folding:
         enabled: false
@@ -160,7 +172,7 @@ modules:
           labels: []
           metrics:
             - name: dem_synthetic.execution_state
-              description: Synthetic attempt outcome
+              description: Latest synthetic observation state
               unit: state
               chart_type: stacked
               dimensions:
@@ -171,20 +183,66 @@ modules:
                 - name: inconclusive
                 - name: error
                 - name: cancelled
+                - name: stale
             - name: dem_synthetic.duration
-              description: Synthetic attempt duration
+              description: Latest synthetic attempt duration
               unit: milliseconds
               chart_type: line
               dimensions:
                 - name: duration
+            - name: dem_synthetic.observation_age
+              description: Age of latest synthetic observation
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - name: dem_synthetic.attempts
+              description: Completed synthetic attempts
+              unit: attempts/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: failed
+                - name: timeout
+                - name: inconclusive
+                - name: error
+                - name: cancelled
+                - name: unknown
+            - name: dem_synthetic.occurrences
+              description: Synthetic scheduled occurrences
+              unit: occurrences/s
+              chart_type: line
+              dimensions:
+                - name: scheduled
+                - name: admitted
+                - name: coalesced
+            - name: dem_synthetic.scheduler_state
+              description: Synthetic active and pending attempts
+              unit: attempts
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: pending
+            - name: dem_synthetic.queue_age
+              description: Oldest synthetic admission wait
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - name: dem_synthetic.scheduling_delay
+              description: Latest synthetic admission delay from selected due time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: delay
             - name: dem_synthetic.lighthouse.performance
-              description: Lighthouse performance score
+              description: Latest Lighthouse performance score
               unit: points
               chart_type: line
               dimensions:
                 - name: performance
             - name: dem_synthetic.lighthouse.timings
-              description: Lighthouse lab timings
+              description: Latest Lighthouse lab timings
               unit: milliseconds
               chart_type: line
               dimensions:
@@ -193,7 +251,7 @@ modules:
                 - name: tbt
                 - name: speed_index
             - name: dem_synthetic.lighthouse.cls
-              description: Lighthouse cumulative layout shift
+              description: Latest Lighthouse cumulative layout shift
               unit: ratio
               chart_type: line
               dimensions:
@@ -255,7 +313,10 @@ modules:
               options: []
           returns:
             description: At most limit active jobs, with independent current-attempt state and last-observation
-              freshness. Disabled and failed-startup jobs are visible through native configuration status.
+              freshness, execution cadence, occurrence counts and queue/admission delays. Counters reset on native
+              activation and continue across vnode changes; latest observations and last success/failure reset on
+              reassignment. Coalesced occurrences never ran. Disabled and failed-startup jobs are visible through
+              native configuration status.
             columns:
               - name: job_id
                 type: string
@@ -317,6 +378,34 @@ modules:
                 type: string
                 unit: ''
                 description: Recorded canonical vnode GUID. Empty means unassigned.
+              - name: check_every
+                type: integer
+                unit: 's'
+                description: Check interval.
+              - name: scheduled
+                type: integer
+                unit: ''
+                description: Scheduled occurrences.
+              - name: admitted
+                type: integer
+                unit: ''
+                description: Admitted attempts.
+              - name: coalesced
+                type: integer
+                unit: ''
+                description: Coalesced occurrences.
+              - name: pending
+                type: boolean
+                unit: ''
+                description: Pending occurrence.
+              - name: queue_age
+                type: float
+                unit: 's'
+                description: Oldest admission wait.
+              - name: scheduling_delay
+                type: float
+                unit: 's'
+                description: Latest admission delay.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -456,6 +545,14 @@ modules:
                 type: string
                 unit: ''
                 description: Recorded canonical vnode GUID. Empty means unassigned.
+              - name: scheduled_us
+                type: timestamp
+                unit: ''
+                description: Selected due time.
+              - name: queued_us
+                type: timestamp
+                unit: ''
+                description: Original admission queue time.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require

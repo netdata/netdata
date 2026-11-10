@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 )
 
 type Job struct {
@@ -24,6 +25,7 @@ type Job struct {
 	Latest         *synthetic.Run `json:"latest,omitempty"`
 	LastSuccessUS  int64          `json:"last_success_us"`
 	LastFailureUS  int64          `json:"last_failure_us"`
+	Schedule       monitor.Status `json:"schedule"`
 }
 
 // Registry contains active observation snapshots only. Native configuration owns
@@ -97,6 +99,14 @@ func (r *Registration) Complete(run synthetic.Run) {
 		r.job.LastFailureUS = run.CompletedUS
 	}
 }
+
+func (r *Registration) SetSchedule(status monitor.Status) {
+	r.registry.mu.Lock()
+	defer r.registry.mu.Unlock()
+	if !r.retired {
+		r.job.Schedule = status
+	}
+}
 func (r *Registration) Retire() {
 	r.registry.mu.Lock()
 	defer r.registry.mu.Unlock()
@@ -114,10 +124,15 @@ func (h *Registry) Snapshot(now time.Time) []Job {
 	out := make([]Job, 0, len(h.jobs))
 	for _, r := range h.jobs {
 		job := r.job
+		if job.Schedule.QueuedUS > 0 {
+			job.Schedule.QueueAge = max(0, now.Sub(time.UnixMicro(job.Schedule.QueuedUS)))
+		}
 		job.Latest = cloneRun(job.Latest)
 		if job.Latest != nil {
 			age := now.Sub(time.UnixMicro(job.Latest.CompletedUS))
-			job.Fresh = job.Latest.CompletedUS > 0 && age >= 0 && age <= 2*time.Duration(job.CadenceSeconds)*time.Second
+			cadence := time.Duration(job.CadenceSeconds) * time.Second
+			job.Fresh = job.Latest.CompletedUS > 0 && cadence > 0 && age >= 0 &&
+				(age <= cadence || age-cadence <= cadence)
 			if job.Latest.CompletedUS > 0 && !job.Fresh && job.State != "waiting" && job.State != "running" {
 				job.State = "stale"
 			}

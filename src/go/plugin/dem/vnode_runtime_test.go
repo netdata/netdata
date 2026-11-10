@@ -41,11 +41,14 @@ type vnodeExecutor struct{}
 
 func (vnodeExecutor) Check(context.Context, synthetic.Kind) error       { return nil }
 func (vnodeExecutor) Rehearse(context.Context, synthetic.Request) error { return nil }
-func (vnodeExecutor) Execute(_ context.Context, r synthetic.Request, state func(string)) synthetic.Execution {
+func (vnodeExecutor) ExecuteScheduled(_ context.Context, r synthetic.Request, state func(string), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
+	at := time.Now()
+	schedule := admitted(at)
 	state("running")
 	return synthetic.Execution{Drained: true, Run: synthetic.Run{
 		JobID: r.JobID(), Name: r.Name, Kind: r.Kind, VnodeGUID: r.VnodeGUID,
-		Outcome: synthetic.Success, CompletedUS: time.Now().UnixMicro(),
+		Outcome: synthetic.Success, StartedUS: at.UnixMicro(), CompletedUS: time.Now().UnixMicro(),
+		ScheduledUS: schedule.DueUS, QueuedUS: schedule.QueuedUS,
 	}}
 }
 
@@ -57,10 +60,12 @@ func TestNativeSyntheticVnodeAttributionAndChartRouting(t *testing.T) {
 			if kind == "journey" {
 				c := journey.New(journey.Dependencies{Executor: vnodeExecutor{}, Registry: hub})
 				c.Name, c.Script, c.Vnode = "check", "test('visit', async () => {});", "site"
+				c.CheckEvery = 1
 				collector = c
 			} else {
 				c := lighthouse.New(lighthouse.Dependencies{Executor: vnodeExecutor{}, Registry: hub})
 				c.Name, c.URL, c.Vnode = "check", "https://example.org", "site"
+				c.CheckEvery = 1
 				collector = c
 			}
 			first := vnodes.VirtualNode{Name: "site", GUID: "11111111-1111-4111-8111-111111111111", Hostname: "storefront"}

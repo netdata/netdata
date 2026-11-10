@@ -60,15 +60,23 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 				require.NotNil(t, response.RawResponse)
 				rows := response.RawResponse["data"].([][]any)
 				require.Len(t, rows, 1)
-				assert.Equal(t, association, rows[0][len(rows[0])-1])
+				assert.Equal(
+					t,
+					association,
+					rows[0][response.RawResponse["columns"].(map[string]any)["vnode_guid"].(map[string]any)["index"].(int)],
+				)
 			}
-			response := tc.handle(ctx, funcapi.RawMethodRequest{Method: tc.method, Permissions: "0x7b"})
+			response := tc.handle(ctx, funcapi.RawMethodRequest{
+				Method:      tc.method,
+				Permissions: "0x7b",
+			})
 			require.NotNil(t, response.RawResponse)
 			rows := response.RawResponse["data"].([][]any)
 			require.Len(t, rows, 3)
 			var groups []any
 			for _, row := range rows {
-				groups = append(groups, row[len(row)-1])
+				index := response.RawResponse["columns"].(map[string]any)["vnode_guid"].(map[string]any)["index"].(int)
+				groups = append(groups, row[index])
 			}
 			assert.ElementsMatch(t, []any{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""}, groups)
 		})

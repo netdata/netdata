@@ -246,6 +246,7 @@ func TestScheduledExecutionSnapshotsLatestOccurrenceAfterAdmission(t *testing.T)
 	defer history.mu.Unlock()
 	for _, saved := range history.runs {
 		if saved.JobID == r.JobID() {
+			assert.Equal(t, r.VnodeGUID, saved.VnodeGUID)
 			assert.Equal(t, run.ScheduledUS, saved.ScheduledUS)
 			assert.Equal(t, run.QueuedUS, saved.QueuedUS)
 			assert.Equal(t, run.StartedUS, saved.StartedUS)

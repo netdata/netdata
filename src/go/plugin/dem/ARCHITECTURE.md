@@ -121,7 +121,7 @@ DEM splits responsibility between three kinds of owner. Most contracts at the en
 |---|---|---|---|
 | Framework (`plugin/agent`) | The process; jobs come and go | Desired configuration, preflight, scheduling, admission, retries, status and DynCfg | Enabling a site; calling `Collect` every `update_every` |
 | Collector jobs (`collector/*`) | One job run | The runtime objects of that job and the metrics it publishes | The receiver's listener; a site's aggregator |
-| Command (`cmd/demplugin`) | The whole process | Shared stores and services: journal, captures, browser runtime, execution admission slot, retention | The journal survives every job reload |
+| Command (`cmd/demplugin`) | The whole process | Shared stores and services: journal, captures, browser runtime, execution admission, retention | The journal survives every job reload |
 
 Two **registries** connect running jobs to each other and to Functions. `rum/registry` and `synthetic/registry` hold
 only what is actually running (admitted sites, receiver availability, active synthetic jobs). `rum/registry` also leases
@@ -134,8 +134,8 @@ The four collector modules (the journeys below show them in action):
 |---|---|---|---|
 | `receiver` | Single instance (`dem:collector:receiver`) | Listens on `127.0.0.1:19938`, `update_every: 10` | HTTP listener, GeoIP resolver, receiver availability |
 | `rum` | One job per website (`dem:collector:rum:<name>`) | 5-minute measurement `window`, `update_every: 10` | Aggregator, route, diagnostics, history writer, optional exporters |
-| `journey` | One job per journey script (`script` or `script_path`) | Every 900 s, 120 s timeout | Prepared request, registration, metric store |
-| `lighthouse` | One job per audited URL | Every 1800 s, 180 s timeout | Prepared request, registration, metric store |
+| `journey` | One job per journey script (`script` or `script_path`) | Checks every 900 s, 120 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
+| `lighthouse` | One job per audited URL | Checks every 1800 s, 180 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
 
 ### Site vnode identity
 
@@ -190,14 +190,11 @@ Netdata configuration directory's `vnodes/` YAML format; DEM supports static con
 
 ### Capacity remains process-owned
 
-Journey and Lighthouse already share the process Executor. Independent configuration owners allow a future shared
-admission coordinator, bounded concurrency and optional vnode-based fairness without adding parent jobs. Vnode placement
-MUST NOT allocate a separate executor or browser pool. Job retirement must still cancel and drain only its own work.
-
-Vnode placement does not improve execution capacity by itself. Current synchronous collection can miss framework ticks
-while a prior run is busy; queueing those calls alone cannot reconstruct missed occurrences. A future central scheduler
-can register independent jobs through their `Run` lifecycle, own due times, and leave metric publication in `Collect`.
-Registration must be cancelled and joined before native predecessor release.
+Journey and Lighthouse share the process Executor and configured browser concurrency. Vnode association MUST NOT
+allocate a separate executor or browser pool. Scheduling is fair between ready jobs; vnode placement does not define quotas.
+Native `Run` owns due times and a bounded pending occurrence, while `Collect` publishes scalar latest observations. This avoids
+losing due occurrences when framework publication ticks are skipped. Retirement cancels and joins the session before
+native predecessor release; a replacement cannot inherit its pending work or completed observation.
 
 Warm browser reuse additionally needs explicit worker lifetime, runtime leases, per-attempt cancellation and browser
 state cleanup. A live shared worker cannot be considered reaped after each attempt. Preserve verified completion at the
@@ -292,8 +289,8 @@ Each site job builds its own objects; nothing is shared between sites:
 
 ## Journey 2: a synthetic run
 
-Journey and Lighthouse jobs do not listen for anything. The framework calls `Collect` on their schedule, and each call
-executes one complete browser run:
+Journey and Lighthouse jobs own background monitor sessions in `Run`. Each session schedules browser attempts using
+`check_every`; framework `Collect` publishes a small latest-observation snapshot every `update_every`:
 
 ```mermaid
 sequenceDiagram
@@ -306,8 +303,8 @@ sequenceDiagram
     participant Art as synthetic/artifacts
     participant J as journal
 
-    FW->>Job: Collect
-    Job->>Eng: Execute(request)
+    Job->>Job: Run: occurrence becomes due
+    Job->>Eng: ExecuteScheduled(request)
     Note over Eng: state "waiting":<br/>shared configured admission slots
     Eng->>RT: BeginUse (execution pin)
     Eng->>J: start record
@@ -319,7 +316,9 @@ sequenceDiagram
     Eng->>Art: Finalize captures
     Eng->>J: completion record
     Eng-->>Job: Execution(run, drained)
-    Job->>Job: registry.Complete, write metrics
+    Job->>Job: count admitted outcome; publish only if association epoch matches
+    FW->>Job: Collect (independent publication cadence)
+    Job->>Job: write latest snapshot and cumulative counters
 ```
 
 Key points of this path:
@@ -439,8 +438,8 @@ flowchart TD
 
 - The journal opens first, and the configured history budget applies before any producer can append.
 - The browser runtime is either a managed host holding the installed startup selection or an administrator preload.
-  The host maintains storage but never downloads or changes its selection. The runner holds the single plugin-wide
-  admission slot.
+  The host maintains storage but never downloads or changes its selection. The runner owns the shared configured
+  admission allowance.
 - Unusable retained history stops the plugin at startup, before any Function registers.
 - An initial capture cleanup failure does not stop startup; the retention worker retries it.
 - Browser runtime setup problems (missing installation, unsupported platform, bad preload) never stop startup. Synthetic
@@ -980,7 +979,17 @@ Job ownership:
 - Journey and Lighthouse each own their prepared request, metric store, product instruments and explicit execution
   flow.
 - They share an executor, pure request validation and the common outcome/duration instrument helper.
-- Framework scheduling owns cadence. The command owns shared execution admission, artifact store and journal.
+- `synthetic/monitor` owns due times in native `Run`; framework scheduling only refreshes metric snapshots.
+  The command owns shared execution admission, artifact store and journal.
+- A session has one executor call in flight and one latest pending occurrence. A new due replaces the pending
+  occurrence without requeuing a waiting call. Elapsed occurrences are counted arithmetically in constant time.
+  The admission callback consumes the latest due time and preserves the original queue timestamp in the run.
+- Bootstrap is immediately eligible. Recurring cadence starts one interval plus a deterministic JobID phase after
+  activation, then advances at a fixed rate. Delayed bootstrap cannot hide scheduled occurrences.
+- Every admitted, verified completion updates job-activation outcome counters, including obsolete-association results.
+  Only current-association completions update the value-only metric projection. `Collect` copies no reporter events
+  or captures, and repeated snapshots never increment attempt counters. Missing/stale measurements remain gaps;
+  known chart identities disable cycle expiry. The latest outcome becomes `stale` after two check intervals.
 
 Activation checks coalesce only while a contract probe is in flight for the exact runtime source view. Their caller
 deadlines remain independent; the last departing caller cancels and joins physical completion before a replacement
@@ -1003,8 +1012,19 @@ Draft rehearsal:
 Registration:
 
 - `Run` registers one observation generation before readiness.
-- `Collect` executes through that exact registration and records terminal outcomes.
-- Retirement fences late callbacks without replacing the collector's registration pointer.
+- The monitor session publishes current-association outcomes through that exact registration; `Collect` reads its scalar snapshot.
+- Session owns a monotonic association epoch under its mutex. At execution-queue submission it captures both the
+  prepared request (including vnode GUID) and epoch by value. Later admission may choose a newer pending due time,
+  but MUST NOT replace the captured identity. History and artifacts retain this GUID regardless of reassignment.
+- A GUID change increments the epoch, updates the next request and clears current latest observations, state and
+  success/failure timestamps. Same-GUID hostname/label updates preserve them. Old-epoch state/completion callbacks
+  MUST NOT refill current observations, including A-to-B-to-A transitions. Changes count when delivered by the
+  framework's configured-vnode snapshot; unobserved intermediate config edits are not association transitions.
+- Placement, state and completion callbacks are serialized under Session's mutex, with lock order Session then
+  Registry and no callback reentry. Physical-job scheduled/admitted/coalesced/outcome counters, pending/active state
+  and queue diagnostics continue across reassignment. Obsolete completions still undergo drainage and completion-time
+  checks; fencing current publication MUST NOT hide unsafe execution or delete historical evidence.
+- Retirement cancels and joins the session and executor call before retiring its registration; late callbacks remain fenced.
 
 Failure handling:
 
@@ -1109,7 +1129,7 @@ Protected preloads and shutdown:
 - Summary reduction is O(selected runs) memory and stores no full timelines. SDK snapshots use bounded buffers per
   retained file.
 - Current synthetic registry registrations own copied generation observations and reset to unknown on replacement.
-- Freshness is two native intervals and remains independent of an in-flight attempt. History does not drive current
+- Freshness is two browser check intervals and remains independent of an in-flight attempt. History does not drive current
   incidents.
 
 ### Captures

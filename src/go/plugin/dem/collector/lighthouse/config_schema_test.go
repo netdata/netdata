@@ -26,6 +26,7 @@ func TestFormsRejectInvalidWorkflowInputs(t *testing.T) {
 		value any
 		valid bool
 	}{
+		{"check_every", 1, true}, {"check_every", 0, false}, {"check_every", -1, false},
 		{"timeout", 0.000999, false}, {"timeout", 0.001, true},
 		{"url", "/relative", false}, {"url", "ftp://example.org/", false},
 		{"url", "https://user:password@example.org/", false}, {"url", "https://user@example.org/", false},

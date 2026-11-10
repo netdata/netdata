@@ -171,8 +171,8 @@ func (e *admissionTestJourneyExecutor) Check(context.Context, synthetic.Kind) er
 	}
 	return nil
 }
-func (*admissionTestJourneyExecutor) Execute(
-	ctx context.Context, _ synthetic.Request, _ func(string),
+func (*admissionTestJourneyExecutor) ExecuteScheduled(
+	ctx context.Context, _ synthetic.Request, _ func(string), _ func(time.Time) synthetic.Schedule,
 ) synthetic.Execution {
 	<-ctx.Done()
 	return synthetic.Execution{Drained: true}
