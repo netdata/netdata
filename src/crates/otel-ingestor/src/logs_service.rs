@@ -744,11 +744,11 @@ impl NetdataLogsService {
 
         // Admit each stream for storage, or record why it is turned away.
         let mut rejections = Rejections::default();
-        let mut accepted = Vec::with_capacity(groups.len());
+        let mut storable_streams = Vec::with_capacity(groups.len());
 
         for (stream, group) in groups {
             match StorableStream::admit(stream, group, tenant_id, &self.claimed_streams) {
-                Ok(s) => accepted.push(s),
+                Ok(s) => storable_streams.push(s),
                 Err(rejection) => rejections.push(rejection),
             }
         }
@@ -756,7 +756,7 @@ impl NetdataLogsService {
         // Nothing to write: the request carried no records, or every stream
         // was a collision or had an oversized identity. Still report the
         // rejected records to the client.
-        if accepted.is_empty() {
+        if storable_streams.is_empty() {
             return Ok(self.counted_response(0, &rejections));
         }
 
@@ -787,7 +787,7 @@ impl NetdataLogsService {
         // resolved times) and are counted only once the records are durable.
         let mut derived_batch = self.derived.as_ref().and_then(|d| d.logs_batch());
 
-        for s in &mut accepted {
+        for s in &mut storable_streams {
             let flattened = s.flatten(fallback_base_ns, bounds, |request| {
                 if let Some(batch) = derived_batch.as_mut() {
                     batch.record(tenant_id.as_str(), request);
@@ -806,7 +806,7 @@ impl NetdataLogsService {
             );
         }
 
-        // Every accepted stream was fully rejected as out-of-window: nothing to
+        // Every storable stream was fully rejected as out-of-window: nothing to
         // write, but still report the rejected records to the client.
         if kept == 0 {
             return Ok(self.counted_response(0, &rejections));
@@ -847,7 +847,7 @@ impl NetdataLogsService {
         };
         {
             let mut writer = writer.lock().unwrap();
-            for s in &accepted {
+            for s in &storable_streams {
                 s.write_to(&mut writer, &self.clock)?;
             }
             writer.sync_all().map_err(|e| {

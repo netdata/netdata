@@ -437,7 +437,7 @@ impl NetdataTracesService {
             observations.push(observer.prepare(tenant_id.as_str(), &request));
         }
 
-        let mut groups = partition_spans(request);
+        let mut storable_spans = partition_spans(request);
 
         // Phase 1 — prepare every frame WITHOUT holding any writer lock:
         // `prepare_trace_frame` consumes an owned request and needs nothing
@@ -466,8 +466,8 @@ impl NetdataTracesService {
         // resolved times) and are counted only once the spans are durable.
         let mut derived_batch = self.derived.as_ref().and_then(|d| d.spans_batch());
 
-        for g in &mut groups {
-            let flattened = g.flatten(fallback_base_ns, bounds, |request| {
+        for s in &mut storable_spans {
+            let flattened = s.flatten(fallback_base_ns, bounds, |request| {
                 if let Some(batch) = derived_batch.as_mut() {
                     batch.record(tenant_id.as_str(), request);
                 }
@@ -526,8 +526,8 @@ impl NetdataTracesService {
         };
         {
             let mut writer = writer.lock().unwrap();
-            for g in &groups {
-                g.write_to(&mut writer, &self.clock)?;
+            for s in &storable_spans {
+                s.write_to(&mut writer, &self.clock)?;
             }
             writer.sync_all().map_err(|e| {
                 tracing::error!(%e, "failed to sync traces WAL");
