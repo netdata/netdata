@@ -6,6 +6,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -30,7 +31,7 @@ func checkWaiters(t *testing.T, e *Engine, n int, retiring bool) {
 	}, time.Second, time.Millisecond)
 }
 func checkReply(out *os.File) ndexec.TreeResult {
-	_, err := fmt.Fprintf(out, `{"version":"release-a","contract":1,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
+	_, err := fmt.Fprintf(out, `{"version":"release-a","contract":%d,"uid":%d,"gid":%d}`, SupportedContract, os.Geteuid(), os.Getegid())
 	return ndexec.TreeResult{Drained: true, Err: err}
 }
 func TestConcurrentChecksShareOneProbeAndLaterCheckIsFresh(t *testing.T) {
@@ -239,7 +240,7 @@ func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
 	}
 	e, _, _ := testEngineSlots(t, 2)
 	monitoring, qualified, release := make(chan struct{}, 1), make(chan struct{}, 1), make(chan struct{})
-	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
+	e.start = withBrowserOwners(t, starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		if slices.Contains(args, "--check") {
 			return checkReply(out)
 		}
@@ -252,6 +253,10 @@ func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
 			<-release
 		} else if r.Kind == synthetic.Journey {
 			qualified <- struct{}{}
+			if r.Browser == nil {
+				return ndexec.TreeResult{Drained: true, Err: errors.New("qualification omitted the managed browser")}
+			}
+			assert.NoError(t, emitBrowserReport(out, r.Browser, "clean"))
 		}
 		result := success()
 		if r.Kind == synthetic.Lighthouse {
@@ -260,7 +265,7 @@ func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
 			result.Metrics = &synthetic.LabMetrics{Performance: &score}
 		}
 		return resultPayload(result)(ctx, args, raw, out, stderr)
-	})
+	}), nil)
 	monitorDone := make(chan synthetic.Execution, 1)
 	go func() { monitorDone <- e.Execute(t.Context(), namedRequest("runtime-qualification", "monitor"), nil) }()
 	receive(t, monitoring)

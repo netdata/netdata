@@ -36,6 +36,7 @@ type Config struct {
 	Timeout             confopt.Duration `yaml:"timeout"               json:"timeout"`
 	Script              string           `yaml:"script,omitempty"      json:"script,omitempty"`
 	ScriptPath          string           `yaml:"script_path,omitempty" json:"script_path,omitempty"`
+	BrowserMode         string           `yaml:"browser_mode" json:"browser_mode"`
 	Secrets             []Secret         `yaml:"secrets,omitempty"     json:"secrets,omitempty"`
 	ScreenshotOnFailure bool             `yaml:"screenshot_on_failure" json:"screenshot_on_failure"`
 }
@@ -82,6 +83,7 @@ func New(deps Dependencies) *Collector {
 	meter := store.Write().SnapshotMeter("")
 	return &Collector{
 		Config: Config{
+			BrowserMode: "reuse",
 			CheckEvery:  900,
 			UpdateEvery: 10,
 			Timeout:     confopt.Duration(2 * time.Minute),

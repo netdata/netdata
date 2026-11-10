@@ -43,6 +43,7 @@ func run(args []string, diagnostics io.Writer) error {
 	fs.StringVar(&sources, "sources", "", "local source archive (required for sign; optional for verify)")
 	var manifest, archiveURL, sourcesURL string
 	var sequence uint64
+	var retained bool
 	switch args[0] {
 	case "sign":
 		fs.StringVar(&publicKey, "public-key", "", "local public OpenPGP keyring to verify the generated signature")
@@ -53,6 +54,7 @@ func run(args []string, diagnostics io.Writer) error {
 		fs.Uint64Var(&sequence, "sequence", 0, "positive publication sequence in the shared release channel")
 	case "verify":
 		fs.StringVar(&descriptor, "release", "", "signed descriptor path")
+		fs.BoolVar(&retained, "retained", false, "accept a prior contract when checking an existing channel pointer")
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
@@ -66,7 +68,7 @@ func run(args []string, diagnostics io.Writer) error {
 		return errors.New("key and descriptor paths are required")
 	}
 	if args[0] == "verify" {
-		return verify(key, descriptor, archive, sources)
+		return verify(key, descriptor, archive, sources, retained)
 	}
 	if publicKey == "" || manifest == "" || archive == "" || sources == "" || archiveURL == "" || sourcesURL == "" || sequence == 0 {
 		return errors.New("sign requires public-key, manifest, archive, sources, archive-url, sources-url, and a positive sequence")
@@ -130,7 +132,7 @@ func run(args []string, diagnostics io.Writer) error {
 	return writeNew(descriptor, signed)
 }
 
-func verify(key, descriptor, archive, sources string) error {
+func verify(key, descriptor, archive, sources string, retained bool) error {
 	public, err := runtime.ReadReleaseKeyring(key)
 	if err != nil {
 		return err
@@ -139,7 +141,11 @@ func verify(key, descriptor, archive, sources string) error {
 	if err != nil {
 		return err
 	}
-	release, err := runtime.VerifyRelease(data, public)
+	verifyDescriptor := runtime.VerifyRelease
+	if retained {
+		verifyDescriptor = runtime.VerifyRetainedRelease
+	}
+	release, err := verifyDescriptor(data, public)
 	if err != nil {
 		return err
 	}

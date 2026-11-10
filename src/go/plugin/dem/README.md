@@ -550,8 +550,11 @@ and joins execution before the replacement starts.
 `browser.concurrency` in `dem.conf` limits simultaneous browser attempts in one plugin process. It defaults to 1 and
 accepts a positive integer; restart the plugin to apply changes. Monitoring, journey rehearsals and in-process runtime
 qualification share this allowance. Ready jobs take turns, and monitoring and rehearsals for the same job cannot overlap.
-Waiting time is separate from execution time; cancellation while waiting starts no browser. A fresh browser is created
-for each run.
+Waiting time is separate from execution time; cancellation while waiting starts no browser. Journeys reuse warm
+Chromium processes by default, with fresh Playwright Test processes and isolated contexts for each attempt.
+`browser_mode: fresh` starts a separate browser per journey. Lighthouse always starts a fresh browser. Reusable
+browsers occupy the same capacity slots, retire before a fresh execution uses the slot, and expire after one idle minute.
+Timeouts, cancellation and unverified context cleanup retire the affected browser before its slot can be reused.
 
 Choose concurrency for the Agent's CPU and memory budget and the accuracy needed from Lighthouse measurements.
 The setting is not a hard memory limit or a count of every child process. Concurrent activation checks share one
@@ -625,8 +628,13 @@ the stuck process before retrying removal or repair.
 
 **Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
 acquired at startup. A process started without a runtime stays unavailable until restarted. Runtime releases can
-update their components without an Agent upgrade while preserving execution contract 1. Runs record the actual
+update their components without an Agent upgrade while preserving execution contract 2. Runs record the actual
 release version, archive digest and execution contract for investigation.
+
+This Agent requires runtime execution contract 2. A previous contract-1 installation remains inspectable and retains
+its ownership records, but cannot execute checks with this Agent. Prepare a compatible signed release using the
+explicit install/update path, upgrade the native runtime package, or prepare a new protected preload as appropriate,
+then restart the Agent. Ordinary enrollment does not silently upgrade an existing incompatible selection.
 
 Explicit installation enables automatic preparation by default and prints this policy before proceeding. Use
 `--manual-updates` on install or repair to disable it. The running plugin checks roughly daily with jitter, downloads
@@ -743,6 +751,11 @@ relative helpers, hooks, fixtures, assertions and `test.step` are supported. The
 neighboring specs/configuration are not discovered. Project aliases and custom package trees are not an initial contract.
 Callable `require('@playwright/test')` shorthand and JSX/TSX are unsupported. One Chromium project/worker runs without
 retries or repetition; script retry overrides are rejected. Scripts are trusted code running under the plugin identity.
+
+Keep the default `browser_mode: reuse` for normal page/context workflows. Choose `fresh` for raw CDP, browser-wide
+tracing or binding, custom selectors, or local `download.path()`/`video.path()` access. Remote downloads can use
+`saveAs()`. These managed-mode restrictions also apply when launch settings cause an automatic fresh-browser fallback.
+Unsupported operations report an execution error; the workflow is never replayed automatically after performing actions.
 
 ```yaml
 jobs:

@@ -158,6 +158,9 @@ func readNativePayload(path string) (Paths, Manifest, error) {
 		return Paths{}, empty, errors.New("native package identity, platform or bound prefix differs")
 	}
 	if err := m.Validate(); err != nil {
+		if errors.Is(err, errIncompatibleContract) {
+			err = fmt.Errorf("%w; upgrade the netdata-dem-runtime package and restart dem.plugin", err)
+		}
 		return Paths{}, empty, err
 	}
 	// Package authentication authorizes the payload. Verify that its entire

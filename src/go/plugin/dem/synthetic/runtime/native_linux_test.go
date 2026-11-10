@@ -236,8 +236,11 @@ func (f *nativeFixture) hold(t *testing.T, action string, target *Manifest) func
 	command.Stderr = &stderr
 	require.NoError(t, command.Start())
 	line, err := bufio.NewReader(output).ReadString('\n')
-	require.NoError(t, err, "%s", stderr.String())
-	require.Equal(t, "ready\n", line, "%s", stderr.String())
+	if err != nil || line != "ready\n" {
+		closeErr := input.Close()
+		waitErr := command.Wait()
+		t.Fatalf("native %s did not become ready: stdout=%q read=%v close=%v wait=%v stderr=%s", action, line, err, closeErr, waitErr, stderr.String())
+	}
 	var once sync.Once
 	stop := func() {
 		once.Do(func() {
@@ -280,6 +283,36 @@ func TestNativeAdmissionLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "closed", state.Phase)
 	require.Nil(t, state.Target)
+	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
+}
+
+func TestNativeLegacyContractAllowsProofInspectionAndReplacement(t *testing.T) {
+	f := newNativeFixture(t)
+	ctx := t.Context()
+	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
+	stop := f.hold(t, "hold", nil)
+	state, err := readNativeControl(f.config)
+	require.NoError(t, err)
+	state.Target.Contract = retainedExecutionContract
+	require.NoError(t, writeNativeControl(f.config, state))
+	legacy, err := json.Marshal(NativePackage{Format: 1, Path: f.config.PayloadPath, Manifest: *state.Target})
+	require.NoError(t, err)
+	metadata := filepath.Join(f.config.PayloadPath, "native.json")
+	require.NoError(t, os.WriteFile(metadata, legacy, 0644))
+
+	status, err := f.inspect(t)(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 1, status.ProcessClaims)
+	data, err := f.command(t, "consume", nil).CombinedOutput()
+	require.Error(t, err, "%s", data)
+	require.Contains(t, string(data), "upgrade the netdata-dem-runtime package")
+	require.ErrorIs(t, f.control.CloseAdmission(ctx, f.inspect(t)), ErrInUse)
+	stop()
+	require.NoError(t, f.control.CloseAdmission(ctx, f.inspect(t)))
+	require.ErrorIs(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")), errIncompatibleContract)
+	current, err := json.Marshal(NativePackage{Format: 1, Path: f.config.PayloadPath, Manifest: f.manifest})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(metadata, current, 0644))
 	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
 }
 

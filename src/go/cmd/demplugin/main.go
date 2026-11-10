@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
@@ -142,7 +143,7 @@ func main() {
 		},
 		cfg,
 	)
-	services := []composition.ProcessService{components.Retention}
+	services := []composition.ProcessService{components.Retention, executor}
 	if runtimeHandle.Host != nil {
 		services = append(services, runtimeHandle.Host)
 	}
@@ -192,6 +193,13 @@ func main() {
 	}
 	if result.ExitRequired {
 		os.Exit(0)
+	}
+	ownerShutdown, cancelOwnerShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+	ownerErr := executor.Close(ownerShutdown)
+	cancelOwnerShutdown()
+	if ownerErr != nil {
+		a.Errorf("plugin exiting with retained unverified browser owners: %v", ownerErr)
+		os.Exit(1)
 	}
 	if err := runtimeHandle.Close(); err != nil {
 		a.Errorf("closing DEM runtime: %v", err)

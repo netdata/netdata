@@ -16,6 +16,8 @@ export function manageBrowser(browser, onError = () => {}) {
   let finishing;
   const creations = new Set();
   const contexts = new Map();
+  const pages = new WeakSet();
+  const localArtifacts = new WeakSet();
   const originalContexts = browser.contexts.bind(browser);
 
   const fail = reason => {
@@ -30,6 +32,28 @@ export function manageBrowser(browser, onError = () => {}) {
       object[name] = async () => { throw fail(`${name} is unavailable with a reused browser`); };
     }
   };
+  function guardArtifact(artifact, kind) {
+    if (!artifact || localArtifacts.has(artifact)) return artifact;
+    localArtifacts.add(artifact);
+    artifact.path = async () => { throw fail(`${kind}.path requires a fresh browser; use saveAs to save a copy`); };
+    return artifact;
+  }
+  function guardPage(page) {
+    if (pages.has(page)) return page;
+    pages.add(page);
+    if (typeof page.emit === 'function') {
+      const emit = page.emit.bind(page);
+      page.emit = (name, ...args) => {
+        if (name === 'download') guardArtifact(args[0], 'download');
+        return emit(name, ...args);
+      };
+    }
+    if (typeof page.video === 'function') {
+      const video = page.video.bind(page);
+      page.video = () => guardArtifact(video(), 'video');
+    }
+    return page;
+  }
   function guardContext(context) {
     if (contexts.has(context)) return context;
     const state = {close: context.close.bind(context), closing: undefined};
@@ -43,6 +67,22 @@ export function manageBrowser(browser, onError = () => {}) {
       }
       return state.closing;
     };
+    if (typeof context.emit === 'function') {
+      const emit = context.emit.bind(context);
+      context.emit = (name, ...args) => {
+        if (name === 'page') guardPage(args[0]);
+        return emit(name, ...args);
+      };
+    }
+    if (typeof context.pages === 'function') {
+      const allPages = context.pages.bind(context);
+      context.pages = () => allPages().map(guardPage);
+      context.pages();
+    }
+    if (typeof context.newPage === 'function') {
+      const newPage = context.newPage.bind(context);
+      context.newPage = (...args) => newPage(...args).then(guardPage);
+    }
     deny(context, 'newCDPSession');
     return context;
   }
@@ -73,7 +113,7 @@ export function manageBrowser(browser, onError = () => {}) {
   browser.contexts = () => originalContexts().map(guardContext);
   browser.contexts();
   creation('newContext', guardContext);
-  creation('newPage', page => { guardContext(page.context()); return page; });
+  creation('newPage', page => { guardContext(page.context()); return guardPage(page); });
   for (const name of ['newBrowserCDPSession', 'startTracing', 'stopTracing', 'bind', 'unbind']) deny(browser, name);
 
   return {

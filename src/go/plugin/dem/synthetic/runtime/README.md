@@ -7,7 +7,7 @@ Release inputs and adapters live in `src/dem-runtime` and `packaging/dem-runtime
 
 ## Trust and preparation
 
-A publisher-authenticated format-1 descriptor identifies execution contract 1,
+A publisher-authenticated format-1 descriptor identifies execution contract 2,
 release version, platform, archive SHA256/size, tar/expanded bounds, entry count,
 layout and authenticated interpreter slots. The archive is not its own trust anchor.
 Production release discovery and CLI delivery integration are separate from these
@@ -128,6 +128,16 @@ Normal checks reject regressions. Explicit repair can select an older authentica
 release after all consumers/executions drain, with a newly specified update policy.
 The CLI's explicit install and repair commands, including signed offline imports,
 enable future automatic online preparation unless `--manual-updates` is supplied.
+
+The Agent reads contract-1 selections, prepared generations and native gate
+records to preserve existing protection and retire obsolete bytes after drainage.
+New execution and qualification require contract 2. A managed contract-1 selection
+requires `dem.plugin runtime update` or `dem.plugin runtime install` with a signed
+contract-2 release, followed by a plugin restart. Update preserves the existing
+automatic-update policy. Opted-in installations can also prepare contract 2 through
+the ordinary automatic update. `ensure` enrolls absent installations and requires
+an explicit upgrade for a contract-1 selection. Upgrade a native installation
+through its package manager, or prepare and configure a new immutable preload.
 Offline import describes acquisition for that invocation, which uses only local
 files; it does not select a manual update policy. Protected preloads remain manual.
 

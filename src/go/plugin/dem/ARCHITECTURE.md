@@ -300,6 +300,7 @@ sequenceDiagram
     participant Eng as synthetic/runner
     participant RT as browser runtime
     participant Proc as nd-run<br/>Node + Chromium
+    participant Owner as supervised warm<br/>Chromium owner
     participant Art as synthetic/artifacts
     participant J as journal
 
@@ -309,10 +310,19 @@ sequenceDiagram
     Eng->>RT: BeginUse (execution pin)
     Eng->>J: start record
     Eng->>Art: Begin (private work directory)
+    opt Managed journey reuse
+      Eng->>Owner: create or borrow slot owner (separate execution pin)
+    end
     Note over Eng: state "running"
     Eng->>Proc: request over private stdin
     Proc-->>Eng: reporter events (private pipe)
+    opt Managed journey reuse
+      Proc-->>Eng: matching owner/epoch cleanup disposition
+    end
     Proc-->>Eng: whole process tree drained (verified)
+    opt Browser retirement required
+      Eng->>Owner: stop and verify whole owner tree drained
+    end
     Eng->>Art: Finalize captures
     Eng->>J: completion record
     Eng-->>Job: Execution(run, drained)
@@ -327,12 +337,15 @@ Key points of this path:
   qualification, defaulting to one. Ready jobs take turns; one logical job cannot run overlapping attempts. Waiting
   time is separate from execution time, and cancellation while waiting starts no browser. Qualification uses a
   separate internal identity, so a user job name cannot collide with it.
-- **A fresh browser per run.** Runs share no browser state.
+- **Fresh Test processes and contexts.** Journeys default to a reusable Chromium owner per capacity slot;
+  `browser_mode: fresh` and Lighthouse use fresh browsers. The owner has an independent runtime use and supervised
+  process tree. Idle expiry, incompatible work, cancellation, timeout or unverified cleanup retires that owner.
 - **Installation is explicit.** An administrator installs and qualifies a complete runtime, or supplies a sealed
   preload. The process acquires its release at startup; each run pins that already prepared release for its duration.
 - **Proof of completion.** The Node adapter and its browser start through `nd-run`, the Agent's unprivileged launcher,
-  acting as a Linux subreaper. A run finishes only when that supervision proves the whole child process tree has
-  exited. Only then are captures published and the admission slot released.
+  acting as a Linux subreaper. A run finishes only when that supervision proves the complete attempt tree has
+  exited. Reuse additionally requires matching context-cleanup evidence and a healthy owner; retirement holds
+  admission until the separate owner tree drains. Only then are captures published and the slot released.
 
 How a run can end:
 

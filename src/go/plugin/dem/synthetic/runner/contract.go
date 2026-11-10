@@ -2,6 +2,8 @@
 
 package runner
 
+import "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+
 // SupportedContract is the semantic execution contract accepted by this Agent.
 // Runtime releases own component versions and private dependency layouts.
-const SupportedContract = 1
+const SupportedContract = runtime.ExecutionContract

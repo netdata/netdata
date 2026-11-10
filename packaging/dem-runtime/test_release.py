@@ -230,7 +230,7 @@ class SignedPublicationTests(unittest.TestCase):
         for arch in release.ARCHITECTURES:
             directory = root / 'artifacts' / ('dem-runtime-' + arch)
             directory.mkdir(parents=True)
-            manifest = {'format': 1, 'contract': 1, 'version': '1.2.3', 'platform': 'linux/' + arch,
+            manifest = {'format': 1, 'contract': 2, 'version': '1.2.3', 'platform': 'linux/' + arch,
                         'archive': {'sha256': digest, 'bytes': len(data), 'tar_bytes': len(raw.getvalue()),
                                     'expanded_bytes': sum(map(len, entries.values())), 'entries': len(entries)},
                         'layout': {'node': 'node', 'browser': 'browser', 'loader': 'lib/loader',
@@ -273,6 +273,44 @@ class SignedPublicationTests(unittest.TestCase):
         path.write_text(json.dumps(envelope))
         with self.assertRaises(subprocess.CalledProcessError):
             release.publication(args)
+
+    def test_contract_upgrade_verifies_existing_latest_before_promotion(self):
+        args, _, _ = self.fixture()
+        release.stage(args)
+        proposed, _ = release.publication(args)
+
+        def stored_descriptor(arch, contract, sequence):
+            stored = copy.deepcopy(proposed[arch])
+            stored['sequence'] = sequence
+            stored['manifest'].update(contract=contract, version='1.2.2')
+            payload = json.dumps(stored).encode()
+            signature = subprocess.run(
+                ['gpg', '--batch', '--no-tty', '--no-armor', '--local-user', self.fingerprint,
+                 '--digest-algo', 'SHA256', '--detach-sign', '--output', '-'],
+                input=b'netdata-dem-runtime-release-v1\0' + payload, capture_output=True, check=True).stdout
+            return json.dumps({'format': 1, 'payload': base64.b64encode(payload).decode(),
+                               'signature': base64.b64encode(signature).decode()}).encode()
+
+        pointer = args.remote + '/dem-runtime/latest/amd64.json'
+        for contract, sequence, error in [(3, 16, subprocess.CalledProcessError), (1, 18, ValueError)]:
+            with self.subTest(contract=contract, sequence=sequence), \
+                    patch.object(release, 'read_latest', side_effect={pointer: stored_descriptor('amd64', contract, sequence)}.get), \
+                    patch.object(release, 'upload') as upload, self.assertRaises(error):
+                release.publish(args)
+            upload.assert_not_called()
+
+        storage = {args.remote + '/dem-runtime/latest/' + arch + '.json': stored_descriptor(arch, 1, 16)
+                   for arch in release.ARCHITECTURES}
+
+        def upload(arguments, path, relative, *, mutable=False):
+            storage[arguments.remote + '/' + relative] = path.read_bytes()
+
+        with patch.object(release, 'read_latest', side_effect=storage.get), \
+                patch.object(release, 'upload', side_effect=upload), patch.object(release, 'public_identity'):
+            release.publish(args)
+            self.assertTrue(all(item['manifest']['contract'] == 1 for item in release.current_releases(args).values()))
+            release.promote(args)
+            self.assertEqual(release.current_releases(args), proposed)
 
     def test_retry_reuses_authenticated_immutable_bytes_and_promotes_them(self):
         args, _, _ = self.fixture()

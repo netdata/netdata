@@ -100,7 +100,7 @@ def recipe_sources():
 def install_runner(assets, root, version):
     metadata = json.loads((assets / 'runtime.json').read_text())
     pins = json.loads((assets / 'manifest.json').read_text())
-    if metadata['contract'] != 1 or pins['protocol_version'] != metadata['contract']:
+    if metadata['contract'] != 2 or pins['protocol_version'] != metadata['contract']:
         raise ValueError('unsupported runtime execution contract')
     if pins['entrypoint'] != 'runner/run.mjs' or metadata['paths'] != {
             'dependencies': 'dependencies', 'browser': 'chrome'}:

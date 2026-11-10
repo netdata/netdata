@@ -14,7 +14,8 @@ no per-monitor resource demand or first-use download.
 `Ready` and `Dependencies` are pure memory lookups. Installation changes do not
 publish readiness changes to the fixed process selection. Missing setup leaves
 browser jobs waiting with installation and restart
-guidance while RUM continues. Every runner probe and invocation obtains `BeginUse`
+guidance while RUM continues. A contract-1 selection is also unavailable for
+execution. Install a contract-2 release before restarting. Every runner probe and invocation obtains `BeginUse`
 from the held process consumer, passes its completion handle to supervision, and
 finishes with actual drainage proof. A failed execution admission can retry
 against the same held release without permanently poisoning readiness.

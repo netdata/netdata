@@ -47,7 +47,7 @@ func (s selection) validateRelease() error {
 	if s.Manifest == nil {
 		return errors.New("uninstalled runtime retains release metadata")
 	}
-	if err := s.Release.Validate(); err != nil {
+	if err := s.Release.validateStored(); err != nil {
 		return err
 	}
 	if s.Manifest.Archive.URL != s.Release.Manifest.Archive.URL || !sameManifest(*s.Manifest, s.Release.Manifest) {
@@ -70,7 +70,8 @@ func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstal
 // BeginPublishedEnsure enrolls only a proven absent selection. A usable selected
 // generation is checked under installer exclusion without discovery, inventory,
 // qualification or changing its update policy. The returned manifest is a
-// snapshot; exclusion is released before return. Damage requires explicit repair.
+// snapshot; exclusion is released before return. An incompatible selection
+// requires update or install. Damage requires explicit repair.
 // A new candidate enables automatic preparation only when successfully selected.
 func (s *Store) BeginPublishedEnsure(ctx context.Context, load func(context.Context) (Release, error)) (*Candidate, *Manifest, error) {
 	return s.beginPublishedInstall(ctx, ReleaseInstallOptions{Operation: ensureRelease, Updates: AutomaticUpdates}, load)
@@ -167,6 +168,9 @@ func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstal
 }
 
 func (s *Store) validateEnsureSelection(m Manifest) (result error) {
+	if err := validateManagedSelectionContract(m); err != nil {
+		return err
+	}
 	root, err := s.root.OpenRoot(filepath.Join("generations", m.Archive.SHA256))
 	if err != nil {
 		return selectedPayloadError(err)

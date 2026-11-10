@@ -20,7 +20,7 @@ func BenchmarkAdmissionReadyJobs(b *testing.B) {
 				b.Fatal(err)
 			}
 			ctx, cancel := context.WithCancel(context.Background())
-			holder, err := engine.acquire(ctx, executionKey{jobID: "holder"})
+			holder, err := engine.acquire(ctx, executionKey{jobID: "holder"}, nil)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -32,7 +32,7 @@ func BenchmarkAdmissionReadyJobs(b *testing.B) {
 				go func() {
 					defer workers.Done()
 					for {
-						job, err := engine.acquire(ctx, key)
+						job, err := engine.acquire(ctx, key, nil)
 						if err != nil {
 							return
 						}

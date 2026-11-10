@@ -82,6 +82,93 @@ func TestPublishedInstallationConsentAndSequenceAreAtomic(t *testing.T) {
 	require.Nil(t, unchanged)
 }
 
+func TestPublishedContractUpgradePreservesLegacyOwnership(t *testing.T) {
+	store, _ := testStore(t)
+	store.config.PreviousRetention = 0
+	legacy := installPublishedFixture(t, store, 2, ManualUpdates)
+	consumer, err := store.AcquireSelected()
+	require.NoError(t, err)
+	defer consumer.Close()
+	use, err := consumer.BeginUse()
+	require.NoError(t, err)
+	defer use.Finish(true)
+
+	// Format 1 of both records is unchanged. Represent a prior Agent's store
+	// by setting its contract on the prepared descriptor and selected release.
+	// The original consumer and execution records stay live and unmodified.
+	legacy.Manifest.Contract = retainedExecutionContract
+	legacyPath := filepath.Join("generations", legacy.Manifest.Archive.SHA256)
+	require.NoError(t, store.withLock(func() error {
+		prepared, err := store.loadGeneration(legacy.Manifest.Archive.SHA256)
+		if err != nil {
+			return err
+		}
+		prepared.Manifest = legacy.Manifest
+		if err := saveJSON(store.root, filepath.Join(legacyPath, "prepared.json"), prepared); err != nil {
+			return err
+		}
+		return store.selectRecordLocked(selection{Manifest: &legacy.Manifest, Release: &legacy})
+	}))
+
+	upgraded, err := Open(store.config)
+	require.NoError(t, err)
+	defer upgraded.Close()
+	upgraded.now = store.now
+	status, err := upgraded.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, legacy, *status.Release)
+	require.Equal(t, 1, status.ProcessClaims)
+	require.Equal(t, 1, status.ExecutionPins)
+	oldConsumer, err := upgraded.AcquireSelected()
+	require.Nil(t, oldConsumer)
+	require.ErrorContains(t, err, "dem.plugin runtime update")
+	require.ErrorContains(t, err, "restart dem.plugin")
+	candidate, selected, err := upgraded.BeginPublishedEnsure(t.Context(), func(context.Context) (Release, error) {
+		t.Fatal("ensure discovered a release for an existing installation")
+		return Release{}, nil
+	})
+	require.Nil(t, candidate)
+	require.Nil(t, selected)
+	require.ErrorIs(t, err, errIncompatibleContract)
+
+	options := ReleaseInstallOptions{Operation: UpdateRelease}
+	_, err = upgraded.BeginPublishedInstall(t.Context(), options, func(context.Context) (Release, error) { return legacy, nil })
+	require.ErrorIs(t, err, errIncompatibleContract, "loaded descriptors must pass admission even when the caller verifies them")
+	_, _, older := publishedFixture(t, 1)
+	_, err = upgraded.BeginPublishedInstall(t.Context(), options, older)
+	require.ErrorContains(t, err, "regress")
+	next, archive, load := publishedFixture(t, 3)
+	candidate, err = upgraded.BeginPublishedInstall(t.Context(), options, load)
+	require.NoError(t, err)
+	require.Equal(t, ExecutionContract, candidate.Manifest().Contract)
+	require.NoError(t, candidate.Import(t.Context(), archive))
+	qualification, err := candidate.BeginUse()
+	require.NoError(t, err)
+	require.NoError(t, qualification.Finish(true))
+	require.NoError(t, candidate.Select())
+	require.NoError(t, candidate.Close())
+	current, err := upgraded.AcquireSelected()
+	require.NoError(t, err)
+	require.Equal(t, next.Manifest, current.Manifest())
+	require.NoError(t, current.Close())
+	status, err = upgraded.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, next, *status.Release)
+	require.False(t, status.AutomaticUpdates, "a manual installation remains manual")
+	require.Equal(t, 1, status.ProcessClaims)
+	require.Equal(t, 1, status.ExecutionPins)
+	require.ErrorIs(t, upgraded.Uninstall(t.Context()), ErrInUse)
+
+	require.NoError(t, consumer.Close())
+	require.NoError(t, upgraded.Sweep())
+	require.FileExists(t, use.Paths.Node, "the live execution still pins the prior generation")
+	require.ErrorIs(t, upgraded.Uninstall(t.Context()), ErrInUse)
+	require.NoError(t, use.Finish(true))
+	require.NoError(t, upgraded.Sweep())
+	require.NoDirExists(t, filepath.Join(store.path, legacyPath))
+	require.NoError(t, upgraded.Uninstall(t.Context()))
+}
+
 func TestAutomaticReleaseDoesNotDiscoverWithoutConsent(t *testing.T) {
 	for _, state := range []string{"absent", "local", "manual", "uninstalled"} {
 		t.Run(state, func(t *testing.T) {

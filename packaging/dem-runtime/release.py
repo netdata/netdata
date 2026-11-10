@@ -87,10 +87,13 @@ def assemble(args):
         'files': {p.name: {'sha256': sha256(p), 'bytes': p.stat().st_size} for p in sorted(output.iterdir())}})
 
 
-def verified_release(tool, key, path):
+def verified_release(tool, key, path, *, retained=False):
     # The Go protocol owner authenticates and strictly decodes before Python uses
     # any field. Publication workspaces are exclusive to this workflow job.
-    run([tool, 'verify', '--key', key, '--release', path])
+    command = [tool, 'verify', '--key', key, '--release', path]
+    if retained:
+        command.append('--retained')
+    run(command)
     return json.loads(base64.b64decode(json.loads(path.read_bytes())['payload'], validate=True))
 
 
@@ -146,7 +149,7 @@ def current_releases(args):
                 continue
             path = Path(temporary) / (arch + '.json')
             path.write_bytes(body)
-            current[arch] = verified_release(args.release_tool, args.public_key, path)
+            current[arch] = verified_release(args.release_tool, args.public_key, path, retained=True)
     return current
 
 

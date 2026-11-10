@@ -105,6 +105,25 @@ func TestReleaseVerificationRequiresLocalTrustAndBoundedMetadata(t *testing.T) {
 	assert.ErrorContains(t, err, "size limit")
 }
 
+func TestSignedReleaseRequiresCurrentExecutionContract(t *testing.T) {
+	release, key := releaseFixture(t)
+	trust := testTrust(t, key)
+	for _, contract := range []int{0, retainedExecutionContract, ExecutionContract + 1} {
+		release.Manifest.Contract = contract
+		data, err := pgptest.Release(release, key)
+		require.NoError(t, err)
+		_, err = VerifyRelease(data, trust)
+		require.ErrorContains(t, err, "runtime execution contract")
+		retained, err := VerifyRetainedRelease(data, trust)
+		if contract == retainedExecutionContract {
+			require.NoError(t, err)
+			require.Equal(t, release, retained)
+		} else {
+			require.ErrorContains(t, err, "unsupported runtime execution contract")
+		}
+	}
+}
+
 func TestReleaseUpdatePreservesPublicationOrder(t *testing.T) {
 	current, _ := releaseFixture(t)
 	for _, scenario := range []struct {
