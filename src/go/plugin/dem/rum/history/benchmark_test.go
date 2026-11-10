@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,90 @@ import (
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/netdata/systemd-journal-sdk/go/journalhost"
 )
+
+// 100,000 rich records span 100 interleaved sites and 24 receipt hours in one
+// journal. Repeated metadata models adjacent browser reports; varying metadata
+// changes every row, including long text with a shared prefix. Both exercise
+// broad and narrow reads without changing native candidate selection.
+func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
+	const rows = 100_000
+	const start = int64(1_700_000_000)
+	const end = start + 86400
+	for _, varying := range []bool{false, true} {
+		name := "repeated"
+		if varying {
+			name = "varying"
+		}
+		b.Run(name, func(b *testing.B) {
+			ctx := context.Background()
+			owner, err := demjournal.Open(ctx, "")
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer owner.Close()
+			store := NewStore(owner)
+			text := strings.Repeat("browser fixture detail ", 32)
+			for i := range rows {
+				sequence := i / 100
+				if varying {
+					sequence = i
+				}
+				value := func(base string) string { return fmt.Sprintf("%s-%d", base, sequence) }
+				r := EventRecord{
+					Site:         fmt.Sprintf("site-%02d", i%100),
+					VnodeGUID:    fmt.Sprintf("%08x-1111-4111-8111-111111111111", i%100/5+1),
+					SessionID:    value("session"),
+					ObservedUS:   start*1_000_000 + int64(i)*86400*1_000_000/rows,
+					Type:         "error",
+					Page:         value("/page"),
+					Browser:      value("browser"),
+					Device:       value("device"),
+					Country:      value("country"),
+					Version:      value("release"),
+					UserID:       value("user"),
+					ExperienceID: fmt.Sprintf("document-%d", i),
+					View:         value("view"),
+					ViewID:       value("view-id"),
+					MetricID:     value("metric"),
+					Revision:     1,
+					Text:         value(text),
+					TraceID:      value("trace"),
+					Fingerprint:  "fingerprint",
+					ErrorType:    value("error-type"),
+					Message:      value("message"),
+					SampleStack:  value(text),
+				}
+				if _, err := store.AppendEvent(ctx, r); err != nil {
+					b.Fatal(err)
+				}
+			}
+			if err := store.Sync(ctx); err != nil {
+				b.Fatal(err)
+			}
+			for _, tc := range []struct {
+				name string
+				run  func() error
+			}{
+				{"sessions_global", func() error { _, err := store.QuerySessions(ctx, "", "", start, end, 0, ""); return err }},
+				{"sessions_site", func() error { _, err := store.QuerySessions(ctx, "site-42", "", start, end, 0, ""); return err }},
+				{"sessions_recent", func() error { _, err := store.QuerySessions(ctx, "site-42", "", end-900, end, 0, ""); return err }},
+				{"errors_guid", func() error {
+					_, err := store.QueryErrors(ctx, "", "fingerprint", start, end, "00000009-1111-4111-8111-111111111111")
+					return err
+				}},
+			} {
+				b.Run(tc.name, func(b *testing.B) {
+					b.ReportAllocs()
+					for b.Loop() {
+						if err := tc.run(); err != nil {
+							b.Fatal(err)
+						}
+					}
+				})
+			}
+		})
+	}
+}
 
 // 10,000 retained rows span 200 sessions, seven error fingerprints, and 20
 // archives. Receipt time spans 10,000 seconds; the recent window selects 891 rows.
@@ -129,11 +214,21 @@ func BenchmarkHistoryEventAppend(b *testing.B) {
 	defer owner.Close()
 	store := NewStore(owner)
 	event := EventRecord{
-		VnodeGUID: "11111111-1111-4111-8111-111111111111",
-		Revision:  1, Site: "shop", SessionID: "session", Type: "error",
-		Page: "/checkout", Browser: "Firefox", Country: "GR", Device: "desktop",
-		Version: "release-1", UserID: "user-id", Fingerprint: "fingerprint",
-		ErrorType: "TypeError", Message: "request failed", SampleStack: "app.js:10",
+		VnodeGUID:   "11111111-1111-4111-8111-111111111111",
+		Revision:    1,
+		Site:        "shop",
+		SessionID:   "session",
+		Type:        "error",
+		Page:        "/checkout",
+		Browser:     "Firefox",
+		Country:     "GR",
+		Device:      "desktop",
+		Version:     "release-1",
+		UserID:      "user-id",
+		Fingerprint: "fingerprint",
+		ErrorType:   "TypeError",
+		Message:     "request failed",
+		SampleStack: "app.js:10",
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
