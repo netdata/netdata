@@ -836,6 +836,14 @@ where
     /// and send `PLUGIN_KEEPALIVE` through [`writer`](Self::writer) while waiting for them: the
     /// Agent gives up on a plugin that stays silent for two minutes. Chart text the plugin writes
     /// through [`writer`](Self::writer) publishes it too: start it at the same point as `run()`.
+    ///
+    /// # Leaving
+    ///
+    /// When `run()` has returned and the plugin has stopped its own work, end the process with
+    /// `std::process::exit`. A return from `main` drops the tokio runtime, and that waits for the
+    /// read of stdin, which tokio cannot cancel. The read ends only when the Agent closes the
+    /// pipe: after a SIGTERM that is two minutes later, when the Agent gives up on the silent
+    /// plugin.
     pub async fn run(mut self) -> Result<()> {
         info!("starting plugin runtime: {}", self.plugin_name);
 
