@@ -539,7 +539,7 @@ void procfile_set_open_close(procfile *ff, const char *open, const char *close) 
 procfile *procfile_open(const char *filename, const char *separators, uint32_t flags) {
     netdata_log_debug(D_PROCFILE, PF_PREFIX ": Opening file '%s'", filename);
 
-    int fd = open(filename, procfile_open_flags, 0666);
+    int fd = open(filename, procfile_open_flags);
     if(unlikely(fd == -1)) {
         if (unlikely(flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
             netdata_log_error(PF_PREFIX ": Cannot open file '%s'", filename);
@@ -590,7 +590,7 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
         close(ff->fd);
     }
 
-    ff->fd = open(filename, procfile_open_flags, 0666);
+    ff->fd = open(filename, procfile_open_flags);
     if(unlikely(ff->fd == -1)) {
         procfile_close(ff);
         return NULL;

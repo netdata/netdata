@@ -412,23 +412,21 @@ void analytics_collectors(void)
  */
 void analytics_alarms_notifications(void)
 {
-    char *script;
-    script = mallocz(
-        sizeof(char) * (strlen(netdata_configured_primary_plugins_dir) + strlen("alarm-notify.sh dump_methods") + 2));
-    sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "alarm-notify.sh");
-    if (unlikely(access(script, R_OK) != 0)) {
-        netdata_log_info("Alarm notify script %s not found.", script);
-        freez(script);
+    BUFFER *script = buffer_create(256, NULL);
+    buffer_sprintf(script, "%s/%s", netdata_configured_primary_plugins_dir, "alarm-notify.sh");
+    if (unlikely(access(buffer_tostring(script), R_OK) != 0)) {
+        netdata_log_info("Alarm notify script %s not found.", buffer_tostring(script));
+        buffer_free(script);
         return;
     }
 
-    strcat(script, " dump_methods");
+    buffer_strcat(script, " dump_methods");
 
-    netdata_log_debug(D_ANALYTICS, "Executing %s", script);
+    netdata_log_debug(D_ANALYTICS, "Executing %s", buffer_tostring(script));
 
     BUFFER *b = buffer_create(1000, NULL);
     int cnt = 0;
-    POPEN_INSTANCE *instance = spawn_popen_run(script);
+    POPEN_INSTANCE *instance = spawn_popen_run(buffer_tostring(script));
     if (instance) {
         char line[200 + 1];
         FILE *child_stdout = spawn_popen_stdout(instance);
@@ -452,7 +450,7 @@ void analytics_alarms_notifications(void)
             spawn_popen_wait(instance);
         }
     }
-    freez(script);
+    buffer_free(script);
 
     analytics_set_data_str(&analytics_data.netdata_notification_methods, (char *)buffer_tostring(b));
 

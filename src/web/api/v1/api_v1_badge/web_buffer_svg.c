@@ -176,77 +176,51 @@ static inline double verdana11_width(const char *s, float em_size) {
     return w;
 }
 
-static inline size_t escape_xmlz(char *dst, const char *src, size_t len) {
+// Escape src for XML into dst, a buffer of dst_size bytes.
+// Writes at most dst_size - 1 characters plus the terminating NUL.
+// An entity is written only when more than its length is still available,
+// so a truncated value never ends in a partial entity.
+static size_t escape_xmlz(char *dst, size_t dst_size, const char *src) {
+    if(unlikely(!dst_size))
+        return 0;
+
+    size_t len = dst_size - 1;
     size_t i = len;
 
     // required escapes from
     // https://github.com/badges/shields/blob/master/badge.js
     while(*src && i) {
+        const char *entity;
+
         switch(*src) {
             case '\\':
                 *dst++ = '/';
                 src++;
                 i--;
-                break;
+                continue;
 
-            case '&':
-                if(i > 5) {
-                    strcpy(dst, "&amp;");
-                    i -= 5;
-                    dst += 5;
-                    src++;
-                }
-                else goto cleanup;
-                break;
-
-            case '<':
-                if(i > 4) {
-                    strcpy(dst, "&lt;");
-                    i -= 4;
-                    dst += 4;
-                    src++;
-                }
-                else goto cleanup;
-                break;
-
-            case '>':
-                if(i > 4) {
-                    strcpy(dst, "&gt;");
-                    i -= 4;
-                    dst += 4;
-                    src++;
-                }
-                else goto cleanup;
-                break;
-
-            case '"':
-                if(i > 6) {
-                    strcpy(dst, "&quot;");
-                    i -= 6;
-                    dst += 6;
-                    src++;
-                }
-                else goto cleanup;
-                break;
-
-            case '\'':
-                if(i > 6) {
-                    strcpy(dst, "&apos;");
-                    i -= 6;
-                    dst += 6;
-                    src++;
-                }
-                else goto cleanup;
-                break;
+            case '&':  entity = "&amp;";  break;
+            case '<':  entity = "&lt;";   break;
+            case '>':  entity = "&gt;";   break;
+            case '"':  entity = "&quot;"; break;
+            case '\'': entity = "&apos;"; break;
 
             default:
-                i--;
                 *dst++ = *src++;
-                break;
+                i--;
+                continue;
         }
+
+        size_t entity_len = strlen(entity);
+        if(i <= entity_len)
+            break;
+
+        memcpy(dst, entity, entity_len);
+        dst += entity_len;
+        i -= entity_len;
+        src++;
     }
 
-cleanup:
     *dst = '\0';
     return len - i;
 }
@@ -769,8 +743,8 @@ static void buffer_svg(BUFFER *wb, const char *label,
     }
     total_width = label_width + value_width;
 
-    escape_xmlz(label_escaped, label, LABEL_STRING_SIZE);
-    escape_xmlz(value_escaped, value_string, VALUE_STRING_SIZE);
+    escape_xmlz(label_escaped, sizeof(label_escaped), label);
+    escape_xmlz(value_escaped, sizeof(value_escaped), value_string);
 
     label_color_parsed = parse_color_argument(label_color, "555");
     value_color_parsed = parse_color_argument(value_color_buffer, "555");
@@ -1237,4 +1211,76 @@ cleanup:
     rrdset_acquired_release(rsa);
     buffer_free(dimensions);
     return ret;
+}
+
+// ----------------------------------------------------------------------------
+// unit test
+
+int web_buffer_svg_escape_unittest(void) {
+    struct {
+        const char *src;
+        size_t dst_size;
+        const char *expected;
+    } tests[] = {
+        { "plain text",          64, "plain text" },
+        { "a&b<c>d\"e'f\\g",     64, "a&amp;b&lt;c&gt;d&quot;e&apos;f/g" },
+        { "",                    64, "" },
+        { "abcdef",               4, "abc" },
+        { "abc",                  1, "" },
+        { "\\\\\\",               3, "//" },
+
+        // an entity is written only when more than its length is available
+        { "&",                    6, "" },
+        { "&",                    7, "&amp;" },
+        { "<",                    5, "" },
+        { "<",                    6, "&lt;" },
+        { ">",                    5, "" },
+        { ">",                    6, "&gt;" },
+        { "\"",                   7, "" },
+        { "\"",                   8, "&quot;" },
+        { "'",                    7, "" },
+        { "'",                    8, "&apos;" },
+        { "x&y",                  7, "x" },
+        { "x&y",                  8, "x&amp;y" },
+        { "x&yz",                 8, "x&amp;y" },
+        { "<<",                   9, "&lt;" },
+        { "<<",                  10, "&lt;&lt;" },
+    };
+
+    int errors = 0;
+    fprintf(stderr, "\nTesting badge XML escaping...\n");
+
+    for(size_t t = 0; t < _countof(tests); t++) {
+        char buf[128];
+        memset(buf, 'Z', sizeof(buf));
+
+        size_t ret = escape_xmlz(buf, tests[t].dst_size, tests[t].src);
+
+        bool canary_ok = true;
+        for(size_t j = tests[t].dst_size; j < sizeof(buf); j++) {
+            if(buf[j] != 'Z') {
+                canary_ok = false;
+                break;
+            }
+        }
+
+        if(strcmp(buf, tests[t].expected) != 0 || ret != strlen(tests[t].expected) || !canary_ok) {
+            fprintf(stderr, "  FAILED: escape_xmlz(\"%s\", %zu) = \"%s\" (returned %zu, canary %s), expected \"%s\"\n",
+                    tests[t].src, tests[t].dst_size, buf, ret, canary_ok ? "ok" : "overwritten",
+                    tests[t].expected);
+            errors++;
+        }
+    }
+
+    // dst_size 0 must not write anything
+    {
+        char c = 'Z';
+        if(escape_xmlz(&c, 0, "abc") != 0 || c != 'Z') {
+            fprintf(stderr, "  FAILED: escape_xmlz() with dst_size 0 wrote to the buffer\n");
+            errors++;
+        }
+    }
+
+    fprintf(stderr, "badge XML escaping: %s\n", errors ? "FAILED" : "OK");
+    return errors;
 }
