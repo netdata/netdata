@@ -433,6 +433,8 @@
 - Contexts: merge collected instance metadata under the context lock ([#24645](https://github.com/netdata/netdata/issues/24645))
 - Sqlite: report why the metadata database failed to initialize ([#24642](https://github.com/netdata/netdata/issues/24642))
 - Missing BSD metrics ([#24617](https://github.com/netdata/netdata/issues/24617))
+- Regenerate integrations docs ([#24657](https://github.com/netdata/netdata/issues/24657))
+- Docs: Add node-to-Room move steps to Spaces and Rooms doc ([#23417](https://github.com/netdata/netdata/issues/23417))
 
 ## [2.12.0] - 2026-09-30
 
