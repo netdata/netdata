@@ -169,20 +169,6 @@ void *onewayalloc_callocz(ONEWAYALLOC *owa, size_t nmemb, size_t size) {
     return mem;
 }
 
-char *onewayalloc_strdupz(ONEWAYALLOC *owa, const char *s) {
-    size_t size = strlen(s) + 1;
-    char *d = onewayalloc_mallocz((OWA_PAGE *)owa, size);
-    memcpy(d, s, size);
-    return d;
-}
-
-void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size) {
-    void *mem = onewayalloc_mallocz((OWA_PAGE *)owa, size);
-    // memcpy() is way faster than strcpy() since it does not check for '\0'
-    memcpy(mem, src, size);
-    return mem;
-}
-
 void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_unused) {
 #ifdef FSANITIZE_ADDRESS
     freez((void *)ptr);
