@@ -436,11 +436,15 @@ int do_PerflibSMB(int update_every, usec_t dt __maybe_unused)
             return 0;
 
         smb_query = nd_pdh_query_create(SMB_SERVER_SHARES_OBJECT, smb_share_counter_names, SMB_SHARE_COUNTERS_MAX);
-        smb_query_next_attempt = now + SMB_QUERY_RETRY_SECONDS;
-        if (!smb_query)
+        if (!smb_query) {
+            smb_query_next_attempt = now + SMB_QUERY_RETRY_SECONDS;
             return 0;
+        }
 
+        // Only a partial query waits before its rebuild; a complete one can be recreated at once after a close.
         smb_query_partial = !smb_query_has_all_counters();
+        if (smb_query_partial)
+            smb_query_next_attempt = now + SMB_QUERY_RETRY_SECONDS;
     }
 
     // A rebuilt query is created on the next iteration; existing charts stay until a complete sample proves them gone.
