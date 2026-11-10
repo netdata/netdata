@@ -152,6 +152,23 @@ struct StorableStream {
     payload: Payload,
 }
 
+impl StorableStream {
+    /// The identity gate: a grouped stream is storable when its identity fits
+    /// the substrate's caps (see [`encode_identity_or_drop`]). Every
+    /// `StorableStream` is built here, so `part_key` is always the hash of
+    /// `stream`.
+    fn new(stream: ServiceStream, group: StreamGroup) -> Result<Self, OversizedDrop> {
+        let content_meta = encode_identity_or_drop(&stream, group.log_record_count)?;
+        Ok(Self {
+            part_key: otel_logs_identity::part_key(&stream),
+            stream,
+            content_meta,
+            log_record_count: group.log_record_count,
+            payload: Payload::Records(group.resource_logs),
+        })
+    }
+}
+
 /// Result of running the collision check across a request's storable streams.
 struct CollisionCheck {
     accepted: Vec<StorableStream>,
@@ -614,14 +631,8 @@ impl NetdataLogsService {
         let mut oversized: Vec<OversizedDrop> = Vec::new();
         let mut storable: Vec<StorableStream> = Vec::with_capacity(groups.len());
         for (stream, group) in groups {
-            match encode_identity_or_drop(&stream, group.log_record_count) {
-                Ok(content_meta) => storable.push(StorableStream {
-                    part_key: otel_logs_identity::part_key(&stream),
-                    stream,
-                    content_meta,
-                    log_record_count: group.log_record_count,
-                    payload: Payload::Records(group.resource_logs),
-                }),
+            match StorableStream::new(stream, group) {
+                Ok(s) => storable.push(s),
                 Err(drop) => oversized.push(drop),
             }
         }
@@ -937,18 +948,12 @@ mod tests {
     }
 
     /// Lift grouped streams into the storable form the collision check
-    /// consumes, mirroring the identity gate (no oversized identities in
+    /// consumes, through the identity gate (no oversized identities in
     /// these fixtures).
     fn storable(groups: HashMap<ServiceStream, StreamGroup>) -> Vec<StorableStream> {
         groups
             .into_iter()
-            .map(|(stream, group)| StorableStream {
-                part_key: otel_logs_identity::part_key(&stream),
-                content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
-                stream,
-                log_record_count: group.log_record_count,
-                payload: Payload::Records(group.resource_logs),
-            })
+            .map(|(stream, group)| StorableStream::new(stream, group).unwrap())
             .collect()
     }
 
