@@ -30,7 +30,7 @@ PACKAGES: Final = (
     (f'{MSYS_REPO}/msys2-runtime-3.6.11-4-x86_64.pkg.tar.zst',
      '7b1c4b625483ceff9a87f2dfcf3659704dc3da655a0ad414ecb7d9175e7d3ba0'),
     # OpenSSL 4 (msys-crypto-4.dll, msys-ssl-4.dll), which msys2-dependencies.sh builds netdata against. It replaces
-    # the base's OpenSSL 3 DLLs, so every base package that loads them is pinned to its OpenSSL 4 rebuild as well.
+    # the base's OpenSSL 3 DLLs, so every base package that imports them is pinned to its OpenSSL 4 rebuild as well.
     (f'{MSYS_REPO}/libopenssl-4.1.0-1-x86_64.pkg.tar.zst',
      '71f093de4a002913f39783b79d18da33b63ce8baf825434218cc1d8bd40304fb'),
     (f'{MSYS_REPO}/openssl-4.1.0-1-x86_64.pkg.tar.zst',

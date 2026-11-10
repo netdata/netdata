@@ -103,19 +103,26 @@ HOOK
 # name upstream (OpenSSL 3 -> 4) leaves the MSI without a DLL it needs, or strands base tools on the old name.
 # Fail the build when an MSYS DLL that a shipped executable or DLL imports is not in the tree.
 check_msys_dll_imports() {
-    local root=/opt/netdata dll file missing=0
+    local root=/opt/netdata imports dll file missing=0
 
     command -v objdump > /dev/null || { echo "objdump is needed to check the MSYS DLL imports." >&2; exit 1; }
+
+    # A file that cannot be read fails the check rather than going unchecked.
+    imports="$(find "${root}" -type f \( -iname '*.exe' -o -iname '*.dll' \) -print0 |
+               xargs -0 objdump -p |
+               awk '/:[ \t]+file format / { file = $0; sub(/:[ \t]+file format .*/, "", file) }
+                    /DLL Name: msys-/ { print $3 "\t" file }' | sort -u)" || {
+        echo "Could not read the DLL imports of the files in ${root}." >&2
+        exit 1
+    }
+    [ -n "${imports}" ] || { echo "Found no MSYS DLL imports in ${root}." >&2; exit 1; }
 
     while IFS=$'\t' read -r dll file; do
         if [ ! -e "${root}/usr/bin/${dll}" ]; then
             echo "${file} imports ${dll}, which the MSI does not ship." >&2
             missing=1
         fi
-    done < <(find "${root}" -type f \( -iname '*.exe' -o -iname '*.dll' \) -print0 |
-                 { xargs -0 objdump -p 2> /dev/null || true; } |
-                 awk '/:[ \t]+file format / { file = $0; sub(/:[ \t]+file format .*/, "", file) }
-                      /DLL Name: msys-/ { print $3 "\t" file }' | sort -u)
+    done <<< "${imports}"
 
     [ "${missing}" -eq 0 ] || exit 1
 }
