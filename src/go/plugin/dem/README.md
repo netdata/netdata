@@ -255,9 +255,10 @@ attributed to the original document.
 
 The configured `window` uses receiver arrival time, including for delayed reports. A genuinely newer revision extends
 that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for 30 minutes,
-unless the runtime restarts. Identified SDK session lifecycle events follow the same rule, so replay does
-not renew observed-session windows. It is best effort, not exactly-once delivery. Reports arriving after retained
-evidence expires can be counted again. Late observations are not rejected merely to claim perfect deduplication.
+unless the site job restarts, is replaced, or changes its vnode association. Identified SDK session lifecycle events
+follow the same rule, so replay does not renew observed-session windows. It is best effort, not exactly-once delivery.
+Reports arriving after retained evidence expires can be counted again. Late observations are not rejected merely to
+claim perfect deduplication.
 Errors, console logs, spans and ordinary custom events are not covered by this identity-based replay suppression;
 repeated delivery of these records can count again and refresh observed-session activity.
 
@@ -266,7 +267,8 @@ when there are no observations. A zero CLS or zero timing is a valid observation
 configured receipt window (five minutes by default); replay identities remain for 30 minutes. There is no independent
 aggregate count or byte cap. Memory grows with admitted distinct state and retained text over these horizons, plus
 investigation detail and query state. This is time retention, not a fixed memory guarantee or a qualified full-scale
-workload claim. Restart starts fresh in-memory windows; retained investigation history is independent.
+workload claim. Restarting or replacing the site job, or changing its vnode association, starts fresh in-memory
+windows; retained investigation history is independent and preserves its original vnode attribution.
 
 `rum.observed_sessions` counts distinct browser session identities seen in the receipt window. It does not estimate
 people, concurrency or time on site. Page session counts use the same window. JavaScript errors are events: several can

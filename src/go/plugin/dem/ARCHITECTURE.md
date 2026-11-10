@@ -731,8 +731,8 @@ Report identity and replay suppression:
   for every measurement: Faro groups by metadata, so per-item metadata would destroy default batching.
 - Explicit document/view/session lifecycle events and performance entries receive identities before transport;
   retries preserve identical IDs/revisions.
-- Identity evidence lasts 30 minutes unless the runtime restarts. The SDK has no finite maximum delivery
-  delay, so this is best-effort replay suppression.
+- Identity evidence lasts 30 minutes unless the site job restarts, is replaced, or changes its vnode association.
+  The SDK has no finite maximum delivery delay, so this is best-effort replay suppression.
 - Unidentified errors, logs, spans and ordinary custom events have no replay suppression.
 
 Vital attribution:
@@ -788,6 +788,8 @@ What `rum/aggregate` stores:
 - Resource observations and replay evidence have separate retention from document/vital activity.
 - Canonical measurements remain exact for the configured receipt window (five minutes by default); replay evidence
   retains its 30-minute identity horizon. No independent aggregate count/byte cap or approximation applies.
+- Restarting or replacing the site job, or changing its vnode GUID, resets canonical measurements and replay evidence.
+  Retained investigation evidence keeps its original vnode GUID.
 - Measurement retention is independent of the investigation-session LRU and the live ring.
 
 How reads derive results:

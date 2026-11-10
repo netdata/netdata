@@ -21,10 +21,16 @@ func TestConcurrentReadsCaptureRevisionAndVnodeTogether(t *testing.T) {
 			if i/10%2 != 0 {
 				guid, page, value = vnodeB, "/beta", 200
 			}
+			value += float64(i % 10)
 			a.SetVnodeGUID(guid)
 			b := mk(*now, "session", page, v(beacon.LCP, value))
 			b.Vitals[0].Revision = uint64(i + 1)
 			a.Ingest(b)
+			if i%10 > 0 {
+				b.Vitals[0].Revision--
+				b.Vitals[0].Value = 9999
+				a.Ingest(b)
+			}
 		}
 	})
 	for range 4 {
@@ -40,7 +46,8 @@ func TestConcurrentReadsCaptureRevisionAndVnodeTogether(t *testing.T) {
 					require.Equal(t, 1, page.PageviewsWindow)
 					require.Equal(t, 1, page.Sessions)
 					require.Equal(t, 1, page.Vitals[beacon.LCP].N)
-					require.Equal(t, want, page.Vitals[beacon.LCP].P75)
+					require.GreaterOrEqual(t, page.Vitals[beacon.LCP].P75, want)
+					require.LessOrEqual(t, page.Vitals[beacon.LCP].P75, want+9)
 				}
 				s := a.Snapshot()
 				require.EqualValues(t, s.Vitals[beacon.LCP].N, s.PageviewsWindow)
@@ -50,7 +57,8 @@ func TestConcurrentReadsCaptureRevisionAndVnodeTogether(t *testing.T) {
 					if group.Value == "/beta" {
 						want = 200
 					}
-					require.Equal(t, want, group.Vitals[beacon.LCP].P75)
+					require.GreaterOrEqual(t, group.Vitals[beacon.LCP].P75, want)
+					require.LessOrEqual(t, group.Vitals[beacon.LCP].P75, want+9)
 					require.Equal(t, s.Vitals[beacon.LCP], group.Vitals[beacon.LCP])
 				}
 			}
@@ -58,6 +66,11 @@ func TestConcurrentReadsCaptureRevisionAndVnodeTogether(t *testing.T) {
 	}
 	close(start)
 	workers.Wait()
+	pages := a.Pages("")
+	require.Len(t, pages, 1)
+	require.Equal(t, vnodeB, pages[0].VnodeGUID)
+	require.Equal(t, 209., pages[0].Vitals[beacon.LCP].P75)
+	require.Equal(t, 209., a.Snapshot().Vitals[beacon.LCP].P75)
 }
 
 func TestResourceClassificationSurvivesInputMutation(t *testing.T) {

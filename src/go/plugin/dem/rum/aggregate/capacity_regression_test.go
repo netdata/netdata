@@ -79,12 +79,13 @@ func TestLateRevisionRetainsChronologicalExpiryOrder(t *testing.T) {
 		b.Events = nil
 		a.Ingest(b)
 	}
+	*now = now.Add(30 * time.Second)
 	first.Vitals[0].Revision = 2
 	a.Ingest(first)
-	b := mk(now.Add(2*time.Nanosecond), "new", "/", v(beacon.FCP, 100))
+	b := mk(first.Received.Add(2*time.Nanosecond), "new", "/", v(beacon.FCP, 100))
 	b.Events = nil
 	a.Ingest(b)
-	*now = now.Add(time.Minute + time.Nanosecond)
+	*now = first.Received.Add(time.Minute + time.Nanosecond)
 	s := a.Snapshot()
 	assert.Zero(t, s.Vitals[beacon.LCP].N, "an older revision receipt must not renew expiry")
 	assert.Equal(t, 10000, s.Vitals[beacon.FCP].N)
