@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Test executables. None is installed or registered with CTest - the project
 # defines no add_test() - but they are NOT all orphans: the topology container
-# tests workflow (.github/workflows/topology-container-tests.yml) builds ten of
+# tests workflow (.github/workflows/topology-container-tests.yml) builds twelve of
 # these targets by name (plus four more that live beside their plugins, in
 # NetdataPluginLocalListeners.cmake and NetdataPluginNetworkViewer.cmake).
 #
