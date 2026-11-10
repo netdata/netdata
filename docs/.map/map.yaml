@@ -461,7 +461,7 @@ sidebar:
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/high-availability-and-disaster-recovery.md
       - meta:
           label: Netdata AI
-          edit_url: https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/netdata-ai.md
+          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/netdata-ai.md
       - meta:
           label: Troubleshooting
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/troubleshooting.md
