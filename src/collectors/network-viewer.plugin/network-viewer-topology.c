@@ -20,6 +20,10 @@
 #define NV_TOPOLOGY_LABEL_KEY_MAX 96
 #define NV_TOPOLOGY_LABEL_VALUE_MAX 512
 #define NV_TOPOLOGY_HOSTNAME_MAX 256
+#define NV_TOPOLOGY_MACHINE_GUID_MAX 128
+// either one is the node identity inside an actor id, which is sized by NV_TOPOLOGY_HOSTNAME_MAX
+_Static_assert(NV_TOPOLOGY_MACHINE_GUID_MAX <= NV_TOPOLOGY_HOSTNAME_MAX,
+               "the machine guid must not be longer than the hostname in an actor id");
 // Process display names can be longer than TASK_COMM_LEN (e.g. Windows
 // exe base names); the actor/link buffers use this bounded width.
 #define NV_TOPOLOGY_PROCESS_MAX 256
@@ -153,13 +157,9 @@ typedef struct {
     uint64_t sockets_total;
     uint64_t skipped_sockets;
     char hostname[NV_TOPOLOGY_HOSTNAME_MAX];
-    char machine_guid[128];
+    char machine_guid[NV_TOPOLOGY_MACHINE_GUID_MAX];
     NV_TOPOLOGY_OPTIONS options;
 } NV_TOPOLOGY_CONTEXT;
-
-// either one is the node identity inside an actor id, sized by NV_TOPOLOGY_HOSTNAME_MAX
-_Static_assert(sizeof(((NV_TOPOLOGY_CONTEXT *)NULL)->machine_guid) <= NV_TOPOLOGY_HOSTNAME_MAX,
-               "the machine guid must not be longer than the hostname in an actor id");
 
 
 typedef struct {
@@ -1875,8 +1875,8 @@ static void topology_write_response_metadata(BUFFER *wb) {
 typedef struct {
     char id[NV_TOPOLOGY_KEY_MAX];
     char type[NV_TOPOLOGY_ACTOR_TYPE_MAX];
-    char machine_guid[128];
-    char hostname[256];
+    char machine_guid[NV_TOPOLOGY_MACHINE_GUID_MAX];
+    char hostname[NV_TOPOLOGY_HOSTNAME_MAX];
     char process[NV_TOPOLOGY_PROCESS_MAX];
     char username[NV_TOPOLOGY_USERNAME_MAX];
     char namespace_type[16];
