@@ -49,6 +49,7 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	for i := 0; i < 10000; i++ {
 		saved := now.Add(time.Duration(i-9999) * time.Second)
 		r := EventRecord{
+			VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 			Site:       "shop",
 			SessionID:  fmt.Sprintf("session-%d", i%200),
 			ObservedUS: saved.Add(-10 * time.Second).UnixMicro(),
@@ -92,16 +93,16 @@ func BenchmarkHistoryQueries(b *testing.B) {
 			return err
 		}},
 		{"sessions_15m", func() error {
-			_, err := s.QuerySessions(context.Background(), "shop", "", now.Add(-15*time.Minute).Unix(), now.Unix(), 0)
+			_, err := s.QuerySessions(context.Background(), "shop", "", now.Add(-15*time.Minute).Unix(), now.Unix(), 0, "")
 			return err
 		}},
 		{"sessions_all", func() error {
-			_, err := s.QuerySessions(context.Background(), "shop", "", 0, now.Unix(), 0)
+			_, err := s.QuerySessions(context.Background(), "shop", "", 0, now.Unix(), 0, "")
 			return err
 		}},
-		{"errors_overview_all", func() error { _, err := s.QueryErrors(context.Background(), "shop", "", 0, now.Unix()); return err }},
+		{"errors_overview_all", func() error { _, err := s.QueryErrors(context.Background(), "shop", "", 0, now.Unix(), ""); return err }},
 		{"error_selected_all", func() error {
-			_, err := s.QueryErrors(context.Background(), "shop", "fingerprint-1", 0, now.Unix())
+			_, err := s.QueryErrors(context.Background(), "shop", "fingerprint-1", 0, now.Unix(), "")
 			return err
 		}},
 	} {
@@ -128,7 +129,8 @@ func BenchmarkHistoryEventAppend(b *testing.B) {
 	defer owner.Close()
 	store := NewStore(owner)
 	event := EventRecord{
-		Revision: 1, Site: "shop", SessionID: "session", Type: "error",
+		VnodeGUID: "11111111-1111-4111-8111-111111111111",
+		Revision:  1, Site: "shop", SessionID: "session", Type: "error",
 		Page: "/checkout", Browser: "Firefox", Country: "GR", Device: "desktop",
 		Version: "release-1", UserID: "user-id", Fingerprint: "fingerprint",
 		ErrorType: "TypeError", Message: "request failed", SampleStack: "app.js:10",

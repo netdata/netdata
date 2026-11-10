@@ -278,6 +278,11 @@
             "default": false
           }
         }
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
       }
     },
     "required": [
@@ -547,6 +552,12 @@
           "fields": [
             "redact_paths"
           ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
         }
       ]
     },
@@ -605,6 +616,10 @@
           ]
         }
       }
+    },
+    "vnode": {
+      "ui:placeholder": "storefront",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define a static Virtual Node through `dem:vnode` or a YAML file in `vnodes/` under the Netdata configuration directory, then enter its reference name here. Leave empty to use the collecting Agent."
     }
   }
 }

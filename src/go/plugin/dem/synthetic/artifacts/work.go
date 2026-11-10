@@ -9,15 +9,17 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 )
 
-func (s *Store) Begin(runID, jobID string) (_ string, retErr error) {
+func (s *Store) Begin(runID, jobID, vnodeGUID string) (_ string, retErr error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
 		return "", ErrClosed
 	}
-	if !runIDPattern.MatchString(runID) || !validJobID(jobID) {
+	if !runIDPattern.MatchString(runID) || !validJobID(jobID) || vnodeguid.Validate(vnodeGUID) != nil {
 		return "", ErrInvalidID
 	}
 	for _, prefix := range []string{"work", "staging", "runs", "drained", "deleting"} {
@@ -56,7 +58,7 @@ func (s *Store) Begin(runID, jobID string) (_ string, retErr error) {
 	if err := syncExternalDir("/tmp"); err != nil {
 		return "", err
 	}
-	s.active[runID] = jobID
+	s.active[runID] = captureOwner{JobID: jobID, VnodeGUID: vnodeGUID}
 	return workAlias(runID), nil
 }
 

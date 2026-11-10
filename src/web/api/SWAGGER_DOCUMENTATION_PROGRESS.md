@@ -2919,18 +2919,18 @@ Per dimension:
 - ACCESS: `HTTP_ACCESS_ANONYMOUS_DATA`
 
 ### PARAMETERS (1 total)
-1. ✅ `file` - string, required - Settings filename (alphanumerics, dashes, underscores). Anonymous users restricted to 'default', authenticated users (bearer token) can use any valid filename.
+1. ✅ `file` - string, optional - Only `default` is supported (omitted or empty = `default`); any other value returns 400. There is one Agent-wide object shared by every admitted caller, anonymous or bearer.
 
 ### HTTP METHODS SUPPORTED (2 total)
-1. ✅ `GET` - Retrieve a settings file
-2. ✅ `PUT` - Create or update a settings file
+1. ✅ `GET` - Retrieve the settings object
+2. ✅ `PUT` - Create or update the settings object
 
 ### REQUEST BODY (PUT only)
 **Content-Type:** `application/json`
 **Max Size:** 20 MiB (20,971,520 bytes)
 
 **Required Fields:**
-1. ✅ `version` - integer, required - Version number of the existing file (for conflict detection)
+1. ✅ `version` - integer, required - Positive JSON integer equal to the stored version, 1 when nothing is stored (for conflict detection); other types return 400
 
 **Optional Fields:**
 - Any additional JSON fields (user-defined)
@@ -2939,23 +2939,25 @@ Per dimension:
 1. ✅ `version` - integer - Current version number of the settings file (minimum 1)
 2. ✅ `[user-defined fields]` - any - Additional fields stored in the settings file
 
-### RESPONSE FIELDS - PUT SUCCESS (1 total)
-1. ✅ `message` - string - "OK"
+### RESPONSE FIELDS - PUT SUCCESS (2 total)
+1. ✅ `status` - integer - 200
+2. ✅ `errorMessage` - string - "OK"
 
 ### ERROR RESPONSES
 **All error responses contain:**
-1. ✅ `message` - string - Error description
+1. ✅ `status` - integer - HTTP status code
+2. ✅ `errorMessage` - string - Error description
 
 **Possible Error Scenarios:**
-- `400 Bad Request` - Invalid file parameter, invalid host, missing version in payload, invalid JSON payload, missing payload on PUT, unauthorized file access for anonymous users, invalid HTTP method
+- `400 Bad Request` - `file` other than `default`, invalid host, missing, non-integer or non-incrementable version in payload, invalid JSON payload, missing payload on PUT, invalid HTTP method
 - `409 Conflict` - Version mismatch (caller must reload and reapply changes)
 - `413 Payload Too Large` - PUT payload exceeds 20 MiB (20,971,520 bytes)
 - `500 Internal Server Error` - Settings path creation failure, file I/O errors
 
 ### SPECIAL BEHAVIORS
 1. ✅ **Version Auto-Increment** - Netdata increments version on successful PUT
-2. ✅ **Default Settings** - Returns `{"version": 1}` if file doesn't exist or cannot be parsed
-3. ✅ **Anonymous User Restriction** - Non-bearer-token users limited to 'default' file only
+2. ✅ **Default Settings** - Returns `{"version": 1}` if the object doesn't exist, cannot be parsed, or its version is not an integer from 1 to 9223372036854775806
+3. ✅ **Single Shared Object** - Every caller (anonymous or bearer) reads and writes the same `default` object
 4. ✅ **Host Restriction** - API only works on localhost (agent node), not child nodes
 5. ✅ **Optimistic Locking** - PUT requires current version to prevent concurrent modification conflicts
 
@@ -2964,11 +2966,11 @@ Per dimension:
 **HTTP Methods Verified:** 2
 **Request Body Fields (PUT):** 1 required + unlimited optional
 **Response Fields (GET):** 1 guaranteed + user-defined
-**Response Fields (PUT):** 1
-**Error Response Fields:** 1
+**Response Fields (PUT):** 2
+**Error Response Fields:** 2
 **Security:** ACL=HTTP_ACL_DASHBOARD + ACCESS=HTTP_ACCESS_ANONYMOUS_DATA
 **Max Payload Size:** 20 MiB (20,971,520 bytes); larger PUT payloads return 413
-**File Storage:** `{varlib}/settings/{file}`
+**File Storage:** `{varlib}/settings/default`
 **Dual-Agent Agreement:** ✅ Agent confirmed optimistic locking settings storage structure
 
 ---

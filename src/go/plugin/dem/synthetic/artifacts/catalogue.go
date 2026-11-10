@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
+
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
 // Manifest is Go-authored capture membership, independent of run history.
 type Manifest struct {
+	VnodeGUID   string               `json:"vnode_guid,omitempty"`
 	JobID       string               `json:"job_id"`
 	RunID       string               `json:"run_id"`
 	PublishedUS int64                `json:"published_us"`
@@ -19,6 +22,7 @@ type Manifest struct {
 }
 
 type Set struct {
+	VnodeGUID   string `json:"vnode_guid,omitempty"`
 	JobID       string `json:"job_id"`
 	RunID       string `json:"run_id"`
 	PublishedUS int64  `json:"published_us"`
@@ -32,9 +36,10 @@ type Cursor struct {
 }
 
 type Filter struct {
-	JobID  string
-	Before *Cursor
-	Limit  int
+	JobID     string
+	VnodeGUID string
+	Before    *Cursor
+	Limit     int
 }
 
 type ByteObservation struct {
@@ -87,7 +92,7 @@ func (s *Store) Catalogue(ctx context.Context, filter Filter) (Page, error) {
 	if err := ctx.Err(); err != nil {
 		return Page{}, err
 	}
-	if filter.Limit < 1 || (filter.JobID != "" && !validJobID(filter.JobID)) ||
+	if vnodeguid.Validate(filter.VnodeGUID) != nil || filter.Limit < 1 || (filter.JobID != "" && !validJobID(filter.JobID)) ||
 		(filter.Before != nil && (filter.Before.PublishedUS <= 0 || !runIDPattern.MatchString(filter.Before.RunID))) {
 		return Page{}, fmt.Errorf("%w: invalid artifact catalogue filter", ErrInvalidID)
 	}
@@ -101,6 +106,9 @@ func (s *Store) Catalogue(ctx context.Context, filter Filter) (Page, error) {
 		Status: s.status(inv),
 	}
 	for _, entry := range entries {
+		if filter.VnodeGUID != "" && filter.VnodeGUID != entry.VnodeGUID {
+			continue
+		}
 		if filter.JobID != "" && filter.JobID != entry.JobID {
 			continue
 		}

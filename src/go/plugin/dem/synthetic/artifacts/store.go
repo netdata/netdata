@@ -41,6 +41,8 @@ func validJobID(id string) bool {
 	return ok && (kind == "journey" || kind == "lighthouse") && strings.TrimSpace(name) != ""
 }
 
+type captureOwner struct{ JobID, VnodeGUID string }
+
 // Store serializes publication, fetch, expiry and close. Work may only be
 // finalized after its caller has joined the complete supervised process tree.
 // Same-UID/root tampering with this private store is outside its ownership model.
@@ -51,7 +53,7 @@ type Store struct {
 	temporary bool
 	lock      *flock.Flock
 	closed    bool
-	active    map[string]string
+	active    map[string]captureOwner
 	uncertain map[string]bool
 	policy    *Policy
 	cleanup   Cleanup
@@ -101,7 +103,7 @@ func Open(name string) (_ *Store, retErr error) {
 		root:        root,
 		path:        name,
 		temporary:   temporary,
-		active:      make(map[string]string),
+		active:      make(map[string]captureOwner),
 		uncertain:   make(map[string]bool),
 		inventoryFS: root.FS(),
 	}

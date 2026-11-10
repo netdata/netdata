@@ -27,7 +27,7 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	prefix := fixtureRunID()[:31]
 	for i, jobID := range []string{"journey:retired", "lighthouse:renamed", "journey:retired"} {
 		runID := fmt.Sprintf("%s%x", prefix, i+1)
-		work, err := store.Begin(runID, jobID)
+		work, err := store.Begin(runID, jobID, []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", "11111111-1111-4111-8111-111111111111"}[i])
 		require.NoError(t, err)
 		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(work, "output/report.html"), []byte("<html>report</html>"), 0600))
@@ -40,7 +40,7 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	}
 	_, err = store.Enforce(ctx, 7, 1<<20)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, nil, store, func() string { return "policy reload rejected" }))
+	h := syntheticfunctions.New(query.New(nil, nil, store, func() string { return "policy reload rejected" }), nil)
 	response := h.HandleRaw(
 		ctx,
 		funcapi.RawMethodRequest{
@@ -76,6 +76,19 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	validate(t, page2)
 	filtered := call(h, "synthetics-artifacts", "job_id:lighthouse:renamed", "limit:1")
 	require.Len(t, responseData(t, filtered), 1)
+	sitePage := call(h, "synthetics-artifacts", "vnode_guid:11111111-1111-4111-8111-111111111111", "limit:1")
+	siteRows := responseData(t, sitePage)
+	require.Len(t, siteRows, 1)
+	assert.Equal(t, "11111111-1111-4111-8111-111111111111", rowValues(t, sitePage, siteRows[0])["vnode_guid"])
+	assert.Equal(t, prefix+"3", rowValues(t, sitePage, siteRows[0])["run_id"])
+	validate(t, sitePage)
+	siteNext := call(h, "synthetics-artifacts", "vnode_guid:11111111-1111-4111-8111-111111111111", "limit:1", "before:"+sitePage.RawResponse["next"].(string))
+	siteRows = responseData(t, siteNext)
+	require.Len(t, siteRows, 1)
+	assert.Equal(t, prefix+"1", rowValues(t, siteNext, siteRows[0])["run_id"])
+	assert.Empty(t, responseData(t, call(h, "synthetics-artifacts", "vnode_guid:11111111-1111-4111-8111-111111111111", "job_id:lighthouse:renamed")))
+	detail := call(h, "synthetics-artifact", "job_id:journey:retired", "run_id:"+prefix+"1")
+	assert.Equal(t, "11111111-1111-4111-8111-111111111111", detail.RawResponse["vnode_guid"])
 	filteredStatus, err := json.Marshal(filtered.RawResponse["storage"])
 	require.NoError(t, err)
 	var filteredFields map[string]any

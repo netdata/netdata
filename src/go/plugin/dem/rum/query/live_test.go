@@ -50,7 +50,7 @@ func TestLiveOutOfOrderReceivedTimesDoNotSkipOrReplay(t *testing.T) {
 			sequences := map[string]uint64{}
 			var cursor string
 			for range 4 {
-				rows, next, err := service.Live(context.Background(), "", cursor, limit)
+				rows, next, err := service.Live(context.Background(), "", cursor, limit, "")
 				require.NoError(t, err)
 				cursor = next
 				for _, row := range rows {
@@ -68,4 +68,42 @@ func TestLiveOutOfOrderReceivedTimesDoNotSkipOrReplay(t *testing.T) {
 			assert.Equal(t, map[string]bool{"/a1": true, "/a2": true, "/b1": true}, seen)
 		})
 	}
+}
+
+func TestLiveVnodeSelectionUsesRecordedRowsBeforeLimits(t *testing.T) {
+	const guidA = "11111111-1111-4111-8111-111111111111"
+	const guidB = "22222222-2222-4222-8222-222222222222"
+	hub := registry.New()
+	a, _ := addSite(t, hub, "job", "generation")
+	service := query.New(hub, nil)
+	a.SetVnodeGUID(guidA)
+	page(a, "job", "/a-old")
+	a.SetVnodeGUID(guidB)
+	page(a, "job", "/b-one")
+	page(a, "job", "/b-two")
+	a.SetVnodeGUID(guidA)
+	page(a, "job", "/a-new")
+	ctx := context.Background()
+	selected, cursor, err := service.Live(ctx, "job", "", 1, guidB)
+	require.NoError(t, err)
+	require.Len(t, selected, 1)
+	assert.Equal(t, "/b-one", selected[0].Page)
+	selected, cursor, err = service.Live(ctx, "job", cursor, 1, guidB)
+	require.NoError(t, err)
+	require.Len(t, selected, 1)
+	assert.Equal(t, "/b-two", selected[0].Page)
+	selected, cursor, err = service.Live(ctx, "job", cursor, 1, guidA)
+	require.NoError(t, err)
+	require.Len(t, selected, 1)
+	assert.Equal(t, "/a-old", selected[0].Page, "changing GUID selection starts the retained view")
+	selected, _, err = service.Live(ctx, "job", cursor, 1, guidA)
+	require.NoError(t, err)
+	require.Len(t, selected, 1)
+	assert.Equal(t, "/a-new", selected[0].Page)
+	sites, err := service.Sites(ctx, guidB)
+	require.NoError(t, err)
+	assert.Empty(t, sites, "inventory reports current identity rather than old buffered identity")
+	pages, err := service.Pages(ctx, "job", guidB)
+	require.NoError(t, err)
+	assert.Empty(t, pages, "rolling pages belong only to the current measurement window")
 }

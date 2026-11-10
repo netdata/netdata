@@ -474,13 +474,10 @@ static inline STRING *comm_from_cmdline_sanitized(STRING *comm, STRING *cmdline)
 }
 
 static void update_pid_comm_from_cmdline(struct pid_stat *p) {
-    bool updated = false;
-
     STRING *new_comm = comm_from_cmdline_sanitized(p->comm, p->cmdline);
     if(new_comm) {
         string_freez(p->comm);
         p->comm = new_comm;
-        updated = true;
     }
 
     if(is_process_an_interpreter(p)) {
@@ -488,60 +485,66 @@ static void update_pid_comm_from_cmdline(struct pid_stat *p) {
         if(new_comm) {
             string_freez(p->comm);
             p->comm = new_comm;
-            updated = true;
         }
     }
-
-    if(updated) {
-        p->is_manager = is_process_a_manager(p);
-        p->is_aggregator = is_process_an_aggregator(p);
-    }
 }
 
-void update_pid_cmdline(struct pid_stat *p, const char *cmdline) {
-    string_freez(p->cmdline);
-    p->cmdline = cmdline ? string_strdupz(cmdline) : NULL;
-
-    if(p->cmdline)
-        update_pid_comm_from_cmdline(p);
+static void invalidate_pid_identity(struct pid_stat *p) {
+    // Descendants may have inherited this assignment; refresh them after parent links are rebuilt.
+    if(p->target)
+        p->identity_changed = true;
+    p->target = NULL;
+    p->matched_by_config = false;
 }
 
-void update_pid_comm(struct pid_stat *p, const char *comm) {
-    if(p->comm_orig && string_strcmp(p->comm_orig, comm) == 0)
-        // no change
-        return;
+static void rebuild_pid_identity(struct pid_stat *p) {
+    // Windows can supply cmdline before the first comm sample.
+    if(!p->comm_collected) return;
 
-    string_freez(p->comm_orig);
-    p->comm_orig = string_strdupz(comm);
-
-    // some process names have ( and ), remove the parenthesis
-    size_t len = strlen(comm);
-    char *buf;
-    if(comm[0] == '(' && comm[len - 1] == ')') {
-        buf = mallocz(len - 1);
-        memcpy(buf, &comm[1], len - 2);
-        buf[len - 2] = '\0';
-    }
-    else
-        buf = strdupz(comm);
+    // OS readers already remove framing; parentheses here belong to the process name.
+    char *buf = strdupz(string2str(p->comm_orig));
 
     sanitize_apps_plugin_chart_meta(buf);
     string_freez(p->comm);
     p->comm = string_strdupz(buf);
     freez(buf);
+
+    update_pid_comm_from_cmdline(p);
     p->is_manager = is_process_a_manager(p);
     p->is_aggregator = is_process_an_aggregator(p);
+}
+
+void update_pid_cmdline(struct pid_stat *p, const char *cmdline) {
+    if(cmdline && !*cmdline) cmdline = NULL;
+    if((!p->cmdline && !cmdline) || (p->cmdline && cmdline && string_strcmp(p->cmdline, cmdline) == 0))
+        return;
+
+    STRING *new_cmdline = cmdline ? string_strdupz(cmdline) : NULL;
+    string_freez(p->cmdline);
+    p->cmdline = new_cmdline;
+    rebuild_pid_identity(p);
+    invalidate_pid_identity(p);
+}
+
+void update_pid_comm(struct pid_stat *p, const char *comm) {
+    bool changed = !p->comm_collected || string_strcmp(p->comm_orig, comm) != 0;
+    if(changed) {
+        STRING *new_comm = string_strdupz(comm);
+        string_freez(p->comm_orig);
+        p->comm_orig = new_comm;
+        p->comm_collected = true;
+        invalidate_pid_identity(p);
+    }
 
 #if (PROCESSES_HAVE_CMDLINE == 1)
-    if(likely(proc_pid_cmdline_is_needed && !p->cmdline))
+    // Spread periodic reads (including retries) over 30 collection iterations.
+    if(proc_pid_cmdline_is_needed &&
+       (changed || global_iterations_counter % 30 == (size_t)p->pid % 30))
         managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
-#else
-    update_pid_comm_from_cmdline(p);
 #endif
 
-    // the process changed comm, we may have to reassign it to
-    // an apps_groups.conf target.
-    p->target = NULL;
+    if(changed)
+        rebuild_pid_identity(p);
 }
 
 // --------------------------------------------------------------------------------------------------------------------

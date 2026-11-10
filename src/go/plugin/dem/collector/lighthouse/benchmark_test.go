@@ -4,31 +4,53 @@ package lighthouse_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 type benchmarkExecutor struct{ result model.Execution }
 
 func (e benchmarkExecutor) Check(context.Context, model.Kind) error { return nil }
-func (e benchmarkExecutor) Execute(_ context.Context, _ model.Request, state func(string)) model.Execution {
+
+func (e benchmarkExecutor) ExecuteScheduled(
+	_ context.Context,
+	r model.Request,
+	state func(string),
+	admitted func(time.Time) model.Schedule,
+) model.Execution {
+	at := time.Now()
+	schedule := admitted(at)
 	state("running")
-	return e.result
+	result := e.result
+	result.Run.ID = "benchmark-run"
+	result.Run.JobID = r.JobID()
+	result.Run.StartedUS = at.UnixMicro()
+	result.Run.CompletedUS = time.Now().UnixMicro()
+	result.Run.ScheduledUS = schedule.DueUS
+	result.Run.QueuedUS = schedule.QueuedUS
+	return result
 }
 
-// One terminal observation and a fixed metric surface isolate collector-cycle
-// overhead. Cost is O(result events + artifacts), independent of other jobs or
-// history. Timing is a local trend; allocations are the regression signal.
-func BenchmarkCollect(b *testing.B) {
+// A completed background observation isolates publication-cycle cost. Snapshots
+// retain only scalars, so event payload and history size must not affect Collect.
+// Timing is a local trend; allocations are the regression signal.
+func BenchmarkCollect(b *testing.B) { benchmarkCollect(b, 0) }
+
+func BenchmarkCollectWith500Events(b *testing.B) { benchmarkCollect(b, 500) }
+
+func benchmarkCollect(b *testing.B, events int) {
 	duration := 1250.5
 	zero := 0.0
 	e := benchmarkExecutor{
 		result: model.Execution{
 			Drained: true,
 			Run: model.Run{
+				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Kind:       model.Lighthouse,
 				Outcome:    model.Success,
 				DurationMS: &duration,
@@ -43,10 +65,19 @@ func BenchmarkCollect(b *testing.B) {
 			},
 		},
 	}
+	e.result.Run.Events = make([]model.Event, events)
+	for i := range e.result.Run.Events {
+		e.result.Run.Events[i] = model.Event{
+			Kind:    "stdout",
+			Message: "fixed synthetic event",
+		}
+	}
+	hub := syntheticregistry.New()
 	c := lighthouse.New(lighthouse.Dependencies{
 		Executor: e,
-		Registry: syntheticregistry.New(),
+		Registry: hub,
 	})
+	c.SetConfiguredVnode(vnodes.VirtualNode{GUID: "11111111-1111-4111-8111-111111111111", Hostname: "site"})
 	c.Name = "benchmark"
 	c.URL = "https://example.org/"
 	if err := c.Init(context.Background()); err != nil {
@@ -68,6 +99,17 @@ func BenchmarkCollect(b *testing.B) {
 			b.Error(err)
 		}
 	}()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		jobs := hub.Snapshot(time.Now())
+		if len(jobs) == 1 && jobs[0].Latest != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			b.Fatal("background observation did not complete")
+		}
+		time.Sleep(time.Millisecond)
+	}
 	managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
 	if !ok {
 		b.Fatal("store is not cycle-managed")
