@@ -140,32 +140,57 @@ enum Payload {
 }
 
 /// One stream's share of an export request, from "accepted for storage" to
-/// the WAL write. The identity gate builds it, so it always carries the
-/// stream's `part_key` (its `ns_hash`, computed once) and its encoded
-/// `content_meta` blob. The collision check then judges `stream`,
+/// the WAL write. [`Self::admit`] builds it once the stream's identity is
+/// known to be storable and its `ns_hash` is claimed, so it always carries
+/// the stream's `part_key` (that hash) and its encoded `content_meta` blob.
 /// [`Self::flatten`] turns `payload` from records into a frame, and
 /// [`Self::write_to`] appends that frame under `part_key` and `content_meta`.
 struct StorableStream {
-    stream: ServiceStream,
     part_key: u64,
     content_meta: Vec<u8>,
-    /// Records the client sent for this stream.
-    log_record_count: usize,
     payload: Payload,
 }
 
 impl StorableStream {
-    /// The identity gate: a grouped stream is storable when its identity fits
-    /// the substrate's caps (see [`encode_identity_or_drop`]). Every
-    /// `StorableStream` is built here, so `part_key` is always the hash of
-    /// `stream`.
-    fn new(stream: ServiceStream, group: StreamGroup) -> Result<Self, OversizedDrop> {
-        let content_meta = encode_identity_or_drop(&stream, group.log_record_count)?;
+    /// Admit one grouped stream for storage, or say why it is turned away.
+    /// Every `StorableStream` is built here, so one exists only for a stream
+    /// that passed both checks.
+    ///
+    /// Identity comes first: a stream whose identity cannot be stored must
+    /// not claim a canonical `part_key` it can never write to (see
+    /// [`encode_identity_or_drop`]). The claim then holds `canonical`'s lock
+    /// for one table operation: the identity is encoded before the lock is
+    /// taken and a collision is logged after it is released.
+    fn admit(
+        stream: ServiceStream,
+        group: StreamGroup,
+        tenant_id: &TenantId,
+        canonical: &Mutex<CanonicalTable>,
+    ) -> Result<Self, Rejection> {
+        let content_meta = encode_identity_or_drop(&stream, group.log_record_count)
+            .map_err(Rejection::Oversized)?;
+        let part_key = otel_logs_identity::part_key(&stream);
+
+        // The lock guard lives for this statement only.
+        let claimed = claim(&mut canonical.lock().unwrap(), tenant_id, part_key, &stream);
+        if let Err(holder) = claimed {
+            tracing::warn!(
+                tenant = %tenant_id,
+                hash = part_key,
+                "ns_hash collision: rejecting {} log records",
+                group.log_record_count,
+            );
+            return Err(Rejection::Collision(Collision {
+                hash: part_key,
+                canonical: holder,
+                rejected: stream,
+                rejected_log_records: group.log_record_count,
+            }));
+        }
+
         Ok(Self {
-            part_key: otel_logs_identity::part_key(&stream),
-            stream,
+            part_key,
             content_meta,
-            log_record_count: group.log_record_count,
             payload: Payload::Records(group.resource_logs),
         })
     }
@@ -258,49 +283,40 @@ struct Flattened {
     rejected: usize,
 }
 
-/// Reconcile a request's storable streams against the canonical-stream table.
+/// The collision table: per tenant, the stream identity that owns each
+/// `ns_hash`.
+type CanonicalTable = HashMap<(TenantId, u64), ServiceStream>;
+
+/// Claim `part_key` for `stream` in the canonical table: the first identity
+/// to write under a hash owns it (first write wins, per tenant).
 ///
-/// For each stream (keyed by its carried `part_key`, the `ns_hash`):
-/// - If the table has no entry for the hash, register the stream as
-///   canonical and accept it.
-/// - If the entry matches the stream, accept.
-/// - If the entry mismatches, reject as a collision and record it in
-///   `collisions`, for the response's `partial_success`.
-///
-/// Returns the accepted streams. Pure with respect to the I/O of the export
-/// path — the only side effect is mutating the canonical table — so it can
-/// be unit-tested without spinning up a writer or a request.
-fn check_collisions(
-    canonical: &mut HashMap<(TenantId, u64), ServiceStream>,
+/// - No entry for the hash: register `stream` as canonical.
+/// - The entry is `stream`: nothing to do.
+/// - The entry is another identity: `Err` with that identity; the table is
+///   left unchanged.
+fn claim(
+    canonical: &mut CanonicalTable,
     tenant_id: &TenantId,
-    streams: Vec<StorableStream>,
-    collisions: &mut Vec<Collision>,
-) -> Vec<StorableStream> {
-    // Collisions are rare: nearly every stream is accepted.
-    let mut accepted = Vec::with_capacity(streams.len());
-
-    for s in streams {
-        let key = (tenant_id.clone(), s.part_key);
-        match canonical.entry(key) {
-            Entry::Vacant(e) => {
-                e.insert(s.stream.clone());
-                accepted.push(s);
-            }
-            Entry::Occupied(e) if *e.get() == s.stream => {
-                accepted.push(s);
-            }
-            Entry::Occupied(e) => {
-                collisions.push(Collision {
-                    hash: s.part_key,
-                    canonical: e.get().clone(),
-                    rejected: s.stream,
-                    rejected_log_records: s.log_record_count,
-                });
-            }
+    part_key: u64,
+    stream: &ServiceStream,
+) -> Result<(), ServiceStream> {
+    match canonical.entry((tenant_id.clone(), part_key)) {
+        Entry::Vacant(e) => {
+            e.insert(stream.clone());
+            Ok(())
         }
+        Entry::Occupied(e) if e.get() == stream => Ok(()),
+        Entry::Occupied(e) => Err(e.get().clone()),
     }
+}
 
-    accepted
+/// Why a stream of a request is turned away at admission.
+#[derive(Debug)]
+enum Rejection {
+    /// Its identity is too large to store.
+    Oversized(OversizedDrop),
+    /// Its `ns_hash` is held by a different identity.
+    Collision(Collision),
 }
 
 /// One frame dropped because its stream identity could not be encoded into the
@@ -337,6 +353,14 @@ struct Rejections {
 }
 
 impl Rejections {
+    /// Record a stream turned away at admission.
+    fn push(&mut self, rejection: Rejection) {
+        match rejection {
+            Rejection::Oversized(drop) => self.oversized.push(drop),
+            Rejection::Collision(collision) => self.collisions.push(collision),
+        }
+    }
+
     /// The records lost, across all three rejection classes.
     fn count(&self) -> usize {
         let collided: usize = self.collisions.iter().map(|c| c.rejected_log_records).sum();
@@ -506,7 +530,7 @@ pub struct NetdataLogsService {
     /// `partial_success`. In-memory only — on restart the table is empty and
     /// the first write of a tenant's stream re-establishes the canonical
     /// stream.
-    canonical: Mutex<HashMap<(TenantId, u64), ServiceStream>>,
+    canonical: Mutex<CanonicalTable>,
     /// Process-wide monotonic clock, shared across tenants, streams, and
     /// signals (lib.rs creates one instance for logs + traces). The WAL writer
     /// orders frames by the `ingestion_ns` stamped here, so one clock keeps
@@ -677,49 +701,6 @@ impl NetdataLogsService {
         }
     }
 
-    /// Decide which streams of a request may be stored; the others are
-    /// recorded in `rejections`.
-    ///
-    /// Identity comes first: a stream whose identity cannot be stored must
-    /// not claim a canonical `part_key` it can never write to (see
-    /// [`encode_identity_or_drop`]). The collision check then runs under the
-    /// canonical table's lock; identities are encoded before it is taken and
-    /// collisions are logged after it is released.
-    fn admit(
-        &self,
-        tenant_id: &TenantId,
-        groups: HashMap<ServiceStream, StreamGroup>,
-        rejections: &mut Rejections,
-    ) -> Vec<StorableStream> {
-        let mut storable = Vec::with_capacity(groups.len());
-
-        for (stream, group) in groups {
-            match StorableStream::new(stream, group) {
-                Ok(s) => storable.push(s),
-                Err(drop) => rejections.oversized.push(drop),
-            }
-        }
-
-        // The lock guard lives for this statement only.
-        let accepted = check_collisions(
-            &mut self.canonical.lock().unwrap(),
-            tenant_id,
-            storable,
-            &mut rejections.collisions,
-        );
-
-        for c in &rejections.collisions {
-            tracing::warn!(
-                tenant = %tenant_id,
-                hash = c.hash,
-                "ns_hash collision: rejecting {} log records",
-                c.rejected_log_records,
-            );
-        }
-
-        accepted
-    }
-
     /// The transport-agnostic OTLP logs export core: everything between
     /// "tenant resolved, request decoded" and the response. The gRPC
     /// `LogsService::export` wrapper resolves the tenant from tonic
@@ -743,8 +724,16 @@ impl NetdataLogsService {
             });
         }
 
+        // Admit each stream for storage, or record why it is turned away.
         let mut rejections = Rejections::default();
-        let mut accepted = self.admit(tenant_id, groups, &mut rejections);
+        let mut accepted = Vec::with_capacity(groups.len());
+
+        for (stream, group) in groups {
+            match StorableStream::admit(stream, group, tenant_id, &self.canonical) {
+                Ok(s) => accepted.push(s),
+                Err(rejection) => rejections.push(rejection),
+            }
+        }
 
         // Nothing left to write: every stream was a collision or had an
         // oversized identity. Still report the rejected records to the client.
@@ -986,49 +975,50 @@ mod tests {
         assert!(group_by_stream(vec![rl(Some("p"), Some("q"), 0)]).is_empty());
     }
 
-    /// Lift grouped streams into the storable form the collision check
-    /// consumes, through the identity gate (no oversized identities in
-    /// these fixtures).
-    fn storable(groups: HashMap<ServiceStream, StreamGroup>) -> Vec<StorableStream> {
-        groups
+    /// Admit the one stream these `ResourceLogs` belong to against `canonical`,
+    /// as the export does.
+    fn admit_stream_of(
+        canonical: &Mutex<CanonicalTable>,
+        tenant: &TenantId,
+        resource_logs: ResourceLogs,
+    ) -> Result<StorableStream, Rejection> {
+        let (stream, group) = group_by_stream(vec![resource_logs])
             .into_iter()
-            .map(|(stream, group)| StorableStream::new(stream, group).unwrap())
-            .collect()
+            .next()
+            .unwrap();
+        StorableStream::admit(stream, group, tenant, canonical)
+    }
+
+    /// The records a freshly admitted stream carries.
+    fn record_count(stream: &StorableStream) -> usize {
+        let Payload::Records(resource_logs) = &stream.payload else {
+            panic!("a freshly admitted stream holds its records");
+        };
+        resource_logs
+            .iter()
+            .flat_map(|rl| rl.scope_logs.iter())
+            .map(|sl| sl.log_records.len())
+            .sum()
     }
 
     #[test]
     fn first_write_establishes_canonical_pair() {
-        let mut canonical = HashMap::new();
-        let groups = group_by_stream(vec![rl(Some("prod"), Some("api"), 4)]);
-        let mut collisions = Vec::new();
-        let accepted =
-            check_collisions(&mut canonical, &tenant(), storable(groups), &mut collisions);
-        assert_eq!(accepted.len(), 1);
-        assert!(collisions.is_empty());
-        let stream = canonical.get(&(tenant(), accepted[0].part_key)).unwrap();
+        let canonical = Mutex::new(HashMap::new());
+        let admitted =
+            admit_stream_of(&canonical, &tenant(), rl(Some("prod"), Some("api"), 4)).unwrap();
+        let canonical = canonical.lock().unwrap();
+        let stream = canonical.get(&(tenant(), admitted.part_key)).unwrap();
         assert_eq!(stream, &ServiceStream::new("prod", "api"));
     }
 
     #[test]
     fn matching_subsequent_writes_pass_through() {
-        let mut canonical = HashMap::new();
-        let mut collisions = Vec::new();
-        check_collisions(
-            &mut canonical,
-            &tenant(),
-            storable(group_by_stream(vec![rl(Some("prod"), Some("api"), 1)])),
-            &mut collisions,
-        );
-        assert!(collisions.is_empty());
-        let accepted = check_collisions(
-            &mut canonical,
-            &tenant(),
-            storable(group_by_stream(vec![rl(Some("prod"), Some("api"), 7)])),
-            &mut collisions,
-        );
-        assert!(collisions.is_empty());
-        assert_eq!(accepted.len(), 1);
-        assert_eq!(accepted[0].log_record_count, 7);
+        let canonical = Mutex::new(HashMap::new());
+        admit_stream_of(&canonical, &tenant(), rl(Some("prod"), Some("api"), 1)).unwrap();
+        let admitted =
+            admit_stream_of(&canonical, &tenant(), rl(Some("prod"), Some("api"), 7)).unwrap();
+        assert_eq!(record_count(&admitted), 7);
+        assert_eq!(canonical.lock().unwrap().len(), 1);
     }
 
     #[test]
@@ -1041,75 +1031,49 @@ mod tests {
         // as if an earlier colliding stream had claimed it. The incoming
         // group then hashes to the occupied slot with a mismatching identity
         // and must be rejected — exercising the Occupied-mismatch arm.
-        let mut canonical = HashMap::new();
         let rejected = ServiceStream::new("staging", "api");
         let hash = rejected.ns_hash();
         let canonical_stream = ServiceStream::new("prod", "api");
-        canonical.insert((tenant(), hash), canonical_stream.clone());
+        let canonical = Mutex::new(HashMap::from([(
+            (tenant(), hash),
+            canonical_stream.clone(),
+        )]));
 
-        let mut groups = HashMap::new();
-        groups.insert(
-            rejected.clone(),
-            StreamGroup {
-                log_record_count: 12,
-                resource_logs: Vec::new(),
-            },
-        );
-
-        let mut collisions = Vec::new();
-        let accepted =
-            check_collisions(&mut canonical, &tenant(), storable(groups), &mut collisions);
-        assert!(accepted.is_empty());
-        assert_eq!(collisions.len(), 1);
-        let c = &collisions[0];
+        let group = StreamGroup {
+            log_record_count: 12,
+            resource_logs: Vec::new(),
+        };
+        let Err(Rejection::Collision(c)) =
+            StorableStream::admit(rejected.clone(), group, &tenant(), &canonical)
+        else {
+            panic!("a stream whose hash another identity holds must collide");
+        };
         assert_eq!(c.hash, hash);
         assert_eq!(c.canonical, canonical_stream);
         assert_eq!(c.rejected, rejected);
         assert_eq!(c.rejected_log_records, 12);
-    }
-
-    #[test]
-    fn collision_does_not_overwrite_canonical_pair() {
-        let mut canonical = HashMap::new();
-        let rejected = ServiceStream::new("staging", "api");
-        let hash = rejected.ns_hash();
-        let canonical_stream = ServiceStream::new("prod", "api");
-        canonical.insert((tenant(), hash), canonical_stream.clone());
-
-        let mut groups = HashMap::new();
-        groups.insert(
-            rejected,
-            StreamGroup {
-                log_record_count: 1,
-                resource_logs: Vec::new(),
-            },
-        );
-
-        check_collisions(&mut canonical, &tenant(), storable(groups), &mut Vec::new());
         // The original canonical stream must remain unchanged.
-        assert_eq!(canonical.get(&(tenant(), hash)).unwrap(), &canonical_stream);
+        assert_eq!(
+            canonical.lock().unwrap().get(&(tenant(), hash)).unwrap(),
+            &canonical_stream
+        );
     }
 
     #[test]
     fn tenants_have_independent_canonical_tables() {
-        let mut canonical = HashMap::new();
+        let canonical = Mutex::new(HashMap::new());
         let t1 = TenantId::from("t1");
         let t2 = TenantId::from("t2");
-        let groups_t1 = group_by_stream(vec![rl(Some("prod"), Some("api"), 1)]);
-        let mut collisions = Vec::new();
-        let accepted_t1 =
-            check_collisions(&mut canonical, &t1, storable(groups_t1), &mut collisions);
-        assert!(collisions.is_empty());
+        let admitted_t1 =
+            admit_stream_of(&canonical, &t1, rl(Some("prod"), Some("api"), 1)).unwrap();
 
         // The same stream (hence the same ns_hash) in a different tenant
         // must be accepted as fresh, not flagged as a collision — the
         // tenant id is part of the canonical-table key.
-        let groups_t2 = group_by_stream(vec![rl(Some("prod"), Some("api"), 1)]);
-        let accepted_t2 =
-            check_collisions(&mut canonical, &t2, storable(groups_t2), &mut collisions);
-        assert!(collisions.is_empty());
-        assert_eq!(accepted_t2.len(), 1);
-        assert_eq!(accepted_t1[0].stream, accepted_t2[0].stream);
+        let admitted_t2 =
+            admit_stream_of(&canonical, &t2, rl(Some("prod"), Some("api"), 1)).unwrap();
+        assert_eq!(admitted_t1.part_key, admitted_t2.part_key);
+        assert_eq!(canonical.lock().unwrap().len(), 2);
     }
 
     /// Build a `NetdataLogsService` rooted at `wal_dir`. The
