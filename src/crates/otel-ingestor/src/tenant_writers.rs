@@ -45,7 +45,7 @@ impl TenantWriter {
     /// released.
     ///
     /// Lock order: the sync turn, then the writer. The fsyncs run with the
-    /// turn held and the writer free.
+    /// turn held and the writer free, all of the round's files at once.
     pub(crate) async fn make_durable(&self, mark: wal::WriteMark) -> wal::Result<()> {
         let _turn = self.sync_turn.lock().await;
 
@@ -59,10 +59,7 @@ impl TenantWriter {
             writer.begin_sync()
         };
 
-        // On the blocking pool: an fsync waits on the disk.
-        let ticket = tokio::task::spawn_blocking(move || ticket.fsync())
-            .await
-            .map_err(std::io::Error::other)?;
+        let ticket = fsync_overlapped(ticket).await;
 
         let mut writer = self.lock();
         let result = writer.finish_sync(ticket);
@@ -92,6 +89,28 @@ impl TenantWriter {
 
         sent
     }
+}
+
+/// fsync the ticket's files, each on the blocking pool (an fsync waits on the
+/// disk), all at once. A tenant has one file per stream, and on a journaling
+/// filesystem fsyncs that overlap share a journal commit, where fsyncs in
+/// turn wait for one each.
+async fn fsync_overlapped(mut ticket: wal::SyncTicket) -> wal::SyncTicket {
+    let files = ticket.take_files();
+    let mut fsyncs = Vec::with_capacity(files.len());
+
+    for file in files {
+        fsyncs.push(tokio::task::spawn_blocking(move || file.fsync()));
+    }
+    for fsync in fsyncs {
+        match fsync.await {
+            Ok(file) => ticket.give_back(file),
+            // The file stays out of the ticket, which fails the round.
+            Err(e) => tracing::error!(%e, "a WAL fsync task failed"),
+        }
+    }
+
+    ticket
 }
 
 /// One WAL writer per tenant, for one signal.
@@ -370,6 +389,37 @@ mod tests {
         };
         assert_eq!(closed_at_shutdown(&short), 0);
         assert_eq!(closed_at_shutdown(&hourly), 1);
+    }
+
+    #[tokio::test]
+    async fn a_round_syncs_every_file_of_the_tenant() {
+        let tmp = tempfile::tempdir().unwrap();
+        let writers = tenant_writers(tmp.path(), &dead_socket());
+        let mut clock = MonotonicClock::new();
+        let writer = writers.writer_for(&TenantId::from("a")).unwrap();
+
+        // Three streams, so three files.
+        let mark = {
+            let mut writer = writer.lock();
+
+            for partition_key in 1..=3 {
+                let meta = wal::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: clock.now_ns(),
+                    log_ts_range: None,
+                };
+                writer
+                    .write_frame(partition_key, &[], b"frame", meta)
+                    .unwrap();
+            }
+            writer.take_all_events();
+
+            writer.write_mark()
+        };
+
+        // A round that loses one of the files fails.
+        writer.make_durable(mark).await.unwrap();
+        assert!(writer.lock().is_durable(mark));
     }
 
     #[tokio::test]
