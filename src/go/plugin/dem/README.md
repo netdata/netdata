@@ -525,8 +525,16 @@ receiver recovery.
 Each `journey` job runs one configured Playwright Test entry and its imports. Each `lighthouse` job runs one desktop
 performance lab audit. Both use native job configuration and scheduling. Stock configuration enables no browser jobs.
 Journey defaults to 900 seconds between attempts and a 120-second admitted timeout; Lighthouse defaults to 1800/180 seconds.
-One plugin-wide admission slot serializes expensive runs. Waiting time is separate from execution time; cancellation
-while waiting starts no browser. A fresh browser is created for each run.
+`browser.concurrency` in `dem.conf` limits simultaneous browser attempts in one plugin process. It defaults to 1 and
+accepts a positive integer; restart the plugin to apply changes. Monitoring, journey rehearsals and in-process runtime
+qualification share this allowance. Ready jobs take turns, and monitoring and rehearsals for the same job cannot overlap.
+Waiting time is separate from execution time; cancellation while waiting starts no browser. A fresh browser is created
+for each run.
+
+Choose concurrency for the Agent's CPU and memory budget and the accuracy needed from Lighthouse measurements.
+The setting is not a hard memory limit or a count of every child process. Concurrent activation checks share one
+runtime contract probe per runtime consumer; probes run outside browser slots so a long audit cannot block activation.
+A later activation checks the runtime again. Standalone administration commands have their own process budget.
 
 Browser jobs require Linux amd64 or arm64 and an unprivileged plugin identity. Chromium sandboxing stays enabled;
 containers need compatible namespace/seccomp support. RUM does not require a browser runtime.

@@ -52,7 +52,7 @@ modules:
             is configured.
         performance_impact:
           description: Each attempt starts a fresh browser and consumes CPU, memory and target website requests.
-            Increasing update_every reduces frequency. Jobs share one browser admission slot, so concurrent
+            Increasing update_every reduces frequency. Jobs share the process browser.concurrency allowance (default 1), so concurrent
             due jobs can wait. Optional captures consume local disk space.
     setup:
       prerequisites:

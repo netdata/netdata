@@ -14,14 +14,36 @@ type RetentionConfig struct {
 	Days     int   `yaml:"days"`
 	MaxBytes int64 `yaml:"max_bytes"`
 }
+type BrowserConfig struct {
+	Concurrency int `yaml:"concurrency"`
+}
+
+func (c *BrowserConfig) UnmarshalYAML(unmarshal func(any) error) error {
+	// yaml.v2 converts fractional numbers to int silently; a slot count must be integral.
+	input := struct {
+		Concurrency any `yaml:"concurrency"`
+	}{Concurrency: c.Concurrency}
+	if err := unmarshal(&input); err != nil {
+		return err
+	}
+	value, ok := input.Concurrency.(int)
+	if !ok || value < 1 {
+		return fmt.Errorf("browser.concurrency must be a positive integer")
+	}
+	c.Concurrency = value
+	return nil
+}
+
 type Config struct {
 	History   RetentionConfig `yaml:"history"`
 	Artifacts RetentionConfig `yaml:"artifacts"`
 	Runtime   RuntimeConfig   `yaml:"runtime"`
+	Browser   BrowserConfig   `yaml:"browser"`
 }
 
 func DefaultConfig() Config {
 	return Config{
+		Browser: BrowserConfig{Concurrency: 1},
 		Artifacts: RetentionConfig{
 			Days:     7,
 			MaxBytes: 2 << 30,
@@ -40,7 +62,7 @@ type opaqueConfigValue struct{}
 func (*opaqueConfigValue) UnmarshalYAML(func(any) error) error { return nil }
 
 // LoadConfig reads the same highest-priority dem.conf as the Agent. Framework
-// fields are decoded by the Agent; this owner decodes process runtime and retention policy.
+// fields are decoded by the Agent; this owner decodes browser, runtime and retention policy.
 func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	cfg := DefaultConfig()
 	path, err := paths.Find("dem.conf")
@@ -75,6 +97,9 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	}
 	if err = cfg.Runtime.validate(); err != nil {
 		return cfg, fmt.Errorf("runtime.%w", err)
+	}
+	if cfg.Browser.Concurrency < 1 {
+		return cfg, fmt.Errorf("browser.concurrency must be a positive integer")
 	}
 	return cfg, nil
 }

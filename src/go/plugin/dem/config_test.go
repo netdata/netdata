@@ -53,6 +53,35 @@ func TestLoadConfigUsesHighestPriorityFile(t *testing.T) {
 	assert.Equal(t, 2, cfg.History.Days)
 }
 
+func TestBrowserConcurrencyConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want int
+		fail bool
+	}{
+		{name: "default", want: 1},
+		{name: "empty section", body: "browser: {}", want: 1},
+		{name: "explicit budget", body: "browser: {concurrency: 4}", want: 4},
+		{name: "zero", body: "browser: {concurrency: 0}", fail: true},
+		{name: "negative", body: "browser: {concurrency: -1}", fail: true},
+		{name: "fractional", body: "browser: {concurrency: 1.5}", fail: true},
+		{name: "text", body: "browser: {concurrency: four}", fail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(tc.body), 0600))
+			cfg, err := LoadConfig(multipath.New(dir))
+			if tc.fail {
+				require.ErrorContains(t, err, "browser.concurrency")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, cfg.Browser.Concurrency)
+		})
+	}
+}
+
 func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}"), 0600))

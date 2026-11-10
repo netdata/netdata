@@ -308,7 +308,7 @@ sequenceDiagram
 
     FW->>Job: Collect
     Job->>Eng: Execute(request)
-    Note over Eng: state "waiting":<br/>one plugin-wide admission slot
+    Note over Eng: state "waiting":<br/>shared configured admission slots
     Eng->>RT: BeginUse (execution pin)
     Eng->>J: start record
     Eng->>Art: Begin (private work directory)
@@ -324,8 +324,10 @@ sequenceDiagram
 
 Key points of this path:
 
-- **One run at a time.** A single plugin-wide admission slot serializes expensive browser runs. Waiting time is
-  separate from execution time, and cancellation while waiting starts no browser.
+- **Shared admission.** `browser.concurrency` bounds active attempts across monitoring, rehearsals and in-process
+  qualification, defaulting to one. Ready jobs take turns; one logical job cannot run overlapping attempts. Waiting
+  time is separate from execution time, and cancellation while waiting starts no browser. Qualification uses a
+  separate internal identity, so a user job name cannot collide with it.
 - **A fresh browser per run.** Runs share no browser state.
 - **Installation is explicit.** An administrator installs and qualifies a complete runtime, or supplies a sealed
   preload. The process acquires its release at startup; each run pins that already prepared release for its duration.
@@ -342,7 +344,7 @@ How a run can end:
 | Skipped, expected-failure, empty or incomplete suite | `inconclusive` | Start and completion | None |
 | The overall deadline passes | `timeout` | Start and completion | None |
 | The run is cancelled | `cancelled` | None when cancelled while waiting | None |
-| The monitor cannot load or run | `error`, still counted in metrics and the registry | None when it fails before the runtime is pinned and checked | None |
+| An admitted monitor cannot load or run | `error`, still counted in metrics and the registry | Start and completion, including preparation failures | None |
 | Process-tree completion cannot be verified | No outcome published | A saved start record stays `unknown` | Admission is poisoned and the plugin fail-stops |
 
 The README defines the full outcome semantics.
@@ -978,7 +980,13 @@ Job ownership:
 - Journey and Lighthouse each own their prepared request, metric store, product instruments and explicit execution
   flow.
 - They share an executor, pure request validation and the common outcome/duration instrument helper.
-- Framework scheduling owns cadence. The command owns the execution admission slot, artifact store and journal.
+- Framework scheduling owns cadence. The command owns shared execution admission, artifact store and journal.
+
+Activation checks coalesce only while a contract probe is in flight for the exact runtime source view. Their caller
+deadlines remain independent; the last departing caller cancels and joins physical completion before a replacement
+probe can start. A later check probes again. Running and candidate runtime consumers have separate probe ownership,
+but share the fatal execution owner. Probes stay outside browser-attempt slots to preserve short startup deadlines;
+deployment resource sizing must include them. The concurrency setting does not impose a host-wide or CPU/RAM limit.
 
 Draft rehearsal:
 
