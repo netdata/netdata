@@ -33,6 +33,11 @@ HRESULT nd_wmi_connect(ND_WMI *wmi, const wchar_t *namespace_path, const char **
         return E_POINTER;
     }
 
+    if (__atomic_load_n(&wmi->cancelled, __ATOMIC_SEQ_CST)) {
+        *failed_step = "WMI connect cancelled";
+        return E_ABORT;
+    }
+
     const size_t namespace_max = sizeof(wmi->namespace_path) / sizeof(wmi->namespace_path[0]);
     size_t namespace_len = wcsnlen(namespace_path, namespace_max);
     if (namespace_len >= namespace_max) {
@@ -95,7 +100,15 @@ HRESULT nd_wmi_connect(ND_WMI *wmi, const wchar_t *namespace_path, const char **
         nd_wmi_disconnect(wmi);
         return E_OUTOFMEMORY;
     }
-    hr = wmi->pLoc->lpVtbl->ConnectServer(
+    // Let nd_wmi_cancel() abort the call from another thread. Checking 'cancelled' after publishing 'connecting'
+    // closes the race with a cancel issued just before the call starts.
+    wmi->connect_thread_id = GetCurrentThreadId();
+    HRESULT cancel_hr = CoEnableCallCancellation(NULL);
+    __atomic_store_n(&wmi->connecting, true, __ATOMIC_SEQ_CST);
+    if (__atomic_load_n(&wmi->cancelled, __ATOMIC_SEQ_CST))
+        hr = E_ABORT;
+    else
+        hr = wmi->pLoc->lpVtbl->ConnectServer(
             wmi->pLoc,
             namespacePath,
             NULL,
@@ -104,12 +117,15 @@ HRESULT nd_wmi_connect(ND_WMI *wmi, const wchar_t *namespace_path, const char **
             WBEM_FLAG_CONNECT_USE_MAX_WAIT,
             0,
             0,
-            &wmi->pSvc
-    );
+            &wmi->pSvc);
+    __atomic_store_n(&wmi->connecting, false, __ATOMIC_SEQ_CST);
+    if (SUCCEEDED(cancel_hr))
+        CoDisableCallCancellation(NULL);
     SysFreeString(namespacePath);
 
     if (FAILED(hr)) {
-        *failed_step = "Could not connect to WMI server";
+        *failed_step = (hr == E_ABORT || hr == RPC_E_CALL_CANCELED) ? "WMI connect cancelled"
+                                                                     : "Could not connect to WMI server";
         nd_wmi_disconnect(wmi);
         return hr;
     }
@@ -154,6 +170,30 @@ void nd_wmi_disconnect(ND_WMI *wmi) {
         CoUninitialize();
         wmi->com_initialized = false;
     }
+}
+
+void nd_wmi_cancel(ND_WMI *wmi, usec_t max_wait_ut) {
+    if (!wmi)
+        return;
+
+    __atomic_store_n(&wmi->cancelled, true, __ATOMIC_SEQ_CST);
+    if (!__atomic_load_n(&wmi->connecting, __ATOMIC_SEQ_CST))
+        return;
+
+    HRESULT com_hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    usec_t deadline_ut = now_monotonic_usec() + max_wait_ut;
+
+    // The outbound call may not have started yet, and ConnectServer() can issue more than one, so keep
+    // cancelling until it returns or the wait expires.
+    while (__atomic_load_n(&wmi->connecting, __ATOMIC_SEQ_CST)) {
+        CoCancelCall(wmi->connect_thread_id, 0);
+        if (now_monotonic_usec() >= deadline_ut)
+            break;
+        sleep_usec(100 * USEC_PER_MS);
+    }
+
+    if (SUCCEEDED(com_hr))
+        CoUninitialize();
 }
 
 HRESULT InitializeWMI(void) {

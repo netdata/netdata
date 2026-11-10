@@ -10,13 +10,14 @@ static struct proc_module {
     int enabled;
     int update_every;
     // Always run on a dedicated thread, so a blocking data source cannot stall the shared loop.
-    // Shutdown still joins it without a time limit: a call already blocked (e.g. a WMI ConnectServer, up to
-    // ~2 minutes) delays this join, and the module's cleanup then runs after the collectors' 20 s stop window.
     bool dedicated_thread;
     int (*func)(int update_every, usec_t dt);
     RRDDIM *rd;
     ND_THREAD *thread;
     void (*cleanup)();
+    // Optional; called from the main thread at shutdown, before joining the module's thread, to abort a blocking
+    // call (e.g. a WMI ConnectServer, up to ~2 minutes) that would otherwise delay the unbounded join.
+    void (*interrupt)(void);
 } win_modules[] = {
 
     // system metrics
@@ -251,7 +252,8 @@ static struct proc_module {
      .func = do_GetFSRMQuota,
      .rd = NULL,
      .thread = NULL,
-     .cleanup = do_GetFSRMQuota_cleanup},
+     .cleanup = do_GetFSRMQuota_cleanup,
+     .interrupt = do_GetFSRMQuota_interrupt},
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL, .rd = NULL, .thread = NULL, .cleanup = NULL}};
 
@@ -384,6 +386,13 @@ void win_plugin_main(void *ptr)
             pm->enabled = !pm->func(pm->update_every, hb_dt);
             lgs[LGS_MODULE_ID] = ND_LOG_FIELD_TXT(NDF_MODULE, PLUGIN_WINDOWS_NAME);
         }
+    }
+
+    // Abort blocking calls in every module thread first, so their joins below do not wait on each other.
+    for (i = 0; win_modules[i].name; i++) {
+        struct proc_module *pm = &win_modules[i];
+        if (pm->thread && pm->interrupt)
+            pm->interrupt();
     }
 
     // Join threads

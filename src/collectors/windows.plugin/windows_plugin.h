@@ -77,6 +77,7 @@ void do_GetPowerSupply_cleanup();
 void do_PerflibSMB_cleanup();
 void do_PerflibStorage_cleanup();
 void do_GetFSRMQuota_cleanup(void);
+void do_GetFSRMQuota_interrupt(void);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY

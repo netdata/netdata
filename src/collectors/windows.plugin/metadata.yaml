@@ -5455,6 +5455,17 @@ modules:
             title: ""
           list: []
     troubleshooting:
+      errors:
+        list:
+          - error: "GetFSRMQuota: the FSRM service (SrmSvc) is not running (service state `state`; 0 means not installed or not accessible); skipping this cycle"
+            when: The FSRM WMI query returned no quotas.
+            cause: |
+              The File Server Resource Manager service is stopped, still starting, or not installed. While it is not
+              running, the FSRM WMI provider answers with an empty list instead of an error, so the module leaves a gap
+              in the charts rather than reporting zero quotas.
+            fix: |
+              Start the service with `Start-Service SrmSvc` and check its startup type. Charts resume on the next
+              successful collection.
       problems:
         list:
           - name: No FSRM charts after enabling the module

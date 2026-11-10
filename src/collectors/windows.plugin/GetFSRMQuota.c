@@ -9,6 +9,7 @@
 // This module runs on a dedicated thread: WMI connects cannot be bounded below ~2 minutes.
 
 #define FSRM_WMI_NAMESPACE L"ROOT\\Microsoft\\Windows\\FSRM"
+#define FSRM_SERVICE_NAME L"SrmSvc"
 #define FSRM_WMI_QUERY                                                                                                 \
     L"SELECT Path, Template, Description, Usage, Size, PeakUsage, Disabled, SoftLimit, MatchesTemplate "              \
     L"FROM MSFT_FSRMQuota"
@@ -17,6 +18,8 @@
 // Whole-enumeration budget; generous because the module has its own thread and large hosts can have many quotas.
 #define FSRM_ENUMERATION_MIN_SECONDS 60
 #define FSRM_RETRY_MAX_UT (600 * USEC_PER_SEC)
+// How long shutdown keeps cancelling an in-flight WMI connect before falling back to the unbounded join.
+#define FSRM_CANCEL_MAX_WAIT_UT (5 * USEC_PER_SEC)
 
 // Large enough for a 32767 UTF-16 unit extended-length path in UTF-8, so long paths are never truncated.
 #define FSRM_SCRATCH_SIZE (32768 * 3)
@@ -287,13 +290,18 @@ static bool fsrm_query(struct fsrm_row **rows_out, size_t *count_out, int update
     *rows_out = NULL;
     *count_out = 0;
 
-    // A connect cannot be interrupted once started (up to ~2 minutes), so never begin one during shutdown.
+    // Do not start a connect (up to ~2 minutes) once shutdown has begun; one in flight is cancelled by
+    // do_GetFSRMQuota_interrupt().
     if (!service_running(SERVICE_COLLECTORS))
         return false;
 
     const char *failed_step = NULL;
     HRESULT hr = nd_wmi_connect(&fsrm_wmi, FSRM_WMI_NAMESPACE, &failed_step);
     if (FAILED(hr)) {
+        // A connect cancelled for shutdown is not an error worth logging.
+        if (!service_running(SERVICE_COLLECTORS))
+            return false;
+
         nd_log_limit_static_thread_var(erl, 3600, 0);
         nd_log_limit(
             &erl,
@@ -390,6 +398,22 @@ static bool fsrm_query(struct fsrm_row **rows_out, size_t *count_out, int update
     if (!complete) {
         if (FAILED(hr))
             nd_wmi_disconnect(&fsrm_wmi);
+        fsrm_rows_free(rows, count);
+        return false;
+    }
+
+    // With SrmSvc stopped or still starting, the provider returns an empty result without an error. Checked after the
+    // query, so a service that stops mid-query is caught too; a stopped service is a failed cycle, not zero quotas.
+    DWORD service_state = 0;
+    if (!count && !os_windows_service_is_running(FSRM_SERVICE_NAME, &service_state)) {
+        nd_log_limit_static_thread_var(erl, 3600, 0);
+        nd_log_limit(
+            &erl,
+            NDLS_COLLECTORS,
+            NDLP_WARNING,
+            "GetFSRMQuota: the FSRM service (SrmSvc) is not running (service state %lu; 0 means not installed or "
+            "not accessible); skipping this cycle",
+            (unsigned long)service_state);
         fsrm_rows_free(rows, count);
         return false;
     }
@@ -648,6 +672,12 @@ int do_GetFSRMQuota(int update_every, usec_t dt __maybe_unused)
     }
 
     return 0;
+}
+
+// Called from the plugin's main thread at shutdown, before it joins this module's thread.
+void do_GetFSRMQuota_interrupt(void)
+{
+    nd_wmi_cancel(&fsrm_wmi, FSRM_CANCEL_MAX_WAIT_UT);
 }
 
 void do_GetFSRMQuota_cleanup(void)

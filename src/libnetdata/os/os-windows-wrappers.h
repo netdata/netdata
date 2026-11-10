@@ -16,5 +16,9 @@ bool netdata_registry_key_exists(void *hKey, const char *subKey);
 
 bool EnableWindowsPrivilege(const char *privilegeName);
 
+// True only when the service is SERVICE_RUNNING. *current_state (optional) receives the SERVICE_* state, or 0 when
+// the service is not installed or cannot be queried.
+bool os_windows_service_is_running(const wchar_t *service_name, DWORD *current_state);
+
 #endif // OS_WINDOWS
 #endif //NETDATA_OS_WINDOWS_WRAPPERS_H
