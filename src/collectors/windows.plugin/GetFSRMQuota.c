@@ -402,10 +402,11 @@ static bool fsrm_query(struct fsrm_row **rows_out, size_t *count_out, int update
         return false;
     }
 
-    // With SrmSvc stopped or still starting, the provider returns an empty result without an error. Checked after the
-    // query, so a service that stops mid-query is caught too; a stopped service is a failed cycle, not zero quotas.
+    // With SrmSvc stopped or still starting, the provider returns an empty result without an error, and a service
+    // that stops mid-query may cut the list short. Trust a result only if the service is running once the query
+    // completes; otherwise the cycle fails (gap), so charts of quotas missing from the list are not retired.
     DWORD service_state = 0;
-    if (!count && !os_windows_service_is_running(FSRM_SERVICE_NAME, &service_state)) {
+    if (!os_windows_service_is_running(FSRM_SERVICE_NAME, &service_state)) {
         nd_log_limit_static_thread_var(erl, 3600, 0);
         nd_log_limit(
             &erl,

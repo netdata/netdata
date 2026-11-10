@@ -5458,13 +5458,16 @@ modules:
       errors:
         list:
           - error: "GetFSRMQuota: the FSRM service (SrmSvc) is not running (service state `state`; 0 means not installed or not accessible); skipping this cycle"
-            when: The FSRM WMI query returned no quotas.
             cause: |
-              The File Server Resource Manager service is stopped, still starting, or not installed. While it is not
-              running, the FSRM WMI provider answers with an empty list instead of an error, so the module leaves a gap
-              in the charts rather than reporting zero quotas.
+              The File Server Resource Manager service is stopped, still starting, not installed, or its state cannot
+              be read by the Netdata service account. While it is not running, the FSRM WMI provider answers with an
+              empty or incomplete list instead of an error, so the module leaves a gap in the charts rather than
+              reporting zero quotas.
             fix: |
-              Start the service with `Start-Service SrmSvc` and check its startup type. Charts resume on the next
+              Run `Get-Service SrmSvc`. If the service is not found, install the FSRM role with
+              `Install-WindowsFeature FS-Resource-Manager` (Windows Server). If it exists but is not running, start it
+              with `Start-Service SrmSvc` and check its startup type. If it is running but the state is 0, the Netdata
+              service account lacks permission to query it; run Netdata as `LocalSystem`. Charts resume on the next
               successful collection.
       problems:
         list:
