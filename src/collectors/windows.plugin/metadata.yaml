@@ -1238,7 +1238,9 @@ modules:
         metrics_description: |
           Monitor SMB server share activity and throughput counters on Windows systems.
         method_description: |
-          It queries the 'SMB Server Shares' object from Perflib in order to gather the metrics.
+          It reads the 'SMB Server Shares' performance counters through the Performance Data Helper (PDH), the same
+          source as Performance Monitor and `Get-Counter`. The registry view of this object reports some counters
+          under the wrong names on recent Windows builds, so it is not used.
       supported_platforms:
         include: ["windows"]
         exclude: []

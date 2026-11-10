@@ -3,6 +3,42 @@
 #include "windows_plugin.h"
 #include "windows-internals.h"
 
+// The registry view of "SMB Server Shares" attaches values to the wrong counters on some Windows builds
+// (reads, metadata and files opened; issue #24660), so this module reads it through PDH.
+#define SMB_SERVER_SHARES_OBJECT "SMB Server Shares"
+
+// While the object is registered but PDH cannot add its counters (e.g. the server service is stopped).
+#define SMB_QUERY_RETRY_SECONDS 60
+
+// Consecutive failed samples after which the query is rebuilt: its handles may be stale after the provider
+// was re-registered, and an unchanged query would never recover.
+#define SMB_QUERY_MAX_FAILED_SAMPLES 60
+
+enum smb_share_counter {
+    SMB_SHARE_CURRENT_OPEN_FILE_COUNT = 0,
+    SMB_SHARE_WRITE_REQUESTS,
+    SMB_SHARE_READ_REQUESTS,
+    SMB_SHARE_METADATA_REQUESTS,
+    SMB_SHARE_FILES_OPENED,
+    SMB_SHARE_TREE_CONNECT_COUNT,
+    SMB_SHARE_RECEIVED_BYTES,
+    SMB_SHARE_SENT_BYTES,
+
+    // terminator
+    SMB_SHARE_COUNTERS_MAX,
+};
+
+static const char *const smb_share_counter_names[SMB_SHARE_COUNTERS_MAX] = {
+    [SMB_SHARE_CURRENT_OPEN_FILE_COUNT] = "Current Open File Count",
+    [SMB_SHARE_WRITE_REQUESTS] = "Write Requests/sec",
+    [SMB_SHARE_READ_REQUESTS] = "Read Requests/sec",
+    [SMB_SHARE_METADATA_REQUESTS] = "Metadata Requests/sec",
+    [SMB_SHARE_FILES_OPENED] = "Files Opened/sec",
+    [SMB_SHARE_TREE_CONNECT_COUNT] = "Tree Connect Count",
+    [SMB_SHARE_RECEIVED_BYTES] = "Received Bytes/sec",
+    [SMB_SHARE_SENT_BYTES] = "Sent Bytes/sec",
+};
+
 struct smb_share {
     usec_t last_collected;
 
@@ -23,28 +59,18 @@ struct smb_share {
     RRDDIM *rd_received_bytes;
     RRDDIM *rd_sent_bytes;
 
-    COUNTER_DATA currentOpenFileCount;
-    COUNTER_DATA writeRequests;
-    COUNTER_DATA readRequests;
-    COUNTER_DATA metadataRequests;
-    COUNTER_DATA filesOpened;
-    COUNTER_DATA treeConnectCount;
-    COUNTER_DATA receivedBytes;
-    COUNTER_DATA sentBytes;
+    COUNTER_DATA counters[SMB_SHARE_COUNTERS_MAX];
 };
 
 static DICTIONARY *smb_shares = NULL;
+static ND_PDH_QUERY *smb_query = NULL;
+static time_t smb_query_next_attempt = 0;
+static size_t smb_query_failed_samples = 0;
 
 static void smb_share_initialize(struct smb_share *share)
 {
-    share->currentOpenFileCount.key = "Current Open File Count";
-    share->writeRequests.key = "Write Requests/sec";
-    share->readRequests.key = "Read Requests/sec";
-    share->metadataRequests.key = "Metadata Requests/sec";
-    share->filesOpened.key = "Files Opened/sec";
-    share->treeConnectCount.key = "Tree Connect Count";
-    share->receivedBytes.key = "Received Bytes/sec";
-    share->sentBytes.key = "Sent Bytes/sec";
+    for (size_t c = 0; c < SMB_SHARE_COUNTERS_MAX; c++)
+        share->counters[c].key = smb_share_counter_names[c];
 }
 
 static void smb_share_cleanup(struct smb_share *share)
@@ -126,7 +152,10 @@ static void smb_share_chart(
 
 static void smb_share_traffic_chart(struct smb_share *share, int update_every, const char *name)
 {
-    if (!share->receivedBytes.updated && !share->sentBytes.updated)
+    COUNTER_DATA *received = &share->counters[SMB_SHARE_RECEIVED_BYTES];
+    COUNTER_DATA *sent = &share->counters[SMB_SHARE_SENT_BYTES];
+
+    if (!received->updated && !sent->updated)
         return;
 
     if (unlikely(!share->st_traffic)) {
@@ -152,19 +181,102 @@ static void smb_share_traffic_chart(struct smb_share *share, int update_every, c
     }
 
     // Each dimension is added on its first successful read so its algorithm follows the real counter type.
-    if (share->receivedBytes.updated) {
+    if (received->updated) {
         if (unlikely(!share->rd_received_bytes))
-            share->rd_received_bytes = perflib_rrddim_add(share->st_traffic, "received", NULL, 1, 1, &share->receivedBytes);
-        perflib_rrddim_set_by_pointer(share->st_traffic, share->rd_received_bytes, &share->receivedBytes);
+            share->rd_received_bytes = perflib_rrddim_add(share->st_traffic, "received", NULL, 1, 1, received);
+        perflib_rrddim_set_by_pointer(share->st_traffic, share->rd_received_bytes, received);
     }
 
-    if (share->sentBytes.updated) {
+    if (sent->updated) {
         if (unlikely(!share->rd_sent_bytes))
-            share->rd_sent_bytes = perflib_rrddim_add(share->st_traffic, "sent", NULL, -1, 1, &share->sentBytes);
-        perflib_rrddim_set_by_pointer(share->st_traffic, share->rd_sent_bytes, &share->sentBytes);
+            share->rd_sent_bytes = perflib_rrddim_add(share->st_traffic, "sent", NULL, -1, 1, sent);
+        perflib_rrddim_set_by_pointer(share->st_traffic, share->rd_sent_bytes, sent);
     }
 
     rrdset_done(share->st_traffic);
+}
+
+static void smb_share_charts(struct smb_share *share, int update_every, const char *name)
+{
+    smb_share_chart(
+        &share->st_current_open_file_count,
+        &share->rd_current_open_file_count,
+        &share->counters[SMB_SHARE_CURRENT_OPEN_FILE_COUNT],
+        update_every,
+        name,
+        "current_open_file_count",
+        "smb.server_shares_current_open_file_count",
+        "Current open file count on the SMB share",
+        "files",
+        PRIO_SMB_SERVER_SHARES_CURRENT_OPEN_FILE_COUNT,
+        "open");
+
+    smb_share_chart(
+        &share->st_write_requests,
+        &share->rd_write_requests,
+        &share->counters[SMB_SHARE_WRITE_REQUESTS],
+        update_every,
+        name,
+        "write_requests",
+        "smb.server_shares_write_requests",
+        "Write requests on the SMB share",
+        "requests/s",
+        PRIO_SMB_SERVER_SHARES_WRITE_REQUESTS,
+        "writes");
+
+    smb_share_chart(
+        &share->st_read_requests,
+        &share->rd_read_requests,
+        &share->counters[SMB_SHARE_READ_REQUESTS],
+        update_every,
+        name,
+        "read_requests",
+        "smb.server_shares_read_requests",
+        "Read requests on the SMB share",
+        "requests/s",
+        PRIO_SMB_SERVER_SHARES_READ_REQUESTS,
+        "reads");
+
+    smb_share_chart(
+        &share->st_metadata_requests,
+        &share->rd_metadata_requests,
+        &share->counters[SMB_SHARE_METADATA_REQUESTS],
+        update_every,
+        name,
+        "metadata_requests",
+        "smb.server_shares_metadata_requests",
+        "Metadata requests on the SMB share",
+        "requests/s",
+        PRIO_SMB_SERVER_SHARES_METADATA_REQUESTS,
+        "metadata");
+
+    smb_share_chart(
+        &share->st_files_opened,
+        &share->rd_files_opened,
+        &share->counters[SMB_SHARE_FILES_OPENED],
+        update_every,
+        name,
+        "files_opened",
+        "smb.server_shares_files_opened",
+        "Files opened on the SMB share",
+        "files/s",
+        PRIO_SMB_SERVER_SHARES_FILES_OPENED,
+        "opened");
+
+    smb_share_chart(
+        &share->st_tree_connects,
+        &share->rd_tree_connects,
+        &share->counters[SMB_SHARE_TREE_CONNECT_COUNT],
+        update_every,
+        name,
+        "tree_connects",
+        "smb.server_shares_tree_connects",
+        "Tree connects on the SMB share",
+        "connections",
+        PRIO_SMB_SERVER_SHARES_TREE_CONNECTS,
+        "connects");
+
+    smb_share_traffic_chart(share, update_every, name);
 }
 
 static void smb_shares_evict_all(void)
@@ -178,144 +290,114 @@ static void smb_shares_evict_all(void)
     dictionary_garbage_collect(smb_shares);
 }
 
-static void do_smb_server_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
+struct smb_sample {
+    usec_t now_ut;
+    enum smb_share_counter counter;
+    bool complete;
+};
+
+static void smb_share_instance_cb(const char *instance, const RAW_DATA *raw, void *data)
 {
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "SMB Server Shares");
-    if (!pObjectType) {
-        // The query succeeded without the object, so no shares remain in this snapshot.
-        smb_shares_evict_all();
+    struct smb_sample *sample = data;
+
+    if (!instance || !*instance) {
+        // Distinct shares cannot share one identity; skip it and keep the others from being evicted.
+        sample->complete = false;
         return;
     }
 
-    usec_t now_ut = now_monotonic_usec();
-    bool complete = true;
+    // The aggregate would double-count when shares are summed.
+    if (strcasecmp(instance, "_Total") == 0)
+        return;
 
-    PERF_INSTANCE_DEFINITION *pi = NULL;
-    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
-        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
-        if (!pi) {
-            complete = false;
-            break;
-        }
-
-        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer))) {
-            // Distinct shares cannot share one identity; skip it and keep the others from being evicted.
-            complete = false;
-            continue;
-        }
-
-        // The aggregate would double-count when shares are summed.
-        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
-            continue;
-
-        struct smb_share *share = dictionary_set(smb_shares, windows_shared_buffer, NULL, sizeof(*share));
-        share->last_collected = now_ut;
-
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->currentOpenFileCount);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->writeRequests);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->readRequests);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->metadataRequests);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->filesOpened);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->treeConnectCount);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->receivedBytes);
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &share->sentBytes);
-
-        smb_share_chart(
-            &share->st_current_open_file_count,
-            &share->rd_current_open_file_count,
-            &share->currentOpenFileCount,
-            update_every,
-            windows_shared_buffer,
-            "current_open_file_count",
-            "smb.server_shares_current_open_file_count",
-            "Current open file count on the SMB share",
-            "files",
-            PRIO_SMB_SERVER_SHARES_CURRENT_OPEN_FILE_COUNT,
-            "open");
-
-        smb_share_chart(
-            &share->st_write_requests,
-            &share->rd_write_requests,
-            &share->writeRequests,
-            update_every,
-            windows_shared_buffer,
-            "write_requests",
-            "smb.server_shares_write_requests",
-            "Write requests on the SMB share",
-            "requests/s",
-            PRIO_SMB_SERVER_SHARES_WRITE_REQUESTS,
-            "writes");
-
-        smb_share_chart(
-            &share->st_read_requests,
-            &share->rd_read_requests,
-            &share->readRequests,
-            update_every,
-            windows_shared_buffer,
-            "read_requests",
-            "smb.server_shares_read_requests",
-            "Read requests on the SMB share",
-            "requests/s",
-            PRIO_SMB_SERVER_SHARES_READ_REQUESTS,
-            "reads");
-
-        smb_share_chart(
-            &share->st_metadata_requests,
-            &share->rd_metadata_requests,
-            &share->metadataRequests,
-            update_every,
-            windows_shared_buffer,
-            "metadata_requests",
-            "smb.server_shares_metadata_requests",
-            "Metadata requests on the SMB share",
-            "requests/s",
-            PRIO_SMB_SERVER_SHARES_METADATA_REQUESTS,
-            "metadata");
-
-        smb_share_chart(
-            &share->st_files_opened,
-            &share->rd_files_opened,
-            &share->filesOpened,
-            update_every,
-            windows_shared_buffer,
-            "files_opened",
-            "smb.server_shares_files_opened",
-            "Files opened on the SMB share",
-            "files/s",
-            PRIO_SMB_SERVER_SHARES_FILES_OPENED,
-            "opened");
-
-        smb_share_chart(
-            &share->st_tree_connects,
-            &share->rd_tree_connects,
-            &share->treeConnectCount,
-            update_every,
-            windows_shared_buffer,
-            "tree_connects",
-            "smb.server_shares_tree_connects",
-            "Tree connects on the SMB share",
-            "connections",
-            PRIO_SMB_SERVER_SHARES_TREE_CONNECTS,
-            "connects");
-
-        smb_share_traffic_chart(share, update_every, windows_shared_buffer);
+    struct smb_share *share = dictionary_set(smb_shares, instance, NULL, sizeof(*share));
+    if (share->last_collected != sample->now_ut) {
+        // First counter to report this share in this sample: values from the previous sample are not current.
+        share->last_collected = sample->now_ut;
+        for (size_t c = 0; c < SMB_SHARE_COUNTERS_MAX; c++)
+            share->counters[c].updated = false;
     }
 
-    // An incomplete snapshot cannot prove which shares disappeared.
-    if (complete) {
-        struct smb_share *share;
-        dfe_start_write(smb_shares, share)
-        {
-            if (share->last_collected < now_ut)
-                dictionary_del(smb_shares, share_dfe.name);
+    // The share exists, but this counter has no valid value for it now.
+    if (!raw)
+        return;
+
+    COUNTER_DATA *cd = &share->counters[sample->counter];
+    cd->previous = cd->current;
+    cd->current = *raw;
+    cd->updated = true;
+}
+
+// Returns false when the sample or a counter read failed; charts are kept and show a gap.
+static bool do_smb_server_shares(int update_every)
+{
+    if (!nd_pdh_query_collect(smb_query))
+        return false;
+
+    struct smb_sample sample = {
+        .now_ut = now_monotonic_usec(),
+        .complete = true,
+    };
+
+    bool have_instances = false;
+    bool read_failed = false;
+    for (size_t c = 0; c < SMB_SHARE_COUNTERS_MAX; c++) {
+        if (!nd_pdh_query_has_counter(smb_query, c))
+            continue;
+
+        sample.counter = (enum smb_share_counter)c;
+        switch (nd_pdh_query_read(smb_query, c, smb_share_instance_cb, &sample)) {
+            case ND_PDH_READ_OK:
+                have_instances = true;
+                break;
+
+            case ND_PDH_READ_NO_DATA:
+                break;
+
+            case ND_PDH_READ_FAILED:
+            default:
+                sample.complete = false;
+                read_failed = true;
+                break;
         }
-        dfe_done(share);
-        dictionary_garbage_collect(smb_shares);
     }
+
+    if (!have_instances) {
+        if (!sample.complete)
+            return false;
+
+        // The sample succeeded without any instance, so no shares remain.
+        smb_shares_evict_all();
+        return true;
+    }
+
+    struct smb_share *share;
+    dfe_start_write(smb_shares, share)
+    {
+        if (share->last_collected == sample.now_ut)
+            smb_share_charts(share, update_every, share_dfe.name);
+        else if (sample.complete)
+            // Only a complete sample proves that a share disappeared.
+            dictionary_del(smb_shares, share_dfe.name);
+    }
+    dfe_done(share);
+    dictionary_garbage_collect(smb_shares);
+
+    // A counter that cannot be read while others can may also have a stale handle.
+    return !read_failed;
+}
+
+static void smb_query_close(void)
+{
+    nd_pdh_query_destroy(smb_query);
+    smb_query = NULL;
+    smb_query_failed_samples = 0;
 }
 
 void do_PerflibSMB_cleanup(void)
 {
+    smb_query_close();
+
     dictionary_destroy(smb_shares);
     smb_shares = NULL;
 }
@@ -330,18 +412,30 @@ int do_PerflibSMB(int update_every, usec_t dt __maybe_unused)
     }
 
     // Keep probing while the server role is absent so a later install is detected without a restart.
-    DWORD id = RegistryFindIDByName("SMB Server Shares");
-    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+    // The name lookup is in memory; PDH is opened only once the object is registered.
+    if (RegistryFindIDByName(SMB_SERVER_SHARES_OBJECT) == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+        smb_query_close();
         smb_shares_evict_all();
         return 0;
     }
 
-    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
-    if (!pDataBlock)
-        // A failed Perflib query is transient; keep existing charts and show a gap.
-        return 0;
+    if (unlikely(!smb_query)) {
+        time_t now = now_monotonic_sec();
+        if (now < smb_query_next_attempt)
+            return 0;
 
-    do_smb_server_shares(pDataBlock, update_every);
+        smb_query = nd_pdh_query_create(SMB_SERVER_SHARES_OBJECT, smb_share_counter_names, SMB_SHARE_COUNTERS_MAX);
+        if (!smb_query) {
+            smb_query_next_attempt = now + SMB_QUERY_RETRY_SECONDS;
+            return 0;
+        }
+    }
+
+    if (do_smb_server_shares(update_every))
+        smb_query_failed_samples = 0;
+    else if (++smb_query_failed_samples >= SMB_QUERY_MAX_FAILED_SAMPLES)
+        // Rebuilt on the next iteration; existing charts stay until a complete sample proves them gone.
+        smb_query_close();
 
     return 0;
 }
