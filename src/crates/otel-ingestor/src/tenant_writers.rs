@@ -176,3 +176,112 @@ impl TenantWriters {
         self.writers.lock().unwrap().is_empty()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use file_registry::{InstanceId, MachineId, MonotonicClock};
+
+    use super::*;
+
+    /// Logs writers under `base_dir`: a one-hour default rotation, and a
+    /// zero-duration override for the tenant `short`.
+    fn tenant_writers(base_dir: &std::path::Path) -> TenantWriters {
+        let mut rotation = HashMap::new();
+        rotation.insert(
+            "default".to_string(),
+            otel_bridge::config::RotationEntry {
+                max_file_size: Some(bytesize::ByteSize::mb(64)),
+                max_entries: Some(100_000),
+                max_file_duration: Some(Duration::from_secs(3600)),
+            },
+        );
+        rotation.insert(
+            "short".to_string(),
+            otel_bridge::config::RotationEntry {
+                max_file_size: None,
+                max_entries: None,
+                max_file_duration: Some(Duration::ZERO),
+            },
+        );
+        let config = otel_bridge::config::WalConfig {
+            dir: base_dir.to_path_buf(),
+            crc_enabled: true,
+            compression_enabled: true,
+            rotation: otel_bridge::config::RotationPolicy::try_from(rotation).unwrap(),
+        };
+
+        TenantWriters::new(
+            Signal::Logs,
+            ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+            base_dir.to_path_buf(),
+            config,
+            Arc::new(wal::SeqAllocator::ephemeral(0)),
+            Identity::new(
+                MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+            ),
+        )
+    }
+
+    #[test]
+    fn writer_for_creates_one_writer_per_tenant() {
+        let tmp = tempfile::tempdir().unwrap();
+        let writers = tenant_writers(tmp.path());
+
+        let first = writers.writer_for(&TenantId::from("a")).unwrap();
+        let again = writers.writer_for(&TenantId::from("a")).unwrap();
+        let other = writers.writer_for(&TenantId::from("b")).unwrap();
+
+        assert!(Arc::ptr_eq(&first, &again));
+        assert!(!Arc::ptr_eq(&first, &other));
+        let mut dirs: Vec<String> = std::fs::read_dir(tmp.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        dirs.sort();
+        assert_eq!(dirs, ["a", "b"]);
+    }
+
+    #[tokio::test]
+    async fn the_sweep_seals_only_expired_streams() {
+        let tmp = tempfile::tempdir().unwrap();
+        let writers = tenant_writers(tmp.path());
+        let socket = format!(
+            "/tmp/netdata-tenant-writers-test-{}.sock",
+            std::process::id()
+        );
+        let ledger_sender = LedgerSender::new(&socket);
+        let mut clock = MonotonicClock::new();
+        let short = TenantId::from("short");
+        let hourly = TenantId::from("hourly");
+
+        for tenant in [&short, &hourly] {
+            let writer = writers.writer_for(tenant).unwrap();
+            let mut writer = writer.lock().unwrap();
+            let meta = wal::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: clock.now_ns(),
+                log_ts_range: None,
+            };
+            writer.write_frame(1, &[], b"frame", meta).unwrap();
+            writer.sync_all().unwrap();
+            writer.take_all_events();
+        }
+
+        writers.rotate_expired(clock.now_ns(), &ledger_sender);
+
+        // A stream the sweep sealed has nothing left for shutdown to close.
+        let closed_at_shutdown = |tenant: &TenantId| {
+            let writer = writers.existing(tenant).unwrap();
+            let events = writer.lock().unwrap().shutdown_all().unwrap();
+            events
+                .iter()
+                .filter(|e| matches!(e, wal::FileEvent::Closed { .. }))
+                .count()
+        };
+        assert_eq!(closed_at_shutdown(&short), 0);
+        assert_eq!(closed_at_shutdown(&hourly), 1);
+    }
+}

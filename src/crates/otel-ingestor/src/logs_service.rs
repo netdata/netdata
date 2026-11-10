@@ -1048,6 +1048,40 @@ mod tests {
         assert_eq!(claimed_streams.by_hash.lock().unwrap().len(), 2);
     }
 
+    #[tokio::test]
+    async fn a_stream_in_the_wrong_state_is_an_internal_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let service = test_service(tmp.path().to_path_buf());
+        let tenant = tenant();
+        let writer = service.writers.writer_for(&tenant).unwrap();
+        let mut writer = writer.lock().unwrap();
+        let bounds = ng_flatten::TimeBounds {
+            min_ns: 0,
+            max_ns: u64::MAX,
+        };
+        let mut stream = admit_stream_of(
+            &service.claimed_streams,
+            &tenant,
+            rl(Some("prod"), Some("api"), 1),
+        )
+        .unwrap();
+
+        let status = stream.write_to(&mut writer, &service.clock).unwrap_err();
+        assert_eq!(
+            (status.code(), status.message()),
+            (tonic::Code::Internal, "log stream was not flattened")
+        );
+
+        stream.flatten(1, bounds, |_| {}).unwrap();
+        let Err(status) = stream.flatten(1, bounds, |_| {}) else {
+            panic!("a log stream flattened twice must fail");
+        };
+        assert_eq!(
+            (status.code(), status.message()),
+            (tonic::Code::Internal, "log stream was already flattened")
+        );
+    }
+
     /// Build a `NetdataLogsService` rooted at `wal_dir`. The
     /// `LedgerSender` points at a path that intentionally won't accept a
     /// connection — `send_events` is fire-and-forget over an internal
@@ -1414,6 +1448,59 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn export_rejects_a_colliding_stream_via_partial_success() {
+        let tmp = tempfile::tempdir().unwrap();
+        let service = test_service(tmp.path().to_path_buf());
+        let tenant = TenantId::default_tenant();
+
+        // A different identity already holds the hash of `staging/api` (see
+        // `synthetic_collision_is_rejected`).
+        let hash = ServiceStream::new("staging", "api").ns_hash();
+        let holder = ServiceStream::new("prod", "api");
+        service
+            .claimed_streams
+            .claim(&tenant, hash, &holder)
+            .unwrap();
+
+        let response = service
+            .export_logs(
+                &tenant,
+                ExportLogsServiceRequest {
+                    resource_logs: vec![
+                        rl(Some("staging"), Some("api"), 3),
+                        rl(Some("prod"), Some("web"), 2),
+                    ],
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.partial_success,
+            Some(ExportLogsPartialSuccess {
+                rejected_log_records: 3,
+                error_message: format!(
+                    "1 ns_hash collision detected; rename one of the colliding \
+                     (service.namespace, service.name) pairs to dedupe: \
+                     ns_hash={hash:#x}: rejected (staging/api) collides with \
+                     canonical (prod/api) (3 log records dropped)"
+                ),
+            })
+        );
+        // The request's other stream is stored.
+        let writer = service.writers.existing(&tenant).unwrap();
+        let events = writer.lock().unwrap().shutdown_all().unwrap();
+        let entry_counts: Vec<_> = events
+            .iter()
+            .filter_map(|e| match e {
+                wal::FileEvent::Closed { entry_count, .. } => Some(*entry_count),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(entry_counts, [2]);
+    }
+
     #[test]
     fn error_message_describes_each_collision() {
         let collisions = vec![
@@ -1561,6 +1648,15 @@ mod tests {
         );
     }
 
+    /// Sums every `SET <dimension> = <value>` line of a rendered stream.
+    fn sum_of(out: &str, dimension: &str) -> f64 {
+        let prefix = format!("SET {dimension} = ");
+        out.lines()
+            .filter_map(|l| l.strip_prefix(&prefix))
+            .map(|v| netdata_plugin_protocol::read_float_value(v).unwrap())
+            .sum()
+    }
+
     #[tokio::test]
     async fn derived_metrics_count_stored_records_by_severity() {
         let now = std::time::SystemTime::now()
@@ -1620,19 +1716,112 @@ mod tests {
 
         let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
-        let sum = |dimension: &str| -> f64 {
-            let prefix = format!("SET {dimension} = ");
-            out.lines()
-                .filter_map(|l| l.strip_prefix(&prefix))
-                .map(|v| netdata_plugin_protocol::read_float_value(v).unwrap())
-                .sum()
-        };
-        assert_eq!(sum("error"), 1.0);
-        assert_eq!(sum("info"), 1.0);
-        assert_eq!(sum("accepted"), 2.0);
-        assert_eq!(sum("rejected"), 1.0);
+        assert_eq!(sum_of(&out, "error"), 1.0);
+        assert_eq!(sum_of(&out, "info"), 1.0);
+        assert_eq!(sum_of(&out, "accepted"), 2.0);
+        assert_eq!(sum_of(&out, "rejected"), 1.0);
         assert!(out.contains("CLABEL 'resource.attributes.service.namespace' 'prod' 1"));
         assert!(out.contains("'otel_service.log_records'"));
+    }
+
+    #[tokio::test]
+    async fn derived_metrics_count_exports_that_store_nothing() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let tenant = TenantId::default_tenant();
+        let derived = Arc::new(
+            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let mut service = test_service_with_ingest(
+            tmp.path().to_path_buf(),
+            otel_bridge::config::IngestConfig {
+                max_age: std::time::Duration::from_secs(3600),
+                future_skew: std::time::Duration::from_secs(60),
+            },
+        );
+        service.set_derived_metrics(Arc::clone(&derived));
+        let colliding = ServiceStream::new("staging", "api");
+        let holder = ServiceStream::new("prod", "api");
+        service
+            .claimed_streams
+            .claim(&tenant, colliding.ns_hash(), &holder)
+            .unwrap();
+
+        let mut out_of_window = rl(Some("prod"), Some("api"), 2);
+        for record in &mut out_of_window.scope_logs[0].log_records {
+            record.time_unix_nano = now - 2 * 3600 * 1_000_000_000;
+        }
+        let huge_ns = "n".repeat(wal::MAX_CONTENT_META_BYTES + 64);
+        // Empty; every record out of the window; an oversized identity; a
+        // collision.
+        let requests = [
+            Vec::new(),
+            vec![out_of_window],
+            vec![rl(Some(&huge_ns), Some("svc"), 3)],
+            vec![rl(Some("staging"), Some("api"), 4)],
+        ];
+
+        for resource_logs in requests {
+            service
+                .export_logs(&tenant, ExportLogsServiceRequest { resource_logs })
+                .await
+                .unwrap();
+        }
+
+        assert!(service.writers.is_empty());
+        let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
+        netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
+        assert_eq!(sum_of(&out, "accepted"), 0.0);
+        assert_eq!(sum_of(&out, "rejected"), 2.0 + 3.0 + 4.0);
+    }
+
+    #[tokio::test]
+    async fn a_wal_write_error_fails_the_export_and_counts_nothing() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let tenant = TenantId::default_tenant();
+        let derived = Arc::new(
+            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
+        );
+        let tmp = tempfile::tempdir().unwrap();
+        let mut service = test_service(tmp.path().to_path_buf());
+        service.set_derived_metrics(Arc::clone(&derived));
+
+        // The tenant's writer exists, but a file now stands where its
+        // directory was: the stream's first WAL file cannot be created,
+        // whatever the user's permissions.
+        service.writers.writer_for(&tenant).unwrap();
+        let tenant_dir = tmp.path().join(tenant.as_str());
+        std::fs::remove_dir_all(&tenant_dir).unwrap();
+        std::fs::write(&tenant_dir, b"").unwrap();
+
+        let mut r = rl(Some("prod"), Some("api"), 2);
+        for record in &mut r.scope_logs[0].log_records {
+            record.time_unix_nano = now;
+            record.severity_number = 9;
+        }
+        let status = service
+            .export_logs(
+                &tenant,
+                ExportLogsServiceRequest {
+                    resource_logs: vec![r],
+                },
+            )
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            (status.code(), status.message()),
+            (tonic::Code::Internal, "WAL write error")
+        );
+        let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
+        assert_eq!(sum_of(&out, "accepted"), 0.0);
+        assert_eq!(sum_of(&out, "info"), 0.0);
     }
 
     #[tokio::test]

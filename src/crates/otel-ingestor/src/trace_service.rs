@@ -733,6 +733,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_wal_write_error_fails_the_export_and_counts_nothing() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let tenant = TenantId::default_tenant();
+        let derived = Arc::new(
+            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
+        );
+        let recorder = Arc::new(Recorder::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let mut service = test_service(tmp.path().to_path_buf());
+        service.set_derived_metrics(Arc::clone(&derived));
+        service.add_observer(recorder.clone());
+
+        // The tenant's writer exists, but a file now stands where its
+        // directory was: the stream's first WAL file cannot be created,
+        // whatever the user's permissions.
+        service.writers.writer_for(&tenant).unwrap();
+        let tenant_dir = tmp.path().join(tenant.as_str());
+        std::fs::remove_dir_all(&tenant_dir).unwrap();
+        std::fs::write(&tenant_dir, b"").unwrap();
+
+        let status = service
+            .export_traces(&tenant, spans_req(2, now))
+            .await
+            .unwrap_err();
+
+        assert_eq!(
+            (status.code(), status.message()),
+            (tonic::Code::Internal, "WAL write error")
+        );
+        assert_eq!(recorder.prepared.lock().unwrap().len(), 1);
+        assert!(recorder.committed.lock().unwrap().is_empty());
+        let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
+        assert_eq!(sum_of(&out, "accepted"), 0.0);
+        assert_eq!(sum_of(&out, "success"), 0.0);
+    }
+
+    #[tokio::test]
     async fn the_service_map_sees_calls_between_services() {
         use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value};
         use opentelemetry_proto::tonic::resource::v1::Resource;
@@ -843,6 +883,41 @@ mod tests {
         assert_eq!(count_spans(request), 3, "all spans ride the one group");
     }
 
+    #[tokio::test]
+    async fn a_span_group_in_the_wrong_state_is_an_internal_error() {
+        let tmp = tempfile::tempdir().unwrap();
+        let service = test_service(tmp.path().to_path_buf());
+        let writer = service
+            .writers
+            .writer_for(&TenantId::default_tenant())
+            .unwrap();
+        let mut writer = writer.lock().unwrap();
+        let bounds = ng_flatten::TimeBounds {
+            min_ns: 0,
+            max_ns: u64::MAX,
+        };
+        let mut storable_spans = partition_spans(spans_req(1, 1_700_000_000_000_000_000))
+            .pop()
+            .unwrap();
+
+        let status = storable_spans
+            .write_to(&mut writer, &service.clock)
+            .unwrap_err();
+        assert_eq!(
+            (status.code(), status.message()),
+            (tonic::Code::Internal, "span group was not flattened")
+        );
+
+        storable_spans.flatten(1, bounds, |_| {}).unwrap();
+        let Err(status) = storable_spans.flatten(1, bounds, |_| {}) else {
+            panic!("a span group flattened twice must fail");
+        };
+        assert_eq!(
+            (status.code(), status.message()),
+            (tonic::Code::Internal, "span group was already flattened")
+        );
+    }
+
     #[test]
     fn partial_success_shapes() {
         assert_eq!(build_partial_success(0), None, "full success → None");
@@ -923,14 +998,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn empty_request_creates_no_wal_files() {
+    async fn empty_request_skips_observers_and_writes_nothing() {
         let tmp = tempfile::tempdir().unwrap();
-        let service = test_service(tmp.path().to_path_buf());
+        let mut service = test_service(tmp.path().to_path_buf());
+        let recorder = Arc::new(Recorder::default());
+        service.add_observer(recorder.clone());
+
         let resp = service
             .export(Request::new(ExportTraceServiceRequest::default()))
             .await
             .unwrap();
+
         assert!(resp.into_inner().partial_success.is_none());
+        assert!(recorder.prepared.lock().unwrap().is_empty());
         assert!(service.writers.is_empty());
         assert!(walkdir(tmp.path()).is_empty());
     }
