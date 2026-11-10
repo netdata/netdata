@@ -16,6 +16,36 @@ const (
 	navDCLName  = "__nav_dcl"
 )
 
+// Read distributions use fixed slots for the five supported vitals. Canonical
+// ingestion still owns named observations; only query-owned values use slots.
+const (
+	lcpIndex = iota
+	fcpIndex
+	ttfbIndex
+	inpIndex
+	clsIndex
+	vitalCount
+)
+
+var vitalNames = [vitalCount]string{beacon.LCP, beacon.FCP, beacon.TTFB, beacon.INP, beacon.CLS}
+
+func vitalIndex(name string) (int, bool) {
+	switch name {
+	case beacon.LCP:
+		return lcpIndex, true
+	case beacon.FCP:
+		return fcpIndex, true
+	case beacon.TTFB:
+		return ttfbIndex, true
+	case beacon.INP:
+		return inpIndex, true
+	case beacon.CLS:
+		return clsIndex, true
+	default:
+		return 0, false
+	}
+}
+
 // thresholds are the CWV good/poor boundaries (good ≤ first, poor > second).
 var thresholds = map[string][2]float64{
 	beacon.LCP:  {2500, 4000},

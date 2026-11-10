@@ -10,7 +10,6 @@ import (
 )
 
 const resourceHostTopN = 10
-const apiName = "__api"
 
 type hostKey struct {
 	host    string
@@ -81,7 +80,7 @@ func (r *windowRead) addResource(v *activityObservation) {
 		g.values = append(g.values, resource.DurationMS)
 	}
 	if v.api {
-		r.global.values[apiName] = append(r.global.values[apiName], resource.DurationMS)
+		r.api = append(r.api, resource.DurationMS)
 	}
 }
 func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
@@ -107,7 +106,7 @@ func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 			Host:     key.host,
 			Unknown:  key.unknown,
 			Count:    g.count,
-			Duration: measurementStats(apiName, g.values),
+			Duration: pctStats(g.values),
 		})
 	}
 	other := resourcePopulation{}
@@ -123,7 +122,7 @@ func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 			Host:     Other,
 			Other:    true,
 			Count:    other.count,
-			Duration: measurementStats(apiName, other.values),
+			Duration: pctStats(other.values),
 		})
 	}
 	return out

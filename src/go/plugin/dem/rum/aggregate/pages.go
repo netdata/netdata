@@ -21,6 +21,10 @@ type elemSample struct {
 	poor       bool
 }
 
+func hasPageElement(v *vitalObservation) bool {
+	return v.element != "" && (v.key.name == beacon.LCP || v.key.name == beacon.INP || v.key.name == beacon.CLS)
+}
+
 // Pages returns all retained page groups, independent of the chart top-N.
 // An empty vnodeGUID selects all current associations. Its inventory is bounded
 // by the canonical retained observations.
@@ -34,14 +38,14 @@ func (a *Aggregator) Pages(vnodeGUID string) []PageInfo {
 	r := a.site.readWindow(a.now(), true)
 	a.mu.Unlock()
 	var out []PageInfo
-	for key, p := range r.groups {
-		if key.kind != KindPage {
-			continue
-		}
+	if len(r.groups[facetPage]) > 0 {
+		out = make([]PageInfo, 0, len(r.groups[facetPage]))
+	}
+	for page, p := range r.groups[facetPage] {
 		out = append(out, PageInfo{
 			Site:              cfg.Name,
 			VnodeGUID:         cfg.VnodeGUID,
-			Page:              key.value,
+			Page:              page,
 			PageviewsWindow:   int(p.documents),
 			Sessions:          p.sessions,
 			ErrorsWindow:      int(p.errors),
