@@ -80,13 +80,103 @@ enum Payload {
 
 /// One group of spans bound for a single WAL stream, from partitioning to the
 /// WAL write: the substrate's opaque partition key, the stream's encoded
-/// `content_meta` blob, and the spans. Flattening turns `payload` from spans
-/// into a frame, and the write loop appends that frame under `part_key` and
-/// `content_meta`.
+/// `content_meta` blob, and the spans. [`Self::flatten`] turns `payload` from
+/// spans into a frame, and [`Self::write_to`] appends that frame under
+/// `part_key` and `content_meta`.
 struct StorableSpans {
     part_key: u64,
     content_meta: Vec<u8>,
     payload: Payload,
+}
+
+impl StorableSpans {
+    /// Phase 1 for this group, lock-free: flatten its spans into one WAL
+    /// frame, or leave it [`Payload::OutOfWindow`] when `bounds` rejects
+    /// every span. `visit` sees the kept spans after normalization (see
+    /// `ng_flatten::prepare_trace_frame_with`).
+    fn flatten(
+        &mut self,
+        fallback_base_ns: u64,
+        bounds: ng_flatten::TimeBounds,
+        visit: impl FnOnce(&ExportTraceServiceRequest),
+    ) -> Result<Flattened, Status> {
+        let Payload::Spans(request) = &mut self.payload else {
+            tracing::error!("a span group was flattened twice");
+            return Err(Status::internal("span group was already flattened"));
+        };
+        let frame = ng_flatten::prepare_trace_frame_with(
+            std::mem::take(request),
+            fallback_base_ns,
+            Some(bounds),
+            visit,
+        )
+        .map_err(|e| {
+            tracing::error!(%e, "failed to encode flattened trace frame");
+            Status::internal("flatten encode error")
+        })?;
+        let flattened = Flattened {
+            kept: frame.records,
+            rejected: frame.rejected,
+        };
+        self.payload = if frame.records == 0 {
+            Payload::OutOfWindow
+        } else {
+            Payload::Frame(frame)
+        };
+        Ok(flattened)
+    }
+
+    /// Phase 2 for this group, under the tenant's writer lock: append its
+    /// frame to the WAL, stamped with a fresh tick of `clock`. An
+    /// out-of-window group writes nothing and takes no tick.
+    fn write_to(
+        &self,
+        writer: &mut wal::Writer,
+        clock: &Mutex<MonotonicClock>,
+    ) -> Result<(), Status> {
+        let frame = match &self.payload {
+            Payload::Frame(frame) => frame,
+            Payload::OutOfWindow => return Ok(()),
+            // `flatten` replaces every `Spans`.
+            Payload::Spans(_) => {
+                tracing::error!("a span group reached the WAL write without a frame");
+                return Err(Status::internal("span group was not flattened"));
+            }
+        };
+        let ingestion_ns = clock.lock().unwrap().now_ns();
+        writer
+            .write_frame(
+                self.part_key,
+                &self.content_meta,
+                &frame.data,
+                wal::FrameMeta {
+                    entry_count: frame.records,
+                    ingestion_ns,
+                    // Always Some here: a `Frame` holds at least one span,
+                    // and `prepare_trace_frame` sets `ts_range` whenever it
+                    // keeps a record.
+                    log_ts_range: frame.ts_range.map(|(min, max)| {
+                        (
+                            file_registry::TimestampNs(min),
+                            file_registry::TimestampNs(max),
+                        )
+                    }),
+                },
+            )
+            .map_err(|e| {
+                tracing::error!(%e, "failed to write traces WAL frame");
+                Status::internal("WAL write error")
+            })?;
+        Ok(())
+    }
+}
+
+/// What [`StorableSpans::flatten`] did with a group's spans.
+struct Flattened {
+    /// Spans in the frame: the ones phase 2 writes.
+    kept: usize,
+    /// Spans the ingestion window rejected.
+    rejected: usize,
 }
 
 /// THE traces partitioning seam.
@@ -374,31 +464,13 @@ impl NetdataTracesService {
         // resolved times) and are counted only once the spans are durable.
         let mut derived_batch = self.derived.as_ref().and_then(|d| d.spans_batch());
         for g in &mut groups {
-            // Only received spans need flattening.
-            let Payload::Spans(request) = &mut g.payload else {
-                continue;
-            };
-            let frame = ng_flatten::prepare_trace_frame_with(
-                std::mem::take(request),
-                fallback_base_ns,
-                Some(bounds),
-                |request| {
-                    if let Some(batch) = derived_batch.as_mut() {
-                        batch.record(tenant_id.as_str(), request);
-                    }
-                },
-            )
-            .map_err(|e| {
-                tracing::error!(%e, "failed to encode flattened trace frame");
-                Status::internal("flatten encode error")
+            let flattened = g.flatten(fallback_base_ns, bounds, |request| {
+                if let Some(batch) = derived_batch.as_mut() {
+                    batch.record(tenant_id.as_str(), request);
+                }
             })?;
-            out_of_window += frame.rejected;
-            kept += frame.records;
-            g.payload = if frame.records == 0 {
-                Payload::OutOfWindow
-            } else {
-                Payload::Frame(frame)
-            };
+            out_of_window += flattened.rejected;
+            kept += flattened.kept;
         }
 
         if out_of_window > 0 {
@@ -452,39 +524,7 @@ impl NetdataTracesService {
         {
             let mut writer = writer.lock().unwrap();
             for g in &groups {
-                let frame = match &g.payload {
-                    Payload::Frame(frame) => frame,
-                    Payload::OutOfWindow => continue,
-                    // Phase 1 flattens every group it is given.
-                    Payload::Spans(_) => {
-                        tracing::error!("a span group reached the WAL write without a frame");
-                        return Err(Status::internal("span group was not flattened"));
-                    }
-                };
-                let ingestion_ns = self.clock.lock().unwrap().now_ns();
-                writer
-                    .write_frame(
-                        g.part_key,
-                        &g.content_meta,
-                        &frame.data,
-                        wal::FrameMeta {
-                            entry_count: frame.records,
-                            ingestion_ns,
-                            // Always Some here: a `Frame` holds at least one
-                            // span, and `prepare_trace_frame` sets `ts_range`
-                            // whenever it keeps a record.
-                            log_ts_range: frame.ts_range.map(|(min, max)| {
-                                (
-                                    file_registry::TimestampNs(min),
-                                    file_registry::TimestampNs(max),
-                                )
-                            }),
-                        },
-                    )
-                    .map_err(|e| {
-                        tracing::error!(%e, "failed to write traces WAL frame");
-                        Status::internal("WAL write error")
-                    })?;
+                g.write_to(&mut writer, &self.clock)?;
             }
             writer.sync_all().map_err(|e| {
                 tracing::error!(%e, "failed to sync traces WAL");

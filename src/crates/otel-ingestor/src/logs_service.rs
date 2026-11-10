@@ -140,9 +140,9 @@ enum Payload {
 /// One stream's share of an export request, from "accepted for storage" to
 /// the WAL write. The identity gate builds it, so it always carries the
 /// stream's `part_key` (its `ns_hash`, computed once) and its encoded
-/// `content_meta` blob. The collision check then judges `stream`, flattening
-/// turns `payload` from records into a frame, and the write loop appends that
-/// frame under `part_key` and `content_meta`.
+/// `content_meta` blob. The collision check then judges `stream`,
+/// [`Self::flatten`] turns `payload` from records into a frame, and
+/// [`Self::write_to`] appends that frame under `part_key` and `content_meta`.
 struct StorableStream {
     stream: ServiceStream,
     part_key: u64,
@@ -167,6 +167,93 @@ impl StorableStream {
             payload: Payload::Records(group.resource_logs),
         })
     }
+
+    /// Phase 1 for this stream, lock-free: flatten its records into one WAL
+    /// frame, or leave it [`Payload::OutOfWindow`] when `bounds` rejects
+    /// every record. `visit` sees the kept records after normalization (see
+    /// `ng_flatten::prepare_log_frame_with`).
+    fn flatten(
+        &mut self,
+        fallback_base_ns: u64,
+        bounds: ng_flatten::TimeBounds,
+        visit: impl FnOnce(&ExportLogsServiceRequest),
+    ) -> Result<Flattened, Status> {
+        let Payload::Records(resource_logs) = &mut self.payload else {
+            tracing::error!("a log stream was flattened twice");
+            return Err(Status::internal("log stream was already flattened"));
+        };
+        let request = ExportLogsServiceRequest {
+            resource_logs: std::mem::take(resource_logs),
+        };
+        let frame =
+            ng_flatten::prepare_log_frame_with(request, fallback_base_ns, Some(bounds), visit)
+                .map_err(|e| {
+                    tracing::error!(%e, "failed to encode flattened frame");
+                    Status::internal("flatten encode error")
+                })?;
+        let flattened = Flattened {
+            kept: frame.records,
+            rejected: frame.rejected,
+        };
+        self.payload = if frame.records == 0 {
+            Payload::OutOfWindow
+        } else {
+            Payload::Frame(frame)
+        };
+        Ok(flattened)
+    }
+
+    /// Phase 2 for this stream, under the tenant's writer lock: append its
+    /// frame to the WAL, stamped with a fresh tick of `clock`. An
+    /// out-of-window stream writes nothing and takes no tick.
+    fn write_to(
+        &self,
+        writer: &mut wal::Writer,
+        clock: &Mutex<MonotonicClock>,
+    ) -> Result<(), Status> {
+        let frame = match &self.payload {
+            Payload::Frame(frame) => frame,
+            Payload::OutOfWindow => return Ok(()),
+            // `flatten` replaces every `Records`.
+            Payload::Records(_) => {
+                tracing::error!("a log stream reached the WAL write without a frame");
+                return Err(Status::internal("log stream was not flattened"));
+            }
+        };
+        let ingestion_ns = clock.lock().unwrap().now_ns();
+        writer
+            .write_frame(
+                self.part_key,
+                &self.content_meta,
+                &frame.data,
+                wal::FrameMeta {
+                    entry_count: frame.records,
+                    ingestion_ns,
+                    // Always Some here: a `Frame` holds at least one record,
+                    // and `prepare_log_frame` sets `ts_range` whenever it
+                    // keeps a record.
+                    log_ts_range: frame.ts_range.map(|(min, max)| {
+                        (
+                            file_registry::TimestampNs(min),
+                            file_registry::TimestampNs(max),
+                        )
+                    }),
+                },
+            )
+            .map_err(|e| {
+                tracing::error!(%e, "failed to write WAL entry");
+                Status::internal("WAL write error")
+            })?;
+        Ok(())
+    }
+}
+
+/// What [`StorableStream::flatten`] did with a stream's records.
+struct Flattened {
+    /// Records in the frame: the ones phase 2 writes.
+    kept: usize,
+    /// Records the ingestion window rejected.
+    rejected: usize,
 }
 
 /// Result of running the collision check across a request's storable streams.
@@ -688,34 +775,13 @@ impl NetdataLogsService {
         // resolved times) and are counted only once the records are durable.
         let mut derived_batch = self.derived.as_ref().and_then(|d| d.logs_batch());
         for s in &mut accepted {
-            // Only received records need flattening.
-            let Payload::Records(resource_logs) = &mut s.payload else {
-                continue;
-            };
-            let request = ExportLogsServiceRequest {
-                resource_logs: std::mem::take(resource_logs),
-            };
-            let frame = ng_flatten::prepare_log_frame_with(
-                request,
-                fallback_base_ns,
-                Some(bounds),
-                |request| {
-                    if let Some(batch) = derived_batch.as_mut() {
-                        batch.record(tenant_id.as_str(), request);
-                    }
-                },
-            )
-            .map_err(|e| {
-                tracing::error!(%e, "failed to encode flattened frame");
-                Status::internal("flatten encode error")
+            let flattened = s.flatten(fallback_base_ns, bounds, |request| {
+                if let Some(batch) = derived_batch.as_mut() {
+                    batch.record(tenant_id.as_str(), request);
+                }
             })?;
-            out_of_window += frame.rejected;
-            kept += frame.records;
-            s.payload = if frame.records == 0 {
-                Payload::OutOfWindow
-            } else {
-                Payload::Frame(frame)
-            };
+            out_of_window += flattened.rejected;
+            kept += flattened.kept;
         }
 
         if out_of_window > 0 {
@@ -769,39 +835,7 @@ impl NetdataLogsService {
         {
             let mut writer = writer.lock().unwrap();
             for s in &accepted {
-                let frame = match &s.payload {
-                    Payload::Frame(frame) => frame,
-                    Payload::OutOfWindow => continue,
-                    // Phase 1 flattens every stream it is given.
-                    Payload::Records(_) => {
-                        tracing::error!("a log stream reached the WAL write without a frame");
-                        return Err(Status::internal("log stream was not flattened"));
-                    }
-                };
-                let ingestion_ns = self.clock.lock().unwrap().now_ns();
-                writer
-                    .write_frame(
-                        s.part_key,
-                        &s.content_meta,
-                        &frame.data,
-                        wal::FrameMeta {
-                            entry_count: frame.records,
-                            ingestion_ns,
-                            // Always Some here: a `Frame` holds at least one
-                            // record, and `prepare_log_frame` sets `ts_range`
-                            // whenever it keeps a record.
-                            log_ts_range: frame.ts_range.map(|(min, max)| {
-                                (
-                                    file_registry::TimestampNs(min),
-                                    file_registry::TimestampNs(max),
-                                )
-                            }),
-                        },
-                    )
-                    .map_err(|e| {
-                        tracing::error!(%e, "failed to write WAL entry");
-                        Status::internal("WAL write error")
-                    })?;
+                s.write_to(&mut writer, &self.clock)?;
             }
             writer.sync_all().map_err(|e| {
                 tracing::error!(%e, "failed to sync WAL");
