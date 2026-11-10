@@ -410,18 +410,19 @@ impl Rejections {
     /// one section per rejection class (`ns_hash` collisions, oversized-identity
     /// frame drops, out-of-window records), joined with `" | "`.
     fn error_message(&self) -> String {
-        let collisions = &self.collisions;
-        let oversized = &self.oversized;
-        let out_of_window = self.out_of_window;
-
         fn show(s: &str) -> &str {
             if s.is_empty() { "<none>" } else { s }
         }
 
+        fn plural(count: usize) -> &'static str {
+            if count == 1 { "" } else { "s" }
+        }
+
         let mut sections: Vec<String> = Vec::new();
 
-        if !collisions.is_empty() {
-            let parts: Vec<String> = collisions
+        if !self.collisions.is_empty() {
+            let parts: Vec<String> = self
+                .collisions
                 .iter()
                 .map(|c| {
                     format!(
@@ -437,14 +438,15 @@ impl Rejections {
                 .collect();
             sections.push(format!(
                 "{} ns_hash collision{} detected; rename one of the colliding (service.namespace, service.name) pairs to dedupe: {}",
-                collisions.len(),
-                if collisions.len() == 1 { "" } else { "s" },
+                self.collisions.len(),
+                plural(self.collisions.len()),
                 parts.join("; "),
             ));
         }
 
-        if !oversized.is_empty() {
-            let parts: Vec<String> = oversized
+        if !self.oversized.is_empty() {
+            let parts: Vec<String> = self
+                .oversized
                 .iter()
                 .map(|o| {
                     format!(
@@ -460,17 +462,17 @@ impl Rejections {
                 .collect();
             sections.push(format!(
                 "{} stream{} dropped for oversized identity; shorten the (service.namespace, service.name) fields: {}",
-                oversized.len(),
-                if oversized.len() == 1 { "" } else { "s" },
+                self.oversized.len(),
+                plural(self.oversized.len()),
                 parts.join("; "),
             ));
         }
 
-        if out_of_window > 0 {
+        if self.out_of_window > 0 {
             sections.push(format!(
                 "{} log record{} rejected: timestamp outside the ingestion window (older than max_age or more than future_skew ahead)",
-                out_of_window,
-                if out_of_window == 1 { "" } else { "s" },
+                self.out_of_window,
+                plural(self.out_of_window),
             ));
         }
 
