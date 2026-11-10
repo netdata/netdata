@@ -539,8 +539,15 @@ void update_pid_comm(struct pid_stat *p, const char *comm) {
 #if (PROCESSES_HAVE_CMDLINE == 1)
     // Spread periodic reads (including retries) over 30 collection iterations.
     if(proc_pid_cmdline_is_needed &&
-       (changed || global_iterations_counter % 30 == (size_t)p->pid % 30))
-        managed_log(p, PID_LOG_CMDLINE, read_proc_pid_cmdline(p));
+       (changed || global_iterations_counter % 30 == (size_t)p->pid % 30)) {
+        int ok = read_proc_pid_cmdline(p);
+
+        // A failed read keeps the cached cmdline, unless the process name changed: then it belonged to the old program.
+        if(!ok && changed)
+            update_pid_cmdline(p, NULL);
+
+        managed_log(p, PID_LOG_CMDLINE, ok);
+    }
 #endif
 
     if(changed)

@@ -23,7 +23,8 @@ if(OS_LINUX)
                 src/collectors/apps.plugin/tests/test_apps_${apps_test}.c)
         target_compile_options(apps-${apps_test}-test PRIVATE -ffunction-sections -fdata-sections)
         target_link_options(apps-${apps_test}-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
-        target_link_libraries(apps-${apps_test}-test libnetdata)
+        # apps_plugin.c (included by the identity test) calls libcap when HAVE_CAPABILITY is set.
+        target_link_libraries(apps-${apps_test}-test libnetdata "$<$<BOOL:${CAP_FOUND}>:PkgConfig::CAP>")
     endforeach()
 
     add_executable(cgroup-name-config-test EXCLUDE_FROM_ALL
