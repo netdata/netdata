@@ -574,54 +574,54 @@ pub struct NetdataLogsService {
     /// Shared with the traces ingestion service: the writer → ledger IPC accepts
     /// exactly one connection (the ledger gap-checks frame sequences per signal),
     /// so every signal's events MUST funnel through one sender.
-    sender: Arc<LedgerSender>,
+    ledger_sender: Arc<LedgerSender>,
     wal_base_dir: PathBuf,
     wal_config: otel_bridge::config::WalConfig,
     /// Global ingestion time-bounds: reject records whose resolved
     /// timestamp is older than `max_age` or more than `future_skew` ahead.
     /// Applied per record inside `prepare_log_frame`.
     ingest_bounds: otel_bridge::config::IngestConfig,
-    seq: Arc<wal::SeqAllocator>,
+    seq_allocator: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
     /// Identity stamped into every WAL FileId (the machine GUID resolved by the
     /// supervisor plus its self-generated per-process instance id; see
     /// `otel_bridge::config::PluginConfig::identity`).
-    identity: Identity,
+    instance_identity: Identity,
     /// Charts the plugin derives from what it ingests (`otel-derived-metrics`).
-    derived: Option<Arc<DerivedMetrics>>,
+    derived_metrics: Option<Arc<DerivedMetrics>>,
 }
 
 impl NetdataLogsService {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        sender: Arc<LedgerSender>,
+        ledger_sender: Arc<LedgerSender>,
         wal_base_dir: PathBuf,
         wal_config: otel_bridge::config::WalConfig,
         ingest_bounds: otel_bridge::config::IngestConfig,
-        seq: Arc<wal::SeqAllocator>,
+        seq_allocator: Arc<wal::SeqAllocator>,
         clock: Arc<Mutex<MonotonicClock>>,
         auth: AuthConfig,
-        identity: Identity,
+        instance_identity: Identity,
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
             claimed_streams: ClaimedStreams::default(),
             clock,
-            sender,
+            ledger_sender,
             wal_base_dir,
             wal_config,
             ingest_bounds,
-            seq,
+            seq_allocator,
             auth,
-            identity,
-            derived: None,
+            instance_identity,
+            derived_metrics: None,
         }
     }
 
     /// Sets where export outcomes and derived metrics are recorded; only
     /// before the service is shared.
-    pub(crate) fn set_derived_metrics(&mut self, derived: Arc<DerivedMetrics>) {
-        self.derived = Some(derived);
+    pub(crate) fn set_derived_metrics(&mut self, derived_metrics: Arc<DerivedMetrics>) {
+        self.derived_metrics = Some(derived_metrics);
     }
 
     /// The tenant's effective WAL rotation config: its per-tenant override,
@@ -697,7 +697,7 @@ impl NetdataLogsService {
                 let events = w.take_all_events();
                 let forwarded = events.len();
                 if forwarded > 0 {
-                    self.sender.send_events(tenant_id.clone(), events);
+                    self.ledger_sender.send_events(tenant_id.clone(), events);
                 }
                 (result, forwarded)
             };
@@ -727,8 +727,8 @@ impl NetdataLogsService {
         stored: usize,
         rejections: &Rejections,
     ) -> ExportLogsServiceResponse {
-        if let Some(derived) = &self.derived {
-            derived.record_ingest(Signal::Logs, stored as u64, rejections.count() as u64);
+        if let Some(derived_metrics) = &self.derived_metrics {
+            derived_metrics.record_ingest(Signal::Logs, stored as u64, rejections.count() as u64);
         }
         ExportLogsServiceResponse {
             partial_success: rejections.partial_success(),
@@ -796,7 +796,7 @@ impl NetdataLogsService {
         let mut kept: usize = 0;
         // Derived metrics see each stream after normalization (kept records,
         // resolved times) and are counted only once the records are durable.
-        let mut derived_batch = self.derived.as_ref().and_then(|d| d.logs_batch());
+        let mut derived_batch = self.derived_metrics.as_ref().and_then(|d| d.logs_batch());
 
         for s in &mut storable_streams {
             let flattened = s.flatten(fallback_base_ns, bounds, |request| {
@@ -838,12 +838,12 @@ impl NetdataLogsService {
                 let w = wal::Writer::new(
                     &path,
                     wal_config,
-                    Arc::clone(&self.seq),
+                    Arc::clone(&self.seq_allocator),
                     wal::FileStamp {
                         pipeline_id: Signal::Logs.pipeline_id(),
                         payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
                     },
-                    self.identity,
+                    self.instance_identity,
                 )
                 .map_err(|e| {
                     tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
@@ -877,7 +877,7 @@ impl NetdataLogsService {
             // `send_events` takes the tenant by value and the core only
             // borrows it, so clone here — the last use of the id in this
             // request either way.
-            self.sender.send_events(tenant_id.clone(), events);
+            self.ledger_sender.send_events(tenant_id.clone(), events);
         }
         if let Some(batch) = derived_batch {
             batch.commit();

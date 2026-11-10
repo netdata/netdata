@@ -174,7 +174,7 @@ async fn run_ingestor(
     // ingest outcomes. The export services record into it; the tick loop
     // renders it. Its stores have their own locks, apart from the
     // ChartManager's.
-    let derived = Arc::new(
+    let derived_metrics = Arc::new(
         DerivedMetrics::new(&config.derived_metrics).context("declaring the derived metrics")?,
     );
 
@@ -184,7 +184,7 @@ async fn run_ingestor(
     // Tick loop: wakes on each second boundary and emits the chart data for
     // that slot.
     let tick_chart_manager = Arc::clone(&chart_manager);
-    let tick_derived = Arc::clone(&derived);
+    let tick_derived_metrics = Arc::clone(&derived_metrics);
     let tick_handle = tokio::spawn(async move {
         let mut buf = String::new();
 
@@ -216,7 +216,7 @@ async fn run_ingestor(
             // `otel_derived_metrics::MAX_CHUNK_BYTES`, so every send stays
             // under the IPC frame limit.
             let mut closed = false;
-            for chunk in tick_derived.emit(slot_timestamp) {
+            for chunk in tick_derived_metrics.emit(slot_timestamp) {
                 if chart_tx.send(chunk).await.is_err() {
                     closed = true;
                     break;
@@ -239,7 +239,8 @@ async fn run_ingestor(
     // and one global seq allocator: the ledger accepts a single writer
     // connection (and gap-checks the frame sequence per signal), and file
     // `seq` must be globally unique across signals.
-    let (sender, seq) = create_shared_writer_state(&config, &config.writer_socket_path)?;
+    let (ledger_sender, seq_allocator) =
+        create_shared_writer_state(&config, &config.writer_socket_path)?;
     // One process-wide monotonic clock, shared across signals — the WAL writer's
     // contract is that all per-frame `ingestion_ns` come from a single clock so
     // frame-level ordering is consistent across every stream/signal.
@@ -248,29 +249,29 @@ async fn run_ingestor(
     let traces_lifecycle = config.lifecycle_for(Signal::Traces);
     // The supervisor always resolves the identity before configuring a worker;
     // its absence here is a supervisor bug, not a runtime condition.
-    let identity = config
+    let instance_identity = config
         .identity
         .context("plugin config reached the ingestor without a resolved identity")?;
     let mut logs_service = create_logs_service(
         &logs_lifecycle,
         &config.auth,
-        Arc::clone(&sender),
-        Arc::clone(&seq),
+        Arc::clone(&ledger_sender),
+        Arc::clone(&seq_allocator),
         Arc::clone(&clock),
-        identity,
+        instance_identity,
     );
-    logs_service.set_derived_metrics(Arc::clone(&derived));
+    logs_service.set_derived_metrics(Arc::clone(&derived_metrics));
     let logs_service = Arc::new(logs_service);
 
     let mut traces_service = create_traces_service(
         &traces_lifecycle,
         &config.auth,
-        sender,
-        seq,
+        ledger_sender,
+        seq_allocator,
         clock,
-        identity,
+        instance_identity,
     );
-    traces_service.set_derived_metrics(Arc::clone(&derived));
+    traces_service.set_derived_metrics(Arc::clone(&derived_metrics));
     // The service map sees accepted trace exports through the observer seam
     // and serves `topology:tracing`. It is optional: when it cannot start,
     // ingestion goes on without it.
@@ -496,12 +497,12 @@ fn create_shared_writer_state(
         .max(traces_scan.max())
         .max(highwater.unwrap_or(0));
 
-    let seq = Arc::new(
+    let seq_allocator = Arc::new(
         wal::SeqAllocator::durable(highwater_path, seed, wal::DEFAULT_RESERVE_BATCH)
             .context("initializing seq high-water allocator")?,
     );
 
-    let sender = Arc::new(ledger_sender::LedgerSender::new(writer_socket_path));
+    let ledger_sender = Arc::new(ledger_sender::LedgerSender::new(writer_socket_path));
 
     tracing::info!(
         logs_wal = logs_scan.wal_max,
@@ -515,7 +516,7 @@ fn create_shared_writer_state(
         "ingestion enabled (multi-tenant WAL); seq allocator + ledger sender shared across logs + traces"
     );
 
-    Ok((sender, seq))
+    Ok((ledger_sender, seq_allocator))
 }
 
 /// The logs ingestion service, built from the derived logs lifecycle the same
@@ -523,20 +524,20 @@ fn create_shared_writer_state(
 fn create_logs_service(
     lifecycle: &LifecycleConfig,
     auth: &AuthConfig,
-    sender: Arc<ledger_sender::LedgerSender>,
-    seq: Arc<wal::SeqAllocator>,
+    ledger_sender: Arc<ledger_sender::LedgerSender>,
+    seq_allocator: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
-    identity: file_registry::Identity,
+    instance_identity: file_registry::Identity,
 ) -> NetdataLogsService {
     NetdataLogsService::new(
-        sender,
+        ledger_sender,
         lifecycle.wal.dir.clone(),
         lifecycle.wal.clone(),
         lifecycle.ingest.clone(),
-        seq,
+        seq_allocator,
         clock,
         auth.clone(),
-        identity,
+        instance_identity,
     )
 }
 
@@ -546,24 +547,24 @@ fn create_logs_service(
 fn create_traces_service(
     lifecycle: &LifecycleConfig,
     auth: &AuthConfig,
-    sender: Arc<ledger_sender::LedgerSender>,
-    seq: Arc<wal::SeqAllocator>,
+    ledger_sender: Arc<ledger_sender::LedgerSender>,
+    seq_allocator: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
-    identity: file_registry::Identity,
+    instance_identity: file_registry::Identity,
 ) -> NetdataTracesService {
     tracing::info!(
         wal_dir = %lifecycle.wal.dir.display(),
         "traces ingestion enabled"
     );
     NetdataTracesService::new(
-        sender,
+        ledger_sender,
         lifecycle.wal.dir.clone(),
         lifecycle.wal.clone(),
         lifecycle.ingest.clone(),
-        seq,
+        seq_allocator,
         clock,
         auth.clone(),
-        identity,
+        instance_identity,
     )
 }
 
