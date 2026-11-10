@@ -66,6 +66,7 @@ jobs:
             netdata-installer.sh
             .github/data/distros.yml
             .github/workflows/build.yml
+            .github/scripts/modules/release_versions.py
             .github/scripts/build-static.sh
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-static.py
@@ -744,6 +745,15 @@ jobs:
           path: artifacts/r2/*
           compression-level: 0
           retention-days: 30
+      - name: Store Preview R2 Artifacts
+        id: store-r2-preview
+        if: needs.file-check.outputs.run == 'true' && github.event_name != 'pull_request' && github.event.inputs.type == 'release'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: r2-preview-artifacts
+          path: artifacts/r2-preview/*
+          compression-level: 0
+          retention-days: 30
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
@@ -761,6 +771,7 @@ jobs:
               Consolidate artifacts: ${{ steps.consolidate.outcome }}
               Store Github: ${{ steps.store-github.outcome }}
               Store R2: ${{ steps.store-r2.outcome }}
+              Store preview R2: ${{ steps.store-r2-preview.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
           ${{
@@ -1228,6 +1239,20 @@ jobs:
       - artifact-verification-dist
       - artifact-verification-static
     steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Artifact Prefixes
+        id: prefixes
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          preview="$(python3 .github/scripts/modules/release_versions.py "${RELEASE_VERSION}")"
+          prefixes=stable
+          if [ "${preview}" = true ]; then
+            prefixes="${prefixes} preview"
+          fi
+          echo "prefixes=${prefixes}" >> "${GITHUB_OUTPUT}"
       - name: Install Rclone
         id: install-rclone
         run: |
@@ -1239,9 +1264,17 @@ jobs:
         with:
           name: r2-artifacts
           path: artifacts
+      - name: Retrieve Preview Artifacts
+        id: fetch-preview
+        if: contains(steps.prefixes.outputs.prefixes, 'preview')
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: r2-preview-artifacts
+          path: preview-artifacts
       - name: Upload Artifacts
         id: upload
         env:
+          ARTIFACT_PREFIXES: ${{ steps.prefixes.outputs.prefixes }}
           RCLONE_CONFIG_S3_TYPE: "s3"
           RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
           RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
@@ -1250,8 +1283,15 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
-          for dir in */ ; do
-            rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/stable/${dir}" || exit 1
+          for prefix in ${ARTIFACT_PREFIXES}; do
+            source_dir=.
+            if [ "${prefix}" = preview ]; then
+              source_dir=../preview-artifacts
+            fi
+            for dir in "${source_dir}"/*/ ; do
+              name="$(basename "${dir}")"
+              rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/${prefix}/${name}/" || exit 1
+            done
           done
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
@@ -1263,6 +1303,9 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to upload stable build artifacts.
+              Checkout: ${{ steps.checkout.outcome }}
+              Select artifact prefixes: ${{ steps.prefixes.outcome }}
+              Fetch preview artifacts: ${{ steps.fetch-preview.outcome }}
               Install Rclone: ${{ steps.install-rclone.outcome }}
               Fetch artifacts: ${{ steps.fetch.outcome }}
               Upload artifacts: ${{ steps.upload.outcome }}

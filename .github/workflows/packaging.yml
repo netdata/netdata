@@ -57,6 +57,9 @@ jobs:
             .github/data/distros.yml
             .github/workflows/packaging.yml
             .github/scripts/gen-matrix-packaging.py
+            .github/scripts/gen-package-repos.py
+            .github/scripts/modules/release_versions.py
+            .github/scripts/package-upload.sh
             .github/scripts/prepare-topology-ip-intel-stock.sh
             .github/scripts/pkg-test.sh
             packaging/cmake/
@@ -142,7 +145,7 @@ jobs:
     name: Version check
     runs-on: ubuntu-latest
     outputs:
-      repo: ${{ steps.check-version.outputs.repo }}
+      repos: ${{ steps.check-version.outputs.repos }}
       version: ${{ steps.check-version.outputs.version }}
       retention: ${{ steps.check-version.outputs.retention }}
     steps:
@@ -151,21 +154,24 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check Version
         id: check-version
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             case "${{ github.event.inputs.type }}" in
               "release")
-                echo "repo=${REPO_PREFIX}" >> "${GITHUB_OUTPUT}"
+                repos="$(python3 .github/scripts/gen-package-repos.py "${RELEASE_VERSION}" "${REPO_PREFIX}")"
+                echo "repos=${repos}" >> "${GITHUB_OUTPUT}"
                 echo "version=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
                 echo "retention=365" >> "${GITHUB_OUTPUT}"
                 ;;
               "nightly")
-                echo "repo=${REPO_PREFIX}-edge" >> "${GITHUB_OUTPUT}"
+                echo "repos=${REPO_PREFIX}-edge" >> "${GITHUB_OUTPUT}"
                 echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
                 echo "retention=30" >> "${GITHUB_OUTPUT}"
                 ;;
               *)
-                echo "repo=${REPO_PREFIX}-devel" >> "${GITHUB_OUTPUT}"
+                echo "repos=${REPO_PREFIX}-devel" >> "${GITHUB_OUTPUT}"
                 echo "version=0.${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
                 echo "retention=30" >> "${GITHUB_OUTPUT}"
                 ;;
@@ -446,23 +452,31 @@ jobs:
         id: package-upload
         continue-on-error: true
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        env:
+          PACKAGE_REPOS: ${{ needs.version-check.outputs.repos }}
         run: |
-          .github/scripts/package-upload.sh \
-          packages.netdata.cloud \
-          ${{ matrix.repo_distro }} \
-          ${{ matrix.arch }} \
-          ${{ matrix.format }} \
-          ${{ needs.version-check.outputs.repo }}
+          for repo in ${PACKAGE_REPOS}; do
+            .github/scripts/package-upload.sh \
+            packages.netdata.cloud \
+            ${{ matrix.repo_distro }} \
+            ${{ matrix.arch }} \
+            ${{ matrix.format }} \
+            "${repo}"
+          done
       - name: Upload to packages2.netdata.cloud
         id: package2-upload
         if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true'
+        env:
+          PACKAGE_REPOS: ${{ needs.version-check.outputs.repos }}
         run: |
-          .github/scripts/package-upload.sh \
-          packages2.netdata.cloud \
-          ${{ matrix.repo_distro }} \
-          ${{ matrix.arch }} \
-          ${{ matrix.format }} \
-          ${{ needs.version-check.outputs.repo }}
+          for repo in ${PACKAGE_REPOS}; do
+            .github/scripts/package-upload.sh \
+            packages2.netdata.cloud \
+            ${{ matrix.repo_distro }} \
+            ${{ matrix.arch }} \
+            ${{ matrix.format }} \
+            "${repo}"
+          done
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
