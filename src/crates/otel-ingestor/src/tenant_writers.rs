@@ -417,7 +417,7 @@ mod tests {
             writer.write_mark()
         };
 
-        // A round that loses one of the files fails.
+        // Had the round lost one of the files, it would have failed.
         writer.make_durable(mark).await.unwrap();
         assert!(writer.lock().is_durable(mark));
     }

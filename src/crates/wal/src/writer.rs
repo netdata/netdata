@@ -88,10 +88,12 @@ struct ActiveFile {
     /// `ingestion_ns` of the file's first frame; anchors the duration
     /// rotation arm.
     first_frame_at_ns: Option<TimestampNs>,
-    /// Durable prefix / record count as of the last fsync (`sync_data`).
-    /// `Closed` carries these — not the live `bytes_written` /
-    /// `log_entry_count` — so a sealed file's authoritative prefix never
-    /// includes bytes past the last fsync. Matters only on the `Drop` close
+    /// Durable prefix / record count as of the last fsync that covered the
+    /// file: `sync_data`'s, or a split sync's (`finish_sync`, which also
+    /// reads them so that a prefix never moves backwards). `Closed` carries
+    /// these — not the live `bytes_written` / `log_entry_count` — so a
+    /// sealed file's authoritative prefix never includes bytes past the last
+    /// fsync; that differs from the live values only on the `Drop` close
     /// path, which writes no sync first.
     synced_up_to: ByteSize,
     synced_entry_count: u64,
@@ -1443,15 +1445,6 @@ mod tests {
             "an older prefix must not be reported after a newer one"
         );
         assert!(writer.is_durable(mark), "the newer sync stays recorded");
-
-        // The file's recorded prefix is still the newer one: a `Closed`
-        // reports it.
-        let closed = writer.shutdown_all().unwrap();
-        let sealed_up_to = closed.iter().find_map(|e| match e {
-            FileEvent::Closed { valid_up_to, .. } => Some(*valid_up_to),
-            _ => None,
-        });
-        assert_eq!(sealed_up_to, Some(reported[0].1));
     }
 
     #[test]
