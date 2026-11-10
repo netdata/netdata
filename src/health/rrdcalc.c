@@ -784,6 +784,20 @@ bool rrdcalc_rematch_keep(RRDSET *st, STRING *alert_name, RRD_ALERT_PROTOTYPE *w
     return kept;
 }
 
+// True when `st` has an alert named `alert_name` linked to it (alert names are interned, so pointers compare).
+bool rrdcalc_rrdset_has_alert(RRDSET *st, STRING *alert_name) {
+    bool found = false;
+    rw_spinlock_read_lock(&st->alerts.spinlock);
+    for(RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
+        if(rc->config.name == alert_name) {
+            found = true;
+            break;
+        }
+    }
+    rw_spinlock_read_unlock(&st->alerts.spinlock);
+    return found;
+}
+
 // Deletes the alerts of `st` that the re-match with sequence `seq` neither kept nor created: their rule is gone.
 void rrdcalc_rematch_sweep_rrdset(RRDSET *st, uint64_t seq) {
     RRDHOST *host = st->rrdhost;

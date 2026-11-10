@@ -176,6 +176,7 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae);
 
 bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *ap);
 bool rrdcalc_rematch_keep(RRDSET *st, STRING *alert_name, RRD_ALERT_PROTOTYPE *winner, uint64_t seq);
+bool rrdcalc_rrdset_has_alert(RRDSET *st, STRING *alert_name);
 void rrdcalc_rematch_sweep_rrdset(RRDSET *st, uint64_t seq);
 
 int dyncfg_health_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd, const char *add_name,

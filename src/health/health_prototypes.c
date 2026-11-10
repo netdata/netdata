@@ -671,7 +671,14 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
 static void health_prototype_rematch_on_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap, uint64_t seq) {
     rw_spinlock_read_lock(&ap->_internal.rw_spinlock);
     RRD_ALERT_PROTOTYPE *winner = health_prototype_winner_for_rrdset_unsafe(st, ap);
-    if(!rrdcalc_rematch_keep(st, ap->config.name, winner, seq) && winner)
+
+    // most rules match nothing on most charts: take the host alert dictionary write lock only when the chart has an
+    // alert of this name to keep or delete; an alert another thread adds meanwhile is stamped for the sweep at insert
+    bool kept = false;
+    if(rrdcalc_rrdset_has_alert(st, ap->config.name))
+        kept = rrdcalc_rematch_keep(st, ap->config.name, winner, seq);
+
+    if(!kept && winner)
         rrdcalc_add_from_prototype(st->rrdhost, st, winner);
     rw_spinlock_read_unlock(&ap->_internal.rw_spinlock);
 }
@@ -730,6 +737,9 @@ void health_prototype_rematch_rrdset(RRDSET *st) {
 // A prototype was added, changed, enabled or disabled: re-match its alert on every chart of every host. Alerts whose
 // rule did not change are kept; a disabled prototype attaches nowhere, so its alerts are removed.
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap) {
+    // like every re-match, wait for a reload that is still loading the rules
+    netdata_rwlock_rdlock(&health_globals.prototypes.reload_rwlock);
+
     uint64_t seq = health_prototype_rematch_seq_next();
 
     RRDHOST *host;
@@ -745,6 +755,8 @@ void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap) {
         dictionary_garbage_collect(host->rrdcalc_root_index);
     }
     dfe_done(host);
+
+    netdata_rwlock_rdunlock(&health_globals.prototypes.reload_rwlock);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
