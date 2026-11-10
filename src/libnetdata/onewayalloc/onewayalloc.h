@@ -34,8 +34,6 @@ char *onewayalloc_strdupz(ONEWAYALLOC *owa, const char *s);
 void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size);
 void onewayalloc_freez(ONEWAYALLOC *owa, const void *ptr);
 
-void *onewayalloc_doublesize(ONEWAYALLOC *owa, const void *src, size_t oldsize);
-
 size_t onewayalloc_allocated_memory(void);
 
 #endif // ONEWAYALLOC_H
