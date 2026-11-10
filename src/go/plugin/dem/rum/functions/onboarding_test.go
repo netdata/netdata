@@ -37,7 +37,7 @@ func TestSiteFunctionPublishesIndependentFacts(t *testing.T) {
 		}
 		response := functions.New(onboardingSource{
 			site: site,
-		}).HandleRaw(context.Background(), funcapi.RawMethodRequest{
+		}, nil).HandleRaw(context.Background(), funcapi.RawMethodRequest{
 			Method: "rum-sites",
 		}).RawResponse
 		require.NotNil(t, response)

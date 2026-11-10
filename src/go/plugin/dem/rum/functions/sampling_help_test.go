@@ -62,7 +62,7 @@ func TestHistoryHelpExplainsBiasOnlyForSelectedProblemSampling(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, nil)
 	for _, method := range []string{"rum-sessions", "rum-errors"} {
 		for _, tc := range []struct {
 			site   string

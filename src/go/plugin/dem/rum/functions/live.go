@@ -12,11 +12,11 @@ import (
 var liveMethod = method{
 	id:      "rum-live",
 	title:   "RUM Live",
-	help:    "Optional vnode_guid selects the recorded configured vnode GUID; empty selects all jobs. Recent observations with an opaque per-site generation cursor. Changing vnode_guid restarts pagination from the retained view for that selection. Row kind distinguishes document activations, application views, vital updates and errors. Multiple rows can belong to one experience; vital updates retain metric ID and revision",
+	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Recent observations with an opaque per-site generation cursor. Changing the selected GUID restarts pagination from the retained view for that selection. Row kind distinguishes document activations, application views, vital updates and errors. Multiple rows can belong to one experience; vital updates retain metric ID and revision",
 	sort:    "seq",
 	every:   2,
 	columns: rumLiveColumns,
-	params:  []string{"site", "vnode_guid", "after"},
+	params:  []string{"site", "vnode", "vnode_guid", "after"},
 }
 
 func (h *Handler) liveRows(ctx context.Context, site, after, vnodeGUID string) (rows [][]any, next string, err error) {

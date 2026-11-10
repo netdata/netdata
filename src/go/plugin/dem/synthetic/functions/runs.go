@@ -49,10 +49,10 @@ func (h *Handler) runs(ctx context.Context, args map[string]string, response map
 var runsMethod = method{
 	id:      "synthetics-runs",
 	title:   "Synthetic runs",
-	help:    "Retained attempts selected by start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at 2000 and disclose truncation. Optional vnode_guid selects the captured vnode GUID; empty means all sites, and blank Vnode GUID cells are unassigned.",
+	help:    "Retained attempts selected by start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at 2000 and disclose truncation. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 	sort:    "started_us",
 	history: true,
-	params:  []string{"job_id", "kind", "outcome", "after", "before", "limit", "vnode_guid"},
+	params:  []string{"job_id", "kind", "outcome", "after", "before", "limit", "vnode", "vnode_guid"},
 	columns: columns(
 		column{
 			"run_id",

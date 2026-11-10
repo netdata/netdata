@@ -2,7 +2,10 @@ modules:
   - functions:
         description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live
             activity and retained investigation history. Invoke their public rum-* names on the collecting Agent; use
-            vnode_guid to select a vnode. Filters retain Agent-level access and do not provide per-site authorization.
+            vnode:storefront to select the exact configured vnode name, not its display hostname. Names use current
+            configuration even with disabled or no jobs; renamed or removed names stop resolving, and reused names select
+            their current GUID. Use vnode_guid for retained history by canonical GUID after removal. Omit both selectors
+            for all vnodes and unassigned data. Filters retain Agent-level access and do not provide per-site authorization.
         list:
           - id: rum-sites
             function_name: rum-sites
@@ -10,9 +13,18 @@ modules:
             description: Inspect site setup, sampling, receiver availability and recent activity to diagnose missing
                 browser data.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID. Leave empty to include every vnode and unassigned data.
+                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
                 default: ''
@@ -151,9 +163,18 @@ modules:
             description: Compare document-entry pages using recent observed traffic, Web Vital populations and
                 attributed elements.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID. Leave empty to include every vnode and unassigned data.
+                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
                 default: ''
@@ -272,9 +293,18 @@ modules:
             description: Read recent browser events for live activity views, optionally continuing from a previous
                 response.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID. Leave empty to include every vnode and unassigned data.
+                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
                 default: ''
@@ -411,9 +441,18 @@ modules:
             description: Investigate sampled sessions with retained observations received within a time range, including pages, errors and
                 optional interaction heuristics.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID. Leave empty to include every vnode and unassigned data.
+                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
                 default: ''
@@ -542,9 +581,18 @@ modules:
             description: Group errors originally received by the Agent in the selected range by fingerprint; select a
                 fingerprint to investigate affected sessions, pages and browsers.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID. Leave empty to include every vnode and unassigned data.
+                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
                 default: ''
@@ -653,9 +701,18 @@ modules:
             description: Read the retained event timeline for a session to follow navigation, errors and traced
                 requests.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID. Leave empty to include every vnode and unassigned data.
+                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
                 default: ''

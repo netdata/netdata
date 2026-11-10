@@ -33,7 +33,7 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	components := New(Dependencies{
 		History: journalStore,
 	}, DefaultConfig())
-	handler := components.Functions[0].NewHandler().(*rumfunctions.Handler)
+	handler := components.Functions[0].NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*rumfunctions.Handler)
 	response := handler.HandleRaw(
 		context.Background(),
 		funcapi.RawMethodRequest{

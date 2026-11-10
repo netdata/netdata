@@ -43,8 +43,8 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 	}
 	require.NoError(t, runs.Sync(ctx))
 	components := dem.New(dem.Dependencies{History: journal}, dem.DefaultConfig())
-	rumHandler := components.Functions[0].NewHandler().(*rumfunctions.Handler)
-	syntheticHandler := components.Functions[1].NewHandler().(*syntheticfunctions.Handler)
+	rumHandler := components.Functions[0].NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*rumfunctions.Handler)
+	syntheticHandler := components.Functions[1].NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*syntheticfunctions.Handler)
 	for name, tc := range map[string]struct {
 		method string
 		handle func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse

@@ -12,11 +12,11 @@ import (
 var errorsMethod = method{
 	id:      "rum-errors",
 	title:   "RUM Errors",
-	help:    "Optional vnode_guid selects the recorded configured vnode GUID; empty selects all jobs. Retained errors originally received by the Agent in the selected inclusive Unix-second range; select fingerprint for affected-session, page and browser statistics",
+	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Retained errors originally received by the Agent in the selected inclusive Unix-second range; select fingerprint for affected-session, page and browser statistics",
 	sort:    "count_window",
 	every:   10,
 	history: true,
-	params:  []string{"site", "vnode_guid", "fingerprint", "after", "before"},
+	params:  []string{"site", "vnode", "vnode_guid", "fingerprint", "after", "before"},
 	columns: rumErrorsColumns,
 }
 

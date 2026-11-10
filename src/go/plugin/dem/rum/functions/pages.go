@@ -12,11 +12,11 @@ import (
 var pagesMethod = method{
 	id:      "rum-pages",
 	title:   "RUM Pages",
-	help:    "Optional vnode_guid selects the current measurement window by configured vnode GUID; empty selects all jobs. All retained document-entry groups in the receipt window, including groups outside chart top-N. Vitals use the latest report per document experience; sample counts describe retained populations and loss counts conservatively flag possible incompleteness. Percentiles, activity counts and session counts are null when capacity loss makes them incomplete. Sessions are observed browser identities, not people or concurrency. Frustration signals are unavailable when capture is disabled",
+	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. All retained document-entry groups in the receipt window, including groups outside chart top-N. Vitals use the latest report per document experience; sample counts describe retained populations and loss counts conservatively flag possible incompleteness. Percentiles, activity counts and session counts are null when capacity loss makes them incomplete. Sessions are observed browser identities, not people or concurrency. Frustration signals are unavailable when capture is disabled",
 	sort:    "pageviews_window",
 	every:   10,
 	columns: rumPagesColumns,
-	params:  []string{"site", "vnode_guid"},
+	params:  []string{"site", "vnode", "vnode_guid"},
 }
 
 func (h *Handler) pagesRows(ctx context.Context, site, vnodeGUID string) (rows [][]any, err error) {

@@ -27,14 +27,16 @@ type Deps interface {
 }
 
 type Handler struct {
-	deps   Deps
-	redact *redact.Redactor
+	deps            Deps
+	redact          *redact.Redactor
+	lookupVnodeGUID func(string) (string, bool)
 }
 
-func New(deps Deps) *Handler {
+func New(deps Deps, lookupVnodeGUID func(string) (string, bool)) *Handler {
 	return &Handler{
-		deps:   deps,
-		redact: redact.NewRedactor(),
+		deps:            deps,
+		redact:          redact.NewRedactor(),
+		lookupVnodeGUID: lookupVnodeGUID,
 	}
 }
 func (h *Handler) Cleanup(context.Context) {}
@@ -95,11 +97,16 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		if !supported {
 			return funcapi.ErrorResponse(400, "unsupported argument %q", key)
 		}
+		if _, exists := args[key]; exists {
+			return funcapi.ErrorResponse(400, "duplicate argument %q", key)
+		}
 		args[key] = value
 	}
-	if err := vnodeguid.Validate(args["vnode_guid"]); err != nil {
+	guid, err := vnodeguid.Resolve(args, h.lookupVnodeGUID)
+	if err != nil {
 		return funcapi.ErrorResponse(400, "%s", err)
 	}
+	args["vnode_guid"] = guid
 	response := map[string]any{
 		"status":              200,
 		"type":                "table",
@@ -150,7 +157,6 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		return funcapi.ErrorResponse(499, "request cancelled")
 	}
 	var rows [][]any
-	var err error
 	now := time.Now().Unix()
 	switch req.Method {
 	case "rum-sites":

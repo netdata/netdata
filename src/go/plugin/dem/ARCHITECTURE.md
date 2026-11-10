@@ -164,10 +164,22 @@ Transport and history counters remain job-wide. Old evidence lacking a captured 
 records with legacy `site_id` text: no current-config backfill or speculative migration is performed.
 
 DEM Functions remain process-owned on the collecting Agent with existing public names and Agent-level permissions.
-The explicit `vnode_guid` filter selects data; it MUST NOT become an authorization boundary. Omitting it preserves
-all-vnode and unassigned reads. Apply GUID filters before row limits and cursor advancement, retaining physical
-job, session, run and capture ownership checks on every evidence read. No Function registration or host-context protocol extension per vnode is
-part of this contract. Retained history remains available with all collector jobs disabled or a vnode archived.
+All six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts` accept either `vnode` or
+`vnode_guid`. The detail Functions `synthetics-run` and `synthetics-artifact` retain their existing parameters.
+Neither selector is an authorization boundary. Omitting both, or supplying only an empty `vnode_guid`, preserves
+all-vnode and unassigned reads. Empty or unknown `vnode` names and requests containing both selectors MUST fail,
+even if either value is empty.
+
+The `vnode` selector is the exact configured resource name used by collector jobs, not the display hostname.
+Resolve it once per request through the framework's read-only current configured-vnode authority, independently of
+active job registries. Lookup MUST work with disabled jobs or no jobs, use an in-memory name-to-canonical-GUID lookup,
+and perform no I/O or job/history scan. Renamed or removed names have no aliases; name reuse resolves only the current
+GUID. Keep `vnode_guid` as the canonical UUID fallback for earlier identities, including after configuration removal.
+Name selection MUST NOT rewrite captured GUIDs or add stored name history.
+
+Apply the resolved GUID filter before row limits and cursor advancement, retaining physical job, session, run and
+capture ownership checks on every evidence read. No Function registration or host-context protocol extension per vnode
+is part of this contract. Retained history remains available with all collector jobs disabled or a vnode archived.
 
 Frontend consumers retain collecting-Agent identity, vnode GUID, module and job name. Desired native configuration
 includes disabled and failed-startup jobs that active registries omit. Guided site setup creates/selects a configured

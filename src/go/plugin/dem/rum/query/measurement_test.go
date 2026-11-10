@@ -28,7 +28,7 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	writer := history.NewWriter("shop", store, owner)
 	owner.SetHistorySink(writer)
 	service := query.New(hub, store)
-	handler := functions.New(service)
+	handler := functions.New(service, nil)
 	now := time.Now()
 	b := &beacon.Beacon{
 		Site:         "shop",

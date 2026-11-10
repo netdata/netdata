@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
-
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
@@ -16,9 +14,9 @@ import (
 var artifactsMethod = method{
 	id:     "synthetics-artifacts",
 	title:  "Retained synthetic captures",
-	help:   "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–2000. Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode_guid selects the captured vnode GUID; empty means all sites, and blank Vnode GUID cells are unassigned.",
+	help:   "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–2000. Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 	sort:   "published_us",
-	params: []string{"job_id", "before", "limit", "vnode_guid"},
+	params: []string{"job_id", "before", "limit", "vnode", "vnode_guid"},
 	columns: columns(
 		column{"run_id", "Run", funcapi.FieldTypeString, ""},
 		column{"job_id", "Monitor", funcapi.FieldTypeString, ""},
@@ -34,9 +32,6 @@ func (h *Handler) artifacts(
 	args map[string]string,
 	response map[string]any,
 ) *funcapi.FunctionResponse {
-	if err := vnodeguid.Validate(args["vnode_guid"]); err != nil {
-		return funcapi.ErrorResponse(400, "%v", err)
-	}
 	limit, err := rowLimit(args["limit"])
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)

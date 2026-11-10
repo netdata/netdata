@@ -28,6 +28,23 @@ func commitConfig(t *testing.T, vc *VNodeConfiguration, c *vnodes.Config) {
 	_, err = p.Commit()
 	require.NoError(t, err)
 }
+
+func TestLookupGUIDBeforeMetadataAcquisition(t *testing.T) {
+	vc, err := NewVNodeConfigurationWithInitial(nil)
+	require.NoError(t, err)
+	c := snmpConfig(t, "router", "test-device")
+	commitConfig(t, vc, c)
+	snapshot, ok := vc.Lookup("router")
+	require.True(t, ok)
+	require.Nil(t, snapshot.Vnode)
+	guid, ok := vc.LookupGUID("router")
+	require.True(t, ok)
+	want, err := vnodes.ConfiguredGUIDKey(c.IdentityGUID())
+	require.NoError(t, err)
+	require.Equal(t, want, guid)
+	_, ok = vc.LookupGUID("unknown")
+	require.False(t, ok)
+}
 func publishMetadata(t *testing.T, vc *VNodeConfiguration, token *AcquisitionToken, m *vnodes.Metadata, failed bool) {
 	t.Helper()
 	p, err := vc.PrepareMetadata(token, m, failed)

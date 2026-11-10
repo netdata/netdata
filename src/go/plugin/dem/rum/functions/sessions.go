@@ -11,11 +11,11 @@ import (
 var sessionsMethod = method{
 	id:      "rum-sessions",
 	title:   "RUM Sessions",
-	help:    "Optional vnode_guid selects the recorded configured vnode GUID; empty selects all jobs. Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
+	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
 	sort:    "last_observed_us",
 	every:   10,
 	history: true,
-	params:  []string{"site", "vnode_guid", "after", "before", "user_id"},
+	params:  []string{"site", "vnode", "vnode_guid", "after", "before", "user_id"},
 	columns: rumSessionsColumns,
 }
 

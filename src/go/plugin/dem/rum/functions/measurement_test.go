@@ -40,7 +40,7 @@ func TestPagePopulationCountsAndIncompleteNulls(t *testing.T) {
 					Lost:         tc.lost,
 					Vitals:       map[string]aggregate.VitalStats{beacon.CLS: {N: tc.n, Lost: tc.lost}},
 				},
-			})
+			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 				Method: "rum-pages",
 			}).RawResponse
@@ -106,7 +106,7 @@ func TestSiteMeasurementAvailabilityAndDetailPopulation(t *testing.T) {
 				serving: tc.serving,
 				rate:    tc.rate,
 				lost:    tc.lost,
-			})
+			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 				Method: "rum-sites",
 			}).RawResponse
@@ -147,7 +147,7 @@ func TestPageActivityCountsAreUnavailableWhenPopulationIncomplete(t *testing.T) 
 					Lost:              tc.lost,
 					FrustrationsKnown: tc.capture,
 				},
-			})
+			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 				Method: "rum-pages",
 			}).RawResponse
@@ -169,7 +169,7 @@ func TestSiteActivityCountsAreUnavailableWhenPopulationIncomplete(t *testing.T) 
 		serving:    true,
 		rate:       1,
 		windowLost: 1,
-	})
+	}, nil)
 	response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 		Method: "rum-sites",
 	}).RawResponse

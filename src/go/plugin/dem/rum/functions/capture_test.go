@@ -38,7 +38,7 @@ func TestPageFrustrationDistinguishesDisabledFromMeasuredZero(t *testing.T) {
 			handler := rumfunctions.New(captureFunctionSource{
 				known: tc.known,
 				count: tc.count,
-			})
+			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 				Method: "rum-pages",
 			})

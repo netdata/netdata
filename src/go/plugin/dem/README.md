@@ -60,9 +60,19 @@ partial success must show which operations need attention. A vnode does not own 
 retention budgets, and referencing it does not deploy jobs to other Agents.
 
 DEM Functions remain global on the collecting Agent. Invoke their existing names through that Agent or Cloud and
-select a site's recorded canonical GUID with `vnode_guid`, for example
-`synthetics-runs vnode_guid:12345678-1234-4234-8234-123456789abc`. Omitting the filter includes all vnodes and unassigned
-data. The selector filters data under the existing Agent-level access model; it is not a per-site authorization boundary.
+select a site by its configured vnode name, for example `synthetics-runs vnode:storefront` or
+`rum-pages vnode:storefront`. The name is the exact resource name used by the job's `vnode` option, not its display
+hostname. Name lookup uses current vnode configuration, including when all jobs are disabled or no jobs reference it.
+Renamed or removed names stop resolving; reusing a name selects its current GUID, without aliases to earlier identities.
+
+Use `vnode_guid` with the recorded canonical GUID to query an earlier identity or retained history after its vnode is
+removed, for example `synthetics-runs vnode_guid:12345678-1234-4234-8234-123456789abc`. Supply only one selector;
+empty or unknown vnode names and requests containing both selectors are rejected, even if either value is empty.
+Omitting both selectors, or supplying only an empty `vnode_guid`, includes all vnodes and unassigned data.
+These selectors apply to all six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts`;
+`synthetics-run` and `synthetics-artifact` keep their existing detail parameters.
+
+The selectors filter data under the existing Agent-level access model; they are not a per-site authorization boundary.
 Functions are not registered on each vnode. Frontend consumers retain the collecting Agent relationship when selecting
 a site, including for archived vnodes and retained history.
 

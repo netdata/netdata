@@ -133,7 +133,7 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	require.Len(t, sites, 1)
 	assert.Equal(t, "job-b", sites[0].Name)
 	// Actual Function requests carry both selectors and expose the stored group.
-	handler := rumfunctions.New(service)
+	handler := rumfunctions.New(service, nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method: "rum-session-events",
 		Args:   []string{"site:job-a", "vnode_guid:11111111-1111-4111-8111-111111111111", "session_id:shared"},

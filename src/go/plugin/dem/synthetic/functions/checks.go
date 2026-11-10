@@ -5,8 +5,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
-
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 )
 
@@ -15,9 +13,6 @@ func (h *Handler) checks(
 	args map[string]string,
 	response map[string]any,
 ) *funcapi.FunctionResponse {
-	if err := vnodeguid.Validate(args["vnode_guid"]); err != nil {
-		return funcapi.ErrorResponse(400, "%v", err)
-	}
 	if err := validKind(args["kind"]); err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
@@ -81,9 +76,9 @@ func (h *Handler) checks(
 var checksMethod = method{
 	id:     "synthetics-checks",
 	title:  "Synthetic monitors",
-	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt. Optional vnode_guid selects the captured vnode GUID; empty means all sites, and blank Vnode GUID cells are unassigned.",
+	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 	sort:   "job_id",
-	params: []string{"job_id", "kind", "limit", "vnode_guid"},
+	params: []string{"job_id", "kind", "limit", "vnode", "vnode_guid"},
 	columns: columns(
 		column{
 			"job_id",

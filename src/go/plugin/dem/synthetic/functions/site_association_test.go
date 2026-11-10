@@ -38,7 +38,7 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 		require.NoError(t, err)
 		job.Complete(run)
 	}
-	h := functions.New(query.New(hub, store, nil, nil))
+	h := functions.New(query.New(hub, store, nil, nil), nil)
 	checks := call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "kind:journey", "job_id:journey:checkout")
 	rows := responseData(t, checks)
 	require.Len(t, rows, 1)

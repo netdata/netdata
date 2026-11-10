@@ -157,7 +157,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	hub := rumregistry.New()
 	a, retire := addSite(t, hub, "site", "first")
 	src := query.New(hub, st)
-	handler := rumfunctions.New(src)
+	handler := rumfunctions.New(src, nil)
 	request := func() [][]any {
 		t.Helper()
 		response := handler.HandleRaw(
@@ -237,7 +237,7 @@ func TestFunctionStatusesAndMissingVitalsFromRealSource(t *testing.T) {
 	st := history.NewStore(journalStore)
 	hub := rumregistry.New()
 	a, _ := addSite(t, hub, "site", "first")
-	handler := rumfunctions.New(query.New(hub, st))
+	handler := rumfunctions.New(query.New(hub, st), nil)
 	for name, tc := range map[string]struct {
 		method string
 		args   []string
@@ -325,7 +325,7 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 	flushCtx, cancel := context.WithCancel(ctx)
 	cancel()
 	writer.Run(flushCtx)
-	handler := rumfunctions.New(query.New(hub, st))
+	handler := rumfunctions.New(query.New(hub, st), nil)
 	data, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "plugins.d", "FUNCTION_UI_SCHEMA.json"))
 	require.NoError(t, err)
 	var doc any
@@ -415,7 +415,7 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 			})
 			require.NoError(t, err)
 			t.Cleanup(retire)
-			handler := rumfunctions.New(query.New(hub, st))
+			handler := rumfunctions.New(query.New(hub, st), nil)
 			for _, method := range []string{"rum-sessions", "rum-errors"} {
 				response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 					Method: method,
@@ -463,7 +463,7 @@ func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {
 		)
 		require.NoError(t, err)
 	}
-	handler := rumfunctions.New(query.New(rumregistry.New(), st))
+	handler := rumfunctions.New(query.New(rumregistry.New(), st), nil)
 	overview := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method: "rum-errors",
 		Args:   []string{"site:retired"},

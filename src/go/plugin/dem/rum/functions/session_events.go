@@ -11,11 +11,11 @@ import (
 var sessionEventsMethod = method{
 	id:      "rum-session-events",
 	title:   "RUM Session Events",
-	help:    "Optional vnode_guid selects the recorded configured vnode GUID; empty selects all jobs. Full retained and pending timeline for one session, ordered by Agent receipt time; includes observations outside the history picker range",
+	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Full retained and pending timeline for one session, ordered by Agent receipt time; includes observations outside the history picker range",
 	sort:    "ts",
 	every:   10,
 	history: true,
-	params:  []string{"site", "vnode_guid", "session_id"},
+	params:  []string{"site", "vnode", "vnode_guid", "session_id"},
 	columns: rumSessionEventsColumns,
 }
 

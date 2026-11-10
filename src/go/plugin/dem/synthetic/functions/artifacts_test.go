@@ -40,7 +40,7 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	}
 	_, err = store.Enforce(ctx, 7, 1<<20)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, nil, store, func() string { return "policy reload rejected" }))
+	h := syntheticfunctions.New(query.New(nil, nil, store, func() string { return "policy reload rejected" }), nil)
 	response := h.HandleRaw(
 		ctx,
 		funcapi.RawMethodRequest{

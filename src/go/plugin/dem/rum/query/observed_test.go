@@ -51,7 +51,7 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 	// Another session's later receipt is in the same whole second, saved after promotion.
 	_, err = store.AppendEvent(ctx, history.EventRecord{Site: "shop", SessionID: "newer", Type: "pageview", ObservedUS: observed.UnixMicro() + 999_999})
 	require.NoError(t, err)
-	handler := functions.New(query.New(registry.New(), store))
+	handler := functions.New(query.New(registry.New(), store), nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method: "rum-sessions", Args: []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()), fmt.Sprintf("before:%d", observed.Unix())},
 	}).RawResponse

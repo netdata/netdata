@@ -220,8 +220,11 @@ modules:
                 - name: not_run
     functions:
       description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse
-        jobs. Invoke their public synthetics-* names on the collecting Agent and select a vnode with vnode_guid.
-        Filters retain Agent-level access and do not provide per-site authorization; no active browser is required.
+        jobs. Invoke their public synthetics-* names on the collecting Agent and select the exact configured vnode name
+        with vnode:storefront, not its display hostname. Names use current configuration even with disabled or no jobs;
+        renamed or removed names stop resolving, and reused names select their current GUID. Use vnode_guid for retained
+        history by canonical GUID after removal. Omit both selectors for all vnodes and unassigned data. Filters retain
+        Agent-level access and do not provide per-site authorization; no active browser is required.
       list:
         - id: synthetics-checks
           function_name: synthetics-checks
@@ -230,9 +233,18 @@ modules:
             and failed-startup configuration remains in native job status. Freshness belongs to the last observation,
             independently of a waiting or running attempt.
           parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: vnode_guid
               name: Virtual node GUID (`vnode_guid`)
-              description: Filter by canonical vnode GUID. Leave empty to include every vnode and unassigned jobs.
+              description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
               type: string
               required: false
               default: ''
@@ -342,9 +354,18 @@ modules:
             second or accept negative offsets from now; omitted bounds cover retained history through now.
             Results are capped at 2000 and disclose truncation.
           parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: vnode_guid
               name: Virtual node GUID (`vnode_guid`)
-              description: Filter by canonical vnode GUID. Leave empty to include every vnode and unassigned jobs.
+              description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
               type: string
               required: false
               default: ''
@@ -547,9 +568,18 @@ modules:
             Journey recovery without a screenshot leaves its previous failure capture eligible. Disabled or
             deleted monitors keep the same preference; renamed monitors form separate groups.
           parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: vnode_guid
               name: Virtual node GUID (`vnode_guid`)
-              description: Filter by canonical vnode GUID. Leave empty to include every vnode and unassigned jobs.
+              description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
               type: string
               required: false
               default: ''

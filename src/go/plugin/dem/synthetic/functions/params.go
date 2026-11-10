@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 )
@@ -69,9 +68,6 @@ func runFilter(args map[string]string, now int64) (query.RunFilter, error) {
 		Kind:      model.Kind(args["kind"]),
 		Outcome:   model.Outcome(args["outcome"]),
 		Before:    &before,
-	}
-	if err := vnodeguid.Validate(f.VnodeGUID); err != nil {
-		return f, err
 	}
 	if err := validKind(args["kind"]); err != nil {
 		return f, err

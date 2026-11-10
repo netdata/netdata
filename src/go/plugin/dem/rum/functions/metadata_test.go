@@ -25,7 +25,7 @@ func TestMetadataDocumentsProcessFunctions(t *testing.T) {
 		require.NotContains(t, documented, function.ID)
 		documented[function.ID] = function
 	}
-	handler := rumfunctions.New(metadataFunctionSource{})
+	handler := rumfunctions.New(metadataFunctionSource{}, nil)
 	for _, declaration := range declarations {
 		t.Run(declaration.ID, func(t *testing.T) {
 			doc, ok := documented[declaration.ID]
@@ -100,7 +100,7 @@ func TestObservationTimestampColumnsDeclareMicroseconds(t *testing.T) {
 		"rum-live": "ts", "rum-session-events": "ts", "rum-sessions": "last_observed_us",
 	} {
 		t.Run(method, func(t *testing.T) {
-			handler := rumfunctions.New(metadataFunctionSource{})
+			handler := rumfunctions.New(metadataFunctionSource{}, nil)
 			args := []string{"site:shop"}
 			if method == "rum-session-events" {
 				args = append(args, "session_id:visit")
