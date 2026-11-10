@@ -124,14 +124,21 @@ modules:
               default_value: 180
               required: false
               group: Collection
+            - name: vnode
+              description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              detailed_description: Define a static vnode through `dem:vnode` or a YAML file in the Netdata configuration directory’s `vnodes/` directory. Enter its reference name, not its GUID. Leave empty to keep charts on the collecting Agent.
+                Retained runs and captures keep the resolved GUID recorded when the attempt started. Changing the vnode does not relabel existing evidence; records without a GUID remain unassigned.
+              default_value: ''
+              required: false
+              group: Virtual Node
         examples:
           folding:
             enabled: true
             title: Examples
           list:
             - name: Monitor a home page
-              description: Create one native browser monitor after preparing the runtime.
-              config: "jobs:\n  - name: home\n    url: https://example.org/\n"
+              description: Create one native browser monitor after preparing the runtime and defining the `example-site` vnode.
+              config: "jobs:\n  - name: home\n    vnode: example-site\n    url: https://example.org/\n"
     troubleshooting:
       problems:
         list:
@@ -193,8 +200,11 @@ modules:
                 - name: cls
     functions:
       description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse
-        jobs. Invoke their public synthetics-* names with the documented filters; no job selector or active
-        browser is required.
+        jobs. Invoke their public synthetics-* names on the collecting Agent and select the exact configured vnode name
+        with vnode:storefront, not its display hostname. Names use current configuration even with disabled or no jobs;
+        renamed or removed names stop resolving, and reused names select their current GUID. Use vnode_guid for retained
+        history by canonical GUID after removal. Omit both selectors for all vnodes and unassigned data. Filters retain
+        Agent-level access and do not provide per-site authorization; no active browser is required.
       list:
         - id: synthetics-checks
           function_name: synthetics-checks
@@ -203,6 +213,23 @@ modules:
             and failed-startup configuration remains in native job status. Freshness belongs to the last observation,
             independently of a waiting or running attempt.
           parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: Not supplied
+              options: []
+            - id: vnode_guid
+              name: Virtual node GUID (`vnode_guid`)
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: job_id
               name: Monitor (`job_id`)
               description: Native module and job name, such as journey:checkout. Leave empty to include all
@@ -273,11 +300,11 @@ modules:
               - name: last_success_us
                 type: timestamp
                 unit: ''
-                description: Last success in this activation. Unix microseconds; null when unavailable.
+                description: Last success in the current vnode association. Unix microseconds; null when unavailable.
               - name: last_failure_us
                 type: timestamp
                 unit: ''
-                description: Last failure in this activation. Unix microseconds; null when unavailable.
+                description: Last failure in the current vnode association. Unix microseconds; null when unavailable.
               - name: error
                 type: string
                 unit: ''
@@ -286,6 +313,10 @@ modules:
                 type: string
                 unit: ''
                 description: History error.
+              - name: vnode_guid
+                type: string
+                unit: ''
+                description: Recorded canonical vnode GUID. Empty means unassigned.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -304,6 +335,23 @@ modules:
             second or accept negative offsets from now; omitted bounds cover retained history through now.
             Results are capped at 2000 and disclose truncation.
           parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: Not supplied
+              options: []
+            - id: vnode_guid
+              name: Virtual node GUID (`vnode_guid`)
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: job_id
               name: Monitor (`job_id`)
               description: Native module and job name, such as journey:checkout. Leave empty to include all
@@ -404,6 +452,10 @@ modules:
                 type: string
                 unit: ''
                 description: History error.
+              - name: vnode_guid
+                type: string
+                unit: ''
+                description: Recorded canonical vnode GUID. Empty means unassigned.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -438,7 +490,8 @@ modules:
           returns:
             description: One row per retained reporter event, preserving actual and expected status and failure
               phase. The run object also contains test counts, nullable lab metrics, capture state, artifact
-              metadata and history errors; dropped_events discloses omitted event detail.
+              metadata and history errors; dropped_events discloses omitted event detail. The run.vnode_guid field
+              contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
             columns:
               - name: at_ms
                 type: timestamp
@@ -497,6 +550,23 @@ modules:
             Journey recovery without a screenshot leaves its previous failure capture eligible. Disabled or
             deleted monitors keep the same preference; renamed monitors form separate groups.
           parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: Not supplied
+              options: []
+            - id: vnode_guid
+              name: Virtual node GUID (`vnode_guid`)
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: job_id
               name: Monitor (`job_id`)
               description: Exact native module and job name to filter captures, such as journey:checkout. Leave
@@ -547,6 +617,10 @@ modules:
                 type: integer
                 unit: ''
                 description: Number of captures in the set.
+              - name: vnode_guid
+                type: string
+                unit: ''
+                description: Recorded canonical vnode GUID. Empty means unassigned.
           performance: Reads local capture metadata and file sizes without reading capture contents or starting a browser.
           security: Requires member-equivalent access. Exposes monitor identities and capture metadata, not capture contents.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse jobs
@@ -587,7 +661,8 @@ modules:
           returns:
             description: Retained capture metadata remains available after run history expires. Fetch verifies content
               and returns encoding=base64 and data_base64 without rendering HTML. A missing recorded capture
-              returns expired_or_unavailable, which does not prove why the file is absent.
+              returns expired_or_unavailable, which does not prove why the file is absent. The top-level vnode_guid field
+              contains the recorded canonical vnode GUID; an empty value means unassigned.
             columns:
               - name: artifact_id
                 type: string

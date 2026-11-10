@@ -226,7 +226,7 @@ func TestFacetsRankAllRetainedGroupsBeforeFolding(t *testing.T) {
 		assert.True(t, groups[10].Other)
 		assert.Zero(t, groups[10].Lost)
 	}
-	pages := a.Pages()
+	pages := a.Pages("")
 	require.Len(t, pages, 1101)
 	for _, page := range pages {
 		assert.Zero(t, page.Lost)
@@ -266,7 +266,7 @@ func TestCapacityDroppedVitalKeepsDocumentOriginInLiveAndHistory(t *testing.T) {
 	result := a.Ingest(b)
 	require.Len(t, result.Observation.Vitals, 1)
 	assert.Equal(t, "/entry", result.Observation.Vitals[0].Origin.PageGroup)
-	rows, _ := a.Live(0, 100)
+	rows, _ := a.Live(0, 100, "")
 	require.Len(t, rows, 2)
 	assert.Equal(t, uint64(2), rows[1].Revision)
 	assert.Equal(t, "/entry", rows[1].Page)

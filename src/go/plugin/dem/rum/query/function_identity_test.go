@@ -45,7 +45,7 @@ func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
 		require.True(t, attempted)
 		require.NoError(t, err)
 	}
-	handler := functions.New(query.New(sites, retained))
+	handler := functions.New(query.New(sites, retained), nil)
 	for method, field := range map[string]string{"rum-errors": "fingerprint", "rum-pages": "page", "rum-sessions": "session_id"} {
 		t.Run(method, func(t *testing.T) {
 			response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
@@ -100,7 +100,7 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}, {Name: "milestone"}},
 		})
 	}
-	handler := functions.New(query.New(sites, retained))
+	handler := functions.New(query.New(sites, retained), nil)
 	timeline := func() [][]any {
 		response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 			Method: "rum-session-events",

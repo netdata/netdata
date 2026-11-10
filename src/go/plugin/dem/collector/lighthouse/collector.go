@@ -22,6 +22,7 @@ var charts string
 var schema string
 
 type Config struct {
+	Vnode       string           `yaml:"vnode,omitempty" json:"vnode,omitempty"`
 	Name        string           `yaml:"name"         json:"name"`
 	UpdateEvery int              `yaml:"update_every" json:"update_every"`
 	Timeout     confopt.Duration `yaml:"timeout"      json:"timeout"`
@@ -49,6 +50,7 @@ type Collector struct {
 	metrics     metrics
 	request     model.Request
 	initialized bool
+	vnodeGUID   string
 	// Assigned before readiness; retained after retirement for in-flight callbacks.
 	registration *syntheticregistry.Registration
 	terminal     chan error

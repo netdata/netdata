@@ -98,7 +98,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		retained, err := observedHistory.GetRun(context.Background(), run.JobID, run.ID)
 		require.NoError(t, err)
 		require.Equal(t, &expectedIdentity, retained.Runtime)
-		handler := syntheticfunctions.New(query.New(nil, observedHistory, captures, nil))
+		handler := syntheticfunctions.New(query.New(nil, observedHistory, captures, nil), nil)
 		response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: "synthetics-run", Args: []string{"job_id:" + run.JobID, "run_id:" + run.ID}, Permissions: "0x7b"})
 		require.NotNil(t, response.RawResponse, response.Message)
 		require.Equal(t, &expectedIdentity, response.RawResponse["run"].(map[string]any)["runtime"])

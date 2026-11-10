@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
@@ -25,11 +26,15 @@ type Deps interface {
 	Evidence(context.Context, string, string, string) (query.Evidence, error)
 }
 
-type Handler struct{ deps Deps }
+type Handler struct {
+	deps            Deps
+	lookupVnodeGUID func(string) (string, bool)
+}
 
-func New(deps Deps) *Handler {
+func New(deps Deps, lookupVnodeGUID func(string) (string, bool)) *Handler {
 	return &Handler{
-		deps: deps,
+		deps:            deps,
+		lookupVnodeGUID: lookupVnodeGUID,
 	}
 }
 
@@ -79,6 +84,11 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if err := ctx.Err(); err != nil {
 		return functionError(err)
 	}
+	guid, err := vnodeguid.Resolve(args, h.lookupVnodeGUID)
+	if err != nil {
+		return funcapi.ErrorResponse(400, "%v", err)
+	}
+	args["vnode_guid"] = guid
 	if h.deps == nil {
 		return funcapi.UnavailableResponse("synthetic observations are unavailable")
 	}

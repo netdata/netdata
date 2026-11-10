@@ -37,7 +37,7 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 		Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1, Time: observed.Add(-24 * time.Hour)}},
 	}
 	require.False(t, owner.Ingest(prior).Investigated)
-	rows, err := store.QuerySessions(ctx, "shop", "", observed.Unix(), observed.Unix(), 0)
+	rows, err := store.QuerySessions(ctx, "shop", "", observed.Unix(), observed.Unix(), 0, "")
 	require.NoError(t, err)
 	require.Empty(t, rows)
 	trigger := &beacon.Beacon{
@@ -51,7 +51,7 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 	// Another session's later receipt is in the same whole second, saved after promotion.
 	_, err = store.AppendEvent(ctx, history.EventRecord{Site: "shop", SessionID: "newer", Type: "pageview", ObservedUS: observed.UnixMicro() + 999_999})
 	require.NoError(t, err)
-	handler := functions.New(query.New(registry.New(), store))
+	handler := functions.New(query.New(registry.New(), store), nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method: "rum-sessions", Args: []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()), fmt.Sprintf("before:%d", observed.Unix())},
 	}).RawResponse

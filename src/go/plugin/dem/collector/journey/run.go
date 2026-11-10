@@ -17,6 +17,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	}
 	registration, err := c.deps.Registry.Register(syntheticregistry.Job{
 		JobID:          c.request.JobID(),
+		VnodeGUID:      c.request.VnodeGUID,
 		Kind:           c.request.Kind,
 		Name:           c.request.Name,
 		CadenceSeconds: c.UpdateEvery,

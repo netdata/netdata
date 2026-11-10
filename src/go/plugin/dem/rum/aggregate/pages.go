@@ -8,6 +8,7 @@ import (
 )
 
 type PageInfo struct {
+	VnodeGUID                               string
 	Site, Page                              string
 	PageviewsWindow, Sessions, ErrorsWindow int
 	Vitals                                  map[string]VitalStats
@@ -22,10 +23,14 @@ type elemSample struct {
 }
 
 // Pages returns all retained page groups, independent of the chart top-N.
-// Its inventory is bounded by the canonical retained observations.
-func (a *Aggregator) Pages() []PageInfo {
+// An empty vnodeGUID selects all current associations. Its inventory is bounded
+// by the canonical retained observations.
+func (a *Aggregator) Pages(vnodeGUID string) []PageInfo {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if vnodeGUID != "" && a.site.cfg.VnodeGUID != vnodeGUID {
+		return nil
+	}
 	r := a.site.readWindow(a.now(), true)
 	var out []PageInfo
 	for key, p := range r.groups {
@@ -34,6 +39,7 @@ func (a *Aggregator) Pages() []PageInfo {
 		}
 		out = append(out, PageInfo{
 			Site:              a.site.cfg.Name,
+			VnodeGUID:         a.site.cfg.VnodeGUID,
 			Page:              key.value,
 			PageviewsWindow:   int(p.documents),
 			Sessions:          p.sessions,

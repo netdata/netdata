@@ -190,7 +190,9 @@ func TestProcessProviderConfigurationRejectsInvalidIdentity(t *testing.T) {
 		"missing ID":           {{Functions: valid.Functions, NewHandler: valid.NewHandler}},
 		"missing declarations": {{ID: "history", NewHandler: valid.NewHandler}},
 		"missing factory":      {{ID: "history", Functions: valid.Functions}},
-		"duplicate ID":         {valid, valid},
+		"two factories": {{ID: "history", Functions: valid.Functions, NewHandler: valid.NewHandler,
+			NewHandlerWithContext: func(funcapi.ProcessFunctionContext) funcapi.MethodHandler { return &assemblyTestHandler{} }}},
+		"duplicate ID": {valid, valid},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewProcess(
@@ -431,7 +433,7 @@ func TestProcessProviderAndCollectorMayShareID(t *testing.T) {
 }
 
 func TestProcessProviderPreparationRemainsContained(t *testing.T) {
-	for _, stage := range []string{"declarations", "factory"} {
+	for _, stage := range []string{"declarations", "factory", "context factory"} {
 		t.Run(stage, func(t *testing.T) {
 			entered, release, cleaned := make(chan struct{}), make(chan struct{}), make(chan struct{})
 			t.Cleanup(func() {
@@ -451,7 +453,7 @@ func TestProcessProviderPreparationRemainsContained(t *testing.T) {
 					return []funcapi.FunctionConfig{{ID: "read"}}
 				},
 				NewHandler: func() funcapi.MethodHandler {
-					if stage == "factory" {
+					if stage == "factory" || stage == "context factory" {
 						close(entered)
 						<-release
 					}
@@ -459,6 +461,16 @@ func TestProcessProviderPreparationRemainsContained(t *testing.T) {
 						cleanup: func() { close(cleaned) },
 					}
 				},
+			}
+			if stage == "context factory" {
+				factory := provider.NewHandler
+				provider.NewHandler = nil
+				provider.NewHandlerWithContext = func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					if ctx.LookupVnodeGUID == nil {
+						panic("missing production vnode lookup")
+					}
+					return factory()
+				}
 			}
 			process, _, output, done := startProviderProcess(
 				t,

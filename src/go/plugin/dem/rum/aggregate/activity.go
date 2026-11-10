@@ -4,6 +4,7 @@ package aggregate
 import "time"
 
 type SiteActivity struct {
+	VnodeGUID                                 string
 	LastBeaconAt                              time.Time
 	BeaconsPerMin, RejectedPerMin, BotsPerMin int
 	LastBeaconAgeS                            int
@@ -34,6 +35,7 @@ func (a *Aggregator) Activity() SiteActivity {
 		}
 	}
 	return SiteActivity{
+		VnodeGUID:              st.cfg.VnodeGUID,
 		BeaconsPerMin:          len(st.accepted),
 		RejectedPerMin:         len(st.rejected),
 		BotsPerMin:             len(st.bots),

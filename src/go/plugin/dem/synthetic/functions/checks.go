@@ -23,6 +23,9 @@ func (h *Handler) checks(
 	rows := make([][]any, 0)
 	truncated := false
 	for _, j := range h.deps.Jobs(time.Now()) {
+		if args["vnode_guid"] != "" && args["vnode_guid"] != j.VnodeGUID {
+			continue
+		}
 		if args["job_id"] != "" && args["job_id"] != j.JobID {
 			continue
 		}
@@ -60,6 +63,7 @@ func (h *Handler) checks(
 				timestamp(j.LastFailureUS),
 				detail,
 				historyErr,
+				j.VnodeGUID,
 			},
 		)
 	}
@@ -72,9 +76,9 @@ func (h *Handler) checks(
 var checksMethod = method{
 	id:     "synthetics-checks",
 	title:  "Synthetic monitors",
-	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt.",
+	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt. Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 	sort:   "job_id",
-	params: []string{"job_id", "kind", "limit"},
+	params: []string{"job_id", "kind", "limit", "vnode", "vnode_guid"},
 	columns: columns(
 		column{
 			"job_id",
@@ -91,9 +95,10 @@ var checksMethod = method{
 		column{"outcome", "Last outcome", funcapi.FieldTypeString, ""},
 		column{"completed_us", "Last completion", funcapi.FieldTypeTimestamp, ""},
 		column{"duration_ms", "Attempt duration", funcapi.FieldTypeFloat, "ms"},
-		column{"last_success_us", "Last success in this activation", funcapi.FieldTypeTimestamp, ""},
-		column{"last_failure_us", "Last failure in this activation", funcapi.FieldTypeTimestamp, ""},
+		column{"last_success_us", "Last success in this vnode association", funcapi.FieldTypeTimestamp, ""},
+		column{"last_failure_us", "Last failure in this vnode association", funcapi.FieldTypeTimestamp, ""},
 		column{"error", "Last error", funcapi.FieldTypeString, ""},
 		column{"history_error", "History error", funcapi.FieldTypeString, ""},
+		column{"vnode_guid", "Vnode GUID", funcapi.FieldTypeString, ""},
 	),
 }

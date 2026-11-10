@@ -67,6 +67,7 @@ func runDetail(run model.Run) map[string]any {
 	detail := map[string]any{
 		"id":             run.ID,
 		"job_id":         run.JobID,
+		"vnode_guid":     run.VnodeGUID,
 		"kind":           run.Kind,
 		"name":           run.Name,
 		"target":         run.Target,

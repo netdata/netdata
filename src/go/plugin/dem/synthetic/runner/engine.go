@@ -33,7 +33,7 @@ type historyWriter interface {
 }
 
 type ArtifactStore interface {
-	Begin(string, string) (string, error)
+	Begin(string, string, string) (string, error)
 	Finalize(context.Context, string, []synthetic.Capture) ([]synthetic.Artifact, error)
 }
 
@@ -103,6 +103,7 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 	redact := newRedactor(request.Secrets)
 	run := synthetic.Run{
 		JobID:        request.JobID(),
+		VnodeGUID:    request.VnodeGUID,
 		Kind:         request.Kind,
 		Name:         redact.text(request.Name),
 		Target:       redact.text(redact.patterns.ApplyURL(request.URL)),
@@ -189,7 +190,7 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 	identity := paths.Identity
 	run.Runtime = &identity
 	e.save(attempt, "start", &run, redact)
-	work, err := e.artifacts.Begin(run.ID, run.JobID)
+	work, err := e.artifacts.Begin(run.ID, run.JobID, run.VnodeGUID)
 	if err != nil {
 		run.Error = redact.text("create run work directory: " + err.Error())
 		e.complete(&run, nil, redact)

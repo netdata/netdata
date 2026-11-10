@@ -34,9 +34,9 @@ func configured() *Collector {
 
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
-		`{"name":"home","update_every":1800,"timeout":180,"url":"https://example.org/","save_report":false}`,
+		`{"vnode":"storefront","name":"home","update_every":1800,"timeout":180,"url":"https://example.org/","save_report":false}`,
 	)
-	cfgYAML := []byte("name: home\nupdate_every: 1800\ntimeout: 180\nurl: https://example.org/\nsave_report: false\n")
+	cfgYAML := []byte("vnode: storefront\nname: home\nupdate_every: 1800\ntimeout: 180\nurl: https://example.org/\nsave_report: false\n")
 	collecttest.TestConfigurationSerialize(t, New(Dependencies{}), cfgJSON, cfgYAML)
 	for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
 		t.Run(format, func(t *testing.T) {
@@ -129,4 +129,11 @@ func TestPreparedCheckAndArtifacts(t *testing.T) {
 			Defaults: true,
 		},
 	)
+}
+
+func TestYAMLNullVnodeRemainsUnassigned(t *testing.T) {
+	c := configured()
+	require.NoError(t, yaml.Unmarshal([]byte("vnode: null\n"), c))
+	require.NoError(t, c.Init(context.Background()))
+	assert.Empty(t, c.Vnode)
 }

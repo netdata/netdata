@@ -1,15 +1,42 @@
 modules:
   - functions:
         description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live
-            activity and retained investigation history. Invoke their public rum-* names; filter by site where
-            supported.
+            activity and retained investigation history. Invoke their public rum-* names on the collecting Agent; use
+            vnode:storefront to select the exact configured vnode name, not its display hostname. Names use current
+            configuration even with disabled or no jobs; renamed or removed names stop resolving, and reused names select
+            their current GUID. Use vnode_guid for retained history by canonical GUID after removal. Omit both selectors
+            for all vnodes and unassigned data. Filters retain Agent-level access and do not provide per-site authorization.
         list:
           - id: rum-sites
             function_name: rum-sites
             name: RUM Sites
             description: Inspect site setup, sampling, receiver availability and recent activity to diagnose missing
                 browser data.
-            parameters: []
+            parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
+              - id: site
+                name: site
+                description: Filter by native site job name. Leave empty to include all sites.
+                type: string
+                required: false
+                default: ''
+                options: []
             returns:
                 description: One admitted site job. The response also includes collector public URL and ingress
                     availability.
@@ -120,6 +147,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Retained capacity-loss evidence; affected measurements are unavailable.
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads bounded local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -133,6 +164,23 @@ modules:
             description: Compare document-entry pages using recent observed traffic, Web Vital populations and
                 attributed elements.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -230,6 +278,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Retained capacity-loss evidence; affected measurements are unavailable.
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads bounded local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -243,6 +295,23 @@ modules:
             description: Read recent browser events for live activity views, optionally continuing from a previous
                 response.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -358,6 +427,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Increasing report revision within this metric or event identity.
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads bounded local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -371,6 +444,23 @@ modules:
             description: Investigate sampled sessions with retained observations received within a time range, including pages, errors and
                 optional interaction heuristics.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -478,6 +568,10 @@ modules:
                     type: timestamp
                     unit: ''
                     description: Last Selected Observation in Unix microseconds; default descending sort.
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -491,6 +585,23 @@ modules:
             description: Group errors originally received by the Agent in the selected range by fingerprint; select a
                 fingerprint to investigate affected sessions, pages and browsers.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -578,6 +689,10 @@ modules:
                     description: Stable row identity scoped to the site; the visible values remain available for
                         filtering.
                     visibility: hidden
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -591,6 +706,23 @@ modules:
             description: Read the retained event timeline for a session to follow navigation, errors and traced
                 requests.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -656,6 +788,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Increasing report revision within this metric or event identity.
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -686,7 +822,7 @@ modules:
     metrics:
         availability: []
         description: |
-            All charts remain on this Agent. Native job identity scopes site charts; display_name is optional metadata.
+            Charts belong to the configured vnode, or to this Agent when vnode is omitted. Native job identity scopes site charts; display_name is optional metadata.
             The window uses receiver arrival time. Each Web Vital contributes its latest report per document experience;
             percentiles cannot be averaged across times or groups. Population charts show retained observations and ratings.
             No observations means no percentile. Capacity loss makes affected percentiles and counts unavailable; lost_reports
@@ -1465,13 +1601,15 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
-                    description: Native charts, session timelines and errors, with country-only location and frustration
+                    description: Define the `storefront` vnode first, or omit `vnode` to use the collecting Agent. Native charts, session timelines and errors use country-only location with frustration
                         heuristics disabled. No OTLP receiver is required.
                     name: Website
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
                             investigate:
                               sample_rate: 0
@@ -1481,6 +1619,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
                             investigate:
                               sample_rate: 0
@@ -1491,6 +1630,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
                             event_logs:
                               enabled: true
@@ -1501,6 +1641,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
                             tracing:
                               enabled: true
@@ -1733,6 +1874,13 @@ modules:
                     description: Replacement text for matching path segments. Leave empty to remove them.
                     group: Normalization
                     name: redact_paths[].replace
+                    required: false
+                  - default_value: ""
+                    description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+                    detailed_description: Define a static vnode through `dem:vnode` or a YAML file in the Netdata configuration directory’s `vnodes/` directory. Enter its reference name, not its GUID. Leave empty to keep charts on the collecting Agent.
+                      A different resolved GUID starts a fresh rolling measurement window and Pages view. Saved and buffered investigation records keep their original GUID; hostname or label edits do not reset measurements. Job-wide transport and history counters continue.
+                    group: Virtual Node
+                    name: vnode
                     required: false
         prerequisites:
             list:
