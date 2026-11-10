@@ -49,7 +49,7 @@ static void gorilla_data_word_store(uint32_t *word, uint32_t value)
 
 // Writes the low `nbits` bits of `v` (up to 39 bits, no bits set above them) at bit
 // position `pos`, LSB-first. Bits at and above `pos` are zero in the target words:
-// every word is first entered by a plain store of a value with zeros above it.
+// every word is first entered by a (relaxed atomic) store of a value with zeros above it.
 // Only the writer thread stores data words, so no read-modify-write is needed.
 static void bit_buffer_write(uint32_t *buf, uint32_t pos, uint64_t v, uint32_t nbits)
 {
@@ -158,7 +158,7 @@ extern "C" {
 
         // Single writer: only this thread modifies nbits, entries and the data words.
         // Readers acquire-load entries, then nbits, so publishing nbits before
-        // entries with plain release stores is enough; no locked RMW is needed.
+        // entries with release stores is enough; no locked RMW is needed.
         const uint32_t nbits = __atomic_load_n(&hdr->nbits, __ATOMIC_RELAXED);
         const uint32_t entries = __atomic_load_n(&hdr->entries, __ATOMIC_RELAXED);
 

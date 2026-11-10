@@ -52,7 +52,7 @@ typedef struct {
 } gorilla_reader_t;
 
 // A writer has a single writer thread: gorilla_writer_write() and
-// gorilla_writer_add_buffer() publish with plain release stores, not atomic
+// gorilla_writer_add_buffer() publish with release stores, not atomic
 // read-modify-writes. Readers may run concurrently from other threads.
 gorilla_writer_t gorilla_writer_init(gorilla_buffer_t *gbuf, size_t n);
 void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, size_t n);
