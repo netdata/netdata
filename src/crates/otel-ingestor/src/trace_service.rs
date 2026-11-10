@@ -15,7 +15,7 @@
 //! Traces are currently **unpartitioned**: [`partition_spans`] routes every
 //! span to the logs-convention *unattributed* stream — the exact stream the
 //! per-service scheme produces for spans with no `service.namespace`/
-//! `service.name` (`part_key = 0`, `content_meta` = the version-tagged empty
+//! `service.name` (`partition_key = 0`, `content_meta` = the version-tagged empty
 //! `ServiceStream` blob). That function is the single seam a future switch
 //! to per-service partitioning replaces (extract the stream per resource,
 //! group, encode-or-drop, collision-check — the logs service is the working
@@ -82,9 +82,9 @@ enum Payload {
 /// WAL write: the substrate's opaque partition key, the stream's encoded
 /// `content_meta` blob, and the spans. [`Self::flatten`] turns `payload` from
 /// spans into a frame, and [`Self::write_to`] appends that frame under
-/// `part_key` and `content_meta`.
+/// `partition_key` and `content_meta`.
 struct StorableSpans {
-    part_key: u64,
+    partition_key: u64,
     content_meta: Vec<u8>,
     payload: Payload,
 }
@@ -146,7 +146,7 @@ impl StorableSpans {
         let ingestion_ns = clock.lock().unwrap().now_ns();
         writer
             .write_frame(
-                self.part_key,
+                self.partition_key,
                 &self.content_meta,
                 &frame.data,
                 wal::FrameMeta {
@@ -183,7 +183,7 @@ struct Flattened {
 ///
 /// Today: unpartitioned — the whole request becomes ONE group on the
 /// *unattributed* stream, reusing the logs identity convention
-/// (`ServiceStream` `("", "")` → `part_key` `0`, version-tagged empty-fields
+/// (`ServiceStream` `("", "")` → `partition_key` `0`, version-tagged empty-fields
 /// `content_meta`). This is deliberately the stream the per-service scheme
 /// assigns to spans without service identity, so flipping this seam later
 /// re-interprets nothing: existing files simply ARE the unattributed stream.
@@ -198,7 +198,7 @@ fn partition_spans(request: ExportTraceServiceRequest) -> Vec<StorableSpans> {
     let content_meta = otel_logs_identity::encode_content_meta(&unattributed)
         .expect("the empty identity always encodes (version byte + two zero lengths)");
     vec![StorableSpans {
-        part_key: otel_logs_identity::part_key(&unattributed),
+        partition_key: otel_logs_identity::part_key(&unattributed),
         content_meta,
         payload: Payload::Spans(request),
     }]
@@ -915,9 +915,9 @@ mod tests {
         let groups = partition_spans(req);
         assert_eq!(groups.len(), 1, "unpartitioned: exactly one group");
         let g = &groups[0];
-        // The logs identity convention for "no service attribution": part_key 0
+        // The logs identity convention for "no service attribution": partition_key 0
         // and a decodable version-tagged empty-fields blob — NOT an empty blob.
-        assert_eq!(g.part_key, 0);
+        assert_eq!(g.partition_key, 0);
         assert_eq!(
             otel_logs_identity::decode_content_meta(&g.content_meta),
             Some(ServiceStream::new("", "")),

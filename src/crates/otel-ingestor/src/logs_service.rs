@@ -96,10 +96,10 @@ impl ResourceLogsExt for ResourceLogs {
 /// identity that already holds its `ns_hash`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Collision {
-    hash: u64,
+    partition_key: u64,
     holder: ServiceStream,
     rejected: ServiceStream,
-    rejected_log_records: usize,
+    log_records: usize,
 }
 
 /// One group of `ResourceLogs` that share an exact `ServiceStream`. The
@@ -153,11 +153,11 @@ enum Payload {
 /// One stream's share of an export request, from "accepted for storage" to
 /// the WAL write. [`Self::admit`] builds it once the stream's identity is
 /// known to be storable and its `ns_hash` is claimed, so it always carries
-/// the stream's `part_key` (that hash) and its encoded `content_meta` blob.
+/// the stream's `partition_key` (that hash) and its encoded `content_meta` blob.
 /// [`Self::flatten`] turns `payload` from records into a frame, and
-/// [`Self::write_to`] appends that frame under `part_key` and `content_meta`.
+/// [`Self::write_to`] appends that frame under `partition_key` and `content_meta`.
 struct StorableStream {
-    part_key: u64,
+    partition_key: u64,
     content_meta: Vec<u8>,
     payload: Payload,
 }
@@ -168,7 +168,7 @@ impl StorableStream {
     /// that passed both checks.
     ///
     /// Identity comes first: a stream whose identity cannot be stored must
-    /// not claim a `part_key` it can never write to (see
+    /// not claim a `partition_key` it can never write to (see
     /// [`encode_identity_or_drop`]). The claim then locks the claimed
     /// streams for one lookup: the identity is encoded before it and a
     /// collision is logged after it.
@@ -180,25 +180,25 @@ impl StorableStream {
     ) -> Result<Self, Rejection> {
         let content_meta = encode_identity_or_drop(&stream, group.log_record_count)
             .map_err(Rejection::Oversized)?;
-        let part_key = otel_logs_identity::part_key(&stream);
+        let partition_key = otel_logs_identity::part_key(&stream);
 
-        if let Err(holder) = claimed_streams.claim(tenant_id, part_key, &stream) {
+        if let Err(holder) = claimed_streams.claim(tenant_id, partition_key, &stream) {
             tracing::warn!(
                 tenant = %tenant_id,
-                hash = part_key,
+                hash = partition_key,
                 "ns_hash collision: rejecting {} log records",
                 group.log_record_count,
             );
             return Err(Rejection::Collision(Collision {
-                hash: part_key,
+                partition_key,
                 holder,
                 rejected: stream,
-                rejected_log_records: group.log_record_count,
+                log_records: group.log_record_count,
             }));
         }
 
         Ok(Self {
-            part_key,
+            partition_key,
             content_meta,
             payload: Payload::Records(group.resource_logs),
         })
@@ -259,7 +259,7 @@ impl StorableStream {
         let ingestion_ns = clock.lock().unwrap().now_ns();
         writer
             .write_frame(
-                self.part_key,
+                self.partition_key,
                 &self.content_meta,
                 &frame.data,
                 wal::FrameMeta {
@@ -306,7 +306,7 @@ struct ClaimedStreams {
 }
 
 impl ClaimedStreams {
-    /// Claim `part_key` (the stream's `ns_hash`) for `stream`.
+    /// Claim `partition_key` (the stream's `ns_hash`) for `stream`.
     ///
     /// - Nobody holds the hash yet: `stream` becomes its holder.
     /// - `stream` is the holder: nothing to do.
@@ -314,14 +314,14 @@ impl ClaimedStreams {
     fn claim(
         &self,
         tenant_id: &TenantId,
-        part_key: u64,
+        partition_key: u64,
         stream: &ServiceStream,
     ) -> Result<(), ServiceStream> {
         match self
             .by_hash
             .lock()
             .unwrap()
-            .entry((tenant_id.clone(), part_key))
+            .entry((tenant_id.clone(), partition_key))
         {
             Entry::Vacant(e) => {
                 e.insert(stream.clone());
@@ -337,18 +337,19 @@ impl ClaimedStreams {
 #[derive(Debug)]
 enum Rejection {
     /// Its identity is too large to store.
-    Oversized(OversizedDrop),
+    Oversized(OversizedIdentity),
     /// Its `ns_hash` is held by a different identity.
     Collision(Collision),
 }
 
-/// One frame dropped because its stream identity could not be encoded into the
+/// A stream identity too large to store: it could not be encoded into the
 /// substrate's `content_meta` budget (the codec's per-field `u16` cap or the
-/// WAL header budget). Reported to the OTLP client via `partial_success`, the
-/// same as a collision — so a sender learns its records were not stored.
+/// WAL header budget), so the stream's frame is dropped. Reported to the OTLP
+/// client via `partial_success`, the same as a collision — so a sender learns
+/// its records were not stored.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct OversizedDrop {
-    part_key: u64,
+struct OversizedIdentity {
+    partition_key: u64,
     namespace_len: usize,
     name_len: usize,
     /// Bounded previews (≤ `IDENTITY_LOG_PREVIEW_CHARS`) so the client message
@@ -358,17 +359,17 @@ struct OversizedDrop {
     name_preview: String,
     /// Total log records dropped for this stream — the sum across every
     /// `ResourceLogs` in the request whose identity collapsed to this
-    /// `part_key` (one drop covers the whole group, like a collision). OTLP's
+    /// `partition_key` (one drop covers the whole group, like a collision). OTLP's
     /// `rejected_log_records` is a request-wide sum, so this is the right unit.
     log_records: usize,
 }
 
-impl OversizedDrop {
-    /// The drop of `stream`'s `log_records` records, with bounded previews of
-    /// its identity.
+impl OversizedIdentity {
+    /// `stream`'s oversized identity, with bounded previews of it and the
+    /// `log_records` records dropped with it.
     fn new(stream: &ServiceStream, log_records: usize) -> Self {
         Self {
-            part_key: otel_logs_identity::part_key(stream),
+            partition_key: otel_logs_identity::part_key(stream),
             namespace_len: stream.namespace.len(),
             name_len: stream.name.len(),
             namespace_preview: identity_preview(&stream.namespace),
@@ -385,7 +386,7 @@ struct Rejections {
     /// Streams whose `ns_hash` a different identity already holds.
     collisions: Vec<Collision>,
     /// Streams whose identity is too large to store.
-    oversized: Vec<OversizedDrop>,
+    oversized: Vec<OversizedIdentity>,
     /// Records whose timestamp is outside the ingestion window.
     out_of_window: usize,
 }
@@ -394,14 +395,14 @@ impl Rejections {
     /// Record a stream turned away at admission.
     fn push(&mut self, rejection: Rejection) {
         match rejection {
-            Rejection::Oversized(drop) => self.oversized.push(drop),
+            Rejection::Oversized(oversized) => self.oversized.push(oversized),
             Rejection::Collision(collision) => self.collisions.push(collision),
         }
     }
 
     /// The records lost, across all three rejection classes.
     fn count(&self) -> usize {
-        let collided: usize = self.collisions.iter().map(|c| c.rejected_log_records).sum();
+        let collided: usize = self.collisions.iter().map(|c| c.log_records).sum();
         let unstorable: usize = self.oversized.iter().map(|o| o.log_records).sum();
         collided + unstorable + self.out_of_window
     }
@@ -440,12 +441,12 @@ impl Rejections {
                 .map(|c| {
                     format!(
                         "ns_hash={:#x}: rejected ({}/{}) collides with canonical ({}/{}) ({} log records dropped)",
-                        c.hash,
+                        c.partition_key,
                         show(&c.rejected.namespace),
                         show(&c.rejected.name),
                         show(&c.holder.namespace),
                         show(&c.holder.name),
-                        c.rejected_log_records,
+                        c.log_records,
                     )
                 })
                 .collect();
@@ -464,7 +465,7 @@ impl Rejections {
                 .map(|o| {
                     format!(
                         "part_key={:#x}: identity too large (namespace={:?} len={}, name={:?} len={}) ({} log records dropped)",
-                        o.part_key,
+                        o.partition_key,
                         o.namespace_preview,
                         o.namespace_len,
                         o.name_preview,
@@ -494,7 +495,7 @@ impl Rejections {
 }
 
 /// Max chars of an attacker-controlled identity field to echo into an
-/// oversized-drop log line or the client's `partial_success` message.
+/// oversized-identity log line or the client's `partial_success` message.
 /// `service.namespace`/`service.name` arrive straight from OTLP resource
 /// attributes with no length guarantee; cap the preview so a pathological
 /// identity can't inflate log volume.
@@ -511,39 +512,39 @@ fn identity_preview(s: &str) -> String {
 /// (`wal::MAX_CONTENT_META_BYTES`). Both are attacker-reachable via OTLP
 /// resource attributes.
 ///
-/// Returns the encoded blob, or an [`OversizedDrop`] (after logging a bounded
+/// Returns the encoded blob, or an [`OversizedIdentity`] (after logging a bounded
 /// preview) when the identity is unstorable. Callers validate up front, before
-/// the stream claims its `part_key`, so an unstorable identity
+/// the stream claims its `partition_key`, so an unstorable identity
 /// never occupies a slot it can't write to and the offending strings are freed
 /// immediately rather than held for the batch.
 fn encode_identity_or_drop(
     stream: &ServiceStream,
     log_records: usize,
-) -> Result<Vec<u8>, OversizedDrop> {
+) -> Result<Vec<u8>, OversizedIdentity> {
     let Some(content_meta) = otel_logs_identity::encode_content_meta(stream) else {
-        let drop = OversizedDrop::new(stream, log_records);
+        let oversized = OversizedIdentity::new(stream, log_records);
         tracing::error!(
-            namespace_len = drop.namespace_len,
-            name_len = drop.name_len,
-            namespace_preview = %drop.namespace_preview,
-            name_preview = %drop.name_preview,
+            namespace_len = oversized.namespace_len,
+            name_len = oversized.name_len,
+            namespace_preview = %oversized.namespace_preview,
+            name_preview = %oversized.name_preview,
             "stream identity too large to encode into content_meta; dropping frame"
         );
-        return Err(drop);
+        return Err(oversized);
     };
 
     if content_meta.len() > wal::MAX_CONTENT_META_BYTES {
-        let drop = OversizedDrop::new(stream, log_records);
+        let oversized = OversizedIdentity::new(stream, log_records);
         tracing::error!(
-            namespace_len = drop.namespace_len,
-            name_len = drop.name_len,
-            namespace_preview = %drop.namespace_preview,
-            name_preview = %drop.name_preview,
+            namespace_len = oversized.namespace_len,
+            name_len = oversized.name_len,
+            namespace_preview = %oversized.namespace_preview,
+            name_preview = %oversized.name_preview,
             content_meta_len = content_meta.len(),
             max = wal::MAX_CONTENT_META_BYTES,
             "stream identity exceeds the WAL content_meta budget; dropping frame"
         );
-        return Err(drop);
+        return Err(oversized);
     }
 
     Ok(content_meta)
@@ -1037,7 +1038,7 @@ mod tests {
         )
         .unwrap();
         let by_hash = claimed_streams.by_hash.lock().unwrap();
-        let stream = by_hash.get(&(tenant(), admitted.part_key)).unwrap();
+        let stream = by_hash.get(&(tenant(), admitted.partition_key)).unwrap();
         assert_eq!(stream, &ServiceStream::new("prod", "api"));
     }
 
@@ -1085,10 +1086,10 @@ mod tests {
         else {
             panic!("a stream whose hash another identity holds must collide");
         };
-        assert_eq!(c.hash, hash);
+        assert_eq!(c.partition_key, hash);
         assert_eq!(c.holder, holder);
         assert_eq!(c.rejected, rejected);
-        assert_eq!(c.rejected_log_records, 12);
+        assert_eq!(c.log_records, 12);
         // The original holder must remain unchanged.
         assert_eq!(
             claimed_streams
@@ -1114,7 +1115,7 @@ mod tests {
         // tenant id is part of the claimed-streams key.
         let admitted_t2 =
             admit_stream_of(&claimed_streams, &t2, rl(Some("prod"), Some("api"), 1)).unwrap();
-        assert_eq!(admitted_t1.part_key, admitted_t2.part_key);
+        assert_eq!(admitted_t1.partition_key, admitted_t2.partition_key);
         assert_eq!(claimed_streams.by_hash.lock().unwrap().len(), 2);
     }
 
@@ -1415,7 +1416,7 @@ mod tests {
             partial.error_message
         );
 
-        // The writer keys a WAL file per `part_key`, so exactly one file must
+        // The writer keys a WAL file per `partition_key`, so exactly one file must
         // exist: the well-formed stream's. The oversized stream was dropped
         // before `write_frame` and produced no file.
         let tenant_dir = wal_dir.join("default");
@@ -1431,7 +1432,7 @@ mod tests {
         );
 
         // The oversized identity is unstorable, so it must NOT have claimed a
-        // `part_key` (validated before the claim). Only the well-formed
+        // `partition_key` (validated before the claim). Only the well-formed
         // stream holds one — otherwise a later valid stream colliding on that
         // hash would be rejected against a phantom.
         let by_hash = service.claimed_streams.by_hash.lock().unwrap();
@@ -1492,16 +1493,16 @@ mod tests {
     fn error_message_describes_each_collision() {
         let collisions = vec![
             Collision {
-                hash: 0x1,
+                partition_key: 0x1,
                 holder: ServiceStream::new("prod", "api"),
                 rejected: ServiceStream::new("staging", "api"),
-                rejected_log_records: 3,
+                log_records: 3,
             },
             Collision {
-                hash: 0x2,
+                partition_key: 0x2,
                 holder: ServiceStream::new("", "worker"),
                 rejected: ServiceStream::new("dev", "worker"),
-                rejected_log_records: 1,
+                log_records: 1,
             },
         ];
         let msg = Rejections {
@@ -1519,8 +1520,8 @@ mod tests {
 
     #[test]
     fn error_message_describes_oversized_drops() {
-        let oversized = vec![OversizedDrop {
-            part_key: 0xabc,
+        let oversized = vec![OversizedIdentity {
+            partition_key: 0xabc,
             namespace_len: 2048,
             name_len: 4,
             namespace_preview: "prod-namespace".to_string(),
@@ -1543,13 +1544,13 @@ mod tests {
     #[test]
     fn partial_success_totals_combine_collision_oversized_and_out_of_window() {
         let collisions = vec![Collision {
-            hash: 0x1,
+            partition_key: 0x1,
             holder: ServiceStream::new("prod", "api"),
             rejected: ServiceStream::new("staging", "api"),
-            rejected_log_records: 3,
+            log_records: 3,
         }];
-        let oversized = vec![OversizedDrop {
-            part_key: 0xabc,
+        let oversized = vec![OversizedIdentity {
+            partition_key: 0xabc,
             namespace_len: 2048,
             name_len: 4,
             namespace_preview: "prod".to_string(),
