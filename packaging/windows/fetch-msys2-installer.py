@@ -29,15 +29,23 @@ PACKAGES: Final = (
     # The base's msys2-runtime 3.6.10 kills netdata at startup; 3.6.11 carries the upstream fixes it lacks.
     (f'{MSYS_REPO}/msys2-runtime-3.6.11-4-x86_64.pkg.tar.zst',
      '7b1c4b625483ceff9a87f2dfcf3659704dc3da655a0ad414ecb7d9175e7d3ba0'),
-    # Security updates for libraries netdata loads, and for the matching command line tools.
-    (f'{MSYS_REPO}/libopenssl-3.6.5-1-x86_64.pkg.tar.zst',
-     '05f6cc946f0dde3aecc3632007fa1d874e40720226117b750327bc2a01846325'),
-    (f'{MSYS_REPO}/openssl-3.6.5-1-x86_64.pkg.tar.zst',
-     '4dc7c1199010b26d6382c59d8b16a9dbc857d314d76d9668f0f333bc5fecdd38'),
-    (f'{MSYS_REPO}/libcurl-8.23.0-1-x86_64.pkg.tar.zst',
-     '3034aae7fb58e129c7af62a7e7d2ae12e0a3475a5310d7fdad38fe9a3c672c9d'),
-    (f'{MSYS_REPO}/curl-8.23.0-1-x86_64.pkg.tar.zst',
-     '6f21e0187e3f309199e01f729d415ccfeb304cc9f8a27365c8aa9c216351022e'),
+    # OpenSSL 4 (msys-crypto-4.dll, msys-ssl-4.dll), which msys2-dependencies.sh builds netdata against. It replaces
+    # the base's OpenSSL 3 DLLs, so every base package that loads them is pinned to its OpenSSL 4 rebuild as well.
+    (f'{MSYS_REPO}/libopenssl-4.1.0-1-x86_64.pkg.tar.zst',
+     '71f093de4a002913f39783b79d18da33b63ce8baf825434218cc1d8bd40304fb'),
+    (f'{MSYS_REPO}/openssl-4.1.0-1-x86_64.pkg.tar.zst',
+     'b108d0fe6ec296acdb5cc837d314f23a20f07ecd73d2a0e7c077446fd2d01df9'),
+    (f'{MSYS_REPO}/libcurl-8.23.0-2-x86_64.pkg.tar.zst',
+     '84095312cbe4155c7d2c6d067bb552ea3ec2b693fc9802a01e7320e28946ba59'),
+    (f'{MSYS_REPO}/curl-8.23.0-2-x86_64.pkg.tar.zst',
+     'cbfbef860ad01a30c7f52b40a12bc2c64e731280ace77efcfa333bfe40a48b2c'),
+    (f'{MSYS_REPO}/libngtcp2-1.26.0-2-x86_64.pkg.tar.zst',
+     'a36645aad55fc2a43ad0c121a91957648a01cbe4006f690338cd9ce0c1987257'),
+    (f'{MSYS_REPO}/libssh2-1.11.1-2-x86_64.pkg.tar.zst',
+     '23edc3dea95daac38e58039256aa6923dcd5cc96313f9b062cd60792881367fa'),
+    (f'{MSYS_REPO}/bsdtar-3.8.11-2-x86_64.pkg.tar.zst',
+     '84b582de0005ff01c9d95347162ea551169c3fb8fd572d341ac4589b4b3cbbb8'),
+    # Security updates for other libraries netdata loads.
     (f'{MSYS_REPO}/brotli-1.2.1-1-x86_64.pkg.tar.zst',
      '0cfd703cbe467c6b645444c5d1ec03f423dcaca241bb99b5baab61d70447cefd'),
     (f'{MSYS_REPO}/libpcre2_8-10.49-1-x86_64.pkg.tar.zst',

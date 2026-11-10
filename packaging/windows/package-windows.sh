@@ -99,6 +99,27 @@ HOOK
     pacman -Qkk "${pacman_root[@]}" "${!pinned[@]}"
 }
 
+# netdata is built against the newest MSYS2 packages while the base is a snapshot, so a library that changes its DLL
+# name upstream (OpenSSL 3 -> 4) leaves the MSI without a DLL it needs, or strands base tools on the old name.
+# Fail the build when an MSYS DLL that a shipped executable or DLL imports is not in the tree.
+check_msys_dll_imports() {
+    local root=/opt/netdata dll file missing=0
+
+    command -v objdump > /dev/null || { echo "objdump is needed to check the MSYS DLL imports." >&2; exit 1; }
+
+    while IFS=$'\t' read -r dll file; do
+        if [ ! -e "${root}/usr/bin/${dll}" ]; then
+            echo "${file} imports ${dll}, which the MSI does not ship." >&2
+            missing=1
+        fi
+    done < <(find "${root}" -type f \( -iname '*.exe' -o -iname '*.dll' \) -print0 |
+                 { xargs -0 objdump -p 2> /dev/null || true; } |
+                 awk '/:[ \t]+file format / { file = $0; sub(/:[ \t]+file format .*/, "", file) }
+                      /DLL Name: msys-/ { print $3 "\t" file }' | sort -u)
+
+    [ "${missing}" -eq 0 ] || exit 1
+}
+
 ${GITHUB_ACTIONS+echo "::group::Copy Files"}
 # Upgrade the freshly unpacked base, and replace the package database a previous run left in /opt/netdata, so pacman
 # never sees two versions of a package.
@@ -109,6 +130,7 @@ rm -rf /opt/netdata/var/lib/pacman/local/
 cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
 cp "${repo_root}/packaging/windows/copy_files.ps1" /opt/netdata/usr/libexec/netdata/ || exit 1
 rm -rf /opt/netdata/msys64/
+check_msys_dll_imports
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Configure Editor"}
