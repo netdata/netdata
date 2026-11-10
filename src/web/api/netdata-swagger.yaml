@@ -6756,9 +6756,9 @@ paths:
         - name: bearer_protection
           in: query
           required: false
+          allowEmptyValue: true
           schema:
-            type: string
-            enum: ["on", "off", "true", "false", "yes", "no"]
+            $ref: "#/components/schemas/bearerProtectionValue"
           description: |
             **Whether to enable or disable bearer token authentication requirement.**
 
@@ -7813,9 +7813,9 @@ paths:
         - name: bearer_protection
           in: query
           required: false
+          allowEmptyValue: true
           schema:
-            type: string
-            enum: ["on", "off", "true", "false", "yes", "no"]
+            $ref: "#/components/schemas/bearerProtectionValue"
           description: Enable (`on`, `true`, `yes`) or disable (`off`, `false`, `no`) bearer protection, matched case-insensitively. Any other value returns HTTP 400 without changing the state; if omitted or empty, the state is not changed.
         - name: claim_id
           in: query
@@ -7839,6 +7839,16 @@ paths:
       responses:
         "200":
           description: Current bearer protection state, after applying the requested change if one was given
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bearer_protection:
+                    type: boolean
+                    description: Current bearer protection state after the operation (true = enabled, false = disabled)
+              example:
+                bearer_protection: true
         "400":
           description: Identity verification failed, or bearer_protection has a value other than on/off, true/false or yes/no (case-insensitive); the protection state is not changed
   /api/v2/bearer_get_token:
@@ -9611,6 +9621,10 @@ components:
           - anomaly-rate
           - value
   schemas:
+    bearerProtectionValue:
+      type: string
+      description: "`on`, `true` or `yes` enable; `off`, `false` or `no` disable; matched case-insensitively. Empty means no change."
+      pattern: '^(?:[oO][nN]|[oO][fF][fF]|[tT][rR][uU][eE]|[fF][aA][lL][sS][eE]|[yY][eE][sS]|[nN][oO])?$'
     info:
       type: object
       properties:
