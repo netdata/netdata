@@ -11,11 +11,18 @@
 //! `seq.rs` owns the durable seq allocator).
 //!
 //! Durability model: frame bytes are buffered per file and made durable only
-//! at the fsync points — after a rotation, in [`Writer::sync_all`] /
-//! [`Writer::shutdown_all`], and in the idle-rotation sweep
-//! ([`Writer::rotate_expired`]). A new file's directory entry is fsynced at
-//! creation (`file_registry::durable::fsync_dir`); its header bytes only at
-//! the file's first fsync.
+//! at the fsync points — after a rotation, in a sync ([`Writer::sync_all`],
+//! or its split form below) / [`Writer::shutdown_all`], and in the
+//! idle-rotation sweep ([`Writer::rotate_expired`]). A new file's directory
+//! entry is fsynced at creation (`file_registry::durable::fsync_dir`); its
+//! header bytes only at the file's first fsync.
+//!
+//! Split sync: an fsync waits on the disk, and a caller that serializes
+//! access with a lock does not want to hold it meanwhile. So a sync comes in
+//! three steps — [`Writer::begin_sync`] under the lock, the fsyncs of the
+//! [`SyncTicket`] without it, [`Writer::finish_sync`] under it again — and a
+//! [`WriteMark`] tells a caller whether a completed sync already covered the
+//! frames it wrote ([`Writer::is_durable`]).
 //!
 //! Events: every lifecycle step (created, synced, closed) is queued per
 //! stream and handed to the caller via [`Writer::take_all_events`]; the
@@ -41,7 +48,7 @@
 //! `file-lifecycle`, and this crate's own tests.
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{BufWriter, Write};
+use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -330,6 +337,58 @@ impl Stream {
         Ok(())
     }
 
+    /// A split sync's first half for this stream: flush the active file's
+    /// buffer and take a second handle to the file, with what is written to
+    /// it now. `None` without an active file.
+    fn begin_sync(&mut self) -> Result<Option<FileSync>> {
+        let Some(active) = &mut self.active else {
+            return Ok(None);
+        };
+
+        active.writer.flush()?;
+        let file = active.writer.get_ref().try_clone()?;
+
+        Ok(Some(FileSync {
+            partition_key: self.partition_key,
+            file_id: active.file_id,
+            file,
+            up_to: active.bytes_written,
+            entry_count: active.log_entry_count,
+            frame_count: active.frame_count,
+            min_timestamp_ns: active.min_timestamp_ns,
+            max_timestamp_ns: active.max_timestamp_ns,
+            result: None,
+        }))
+    }
+
+    /// A split sync's second half for this stream: record the prefix
+    /// `fsynced` made durable and queue its `Synced` event.
+    ///
+    /// Does nothing when the file was sealed meanwhile (a rotation fsyncs
+    /// the file before it seals it, and the `Closed` carries that prefix),
+    /// or when a sync that began later already recorded more, so the prefix
+    /// and the `Synced` events of a file never move backwards.
+    fn finish_sync(&mut self, fsynced: &FileSync) {
+        let Some(active) = &mut self.active else {
+            return;
+        };
+
+        if active.file_id != fsynced.file_id || fsynced.up_to < active.synced_up_to {
+            return;
+        }
+
+        active.synced_up_to = fsynced.up_to;
+        active.synced_entry_count = fsynced.entry_count;
+        self.pending_events.push(FileEvent::Synced {
+            file_id: fsynced.file_id,
+            valid_up_to: fsynced.up_to,
+            frame_count: fsynced.frame_count,
+            entry_count: fsynced.entry_count,
+            min_timestamp_ns: fsynced.min_timestamp_ns,
+            max_timestamp_ns: fsynced.max_timestamp_ns,
+        });
+    }
+
     fn shutdown(&mut self) -> Result<Vec<FileEvent>> {
         self.sync()?;
         self.close_active_file();
@@ -506,6 +565,82 @@ impl Config {
 }
 
 // ---------------------------------------------------------------------------
+// Split sync
+// ---------------------------------------------------------------------------
+
+/// A point in a writer's sequence of frames: every frame it had written
+/// when the mark was taken ([`Writer::write_mark`]). A caller that needs its
+/// frames durable takes one after writing them and asks
+/// [`Writer::is_durable`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct WriteMark(u64);
+
+/// One file of a [`SyncTicket`]: a second handle to the file, and the state
+/// of the file when the sync began.
+pub struct FileSync {
+    partition_key: u64,
+    file_id: FileId,
+    file: File,
+    /// What the file held when the sync began. Its `Synced` event reports
+    /// these, not what was written since.
+    up_to: ByteSize,
+    entry_count: u64,
+    frame_count: u64,
+    min_timestamp_ns: TimestampNs,
+    max_timestamp_ns: TimestampNs,
+    /// `None` until [`FileSync::fsync`] ran.
+    result: Option<io::Result<()>>,
+}
+
+impl FileSync {
+    /// fsync the file. Blocks on the disk and needs no lock.
+    pub fn fsync(mut self) -> Self {
+        self.result = Some(self.file.sync_all());
+        self
+    }
+}
+
+/// A sync split around the caller's lock: begun under it
+/// ([`Writer::begin_sync`]), fsynced without it, completed under it again
+/// ([`Writer::finish_sync`]).
+///
+/// [`SyncTicket::fsync`] runs the fsyncs one after the other. A caller that
+/// wants them to overlap takes the files out ([`SyncTicket::take_files`]),
+/// runs [`FileSync::fsync`] on each wherever it likes, and gives each one
+/// back ([`SyncTicket::give_back`]).
+pub struct SyncTicket {
+    files: Vec<FileSync>,
+    /// How many files the sync began with; one that never comes back fails
+    /// the sync.
+    file_count: usize,
+    /// The frames this sync makes durable when all of it succeeds.
+    mark: WriteMark,
+    /// The first file that could not be flushed or get a second handle.
+    error: Option<crate::Error>,
+}
+
+impl SyncTicket {
+    /// fsync every file of the ticket, one after the other. Blocks.
+    pub fn fsync(mut self) -> Self {
+        for file in self.take_files() {
+            self.give_back(file.fsync());
+        }
+
+        self
+    }
+
+    /// Take the files out of the ticket, to fsync them elsewhere.
+    pub fn take_files(&mut self) -> Vec<FileSync> {
+        std::mem::take(&mut self.files)
+    }
+
+    /// Give a file taken with [`take_files`](Self::take_files) back.
+    pub fn give_back(&mut self, file: FileSync) {
+        self.files.push(file);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Writer
 // ---------------------------------------------------------------------------
 
@@ -524,6 +659,10 @@ pub struct Writer {
     config: Config,
     seq: Arc<SeqAllocator>,
     streams: HashMap<u64, Stream>,
+    /// Frames written so far, and how many of them a completed sync covers
+    /// (see [`WriteMark`]).
+    frames_written: u64,
+    durable_frames: u64,
 }
 
 impl Writer {
@@ -565,6 +704,8 @@ impl Writer {
             config,
             seq,
             streams: HashMap::new(),
+            frames_written: 0,
+            durable_frames: 0,
         })
     }
 
@@ -597,8 +738,13 @@ impl Writer {
                 crate::format::MAX_CONTENT_META_BYTES
             )));
         }
-        self.get_or_create(partition_key, content_meta)
-            .write_frame(data, meta)
+        let frame_offset = self
+            .get_or_create(partition_key, content_meta)
+            .write_frame(data, meta)?;
+
+        self.frames_written += 1;
+
+        Ok(frame_offset)
     }
 
     /// Get or lazily create the writer for `partition_key`. On first use the
@@ -634,10 +780,87 @@ impl Writer {
     /// Flush and fsync every stream with an active file, queuing a `Synced`
     /// event for each — including streams that saw no new bytes since their
     /// last sync (the event re-reports the accumulated state).
+    ///
+    /// Every stream is attempted: a `Synced` is queued for each one whose
+    /// own fsync succeeded, and the first error is returned. The whole of a
+    /// split sync in one call, so it blocks on the disk for as long as the
+    /// caller holds the writer.
     pub fn sync_all(&mut self) -> Result<()> {
+        let ticket = self.begin_sync().fsync();
+        self.finish_sync(ticket)
+    }
+
+    /// The frames written so far.
+    pub fn write_mark(&self) -> WriteMark {
+        WriteMark(self.frames_written)
+    }
+
+    /// Whether a completed sync covers every frame of `mark`.
+    pub fn is_durable(&self, mark: WriteMark) -> bool {
+        self.durable_frames >= mark.0
+    }
+
+    /// First step of a split sync, under the caller's lock: flush every
+    /// active file's buffer and note what is written. The ticket's fsyncs
+    /// then run without the lock, and [`finish_sync`](Self::finish_sync)
+    /// completes the sync.
+    pub fn begin_sync(&mut self) -> SyncTicket {
+        let mut files = Vec::with_capacity(self.streams.len());
+        let mut error = None;
+
         for stream in self.streams.values_mut() {
-            stream.sync()?;
+            match stream.begin_sync() {
+                Ok(Some(file)) => files.push(file),
+                Ok(None) => {}
+                Err(e) => {
+                    error.get_or_insert(e);
+                }
+            }
         }
+
+        SyncTicket {
+            file_count: files.len(),
+            files,
+            mark: self.write_mark(),
+            error,
+        }
+    }
+
+    /// Last step of a split sync, under the caller's lock again: queue a
+    /// `Synced` for every file whose fsync succeeded, and return the first
+    /// error. Only a sync without any error makes its [`WriteMark`] durable:
+    /// a frame can sit in any of the files.
+    pub fn finish_sync(&mut self, ticket: SyncTicket) -> Result<()> {
+        let mut first_error = ticket.error;
+
+        if ticket.files.len() != ticket.file_count {
+            first_error
+                .get_or_insert_with(|| io::Error::other("a WAL file's fsync was lost").into());
+        }
+
+        for mut file in ticket.files {
+            match file.result.take() {
+                Some(Ok(())) => {
+                    if let Some(stream) = self.streams.get_mut(&file.partition_key) {
+                        stream.finish_sync(&file);
+                    }
+                }
+                Some(Err(e)) => {
+                    first_error.get_or_insert(e.into());
+                }
+                None => {
+                    first_error.get_or_insert_with(|| {
+                        io::Error::other("a WAL file was not fsynced").into()
+                    });
+                }
+            }
+        }
+
+        if let Some(e) = first_error {
+            return Err(e);
+        }
+        self.durable_frames = self.durable_frames.max(ticket.mark.0);
+
         Ok(())
     }
 
@@ -1103,5 +1326,204 @@ mod tests {
         seqs.sort();
         // Sequences must be distinct (1, 2) — not both 1.
         assert_eq!(seqs, vec![1, 2]);
+    }
+
+    // --- split sync: write_mark / is_durable / begin_sync / finish_sync ---
+
+    fn write_one(writer: &mut Writer, label: u64, payload: &[u8], ingestion_ns: u64) {
+        writer
+            .write_frame(
+                pk(label),
+                &[],
+                payload,
+                crate::FrameMeta {
+                    entry_count: 1,
+                    ingestion_ns: TimestampNs(ingestion_ns),
+                    log_ts_range: None,
+                },
+            )
+            .unwrap();
+    }
+
+    /// `(partition_key, valid_up_to)` of every `Synced` in `events`, sorted.
+    fn synced_of(events: &[FileEvent]) -> Vec<(u64, ByteSize)> {
+        let mut synced = Vec::new();
+        for event in events {
+            if let FileEvent::Synced {
+                file_id,
+                valid_up_to,
+                ..
+            } = event
+            {
+                synced.push((file_id.partition_key, *valid_up_to));
+            }
+        }
+        synced.sort();
+        synced
+    }
+
+    #[test]
+    fn a_sync_makes_the_frames_written_before_it_durable() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        assert!(writer.is_durable(writer.write_mark()), "nothing written");
+
+        write_one(&mut writer, 1, b"one", 1);
+        write_one(&mut writer, 2, b"two", 2);
+        let mark = writer.write_mark();
+        assert!(!writer.is_durable(mark), "nothing synced yet");
+
+        writer.sync_all().unwrap();
+        assert!(writer.is_durable(mark));
+        let synced = synced_of(&writer.take_all_events());
+        let mut expected = vec![pk(1), pk(2)];
+        expected.sort();
+        assert_eq!(synced.iter().map(|s| s.0).collect::<Vec<_>>(), expected);
+
+        // A frame written after the sync needs another one.
+        write_one(&mut writer, 2, b"more", 3);
+        let later = writer.write_mark();
+        assert!(writer.is_durable(mark), "an older mark stays durable");
+        assert!(!writer.is_durable(later));
+
+        let ticket = writer.begin_sync().fsync();
+        writer.finish_sync(ticket).unwrap();
+        assert!(writer.is_durable(later));
+    }
+
+    #[test]
+    fn finish_sync_skips_a_file_sealed_meanwhile() {
+        // The sweep fsyncs and seals stream 1's file while the ticket is
+        // out, and the stream starts another file: the sealed file's
+        // `Closed` carries its prefix, so the sync adds no `Synced` for the
+        // stream, and the frames still become durable.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        let hour_ns: u64 = 3600 * 1_000_000_000;
+        write_one(&mut writer, 1, b"old", 1);
+        write_one(&mut writer, 2, b"new", hour_ns + 1);
+        writer.take_all_events();
+        let mark = writer.write_mark();
+
+        let ticket = writer.begin_sync();
+        assert_eq!(writer.rotate_expired(TimestampNs(hour_ns + 2)).unwrap(), 1);
+        let sealed = writer.take_all_events();
+        assert!(sealed.iter().any(|e| matches!(
+            e,
+            FileEvent::Closed { file_id, .. } if file_id.partition_key == pk(1)
+        )));
+        write_one(&mut writer, 1, b"next file", hour_ns + 3);
+        writer.take_all_events();
+
+        writer.finish_sync(ticket.fsync()).unwrap();
+        let synced = synced_of(&writer.take_all_events());
+        assert_eq!(synced.iter().map(|s| s.0).collect::<Vec<_>>(), vec![pk(2)]);
+        assert!(writer.is_durable(mark));
+    }
+
+    #[test]
+    fn finish_sync_never_moves_a_prefix_backwards() {
+        // Two syncs that finish out of order: the older one reports nothing.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        write_one(&mut writer, 1, b"first", 1);
+        let older = writer.begin_sync();
+        write_one(&mut writer, 1, b"second", 2);
+        let newer = writer.begin_sync();
+        let mark = writer.write_mark();
+        writer.take_all_events();
+
+        writer.finish_sync(newer.fsync()).unwrap();
+        let reported = synced_of(&writer.take_all_events());
+        assert_eq!(reported.len(), 1);
+
+        writer.finish_sync(older.fsync()).unwrap();
+        assert!(
+            synced_of(&writer.take_all_events()).is_empty(),
+            "an older prefix must not be reported after a newer one"
+        );
+        assert!(writer.is_durable(mark), "the newer sync stays recorded");
+
+        // The file's recorded prefix is still the newer one: a `Closed`
+        // reports it.
+        let closed = writer.shutdown_all().unwrap();
+        let sealed_up_to = closed.iter().find_map(|e| match e {
+            FileEvent::Closed { valid_up_to, .. } => Some(*valid_up_to),
+            _ => None,
+        });
+        assert_eq!(sealed_up_to, Some(reported[0].1));
+    }
+
+    #[test]
+    fn a_failed_fsync_fails_the_sync_and_the_other_files_are_still_reported() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        write_one(&mut writer, 1, b"one", 1);
+        write_one(&mut writer, 2, b"two", 2);
+        writer.take_all_events();
+        let mark = writer.write_mark();
+
+        // The crate has no seam to make an fsync fail, so the failure of
+        // stream 1's file is written into the ticket.
+        let mut ticket = writer.begin_sync();
+        for mut file in ticket.take_files() {
+            file = file.fsync();
+            if file.partition_key == pk(1) {
+                file.result = Some(Err(io::Error::other("injected")));
+            }
+            ticket.give_back(file);
+        }
+
+        let error = writer.finish_sync(ticket).unwrap_err();
+        assert!(error.to_string().contains("injected"), "{error}");
+        let synced = synced_of(&writer.take_all_events());
+        assert_eq!(synced.iter().map(|s| s.0).collect::<Vec<_>>(), vec![pk(2)]);
+        assert!(
+            !writer.is_durable(mark),
+            "a frame can sit in the file that failed"
+        );
+
+        // The next sync that succeeds covers the frames.
+        writer.sync_all().unwrap();
+        assert!(writer.is_durable(mark));
+        assert_eq!(synced_of(&writer.take_all_events()).len(), 2);
+    }
+
+    #[test]
+    fn a_file_missing_from_the_ticket_fails_the_sync() {
+        // A caller that fsyncs the files elsewhere and loses one (its task
+        // panicked, say) must not make the frames durable.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        write_one(&mut writer, 1, b"one", 1);
+        write_one(&mut writer, 2, b"two", 2);
+        writer.take_all_events();
+        let mark = writer.write_mark();
+
+        let mut ticket = writer.begin_sync();
+        let mut files = ticket.take_files();
+        drop(files.pop());
+        for file in files {
+            ticket.give_back(file.fsync());
+        }
+
+        assert!(writer.finish_sync(ticket).is_err());
+        assert_eq!(synced_of(&writer.take_all_events()).len(), 1);
+        assert!(!writer.is_durable(mark));
+    }
+
+    #[test]
+    fn a_file_that_was_not_fsynced_fails_the_sync() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        write_one(&mut writer, 1, b"one", 1);
+        writer.take_all_events();
+        let mark = writer.write_mark();
+
+        let ticket = writer.begin_sync();
+
+        assert!(writer.finish_sync(ticket).is_err());
+        assert!(synced_of(&writer.take_all_events()).is_empty());
+        assert!(!writer.is_durable(mark));
     }
 }
