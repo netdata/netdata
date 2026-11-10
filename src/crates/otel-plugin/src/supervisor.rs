@@ -14,7 +14,9 @@
 //! Lifecycle: resolve identity + config, spawn and handshake each worker,
 //! then one event loop ([`Supervisor::run`]) until the agent sends QUIT,
 //! stdin closes, or SIGINT/SIGTERM arrives — followed by IPC Shutdown with a
-//! bounded wait and a SIGKILL fallback (`ChildGuard`).
+//! bounded wait and a SIGKILL fallback (`ChildGuard`). A supervisor that is
+//! killed runs none of that: each worker then exits on its own, because the
+//! pipe it has as stdin closes (`crate::lifeline`).
 //!
 //! Failure model: ingestor and ledger failures are fatal to the plugin (the
 //! agent restarts the whole process); the legacy-logs viewer is best-effort
@@ -82,11 +84,26 @@ fn resolve_identity(value: Option<&str>, var_name: &str) -> anyhow::Result<Machi
 struct ChildGuard {
     child: tokio::process::Child,
     name: &'static str,
+    /// The write end of the worker's stdin, its lifeline (`crate::lifeline`).
+    /// Never written: it closes with this guard or with the supervisor
+    /// process, and the worker exits on the end-of-file.
+    ///
+    /// Taken out of `child` because `Child::wait` closes a stdin that is
+    /// still in there, which would end the worker at the first wait. A field
+    /// drops after `drop` below has run, so the SIGKILL decision there sees
+    /// the worker as it was.
+    _lifeline: Option<tokio::process::ChildStdin>,
 }
 
 impl ChildGuard {
-    fn new(child: tokio::process::Child, name: &'static str) -> Self {
-        Self { child, name }
+    fn new(mut child: tokio::process::Child, name: &'static str) -> Self {
+        let lifeline = child.stdin.take();
+
+        Self {
+            child,
+            name,
+            _lifeline: lifeline,
+        }
     }
 }
 
@@ -673,6 +690,11 @@ fn socket_dir() -> anyhow::Result<std::path::PathBuf> {
 /// [`WORKER_CONNECT_TIMEOUT`]. The child is wrapped in a [`ChildGuard`]
 /// immediately, so a failed or timed-out accept still kills it. Both sides
 /// cap messages at `otel_bridge::IPC_MAX_MESSAGE_SIZE`.
+///
+/// The worker's stdin is a pipe that only this process can write to, and
+/// never does: the worker's lifeline (`crate::lifeline`). std opens the pipe
+/// close-on-exec, so a worker spawned later does not inherit this one's
+/// write end and keep it open.
 async fn spawn_worker<S, R>(
     self_exe: &std::path::Path,
     sock: &SocketGuard,
@@ -690,8 +712,8 @@ where
     tracing::info!("spawning {name} socket={}", sock.path());
 
     let child = Command::new(self_exe)
-        .args(["worker", name, "--socket", sock.path()])
-        .stdin(Stdio::null())
+        .args(["worker", name, "--socket", sock.path(), "--lifeline"])
+        .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .spawn()

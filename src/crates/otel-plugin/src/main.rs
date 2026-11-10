@@ -9,6 +9,8 @@
 //!   loads `config`, and drives the three worker subprocesses.
 //! - `worker <kind>`: the supervisor's internal re-exec of this binary as the
 //!   ingestor, ledger, or legacy-logs worker (see `supervisor::spawn_worker`).
+//!   With `--lifeline` the worker exits when the supervisor is gone
+//!   (`lifeline`).
 //! - `logs`: the embedded `sfsq-cli` query over stored WAL/SFST files, for
 //!   operators inspecting logs without a running agent.
 //!
@@ -16,6 +18,7 @@
 //! `otel_ledger`, `otel_legacy_logs`); this crate owns only the entry point,
 //! the supervisor, and configuration loading.
 mod config;
+mod lifeline;
 mod supervisor;
 
 use anyhow::Context;
@@ -54,6 +57,14 @@ enum CliCommand {
     /// Run as a worker subprocess of this same executable; spawned by the
     /// supervisor's own re-exec, not an operator command.
     Worker {
+        /// Exit when stdin closes: the supervisor passes a pipe it never
+        /// writes, so end-of-file means the supervisor is gone (`lifeline`).
+        /// A flag, and not the rule, so that a worker started by hand with
+        /// no stdin does not exit at once. Global, so that it can follow the
+        /// worker's kind: tools find a worker by its `worker <kind>`
+        /// arguments.
+        #[arg(long, global = true)]
+        lifeline: bool,
         #[command(subcommand)]
         kind: WorkerKind,
     },
@@ -141,13 +152,20 @@ async fn main() {
             };
             std::process::exit(code);
         }
-        Some(CliCommand::Worker { kind }) => {
+        Some(CliCommand::Worker {
+            lifeline: has_lifeline,
+            kind,
+        }) => {
             let syslog_id = match &kind {
                 WorkerKind::Ingestor { .. } => "otel-plugin/ingestor",
                 WorkerKind::Ledger { .. } => "otel-plugin/ledger",
                 WorkerKind::LegacyLogs { .. } => "otel-plugin/legacy-logs",
             };
             netdata_plugin_rt::init_tracing_with_identifier(syslog_id);
+            if has_lifeline && let Err(e) = lifeline::exit_when_stdin_closes() {
+                tracing::error!("failed to watch the supervisor's lifeline: {e}");
+                std::process::exit(1);
+            }
             if let Err(e) = run_worker(kind).await {
                 tracing::error!("{e:#}");
                 std::process::exit(1);
@@ -218,6 +236,36 @@ mod tests {
     fn worker_subcommand_still_routes() {
         let cli = parse(&["otel-plugin", "worker", "ingestor", "--socket", "/s"]).unwrap();
         assert!(matches!(cli.command, Some(CliCommand::Worker { .. })));
+    }
+
+    // The argv `supervisor::spawn_worker` builds: the flag follows the kind.
+    #[test]
+    fn worker_lifeline_flag_follows_the_kind() {
+        let with = parse(&[
+            "otel-plugin",
+            "worker",
+            "ledger",
+            "--socket",
+            "/s",
+            "--lifeline",
+        ])
+        .unwrap();
+        assert!(matches!(
+            with.command,
+            Some(CliCommand::Worker {
+                lifeline: true,
+                kind: WorkerKind::Ledger { .. }
+            })
+        ));
+
+        let without = parse(&["otel-plugin", "worker", "ledger", "--socket", "/s"]).unwrap();
+        assert!(matches!(
+            without.command,
+            Some(CliCommand::Worker {
+                lifeline: false,
+                ..
+            })
+        ));
     }
 
     // `allow_hyphen_values` on since/until must survive the subcommand flatten.
