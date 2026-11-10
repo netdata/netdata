@@ -25,10 +25,9 @@ var thresholds = map[string][2]float64{
 	beacon.CLS:  {0.1, 0.25},
 }
 
-// pctStats computes percentiles only, no CWV rating (navigation timing has no good/needs_improvement/poor buckets).
+// pctStats consumes an owned read distribution; navigation timing has no CWV rating.
 func pctStats(vals []float64) VitalStats {
-	sorted := make([]float64, len(vals))
-	copy(sorted, vals)
+	sorted := vals
 	sort.Float64s(sorted)
 	return VitalStats{
 		N:   len(sorted),
@@ -38,9 +37,9 @@ func pctStats(vals []float64) VitalStats {
 	}
 }
 
+// stats consumes an owned read distribution without copying its values again.
 func stats(vital string, vals []float64) VitalStats {
-	sorted := make([]float64, len(vals))
-	copy(sorted, vals)
+	sorted := vals
 	sort.Float64s(sorted)
 	st := VitalStats{
 		N:   len(sorted),

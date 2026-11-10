@@ -9,29 +9,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
-// Lost is conservative retained capacity-loss evidence, not a denominator.
-// Percentiles are unavailable while Lost>0; N and ratings describe retained samples.
+// VitalStats describes the exact retained population. Percentiles are unavailable when N is zero.
 type VitalStats struct {
 	N                     int
 	P50, P75, P95         float64
 	Good, NeedsImpr, Poor int
-	Lost                  uint64
 }
 
 // Group contains current-window gauges. Other identifies the synthetic fold;
 // a literal value "other" remains a separate real group.
 type Group struct {
-	Value                                       string
-	Other                                       bool
-	Vitals                                      map[string]VitalStats
-	Pageviews, JSErrors, ApplicationViews, Lost uint64
+	Value                                 string
+	Other                                 bool
+	Vitals                                map[string]VitalStats
+	Pageviews, JSErrors, ApplicationViews uint64
 }
 type Snapshot struct {
 	Name, DisplayName                                          string
 	Vitals                                                     map[string]VitalStats
 	Counters                                                   map[string]uint64
 	ObservedSessions                                           int
-	SessionsLost, WindowLost                                   uint64
 	Breakdowns                                                 map[string][]Group
 	Load, DCL, API                                             VitalStats
 	ErrorGroups                                                []ErrorChartGroup
@@ -51,13 +48,11 @@ type population struct {
 	elements                               []elemSample
 }
 type windowRead struct {
-	global                                                    population
-	groups                                                    map[groupKey]*population
-	resourceGroups                                            map[hostKey]*resourcePopulation
-	errorGroups                                               map[errorKey]*errorPopulation
-	sessions                                                  int
-	windowLost, resourcesLost, sessionsLost, pageSessionsLost uint64
-	vitalLost                                                 map[string]uint64
+	global         population
+	groups         map[groupKey]*population
+	resourceGroups map[hostKey]*resourcePopulation
+	errorGroups    map[errorKey]*errorPopulation
+	sessions       int
 }
 
 func newPopulation() *population {
@@ -93,7 +88,8 @@ func attributePairs(v attributes, pageOnly bool) []groupKey {
 	}
 }
 
-// Page reads derive only the page facet; other materialization belongs to Snapshot.
+// readWindow captures owned values and counts under the aggregator mutex.
+// Its distributions can be sorted after unlocking. Page reads derive only the page facet.
 func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	cutoff := now.Add(-st.window)
 	st.expire(now)
@@ -102,21 +98,7 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 		groups:         map[groupKey]*population{},
 		resourceGroups: map[hostKey]*resourcePopulation{},
 		errorGroups:    map[errorKey]*errorPopulation{},
-		vitalLost:      map[string]uint64{},
 	}
-	r.windowLost = st.activityLoss.current(now) + st.currentIdentityLoss("document", now) + st.currentIdentityLoss("view", now)
-	r.resourcesLost = st.resourceLoss.current(now) + st.currentIdentityLoss("resource", now)
-	r.sessionsLost = st.sessionLoss.current(now) + st.identitySessionLoss.current(now)
-	r.pageSessionsLost = st.pageSessionLoss.current(now) + st.identitySessionLoss.current(now)
-	for name, loss := range st.vitalLoss {
-		r.vitalLost[name] = loss.current(now)
-	}
-	for _, name := range beacon.Vitals {
-		r.vitalLost[name] += st.currentIdentityLoss(name, now)
-	}
-	navigationLost := st.currentIdentityLoss("navigation", now)
-	r.vitalLost[navLoadName] += navigationLost
-	r.vitalLost[navDCLName] += navigationLost
 	for _, el := range st.observationOrder.entries {
 		v := el.Value.(*vitalObservation)
 		if v.received.Before(cutoff) {
@@ -180,15 +162,8 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	return r
 }
 
-func (st *siteState) currentIdentityLoss(kind string, now time.Time) uint64 {
-	if loss := st.identityLoss[kind]; loss != nil {
-		return loss.current(now)
-	}
-	return 0
-}
-
 // Expiry removes only expired heap roots. Each removal costs O(log retained).
-func (st *siteState) expire(now time.Time) {
+func (st *siteState) expireMeasurements(now time.Time) {
 	cutoff := now.Add(-st.window)
 	for el := st.observationOrder.oldest(); el != nil && el.Value.receivedAt().Before(cutoff); el = st.observationOrder.oldest() {
 		delete(st.observations, el.Value.(*vitalObservation).key)
@@ -203,6 +178,10 @@ func (st *siteState) expire(now time.Time) {
 	}
 	expireObservedSessions(st.sessions, &st.sessionOrder, cutoff)
 	expireObservedSessions(st.pageSessions, &st.pageSessionOrder, cutoff)
+}
+
+func (st *siteState) expire(now time.Time) {
+	st.expireMeasurements(now)
 	st.evictActivity(now)
 	st.evictSessions(now)
 }
@@ -220,21 +199,14 @@ func expireObservedSessions(index map[string]*receiptEntry, order *receiptHeap, 
 }
 func (a *Aggregator) Snapshot() Snapshot {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	st := &a.site
 	r := st.readWindow(a.now(), false)
+	cfg := st.cfg
 	snap := Snapshot{
-		Name:                   st.cfg.Name,
-		DisplayName:            st.cfg.DisplayName,
-		Vitals:                 r.vitals(&r.global),
+		Name:                   cfg.Name,
+		DisplayName:            cfg.DisplayName,
 		Counters:               map[string]uint64{},
 		ObservedSessions:       r.sessions,
-		SessionsLost:           r.sessionsLost,
-		WindowLost:             r.windowLost,
-		Breakdowns:             map[string][]Group{},
-		Load:                   measurementStats(navLoadName, r.global.values[navLoadName], r.vitalLost[navLoadName]),
-		DCL:                    measurementStats(navDCLName, r.global.values[navDCLName], r.vitalLost[navDCLName]),
-		API:                    measurementStats(apiName, r.global.values[apiName], r.resourcesLost),
 		ResourcesSeen:          st.resourcesSeen,
 		FirstPartyResources:    st.firstPartyResources,
 		ThirdPartyResources:    st.thirdPartyResources,
@@ -246,41 +218,39 @@ func (a *Aggregator) Snapshot() Snapshot {
 	for k, v := range st.counters {
 		snap.Counters[k] = v
 	}
+	a.mu.Unlock()
+
+	snap.Vitals = r.vitals(&r.global)
+	snap.Breakdowns = map[string][]Group{}
+	snap.Load = measurementStats(navLoadName, r.global.values[navLoadName])
+	snap.DCL = measurementStats(navDCLName, r.global.values[navDCLName])
+	snap.API = measurementStats(apiName, r.global.values[apiName])
 	for _, kind := range Kinds {
-		snap.Breakdowns[kind] = r.rank(kind, st.topN(kind))
+		snap.Breakdowns[kind] = r.rank(kind, cfg.topN(kind))
 	}
 	snap.ResourceHosts = r.rankResourceHosts()
 	snap.ErrorGroups = r.rankErrorGroups()
 	return snap
 }
-func measurementStats(name string, values []float64, lost uint64) VitalStats {
-	var out VitalStats
+func measurementStats(name string, values []float64) VitalStats {
 	if _, ok := thresholds[name]; ok {
-		out = stats(name, values)
-	} else {
-		out = pctStats(values)
+		return stats(name, values)
 	}
-	out.Lost = lost
-	if lost > 0 {
-		out.P50 = 0
-		out.P75 = 0
-		out.P95 = 0
-	}
-	return out
+	return pctStats(values)
 }
 func (r *windowRead) vitals(p *population) map[string]VitalStats {
 	out := make(map[string]VitalStats, len(beacon.Vitals))
 	for _, name := range beacon.Vitals {
-		out[name] = measurementStats(name, p.values[name], r.vitalLost[name])
+		out[name] = measurementStats(name, p.values[name])
 	}
 	return out
 }
-func (st *siteState) topN(kind string) int {
+func (cfg SiteCfg) topN(kind string) int {
 	switch kind {
 	case KindPage, KindView:
-		return st.cfg.PageGroups
+		return cfg.PageGroups
 	case KindCountry:
-		return st.cfg.Countries
+		return cfg.Countries
 	case KindBrowser:
 		return browserTopN
 	case KindVersion:
@@ -348,7 +318,6 @@ func (r *windowRead) emitGroup(key groupKey, p *population) Group {
 		Pageviews:        p.documents,
 		ApplicationViews: p.views,
 		JSErrors:         p.errors,
-		Lost:             r.windowLost,
 	}
 	if key.kind == KindView {
 		out.Vitals = nil

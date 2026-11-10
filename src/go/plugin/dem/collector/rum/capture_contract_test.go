@@ -171,7 +171,6 @@ func TestCaptureNormalizationThroughNativeHistory(t *testing.T) {
 	require.Len(t, pages, 1)
 	assert.Equal(t, page, pages[0].Page)
 	assert.Equal(t, 1, pages[0].Vitals[beacon.LCP].N)
-	assert.Zero(t, pages[0].Vitals[beacon.LCP].Lost)
 	assert.Equal(t, float64(4200), pages[0].Vitals[beacon.LCP].P75)
 	assert.Equal(t, "#account-:id", pages[0].LCPElement)
 	assert.False(t, pages[0].FrustrationsKnown)

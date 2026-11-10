@@ -12,7 +12,6 @@ type PageInfo struct {
 	Site, Page                              string
 	PageviewsWindow, Sessions, ErrorsWindow int
 	Vitals                                  map[string]VitalStats
-	Lost, SessionsLost                      uint64
 	LCPElement, INPElement, CLSElement      string
 	FrustrationWindow                       int
 	FrustrationsKnown                       bool
@@ -27,31 +26,31 @@ type elemSample struct {
 // by the canonical retained observations.
 func (a *Aggregator) Pages(vnodeGUID string) []PageInfo {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if vnodeGUID != "" && a.site.cfg.VnodeGUID != vnodeGUID {
+		a.mu.Unlock()
 		return nil
 	}
+	cfg := a.site.cfg
 	r := a.site.readWindow(a.now(), true)
+	a.mu.Unlock()
 	var out []PageInfo
 	for key, p := range r.groups {
 		if key.kind != KindPage {
 			continue
 		}
 		out = append(out, PageInfo{
-			Site:              a.site.cfg.Name,
-			VnodeGUID:         a.site.cfg.VnodeGUID,
+			Site:              cfg.Name,
+			VnodeGUID:         cfg.VnodeGUID,
 			Page:              key.value,
 			PageviewsWindow:   int(p.documents),
 			Sessions:          p.sessions,
 			ErrorsWindow:      int(p.errors),
 			Vitals:            r.vitals(p),
-			Lost:              r.windowLost,
-			SessionsLost:      r.pageSessionsLost,
 			LCPElement:        topElement(p.elements, beacon.LCP),
 			INPElement:        topElement(p.elements, beacon.INP),
 			CLSElement:        topElement(p.elements, beacon.CLS),
 			FrustrationWindow: int(p.frustrations),
-			FrustrationsKnown: a.site.cfg.FrustrationSignals,
+			FrustrationsKnown: cfg.FrustrationSignals,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Page < out[j].Page })

@@ -126,7 +126,7 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 			assert.EqualValues(t, 1, counters[aggregate.CounterJSErrors])
 			assert.EqualValues(t, tc.wantLogs, counters[aggregate.CounterOTLPSent])
 			assert.EqualValues(t, tc.wantSpans, counters[aggregate.CounterSpansSent])
-			for _, counter := range []string{aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors, aggregate.CounterHistoryDropped, aggregate.CounterSamplesDropped, aggregate.CounterInvalidMeasurements} {
+			for _, counter := range []string{aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors, aggregate.CounterHistoryDropped, aggregate.CounterInvalidMeasurements} {
 				assert.Zero(t, counters[counter], counter)
 			}
 			live, _ := a.Live(0, 10, "")

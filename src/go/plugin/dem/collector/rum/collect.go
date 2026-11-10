@@ -29,16 +29,10 @@ func (c *Collector) Collect(context.Context) error {
 	for _, counter := range c.metrics.traffic {
 		counter.instrument.ObserveTotal(float64(s.Counters[counter.name]))
 	}
-	c.metrics.windowLost.Observe(float64(s.WindowLost))
-	c.metrics.sessionsLost.Observe(float64(s.SessionsLost))
-	if s.SessionsLost == 0 {
-		c.metrics.observedSessions.Observe(float64(s.ObservedSessions))
-	}
-	if s.WindowLost == 0 {
-		c.metrics.windowDocumentViews.Observe(float64(s.PageviewsWindow))
-		c.metrics.windowApplicationViews.Observe(float64(s.ApplicationViewsWindow))
-		c.metrics.windowJSErrors.Observe(float64(s.JSErrorsWindow))
-	}
+	c.metrics.observedSessions.Observe(float64(s.ObservedSessions))
+	c.metrics.windowDocumentViews.Observe(float64(s.PageviewsWindow))
+	c.metrics.windowApplicationViews.Observe(float64(s.ApplicationViewsWindow))
+	c.metrics.windowJSErrors.Observe(float64(s.JSErrorsWindow))
 	// Publish an empty population as zero observations. It is ineligible for a
 	// quality alert, while its percentile remains unavailable.
 	for _, vital := range beacon.Vitals {
@@ -60,15 +54,12 @@ func (c *Collector) Collect(context.Context) error {
 				Value: g.Value,
 			}, bucketLabel(g.Other))
 			prefix := "breakdown_" + kind + "_"
-			gm.Gauge(prefix + "lost_reports").Observe(float64(g.Lost))
-			if g.Lost == 0 {
-				if kind != aggregate.KindView {
-					gm.Gauge(prefix + "document_views").Observe(float64(g.Pageviews))
-				}
-				gm.Gauge(prefix + "js_errors").Observe(float64(g.JSErrors))
-				if kind == aggregate.KindView {
-					gm.Gauge(prefix + "application_views").Observe(float64(g.ApplicationViews))
-				}
+			if kind != aggregate.KindView {
+				gm.Gauge(prefix + "document_views").Observe(float64(g.Pageviews))
+			}
+			gm.Gauge(prefix + "js_errors").Observe(float64(g.JSErrors))
+			if kind == aggregate.KindView {
+				gm.Gauge(prefix + "application_views").Observe(float64(g.ApplicationViews))
 			}
 			if kind == aggregate.KindView {
 				continue
@@ -77,8 +68,7 @@ func (c *Collector) Collect(context.Context) error {
 				st := g.Vitals[vital]
 				name := prefix + strings.ToLower(vital)
 				gm.Gauge(name + "_observations").Observe(float64(st.N))
-				gm.Gauge(name + "_lost_reports").Observe(float64(st.Lost))
-				if st.N > 0 && st.Lost == 0 {
+				if st.N > 0 {
 					gm.Gauge(name, metrix.WithFloat(true)).Observe(st.P75)
 				}
 			}
@@ -96,10 +86,7 @@ func (c *Collector) Collect(context.Context) error {
 			Key:   "message",
 			Value: string(msg),
 		}, bucketLabel(g.Other))
-		em.Gauge("error_group_lost_reports").Observe(float64(g.Lost))
-		if g.Lost == 0 {
-			em.Gauge("error_group_count").Observe(float64(g.Count))
-		}
+		em.Gauge("error_group_count").Observe(float64(g.Count))
 	}
 	if s.ResourcesSeen {
 		c.metrics.sameSiteResources.ObserveTotal(float64(s.FirstPartyResources))
@@ -114,13 +101,9 @@ func (c *Collector) Collect(context.Context) error {
 				Key:   "host",
 				Value: host.Host,
 			}, hostBucket)
-			hm.Gauge("resource_host_lost_reports").Observe(float64(host.Lost))
-			if host.Lost == 0 {
-				hm.Gauge("resource_host_count").Observe(float64(host.Count))
-			}
+			hm.Gauge("resource_host_count").Observe(float64(host.Count))
 			hm.Gauge("resource_host_observations").Observe(float64(host.Duration.N))
-			hm.Gauge("resource_host_duration_lost_reports").Observe(float64(host.Duration.Lost))
-			if host.Duration.N > 0 && host.Duration.Lost == 0 {
+			if host.Duration.N > 0 {
 				hm.Gauge("resource_host_p75", metrix.WithFloat(true)).Observe(host.Duration.P75)
 			}
 		}

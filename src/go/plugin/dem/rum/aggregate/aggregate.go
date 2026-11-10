@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package aggregate owns bounded, canonical receipt-window RUM measurements
+// Package aggregate owns exact canonical receipt-window RUM measurements
 // for one site. It replaces identified metric revisions, derives consistent
 // facets at read time, and keeps investigation detail independent of measurement.
 package aggregate
@@ -43,7 +43,6 @@ const (
 	CounterOTLPSent            = "otlp_sent"
 	CounterOTLPDropped         = "otlp_dropped"
 	CounterOTLPErrors          = "otlp_errors"
-	CounterSamplesDropped      = "samples_dropped"
 
 	// History writer counters: the rum.history chart's
 	// written/dropped dims. Fed by the history writer's own goroutine via
@@ -65,10 +64,9 @@ var frustrationCounters = map[string]string{
 }
 
 const (
-	maxWindowObservations = 10000
-	identityRetention     = 30 * time.Minute
-	browserTopN           = 20
-	unknownValue          = "unknown"
+	identityRetention = 30 * time.Minute
+	browserTopN       = 20
+	unknownValue      = "unknown"
 )
 
 // SiteCfg configures one job. VnodeGUID follows its resolved host; Name is the stable
@@ -114,7 +112,7 @@ type Aggregator struct {
 }
 
 // Measurement retention is independent of investigation sampling and detail LRU.
-// Bounds reuse the former sample/group budget, now once per canonical population.
+// Canonical populations expire by receipt time, without count-driven eviction.
 type attributes struct{ browser, device, country, page, version, view string }
 type observationKey struct{ experience, name string }
 type vitalObservation struct {
@@ -144,29 +142,7 @@ type activityObservation struct {
 	documents, views, errors, frustrations uint64
 	fingerprint, message                   string
 	resource                               *beacon.Resource
-	pageHost                               string
-}
-
-// A loss interval conservatively remains incomplete until its newest lost
-// observation leaves the window. It needs constant space during overload.
-type lossInterval struct {
-	until time.Time
-	count uint64
-}
-
-func (l *lossInterval) add(received time.Time, window time.Duration) {
-	until := received.Add(window)
-	if until.After(l.until) {
-		l.until = until
-	}
-	l.count++
-}
-func (l *lossInterval) current(now time.Time) uint64 {
-	if now.After(l.until) {
-		l.count = 0
-		l.until = time.Time{}
-	}
-	return l.count
+	api                                    bool
 }
 
 type siteState struct {
@@ -182,15 +158,12 @@ type siteState struct {
 	sessionOrder                                               receiptHeap
 	pageSessions                                               map[string]*receiptEntry
 	pageSessionOrder                                           receiptHeap
-	vitalLoss                                                  map[string]*lossInterval
-	activityLoss, resourceLoss, sessionLoss, pageSessionLoss   lossInterval
-	identityLoss                                               map[string]*lossInterval
-	identitySessionLoss                                        lossInterval
 	resourceIdentities                                         map[identityKey]*receiptEntry
 	resourceIdentityOrder                                      receiptHeap
 	sess                                                       *list.List
 	sessIdx                                                    map[string]*list.Element
 	accepted, rejected, bots                                   []time.Time
+	lastActivityExpiry                                         time.Time
 	lastAccepted                                               time.Time
 	resourcesSeen                                              bool
 	firstPartyResources, thirdPartyResources, unknownResources uint64
@@ -214,8 +187,6 @@ func newSiteState(window time.Duration, cfg SiteCfg) siteState {
 		identities:         map[identityKey]*receiptEntry{},
 		sessions:           map[string]*receiptEntry{},
 		pageSessions:       map[string]*receiptEntry{},
-		vitalLoss:          map[string]*lossInterval{},
-		identityLoss:       map[string]*lossInterval{},
 		resourceIdentities: map[identityKey]*receiptEntry{},
 		sess:               list.New(),
 		sessIdx:            map[string]*list.Element{},

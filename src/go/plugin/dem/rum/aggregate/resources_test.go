@@ -68,21 +68,21 @@ func TestResourceHostsRankCurrentWindowAndFold(t *testing.T) {
 	assert.Equal(t, "new.example.com", groups[0].Host)
 	assert.Zero(t, groups[0].Duration.N)
 }
-func TestResourceCapacityWithholdsPercentiles(t *testing.T) {
+func TestResourcePopulationRetainsExactPercentiles(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	b := mk(*now, "s", "/")
 	b.Events = nil
 	b.PageHost = "example.com"
-	for i := range maxWindowObservations + 1 {
+	for i := range 10000 + 1 {
 		b.Resources = []beacon.Resource{
 			{ID: fmt.Sprint(i), Host: "example.com", HasDuration: true, DurationMS: float64(i), Initiator: "fetch"},
 		}
 		a.Ingest(b)
 	}
 	s := a.Snapshot()
-	assert.EqualValues(t, maxWindowObservations+1, s.FirstPartyResources)
-	assert.Positive(t, s.API.Lost)
-	assert.Zero(t, s.API.P75)
+	assert.EqualValues(t, 10000+1, s.FirstPartyResources)
+	assert.Equal(t, 10001, s.API.N)
+	assert.Equal(t, 7500., s.API.P75)
 }
 func TestIsFirstParty(t *testing.T) {
 	for _, tc := range []struct {
