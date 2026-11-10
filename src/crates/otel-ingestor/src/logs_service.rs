@@ -333,6 +333,55 @@ fn identity_preview(s: &str) -> String {
     s.chars().take(IDENTITY_LOG_PREVIEW_CHARS).collect()
 }
 
+/// Lower a stream identity onto the substrate's content-agnostic contract:
+/// encode the opaque `content_meta` blob and validate it against both caps that
+/// can reject an identity — the codec's per-field `u16` limit
+/// (`encode_content_meta` returns `None`) and the WAL header budget
+/// (`wal::MAX_CONTENT_META_BYTES`). Both are attacker-reachable via OTLP
+/// resource attributes.
+///
+/// Returns the encoded blob, or an [`OversizedDrop`] (after logging a bounded
+/// preview) when the identity is unstorable. Callers validate up front, before
+/// the collision check claims a canonical `part_key`, so an unstorable identity
+/// never occupies a slot it can't write to and the offending strings are freed
+/// immediately rather than held for the batch.
+fn encode_identity_or_drop(
+    stream: &ServiceStream,
+    log_records: usize,
+) -> Result<Vec<u8>, OversizedDrop> {
+    let make_drop = || OversizedDrop {
+        part_key: otel_logs_identity::part_key(stream),
+        namespace_len: stream.namespace.len(),
+        name_len: stream.name.len(),
+        namespace_preview: identity_preview(&stream.namespace),
+        name_preview: identity_preview(&stream.name),
+        log_records,
+    };
+    let Some(content_meta) = otel_logs_identity::encode_content_meta(stream) else {
+        tracing::error!(
+            namespace_len = stream.namespace.len(),
+            name_len = stream.name.len(),
+            namespace_preview = %identity_preview(&stream.namespace),
+            name_preview = %identity_preview(&stream.name),
+            "stream identity too large to encode into content_meta; dropping frame"
+        );
+        return Err(make_drop());
+    };
+    if content_meta.len() > wal::MAX_CONTENT_META_BYTES {
+        tracing::error!(
+            namespace_len = stream.namespace.len(),
+            name_len = stream.name.len(),
+            namespace_preview = %identity_preview(&stream.namespace),
+            name_preview = %identity_preview(&stream.name),
+            content_meta_len = content_meta.len(),
+            max = wal::MAX_CONTENT_META_BYTES,
+            "stream identity exceeds the WAL content_meta budget; dropping frame"
+        );
+        return Err(make_drop());
+    }
+    Ok(content_meta)
+}
+
 /// Transport-agnostic sink for OTLP log exports: polices per-tenant stream
 /// identities, appends flattened frames to per-tenant WALs, and forwards
 /// lifecycle events to the ledger. The gRPC path reaches it via the thin
@@ -503,58 +552,7 @@ impl NetdataLogsService {
             }
         }
     }
-}
 
-/// Lower a stream identity onto the substrate's content-agnostic contract:
-/// encode the opaque `content_meta` blob and validate it against both caps that
-/// can reject an identity — the codec's per-field `u16` limit
-/// (`encode_content_meta` returns `None`) and the WAL header budget
-/// (`wal::MAX_CONTENT_META_BYTES`). Both are attacker-reachable via OTLP
-/// resource attributes.
-///
-/// Returns the encoded blob, or an [`OversizedDrop`] (after logging a bounded
-/// preview) when the identity is unstorable. Callers validate up front, before
-/// the collision check claims a canonical `part_key`, so an unstorable identity
-/// never occupies a slot it can't write to and the offending strings are freed
-/// immediately rather than held for the batch.
-fn encode_identity_or_drop(
-    stream: &ServiceStream,
-    log_records: usize,
-) -> Result<Vec<u8>, OversizedDrop> {
-    let make_drop = || OversizedDrop {
-        part_key: otel_logs_identity::part_key(stream),
-        namespace_len: stream.namespace.len(),
-        name_len: stream.name.len(),
-        namespace_preview: identity_preview(&stream.namespace),
-        name_preview: identity_preview(&stream.name),
-        log_records,
-    };
-    let Some(content_meta) = otel_logs_identity::encode_content_meta(stream) else {
-        tracing::error!(
-            namespace_len = stream.namespace.len(),
-            name_len = stream.name.len(),
-            namespace_preview = %identity_preview(&stream.namespace),
-            name_preview = %identity_preview(&stream.name),
-            "stream identity too large to encode into content_meta; dropping frame"
-        );
-        return Err(make_drop());
-    };
-    if content_meta.len() > wal::MAX_CONTENT_META_BYTES {
-        tracing::error!(
-            namespace_len = stream.namespace.len(),
-            name_len = stream.name.len(),
-            namespace_preview = %identity_preview(&stream.namespace),
-            name_preview = %identity_preview(&stream.name),
-            content_meta_len = content_meta.len(),
-            max = wal::MAX_CONTENT_META_BYTES,
-            "stream identity exceeds the WAL content_meta budget; dropping frame"
-        );
-        return Err(make_drop());
-    }
-    Ok(content_meta)
-}
-
-impl NetdataLogsService {
     /// The transport-agnostic OTLP logs export entry point: runs
     /// [`Self::export_logs_core`] and counts its outcome (records stored and
     /// records rejected) for self-monitoring. A failed export counts nothing.
