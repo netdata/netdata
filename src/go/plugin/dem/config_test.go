@@ -62,11 +62,16 @@ func TestBrowserConcurrencyConfig(t *testing.T) {
 	}{
 		{name: "default", want: 1},
 		{name: "empty section", body: "browser: {}", want: 1},
+		{name: "commented section", body: "browser:\n  # concurrency: 1\n", want: 1},
+		{name: "null section", body: "browser: null", want: 1},
+		{name: "tilde section", body: "browser: ~", want: 1},
+		{name: "null alias", body: "empty: &empty null\nbrowser: *empty", want: 1},
 		{name: "explicit budget", body: "browser: {concurrency: 4}", want: 4},
 		{name: "zero", body: "browser: {concurrency: 0}", fail: true},
 		{name: "negative", body: "browser: {concurrency: -1}", fail: true},
 		{name: "fractional", body: "browser: {concurrency: 1.5}", fail: true},
 		{name: "text", body: "browser: {concurrency: four}", fail: true},
+		{name: "null concurrency", body: "browser: {concurrency: null}", fail: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()

@@ -30,7 +30,7 @@
       },
       "update_every": {
         "title": "Update every",
-        "description": "Chart refresh interval, in seconds. Publishes the latest completed observation; it does not start a browser check.",
+        "description": "Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`.",
         "type": "integer",
         "minimum": 1,
         "default": 10
@@ -47,6 +47,7 @@
         "description": "Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check.",
         "type": "integer",
         "minimum": 1,
+        "maximum": 9223372036,
         "default": 1800
       }
     },

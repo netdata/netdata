@@ -98,8 +98,10 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	if err = cfg.Runtime.validate(); err != nil {
 		return cfg, fmt.Errorf("runtime.%w", err)
 	}
-	if cfg.Browser.Concurrency < 1 {
-		return cfg, fmt.Errorf("browser.concurrency must be a positive integer")
+	// yaml.v2 zeroes a null section without calling BrowserConfig.UnmarshalYAML.
+	// Non-null sections already reject explicit invalid concurrency values there.
+	if cfg.Browser.Concurrency == 0 {
+		cfg.Browser = DefaultConfig().Browser
 	}
 	return cfg, nil
 }

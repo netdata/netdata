@@ -120,7 +120,7 @@ modules:
               required: false
               group: Collection
             - name: update_every
-              description: Chart refresh interval, in seconds. Publishes the latest completed observation; it does not start a browser check.
+              description: Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`.
               default_value: 10
               required: false
               group: Collection

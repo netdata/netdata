@@ -244,14 +244,17 @@ func TestScheduledExecutionSnapshotsLatestOccurrenceAfterAdmission(t *testing.T)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", run.VnodeGUID)
 	history.mu.Lock()
 	defer history.mu.Unlock()
-	for _, saved := range history.runs {
+	var phases []string
+	for i, saved := range history.runs {
 		if saved.JobID == r.JobID() {
+			phases = append(phases, history.phases[i])
 			assert.Equal(t, r.VnodeGUID, saved.VnodeGUID)
 			assert.Equal(t, run.ScheduledUS, saved.ScheduledUS)
 			assert.Equal(t, run.QueuedUS, saved.QueuedUS)
 			assert.Equal(t, run.StartedUS, saved.StartedUS)
 		}
 	}
+	assert.Equal(t, []string{"start", "complete"}, phases)
 }
 
 func TestScheduledCancellationDoesNotAdmitAndInfrastructureErrorsAreRecorded(t *testing.T) {
