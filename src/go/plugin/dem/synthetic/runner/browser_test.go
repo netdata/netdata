@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -77,7 +78,7 @@ func withBrowserOwners(t *testing.T, attempt startFunc, owners chan<- testBrowse
 			} else {
 				owner.receipt <- ndexec.TreeResult{Drained: true}
 			}
-			err = json.NewEncoder(output).Encode(map[string]string{"type": "ready", "owner_id": request.ID, "endpoint": "ws://127.0.0.1:43210/" + request.ID})
+			err = json.NewEncoder(output).Encode(map[string]string{"type": "ready", "owner_id": request.ID, "endpoint": request.Work + "/browser.sock"})
 			if err != nil {
 				process.done <- ndexec.TreeResult{Drained: true, Err: err}
 				return
@@ -115,6 +116,38 @@ func emitBrowserReport(w io.Writer, loan *browserLoan, state string) error {
 	return json.NewEncoder(w).Encode(frame{Type: "browser", Browser: &browserReport{
 		OwnerID: loan.OwnerID, Epoch: loan.Epoch, State: state,
 	}})
+}
+
+func TestBrowserSocketMustRemainInOwnedDirectory(t *testing.T) {
+	const work = "/tmp/nd-dem-owner-test"
+	require.True(t, validBrowserEndpoint(work+"/home/browser/one.sock", work))
+	for _, value := range []string{"ws://127.0.0.1:1234/path", "/tmp/other/browser.sock", work + "-other/browser.sock",
+		work + "/../browser.sock", work + "/browser.sock\x00", work + "/" + strings.Repeat("a", 100) + ".sock"} {
+		assert.False(t, validBrowserEndpoint(value, work), value)
+	}
+}
+
+func TestBrowserPoolReplacesContinuouslyBusyOwner(t *testing.T) {
+	e, _, _ := testEngine(t)
+	var ids []string
+	e.start = withBrowserOwners(t, starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
+		var req wireRequest
+		assert.NoError(t, json.Unmarshal(raw, &req))
+		ids = append(ids, req.Browser.OwnerID)
+		assert.NoError(t, emitBrowserReport(out, req.Browser, "clean"))
+		return resultPayload(reporterResult{Status: synthetic.Success, Tests: &synthetic.TestCounts{Declared: 1, Passed: 1}, CaptureState: "disabled"})(ctx, args, raw, out, stderr)
+	}), nil)
+	for i := 0; i <= browserMaxLoans; i++ {
+		result := e.Execute(t.Context(), reuseRequest("busy"), nil)
+		require.True(t, result.Drained)
+		require.Equal(t, synthetic.Success, result.Run.Outcome, result.Run.Error)
+	}
+	require.Len(t, ids, browserMaxLoans+1)
+	for _, id := range ids[:browserMaxLoans] {
+		assert.Equal(t, ids[0], id)
+	}
+	assert.NotEqual(t, ids[0], ids[browserMaxLoans])
+	require.NoError(t, e.Close(t.Context()))
 }
 
 func TestBrowserPoolRetainsFairSlotThroughPhysicalDrain(t *testing.T) {

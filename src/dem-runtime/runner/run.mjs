@@ -88,7 +88,7 @@ async function main() {
     await fs.writeFile(tsconfig, JSON.stringify({compilerOptions: {allowJs: true, baseUrl: runtime.dependencies, paths: {
       '@playwright/test': [loan?.shim || path.join(modules, '@playwright/test/index.mjs')],
       'playwright/test': [loan?.shim || path.join(modules, 'playwright/test.mjs')],
-      'playwright': [path.join(modules, 'playwright/index.mjs')],
+      'playwright': [loan?.playwright || path.join(modules, 'playwright/index.mjs')],
     }}}), {mode: 0o600});
     args = [path.join(modules, 'playwright/cli.js'), 'test', '--config', configPath, '--tsconfig', tsconfig, '--pass-with-no-tests'];
   } else {
@@ -120,7 +120,7 @@ async function main() {
     emit({type: 'browser', browser: disposition});
     if (disposition.state === 'retire' && terminal && ['success', 'inconclusive'].includes(terminal.status)) {
       terminal.status = 'error';
-      terminal.error = 'Browser cleanup was not acknowledged; the browser must be retired';
+      terminal.error = 'Managed browser cleanup or policy failed; use browser_mode: fresh for direct browser control';
     }
   }
   if (protocolError || !terminal) throw new Error(protocolError || 'Runner exited without a terminal result (' + (exit.signal || exit.code) + ')');

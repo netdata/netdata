@@ -9,9 +9,8 @@ export function validateLoan(loan) {
       typeof loan.epoch !== 'string' || !/^[1-9][0-9]{0,19}$/.test(loan.epoch)) {
     throw new Error('invalid browser loan');
   }
-  const endpoint = new URL(loan.endpoint);
-  if (endpoint.protocol !== 'ws:' || endpoint.hostname !== '127.0.0.1' || !endpoint.port ||
-      endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.pathname === '/') {
+  if (typeof loan.endpoint !== 'string' || !path.isAbsolute(loan.endpoint) || path.normalize(loan.endpoint) !== loan.endpoint ||
+      loan.endpoint.includes('\0') || !loan.endpoint.endsWith('.sock') || Buffer.byteLength(loan.endpoint) > 103) {
     throw new Error('invalid browser owner endpoint');
   }
 }
@@ -24,23 +23,32 @@ export async function prepareLoan(runtime, request, here) {
   const directory = path.join(request.work_dir, 'browser-loan');
   await fs.mkdir(directory, {mode: 0o700});
   const shim = path.join(directory, 'test.mjs');
+  const playwright = path.join(directory, 'playwright.mjs');
   const api = path.join(runtime.modules, '@playwright/test/index.mjs');
   const implementation = path.join(here, 'managed-browser.mjs');
   // Absolute paths work in both native ESM and Test's CommonJS transformation.
   await fs.writeFile(shim, `import * as api from ${JSON.stringify(api)};
 import fs from 'node:fs/promises';
+import {writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {managedTest} from ${JSON.stringify(implementation)};
 export * from ${JSON.stringify(api)};
 const identity=${JSON.stringify(identity)};
 const record=name=>fs.writeFile(path.join(${JSON.stringify(directory)},name+'.json'),JSON.stringify(identity),{flag:'wx',mode:0o600});
+const failed=()=>{try{writeFileSync(path.join(${JSON.stringify(directory)},'failed.json'),JSON.stringify(identity),{flag:'wx',mode:0o600});}catch(error){if(error.code!=='EEXIST')throw error;}};
 export const test=managedTest(api,{endpoint:${JSON.stringify(endpoint)},
 launchOptions:${JSON.stringify({executablePath:runtime.browser,chromiumSandbox:true})},
-claim:()=>record('claim'),cleaned:()=>record('clean'),failed:()=>record('failed')});
+claim:()=>record('claim'),cleaned:()=>record('clean'),failed});
 export default test;
 `, {mode: 0o600});
+  // A helper may import selectors from playwright before importing Test. Apply
+  // the same guard before exposing any canonical SDK entry to user modules.
+  await fs.writeFile(playwright, `import './test.mjs';
+export * from ${JSON.stringify(path.join(runtime.modules, 'playwright/index.mjs'))};
+export {default} from ${JSON.stringify(path.join(runtime.modules, 'playwright/index.mjs'))};
+`, {mode: 0o600});
   return {
-    shim,
+    shim, playwright,
     async disposition() {
       const records = {};
       try {

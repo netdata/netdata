@@ -15,7 +15,6 @@ assert(path.isAbsolute(entry) && path.isAbsolute(work));
 assert.notEqual(process.getuid(), 0);
 const {runtimePaths} = await import(pathToFileURL(path.join(path.dirname(entry), 'runtime.mjs')));
 const runtime = await runtimePaths();
-const api = await import(pathToFileURL(path.join(runtime.modules, 'playwright/index.mjs')));
 const helper = pathToFileURL(path.resolve(import.meta.dirname, '../../runner/managed-browser.mjs')).href;
 const emit = value => process.stdout.write(JSON.stringify(value) + '\n');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -23,6 +22,8 @@ const launchOptions = {executablePath: runtime.browser, chromiumSandbox: true};
 const home = path.join(work, 'home');
 await fs.mkdir(home, {recursive: true});
 const env = {PATH: path.dirname(process.execPath) + ':/usr/bin:/bin', HOME: home, TMPDIR: home, LANG: 'C.UTF-8'};
+Object.assign(process.env, env, {XDG_CACHE_HOME: home, XDG_CONFIG_HOME: home});
+const api = await import(pathToFileURL(path.join(runtime.modules, 'playwright/index.mjs')));
 let owner;
 let retirements = 0;
 let passes = 0;
@@ -40,21 +41,30 @@ fixture.listen(0,'127.0.0.1');
 await once(fixture,'listening');
 const origin = 'http://127.0.0.1:' + fixture.address().port;
 async function start() {
-  owner = await api.chromium.launchServer({...launchOptions, headless: true, host: '127.0.0.1', env});
+  const browser = await api.chromium.launch({...launchOptions, headless: true, env});
+  const cdp = await browser.newBrowserCDPSession();
+  const {processInfo} = await cdp.send('SystemInfo.getProcessInfo');
+  await cdp.detach();
+  const pid = processInfo.find(item => item.type === 'browser').id;
+  const {endpoint} = await browser.bind('DEM cleanup proof');
+  owner = {browser, endpoint, pid, start: await processStart(pid)};
+}
+async function processStart(pid) {
+  try {
+    const stat = await fs.readFile(`/proc/${pid}/stat`, 'utf8');
+    return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
 async function retire() {
   if (!owner) return;
-  const process = owner.process();
-  const closed = process.exitCode !== null || process.signalCode !== null ? Promise.resolve() : once(process, 'close');
-  await owner.close();
-  await closed;
-  assert(process.exitCode !== null || process.signalCode !== null);
+  await owner.browser.close();
+  assert.notEqual(await processStart(owner.pid), owner.start);
   owner = undefined;
   retirements++;
 }
 async function check(name, fn, dirty = false) {
   const started = performance.now();
-  const browser = await api.chromium.connect(owner.wsEndpoint());
+  const browser = await api.chromium.connect(owner.endpoint);
   try { await fn(browser); }
   finally { await browser.close(); }
   if (dirty) { await retire(); await start(); }
@@ -197,13 +207,14 @@ try {
   await check('dead browser cannot acknowledge cleanup',async browser=>{
     const guard=manageBrowser(browser);await browser.newContext();
     const disconnected=once(browser,'disconnected');
-    owner.process().kill('SIGKILL');
+    assert.equal(await processStart(owner.pid), owner.start);
+    process.kill(owner.pid, 'SIGKILL');
     await disconnected;
     await assert.rejects(guard.finish(),/disconnected|cleanup failed/);
   },true);
   await check('disconnect during acknowledgment forces retirement',async browser=>{
     const guard=manageBrowser(browser);
-    await assert.rejects(guard.finish(async()=>{await browser.close();}),/disconnected/);
+    await assert.rejects(guard.finish(async()=>{await browser.close();}),/closed before|disconnected/);
   },true);
 
   // Exercise the real Test CLI and workers, not just direct library calls.
@@ -232,7 +243,7 @@ try {
       import fs from 'node:fs/promises';
       import {managedTest} from ${JSON.stringify(fileURLToPath(helper))};
       export * from ${JSON.stringify(real)};
-      export const test=managedTest(api,{endpoint:${JSON.stringify(owner.wsEndpoint())},launchOptions:${JSON.stringify(launchOptions)},
+      export const test=managedTest(api,{endpoint:${JSON.stringify(owner.endpoint)},launchOptions:${JSON.stringify(launchOptions)},
         claim:()=>fs.writeFile(${JSON.stringify(paths.claim)},'{}',{flag:'wx'}),
         cleaned:()=>fs.writeFile(${JSON.stringify(paths.clean)},'{}',{flag:'wx'}),
         failed:()=>fs.writeFile(${JSON.stringify(paths.failed)},'{}',{flag:'wx'})});

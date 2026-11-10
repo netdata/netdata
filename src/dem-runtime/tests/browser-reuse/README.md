@@ -26,7 +26,16 @@ separately reports process status, physical drainage and runtime-use release.
 Retain both outcomes: an expected failure inside a fixture is not a failed proof,
 and verified drainage does not make a failed assertion successful.
 
-This is the first runtime cleanup proof. Its one cohort receipt does not prove
+`runtime-proof.mjs` exercises the production owner/attempt protocol, all entry
+formats, policy failures during discovery, reused-context fresh fallback, downloads,
+EOF/early stop and idle browser death. The owner uses a Unix socket and private
+profile/artifact/registry paths. `-script-arg=--inspect` pauses with a private
+`access-probe.json` until an external cross-UID/no-TCP check creates `access-checked`
+(within 45 seconds). `--soak` measures owner memory across 1,000 clean connections;
+it is a provider retention probe, not full journey throughput. `unit-suite.mjs` runs
+all source Node tests with the installed dependencies.
+
+These cohort receipts do not prove
 per-owner Agent admission, epoch checking, runtime upgrade or independent-slot
 progress. Those require integration tests through the actual Agent pool. Timings
 here are diagnostics, not a capacity benchmark.

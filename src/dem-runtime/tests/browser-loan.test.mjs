@@ -7,11 +7,12 @@ import os from 'node:os';
 import {prepareLoan, validateLoan} from '../runner/browser-loan.mjs';
 
 const identity = {owner_id: 'owner-a', epoch: '7'};
-const browser = {...identity, endpoint: 'ws://127.0.0.1:12345/opaque-capability'};
-test('private loan accepts only loopback and exact fields', () => {
+const browser = {...identity, endpoint: '/tmp/nd-dem-owner-test/browser.sock'};
+test('private loan accepts only absolute socket paths and exact fields', () => {
   assert.doesNotThrow(() => validateLoan(browser));
   for (const change of [{epoch:'0'},{epoch:7},{owner_id:''},{endpoint:'ws://example.com:1234/path'},
-    {endpoint:'ws://127.0.0.1:1234/'},{endpoint:'ws://user:password@127.0.0.1:1234/path'},{extra:true}]) {
+    {endpoint:'relative.sock'},{endpoint:'/tmp/a/../browser.sock'},{endpoint:'/tmp/browser.sock\0'},
+    {endpoint:'/'+'a'.repeat(100)+'.sock'},{extra:true}]) {
     assert.throws(() => validateLoan({...browser,...change}));
   }
 });

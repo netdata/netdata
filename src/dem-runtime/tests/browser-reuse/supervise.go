@@ -29,6 +29,7 @@ func run() (err error) {
 	storePath := flag.String("store", "", "installed managed runtime root")
 	helper := flag.String("helper", "", "installed nd-run executable")
 	script := flag.String("script", "", "browser-reuse proof.mjs path")
+	scriptArg := flag.String("script-arg", "", "optional proof mode argument")
 	work := flag.String("work", "", "new experiment output directory")
 	limit := flag.Duration("timeout", 10*time.Minute, "whole experiment timeout")
 	flag.Parse()
@@ -72,9 +73,13 @@ func run() (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), *limit)
 	defer cancel()
 	started := time.Now()
+	args := []string{*script, use.Paths.EntryPoint, *work}
+	if *scriptArg != "" {
+		args = append(args, *scriptArg)
+	}
 	process, startErr := ndexec.StartUnprivilegedProcessTree(ctx,
 		ndexec.TreeOptions{Stdout: out, Stderr: diagnostic, Completion: use.Completion},
-		use.Paths.Node, *script, use.Paths.EntryPoint, *work)
+		use.Paths.Node, args...)
 	if startErr != nil {
 		return errors.Join(startErr, use.Finish(true))
 	}

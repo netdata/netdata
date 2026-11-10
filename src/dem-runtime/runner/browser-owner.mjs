@@ -35,7 +35,7 @@ export async function browserOwner(runtime) {
     requestedStop = true;
     stop.resolve();
   })().catch(error => { inputError = error; first.reject(error); requestedStop = true; stop.resolve(); });
-  let server;
+  let browser;
   let failed = false;
   try {
     const request = await first.promise;
@@ -47,18 +47,27 @@ export async function browserOwner(runtime) {
     if (requestedStop) return;
     const home = path.join(request.work_dir, 'home');
     await fs.mkdir(home, {recursive: true, mode: 0o700});
+    // Playwright creates profiles, sockets and its registry in the Node process,
+    // before spawning Chromium. Keep all of them inside supervised ownership.
+    Object.assign(process.env, {HOME: home, TMPDIR: home, XDG_CONFIG_HOME: home, XDG_CACHE_HOME: home});
     const {chromium} = await import(pathToFileURL(path.join(runtime.modules, 'playwright/index.mjs')));
-    server = await chromium.launchServer({executablePath: runtime.browser, chromiumSandbox: true,
-      headless: true, host: '127.0.0.1', env: {PATH: path.dirname(process.execPath) + ':/usr/bin:/bin',
+    browser = await chromium.launch({executablePath: runtime.browser, chromiumSandbox: true,
+      headless: true, env: {PATH: path.dirname(process.execPath) + ':/usr/bin:/bin',
         HOME: home, TMPDIR: home, XDG_CONFIG_HOME: home, XDG_CACHE_HOME: home, LANG: 'C.UTF-8'}});
-    server.on('close', () => { if (!requestedStop) failed = true; stop.resolve(); });
+    browser.on('disconnected', () => { if (!requestedStop) failed = true; stop.resolve(); });
     if (!requestedStop) {
-      write(1, {type: 'ready', owner_id: request.owner_id, endpoint: server.wsEndpoint()});
+      // A loopback launchServer endpoint is discoverable through its /json route.
+      // Public bind without host/port uses a filesystem-protected Unix socket.
+      const {endpoint} = await browser.bind('DEM managed browser');
+      const relative = path.relative(request.work_dir, endpoint);
+      if (!path.isAbsolute(endpoint) || !relative || relative.startsWith('../') || path.isAbsolute(relative) ||
+          !(await fs.lstat(endpoint)).isSocket()) throw new Error('browser socket escaped owner directory');
+      write(1, {type: 'ready', owner_id: request.owner_id, endpoint});
       await stop.promise;
     }
   } finally {
     requestedStop = true;
-    try { await server?.close(); }
+    try { await browser?.close(); }
     finally { process.stdin.destroy(); await input; }
   }
   if (inputError || failed) throw new Error('browser owner stopped unexpectedly');

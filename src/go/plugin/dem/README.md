@@ -553,7 +553,7 @@ qualification share this allowance. Ready jobs take turns, and monitoring and re
 Waiting time is separate from execution time; cancellation while waiting starts no browser. Journeys reuse warm
 Chromium processes by default, with fresh Playwright Test processes and isolated contexts for each attempt.
 `browser_mode: fresh` starts a separate browser per journey. Lighthouse always starts a fresh browser. Reusable
-browsers occupy the same capacity slots, retire before a fresh execution uses the slot, and expire after one idle minute.
+browsers occupy the same capacity slots, retire before a fresh execution uses the slot, and expire after one idle minute. Busy owners are replaced after 100 loans to bound retained runtime state.
 Timeouts, cancellation and unverified context cleanup retire the affected browser before its slot can be reused.
 
 Choose concurrency for the Agent's CPU and memory budget and the accuracy needed from Lighthouse measurements.

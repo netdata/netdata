@@ -54,7 +54,7 @@ module.exports = class DEMReporter {
       const original = String(error.message || error.value || error);
       const message = text(original);
       // Classify original evidence; redaction must not change monitoring truth.
-      if (/browserType\.(?:launch(?:PersistentContext)?|connect):|DEM browser reuse:/.test(original)) {
+      if (/browserType\.(?:launch(?:PersistentContext)?|connect):|^ManagedBrowserError: DEM browser reuse:/.test(original)) {
         this.executionError = true;
       } else {
         launchOnly = false;

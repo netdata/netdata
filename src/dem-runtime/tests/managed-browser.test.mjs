@@ -128,3 +128,11 @@ test('disconnect during acknowledgment write prevents reuse', async () => {
   release.resolve();
   await assert.rejects(done, /disconnected before cleanup/);
 });
+
+test('unawaited browser close is sticky before disconnected notification', async () => {
+  const {browser} = fixture();
+  browser.close = async () => {};
+  const guard = manageBrowser(browser);
+  void browser.close();
+  await assert.rejects(guard.finish(), /closed before acknowledged cleanup/);
+});

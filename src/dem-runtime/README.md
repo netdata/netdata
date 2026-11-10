@@ -37,7 +37,7 @@ qualification through the supervised Agent execution path.
 `runner/run.mjs` receives one JSON request on stdin. The Go caller supplies version 2,
 kind, run_id, work_dir, timeout_ms, capture and
 optional secrets. A managed journey also receives a private `browser` loan with
-`owner_id`, decimal-string `epoch` and a loopback WebSocket `endpoint`.
+`owner_id`, decimal-string `epoch` and an absolute private Unix-socket `endpoint`.
 Journeys select exactly one of inline script and absolute
 script_path; Lighthouse uses url. The Go owner creates the private working
 folder. Node writes only generated configuration, script/cache/profile state
@@ -109,18 +109,22 @@ belongs to a shared capacity slot, independent of the jobs and vnodes using it.
 Each attempt starts new Node, Playwright Test CLI and worker processes. No script
 module, secret environment or browser context is retained between attempts.
 Lighthouse and `browser_mode: fresh` retire a slot's warm owner before running.
-Owners start lazily and expire after one idle minute; this is an internal policy,
+Owners start lazily, expire after one idle minute, and retire after at most 100
+loans to bound connection state retained by the pinned Playwright server. This is an internal policy,
 not a capacity or long-term memory guarantee.
 
 `runner/run.mjs --browser-owner` accepts an initial newline-delimited request
 containing `version: 2`, `owner_id` and an absolute private `work_dir`. It launches
-a sandboxed browser with a separate, secret-free environment and reports exactly
+a sandboxed browser with a separate, secret-free environment, binds it with the
+public Playwright named-pipe API, and reports exactly
 one `{type: "ready", owner_id, endpoint}` frame. EOF or `{type: "stop"}` requests
 shutdown. Unexpected browser death ends the owner, including while idle. The
-endpoint is a private capability and must not enter public logs or history.
+socket, browser profiles, artifacts and registry are confined to the owner's
+mode-0700 directory. No TCP listener or HTTP discovery route is opened. The
+endpoint remains private and must not enter public logs or history.
 
-Only the first compatible Test worker borrows a loan. Worker restarts and
-different launch settings use fresh browsers. The managed fixture guards browser
+Only the first compatible Test worker borrows a loan. Worker restarts,
+`test.use({reuseContext: true})` and different launch settings use fresh browsers. The managed fixture guards browser
 context creation and every exposed context's original close operation. Teardown
 seals new creation, joins pending creation and original closes, verifies an empty
 connected browser, and acknowledges the exact owner/epoch in the private attempt

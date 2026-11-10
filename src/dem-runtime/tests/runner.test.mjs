@@ -233,6 +233,11 @@ test('assertion failure takes precedence over launch inability in the same test'
   assert.equal(actual.result.status,'failed');
 });
 
+test('quoted managed policy text remains an ordinary website failure',async()=>{
+  const actual=await run(prefix+"test('website',()=>{expect(1,'DEM browser reuse: expected website text').toBe(2)});");
+  assert.equal(actual.result.status,'failed');
+});
+
 test('mixed stream chunks preserve byte ordering and empty UTF-8 boundaries',async()=>{
   const {default:protocol}=await import('../runner/protocol.cjs');
   for(const chunks of [[Buffer.from([0xe7]),'',Buffer.from([0x95,0x8c])],[Buffer.from([0xe7]),'middle',Buffer.from([0x95,0x8c])]]){

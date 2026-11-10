@@ -112,6 +112,13 @@ export function manageBrowser(browser, onError = () => {}) {
   };
   browser.contexts = () => originalContexts().map(guardContext);
   browser.contexts();
+  if (typeof browser.close === 'function') {
+    const close = browser.close.bind(browser);
+    browser.close = (...args) => {
+      if (!clean) fail('browser closed before acknowledged cleanup');
+      return close(...args);
+    };
+  }
   creation('newContext', guardContext);
   creation('newPage', page => { guardContext(page.context()); return guardPage(page); });
   for (const name of ['newBrowserCDPSession', 'startTracing', 'stopTracing', 'bind', 'unbind']) deny(browser, name);
@@ -143,9 +150,10 @@ export function managedTest(api, {endpoint, launchOptions, claim, cleaned, faile
   let borrowed = false;
   let policyFailure;
   let failureReported;
-  const reportFailure = () => failureReported ??= Promise.resolve().then(failed);
+  const reportFailure = () => failureReported ??= Promise.resolve(failed());
   api.selectors.register = async () => {
     policyFailure ??= new ManagedBrowserError('custom selector registration is unavailable with a reused browser');
+    await reportFailure();
     throw policyFailure;
   };
   const test = api.test.extend({
@@ -153,12 +161,12 @@ export function managedTest(api, {endpoint, launchOptions, claim, cleaned, faile
       await use();
       if (policyFailure) { await reportFailure(); throw policyFailure; }
     }, {scope: 'worker', auto: true}],
-    connectOptions: [async ({browserName, headless, channel, launchOptions: effective}, use, workerInfo) => {
+    connectOptions: [async ({browserName, headless, channel, reuseContext, launchOptions: effective}, use, workerInfo) => {
       const keys = Object.keys(effective);
       const compatible = browserName === 'chromium' && headless && !channel &&
         keys.length === Object.keys(launchOptions).length &&
         keys.every(key => effective[key] === launchOptions[key]);
-      if (workerInfo.workerIndex !== 0 || !compatible) return use(undefined);
+      if (workerInfo.workerIndex !== 0 || reuseContext || !compatible) return use(undefined);
       await claim();
       borrowed = true;
       await use({wsEndpoint: endpoint, timeout: 5000});
@@ -167,6 +175,7 @@ export function managedTest(api, {endpoint, launchOptions, claim, cleaned, faile
       if (!borrowed) return use(browser);
       const guard = manageBrowser(browser, error => { policyFailure ??= error; });
       try {
+        if (browser.contexts().length !== 0) throw new ManagedBrowserError('browser already contains contexts before this attempt');
         await use(browser);
         await guard.finish(async () => {
           if (policyFailure) throw policyFailure;

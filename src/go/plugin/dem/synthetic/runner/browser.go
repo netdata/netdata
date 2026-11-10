@@ -10,8 +10,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -22,6 +22,10 @@ import (
 )
 
 const browserIdleTimeout = time.Minute
+
+// The pinned SDK retains a listener per remote connection. Bound busy owners
+// too: idle expiry alone cannot limit that retained state.
+const browserMaxLoans = 100
 
 // A process consumer and every candidate qualification get distinct affinity,
 // even when their prepared paths and release identity happen to match.
@@ -40,8 +44,7 @@ type browserReport struct {
 }
 
 func (l browserLoan) redactor(secrets map[string]string) *textRedactor {
-	endpoint, _ := url.Parse(l.Endpoint) // Validated during owner readiness.
-	return newRedactor(secrets, l.Endpoint, endpoint.EscapedPath()[1:])
+	return newRedactor(secrets, l.Endpoint, filepath.Base(l.Endpoint))
 }
 
 type browserOwner struct {
@@ -99,7 +102,7 @@ func (slot *browserSlot) retireOwner() bool {
 
 func (e *Engine) prepareBrowser(ctx context.Context, slot *browserSlot, scope *browserSource, paths Paths) (*browserLoan, error) {
 	if owner := slot.owner; owner != nil &&
-		(scope == nil || owner.scope != scope || owner.paths != paths || !owner.alive()) {
+		(scope == nil || owner.scope != scope || owner.paths != paths || !owner.alive() || owner.epoch >= browserMaxLoans) {
 		if !slot.retireOwner() {
 			return nil, ndexec.ErrTreeNotDrained
 		}
@@ -199,7 +202,7 @@ func (e *Engine) startBrowserOwner(ctx context.Context, paths Paths) (*browserOw
 		}
 		result, startErr := e.executeProcessWithInput(lifetime, paths, use.Completion(), []string{paths.EntryPoint, "--browser-owner"}, input, func(r io.Reader) error {
 			defer owner.unhealthy.Store(true)
-			return readOwnerReady(r, owner.id, ready)
+			return readOwnerReady(r, owner.id, work, ready)
 		}, func(r io.Reader) { _, _ = io.Copy(io.Discard, r) }, owner.exited)
 		owner.result = result
 		if result.Drained {
@@ -224,7 +227,7 @@ func (e *Engine) startBrowserOwner(ctx context.Context, paths Paths) (*browserOw
 	}
 }
 
-func readOwnerReady(r io.Reader, id string, ready chan<- string) error {
+func readOwnerReady(r io.Reader, id, work string, ready chan<- string) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 1024), 4096)
 	if !scanner.Scan() {
@@ -239,7 +242,7 @@ func readOwnerReady(r io.Reader, id string, ready chan<- string) error {
 	decoder.DisallowUnknownFields()
 	var extra any
 	if decoder.Decode(&response) != nil || decoder.Decode(&extra) != io.EOF ||
-		response.Type != "ready" || response.OwnerID != id || !validBrowserEndpoint(response.Endpoint) {
+		response.Type != "ready" || response.OwnerID != id || !validBrowserEndpoint(response.Endpoint, work) {
 		return errors.New("invalid browser owner readiness")
 	}
 	ready <- response.Endpoint
@@ -249,15 +252,10 @@ func readOwnerReady(r io.Reader, id string, ready chan<- string) error {
 	return nil
 }
 
-func validBrowserEndpoint(value string) bool {
-	endpoint, err := url.Parse(value)
-	if err != nil {
-		return false
-	}
-	port, err := strconv.ParseUint(endpoint.Port(), 10, 16)
-	return err == nil && port > 0 && endpoint.Scheme == "ws" && endpoint.Hostname() == "127.0.0.1" &&
-		endpoint.User == nil && endpoint.RawQuery == "" && !endpoint.ForceQuery && endpoint.Fragment == "" &&
-		len(endpoint.Path) > 1
+func validBrowserEndpoint(value, work string) bool {
+	return filepath.IsAbs(value) && filepath.Clean(value) == value &&
+		strings.HasPrefix(value, work+string(filepath.Separator)) && strings.HasSuffix(value, ".sock") &&
+		len(value) <= 103 && !strings.ContainsRune(value, '\x00')
 }
 
 // Run fences new grants at process shutdown. Existing monitor and Function
