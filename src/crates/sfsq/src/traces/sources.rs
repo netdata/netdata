@@ -10,7 +10,7 @@
 //! assembled; the production assembler is the ledger's
 //! `TracesSourceSupplier` (`otel-ledger/src/ledger/rpc/traces/sources.rs`).
 //!
-//! The library never inspects `part_key` or any other content of a
+//! The library never inspects `partition_key` or any other content of a
 //! source's identity — [`SourceId`] is opaque, and the caller decides
 //! what the set covers. What it validates, on every operation, is set
 //! hygiene ([`validate_sources`]):
@@ -43,7 +43,7 @@ use crate::source::Source;
 ///
 /// Uniqueness is the caller's contract; the documented production
 /// derivation is the full `FileId` (machine, instance, pipeline, seq,
-/// part_key) plus the chunk index for in-memory chunks and the byte
+/// partition_key) plus the chunk index for in-memory chunks and the byte
 /// range for tails — a bare `seq` is unique only within one process
 /// instance and is NOT sufficient.
 ///

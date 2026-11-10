@@ -37,7 +37,7 @@ use otel_logs_identity::ServiceStream;
 /// `(service.namespace, service.name)` identity for display.
 #[derive(Debug, Clone)]
 struct StreamStat {
-    /// The partition's opaque `part_key` (the option id the selector echoes back).
+    /// The partition's opaque `partition_key` (the option id the selector echoes back).
     ns_hash: u64,
     /// `(service.namespace, service.name)` for display.
     stream: ServiceStream,
@@ -51,7 +51,7 @@ impl StreamStat {
     /// Decode a neutral [`PartitionStat`]'s `content_meta` into the logs identity.
     fn from_partition(p: PartitionStat) -> Self {
         Self {
-            ns_hash: p.part_key,
+            ns_hash: p.partition_key,
             stream: otel_logs_identity::decode_content_meta_or_empty(&p.content_meta),
             total_size: p.total_size,
             file_count: p.file_count,
@@ -159,7 +159,7 @@ pub fn stream_required_params(partitions: Vec<PartitionStat>) -> Vec<RequiredPar
         return Vec::new();
     }
     // Decode each partition's opaque identity, then sort by `(namespace, name)`
-    // for display (the substrate yields them ordered by opaque `part_key`).
+    // for display (the substrate yields them ordered by opaque `partition_key`).
     let mut stats: Vec<StreamStat> = partitions
         .into_iter()
         .map(StreamStat::from_partition)

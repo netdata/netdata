@@ -58,7 +58,7 @@ pub struct WalDesc {
 
 /// One partition's aggregate stats for the signal selector — content-agnostic.
 ///
-/// The substrate folds in-window files per `part_key` and carries each
+/// The substrate folds in-window files per `partition_key` and carries each
 /// partition's opaque `content_meta` through verbatim; it never decodes the
 /// identity. The signal's query layer (for logs, the rpc adapter) decodes
 /// `content_meta` and builds its own display-typed selector option.
@@ -72,8 +72,8 @@ pub struct WalDesc {
 /// once — SFST wins — mirroring [`TenantRegistries::query_snapshot`].
 #[derive(Debug, Clone)]
 pub struct PartitionStat {
-    /// The files' opaque `part_key` (the option id the selector echoes back).
-    pub part_key: u64,
+    /// The files' opaque `partition_key` (the option id the selector echoes back).
+    pub partition_key: u64,
     /// The partition's opaque content-plane identity blob, carried verbatim
     /// from the files' summaries. The substrate never decodes it; the signal's
     /// query layer does (for logs, into `(service.namespace, service.name)`).
@@ -90,9 +90,9 @@ pub struct PartitionStat {
 }
 
 impl PartitionStat {
-    fn new(part_key: u64, content_meta: Vec<u8>) -> Self {
+    fn new(partition_key: u64, content_meta: Vec<u8>) -> Self {
         Self {
-            part_key,
+            partition_key,
             content_meta,
             total_size: 0,
             file_count: 0,
@@ -656,7 +656,7 @@ impl Registry {
     }
 
     /// The in-memory half of the window-scoped stream selector: the in-window
-    /// local SFST/WAL files folded per partition (`part_key`), SFST-wins over its
+    /// local SFST/WAL files folded per partition (`partition_key`), SFST-wins over its
     /// own WAL per seq. Only `q.time_range` is used — the selector lists every
     /// in-window partition regardless of the caller's current pick. Owned, so
     /// the registry lock can drop before [`LocalStreams::with_catalog`] folds the
@@ -671,9 +671,9 @@ impl Registry {
             streams.folded.insert(SeqKey::from(&f.id));
             streams
                 .by_part
-                .entry(f.id.part_key)
+                .entry(f.id.partition_key)
                 .or_insert_with(|| {
-                    PartitionStat::new(f.id.part_key, f.summary.content_meta.clone())
+                    PartitionStat::new(f.id.partition_key, f.summary.content_meta.clone())
                 })
                 .add(
                     f.size.0,
@@ -693,8 +693,8 @@ impl Registry {
             let size = f.size.0.max(f.valid_up_to.0);
             streams
                 .by_part
-                .entry(f.id.part_key)
-                .or_insert_with(|| PartitionStat::new(f.id.part_key, f.content_meta.clone()))
+                .entry(f.id.partition_key)
+                .or_insert_with(|| PartitionStat::new(f.id.partition_key, f.content_meta.clone()))
                 .add(size, to_s(f.min_timestamp_ns.0), to_s(f.max_timestamp_ns.0));
         }
         streams
@@ -717,7 +717,7 @@ impl LocalStreams {
     /// Complete the selector with the remote-only streams of `catalog` (the
     /// window's catalog entries, read off the lock): entries whose identity+seq
     /// was not folded locally, one per identity+seq. Sorted by the opaque
-    /// `part_key`; the signal's query layer decodes `content_meta` and re-sorts
+    /// `partition_key`; the signal's query layer decodes `content_meta` and re-sorts
     /// for display.
     pub fn with_catalog(mut self, catalog: &[otel_catalog::CatalogEntry]) -> Vec<PartitionStat> {
         for e in catalog {
@@ -725,12 +725,12 @@ impl LocalStreams {
                 continue;
             }
             self.by_part
-                .entry(e.id.part_key)
-                .or_insert_with(|| PartitionStat::new(e.id.part_key, e.content_meta.clone()))
+                .entry(e.id.partition_key)
+                .or_insert_with(|| PartitionStat::new(e.id.partition_key, e.content_meta.clone()))
                 .add(e.size.0, e.min_timestamp_s, e.max_timestamp_s);
         }
         let mut out: Vec<PartitionStat> = self.by_part.into_values().collect();
-        out.sort_by_key(|p| p.part_key);
+        out.sort_by_key(|p| p.partition_key);
         out
     }
 }

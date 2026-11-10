@@ -1,5 +1,5 @@
 //! Durable WAL sequence allocator: the `seq` axis of the file-registry
-//! `FileId` (`machine_id`/`instance_id`/`pipeline_id`/`seq`/`part_key`).
+//! `FileId` (`machine_id`/`instance_id`/`pipeline_id`/`seq`/`partition_key`).
 //! One seq is allocated per WAL file creation (`writer.rs` `ensure_file`)
 //! and stamped into every local filename, every remote object key, and
 //! every catalog stem; the SFST built from a WAL file and the catalog

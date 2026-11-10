@@ -869,7 +869,7 @@ mod tests {
 
     // ── files_overlapping() / read_entries() tests ───────────────
 
-    use crate::entry::opaque_part_key;
+    use crate::entry::opaque_partition_key;
 
     /// Write a catalog file containing `entries` to disk and return the
     /// path. Also tracks it in the registry under the canonical
@@ -897,9 +897,9 @@ mod tests {
     }
 
     fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
-        let part_key = opaque_part_key(ns, name);
+        let partition_key = opaque_partition_key(ns, name);
         CatalogEntry {
-            id: file_registry::FileId::new(ident(), 0, seq, part_key),
+            id: file_registry::FileId::new(ident(), 0, seq, partition_key),
             remote_key: format!("k{seq}"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
@@ -949,7 +949,7 @@ mod tests {
         assert_eq!(seqs(in_window), vec![1, 3]);
         let api_only = Query {
             time_range: 0..1000,
-            partition_keys: vec![opaque_part_key("prod", "api")],
+            partition_keys: vec![opaque_partition_key("prod", "api")],
         };
         assert_eq!(
             seqs(read_entries(&path, &api_only).unwrap().unwrap()),

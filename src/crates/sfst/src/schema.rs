@@ -43,7 +43,7 @@ use crate::Error;
 /// This is the substrate's [`file_registry::FileSummary`]; the SFST stores it
 /// verbatim and never interprets `content_meta`. A query keeps the file as a
 /// candidate when its `[min_timestamp_s, max_timestamp_s]` span overlaps the
-/// request window and its `id.part_key` matches (the partition key lives in
+/// request window and its `id.partition_key` matches (the partition key lives in
 /// the `FileId`, not the summary); `record_count` drives the file's
 /// stream-batch geometry (see [`stream_batch_size`](crate::stream_batch_size)).
 /// It lives in its own `SUMR` chunk so a registry rebuilds on startup by

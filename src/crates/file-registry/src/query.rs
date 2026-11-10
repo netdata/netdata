@@ -18,7 +18,7 @@
 //!   (`start >= end`) matches nothing.
 //! - Partition filter: an empty `partition_keys` set matches every
 //!   partition; a non-empty set is membership-only over the opaque
-//!   [`FileId::part_key`](crate::FileId#structfield.part_key). For OTel
+//!   [`FileId::partition_key`](crate::FileId#structfield.partition_key). For OTel
 //!   logs the keys are the content plane's service-stream hashes, driven
 //!   by the `__streams` selector — one stream identity per key within a
 //!   tenant via the ingestor's collision table.
@@ -55,9 +55,9 @@ pub struct Query {
     /// nothing.
     pub time_range: Range<u32>,
     /// Partition filter over the opaque
-    /// [`FileId::part_key`](crate::FileId#structfield.part_key) values.
+    /// [`FileId::partition_key`](crate::FileId#structfield.partition_key) values.
     /// **Empty matches every partition**; a non-empty set keeps only files
-    /// whose `part_key` is one of these values
+    /// whose `partition_key` is one of these values
     /// ([`matches_partition`](Query::matches_partition)). The substrate
     /// compares the key as an opaque `u64` and ascribes it no meaning; the
     /// content plane supplies the set (for OTel logs, the service-stream
@@ -74,7 +74,7 @@ impl Query {
         range_overlaps(&self.time_range, min_s, max_s)
     }
 
-    /// Whether a file with partition key `part_key` passes the partition
+    /// Whether a file with partition key `partition_key` passes the partition
     /// filter: an empty [`Query::partition_keys`] matches every partition,
     /// otherwise the key must be in the set.
     ///
@@ -83,8 +83,8 @@ impl Query {
     /// calling this; the method is the rule's canonical statement and the
     /// form used where filtering runs after a registry scan
     /// (file-lifecycle's remote-only catalog selection).
-    pub fn matches_partition(&self, part_key: u64) -> bool {
-        self.partition_keys.is_empty() || self.partition_keys.contains(&part_key)
+    pub fn matches_partition(&self, partition_key: u64) -> bool {
+        self.partition_keys.is_empty() || self.partition_keys.contains(&partition_key)
     }
 }
 

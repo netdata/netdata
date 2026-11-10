@@ -12,7 +12,7 @@
 //! and rejects in a fixed order — magic, version, header CRC, unknown flag
 //! bits, compression id, `content_meta` cap — so a corrupt or foreign file
 //! fails before any field is interpreted. The header carries no partition key
-//! and no footer: `part_key` lives only in the filename `FileId` stem (the
+//! and no footer: `partition_key` lives only in the filename `FileId` stem (the
 //! `file-registry` stem contract), and a file recovered from disk has no
 //! durable prefix or log-time range (`wal::registry` re-reads the header for
 //! identity only).
@@ -110,7 +110,7 @@ pub const FRAME_ALIGNMENT: usize = 8;
 /// `payload_format(2)`, then `content_meta` length-prefixed —
 /// `content_meta_len(2) content_meta` — capped at [`MAX_CONTENT_META_BYTES`].
 /// The rest of the page is zero except the last 4 bytes, a CRC32 over
-/// everything before it. The header stores no partition key: the `part_key`
+/// everything before it. The header stores no partition key: the `partition_key`
 /// is the single source of truth in the filename (`FileId`), and
 /// `content_meta` is an opaque content-plane blob (for OTel logs, the encoded
 /// service identity) the WAL never interprets.

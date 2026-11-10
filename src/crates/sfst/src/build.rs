@@ -370,7 +370,7 @@ pub(crate) fn build_into<W: Write + Seek>(
     let histogram = row_index.sparse_histogram(&time_order);
 
     // Both identity halves are producer-supplied and opaque here: `content_meta`
-    // lands verbatim in the summary, and the `part_key` is not stored at all —
+    // lands verbatim in the summary, and the `partition_key` is not stored at all —
     // the filename (`FileId`), propagated from the WAL file the SFST is built
     // from, is its single source of truth and is deliberately not cross-checked
     // against the rows. See `FORMAT.md` ("Partition-key authority").

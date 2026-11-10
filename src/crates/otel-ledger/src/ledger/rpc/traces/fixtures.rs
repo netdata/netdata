@@ -39,7 +39,7 @@ pub(crate) fn summary(record_count: u32, min_s: u32, max_s: u32) -> sfst::Summar
 }
 
 /// The id every registry-installed fixture file of sequence `seq`
-/// carries: one shared test identity, pipeline 1, part_key 7.
+/// carries: one shared test identity, pipeline 1, partition_key 7.
 pub(crate) fn test_file_id(seq: u64) -> FileId {
     FileId::new(test_identity(), 1, seq, 7)
 }

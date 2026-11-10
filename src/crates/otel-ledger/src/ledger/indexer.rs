@@ -97,9 +97,9 @@ impl Ledger {
                 }
             } else {
                 // Tracked under the WAL's own `FileId`, so the SFST inherits its
-                // `part_key` — the partition key embedded in the filename, not a
+                // `partition_key` — the partition key embedded in the filename, not a
                 // summary field — and the selector and the `files:true` inventory
-                // both read `id.part_key` and cannot disagree. The summary's
+                // both read `id.partition_key` and cannot disagree. The summary's
                 // timestamps/record_count/content_meta land on the registry
                 // entry; the uploader response handler
                 // (`Ledger::handle_uploader_resp`) reads them back.

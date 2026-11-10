@@ -5,7 +5,7 @@
 //! filter, and the strictly increasing wall clock.
 //!
 //! The crate is deliberately content-agnostic: no codec, no query engine, no
-//! signal knowledge. [`FileId::pipeline_id`] and [`FileId::part_key`] are
+//! signal knowledge. [`FileId::pipeline_id`] and [`FileId::partition_key`] are
 //! opaque numbers here — the signal↔id mapping is the integration layer's
 //! (`otel_bridge::signals`: logs=0, traces=1) and the content plane derives
 //! partition keys — so a second signal reuses the whole substrate without
@@ -19,7 +19,7 @@
 //!   [`TenantId`], [`TimestampNs`], [`ByteSize`], and the content-agnostic
 //!   [`FileSummary`].
 //! - `stem` (public): the shared `{machine}-{instance}` 32-hex filename
-//!   prefix. Data files append `{pipeline_id:05}-{seq:010}-{part_key:016x}`
+//!   prefix. Data files append `{pipeline_id:05}-{seq:010}-{partition_key:016x}`
 //!   and parse back through [`FileId::parse`]/[`FileId::parse_stem`]; the
 //!   remote catalog appends `{max_seq:010}-{min_ts:010}-{max_ts:010}` and
 //!   parses the prefix with this codec — the reason the module is public.
@@ -51,9 +51,9 @@
 //! # Contracts
 //!
 //! - Data-file name:
-//!   `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>.<ext>`
+//!   `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<partition_key:016x>.<ext>`
 //!   — machine/instance as 32-char lowercase hex UUIDs, pipeline_id a 5-digit
-//!   zero-padded decimal, seq 10 digits, part_key 16 lowercase hex digits;
+//!   zero-padded decimal, seq 10 digits, partition_key 16 lowercase hex digits;
 //!   the extension is the producer's (`wal`, `sfst`, ...). A nil-bearing
 //!   machine or instance never renders: the newtypes refuse nil at
 //!   construction and [`FileId::parse_stem`] returns `None` on it, so

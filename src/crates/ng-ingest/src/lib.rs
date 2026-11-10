@@ -7,8 +7,8 @@ use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 
 /// Every frame goes to one logical stream, hence one WAL file. The WAL treats
-/// `part_key` as opaque; a single constant keeps everything in one file.
-pub const PART_KEY: u64 = 0;
+/// `partition_key` as opaque; a single constant keeps everything in one file.
+pub const PARTITION_KEY: u64 = 0;
 
 /// The opaque signal axis stamped into the file id (logs == 0). The WAL ascribes
 /// no meaning to it here; it only labels the on-disk file name.
@@ -29,7 +29,7 @@ pub fn count_log_records(req: &ExportLogsServiceRequest) -> usize {
 
 /// One WAL file, no rotation, frames always LZ4-compressed: rotation
 /// thresholds set to effectively infinite so the writer never starts a second
-/// file, and callers pass the single `PART_KEY` so every frame lands in that
+/// file, and callers pass the single `PARTITION_KEY` so every frame lands in that
 /// one file. `wal::Reader` decompresses transparently, so the artifact stays
 /// directly consumable by a downstream reader.
 pub fn one_file_config() -> wal::Config {
@@ -67,7 +67,7 @@ pub fn write_request(
         return Ok(0);
     }
     writer.write_frame(
-        PART_KEY,
+        PARTITION_KEY,
         &[],
         &frame.data,
         wal::FrameMeta {
@@ -145,7 +145,7 @@ pub fn write_trace_request(
         return Ok(0);
     }
     writer.write_frame(
-        PART_KEY,
+        PARTITION_KEY,
         &[],
         &frame.data,
         wal::FrameMeta {

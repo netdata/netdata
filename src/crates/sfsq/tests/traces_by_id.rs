@@ -4,7 +4,7 @@
 //! an in-memory chunk SFST, and a WAL tail reconstructs IDENTICALLY to
 //! the same corpus sealed as one file — under source-order permutations,
 //! resends (equal and unequal payloads), shared client/server span ids,
-//! UNSET ids, and mixed part_keys. Plus the status-honesty contract:
+//! UNSET ids, and mixed partition_keys. Plus the status-honesty contract:
 //! failures, caps, and cancellation are reported, never silent. Also
 //! pinned: request validation, the coalesced field-kind map, the
 //! absent-id Complete-empty, and the per-source progress ticks.

@@ -157,7 +157,7 @@ impl Registry {
 
     /// Rebuild the registry from the directory's files: scan it, then read
     /// each file's header. Identity comes from the filename (`FileId`,
-    /// including the `part_key` the header does not store); `created_at_ns`,
+    /// including the `partition_key` the header does not store); `created_at_ns`,
     /// `size`, and `content_meta` come from the header. The log-data range
     /// and durable prefix stay unknown (see [`File`]'s recovery note), and
     /// every entry lands as `Archived` — whether the file was mid-write at
@@ -362,7 +362,7 @@ impl Registry {
     /// half-open `[start, end)` window; a degenerate window matches
     /// nothing).
     ///
-    /// Partition filter: membership over the opaque `id.part_key` — an
+    /// Partition filter: membership over the opaque `id.partition_key` — an
     /// empty `partition_keys` matches every partition. One key per stream
     /// identity per tenant (the ingestor's collision table keeps it so),
     /// so key equality is stream equality.
@@ -388,7 +388,9 @@ impl Registry {
             .values()
             .filter(|f| f.min_timestamp_ns != TimestampNs::ZERO)
             .filter(move |f| range_overlaps_ns(f, q_min_ns, q_max_ns))
-            .filter(move |f| partition_keys.is_empty() || partition_keys.contains(&f.id.part_key))
+            .filter(move |f| {
+                partition_keys.is_empty() || partition_keys.contains(&f.id.partition_key)
+            })
     }
 
     pub fn len(&self) -> usize {
@@ -464,7 +466,7 @@ mod tests {
             for i in 0..count {
                 writer
                     .write_frame(
-                        crate::opaque_part_key("ns", "svc"),
+                        crate::opaque_partition_key("ns", "svc"),
                         &[],
                         &(i as u32).to_le_bytes(),
                         crate::FrameMeta {
@@ -518,11 +520,11 @@ mod tests {
         assert_eq!(seqs, vec![1, 2]);
 
         // Recovery reads the partition key from the filename (FileId), not the
-        // header — the header stores no part_key.
+        // header — the header stores no partition_key.
         assert!(
             registry
                 .archived_files()
-                .all(|f| f.id.part_key == crate::opaque_part_key("ns", "svc")),
+                .all(|f| f.id.partition_key == crate::opaque_partition_key("ns", "svc")),
             "recovery must recover each file's partition key from its filename (FileId)"
         );
     }
@@ -769,9 +771,9 @@ mod tests {
 
     // ── candidates() tests ───────────────────────────────────────
 
-    fn fid_with(seq: u64, part_key: u64) -> FileId {
+    fn fid_with(seq: u64, partition_key: u64) -> FileId {
         let identity = crate::test_identity();
-        FileId::new(identity, 0, seq, part_key)
+        FileId::new(identity, 0, seq, partition_key)
     }
 
     /// Insert a file via the event flow with the given (min, max) range
@@ -779,12 +781,12 @@ mod tests {
     fn track(
         reg: &mut Registry,
         seq: u64,
-        part_key: u64,
+        partition_key: u64,
         min_ns: u64,
         max_ns: u64,
         status: FileStatus,
     ) -> FileId {
-        let id = fid_with(seq, part_key);
+        let id = fid_with(seq, partition_key);
         reg.apply_event(&FileEvent::Created {
             file_id: id,
             created_at_ns: TimestampNs(0),
@@ -879,15 +881,15 @@ mod tests {
     }
 
     #[test]
-    fn candidates_filter_by_part_key() {
-        // The WAL filter matches files by their opaque `part_key` (the content
+    fn candidates_filter_by_partition_key() {
+        // The WAL filter matches files by their opaque `partition_key` (the content
         // plane's stream-hash collapse — absent vs empty namespace — is the
         // content plane's concern, covered by otel-logs-identity's tests).
         let dir = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(dir.path());
 
-        let api = crate::opaque_part_key("prod", "api");
-        let worker = crate::opaque_part_key("prod", "worker");
+        let api = crate::opaque_partition_key("prod", "api");
+        let worker = crate::opaque_partition_key("prod", "worker");
         track(&mut reg, 1, api, 100 * NS, 200 * NS, FileStatus::Archived);
         track(
             &mut reg,

@@ -59,7 +59,7 @@
 //!   `file_registry::durable::write_atomic`): `seq`.
 //!
 //! Opaque to this crate — the content plane assigns and decodes them: the
-//! partition key `part_key`, the per-file identity blob `content_meta`
+//! partition key `partition_key`, the per-file identity blob `content_meta`
 //! (capped at [`MAX_CONTENT_META_BYTES`]), and the frame-codec tag
 //! `payload_format` (`0` reserved, rejected at [`Writer::new`]).
 //! `pipeline_id` is the numeric signal axis: stamped into every `FileId`,
@@ -127,12 +127,12 @@ pub use writer::{FileStamp, FrameMeta, Writer};
 // wal-internal tests reach the fixture as `crate::test_identity()`.
 pub use file_registry::{Identity, InstanceId, MachineId, test_identity};
 
-/// Deterministic opaque partition key for tests. The WAL treats `part_key` as
+/// Deterministic opaque partition key for tests. The WAL treats `partition_key` as
 /// an opaque `u64` and never decodes it, so tests fabricate distinct keys per
 /// logical stream without depending on the content-plane identity codec —
 /// same label → same key, different label → (almost surely) different key.
 #[cfg(test)]
-pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
+pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     namespace.hash(&mut h);

@@ -22,9 +22,9 @@
 //!   as a bare `u64`, `TenantId` as a string), so they are wire-neutral
 //!   drop-ins for their inner values.
 //! - The stem is a lossless `FileId` encoding,
-//!   `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>`:
+//!   `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<partition_key:016x>`:
 //!   32-hex simple-form UUIDs, zero-padded decimal pipeline/seq, zero-padded
-//!   hex `part_key`. Rendering always emits the padded canonical form;
+//!   hex `partition_key`. Rendering always emits the padded canonical form;
 //!   parsing is lenient about padding and rejects nil identities.
 //!
 //! [`FileId::pipeline_id`] is an opaque `u16`. The signal↔id mapping and its
@@ -453,14 +453,14 @@ impl std::fmt::Display for SeqKey {
 /// and sequences.
 ///
 /// The filename stem is the canonical lossless encoding —
-/// `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>` —
+/// `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<partition_key:016x>` —
 /// built by [`to_stem`](Self::to_stem) and parsed by
 /// [`parse_stem`](Self::parse_stem); the exact field formats and the wire
 /// contracts are in the module docs.
 ///
-/// `part_key` is an opaque partition key and `pipeline_id` an opaque
+/// `partition_key` is an opaque partition key and `pipeline_id` an opaque
 /// signal/pipeline discriminator: this crate never interprets either. The
-/// content plane derives `part_key` and assigns its meaning (for OTel logs
+/// content plane derives `partition_key` and assigns its meaning (for OTel logs
 /// today, the content plane's service-stream hash); the integration layer
 /// assigns `pipeline_id` and owns the signal↔id mapping (`otel_bridge::signals`).
 /// `pipeline_id` routes a file to its owning pipeline.
@@ -486,33 +486,36 @@ pub struct FileId {
     /// default pipeline.
     pub pipeline_id: u16,
     pub seq: u64,
-    /// Opaque partition key; the content plane derives it.
-    pub part_key: u64,
+    /// Opaque partition key; the content plane derives it. Stored as
+    /// `part_key`: catalog files carry this struct as JSON, so the serialized
+    /// name is part of their format and stays what it was when they shipped.
+    #[serde(rename = "part_key")]
+    pub partition_key: u64,
 }
 
 impl FileId {
     /// Construct a `FileId` from an [`Identity`] plus the opaque
-    /// `pipeline_id` / `seq` / `part_key` fields (conventions in the struct
+    /// `pipeline_id` / `seq` / `partition_key` fields (conventions in the struct
     /// docs).
-    pub fn new(identity: Identity, pipeline_id: u16, seq: u64, part_key: u64) -> Self {
+    pub fn new(identity: Identity, pipeline_id: u16, seq: u64, partition_key: u64) -> Self {
         Self {
             machine_id: identity.machine_id,
             instance_id: identity.instance_id,
             pipeline_id,
             seq,
-            part_key,
+            partition_key,
         }
     }
 
     /// Format the stem portion:
-    /// `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<part_key:016x>`
+    /// `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<partition_key:016x>`
     pub fn to_stem(&self) -> String {
         format!(
             "{}-{:05}-{:010}-{:016x}",
             crate::stem::format_uuid_pair(self.machine_id.as_uuid(), self.instance_id.as_uuid()),
             self.pipeline_id,
             self.seq,
-            self.part_key,
+            self.partition_key,
         )
     }
 
@@ -530,17 +533,17 @@ impl FileId {
     }
 
     /// Parse just the stem:
-    /// `<machine_id>-<instance_id>-<pipeline_id>-<seq>-<part_key>`.
+    /// `<machine_id>-<instance_id>-<pipeline_id>-<seq>-<partition_key>`.
     ///
     /// Lenient about zero-padding (any decimal/hex width parses) and strict
     /// about shape: `None` for a malformed UUID prefix (`crate::stem`), a
     /// `pipeline_id` that does not fit `u16`, an unparsable `seq` or
-    /// `part_key`, or a nil machine/instance id.
+    /// `partition_key`, or a nil machine/instance id.
     pub fn parse_stem(stem: &str) -> Option<Self> {
         let (machine_uuid, instance_uuid, rest) = crate::stem::parse_uuid_pair(stem)?;
 
-        // rest = "<pipeline_id>-<seq>-<part_key>": split off pipeline (first
-        // '-'), then split the remainder into seq and part_key (last '-').
+        // rest = "<pipeline_id>-<seq>-<partition_key>": split off pipeline (first
+        // '-'), then split the remainder into seq and partition_key (last '-').
         let first_dash = rest.find('-')?;
         let pipeline_str = &rest[..first_dash];
         let after = &rest[first_dash + 1..];
@@ -550,7 +553,7 @@ impl FileId {
 
         let pipeline_id = pipeline_str.parse().ok()?;
         let seq = seq_str.parse().ok()?;
-        let part_key = u64::from_str_radix(key_str, 16).ok()?;
+        let partition_key = u64::from_str_radix(key_str, 16).ok()?;
 
         // A nil-bearing name is not a valid identity — reject it here so a
         // corrupt or pre-identity file surfaces as "unparseable" (warn+skip on
@@ -560,7 +563,7 @@ impl FileId {
             instance_id: InstanceId::new(instance_uuid).ok()?,
             pipeline_id,
             seq,
-            part_key,
+            partition_key,
         })
     }
 }
@@ -572,8 +575,8 @@ impl fmt::Display for FileId {
 }
 
 // `Ord`/`PartialOrd` are derived: field order (machine_id, instance_id,
-// pipeline_id, seq, part_key) — within one identity and pipeline, files sort
-// by seq then part_key; pipeline_id dominates seq across pipelines. The
+// pipeline_id, seq, partition_key) — within one identity and pipeline, files sort
+// by seq then partition_key; pipeline_id dominates seq across pipelines. The
 // `MachineId`/`InstanceId` newtypes compare by their inner UUID's byte order.
 
 // ---------------------------------------------------------------------------
@@ -593,7 +596,7 @@ impl fmt::Display for FileId {
 /// logs, the encoded `(namespace, name)` — see the `otel-logs-identity`
 /// crate). The partition key is NOT a summary field — it lives only in the
 /// file's [`FileId`] (filename), the single source of truth; candidate
-/// filtering reads `id.part_key`.
+/// filtering reads `id.partition_key`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileSummary {
     /// Earliest record timestamp in the file, seconds since the Unix epoch.
@@ -719,7 +722,7 @@ mod tests {
         let stem = id.to_stem();
         assert!(stem.ends_with("-0000000000000000"));
         let parsed = FileId::parse_stem(&stem).unwrap();
-        assert_eq!(parsed.part_key, 0);
+        assert_eq!(parsed.partition_key, 0);
     }
 
     #[test]
@@ -728,7 +731,7 @@ mod tests {
         let stem = id.to_stem();
         assert!(stem.ends_with("-ffffffffffffffff"));
         let parsed = FileId::parse_stem(&stem).unwrap();
-        assert_eq!(parsed.part_key, u64::MAX);
+        assert_eq!(parsed.partition_key, u64::MAX);
     }
 
     #[test]
@@ -744,7 +747,7 @@ mod tests {
         let b = FileId::new(ident(), 0, 2, 0);
         assert!(a < b);
 
-        // Same seq, different part_key
+        // Same seq, different partition_key
         let c = FileId::new(ident(), 0, 1, 1);
         let d = FileId::new(ident(), 0, 1, 2);
         assert!(c < d);

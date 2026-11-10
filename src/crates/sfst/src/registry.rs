@@ -202,7 +202,7 @@ impl Registry {
     /// [`file_registry::range_overlaps`] rule, so an empty window matches
     /// nothing).
     ///
-    /// Partition filter, when non-empty, keeps files whose opaque `part_key`
+    /// Partition filter, when non-empty, keeps files whose opaque `partition_key`
     /// is one of [`Query::partition_keys`] — exact `u64` match, no partial
     /// matching; each SFST holds exactly one partition.
     pub fn candidates<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a File> + 'a {
@@ -214,7 +214,9 @@ impl Registry {
             .values()
             .filter(|f| !f.pending_deletion)
             .filter(move |f| range_overlaps(&f.summary, &q_range))
-            .filter(move |f| partition_keys.is_empty() || partition_keys.contains(&f.id.part_key))
+            .filter(move |f| {
+                partition_keys.is_empty() || partition_keys.contains(&f.id.partition_key)
+            })
     }
 
     /// Number of tracked files (including pending-deletion entries).

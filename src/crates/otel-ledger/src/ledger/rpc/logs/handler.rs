@@ -64,7 +64,7 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
                 .values()
                 .map(|f| WalFileEntry {
                     seq: f.id.seq,
-                    ns_hash: format!("{:016x}", f.id.part_key),
+                    ns_hash: format!("{:016x}", f.id.partition_key),
                     stream: stream_id_from_content_meta(&f.content_meta),
                     status: match f.status {
                         FileStatus::Active => "active",
@@ -85,7 +85,7 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
                     let key = file_registry::SeqKey::from(&f.id);
                     SfstFileEntry {
                         seq: f.id.seq,
-                        ns_hash: format!("{:016x}", f.id.part_key),
+                        ns_hash: format!("{:016x}", f.id.partition_key),
                         stream: stream_id_from_content_meta(&f.summary.content_meta),
                         size: f.size.as_u64(),
                         total_logs: f.summary.record_count,

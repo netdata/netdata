@@ -49,9 +49,9 @@ fn date() -> NaiveDate {
 /// filename (the below-threshold test recomputes the expected path from them);
 /// everything else rides along verbatim.
 fn entry_for(seq: u64) -> CatalogEntry {
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     CatalogEntry {
-        id: FileId::new(ident(), 0, seq, part_key),
+        id: FileId::new(ident(), 0, seq, partition_key),
         remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,

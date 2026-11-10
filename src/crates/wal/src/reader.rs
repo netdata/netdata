@@ -500,7 +500,7 @@ mod tests {
         for (i, payload) in payloads.iter().enumerate() {
             writer
                 .write_frame(
-                    crate::opaque_part_key("ns", "svc"),
+                    crate::opaque_partition_key("ns", "svc"),
                     &[],
                     payload,
                     crate::FrameMeta {
@@ -700,7 +700,7 @@ mod tests {
         for (i, &count) in counts.iter().enumerate() {
             writer
                 .write_frame(
-                    crate::opaque_part_key("ns", "svc"),
+                    crate::opaque_partition_key("ns", "svc"),
                     &[],
                     b"payload",
                     crate::FrameMeta {

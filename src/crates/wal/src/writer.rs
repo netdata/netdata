@@ -1,7 +1,7 @@
 //! The WAL writer: the producing half of the crate (`reader.rs` is the
 //! consuming half). A [`Writer`] owns one directory of `.wal` files — one
 //! writer per tenant and signal in the otel path — and appends frames to one
-//! active file per partition stream (`part_key`), sealing the file and
+//! active file per partition stream (`partition_key`), sealing the file and
 //! starting another when a rotation threshold is met. The writer owns the
 //! write path: frame emission (compression, CRC, alignment padding), file
 //! creation (`create_new` + header page), rotation, and the fsync points.
@@ -140,7 +140,7 @@ impl SeqCounter {
     }
 }
 
-/// A single WAL output stream for one partition (identified by `part_key`).
+/// A single WAL output stream for one partition (identified by `partition_key`).
 ///
 /// Handles frame writing, compression, rotation, and lifecycle event
 /// emission. The stream does not own a clock — every per-frame
@@ -158,7 +158,7 @@ struct Stream {
     seq: SeqCounter,
     /// Opaque partition key for this stream's files — the file-naming/partition
     /// key. The WAL does not interpret it (the content plane derives it).
-    part_key: u64,
+    partition_key: u64,
     /// Opaque content-plane identity blob recorded in each file's header so the
     /// file's identity is available cheaply without decoding frames.
     content_meta: Vec<u8>,
@@ -175,7 +175,7 @@ impl Stream {
         stamp: FileStamp,
         config: Config,
         seq: SeqCounter,
-        part_key: u64,
+        partition_key: u64,
         content_meta: Vec<u8>,
     ) -> Self {
         Self {
@@ -185,7 +185,7 @@ impl Stream {
             config,
             active: None,
             seq,
-            part_key,
+            partition_key,
             content_meta,
             pending_events: Vec::new(),
         }
@@ -193,7 +193,12 @@ impl Stream {
 
     /// Create a `FileId` stamped with this stream's pipeline + partition key.
     fn file_id(&self, seq: u64) -> FileId {
-        FileId::new(self.identity, self.stamp.pipeline_id, seq, self.part_key)
+        FileId::new(
+            self.identity,
+            self.stamp.pipeline_id,
+            seq,
+            self.partition_key,
+        )
     }
 
     /// Append one frame to the stream, creating its file if needed. Rotation
@@ -503,7 +508,7 @@ impl Config {
 // Writer
 // ---------------------------------------------------------------------------
 
-/// Manages multiple WAL output streams (one per `part_key`) over one
+/// Manages multiple WAL output streams (one per `partition_key`) over one
 /// directory, with a shared seq counter so file sequence numbers are unique
 /// across everything sharing the allocator — all tenants and signals in the
 /// otel path, where the ingestor hands every writer the same
@@ -564,7 +569,7 @@ impl Writer {
 
     /// Write a frame to the writer for the given partition.
     ///
-    /// Lazily creates a new per-partition writer (keyed by `part_key`) if one
+    /// Lazily creates a new per-partition writer (keyed by `partition_key`) if one
     /// doesn't exist yet; the opaque `content_meta` identity blob is recorded
     /// in each file's header. A `content_meta` larger than
     /// [`MAX_CONTENT_META_BYTES`](crate::format::MAX_CONTENT_META_BYTES) is
@@ -579,7 +584,7 @@ impl Writer {
     /// path above records the details).
     pub fn write_frame(
         &mut self,
-        part_key: u64,
+        partition_key: u64,
         content_meta: &[u8],
         data: &[u8],
         meta: FrameMeta,
@@ -591,22 +596,22 @@ impl Writer {
                 crate::format::MAX_CONTENT_META_BYTES
             )));
         }
-        self.get_or_create(part_key, content_meta)
+        self.get_or_create(partition_key, content_meta)
             .write_frame(data, meta)
     }
 
-    /// Get or lazily create the writer for `part_key`. On first use the stream
+    /// Get or lazily create the writer for `partition_key`. On first use the stream
     /// records `content_meta` in each file's header; later frames for the same
     /// key reuse the already-recorded blob.
-    fn get_or_create(&mut self, part_key: u64, content_meta: &[u8]) -> &mut Stream {
-        self.streams.entry(part_key).or_insert_with(|| {
+    fn get_or_create(&mut self, partition_key: u64, content_meta: &[u8]) -> &mut Stream {
+        self.streams.entry(partition_key).or_insert_with(|| {
             Stream::new(
                 Arc::clone(&self.dir),
                 self.identity,
                 self.stamp,
                 self.config.clone(),
                 SeqCounter(Arc::clone(&self.seq)),
-                part_key,
+                partition_key,
                 content_meta.to_vec(),
             )
         })
@@ -702,10 +707,10 @@ mod tests {
         .unwrap()
     }
 
-    /// A distinct opaque `part_key` per label — distinct labels give distinct
+    /// A distinct opaque `partition_key` per label — distinct labels give distinct
     /// keys, so a test can partition by key without hand-picking values.
     fn pk(label: u64) -> u64 {
-        crate::opaque_part_key("ns", &format!("svc{label}"))
+        crate::opaque_partition_key("ns", &format!("svc{label}"))
     }
 
     #[test]
@@ -758,7 +763,7 @@ mod tests {
         .unwrap();
         writer
             .write_frame(
-                crate::opaque_part_key("ns", "svc"),
+                crate::opaque_partition_key("ns", "svc"),
                 &[],
                 b"x",
                 crate::FrameMeta {
@@ -836,7 +841,7 @@ mod tests {
                     entry_count,
                     size,
                     ..
-                } => Some((file_id.part_key, *valid_up_to, *entry_count, *size)),
+                } => Some((file_id.partition_key, *valid_up_to, *entry_count, *size)),
                 _ => None,
             })
             .collect();
@@ -845,8 +850,12 @@ mod tests {
             1,
             "exactly one stream should seal: {events:?}"
         );
-        let (part_key, valid_up_to, entry_count, size) = closed[0];
-        assert_eq!(part_key, pk(1), "the expired stream (A) must be sealed");
+        let (partition_key, valid_up_to, entry_count, size) = closed[0];
+        assert_eq!(
+            partition_key,
+            pk(1),
+            "the expired stream (A) must be sealed"
+        );
         assert!(
             valid_up_to.0 > HEADER_SIZE as u64,
             "valid_up_to must include the written frame"
@@ -914,10 +923,10 @@ mod tests {
             .collect();
         assert_eq!(wal_files.len(), 2);
 
-        // Filenames carry each stream's distinct part_key.
+        // Filenames carry each stream's distinct partition_key.
         let mut hashes: Vec<u64> = wal_files
             .iter()
-            .map(|e| FileId::parse(&e.path()).unwrap().part_key)
+            .map(|e| FileId::parse(&e.path()).unwrap().partition_key)
             .collect();
         hashes.sort();
         let mut expected = vec![pk(1), pk(2)];

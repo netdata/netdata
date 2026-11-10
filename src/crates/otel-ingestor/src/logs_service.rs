@@ -180,7 +180,7 @@ impl StorableStream {
     ) -> Result<Self, Rejection> {
         let content_meta = encode_identity_or_drop(&stream, group.log_record_count)
             .map_err(Rejection::Oversized)?;
-        let partition_key = otel_logs_identity::part_key(&stream);
+        let partition_key = otel_logs_identity::partition_key(&stream);
 
         if let Err(holder) = claimed_streams.claim(tenant_id, partition_key, &stream) {
             tracing::warn!(
@@ -369,7 +369,7 @@ impl OversizedIdentity {
     /// `log_records` records dropped with it.
     fn new(stream: &ServiceStream, log_records: usize) -> Self {
         Self {
-            partition_key: otel_logs_identity::part_key(stream),
+            partition_key: otel_logs_identity::partition_key(stream),
             namespace_len: stream.namespace.len(),
             name_len: stream.name.len(),
             namespace_preview: identity_preview(&stream.namespace),

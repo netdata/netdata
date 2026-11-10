@@ -7,13 +7,13 @@
 //!
 //! It is the content-plane counterpart to the content-agnostic substrate
 //! (`file-registry`/`wal`/`sfst`/`otel-catalog`): the substrate carries an
-//! opaque `part_key: u64` (in the file's `FileId`/filename, the single source
+//! opaque `partition_key: u64` (in the file's `FileId`/filename, the single source
 //! of truth) and an opaque `content_meta: Vec<u8>` (in the per-file summary)
 //! and never interprets either. This crate is the one place that gives them
 //! meaning for logs: the producer (`otel-ingestor`) encodes the identity here
 //! before writing, and the query layer (`otel-ledger`) decodes it here for
 //! display. Traces reuse only the *unattributed* convention defined here — the
-//! `("", "")` stream `otel-ingestor`'s `trace_service` writes (`part_key` 0 +
+//! `("", "")` stream `otel-ingestor`'s `trace_service` writes (`partition_key` 0 +
 //! the version-tagged empty-fields blob) — the single seam a future
 //! per-service traces scheme would replace; a sibling traces identity crate,
 //! and a shared home for the hash primitive, would arrive with that switch.
@@ -21,7 +21,7 @@
 //! bars the content-agnostic substrate from depending on this log-content
 //! crate. Consumers (grep-verified): `otel-ingestor` `logs_service` (extracts
 //! the stream from OTLP resource attributes, groups frames per stream, writes
-//! `part_key` + `content_meta`) and `trace_service`; `otel-ledger`'s
+//! `partition_key` + `content_meta`) and `trace_service`; `otel-ledger`'s
 //! `rpc/logs` handler + adapter (`decode_content_meta_or_empty` for the stream
 //! names shown to the UI, the "Services" selector included); `sfsq-cli`
 //! `discover`/`lib` (derives the query partition key from the CLI
@@ -40,7 +40,7 @@ use twox_hash::XxHash64;
 /// `(namespace, name)` pair identifying a log stream.
 ///
 /// This is the canonical OTel-logs stream identifier. The content plane derives
-/// it into the substrate's opaque `part_key` (via [`part_key`]) and serializes
+/// it into the substrate's opaque `partition_key` (via [`partition_key`]) and serializes
 /// it into the opaque `content_meta` blob (via [`encode_content_meta`]); the
 /// substrate (`wal`/`sfst`/`otel-catalog`) never sees this type.
 ///
@@ -154,7 +154,7 @@ pub const MAX_FIELD_BYTES: usize = u16::MAX as usize;
 /// [`ServiceStream`] into the opaque `u64` the substrate files under. It is the
 /// canonical `ServiceStream::ns_hash` (absent-equals-empty collapse included);
 /// the substrate ascribes the result no meaning.
-pub fn part_key(stream: &ServiceStream) -> u64 {
+pub fn partition_key(stream: &ServiceStream) -> u64 {
     stream.ns_hash()
 }
 
@@ -220,7 +220,7 @@ pub fn decode_content_meta(bytes: &[u8]) -> Option<ServiceStream> {
 /// (`("", "")`) when the blob is absent or unparseable.
 ///
 /// Stream-listing paths use this so a corrupt or missing blob still appears
-/// (under an empty name) instead of vanishing; the authoritative `part_key`
+/// (under an empty name) instead of vanishing; the authoritative `partition_key`
 /// is carried separately. Centralizing the fallback here keeps every listing
 /// call site identical — the policy cannot drift between them.
 pub fn decode_content_meta_or_empty(bytes: &[u8]) -> ServiceStream {
@@ -248,18 +248,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn part_key_matches_ns_hash_and_distinguishes_streams() {
+    fn partition_key_matches_ns_hash_and_distinguishes_streams() {
         // The cross-component invariant the file naming + Services selector
-        // rely on: part_key IS exactly ServiceStream::ns_hash.
+        // rely on: partition_key IS exactly ServiceStream::ns_hash.
         let s = ServiceStream::new("prod", "api");
-        assert_eq!(part_key(&s), s.ns_hash());
+        assert_eq!(partition_key(&s), s.ns_hash());
         // Distinct streams resolve to distinct keys.
         assert_ne!(
-            part_key(&ServiceStream::new("prod", "api")),
-            part_key(&ServiceStream::new("prod", "worker")),
+            partition_key(&ServiceStream::new("prod", "api")),
+            partition_key(&ServiceStream::new("prod", "worker")),
         );
         // The all-empty stream collapses to the `0` "no attribution" sentinel.
-        assert_eq!(part_key(&ServiceStream::new("", "")), 0);
+        assert_eq!(partition_key(&ServiceStream::new("", "")), 0);
     }
 
     #[test]
@@ -430,7 +430,7 @@ mod tests {
         // The collapse means an empty-namespace stream does NOT hash like the
         // raw `Some("")` primitive — the digest is a stability contract:
         // changing the collapse re-partitions already-written files, whose
-        // `part_key` is baked into the `FileId` filename.
+        // `partition_key` is baked into the `FileId` filename.
         assert_ne!(
             ServiceStream::new("", "api").ns_hash(),
             compute_ns_hash(Some(""), Some("api"))

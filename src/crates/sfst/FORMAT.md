@@ -411,7 +411,7 @@ candidate filtering reads it from there.
 #### Partition-key authority
 
 The partition key in the filename is **authoritative**: every reader
-(WAL, SFST, catalog, query planner) routes a file by `id.part_key`
+(WAL, SFST, catalog, query planner) routes a file by `id.partition_key`
 parsed from its name, and the key is never re-derived from the file's
 contents or cross-checked against them at read time. The producer chain
 guarantees the filename matches the contents — the WAL writer stamps the

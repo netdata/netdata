@@ -59,8 +59,8 @@ fn sk(seq: u64) -> file_registry::SeqKey {
 use crate::test_helpers::empty_summary;
 
 fn make_entry(seq: u64) -> otel_catalog::CatalogEntry {
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-    let id = file_registry::FileId::new(ident(), 0, seq, part_key);
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let id = file_registry::FileId::new(ident(), 0, seq, partition_key);
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     otel_catalog::CatalogEntry {
         id,
@@ -400,8 +400,8 @@ fn validate_catalog_rejects_cross_date_entry() {
 
     // Entry whose remote_key is well-formed on the right machine/tenant/signal
     // and FileId, but on a DIFFERENT date (d18 != the catalog's d17).
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-    let id = file_registry::FileId::new(ident(), 0, 5, part_key);
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let id = file_registry::FileId::new(ident(), 0, 5, partition_key);
     let mut catalog = Catalog::new(tenant.clone(), cat_date, ident());
     catalog.add(otel_catalog::CatalogEntry {
         id,
@@ -438,8 +438,8 @@ fn validate_catalog_rejects_cross_date_entry() {
 fn validate_one_entry_key(remote_key: String) -> Result<(), String> {
     let tenant = TenantId::from("tenant1");
     let date = d(17);
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-    let id = file_registry::FileId::new(ident(), 0, 5, part_key);
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let id = file_registry::FileId::new(ident(), 0, 5, partition_key);
     let mut catalog = Catalog::new(tenant.clone(), date, ident());
     catalog.add(otel_catalog::CatalogEntry {
         id,
@@ -1591,9 +1591,9 @@ fn place_local_catalog_for(
         .file_path(date, identity, max_seq, min_ts, max_ts);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let mut catalog = otel_catalog::Catalog::new(TenantId::from("tenant1"), date, identity);
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     catalog.add(otel_catalog::CatalogEntry {
-        id: file_registry::FileId::new(identity, 0, max_seq, part_key),
+        id: file_registry::FileId::new(identity, 0, max_seq, partition_key),
         remote_key: String::new(),
         min_timestamp_s: min_ts,
         max_timestamp_s: max_ts,
@@ -1932,8 +1932,8 @@ fn catalog_object(
 ) -> (String, Vec<u8>) {
     let mut catalog = otel_catalog::Catalog::new(tenant.clone(), date, identity);
     for &seq in seqs {
-        let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-        let id = file_registry::FileId::new(identity, 0, seq, part_key);
+        let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+        let id = file_registry::FileId::new(identity, 0, seq, partition_key);
         catalog.add(otel_catalog::CatalogEntry {
             id,
             remote_key: crate::remote_keys::sfst("logs", tenant, date, id),
@@ -2423,8 +2423,8 @@ async fn rotated_catalog_passes_validate_catalog() {
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let mut last = None;
     for seq in 1..=3u64 {
-        let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-        let id = file_registry::FileId::new(ident(), 0, seq, part_key);
+        let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+        let id = file_registry::FileId::new(ident(), 0, seq, partition_key);
         let entry = otel_catalog::CatalogEntry {
             id,
             remote_key: crate::remote_keys::sfst("logs", &tenant, date, id),

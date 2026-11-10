@@ -9,17 +9,17 @@
 //! twin (src/crates/file-lifecycle/src/test_helpers.rs), identity here comes
 //! from the real `otel-logs-identity` codecs.
 
-/// The identity pair production stamps per logs stream — its `part_key` (the
+/// The identity pair production stamps per logs stream — its `partition_key` (the
 /// `ns_hash`) and the opaque `content_meta` blob — from the real
 /// `otel-logs-identity` codecs, exactly as the ingestor does when writing a
 /// WAL header (`src/crates/otel-ingestor/src/logs_service.rs`
-/// `NetdataLogsService::export`). Returns `(part_key, content_meta)`. The
+/// `NetdataLogsService::export`). Returns `(partition_key, content_meta)`. The
 /// `.expect` covers the encoder's
 /// only failure (a field over its `u16` cap — production drops such records)
 /// and cannot fire for the short identities tests use.
 pub(crate) fn identity_for(stream: &otel_logs_identity::ServiceStream) -> (u64, Vec<u8>) {
     (
-        otel_logs_identity::part_key(stream),
+        otel_logs_identity::partition_key(stream),
         otel_logs_identity::encode_content_meta(stream)
             .expect("test service identity encodes within content_meta limits"),
     )
@@ -31,7 +31,7 @@ pub(crate) fn identity_for(stream: &otel_logs_identity::ServiceStream) -> (u64, 
 /// `build_sfst_file`). The partition key is NOT in the summary — it lives only
 /// in the file's
 /// `FileId`; tests keep the pair consistent by using the same stream's
-/// `ns_hash` as the `FileId`'s `part_key`.
+/// `ns_hash` as the `FileId`'s `partition_key`.
 pub(crate) fn summary_for(
     stream: &otel_logs_identity::ServiceStream,
     record_count: u32,

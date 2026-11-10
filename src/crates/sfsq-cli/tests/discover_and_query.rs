@@ -38,7 +38,7 @@ const NS: u64 = 1_000_000_000;
 /// The one stream a fixture `ResourceLogs` carries: `service.namespace` /
 /// `service.name`, each empty when absent. Mirrors the ingestor's private
 /// `ResourceLogsExt::service_stream` (otel-ingestor/src/logs_service.rs) because both feed the
-/// part_key a WAL filename embeds — the filename-hash assertions below fail
+/// partition_key a WAL filename embeds — the filename-hash assertions below fail
 /// if the two ever drift.
 fn stream_of(rl: &ResourceLogs) -> ServiceStream {
     let mut namespace = "";
@@ -166,12 +166,12 @@ fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start
         let (data, count) = encode_ng_frame(b.clone());
         let ingestion = TimestampNs((BASE_S + 500 + i as u64) * NS);
         let stream = stream_of(&b[0]);
-        let part_key = otel_logs_identity::part_key(&stream);
+        let partition_key = otel_logs_identity::partition_key(&stream);
         let content_meta =
             otel_logs_identity::encode_content_meta(&stream).expect("identity encodes");
         writer
             .write_frame(
-                part_key,
+                partition_key,
                 &content_meta,
                 &data,
                 wal::FrameMeta {
@@ -310,8 +310,8 @@ fn wal_stream_filter_matches_absent_namespace() {
     let wal_dir = dirs.wal.join("default");
     std::fs::create_dir_all(&wal_dir).unwrap();
 
-    // The WAL filename embeds the stream's part_key — the canonical `ns_hash`
-    // via `otel_logs_identity::part_key` — so for a service.name without
+    // The WAL filename embeds the stream's partition_key — the canonical `ns_hash`
+    // via `otel_logs_identity::partition_key` — so for a service.name without
     // service.namespace it is `compute_ns_hash(None, name)`, exactly what the
     // ingestor stamps on real files.
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
@@ -328,11 +328,11 @@ fn wal_stream_filter_matches_absent_namespace() {
     .expect("writer");
     let (data, count) = encode_ng_frame(batch_for(records(0..10), "", "api"));
     let stream = ServiceStream::new("", "api");
-    let part_key = otel_logs_identity::part_key(&stream);
+    let partition_key = otel_logs_identity::partition_key(&stream);
     let content_meta = otel_logs_identity::encode_content_meta(&stream).expect("identity encodes");
     writer
         .write_frame(
-            part_key,
+            partition_key,
             &content_meta,
             &data,
             wal::FrameMeta {
@@ -352,7 +352,7 @@ fn wal_stream_filter_matches_absent_namespace() {
         .find(|p| p.extension().is_some_and(|x| x == "wal"))
         .unwrap();
     assert_eq!(
-        FileId::parse(&wal_path).unwrap().part_key,
+        FileId::parse(&wal_path).unwrap().partition_key,
         compute_ns_hash(None, Some("api")),
     );
 

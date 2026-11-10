@@ -198,7 +198,7 @@ fn partition_spans(request: ExportTraceServiceRequest) -> Vec<StorableSpans> {
     let content_meta = otel_logs_identity::encode_content_meta(&unattributed)
         .expect("the empty identity always encodes (version byte + two zero lengths)");
     vec![StorableSpans {
-        partition_key: otel_logs_identity::part_key(&unattributed),
+        partition_key: otel_logs_identity::partition_key(&unattributed),
         content_meta,
         payload: Payload::Spans(request),
     }]

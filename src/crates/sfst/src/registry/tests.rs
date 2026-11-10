@@ -17,7 +17,7 @@
 //! - `candidates()` overlap: file ranges are inclusive on both ends, the
 //!   query half-open `[start, end)` — any shared second includes the
 //!   file, and an empty window matches nothing;
-//! - partition filter: exact match on the opaque `part_key` carried by
+//! - partition filter: exact match on the opaque `partition_key` carried by
 //!   the `FileId` (never in the summary); an empty key list is a
 //!   wildcard;
 //! - files marked pending-deletion are invisible to `candidates()`;
@@ -133,7 +133,7 @@ fn track_sets_summary() {
 // ── Candidate selection (`candidates`) ───────────────────────────
 
 /// Track one file per tuple — `(seq, min_s, max_s, namespace, stream)`;
-/// the namespace/stream pair is hashed into the opaque `part_key`
+/// the namespace/stream pair is hashed into the opaque `partition_key`
 /// stamped on the `FileId`.
 fn populate(
     reg: &mut Registry,
@@ -142,10 +142,10 @@ fn populate(
     for &(seq, min_s, max_s, ns, name) in entries {
         // The partition lives only on the `FileId` (on disk: part of the
         // filename; `Summary` has no partition field), so filtering reads
-        // `f.id.part_key` — exactly what these tests drive.
-        let part_key = crate::opaque_part_key(ns, name);
+        // `f.id.partition_key` — exactly what these tests drive.
+        let partition_key = crate::opaque_partition_key(ns, name);
         reg.track(
-            FileId::new(file_registry::test_identity(), 0, seq, part_key),
+            FileId::new(file_registry::test_identity(), 0, seq, partition_key),
             ByteSize(1),
             Summary {
                 min_timestamp_s: min_s,
@@ -259,7 +259,7 @@ fn candidates_empty_query_matches_nothing() {
 
 #[test]
 fn candidates_filter_by_stream() {
-    // Partition filtering is an exact, opaque u64 match on part_key —
+    // Partition filtering is an exact, opaque u64 match on partition_key —
     // no partial or prefix matching. Only prod/api's file comes back;
     // a shared namespace ("prod"/"worker") or stream name
     // ("staging"/"api") is already a different key.
@@ -276,7 +276,7 @@ fn candidates_filter_by_stream() {
 
     let q = Query {
         time_range: 0..u32::MAX,
-        partition_keys: vec![crate::opaque_part_key("prod", "api")],
+        partition_keys: vec![crate::opaque_partition_key("prod", "api")],
     };
     assert_eq!(seqs(reg.candidates(&q)), vec![1]);
 }
