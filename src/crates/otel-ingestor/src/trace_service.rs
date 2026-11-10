@@ -39,7 +39,6 @@
 //! [`NetdataTracesService::sweep_expired_rotations`] seals quiet streams so
 //! they still get indexed (and uploaded, with remote storage).
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -53,6 +52,7 @@ use tonic::{Request, Response, Status};
 use crate::ledger_sender::LedgerSender;
 use crate::observer::TraceObserver;
 use crate::tenant::extract_tenant_id;
+use crate::tenant_writers::TenantWriters;
 use otel_bridge::config::AuthConfig;
 use otel_bridge::signals::Signal;
 use otel_derived_metrics::DerivedMetrics;
@@ -229,11 +229,8 @@ fn build_partial_success(out_of_window: usize) -> Option<ExportTracePartialSucce
 /// path reaches it via the thin `TraceService` wrapper; the OTLP/HTTP front
 /// end calls the same core. See the module docs for the request flow.
 pub struct NetdataTracesService {
-    /// Per-tenant WAL writers. The map mutex is held only for lookup/insert;
-    /// each request then locks ONLY its tenant's writer for the write+sync
-    /// region, so tenants ingest in parallel (same discipline as the logs
-    /// service).
-    writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
+    /// The per-tenant WAL writers of this signal.
+    writers: TenantWriters,
     /// Process-wide monotonic clock, shared across tenants, streams, and
     /// signals (lib.rs creates one instance for logs + traces): the WAL writer
     /// stamps per-frame `ingestion_ns` from it, so one clock keeps frame
@@ -243,20 +240,11 @@ pub struct NetdataTracesService {
     /// exactly one connection (the ledger gap-checks frame sequences per
     /// signal), so every signal's events MUST funnel through one sender.
     ledger_sender: Arc<LedgerSender>,
-    wal_base_dir: PathBuf,
-    wal_config: otel_bridge::config::WalConfig,
     /// Global ingestion time-bounds: reject spans whose `[start, effective
     /// end]` interval falls outside `[now - max_age, now + future_skew]`.
     /// Applied per span inside `prepare_trace_frame`.
     ingest_bounds: otel_bridge::config::IngestConfig,
-    /// Shared global seq allocator (lib.rs hands the same one to the logs and
-    /// traces services), so file `seq` is unique across signals.
-    seq_allocator: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
-    /// Identity stamped into every WAL FileId (the machine GUID resolved by the
-    /// supervisor plus its self-generated per-process instance id; see
-    /// `otel_bridge::config::PluginConfig::identity`).
-    instance_identity: Identity,
     /// Features that see accepted exports without taking part in storing
     /// them (`observer.rs`).
     observers: Vec<Arc<dyn TraceObserver>>,
@@ -277,15 +265,18 @@ impl NetdataTracesService {
         instance_identity: Identity,
     ) -> Self {
         Self {
-            writers: Mutex::new(HashMap::new()),
+            writers: TenantWriters::new(
+                Signal::Traces,
+                ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
+                wal_base_dir,
+                wal_config,
+                seq_allocator,
+                instance_identity,
+            ),
             clock,
             ledger_sender,
-            wal_base_dir,
-            wal_config,
             ingest_bounds,
-            seq_allocator,
             auth,
-            instance_identity,
             observers: Vec::new(),
             derived_metrics: None,
         }
@@ -302,30 +293,12 @@ impl NetdataTracesService {
         self.derived_metrics = Some(derived_metrics);
     }
 
-    /// The tenant's effective WAL rotation config: its per-tenant override,
-    /// or the global default when it has none (see `RotationPolicy::resolve`).
-    fn resolve_wal_config(&self, tenant_id: &str) -> wal::Config {
-        let rotation = self.wal_config.rotation.resolve(tenant_id);
-        wal::Config {
-            rotation: wal::RotationConfig {
-                max_entries: rotation.max_entries,
-                max_file_size: file_registry::ByteSize(rotation.max_file_size.as_u64()),
-                max_duration: Some(rotation.max_file_duration),
-            },
-            crc_enabled: self.wal_config.crc_enabled,
-            compression_enabled: self.wal_config.compression_enabled,
-        }
-    }
-
     /// The default (non-overridden) WAL rotation `max_duration` — the value the
     /// idle-rotation sweep enforces for most streams. Used at startup to warn
     /// when it is at or below the sweep interval (idle streams then rotate at
     /// sweep granularity).
     pub fn default_max_file_duration(&self) -> std::time::Duration {
-        self.wal_config
-            .rotation
-            .resolve("default")
-            .max_file_duration
+        self.writers.default_max_file_duration()
     }
 
     /// The resolved ingestion `future_skew`. Used at startup to warn when it is
@@ -341,59 +314,17 @@ impl NetdataTracesService {
     }
 
     /// Rotate any per-tenant WAL stream whose active file has passed a rotation
-    /// threshold as of now, without a new frame (the idle-rotation sweep, the
-    /// traces twin of the logs service's). lib.rs runs it periodically per
-    /// signal, off the async worker pool (it does serial fsyncs), so quiet
-    /// streams still get indexed (and, with remote storage, uploaded).
-    /// Lock discipline mirrors the export path:
-    /// - the clock is read ONCE before any writer lock, so the sweep never
-    ///   nests clock → writer and cannot AB-BA with the export path's one
-    ///   nesting (writer → clock, for the per-frame `ingestion_ns` tick);
-    /// - writer handles are snapshotted under the map lock only (held just for
-    ///   the clone), so exports are not blocked by the sweep;
-    /// - per writer: rotate, then drain AND send UNDER that writer's lock so
-    ///   the sealed file's events reach the ledger in order.
+    /// threshold as of now, without a new frame (the idle-rotation sweep).
+    /// lib.rs calls it periodically per signal, off the write path and off the
+    /// async worker pool (it does serial fsyncs), so a quiet stream still
+    /// seals, gets indexed, and (with remote storage) uploaded.
+    ///
+    /// The clock is read ONCE here and its guard dropped before any writer is
+    /// locked; the rest of the lock discipline is on
+    /// [`TenantWriters::rotate_expired`].
     pub fn sweep_expired_rotations(&self) {
         let now_ns = self.clock.lock().unwrap().now_ns();
-
-        let writers: Vec<(TenantId, Arc<Mutex<wal::Writer>>)> = {
-            let guard = self.writers.lock().unwrap();
-            guard
-                .iter()
-                .map(|(t, w)| (t.clone(), Arc::clone(w)))
-                .collect()
-        };
-
-        for (tenant_id, writer) in writers {
-            let (result, forwarded) = {
-                let mut w = writer.lock().unwrap();
-                let result = w.rotate_expired(now_ns);
-                // Drain UNCONDITIONALLY, even when the rotation errored: it is
-                // best-effort per stream, so it may have already sealed earlier
-                // streams and queued their `Closed` events — those must still
-                // reach the ledger. Send under the lock (ordering, as in export).
-                let events = w.take_all_events();
-                let forwarded = events.len();
-                if forwarded > 0 {
-                    self.ledger_sender.send_events(tenant_id.clone(), events);
-                }
-                (result, forwarded)
-            };
-            match result {
-                Ok(n) if n > 0 => tracing::debug!(
-                    tenant = %tenant_id,
-                    rotated = n,
-                    "idle traces WAL rotation: sealed expired stream(s)"
-                ),
-                Ok(_) => {}
-                Err(e) => tracing::error!(
-                    %e,
-                    tenant = %tenant_id,
-                    forwarded_events = forwarded,
-                    "idle traces WAL rotation failed; forwarded already-sealed streams' events"
-                ),
-            }
-        }
+        self.writers.rotate_expired(now_ns, &self.ledger_sender);
     }
 
     /// The response of a successful export that carried spans, counted for
@@ -496,34 +427,10 @@ impl NetdataTracesService {
         // one durability sync (a successful ack implies the frames are on
         // disk), event drain. All sync code — no `.await` while a guard is
         // held.
-        let writer = {
-            let mut writers = self.writers.lock().unwrap();
-            if let Some(w) = writers.get(tenant_id) {
-                Arc::clone(w)
-            } else {
-                let path = self.wal_base_dir.join(tenant_id.as_str());
-                let wal_config = self.resolve_wal_config(tenant_id.as_str());
-                let w = wal::Writer::new(
-                    &path,
-                    wal_config,
-                    Arc::clone(&self.seq_allocator),
-                    wal::FileStamp {
-                        pipeline_id: Signal::Traces.pipeline_id(),
-                        payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
-                    },
-                    self.instance_identity,
-                )
-                .map_err(|e| {
-                    tracing::error!(%e, tenant = %tenant_id, "failed to create traces WAL writer");
-                    Status::internal("WAL writer creation failed")
-                })?;
-                Arc::clone(
-                    writers
-                        .entry(tenant_id.clone())
-                        .or_insert(Arc::new(Mutex::new(w))),
-                )
-            }
-        };
+        let writer = self.writers.writer_for(tenant_id).map_err(|e| {
+            tracing::error!(%e, tenant = %tenant_id, "failed to create traces WAL writer");
+            Status::internal("WAL writer creation failed")
+        })?;
         {
             let mut writer = writer.lock().unwrap();
             for s in &storable_spans {
@@ -574,6 +481,8 @@ impl TraceService for NetdataTracesService {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
     use file_registry::{InstanceId, MachineId};
     use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
@@ -948,14 +857,10 @@ mod tests {
             .unwrap();
         assert!(resp.into_inner().partial_success.is_none());
 
-        let writer = Arc::clone(
-            service
-                .writers
-                .lock()
-                .unwrap()
-                .get(&TenantId::default_tenant())
-                .unwrap(),
-        );
+        let writer = service
+            .writers
+            .existing(&TenantId::default_tenant())
+            .unwrap();
         let events = writer.lock().unwrap().shutdown_all().unwrap();
         // The Closed event carries the span-start range accumulated from the
         // frame's log_ts_range — span time, not ingestion time.
@@ -1020,7 +925,7 @@ mod tests {
             .await
             .unwrap();
         assert!(resp.into_inner().partial_success.is_none());
-        assert!(service.writers.lock().unwrap().is_empty());
+        assert!(service.writers.is_empty());
         assert!(walkdir(tmp.path()).is_empty());
     }
 
@@ -1065,14 +970,10 @@ mod tests {
         assert!(partial.error_message.contains("ingestion window"));
 
         // The kept span was written: one frame, entry_count 1.
-        let writer = Arc::clone(
-            service
-                .writers
-                .lock()
-                .unwrap()
-                .get(&TenantId::default_tenant())
-                .unwrap(),
-        );
+        let writer = service
+            .writers
+            .existing(&TenantId::default_tenant())
+            .unwrap();
         let events = writer.lock().unwrap().shutdown_all().unwrap();
         assert!(
             events.iter().any(
@@ -1100,7 +1001,7 @@ mod tests {
         let partial = resp.into_inner().partial_success.expect("all rejected");
         assert_eq!(partial.rejected_spans, 3);
         assert!(
-            service.writers.lock().unwrap().is_empty(),
+            service.writers.is_empty(),
             "no writer created when nothing is written"
         );
         assert!(walkdir(tmp.path()).is_empty());

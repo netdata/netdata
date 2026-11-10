@@ -68,6 +68,7 @@ mod otel;
 mod otlp_json;
 mod output;
 mod tenant;
+mod tenant_writers;
 mod trace_service;
 
 use chart_config::ChartConfigManager;

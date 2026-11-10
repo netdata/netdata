@@ -48,6 +48,7 @@ use tonic::{Request, Response, Status};
 
 use crate::ledger_sender::LedgerSender;
 use crate::tenant::extract_tenant_id;
+use crate::tenant_writers::TenantWriters;
 
 /// What the logs export asks of an OTLP `ResourceLogs`.
 trait ResourceLogsExt {
@@ -556,12 +557,8 @@ fn encode_identity_or_drop(
 /// `LogsService` wrapper; the OTLP/HTTP front end calls the same core. See
 /// the module docs for the request flow.
 pub struct NetdataLogsService {
-    /// Per-tenant WAL writers. The map mutex is held only for lookup/insert
-    /// (a tenant's first request creates its writer under it); each request
-    /// then locks ONLY its tenant's writer for the serialized write+sync
-    /// region, so tenants ingest in parallel and same-tenant requests overlap
-    /// everything before that region.
-    writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
+    /// The per-tenant WAL writers of this signal.
+    writers: TenantWriters,
     /// The stream that holds each `(tenant, ns_hash)`. First write wins; a
     /// later stream with the same hash and another identity is rejected via
     /// `partial_success`.
@@ -576,18 +573,11 @@ pub struct NetdataLogsService {
     /// exactly one connection (the ledger gap-checks frame sequences per signal),
     /// so every signal's events MUST funnel through one sender.
     ledger_sender: Arc<LedgerSender>,
-    wal_base_dir: PathBuf,
-    wal_config: otel_bridge::config::WalConfig,
     /// Global ingestion time-bounds: reject records whose resolved
     /// timestamp is older than `max_age` or more than `future_skew` ahead.
     /// Applied per record inside `prepare_log_frame`.
     ingest_bounds: otel_bridge::config::IngestConfig,
-    seq_allocator: Arc<wal::SeqAllocator>,
     auth: AuthConfig,
-    /// Identity stamped into every WAL FileId (the machine GUID resolved by the
-    /// supervisor plus its self-generated per-process instance id; see
-    /// `otel_bridge::config::PluginConfig::identity`).
-    instance_identity: Identity,
     /// Charts the plugin derives from what it ingests (`otel-derived-metrics`).
     derived_metrics: Option<Arc<DerivedMetrics>>,
 }
@@ -605,16 +595,19 @@ impl NetdataLogsService {
         instance_identity: Identity,
     ) -> Self {
         Self {
-            writers: Mutex::new(HashMap::new()),
+            writers: TenantWriters::new(
+                Signal::Logs,
+                ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+                wal_base_dir,
+                wal_config,
+                seq_allocator,
+                instance_identity,
+            ),
             claimed_streams: ClaimedStreams::default(),
             clock,
             ledger_sender,
-            wal_base_dir,
-            wal_config,
             ingest_bounds,
-            seq_allocator,
             auth,
-            instance_identity,
             derived_metrics: None,
         }
     }
@@ -625,29 +618,11 @@ impl NetdataLogsService {
         self.derived_metrics = Some(derived_metrics);
     }
 
-    /// The tenant's effective WAL rotation config: its per-tenant override,
-    /// or the global default when it has none (see `RotationPolicy::resolve`).
-    fn resolve_wal_config(&self, tenant_id: &str) -> wal::Config {
-        let rotation = self.wal_config.rotation.resolve(tenant_id);
-        wal::Config {
-            rotation: wal::RotationConfig {
-                max_entries: rotation.max_entries,
-                max_file_size: file_registry::ByteSize(rotation.max_file_size.as_u64()),
-                max_duration: Some(rotation.max_file_duration),
-            },
-            crc_enabled: self.wal_config.crc_enabled,
-            compression_enabled: self.wal_config.compression_enabled,
-        }
-    }
-
     /// The default (non-overridden) WAL rotation `max_duration` — the value the
     /// idle-rotation sweep enforces for most streams. Used at startup to warn
     /// when it is at or below the sweep interval.
     pub fn default_max_file_duration(&self) -> std::time::Duration {
-        self.wal_config
-            .rotation
-            .resolve("default")
-            .max_file_duration
+        self.writers.default_max_file_duration()
     }
 
     /// The resolved ingestion `future_skew`. Used at startup to warn when it is
@@ -664,59 +639,16 @@ impl NetdataLogsService {
 
     /// Rotate any per-tenant WAL stream whose active file has passed a rotation
     /// threshold as of now, without a new frame (the idle-rotation sweep).
-    /// Called periodically off the write path so a quiet stream still seals,
-    /// gets indexed, and (with remote storage) uploaded.
+    /// lib.rs calls it periodically per signal, off the write path and off the
+    /// async worker pool (it does serial fsyncs), so a quiet stream still
+    /// seals, gets indexed, and (with remote storage) uploaded.
     ///
-    /// Lock discipline:
-    /// - read the monotonic clock ONCE and drop its guard before locking any
-    ///   writer: the sweep never holds the clock while acquiring a writer
-    ///   lock, so the export path's one lock nesting (writer → clock, for the
-    ///   per-frame `ingestion_ns` tick) cannot form an AB-BA cycle with it;
-    /// - snapshot the tenant→writer handles under the map lock (held only for the
-    ///   clone), so exports and new-tenant creation are not blocked by the sweep;
-    /// - per writer: lock it, rotate, then drain AND send UNDER that lock so the
-    ///   sealed file's events reach the ledger in order (see the export path).
+    /// The clock is read ONCE here and its guard dropped before any writer is
+    /// locked; the rest of the lock discipline is on
+    /// [`TenantWriters::rotate_expired`].
     pub fn sweep_expired_rotations(&self) {
         let now_ns = self.clock.lock().unwrap().now_ns();
-
-        let writers: Vec<(TenantId, Arc<Mutex<wal::Writer>>)> = {
-            let guard = self.writers.lock().unwrap();
-            guard
-                .iter()
-                .map(|(t, w)| (t.clone(), Arc::clone(w)))
-                .collect()
-        };
-
-        for (tenant_id, writer) in writers {
-            let (result, forwarded) = {
-                let mut w = writer.lock().unwrap();
-                let result = w.rotate_expired(now_ns);
-                // Drain UNCONDITIONALLY, even when the rotation errored: it is
-                // best-effort per stream, so it may have already sealed earlier
-                // streams and queued their `Closed` events — those must still
-                // reach the ledger. Send under the lock (ordering, as in export).
-                let events = w.take_all_events();
-                let forwarded = events.len();
-                if forwarded > 0 {
-                    self.ledger_sender.send_events(tenant_id.clone(), events);
-                }
-                (result, forwarded)
-            };
-            match result {
-                Ok(n) if n > 0 => tracing::debug!(
-                    tenant = %tenant_id,
-                    rotated = n,
-                    "idle WAL rotation: sealed expired stream(s)"
-                ),
-                Ok(_) => {}
-                Err(e) => tracing::error!(
-                    %e,
-                    tenant = %tenant_id,
-                    forwarded_events = forwarded,
-                    "idle WAL rotation failed; forwarded already-sealed streams' events"
-                ),
-            }
-        }
+        self.writers.rotate_expired(now_ns, &self.ledger_sender);
     }
 
     /// The response of a successful export, counted for self-monitoring on
@@ -829,34 +761,10 @@ impl NetdataLogsService {
         // after `sync_all` succeeds, so a 200 implies the frames are on
         // disk), event drain. All sync code — no `.await` while a guard is
         // held.
-        let writer = {
-            let mut writers = self.writers.lock().unwrap();
-            if let Some(w) = writers.get(tenant_id) {
-                Arc::clone(w)
-            } else {
-                let path = self.wal_base_dir.join(tenant_id.as_str());
-                let wal_config = self.resolve_wal_config(tenant_id.as_str());
-                let w = wal::Writer::new(
-                    &path,
-                    wal_config,
-                    Arc::clone(&self.seq_allocator),
-                    wal::FileStamp {
-                        pipeline_id: Signal::Logs.pipeline_id(),
-                        payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
-                    },
-                    self.instance_identity,
-                )
-                .map_err(|e| {
-                    tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
-                    Status::internal("WAL writer creation failed")
-                })?;
-                Arc::clone(
-                    writers
-                        .entry(tenant_id.clone())
-                        .or_insert(Arc::new(Mutex::new(w))),
-                )
-            }
-        };
+        let writer = self.writers.writer_for(tenant_id).map_err(|e| {
+            tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
+            Status::internal("WAL writer creation failed")
+        })?;
         {
             let mut writer = writer.lock().unwrap();
             for s in &storable_streams {
@@ -1200,14 +1108,10 @@ mod tests {
             .await
             .unwrap();
 
-        let writer = Arc::clone(
-            service
-                .writers
-                .lock()
-                .unwrap()
-                .get(&TenantId::default_tenant())
-                .unwrap(),
-        );
+        let writer = service
+            .writers
+            .existing(&TenantId::default_tenant())
+            .unwrap();
         let events = writer.lock().unwrap().shutdown_all().unwrap();
         assert!(
             events.iter().any(|e| matches!(
@@ -1630,9 +1534,8 @@ mod tests {
         assert!(
             service
                 .writers
-                .lock()
-                .unwrap()
-                .contains_key(&TenantId::default_tenant()),
+                .existing(&TenantId::default_tenant())
+                .is_some(),
             "the in-window record must still be written",
         );
     }
@@ -1749,7 +1652,7 @@ mod tests {
         assert_eq!(ps.rejected_log_records, 2);
         assert!(ps.error_message.contains("ingestion window"));
         assert!(
-            service.writers.lock().unwrap().is_empty(),
+            service.writers.is_empty(),
             "no WAL writer should be created when every record is rejected",
         );
     }
@@ -1776,14 +1679,10 @@ mod tests {
             .await
             .unwrap();
 
-        let writer = Arc::clone(
-            service
-                .writers
-                .lock()
-                .unwrap()
-                .get(&TenantId::default_tenant())
-                .unwrap(),
-        );
+        let writer = service
+            .writers
+            .existing(&TenantId::default_tenant())
+            .unwrap();
         let events = writer.lock().unwrap().shutdown_all().unwrap();
         let bases: Vec<u64> = events
             .iter()
