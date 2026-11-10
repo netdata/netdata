@@ -37,7 +37,7 @@ const BASE_S: u64 = 1_000_000;
 const NS: u64 = 1_000_000_000;
 /// The one stream a fixture `ResourceLogs` carries: `service.namespace` /
 /// `service.name`, each empty when absent. Mirrors the ingestor's private
-/// `extract_stream` (otel-ingestor/src/logs_service.rs) because both feed the
+/// `ResourceLogsExt::service_stream` (otel-ingestor/src/logs_service.rs) because both feed the
 /// part_key a WAL filename embeds — the filename-hash assertions below fail
 /// if the two ever drift.
 fn stream_of(rl: &ResourceLogs) -> ServiceStream {

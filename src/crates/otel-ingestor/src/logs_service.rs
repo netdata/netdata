@@ -42,43 +42,56 @@ use tonic::{Request, Response, Status};
 use crate::ledger_sender::LedgerSender;
 use crate::tenant::extract_tenant_id;
 
-/// Extract the `(service.namespace, service.name)` stream identity from a
-/// `ResourceLogs`.
-///
-/// An absent attribute and an empty-string attribute collapse to the same
-/// empty-string field — they identify the same stream (see
-/// `ServiceStream::ns_hash`). The `ns_hash` is derived from the returned
-/// `ServiceStream` at the point it is needed, not stored alongside it.
-fn extract_stream(rl: &ResourceLogs) -> ServiceStream {
-    let attrs = match rl.resource.as_ref() {
-        Some(r) => &r.attributes,
-        None => return ServiceStream::new("", ""),
-    };
+/// What the logs export asks of an OTLP `ResourceLogs`.
+trait ResourceLogsExt {
+    /// The `(service.namespace, service.name)` stream these logs belong to.
+    ///
+    /// An absent attribute and an empty-string attribute collapse to the same
+    /// empty-string field — they identify the same stream (see
+    /// `ServiceStream::ns_hash`). The `ns_hash` is derived from the returned
+    /// `ServiceStream` at the point it is needed, not stored alongside it.
+    fn service_stream(&self) -> ServiceStream;
 
-    let mut namespace: &str = "";
-    let mut name: &str = "";
+    /// The log records these logs carry, across all their scopes.
+    fn log_record_count(&self) -> usize;
+}
 
-    for kv in attrs {
-        match kv.key.as_str() {
-            "service.namespace" => {
-                if let Some(Value::StringValue(s)) =
-                    kv.value.as_ref().and_then(|v| v.value.as_ref())
-                {
-                    namespace = s.as_str();
+impl ResourceLogsExt for ResourceLogs {
+    fn service_stream(&self) -> ServiceStream {
+        let attrs = match self.resource.as_ref() {
+            Some(r) => &r.attributes,
+            None => return ServiceStream::new("", ""),
+        };
+
+        let mut namespace: &str = "";
+        let mut name: &str = "";
+
+        for kv in attrs {
+            match kv.key.as_str() {
+                "service.namespace" => {
+                    if let Some(Value::StringValue(s)) =
+                        kv.value.as_ref().and_then(|v| v.value.as_ref())
+                    {
+                        namespace = s.as_str();
+                    }
                 }
-            }
-            "service.name" => {
-                if let Some(Value::StringValue(s)) =
-                    kv.value.as_ref().and_then(|v| v.value.as_ref())
-                {
-                    name = s.as_str();
+                "service.name" => {
+                    if let Some(Value::StringValue(s)) =
+                        kv.value.as_ref().and_then(|v| v.value.as_ref())
+                    {
+                        name = s.as_str();
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
+
+        ServiceStream::new(namespace, name)
     }
 
-    ServiceStream::new(namespace, name)
+    fn log_record_count(&self) -> usize {
+        self.scope_logs.iter().map(|sl| sl.log_records.len()).sum()
+    }
 }
 
 /// One collision: a request group whose stream identity doesn't match the
@@ -112,11 +125,11 @@ fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, S
     let mut groups: HashMap<ServiceStream, StreamGroup> = HashMap::new();
 
     for rl in resource_logs {
-        let count: usize = rl.scope_logs.iter().map(|sl| sl.log_records.len()).sum();
+        let count = rl.log_record_count();
         if count == 0 {
             continue;
         }
-        let stream = extract_stream(&rl);
+        let stream = rl.service_stream();
         let group = groups.entry(stream).or_insert_with(|| StreamGroup {
             log_record_count: 0,
             resource_logs: Vec::new(),
@@ -926,8 +939,8 @@ mod tests {
     }
 
     #[test]
-    fn extract_stream_pulls_namespace_and_name_from_resource_attrs() {
-        let s = extract_stream(&rl(Some("prod"), Some("api"), 0));
+    fn service_stream_pulls_namespace_and_name_from_resource_attrs() {
+        let s = rl(Some("prod"), Some("api"), 0).service_stream();
         assert_eq!(s, ServiceStream::new("prod", "api"));
         assert_eq!(
             s.ns_hash(),
@@ -936,19 +949,19 @@ mod tests {
     }
 
     #[test]
-    fn extract_stream_handles_missing_attrs() {
-        let s = extract_stream(&rl(None, None, 0));
+    fn service_stream_handles_missing_attrs() {
+        let s = rl(None, None, 0).service_stream();
         assert_eq!(s, ServiceStream::new("", ""));
         assert_eq!(s.ns_hash(), otel_logs_identity::compute_ns_hash(None, None));
     }
 
     #[test]
-    fn extract_stream_merges_missing_and_empty() {
+    fn service_stream_merges_missing_and_empty() {
         // Absent and empty-string attributes identify the same stream:
         // both collapse to an empty-field ServiceStream and the same
         // ns_hash, so the claimed streams treat them as one.
-        let absent = extract_stream(&rl(None, None, 0));
-        let empty = extract_stream(&rl(Some(""), Some(""), 0));
+        let absent = rl(None, None, 0).service_stream();
+        let empty = rl(Some(""), Some(""), 0).service_stream();
         assert_eq!(absent, empty);
         assert_eq!(absent, ServiceStream::new("", ""));
         assert_eq!(absent.ns_hash(), empty.ns_hash());
@@ -1000,11 +1013,7 @@ mod tests {
         let Payload::Records(resource_logs) = &stream.payload else {
             panic!("a freshly admitted stream holds its records");
         };
-        resource_logs
-            .iter()
-            .flat_map(|rl| rl.scope_logs.iter())
-            .map(|sl| sl.log_records.len())
-            .sum()
+        resource_logs.iter().map(|rl| rl.log_record_count()).sum()
     }
 
     #[test]
