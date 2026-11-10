@@ -26,6 +26,7 @@ use otel_bridge::signals::Signal;
 use self_monitoring::{DerivationHealth, IngestOutcomes};
 use service_log_records::ServiceLogRecords;
 use service_requests::ServiceRequests;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Largest chunk [`DerivedMetrics::emit`] returns: far below the 16 MiB IPC
@@ -33,13 +34,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub const MAX_CHUNK_BYTES: usize = 1 << 20;
 
 /// The spans of one export request, recorded but not yet counted. Commit the
-/// batch once the spans are durable; a dropped batch counts nothing.
-pub struct SpansBatch<'a> {
-    service_requests: &'a ServiceRequests,
+/// batch once the spans are durable; a dropped batch counts nothing. It owns
+/// what it needs, so the task that waits for the spans to be durable can
+/// carry it.
+pub struct SpansBatch {
+    service_requests: Arc<ServiceRequests>,
     batch: Batch,
 }
 
-impl SpansBatch<'_> {
+impl SpansBatch {
     /// Record the requests among the spans of `export`, a normalized group of
     /// an export request of `tenant`.
     pub fn record(&mut self, tenant: &str, export: &ExportTraceServiceRequest) {
@@ -55,13 +58,13 @@ impl SpansBatch<'_> {
 
 /// The log records of one export request, recorded but not yet counted.
 /// Commit the batch once the log records are durable; a dropped batch counts
-/// nothing.
-pub struct LogsBatch<'a> {
-    service_log_records: &'a ServiceLogRecords,
+/// nothing. It owns what it needs, like [`SpansBatch`].
+pub struct LogsBatch {
+    service_log_records: Arc<ServiceLogRecords>,
     batch: Batch,
 }
 
-impl LogsBatch<'_> {
+impl LogsBatch {
     /// Record the log records of `export`, a normalized group of an export
     /// request of `tenant`.
     pub fn record(&mut self, tenant: &str, export: &ExportLogsServiceRequest) {
@@ -78,8 +81,9 @@ impl LogsBatch<'_> {
 /// The per-service metric sets and their health: present when derived metrics
 /// are enabled.
 struct PerServiceMetrics {
-    requests: ServiceRequests,
-    log_records: ServiceLogRecords,
+    // Shared with the batches of the export requests in flight.
+    requests: Arc<ServiceRequests>,
+    log_records: Arc<ServiceLogRecords>,
     health: DerivationHealth,
 }
 
@@ -98,8 +102,8 @@ impl DerivedMetrics {
     pub fn new(config: &DerivedMetricsConfig) -> Result<Self, netdata_plugin_metrics::Error> {
         let per_service = if config.enabled {
             Some(PerServiceMetrics {
-                requests: ServiceRequests::new(config.max_services)?,
-                log_records: ServiceLogRecords::new(config.max_services)?,
+                requests: Arc::new(ServiceRequests::new(config.max_services)?),
+                log_records: Arc::new(ServiceLogRecords::new(config.max_services)?),
                 health: DerivationHealth::new()?,
             })
         } else {
@@ -113,20 +117,20 @@ impl DerivedMetrics {
 
     /// A batch for the spans of one export request; `None` when derived
     /// metrics are disabled.
-    pub fn spans_batch(&self) -> Option<SpansBatch<'_>> {
+    pub fn spans_batch(&self) -> Option<SpansBatch> {
         let service_requests = &self.per_service.as_ref()?.requests;
         Some(SpansBatch {
-            service_requests,
+            service_requests: Arc::clone(service_requests),
             batch: service_requests.batch(),
         })
     }
 
     /// A batch for the log records of one export request; `None` when
     /// derived metrics are disabled.
-    pub fn logs_batch(&self) -> Option<LogsBatch<'_>> {
+    pub fn logs_batch(&self) -> Option<LogsBatch> {
         let service_log_records = &self.per_service.as_ref()?.log_records;
         Some(LogsBatch {
-            service_log_records,
+            service_log_records: Arc::clone(service_log_records),
             batch: service_log_records.batch(),
         })
     }
