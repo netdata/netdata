@@ -58,31 +58,22 @@ trait ResourceLogsExt {
 
 impl ResourceLogsExt for ResourceLogs {
     fn service_stream(&self) -> ServiceStream {
-        let attrs = match self.resource.as_ref() {
-            Some(r) => &r.attributes,
-            None => return ServiceStream::new("", ""),
-        };
-
         let mut namespace: &str = "";
         let mut name: &str = "";
 
-        for kv in attrs {
-            match kv.key.as_str() {
-                "service.namespace" => {
-                    if let Some(Value::StringValue(s)) =
-                        kv.value.as_ref().and_then(|v| v.value.as_ref())
-                    {
-                        namespace = s.as_str();
-                    }
+        if let Some(resource) = &self.resource {
+            for attribute in &resource.attributes {
+                // Only a string value can name a stream.
+                let Some(Value::StringValue(value)) =
+                    attribute.value.as_ref().and_then(|any| any.value.as_ref())
+                else {
+                    continue;
+                };
+                match attribute.key.as_str() {
+                    "service.namespace" => namespace = value,
+                    "service.name" => name = value,
+                    _ => {}
                 }
-                "service.name" => {
-                    if let Some(Value::StringValue(s)) =
-                        kv.value.as_ref().and_then(|v| v.value.as_ref())
-                    {
-                        name = s.as_str();
-                    }
-                }
-                _ => {}
             }
         }
 
