@@ -8,7 +8,9 @@ does not consume browser slots.
 
 The qualification uses a development build with shared browser admission, independent check and chart cadences,
 and exact time-based RUM retention. It runs the native Agent, DEM plugin, real Chromium executions, HTTP receiver,
-and retained-history queries together. The target below applies to one Agent and its DEM plugin process.
+and retained-history queries together. The browser and RUM implementation was subsequently merged in
+[PR #24674](https://github.com/netdata/netdata/pull/24674) and
+[PR #24675](https://github.com/netdata/netdata/pull/24675). The target below applies to one Agent and its DEM plugin process.
 
 | Work | Configuration |
 |---|---|
@@ -122,9 +124,10 @@ when changing scripts, audited pages, runtime, hardware, frequency or concurrenc
 ## RUM and query costs
 
 Size RUM using new document, session, vital and resource identities as well as bytes and beacons per second.
-Canonical measurements retain their receipt window; replay identities remain for 30 minutes. Repeated reports and
-revisions have a different memory cost from entirely new documents. Session detail sampling controls investigation
-history, not the population used for live measurement.
+Canonical measurements retain their receipt window; replay identities remain for 30 minutes. Restarting or replacing
+the site job, or changing its vnode association, resets these in-memory windows. Repeated reports and revisions have
+a different memory cost from entirely new documents. Session detail sampling controls investigation history, not the
+population used for live measurement.
 
 The qualification reads live sites/pages and two concurrent, bounded recent session-history ranges every 15 seconds,
 while also observing browser status/history. This is a specific query mix. Broad history ranges, more concurrent
