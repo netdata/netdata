@@ -123,8 +123,8 @@ int retransmission_timeout = 0; /* 0 for default */
 /* Workarounds - specify workaround flags if necessary */
 unsigned int workaround_flags = 0;
 
-/* Set to an appropriate alternate if desired */
-char *sdr_cache_directory = "/tmp";
+/* Set in main() to the Netdata cache directory; sdr-cache-dir overrides it */
+const char *sdr_cache_directory = NULL;
 char *sdr_sensors_cache_format = ".netdata-freeipmi-sensors-%H-on-%L.sdr";
 char *sdr_sel_cache_format = ".netdata-freeipmi-sel-%H-on-%L.sdr";
 char *sensor_config_file = NULL;
@@ -1669,6 +1669,10 @@ int main (int argc, char **argv) {
     netdata_threads_init_for_external_plugins(0); // set the default threads stack size here
 
     bool netdata_do_sel = IPMI_ENABLE_SEL_BY_DEFAULT;
+
+    // the plugin runs privileged, so keep its SDR cache in the Netdata cache directory, not in a shared one
+    const char *cache_dir = getenv("NETDATA_CACHE_DIR");
+    sdr_cache_directory = (cache_dir && *cache_dir) ? cache_dir : netdata_configured_cache_dir;
 
     bool debug = false;
 

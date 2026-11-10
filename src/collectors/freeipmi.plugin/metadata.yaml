@@ -159,7 +159,7 @@ modules:
               required: false
             - name: sdr-cache-dir PATH
               description: SDR cache files directory.
-              default_value: /tmp
+              default_value: Netdata cache directory (usually /var/cache/netdata)
               required: false
             - name: sensor-config-file FILE
               description: Sensors configuration filename.
