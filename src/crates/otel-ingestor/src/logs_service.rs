@@ -1,24 +1,31 @@
 //! The OTLP logs ingestion service: receives `ExportLogsServiceRequest`s
 //! and lands them in per-tenant WALs. The logic is transport-agnostic — it
 //! lives on the [`NetdataLogsService::export_logs`] core, which both the
-//! gRPC `LogsService` wrapper and the OTLP/HTTP front end call.
+//! gRPC `LogsService` wrapper and the OTLP/HTTP front end call once they
+//! have resolved the tenant (`x-scope-orgid` header).
 //!
-//! Export flow: the transport wrapper resolves the tenant (`x-scope-orgid`
-//! header) and calls the core, which groups
-//! `ResourceLogs` by `ServiceStream` identity → drop identities too large
-//! for the substrate's `content_meta` caps → reject streams whose `ns_hash`
-//! is already claimed by a different identity (first write wins, per tenant)
-//! → prepare flattened frames lock-free via `ng_flatten::prepare_log_frame`
-//! (normalization + flattening + the ingestion time-window; `Some(bounds)`
-//! here — production enforces the window, `ng-ingest` and the benches pass
-//! `None`) → under the tenant's writer lock: write frames, one `sync_all`,
-//! drain lifecycle events → forward them to the ledger over fire-and-forget
-//! IPC ([`LedgerSender`]); the ledger's per-signal indexer seals the WAL into
-//! SFST indexes (`ng-index`).
+//! The export, in order:
+//!
+//! 1. `group_by_stream` groups the request's `ResourceLogs` by their
+//!    `ServiceStream` identity.
+//! 2. `StorableStream::admit` turns each group into a storable stream or
+//!    rejects it: its identity is too large for the substrate's
+//!    `content_meta` caps, or its `ns_hash` is already claimed by a different
+//!    identity (first write wins, per tenant; see `ClaimedStreams`).
+//! 3. `StorableStream::flatten` prepares each stream's WAL frame, lock-free,
+//!    via `ng_flatten::prepare_log_frame` (normalization + flattening + the
+//!    ingestion time-window; `Some(bounds)` here — production enforces the
+//!    window, `ng-ingest` and the benches pass `None`).
+//! 4. Under the tenant's writer lock: `StorableStream::write_to` writes the
+//!    frames, one `sync_all` makes them durable, and the WAL's lifecycle
+//!    events are drained and forwarded to the ledger over fire-and-forget IPC
+//!    ([`LedgerSender`]); the ledger's per-signal indexer seals the WAL into
+//!    SFST indexes (`ng-index`).
 //!
 //! All rejections — collisions, oversized identities, out-of-window records —
-//! are reported to the sender via OTLP `partial_success` instead of failing
-//! the RPC, and the ack is only returned after the WAL sync. The periodic
+//! are collected in `Rejections` and reported to the sender via OTLP
+//! `partial_success` instead of failing the RPC, and the ack is only returned
+//! after the WAL sync. The periodic
 //! [`NetdataLogsService::sweep_expired_rotations`] seals quiet streams
 //! between exports.
 use std::collections::HashMap;
