@@ -171,7 +171,7 @@ impl StorableStream {
     ///
     /// Identity comes first: a stream whose identity cannot be stored must
     /// not claim a `partition_key` it can never write to (see
-    /// [`encode_identity_or_drop`]). The claim then locks the claimed
+    /// [`encode_identity`]). The claim then locks the claimed
     /// streams for one lookup: the identity is encoded before it and a
     /// collision is logged after it.
     fn admit(
@@ -180,8 +180,8 @@ impl StorableStream {
         tenant_id: &TenantId,
         claimed_streams: &ClaimedStreams,
     ) -> Result<Self, Rejection> {
-        let content_meta = encode_identity_or_drop(&stream, group.log_record_count)
-            .map_err(Rejection::Oversized)?;
+        let content_meta =
+            encode_identity(&stream, group.log_record_count).map_err(Rejection::Oversized)?;
         let partition_key = otel_logs_identity::partition_key(&stream);
 
         if let Err(holder) = claimed_streams.claim(tenant_id, partition_key, &stream) {
@@ -231,7 +231,7 @@ impl StorableStream {
                 })?;
         let flattened = Flattened {
             kept: frame.records,
-            rejected: frame.rejected,
+            out_of_window: frame.rejected,
         };
 
         self.payload = if frame.records == 0 {
@@ -293,7 +293,7 @@ struct Flattened {
     /// Records in the frame: the ones phase 2 writes.
     kept: usize,
     /// Records the ingestion window rejected.
-    rejected: usize,
+    out_of_window: usize,
 }
 
 /// Per tenant, the stream that holds each `ns_hash`: the first identity
@@ -393,7 +393,7 @@ struct Rejections {
     /// Streams whose `ns_hash` a different identity already holds.
     collisions: Vec<Collision>,
     /// Streams whose identity is too large to store.
-    oversized: Vec<OversizedIdentity>,
+    oversized_identities: Vec<OversizedIdentity>,
     /// Records whose timestamp is outside the ingestion window.
     out_of_window: usize,
 }
@@ -402,27 +402,39 @@ impl Rejections {
     /// Record a stream turned away at admission.
     fn push(&mut self, rejection: Rejection) {
         match rejection {
-            Rejection::Oversized(oversized) => self.oversized.push(oversized),
+            Rejection::Oversized(oversized_identity) => {
+                self.oversized_identities.push(oversized_identity)
+            }
             Rejection::Collision(collision) => self.collisions.push(collision),
         }
     }
 
-    /// The records lost, across all three rejection classes.
-    fn count(&self) -> usize {
-        let collided: usize = self.collisions.iter().map(|c| c.log_records).sum();
-        let unstorable: usize = self.oversized.iter().map(|o| o.log_records).sum();
-        collided + unstorable + self.out_of_window
+    /// The log records lost, across all three rejection classes.
+    fn log_records(&self) -> usize {
+        let mut log_records = self.out_of_window;
+
+        for collision in &self.collisions {
+            log_records += collision.log_records;
+        }
+        for oversized_identity in &self.oversized_identities {
+            log_records += oversized_identity.log_records;
+        }
+
+        log_records
     }
 
     /// The OTLP `partial_success` payload: `None` only when nothing was
     /// rejected (full success); otherwise the total rejected count and a
     /// developer-facing message describing each rejection.
     fn partial_success(&self) -> Option<ExportLogsPartialSuccess> {
-        if self.collisions.is_empty() && self.oversized.is_empty() && self.out_of_window == 0 {
+        if self.collisions.is_empty()
+            && self.oversized_identities.is_empty()
+            && self.out_of_window == 0
+        {
             return None;
         }
         Some(ExportLogsPartialSuccess {
-            rejected_log_records: self.count() as i64,
+            rejected_log_records: self.log_records() as i64,
             error_message: self.error_message(),
         })
     }
@@ -465,9 +477,9 @@ impl Rejections {
             ));
         }
 
-        if !self.oversized.is_empty() {
+        if !self.oversized_identities.is_empty() {
             let parts: Vec<String> = self
-                .oversized
+                .oversized_identities
                 .iter()
                 .map(|o| {
                     format!(
@@ -483,8 +495,8 @@ impl Rejections {
                 .collect();
             sections.push(format!(
                 "{} stream{} dropped for oversized identity; shorten the (service.namespace, service.name) fields: {}",
-                self.oversized.len(),
-                plural(self.oversized.len()),
+                self.oversized_identities.len(),
+                plural(self.oversized_identities.len()),
                 parts.join("; "),
             ));
         }
@@ -524,7 +536,7 @@ fn identity_preview(s: &str) -> String {
 /// the stream claims its `partition_key`, so an unstorable identity
 /// never occupies a slot it can't write to and the offending strings are freed
 /// immediately rather than held for the batch.
-fn encode_identity_or_drop(
+fn encode_identity(
     stream: &ServiceStream,
     log_records: usize,
 ) -> Result<Vec<u8>, OversizedIdentity> {
@@ -659,16 +671,16 @@ impl NetdataLogsService {
     }
 
     /// The response of a successful export, counted for self-monitoring on
-    /// the way out: `stored` records are on disk, the rest were rejected (an
+    /// the way out: `kept` records are on disk, the rest were rejected (an
     /// empty request counts zero of each). Every successful exit of
     /// [`Self::export_logs`] ends here, so a failed export counts nothing.
-    fn counted_response(
-        &self,
-        stored: usize,
-        rejections: &Rejections,
-    ) -> ExportLogsServiceResponse {
+    fn counted_response(&self, kept: usize, rejections: &Rejections) -> ExportLogsServiceResponse {
         if let Some(derived_metrics) = &self.derived_metrics {
-            derived_metrics.record_ingest(Signal::Logs, stored as u64, rejections.count() as u64);
+            derived_metrics.record_ingest(
+                Signal::Logs,
+                kept as u64,
+                rejections.log_records() as u64,
+            );
         }
 
         ExportLogsServiceResponse {
@@ -745,7 +757,7 @@ impl NetdataLogsService {
                     batch.record(tenant_id.as_str(), request);
                 }
             })?;
-            rejections.out_of_window += flattened.rejected;
+            rejections.out_of_window += flattened.out_of_window;
             kept += flattened.kept;
         }
 
@@ -1433,7 +1445,7 @@ mod tests {
 
     #[test]
     fn error_message_describes_oversized_drops() {
-        let oversized = vec![OversizedIdentity {
+        let oversized_identities = vec![OversizedIdentity {
             partition_key: 0xabc,
             namespace_len: 2048,
             name_len: 4,
@@ -1442,7 +1454,7 @@ mod tests {
             log_records: 5,
         }];
         let msg = Rejections {
-            oversized,
+            oversized_identities,
             ..Default::default()
         }
         .error_message();
@@ -1462,7 +1474,7 @@ mod tests {
             rejected: ServiceStream::new("staging", "api"),
             log_records: 3,
         }];
-        let oversized = vec![OversizedIdentity {
+        let oversized_identities = vec![OversizedIdentity {
             partition_key: 0xabc,
             namespace_len: 2048,
             name_len: 4,
@@ -1472,7 +1484,7 @@ mod tests {
         }];
         let ps = Rejections {
             collisions,
-            oversized,
+            oversized_identities,
             out_of_window: 7,
         }
         .partial_success()

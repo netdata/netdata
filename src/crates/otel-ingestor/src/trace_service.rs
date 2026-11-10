@@ -116,7 +116,7 @@ impl StorableSpans {
         })?;
         let flattened = Flattened {
             kept: frame.records,
-            rejected: frame.rejected,
+            out_of_window: frame.rejected,
         };
 
         self.payload = if frame.records == 0 {
@@ -178,7 +178,7 @@ struct Flattened {
     /// Spans in the frame: the ones phase 2 writes.
     kept: usize,
     /// Spans the ingestion window rejected.
-    rejected: usize,
+    out_of_window: usize,
 }
 
 /// THE traces partitioning seam.
@@ -331,12 +331,12 @@ impl NetdataTracesService {
     }
 
     /// The response of a successful export that carried spans, counted for
-    /// self-monitoring on the way out: `stored` spans are on disk,
+    /// self-monitoring on the way out: `kept` spans are on disk,
     /// `out_of_window` spans were rejected. Every such exit of
     /// [`Self::export_traces`] ends here, so a failed export counts nothing.
-    fn counted_response(&self, stored: usize, out_of_window: usize) -> ExportTraceServiceResponse {
+    fn counted_response(&self, kept: usize, out_of_window: usize) -> ExportTraceServiceResponse {
         if let Some(derived_metrics) = &self.derived_metrics {
-            derived_metrics.record_ingest(Signal::Traces, stored as u64, out_of_window as u64);
+            derived_metrics.record_ingest(Signal::Traces, kept as u64, out_of_window as u64);
         }
 
         ExportTraceServiceResponse {
@@ -407,7 +407,7 @@ impl NetdataTracesService {
                     batch.record(tenant_id.as_str(), request);
                 }
             })?;
-            out_of_window += flattened.rejected;
+            out_of_window += flattened.out_of_window;
             kept += flattened.kept;
         }
 

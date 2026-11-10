@@ -117,7 +117,7 @@ impl TenantWriters {
     ///   sealed file's events reach the ledger in order (see the export path).
     pub(crate) fn rotate_expired(&self, now_ns: TimestampNs, ledger_sender: &LedgerSender) {
         // The traces messages name their signal; the logs ones never did.
-        let wal = match self.signal {
+        let wal_label = match self.signal {
             Signal::Logs => "WAL",
             Signal::Traces => "traces WAL",
         };
@@ -151,14 +151,14 @@ impl TenantWriters {
                 Ok(n) if n > 0 => tracing::debug!(
                     tenant = %tenant_id,
                     rotated = n,
-                    "idle {wal} rotation: sealed expired stream(s)"
+                    "idle {wal_label} rotation: sealed expired stream(s)"
                 ),
                 Ok(_) => {}
                 Err(e) => tracing::error!(
                     %e,
                     tenant = %tenant_id,
                     forwarded_events = forwarded,
-                    "idle {wal} rotation failed; forwarded already-sealed streams' events"
+                    "idle {wal_label} rotation failed; forwarded already-sealed streams' events"
                 ),
             }
         }
