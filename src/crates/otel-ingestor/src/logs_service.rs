@@ -363,6 +363,21 @@ struct OversizedDrop {
     log_records: usize,
 }
 
+impl OversizedDrop {
+    /// The drop of `stream`'s `log_records` records, with bounded previews of
+    /// its identity.
+    fn new(stream: &ServiceStream, log_records: usize) -> Self {
+        Self {
+            part_key: otel_logs_identity::part_key(stream),
+            namespace_len: stream.namespace.len(),
+            name_len: stream.name.len(),
+            namespace_preview: identity_preview(&stream.namespace),
+            name_preview: identity_preview(&stream.name),
+            log_records,
+        }
+    }
+}
+
 /// Everything one export request lost, by rejection class. The client's
 /// `partial_success` and self-monitoring both report from this one record.
 #[derive(Default)]
@@ -505,36 +520,32 @@ fn encode_identity_or_drop(
     stream: &ServiceStream,
     log_records: usize,
 ) -> Result<Vec<u8>, OversizedDrop> {
-    let make_drop = || OversizedDrop {
-        part_key: otel_logs_identity::part_key(stream),
-        namespace_len: stream.namespace.len(),
-        name_len: stream.name.len(),
-        namespace_preview: identity_preview(&stream.namespace),
-        name_preview: identity_preview(&stream.name),
-        log_records,
-    };
     let Some(content_meta) = otel_logs_identity::encode_content_meta(stream) else {
+        let drop = OversizedDrop::new(stream, log_records);
         tracing::error!(
-            namespace_len = stream.namespace.len(),
-            name_len = stream.name.len(),
-            namespace_preview = %identity_preview(&stream.namespace),
-            name_preview = %identity_preview(&stream.name),
+            namespace_len = drop.namespace_len,
+            name_len = drop.name_len,
+            namespace_preview = %drop.namespace_preview,
+            name_preview = %drop.name_preview,
             "stream identity too large to encode into content_meta; dropping frame"
         );
-        return Err(make_drop());
+        return Err(drop);
     };
+
     if content_meta.len() > wal::MAX_CONTENT_META_BYTES {
+        let drop = OversizedDrop::new(stream, log_records);
         tracing::error!(
-            namespace_len = stream.namespace.len(),
-            name_len = stream.name.len(),
-            namespace_preview = %identity_preview(&stream.namespace),
-            name_preview = %identity_preview(&stream.name),
+            namespace_len = drop.namespace_len,
+            name_len = drop.name_len,
+            namespace_preview = %drop.namespace_preview,
+            name_preview = %drop.name_preview,
             content_meta_len = content_meta.len(),
             max = wal::MAX_CONTENT_META_BYTES,
             "stream identity exceeds the WAL content_meta budget; dropping frame"
         );
-        return Err(make_drop());
+        return Err(drop);
     }
+
     Ok(content_meta)
 }
 
