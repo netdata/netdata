@@ -432,6 +432,7 @@ impl NetdataTracesService {
         // Observers read the request before it is consumed below; their
         // observations are committed only once the spans are durable.
         let mut observations = Vec::with_capacity(self.observers.len());
+
         for observer in &self.observers {
             observations.push(observer.prepare(tenant_id.as_str(), &request));
         }
@@ -457,12 +458,14 @@ impl NetdataTracesService {
             min_ns: fallback_base_ns.saturating_sub(self.ingest_bounds.max_age_ns()),
             max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
         };
+
         let mut out_of_window: usize = 0;
         // Spans that passed the window check: the ones phase 2 writes.
         let mut kept: usize = 0;
         // Derived metrics see each group after normalization (kept spans,
         // resolved times) and are counted only once the spans are durable.
         let mut derived_batch = self.derived.as_ref().and_then(|d| d.spans_batch());
+
         for g in &mut groups {
             let flattened = g.flatten(fallback_base_ns, bounds, |request| {
                 if let Some(batch) = derived_batch.as_mut() {

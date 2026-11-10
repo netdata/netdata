@@ -110,6 +110,7 @@ struct StreamGroup {
 /// cannot collide at all.
 fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, StreamGroup> {
     let mut groups: HashMap<ServiceStream, StreamGroup> = HashMap::new();
+
     for rl in resource_logs {
         let count: usize = rl.scope_logs.iter().map(|sl| sl.log_records.len()).sum();
         if count == 0 {
@@ -123,6 +124,7 @@ fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, S
         group.log_record_count += count;
         group.resource_logs.push(rl);
     }
+
     groups
 }
 
@@ -690,6 +692,7 @@ impl NetdataLogsService {
         rejections: &mut Rejections,
     ) -> Vec<StorableStream> {
         let mut storable = Vec::with_capacity(groups.len());
+
         for (stream, group) in groups {
             match StorableStream::new(stream, group) {
                 Ok(s) => storable.push(s),
@@ -713,6 +716,7 @@ impl NetdataLogsService {
                 c.rejected_log_records,
             );
         }
+
         accepted
     }
 
@@ -768,11 +772,13 @@ impl NetdataLogsService {
             min_ns: fallback_base_ns.saturating_sub(self.ingest_bounds.max_age_ns()),
             max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
         };
+
         // Records that passed every check: the ones phase 2 writes.
         let mut kept: usize = 0;
         // Derived metrics see each stream after normalization (kept records,
         // resolved times) and are counted only once the records are durable.
         let mut derived_batch = self.derived.as_ref().and_then(|d| d.logs_batch());
+
         for s in &mut accepted {
             let flattened = s.flatten(fallback_base_ns, bounds, |request| {
                 if let Some(batch) = derived_batch.as_mut() {
