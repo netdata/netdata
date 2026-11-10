@@ -34,6 +34,8 @@ func TestFormsRejectInvalidWorkflowInputs(t *testing.T) {
 		value any
 		valid bool
 	}{
+		{"check_every", 1, true}, {"check_every", 0, false}, {"check_every", -1, false},
+		{"check_every", int64(9223372036), true}, {"check_every", int64(9223372037), false},
 		{"timeout", 0.000999, false}, {"timeout", 0.001, true},
 		{"script", " \t\n", false}, {"script", "\u0085", false}, {"script", "\u00a0", false}, {"script", "\u2003", false},
 	} {
@@ -49,7 +51,12 @@ func TestFormsRejectInvalidWorkflowInputs(t *testing.T) {
 			raw, err := json.Marshal(cfg)
 			require.NoError(t, err)
 			c := configured()
-			require.NoError(t, json.Unmarshal(raw, c))
+			err = json.Unmarshal(raw, c)
+			if value, ok := tc.value.(int64); ok && int64(int(value)) != value {
+				require.Error(t, err) // The collector config uses int on 32-bit platforms.
+				return
+			}
+			require.NoError(t, err)
 			err = c.Init(context.Background())
 			if tc.valid {
 				require.NoError(t, err)

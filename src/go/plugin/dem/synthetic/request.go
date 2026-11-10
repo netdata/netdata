@@ -23,6 +23,12 @@ const (
 	Lighthouse Kind = "lighthouse"
 )
 
+// Schedule identifies the selected occurrence and its original admission queue time.
+type Schedule struct {
+	DueUS    int64
+	QueuedUS int64
+}
+
 // Request is ephemeral. Script and resolved secrets never enter history.
 type Request struct {
 	Kind       Kind

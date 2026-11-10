@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
@@ -32,7 +33,7 @@ import (
 // Executor is the browser capability injected into native collectors.
 type Executor interface {
 	Check(context.Context, synthetic.Kind) error
-	Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution
+	monitor.Executor
 	Rehearse(context.Context, synthetic.Request) error
 }
 

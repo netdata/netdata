@@ -22,7 +22,13 @@ type prepared struct{}
 
 func (prepared) Check(context.Context, model.Kind) error       { return nil }
 func (prepared) Rehearse(context.Context, model.Request) error { panic("unexpected rehearsal") }
-func (prepared) Execute(context.Context, model.Request, func(string)) model.Execution {
+
+func (prepared) ExecuteScheduled(
+	context.Context,
+	model.Request,
+	func(string),
+	func(time.Time) model.Schedule,
+) model.Execution {
 	panic("unexpected execution during config validation")
 }
 func configured() *Collector {
@@ -37,10 +43,10 @@ func configured() *Collector {
 
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
-		`{"vnode":"storefront","name":"login","update_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":false}`,
+		`{"vnode":"storefront","name":"login","update_every":10,"check_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":false}`,
 	)
 	cfgYAML := []byte(
-		"vnode: storefront\nname: login\nupdate_every: 900\ntimeout: 120\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: false\n",
+		"vnode: storefront\nname: login\nupdate_every: 10\ncheck_every: 900\ntimeout: 120\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: false\n",
 	)
 	collecttest.TestConfigurationSerialize(t, New(Dependencies{}), cfgJSON, cfgYAML)
 	for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
@@ -50,7 +56,8 @@ func TestConfiguration(t *testing.T) {
 			require.NoError(t, decode(input, c))
 			want := Config{
 				Name:        "login",
-				UpdateEvery: 900,
+				UpdateEvery: 10,
+				CheckEvery:  900,
 				Timeout:     120000000000,
 				Script:      "test('login', async () => {});",
 			}
@@ -63,7 +70,7 @@ func TestConfiguration(t *testing.T) {
 		})
 	}
 	creator := Creator(Dependencies{})
-	assert.Equal(t, 900, creator.Defaults.UpdateEvery)
+	assert.Equal(t, 10, creator.Defaults.UpdateEvery)
 	assert.True(t, creator.StoreFirst)
 	assert.Equal(t, New(Dependencies{}).Configuration(), creator.CreateV2().Configuration())
 }
@@ -75,28 +82,31 @@ func TestInitValidation(t *testing.T) {
 		change func(*Collector)
 		valid  bool
 	}{
-		"inline":                 {func(*Collector) {}, true},
-		"file":                   {func(c *Collector) { c.Script = ""; c.ScriptPath = file }, true},
-		"missing source":         {func(c *Collector) { c.Script = "" }, false},
-		"whitespace source":      {func(c *Collector) { c.Script = "  \n" }, false},
-		"blank inline with path": {func(c *Collector) { c.Script = "  "; c.ScriptPath = file }, false},
-		"both sources":           {func(c *Collector) { c.ScriptPath = file }, false},
-		"relative path":          {func(c *Collector) { c.Script = ""; c.ScriptPath = "login.spec.ts" }, false},
-		"missing file":           {func(c *Collector) { c.Script = ""; c.ScriptPath = file + ".missing.ts" }, false},
-		"unsupported extension":  {func(c *Collector) { c.Script = ""; c.ScriptPath = file + "x" }, false},
-		"directory":              {func(c *Collector) { c.Script = ""; c.ScriptPath = t.TempDir() }, false},
-		"missing name":           {func(c *Collector) { c.Name = " " }, false},
-		"zero interval":          {func(c *Collector) { c.UpdateEvery = 0 }, false},
-		"submillisecond timeout": {func(c *Collector) { c.Timeout = 999999 }, false},
-		"zero timeout":           {func(c *Collector) { c.Timeout = 0 }, false},
-		"negative timeout":       {func(c *Collector) { c.Timeout = -1 }, false},
-		"secret":                 {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_TOKEN", Value: "test"}} }, true},
-		"empty secret value":     {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_TOKEN"}} }, true},
-		"unscoped secret":        {func(c *Collector) { c.Secrets = []Secret{{Name: "PATH"}} }, false},
-		"empty secret suffix":    {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_"}} }, false},
-		"secret punctuation":     {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_A-B"}} }, false},
-		"duplicate secret":       {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_TOKEN"}, {Name: "DEM_SECRET_TOKEN"}} }, false},
-		"NUL secret":             {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_TOKEN", Value: "a\x00b"}} }, false},
+		"inline":                  {func(*Collector) {}, true},
+		"file":                    {func(c *Collector) { c.Script = ""; c.ScriptPath = file }, true},
+		"missing source":          {func(c *Collector) { c.Script = "" }, false},
+		"whitespace source":       {func(c *Collector) { c.Script = "  \n" }, false},
+		"blank inline with path":  {func(c *Collector) { c.Script = "  "; c.ScriptPath = file }, false},
+		"both sources":            {func(c *Collector) { c.ScriptPath = file }, false},
+		"relative path":           {func(c *Collector) { c.Script = ""; c.ScriptPath = "login.spec.ts" }, false},
+		"missing file":            {func(c *Collector) { c.Script = ""; c.ScriptPath = file + ".missing.ts" }, false},
+		"unsupported extension":   {func(c *Collector) { c.Script = ""; c.ScriptPath = file + "x" }, false},
+		"directory":               {func(c *Collector) { c.Script = ""; c.ScriptPath = t.TempDir() }, false},
+		"missing name":            {func(c *Collector) { c.Name = " " }, false},
+		"zero check interval":     {func(c *Collector) { c.CheckEvery = 0 }, false},
+		"negative check interval": {func(c *Collector) { c.CheckEvery = -1 }, false},
+		"duration capacity":       {func(c *Collector) { c.CheckEvery = int(^uint(0) >> 1) }, time.Duration(int(^uint(0)>>1)) <= time.Duration(1<<63-1)/time.Second},
+		"zero interval":           {func(c *Collector) { c.UpdateEvery = 0 }, false},
+		"submillisecond timeout":  {func(c *Collector) { c.Timeout = 999999 }, false},
+		"zero timeout":            {func(c *Collector) { c.Timeout = 0 }, false},
+		"negative timeout":        {func(c *Collector) { c.Timeout = -1 }, false},
+		"secret":                  {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_TOKEN", Value: "test"}} }, true},
+		"empty secret value":      {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_TOKEN"}} }, true},
+		"unscoped secret":         {func(c *Collector) { c.Secrets = []Secret{{Name: "PATH"}} }, false},
+		"empty secret suffix":     {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_"}} }, false},
+		"secret punctuation":      {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_A-B"}} }, false},
+		"duplicate secret":        {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_TOKEN"}, {Name: "DEM_SECRET_TOKEN"}} }, false},
+		"NUL secret":              {func(c *Collector) { c.Secrets = []Secret{{Name: "DEM_SECRET_TOKEN", Value: "a\x00b"}} }, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := configured()
@@ -132,7 +142,16 @@ func TestPreparedCheckAndArtifacts(t *testing.T) {
 		metadata,
 		charts,
 		map[string][]string{
-			"execution_state": {"unknown", "success", "failed", "timeout", "inconclusive", "error", "cancelled"},
+			"execution_state": {
+				"unknown",
+				"success",
+				"failed",
+				"timeout",
+				"inconclusive",
+				"error",
+				"cancelled",
+				"stale",
+			},
 		},
 	)
 	collecttest.AssertConfigSchemaMatchesMetadataWith(

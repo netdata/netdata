@@ -72,6 +72,8 @@ func runDetail(run model.Run) map[string]any {
 		"name":           run.Name,
 		"target":         run.Target,
 		"started_us":     timestamp(run.StartedUS),
+		"scheduled_us":   timestamp(run.ScheduledUS),
+		"queued_us":      timestamp(run.QueuedUS),
 		"completed_us":   timestamp(run.CompletedUS),
 		"duration_ms":    number(run.DurationMS),
 		"outcome":        run.Outcome,

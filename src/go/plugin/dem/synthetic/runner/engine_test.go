@@ -106,6 +106,11 @@ func duplicatePipes(files ...*os.File) ([]*os.File, error) {
 
 func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 	t.Helper()
+	return testEngineSlots(t, 1)
+}
+
+func testEngineSlots(t *testing.T, concurrency int) (*Engine, *fakeHistory, *observedArtifacts) {
+	t.Helper()
 	base := t.TempDir()
 	bin, err := os.Executable()
 	require.NoError(t, err)
@@ -130,7 +135,7 @@ func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 	owner := &observedArtifacts{
 		Store: store,
 	}
-	engine := New(
+	engine, err := New(
 		fixtureRuntime{Paths: Paths{
 			Node:       bin,
 			EntryPoint: entrypoint,
@@ -138,7 +143,9 @@ func testEngine(t *testing.T) (*Engine, *fakeHistory, *observedArtifacts) {
 		}},
 		history,
 		owner,
+		concurrency,
 	)
+	require.NoError(t, err)
 	engine.platform = func() error { return nil }
 	return engine, history, owner
 }
@@ -436,7 +443,7 @@ func TestUnverifiedDrainPoisonsBeforeReaderJoin(t *testing.T) {
 		t.Fatal("owned readers did not join")
 	}
 	assert.Zero(t, a.finalized.Load())
-	assert.Equal(t, 1, len(e.admission))
+	assert.Equal(t, 1, e.active)
 	assert.False(t, e.Execute(context.Background(), journey(), nil).Drained)
 }
 func TestSecretInputRedactionAndDiagnosticBounds(t *testing.T) {

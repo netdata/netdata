@@ -17,6 +17,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.deps.Executor == nil || c.deps.Registry == nil {
 		return errors.New("missing synthetic executor or observation registry")
 	}
+	if c.CheckEvery <= 0 || time.Duration(c.CheckEvery) > time.Duration(1<<63-1)/time.Second {
+		return errors.New("check_every must be positive and representable as a duration")
+	}
 	if c.UpdateEvery <= 0 {
 		return errors.New("update_every must be positive")
 	}

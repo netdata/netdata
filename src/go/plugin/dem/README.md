@@ -49,7 +49,8 @@ jobs:
   - name: storefront-checkout
     vnode: storefront
     script_path: /etc/netdata/dem/checkout.spec.ts
-    update_every: 300
+    check_every: 300
+    update_every: 10
     timeout: 120
 ```
 
@@ -77,9 +78,9 @@ Functions are not registered on each vnode. Frontend consumers retain the collec
 a site, including for archived vnodes and retained history.
 
 Functions and retained evidence expose `vnode_guid`; charts use normal vnode placement without an extra GUID label.
-Existing RUM `site` fields identify the physical RUM job. Observations capture the resolved GUID when admitted, and
-synthetic attempts capture it at their start. Saved and buffered investigation records, runs and captures retain that
-GUID after reassignment. A changed RUM GUID starts a fresh rolling measurement window and Pages view; hostname or label
+Existing RUM `site` fields identify the physical RUM job. RUM observations capture the resolved GUID when admitted;
+synthetic attempts capture it when submitted to the execution queue, before waiting for browser admission. Saved and
+buffered investigation records, runs and captures retain that GUID after reassignment. A changed RUM GUID starts a fresh rolling measurement window and Pages view; hostname or label
 edits with the same GUID do not reset measurements. Transport and history counters remain job-wide. Old evidence without
 a captured GUID stays unassigned; legacy `site_id` text is not mapped to a vnode or rewritten.
 
@@ -523,10 +524,38 @@ receiver recovery.
 ## Synthetic monitoring
 
 Each `journey` job runs one configured Playwright Test entry and its imports. Each `lighthouse` job runs one desktop
-performance lab audit. Both use native job configuration and scheduling. Stock configuration enables no browser jobs.
-Journey defaults to 900 seconds between attempts and a 120-second admitted timeout; Lighthouse defaults to 1800/180 seconds.
-One plugin-wide admission slot serializes expensive runs. Waiting time is separate from execution time; cancellation
-while waiting starts no browser. A fresh browser is created for each run.
+performance lab audit. Both use native job configuration. Stock configuration enables no browser jobs.
+`check_every` controls browser execution: 900 seconds for journeys and 1800 seconds for Lighthouse by default.
+Admitted attempt timeouts default to 120 and 180 seconds respectively. `update_every` controls chart refreshes and defaults
+to 10 seconds for both. When updating an existing test configuration, move its old browser interval from `update_every`
+to `check_every`; otherwise it will only change chart refresh frequency.
+
+A job queues its first check immediately. The first recurring check is spread deterministically between one and two
+check intervals after activation; later due times follow a fixed cadence. A busy job keeps at most one active and one
+pending monitoring occurrence. A newer due occurrence replaces the older pending one without losing its admission
+position. Replaced occurrences count as coalesced; they never ran and do not establish website failure. There is no
+catch-up backlog or automatic attempt retry. Equal-job turns do not imply equal CPU time or per-site quotas.
+
+Charts show the latest completed observation, its age, and independent active/pending and delay measurements.
+Refreshing a chart does not start or count another check. Observations older than two check intervals become `stale`;
+missing or stale duration, test and Lighthouse measurements remain gaps. Outcome counters count each completed attempt
+once, including attempts between chart refreshes, and reset on native job restart/replacement. These job diagnostics
+continue across vnode changes. Reassignment clears latest measurements, age and last success/failure until a check
+submitted for the new association completes. Earlier queued or running attempts keep their captured GUID in history
+and cannot repopulate current observations, including after switching back to the original vnode. History retains per-run
+evidence under its normal retention and availability policy. Stopping or replacing a job cancels its queued/active work
+and joins execution before the replacement starts.
+
+`browser.concurrency` in `dem.conf` limits simultaneous browser attempts in one plugin process. It defaults to 1 and
+accepts a positive integer; restart the plugin to apply changes. Monitoring, journey rehearsals and in-process runtime
+qualification share this allowance. Ready jobs take turns, and monitoring and rehearsals for the same job cannot overlap.
+Waiting time is separate from execution time; cancellation while waiting starts no browser. A fresh browser is created
+for each run.
+
+Choose concurrency for the Agent's CPU and memory budget and the accuracy needed from Lighthouse measurements.
+The setting is not a hard memory limit or a count of every child process. Concurrent activation checks share one
+runtime contract probe per runtime consumer; probes run outside browser slots so a long audit cannot block activation.
+A later activation checks the runtime again. Standalone administration commands have their own process budget.
 
 Browser jobs require Linux amd64 or arm64 and an unprivileged plugin identity. Chromium sandboxing stays enabled;
 containers need compatible namespace/seccomp support. RUM does not require a browser runtime.
@@ -602,7 +631,7 @@ Explicit installation enables automatic preparation by default and prints this p
 `--manual-updates` on install or repair to disable it. The running plugin checks roughly daily with jitter, downloads
 and qualifies a newer signed release beside the working release, and reports that restart is required. It never
 restarts the Agent. Security fixes remain inactive until the administrator or deployment system restarts DEM.
-Qualification shares the browser execution slot, so monitors can wait while these local checks run. Failures preserve
+Qualification shares the browser execution allowance, so monitors can wait while these local checks run. Failures preserve
 the selected release and appear as update maintenance errors, separately from website measurements.
 
 Signatures authenticate publication order and complete preparation instructions. They cannot detect withheld updates
@@ -742,14 +771,14 @@ execution is not success. It does not save the draft, change monitoring observat
 retain captures. `screenshot_on_failure` applies to monitoring only. Test actions against the website are real and
 are not rolled back. Activation still checks runtime preparation without executing the workflow.
 
-Test shares the browser slot with monitoring and may wait for another attempt or delay a later one. The caller's
+Test shares the browser allowance with monitoring and may wait for another attempt or delay a later one. The caller's
 request deadline covers waiting and execution, so it may expire before the configured workflow timeout. Cancellation
 requests process-tree shutdown. If drainage cannot be verified, DEM exits and preserves uncertain work instead of
 claiming cleanup. A timed-out caller may not receive the final diagnosis, and there is no retained result to retrieve
 later. Existing secret-reference redaction can replace detailed errors with a generic failure.
 
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
-observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
+observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two check
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
 and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable
 dependencies; plugin logs explain runtime setup/execution errors. The installation CLI reports preparation and
@@ -770,8 +799,10 @@ storage status, and `synthetics-artifact` for one set's metadata or bytes.
 Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
 status. Last success/failure and freshness describe the current activation and vnode association; reassignment resets
 these observations. They do not reconstruct a historical incident. A running or
-waiting attempt does not refresh its previous result. Run summaries are capped at 2000 rows with an explicit truncation
-flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
+waiting attempt does not refresh its previous result. Active rows also expose check cadence, scheduled/admitted/coalesced
+counts and queue/admission delays for the current activation; these diagnostics continue across vnode changes.
+Run records preserve selected due and original queue timestamps when produced by the monitor scheduler; older and
+immediate diagnostic records may omit them. Run summaries are capped at 2000 rows with an explicit truncation flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
 including the entire endpoint seconds. Explicit zero means epoch, negative values are offsets from one captured now, and
 omitted bounds cover epoch through now. Run timestamps use Unix microseconds, while reporter event `at_ms` uses Unix
 milliseconds.

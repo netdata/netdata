@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -39,30 +38,28 @@ type ArtifactStore interface {
 
 type Engine struct {
 	*executionOwner
-	source     Source
-	history    historyWriter
-	unrecorded bool
-	artifacts  ArtifactStore
-	start      startFunc
-	platform   func() error
+	source        Source
+	history       historyWriter
+	unrecorded    bool
+	artifacts     ArtifactStore
+	start         startFunc
+	platform      func() error
+	checks        *checkOwner
+	qualification bool
 }
 
-// Qualification, rehearsal and monitoring share admission and fail-stop state.
-// Keep sync.Once on this shared owner; never copy it into a candidate view.
-type executionOwner struct {
-	admission  chan struct{}
-	fatal      chan error
-	poisoned   chan struct{}
-	poisonOnce sync.Once
-}
-
-func New(source Source, history historyWriter, artifacts ArtifactStore) *Engine {
+func New(source Source, history historyWriter, artifacts ArtifactStore, concurrency int) (*Engine, error) {
+	if concurrency <= 0 {
+		return nil, errors.New("browser concurrency must be positive")
+	}
 	return &Engine{
 		executionOwner: &executionOwner{
-			admission: make(chan struct{}, 1),
-			fatal:     make(chan error, 1),
-			poisoned:  make(chan struct{}),
+			limit:    concurrency,
+			jobs:     make(map[executionKey]*admissionJob),
+			fatal:    make(chan error, 1),
+			poisoned: make(chan struct{}),
 		},
+		checks:    &checkOwner{},
 		source:    source,
 		history:   history,
 		artifacts: artifacts,
@@ -70,7 +67,7 @@ func New(source Source, history historyWriter, artifacts ArtifactStore) *Engine 
 		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
 		},
-	}
+	}, nil
 }
 
 func (e *Engine) unrecordedView(source Source, artifacts ArtifactStore) *Engine {
@@ -78,6 +75,8 @@ func (e *Engine) unrecordedView(source Source, artifacts ArtifactStore) *Engine 
 		executionOwner: e.executionOwner,
 		source:         source,
 		unrecorded:     true,
+		checks:         &checkOwner{},
+		qualification:  e.qualification,
 		artifacts:      artifacts,
 		start:          e.start,
 		platform:       e.platform,
@@ -87,19 +86,21 @@ func (e *Engine) unrecordedView(source Source, artifacts ArtifactStore) *Engine 
 func (e *Engine) Fatal() <-chan error { return e.fatal }
 
 func (e *Engine) poison(err error) {
-	e.poisonOnce.Do(func() { close(e.poisoned); e.fatal <- errors.Join(ndexec.ErrTreeNotDrained, err) })
-}
-
-func (e *Engine) isPoisoned() bool {
-	select {
-	case <-e.poisoned:
-		return true
-	default:
-		return false
-	}
+	e.poisonOnce.Do(func() {
+		e.mu.Lock()
+		close(e.poisoned)
+		e.mu.Unlock()
+		e.fatal <- errors.Join(ndexec.ErrTreeNotDrained, err)
+	})
 }
 
 func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state func(string)) synthetic.Execution {
+	return e.ExecuteScheduled(ctx, request, state, nil)
+}
+
+// ExecuteScheduled snapshots the latest pending occurrence only after admission.
+// Immediate diagnostics and qualification use Execute without scheduling metadata.
+func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request, state func(string), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
 	redact := newRedactor(request.Secrets)
 	run := synthetic.Run{
 		JobID:        request.JobID(),
@@ -146,46 +147,48 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 	if state != nil {
 		state("waiting")
 	}
-	select {
-	case <-ctx.Done():
-		return finishUnstarted(ctx.Err(), true)
-	case <-e.poisoned:
-		return finishUnstarted(ndexec.ErrTreeNotDrained, false)
-	case e.admission <- struct{}{}:
+	job, err := e.acquire(ctx, executionKey{jobID: request.JobID(), qualification: e.qualification})
+	if err != nil {
+		return finishUnstarted(err, !errors.Is(err, ndexec.ErrTreeNotDrained))
 	}
 	drained := true
 	defer func() {
 		if drained {
-			<-e.admission
+			e.release(job)
 		}
 	}()
 	if e.isPoisoned() {
-		drained = false
 		return finishUnstarted(ndexec.ErrTreeNotDrained, false)
 	}
 	if err := ctx.Err(); err != nil {
 		return finishUnstarted(err, true)
 	}
-	run.StartedUS = time.Now().UnixMicro()
+	admittedAt := time.Now()
+	if admitted != nil {
+		schedule := admitted(admittedAt)
+		run.ScheduledUS = schedule.DueUS
+		run.QueuedUS = schedule.QueuedUS
+	}
+	run.StartedUS = admittedAt.UnixMicro()
 	attempt, cancel := context.WithTimeout(ctx, request.Timeout)
 	defer cancel()
 	if err := synthetic.ValidateRequest(request); err != nil {
-		return finishUnstarted(err, true)
+		return e.failAdmitted(&run, err, redact)
 	}
 	if err := e.platform(); err != nil {
-		return finishUnstarted(err, true)
+		return e.failAdmitted(&run, err, redact)
 	}
 	use, err := e.beginUse()
 	if err != nil {
-		return finishUnstarted(err, true)
+		return e.failAdmitted(&run, err, redact)
 	}
 	defer func() { _ = use.Finish(drained) }()
 	paths := use.Paths()
 	if err := e.checkFiles(request.Kind, paths); err != nil {
-		return finishUnstarted(err, true)
+		return e.failAdmitted(&run, err, redact)
 	}
 	if e.artifacts == nil {
-		return finishUnstarted(errors.New("artifact owner is unavailable"), true)
+		return e.failAdmitted(&run, errors.New("artifact owner is unavailable"), redact)
 	}
 	identity := paths.Identity
 	run.Runtime = &identity
@@ -297,6 +300,17 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 		Run:     run,
 		Drained: true,
 	}
+}
+
+// A slot was admitted, so infrastructure/validation failure is an actual error
+// observation. There was no child or workspace to finalize on this path.
+func (e *Engine) failAdmitted(run *synthetic.Run, err error, redact *textRedactor) synthetic.Execution {
+	run.Error = redact.text(err.Error())
+	cleanup, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
+	defer cancel()
+	e.save(cleanup, "start", run, redact)
+	e.complete(run, nil, redact)
+	return synthetic.Execution{Run: *run, Drained: true}
 }
 
 // complete owns a fixed cleanup budget independent of cancelled workflow input.

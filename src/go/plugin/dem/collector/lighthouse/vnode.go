@@ -7,7 +7,7 @@ import "github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 func (c *Collector) SetConfiguredVnode(v vnodes.VirtualNode) {
 	c.vnodeGUID, _ = vnodes.ConfiguredGUIDKey(v.GUID)
 	c.request.VnodeGUID = c.vnodeGUID
-	if c.registration != nil {
-		c.registration.SetVnodeGUID(c.vnodeGUID)
+	if c.session != nil {
+		c.session.SetVnodeGUID(c.vnodeGUID)
 	}
 }

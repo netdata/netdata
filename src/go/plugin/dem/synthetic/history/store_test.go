@@ -29,11 +29,17 @@ func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	old := time.Now().Add(-24 * time.Hour).UnixMicro()
 	run := synthetic.Run{
-		Runtime:      &synthetic.RuntimeIdentity{Version: "release-a", SHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Contract: 1},
+		Runtime: &synthetic.RuntimeIdentity{
+			Version:  "release-a",
+			SHA256:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Contract: 1,
+		},
 		ID:           "a",
 		JobID:        "journey:disabled",
 		Kind:         synthetic.Journey,
 		Name:         "disabled",
+		ScheduledUS:  old - 2000,
+		QueuedUS:     old - 1500,
 		StartedUS:    old,
 		Outcome:      synthetic.Unknown,
 		CaptureState: "disabled",
@@ -145,13 +151,62 @@ func TestSyntheticStartMembershipAndRetainedPhases(t *testing.T) {
 	historyStore := history.NewStore(st)
 	duration := 350.25
 	runs := []synthetic.Run{
-		{ID: "before", JobID: "journey:one", Kind: synthetic.Journey, StartedUS: 119999999, CompletedUS: 130000000, Outcome: synthetic.Success},
-		{ID: "lower", JobID: "journey:one", Kind: synthetic.Journey, StartedUS: 120000000, CompletedUS: 250000000, Outcome: synthetic.Failed},
-		{ID: "rollback", JobID: "journey:one", Kind: synthetic.Journey, StartedUS: 125000000, CompletedUS: 10000000, DurationMS: &duration, Outcome: synthetic.Success},
-		{ID: "complete-only", JobID: "lighthouse:one", Kind: synthetic.Lighthouse, StartedUS: 130000000, CompletedUS: 260000000, Outcome: synthetic.Timeout},
-		{ID: "unmatched", JobID: "journey:one", Kind: synthetic.Journey, StartedUS: 140000000, Outcome: synthetic.Unknown},
-		{ID: "upper", JobID: "journey:one", Kind: synthetic.Journey, StartedUS: 179999999, CompletedUS: 300000000, Outcome: synthetic.Success},
-		{ID: "after", JobID: "journey:one", Kind: synthetic.Journey, StartedUS: 180000000, CompletedUS: 310000000, Outcome: synthetic.Success},
+		{
+			ID:          "before",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   119999999,
+			CompletedUS: 130000000,
+			Outcome:     synthetic.Success,
+		},
+		{
+			ID:          "lower",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   120000000,
+			CompletedUS: 250000000,
+			Outcome:     synthetic.Failed,
+		},
+		{
+			ID:          "rollback",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   125000000,
+			CompletedUS: 10000000,
+			DurationMS:  &duration,
+			Outcome:     synthetic.Success,
+		},
+		{
+			ID:          "complete-only",
+			JobID:       "lighthouse:one",
+			Kind:        synthetic.Lighthouse,
+			StartedUS:   130000000,
+			CompletedUS: 260000000,
+			Outcome:     synthetic.Timeout,
+		},
+		{
+			ID:        "unmatched",
+			JobID:     "journey:one",
+			Kind:      synthetic.Journey,
+			StartedUS: 140000000,
+			Outcome:   synthetic.Unknown,
+		},
+		{
+			ID:          "upper",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   179999999,
+			CompletedUS: 300000000,
+			Outcome:     synthetic.Success,
+		},
+		{
+			ID:          "after",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   180000000,
+			CompletedUS: 310000000,
+			Outcome:     synthetic.Success,
+		},
 	}
 	for _, run := range runs {
 		if run.CompletedUS != 0 {
@@ -174,18 +229,46 @@ func TestSyntheticStartMembershipAndRetainedPhases(t *testing.T) {
 		want      []synthetic.Run
 		truncated bool
 	}{
-		"whole seconds":                {history.RunFilter{After: 120, Before: &upper}, selected, false},
-		"outcome after resolution":     {history.RunFilter{After: 120, Before: &upper, Outcome: synthetic.Unknown}, []synthetic.Run{runs[4]}, false},
-		"completion after picker":      {history.RunFilter{After: 120, Before: &upper, Outcome: synthetic.Failed}, []synthetic.Run{runs[1]}, false},
-		"completion survives rollback": {history.RunFilter{After: 120, Before: &upper, Outcome: synthetic.Success}, []synthetic.Run{runs[5], runs[2]}, false},
-		"complete only":                {history.RunFilter{After: 120, Before: &upper, Kind: synthetic.Lighthouse}, []synthetic.Run{runs[3]}, false},
-		"ordered limit":                {history.RunFilter{After: 120, Before: &upper, Limit: 2}, selected[:2], true},
-		"maximum seconds":              {history.RunFilter{After: math.MaxInt64}, []synthetic.Run{}, false},
+		"whole seconds": {history.RunFilter{
+			After:  120,
+			Before: &upper,
+		}, selected, false},
+		"outcome after resolution": {history.RunFilter{
+			After:   120,
+			Before:  &upper,
+			Outcome: synthetic.Unknown,
+		}, []synthetic.Run{runs[4]}, false},
+		"completion after picker": {history.RunFilter{
+			After:   120,
+			Before:  &upper,
+			Outcome: synthetic.Failed,
+		}, []synthetic.Run{runs[1]}, false},
+		"completion survives rollback": {history.RunFilter{
+			After:   120,
+			Before:  &upper,
+			Outcome: synthetic.Success,
+		}, []synthetic.Run{runs[5], runs[2]}, false},
+		"complete only": {history.RunFilter{
+			After:  120,
+			Before: &upper,
+			Kind:   synthetic.Lighthouse,
+		}, []synthetic.Run{runs[3]}, false},
+		"ordered limit": {history.RunFilter{
+			After:  120,
+			Before: &upper,
+			Limit:  2,
+		}, selected[:2], true},
+		"maximum seconds": {history.RunFilter{
+			After: math.MaxInt64,
+		}, []synthetic.Run{}, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			page, err := historyStore.QueryRuns(ctx, test.filter)
 			require.NoError(t, err)
-			assert.Equal(t, history.RunPage{Runs: test.want, Truncated: test.truncated}, page)
+			assert.Equal(t, history.RunPage{
+				Runs:      test.want,
+				Truncated: test.truncated,
+			}, page)
 		})
 	}
 	for _, run := range runs {
@@ -204,13 +287,39 @@ func TestSyntheticRejectsInvalidProducerRecordBeforeAppend(t *testing.T) {
 		phase string
 		run   synthetic.Run
 	}{
-		"missing run":         {"start", synthetic.Run{JobID: "job", StartedUS: 1}},
-		"missing job":         {"start", synthetic.Run{ID: "run", StartedUS: 1}},
-		"missing start":       {"start", synthetic.Run{ID: "run", JobID: "job"}},
-		"negative start":      {"start", synthetic.Run{ID: "run", JobID: "job", StartedUS: -1}},
-		"missing completion":  {"complete", synthetic.Run{ID: "run", JobID: "job", StartedUS: 1}},
-		"negative completion": {"complete", synthetic.Run{ID: "run", JobID: "job", StartedUS: 1, CompletedUS: -1}},
-		"invalid phase":       {"other", synthetic.Run{ID: "run", JobID: "job", StartedUS: 1}},
+		"missing run": {"start", synthetic.Run{
+			JobID:     "job",
+			StartedUS: 1,
+		}},
+		"missing job": {"start", synthetic.Run{
+			ID:        "run",
+			StartedUS: 1,
+		}},
+		"missing start": {"start", synthetic.Run{
+			ID:    "run",
+			JobID: "job",
+		}},
+		"negative start": {"start", synthetic.Run{
+			ID:        "run",
+			JobID:     "job",
+			StartedUS: -1,
+		}},
+		"missing completion": {"complete", synthetic.Run{
+			ID:        "run",
+			JobID:     "job",
+			StartedUS: 1,
+		}},
+		"negative completion": {"complete", synthetic.Run{
+			ID:          "run",
+			JobID:       "job",
+			StartedUS:   1,
+			CompletedUS: -1,
+		}},
+		"invalid phase": {"other", synthetic.Run{
+			ID:        "run",
+			JobID:     "job",
+			StartedUS: 1,
+		}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			attempted, err := history.NewStore(st).AppendRun(ctx, test.phase, test.run)
@@ -242,12 +351,21 @@ func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
 			st, err := demjournal.Open(ctx, t.TempDir())
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, st.Close()) })
-			run := synthetic.Run{ID: "run", JobID: "job", Kind: synthetic.Journey, StartedUS: 120000000, CompletedUS: 130000000, Outcome: synthetic.Success}
+			run := synthetic.Run{
+				ID:          "run",
+				JobID:       "job",
+				Kind:        synthetic.Journey,
+				StartedUS:   120000000,
+				CompletedUS: 130000000,
+				Outcome:     synthetic.Success,
+			}
 			data, err := json.Marshal(run)
 			require.NoError(t, err)
 			fields := map[string][]string{
 				"DEM_KIND": {"synthetic"}, "DEM_PHASE": {"complete"}, "DEM_JOB_ID": {run.JobID},
-				"DEM_RUN_ID": {run.ID}, "DEM_STARTED_US": {strconv.FormatInt(run.StartedUS, 10)}, "DEM_DATA": {string(data)},
+				"DEM_RUN_ID": {
+					run.ID,
+				}, "DEM_STARTED_US": {strconv.FormatInt(run.StartedUS, 10)}, "DEM_DATA": {string(data)},
 			}
 			mutate(fields)
 			keys := make([]string, 0, len(fields))
@@ -265,7 +383,10 @@ func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, attempted)
 			upper := int64(120)
-			_, err = history.NewStore(st).QueryRuns(ctx, history.RunFilter{After: 120, Before: &upper})
+			_, err = history.NewStore(st).QueryRuns(ctx, history.RunFilter{
+				After:  120,
+				Before: &upper,
+			})
 			require.Error(t, err, "malformed selected record: %s", name)
 		})
 	}

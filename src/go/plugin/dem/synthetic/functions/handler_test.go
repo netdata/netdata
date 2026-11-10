@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -255,6 +256,17 @@ func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
 		HistoryError: "history write failed",
 	}
 	registration.Complete(evidence)
+	registration.SetSchedule(
+		monitor.Status{
+			Scheduled:       12,
+			Admitted:        2,
+			Coalesced:       9,
+			Pending:         true,
+			Active:          true,
+			AdmittedUS:      completed,
+			SchedulingDelay: 3 * time.Second,
+		},
+	)
 	registration.SetState("running")
 	h := newHandler(&source{
 		hub: hub,
@@ -265,21 +277,28 @@ func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
 	assert.Equal(
 		t,
 		map[string]any{
-			"job_id":          "journey:checkout",
-			"vnode_guid":      "",
-			"kind":            model.Journey,
-			"name":            "checkout",
-			"target":          "",
-			"state":           "running",
-			"fresh":           false,
-			"run_id":          "r",
-			"outcome":         "failed",
-			"completed_us":    completed,
-			"duration_ms":     500.25,
-			"last_success_us": nil,
-			"last_failure_us": completed,
-			"error":           "afterAll failed",
-			"history_error":   "history write failed",
+			"job_id":           "journey:checkout",
+			"vnode_guid":       "",
+			"kind":             model.Journey,
+			"name":             "checkout",
+			"target":           "",
+			"state":            "running",
+			"fresh":            false,
+			"run_id":           "r",
+			"outcome":          "failed",
+			"completed_us":     completed,
+			"duration_ms":      500.25,
+			"last_success_us":  nil,
+			"last_failure_us":  completed,
+			"error":            "afterAll failed",
+			"history_error":    "history write failed",
+			"check_every":      1,
+			"scheduled":        uint64(12),
+			"admitted":         uint64(2),
+			"coalesced":        uint64(9),
+			"pending":          true,
+			"queue_age":        nil,
+			"scheduling_delay": 3.0,
 		},
 		rowValues(t, got, rows[0]),
 	)
@@ -383,7 +402,11 @@ func TestHistoryFiltersAndUnavailableValues(t *testing.T) {
 
 func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 	run := model.Run{
-		Runtime:     &model.RuntimeIdentity{Version: "release-a", SHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Contract: 1},
+		Runtime: &model.RuntimeIdentity{
+			Version:  "release-a",
+			SHA256:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Contract: 1,
+		},
 		ID:          "r",
 		JobID:       "journey:a",
 		Name:        "a",

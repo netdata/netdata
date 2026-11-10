@@ -11,5 +11,9 @@ import (
 // Standalone administration owns an independent execution scope. In-process
 // updates instead qualify through the existing monitoring engine.
 func qualifyRuntime(ctx context.Context, source runner.Source) (*runner.Qualification, error) {
-	return runner.New(source, nil, nil).Qualify(ctx, source)
+	executor, err := runner.New(source, nil, nil, 1)
+	if err != nil {
+		return nil, err
+	}
+	return executor.Qualify(ctx, source)
 }

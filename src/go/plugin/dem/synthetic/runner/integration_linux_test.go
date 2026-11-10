@@ -86,7 +86,8 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		}
 	}()
 	observedHistory := &identityHistory{Store: synthetichistory.NewStore(history)}
-	engine := runner.New(selectedRuntime{consumer}, observedHistory, captures)
+	engine, err := runner.New(selectedRuntime{consumer}, observedHistory, captures, 1)
+	require.NoError(t, err)
 	verifyIdentity := func(t *testing.T, run synthetic.Run) {
 		t.Helper()
 		require.Equal(t, &expectedIdentity, run.Runtime)
@@ -317,7 +318,9 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			assertIsolated(t)
 		})
 		t.Run("runtime-unavailable", func(t *testing.T) {
-			unavailable := makeFactory(runner.New(nil, observedHistory, captures))
+			unavailableEngine, err := runner.New(nil, observedHistory, captures, 1)
+			require.NoError(t, err)
+			unavailable := makeFactory(unavailableEngine)
 			require.Error(t, unavailable.Test(context.Background(), config(prefix+"test('unused',async()=>{});")))
 			assertIsolated(t)
 		})
@@ -432,7 +435,8 @@ test('selected entry',async({message},info)=>{
 		verifyGone(t)
 	})
 	t.Run("setup-inability", func(t *testing.T) {
-		unavailable := runner.New(nil, synthetichistory.NewStore(history), captures)
+		unavailable, err := runner.New(nil, synthetichistory.NewStore(history), captures, 1)
+		require.NoError(t, err)
 		require.Error(t, unavailable.Check(context.Background(), synthetic.Journey))
 		got := unavailable.Execute(
 			context.Background(),

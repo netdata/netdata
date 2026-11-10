@@ -65,6 +65,8 @@ type Run struct {
 	Name          string           `json:"name"`
 	VnodeGUID     string           `json:"vnode_guid,omitempty"`
 	Target        string           `json:"target,omitempty"`
+	ScheduledUS   int64            `json:"scheduled_us,omitempty"`
+	QueuedUS      int64            `json:"queued_us,omitempty"`
 	StartedUS     int64            `json:"started_us"`
 	CompletedUS   int64            `json:"completed_us"`
 	DurationMS    *float64         `json:"duration_ms,omitempty"`
