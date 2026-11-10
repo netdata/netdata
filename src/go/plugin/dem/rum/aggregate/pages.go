@@ -21,6 +21,10 @@ type elemSample struct {
 	poor       bool
 }
 
+func hasPageElement(v *vitalObservation) bool {
+	return v.element != "" && (v.key.name == beacon.LCP || v.key.name == beacon.INP || v.key.name == beacon.CLS)
+}
+
 // Pages returns all retained page groups, independent of the chart top-N.
 // An empty vnodeGUID selects all current associations. Its inventory is bounded
 // by the canonical retained observations.

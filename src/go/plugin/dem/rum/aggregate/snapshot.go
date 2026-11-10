@@ -64,8 +64,9 @@ type population struct {
 // Distributions are allocated only for groups containing vitals. Counts allow
 // exact-sized owned buffers, avoiding repeated growth while ingestion is locked.
 type vitalDistributions struct {
-	counts [vitalCount]int
-	values [vitalCount][]float64
+	counts       [vitalCount]int
+	values       [vitalCount][]float64
+	elementCount int
 }
 
 func (p *population) countVital(index int) {
@@ -82,6 +83,9 @@ func (p *population) reserveVitals() {
 		if count > 0 {
 			p.vitalValues.values[index] = make([]float64, 0, count)
 		}
+	}
+	if p.vitalValues.elementCount > 0 {
+		p.elements = make([]elemSample, 0, p.vitalValues.elementCount)
 	}
 }
 
@@ -147,7 +151,11 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 			r.global.countVital(index)
 		}
 		for _, kv := range attributePairs(v.attrs, pageOnly) {
-			r.group(kv.kind, kv.value).countVital(index)
+			g := r.group(kv.kind, kv.value)
+			g.countVital(index)
+			if pageOnly && hasPageElement(v) {
+				g.vitalValues.elementCount++
+			}
 		}
 	}
 	r.global.reserveVitals()
@@ -179,8 +187,7 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 		for _, kv := range attributePairs(v.attrs, pageOnly) {
 			g := r.group(kv.kind, kv.value)
 			g.vitalValues.values[index] = append(g.vitalValues.values[index], v.value)
-			if pageOnly && v.element != "" &&
-				(v.key.name == beacon.LCP || v.key.name == beacon.INP || v.key.name == beacon.CLS) {
+			if pageOnly && hasPageElement(v) {
 				g.elements = append(g.elements, elemSample{
 					vital: v.key.name,
 					sel:   v.element,

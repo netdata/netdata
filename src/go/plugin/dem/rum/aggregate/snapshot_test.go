@@ -81,8 +81,8 @@ func TestReadsPreserveEveryVitalAndEmptyPopulation(t *testing.T) {
 
 // With fixed facet membership, exact read-buffer allocation counts depend on
 // populated distributions, not retained sample count or attribution selectors.
-func TestSnapshotAllocationCountDoesNotGrowWithSamples(t *testing.T) {
-	allocs := func(samples int) float64 {
+func TestReadAllocationCountDoesNotGrowWithSamples(t *testing.T) {
+	allocs := func(samples int) map[string]float64 {
 		a, now := newAgg(time.Minute)
 		for i := range samples {
 			input := mk(*now, fmt.Sprint(i), "/page")
@@ -93,8 +93,59 @@ func TestSnapshotAllocationCountDoesNotGrowWithSamples(t *testing.T) {
 			}
 			a.Ingest(input)
 		}
-		return testing.AllocsPerRun(3, func() { a.Snapshot() })
+		return map[string]float64{
+			"snapshot": testing.AllocsPerRun(3, func() { a.Snapshot() }),
+			"pages":    testing.AllocsPerRun(3, func() { a.Pages("") }),
+		}
 	}
 	small, large := allocs(100), allocs(10000)
-	assert.LessOrEqual(t, large, small+10, "100 samples: %.0f allocations; 10000 samples: %.0f", small, large)
+	for kind, count := range small {
+		assert.LessOrEqual(
+			t,
+			large[kind],
+			count+10,
+			"%s: 100 samples: %.0f allocations; 10000 samples: %.0f",
+			kind,
+			count,
+			large[kind],
+		)
+	}
+}
+
+func TestPageSelectorsPreservePoorAndLexicalPrecedence(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	for i := range 5 {
+		input := mk(*now, fmt.Sprint(i), "/page")
+		for _, name := range beacon.Vitals {
+			metric := v(name, 0)
+			metric.Element = "#common"
+			switch name {
+			case beacon.LCP, beacon.CLS:
+				if i < 2 {
+					metric.Value = 5000
+					metric.Element = []string{"#z", "#a"}[i]
+				}
+			case beacon.INP:
+				metric.Value = 500 // The exact poor boundary is not poor.
+				if i == 0 {
+					metric.Value = 501
+					metric.Element = "#poor"
+				}
+			}
+			if i == 4 {
+				metric.Element = ""
+			}
+			input.Vitals = append(input.Vitals, metric)
+		}
+		require.True(t, a.Ingest(input).Accepted)
+	}
+	pages := a.Pages("")
+	require.Len(t, pages, 1)
+	assert.Equal(t, "#a", pages[0].LCPElement)
+	assert.Equal(t, "#poor", pages[0].INPElement)
+	assert.Equal(t, "#a", pages[0].CLSElement)
+	assert.Equal(t, a.Snapshot().Vitals, pages[0].Vitals)
+	for _, name := range beacon.Vitals {
+		assert.Equal(t, 5, pages[0].Vitals[name].N)
+	}
 }
