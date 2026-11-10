@@ -132,6 +132,17 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, sites, 1)
 	assert.Equal(t, "job-b", sites[0].Name)
+	// The old GUID still returns retained rows after in-place reassignment.
+	for _, method := range []string{"rum-sessions", "rum-errors"} {
+		response := rumfunctions.New(service, nil).HandleRaw(ctx, funcapi.RawMethodRequest{
+			Method: method,
+			Args:   []string{"site:job-a", "vnode_guid:11111111-1111-4111-8111-111111111111"},
+		})
+		require.NotEmpty(t, response.RawResponse["data"].([][]any))
+		help := response.RawResponse["help"].(string)
+		assert.Contains(t, help, "earlier policies", "historical caveat must survive current-identity reassignment")
+		assert.Contains(t, help, "do not estimate all visitors or errors")
+	}
 	// Actual Function requests carry both selectors and expose the stored group.
 	handler := rumfunctions.New(service, nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{

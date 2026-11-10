@@ -16,14 +16,15 @@ modules:
               - id: vnode
                 name: vnode
                 description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
-                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
                 type: string
                 required: false
-                default: ''
+                default: Not supplied
                 options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
                   vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
@@ -166,14 +167,15 @@ modules:
               - id: vnode
                 name: vnode
                 description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
-                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
                 type: string
                 required: false
-                default: ''
+                default: Not supplied
                 options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
                   vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
@@ -296,14 +298,15 @@ modules:
               - id: vnode
                 name: vnode
                 description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
-                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
                 type: string
                 required: false
-                default: ''
+                default: Not supplied
                 options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
                   vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
@@ -444,14 +447,15 @@ modules:
               - id: vnode
                 name: vnode
                 description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
-                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
                 type: string
                 required: false
-                default: ''
+                default: Not supplied
                 options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
                   vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
@@ -584,14 +588,15 @@ modules:
               - id: vnode
                 name: vnode
                 description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
-                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
                 type: string
                 required: false
-                default: ''
+                default: Not supplied
                 options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
                   vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
@@ -704,14 +709,15 @@ modules:
               - id: vnode
                 name: vnode
                 description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
-                  names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
                 type: string
                 required: false
-                default: ''
+                default: Not supplied
                 options: []
               - id: vnode_guid
                 name: vnode_guid
-                description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
                   vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
                 type: string
                 required: false
@@ -816,7 +822,7 @@ modules:
     metrics:
         availability: []
         description: |
-            All charts remain on this Agent. Native job identity scopes site charts; display_name is optional metadata.
+            Charts belong to the configured vnode, or to this Agent when vnode is omitted. Native job identity scopes site charts; display_name is optional metadata.
             The window uses receiver arrival time. Each Web Vital contributes its latest report per document experience;
             percentiles cannot be averaged across times or groups. Population charts show retained observations and ratings.
             No observations means no percentile. Capacity loss makes affected percentiles and counts unavailable; lost_reports

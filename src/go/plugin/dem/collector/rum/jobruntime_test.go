@@ -371,7 +371,7 @@ func TestNativeRUMConfiguredVnodeChangeKeepsEvidenceAndMovesFreshMetrics(t *test
 	site, _, release, ok = hub.AcquireSite("shop")
 	require.True(t, ok)
 	require.Equal(t, generation, site.Generation, "vnode refresh does not restart ingestion")
-	require.Empty(t, site.Aggregator.Pages())
+	require.Empty(t, site.Aggregator.Pages(""))
 	oldRows, _ := site.Aggregator.Live(0, 10, guidA)
 	require.Len(t, oldRows, 2)
 	release()

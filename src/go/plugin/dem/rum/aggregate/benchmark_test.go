@@ -116,7 +116,7 @@ func BenchmarkIngestErrors(b *testing.B) {
 		Browser:   "Chrome",
 		Received:  time.Now(),
 		Errors: []beacon.Error{
-			{Type: "TypeError", Message: "checkout failed", Stack: "at checkout()", Fingerprint: "22222222-2222-4222-8222-222222222222"},
+			{Type: "TypeError", Message: "checkout failed", Stack: "at checkout()", Fingerprint: beacon.Fingerprint("TypeError", "checkout failed", "at checkout()")},
 		},
 	}
 	b.ReportAllocs()
@@ -275,7 +275,7 @@ func BenchmarkHighCardinalityReads(b *testing.B) {
 				if kind == "snapshot" {
 					a.Snapshot()
 				} else {
-					a.Pages()
+					a.Pages("")
 				}
 			}
 		})

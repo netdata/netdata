@@ -134,15 +134,15 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 				problemBiased = true
 			}
 		}
+		help := spec.help + ". Historical evidence may reflect earlier policies, bounded context, retention and delivery loss. " +
+			"These rows do not estimate all visitors or errors."
 		if len(notes) > 0 {
-			help := spec.help + ". Current sampling policy: " + strings.Join(notes, "; ") +
-				". Historical evidence may reflect earlier policies, bounded context, retention and delivery loss. " +
-				"These rows do not estimate all visitors or errors."
+			help += " Current sampling policy: " + strings.Join(notes, "; ") + "."
 			if problemBiased {
 				help += " Problem overrides bias retained detail toward failures."
 			}
-			response["help"] = help
 		}
+		response["help"] = help
 	}
 	if len(spec.params) > 0 {
 		response["accepted_params"] = spec.params

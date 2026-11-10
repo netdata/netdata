@@ -173,7 +173,7 @@ func TestLatestRevisionAndExplicitActivations(t *testing.T) {
 	snap := a.Snapshot()
 	assert.Equal(t, .5, snap.Vitals[beacon.CLS].P75)
 	assert.EqualValues(t, 1, snap.Counters[CounterPageviews])
-	pages := a.Pages()
+	pages := a.Pages("")
 	for _, p := range pages {
 		if p.Page == "/entry" {
 			assert.Equal(t, .5, p.Vitals[beacon.CLS].P75)
@@ -203,7 +203,7 @@ func TestDuplicatesDoNotExtendSampleOrIdentityRetention(t *testing.T) {
 	b.PageGroup = "/wrong"
 	a.Ingest(b)
 	assert.Equal(t, 200., a.Snapshot().Vitals[beacon.LCP].P75)
-	pages := a.Pages()
+	pages := a.Pages("")
 	require.NotEmpty(t, pages)
 	var found bool
 	for _, p := range pages {
@@ -308,7 +308,7 @@ func TestMismatchedIdentityHasNoEffects(t *testing.T) {
 	b.Site = "other"
 	assert.False(t, a.Ingest(b).Accepted)
 	assert.Empty(t, a.Snapshot().Counters)
-	assert.Empty(t, a.Pages())
+	assert.Empty(t, a.Pages(""))
 }
 func itoa(i int) string { return fmt.Sprint(i) }
 
@@ -448,7 +448,7 @@ func TestIdentityCapacityLossInvalidatesObservedSessions(t *testing.T) {
 	require.Positive(t, snapshot.WindowLost)
 	require.Positive(t, snapshot.SessionsLost, "replay evidence loss also compromises session membership")
 	require.Positive(t, a.Activity().SessionsLost)
-	for _, page := range a.Pages() {
+	for _, page := range a.Pages("") {
 		if page.Page == "/old" {
 			require.Positive(t, page.SessionsLost)
 		}

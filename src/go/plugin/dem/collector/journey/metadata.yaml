@@ -236,14 +236,15 @@ modules:
             - id: vnode
               name: Virtual node name (`vnode`)
               description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
-                names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
               type: string
               required: false
-              default: ''
+              default: Not supplied
               options: []
             - id: vnode_guid
               name: Virtual node GUID (`vnode_guid`)
-              description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
                 vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
               type: string
               required: false
@@ -319,11 +320,11 @@ modules:
               - name: last_success_us
                 type: timestamp
                 unit: ''
-                description: Last success in this activation. Unix microseconds; null when unavailable.
+                description: Last success in the current vnode association. Unix microseconds; null when unavailable.
               - name: last_failure_us
                 type: timestamp
                 unit: ''
-                description: Last failure in this activation. Unix microseconds; null when unavailable.
+                description: Last failure in the current vnode association. Unix microseconds; null when unavailable.
               - name: error
                 type: string
                 unit: ''
@@ -357,14 +358,15 @@ modules:
             - id: vnode
               name: Virtual node name (`vnode`)
               description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
-                names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
               type: string
               required: false
-              default: ''
+              default: Not supplied
               options: []
             - id: vnode_guid
               name: Virtual node GUID (`vnode_guid`)
-              description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
                 vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
               type: string
               required: false
@@ -571,14 +573,15 @@ modules:
             - id: vnode
               name: Virtual node name (`vnode`)
               description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
-                names are rejected. Supply either vnode or vnode_guid, never both, even with empty values.
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
               type: string
               required: false
-              default: ''
+              default: Not supplied
               options: []
             - id: vnode_guid
               name: Virtual node GUID (`vnode_guid`)
-              description: Filter by canonical vnode GUID without a currently configured name. Do not also supply
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
                 vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
               type: string
               required: false

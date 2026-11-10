@@ -66,7 +66,10 @@ func (s *Service) Sites(ctx context.Context, vnodeGUID string) ([]Site, error) {
 func (s *Service) Pages(ctx context.Context, filter, vnodeGUID string) ([]Page, error) {
 	var out []Page
 	err := s.visit(ctx, filter, func(key string, site *rumregistry.Site) {
-		rows := site.Aggregator.Pages()
+		rows := site.Aggregator.Pages(vnodeGUID)
+		if len(rows) == 0 {
+			return
+		}
 		redact := siteRedactor(site)
 		for i := range rows {
 			r := &rows[i]
@@ -76,9 +79,6 @@ func (s *Service) Pages(ctx context.Context, filter, vnodeGUID string) ([]Page, 
 			r.CLSElement = redact.Apply(r.CLSElement)
 		}
 		for _, row := range rows {
-			if vnodeGUID != "" && row.VnodeGUID != vnodeGUID {
-				continue
-			}
 			out = append(out, Page(row))
 		}
 	})

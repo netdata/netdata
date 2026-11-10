@@ -76,7 +76,7 @@ func (h *Handler) checks(
 var checksMethod = method{
 	id:     "synthetics-checks",
 	title:  "Synthetic monitors",
-	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
+	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt. Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 	sort:   "job_id",
 	params: []string{"job_id", "kind", "limit", "vnode", "vnode_guid"},
 	columns: columns(
@@ -95,8 +95,8 @@ var checksMethod = method{
 		column{"outcome", "Last outcome", funcapi.FieldTypeString, ""},
 		column{"completed_us", "Last completion", funcapi.FieldTypeTimestamp, ""},
 		column{"duration_ms", "Attempt duration", funcapi.FieldTypeFloat, "ms"},
-		column{"last_success_us", "Last success in this activation", funcapi.FieldTypeTimestamp, ""},
-		column{"last_failure_us", "Last failure in this activation", funcapi.FieldTypeTimestamp, ""},
+		column{"last_success_us", "Last success in this vnode association", funcapi.FieldTypeTimestamp, ""},
+		column{"last_failure_us", "Last failure in this vnode association", funcapi.FieldTypeTimestamp, ""},
 		column{"error", "Last error", funcapi.FieldTypeString, ""},
 		column{"history_error", "History error", funcapi.FieldTypeString, ""},
 		column{"vnode_guid", "Vnode GUID", funcapi.FieldTypeString, ""},

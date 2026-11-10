@@ -102,3 +102,20 @@ func TestHistoryHelpExplainsBiasOnlyForSelectedProblemSampling(t *testing.T) {
 		}
 	}
 }
+
+func TestHistoryHelpWithoutActiveSites(t *testing.T) {
+	handler := rumfunctions.New(samplingFunctionSource{}, nil)
+	for _, method := range []string{"rum-sessions", "rum-errors"} {
+		for _, info := range []bool{false, true} {
+			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: method, Info: info})
+			help := response.Help
+			if !info {
+				require.NotNil(t, response.RawResponse)
+				help = response.RawResponse["help"].(string)
+			}
+			assert.Contains(t, help, "earlier policies")
+			assert.Contains(t, help, "do not estimate all visitors or errors")
+			assert.NotContains(t, help, "Current sampling policy:")
+		}
+	}
+}

@@ -768,7 +768,8 @@ Process Functions use the regular Netdata transport: `synthetics-checks` for act
 for retained history, `synthetics-run` for one run's full diagnosis, `synthetics-artifacts` for retained capture sets and
 storage status, and `synthetics-artifact` for one set's metadata or bytes.
 Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
-status. Current-generation last success/failure and freshness do not reconstruct a historical incident. A running or
+status. Last success/failure and freshness describe the current activation and vnode association; reassignment resets
+these observations. They do not reconstruct a historical incident. A running or
 waiting attempt does not refresh its previous result. Run summaries are capped at 2000 rows with an explicit truncation
 flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
 including the entire endpoint seconds. Explicit zero means epoch, negative values are offsets from one captured now, and

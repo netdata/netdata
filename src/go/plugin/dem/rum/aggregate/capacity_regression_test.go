@@ -226,7 +226,7 @@ func TestFacetsRankAllRetainedGroupsBeforeFolding(t *testing.T) {
 		assert.True(t, groups[10].Other)
 		assert.Zero(t, groups[10].Lost)
 	}
-	pages := a.Pages()
+	pages := a.Pages("")
 	require.Len(t, pages, 1101)
 	for _, page := range pages {
 		assert.Zero(t, page.Lost)
