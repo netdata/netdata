@@ -1023,6 +1023,12 @@ get_latest_version() {
   parse_version "${latest_tag}"
 }
 
+# Preview tags are not constrained by the legacy numeric version encoding.
+version_major() {
+  version_tag="${1#v}"
+  printf '%s\n' "${version_tag%%.*}"
+}
+
 update_available() {
   if [ "$NETDATA_FORCE_UPDATE" = "1" ]; then
      info "Force update requested"
@@ -1032,8 +1038,8 @@ update_available() {
   if [ "${RELEASE_CHANNEL}" = preview ]; then
     current_tag="$(get_current_tag)"
     latest_tag="$(get_latest_tag preview)" || fatal "Unable to determine latest version" U002B
-    current_version="$(get_current_version)"
-    latest_version="$(parse_version "${latest_tag}")"
+    current_version="${current_tag}"
+    latest_version="${latest_tag}"
   else
     current_version="$(get_current_version)"
     latest_version="$(get_latest_version)" || fatal "Unable to determine latest version" U002B
@@ -1053,10 +1059,16 @@ update_available() {
   else
     info "Update available"
 
-    if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
+    if [ "${RELEASE_CHANNEL}" = preview ]; then
+      current_major="$(version_major "${current_tag}")"
+      latest_major="$(version_major "${latest_tag}")"
+    else
       current_major="$(echo "${current_version}" | head -c 3)"
       latest_major="$(echo "${latest_version}" | head -c 3)"
+    fi
 
+    if [ -n "${current_major}" ] && [ -n "${latest_major}" ] &&
+       [ "${current_major}" -ne 0 ] && [ "${latest_major}" -ne 0 ]; then
       if [ "${current_major}" -ne "${latest_major}" ]; then
         update_safe=0
 
@@ -1468,7 +1480,7 @@ update_binpkg() {
       ;;
   esac
 
-  initial_version="$(get_current_version)"
+  initial_version=""
 
   if [ -n "${repo_subcmd}" ]; then
     # shellcheck disable=SC2086
@@ -1485,6 +1497,7 @@ update_binpkg() {
     RELEASE_CHANNEL="nightly"
     repopkg="netdata-repo-edge"
   else
+    initial_version="$(get_current_version)"
     case "$(echo "${initial_version}" | cut -c 10)" in
       0)
         RELEASE_CHANNEL="nightly"
@@ -1503,6 +1516,8 @@ update_binpkg() {
 
   if [ "${RELEASE_CHANNEL}" = preview ]; then
     initial_tag="$(get_current_tag)"
+  elif [ -z "${initial_version}" ]; then
+    initial_version="$(get_current_version)"
   fi
 
   if [ -n "${repo_path}" ]; then
@@ -1552,7 +1567,12 @@ update_binpkg() {
     fi
   fi
 
-  current_major="$(get_current_version | head -c 3 | awk '{ print $1 + 0 }')"
+  if [ "${RELEASE_CHANNEL}" = preview ]; then
+    current_major="$(version_major "${initial_tag}")"
+    [ -n "${current_major}" ] || current_major=0
+  else
+    current_major="$(get_current_version | head -c 3 | awk '{ print $1 + 0 }')"
+  fi
   latest_major="$(get_new_binpkg_major)"
 
   # current_major == 0 means we could not determine the installed version
@@ -1590,18 +1610,17 @@ update_binpkg() {
   # Keep ownership of metadata downloads outside command substitutions so the
   # EXIT trap can clean them up even when updater self-update was skipped.
   create_exec_tmp_directory
-  current_version="$(get_current_version)"
   if [ "${RELEASE_CHANNEL}" = preview ]; then
     latest_tag="$(get_latest_tag preview)" || fatal "Unable to determine latest version" U002B
-    latest_version="$(parse_version "${latest_tag}")"
   else
+    current_version="$(get_current_version)"
     latest_version="$(get_latest_version)" || fatal "Unable to determine latest version" U002B
   fi
 
   update_incomplete=0
   if [ "${RELEASE_CHANNEL}" = preview ]; then
     current_tag="$(get_current_tag)"
-    if [ "${current_tag#v}" != "${latest_tag#v}" ] && [ "${initial_tag#v}" = "${current_tag#v}" ]; then
+    if [ "${current_tag#v}" != "${latest_tag#v}" ]; then
       update_incomplete=1
     fi
   elif [ "${RELEASE_CHANNEL}" != "none" ] && [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then

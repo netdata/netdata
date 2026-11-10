@@ -332,6 +332,8 @@ self_update
         for current, latest, needs_update in [
             ('v2.9.0-alpha.1', 'v2.9.0-beta.1', True),
             ('v2.9.0-rc.1', 'v2.9.0-rc.2', True),
+            ('v2.9.0-rc.999', 'v2.9.0-rc.1000', True),
+            ('v2.999.0-alpha.1', 'v2.1000.0-alpha.1', True),
             ('v2.9.0-rc1', 'v2.9.0', True),
             ('v2.9.0', 'v2.10.0-alpha.1+build.8', True),
             ('v2.10.0', 'v2.9.0-rc1', True),
@@ -343,6 +345,8 @@ self_update
 RELEASE_CHANNEL=preview
 NETDATA_FORCE_UPDATE=0
 NETDATA_ACCEPT_MAJOR_VERSIONS=2
+get_current_version() {{ echo legacy-encoding-must-not-be-used >&2; exit 8; }}
+warn_major_update() {{ exit 7; }}
 get_current_tag() {{ echo {current}; }}
 get_latest_tag() {{ echo {latest}; }}
 if update_available; then result=yes; else result=no; fi
@@ -390,7 +394,7 @@ env() {
 }
 fixture_pm() {
   echo "$*" >> pm-calls
-  for arg do [ "$arg" != netdata ] || installed_tag=v2.9.0-rc.2; done
+  for arg do [ "$arg" != netdata ] || installed_tag=v2.9.0-rc.1000; done
   return 0
 }
 apt-get() { fixture_pm "$@"; }
@@ -401,36 +405,44 @@ dpkg-query() { [ "$2" = netdata-repo-preview ]; }
 rpm() { [ "$2" = netdata-repo-preview ]; }
 get_current_tag() { echo "$installed_tag"; }
 get_new_binpkg_major() { echo 2; }
+get_current_version() { echo legacy-encoding-must-not-be-used >&2; exit 8; }
+warn_major_update() { exit 7; }
 check_for_remote_file() { echo "$1"; return 0; }
-get_latest_tag() { [ "$1" = preview ]; echo v2.9.0-rc.2; }
+get_latest_tag() { [ "$1" = preview ]; echo v2.9.0-rc.1000; }
 update_binpkg
 [ "$RELEASE_CHANNEL" = preview ]
 [ "$repopkg" = netdata-repo-preview ]
-[ "$installed_tag" = v2.9.0-rc.2 ]
+[ "$installed_tag" = v2.9.0-rc.1000 ]
 ''', functions=functions)
                 self.assertIn(f'https://repository.netdata.cloud/repos/preview/{repo_path}/.currently.published',
                               result.stdout)
                 self.assertIn('netdata-repo-preview', (self.work / 'pm-calls').read_text())
                 (self.work / 'pm-calls').unlink()
 
-    def test_preview_native_unchanged_prerelease_is_failure(self):
+    def test_preview_native_nonlatest_version_is_failure(self):
         release_file = self.root / 'os-release'
         release_file.write_text('ID=debian\nVERSION_ID=12\nVERSION_CODENAME=bookworm\n')
         functions = FUNCTIONS.replace('/etc/os-release', str(release_file))
-        result = self.run_shell('''
+        for post_transaction in ('v2.9.0-alpha.1', 'v2.9.0-beta.1'):
+            with self.subTest(installed=post_transaction):
+                result = self.run_shell(f'''
 INTERACTIVE=1
 NETDATA_NO_SYSTEMD_JOURNAL=1
 NETDATA_PREVIEW_REPO_URL=https://repository.netdata.cloud/repos/preview
-env() { "$@"; }
-apt-get() { :; }
-dpkg-query() { [ "$2" = netdata-repo-preview ]; }
-get_current_tag() { echo v2.9.0-alpha.1; }
-get_latest_tag() { echo v2.9.0-beta.1; }
-get_new_binpkg_major() { echo 2; }
-check_for_remote_file() { return 0; }
+installed_tag=v2.9.0-alpha.1
+env() {{ "$@"; }}
+apt-get() {{
+  for arg do [ "$arg" != netdata ] || installed_tag={post_transaction}; done
+  return 0
+}}
+dpkg-query() {{ [ "$2" = netdata-repo-preview ]; }}
+get_current_tag() {{ echo "$installed_tag"; }}
+get_latest_tag() {{ echo v2.9.0-rc.1000; }}
+get_new_binpkg_major() {{ echo 2; }}
+check_for_remote_file() {{ return 0; }}
 update_binpkg
 ''', functions=functions, success=False)
-        self.assertIn('Package manager did not fully update Netdata', result.stderr)
+                self.assertIn('Package manager did not fully update Netdata', result.stderr)
 
     def test_preview_missing_version_fails_in_update_check(self):
         result = self.run_shell('''
