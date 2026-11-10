@@ -256,32 +256,26 @@ struct Flattened {
     rejected: usize,
 }
 
-/// Result of running the collision check across a request's storable streams.
-struct CollisionCheck {
-    accepted: Vec<StorableStream>,
-    collisions: Vec<Collision>,
-}
-
 /// Reconcile a request's storable streams against the canonical-stream table.
 ///
 /// For each stream (keyed by its carried `part_key`, the `ns_hash`):
 /// - If the table has no entry for the hash, register the stream as
 ///   canonical and accept it.
 /// - If the entry matches the stream, accept.
-/// - If the entry mismatches, reject as a collision and record it for the
-///   response's `partial_success`.
+/// - If the entry mismatches, reject as a collision and record it in
+///   `collisions`, for the response's `partial_success`.
 ///
-/// Pure with respect to the I/O of the export path — the only side effect
-/// is mutating the canonical table. Extracted from `export_logs` so it can
+/// Returns the accepted streams. Pure with respect to the I/O of the export
+/// path — the only side effect is mutating the canonical table — so it can
 /// be unit-tested without spinning up a writer or a request.
 fn check_collisions(
     canonical: &mut HashMap<(TenantId, u64), ServiceStream>,
     tenant_id: &TenantId,
     streams: Vec<StorableStream>,
-) -> CollisionCheck {
+    collisions: &mut Vec<Collision>,
+) -> Vec<StorableStream> {
     // Collisions are rare: nearly every stream is accepted.
     let mut accepted = Vec::with_capacity(streams.len());
-    let mut collisions = Vec::new();
 
     for s in streams {
         let key = (tenant_id.clone(), s.part_key);
@@ -304,10 +298,7 @@ fn check_collisions(
         }
     }
 
-    CollisionCheck {
-        accepted,
-        collisions,
-    }
+    accepted
 }
 
 /// One frame dropped because its stream identity could not be encoded into the
@@ -331,108 +322,109 @@ struct OversizedDrop {
     log_records: usize,
 }
 
-/// Build the OTLP `partial_success` payload from a request's rejected records,
-/// across all three rejection classes: `ns_hash` collisions, oversized-identity
-/// frame drops, and out-of-window records.
-///
-/// Returns `None` only when nothing was rejected (full success); otherwise
-/// reports the total rejected count and a developer-facing message describing
-/// each rejection.
-fn build_partial_success(
-    collisions: &[Collision],
-    oversized: &[OversizedDrop],
+/// Everything one export request lost, by rejection class. The client's
+/// `partial_success` and self-monitoring both report from this one record.
+#[derive(Default)]
+struct Rejections {
+    /// Streams whose `ns_hash` a different identity already holds.
+    collisions: Vec<Collision>,
+    /// Streams whose identity is too large to store.
+    oversized: Vec<OversizedDrop>,
+    /// Records whose timestamp is outside the ingestion window.
     out_of_window: usize,
-) -> Option<ExportLogsPartialSuccess> {
-    if collisions.is_empty() && oversized.is_empty() && out_of_window == 0 {
-        return None;
-    }
-    Some(ExportLogsPartialSuccess {
-        rejected_log_records: count_rejected(collisions, oversized, out_of_window) as i64,
-        error_message: format_rejection_error(collisions, oversized, out_of_window),
-    })
 }
 
-/// The records a request lost, across all three rejection classes. The client
-/// (`partial_success`) and self-monitoring both report this one number.
-fn count_rejected(
-    collisions: &[Collision],
-    oversized: &[OversizedDrop],
-    out_of_window: usize,
-) -> usize {
-    let collided: usize = collisions.iter().map(|c| c.rejected_log_records).sum();
-    let unstorable: usize = oversized.iter().map(|o| o.log_records).sum();
-    collided + unstorable + out_of_window
-}
-
-/// Format the rejected-records detail for `ExportLogsPartialSuccess::error_message`,
-/// one section per rejection class (`ns_hash` collisions, oversized-identity
-/// frame drops, out-of-window records), joined with `" | "`.
-fn format_rejection_error(
-    collisions: &[Collision],
-    oversized: &[OversizedDrop],
-    out_of_window: usize,
-) -> String {
-    fn show(s: &str) -> &str {
-        if s.is_empty() { "<none>" } else { s }
+impl Rejections {
+    /// The records lost, across all three rejection classes.
+    fn count(&self) -> usize {
+        let collided: usize = self.collisions.iter().map(|c| c.rejected_log_records).sum();
+        let unstorable: usize = self.oversized.iter().map(|o| o.log_records).sum();
+        collided + unstorable + self.out_of_window
     }
 
-    let mut sections: Vec<String> = Vec::new();
-
-    if !collisions.is_empty() {
-        let parts: Vec<String> = collisions
-            .iter()
-            .map(|c| {
-                format!(
-                    "ns_hash={:#x}: rejected ({}/{}) collides with canonical ({}/{}) ({} log records dropped)",
-                    c.hash,
-                    show(&c.rejected.namespace),
-                    show(&c.rejected.name),
-                    show(&c.canonical.namespace),
-                    show(&c.canonical.name),
-                    c.rejected_log_records,
-                )
-            })
-            .collect();
-        sections.push(format!(
-            "{} ns_hash collision{} detected; rename one of the colliding (service.namespace, service.name) pairs to dedupe: {}",
-            collisions.len(),
-            if collisions.len() == 1 { "" } else { "s" },
-            parts.join("; "),
-        ));
+    /// The OTLP `partial_success` payload: `None` only when nothing was
+    /// rejected (full success); otherwise the total rejected count and a
+    /// developer-facing message describing each rejection.
+    fn partial_success(&self) -> Option<ExportLogsPartialSuccess> {
+        if self.collisions.is_empty() && self.oversized.is_empty() && self.out_of_window == 0 {
+            return None;
+        }
+        Some(ExportLogsPartialSuccess {
+            rejected_log_records: self.count() as i64,
+            error_message: self.error_message(),
+        })
     }
 
-    if !oversized.is_empty() {
-        let parts: Vec<String> = oversized
-            .iter()
-            .map(|o| {
-                format!(
-                    "part_key={:#x}: identity too large (namespace={:?} len={}, name={:?} len={}) ({} log records dropped)",
-                    o.part_key,
-                    o.namespace_preview,
-                    o.namespace_len,
-                    o.name_preview,
-                    o.name_len,
-                    o.log_records,
-                )
-            })
-            .collect();
-        sections.push(format!(
-            "{} stream{} dropped for oversized identity; shorten the (service.namespace, service.name) fields: {}",
-            oversized.len(),
-            if oversized.len() == 1 { "" } else { "s" },
-            parts.join("; "),
-        ));
-    }
+    /// The rejected-records detail for `ExportLogsPartialSuccess::error_message`,
+    /// one section per rejection class (`ns_hash` collisions, oversized-identity
+    /// frame drops, out-of-window records), joined with `" | "`.
+    fn error_message(&self) -> String {
+        let collisions = &self.collisions;
+        let oversized = &self.oversized;
+        let out_of_window = self.out_of_window;
 
-    if out_of_window > 0 {
-        sections.push(format!(
-            "{} log record{} rejected: timestamp outside the ingestion window (older than max_age or more than future_skew ahead)",
-            out_of_window,
-            if out_of_window == 1 { "" } else { "s" },
-        ));
-    }
+        fn show(s: &str) -> &str {
+            if s.is_empty() { "<none>" } else { s }
+        }
 
-    sections.join(" | ")
+        let mut sections: Vec<String> = Vec::new();
+
+        if !collisions.is_empty() {
+            let parts: Vec<String> = collisions
+                .iter()
+                .map(|c| {
+                    format!(
+                        "ns_hash={:#x}: rejected ({}/{}) collides with canonical ({}/{}) ({} log records dropped)",
+                        c.hash,
+                        show(&c.rejected.namespace),
+                        show(&c.rejected.name),
+                        show(&c.canonical.namespace),
+                        show(&c.canonical.name),
+                        c.rejected_log_records,
+                    )
+                })
+                .collect();
+            sections.push(format!(
+                "{} ns_hash collision{} detected; rename one of the colliding (service.namespace, service.name) pairs to dedupe: {}",
+                collisions.len(),
+                if collisions.len() == 1 { "" } else { "s" },
+                parts.join("; "),
+            ));
+        }
+
+        if !oversized.is_empty() {
+            let parts: Vec<String> = oversized
+                .iter()
+                .map(|o| {
+                    format!(
+                        "part_key={:#x}: identity too large (namespace={:?} len={}, name={:?} len={}) ({} log records dropped)",
+                        o.part_key,
+                        o.namespace_preview,
+                        o.namespace_len,
+                        o.name_preview,
+                        o.name_len,
+                        o.log_records,
+                    )
+                })
+                .collect();
+            sections.push(format!(
+                "{} stream{} dropped for oversized identity; shorten the (service.namespace, service.name) fields: {}",
+                oversized.len(),
+                if oversized.len() == 1 { "" } else { "s" },
+                parts.join("; "),
+            ));
+        }
+
+        if out_of_window > 0 {
+            sections.push(format!(
+                "{} log record{} rejected: timestamp outside the ingestion window (older than max_age or more than future_skew ahead)",
+                out_of_window,
+                if out_of_window == 1 { "" } else { "s" },
+            ));
+        }
+
+        sections.join(" | ")
+    }
 }
 
 /// Max chars of an attacker-controlled identity field to echo into an
@@ -673,17 +665,55 @@ impl NetdataLogsService {
     fn counted_response(
         &self,
         stored: usize,
-        collisions: &[Collision],
-        oversized: &[OversizedDrop],
-        out_of_window: usize,
+        rejections: &Rejections,
     ) -> ExportLogsServiceResponse {
         if let Some(derived) = &self.derived {
-            let rejected = count_rejected(collisions, oversized, out_of_window);
-            derived.record_ingest(Signal::Logs, stored as u64, rejected as u64);
+            derived.record_ingest(Signal::Logs, stored as u64, rejections.count() as u64);
         }
         ExportLogsServiceResponse {
-            partial_success: build_partial_success(collisions, oversized, out_of_window),
+            partial_success: rejections.partial_success(),
         }
+    }
+
+    /// Decide which streams of a request may be stored; the others are
+    /// recorded in `rejections`.
+    ///
+    /// Identity comes first: a stream whose identity cannot be stored must
+    /// not claim a canonical `part_key` it can never write to (see
+    /// [`encode_identity_or_drop`]). The collision check then runs under the
+    /// canonical table's lock; identities are encoded before it is taken and
+    /// collisions are logged after it is released.
+    fn admit(
+        &self,
+        tenant_id: &TenantId,
+        groups: HashMap<ServiceStream, StreamGroup>,
+        rejections: &mut Rejections,
+    ) -> Vec<StorableStream> {
+        let mut storable = Vec::with_capacity(groups.len());
+        for (stream, group) in groups {
+            match StorableStream::new(stream, group) {
+                Ok(s) => storable.push(s),
+                Err(drop) => rejections.oversized.push(drop),
+            }
+        }
+
+        // The lock guard lives for this statement only.
+        let accepted = check_collisions(
+            &mut self.canonical.lock().unwrap(),
+            tenant_id,
+            storable,
+            &mut rejections.collisions,
+        );
+
+        for c in &rejections.collisions {
+            tracing::warn!(
+                tenant = %tenant_id,
+                hash = c.hash,
+                "ns_hash collision: rejecting {} log records",
+                c.rejected_log_records,
+            );
+        }
+        accepted
     }
 
     /// The transport-agnostic OTLP logs export core: everything between
@@ -709,43 +739,13 @@ impl NetdataLogsService {
             });
         }
 
-        // Validate identity encodability BEFORE the collision check mutates the
-        // canonical table: an unstorable identity must not claim a canonical
-        // `part_key` it can never write to (see `encode_identity_or_drop`).
-        // The surviving streams carry their `part_key` + encoded `content_meta`
-        // through the collision check to the write loop (no re-derive, no
-        // side-map).
-        let mut oversized: Vec<OversizedDrop> = Vec::new();
-        let mut storable: Vec<StorableStream> = Vec::with_capacity(groups.len());
-        for (stream, group) in groups {
-            match StorableStream::new(stream, group) {
-                Ok(s) => storable.push(s),
-                Err(drop) => oversized.push(drop),
-            }
-        }
+        let mut rejections = Rejections::default();
+        let mut accepted = self.admit(tenant_id, groups, &mut rejections);
 
-        let CollisionCheck {
-            mut accepted,
-            collisions,
-        } = {
-            let mut canonical = self.canonical.lock().unwrap();
-            check_collisions(&mut canonical, tenant_id, storable)
-        };
-
-        for c in &collisions {
-            tracing::warn!(
-                tenant = %tenant_id,
-                hash = c.hash,
-                "ns_hash collision: rejecting {} log records",
-                c.rejected_log_records,
-            );
-        }
-
-        // No-op short-circuit: nothing left to write (every storable group was a
-        // collision, or every group was dropped as oversized). Still report the
-        // rejected records — collisions and oversized drops — to the client.
+        // Nothing left to write: every stream was a collision or had an
+        // oversized identity. Still report the rejected records to the client.
         if accepted.is_empty() {
-            return Ok(self.counted_response(0, &collisions, &oversized, 0));
+            return Ok(self.counted_response(0, &rejections));
         }
 
         // Phase 1 — prepare every frame WITHOUT holding any writer lock:
@@ -768,7 +768,6 @@ impl NetdataLogsService {
             min_ns: fallback_base_ns.saturating_sub(self.ingest_bounds.max_age_ns()),
             max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
         };
-        let mut out_of_window: usize = 0;
         // Records that passed every check: the ones phase 2 writes.
         let mut kept: usize = 0;
         // Derived metrics see each stream after normalization (kept records,
@@ -780,23 +779,23 @@ impl NetdataLogsService {
                     batch.record(tenant_id.as_str(), request);
                 }
             })?;
-            out_of_window += flattened.rejected;
+            rejections.out_of_window += flattened.rejected;
             kept += flattened.kept;
         }
 
-        if out_of_window > 0 {
+        if rejections.out_of_window > 0 {
             tracing::warn!(
                 tenant = %tenant_id,
-                rejected = out_of_window,
+                rejected = rejections.out_of_window,
                 "rejected {} log records outside the ingestion time window",
-                out_of_window,
+                rejections.out_of_window,
             );
         }
 
         // Every accepted stream was fully rejected as out-of-window: nothing to
         // write, but still report the rejected records to the client.
         if kept == 0 {
-            return Ok(self.counted_response(0, &collisions, &oversized, out_of_window));
+            return Ok(self.counted_response(0, &rejections));
         }
 
         // Phase 2 — the serialized region, under THIS TENANT's writer lock
@@ -859,7 +858,7 @@ impl NetdataLogsService {
             batch.commit();
         }
 
-        Ok(self.counted_response(kept, &collisions, &oversized, out_of_window))
+        Ok(self.counted_response(kept, &rejections))
     }
 }
 
@@ -995,30 +994,35 @@ mod tests {
     fn first_write_establishes_canonical_pair() {
         let mut canonical = HashMap::new();
         let groups = group_by_stream(vec![rl(Some("prod"), Some("api"), 4)]);
-        let r = check_collisions(&mut canonical, &tenant(), storable(groups));
-        assert_eq!(r.accepted.len(), 1);
-        assert!(r.collisions.is_empty());
-        let stream = canonical.get(&(tenant(), r.accepted[0].part_key)).unwrap();
+        let mut collisions = Vec::new();
+        let accepted =
+            check_collisions(&mut canonical, &tenant(), storable(groups), &mut collisions);
+        assert_eq!(accepted.len(), 1);
+        assert!(collisions.is_empty());
+        let stream = canonical.get(&(tenant(), accepted[0].part_key)).unwrap();
         assert_eq!(stream, &ServiceStream::new("prod", "api"));
     }
 
     #[test]
     fn matching_subsequent_writes_pass_through() {
         let mut canonical = HashMap::new();
-        let r1 = check_collisions(
+        let mut collisions = Vec::new();
+        check_collisions(
             &mut canonical,
             &tenant(),
             storable(group_by_stream(vec![rl(Some("prod"), Some("api"), 1)])),
+            &mut collisions,
         );
-        assert!(r1.collisions.is_empty());
-        let r2 = check_collisions(
+        assert!(collisions.is_empty());
+        let accepted = check_collisions(
             &mut canonical,
             &tenant(),
             storable(group_by_stream(vec![rl(Some("prod"), Some("api"), 7)])),
+            &mut collisions,
         );
-        assert!(r2.collisions.is_empty());
-        assert_eq!(r2.accepted.len(), 1);
-        assert_eq!(r2.accepted[0].log_record_count, 7);
+        assert!(collisions.is_empty());
+        assert_eq!(accepted.len(), 1);
+        assert_eq!(accepted[0].log_record_count, 7);
     }
 
     #[test]
@@ -1046,10 +1050,12 @@ mod tests {
             },
         );
 
-        let r = check_collisions(&mut canonical, &tenant(), storable(groups));
-        assert!(r.accepted.is_empty());
-        assert_eq!(r.collisions.len(), 1);
-        let c = &r.collisions[0];
+        let mut collisions = Vec::new();
+        let accepted =
+            check_collisions(&mut canonical, &tenant(), storable(groups), &mut collisions);
+        assert!(accepted.is_empty());
+        assert_eq!(collisions.len(), 1);
+        let c = &collisions[0];
         assert_eq!(c.hash, hash);
         assert_eq!(c.canonical, canonical_stream);
         assert_eq!(c.rejected, rejected);
@@ -1073,7 +1079,7 @@ mod tests {
             },
         );
 
-        let _ = check_collisions(&mut canonical, &tenant(), storable(groups));
+        check_collisions(&mut canonical, &tenant(), storable(groups), &mut Vec::new());
         // The original canonical stream must remain unchanged.
         assert_eq!(canonical.get(&(tenant(), hash)).unwrap(), &canonical_stream);
     }
@@ -1084,17 +1090,20 @@ mod tests {
         let t1 = TenantId::from("t1");
         let t2 = TenantId::from("t2");
         let groups_t1 = group_by_stream(vec![rl(Some("prod"), Some("api"), 1)]);
-        let r1 = check_collisions(&mut canonical, &t1, storable(groups_t1));
-        assert!(r1.collisions.is_empty());
+        let mut collisions = Vec::new();
+        let accepted_t1 =
+            check_collisions(&mut canonical, &t1, storable(groups_t1), &mut collisions);
+        assert!(collisions.is_empty());
 
         // The same stream (hence the same ns_hash) in a different tenant
         // must be accepted as fresh, not flagged as a collision — the
         // tenant id is part of the canonical-table key.
         let groups_t2 = group_by_stream(vec![rl(Some("prod"), Some("api"), 1)]);
-        let r2 = check_collisions(&mut canonical, &t2, storable(groups_t2));
-        assert!(r2.collisions.is_empty());
-        assert_eq!(r2.accepted.len(), 1);
-        assert_eq!(r1.accepted[0].stream, r2.accepted[0].stream);
+        let accepted_t2 =
+            check_collisions(&mut canonical, &t2, storable(groups_t2), &mut collisions);
+        assert!(collisions.is_empty());
+        assert_eq!(accepted_t2.len(), 1);
+        assert_eq!(accepted_t1[0].stream, accepted_t2[0].stream);
     }
 
     /// Build a `NetdataLogsService` rooted at `wal_dir`. The
@@ -1483,7 +1492,11 @@ mod tests {
                 rejected_log_records: 1,
             },
         ];
-        let msg = format_rejection_error(&collisions, &[], 0);
+        let msg = Rejections {
+            collisions,
+            ..Default::default()
+        }
+        .error_message();
         assert!(msg.contains("2 ns_hash collisions"));
         assert!(msg.contains("prod"));
         assert!(msg.contains("staging"));
@@ -1502,7 +1515,11 @@ mod tests {
             name_preview: "api".to_string(),
             log_records: 5,
         }];
-        let msg = format_rejection_error(&[], &oversized, 0);
+        let msg = Rejections {
+            oversized,
+            ..Default::default()
+        }
+        .error_message();
         assert!(msg.contains("1 stream dropped for oversized identity"));
         assert!(msg.contains("part_key=0xabc"));
         assert!(msg.contains("len=2048"));
@@ -1527,8 +1544,13 @@ mod tests {
             name_preview: "api".to_string(),
             log_records: 5,
         }];
-        let ps =
-            build_partial_success(&collisions, &oversized, 7).expect("rejections present => Some");
+        let ps = Rejections {
+            collisions,
+            oversized,
+            out_of_window: 7,
+        }
+        .partial_success()
+        .expect("rejections present => Some");
         assert_eq!(ps.rejected_log_records, 3 + 5 + 7);
         // All three rejection classes appear in the aggregated message.
         assert!(ps.error_message.contains("ns_hash collision"));
@@ -1539,12 +1561,17 @@ mod tests {
 
     #[test]
     fn partial_success_is_none_when_nothing_rejected() {
-        assert!(build_partial_success(&[], &[], 0).is_none());
+        assert!(Rejections::default().partial_success().is_none());
     }
 
     #[test]
     fn partial_success_reports_out_of_window_alone() {
-        let ps = build_partial_success(&[], &[], 1).expect("out-of-window => Some");
+        let ps = Rejections {
+            out_of_window: 1,
+            ..Default::default()
+        }
+        .partial_success()
+        .expect("out-of-window => Some");
         assert_eq!(ps.rejected_log_records, 1);
         // Singular phrasing for a single record.
         assert!(ps.error_message.contains("1 log record rejected"));
