@@ -67,13 +67,26 @@ fn count_spans(req: &ExportTraceServiceRequest) -> usize {
         .sum()
 }
 
-/// One storable group of spans bound for a single WAL stream: the substrate's
-/// opaque partition key, the stream's encoded `content_meta` blob, and the
-/// spans themselves (still an OTLP request — the frame recipe consumes it).
+/// What a group's spans are at each point of the export.
+enum Payload {
+    /// As received (still an OTLP request — the frame recipe consumes it).
+    Spans(ExportTraceServiceRequest),
+    /// Flattened and encoded lock-free (phase 1): one WAL frame, awaiting the
+    /// serialized write+sync region (phase 2). Holds at least one span.
+    Frame(ng_flatten::PreparedTraceFrame),
+    /// Every span fell outside the ingestion window: nothing to write.
+    OutOfWindow,
+}
+
+/// One group of spans bound for a single WAL stream, from partitioning to the
+/// WAL write: the substrate's opaque partition key, the stream's encoded
+/// `content_meta` blob, and the spans. Flattening turns `payload` from spans
+/// into a frame, and the write loop appends that frame under `part_key` and
+/// `content_meta`.
 struct StorableSpans {
     part_key: u64,
     content_meta: Vec<u8>,
-    request: ExportTraceServiceRequest,
+    payload: Payload,
 }
 
 /// THE traces partitioning seam.
@@ -97,16 +110,8 @@ fn partition_spans(request: ExportTraceServiceRequest) -> Vec<StorableSpans> {
     vec![StorableSpans {
         part_key: otel_logs_identity::part_key(&unattributed),
         content_meta,
-        request,
+        payload: Payload::Spans(request),
     }]
-}
-
-/// One group's frame, fully prepared lock-free (phase 1) and awaiting the
-/// serialized write+sync region (phase 2).
-struct PreparedSpans {
-    part_key: u64,
-    content_meta: Vec<u8>,
-    frame: ng_flatten::PreparedTraceFrame,
 }
 
 /// Build the OTLP `partial_success` payload from a request's rejected spans.
@@ -341,7 +346,7 @@ impl NetdataTracesService {
             observations.push(observer.prepare(tenant_id.as_str(), &request));
         }
 
-        let groups = partition_spans(request);
+        let mut groups = partition_spans(request);
 
         // Phase 1 — prepare every frame WITHOUT holding any writer lock:
         // `prepare_trace_frame` consumes an owned request and needs nothing
@@ -363,13 +368,18 @@ impl NetdataTracesService {
             max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
         };
         let mut out_of_window: usize = 0;
-        let mut prepared = Vec::with_capacity(groups.len());
+        // Spans that passed the window check: the ones phase 2 writes.
+        let mut kept: usize = 0;
         // Derived metrics see each group after normalization (kept spans,
         // resolved times) and are counted only once the spans are durable.
         let mut derived_batch = self.derived.as_ref().and_then(|d| d.spans_batch());
-        for g in groups {
+        for g in &mut groups {
+            // Only received spans need flattening.
+            let Payload::Spans(request) = &mut g.payload else {
+                continue;
+            };
             let frame = ng_flatten::prepare_trace_frame_with(
-                g.request,
+                std::mem::take(request),
                 fallback_base_ns,
                 Some(bounds),
                 |request| {
@@ -383,16 +393,12 @@ impl NetdataTracesService {
                 Status::internal("flatten encode error")
             })?;
             out_of_window += frame.rejected;
-            // Every span in this group fell outside the ingestion window:
-            // nothing to write for it.
-            if frame.records == 0 {
-                continue;
-            }
-            prepared.push(PreparedSpans {
-                part_key: g.part_key,
-                content_meta: g.content_meta,
-                frame,
-            });
+            kept += frame.records;
+            g.payload = if frame.records == 0 {
+                Payload::OutOfWindow
+            } else {
+                Payload::Frame(frame)
+            };
         }
 
         if out_of_window > 0 {
@@ -406,7 +412,7 @@ impl NetdataTracesService {
 
         // Every span was rejected as out-of-window: nothing to write, but
         // still report the rejected spans to the client.
-        if prepared.is_empty() {
+        if kept == 0 {
             return Ok(self.counted_response(0, out_of_window));
         }
 
@@ -445,20 +451,29 @@ impl NetdataTracesService {
         };
         {
             let mut writer = writer.lock().unwrap();
-            for p in &prepared {
+            for g in &groups {
+                let frame = match &g.payload {
+                    Payload::Frame(frame) => frame,
+                    Payload::OutOfWindow => continue,
+                    // Phase 1 flattens every group it is given.
+                    Payload::Spans(_) => {
+                        tracing::error!("a span group reached the WAL write without a frame");
+                        return Err(Status::internal("span group was not flattened"));
+                    }
+                };
                 let ingestion_ns = self.clock.lock().unwrap().now_ns();
                 writer
                     .write_frame(
-                        p.part_key,
-                        &p.content_meta,
-                        &p.frame.data,
+                        g.part_key,
+                        &g.content_meta,
+                        &frame.data,
                         wal::FrameMeta {
-                            entry_count: p.frame.records,
+                            entry_count: frame.records,
                             ingestion_ns,
-                            // Always Some here: zero-record frames were
-                            // skipped above, and `prepare_trace_frame` sets
-                            // `ts_range` whenever it keeps a record.
-                            log_ts_range: p.frame.ts_range.map(|(min, max)| {
+                            // Always Some here: a `Frame` holds at least one
+                            // span, and `prepare_trace_frame` sets `ts_range`
+                            // whenever it keeps a record.
+                            log_ts_range: frame.ts_range.map(|(min, max)| {
                                 (
                                     file_registry::TimestampNs(min),
                                     file_registry::TimestampNs(max),
@@ -495,8 +510,7 @@ impl NetdataTracesService {
             batch.commit();
         }
 
-        let stored = prepared.iter().map(|p| p.frame.records).sum();
-        Ok(self.counted_response(stored, out_of_window))
+        Ok(self.counted_response(kept, out_of_window))
     }
 }
 
@@ -865,7 +879,10 @@ mod tests {
             otel_logs_identity::decode_content_meta(&g.content_meta),
             Some(ServiceStream::new("", "")),
         );
-        assert_eq!(count_spans(&g.request), 3, "all spans ride the one group");
+        let Payload::Spans(request) = &g.payload else {
+            panic!("partitioning yields received spans");
+        };
+        assert_eq!(count_spans(request), 3, "all spans ride the one group");
     }
 
     #[test]

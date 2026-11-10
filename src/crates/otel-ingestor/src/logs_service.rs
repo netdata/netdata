@@ -126,23 +126,30 @@ fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, S
     groups
 }
 
-/// One storable stream flowing through the identity → collision → write
-/// stages: the stream, its `part_key` (its `ns_hash`, computed once), the
-/// encoded `content_meta` blob, and the grouped logs. Built by the identity
-/// gate so later stages read fields instead of re-deriving or re-looking-up.
+/// What a stream's records are at each point of the export.
+enum Payload {
+    /// As received and grouped; not flattened yet.
+    Records(Vec<ResourceLogs>),
+    /// Flattened and encoded lock-free (phase 1): one WAL frame, awaiting the
+    /// serialized write+sync region (phase 2). Holds at least one record.
+    Frame(ng_flatten::PreparedLogFrame),
+    /// Every record fell outside the ingestion window: nothing to write.
+    OutOfWindow,
+}
+
+/// One stream's share of an export request, from "accepted for storage" to
+/// the WAL write. The identity gate builds it, so it always carries the
+/// stream's `part_key` (its `ns_hash`, computed once) and its encoded
+/// `content_meta` blob. The collision check then judges `stream`, flattening
+/// turns `payload` from records into a frame, and the write loop appends that
+/// frame under `part_key` and `content_meta`.
 struct StorableStream {
     stream: ServiceStream,
     part_key: u64,
     content_meta: Vec<u8>,
-    group: StreamGroup,
-}
-
-/// One stream's frame, fully prepared lock-free (phase 1) and awaiting the
-/// serialized write+sync region (phase 2).
-struct PreparedStream {
-    part_key: u64,
-    content_meta: Vec<u8>,
-    frame: ng_flatten::PreparedLogFrame,
+    /// Records the client sent for this stream.
+    log_record_count: usize,
+    payload: Payload,
 }
 
 /// Result of running the collision check across a request's storable streams.
@@ -186,7 +193,7 @@ fn check_collisions(
                     hash: s.part_key,
                     canonical: e.get().clone(),
                     rejected: s.stream,
-                    rejected_log_records: s.group.log_record_count,
+                    rejected_log_records: s.log_record_count,
                 });
             }
         }
@@ -604,26 +611,22 @@ impl NetdataLogsService {
         // through the collision check to the write loop (no re-derive, no
         // side-map).
         let mut oversized: Vec<OversizedDrop> = Vec::new();
-        let storable: Vec<StorableStream> = groups
-            .into_iter()
-            .filter_map(|(stream, group)| {
-                match encode_identity_or_drop(&stream, group.log_record_count) {
-                    Ok(content_meta) => Some(StorableStream {
-                        part_key: otel_logs_identity::part_key(&stream),
-                        stream,
-                        content_meta,
-                        group,
-                    }),
-                    Err(drop) => {
-                        oversized.push(drop);
-                        None
-                    }
-                }
-            })
-            .collect();
+        let mut storable: Vec<StorableStream> = Vec::with_capacity(groups.len());
+        for (stream, group) in groups {
+            match encode_identity_or_drop(&stream, group.log_record_count) {
+                Ok(content_meta) => storable.push(StorableStream {
+                    part_key: otel_logs_identity::part_key(&stream),
+                    stream,
+                    content_meta,
+                    log_record_count: group.log_record_count,
+                    payload: Payload::Records(group.resource_logs),
+                }),
+                Err(drop) => oversized.push(drop),
+            }
+        }
 
         let CollisionCheck {
-            accepted,
+            mut accepted,
             collisions,
         } = {
             let mut canonical = self.canonical.lock().unwrap();
@@ -667,13 +670,18 @@ impl NetdataLogsService {
             max_ns: fallback_base_ns.saturating_add(self.ingest_bounds.future_skew_ns()),
         };
         let mut out_of_window: usize = 0;
-        let mut prepared = Vec::with_capacity(accepted.len());
+        // Records that passed every check: the ones phase 2 writes.
+        let mut kept: usize = 0;
         // Derived metrics see each stream after normalization (kept records,
         // resolved times) and are counted only once the records are durable.
         let mut derived_batch = self.derived.as_ref().and_then(|d| d.logs_batch());
-        for s in accepted {
+        for s in &mut accepted {
+            // Only received records need flattening.
+            let Payload::Records(resource_logs) = &mut s.payload else {
+                continue;
+            };
             let request = ExportLogsServiceRequest {
-                resource_logs: s.group.resource_logs,
+                resource_logs: std::mem::take(resource_logs),
             };
             let frame = ng_flatten::prepare_log_frame_with(
                 request,
@@ -690,17 +698,12 @@ impl NetdataLogsService {
                 Status::internal("flatten encode error")
             })?;
             out_of_window += frame.rejected;
-            // Every record in this stream fell outside the ingestion window:
-            // nothing to write. Skip it (the write path below assumes each
-            // prepared frame carries at least one record).
-            if frame.records == 0 {
-                continue;
-            }
-            prepared.push(PreparedStream {
-                part_key: s.part_key,
-                content_meta: s.content_meta,
-                frame,
-            });
+            kept += frame.records;
+            s.payload = if frame.records == 0 {
+                Payload::OutOfWindow
+            } else {
+                Payload::Frame(frame)
+            };
         }
 
         if out_of_window > 0 {
@@ -714,7 +717,7 @@ impl NetdataLogsService {
 
         // Every accepted stream was fully rejected as out-of-window: nothing to
         // write, but still report the rejected records to the client.
-        if prepared.is_empty() {
+        if kept == 0 {
             return Ok(self.counted_response(0, &collisions, &oversized, out_of_window));
         }
 
@@ -753,20 +756,29 @@ impl NetdataLogsService {
         };
         {
             let mut writer = writer.lock().unwrap();
-            for p in &prepared {
+            for s in &accepted {
+                let frame = match &s.payload {
+                    Payload::Frame(frame) => frame,
+                    Payload::OutOfWindow => continue,
+                    // Phase 1 flattens every stream it is given.
+                    Payload::Records(_) => {
+                        tracing::error!("a log stream reached the WAL write without a frame");
+                        return Err(Status::internal("log stream was not flattened"));
+                    }
+                };
                 let ingestion_ns = self.clock.lock().unwrap().now_ns();
                 writer
                     .write_frame(
-                        p.part_key,
-                        &p.content_meta,
-                        &p.frame.data,
+                        s.part_key,
+                        &s.content_meta,
+                        &frame.data,
                         wal::FrameMeta {
-                            entry_count: p.frame.records,
+                            entry_count: frame.records,
                             ingestion_ns,
-                            // Always Some here: frames with zero kept records
-                            // were skipped above, and `prepare_log_frame`
-                            // sets `ts_range` whenever it keeps a record.
-                            log_ts_range: p.frame.ts_range.map(|(min, max)| {
+                            // Always Some here: a `Frame` holds at least one
+                            // record, and `prepare_log_frame` sets `ts_range`
+                            // whenever it keeps a record.
+                            log_ts_range: frame.ts_range.map(|(min, max)| {
                                 (
                                     file_registry::TimestampNs(min),
                                     file_registry::TimestampNs(max),
@@ -801,8 +813,7 @@ impl NetdataLogsService {
             batch.commit();
         }
 
-        let stored = prepared.iter().map(|p| p.frame.records).sum();
-        Ok(self.counted_response(stored, &collisions, &oversized, out_of_window))
+        Ok(self.counted_response(kept, &collisions, &oversized, out_of_window))
     }
 }
 
@@ -934,7 +945,8 @@ mod tests {
                 part_key: otel_logs_identity::part_key(&stream),
                 content_meta: otel_logs_identity::encode_content_meta(&stream).unwrap(),
                 stream,
-                group,
+                log_record_count: group.log_record_count,
+                payload: Payload::Records(group.resource_logs),
             })
             .collect()
     }
@@ -966,7 +978,7 @@ mod tests {
         );
         assert!(r2.collisions.is_empty());
         assert_eq!(r2.accepted.len(), 1);
-        assert_eq!(r2.accepted[0].group.log_record_count, 7);
+        assert_eq!(r2.accepted[0].log_record_count, 7);
     }
 
     #[test]
@@ -1637,7 +1649,7 @@ mod tests {
         let two_hours_ns = 2 * 3600 * 1_000_000_000u64;
 
         // Every record is ~2h old → all rejected → nothing to write. Exercises
-        // the `prepared.is_empty()` branch: still ack with partial_success, no
+        // the `kept == 0` branch: still ack with partial_success, no
         // writer created.
         let mut r = rl(Some("prod"), Some("api"), 2);
         r.scope_logs[0].log_records[0].time_unix_nano = now - two_hours_ns;
