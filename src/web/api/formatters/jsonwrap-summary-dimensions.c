@@ -131,7 +131,7 @@ void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const cha
         const char *k, *id, *name;
 
         if(v2) {
-            k = rrdmetric_acquired_name(rma);
+            k = string2str(qd->name);
             if(unlikely(!k || !*k))
                 k = rrdmetric_acquired_id(rma);
             if(unlikely(!k || !*k)) {
@@ -144,10 +144,10 @@ void query_target_summary_dimensions_v12(BUFFER *wb, QUERY_TARGET *qt, const cha
         else {
             snprintfz(buf, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
                       rrdmetric_acquired_id(rma),
-                      rrdmetric_acquired_name(rma));
+                      string2str(qd->name));
             k = buf;
             id = rrdmetric_acquired_id(rma);
-            name = rrdmetric_acquired_name(rma);
+            name = string2str(qd->name);
         }
 
         z = dictionary_set(dict, k, NULL, sizeof(*z));

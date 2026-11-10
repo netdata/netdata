@@ -285,10 +285,7 @@ bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
 void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
     // we need to refresh the string pointers in rc->hub
     // in case the context changed values
-    rc->hub.id = string2str(rc->id);
-    rc->hub.title = string2str(rc->title);
-    rc->hub.units = string2str(rc->units);
-    rc->hub.family = string2str(rc->family);
+    rrdcontext_hub_strings_update_unsafe(rc);
 
     if (rc->rrdhost->rrd_memory_mode != RRD_DB_MODE_DBENGINE)
         return;
@@ -671,10 +668,23 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
                     if(unlikely(!currently_collected && rrd_flag_is_collected(ri) && ri->first_time_s))
                         currently_collected = true;
 
-                    internal_error(rc->units != ri->units,
-                                   "RRDCONTEXT: '%s' rrdinstance '%s' has different units, context '%s', instance '%s'",
-                                   string2str(rc->id), string2str(ri->id),
-                                   string2str(rc->units), string2str(ri->units));
+#ifdef NETDATA_INTERNAL_CHECKS
+                    {
+                        // both are replaced while we use them: compare our own references
+                        STRING *ri_units = rrdinstance_acquired_units_dup((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+                        rrdcontext_lock(rc);
+                        STRING *rc_units = string_dup(rc->units);
+                        rrdcontext_unlock(rc);
+
+                        internal_error(rc_units != ri_units,
+                                       "RRDCONTEXT: '%s' rrdinstance '%s' has different units, context '%s', instance '%s'",
+                                       string2str(rc->id), string2str(ri->id),
+                                       string2str(rc_units), string2str(ri_units));
+
+                        string_freez(rc_units);
+                        string_freez(ri_units);
+                    }
+#endif
 
                     instances_active++;
 
@@ -864,10 +874,7 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
 
     // save it, so that we know the last version we sent to hub
     rc->version = rc->hub.version = rrdcontext_get_next_version(rc);
-    rc->hub.id = string2str(rc->id);
-    rc->hub.title = string2str(rc->title);
-    rc->hub.units = string2str(rc->units);
-    rc->hub.family = string2str(rc->family);
+    rrdcontext_hub_strings_update_unsafe(rc);
     rc->hub.chart_type = rrdset_type_name(rc->chart_type);
     rc->hub.priority = rc->priority;
     rc->hub.first_time_s = rc->first_time_s;
