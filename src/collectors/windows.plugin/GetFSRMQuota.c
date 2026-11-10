@@ -107,15 +107,17 @@ static void fsrm_quota_chart_id(char *dst, size_t size, const char *path, const 
     snprintfz(dst, size, "quota_%.*s_%016llx_%s", (int)visible, sanitized, (unsigned long long)hash, suffix);
 }
 
-static void fsrm_update_labels(RRDSET *st, const char *path, const char *template_name)
+static void fsrm_update_template_label(RRDSET *st, const char *template_name)
 {
-    // Plain check: the analyzer does not correlate a NULL test wrapped in unlikely() with the dereference below.
-    if (!st)
+    if (!st || !rrdlabels_add_changed(st->rrdlabels, "template", template_name, RRDLABEL_SRC_AUTO))
         return;
 
-    rrdlabels_add(st->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
-    if (rrdlabels_add_changed(st->rrdlabels, "template", template_name, RRDLABEL_SRC_AUTO))
-        rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+    // Bumping the chart version is what re-sends the definition to parents; the flags persist it and re-match alerts.
+    rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
+    rrdset_metadata_updated(st);
+    rrdset_flag_set(st, RRDSET_FLAG_PENDING_LABEL_RECHECK);
+    rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 }
 
 static void fsrm_chart_quota(struct fsrm_quota *q, const char *path, int update_every)
@@ -143,9 +145,12 @@ static void fsrm_chart_quota(struct fsrm_quota *q, const char *path, int update_
             q->rd_used = rrddim_add(q->st_space, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             q->rd_peak = rrddim_add(q->st_space, "peak", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             q->rd_limit = rrddim_add(q->st_space, "limit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            // The path is the quota's identity, so it never changes for an existing chart.
+            rrdlabels_add(q->st_space->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
         }
 
-        fsrm_update_labels(q->st_space, path, q->template_name);
+        fsrm_update_template_label(q->st_space, q->template_name);
         if (v->has_usage)
             rrddim_set_by_pointer(q->st_space, q->rd_used, (collected_number)v->usage);
         if (v->has_peak)
@@ -175,9 +180,12 @@ static void fsrm_chart_quota(struct fsrm_quota *q, const char *path, int update_
             q->rd_disabled = rrddim_add(q->st_state, "disabled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             q->rd_soft_limit = rrddim_add(q->st_state, "soft_limit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             q->rd_matches_template = rrddim_add(q->st_state, "matches_template", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            // The path is the quota's identity, so it never changes for an existing chart.
+            rrdlabels_add(q->st_state->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
         }
 
-        fsrm_update_labels(q->st_state, path, q->template_name);
+        fsrm_update_template_label(q->st_state, q->template_name);
         if (v->has_disabled)
             rrddim_set_by_pointer(q->st_state, q->rd_disabled, v->disabled ? 1 : 0);
         if (v->has_soft_limit)
@@ -279,6 +287,10 @@ static bool fsrm_query(struct fsrm_row **rows_out, size_t *count_out, int update
     *rows_out = NULL;
     *count_out = 0;
 
+    // A connect cannot be interrupted once started (up to ~2 minutes), so never begin one during shutdown.
+    if (!service_running(SERVICE_COLLECTORS))
+        return false;
+
     const char *failed_step = NULL;
     HRESULT hr = nd_wmi_connect(&fsrm_wmi, FSRM_WMI_NAMESPACE, &failed_step);
     if (FAILED(hr)) {
@@ -293,6 +305,10 @@ static bool fsrm_query(struct fsrm_row **rows_out, size_t *count_out, int update
             (unsigned)hr);
         return false;
     }
+
+    // Shutdown may have started while the connect was blocked.
+    if (!service_running(SERVICE_COLLECTORS))
+        return false;
 
     IEnumWbemClassObject *enumerator = NULL;
     hr = nd_wmi_exec_query(fsrm_wmi.pSvc, FSRM_WMI_QUERY, &enumerator);

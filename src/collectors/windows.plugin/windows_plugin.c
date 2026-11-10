@@ -10,6 +10,8 @@ static struct proc_module {
     int enabled;
     int update_every;
     // Always run on a dedicated thread, so a blocking data source cannot stall the shared loop.
+    // Shutdown still joins it without a time limit: a call already blocked (e.g. a WMI ConnectServer, up to
+    // ~2 minutes) delays this join, and the module's cleanup then runs after the collectors' 20 s stop window.
     bool dedicated_thread;
     int (*func)(int update_every, usec_t dt);
     RRDDIM *rd;
