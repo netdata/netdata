@@ -85,8 +85,8 @@ metrics:
     metric_tags:
       - tag: ha_node_index
         symbol:
-          OID: 1.3.6.1.4.1.12356.101.13.2.1.1.1
           name: fgHaStatsIndex
+        index: 1
       - tag: _ha_node_serial
         symbol:
           OID: 1.3.6.1.4.1.12356.101.13.2.1.1.2

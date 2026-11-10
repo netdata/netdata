@@ -123,6 +123,7 @@ func projectTopologyAcquisitionBGPRows(
 			RowKey:          strings.Clone(row.RowKey),
 			StructuralID:    strings.Clone(row.StructuralID),
 			Kind:            row.Kind,
+			ProcessID:       strings.Clone(row.Identity.ProcessID),
 			RoutingInstance: strings.Clone(row.Identity.RoutingInstance),
 			Neighbor:        strings.Clone(row.Identity.Neighbor),
 			RemoteAS:        strings.Clone(row.Identity.RemoteAS),
@@ -213,7 +214,7 @@ func topologySemanticFilteredMetaTagMapBytes(values map[string]ddsnmp.MetaTag, a
 
 func topologySemanticBGPRowLogicalBytes(row ddsnmp.BGPRow) uint64 {
 	return uint64(len(row.OriginProfileID)+len(row.Table)+len(row.RowKey)+len(row.StructuralID)+len(row.Kind)+
-		len(row.Identity.RoutingInstance)+len(row.Identity.Neighbor)+len(row.Identity.RemoteAS)+
+		len(row.Identity.ProcessID)+len(row.Identity.RoutingInstance)+len(row.Identity.Neighbor)+len(row.Identity.RemoteAS)+
 		len(row.Descriptors.LocalAddress)+len(row.Descriptors.LocalAS)+len(row.Descriptors.LocalIdentifier)+
 		len(row.Descriptors.PeerIdentifier)+len(row.Descriptors.PeerType)+len(row.Descriptors.BGPVersion)+
 		len(row.Descriptors.Description)+len(row.State.State)+len(row.State.Raw)+19) +
@@ -388,7 +389,7 @@ func topologySemanticMetricTagAllowed(kind ddsnmp.TopologyKind, key string) bool
 
 func topologySemanticBGPTagAllowed(key string) bool {
 	switch key {
-	case "neighbor", "remote_as", "routing_instance":
+	case "process_id", "neighbor", "remote_as", "routing_instance":
 		return true
 	default:
 		return false

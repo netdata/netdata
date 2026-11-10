@@ -19,6 +19,7 @@ static struct freebsd_module {
     {.name = "vm.loadavg",              .dim = "loadavg",         .enabled = 1, .func = do_vm_loadavg},
     {.name = "system.ram",              .dim = "system_ram",      .enabled = 1, .func = do_system_ram},
     {.name = "vm.swap_info",            .dim = "swap",            .enabled = 1, .func = do_vm_swap_info},
+    {.name = "vm.swap_reserved",        .dim = "swap_reserved",   .enabled = 1, .func = do_vm_swap_reserved},
     {.name = "vm.stats.vm.v_swappgs",   .dim = "swap_io",         .enabled = 1, .func = do_vm_stats_sys_v_swappgs},
     {.name = "vm.vmtotal",              .dim = "vmtotal",         .enabled = 1, .func = do_vm_vmtotal},
     {.name = "vm.stats.vm.v_forks",     .dim = "forks",           .enabled = 1, .func = do_vm_stats_sys_v_forks},
@@ -40,6 +41,9 @@ static struct freebsd_module {
     {.name = "kern.cp_times",           .dim = "cp_times",        .enabled = 1, .func = do_kern_cp_times},
     {.name = "dev.cpu.temperature",     .dim = "cpu_temperature", .enabled = 1, .func = do_dev_cpu_temperature},
     {.name = "dev.cpu.0.freq",          .dim = "cpu_frequency",   .enabled = 1, .func = do_dev_cpu_0_freq},
+
+    // power supply metrics
+    {.name = "hw.acpi.battery",         .dim = "acpi_battery",    .enabled = 1, .func = do_hw_acpi_battery},
 
     // disk metrics
     {.name = "kern.devstat",            .dim = "kern_devstat",    .enabled = 1, .func = do_kern_devstat},

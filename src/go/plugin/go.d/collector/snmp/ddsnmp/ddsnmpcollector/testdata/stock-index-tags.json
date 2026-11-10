@@ -1,0 +1,2848 @@
+{
+  "_checkpoint-hardware/0-powerSupplyTable": {
+    "profile": "_checkpoint-hardware.yaml",
+    "table_oid": "1.3.6.1.4.1.2620.1.6.7.9.1",
+    "metric": "powerSupplyStatus",
+    "metric_oid": "1.3.6.1.4.1.2620.1.6.7.9.1.1.2",
+    "rows": [
+      {
+        "suffix": "7.0",
+        "tags": {
+          "psu_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8.0",
+        "tags": {
+          "psu_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2620.1.6.7.9.1.1.1"
+    ],
+    "source_mib": "mibs/checkpoint/CHECKPOINT-MIB:10947",
+    "index_layout": [
+      {
+        "object": "powerSupplyIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A001"
+    ]
+  },
+  "_checkpoint-hardware/1-voltageSensorTable": {
+    "profile": "_checkpoint-hardware.yaml",
+    "table_oid": "1.3.6.1.4.1.2620.1.6.7.8.3",
+    "metric": "voltageSensorValue",
+    "metric_oid": "1.3.6.1.4.1.2620.1.6.7.8.3.1.3",
+    "rows": [
+      {
+        "suffix": "7.0",
+        "tags": {
+          "sensor_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.8.3.1.2.7.0",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.0",
+        "tags": {
+          "sensor_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.8.3.1.2.8.0",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2620.1.6.7.8.3.1.1"
+    ],
+    "source_mib": "mibs/checkpoint/CHECKPOINT-MIB:10869",
+    "index_layout": [
+      {
+        "object": "voltageSensorIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A002"
+    ]
+  },
+  "_checkpoint-hardware/2-raidVolumeTable": {
+    "profile": "_checkpoint-hardware.yaml",
+    "table_oid": "1.3.6.1.4.1.2620.1.6.7.7.1",
+    "metric": "raidVolumeState",
+    "metric_oid": "1.3.6.1.4.1.2620.1.6.7.7.1.1.6",
+    "rows": [
+      {
+        "suffix": "7.0",
+        "tags": {
+          "raid_volume_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.7.1.1.3.7.0",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.0",
+        "tags": {
+          "raid_volume_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.7.1.1.3.8.0",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2620.1.6.7.7.1.1.1"
+    ],
+    "source_mib": "mibs/checkpoint/CHECKPOINT-MIB:10467",
+    "index_layout": [
+      {
+        "object": "raidVolumeIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A003"
+    ]
+  },
+  "_checkpoint-hardware/3-raidDiskTable": {
+    "profile": "_checkpoint-hardware.yaml",
+    "table_oid": "1.3.6.1.4.1.2620.1.6.7.7.2",
+    "metric": "raidDiskState",
+    "metric_oid": "1.3.6.1.4.1.2620.1.6.7.7.2.1.9",
+    "rows": [
+      {
+        "suffix": "7.0",
+        "tags": {
+          "raid_disk_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.7.2.1.2.7.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.7.2.1.6.7.0",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.0",
+        "tags": {
+          "raid_disk_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.7.2.1.2.8.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.7.2.1.6.8.0",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2620.1.6.7.7.2.1.1"
+    ],
+    "source_mib": "mibs/checkpoint/CHECKPOINT-MIB:10571",
+    "index_layout": [
+      {
+        "object": "raidDiskIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A004"
+    ]
+  },
+  "_checkpoint-vsx/3-vsxStatusTable": {
+    "profile": "_checkpoint-vsx.yaml",
+    "table_oid": "1.3.6.1.4.1.2620.1.16.22.1",
+    "metric": "vsxStatusVSWeight",
+    "metric_oid": "1.3.6.1.4.1.2620.1.16.22.1.1.10",
+    "rows": [
+      {
+        "suffix": "7.0",
+        "tags": {
+          "vs_id": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.3.7.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.4.7.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.5.7.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.7.7.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.9.7.0",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.0",
+        "tags": {
+          "vs_id": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.3.8.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.4.8.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.5.8.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.7.8.0",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2620.1.16.22.1.1.9.8.0",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2620.1.16.22.1.1.1"
+    ],
+    "source_mib": "mibs/checkpoint/CHECKPOINT-MIB:1404",
+    "index_layout": [
+      {
+        "object": "vsxStatusVSId",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A005"
+    ]
+  },
+  "_cisco-base/10-cfwConnectionStatTable": {
+    "profile": "_cisco-base.yaml",
+    "table_oid": "1.3.6.1.4.1.9.9.147.1.2.2.2",
+    "metric": "cfwConnectionStatCount",
+    "metric_oid": "1.3.6.1.4.1.9.9.147.1.2.2.2.1.4",
+    "rows": [
+      {
+        "suffix": "1.2",
+        "tags": {
+          "conn_stat_id": "otherFWService",
+          "conn_stat_type": "2"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "1.3",
+        "tags": {
+          "conn_stat_id": "otherFWService",
+          "conn_stat_type": "3"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.9.9.147.1.2.2.2.1.1"
+    ],
+    "source_mib": "mibs/cisco/CISCO-FIREWALL-MIB:1076",
+    "index_layout": [
+      {
+        "object": "cfwConnectionStatService",
+        "encoding": "integer"
+      },
+      {
+        "object": "cfwConnectionStatType",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A006"
+    ]
+  },
+  "_fortinet-fortigate-ha/1-fgHaStatsTable": {
+    "profile": "_fortinet-fortigate-ha.yaml",
+    "table_oid": "1.3.6.1.4.1.12356.101.13.2.1",
+    "metric": "fgHaStatsCpuUsage",
+    "metric_oid": "1.3.6.1.4.1.12356.101.13.2.1.1.3",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "ha_node_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12356.101.13.2.1.1.2.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.101.13.2.1.1.11.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "ha_node_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12356.101.13.2.1.1.2.8",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.101.13.2.1.1.11.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.12356.101.13.2.1.1.1"
+    ],
+    "source_mib": "mibs/fortinet/FORTINET-FORTIGATE-MIB:9443",
+    "index_layout": [
+      {
+        "object": "fgHaStatsIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A007"
+    ]
+  },
+  "_fortinet-fortigate-hardware/0-fgHwSensorTable": {
+    "profile": "_fortinet-fortigate-hardware.yaml",
+    "table_oid": "1.3.6.1.4.1.12356.101.4.3.2",
+    "metric": "fgHwSensorEntValue",
+    "metric_oid": "1.3.6.1.4.1.12356.101.4.3.2.1.3",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "sensor_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12356.101.4.3.2.1.2.7",
+            "value": "CPU temperature"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.101.4.3.2.1.2.7",
+            "value": "CPU temperature"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "sensor_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12356.101.4.3.2.1.2.8",
+            "value": "CPU temperature"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.101.4.3.2.1.2.8",
+            "value": "CPU temperature"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.12356.101.4.3.2.1.1"
+    ],
+    "output_metric": "fgHwSensorEntValue_temperature",
+    "source_mib": "mibs/fortinet/FORTINET-FORTIGATE-MIB:1436",
+    "index_layout": [
+      {
+        "object": "fgHwSensorEntIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A008"
+    ]
+  },
+  "_juniper-cos/0-jnxCosIfsetQstatTable": {
+    "profile": "_juniper-cos.yaml",
+    "table_oid": "1.3.6.1.4.1.2636.3.15.10",
+    "metric": "jnxCosIfsetQstatQedPkts",
+    "metric_oid": "1.3.6.1.4.1.2636.3.15.10.1.3",
+    "rows": [
+      {
+        "suffix": "7.7",
+        "tags": {
+          "queue_number": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2636.3.15.9.1.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "7.8",
+        "tags": {
+          "queue_number": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2636.3.15.9.1.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2636.3.15.10.1.2"
+    ],
+    "source_mib": "mibs/juniper/junos/JUNIPER-COS-MIB:2719",
+    "index_layout": [
+      {
+        "object": "jnxCosIfsetQstatChildIfIndex",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxCosIfsetQstatQueueNr",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A014"
+    ]
+  },
+  "_juniper-dcu/0-jnxDcuStatsTable": {
+    "profile": "_juniper-dcu.yaml",
+    "table_oid": "1.3.6.1.4.1.2636.3.6.2",
+    "metric": "jnxDcuStatsPackets",
+    "metric_oid": "1.3.6.1.4.1.2636.3.6.2.1.4",
+    "rows": [
+      {
+        "suffix": "7.7.5.99.108.97.115.115",
+        "tags": {
+          "address_family": "7",
+          "destination_class_name": "class"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.2.1.31.1.1.1.1.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.2.1.31.1.1.1.18.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "7.7.6.99.108.97.115.115.50",
+        "tags": {
+          "address_family": "7",
+          "destination_class_name": "class2"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.2.1.31.1.1.1.1.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.2.1.31.1.1.1.18.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2636.3.6.2.1.2",
+      "1.3.6.1.4.1.2636.3.6.2.1.3"
+    ],
+    "source_mib": "mibs/juniper/junos/JUNIPER-DCU-MIB:129",
+    "index_layout": [
+      {
+        "object": "jnxDcuStatsSrcIfIndex",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxDcuStatsAddrFamily",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxDcuStatsClassName",
+        "encoding": "length-prefixed"
+      }
+    ],
+    "audit_ids": [
+      "A015",
+      "A016"
+    ]
+  },
+  "_juniper-firewall/0-jnxFirewallCounterTable": {
+    "profile": "_juniper-firewall.yaml",
+    "table_oid": "1.3.6.1.4.1.2636.3.5.2",
+    "metric": "jnxFWCounterPacketCount",
+    "metric_oid": "1.3.6.1.4.1.2636.3.5.2.1.4",
+    "rows": [
+      {
+        "suffix": "4.98.108.117.101.5.99.108.97.115.115.7",
+        "tags": {
+          "firewall_filter_name": "blue",
+          "counter_name": "class",
+          "counter_type": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "5.98.108.117.101.50.5.99.108.97.115.115.7",
+        "tags": {
+          "firewall_filter_name": "blue2",
+          "counter_name": "class",
+          "counter_type": "7"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2636.3.5.2.1.1",
+      "1.3.6.1.4.1.2636.3.5.2.1.2",
+      "1.3.6.1.4.1.2636.3.5.2.1.3"
+    ],
+    "source_mib": "mibs/juniper/junos/JUNIPER-FIREWALL-MIB:141",
+    "index_layout": [
+      {
+        "object": "jnxFWCounterFilterName",
+        "encoding": "length-prefixed"
+      },
+      {
+        "object": "jnxFWCounterName",
+        "encoding": "length-prefixed"
+      },
+      {
+        "object": "jnxFWCounterType",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A017",
+      "A018",
+      "A019"
+    ]
+  },
+  "_juniper-ipsec-flow-monitor/2-jnxIkeTunnelMonTable": {
+    "profile": "_juniper-ipsec-flow-monitor.yaml",
+    "table_oid": "1.3.6.1.4.1.2636.3.52.1.1.2",
+    "metric": "jnxIkeTunMonState",
+    "metric_oid": "1.3.6.1.4.1.2636.3.52.1.1.2.1.6",
+    "rows": [
+      {
+        "suffix": "1.4.192.0.2.1.7",
+        "tags": {
+          "peer_remote_address": "192.0.2.1",
+          "peer_address_type": "1",
+          "ike_tunnel_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.1.2.1.4.1.4.192.0.2.1.7",
+            "value": "192.0.2.255"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.1.2.1.14.1.4.192.0.2.1.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.1.2.1.43.1.4.192.0.2.1.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "1.4.192.0.2.2.7",
+        "tags": {
+          "peer_remote_address": "192.0.2.2",
+          "peer_address_type": "1",
+          "ike_tunnel_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.1.2.1.4.1.4.192.0.2.2.7",
+            "value": "192.0.2.255"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.1.2.1.14.1.4.192.0.2.2.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.1.2.1.43.1.4.192.0.2.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2636.3.52.1.1.2.1.2"
+    ],
+    "source_mib": "mibs/juniper/junos/JUNIPER-IPSEC-FLOW-MON-MIB:617",
+    "index_layout": [
+      {
+        "object": "jnxIkeTunMonRemoteGwAddrType",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxIkeTunMonRemoteGwAddr",
+        "encoding": "length-prefixed"
+      },
+      {
+        "object": "jnxIkeTunMonIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A020"
+    ]
+  },
+  "_juniper-ipsec-flow-monitor/3-jnxIpSecTunnelMonTable": {
+    "profile": "_juniper-ipsec-flow-monitor.yaml",
+    "table_oid": "1.3.6.1.4.1.2636.3.52.1.2.2",
+    "metric": "jnxIpSecTunMonOutEncryptedBytes",
+    "metric_oid": "1.3.6.1.4.1.2636.3.52.1.2.2.1.10",
+    "rows": [
+      {
+        "suffix": "1.4.192.0.2.1.7",
+        "tags": {
+          "peer_remote_address": "192.0.2.1",
+          "peer_address_type": "1",
+          "ipsec_tunnel_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.2.1.5.1.4.192.0.2.1.7",
+            "value": "192.0.2.255"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.2.1.6.1.4.192.0.2.1.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.2.1.7.1.4.192.0.2.1.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "1.4.192.0.2.2.7",
+        "tags": {
+          "peer_remote_address": "192.0.2.2",
+          "peer_address_type": "1",
+          "ipsec_tunnel_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.2.1.5.1.4.192.0.2.2.7",
+            "value": "192.0.2.255"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.2.1.6.1.4.192.0.2.2.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.2.1.7.1.4.192.0.2.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2636.3.52.1.2.2.1.2"
+    ],
+    "source_mib": "mibs/juniper/junos/JUNIPER-IPSEC-FLOW-MON-MIB:3747",
+    "index_layout": [
+      {
+        "object": "jnxIpSecTunMonRemoteGwAddrType",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxIpSecTunMonRemoteGwAddr",
+        "encoding": "length-prefixed"
+      },
+      {
+        "object": "jnxIpSecTunMonIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A021"
+    ]
+  },
+  "_juniper-scu/0-jnxScuStatsTable": {
+    "profile": "_juniper-scu.yaml",
+    "table_oid": "1.3.6.1.4.1.2636.3.16.1.1",
+    "metric": "jnxScuStatsPackets",
+    "metric_oid": "1.3.6.1.4.1.2636.3.16.1.1.1.4",
+    "rows": [
+      {
+        "suffix": "7.7.5.99.108.97.115.115",
+        "tags": {
+          "address_family": "7",
+          "source_class_name": "class"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.2.1.31.1.1.1.1.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.2.1.31.1.1.1.18.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "7.7.6.99.108.97.115.115.50",
+        "tags": {
+          "address_family": "7",
+          "source_class_name": "class2"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.2.1.31.1.1.1.1.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.2.1.31.1.1.1.18.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2636.3.16.1.1.1.2"
+    ],
+    "source_mib": "mibs/juniper/junos/JUNIPER-SCU-MIB:50",
+    "index_layout": [
+      {
+        "object": "jnxScuStatsDstIfIndex",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxScuStatsAddrFamily",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxScuStatsClassName",
+        "encoding": "length-prefixed"
+      }
+    ],
+    "audit_ids": [
+      "A022"
+    ]
+  },
+  "_juniper-virtualchassis/0-jnxVirtualChassisPortTable": {
+    "profile": "_juniper-virtualchassis.yaml",
+    "table_oid": "1.3.6.1.4.1.2636.3.40.1.4.1.2",
+    "metric": "jnxVirtualChassisPortInPkts",
+    "metric_oid": "1.3.6.1.4.1.2636.3.40.1.4.1.2.1.5",
+    "rows": [
+      {
+        "suffix": "7.5.99.108.97.115.115",
+        "tags": {
+          "port_name": "class",
+          "member_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8.5.99.108.97.115.115",
+        "tags": {
+          "port_name": "class",
+          "member_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2636.3.40.1.4.1.2.1.2"
+    ],
+    "source_mib": "mibs/juniper/junos/JUNIPER-VIRTUALCHASSIS-MIB:218",
+    "index_layout": [
+      {
+        "object": "jnxVirtualChassisFpcId",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxVirtualChassisPortName",
+        "encoding": "length-prefixed"
+      }
+    ],
+    "audit_ids": [
+      "A023"
+    ]
+  },
+  "_mikrotik-hardware/1-mtxrOpticalTable": {
+    "profile": "_mikrotik-hardware.yaml",
+    "table_oid": "1.3.6.1.4.1.14988.1.1.19.1",
+    "metric": "mtxrOpticalTemperature",
+    "metric_oid": "1.3.6.1.4.1.14988.1.1.19.1.1.6",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "optical_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.14988.1.1.19.1.1.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "optical_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.14988.1.1.19.1.1.2.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.14988.1.1.19.1.1.1"
+    ],
+    "source_mib": "mibs/mikrotik/MIKROTIK-MIB:3641",
+    "index_layout": [
+      {
+        "object": "mtxrOpticalIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A024"
+    ]
+  },
+  "_mikrotik-hardware/2-mtxrPOETable": {
+    "profile": "_mikrotik-hardware.yaml",
+    "table_oid": "1.3.6.1.4.1.14988.1.1.15.1",
+    "metric": "mtxrPOEPower",
+    "metric_oid": "1.3.6.1.4.1.14988.1.1.15.1.1.6",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "poe_interface_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.14988.1.1.15.1.1.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "poe_interface_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.14988.1.1.15.1.1.2.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.14988.1.1.15.1.1.1"
+    ],
+    "source_mib": "mibs/mikrotik/MIKROTIK-MIB:2990",
+    "index_layout": [
+      {
+        "object": "mtxrPOEInterfaceIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A025"
+    ]
+  },
+  "_std-lldp-mib/5-lldpStatsTxPortTable": {
+    "profile": "_std-lldp-mib.yaml",
+    "table_oid": "1.0.8802.1.1.2.1.2.6",
+    "metric": "lldpStatsTxPortFramesTotal",
+    "metric_oid": "1.0.8802.1.1.2.1.2.6.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "lldp_loc_port_num": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "lldp_loc_port_num": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.0.8802.1.1.2.1.2.6.1.1"
+    ],
+    "source_mib": "mibs/LLDP-MIB:821",
+    "index_layout": [
+      {
+        "object": "lldpStatsTxPortNum",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A026"
+    ]
+  },
+  "_std-lldp-mib/6-lldpStatsRxPortTable": {
+    "profile": "_std-lldp-mib.yaml",
+    "table_oid": "1.0.8802.1.1.2.1.2.7",
+    "metric": "lldpStatsRxPortFramesDiscardedTotal",
+    "metric_oid": "1.0.8802.1.1.2.1.2.7.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "lldp_loc_port_num": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "lldp_loc_port_num": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.0.8802.1.1.2.1.2.7.1.1"
+    ],
+    "source_mib": "mibs/LLDP-MIB:883",
+    "index_layout": [
+      {
+        "object": "lldpStatsRxPortNum",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A027"
+    ]
+  },
+  "_std-ups-mib/17-upsOutputTable": {
+    "profile": "_std-ups-mib.yaml",
+    "table_oid": "1.3.6.1.2.1.33.1.4.4",
+    "metric": "upsOutputVoltage",
+    "metric_oid": "1.3.6.1.2.1.33.1.4.4.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "ups_output_line_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "ups_output_line_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.2.1.33.1.4.4.1.1"
+    ],
+    "source_mib": "mibs/UPS-MIB:362",
+    "index_layout": [
+      {
+        "object": "upsOutputLineIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A028"
+    ]
+  },
+  "_std-ups-mib/18-upsInputTable": {
+    "profile": "_std-ups-mib.yaml",
+    "table_oid": "1.3.6.1.2.1.33.1.3.3",
+    "metric": "upsInputFrequency",
+    "metric_oid": "1.3.6.1.2.1.33.1.3.3.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "ups_input_line_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "ups_input_line_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.2.1.33.1.3.3.1.1"
+    ],
+    "source_mib": "mibs/UPS-MIB:246",
+    "index_layout": [
+      {
+        "object": "upsInputLineIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A029"
+    ]
+  },
+  "_std-ups-mib/19-upsBypassTable": {
+    "profile": "_std-ups-mib.yaml",
+    "table_oid": "1.3.6.1.2.1.33.1.5.3",
+    "metric": "upsBypassVoltage",
+    "metric_oid": "1.3.6.1.2.1.33.1.5.3.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "ups_bypass_line_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "ups_bypass_line_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.2.1.33.1.5.3.1.1"
+    ],
+    "source_mib": "mibs/UPS-MIB:461",
+    "index_layout": [
+      {
+        "object": "upsBypassLineIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A030"
+    ]
+  },
+  "aruba-switch/0-wlsxSysExtFanTable": {
+    "profile": "aruba-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.14823.2.2.1.2.1.17",
+    "metric": "sysExtFanStatus",
+    "metric_oid": "1.3.6.1.4.1.14823.2.2.1.2.1.17.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "fan_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "fan_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.14823.2.2.1.2.1.17.1.1"
+    ],
+    "source_mib": "mibs/arubaos/WLSX-SYSTEMEXT-MIB:614",
+    "index_layout": [
+      {
+        "object": "sysExtFanIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A031"
+    ]
+  },
+  "aruba-switch/1-wlsxSysExtPowerSupplyTable": {
+    "profile": "aruba-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.14823.2.2.1.2.1.18",
+    "metric": "sysExtPowerSupplyStatus",
+    "metric_oid": "1.3.6.1.4.1.14823.2.2.1.2.1.18.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "powersupply_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "powersupply_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.14823.2.2.1.2.1.18.1.1"
+    ],
+    "source_mib": "mibs/arubaos/WLSX-SYSTEMEXT-MIB:664",
+    "index_layout": [
+      {
+        "object": "sysExtPowerSupplyIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A032"
+    ]
+  },
+  "bluecat-server/0-bcnDhcpv4SubnetTable": {
+    "profile": "bluecat-server.yaml",
+    "table_oid": "1.3.6.1.4.1.13315.3.1.1.2.2.2",
+    "metric": "bcnDhcpv4SubnetFreeAddresses",
+    "metric_oid": "1.3.6.1.4.1.13315.3.1.1.2.2.2.1.4",
+    "rows": [
+      {
+        "suffix": "192.0.2.1",
+        "tags": {
+          "bcn_dhcpv4_subnet": "192.0.2.1/24"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.13315.3.1.1.2.2.2.1.2.192.0.2.1",
+            "value": "255.255.255.0"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "192.0.2.2",
+        "tags": {
+          "bcn_dhcpv4_subnet": "192.0.2.2/255.0.255.0"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.13315.3.1.1.2.2.2.1.2.192.0.2.2",
+            "value": "255.0.255.0"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.13315.3.1.1.2.2.2.1.1"
+    ],
+    "source_mib": "mibs/bluecatnetworks/BCN-DHCPV4-MIB:199",
+    "index_layout": [
+      {
+        "object": "bcnDhcpv4SubnetIP",
+        "encoding": "ip-address"
+      }
+    ],
+    "audit_ids": [
+      "A033"
+    ]
+  },
+  "bluecat-server/1-bcnDhcpv4PoolTable": {
+    "profile": "bluecat-server.yaml",
+    "table_oid": "1.3.6.1.4.1.13315.3.1.1.2.2.3",
+    "metric": "bcnDhcpv4PoolFreeAddresses",
+    "metric_oid": "1.3.6.1.4.1.13315.3.1.1.2.2.3.1.5",
+    "rows": [
+      {
+        "suffix": "192.0.2.1",
+        "tags": {
+          "bcn_dhcpv4_pool_range": "192.0.2.1-192.0.2.255"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.13315.3.1.1.2.2.3.1.3.192.0.2.1",
+            "value": "192.0.2.255"
+          },
+          {
+            "oid": "1.3.6.1.4.1.13315.3.1.1.2.2.3.1.2.192.0.2.1",
+            "value": "192.0.2.255"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "192.0.2.2",
+        "tags": {
+          "bcn_dhcpv4_pool_range": "192.0.2.2-192.0.2.255"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.13315.3.1.1.2.2.3.1.3.192.0.2.2",
+            "value": "192.0.2.255"
+          },
+          {
+            "oid": "1.3.6.1.4.1.13315.3.1.1.2.2.3.1.2.192.0.2.2",
+            "value": "192.0.2.255"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.13315.3.1.1.2.2.3.1.1"
+    ],
+    "source_mib": "mibs/bluecatnetworks/BCN-DHCPV4-MIB:283",
+    "index_layout": [
+      {
+        "object": "bcnDhcpv4PoolStartIP",
+        "encoding": "ip-address"
+      }
+    ],
+    "audit_ids": [
+      "A034"
+    ]
+  },
+  "checkpoint/0-multiProcTable": {
+    "profile": "checkpoint.yaml",
+    "table_oid": "1.3.6.1.4.1.2620.1.6.7.5",
+    "metric": "multiProcUserTime",
+    "metric_oid": "1.3.6.1.4.1.2620.1.6.7.5.1.2",
+    "rows": [
+      {
+        "suffix": "7.0",
+        "tags": {
+          "cpu_core": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8.0",
+        "tags": {
+          "cpu_core": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2620.1.6.7.5.1.1"
+    ],
+    "source_mib": "mibs/checkpoint/CHECKPOINT-MIB:10305",
+    "index_layout": [
+      {
+        "object": "multiProcIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A035"
+    ]
+  },
+  "checkpoint/7-multiDiskTable": {
+    "profile": "checkpoint.yaml",
+    "table_oid": "1.3.6.1.4.1.2620.1.6.7.6",
+    "metric": "multiDiskSize",
+    "metric_oid": "1.3.6.1.4.1.2620.1.6.7.6.1.3",
+    "rows": [
+      {
+        "suffix": "7.0",
+        "tags": {
+          "disk_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.6.1.2.7.0",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.0",
+        "tags": {
+          "disk_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.6.1.2.8.0",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2620.1.6.7.6.1.1"
+    ],
+    "source_mib": "mibs/checkpoint/CHECKPOINT-MIB:10380",
+    "index_layout": [
+      {
+        "object": "multiDiskIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A036"
+    ]
+  },
+  "checkpoint/8-fanSpeedSensorTable": {
+    "profile": "checkpoint.yaml",
+    "table_oid": "1.3.6.1.4.1.2620.1.6.7.8.2",
+    "metric": "fanSpeedSensorValue",
+    "metric_oid": "1.3.6.1.4.1.2620.1.6.7.8.2.1.3",
+    "rows": [
+      {
+        "suffix": "7.0",
+        "tags": {
+          "sensor_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.8.2.1.2.7.0",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.0",
+        "tags": {
+          "sensor_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.8.2.1.2.8.0",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2620.1.6.7.8.2.1.1"
+    ],
+    "source_mib": "mibs/checkpoint/CHECKPOINT-MIB:10791",
+    "index_layout": [
+      {
+        "object": "fanSpeedSensorIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A037"
+    ]
+  },
+  "checkpoint/9-tempertureSensorTable": {
+    "profile": "checkpoint.yaml",
+    "table_oid": "1.3.6.1.4.1.2620.1.6.7.8.1",
+    "metric": "tempertureSensorValue",
+    "metric_oid": "1.3.6.1.4.1.2620.1.6.7.8.1.1.3",
+    "rows": [
+      {
+        "suffix": "7.0",
+        "tags": {
+          "sensor_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.8.1.1.2.7.0",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.0",
+        "tags": {
+          "sensor_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2620.1.6.7.8.1.1.2.8.0",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.2620.1.6.7.8.1.1.1"
+    ],
+    "source_mib": "mibs/checkpoint/CHECKPOINT-MIB:10713",
+    "index_layout": [
+      {
+        "object": "tempertureSensorIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A038"
+    ]
+  },
+  "dell-emc-data-domain/10-fileSystemCompressionTable": {
+    "profile": "dell-emc-data-domain.yaml",
+    "table_oid": "1.3.6.1.4.1.19746.1.3.3.1",
+    "metric": "datadomain.fileSystemCompressionStartTime",
+    "metric_oid": "1.3.6.1.4.1.19746.1.3.3.1.1.3",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "data_domain_file_system_compression_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "data_domain_file_system_compression_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.19746.1.3.3.1.1.1"
+    ],
+    "source_mib": "mibs/datadomain/DATA-DOMAIN-MIB:2346",
+    "index_layout": [
+      {
+        "object": "fileSystemCompressionIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A039"
+    ]
+  },
+  "dell-emc-data-domain/11-systemStatsTable": {
+    "profile": "dell-emc-data-domain.yaml",
+    "table_oid": "1.3.6.1.4.1.19746.1.5.1.1",
+    "metric": "cpu.usage",
+    "metric_oid": "1.3.6.1.4.1.19746.1.5.1.1.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "datadomain_system_stats_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "datadomain_system_stats_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.19746.1.5.1.1.1.1"
+    ],
+    "source_mib": "mibs/datadomain/DATA-DOMAIN-MIB:2925",
+    "index_layout": [
+      {
+        "object": "systemStatsIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A040"
+    ]
+  },
+  "dell-emc-data-domain/12-diskPropertiesTable": {
+    "profile": "dell-emc-data-domain.yaml",
+    "table_oid": "1.3.6.1.4.1.19746.1.6.1.1",
+    "metric": "diskPropState",
+    "metric_oid": "1.3.6.1.4.1.19746.1.6.1.1.1.8",
+    "rows": [
+      {
+        "suffix": "7.7",
+        "tags": {
+          "datadomain_disk_prop_enclosure_id": "7",
+          "datadomain_disk_prop_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.19746.1.6.1.1.1.4.7.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.19746.1.6.1.1.1.5.7.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.19746.1.6.1.1.1.6.7.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.19746.1.6.1.1.1.9.7.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.7",
+        "tags": {
+          "datadomain_disk_prop_enclosure_id": "8",
+          "datadomain_disk_prop_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.19746.1.6.1.1.1.4.8.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.19746.1.6.1.1.1.5.8.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.19746.1.6.1.1.1.6.8.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.19746.1.6.1.1.1.9.8.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.19746.1.6.1.1.1.1",
+      "1.3.6.1.4.1.19746.1.6.1.1.1.2"
+    ],
+    "source_mib": "mibs/datadomain/DATA-DOMAIN-MIB:3200",
+    "index_layout": [
+      {
+        "object": "diskPropEnclosureID",
+        "encoding": "integer"
+      },
+      {
+        "object": "diskPropIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A041",
+      "A042"
+    ]
+  },
+  "dell-emc-data-domain/13-diskPerformanceTable": {
+    "profile": "dell-emc-data-domain.yaml",
+    "table_oid": "1.3.6.1.4.1.19746.1.6.2.1",
+    "metric": "datadomain.diskSectorsRead",
+    "metric_oid": "1.3.6.1.4.1.19746.1.6.2.1.1.3",
+    "rows": [
+      {
+        "suffix": "7.7",
+        "tags": {
+          "datadomain_disk_perf_index": "7",
+          "datadomain_disk_perf_enclosure_id": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8.7",
+        "tags": {
+          "datadomain_disk_perf_index": "7",
+          "datadomain_disk_perf_enclosure_id": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.19746.1.6.2.1.1.2"
+    ],
+    "source_mib": "mibs/datadomain/DATA-DOMAIN-MIB:3103",
+    "index_layout": [
+      {
+        "object": "diskPerfEnclosureID",
+        "encoding": "integer"
+      },
+      {
+        "object": "diskPerfIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A043"
+    ]
+  },
+  "dell-os10/2-dell.os10PowerSupplyTable": {
+    "profile": "dell-os10.yaml",
+    "table_oid": "1.3.6.1.4.1.674.11000.5000.100.4.1.2.1",
+    "metric": "dell.os10PowerSupplyOperStatus",
+    "metric_oid": "1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.4",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "dell_os10_power_supply_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "dell_os10_power_supply_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.1"
+    ],
+    "source_mib": "mibs/dell/DELLEMC-OS10-CHASSIS-MIB:384",
+    "index_layout": [
+      {
+        "object": "os10PowerSupplyIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A044"
+    ]
+  },
+  "dell-os10/3-dell.os10FanTrayTable": {
+    "profile": "dell-os10.yaml",
+    "table_oid": "1.3.6.1.4.1.674.11000.5000.100.4.1.2.2",
+    "metric": "dell.os10FanTrayOperStatus",
+    "metric_oid": "1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.4",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "dell_os10_fan_tray_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "dell_os10_fan_tray_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.1"
+    ],
+    "source_mib": "mibs/dell/DELLEMC-OS10-CHASSIS-MIB:487",
+    "index_layout": [
+      {
+        "object": "os10FanTrayIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A045"
+    ]
+  },
+  "dell-os10/4-dell.os10FanTable": {
+    "profile": "dell-os10.yaml",
+    "table_oid": "1.3.6.1.4.1.674.11000.5000.100.4.1.2.3",
+    "metric": "dell.os10FanOperStatus",
+    "metric_oid": "1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.7",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "dell_os10_fan_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "dell_os10_fan_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.1"
+    ],
+    "source_mib": "mibs/dell/DELLEMC-OS10-CHASSIS-MIB:576",
+    "index_layout": [
+      {
+        "object": "os10FanIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A046"
+    ]
+  },
+  "dlink-dgs-switch/0-dEntityExtCpuUtilTable": {
+    "profile": "dlink-dgs-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.171.14.5.1.7",
+    "metric": "cpu.usage",
+    "metric_oid": "1.3.6.1.4.1.171.14.5.1.7.1.3",
+    "rows": [
+      {
+        "suffix": "7.7",
+        "tags": {
+          "dlink_entity_ext_cpu_util_unit_id": "7",
+          "dlink_entity_ext_cpu_util_cpu_id": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8.7",
+        "tags": {
+          "dlink_entity_ext_cpu_util_unit_id": "8",
+          "dlink_entity_ext_cpu_util_cpu_id": "7"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.171.14.5.1.7.1.1",
+      "1.3.6.1.4.1.171.14.5.1.7.1.2"
+    ],
+    "source_mib": "mibs/dlink/DLINKSW-ENTITY-EXT-MIB:563",
+    "index_layout": [
+      {
+        "object": "dEntityExtCpuUtilUnitId",
+        "encoding": "integer"
+      },
+      {
+        "object": "dEntityExtCpuUtilCpuID",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A047",
+      "A048"
+    ]
+  },
+  "dlink-dgs-switch/1-dEntityExtMemoryUtilTable": {
+    "profile": "dlink-dgs-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.171.14.5.1.4",
+    "metric": "memory.total",
+    "metric_oid": "1.3.6.1.4.1.171.14.5.1.4.1.3",
+    "rows": [
+      {
+        "suffix": "7.7",
+        "tags": {
+          "mem": "7",
+          "d_entity_ext_mem_util_type": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8.7",
+        "tags": {
+          "mem": "8",
+          "d_entity_ext_mem_util_type": "7"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.171.14.5.1.4.1.1",
+      "1.3.6.1.4.1.171.14.5.1.4.1.2"
+    ],
+    "source_mib": "mibs/dlink/DLINKSW-ENTITY-EXT-MIB:484",
+    "index_layout": [
+      {
+        "object": "dEntityExtMemUtilUnitId",
+        "encoding": "integer"
+      },
+      {
+        "object": "dEntityExtMemUtilType",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A049",
+      "A050"
+    ]
+  },
+  "dlink-dgs-switch/2-dEntityExtEnvTempTable": {
+    "profile": "dlink-dgs-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.171.14.5.1.1.1",
+    "metric": "dlink.dEntityExtEnvTempCurrent",
+    "metric_oid": "1.3.6.1.4.1.171.14.5.1.1.1.1.4",
+    "rows": [
+      {
+        "suffix": "7.7",
+        "tags": {
+          "d_entity_ext_env_temp_unit_id": "7",
+          "d_entity_ext_env_temp_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.171.14.5.1.1.1.1.3.7.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.7",
+        "tags": {
+          "d_entity_ext_env_temp_unit_id": "8",
+          "d_entity_ext_env_temp_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.171.14.5.1.1.1.1.3.8.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.171.14.5.1.1.1.1.1",
+      "1.3.6.1.4.1.171.14.5.1.1.1.1.2"
+    ],
+    "source_mib": "mibs/dlink/DLINKSW-ENTITY-EXT-MIB:65",
+    "index_layout": [
+      {
+        "object": "dEntityExtEnvTempUnitId",
+        "encoding": "integer"
+      },
+      {
+        "object": "dEntityExtEnvTempIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A051",
+      "A052"
+    ]
+  },
+  "dlink-dgs-switch/3-dEntityExtEnvFanTable": {
+    "profile": "dlink-dgs-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.171.14.5.1.1.2",
+    "metric": "dEntityExtEnvFanStatus",
+    "metric_oid": "1.3.6.1.4.1.171.14.5.1.1.2.1.4",
+    "rows": [
+      {
+        "suffix": "7.7",
+        "tags": {
+          "d_entity_ext_env_fan_unit_id": "7",
+          "d_entity_ext_env_fan_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.171.14.5.1.1.2.1.3.7.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.7",
+        "tags": {
+          "d_entity_ext_env_fan_unit_id": "8",
+          "d_entity_ext_env_fan_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.171.14.5.1.1.2.1.3.8.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.171.14.5.1.1.2.1.1",
+      "1.3.6.1.4.1.171.14.5.1.1.2.1.2"
+    ],
+    "source_mib": "mibs/dlink/DLINKSW-ENTITY-EXT-MIB:170",
+    "index_layout": [
+      {
+        "object": "dEntityExtEnvFanUnitId",
+        "encoding": "integer"
+      },
+      {
+        "object": "dEntityExtEnvFanIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A053",
+      "A054"
+    ]
+  },
+  "dlink-dgs-switch/4-dEntityExtEnvPowerTable": {
+    "profile": "dlink-dgs-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.171.14.5.1.1.3",
+    "metric": "dlink.dEntityExtEnvPowerUsedPower",
+    "metric_oid": "1.3.6.1.4.1.171.14.5.1.1.3.1.4",
+    "rows": [
+      {
+        "suffix": "7.7",
+        "tags": {
+          "d_entity_ext_env_power_unit_id": "7",
+          "d_entity_ext_env_power_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.171.14.5.1.1.3.1.3.7.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8.7",
+        "tags": {
+          "d_entity_ext_env_power_unit_id": "8",
+          "d_entity_ext_env_power_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.171.14.5.1.1.3.1.3.8.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.171.14.5.1.1.3.1.1",
+      "1.3.6.1.4.1.171.14.5.1.1.3.1.2"
+    ],
+    "source_mib": "mibs/dlink/DLINKSW-ENTITY-EXT-MIB:239",
+    "index_layout": [
+      {
+        "object": "dEntityExtEnvPowerUnitId",
+        "encoding": "integer"
+      },
+      {
+        "object": "dEntityExtEnvPowerIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A055",
+      "A056"
+    ]
+  },
+  "dlink-dgs-switch/5-dEntityExtEnvAirFlowTable": {
+    "profile": "dlink-dgs-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.171.14.5.1.1.4",
+    "metric": "dEntityExtEnvAirFlowStatus",
+    "metric_oid": "1.3.6.1.4.1.171.14.5.1.1.4.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "d_entity_ext_env_air_flow_unit_id": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "d_entity_ext_env_air_flow_unit_id": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.171.14.5.1.1.4.1.1"
+    ],
+    "source_mib": "mibs/dlink/DLINKSW-ENTITY-EXT-MIB:331",
+    "index_layout": [
+      {
+        "object": "dEntityExtEnvAirFlowUnitId",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A057"
+    ]
+  },
+  "dlink-dgs-switch/6-dEntityExtUnitTable": {
+    "profile": "dlink-dgs-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.171.14.5.1.3",
+    "metric": "dEntityExtUnitStatus",
+    "metric_oid": "1.3.6.1.4.1.171.14.5.1.3.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "d_entity_ext_unit_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "d_entity_ext_unit_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.171.14.5.1.3.1.1"
+    ],
+    "source_mib": "mibs/dlink/DLINKSW-ENTITY-EXT-MIB:422",
+    "index_layout": [
+      {
+        "object": "dEntityExtUnitIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A058"
+    ]
+  },
+  "fortinet-appliance/14-fmDeviceTable": {
+    "profile": "fortinet-appliance.yaml",
+    "table_oid": "1.3.6.1.4.1.12356.103.6.2",
+    "metric": "fmDeviceEntMode",
+    "metric_oid": "1.3.6.1.4.1.12356.103.6.2.1.4",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "fm_device_ent_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.2.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.3.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.5.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.6.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.11.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.24.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "fm_device_ent_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.2.8",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.3.8",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.5.8",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.6.8",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.11.8",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.6.2.1.24.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.12356.103.6.2.1.1"
+    ],
+    "source_mib": "mibs/fortinet/FORTINET-FORTIMANAGER-FORTIANALYZER-MIB:1296",
+    "index_layout": [
+      {
+        "object": "fmDeviceEntIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A059"
+    ]
+  },
+  "fortinet-appliance/15-fmRaidDiskTable": {
+    "profile": "fortinet-appliance.yaml",
+    "table_oid": "1.3.6.1.4.1.12356.103.7.2",
+    "metric": "fmRaidDiskEntSize",
+    "metric_oid": "1.3.6.1.4.1.12356.103.7.2.1.3",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "fm_raid_disk_ent_index": "7"
+        },
+        "pdus": [],
+        "value": 107374182400
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "fm_raid_disk_ent_index": "8"
+        },
+        "pdus": [],
+        "value": 108447924224
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.12356.103.7.2.1.1"
+    ],
+    "source_mib": "mibs/fortinet/FORTINET-FORTIMANAGER-FORTIANALYZER-MIB:1737",
+    "index_layout": [
+      {
+        "object": "fmRaidDiskEntIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A060"
+    ]
+  },
+  "fortinet-appliance/17-fmHaPeerTable": {
+    "profile": "fortinet-appliance.yaml",
+    "table_oid": "1.3.6.1.4.1.12356.103.9.2",
+    "metric": "fmHaPeerEntState",
+    "metric_oid": "1.3.6.1.4.1.12356.103.9.2.1.6",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "fm_ha_peer_ent_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12356.103.9.2.1.2.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.9.2.1.3.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.9.2.1.5.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "fm_ha_peer_ent_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12356.103.9.2.1.2.8",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.9.2.1.3.8",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12356.103.9.2.1.5.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.12356.103.9.2.1.1"
+    ],
+    "source_mib": "mibs/fortinet/FORTINET-FORTIMANAGER-FORTIANALYZER-MIB:1941",
+    "index_layout": [
+      {
+        "object": "fmHaPeerEntIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A061"
+    ]
+  },
+  "fortinet-fortigate/2-fgProcessorTable": {
+    "profile": "fortinet-fortigate.yaml",
+    "table_oid": "1.3.6.1.4.1.12356.101.4.4.2",
+    "metric": "fgProcessorPktRxCount",
+    "metric_oid": "1.3.6.1.4.1.12356.101.4.4.2.1.6",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "processor_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "processor_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.12356.101.4.4.2.1.1"
+    ],
+    "source_mib": "mibs/fortinet/FORTINET-FORTIGATE-MIB:1507",
+    "index_layout": [
+      {
+        "object": "fgProcessorEntIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A062"
+    ]
+  },
+  "fortinet-fortigate/3-fgProcessorTable": {
+    "profile": "fortinet-fortigate.yaml",
+    "table_oid": "1.3.6.1.4.1.12356.101.4.4.2",
+    "metric": "fgProcessorUsage",
+    "metric_oid": "1.3.6.1.4.1.12356.101.4.4.2.1.2",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "processor_index": "7"
+        },
+        "pdus": [],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "processor_index": "8"
+        },
+        "pdus": [],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.12356.101.4.4.2.1.1"
+    ],
+    "source_mib": "mibs/fortinet/FORTINET-FORTIGATE-MIB:1507",
+    "index_layout": [
+      {
+        "object": "fgProcessorEntIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A063"
+    ]
+  },
+  "hp-h3c-switch/1-hh3cEntityExtStateTable": {
+    "profile": "hp-h3c-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.25506.2.6.1.1.1",
+    "metric": "cpu.usage",
+    "metric_oid": "1.3.6.1.4.1.25506.2.6.1.1.1.1.6",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "hh3c_entity_ext_physical_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.2.1.47.1.1.1.1.7.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "hh3c_entity_ext_physical_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.2.1.47.1.1.1.1.7.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.25506.2.6.1.1.1.1.1"
+    ],
+    "source_mib": "mibs/comware/HH3C-ENTITY-EXT-MIB:241",
+    "index_layout": [
+      {
+        "object": "hh3cEntityExtPhysicalIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A064"
+    ]
+  },
+  "hp-h3c-switch/2-hh3cEntityExtStateTable": {
+    "profile": "hp-h3c-switch.yaml",
+    "table_oid": "1.3.6.1.4.1.25506.2.6.1.1.1",
+    "metric": "memory.usage",
+    "metric_oid": "1.3.6.1.4.1.25506.2.6.1.1.1.1.8",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "hh3c_entity_ext_physical_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.2.1.47.1.1.1.1.7.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "hh3c_entity_ext_physical_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.2.1.47.1.1.1.1.7.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.25506.2.6.1.1.1.1.1"
+    ],
+    "source_mib": "mibs/comware/HH3C-ENTITY-EXT-MIB:241",
+    "index_layout": [
+      {
+        "object": "hh3cEntityExtPhysicalIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A065"
+    ]
+  },
+  "isilon/11-quotaTable": {
+    "profile": "isilon.yaml",
+    "table_oid": "1.3.6.1.4.1.12124.1.12.1",
+    "metric": "quotaHardThreshold",
+    "metric_oid": "1.3.6.1.4.1.12124.1.12.1.1.7",
+    "rows": [
+      {
+        "suffix": "97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97",
+        "tags": {
+          "quota_domain_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12124.1.12.1.1.2.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12124.1.12.1.1.3.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "98.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97",
+        "tags": {
+          "quota_domain_id": "baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.12124.1.12.1.1.2.98.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.12124.1.12.1.1.3.98.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97.97",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.12124.1.12.1.1.1"
+    ],
+    "source_mib": "mibs/emc/ISILON-MIB:386",
+    "index_layout": [
+      {
+        "object": "quotaDomainID",
+        "encoding": "fixed-string"
+      }
+    ],
+    "audit_ids": [
+      "A066"
+    ]
+  },
+  "ixsystems-truenas/0-zpoolTable": {
+    "profile": "ixsystems-truenas.yaml",
+    "table_oid": "1.3.6.1.4.1.50536.1.1.1",
+    "metric": "freenas.zpoolReadBytes",
+    "metric_oid": "1.3.6.1.4.1.50536.1.1.1.1.10",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "freenas_zpool_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.50536.1.1.1.1.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "freenas_zpool_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.50536.1.1.1.1.2.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.50536.1.1.1.1.1"
+    ],
+    "source_mib": "mibs/ixsystems/FREENAS-MIB:68",
+    "index_layout": [
+      {
+        "object": "zpoolIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A067"
+    ]
+  },
+  "ixsystems-truenas/1-datasetTable": {
+    "profile": "ixsystems-truenas.yaml",
+    "table_oid": "1.3.6.1.4.1.50536.1.2.1",
+    "metric": "freenas.datasetSize",
+    "metric_oid": "1.3.6.1.4.1.50536.1.2.1.1.4",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "freenas_dataset_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.50536.1.2.1.1.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "freenas_dataset_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.50536.1.2.1.1.2.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.50536.1.2.1.1.1"
+    ],
+    "source_mib": "mibs/ixsystems/FREENAS-MIB:233",
+    "index_layout": [
+      {
+        "object": "datasetIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A068"
+    ]
+  },
+  "ixsystems-truenas/2-zvolTable": {
+    "profile": "ixsystems-truenas.yaml",
+    "table_oid": "1.3.6.1.4.1.50536.1.3.1",
+    "metric": "freenas.zvolSize",
+    "metric_oid": "1.3.6.1.4.1.50536.1.3.1.1.4",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "freenas_zvol_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.50536.1.3.1.1.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "freenas_zvol_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.50536.1.3.1.1.2.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.50536.1.3.1.1.1"
+    ],
+    "source_mib": "mibs/ixsystems/FREENAS-MIB:308",
+    "index_layout": [
+      {
+        "object": "zvolIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A069"
+    ]
+  },
+  "tripplite-ups/11-tlUpsInputVoltageTable": {
+    "profile": "tripplite-ups.yaml",
+    "table_oid": "1.3.6.1.4.1.850.100.1.3.2",
+    "metric": "tlUpsInputVoltage",
+    "metric_oid": "1.3.6.1.4.1.850.100.1.3.2.1.3",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "tl_ups_input_voltage_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.850.100.1.3.2.1.2.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "tl_ups_input_voltage_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.850.100.1.3.2.1.2.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.850.100.1.3.2.1.1"
+    ],
+    "source_mib": "mibs/poweralert/TRIPPLITE-12X:424",
+    "index_layout": [
+      {
+        "object": "tlUpsInputVoltageIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A073"
+    ]
+  },
+  "ubiquiti-unifi/2-unifiRadioTable": {
+    "profile": "ubiquiti-unifi.yaml",
+    "table_oid": "1.3.6.1.4.1.41112.1.6.1.1",
+    "metric": "ubiquiti.unifiRadioRxPackets",
+    "metric_oid": "1.3.6.1.4.1.41112.1.6.1.1.1.4",
+    "rows": [
+      {
+        "suffix": "7",
+        "tags": {
+          "ubiquiti_unifi_radio_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.41112.1.6.1.1.1.2.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.41112.1.6.1.1.1.3.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "8",
+        "tags": {
+          "ubiquiti_unifi_radio_index": "8"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.41112.1.6.1.1.1.2.8",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.41112.1.6.1.1.1.3.8",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [
+      "1.3.6.1.4.1.41112.1.6.1.1.1.1"
+    ],
+    "source_mib": "mibs/ubnt/UBNT-UniFi-MIB:209",
+    "index_layout": [
+      {
+        "object": "unifiRadioIndex",
+        "encoding": "integer"
+      }
+    ],
+    "audit_ids": [
+      "A074"
+    ]
+  },
+  "_juniper-ipsec-flow-monitor/4-jnxIpSecSaMonTable": {
+    "profile": "_juniper-ipsec-flow-monitor.yaml",
+    "table_oid": "1.3.6.1.4.1.2636.3.52.1.2.3",
+    "metric": "jnxIpSecSaMonState",
+    "metric_oid": "1.3.6.1.4.1.2636.3.52.1.2.3.1.14",
+    "rows": [
+      {
+        "suffix": "1.4.192.0.2.1.7.7",
+        "tags": {
+          "peer_address_type": "1",
+          "peer_remote_address": "192.0.2.1",
+          "ipsec_tunnel_index": "7",
+          "sa_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.3.1.6.1.4.192.0.2.1.7.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.3.1.12.1.4.192.0.2.1.7.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.3.1.13.1.4.192.0.2.1.7.7",
+            "value": "display"
+          }
+        ],
+        "value": 100
+      },
+      {
+        "suffix": "1.4.192.0.2.1.8.7",
+        "tags": {
+          "peer_address_type": "1",
+          "peer_remote_address": "192.0.2.1",
+          "ipsec_tunnel_index": "8",
+          "sa_index": "7"
+        },
+        "pdus": [
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.3.1.6.1.4.192.0.2.1.8.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.3.1.12.1.4.192.0.2.1.8.7",
+            "value": "display"
+          },
+          {
+            "oid": "1.3.6.1.4.1.2636.3.52.1.2.3.1.13.1.4.192.0.2.1.8.7",
+            "value": "display"
+          }
+        ],
+        "value": 101
+      }
+    ],
+    "forbidden_oids": [],
+    "source_mib": "mibs/juniper/junos/JUNIPER-IPSEC-FLOW-MON-MIB:4113",
+    "index_layout": [
+      {
+        "object": "jnxIpSecTunMonRemoteGwAddrType",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxIpSecTunMonRemoteGwAddr",
+        "encoding": "length-prefixed"
+      },
+      {
+        "object": "jnxIpSecTunMonIndex",
+        "encoding": "integer"
+      },
+      {
+        "object": "jnxIpSecSaMonIndex",
+        "encoding": "integer"
+      }
+    ]
+  }
+}

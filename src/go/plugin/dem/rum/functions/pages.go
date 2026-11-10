@@ -12,16 +12,16 @@ import (
 var pagesMethod = method{
 	id:      "rum-pages",
 	title:   "RUM Pages",
-	help:    "All retained document-entry groups in the receipt window, including groups outside chart top-N. Vitals use the latest report per document experience; sample counts describe retained populations and loss counts conservatively flag possible incompleteness. Percentiles, activity counts and session counts are null when capacity loss makes them incomplete. Sessions are observed browser identities, not people or concurrency. Frustration signals are unavailable when capture is disabled",
+	help:    "Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. All retained document-entry groups in the receipt window, including groups outside chart top-N. Vitals use the latest report per document experience; sample counts describe retained populations and loss counts conservatively flag possible incompleteness. Percentiles, activity counts and session counts are null when capacity loss makes them incomplete. Sessions are observed browser identities, not people or concurrency. Frustration signals are unavailable when capture is disabled",
 	sort:    "pageviews_window",
 	every:   10,
 	columns: rumPagesColumns,
-	params:  []string{"site"},
+	params:  []string{"site", "vnode", "vnode_guid"},
 }
 
-func (h *Handler) pagesRows(ctx context.Context, site string) (rows [][]any, err error) {
+func (h *Handler) pagesRows(ctx context.Context, site, vnodeGUID string) (rows [][]any, err error) {
 	var pages []query.Page
-	pages, err = h.deps.Pages(ctx, site)
+	pages, err = h.deps.Pages(ctx, site, vnodeGUID)
 	for _, p := range pages {
 		rows = append(
 			rows,
@@ -46,7 +46,7 @@ func (h *Handler) pagesRows(ctx context.Context, site string) (rows [][]any, err
 				p.Vitals[beacon.INP].Lost,
 				p.Vitals[beacon.CLS].Lost,
 				p.Lost,
-				p.SessionsLost,
+				p.SessionsLost, p.VnodeGUID,
 			},
 		)
 	}
@@ -55,6 +55,7 @@ func (h *Handler) pagesRows(ctx context.Context, site string) (rows [][]any, err
 }
 
 var rumPagesColumns = map[string]any{
+	"vnode_guid": (funcapi.Column{Index: 21, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
 	"row_id": (funcapi.Column{
 		Index:         12,
 		Name:          "Row ID",

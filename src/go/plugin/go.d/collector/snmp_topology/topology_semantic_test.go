@@ -110,9 +110,9 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 			StructuralID:    "peer-1",
 			Kind:            ddprofiledefinition.BGPRowKindPeer,
 			Identity: ddsnmp.BGPIdentity{
-				RoutingInstance: "default",
+				ProcessID:       "0",
+				RoutingInstance: "7",
 				Neighbor:        "192.0.2.2",
-				RemoteAS:        "65002",
 			},
 			Descriptors: ddsnmp.BGPDescriptors{
 				LocalAddress: "192.0.2.1",
@@ -122,8 +122,8 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 			State: ddsnmp.BGPState{Has: true, State: ddprofiledefinition.BGPPeerStateEstablished},
 			Tags: map[string]string{
 				"neighbor":         "192.0.2.2",
-				"remote_as":        "65002",
-				"routing_instance": "default",
+				"process_id":       "0",
+				"routing_instance": "7",
 				"unused_bgp":       "must-not-appear-unused-bgp-tag",
 			},
 		}},
@@ -187,6 +187,7 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 	pms[0].Tags[tagLldpLocSysName] = "changed"
 	pms[0].TopologyMetrics[0].Tags[tagTopoIfName] = "changed"
 	pms[0].BGPRows[0].Identity.Neighbor = "198.51.100.2"
+	pms[0].BGPRows[0].Identity.ProcessID = "changed"
 
 	beforeReplay := cloneTopologyAcquisitionEvidence(capture.Evidence)
 	replayed, present := replayTopologyAcquisitionEvidence(capture.Evidence)
@@ -222,6 +223,8 @@ func TestTopologyAcquisitionReplayMatchesLiveBuilder(t *testing.T) {
 		require.Contains(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.TopologyMetrics[3].Tags, tag)
 	}
 	require.Contains(t, capture.Evidence.CollectionContexts[0].Profiles[0].Values.BGPRows[0].Tags, "neighbor")
+	require.Equal(t, "0", capture.Evidence.CollectionContexts[0].Profiles[0].Values.BGPRows[0].ProcessID)
+	require.Equal(t, "0", capture.Evidence.CollectionContexts[0].Profiles[0].Values.BGPRows[0].Tags["process_id"])
 	require.Contains(t, capture.Evidence.CollectionContexts[1].Profiles[0].Values.Metadata, tagOSPFRouterID)
 	require.Contains(t, capture.Evidence.CollectionContexts[1].Profiles[0].Values.Tags, tagBridgeBaseAddress)
 }

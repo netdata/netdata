@@ -9,6 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 type benchmarkExecutor struct{ result model.Execution }
@@ -29,6 +30,7 @@ func BenchmarkCollect(b *testing.B) {
 		result: model.Execution{
 			Drained: true,
 			Run: model.Run{
+				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Kind:       model.Lighthouse,
 				Outcome:    model.Success,
 				DurationMS: &duration,
@@ -47,6 +49,7 @@ func BenchmarkCollect(b *testing.B) {
 		Executor: e,
 		Registry: syntheticregistry.New(),
 	})
+	c.SetConfiguredVnode(vnodes.VirtualNode{GUID: "11111111-1111-4111-8111-111111111111", Hostname: "site"})
 	c.Name = "benchmark"
 	c.URL = "https://example.org/"
 	if err := c.Init(context.Background()); err != nil {

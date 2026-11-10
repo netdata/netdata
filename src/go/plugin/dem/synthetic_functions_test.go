@@ -48,7 +48,7 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	require.Contains(t, components.Collectors, "journey")
 	require.Contains(t, components.Collectors, "lighthouse")
 	require.Len(t, components.Functions[1].Functions(), 5)
-	handler := components.Functions[1].NewHandler().(*syntheticfunctions.Handler)
+	handler := components.Functions[1].NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*syntheticfunctions.Handler)
 	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method:      "synthetics-checks",
 		Permissions: "0x7b",
@@ -76,6 +76,9 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 type inventoryExecutor struct{}
 
 func (inventoryExecutor) Check(context.Context, synthetic.Kind) error { return nil }
+func (inventoryExecutor) Rehearse(context.Context, synthetic.Request) error {
+	panic("inventory must not rehearse a browser")
+}
 func (inventoryExecutor) Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution {
 	panic("inventory must not execute a browser")
 }
@@ -98,7 +101,7 @@ func TestRegistrySyntheticInventoryRedactsTargetCredentials(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("collector did not become ready")
 	}
-	handler := components.Functions[1].NewHandler().(*syntheticfunctions.Handler)
+	handler := components.Functions[1].NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*syntheticfunctions.Handler)
 	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method:      "synthetics-checks",
 		Permissions: "0x1b",

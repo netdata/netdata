@@ -5688,63 +5688,44 @@ paths:
       operationId: settings_get
       tags:
         - settings
-      summary: Retrieve user settings/preferences (GET)
+      summary: Retrieve the agent-wide dashboard settings (GET)
       description: |
         **V3 SPECIFIC ENDPOINT**
 
-        Retrieves stored user settings and preferences from Netdata's settings storage.
-        The settings API provides persistent key-value storage for UI preferences, dashboard layouts,
-        alert configurations, and other user-specific data.
+        Retrieves the agent's dashboard settings object.
 
         **Settings System:**
-        - **Persistent storage**: Settings survive agent restarts
-        - **Version-controlled**: Each update increments version for conflict detection
-        - **User-scoped**: Authenticated users can have multiple named settings files
-        - **Anonymous access**: Limited to 'default' file only
-        - **JSON format**: All settings stored as JSON with mandatory 'version' field
+        - **One object per agent**: there is a single settings object, `default`. It is shared by every caller
+          admitted to this API, anonymous or authenticated; it is not scoped to a user.
+        - **Persistent storage**: stored as `settings/default` in Netdata's var/lib directory; survives restarts
+        - **Version-controlled**: each update increments `version` for conflict detection
+        - **JSON format**: a JSON object with a mandatory integer `version` field
 
-        **File-Based Storage:**
-        Settings are stored as individual files in Netdata's var/lib directory:
-        - Anonymous users: Only `file=default` allowed
-        - Authenticated users: Can create custom files (e.g., `file=my-dashboard`)
-        - File names: Alphanumeric, dashes, underscores only
+        The dashboard keeps agent-wide preferences here, such as the preferred nodes of the agent's local space.
+        Do not store per-user or sensitive data in it.
 
         **Version Control:**
-        Each settings object has a `version` field:
-        - Starts at version 1 for new files
+        - A missing object reads as version 1
         - Auto-incremented on each PUT operation
         - Used for optimistic locking to prevent conflicts
 
-        **Use Cases:**
-        - **Dashboard preferences**: Store layout, theme, selected metrics
-        - **Alert customization**: Save user-specific alert thresholds
-        - **UI state**: Remember filters, time ranges, node selections
-        - **Multi-device sync**: Share settings across browsers/devices (for authenticated users)
-
-        **Common Usage Patterns:**
-
-        1. **Get default settings (anonymous user):**
-           ```
-           GET /api/v3/settings?file=default
-           ```
-
-        2. **Get named settings file (authenticated):**
-           ```
-           GET /api/v3/settings?file=production-dashboard
-           ```
+        **Usage:**
+        ```
+        GET /api/v3/settings?file=default
+        ```
 
         **Response Structure:**
         ```json
         {
           "version": 3,
-          "theme": "dark",
-          "defaultTimeRange": "-3600",
-          "favoriteMetrics": ["system.cpu", "system.ram"]
+          "value": {
+            "preferred_node_ids": ["..."]
+          }
         }
         ```
 
-        **New Files:**
-        If requested file doesn't exist, returns initial version:
+        **New Object:**
+        If the object doesn't exist (or its stored `version` is not an integer from 1 to 9223372036854775806), returns the initial version:
         ```json
         {
           "version": 1
@@ -5767,32 +5748,15 @@ paths:
         - name: file
           in: query
           required: false
+          allowEmptyValue: true
           description: |
-            Name of the settings file to retrieve.
-
-            **File Naming Rules:**
-            - Alphanumeric characters only
-            - Dashes (-) and underscores (_) allowed
-            - No spaces or special characters
-            - Case-sensitive
-
-            **Access Control:**
-            - **Anonymous users**: Only `file=default` allowed
-            - **Authenticated users (bearer token)**: Any valid file name
-
-            **Examples:**
-            - `default` - Default settings file
-            - `my-dashboard` - Custom dashboard settings
-            - `prod-alerts` - Production alert preferences
-            - `mobile-view` - Mobile UI settings
-
-            **Invalid File Names:**
-            - Missing or empty: Returns 400 Bad Request
-            - Special characters: Returns 400 Bad Request
-            - Non-default for anonymous: Returns 400 Bad Request
+            Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty
+            value) selects `default`. Any other value returns 400 Bad Request.
           schema:
             type: string
-            pattern: '^[a-zA-Z0-9_-]+$'
+            enum:
+              - default
+              - ""
             default: "default"
           example: "default"
       responses:
@@ -5811,43 +5775,41 @@ paths:
                 properties:
                   version:
                     type: integer
+                    format: int64
                     description: Current version number (auto-incremented on updates)
                     minimum: 1
+                    maximum: 9223372036854775806
                 additionalProperties: true
               examples:
-                new_file:
+                new_object:
                   value:
                     version: 1
-                  summary: Newly created settings file with just version
-                existing_file:
+                  summary: No settings stored yet
+                existing_object:
                   value:
                     version: 5
-                    theme: "dark"
-                    language: "en"
-                    dashboard:
-                      layout: "grid"
-                      columns: 3
-                    notifications:
-                      enabled: true
-                      sound: false
-                  summary: Existing settings with custom fields
+                    value:
+                      preferred_node_ids:
+                        - "11111111-2222-3333-4444-555555555555"
+                  summary: Settings stored by the dashboard
         "400":
           description: |
             Bad request. Common causes:
-            - Invalid file name (contains special characters)
-            - Anonymous user trying to access non-default file
-            - Empty file name
+            - `file` is not `default`
+            - The request is not for the agent node
         "500":
           description: Internal server error during settings retrieval.
     put:
       operationId: settings_put
       tags:
         - settings
-      summary: Create or update user settings/preferences (PUT)
+      summary: Create or update the agent-wide dashboard settings (PUT)
       description: |
         **V3 SPECIFIC ENDPOINT**
 
-        Creates or updates user settings with optimistic locking to prevent concurrent modification conflicts.
+        Creates or updates the agent's single settings object (`default`), with optimistic locking to prevent
+        concurrent modification conflicts. The object is shared by every caller admitted to this API, anonymous
+        or authenticated; it is not scoped to a user.
 
         **Update Process:**
         1. Client GET current settings (to get current version)
@@ -5867,14 +5829,14 @@ paths:
         **Optimistic Locking Flow:**
         ```javascript
         // 1. Get current settings
-        const response = await fetch('/api/v3/settings?file=my-dashboard');
+        const response = await fetch('/api/v3/settings?file=default');
         const settings = await response.json(); // { version: 3, ... }
 
         // 2. Modify settings
-        settings.theme = 'dark';
+        settings.value = { ...settings.value, preferred_node_ids: nodeIds };
 
         // 3. PUT with ORIGINAL version (still 3)
-        const result = await fetch('/api/v3/settings?file=my-dashboard', {
+        const result = await fetch('/api/v3/settings?file=default', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(settings) // version: 3
@@ -5889,7 +5851,7 @@ paths:
 
         **Payload Requirements:**
         - MUST be valid JSON
-        - MUST include `version` field with current file version
+        - MUST include an integer `version` field with the current version (1 when nothing is stored yet)
         - MAY include any additional fields
         - Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
 
@@ -5898,12 +5860,6 @@ paths:
         - Netdata verifies version matches file on disk
         - Netdata increments version before saving
         - Saved file has version + 1
-
-        **Use Cases:**
-        - Save dashboard configuration changes
-        - Update user preferences
-        - Store UI state
-        - Persist alert customizations
 
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
@@ -5918,33 +5874,23 @@ paths:
         - name: file
           in: query
           required: false
+          allowEmptyValue: true
           description: |
-            Name of the settings file to create or update.
-
-            **File Naming Rules:**
-            - Alphanumeric characters only
-            - Dashes (-) and underscores (_) allowed
-            - No spaces or special characters
-            - Case-sensitive
-
-            **Access Control:**
-            - **Anonymous users**: Only `file=default` allowed
-            - **Authenticated users (bearer token)**: Any valid file name
-
-            **File Creation:**
-            - If file doesn't exist: Created with initial payload
-            - If file exists: Updated with new payload (version check applies)
+            Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty
+            value) selects `default`. Any other value returns 400 Bad Request.
           schema:
             type: string
-            pattern: '^[a-zA-Z0-9_-]+$'
+            enum:
+              - default
+              - ""
             default: "default"
-          example: "my-dashboard"
+          example: "default"
       requestBody:
         description: |
           JSON object containing settings data with mandatory `version` field.
 
           **Required Fields:**
-          - `version`: Integer matching current file version (or 0 for non-existent files)
+          - `version`: Integer matching the current version (1 when nothing is stored yet)
 
           **Optional Fields:**
           - Any user-defined fields
@@ -5953,8 +5899,10 @@ paths:
           Maximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
 
           **Version Rules:**
-          - New file: version can be 0 or 1
-          - Existing file: version MUST match current file version exactly
+          - MUST be a JSON integer from 1 to 9223372036854775806 (strings, decimals and booleans return 400)
+          - A stored version that has reached 9223372036854775806 cannot be incremented; such a PUT returns 400
+          - Nothing stored yet: version MUST be 1
+          - Existing object: version MUST match the stored version exactly
           - Mismatch causes 409 Conflict
         required: true
         content:
@@ -5966,23 +5914,25 @@ paths:
               properties:
                 version:
                   type: integer
+                  format: int64
                   description: Current version from GET request
-                  minimum: 0
+                  minimum: 1
+                  maximum: 9223372036854775806
               additionalProperties: true
             examples:
               create_new:
                 value:
-                  version: 0
-                  theme: "dark"
-                  language: "en"
-                summary: Creating new settings file
+                  version: 1
+                  value:
+                    preferred_node_ids: []
+                summary: Creating the settings object (nothing stored yet)
               update_existing:
                 value:
                   version: 5
-                  theme: "light"
-                  dashboard:
-                    layout: "list"
-                summary: Updating existing file (version from previous GET)
+                  value:
+                    preferred_node_ids:
+                      - "11111111-2222-3333-4444-555555555555"
+                summary: Updating the stored object (version from previous GET)
       responses:
         "200":
           description: |
@@ -5992,17 +5942,19 @@ paths:
               schema:
                 type: object
                 properties:
-                  message:
+                  status:
+                    type: integer
+                    example: 200
+                  errorMessage:
                     type: string
                     example: "OK"
         "400":
           description: |
             Bad request. Common causes:
-            - Invalid file name
-            - Missing `version` field in payload
+            - `file` is not `default`
+            - Missing `version` field in payload, `version` is not a valid integer, or it cannot be incremented
             - Invalid JSON payload
             - Empty payload
-            - Anonymous user trying to access non-default file
         "409":
           description: |
             Conflict. Version mismatch detected.
@@ -6018,7 +5970,10 @@ paths:
               schema:
                 type: object
                 properties:
-                  message:
+                  status:
+                    type: integer
+                    example: 409
+                  errorMessage:
                     type: string
                     example: "Payload version does not match the version of the stored object"
         "413":
@@ -9389,7 +9344,7 @@ components:
       name: gtime
       in: query
       description: |
-        The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).
+        The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute). Values above 315360000 (10 years) are treated as 315360000.
       required: false
       allowEmptyValue: false
       schema:
@@ -9400,7 +9355,7 @@ components:
       name: time_resampling
       in: query
       description: |
-        For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average.
+        For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average. Values above 315360000 (10 years) are treated as 315360000.
       required: false
       schema:
         type: number

@@ -71,9 +71,10 @@ const (
 	unknownValue          = "unknown"
 )
 
-// SiteCfg is the immutable configuration for one site. Name is the stable
+// SiteCfg configures one job. VnodeGUID follows its resolved host; Name is the stable
 // identity; DisplayName is presentation metadata.
 type SiteCfg struct {
+	VnodeGUID          string
 	Name, DisplayName  string
 	PageGroups         int
 	Countries          int
@@ -195,24 +196,47 @@ type siteState struct {
 	firstPartyResources, thirdPartyResources, unknownResources uint64
 }
 
-// New creates an aggregator for one site with immutable configuration.
+// New creates an aggregator for one site with its initial resolved vnode identity.
 func New(window time.Duration, cfg SiteCfg) *Aggregator {
 	return &Aggregator{
 		window: window,
 		now:    time.Now,
-		site: siteState{
-			cfg:                cfg,
-			window:             window,
-			counters:           map[string]uint64{},
-			observations:       map[observationKey]*receiptEntry{},
-			identities:         map[identityKey]*receiptEntry{},
-			sessions:           map[string]*receiptEntry{},
-			pageSessions:       map[string]*receiptEntry{},
-			vitalLoss:          map[string]*lossInterval{},
-			identityLoss:       map[string]*lossInterval{},
-			resourceIdentities: map[identityKey]*receiptEntry{},
-			sess:               list.New(),
-			sessIdx:            map[string]*list.Element{},
-		},
+		site:   newSiteState(window, cfg),
+	}
+}
+
+func newSiteState(window time.Duration, cfg SiteCfg) siteState {
+	return siteState{
+		cfg:                cfg,
+		window:             window,
+		counters:           map[string]uint64{},
+		observations:       map[observationKey]*receiptEntry{},
+		identities:         map[identityKey]*receiptEntry{},
+		sessions:           map[string]*receiptEntry{},
+		pageSessions:       map[string]*receiptEntry{},
+		vitalLoss:          map[string]*lossInterval{},
+		identityLoss:       map[string]*lossInterval{},
+		resourceIdentities: map[identityKey]*receiptEntry{},
+		sess:               list.New(),
+		sessIdx:            map[string]*list.Element{},
+	}
+}
+
+// SetVnodeGUID starts a fresh measurement window when the configured host changes.
+// Investigation buffers and queued evidence keep their observation-time identity.
+func (a *Aggregator) SetVnodeGUID(guid string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.site.cfg.VnodeGUID == guid {
+		return
+	}
+	old := a.site
+	cfg := old.cfg
+	cfg.VnodeGUID = guid
+	a.site = newSiteState(a.window, cfg)
+	a.site.sess, a.site.sessIdx = old.sess, old.sessIdx
+	// These counters describe this job's asynchronous transports, not a measured population.
+	for _, key := range []string{CounterHistoryWritten, CounterHistoryDropped, CounterOTLPSent, CounterOTLPDropped, CounterOTLPErrors, CounterSpansSent, CounterSpansDropped, CounterSpansErrors} {
+		a.site.counters[key] = old.counters[key]
 	}
 }

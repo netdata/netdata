@@ -50,6 +50,11 @@ No browser tab is required for token-based auth. Tokens can expire or be revoked
 
 ## Triage decision matrix
 
+Apply `AGENTS.md#review` for finding materiality, maintenance benefit and duplication before choosing a source change.
+For a code-smell issue key, distinguish inaccurate detection (`falsepositive`) from an accurate finding whose fix
+is not worthwhile (`wontfix`). Neither classification authorizes a remote transition by itself. Duplication metrics
+may fail the quality gate without an issue key; report that condition rather than inventing an issue transition.
+
 ### Issues (Bug, Vulnerability, Code Smell)
 
 | Decision     | API transition  | When to use                                                       |

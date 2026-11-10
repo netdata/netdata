@@ -76,13 +76,13 @@ func (s *source) Fetch(ctx context.Context, jobID, runID, artifactID string) (mo
 }
 func newHandler(s *source) *syntheticfunctions.Handler {
 	if s == nil {
-		return syntheticfunctions.New(nil)
+		return syntheticfunctions.New(nil, nil)
 	}
 	var active query.Observations
 	if s.hub != nil {
 		active = s.hub
 	}
-	return syntheticfunctions.New(query.New(active, s, s, nil))
+	return syntheticfunctions.New(query.New(active, s, s, nil), nil)
 }
 
 func ptr(n float64) *float64 { return &n }
@@ -266,6 +266,7 @@ func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
 		t,
 		map[string]any{
 			"job_id":          "journey:checkout",
+			"vnode_guid":      "",
 			"kind":            model.Journey,
 			"name":            "checkout",
 			"target":          "",
@@ -473,7 +474,7 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	require.NoError(t, err)
 	defer store.Close()
 	runID := fixtureRunID()
-	dir, err := store.Begin(runID, "lighthouse:home")
+	dir, err := store.Begin(runID, "lighthouse:home", "")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "output"), 0700))
 	html := []byte("<html><script>privateReport()</script></html>")
@@ -561,7 +562,7 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	run.CompletedUS = run.StartedUS + 1
 	_, err = synthetichistory.NewStore(journal).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, synthetichistory.NewStore(journal), nil, nil))
+	h := syntheticfunctions.New(query.New(nil, synthetichistory.NewStore(journal), nil, nil), nil)
 	require.Len(t, responseData(t, call(h, "synthetics-runs")), 1)
 	got := call(h, "synthetics-runs", "before:0")
 	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
@@ -587,7 +588,7 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	}
 	_, err = retained.AppendRun(ctx, "start", run)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, retained, nil, nil))
+	h := syntheticfunctions.New(query.New(nil, retained, nil, nil), nil)
 	beforeCompletion := call(h, "synthetics-runs", "after:100", "before:100", "outcome:unknown")
 	require.Len(t, responseData(t, beforeCompletion), 1)
 	validate(t, beforeCompletion)

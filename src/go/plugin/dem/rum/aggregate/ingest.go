@@ -57,6 +57,7 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 		st.lastAccepted = now
 	}
 	obs := *b
+	obs.VnodeGUID = st.cfg.VnodeGUID
 	obs.Vitals, obs.Events, obs.Resources, obs.Navigation = nil, nil, nil, nil
 	attrs := measurementAttributes(b)
 	var documents, views, frustrations uint64
@@ -257,6 +258,7 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 		for _, e := range obs.Errors {
 			a.history.Event(HistoryEvent{
 				Site:         st.cfg.Name,
+				VnodeGUID:    st.cfg.VnodeGUID,
 				ObservedUS:   now.UnixMicro(),
 				Type:         "error",
 				Page:         b.PageGroup,

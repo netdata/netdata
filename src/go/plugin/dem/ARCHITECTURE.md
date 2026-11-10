@@ -137,6 +137,74 @@ The four collector modules (the journeys below show them in action):
 | `journey` | One job per journey script (`script` or `script_path`) | Every 900 s, 120 s timeout | Prepared request, registration, metric store |
 | `lighthouse` | One job per audited URL | Every 1800 s, 180 s timeout | Prepared request, registration, metric store |
 
+### Site vnode identity
+
+A DEM site is a configured vnode. RUM, journey and Lighthouse use the standard optional `vnode` reference and
+framework-owned resolved snapshot. The reference is a lookup name, not a public GUID option. Normal framework routing
+places charts on the vnode; charts MUST NOT duplicate that identity in a GUID label. With no reference, metrics stay
+on the collecting Agent and observations are unassigned to a site. A synthetic-only site requires no RUM job.
+
+Keep these identities distinct:
+
+| Identity | Purpose |
+|---|---|
+| Collecting Agent | Function registration, access policy, receiver, executor and retention owner |
+| Native module and job name | Configuration, lifecycle and chart-instance owner |
+| RUM `site` / job name | Beacon route and physical RUM history namespace |
+| Synthetic `kind:name`, run ID | Monitor identity and individual execution/artifact ownership |
+| `vnode` reference | Configured vnode lookup name, independent of physical job identity |
+| Recorded `vnode_guid` | Canonical resolved node identity captured for observations and attempts |
+
+The framework delivers configured vnode snapshots before initialization and on revision changes before collection.
+Long-lived RUM ingestion and synthetic attempt work MUST reconcile those updates with their admission boundaries.
+History queries MUST use captured GUIDs, not current configuration. Session/error reductions retain physical identity
+and recorded GUID so reassignment cannot merge evidence. Saved and buffered investigation records retain their old GUID.
+A changed RUM GUID starts a fresh rolling measurement window and Pages view; metadata-only hostname/label edits do not.
+Transport and history counters remain job-wide. Old evidence lacking a captured GUID remains unassigned, including
+records with legacy `site_id` text: no current-config backfill or speculative migration is performed.
+
+DEM Functions remain process-owned on the collecting Agent with existing public names and Agent-level permissions.
+All six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts` accept either `vnode` or
+`vnode_guid`. The detail Functions `synthetics-run` and `synthetics-artifact` retain their existing parameters.
+Neither selector is an authorization boundary. Omitting both, or supplying only an empty `vnode_guid`, preserves
+all-vnode and unassigned reads. Empty or unknown `vnode` names and requests containing both selectors MUST fail,
+even if either value is empty.
+
+The `vnode` selector is the exact configured resource name used by collector jobs, not the display hostname.
+Resolve it once per request through the framework's read-only current configured-vnode authority, independently of
+active job registries. Lookup MUST work with disabled jobs or no jobs, use an in-memory name-to-canonical-GUID lookup,
+and perform no I/O or job/history scan. Renamed or removed names have no aliases; name reuse resolves only the current
+GUID. Keep `vnode_guid` as the canonical UUID fallback for earlier identities, including after configuration removal.
+Name selection MUST NOT rewrite captured GUIDs or add stored name history.
+
+Apply the resolved GUID filter before row limits and cursor advancement, retaining physical job, session, run and
+capture ownership checks on every evidence read. No Function registration or host-context protocol extension per vnode
+is part of this contract. Retained history remains available with all collector jobs disabled or a vnode archived.
+
+Frontend consumers retain collecting-Agent identity, vnode GUID, module and job name. Desired native configuration
+includes disabled and failed-startup jobs that active registries omit. Guided site setup creates/selects a configured
+vnode through `dem:vnode` or file configuration, then submits independent native job operations with visible outcomes.
+There is no parent configuration, generated child ownership, atomic site save or shared deletion lifecycle. Equal vnode
+references on different Agents do not create deployment or failover authority. File definitions use the standard
+Netdata configuration directory's `vnodes/` YAML format; DEM supports static configured vnodes.
+
+### Capacity remains process-owned
+
+Journey and Lighthouse already share the process Executor. Independent configuration owners allow a future shared
+admission coordinator, bounded concurrency and optional vnode-based fairness without adding parent jobs. Vnode placement
+MUST NOT allocate a separate executor or browser pool. Job retirement must still cancel and drain only its own work.
+
+Vnode placement does not improve execution capacity by itself. Current synchronous collection can miss framework ticks
+while a prior run is busy; queueing those calls alone cannot reconstruct missed occurrences. A future central scheduler
+can register independent jobs through their `Run` lifecycle, own due times, and leave metric publication in `Collect`.
+Registration must be cancelled and joined before native predecessor release.
+
+Warm browser reuse additionally needs explicit worker lifetime, runtime leases, per-attempt cancellation and browser
+state cleanup. A live shared worker cannot be considered reaped after each attempt. Preserve verified completion at the
+appropriate boundary and qualify Playwright and Lighthouse separately. The current fail-stop on unverified process
+drainage also stops RUM; independent jobs do not provide process isolation. These are separate execution changes that
+need measurement and validation, not promises made by vnode placement.
+
 ## Journey 1: a browser report
 
 A website installs one script tag. From then on, every sampled visitor's browser sends reports to the receiver, and each
@@ -911,6 +979,18 @@ Job ownership:
   flow.
 - They share an executor, pure request validation and the common outcome/duration instrument helper.
 - Framework scheduling owns cadence. The command owns the execution admission slot, artifact store and journal.
+
+Draft rehearsal:
+
+- Explicit journey DynCfg `Test` uses resolved submitted configuration after `Init`; activation still uses `Check`.
+- `Engine.Rehearse` shares the installed source, admission and fail-stop owner with scheduled execution. It uses
+  an explicitly unrecorded view, as runtime qualification does, and a private temporary artifact store with capture
+  disabled. A missing history owner remains an error for ordinary monitoring.
+- Rehearsal never calls collector `Run` or `Collect`, registers an observation generation, or writes metrics.
+  After verified drainage, it closes the temporary store and returns only an error/pass result; no result registry
+  or polling API exists.
+- Caller deadlines include admission waiting. Unverified drainage signals the shared fatal owner and preserves
+  uncertain live work, even if the configuration request has already timed out.
 
 Registration:
 

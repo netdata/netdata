@@ -136,6 +136,16 @@ var (
 		name: "getDeviceSwitchPortsStatusesPackets",
 		path: "/devices/{serial}/switch/ports/statuses/packets",
 	}
+	opApplianceUplinkStatuses = operation{
+		name:        "getOrganizationApplianceUplinkStatuses",
+		path:        "/organizations/{organizationId}/appliance/uplink/statuses",
+		pageSize:    1000,
+		maxPageSize: 1000,
+	}
+	opUplinkLossAndLatency = operation{
+		name: "getOrganizationDevicesUplinksLossAndLatency",
+		path: "/organizations/{organizationId}/devices/uplinksLossAndLatency",
+	}
 	opApplianceUplinksUsage = operation{
 		name: "getOrganizationApplianceUplinksUsageByNetwork",
 		path: "/organizations/{organizationId}/appliance/uplinks/usage/byNetwork",
@@ -195,6 +205,23 @@ func (c *Client) ListApplianceUplinkUsage(
 	start, end time.Time,
 ) ([]ApplianceUplinkUsage, error) {
 	return get[ApplianceUplinkUsage](ctx, c, opApplianceUplinksUsage, organizationID, window{start, end}.query())
+}
+
+// ListApplianceUplinkStatuses returns the reported uplink state of each MX,
+// Z-series appliance and Secure Router in the organization.
+func (c *Client) ListApplianceUplinkStatuses(ctx context.Context, organizationID string) ([]ApplianceUplinkStatus, error) {
+	return list[ApplianceUplinkStatus](ctx, c, opApplianceUplinkStatuses, organizationID, nil)
+}
+
+// ListUplinkLossAndLatency returns MX loss and latency samples by uplink and
+// destination during [start, end]. Meraki permits at most five minutes, ending
+// at least two minutes in the past. This organization operation is unpaginated.
+func (c *Client) ListUplinkLossAndLatency(
+	ctx context.Context,
+	organizationID string,
+	start, end time.Time,
+) ([]UplinkLossAndLatency, error) {
+	return get[UplinkLossAndLatency](ctx, c, opUplinkLossAndLatency, organizationID, window{start, end}.query())
 }
 
 // ProbeOrganization checks access to the organization by reading one minimal

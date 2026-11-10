@@ -55,8 +55,8 @@ metrics:
     metric_tags:
       - tag: sensor_index
         symbol:
-          OID: 1.3.6.1.4.1.12356.101.4.3.2.1.1
           name: fgHwSensorEntIndex
+        index: 1
       - tag: _sensor_name
         symbol:
           OID: 1.3.6.1.4.1.12356.101.4.3.2.1.2

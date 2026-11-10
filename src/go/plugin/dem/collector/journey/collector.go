@@ -5,6 +5,7 @@ package journey
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -27,6 +28,7 @@ type Secret struct {
 }
 
 type Config struct {
+	Vnode               string           `yaml:"vnode,omitempty" json:"vnode,omitempty"`
 	Name                string           `yaml:"name"                  json:"name"`
 	UpdateEvery         int              `yaml:"update_every"          json:"update_every"`
 	Timeout             confopt.Duration `yaml:"timeout"               json:"timeout"`
@@ -41,6 +43,7 @@ type Config struct {
 type Executor interface {
 	Check(context.Context, model.Kind) error
 	Execute(context.Context, model.Request, func(string)) model.Execution
+	Rehearse(context.Context, model.Request) error
 }
 
 type Dependencies struct {
@@ -56,6 +59,7 @@ type Collector struct {
 	metrics     metrics
 	request     model.Request
 	initialized bool
+	vnodeGUID   string
 	// Assigned before readiness; retained after retirement for in-flight callbacks.
 	registration *syntheticregistry.Registration
 	terminal     chan error
@@ -90,3 +94,10 @@ func New(deps Dependencies) *Collector {
 func (c *Collector) Configuration() any                 { return c.Config }
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string          { return charts }
+
+func (c *Collector) Test(ctx context.Context) error {
+	if !c.initialized {
+		return errors.New("collector is not initialized")
+	}
+	return c.deps.Executor.Rehearse(ctx, c.request)
+}

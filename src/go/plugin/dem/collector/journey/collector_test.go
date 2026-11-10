@@ -20,7 +20,8 @@ import (
 
 type prepared struct{}
 
-func (prepared) Check(context.Context, model.Kind) error { return nil }
+func (prepared) Check(context.Context, model.Kind) error       { return nil }
+func (prepared) Rehearse(context.Context, model.Request) error { panic("unexpected rehearsal") }
 func (prepared) Execute(context.Context, model.Request, func(string)) model.Execution {
 	panic("unexpected execution during config validation")
 }
@@ -36,10 +37,10 @@ func configured() *Collector {
 
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
-		`{"name":"login","update_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":false}`,
+		`{"vnode":"storefront","name":"login","update_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":false}`,
 	)
 	cfgYAML := []byte(
-		"name: login\nupdate_every: 900\ntimeout: 120\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: false\n",
+		"vnode: storefront\nname: login\nupdate_every: 900\ntimeout: 120\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: false\n",
 	)
 	collecttest.TestConfigurationSerialize(t, New(Dependencies{}), cfgJSON, cfgYAML)
 	for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
@@ -152,4 +153,11 @@ func TestPreparedCheckAndArtifacts(t *testing.T) {
 			ContextPrefix: "dem_synthetic.",
 		},
 	)
+}
+
+func TestYAMLNullVnodeRemainsUnassigned(t *testing.T) {
+	c := configured()
+	require.NoError(t, yaml.Unmarshal([]byte("vnode: null\n"), c))
+	require.NoError(t, c.Init(context.Background()))
+	assert.Empty(t, c.Vnode)
 }

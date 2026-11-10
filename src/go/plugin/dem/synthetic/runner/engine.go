@@ -33,20 +33,21 @@ type historyWriter interface {
 }
 
 type ArtifactStore interface {
-	Begin(string, string) (string, error)
+	Begin(string, string, string) (string, error)
 	Finalize(context.Context, string, []synthetic.Capture) ([]synthetic.Artifact, error)
 }
 
 type Engine struct {
 	*executionOwner
-	source    Source
-	history   historyWriter
-	artifacts ArtifactStore
-	start     startFunc
-	platform  func() error
+	source     Source
+	history    historyWriter
+	unrecorded bool
+	artifacts  ArtifactStore
+	start      startFunc
+	platform   func() error
 }
 
-// Candidate qualification and monitoring share admission and fail-stop state.
+// Qualification, rehearsal and monitoring share admission and fail-stop state.
 // Keep sync.Once on this shared owner; never copy it into a candidate view.
 type executionOwner struct {
 	admission  chan struct{}
@@ -72,10 +73,11 @@ func New(source Source, history historyWriter, artifacts ArtifactStore) *Engine 
 	}
 }
 
-func (e *Engine) qualificationView(source Source, artifacts ArtifactStore) *Engine {
+func (e *Engine) unrecordedView(source Source, artifacts ArtifactStore) *Engine {
 	return &Engine{
 		executionOwner: e.executionOwner,
 		source:         source,
+		unrecorded:     true,
 		artifacts:      artifacts,
 		start:          e.start,
 		platform:       e.platform,
@@ -101,6 +103,7 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 	redact := newRedactor(request.Secrets)
 	run := synthetic.Run{
 		JobID:        request.JobID(),
+		VnodeGUID:    request.VnodeGUID,
 		Kind:         request.Kind,
 		Name:         redact.text(request.Name),
 		Target:       redact.text(redact.patterns.ApplyURL(request.URL)),
@@ -187,7 +190,7 @@ func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state f
 	identity := paths.Identity
 	run.Runtime = &identity
 	e.save(attempt, "start", &run, redact)
-	work, err := e.artifacts.Begin(run.ID, run.JobID)
+	work, err := e.artifacts.Begin(run.ID, run.JobID, run.VnodeGUID)
 	if err != nil {
 		run.Error = redact.text("create run work directory: " + err.Error())
 		e.complete(&run, nil, redact)
@@ -319,6 +322,9 @@ func (e *Engine) complete(run *synthetic.Run, captures []synthetic.Capture, reda
 }
 
 func (e *Engine) save(ctx context.Context, phase string, run *synthetic.Run, redact *textRedactor) {
+	if e.unrecorded {
+		return
+	}
 	if e.history == nil {
 		run.HistoryError = joinText(run.HistoryError, "history owner is unavailable")
 		return

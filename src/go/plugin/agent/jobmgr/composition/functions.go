@@ -5,6 +5,7 @@ package composition
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -33,7 +34,7 @@ func NewContainedFunctionAssembly(
 	frames *lifecycle.FrameOwner,
 	initial ...functionadapter.InitialRoute,
 ) (*FunctionAssembly, error) {
-	return newContainedFunctionAssembly(ctx, epoch, attempts, diagnostics, modules, nil, frames, initial...)
+	return newContainedFunctionAssembly(ctx, epoch, attempts, diagnostics, modules, nil, funcapi.ProcessFunctionContext{}, frames, initial...)
 }
 
 func newContainedFunctionAssembly(
@@ -43,11 +44,22 @@ func newContainedFunctionAssembly(
 	diagnostics jobmgr.DiagnosticObserver,
 	modules collectorapi.Registry,
 	providers []funcapi.ProcessFunctionProvider,
+	providerContext funcapi.ProcessFunctionContext,
 	frames *lifecycle.FrameOwner,
 	initial ...functionadapter.InitialRoute,
 ) (*FunctionAssembly, error) {
 	if ctx == nil || epoch == 0 || attempts == nil || modules == nil || frames == nil {
 		return nil, errors.New("jobmgr composition: invalid contained Function assembly")
+	}
+	if err := functionadapter.ValidateProcessProviders(providers); err != nil {
+		return nil, err
+	}
+	providers = slices.Clone(providers)
+	for i, provider := range providers {
+		if provider.NewHandlerWithContext != nil {
+			providers[i].NewHandler = func() funcapi.MethodHandler { return provider.NewHandlerWithContext(providerContext) }
+			providers[i].NewHandlerWithContext = nil
+		}
 	}
 	controller, catalog, err := functionadapter.NewContainedControllerWithProviders(
 		ctx,

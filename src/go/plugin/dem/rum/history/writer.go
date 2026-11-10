@@ -145,6 +145,7 @@ func (w *Writer) flush(ctx context.Context, batch []aggregate.HistoryEvent) int 
 			Revision:     rec.Revision,
 
 			Site:        rec.Site,
+			VnodeGUID:   rec.VnodeGUID,
 			SessionID:   rec.SessionID,
 			ObservedUS:  rec.ObservedUS,
 			Type:        rec.Type,

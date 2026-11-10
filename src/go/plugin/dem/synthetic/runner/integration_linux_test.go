@@ -20,10 +20,18 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -90,7 +98,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		retained, err := observedHistory.GetRun(context.Background(), run.JobID, run.ID)
 		require.NoError(t, err)
 		require.Equal(t, &expectedIdentity, retained.Runtime)
-		handler := syntheticfunctions.New(query.New(nil, observedHistory, captures, nil))
+		handler := syntheticfunctions.New(query.New(nil, observedHistory, captures, nil), nil)
 		response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: "synthetics-run", Args: []string{"job_id:" + run.JobID, "run_id:" + run.ID}, Permissions: "0x7b"})
 		require.NotNil(t, response.RawResponse, response.Message)
 		require.Equal(t, &expectedIdentity, response.RawResponse["run"].(map[string]any)["runtime"])
@@ -209,6 +217,148 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		t.Logf("%s: %s (%s)", name, execution.Run.Outcome, execution.Run.Error)
 		return execution
 	}
+	t.Run("draft-configuration-test", func(t *testing.T) {
+		const secret = "synthetic-rehearsal-secret"
+		t.Setenv("DEM_REHEARSAL_TEST_SECRET", secret)
+		temporary := filepath.Join(base, "rehearsal-tmp")
+		require.NoError(t, os.Mkdir(temporary, 0700))
+		t.Setenv("TMPDIR", temporary)
+		resolver, err := secretresolver.NewDefaultAtomicResolver()
+		require.NoError(t, err)
+		configs, err := secretconfig.NewConfigResolver(resolver, func([]string) (secretresolver.AtomicScope, error) {
+			return nil, errors.New("fixture does not use SecretStore references")
+		})
+		require.NoError(t, err)
+		registry := syntheticregistry.New()
+		var collector *journey.Collector
+		makeFactory := func(executor journey.Executor) *joboutput.ConfigModuleFactory {
+			creator := journey.Creator(journey.Dependencies{Executor: executor, Registry: registry})
+			create := creator.CreateV2
+			creator.CreateV2 = func() collectorapi.CollectorV2 {
+				collector = create().(*journey.Collector)
+				return collector
+			}
+			factory, err := joboutput.NewConfigModuleFactory(joboutput.ConfigModuleFactoryConfig{
+				Modules: collectorapi.Registry{"journey": creator},
+				Configs: configs,
+			})
+			require.NoError(t, err)
+			return factory
+		}
+		factory := makeFactory(engine)
+		config := func(script string) confgroup.Config {
+			return confgroup.Config{
+				"name":                  "unsaved-draft",
+				"module":                "journey",
+				"script":                script,
+				"timeout":               "30s",
+				"screenshot_on_failure": true,
+				"secrets": []any{map[string]any{
+					"name":  "DEM_SECRET_REHEARSAL",
+					"value": "${env:DEM_REHEARSAL_TEST_SECRET}",
+				}},
+			}.SetSourceType(confgroup.TypeDyncfg)
+		}
+		assertIsolated := func(t *testing.T) {
+			t.Helper()
+			assert.Empty(t, registry.Snapshot(time.Now()), "draft must not register a monitor")
+			assert.Empty(t, observedHistory.records, "draft must not append monitoring events")
+			page, err := observedHistory.QueryRuns(context.Background(), synthetichistory.RunFilter{})
+			require.NoError(t, err)
+			assert.Empty(t, page.Runs, "draft must not enter retained history")
+			require.NotNil(t, collector)
+			collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()).ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
+				t.Errorf("draft published metric %s", name)
+			})
+			for _, directory := range []string{"work", "staging", "runs", "drained", "deleting"} {
+				entries, err := os.ReadDir(filepath.Join(base, "captures", directory))
+				require.NoError(t, err)
+				assert.Empty(t, entries, "draft must not retain captures or workspaces in %s", directory)
+			}
+			leftovers, err := filepath.Glob(filepath.Join(temporary, "netdata-dem-artifacts-*"))
+			require.NoError(t, err)
+			if len(leftovers) != 0 {
+				safe = false // Preserve uncertain workspaces for diagnosis.
+			}
+			assert.Empty(t, leftovers, "temporary rehearsal stores must be closed after drainage")
+		}
+		for _, scenario := range []struct {
+			name      string
+			body      string
+			wantError bool
+		}{
+			{"success-with-resolved-secret", "test('secret',async({page})=>{await page.goto(" + string(urlJSON) + ");await expect(page).toHaveTitle('DEM synthetic fixture');expect(process.env.DEM_SECRET_REHEARSAL).toBe('" + secret + "')});", false},
+			{"assertion-failure", "test('failed',async({page})=>{await page.goto(" + string(urlJSON) + ");expect(1).toBe(2)});", true},
+			{"incomplete-suite", "test('passed',async({page})=>{});test.skip('not-covered',async()=>{});", true},
+		} {
+			t.Run(scenario.name, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+				defer cancel()
+				err := factory.Test(ctx, config(browserPrefix+scenario.body))
+				if scenario.wantError {
+					require.Error(t, err)
+					assert.NotContains(t, err.Error(), secret)
+				} else {
+					require.NoError(t, err)
+				}
+				verifyGone(t)
+				assertIsolated(t)
+			})
+		}
+		t.Run("script-path-load-failure", func(t *testing.T) {
+			entry := filepath.Join(base, "invalid-draft.spec.ts")
+			require.NoError(t, os.WriteFile(entry, []byte("export const invalid = ;"), 0600))
+			draft := config("")
+			delete(draft, "script")
+			draft["script_path"] = entry
+			ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+			defer cancel()
+			require.Error(t, factory.Test(ctx, draft))
+			assertIsolated(t)
+		})
+		t.Run("runtime-unavailable", func(t *testing.T) {
+			unavailable := makeFactory(runner.New(nil, observedHistory, captures))
+			require.Error(t, unavailable.Test(context.Background(), config(prefix+"test('unused',async()=>{});")))
+			assertIsolated(t)
+		})
+		t.Run("cancel-after-browser-start", func(t *testing.T) {
+			mu.Lock()
+			registered = make(chan struct{}, 1)
+			signal := registered
+			mu.Unlock()
+			defer func() {
+				mu.Lock()
+				registered = nil
+				mu.Unlock()
+			}()
+			ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+			defer cancel()
+			done := make(chan error, 1)
+			go func() {
+				done <- factory.Test(ctx, config(browserPrefix+"test('cancel',async({page})=>{await new Promise(()=>{})});"))
+			}()
+			select {
+			case <-signal:
+				assert.Empty(t, registry.Snapshot(time.Now()), "started draft must not become a monitor")
+				cancel()
+			case err := <-done:
+				t.Fatalf("draft returned before browser registration: %v", err)
+			case <-time.After(20 * time.Second):
+				cancel()
+				t.Error("draft browser registration did not arrive")
+			}
+			select {
+			case err := <-done:
+				require.Error(t, err)
+				assert.NotContains(t, err.Error(), secret)
+			case <-time.After(30 * time.Second):
+				safe = false
+				t.Fatal("cancelled draft did not finish cleanup")
+			}
+			verifyGone(t)
+			assertIsolated(t)
+		})
+	})
 	t.Run("browser-success-and-detached-leaf", func(t *testing.T) {
 		script := browserPrefix + "import {spawn} from 'node:child_process';test('checkout',async({page})=>{const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{detached:true,stdio:'ignore'});child.unref();const response=await fetch(" + string(
 			pidURLJSON,

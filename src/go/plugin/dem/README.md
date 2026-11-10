@@ -8,8 +8,85 @@ is built, from the overall data flow to package ownership and runtime lifetimes.
 
 The stock configuration starts one loopback receiver and no sites. Configuration follows the normal Go Agent layout:
 `dem.conf` for plugin policy and `dem/receiver.conf` / `dem/rum.conf` for collectors. The receiver is a canonical single
-object (`dem:collector:receiver`); each site is an independent job (`dem:collector:rum:<name>`). Native `name` is the
-stable beacon/history key; `display_name` is presentation metadata. Renaming a site starts a new history namespace.
+object (`dem:collector:receiver`); each RUM monitor is an independent job (`dem:collector:rum:<name>`). Native `name` is the
+stable beacon/history key; `display_name` is presentation metadata. Renaming a RUM job starts a new history namespace.
+
+## Organize monitors on a site vnode
+
+A DEM site is a configured Virtual Node (vnode). Set the optional `vnode` reference on independent RUM, journey and
+Lighthouse jobs to place their charts on that node. Omit it to keep charts on the collecting Agent and leave the job
+unassigned to a site. A site with only synthetic monitors needs no RUM job or receiver.
+
+Create a static vnode through the plugin's `dem:vnode` dynamic configuration entry, or define one in a YAML file under
+`vnodes/` in the Netdata configuration directory. For example, `/etc/netdata/vnodes/sites.yaml`:
+
+```yaml
+- hostname: storefront
+  guid: 12345678-1234-4234-8234-123456789abc
+  labels:
+    environment: production
+```
+
+Generate a unique GUID for each site, for example with `uuidgen`. For file-defined static vnodes, `hostname` is also
+the reference name used by jobs. A dynamically configured vnode uses its configuration entry's name as the reference.
+Use the reference name in `vnode`, not the GUID. See [node identities](../../../../docs/learn/node-identities.md#virtual-nodes-vnodes)
+for the standard configuration and identity rules.
+
+These entries place two independent jobs on Storefront:
+
+```yaml
+# dem/rum.conf
+jobs:
+  - name: storefront-rum
+    vnode: storefront
+    display_name: Storefront
+    allowed_origins: [https://shop.example.org]
+```
+
+```yaml
+# dem/journey.conf
+jobs:
+  - name: storefront-checkout
+    vnode: storefront
+    script_path: /etc/netdata/dem/checkout.spec.ts
+    update_every: 300
+    timeout: 120
+```
+
+The RUM installation key remains `storefront-rum`, so its script URL ends in `/rum/storefront-rum.js`. Each job keeps
+its own configuration, DynCfg entry, schedule, secrets and enable/disable controls. Names must be distinct within each
+collector module. Guided site setup creates or selects a vnode and submits ordinary independent job operations;
+partial success must show which operations need attention. A vnode does not own child jobs, browser workers or shared
+retention budgets, and referencing it does not deploy jobs to other Agents.
+
+DEM Functions remain global on the collecting Agent. Invoke their existing names through that Agent or Cloud and
+select a site by its configured vnode name, for example `synthetics-runs vnode:storefront` or
+`rum-pages vnode:storefront`. The name is the exact resource name used by the job's `vnode` option, not its display
+hostname. Name lookup uses current vnode configuration, including when all jobs are disabled or no jobs reference it.
+Renamed or removed names stop resolving; reusing a name selects its current GUID, without aliases to earlier identities.
+
+Use `vnode_guid` with the recorded canonical GUID to query an earlier identity or retained history after its vnode is
+removed, for example `synthetics-runs vnode_guid:12345678-1234-4234-8234-123456789abc`. Supply only one selector;
+empty or unknown vnode names and requests containing both selectors are rejected, even if either value is empty.
+Omitting both selectors, or supplying only an empty `vnode_guid`, includes all vnodes and unassigned data.
+These selectors apply to all six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts`;
+`synthetics-run` and `synthetics-artifact` keep their existing detail parameters.
+
+The selectors filter data under the existing Agent-level access model; they are not a per-site authorization boundary.
+Functions are not registered on each vnode. Frontend consumers retain the collecting Agent relationship when selecting
+a site, including for archived vnodes and retained history.
+
+Functions and retained evidence expose `vnode_guid`; charts use normal vnode placement without an extra GUID label.
+Existing RUM `site` fields identify the physical RUM job. Observations capture the resolved GUID when admitted, and
+synthetic attempts capture it at their start. Saved and buffered investigation records, runs and captures retain that
+GUID after reassignment. A changed RUM GUID starts a fresh rolling measurement window and Pages view; hostname or label
+edits with the same GUID do not reset measurements. Transport and history counters remain job-wide. Old evidence without
+a captured GUID stays unassigned; legacy `site_id` text is not mapped to a vnode or rewritten.
+
+Vnode placement does not combine RUM populations, change artifact ownership or increase browser capacity. Execution,
+receiver service and retention remain shared by the collecting Agent.
+
+## Receive browser reports
 
 Expose the receiver through HTTPS, configure its public URL and actual trusted proxy addresses, then install
 `<script async src="https://rum.example.org/rum/shop.js"></script>` on the configured website. Public URLs may include a
@@ -659,6 +736,18 @@ incomplete coverage. Skipped, expected-failure, empty or incomplete suites are i
 unexpected failure/timeout. Errors loading/running the monitor are execution inability. Cancellation and an interrupted
 start are distinct from a failed target. A workflow failure means a declared check failed, not proof of a service-wide outage.
 
+Use the journey configuration's **Test** action to execute an unsaved draft on the selected Agent with its resolved
+secrets and installed browser runtime. Test returns pass/fail; failed, skipped/incomplete, interrupted or unavailable
+execution is not success. It does not save the draft, change monitoring observations, publish metrics or alerts, or
+retain captures. `screenshot_on_failure` applies to monitoring only. Test actions against the website are real and
+are not rolled back. Activation still checks runtime preparation without executing the workflow.
+
+Test shares the browser slot with monitoring and may wait for another attempt or delay a later one. The caller's
+request deadline covers waiting and execution, so it may expire before the configured workflow timeout. Cancellation
+requests process-tree shutdown. If drainage cannot be verified, DEM exits and preserves uncertain work instead of
+claiming cleanup. A timed-out caller may not receive the final diagnosis, and there is no retained result to retrieve
+later. Existing secret-reference redaction can replace detailed errors with a generic failure.
+
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
 observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
@@ -679,7 +768,8 @@ Process Functions use the regular Netdata transport: `synthetics-checks` for act
 for retained history, `synthetics-run` for one run's full diagnosis, `synthetics-artifacts` for retained capture sets and
 storage status, and `synthetics-artifact` for one set's metadata or bytes.
 Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
-status. Current-generation last success/failure and freshness do not reconstruct a historical incident. A running or
+status. Last success/failure and freshness describe the current activation and vnode association; reassignment resets
+these observations. They do not reconstruct a historical incident. A running or
 waiting attempt does not refresh its previous result. Run summaries are capped at 2000 rows with an explicit truncation
 flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
 including the entire endpoint seconds. Explicit zero means epoch, negative values are offsets from one captured now, and

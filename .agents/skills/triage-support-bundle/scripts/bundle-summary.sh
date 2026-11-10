@@ -141,7 +141,7 @@ check() { # path, note
     fi
 }
 check "06-state/status-file.json"        "no crash/exit record - check whether the host ever wrote one"
-check "07-runtime/dyncfg-tree.json"      "NO collector job state - API down, or a bundle predating this capture"
+check "07-runtime/dyncfg-tree.json"      "NO collector job state - agent down, netdatacli and API both unusable, deadline reached, or an older bundle"
 check "04-config/effective-netdata.conf" "no merged config - fall back to on-disk files and say so"
 check "06-state/health-silencers.json"   "POSIX-only; on Windows 'not silenced' is unprovable"
 check "07-runtime/stream-info.json"      "no streaming diagnostics"

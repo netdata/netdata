@@ -10,6 +10,11 @@
         "type": "string",
         "minLength": 1
       },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "script": {
         "title": "Script",
         "description": "Inline Playwright Test JavaScript or TypeScript source. Leave empty when using Script path.",
@@ -138,6 +143,12 @@
             "update_every",
             "timeout"
           ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
         }
       ]
     },
@@ -154,6 +165,10 @@
           "ui:widget": "password"
         }
       }
+    },
+    "vnode": {
+      "ui:placeholder": "storefront",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define a static Virtual Node through `dem:vnode` or a YAML file in `vnodes/` under the Netdata configuration directory, then enter its reference name here. Leave empty to use the collecting Agent."
     }
   }
 }

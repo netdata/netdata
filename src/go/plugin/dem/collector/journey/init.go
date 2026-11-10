@@ -29,6 +29,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 	request := model.Request{
 		Kind:       model.Journey,
+		VnodeGUID:  c.vnodeGUID,
 		Name:       c.Name,
 		Script:     c.Script,
 		ScriptPath: c.ScriptPath,

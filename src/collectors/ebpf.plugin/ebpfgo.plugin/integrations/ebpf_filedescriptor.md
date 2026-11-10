@@ -43,7 +43,7 @@ eBPF Filedescriptor can be monitored further using the following other integrati
 
 #### Auto-Detection
 
-The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), presence of BTF files, and the configured object flavor to decide which eBPF program will be attached. The attach symbols differ by kernel version and architecture, so the collector resolves them from `/proc/kallsyms` before attaching. Open uses `do_sys_openat2`, then `do_sys_open`: both are inner functions that `open`, `openat` and `openat2` all funnel through. Close uses the architecture's close(2) syscall symbol (`__x64_sys_close`, `__arm64_sys_close`, ..., or the unprefixed `sys_close` on architectures without syscall wrappers), falling back to the inner helpers `close_fd` and `__close_fd` on kernels that predate the wrappers. The inner helper is not used on newer kernels because the close(2) syscall no longer calls it, which made the close counters read zero.
+The plugin checks kernel compilation flags (CONFIG_BPF and CONFIG_BPF_SYSCALL, plus CONFIG_KPROBES for probe-based collectors) and BTF availability to select the eBPF loading mode and object flavor. The attach symbols differ by kernel version and architecture, so the collector resolves them from `/proc/kallsyms` before attaching. Open uses `do_sys_openat2`, then `do_sys_open`: both are inner functions that `open`, `openat` and `openat2` all funnel through. Close uses the architecture's close(2) syscall symbol (`__x64_sys_close`, `__arm64_sys_close`, ..., or the unprefixed `sys_close` on architectures without syscall wrappers), falling back to the inner helpers `close_fd` and `__close_fd` on kernels that predate the wrappers. The inner helper is not used on newer kernels because the close(2) syscall no longer calls it, which made the close counters read zero.
 
 
 #### Performance Impact
@@ -57,7 +57,7 @@ This thread will add overhead every time that an internal kernel function monito
 
 #### Compile kernel
 
-Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different according to the preferences of Linux distributions.
+Check that your kernel was compiled with CONFIG_BPF and CONFIG_BPF_SYSCALL, and CONFIG_KPROBES for probe-based collectors. Look in `/proc/config.gz` or a `/boot/config-*` file; CONFIG_BPF_JIT is optional.
 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well defined pattern, but distributions can deliver their configuration files
 with different names.
 
@@ -150,3 +150,4 @@ Metrics:
 |:------|:------------|:----------|:----|
 | filesystem.file_descriptor | Open and close calls. Published as cumulative kernel counters with the `incremental` algorithm, preserving the legacy filedescriptor metric contract. | open, close | calls/s |
 | filesystem.file_error | Open and close calls that returned an error. Published only in the non-entry load modes, `ebpf load mode = return` and its legacy alias `dev`. | open, close | calls/s |
+| ebpf.filedescriptor_arena_drops | Per-PID events dropped by the FD arena queue. Published only when the arena object is active. | dropped | events/s |

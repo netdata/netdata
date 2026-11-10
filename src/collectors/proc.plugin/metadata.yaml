@@ -470,7 +470,7 @@ modules:
               dimensions:
                 - name: in
                 - name: out
-            - name: system.pgfaults
+            - name: mem.pgfaults
               description: Memory Page Faults
               unit: "faults/s"
               chart_type: line
@@ -1305,12 +1305,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: HardwareCorrupted
-            - name: mem.commited
+            - name: mem.committed
               description: Committed (Allocated) Memory
               unit: "MiB"
               chart_type: area
               dimensions:
-                - name: Commited_AS
+                - name: Committed_AS
             - name: mem.writeback
               description: Writeback Memory
               unit: "MiB"

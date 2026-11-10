@@ -1182,8 +1182,7 @@ func TestCollector_Collect(t *testing.T) {
 				return collr
 			},
 			want: map[string]int64{
-				// table key: "snmp_device_prof_<name>_<sorted tag values>_<subkey>"
-				// here tags = {"ifName":"eth0"} → key part becomes "_eth0"
+				// Fixed IDs independently pin the canonical table and dimension tuples.
 				"snmp_device_prof_test_stats_errors_processing_scalar":      0,
 				"snmp_device_prof_test_stats_errors_processing_preparation": 0,
 				"snmp_device_prof_test_stats_errors_processing_table":       0,
@@ -1211,8 +1210,8 @@ func TestCollector_Collect(t *testing.T) {
 				"snmp_device_prof_test_stats_timings_licensing":             0,
 				"snmp_device_prof_test_stats_timings_bgp":                   0,
 				"snmp_device_prof_test_stats_timings_virtual":               0,
-				"snmp_device_prof_if_octets_eth0_in":                        1,
-				"snmp_device_prof_if_octets_eth0_out":                       2,
+				"snmp_device_prof_if_octets_0f10e7444a2acaa58b50cb6ec47f747e7c7b794bdae66ead73ec5709e8330f3e_dim_a30c203d721fe59afc8c2f5153f5935cd9c1813e2d3856658d5d23cd2b867779": 1,
+				"snmp_device_prof_if_octets_0f10e7444a2acaa58b50cb6ec47f747e7c7b794bdae66ead73ec5709e8330f3e_dim_9af28730174f8ee3c27e63536b966844bbc12bec92626294f2ee91e6fe8b9d60": 2,
 			},
 		},
 	}

@@ -15,6 +15,7 @@ type Job struct {
 	JobID          string         `json:"job_id"`
 	Kind           synthetic.Kind `json:"kind"`
 	Name           string         `json:"name"`
+	VnodeGUID      string         `json:"vnode_guid,omitempty"`
 	Target         string         `json:"target,omitempty"`
 	CadenceSeconds int            `json:"cadence_seconds"`
 	TimeoutSeconds float64        `json:"timeout_seconds"`
@@ -59,6 +60,20 @@ func (h *Registry) Register(job Job) (*Registration, error) {
 	}
 	h.jobs[job.JobID] = r
 	return r, nil
+}
+
+// SetVnodeGUID updates current placement without reattributing a completed run.
+func (r *Registration) SetVnodeGUID(guid string) {
+	r.registry.mu.Lock()
+	defer r.registry.mu.Unlock()
+	if r.retired || r.job.VnodeGUID == guid {
+		return
+	}
+	r.job.VnodeGUID = guid
+	r.job.Latest = nil
+	r.job.State = "unknown"
+	r.job.LastSuccessUS = 0
+	r.job.LastFailureUS = 0
 }
 func (r *Registration) SetState(state string) {
 	r.registry.mu.Lock()

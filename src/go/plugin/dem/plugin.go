@@ -33,6 +33,7 @@ import (
 type Executor interface {
 	Check(context.Context, synthetic.Kind) error
 	Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution
+	Rehearse(context.Context, synthetic.Request) error
 }
 
 type Dependencies struct {
@@ -112,14 +113,18 @@ func New(deps Dependencies, cfg Config) Components {
 		Collectors: collectors,
 		Functions: []funcapi.ProcessFunctionProvider{
 			{
-				ID:         "rum",
-				Functions:  rumfunctions.Declarations,
-				NewHandler: func() funcapi.MethodHandler { return rumfunctions.New(rumQueries) },
+				ID:        "rum",
+				Functions: rumfunctions.Declarations,
+				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					return rumfunctions.New(rumQueries, ctx.LookupVnodeGUID)
+				},
 			},
 			{
-				ID:         "synthetics",
-				Functions:  syntheticfunctions.Declarations,
-				NewHandler: func() funcapi.MethodHandler { return syntheticfunctions.New(syntheticQueries) },
+				ID:        "synthetics",
+				Functions: syntheticfunctions.Declarations,
+				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					return syntheticfunctions.New(syntheticQueries, ctx.LookupVnodeGUID)
+				},
 			},
 			{
 				ID:         "dem-history",
