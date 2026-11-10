@@ -177,15 +177,14 @@ airdrop-sharing: sharingd
 > `apps.plugin` attempts to obtain the full process name by searching for it in the **cmdline**.
 > If successful, the entire process name is used; otherwise, the shortened version is used.
 
-On Linux, FreeBSD and macOS, when the configuration needs command lines, they are read when a
-process is first observed, when its operating-system process name changes, and every 30 collection
-iterations. Periodic reads are staggered across processes and also retry failed reads. Changes that
+On Linux, FreeBSD and macOS, command lines are read when a process is first observed, when its
+operating-system process name changes, and every 30 collection iterations. Periodic reads are staggered across processes and also retry failed reads. Changes that
 leave the process name unchanged can take up to 30 iterations to appear (30 seconds at the default
 one-second collection interval). Changed command lines refresh process matching and any groups
 inherited by descendants. A failed read keeps the command line already known for the process, unless
 its process name has just changed. Matching falls back to the process name when no command line is
 known, when a read after a process name change fails, or when a read returns an empty command line
-(for example, a zombie process). Windows reads the command line once, when it first sees the process.
+(for example, a zombie process on Linux). Windows reads the command line once, when it first sees the process.
 
 #### Windows process fields
 

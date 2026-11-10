@@ -127,7 +127,7 @@ static bool test_failed_read_after_name_change(void) {
     global_iterations_counter = 2;
     update_pid_comm(&p, "worker");
     CHECK(cmdline_reads == 2);
-    CHECK(!p.cmdline && !p.target && p.identity_changed);
+    CHECK(!p.cmdline && !p.target && p.identity_changed && !p.matched_by_config);
     CHECK(strcmp(string2str(p.comm), "worker") == 0);
     clear_identity(&p);
     return true;
@@ -144,8 +144,10 @@ static bool test_empty_read_clears_cmdline(void) {
 
     // A successful empty read (zombie) clears the cmdline even though the process name did not change.
     os_cmdline = "";
+    cmdline_reads = 0;
     global_iterations_counter = 32;
     update_pid_comm(&p, "clickhouse-serv");
+    CHECK(cmdline_reads == 1);
     CHECK(!p.cmdline && !p.target && p.identity_changed);
     CHECK(strcmp(string2str(p.comm), "clickhouse-serv") == 0);
     clear_identity(&p);
@@ -268,8 +270,10 @@ static bool test_inherited_assignments(void) {
 
     // A failed scheduled refresh of the parent keeps the group its descendants inherited.
     os_cmdline = NULL;
+    cmdline_reads = 0;
     global_iterations_counter = 40;
     update_pid_comm(&parent, "worker");
+    CHECK(cmdline_reads == 1);
     assign_a_target_to_all_processes();
     CHECK(strcmp(string2str(parent.cmdline), "/bin/worker --new") == 0);
     CHECK(parent.target == new && child.target == new && grandchild.target == new);
