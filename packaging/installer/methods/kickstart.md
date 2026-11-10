@@ -78,7 +78,7 @@ Use these flags to customize your installation.
 |                         | `--old-install-prefix` | Clean previous install directory    |
 | **Interactivity**       | `--non-interactive`    | No prompts (good for scripts)       |
 |                         | `--interactive`        | Force interactive prompts           |
-| **Release Channel**     | `--release-channel`    | `nightly` or `stable`               |
+| **Release Channel**     | `--release-channel`    | `nightly`, `stable`, or `preview`               |
 |                         | `--install-version`    | Install specific version            |
 | **Auto-Updates**        | `--auto-update`        | Enable updates                      |
 |                         | `--no-updates`         | Disable updates                     |
@@ -93,6 +93,12 @@ Use these flags to customize your installation.
 **Managing auto-updates after installation:** `kickstart.sh` enables daily auto-updates by default. To disable, check, or re-enable auto-updates — including why `netdata-updater.conf` cannot disable them — see [Managing Automatic Updates](/packaging/installer/UPDATE.md#managing-automatic-updates) in the Update guide.
 
 :::
+
+To use preview releases, pass `--release-channel=preview`. This channel includes prereleases and final releases.
+Without a version pin, preview installs the latest version published to that channel.
+Native installations use the `netdata-preview` repository. Static and source builds use only preview artifacts from
+`artifacts.netdata.cloud`, with no GitHub fallback.
+You can pin a prerelease with `--install-version`, for example `--install-version 2.13.0-rc1`.
 
 ## Optional browser runtime for synthetic monitoring
 
