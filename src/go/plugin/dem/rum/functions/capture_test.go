@@ -19,7 +19,7 @@ type captureFunctionSource struct {
 	count int
 }
 
-func (s captureFunctionSource) Pages(context.Context, string) ([]query.Page, error) {
+func (s captureFunctionSource) Pages(context.Context, string, string) ([]query.Page, error) {
 	return []query.Page{{Site: "shop", Page: "/", FrustrationsKnown: s.known, FrustrationWindow: s.count}}, nil
 }
 

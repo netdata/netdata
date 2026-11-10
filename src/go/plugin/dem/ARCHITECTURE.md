@@ -137,6 +137,62 @@ The four collector modules (the journeys below show them in action):
 | `journey` | One job per journey script (`script` or `script_path`) | Every 900 s, 120 s timeout | Prepared request, registration, metric store |
 | `lighthouse` | One job per audited URL | Every 1800 s, 180 s timeout | Prepared request, registration, metric store |
 
+### Site vnode identity
+
+A DEM site is a configured vnode. RUM, journey and Lighthouse use the standard optional `vnode` reference and
+framework-owned resolved snapshot. The reference is a lookup name, not a public GUID option. Normal framework routing
+places charts on the vnode; charts MUST NOT duplicate that identity in a GUID label. With no reference, metrics stay
+on the collecting Agent and observations are unassigned to a site. A synthetic-only site requires no RUM job.
+
+Keep these identities distinct:
+
+| Identity | Purpose |
+|---|---|
+| Collecting Agent | Function registration, access policy, receiver, executor and retention owner |
+| Native module and job name | Configuration, lifecycle and chart-instance owner |
+| RUM `site` / job name | Beacon route and physical RUM history namespace |
+| Synthetic `kind:name`, run ID | Monitor identity and individual execution/artifact ownership |
+| `vnode` reference | Configured vnode lookup name, independent of physical job identity |
+| Recorded `vnode_guid` | Canonical resolved node identity captured for observations and attempts |
+
+The framework delivers configured vnode snapshots before initialization and on revision changes before collection.
+Long-lived RUM ingestion and synthetic attempt work MUST reconcile those updates with their admission boundaries.
+History queries MUST use captured GUIDs, not current configuration. Session/error reductions retain physical identity
+and recorded GUID so reassignment cannot merge evidence. Saved and buffered investigation records retain their old GUID.
+A changed RUM GUID starts a fresh rolling measurement window and Pages view; metadata-only hostname/label edits do not.
+Transport and history counters remain job-wide. Old evidence lacking a captured GUID remains unassigned, including
+records with legacy `site_id` text: no current-config backfill or speculative migration is performed.
+
+DEM Functions remain process-owned on the collecting Agent with existing public names and Agent-level permissions.
+The explicit `vnode_guid` filter selects data; it MUST NOT become an authorization boundary. Omitting it preserves
+all-vnode and unassigned reads. Apply GUID filters before row limits and cursor advancement, retaining physical
+job, session, run and capture ownership checks on every evidence read. No Function registration or host-context protocol extension per vnode is
+part of this contract. Retained history remains available with all collector jobs disabled or a vnode archived.
+
+Frontend consumers retain collecting-Agent identity, vnode GUID, module and job name. Desired native configuration
+includes disabled and failed-startup jobs that active registries omit. Guided site setup creates/selects a configured
+vnode through `dem:vnode` or file configuration, then submits independent native job operations with visible outcomes.
+There is no parent configuration, generated child ownership, atomic site save or shared deletion lifecycle. Equal vnode
+references on different Agents do not create deployment or failover authority. File definitions use the standard
+Netdata configuration directory's `vnodes/` YAML format; DEM supports static configured vnodes.
+
+### Capacity remains process-owned
+
+Journey and Lighthouse already share the process Executor. Independent configuration owners allow a future shared
+admission coordinator, bounded concurrency and optional vnode-based fairness without adding parent jobs. Vnode placement
+MUST NOT allocate a separate executor or browser pool. Job retirement must still cancel and drain only its own work.
+
+Vnode placement does not improve execution capacity by itself. Current synchronous collection can miss framework ticks
+while a prior run is busy; queueing those calls alone cannot reconstruct missed occurrences. A future central scheduler
+can register independent jobs through their `Run` lifecycle, own due times, and leave metric publication in `Collect`.
+Registration must be cancelled and joined before native predecessor release.
+
+Warm browser reuse additionally needs explicit worker lifetime, runtime leases, per-attempt cancellation and browser
+state cleanup. A live shared worker cannot be considered reaped after each attempt. Preserve verified completion at the
+appropriate boundary and qualify Playwright and Lighthouse separately. The current fail-stop on unverified process
+drainage also stops RUM; independent jobs do not provide process isolation. These are separate execution changes that
+need measurement and validation, not promises made by vnode placement.
+
 ## Journey 1: a browser report
 
 A website installs one script tag. From then on, every sampled visitor's browser sends reports to the receiver, and each

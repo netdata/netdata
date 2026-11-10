@@ -266,7 +266,7 @@ func TestCapacityDroppedVitalKeepsDocumentOriginInLiveAndHistory(t *testing.T) {
 	result := a.Ingest(b)
 	require.Len(t, result.Observation.Vitals, 1)
 	assert.Equal(t, "/entry", result.Observation.Vitals[0].Origin.PageGroup)
-	rows, _ := a.Live(0, 100)
+	rows, _ := a.Live(0, 100, "")
 	require.Len(t, rows, 2)
 	assert.Equal(t, uint64(2), rows[1].Revision)
 	assert.Equal(t, "/entry", rows[1].Page)

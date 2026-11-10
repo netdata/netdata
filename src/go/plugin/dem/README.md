@@ -8,8 +8,75 @@ is built, from the overall data flow to package ownership and runtime lifetimes.
 
 The stock configuration starts one loopback receiver and no sites. Configuration follows the normal Go Agent layout:
 `dem.conf` for plugin policy and `dem/receiver.conf` / `dem/rum.conf` for collectors. The receiver is a canonical single
-object (`dem:collector:receiver`); each site is an independent job (`dem:collector:rum:<name>`). Native `name` is the
-stable beacon/history key; `display_name` is presentation metadata. Renaming a site starts a new history namespace.
+object (`dem:collector:receiver`); each RUM monitor is an independent job (`dem:collector:rum:<name>`). Native `name` is the
+stable beacon/history key; `display_name` is presentation metadata. Renaming a RUM job starts a new history namespace.
+
+## Organize monitors on a site vnode
+
+A DEM site is a configured Virtual Node (vnode). Set the optional `vnode` reference on independent RUM, journey and
+Lighthouse jobs to place their charts on that node. Omit it to keep charts on the collecting Agent and leave the job
+unassigned to a site. A site with only synthetic monitors needs no RUM job or receiver.
+
+Create a static vnode through the plugin's `dem:vnode` dynamic configuration entry, or define one in a YAML file under
+`vnodes/` in the Netdata configuration directory. For example, `/etc/netdata/vnodes/sites.yaml`:
+
+```yaml
+- hostname: storefront
+  guid: 12345678-1234-4234-8234-123456789abc
+  labels:
+    environment: production
+```
+
+Generate a unique GUID for each site, for example with `uuidgen`. For file-defined static vnodes, `hostname` is also
+the reference name used by jobs. A dynamically configured vnode uses its configuration entry's name as the reference.
+Use the reference name in `vnode`, not the GUID. See [node identities](../../../../docs/learn/node-identities.md#virtual-nodes-vnodes)
+for the standard configuration and identity rules.
+
+These entries place two independent jobs on Storefront:
+
+```yaml
+# dem/rum.conf
+jobs:
+  - name: storefront-rum
+    vnode: storefront
+    display_name: Storefront
+    allowed_origins: [https://shop.example.org]
+```
+
+```yaml
+# dem/journey.conf
+jobs:
+  - name: storefront-checkout
+    vnode: storefront
+    script_path: /etc/netdata/dem/checkout.spec.ts
+    update_every: 300
+    timeout: 120
+```
+
+The RUM installation key remains `storefront-rum`, so its script URL ends in `/rum/storefront-rum.js`. Each job keeps
+its own configuration, DynCfg entry, schedule, secrets and enable/disable controls. Names must be distinct within each
+collector module. Guided site setup creates or selects a vnode and submits ordinary independent job operations;
+partial success must show which operations need attention. A vnode does not own child jobs, browser workers or shared
+retention budgets, and referencing it does not deploy jobs to other Agents.
+
+DEM Functions remain global on the collecting Agent. Invoke their existing names through that Agent or Cloud and
+select a site's recorded canonical GUID with `vnode_guid`, for example
+`synthetics-runs vnode_guid:12345678-1234-4234-8234-123456789abc`. Omitting the filter includes all vnodes and unassigned
+data. The selector filters data under the existing Agent-level access model; it is not a per-site authorization boundary.
+Functions are not registered on each vnode. Frontend consumers retain the collecting Agent relationship when selecting
+a site, including for archived vnodes and retained history.
+
+Functions and retained evidence expose `vnode_guid`; charts use normal vnode placement without an extra GUID label.
+Existing RUM `site` fields identify the physical RUM job. Observations capture the resolved GUID when admitted, and
+synthetic attempts capture it at their start. Saved and buffered investigation records, runs and captures retain that
+GUID after reassignment. A changed RUM GUID starts a fresh rolling measurement window and Pages view; hostname or label
+edits with the same GUID do not reset measurements. Transport and history counters remain job-wide. Old evidence without
+a captured GUID stays unassigned; legacy `site_id` text is not mapped to a vnode or rewritten.
+
+Vnode placement does not combine RUM populations, change artifact ownership or increase browser capacity. Execution,
+receiver service and retention remain shared by the collecting Agent.
+
+## Receive browser reports
 
 Expose the receiver through HTTPS, configure its public URL and actual trusted proxy addresses, then install
 `<script async src="https://rum.example.org/rum/shop.js"></script>` on the configured website. Public URLs may include a

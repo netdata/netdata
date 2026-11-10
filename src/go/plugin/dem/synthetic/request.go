@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 )
 
 var secretName = regexp.MustCompile(`^DEM_SECRET_[A-Za-z0-9_]+$`)
@@ -25,6 +27,7 @@ const (
 type Request struct {
 	Kind       Kind
 	Name       string
+	VnodeGUID  string
 	Script     string
 	ScriptPath string
 	URL        string
@@ -37,6 +40,9 @@ func (r Request) JobID() string { return string(r.Kind) + ":" + r.Name }
 
 // ValidateRequest checks the execution contract without acquiring resources or reading files.
 func ValidateRequest(r Request) error {
+	if err := vnodeguid.Validate(r.VnodeGUID); err != nil {
+		return err
+	}
 	if r.Timeout < time.Millisecond {
 		return errors.New("synthetic timeout must be at least one millisecond")
 	}

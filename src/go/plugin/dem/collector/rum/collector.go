@@ -16,6 +16,7 @@ import (
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 //go:embed charts.yaml
@@ -25,6 +26,7 @@ var charts string
 var schema string
 
 type Config struct {
+	Vnode       string           `yaml:"vnode,omitempty" json:"vnode,omitempty"`
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	Window      confopt.Duration `yaml:"window"                 json:"window"`
 	config.Site `yaml:",inline" json:""`
@@ -41,6 +43,7 @@ type Collector struct {
 	aggregator *aggregate.Aggregator
 	redactor   *redact.Redactor
 	metrics    collectorMetrics
+	vnodeGUID  string
 }
 
 func Creator(deps Dependencies) collectorapi.Creator {
@@ -84,3 +87,11 @@ func (c *Collector) Check(context.Context) error {
 }
 
 func (c *Collector) Cleanup(context.Context) {}
+
+// SetConfiguredVnode adopts framework-resolved identity without changing the authored reference.
+func (c *Collector) SetConfiguredVnode(v vnodes.VirtualNode) {
+	c.vnodeGUID, _ = vnodes.ConfiguredGUIDKey(v.GUID)
+	if c.aggregator != nil {
+		c.aggregator.SetVnodeGUID(c.vnodeGUID)
+	}
+}

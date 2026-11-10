@@ -266,6 +266,7 @@ func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
 		t,
 		map[string]any{
 			"job_id":          "journey:checkout",
+			"vnode_guid":      "",
 			"kind":            model.Journey,
 			"name":            "checkout",
 			"target":          "",
@@ -473,7 +474,7 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	require.NoError(t, err)
 	defer store.Close()
 	runID := fixtureRunID()
-	dir, err := store.Begin(runID, "lighthouse:home")
+	dir, err := store.Begin(runID, "lighthouse:home", "")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "output"), 0700))
 	html := []byte("<html><script>privateReport()</script></html>")

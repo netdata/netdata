@@ -51,7 +51,7 @@ func store(t *testing.T) (*artifacts.Store, string) {
 }
 func captured(t *testing.T, s *artifacts.Store, id string, content []byte) (string, synthetic.Capture) {
 	t.Helper()
-	work, err := s.Begin(id, "lighthouse:test")
+	work, err := s.Begin(id, "lighthouse:test", "")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	require.NoError(t, os.WriteFile(filepath.Join(work, "output", "report.html"), content, 0600))
@@ -92,7 +92,7 @@ func TestPublishFetchAndRestart(t *testing.T) {
 	_, got, err = reopened.Fetch(ctx, "lighthouse:test", run1, c.ID)
 	require.NoError(t, err)
 	assert.Equal(t, payload, got)
-	_, err = reopened.Begin(run1, "lighthouse:test")
+	_, err = reopened.Begin(run1, "lighthouse:test", "")
 	assert.ErrorIs(t, err, artifacts.ErrExists)
 }
 func TestStrictCapturePathsAndKinds(t *testing.T) {
@@ -148,7 +148,7 @@ func TestStrictCapturePathsAndKinds(t *testing.T) {
 }
 func TestPNGCapture(t *testing.T) {
 	s, _ := store(t)
-	work, err := s.Begin(run1, "lighthouse:test")
+	work, err := s.Begin(run1, "lighthouse:test", "")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	require.NoError(t, os.WriteFile(filepath.Join(work, "output", "capture.png"), png, 0600))
@@ -198,7 +198,7 @@ func TestRetentionAndProtectedWork(t *testing.T) {
 	_, c := captured(t, s, run1, []byte("retained report"))
 	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
 	require.NoError(t, err)
-	work, err := s.Begin(run2, "lighthouse:test")
+	work, err := s.Begin(run2, "lighthouse:test", "")
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(work, "profile"), []byte("unverified browser state"), 0600))
 	stats, err := s.Enforce(context.Background(), 7, 2<<30)
@@ -275,12 +275,12 @@ func TestOwnershipIDsAndClose(t *testing.T) {
 	assert.Nil(t, other)
 	assert.ErrorIs(t, err, artifacts.ErrLocked)
 	for _, id := range []string{"../escape", "ABCDEF", "short", "0000000000000000000000000000000g"} {
-		_, err = s.Begin(id, "lighthouse:test")
+		_, err = s.Begin(id, "lighthouse:test", "")
 		assert.ErrorIs(t, err, artifacts.ErrInvalidID)
 	}
-	_, err = s.Begin(run1, "lighthouse:test")
+	_, err = s.Begin(run1, "lighthouse:test", "")
 	require.NoError(t, err)
-	_, err = s.Begin(run1, "lighthouse:test")
+	_, err = s.Begin(run1, "lighthouse:test", "")
 	assert.ErrorIs(t, err, artifacts.ErrExists)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -292,13 +292,13 @@ func TestOwnershipIDsAndClose(t *testing.T) {
 	assert.ErrorIs(t, err, artifacts.ErrNotFound)
 	require.NoError(t, s.Close())
 	require.NoError(t, s.Close())
-	_, err = s.Begin(run2, "lighthouse:test")
+	_, err = s.Begin(run2, "lighthouse:test", "")
 	assert.ErrorIs(t, err, artifacts.ErrClosed)
 }
 func TestTemporaryClosePreservesUnverifiedWork(t *testing.T) {
 	s, err := artifacts.Open("")
 	require.NoError(t, err)
-	work, err := s.Begin(run1, "lighthouse:test")
+	work, err := s.Begin(run1, "lighthouse:test", "")
 	require.NoError(t, err)
 	actual, err := os.Readlink(work)
 	require.NoError(t, err)
@@ -310,7 +310,7 @@ func TestTemporaryClosePreservesUnverifiedWork(t *testing.T) {
 	require.NoError(t, os.RemoveAll(filepath.Dir(filepath.Dir(actual))))
 	s, err = artifacts.Open("")
 	require.NoError(t, err)
-	work, err = s.Begin(run1, "lighthouse:test")
+	work, err = s.Begin(run1, "lighthouse:test", "")
 	require.NoError(t, err)
 	actual, err = os.Readlink(work)
 	require.NoError(t, err)
@@ -384,7 +384,7 @@ func TestExistingAliasIsNeverAdoptedOrRemoved(t *testing.T) {
 	unrelated := t.TempDir()
 	require.NoError(t, os.Symlink(unrelated, alias))
 	defer os.Remove(alias)
-	_, err := s.Begin(run1, "lighthouse:test")
+	_, err := s.Begin(run1, "lighthouse:test", "")
 	require.Error(t, err)
 	_, err = s.Enforce(context.Background(), 7, 1)
 	require.NoError(t, err)
@@ -533,7 +533,7 @@ func (c *cancelAfterAdmissionContext) Err() error {
 func TestCancelledEmptyFinalizeCleansDrainedWorkWithoutPublishing(t *testing.T) {
 	s, root := store(t)
 	id := fixtureRunID()
-	alias, err := s.Begin(id, "lighthouse:test")
+	alias, err := s.Begin(id, "lighthouse:test", "")
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

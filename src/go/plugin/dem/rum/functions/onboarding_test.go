@@ -17,7 +17,7 @@ type onboardingSource struct {
 	site query.Site
 }
 
-func (s onboardingSource) Sites(context.Context) ([]query.Site, error) {
+func (s onboardingSource) Sites(context.Context, string) ([]query.Site, error) {
 	return []query.Site{s.site}, nil
 }
 func TestSiteFunctionPublishesIndependentFacts(t *testing.T) {

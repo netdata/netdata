@@ -18,6 +18,7 @@ const liveRingCap = 5000
 // from a genuine zero, matching the FUNCTION's "null when absent" column
 // contract.
 type LiveRow struct {
+	VnodeGUID                                         string
 	ExperienceID, View, ViewID, MetricID, Kind, Vital string
 	Revision                                          uint64
 	Seq                                               uint64
@@ -43,6 +44,7 @@ type LiveRow struct {
 // appendLive gives each measurement its own unambiguous update identity.
 func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) {
 	base := LiveRow{
+		VnodeGUID:    b.VnodeGUID,
 		TS:           now,
 		Site:         b.Site,
 		Country:      b.Country,
@@ -144,7 +146,7 @@ func (a *Aggregator) evictLive(now time.Time) {
 // Live returns ring rows with Seq > after, oldest first, capped at maxRows. next is the max seq among returned rows,
 // or after unchanged when nothing matched. A cursor ahead of this runtime
 // sequence is treated as 0; the Function routing owner fences generations.
-func (a *Aggregator) Live(after uint64, maxRows int) ([]LiveRow, uint64) {
+func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) ([]LiveRow, uint64) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now()
@@ -159,7 +161,7 @@ func (a *Aggregator) Live(after uint64, maxRows int) ([]LiveRow, uint64) {
 	next := after
 	out := make([]LiveRow, 0, maxRows)
 	for _, row := range a.live[a.liveStart:] {
-		if row.Seq <= after || row.TS.Before(cutoff) {
+		if row.Seq <= after || row.TS.Before(cutoff) || (vnodeGUID != "" && row.VnodeGUID != vnodeGUID) {
 			continue
 		}
 		out = append(out, row)

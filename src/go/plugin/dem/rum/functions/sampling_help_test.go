@@ -18,7 +18,9 @@ type samplingFunctionSource struct {
 	sites []query.Site
 }
 
-func (s samplingFunctionSource) Sites(context.Context) ([]query.Site, error) { return s.sites, nil }
+func (s samplingFunctionSource) Sites(context.Context, string) ([]query.Site, error) {
+	return s.sites, nil
+}
 
 func TestHistoryHelpExplainsBiasOnlyForSelectedProblemSampling(t *testing.T) {
 	handler := rumfunctions.New(samplingFunctionSource{

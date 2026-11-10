@@ -20,11 +20,12 @@ func (c *Collector) Init(ctx context.Context) error {
 		return errors.New("update_every must be positive")
 	}
 	request := model.Request{
-		Kind:    model.Lighthouse,
-		Name:    c.Name,
-		URL:     c.URL,
-		Timeout: time.Duration(c.Timeout),
-		Capture: c.SaveReport,
+		Kind:      model.Lighthouse,
+		VnodeGUID: c.vnodeGUID,
+		Name:      c.Name,
+		URL:       c.URL,
+		Timeout:   time.Duration(c.Timeout),
+		Capture:   c.SaveReport,
 	}
 	if err := model.ValidateRequest(request); err != nil {
 		return err

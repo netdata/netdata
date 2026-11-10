@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
+
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
@@ -14,15 +16,16 @@ import (
 var artifactsMethod = method{
 	id:     "synthetics-artifacts",
 	title:  "Retained synthetic captures",
-	help:   "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–2000. Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance.",
+	help:   "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–2000. Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode_guid selects the captured vnode GUID; empty means all sites, and blank Vnode GUID cells are unassigned.",
 	sort:   "published_us",
-	params: []string{"job_id", "before", "limit"},
+	params: []string{"job_id", "before", "limit", "vnode_guid"},
 	columns: columns(
 		column{"run_id", "Run", funcapi.FieldTypeString, ""},
 		column{"job_id", "Monitor", funcapi.FieldTypeString, ""},
 		column{"published_us", "Published", funcapi.FieldTypeTimestamp, ""},
 		column{"bytes", "Set size", funcapi.FieldTypeInteger, "bytes"},
 		column{"artifact_count", "Artifacts", funcapi.FieldTypeInteger, ""},
+		column{"vnode_guid", "Vnode GUID", funcapi.FieldTypeString, ""},
 	),
 }
 
@@ -31,6 +34,9 @@ func (h *Handler) artifacts(
 	args map[string]string,
 	response map[string]any,
 ) *funcapi.FunctionResponse {
+	if err := vnodeguid.Validate(args["vnode_guid"]); err != nil {
+		return funcapi.ErrorResponse(400, "%v", err)
+	}
 	limit, err := rowLimit(args["limit"])
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
@@ -40,16 +46,17 @@ func (h *Handler) artifacts(
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
 	page, err := h.deps.Catalogue(ctx, artifacts.Filter{
-		JobID:  args["job_id"],
-		Before: cursor,
-		Limit:  limit,
+		JobID:     args["job_id"],
+		VnodeGUID: args["vnode_guid"],
+		Before:    cursor,
+		Limit:     limit,
 	})
 	if err != nil {
 		return functionError(err)
 	}
 	rows := make([][]any, 0, len(page.Sets))
 	for _, set := range page.Sets {
-		rows = append(rows, []any{set.RunID, set.JobID, set.PublishedUS, set.Bytes, set.Artifacts})
+		rows = append(rows, []any{set.RunID, set.JobID, set.PublishedUS, set.Bytes, set.Artifacts, set.VnodeGUID})
 	}
 	response["data"] = rows
 	response["limit"] = limit

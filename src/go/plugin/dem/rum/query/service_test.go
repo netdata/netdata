@@ -86,7 +86,7 @@ func TestLivePreservesQuietSitesAndPaginatesWithoutSkipping(t *testing.T) {
 	var paths []string
 	var cursor string
 	for range 4 {
-		rows, next, err := s.Live(context.Background(), "", cursor, 2)
+		rows, next, err := s.Live(context.Background(), "", cursor, 2, "")
 		require.NoError(t, err)
 		cursor = next
 		for _, r := range rows {
@@ -95,11 +95,11 @@ func TestLivePreservesQuietSitesAndPaginatesWithoutSkipping(t *testing.T) {
 	}
 	assert.Equal(t, []string{"/hot/0", "/hot/1", "/hot/2", "/hot/3", "/hot/4", "/hot/5", "/quiet/first"}, paths)
 	page(quiet, "quiet", "/quiet/second")
-	rows, next, err := s.Live(context.Background(), "", cursor, 2)
+	rows, next, err := s.Live(context.Background(), "", cursor, 2, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "/quiet/second", rows[0].Page)
-	rows, _, err = s.Live(context.Background(), "", next, 2)
+	rows, _, err = s.Live(context.Background(), "", next, 2, "")
 	require.NoError(t, err)
 	assert.Empty(t, rows)
 }
@@ -110,13 +110,13 @@ func TestLiveReplacementAndFilterDoNotReuseAnotherStreamPosition(t *testing.T) {
 	b, _ := addSite(t, hub, "b", "other")
 	page(a, "a", "/old")
 	page(b, "b", "/other")
-	rows, cursor, err := s.Live(context.Background(), "a", "", 10)
+	rows, cursor, err := s.Live(context.Background(), "a", "", 10, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	retire()
 	replacement, _ := addSite(t, hub, "a", "new")
 	page(replacement, "a", "/new")
-	rows, _, err = s.Live(context.Background(), "", cursor, 10)
+	rows, _, err = s.Live(context.Background(), "", cursor, 10, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	assert.Equal(t, "/other", rows[0].Page)
@@ -128,13 +128,13 @@ func TestSourceRedactsCopiesAndRejectsCancelledReads(t *testing.T) {
 	s := query.New(hub, nil)
 	a, _ := addSite(t, hub, "site", "generation")
 	page(a, "site", "/opaque-secret")
-	rows, _, err := s.Live(context.Background(), "", "", 10)
+	rows, _, err := s.Live(context.Background(), "", "", 10, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "/[REDACTED]", rows[0].Page)
-	original, _ := a.Live(0, 10)
+	original, _ := a.Live(0, 10, "")
 	assert.Equal(t, "/opaque-secret", original[0].Page)
-	sites, err := s.Sites(context.Background())
+	sites, err := s.Sites(context.Background(), "")
 	require.NoError(t, err)
 	require.Len(t, sites, 1)
 	assert.Equal(t, "site [REDACTED]", sites[0].Label)
@@ -143,9 +143,9 @@ func TestSourceRedactsCopiesAndRejectsCancelledReads(t *testing.T) {
 	}, sites[0].Capture)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = s.Pages(ctx, "")
+	_, err = s.Pages(ctx, "", "")
 	assert.ErrorIs(t, err, context.Canceled)
-	_, _, err = s.Live(context.Background(), "", "not-a-cursor", 10)
+	_, _, err = s.Live(context.Background(), "", "not-a-cursor", 10, "")
 	assert.Error(t, err)
 }
 func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
@@ -209,7 +209,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	merged := request()
 	require.Len(t, merged, 4)
 	assert.Equal(t, pending, merged[:3])
-	assert.Equal(t, []any{"event", "/second", "purchase", "", "", "", "", "", "", uint64(0)}, merged[3][1:])
+	assert.Equal(t, []any{"event", "/second", "purchase", "", "", "", "", "", "", uint64(0), ""}, merged[3][1:])
 	flush(second)
 	assert.Equal(t, merged, request())
 	retire()

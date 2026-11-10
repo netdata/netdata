@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -361,4 +362,36 @@ func TestMeasurementPublicationDistinguishesMissingAndLiteralUnknownHost(t *test
 	}
 	require.Len(t, ids, 2)
 	require.NotEqual(t, ids["unknown"], ids["value"])
+}
+
+func TestConfiguredVnodeDoesNotBecomeChartLabelOrIdentity(t *testing.T) {
+	ctx := context.Background()
+	db, err := demjournal.Open(ctx, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	hub := registry.New()
+	t.Cleanup(hub.PublishReceiver(registry.Availability{Serving: true}).Close)
+	var baseline []string
+	for _, group := range []string{"", "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"} {
+		c := New(Dependencies{Registry: hub, History: history.NewStore(db)})
+		c.Name, c.DisplayName = "job", "Readable job"
+		c.SetConfiguredVnode(vnodes.VirtualNode{GUID: group})
+		c.AllowedOrigins = []string{"https://example.org"}
+		require.NoError(t, c.Init(ctx))
+		c.aggregator.Ingest(&beacon.Beacon{Site: "job", SessionID: "session", ExperienceID: "document", PageGroup: "/entry", Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}}, Vitals: []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}}})
+		collectMeasurements(t, c)
+		charts := measurementCharts(t, c)
+		require.NotEmpty(t, charts)
+		var identities []string
+		for _, chart := range charts {
+			identities = append(identities, chart.ChartID)
+			require.NotContains(t, chart.Labels, "vnode_guid")
+			require.Equal(t, "Readable job", chart.Labels["display_name"])
+		}
+		if baseline == nil {
+			baseline = identities
+		} else {
+			require.ElementsMatch(t, baseline, identities, "site association is metadata, never chart identity")
+		}
+	}
 }
