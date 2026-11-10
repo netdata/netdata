@@ -17,6 +17,10 @@ if [ -f /opt/netdata/usr/bin/bashbug ]; then
     rm -rf /opt/netdata/usr/bin/bashbug
 fi
 
+# Drop the MSYS DLLs a previous run staged, so a DLL the current base and pins no longer provide is neither shipped
+# nor counted by check_msys_dll_imports. cmake --install and the base copy below put back the current ones.
+rm -f /opt/netdata/usr/bin/msys-*.dll
+
 ${GITHUB_ACTIONS+echo "::group::Installing"}
 # shellcheck disable=SC2154  # build is assigned by win-build-dir.sh
 cmake --install "${build}"
@@ -119,7 +123,7 @@ check_msys_dll_imports() {
 
     while IFS=$'\t' read -r dll file; do
         if [ ! -e "${root}/usr/bin/${dll}" ]; then
-            echo "${file} imports ${dll}, which the MSI does not ship." >&2
+            echo "${file} imports ${dll}, which is missing from the staged usr/bin." >&2
             missing=1
         fi
     done <<< "${imports}"
