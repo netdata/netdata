@@ -157,12 +157,12 @@ impl Registry {
 
     /// Rebuild the registry from the directory's files: scan it, then read
     /// each file's header. Identity comes from the filename (`FileId`,
-    /// including the `partition_key` the header does not store); `created_at_ns`,
-    /// `size`, and `content_meta` come from the header. The log-data range
-    /// and durable prefix stay unknown (see [`File`]'s recovery note), and
-    /// every entry lands as `Archived` — whether the file was mid-write at
-    /// the last crash is unknowable from the header, so startup recovery
-    /// re-indexes every recovered WAL that has no SFST yet.
+    /// including the `partition_key` the header does not store);
+    /// `created_at_ns`, `size`, and `content_meta` come from the header. The
+    /// log-data range and durable prefix stay unknown (see [`File`]'s recovery
+    /// note), and every entry lands as `Archived` — whether the file was
+    /// mid-write at the last crash is unknowable from the header, so startup
+    /// recovery re-indexes every recovered WAL that has no SFST yet.
     ///
     /// Failure policy: an unreadable file (I/O, or a header format
     /// rejection) is logged and skipped — it stays on disk but untracked. A
@@ -882,9 +882,9 @@ mod tests {
 
     #[test]
     fn candidates_filter_by_partition_key() {
-        // The WAL filter matches files by their opaque `partition_key` (the content
-        // plane's stream-hash collapse — absent vs empty namespace — is the
-        // content plane's concern, covered by otel-logs-identity's tests).
+        // The WAL filter matches files by their opaque `partition_key` (the
+        // content plane's stream-hash collapse — absent vs empty namespace — is
+        // the content plane's concern, covered by otel-logs-identity's tests).
         let dir = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(dir.path());
 

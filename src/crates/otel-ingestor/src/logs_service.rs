@@ -154,9 +154,10 @@ enum Payload {
 /// One stream's share of an export request, from "accepted for storage" to
 /// the WAL write. [`Self::admit`] builds it once the stream's identity is
 /// known to be storable and its `ns_hash` is claimed, so it always carries
-/// the stream's `partition_key` (that hash) and its encoded `content_meta` blob.
-/// [`Self::flatten`] turns `payload` from records into a frame, and
-/// [`Self::write_to`] appends that frame under `partition_key` and `content_meta`.
+/// the stream's `partition_key` (that hash) and its encoded `content_meta`
+/// blob. [`Self::flatten`] turns `payload` from records into a frame, and
+/// [`Self::write_to`] appends that frame under `partition_key` and
+/// `content_meta`.
 struct StorableStream {
     partition_key: u64,
     content_meta: Vec<u8>,
@@ -362,8 +363,9 @@ struct OversizedIdentity {
     name_preview: String,
     /// Total log records dropped for this stream — the sum across every
     /// `ResourceLogs` in the request whose identity collapsed to this
-    /// `partition_key` (one drop covers the whole group, like a collision). OTLP's
-    /// `rejected_log_records` is a request-wide sum, so this is the right unit.
+    /// `partition_key` (one drop covers the whole group, like a collision).
+    /// OTLP's `rejected_log_records` is a request-wide sum, so this is the
+    /// right unit.
     log_records: usize,
 }
 
@@ -1323,9 +1325,9 @@ mod tests {
             partial.error_message
         );
 
-        // The writer keys a WAL file per `partition_key`, so exactly one file must
-        // exist: the well-formed stream's. The oversized stream was dropped
-        // before `write_frame` and produced no file.
+        // The writer keys a WAL file per `partition_key`, so exactly one file
+        // must exist: the well-formed stream's. The oversized stream was
+        // dropped before `write_frame` and produced no file.
         let tenant_dir = wal_dir.join("default");
         let wal_files: Vec<_> = std::fs::read_dir(&tenant_dir)
             .expect("tenant WAL dir exists")

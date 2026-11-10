@@ -159,7 +159,8 @@ pub fn stream_required_params(partitions: Vec<PartitionStat>) -> Vec<RequiredPar
         return Vec::new();
     }
     // Decode each partition's opaque identity, then sort by `(namespace, name)`
-    // for display (the substrate yields them ordered by opaque `partition_key`).
+    // for display (the substrate yields them ordered by opaque
+    // `partition_key`).
     let mut stats: Vec<StreamStat> = partitions
         .into_iter()
         .map(StreamStat::from_partition)

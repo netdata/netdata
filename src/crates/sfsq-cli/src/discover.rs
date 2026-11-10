@@ -13,14 +13,14 @@
 //! the scan.
 //!
 //! Both tiers match by partition key — the SFST `Query` carries the stream's
-//! key, and the WAL is matched on its `FileId.partition_key` — mirroring the live
-//! planner. Dedup mirrors it too: a WAL whose sequence is already sealed into
-//! an SFST is skipped (SFST wins), but the dedup set is built from the
-//! *windowed* SFST candidates, so an SFST entirely outside the query window
-//! is not added and its WAL twin is scanned as a tail. Results stay correct
-//! — the engine's row-scan filters those rows out by time — at the cost of a
-//! little extra I/O; a full dedup would need a window-independent SFST scan
-//! for no practical gain.
+//! key, and the WAL is matched on its `FileId.partition_key` — mirroring the
+//! live planner. Dedup mirrors it too: a WAL whose sequence is already sealed
+//! into an SFST is skipped (SFST wins), but the dedup set is built from the
+//! *windowed* SFST candidates, so an SFST entirely outside the query window is
+//! not added and its WAL twin is scanned as a tail. Results stay correct — the
+//! engine's row-scan filters those rows out by time — at the cost of a little
+//! extra I/O; a full dedup would need a window-independent SFST scan for no
+//! practical gain.
 //!
 //! The only caller is `run` in `lib.rs`: `sources` go to the engine,
 //! `consulted` feeds `--show-files`.

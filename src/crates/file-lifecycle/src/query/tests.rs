@@ -116,9 +116,9 @@ fn track_remote(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
 }
 
 /// Like [`track_remote`] but with a caller-chosen stream. The entry's
-/// `id.partition_key` matches the stream's key, as production `build_catalog_entry`
-/// guarantees (it copies the `id` and the summary's `content_meta` from the
-/// same SFST).
+/// `id.partition_key` matches the stream's key, as production
+/// `build_catalog_entry` guarantees (it copies the `id` and the summary's
+/// `content_meta` from the same SFST).
 fn track_remote_as(reg: &mut Registry, seq: u64, ns: &str, name: &str, min_s: u32, max_s: u32) {
     use chrono::NaiveDate;
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();

@@ -121,8 +121,8 @@ impl Catalog {
     /// intersects the query's `[start, end)` window (half-open) — the shared
     /// [`file_registry::range_overlaps`] rule, the same convention as
     /// `sfst::Registry::candidates` and `wal::Registry::candidates` — and
-    /// whose `id.partition_key` passes the query's partition filter (an empty set
-    /// matches every partition). Yields in `FileId` (map) order; the query
+    /// whose `id.partition_key` passes the query's partition filter (an empty
+    /// set matches every partition). Yields in `FileId` (map) order; the query
     /// path consumes it through `read_entries` (sibling `registry.rs`).
     pub fn find<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a CatalogEntry> + 'a {
         // Extract q's contents upfront so the filter closures don't borrow

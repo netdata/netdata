@@ -15,13 +15,13 @@
 //! Traces are currently **unpartitioned**: [`partition_spans`] routes every
 //! span to the logs-convention *unattributed* stream — the exact stream the
 //! per-service scheme produces for spans with no `service.namespace`/
-//! `service.name` (`partition_key = 0`, `content_meta` = the version-tagged empty
-//! `ServiceStream` blob). That function is the single seam a future switch
-//! to per-service partitioning replaces (extract the stream per resource,
-//! group, encode-or-drop, collision-check — the logs service is the working
-//! template); everything downstream of it already handles N groups, and files
-//! written today ARE the unattributed stream under the future scheme, so old
-//! and new files coexist with no migration.
+//! `service.name` (`partition_key = 0`, `content_meta` = the version-tagged
+//! empty `ServiceStream` blob). That function is the single seam a future
+//! switch to per-service partitioning replaces (extract the stream per
+//! resource, group, encode-or-drop, collision-check — the logs service is the
+//! working template); everything downstream of it already handles N groups, and
+//! files written today ARE the unattributed stream under the future scheme, so
+//! old and new files coexist with no migration.
 //!
 //! ## Rejections
 //!
@@ -183,10 +183,11 @@ struct Flattened {
 ///
 /// Today: unpartitioned — the whole request becomes ONE group on the
 /// *unattributed* stream, reusing the logs identity convention
-/// (`ServiceStream` `("", "")` → `partition_key` `0`, version-tagged empty-fields
-/// `content_meta`). This is deliberately the stream the per-service scheme
-/// assigns to spans without service identity, so flipping this seam later
-/// re-interprets nothing: existing files simply ARE the unattributed stream.
+/// (`ServiceStream` `("", "")` → `partition_key` `0`, version-tagged
+/// empty-fields `content_meta`). This is deliberately the stream the
+/// per-service scheme assigns to spans without service identity, so flipping
+/// this seam later re-interprets nothing: existing files simply ARE the
+/// unattributed stream.
 ///
 /// Switching to per-service partitioning means reimplementing ONLY this
 /// function (per-resource stream extraction, grouping, encode-or-drop,
@@ -824,8 +825,9 @@ mod tests {
         let groups = partition_spans(req);
         assert_eq!(groups.len(), 1, "unpartitioned: exactly one group");
         let g = &groups[0];
-        // The logs identity convention for "no service attribution": partition_key 0
-        // and a decodable version-tagged empty-fields blob — NOT an empty blob.
+        // The logs identity convention for "no service attribution":
+        // partition_key 0 and a decodable version-tagged empty-fields blob —
+        // NOT an empty blob.
         assert_eq!(g.partition_key, 0);
         assert_eq!(
             otel_logs_identity::decode_content_meta(&g.content_meta),

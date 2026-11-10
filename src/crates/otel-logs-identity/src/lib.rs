@@ -7,20 +7,20 @@
 //!
 //! It is the content-plane counterpart to the content-agnostic substrate
 //! (`file-registry`/`wal`/`sfst`/`otel-catalog`): the substrate carries an
-//! opaque `partition_key: u64` (in the file's `FileId`/filename, the single source
-//! of truth) and an opaque `content_meta: Vec<u8>` (in the per-file summary)
-//! and never interprets either. This crate is the one place that gives them
-//! meaning for logs: the producer (`otel-ingestor`) encodes the identity here
-//! before writing, and the query layer (`otel-ledger`) decodes it here for
+//! opaque `partition_key: u64` (in the file's `FileId`/filename, the single
+//! source of truth) and an opaque `content_meta: Vec<u8>` (in the per-file
+//! summary) and never interprets either. This crate is the one place that gives
+//! them meaning for logs: the producer (`otel-ingestor`) encodes the identity
+//! here before writing, and the query layer (`otel-ledger`) decodes it here for
 //! display. Traces reuse only the *unattributed* convention defined here — the
-//! `("", "")` stream `otel-ingestor`'s `trace_service` writes (`partition_key` 0 +
-//! the version-tagged empty-fields blob) — the single seam a future
+//! `("", "")` stream `otel-ingestor`'s `trace_service` writes (`partition_key`
+//! 0 + the version-tagged empty-fields blob) — the single seam a future
 //! per-service traces scheme would replace; a sibling traces identity crate,
-//! and a shared home for the hash primitive, would arrive with that switch.
-//! The boundary runs the other way too: `file-lifecycle/tests/dep_guard.rs`
-//! bars the content-agnostic substrate from depending on this log-content
-//! crate. Consumers (grep-verified): `otel-ingestor` `logs_service` (extracts
-//! the stream from OTLP resource attributes, groups frames per stream, writes
+//! and a shared home for the hash primitive, would arrive with that switch. The
+//! boundary runs the other way too: `file-lifecycle/tests/dep_guard.rs` bars
+//! the content-agnostic substrate from depending on this log-content crate.
+//! Consumers (grep-verified): `otel-ingestor` `logs_service` (extracts the
+//! stream from OTLP resource attributes, groups frames per stream, writes
 //! `partition_key` + `content_meta`) and `trace_service`; `otel-ledger`'s
 //! `rpc/logs` handler + adapter (`decode_content_meta_or_empty` for the stream
 //! names shown to the UI, the "Services" selector included); `sfsq-cli`
@@ -40,9 +40,10 @@ use twox_hash::XxHash64;
 /// `(namespace, name)` pair identifying a log stream.
 ///
 /// This is the canonical OTel-logs stream identifier. The content plane derives
-/// it into the substrate's opaque `partition_key` (via [`partition_key`]) and serializes
-/// it into the opaque `content_meta` blob (via [`encode_content_meta`]); the
-/// substrate (`wal`/`sfst`/`otel-catalog`) never sees this type.
+/// it into the substrate's opaque `partition_key` (via [`partition_key`]) and
+/// serializes it into the opaque `content_meta` blob (via
+/// [`encode_content_meta`]); the substrate (`wal`/`sfst`/`otel-catalog`) never
+/// sees this type.
 ///
 /// Absent equals empty: a missing attribute is stored as an empty string, so a
 /// stream that carries no `service.namespace` and one that carries an
@@ -220,9 +221,9 @@ pub fn decode_content_meta(bytes: &[u8]) -> Option<ServiceStream> {
 /// (`("", "")`) when the blob is absent or unparseable.
 ///
 /// Stream-listing paths use this so a corrupt or missing blob still appears
-/// (under an empty name) instead of vanishing; the authoritative `partition_key`
-/// is carried separately. Centralizing the fallback here keeps every listing
-/// call site identical — the policy cannot drift between them.
+/// (under an empty name) instead of vanishing; the authoritative
+/// `partition_key` is carried separately. Centralizing the fallback here keeps
+/// every listing call site identical — the policy cannot drift between them.
 pub fn decode_content_meta_or_empty(bytes: &[u8]) -> ServiceStream {
     decode_content_meta(bytes).unwrap_or_else(|| ServiceStream::new("", ""))
 }

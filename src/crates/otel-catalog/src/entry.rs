@@ -36,8 +36,9 @@ use serde::{Deserialize, Serialize};
 /// One uploaded SFST as one catalog row.
 ///
 /// One entry describes exactly one SFST, and an SFST holds exactly one
-/// partition: its `partition_key` lives only in `id` and is what query filtering
-/// matches on; the stream identity itself is the opaque `content_meta` blob.
+/// partition: its `partition_key` lives only in `id` and is what query
+/// filtering matches on; the stream identity itself is the opaque
+/// `content_meta` blob.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CatalogEntry {
     /// The SFST's full identity (`FileId` — see file-registry `types.rs`) and
@@ -112,13 +113,13 @@ impl CatalogEntry {
     }
 }
 
-/// Deterministic opaque partition key for tests. The catalog treats `partition_key`
-/// as an opaque `u64` and never decodes it, so tests fabricate distinct keys
-/// per logical stream without depending on the content-plane identity codec —
-/// same label → same key, different label → (almost surely) different key.
-/// A `pub(crate)` fixture for the sibling tests (`catalog.rs`, `registry.rs`);
-/// the same helper is mirrored in file-lifecycle (`test_helpers.rs`), `wal`
-/// and `sfst`.
+/// Deterministic opaque partition key for tests. The catalog treats
+/// `partition_key` as an opaque `u64` and never decodes it, so tests fabricate
+/// distinct keys per logical stream without depending on the content-plane
+/// identity codec — same label → same key, different label → (almost surely)
+/// different key. A `pub(crate)` fixture for the sibling tests (`catalog.rs`,
+/// `registry.rs`); the same helper is mirrored in file-lifecycle
+/// (`test_helpers.rs`), `wal` and `sfst`.
 #[cfg(test)]
 pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {
     use std::hash::{Hash, Hasher};

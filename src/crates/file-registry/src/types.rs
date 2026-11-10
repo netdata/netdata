@@ -453,8 +453,8 @@ impl std::fmt::Display for SeqKey {
 /// and sequences.
 ///
 /// The filename stem is the canonical lossless encoding —
-/// `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<partition_key:016x>` —
-/// built by [`to_stem`](Self::to_stem) and parsed by
+/// `<machine_id>-<instance_id>-<pipeline_id:05>-<seq:010>-<partition_key:016x>`
+/// — built by [`to_stem`](Self::to_stem) and parsed by
 /// [`parse_stem`](Self::parse_stem); the exact field formats and the wire
 /// contracts are in the module docs.
 ///
@@ -495,8 +495,8 @@ pub struct FileId {
 
 impl FileId {
     /// Construct a `FileId` from an [`Identity`] plus the opaque
-    /// `pipeline_id` / `seq` / `partition_key` fields (conventions in the struct
-    /// docs).
+    /// `pipeline_id` / `seq` / `partition_key` fields (conventions in the
+    /// struct docs).
     pub fn new(identity: Identity, pipeline_id: u16, seq: u64, partition_key: u64) -> Self {
         Self {
             machine_id: identity.machine_id,
@@ -542,8 +542,9 @@ impl FileId {
     pub fn parse_stem(stem: &str) -> Option<Self> {
         let (machine_uuid, instance_uuid, rest) = crate::stem::parse_uuid_pair(stem)?;
 
-        // rest = "<pipeline_id>-<seq>-<partition_key>": split off pipeline (first
-        // '-'), then split the remainder into seq and partition_key (last '-').
+        // rest = "<pipeline_id>-<seq>-<partition_key>": split off pipeline
+        // (first '-'), then split the remainder into seq and partition_key
+        // (last '-').
         let first_dash = rest.find('-')?;
         let pipeline_str = &rest[..first_dash];
         let after = &rest[first_dash + 1..];
@@ -575,9 +576,10 @@ impl fmt::Display for FileId {
 }
 
 // `Ord`/`PartialOrd` are derived: field order (machine_id, instance_id,
-// pipeline_id, seq, partition_key) — within one identity and pipeline, files sort
-// by seq then partition_key; pipeline_id dominates seq across pipelines. The
-// `MachineId`/`InstanceId` newtypes compare by their inner UUID's byte order.
+// pipeline_id, seq, partition_key) — within one identity and pipeline, files
+// sort by seq then partition_key; pipeline_id dominates seq across pipelines.
+// The `MachineId`/`InstanceId` newtypes compare by their inner UUID's byte
+// order.
 
 // ---------------------------------------------------------------------------
 // FileSummary

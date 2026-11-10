@@ -5,13 +5,13 @@
 //! keys and `content_meta` blobs directly — with NO dependency on any
 //! content-plane identity codec (e.g. `otel-logs-identity`). A logical stream
 //! is named by a `(namespace, name)` pair purely for test readability; the
-//! substrate treats `partition_key` as an opaque `u64` and `content_meta` as opaque
-//! bytes and never decodes either.
+//! substrate treats `partition_key` as an opaque `u64` and `content_meta` as
+//! opaque bytes and never decodes either.
 
 /// Deterministic opaque partition key for a logical `(namespace, name)`.
 /// Same label → same key (`DefaultHasher`); the substrate ascribes it no
-/// meaning. Mirrors the `opaque_partition_key` test helpers in the `wal`, `sfst`,
-/// and `otel-catalog` crates (intentionally duplicated — sharing would
+/// meaning. Mirrors the `opaque_partition_key` test helpers in the `wal`,
+/// `sfst`, and `otel-catalog` crates (intentionally duplicated — sharing would
 /// re-couple them).
 pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {
     use std::hash::{Hash, Hasher};
@@ -56,8 +56,8 @@ pub(crate) fn decode_opaque(bytes: &[u8]) -> (String, String) {
     (ns, name)
 }
 
-/// `(partition_key, content_meta)` for a logical stream, as a content plane would
-/// derive them at index time — but with opaque test encodings.
+/// `(partition_key, content_meta)` for a logical stream, as a content plane
+/// would derive them at index time — but with opaque test encodings.
 pub(crate) fn identity_for(namespace: &str, name: &str) -> (u64, Vec<u8>) {
     (
         opaque_partition_key(namespace, name),
@@ -67,8 +67,8 @@ pub(crate) fn identity_for(namespace: &str, name: &str) -> (u64, Vec<u8>) {
 
 /// A `Summary` for the logical stream with the given range and record count.
 /// The partition key is NOT in the summary — partition matching keys off
-/// `id.partition_key` in the file's `FileId` (`Query::matches_partition`), so tests
-/// pass the key there via [`identity_for`] or [`opaque_partition_key`].
+/// `id.partition_key` in the file's `FileId` (`Query::matches_partition`), so
+/// tests pass the key there via [`identity_for`] or [`opaque_partition_key`].
 pub(crate) fn summary_for(
     namespace: &str,
     name: &str,

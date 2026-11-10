@@ -127,9 +127,9 @@ pub use writer::{FileStamp, FrameMeta, Writer};
 // wal-internal tests reach the fixture as `crate::test_identity()`.
 pub use file_registry::{Identity, InstanceId, MachineId, test_identity};
 
-/// Deterministic opaque partition key for tests. The WAL treats `partition_key` as
-/// an opaque `u64` and never decodes it, so tests fabricate distinct keys per
-/// logical stream without depending on the content-plane identity codec —
+/// Deterministic opaque partition key for tests. The WAL treats `partition_key`
+/// as an opaque `u64` and never decodes it, so tests fabricate distinct keys
+/// per logical stream without depending on the content-plane identity codec —
 /// same label → same key, different label → (almost surely) different key.
 #[cfg(test)]
 pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {

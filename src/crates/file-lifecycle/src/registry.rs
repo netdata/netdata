@@ -72,7 +72,8 @@ pub struct WalDesc {
 /// once — SFST wins — mirroring [`TenantRegistries::query_snapshot`].
 #[derive(Debug, Clone)]
 pub struct PartitionStat {
-    /// The files' opaque `partition_key` (the option id the selector echoes back).
+    /// The files' opaque `partition_key` (the option id the selector echoes
+    /// back).
     pub partition_key: u64,
     /// The partition's opaque content-plane identity blob, carried verbatim
     /// from the files' summaries. The substrate never decodes it; the signal's
@@ -717,8 +718,8 @@ impl LocalStreams {
     /// Complete the selector with the remote-only streams of `catalog` (the
     /// window's catalog entries, read off the lock): entries whose identity+seq
     /// was not folded locally, one per identity+seq. Sorted by the opaque
-    /// `partition_key`; the signal's query layer decodes `content_meta` and re-sorts
-    /// for display.
+    /// `partition_key`; the signal's query layer decodes `content_meta` and
+    /// re-sorts for display.
     pub fn with_catalog(mut self, catalog: &[otel_catalog::CatalogEntry]) -> Vec<PartitionStat> {
         for e in catalog {
             if !self.folded.insert(SeqKey::from(&e.id)) {

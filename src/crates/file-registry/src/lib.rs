@@ -19,10 +19,11 @@
 //!   [`TenantId`], [`TimestampNs`], [`ByteSize`], and the content-agnostic
 //!   [`FileSummary`].
 //! - `stem` (public): the shared `{machine}-{instance}` 32-hex filename
-//!   prefix. Data files append `{pipeline_id:05}-{seq:010}-{partition_key:016x}`
-//!   and parse back through [`FileId::parse`]/[`FileId::parse_stem`]; the
-//!   remote catalog appends `{max_seq:010}-{min_ts:010}-{max_ts:010}` and
-//!   parses the prefix with this codec — the reason the module is public.
+//!   prefix. Data files append
+//!   `{pipeline_id:05}-{seq:010}-{partition_key:016x}` and parse back through
+//!   [`FileId::parse`]/[`FileId::parse_stem`]; the remote catalog appends
+//!   `{max_seq:010}-{min_ts:010}-{max_ts:010}` and parses the prefix with this
+//!   codec — the reason the module is public.
 //! - `durable` (public): the one temp+fsync+rename+dir-fsync write path and
 //!   the reserved `.tmp` suffix with its stale-temp sweep. Every
 //!   tmp+rename producer in the otel stack (SFST, remote catalogs, the seq

@@ -140,7 +140,8 @@ impl SeqCounter {
     }
 }
 
-/// A single WAL output stream for one partition (identified by `partition_key`).
+/// A single WAL output stream for one partition (identified by
+/// `partition_key`).
 ///
 /// Handles frame writing, compression, rotation, and lifecycle event
 /// emission. The stream does not own a clock — every per-frame
@@ -569,9 +570,9 @@ impl Writer {
 
     /// Write a frame to the writer for the given partition.
     ///
-    /// Lazily creates a new per-partition writer (keyed by `partition_key`) if one
-    /// doesn't exist yet; the opaque `content_meta` identity blob is recorded
-    /// in each file's header. A `content_meta` larger than
+    /// Lazily creates a new per-partition writer (keyed by `partition_key`) if
+    /// one doesn't exist yet; the opaque `content_meta` identity blob is
+    /// recorded in each file's header. A `content_meta` larger than
     /// [`MAX_CONTENT_META_BYTES`](crate::format::MAX_CONTENT_META_BYTES) is
     /// rejected — the caller drops the records — rather than truncated.
     ///
@@ -600,9 +601,9 @@ impl Writer {
             .write_frame(data, meta)
     }
 
-    /// Get or lazily create the writer for `partition_key`. On first use the stream
-    /// records `content_meta` in each file's header; later frames for the same
-    /// key reuse the already-recorded blob.
+    /// Get or lazily create the writer for `partition_key`. On first use the
+    /// stream records `content_meta` in each file's header; later frames for
+    /// the same key reuse the already-recorded blob.
     fn get_or_create(&mut self, partition_key: u64, content_meta: &[u8]) -> &mut Stream {
         self.streams.entry(partition_key).or_insert_with(|| {
             Stream::new(
@@ -707,8 +708,9 @@ mod tests {
         .unwrap()
     }
 
-    /// A distinct opaque `partition_key` per label — distinct labels give distinct
-    /// keys, so a test can partition by key without hand-picking values.
+    /// A distinct opaque `partition_key` per label — distinct labels give
+    /// distinct keys, so a test can partition by key without hand-picking
+    /// values.
     fn pk(label: u64) -> u64 {
         crate::opaque_partition_key("ns", &format!("svc{label}"))
     }

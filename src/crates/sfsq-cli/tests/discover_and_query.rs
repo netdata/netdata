@@ -310,10 +310,10 @@ fn wal_stream_filter_matches_absent_namespace() {
     let wal_dir = dirs.wal.join("default");
     std::fs::create_dir_all(&wal_dir).unwrap();
 
-    // The WAL filename embeds the stream's partition_key — the canonical `ns_hash`
-    // via `otel_logs_identity::partition_key` — so for a service.name without
-    // service.namespace it is `compute_ns_hash(None, name)`, exactly what the
-    // ingestor stamps on real files.
+    // The WAL filename embeds the stream's partition_key — the canonical
+    // `ns_hash` via `otel_logs_identity::partition_key` — so for a service.name
+    // without service.namespace it is `compute_ns_hash(None, name)`, exactly
+    // what the ingestor stamps on real files.
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(
         &wal_dir,

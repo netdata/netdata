@@ -131,10 +131,10 @@ pub use trace_rollup::{
 };
 pub use vocab_match::{ContainsMatcher, MatchClass, ValueMatcher};
 
-/// Deterministic opaque partition key for tests. SFST treats `partition_key` as an
-/// opaque `u64` and never decodes it, so tests fabricate distinct keys per
-/// logical stream without depending on the content-plane identity codec —
-/// same label → same key, different label → (almost surely) different key.
+/// Deterministic opaque partition key for tests. SFST treats `partition_key` as
+/// an opaque `u64` and never decodes it, so tests fabricate distinct keys per
+/// logical stream without depending on the content-plane identity codec — same
+/// label → same key, different label → (almost surely) different key.
 #[cfg(test)]
 pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {
     use std::hash::{Hash, Hasher};

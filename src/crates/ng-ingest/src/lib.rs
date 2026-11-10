@@ -29,9 +29,9 @@ pub fn count_log_records(req: &ExportLogsServiceRequest) -> usize {
 
 /// One WAL file, no rotation, frames always LZ4-compressed: rotation
 /// thresholds set to effectively infinite so the writer never starts a second
-/// file, and callers pass the single `PARTITION_KEY` so every frame lands in that
-/// one file. `wal::Reader` decompresses transparently, so the artifact stays
-/// directly consumable by a downstream reader.
+/// file, and callers pass the single `PARTITION_KEY` so every frame lands in
+/// that one file. `wal::Reader` decompresses transparently, so the artifact
+/// stays directly consumable by a downstream reader.
 pub fn one_file_config() -> wal::Config {
     wal::Config {
         rotation: wal::RotationConfig {

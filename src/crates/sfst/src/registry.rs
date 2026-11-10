@@ -202,9 +202,9 @@ impl Registry {
     /// [`file_registry::range_overlaps`] rule, so an empty window matches
     /// nothing).
     ///
-    /// Partition filter, when non-empty, keeps files whose opaque `partition_key`
-    /// is one of [`Query::partition_keys`] — exact `u64` match, no partial
-    /// matching; each SFST holds exactly one partition.
+    /// Partition filter, when non-empty, keeps files whose opaque
+    /// `partition_key` is one of [`Query::partition_keys`] — exact `u64` match,
+    /// no partial matching; each SFST holds exactly one partition.
     pub fn candidates<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a File> + 'a {
         // Copy q's fields so the returned iterator doesn't borrow q (callers
         // may pass a temporary Query).
