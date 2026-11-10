@@ -18,6 +18,11 @@
 //! killed runs none of that: each worker then exits on its own, because the
 //! pipe it has as stdin closes (`crate::lifeline`).
 //!
+//! The agent stops a plugin that writes nothing for two minutes, so from the
+//! first handshake on the supervisor writes `PLUGIN_KEEPALIVE` every
+//! [`KEEPALIVE_INTERVAL`]: a handshake lasts as long as the worker's startup,
+//! and the ledger indexes its whole backlog of WAL files before it is ready.
+//!
 //! Failure model: ingestor and ledger failures are fatal to the plugin (the
 //! agent restarts the whole process); the legacy-logs viewer is best-effort
 //! and is disabled at runtime without affecting the pipeline.
@@ -38,7 +43,11 @@ use otel_bridge::{
     IngestorRequest, IngestorResponse, LedgerRequest, LedgerResponse, LegacyLogsRequest,
     LegacyLogsResponse,
 };
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use tokio::io::AsyncWrite;
 use tokio::process::Command;
+use tokio::time::Interval;
 
 /// Maximum time to wait for a worker to connect after spawning.
 const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -48,6 +57,11 @@ const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 /// wedges mid-exit; distinct from the shutdown budget in `shutdown_workers`,
 /// which is sized to the agent's 3s SIGTERM→SIGKILL grace.
 const LEGACY_REAP_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// How often the supervisor writes `PLUGIN_KEEPALIVE` to the agent. The
+/// agent's limit for a silent plugin is 120 s, or two collection intervals
+/// when that is longer.
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(60);
 
 use crate::config;
 
@@ -187,6 +201,9 @@ struct Supervisor {
     transactions: HashMap<String, Worker>,
     reader: MessageReader<tokio::io::Stdin>,
     writer: MessageWriter<tokio::io::Stdout>,
+    /// Ticks every [`KEEPALIVE_INTERVAL`]. The handshakes and the event loop
+    /// share it, so that the time between them counts too.
+    keepalive: Interval,
     /// Removes socket files on drop.
     #[allow(dead_code)]
     sockets: [SocketGuard; 4],
@@ -244,7 +261,12 @@ impl Supervisor {
             .await
             .context("failed to send Configure to ingestor")?;
 
-        match self.ingestor.recv().await.context("ingestor handshake")? {
+        let response =
+            recv_keeping_agent_alive(&mut self.ingestor, &mut self.writer, &mut self.keepalive)
+                .await
+                .context("ingestor handshake")?;
+
+        match response {
             IngestorResponse::Ready { declarations } => Ok(declarations),
             other => bail!("expected Ready from ingestor, got: {other:?}"),
         }
@@ -262,7 +284,12 @@ impl Supervisor {
             .await
             .context("failed to send Configure to ledger")?;
 
-        match self.ledger.recv().await.context("ledger handshake")? {
+        let response =
+            recv_keeping_agent_alive(&mut self.ledger, &mut self.writer, &mut self.keepalive)
+                .await
+                .context("ledger handshake")?;
+
+        match response {
             LedgerResponse::Ready { declarations } => Ok(declarations),
             other => bail!("expected Ready from ledger, got: {other:?}"),
         }
@@ -277,7 +304,12 @@ impl Supervisor {
             .await
             .context("failed to send Configure to legacy-logs")?;
 
-        match self.legacy.recv().await.context("legacy-logs handshake")? {
+        let response =
+            recv_keeping_agent_alive(&mut self.legacy, &mut self.writer, &mut self.keepalive)
+                .await
+                .context("legacy-logs handshake")?;
+
+        match response {
             LegacyLogsResponse::Ready { declarations } => {
                 self.register_declarations(Worker::LegacyLogs, declarations)
                     .await?;
@@ -573,10 +605,6 @@ impl Supervisor {
     /// We intentionally do not restart workers — the Netdata agent is
     /// responsible for restarting the entire plugin.
     async fn run(&mut self) -> anyhow::Result<&'static str> {
-        // PLUGIN_KEEPALIVE is a benign no-op on the agent side; the point is
-        // regular stdout traffic so the agent's 2-minute idle read on this
-        // plugin never fires while nothing else is being emitted.
-        let mut keepalive = tokio::time::interval(tokio::time::Duration::from_secs(60));
         let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
             .context("failed to register SIGINT handler")?;
         let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
@@ -629,15 +657,48 @@ impl Supervisor {
                         }
                     }
                 }
-                _ = keepalive.tick() => {
-                    self.writer
-                        .write_raw(b"PLUGIN_KEEPALIVE\n")
-                        .await
-                        .context("keepalive write failed")?;
+                _ = self.keepalive.tick() => {
+                    send_keepalive(&mut self.writer).await?;
                 }
             }
         }
     }
+}
+
+/// Wait for `worker`'s next message, and write a keepalive to the agent on
+/// every tick of `keepalive` until it arrives.
+///
+/// For the handshakes: the supervisor has nothing else to write to the agent
+/// until the worker answers, and the worker answers only when its startup is
+/// over.
+async fn recv_keeping_agent_alive<S, R, W>(
+    worker: &mut Connection<S, R>,
+    agent: &mut MessageWriter<W>,
+    keepalive: &mut Interval,
+) -> anyhow::Result<R>
+where
+    S: Serialize + Send + 'static,
+    R: DeserializeOwned + Send + 'static,
+    W: AsyncWrite + Unpin,
+{
+    loop {
+        tokio::select! {
+            response = worker.recv() => return Ok(response?),
+            _ = keepalive.tick() => send_keepalive(agent).await?,
+        }
+    }
+}
+
+/// Write `PLUGIN_KEEPALIVE` to the agent. The agent does nothing with the
+/// line; that the plugin wrote one is what resets its idle timer.
+async fn send_keepalive<W>(agent: &mut MessageWriter<W>) -> anyhow::Result<()>
+where
+    W: AsyncWrite + Unpin,
+{
+    agent
+        .write_raw(b"PLUGIN_KEEPALIVE\n")
+        .await
+        .context("keepalive write failed")
 }
 
 /// Guard for one IPC socket file: `new` removes any stale file at the path
@@ -859,6 +920,7 @@ pub async fn run() -> anyhow::Result<()> {
         transactions: HashMap::new(),
         reader: MessageReader::new(tokio::io::stdin()),
         writer: MessageWriter::new(tokio::io::stdout()),
+        keepalive: tokio::time::interval(KEEPALIVE_INTERVAL),
         sockets: [writer_sock, ledger_sock, ingestor_sock, legacy_sock],
     };
 
@@ -925,7 +987,79 @@ mod tests {
     use std::ffi::{OsStr, OsString};
     use std::path::Path;
 
-    use super::{resolve_identity, worker_command, worker_malloc_arena_max};
+    use std::time::Duration;
+
+    use ferryboat::{Connection, Endpoint, Listener};
+    use netdata_plugin_protocol::MessageWriter;
+    use tokio::io::{AsyncReadExt, DuplexStream};
+
+    use super::{
+        KEEPALIVE_INTERVAL, recv_keeping_agent_alive, resolve_identity, worker_command,
+        worker_malloc_arena_max,
+    };
+
+    /// The supervisor's and the worker's end of one connection.
+    async fn connected(name: &str) -> (Connection<u32, u32>, Connection<u32, u32>) {
+        let mut listener = Listener::<u32, u32>::bind(Endpoint::in_process(name))
+            .open()
+            .unwrap();
+        let worker = Connection::<u32, u32>::connect(Endpoint::in_process(name)).open();
+        let (supervisor, worker) = tokio::join!(listener.accept(), worker);
+
+        (supervisor.unwrap(), worker.unwrap())
+    }
+
+    /// Everything that was written to the agent.
+    async fn written_to(
+        agent: MessageWriter<DuplexStream>,
+        mut agent_side: DuplexStream,
+    ) -> String {
+        drop(agent);
+
+        let mut written = String::new();
+        agent_side.read_to_string(&mut written).await.unwrap();
+        written
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_agent_gets_keepalives_until_a_worker_answers() {
+        let (mut supervisor, mut worker) = connected("keepalives-until-the-answer").await;
+        let worker = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(150)).await;
+            worker.send(7).await.unwrap();
+            worker
+        });
+        let (agent, agent_side) = tokio::io::duplex(1024);
+        let mut agent = MessageWriter::new(agent);
+        let mut keepalive = tokio::time::interval(KEEPALIVE_INTERVAL);
+
+        let answer = recv_keeping_agent_alive(&mut supervisor, &mut agent, &mut keepalive)
+            .await
+            .unwrap();
+
+        assert_eq!(answer, 7);
+        // One at once, one after 60 s, one after 120 s; the answer came at 150 s.
+        assert_eq!(
+            written_to(agent, agent_side).await,
+            "PLUGIN_KEEPALIVE\n".repeat(3)
+        );
+        drop(worker);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_keepalive_the_agent_does_not_take_ends_the_wait() {
+        let (mut supervisor, _worker) = connected("keepalive-to-a-closed-agent").await;
+        let (agent, agent_side) = tokio::io::duplex(1024);
+        let mut agent = MessageWriter::new(agent);
+        let mut keepalive = tokio::time::interval(KEEPALIVE_INTERVAL);
+        drop(agent_side);
+
+        let error = recv_keeping_agent_alive(&mut supervisor, &mut agent, &mut keepalive)
+            .await
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "keepalive write failed");
+    }
 
     #[test]
     fn a_worker_command_carries_the_lifeline_and_the_arena_limit() {

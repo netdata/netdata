@@ -37,5 +37,7 @@ file-registry = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# `test-util` gives the paused clock for the supervisor's keepalive tests.
+tokio = { workspace = true, features = ["test-util"] }
 # Lets config tests capture the warnings that config resolution logs.
 tracing-subscriber = { workspace = true }
