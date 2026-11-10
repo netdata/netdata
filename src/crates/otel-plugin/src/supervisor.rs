@@ -699,7 +699,6 @@ async fn spawn_worker<S, R>(
     self_exe: &std::path::Path,
     sock: &SocketGuard,
     name: &'static str,
-    malloc_arena_max: Option<usize>,
 ) -> anyhow::Result<(Connection<S, R>, ChildGuard)>
 where
     S: serde::Serialize + Send + 'static,
@@ -712,7 +711,7 @@ where
 
     tracing::info!("spawning {name} socket={}", sock.path());
 
-    let child = worker_command(self_exe, name, sock.path(), malloc_arena_max)
+    let child = worker_command(self_exe, name, sock.path())
         .spawn()
         .with_context(|| format!("failed to spawn {name} worker"))?;
 
@@ -730,32 +729,22 @@ where
 }
 
 /// The command that runs this binary as the `name` worker against `socket`,
-/// with a pipe as stdin (the lifeline).
-///
-/// `malloc_arena_max` replaces the limit the worker would inherit from the
-/// agent ([`worker_malloc_arena_max`]); `None` leaves it as it is.
-fn worker_command(
-    self_exe: &std::path::Path,
-    name: &str,
-    socket: &str,
-    malloc_arena_max: Option<usize>,
-) -> Command {
+/// with a pipe as stdin (the lifeline) and the workers' malloc arena limit
+/// ([`worker_malloc_arena_max`]) in place of the one it would inherit.
+fn worker_command(self_exe: &std::path::Path, name: &str, socket: &str) -> Command {
     let mut command = Command::new(self_exe);
     command
         .args(["worker", name, "--socket", socket, "--lifeline"])
+        // glibc reads the limit from the environment when the process starts.
+        .env("MALLOC_ARENA_MAX", worker_malloc_arena_max().to_string())
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
 
-    // glibc reads the limit from the environment when the process starts.
-    if let Some(arenas) = malloc_arena_max {
-        command.env("MALLOC_ARENA_MAX", arenas.to_string());
-    }
-
     command
 }
 
-/// The malloc arena limit of the ingestor and the ledger: one per CPU.
+/// The malloc arena limit of every worker: one per CPU.
 ///
 /// The agent exports `MALLOC_ARENA_MAX` to every plugin, from netdata.conf's
 /// `glibc malloc arena max for plugins`: 1 on most profiles. With one arena,
@@ -765,10 +754,12 @@ fn worker_command(
 /// 24, and spent its time in the kernel with one.
 ///
 /// The agent always exports a value, so the plugin cannot tell an operator's
-/// setting from the profile's default: it replaces the value for these two
-/// workers. It is a limit, not a count: glibc adds an arena only when
-/// threads contend. Where the C library is not glibc the variable does
-/// nothing.
+/// setting from the profile's default: it replaces the value, for every
+/// worker alike. It is a limit, not a count: glibc adds an arena only when
+/// threads contend, so a worker with little to do stays small. Where the C
+/// library is not glibc the variable does nothing. The supervisor itself
+/// keeps the agent's value: a process cannot change its own limit this way
+/// once it has started.
 fn worker_malloc_arena_max() -> usize {
     std::thread::available_parallelism().map_or(1, |cpus| cpus.get())
 }
@@ -851,13 +842,10 @@ pub async fn run() -> anyhow::Result<()> {
     // Spawn the ledger first: it listens on the writer socket, and on startup
     // the ingestor connects to that socket to stream records to it. Reversing
     // the order would race the ingestor against a not-yet-listening ledger.
-    let arenas = Some(worker_malloc_arena_max());
-    let (ledger_conn, ledger_child) =
-        spawn_worker(&self_exe, &ledger_sock, "ledger", arenas).await?;
+    let (ledger_conn, ledger_child) = spawn_worker(&self_exe, &ledger_sock, "ledger").await?;
     let (ingestor_conn, ingestor_child) =
-        spawn_worker(&self_exe, &ingestor_sock, "ingestor", arenas).await?;
-    let (legacy_conn, legacy_child) =
-        spawn_worker(&self_exe, &legacy_sock, "legacy-logs", None).await?;
+        spawn_worker(&self_exe, &ingestor_sock, "ingestor").await?;
+    let (legacy_conn, legacy_child) = spawn_worker(&self_exe, &legacy_sock, "legacy-logs").await?;
 
     let mut supervisor = Supervisor {
         ingestor: ingestor_conn,
@@ -934,27 +922,25 @@ pub async fn run() -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::OsStr;
+    use std::ffi::{OsStr, OsString};
     use std::path::Path;
 
-    use super::{resolve_identity, worker_command};
+    use super::{resolve_identity, worker_command, worker_malloc_arena_max};
 
     #[test]
     fn a_worker_command_carries_the_lifeline_and_the_arena_limit() {
-        let command = worker_command(Path::new("/x/otel-plugin"), "ledger", "/s", Some(6));
+        let command = worker_command(Path::new("/x/otel-plugin"), "ledger", "/s");
         let command = command.as_std();
+        let arenas = OsString::from(worker_malloc_arena_max().to_string());
+
         assert_eq!(
             command.get_args().collect::<Vec<_>>(),
             ["worker", "ledger", "--socket", "/s", "--lifeline"]
         );
         assert_eq!(
             command.get_envs().collect::<Vec<_>>(),
-            [(OsStr::new("MALLOC_ARENA_MAX"), Some(OsStr::new("6")))]
+            [(OsStr::new("MALLOC_ARENA_MAX"), Some(arenas.as_os_str()))]
         );
-
-        // Without a limit of its own the worker inherits the agent's.
-        let command = worker_command(Path::new("/x/otel-plugin"), "legacy-logs", "/s", None);
-        assert_eq!(command.as_std().get_envs().count(), 0);
     }
 
     #[test]
