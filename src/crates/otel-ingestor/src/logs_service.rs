@@ -105,8 +105,8 @@ struct StreamGroup {
 ///
 /// Senders normally put one service's `ResourceLogs` under one stream, so a
 /// request produces few groups. Distinct streams that share an `ns_hash` (a
-/// genuine xxhash64 collision) are rejected later by the canonical-table
-/// check; absent vs empty-string fields collapse to one stream here, so they
+/// genuine xxhash64 collision) are rejected later by the canonical-streams
+/// claim; absent vs empty-string fields collapse to one stream here, so they
 /// cannot collide at all.
 fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, StreamGroup> {
     let mut groups: HashMap<ServiceStream, StreamGroup> = HashMap::new();
@@ -158,22 +158,20 @@ impl StorableStream {
     ///
     /// Identity comes first: a stream whose identity cannot be stored must
     /// not claim a canonical `part_key` it can never write to (see
-    /// [`encode_identity_or_drop`]). The claim then holds `canonical`'s lock
-    /// for one table operation: the identity is encoded before the lock is
-    /// taken and a collision is logged after it is released.
+    /// [`encode_identity_or_drop`]). The claim then locks the canonical
+    /// streams for one lookup: the identity is encoded before it and a
+    /// collision is logged after it.
     fn admit(
         stream: ServiceStream,
         group: StreamGroup,
         tenant_id: &TenantId,
-        canonical: &Mutex<CanonicalTable>,
+        canonical_streams: &CanonicalStreams,
     ) -> Result<Self, Rejection> {
         let content_meta = encode_identity_or_drop(&stream, group.log_record_count)
             .map_err(Rejection::Oversized)?;
         let part_key = otel_logs_identity::part_key(&stream);
 
-        // The lock guard lives for this statement only.
-        let claimed = claim(&mut canonical.lock().unwrap(), tenant_id, part_key, &stream);
-        if let Err(holder) = claimed {
+        if let Err(canonical) = canonical_streams.claim(tenant_id, part_key, &stream) {
             tracing::warn!(
                 tenant = %tenant_id,
                 hash = part_key,
@@ -182,7 +180,7 @@ impl StorableStream {
             );
             return Err(Rejection::Collision(Collision {
                 hash: part_key,
-                canonical: holder,
+                canonical,
                 rejected: stream,
                 rejected_log_records: group.log_record_count,
             }));
@@ -283,30 +281,44 @@ struct Flattened {
     rejected: usize,
 }
 
-/// The collision table: per tenant, the stream identity that owns each
-/// `ns_hash`.
-type CanonicalTable = HashMap<(TenantId, u64), ServiceStream>;
-
-/// Claim `part_key` for `stream` in the canonical table: the first identity
-/// to write under a hash owns it (first write wins, per tenant).
+/// Per tenant, the canonical stream of each `ns_hash`: the first identity to
+/// write under a hash owns it, and a different identity that later hashes to
+/// the same value is a collision (first write wins). In-memory only — after a
+/// restart it is empty and the first write of a stream establishes its
+/// canonical stream again.
 ///
-/// - No entry for the hash: register `stream` as canonical.
-/// - The entry is `stream`: nothing to do.
-/// - The entry is another identity: `Err` with that identity; the table is
-///   left unchanged.
-fn claim(
-    canonical: &mut CanonicalTable,
-    tenant_id: &TenantId,
-    part_key: u64,
-    stream: &ServiceStream,
-) -> Result<(), ServiceStream> {
-    match canonical.entry((tenant_id.clone(), part_key)) {
-        Entry::Vacant(e) => {
-            e.insert(stream.clone());
-            Ok(())
+/// The type owns its lock: [`Self::claim`] holds it for one lookup, so no
+/// caller can keep it across other work.
+#[derive(Default)]
+struct CanonicalStreams {
+    by_hash: Mutex<HashMap<(TenantId, u64), ServiceStream>>,
+}
+
+impl CanonicalStreams {
+    /// Claim `part_key` (the stream's `ns_hash`) for `stream`.
+    ///
+    /// - No canonical stream for the hash yet: `stream` becomes it.
+    /// - `stream` is the canonical stream: nothing to do.
+    /// - Another identity is: `Err` with that identity; nothing changes.
+    fn claim(
+        &self,
+        tenant_id: &TenantId,
+        part_key: u64,
+        stream: &ServiceStream,
+    ) -> Result<(), ServiceStream> {
+        match self
+            .by_hash
+            .lock()
+            .unwrap()
+            .entry((tenant_id.clone(), part_key))
+        {
+            Entry::Vacant(e) => {
+                e.insert(stream.clone());
+                Ok(())
+            }
+            Entry::Occupied(e) if e.get() == stream => Ok(()),
+            Entry::Occupied(e) => Err(e.get().clone()),
         }
-        Entry::Occupied(e) if e.get() == stream => Ok(()),
-        Entry::Occupied(e) => Err(e.get().clone()),
     }
 }
 
@@ -525,12 +537,10 @@ pub struct NetdataLogsService {
     /// region, so tenants ingest in parallel and same-tenant requests overlap
     /// everything before that region.
     writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
-    /// Canonical `ServiceStream` per `(tenant, ns_hash)`. First write
-    /// wins; subsequent writes whose stream doesn't match are rejected via
-    /// `partial_success`. In-memory only — on restart the table is empty and
-    /// the first write of a tenant's stream re-establishes the canonical
-    /// stream.
-    canonical: Mutex<CanonicalTable>,
+    /// The canonical stream per `(tenant, ns_hash)`. First write wins; a
+    /// later stream with the same hash and another identity is rejected via
+    /// `partial_success`.
+    canonical_streams: CanonicalStreams,
     /// Process-wide monotonic clock, shared across tenants, streams, and
     /// signals (lib.rs creates one instance for logs + traces). The WAL writer
     /// orders frames by the `ingestion_ns` stamped here, so one clock keeps
@@ -571,7 +581,7 @@ impl NetdataLogsService {
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
-            canonical: Mutex::new(HashMap::new()),
+            canonical_streams: CanonicalStreams::default(),
             clock,
             sender,
             wal_base_dir,
@@ -729,7 +739,7 @@ impl NetdataLogsService {
         let mut accepted = Vec::with_capacity(groups.len());
 
         for (stream, group) in groups {
-            match StorableStream::admit(stream, group, tenant_id, &self.canonical) {
+            match StorableStream::admit(stream, group, tenant_id, &self.canonical_streams) {
                 Ok(s) => accepted.push(s),
                 Err(rejection) => rejections.push(rejection),
             }
@@ -940,7 +950,7 @@ mod tests {
     fn extract_stream_merges_missing_and_empty() {
         // Absent and empty-string attributes identify the same stream:
         // both collapse to an empty-field ServiceStream and the same
-        // ns_hash, so the canonical table treats them as one.
+        // ns_hash, so the canonical streams treat them as one.
         let absent = extract_stream(&rl(None, None, 0));
         let empty = extract_stream(&rl(Some(""), Some(""), 0));
         assert_eq!(absent, empty);
@@ -975,10 +985,10 @@ mod tests {
         assert!(group_by_stream(vec![rl(Some("p"), Some("q"), 0)]).is_empty());
     }
 
-    /// Admit the one stream these `ResourceLogs` belong to against `canonical`,
-    /// as the export does.
+    /// Admit the one stream these `ResourceLogs` belong to, as the export
+    /// does.
     fn admit_stream_of(
-        canonical: &Mutex<CanonicalTable>,
+        canonical_streams: &CanonicalStreams,
         tenant: &TenantId,
         resource_logs: ResourceLogs,
     ) -> Result<StorableStream, Rejection> {
@@ -986,7 +996,7 @@ mod tests {
             .into_iter()
             .next()
             .unwrap();
-        StorableStream::admit(stream, group, tenant, canonical)
+        StorableStream::admit(stream, group, tenant, canonical_streams)
     }
 
     /// The records a freshly admitted stream carries.
@@ -1003,22 +1013,35 @@ mod tests {
 
     #[test]
     fn first_write_establishes_canonical_pair() {
-        let canonical = Mutex::new(HashMap::new());
-        let admitted =
-            admit_stream_of(&canonical, &tenant(), rl(Some("prod"), Some("api"), 4)).unwrap();
-        let canonical = canonical.lock().unwrap();
-        let stream = canonical.get(&(tenant(), admitted.part_key)).unwrap();
+        let canonical_streams = CanonicalStreams::default();
+        let admitted = admit_stream_of(
+            &canonical_streams,
+            &tenant(),
+            rl(Some("prod"), Some("api"), 4),
+        )
+        .unwrap();
+        let by_hash = canonical_streams.by_hash.lock().unwrap();
+        let stream = by_hash.get(&(tenant(), admitted.part_key)).unwrap();
         assert_eq!(stream, &ServiceStream::new("prod", "api"));
     }
 
     #[test]
     fn matching_subsequent_writes_pass_through() {
-        let canonical = Mutex::new(HashMap::new());
-        admit_stream_of(&canonical, &tenant(), rl(Some("prod"), Some("api"), 1)).unwrap();
-        let admitted =
-            admit_stream_of(&canonical, &tenant(), rl(Some("prod"), Some("api"), 7)).unwrap();
+        let canonical_streams = CanonicalStreams::default();
+        admit_stream_of(
+            &canonical_streams,
+            &tenant(),
+            rl(Some("prod"), Some("api"), 1),
+        )
+        .unwrap();
+        let admitted = admit_stream_of(
+            &canonical_streams,
+            &tenant(),
+            rl(Some("prod"), Some("api"), 7),
+        )
+        .unwrap();
         assert_eq!(record_count(&admitted), 7);
-        assert_eq!(canonical.lock().unwrap().len(), 1);
+        assert_eq!(canonical_streams.by_hash.lock().unwrap().len(), 1);
     }
 
     #[test]
@@ -1034,17 +1057,17 @@ mod tests {
         let rejected = ServiceStream::new("staging", "api");
         let hash = rejected.ns_hash();
         let canonical_stream = ServiceStream::new("prod", "api");
-        let canonical = Mutex::new(HashMap::from([(
-            (tenant(), hash),
-            canonical_stream.clone(),
-        )]));
+        let canonical_streams = CanonicalStreams::default();
+        canonical_streams
+            .claim(&tenant(), hash, &canonical_stream)
+            .unwrap();
 
         let group = StreamGroup {
             log_record_count: 12,
             resource_logs: Vec::new(),
         };
         let Err(Rejection::Collision(c)) =
-            StorableStream::admit(rejected.clone(), group, &tenant(), &canonical)
+            StorableStream::admit(rejected.clone(), group, &tenant(), &canonical_streams)
         else {
             panic!("a stream whose hash another identity holds must collide");
         };
@@ -1054,26 +1077,31 @@ mod tests {
         assert_eq!(c.rejected_log_records, 12);
         // The original canonical stream must remain unchanged.
         assert_eq!(
-            canonical.lock().unwrap().get(&(tenant(), hash)).unwrap(),
+            canonical_streams
+                .by_hash
+                .lock()
+                .unwrap()
+                .get(&(tenant(), hash))
+                .unwrap(),
             &canonical_stream
         );
     }
 
     #[test]
-    fn tenants_have_independent_canonical_tables() {
-        let canonical = Mutex::new(HashMap::new());
+    fn tenants_have_independent_canonical_streams() {
+        let canonical_streams = CanonicalStreams::default();
         let t1 = TenantId::from("t1");
         let t2 = TenantId::from("t2");
         let admitted_t1 =
-            admit_stream_of(&canonical, &t1, rl(Some("prod"), Some("api"), 1)).unwrap();
+            admit_stream_of(&canonical_streams, &t1, rl(Some("prod"), Some("api"), 1)).unwrap();
 
         // The same stream (hence the same ns_hash) in a different tenant
         // must be accepted as fresh, not flagged as a collision — the
-        // tenant id is part of the canonical-table key.
+        // tenant id is part of the canonical-streams key.
         let admitted_t2 =
-            admit_stream_of(&canonical, &t2, rl(Some("prod"), Some("api"), 1)).unwrap();
+            admit_stream_of(&canonical_streams, &t2, rl(Some("prod"), Some("api"), 1)).unwrap();
         assert_eq!(admitted_t1.part_key, admitted_t2.part_key);
-        assert_eq!(canonical.lock().unwrap().len(), 2);
+        assert_eq!(canonical_streams.by_hash.lock().unwrap().len(), 2);
     }
 
     /// Build a `NetdataLogsService` rooted at `wal_dir`. The
@@ -1327,8 +1355,8 @@ mod tests {
             .await
             .unwrap();
 
-        // The canonical table should be empty — no claim was made.
-        let canonical = service.canonical.lock().unwrap();
+        // No canonical stream should exist — no claim was made.
+        let canonical = service.canonical_streams.by_hash.lock().unwrap();
         assert!(
             canonical.is_empty(),
             "empty request must not have claimed a canonical (ns, name) pair"
@@ -1392,7 +1420,7 @@ mod tests {
         // canonical `part_key` (validated before the collision check). Only the
         // well-formed stream's pair is registered — otherwise a later valid
         // stream colliding on that hash would be rejected against a phantom.
-        let canonical = service.canonical.lock().unwrap();
+        let canonical = service.canonical_streams.by_hash.lock().unwrap();
         let tenant = TenantId::from("default");
         assert!(
             canonical.contains_key(&(tenant.clone(), ServiceStream::new("prod", "api").ns_hash())),
