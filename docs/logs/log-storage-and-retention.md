@@ -123,9 +123,9 @@ Retention applies to sealed indexed files, oldest first, when any of three limit
 | `logs.retention.default.max_age` | 7 days | Maximum age of an indexed file, measured on its newest entry |
 
 `max_total_size` is not a cap on the plugin's disk usage: active write-ahead logs (up to `max_file_size` per stream),
-catalogs, and the download cache for offloaded data are additional. Retention runs when a file is sealed; when logs
-stop arriving, the last write-ahead log seals on idle (within about 15 minutes) and gets one final pass, and the
-remaining files are kept until logs arrive again or the Agent restarts.
+catalogs, and the download cache for offloaded data are additional. Retention runs when a file is sealed, and also
+every 30 seconds. When logs stop arriving, the last write-ahead log seals on idle (within about 15 minutes), and the
+files that pass `max_age` are still deleted.
 
 Set the limits under `logs.retention.default`; a user `otel.yaml` needs only the fields that change:
 
@@ -146,10 +146,11 @@ With `remote_storage.enabled: true`, every sealed indexed file is also uploaded 
 `fs://` location. Traces are uploaded the same way; how trace queries read them back is in
 [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md#offloading-to-object-storage).
 Uploading changes nothing locally: files stay under local retention, and
-a local file is not deleted by retention until its catalog entry confirms it is in the remote. When a query needs an
-offloaded file that is no longer local, the Agent downloads it whole into a download cache at `<base_dir>/remote-read`,
-bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then answers from it; repeated
-queries over the same files are served from the cache.
+a local file is not deleted by retention until its catalog entry confirms it is in the remote. While an older file
+waits for this confirmation, retention deletes the oldest files that are confirmed, so the limits hold. When a query
+needs an offloaded file that is no longer local, the Agent downloads it whole into a download cache at
+`<base_dir>/remote-read`, bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then
+answers from it; repeated queries over the same files are served from the cache.
 
 - A query whose offloaded files exceed the cache fails with a message to narrow the time window or stream filter.
 - A download may take 30 seconds plus one second per MiB of the file, at most 5 minutes. A file that takes longer, or

@@ -37,9 +37,9 @@ Retention applies to sealed indexed files, oldest first, when any of three limit
 | `traces.retention.default.max_age` | 7 days | Maximum age of an indexed file, measured on the start time of its newest span |
 
 `max_total_size` is not a cap on the plugin's disk usage: the active write-ahead log (up to `max_file_size`), catalogs,
-and the download cache for offloaded data are additional. Retention runs when a file is sealed; when spans stop
-arriving, the last write-ahead log seals on idle (within about 15 minutes) and gets one final pass, and the remaining
-files are kept until spans arrive again or the Agent restarts.
+and the download cache for offloaded data are additional. Retention runs when a file is sealed, and also every 30
+seconds. When spans stop arriving, the last write-ahead log seals on idle (within about 15 minutes), and the files that
+pass `max_age` are still deleted.
 
 Traces have their own settings, separate from `logs`. Set the limits under `traces.retention.default`; a user
 `otel.yaml` needs only the fields that change:
