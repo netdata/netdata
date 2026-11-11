@@ -81,9 +81,11 @@ static inline void health_rrdcalc2json_nolock(
         buffer_json_member_add_int64(wb, "lookup_after", rc->config.after);
         buffer_json_member_add_int64(wb, "lookup_before", rc->config.before);
 
-        CLEAN_BUFFER *options = buffer_create(0, NULL);
-        rrdr_options_to_buffer(options, rc->config.options);
-        buffer_json_member_add_string(wb, "lookup_options", buffer_tostring(options));
+        // option names are fixed literals that need no escaping
+        buffer_json_member_add_key_only(wb, "lookup_options");
+        buffer_fast_strcat(wb, "\"", 1);
+        rrdr_options_to_buffer(wb, rc->config.options);
+        buffer_fast_strcat(wb, "\"", 1);
     }
 
     if(rc->config.calculation) {
