@@ -114,15 +114,23 @@ func New(deps Dependencies, cfg Config) Components {
 		Collectors: collectors,
 		Functions: []funcapi.ProcessFunctionProvider{
 			{
-				ID:        "rum",
-				Functions: rumfunctions.Declarations,
+				ID: "rum",
+				Functions: func() []funcapi.FunctionConfig {
+					return availableFunctions(rumfunctions.Declarations(), func() bool {
+						return rumRegistry.HasSites() || deps.History.HasObservedKind("rum")
+					})
+				},
 				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
 					return rumfunctions.New(rumQueries, ctx.LookupVnodeGUID)
 				},
 			},
 			{
-				ID:        "synthetics",
-				Functions: syntheticfunctions.Declarations,
+				ID: "synthetics",
+				Functions: func() []funcapi.FunctionConfig {
+					return availableFunctions(syntheticfunctions.Declarations(), func() bool {
+						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind("synthetic") || deps.Artifacts.HasObservedPublished()
+					})
+				},
 				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
 					return syntheticfunctions.New(syntheticQueries, ctx.LookupVnodeGUID)
 				},
@@ -135,4 +143,11 @@ func New(deps Dependencies, cfg Config) Components {
 		},
 		Retention: retention,
 	}
+}
+
+func availableFunctions(methods []funcapi.FunctionConfig, available func() bool) []funcapi.FunctionConfig {
+	for i := range methods {
+		methods[i].Available = available
+	}
+	return methods
 }

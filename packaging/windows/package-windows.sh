@@ -17,6 +17,10 @@ if [ -f /opt/netdata/usr/bin/bashbug ]; then
     rm -rf /opt/netdata/usr/bin/bashbug
 fi
 
+# Drop the MSYS DLLs a previous run staged, so a DLL the current base and pins no longer provide is neither shipped
+# nor counted by check_msys_dll_imports. cmake --install and the base copy below put back the current ones.
+rm -f /opt/netdata/usr/bin/msys-*.dll
+
 ${GITHUB_ACTIONS+echo "::group::Installing"}
 # shellcheck disable=SC2154  # build is assigned by win-build-dir.sh
 cmake --install "${build}"
@@ -99,6 +103,34 @@ HOOK
     pacman -Qkk "${pacman_root[@]}" "${!pinned[@]}"
 }
 
+# netdata is built against the newest MSYS2 packages while the base is a snapshot, so a library that changes its DLL
+# name upstream (OpenSSL 3 -> 4) leaves the MSI without a DLL it needs, or strands base tools on the old name.
+# Fail the build when an MSYS DLL that a shipped executable or DLL imports is not in the tree.
+check_msys_dll_imports() {
+    local root=/opt/netdata imports dll file missing=0
+
+    command -v objdump > /dev/null || { echo "objdump is needed to check the MSYS DLL imports." >&2; exit 1; }
+
+    # A file that cannot be read fails the check rather than going unchecked.
+    imports="$(find "${root}" -type f \( -iname '*.exe' -o -iname '*.dll' \) -print0 |
+               xargs -0 objdump -p |
+               awk '/:[ \t]+file format / { file = $0; sub(/:[ \t]+file format .*/, "", file) }
+                    /DLL Name: msys-/ { print $3 "\t" file }' | sort -u)" || {
+        echo "Could not read the DLL imports of the files in ${root}." >&2
+        exit 1
+    }
+    [ -n "${imports}" ] || { echo "Found no MSYS DLL imports in ${root}." >&2; exit 1; }
+
+    while IFS=$'\t' read -r dll file; do
+        if [ ! -e "${root}/usr/bin/${dll}" ]; then
+            echo "${file} imports ${dll}, which is missing from the staged usr/bin." >&2
+            missing=1
+        fi
+    done <<< "${imports}"
+
+    [ "${missing}" -eq 0 ] || exit 1
+}
+
 ${GITHUB_ACTIONS+echo "::group::Copy Files"}
 # Upgrade the freshly unpacked base, and replace the package database a previous run left in /opt/netdata, so pacman
 # never sees two versions of a package.
@@ -109,6 +141,7 @@ rm -rf /opt/netdata/var/lib/pacman/local/
 cp -R /opt/netdata/msys64/* /opt/netdata/ || exit 1
 cp "${repo_root}/packaging/windows/copy_files.ps1" /opt/netdata/usr/libexec/netdata/ || exit 1
 rm -rf /opt/netdata/msys64/
+check_msys_dll_imports
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Configure Editor"}

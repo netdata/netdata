@@ -213,7 +213,6 @@ extern bool include_exited_childs;
 extern bool enable_function_cmdline;
 extern bool proc_pid_cmdline_is_needed;
 extern int enable_file_charts;
-extern bool obsolete_file_charts;
 
 extern size_t
     global_iterations_counter,
@@ -316,6 +315,12 @@ struct openfds {
 //
 // - Each entry in /etc/apps_groups.conf creates a target.
 // - Each user and group used by a process in the system, creates a target.
+//
+// Every target type except TARGET_TYPE_APP_GROUP is dynamic: it is created on
+// first sight of an identity, retired once no process has referenced it for
+// retire_targets_after_s, and admitted only while its family holds fewer than
+// max_targets_per_family; beyond that, new identities aggregate into the
+// family's overflow target.
 
 struct pid_on_target {
     int32_t pid;
@@ -338,6 +343,17 @@ typedef enum __attribute__((packed)) {
 #endif
     TARGET_TYPE_TREE,
 } TARGET_TYPE;
+
+// the optional chart groups a target has announced to netdata, so that
+// retirement obsoletes exactly what was defined
+typedef enum __attribute__((packed)) {
+    TARGET_CHARTS_BASE              = (1 << 0), // the charts every exposed target has
+    TARGET_CHARTS_FILES             = (1 << 1),
+    TARGET_CHARTS_EBPF_CACHESTAT    = (1 << 2),
+    TARGET_CHARTS_EBPF_DCSTAT       = (1 << 3),
+    TARGET_CHARTS_EBPF_FD           = (1 << 4),
+    TARGET_CHARTS_EBPF_FD_ERRORS    = (1 << 5),
+} TARGET_CHARTS;
 
 typedef enum __attribute__((packed)) {
     // CPU utilization time
@@ -475,6 +491,11 @@ struct target {
 
     bool exposed:1;         // if set, we have sent this to netdata
     bool needs_smaps_update:1;
+    bool overflow:1;        // the family's overflow target - never matched by identity
+    TARGET_CHARTS charts;   // the chart groups announced to netdata
+
+    size_t referenced_iteration;    // the last iteration a process referenced this target
+    usec_t last_active_ut;          // monotonic time of that iteration
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
@@ -563,17 +584,27 @@ struct pid_stat {
     struct target *target;          // app_groups.conf/tree targets
     struct target *prev_target;
 
+    // A process placed in a family's overflow target keeps it only while its
+    // identity (the key) and the family's generation are unchanged.
 #if (PROCESSES_HAVE_UID == 1)
     struct target *uid_target;      // uid based targets
+    uid_t uid_overflow_key;
+    size_t uid_overflow_generation;
 #endif
 #if (PROCESSES_HAVE_GID == 1)
     struct target *gid_target;      // gid based targets
+    gid_t gid_overflow_key;
+    size_t gid_overflow_generation;
 #endif
 #if (PROCESSES_HAVE_SID == 1)
     struct target *sid_target;      // sid based targets
+    STRING *sid_overflow_key;       // own reference
+    size_t sid_overflow_generation;
 #endif
 #if (PROCESSES_HAVE_SERVICE == 1)
     struct target *service_target;  // service based targets
+    STRING *service_overflow_key;   // own reference
+    size_t service_overflow_generation;
 #endif
 
     STRING *comm_orig;              // the command, as-collected
@@ -792,6 +823,57 @@ bool is_process_an_interpreter(struct pid_stat *p);
 // --------------------------------------------------------------------------------------------------------------------
 // targets management
 
+#define RETIRE_TARGETS_AFTER_DEFAULT_S 3600
+#define MAX_TARGETS_PER_FAMILY_DEFAULT 500
+
+extern time_t retire_targets_after_s;
+extern size_t max_targets_per_family;
+
+// a family is one list of targets, reported under one chart type
+struct target_family {
+    struct target **root;
+    const char *type;           // chart type: app, user, usergroup, service
+    const char *lbl_name;       // the chart label carrying the target name
+    const char *title;          // chart title prefix
+    bool *enabled;              // charts enabled for this family (NULL = always)
+
+    size_t dynamic;             // dynamic targets linked, excluding the overflow target
+    size_t retired;             // dynamic targets retired so far
+    size_t generation;          // bumped whenever a real target is linked or retired
+    struct target *overflow;    // where new identities go while the family is at its cap
+    bool cap_logged;
+};
+
+typedef enum {
+    TARGET_FAMILY_APPS = 0,
+#if (PROCESSES_HAVE_UID == 1)
+    TARGET_FAMILY_UID,
+#endif
+#if (PROCESSES_HAVE_GID == 1)
+    TARGET_FAMILY_GID,
+#endif
+#if (PROCESSES_HAVE_SID == 1)
+    TARGET_FAMILY_SID,
+#endif
+#if (PROCESSES_HAVE_SERVICE == 1)
+    TARGET_FAMILY_SERVICE,
+#endif
+    TARGET_FAMILY_MAX,
+} TARGET_FAMILY;
+
+extern struct target_family target_families[TARGET_FAMILY_MAX];
+
+static inline bool target_family_enabled(const struct target_family *f) {
+    return !f->enabled || *f->enabled;
+}
+
+static inline bool target_family_at_cap(TARGET_FAMILY family) {
+    return target_families[family].dynamic >= max_targets_per_family;
+}
+
+void apps_targets_mark_referenced(void);
+void apps_targets_retire(void);
+
 struct target *find_target_by_name(struct target *base, const char *name);
 struct target *get_tree_target(struct pid_stat *p);
 
@@ -824,8 +906,9 @@ int read_apps_groups_conf(const char *path, const char *file);
 // --------------------------------------------------------------------------------------------------------------------
 // output
 
-void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title);
-void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt);
+void send_charts_updates_to_netdata(struct target_family *f);
+void send_collected_data_to_netdata(struct target_family *f, usec_t dt);
+void send_target_charts_obsolete(struct target *w, const struct target_family *f);
 void send_resource_usage_to_netdata(usec_t dt);
 
 #if (PROCESSES_HAVE_STATE == 1)

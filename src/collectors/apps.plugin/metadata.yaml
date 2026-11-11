@@ -34,7 +34,10 @@ modules:
         auto_detection:
           description: ""
         limits:
-          description: ""
+          description: |
+            - **Idle process groups disappear after 1 hour:** the charts of a process group with no processes for `retire-targets-after` seconds (default 3600) are removed. Groups defined in `apps_groups.conf` are never removed and do not count against the limit.
+            - **At most 500 process groups:** up to `max-targets` (default 500) process groups get their own charts. Beyond that, new ones are aggregated into `app.other_*`, and an info message is logged once.
+            - Both are set in `netdata.conf`, for example `[plugin:apps]` `command options = retire-targets-after 7200 max-targets 1000` (seconds, and targets per family).
         performance_impact:
           description: ""
     setup:
@@ -363,7 +366,10 @@ modules:
         auto_detection:
           description: ""
         limits:
-          description: ""
+          description: |
+            - **Idle user groups disappear after 1 hour:** the charts of a user group with no processes for `retire-targets-after` seconds (default 3600) are removed.
+            - **At most 500 user groups:** up to `max-targets` (default 500) user groups get their own charts. Beyond that, new ones are aggregated into `usergroup.other_*`, and an info message is logged once.
+            - Both are set in `netdata.conf`, for example `[plugin:apps]` `command options = retire-targets-after 7200 max-targets 1000` (seconds, and targets per family).
         performance_impact:
           description: ""
     setup:
@@ -550,7 +556,10 @@ modules:
         auto_detection:
           description: ""
         limits:
-          description: ""
+          description: |
+            - **Idle users disappear after 1 hour:** the charts of a user with no processes for `retire-targets-after` seconds (default 3600) are removed.
+            - **At most 500 users:** up to `max-targets` (default 500) users get their own charts. Beyond that, new ones are aggregated into `user.other_*`, and an info message is logged once.
+            - Both are set in `netdata.conf`, for example `[plugin:apps]` `command options = retire-targets-after 7200 max-targets 1000` (seconds, and targets per family).
         performance_impact:
           description: ""
     setup:
@@ -739,7 +748,10 @@ modules:
         auto_detection:
           description: "All running Windows services are automatically discovered. No configuration is needed."
         limits:
-          description: ""
+          description: |
+            - **Idle Windows services disappear after 1 hour:** the charts of a Windows service with no processes for `retire-targets-after` seconds (default 3600) are removed.
+            - **At most 500 Windows services:** up to `max-targets` (default 500) Windows services get their own charts. Beyond that, new ones are aggregated into `service.other_*`, and an info message is logged once.
+            - Both are set in `netdata.conf`, for example `[plugin:apps]` `command options = retire-targets-after 7200 max-targets 1000` (seconds, and targets per family).
         performance_impact:
           description: "No additional SCM query overhead. The service list is already queried by apps.plugin for process naming. Per-iteration work involves walking parent chains to assign service names."
     setup:

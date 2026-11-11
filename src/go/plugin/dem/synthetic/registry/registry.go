@@ -150,3 +150,10 @@ func cloneRun(in *synthetic.Run) *synthetic.Run {
 	result := synthetic.CloneRun(*in)
 	return &result
 }
+
+// HasJobs reports whether any runtime is currently admitted.
+func (h *Registry) HasJobs() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.jobs) != 0
+}

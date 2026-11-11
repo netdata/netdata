@@ -48,7 +48,7 @@ func Declarations() []funcapi.FunctionConfig {
 		Name:         "DEM History Status",
 		UpdateEvery:  60,
 		Help:         help,
-		Tags:         "dem hidden",
+		Tags:         "dem",
 		RawRequest:   true,
 		ManagedInfo:  true,
 	}}

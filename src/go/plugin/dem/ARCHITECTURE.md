@@ -37,7 +37,9 @@ relative to `src/go/`.
   configured through DynCfg, scheduled by the framework, publishing charts. Stock alerts cover RUM Web Vitals (LCP,
   INP, CLS), OTLP export failures and loss, and journey failures.
 - Beyond charts, DEM keeps sampled investigation detail in a journal and optional screenshots/reports on disk. Process
-  Functions expose both, and keep working even when every collector is disabled.
+  Functions expose both when a corresponding job is active or retained data has been observed. Retained-data access
+  works with every collector disabled; already-announced Functions remain callable for that framework generation.
+  An empty fresh installation announces only `dem-history-status`.
 - The command (`cmd/demplugin`) owns the shared stores. Jobs only borrow them, and the stores close only after a clean
   shutdown.
 
@@ -567,8 +569,14 @@ Framework-owned behavior:
 
 - The framework owns desired configuration, preflight, scheduling, admission, retries, status and DynCfg.
 - The constructor injects domain registries into collectors and query services into process Function providers.
-- Providers construct fresh handlers for each contained framework run generation and remain available independently
-  of collector selection.
+- Providers construct fresh handlers for each contained framework run generation, independently of collector selection.
+  `dem-history-status` is unconditional. RUM/synthetics declarations use `Available` to wait for a corresponding
+  admitted job or retained data; the framework keeps announced methods callable for the rest of that generation.
+- Availability uses registry length checks and store-owned atomic presence hints, never per-tick history or capture
+  scans. Journal startup seeds hints from indexed kind counts; successful appends set them thereafter. Artifact startup
+  probes one published-directory entry, and successful publication sets its hint. Unclassified published entries or
+  enumeration errors also expose catalogue diagnostics without bypassing manifest validation. Workspaces alone do not.
+  Hints stay true across framework generations during the store lifetime; process restart derives them from disk again.
 - The RUM registry contains actual admitted site registrations and receiver availability. It has no desired config
   mirror, scheduler or job status.
 
@@ -1045,8 +1053,8 @@ Failure handling:
 
 Functions:
 
-- Process Functions are registered through separate process providers and published independently of collector
-  selection.
+- Process Functions use separate providers, independent of collector selection. Initial publication waits for active
+  jobs or retained history/captures, as described under framework-owned behavior above.
 - Their narrow source copies active snapshots before independent history I/O. No Function acquires browser admission.
 
 Node adapter and supervision:

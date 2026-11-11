@@ -861,6 +861,8 @@ int web_client_forwarded_for_unittest(void)
         { "203.0.113.7\" \"x", "" },
         { "unknown", "" },
         { "", "" },
+        { ",203.0.113.7", "" },
+        { " \t, 203.0.113.7", "" },
 
         // address with a port
         { "203.0.113.7:8080", "203.0.113.7" },

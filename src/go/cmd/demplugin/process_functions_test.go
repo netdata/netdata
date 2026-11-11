@@ -85,6 +85,25 @@ func (w *functionWire) request(t *testing.T, input io.Writer, id, command, paylo
 	require.NoError(t, json.Unmarshal([]byte(body), &response))
 	return response
 }
+
+// selectionData returns a table response's rows without its age columns. An
+// age counts whole seconds back from the clock of its own call, so two calls
+// that select the same rows can differ by one across a second boundary.
+func selectionData(response map[string]any) any {
+	columns, _ := response["columns"].(map[string]any)
+	rows, _ := response["data"].([]any)
+	for key, column := range columns {
+		if !strings.HasSuffix(key, "_age_s") {
+			continue
+		}
+		index := int(column.(map[string]any)["index"].(float64))
+		for _, row := range rows {
+			row.([]any)[index] = nil
+		}
+	}
+	return response["data"]
+}
+
 func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 	raw, err := os.ReadFile("../../../plugins.d/FUNCTION_UI_SCHEMA.json")
 	require.NoError(t, err)
@@ -103,7 +122,8 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
-			history, err := demjournal.Open(ctx, "")
+			historyRoot := t.TempDir()
+			history, err := demjournal.Open(ctx, historyRoot)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, history.Close()) })
 			cfg := dem.DefaultConfig()
@@ -140,6 +160,10 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			captures, err := artifacts.Open(t.TempDir())
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, captures.Close()) })
+			require.NoError(t, history.Close())
+			history, err = demjournal.Open(ctx, historyRoot)
+			require.NoError(t, err)
+			require.NoError(t, history.EnforceHistoryRetention(ctx, cfg.History.Days, cfg.History.MaxBytes))
 			components := dem.New(dem.Dependencies{
 				Artifacts: captures,
 				History:   history,
@@ -245,7 +269,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 					}
 					byName := output.call(t, writer, "name-"+id, method+args+" vnode:storefront")
 					byGUID := output.call(t, writer, "guid-"+id, method+args+" vnode_guid:"+siteGUID)
-					assert.Equal(t, byGUID["data"], byName["data"])
+					assert.Equal(t, selectionData(byGUID), selectionData(byName))
 					assert.Contains(t, byName["accepted_params"], "vnode")
 					for n, selector := range []string{"vnode:unknown", "vnode:", "vnode:storefront vnode_guid:", "vnode:storefront vnode:storefront"} {
 						output.request(t, writer, fmt.Sprintf("invalid-%s-%d", id, n), method+args+" "+selector, "", 400)
@@ -295,4 +319,70 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			assert.NotContains(t, output.String(), "CHART ")
 		})
 	}
+}
+
+func TestDEMFunctionsWaitForDataWithoutJobs(t *testing.T) {
+	history, err := demjournal.Open(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, history.Close()) })
+	components := dem.New(dem.Dependencies{
+		History: history,
+	}, dem.DefaultConfig())
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: no\n"), 0600))
+	a := agent.New(agent.Config{
+		Name:                    "dem",
+		VarLibDir:               t.TempDir(),
+		PluginConfigDir:         []string{dir},
+		CollectorsConfigDir:     []string{dir},
+		ModuleRegistry:          components.Collectors,
+		ProcessFunctions:        components.Functions,
+		ShutdownTimeout:         time.Second,
+		DisableServiceDiscovery: true,
+		DiscoveryProviders:      []discovery.ProviderFactory{discoveryproviders.File(), discoveryproviders.Dummy()},
+	})
+	reader, writer := io.Pipe()
+	output := &functionWire{}
+	a.In, a.Out = reader, output
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- a.RunContext(ctx) }()
+	t.Cleanup(func() {
+		cancel()
+		_ = writer.Close()
+		_ = reader.Close()
+		select {
+		case err := <-done:
+			if err != nil {
+				require.ErrorIs(t, err, context.Canceled)
+			}
+		case <-time.After(3 * time.Second):
+			t.Error("Agent did not join")
+		}
+	})
+	require.Eventually(t, func() bool { return strings.Contains(output.String(), `FUNCTION GLOBAL "dem-history-status"`) }, 3*time.Second, time.Millisecond)
+	output.call(t, writer, "empty-status", "dem-history-status")
+	assert.NotContains(t, output.String(), `FUNCTION GLOBAL "rum-`)
+	assert.NotContains(t, output.String(), `FUNCTION GLOBAL "synthetics-`)
+	_, err = rumhistory.NewStore(history).AppendEvent(t.Context(), rumhistory.EventRecord{
+		Site:       "retired",
+		SessionID:  "session",
+		ObservedUS: time.Now().UnixMicro(),
+		Type:       "pageview",
+		Page:       "/",
+	})
+	require.NoError(t, err)
+	require.Eventually(t, func() bool {
+		wire := output.String()
+		for _, method := range []string{"rum-sites", "rum-pages", "rum-live", "rum-sessions", "rum-errors", "rum-session-events"} {
+			if !strings.Contains(wire, `FUNCTION GLOBAL "`+method+`"`) {
+				return false
+			}
+		}
+		return true
+	}, 3*time.Second, time.Millisecond)
+	assert.NotContains(t, output.String(), `FUNCTION GLOBAL "synthetics-`)
+	assert.NotContains(t, output.String(), "hidden")
+	result := output.call(t, writer, "retained-rum", "rum-sessions site:retired")
+	assert.Len(t, result["data"], 1)
 }

@@ -49,14 +49,15 @@ func TestIngestExpiresCanonicalStateWithoutReads(t *testing.T) {
 	require.Zero(t, a.site.resources.Len())
 	require.Len(t, a.site.sessions, 1)
 	require.Len(t, a.site.pageSessions, 1)
-	require.Len(t, a.site.identities, 4, "identity evidence outlives measurement windows")
+	identities := func() int { return len(a.site.identities) + len(a.site.vitalIdentities) }
+	require.Equal(t, 4, identities(), "identity evidence outlives measurement windows")
 	require.Len(t, a.site.resourceIdentities, 1)
 	*now = now.Add(30 * time.Minute)
 	a.Ingest(mk(*now, "last", "/last"))
-	require.Len(t, a.site.identities, 3, "the exact 30-minute boundary remains included")
+	require.Equal(t, 3, identities(), "the exact 30-minute boundary remains included")
 	*now = now.Add(time.Nanosecond)
 	a.Ingest(&beacon.Beacon{Site: "s", Received: *now})
-	require.Len(t, a.site.identities, 1)
+	require.Equal(t, 1, identities())
 	require.Empty(t, a.site.resourceIdentities)
 }
 

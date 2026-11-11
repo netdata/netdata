@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/systemd-journal-sdk/go/journal"
@@ -20,13 +21,15 @@ import (
 // the writer for its entire duration. Snapshot file handles remain open until
 // the query completes, including when retention unlinks an archive.
 type Store struct {
-	gate            chan struct{}
-	root, temporary string
-	host            *journalhost.Provider
-	log             *journal.Log
-	closed          bool
-	failure         error
-	readers         sync.WaitGroup
+	gate              chan struct{}
+	root, temporary   string
+	host              *journalhost.Provider
+	log               *journal.Log
+	closed            bool
+	failure           error
+	readers           sync.WaitGroup
+	observedRUM       atomic.Bool
+	observedSynthetic atomic.Bool
 }
 
 // Open opens one command-owned journal chain. An empty path uses private
@@ -132,4 +135,33 @@ func (s *Store) Close() error {
 		}
 	}
 	return err
+}
+
+// HasObservedKind is a prompt Function-discovery hint, not a retention inventory.
+// It stays true for this store's lifetime once startup or an append observes the kind.
+func (s *Store) HasObservedKind(kind string) bool {
+	if s == nil {
+		return false
+	}
+	switch kind {
+	case "rum":
+		return s.observedRUM.Load()
+	case "synthetic":
+		return s.observedSynthetic.Load()
+	default:
+		return false
+	}
+}
+
+func (s *Store) observeKind(kind string) {
+	switch kind {
+	case "rum":
+		if !s.observedRUM.Load() {
+			s.observedRUM.Store(true)
+		}
+	case "synthetic":
+		if !s.observedSynthetic.Load() {
+			s.observedSynthetic.Store(true)
+		}
+	}
 }
