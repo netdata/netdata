@@ -82,8 +82,8 @@ metrics:
   grace_period_secs: 60
 
   # Seconds without data after which a chart is removed. A data point is
-  # rejected when its timestamp is further from the current time than this,
-  # in the past or in the future.
+  # rejected when its timestamp is further from the current time than the
+  # expiry of its chart, in the past or in the future.
   expiry_duration_secs: 900
 
   # Maximum number of new charts a single OTLP export request may create —

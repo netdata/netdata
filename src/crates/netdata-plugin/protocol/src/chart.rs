@@ -15,10 +15,13 @@
 //!
 //! Ids and option words are written verbatim; callers own their validity:
 //! - a chart id is `type.id`, both parts non-empty (the agent rejects the line
-//!   otherwise, `pluginsd_chart`), with no whitespace or quotes (the splitter
-//!   would cut the word there), and at most [`MAX_CHART_ID_BYTES`] long;
-//! - a dimension id has no whitespace or quotes, and every `SET` names a
-//!   dimension the chart declared (an unknown id is a protocol error,
+//!   otherwise, `pluginsd_chart`), at most [`MAX_CHART_ID_BYTES`] long, and a
+//!   plain word: no whitespace or `=` (the splitter ends the word there), no
+//!   quote (one at the start of a word opens a quoted field) and no backslash
+//!   (it takes the next byte with it). The agent's splitter would keep a
+//!   quote inside a word; this crate refuses one anywhere, as one rule;
+//! - a dimension id is a plain word too, and every `SET` names a dimension
+//!   the chart declared (an unknown id is a protocol error,
 //!   `pluginsd_acquire_dimension`).
 //!
 //! [`sanitize_chart_id`] and [`sanitize_dimension_id`] make an id valid when

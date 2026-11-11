@@ -11,10 +11,11 @@
 //! parser, and the agent then restarts or disables the whole plugin
 //! (`src/plugins.d/plugins_d.c`), logs and traces included.
 //!
-//! These bytes are the ingestor's agent-facing output: chart.rs writes them
-//! into a buffer, the lib.rs tick loop hands the buffer to the main loop, the
-//! main loop forwards it as `IngestorResponse::ChartData`, and the otel-plugin
-//! supervisor writes it to stdout as it is. Line order here is wire order.
+//! These bytes are the ingestor's agent-facing output: chart.rs writes each
+//! definition, data slot and obsolete mark as one block, the lib.rs tick loop
+//! sends the blocks in chunks as `IngestorResponse::ChartData`, and the
+//! otel-plugin supervisor writes each chunk to stdout as it is. Line order
+//! here is wire order.
 //!
 //! Consumers: chart.rs uses everything here; metrics_service.rs only
 //! [`ChartType`].

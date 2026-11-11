@@ -71,7 +71,9 @@ pub struct ChartConfig {
     pub collection_interval: u64,
     /// How long to wait for data before gap-filling on a tick with no data.
     pub grace_period: Duration,
-    /// Duration after which a chart with no new data stops emitting.
+    /// Duration after which a chart with no new data is marked obsolete and
+    /// dropped. Also how far from now a data point's timestamp may be
+    /// ([`Self::shows`]).
     pub expiry_duration: Duration,
 }
 
@@ -208,7 +210,7 @@ pub struct Chart {
     chart_type: ChartType,
     /// Collection interval in seconds.
     update_every: u64,
-    /// Duration after which a chart with no new data stops emitting.
+    /// Duration after which a chart with no new data expires.
     expiry_duration: Duration,
     /// How long to wait for data before gap-filling on a tick with no data.
     grace_period: Duration,
@@ -455,8 +457,8 @@ impl Chart {
         out.block(|buf| write_data_slot(buf, &self.chart_id, self.update_every, slot, values));
     }
 
-    /// Write the chart definition as one block of `out` if pending, then
-    /// mark as emitted.
+    /// Write the chart definition as one block of `out` if it needs
+    /// emission, then mark as emitted.
     fn emit_definition_if_needed(&mut self, out: &mut Chunker) {
         if !self.needs_definition() {
             return;
@@ -541,6 +543,15 @@ impl Chart {
             Some(instant) => instant.elapsed() >= self.expiry_duration,
             None => false,
         }
+    }
+
+    /// Make the chart's last data point `by` older than it is, so a test
+    /// can let a chart expire without waiting.
+    #[cfg(test)]
+    pub(crate) fn backdate_last_ingest(&mut self, by: Duration) {
+        self.last_ingest_instant = self
+            .last_ingest_instant
+            .map(|instant| instant.checked_sub(by).expect("a time the clock can hold"));
     }
 
     /// Get a reference to the chart definition (test only).
@@ -796,9 +807,6 @@ mod tests {
         assert!(text(&buf).contains("BEGIN my_metric.42 "), "{}", text(&buf));
     }
 
-    /// The whole text of a chart whose names need no change. The agent reads
-    /// it as it read the text the ingestor wrote before it used the shared
-    /// writer; the one difference in bytes is the quoted dimension name.
     #[test]
     fn a_dimension_with_a_name_too_long_is_refused() {
         let mut chart = gauge_chart();
@@ -841,6 +849,7 @@ mod tests {
         assert_eq!(text(&buf).matches("DIMENSION GET_/x ").count(), 1);
     }
 
+    /// The window is the chart's expiry, on both sides of now.
     #[test]
     fn a_chart_shows_points_within_its_expiry_of_now() {
         let config = ChartConfig {
@@ -858,6 +867,9 @@ mod tests {
         assert!(!config.shows(u64::MAX, now));
     }
 
+    /// The whole text of a chart whose names need no change. The agent reads
+    /// it as it read the text the ingestor wrote before it used the shared
+    /// writer; the one difference in bytes is the quoted dimension name.
     #[test]
     fn chart_text_of_plain_names() {
         let mut chart = Chart::new(

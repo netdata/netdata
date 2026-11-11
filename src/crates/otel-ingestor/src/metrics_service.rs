@@ -983,7 +983,7 @@ mod tests {
         let config = ChartConfig {
             collection_interval: 1,
             grace_period: std::time::Duration::ZERO,
-            expiry_duration: std::time::Duration::from_millis(20),
+            expiry_duration: std::time::Duration::from_secs(300),
         };
         let chart = manager.create_typed_chart(
             "load.42",
@@ -1002,7 +1002,10 @@ mod tests {
         let live = emit(&mut manager, 102);
         assert!(live.contains("BEGIN load.42 "), "{live}");
 
-        std::thread::sleep(std::time::Duration::from_millis(40));
+        manager
+            .get("load.42")
+            .unwrap()
+            .backdate_last_ingest(std::time::Duration::from_secs(301));
         let expired = emit(&mut manager, 103);
 
         assert_eq!(
