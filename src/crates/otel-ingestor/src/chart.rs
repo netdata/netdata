@@ -26,6 +26,20 @@ use crate::aggregation::{
 use crate::iter::MetricDataKind;
 use crate::output::{ChartDefinition, ChartType, DimensionValue, write_data_slot};
 
+/// The longest name a metric or a dimension may have, in bytes: the
+/// OpenTelemetry API's limit for an instrument name is 255 characters. The
+/// names go into ids, and a chart id has a longest length at the agent
+/// (`netdata_plugin_protocol::MAX_CHART_ID_BYTES`); a metric's name of this
+/// length leaves its chart ids far below it, so they are never cut.
+pub const MAX_NAME_BYTES: usize = 255;
+
+/// The most dimensions one chart takes. A chart's definition and each of its
+/// updates is one block of text that leaves as one message, with a line per
+/// dimension: with this limit and [`MAX_NAME_BYTES`] a block stays near
+/// 2 MiB, under the 16 MiB a message may have
+/// (`otel_bridge::IPC_MAX_MESSAGE_SIZE`).
+pub const MAX_DIMENSIONS: usize = 4096;
+
 /// One dimension of a chart: a cross-slot context plus per-slot accumulators.
 ///
 /// Slots live in a `BTreeMap`, so points can land in any slot that has not
@@ -229,13 +243,21 @@ enum DimensionStore {
 }
 
 impl DimensionStore {
-    /// Number of dimensions; no production caller today.
-    #[allow(dead_code)]
+    /// Number of dimensions.
     fn len(&self) -> usize {
         match self {
             Self::Gauge(dims) => dims.len(),
             Self::DeltaSum(dims) => dims.len(),
             Self::CumulativeSum(dims) => dims.len(),
+        }
+    }
+
+    /// Whether the chart has the dimension `id`.
+    fn contains(&self, id: &str) -> bool {
+        match self {
+            Self::Gauge(dims) => dims.contains_key(id),
+            Self::DeltaSum(dims) => dims.contains_key(id),
+            Self::CumulativeSum(dims) => dims.contains_key(id),
         }
     }
 }
@@ -291,17 +313,35 @@ impl Chart {
 
     /// Ingest a data point into a dimension's per-slot accumulator. The
     /// dimension is the one whose id `dimension_name` gives.
+    ///
+    /// Returns `false` when the chart does not take the point: it would add
+    /// a dimension whose name is longer than [`MAX_NAME_BYTES`], or one more
+    /// than [`MAX_DIMENSIONS`].
     pub fn ingest(
         &mut self,
         dimension_name: &str,
         value: f64,
         timestamp_ns: u64,
         start_time_ns: u64,
-    ) {
+    ) -> bool {
+        let dimension_id = sanitize_dimension_id(dimension_name);
+        if !self.dimensions.contains(&dimension_id) {
+            let dimensions = self.dimensions.len();
+            if dimension_id.len() > MAX_NAME_BYTES || dimensions == MAX_DIMENSIONS {
+                return false;
+            }
+            if dimensions + 1 == MAX_DIMENSIONS {
+                tracing::warn!(
+                    "chart {} has {MAX_DIMENSIONS} dimensions, the most a chart takes: data \
+                     points of other dimensions are dropped",
+                    self.chart_id
+                );
+            }
+        }
+
         self.last_ingest_instant = Some(Instant::now());
 
         let slot = self.slot_for_timestamp(timestamp_ns);
-        let dimension_id = sanitize_dimension_id(dimension_name);
 
         // Record into the correct slot's accumulator.
         let new_dimension =
@@ -316,10 +356,12 @@ impl Chart {
             }
             self.definition.mark_changed();
         }
+
+        true
     }
 
-    /// Number of dimensions; no production caller today.
-    #[allow(dead_code)]
+    /// Number of dimensions.
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.dimensions.len()
     }
@@ -757,6 +799,27 @@ mod tests {
     /// The whole text of a chart whose names need no change. The agent reads
     /// it as it read the text the ingestor wrote before it used the shared
     /// writer; the one difference in bytes is the quoted dimension name.
+    #[test]
+    fn a_dimension_with_a_name_too_long_is_refused() {
+        let mut chart = gauge_chart();
+
+        assert!(chart.ingest(&"d".repeat(MAX_NAME_BYTES), 1.0, ns(100), 0));
+        assert!(!chart.ingest(&"d".repeat(MAX_NAME_BYTES + 1), 1.0, ns(100), 0));
+        assert_eq!(chart.len(), 1);
+    }
+
+    #[test]
+    fn a_chart_at_its_dimension_limit_refuses_new_dimensions_only() {
+        let mut chart = gauge_chart();
+        for i in 0..MAX_DIMENSIONS {
+            assert!(chart.ingest(&format!("d{i}"), 1.0, ns(100), 0));
+        }
+
+        assert!(!chart.ingest("one more", 1.0, ns(100), 0));
+        assert!(chart.ingest("d0", 2.0, ns(101), 0));
+        assert_eq!(chart.len(), MAX_DIMENSIONS);
+    }
+
     /// Two names that an id cannot tell apart are one dimension: an update
     /// never sets one id twice.
     #[test]

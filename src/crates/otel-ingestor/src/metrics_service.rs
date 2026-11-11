@@ -44,7 +44,7 @@ use opentelemetry_proto::tonic::metrics::v1::{
 use netdata_plugin_protocol::Chunker;
 use otel_derived_metrics::DerivedMetrics;
 
-use crate::chart::{Chart, ChartAggregationType, ChartConfig};
+use crate::chart::{Chart, ChartAggregationType, ChartConfig, MAX_NAME_BYTES};
 use crate::chart_config::ChartConfigManager;
 use crate::iter::{DataPointContext, DataPointContextIterExt};
 use crate::otel::{self, PointValue};
@@ -127,14 +127,14 @@ impl ChartManager {
         });
     }
 
-    /// Number of registered charts. No in-repo caller (`#[allow(dead_code)]`).
-    #[allow(dead_code)]
+    /// Number of registered charts.
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.charts.len()
     }
 
-    /// Whether no charts are registered. No in-repo caller (`#[allow(dead_code)]`).
-    #[allow(dead_code)]
+    /// Whether no charts are registered.
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.charts.is_empty()
     }
@@ -147,8 +147,9 @@ enum PointOutcome {
     /// It reached at least one chart.
     Charted,
     /// The plugin could not chart it: a timestamp too far from now, a metric
-    /// type or temporality it has no chart for, a malformed histogram, or a
-    /// new chart past the request's budget.
+    /// or dimension name too long for an id, a metric type or temporality it
+    /// has no chart for, a malformed histogram, a new chart past the
+    /// request's budget, or a new dimension past the chart's limit.
     Dropped,
 }
 
@@ -558,8 +559,12 @@ impl NetdataMetricsService {
                     dp.chart_labels(),
                 );
             }
-            chart.ingest(dimension_name, value, timestamp_ns, start_time_ns);
-            return PointOutcome::Charted;
+            return Self::outcome_of(chart.ingest(
+                dimension_name,
+                value,
+                timestamp_ns,
+                start_time_ns,
+            ));
         }
 
         // Chart doesn't exist — check budget before creating
@@ -584,8 +589,16 @@ impl NetdataMetricsService {
         );
 
         // Ingest the data point (accumulate only; emission happens on tick).
-        chart.ingest(dimension_name, value, timestamp_ns, start_time_ns);
-        PointOutcome::Charted
+        Self::outcome_of(chart.ingest(dimension_name, value, timestamp_ns, start_time_ns))
+    }
+
+    /// The outcome of a point that one chart took (`ingested`) or refused.
+    fn outcome_of(ingested: bool) -> PointOutcome {
+        if ingested {
+            PointOutcome::Charted
+        } else {
+            PointOutcome::Dropped
+        }
     }
 
     /// One export request end to end: normalize, attach per-metric configs,
@@ -611,6 +624,12 @@ impl NetdataMetricsService {
             let Some(value) = dp.datapoint_ref.value() else {
                 continue;
             };
+
+            // The name goes into the ids of the metric's charts.
+            if dp.metric_ref.metric.name.len() > MAX_NAME_BYTES {
+                dropped += 1;
+                continue;
+            }
 
             // Per-chart timing: the metric's matched config merged over the
             // global defaults (chart_config.rs).
@@ -739,8 +758,9 @@ impl MetricsService for NetdataMetricsService {
 #[cfg(test)]
 mod tests {
     use opentelemetry_proto::tonic::metrics::v1::{
-        ExponentialHistogram, ExponentialHistogramDataPoint, Gauge, Metric, NumberDataPoint,
-        ResourceMetrics, ScopeMetrics, metric::Data, number_data_point::Value,
+        AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
+        Histogram, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, metric::Data,
+        number_data_point::Value,
     };
 
     use super::*;
@@ -851,6 +871,69 @@ mod tests {
 
         assert_eq!(counted(&service), (0, 0));
         assert!(service.chart_manager.read().await.is_empty());
+    }
+
+    /// A metric's name becomes part of its charts' ids, and an id has a
+    /// longest length at the agent: a longer name is not charted.
+    #[tokio::test]
+    async fn a_metric_with_a_name_too_long_for_a_chart_id_is_rejected() {
+        let service = NetdataMetricsService::default();
+        let now = now_ns();
+
+        service
+            .export_metrics(request(vec![
+                gauge(&"n".repeat(255), vec![point(Some(1.0), now)]),
+                gauge(&"n".repeat(256), vec![point(Some(1.0), now)]),
+                gauge(&"n".repeat(2_000), vec![point(Some(1.0), now)]),
+            ]))
+            .await
+            .unwrap();
+
+        assert_eq!(counted(&service), (1, 2));
+        assert_eq!(service.chart_manager.read().await.len(), 1);
+    }
+
+    /// A chart's definition is one block of text, sent as one message: the
+    /// number of its dimensions has a limit, whatever a sender asks for.
+    #[tokio::test]
+    async fn a_chart_takes_a_limited_number_of_dimensions() {
+        let service = NetdataMetricsService::default();
+        let now = now_ns();
+        let bounds: Vec<f64> = (0..5_000).map(f64::from).collect();
+        let histogram = Metric {
+            name: "latency".to_string(),
+            data: Some(Data::Histogram(Histogram {
+                aggregation_temporality: AggregationTemporality::Delta as i32,
+                data_points: vec![HistogramDataPoint {
+                    time_unix_nano: now,
+                    count: 5_001,
+                    bucket_counts: vec![1; bounds.len() + 1],
+                    explicit_bounds: bounds,
+                    ..Default::default()
+                }],
+            })),
+            ..Default::default()
+        };
+        service
+            .export_metrics(request(vec![histogram]))
+            .await
+            .unwrap();
+
+        let mut out = Chunker::new(usize::MAX);
+        service
+            .chart_manager
+            .write()
+            .await
+            .emit(now / 1_000_000_000 + 30, &mut out);
+        let text = String::from_utf8(out.finish().concat()).unwrap();
+
+        netdata_plugin_protocol::validate_chart_stream(text.as_bytes()).unwrap();
+        // The bucket chart is the only one with more than a few dimensions.
+        let dimensions = text
+            .lines()
+            .filter(|line| line.starts_with("DIMENSION "))
+            .count();
+        assert_eq!(dimensions, crate::chart::MAX_DIMENSIONS + 1);
     }
 
     /// The chart shows the present: a data point far from now is rejected,
