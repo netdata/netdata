@@ -520,7 +520,7 @@ impl Supervisor {
     }
 
     /// Translate an ingestor response into agent-facing output. `ChartData` is
-    /// ingestor-only; the rest is shared with the other workers.
+    /// written as it is; the rest is shared with the other workers.
     async fn handle_ingestor_response(&mut self, resp: IngestorResponse) {
         match resp {
             IngestorResponse::Result(result) => self.forward_result(Worker::Ingestor, result).await,
@@ -549,6 +549,11 @@ impl Supervisor {
                 done,
                 total,
             } => self.forward_progress(transaction, done, total).await,
+            LedgerResponse::ChartData { payload } => {
+                if let Err(e) = self.writer.write_raw(&payload).await {
+                    tracing::error!("failed to emit chart data: {e}");
+                }
+            }
             LedgerResponse::Ready { .. } => {
                 tracing::warn!("unexpected late Ready from ledger");
             }

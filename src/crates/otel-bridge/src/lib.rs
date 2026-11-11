@@ -6,9 +6,10 @@
 //! Function traffic is typed: the supervisor translates between the agent's
 //! pluginsd protocol (`netdata_plugin_protocol::Message` on stdin/stdout) and
 //! these enums, so a worker only ever speaks the variants below. The one
-//! exception is [`IngestorResponse::ChartData`], which carries chart-protocol
-//! text the ingestor renders itself and the supervisor writes to the agent's
-//! stdout verbatim.
+//! exception is chart data ([`IngestorResponse::ChartData`],
+//! [`LedgerResponse::ChartData`]), which carries chart-protocol text the
+//! worker renders itself and the supervisor writes to the agent's stdout
+//! verbatim.
 //!
 //! The submodules carry the crate's other shared contracts: `config` (the
 //! types sent in `Configure`), `function` (the handler engine the ledger and
@@ -182,6 +183,10 @@ pub enum LedgerResponse {
         done: usize,
         total: usize,
     },
+    /// Pre-rendered chart-protocol text the ledger emits for its own charts,
+    /// as [`IngestorResponse::ChartData`]: the supervisor writes the bytes to
+    /// the agent's stdout verbatim.
+    ChartData { payload: Vec<u8> },
 }
 
 // --- Legacy OTel logs viewer subprocess ---
