@@ -35,7 +35,8 @@ The dashboard loads these services only when the Agent's `anonymous_statistics` 
 ### Agent Backend - Restart and Crash Reports
 
 When the daemon starts, it reads the status file it saved during its previous run and, if reporting is enabled, sends
-it to `https://agent-events.netdata.cloud/agent-events`. Each kind of event is deduplicated and reported at most once
+it to `https://agent-events.netdata.cloud/agent-events`. On the first start, when there is no previous status, it
+sends the current one. Each kind of event is deduplicated and reported at most once
 per day.
 
 **Information in a report:**
@@ -52,8 +53,8 @@ per day.
   node and claim IDs when the Agent is connected to Netdata Cloud
 
 The `crash reports` option in the `[global]` section of `netdata.conf` controls these reports: `all` (restarts and
-crashes), `crashes` (crashes only) or `off`. Its default is `all` when telemetry is enabled or the Agent is connected to
-Netdata Cloud (directly or through a Netdata Parent), and `off` otherwise.
+crashes), `crashes` (crashes only) or `off`. Its default is `all` when telemetry is enabled or the Agent is, or was in its
+previous run, connected to Netdata Cloud (directly or through a Netdata Parent), and `off` otherwise.
 
 **Sentry crash reports:** builds that include Sentry support (some native packages) also send a crash report to
 Sentry when the daemon crashes. Sentry is not started when telemetry is disabled.
