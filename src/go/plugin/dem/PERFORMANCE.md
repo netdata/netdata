@@ -4,6 +4,10 @@ DEM capacity depends on browser service time, RUM identity and payload volume, r
 Job count or beacon rate alone is not a sizing rule. Browser attempts share one process allowance; RUM processing
 does not consume browser slots.
 
+The mixed qualification below uses fresh browsers and met the tested target. Later RUM optimizations and a browser
+reuse experiment are reported separately because they measured different components and fixtures. Browser reuse is
+deferred; fresh execution and the default allowance of one shared browser slot remain the production approach.
+
 ## Qualification workload
 
 The qualification uses a development build with shared browser admission, independent check and chart cadences,
@@ -133,7 +137,89 @@ The qualification reads live sites/pages and two concurrent, bounded recent sess
 while also observing browser status/history. This is a specific query mix. Broad history ranges, more concurrent
 readers, richer payloads, always-kept errors, exports and captures require their own measurements.
 
-## Measurement boundaries
+## Subsequent RUM component measurements
+
+After the mixed qualification, [PR #24677](https://github.com/netdata/netdata/pull/24677) reduced history-query
+string allocations and [PR #24680](https://github.com/netdata/netdata/pull/24680) reduced snapshot and Pages read
+costs. Both are merged. The following Linux VM results compare six balanced baseline/candidate pairs for each
+component; they are not a rerun of the full mixed workload.
+
+| Component fixture | Median time, before → after | Allocated bytes per operation, before → after |
+|---|---:|---:|
+| Selected-site history query, repeated metadata | 416.1 → 304.2 ms (-26.9%) | 171.14 → 8.33 MiB (-95.1%) |
+| Dense chart snapshot | 538.0 → 364.8 ms (-32.2%) | 120.00 → 33.63 MiB (-72.0%) |
+| Dense Pages read | 131.7 → 119.7 ms (-9.1%) | 14.87 → 3.77 MiB (-74.6%) |
+| High-cardinality chart snapshot | 57.00 → 21.98 ms (-61.4%) | 18.40 → 7.67 MiB (-58.3%) |
+
+The history fixture contains 100,000 rich records across 100 interleaved sites and 24 receipt hours. Metadata
+repetition determines the benefit: two deliberately varying-metadata controls showed no statistically significant
+timing change, and their allocated bytes fell only about 1.3%. The ordinary varying-metadata median was 3.5% slower,
+so this is not a universal speedup claim. The tested history implementation is `7560ac8f48`, compared with `e8fb39b24d`.
+
+The dense snapshot fixture retains 150,000 documents with three varied vitals and a resource; the high-cardinality
+fixture has 10,000 pages/versions. The tested snapshot implementation is `96712049ae`, compared with `b7c4db7de2`.
+Exact-output, revision, expiry and vnode-reset checks passed. Ingestion controls had unchanged allocated bytes and
+allocation counts, with no significant timing change. A separate concurrent ingestion/read fixture retained about
+794 MB of heap in both versions. Lower allocation volume per read is not an equivalent reduction in resident memory.
+
+These component improvements do not establish a new whole-Agent CPU or memory figure. The 7.21-core and 15.28-GiB
+mixed measurements above remain attributed to their original build and workload.
+
+## Browser reuse experiment — deferred
+
+On 2026-11-11, [PR #24684](https://github.com/netdata/netdata/pull/24684) compared fresh browsers with supervised
+Chromium reuse while retaining fresh Playwright Test processes and isolated contexts per attempt. This experiment
+is deferred and is not a shipped configuration option. The implementation and its
+[detailed validation report](https://github.com/netdata/netdata/blob/58f052c313/src/dem-runtime/tests/browser-reuse/RESULTS.md)
+are preserved for reference.
+
+The browser-only tests used the same 16-CPU/32-GiB unit limits, with no swap, on the same Debian VM. They ran real
+Engine, runtime, supervisor, history and artifact paths against deterministic loopback pages. They excluded native
+Agent bootstrap, chart publication and RUM traffic. Source `c4c2550f9d` supplied the browser implementation; paced
+harness `02854d067c` added scheduled arrivals. Both modes used the same experimental contract-2 runtime
+`2026.11.11-contract2-proof2` (Node 24.20.0, Playwright 1.63.0 and Chromium 154.0.8037.92).
+
+Matched batches held the workload at 120 journeys with no audits. At each slot count, the order was fresh, reuse,
+reuse, fresh. The table compares means of two runs per mode. CPU, elapsed time and mean memory cover the complete
+unit, including startup, cleanup, owner replacement and shutdown.
+
+| Shared slots | CPU reduction with reuse | Elapsed reduction | Mean memory, fresh → reuse |
+|---:|---:|---:|---:|
+| 1 | 17.1% | 24.4% | 216 → 358 MiB |
+| 4 | 14.7% | 26.1% | 761 → 1265 MiB |
+| 12 | 9.9% | 31.9% | 1971 → 2997 MiB |
+
+The paced comparison used 300 persistent journey jobs every five minutes and 100 audit jobs every fifteen minutes,
+sharing 12 slots. Four full 15-minute windows, in the same balanced mode order, each completed 900 journeys and
+100 audits. All four used identical per-job phases matching production scheduling and began with a cold pool.
+
+| Paced browser measurement | Fresh | Reuse |
+|---|---:|---:|
+| Mean whole-unit CPU per workload | 4203.4 CPU-seconds | 3585.6 CPU-seconds |
+| Mean memory during the arrival window | 1.19 GiB | 2.27 GiB |
+| Mean journey response | 4.84 s | 2.85 s |
+| Journey p95 response | 10.34 s | 6.10 s |
+
+Reuse saved 14.7% CPU: 618 CPU-seconds per 15-minute workload, equivalent to about 0.69 CPU cores. Average resident
+memory increased by 1.08 GiB, or about 90%. Response time runs from the scheduled due time through attempt cleanup;
+the response statistics pool both trials per mode. Both modes met cadence. Fixed-window elapsed time is not a
+throughput comparison, and these response timings differ from the narrower execution timings in the mixed test.
+
+Whole-unit CPU includes a further 75-second idle observation and final shutdown. Memory means use approximately
+one-second cgroup samples over the exact arrival window. Every response finished before its next same-job occurrence;
+monitor coalescing was not implemented by this harness. Short CPU-quota throttling bursts occurred, with no OOM or
+memory-limit events. All 5,480 checks across 12 matched trials, two short smokes and four full paced trials passed.
+Task processes and runtime ownership drained; the installed Agent and runtime were unchanged. Two runs per mode
+demonstrate repeatability, not statistical confidence or arbitrary-website capacity.
+
+Reuse is deferred because fresh execution already meets the tested target. The measured CPU and response gains do
+not currently justify maintaining long-lived browser owners, cleanup acknowledgments, separate runtime leases,
+retirement/replacement logic and browser-API restrictions. Making reuse opt-in would retain that maintenance cost.
+The experiment also retains browsers for up to one idle minute, so a sparse five-minute check can start cold every
+time and gain no reuse benefit. A demonstrated CPU-budget or cadence shortfall with fresh execution would provide
+a stronger reason to reconsider this trade-off. The 12-slot test setting does not change the production default of 1.
+
+## Mixed-qualification measurement boundaries
 
 The test uses Debian 13.7, Linux 6.12.111, x86_64 and an exposed AMD EPYC 7713 CPU model. The VM has 16 virtual
 CPUs and about 64 GiB of RAM; the test unit is limited to 16 CPUs and 32 GiB. The virtual CPU model does not identify
