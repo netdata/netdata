@@ -25,14 +25,17 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinSet;
 
 /// How a job failed.
+///
+/// The I/O errors are part of the message and not a `source`: a caller that
+/// prints the whole chain would print them twice.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// The child process could not be started.
     #[error("failed to start the job: {0}")]
-    Spawn(#[source] std::io::Error),
+    Spawn(std::io::Error),
     /// The child ran, but waiting for it or reading its output failed.
     #[error("failed to wait for the job: {0}")]
-    Wait(#[source] std::io::Error),
+    Wait(std::io::Error),
     /// The child exited with a non-zero status; `stderr` is what it wrote
     /// there.
     #[error("the job exited with status {code}: {}", .stderr.trim_end())]
@@ -271,6 +274,11 @@ mod tests {
         let err = scheduler.run(command).await.unwrap_err();
 
         assert!(matches!(err, Error::Spawn(_)), "{err:?}");
+        assert!(
+            err.to_string().contains("No such file or directory"),
+            "{err}"
+        );
+        assert!(std::error::Error::source(&err).is_none());
     }
 
     #[tokio::test]
