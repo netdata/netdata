@@ -489,7 +489,40 @@ pub enum DataPointRef<'a> {
     Summary(&'a SummaryDataPoint),
 }
 
+/// What a data point holds for the charts: a number, or the point itself
+/// for the shapes that become several charts.
+pub enum PointValue<'a> {
+    Number(f64),
+    Histogram(&'a HistogramDataPoint),
+    Summary(&'a SummaryDataPoint),
+    /// No chart is made of an exponential histogram.
+    ExponentialHistogram,
+}
+
+/// The `NO_RECORDED_VALUE` bit of a data point's flags: the point is a
+/// marker that the series has no value at this time (a staleness marker,
+/// for example), and whatever its value fields hold is not a measurement.
+const NO_RECORDED_VALUE: u32 = 1;
+
 impl<'a> DataPointRef<'a> {
+    /// What the point holds, or `None` when it carries no value: the sender
+    /// flagged it `NO_RECORDED_VALUE`, or left a number point's value unset.
+    pub fn value(&self) -> Option<PointValue<'a>> {
+        let (flags, value) = match *self {
+            DataPointRef::Number(dp) => (dp.flags, self.value_as_f64().map(PointValue::Number)),
+            DataPointRef::Histogram(dp) => (dp.flags, Some(PointValue::Histogram(dp))),
+            DataPointRef::Summary(dp) => (dp.flags, Some(PointValue::Summary(dp))),
+            DataPointRef::ExponentialHistogram(dp) => {
+                (dp.flags, Some(PointValue::ExponentialHistogram))
+            }
+        };
+
+        if flags & NO_RECORDED_VALUE != 0 {
+            return None;
+        }
+        value
+    }
+
     /// The wrapped data point's attributes.
     pub fn attributes(&self) -> &[KeyValue] {
         match self {

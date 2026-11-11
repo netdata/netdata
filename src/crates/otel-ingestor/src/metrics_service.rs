@@ -47,7 +47,7 @@ use otel_derived_metrics::DerivedMetrics;
 use crate::chart::{Chart, ChartAggregationType, ChartConfig};
 use crate::chart_config::ChartConfigManager;
 use crate::iter::{DataPointContext, DataPointContextIterExt};
-use crate::otel::{self, DataPointRef};
+use crate::otel::{self, PointValue};
 use crate::output::ChartType;
 
 /// All charts created from OTLP metrics, keyed by chart name
@@ -140,7 +140,8 @@ impl ChartManager {
     }
 }
 
-/// What became of one data point of an export request.
+/// What became of one data point of an export request that carries a value
+/// (`DataPointRef::value`); a point without one is neither.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PointOutcome {
     /// It reached at least one chart.
@@ -149,9 +150,6 @@ enum PointOutcome {
     /// type or temporality it has no chart for, a malformed histogram, or a
     /// new chart past the request's budget.
     Dropped,
-    /// It carries no value: the sender flagged it `NO_RECORDED_VALUE`, or
-    /// left a number point's value unset.
-    NoValue,
 }
 
 /// The OTLP metrics ingestion service: OTLP metric exports in, chart
@@ -214,8 +212,7 @@ impl NetdataMetricsService {
     /// Decompose one histogram data point into up to four charts: a bucket
     /// heatmap (one dimension per bucket), count and sum lines (DeltaSum or
     /// CumulativeSum per temporality), and a gauge min/max line. Points
-    /// with unknown temporality, the NO_RECORDED_VALUE flag, or a malformed
-    /// bucket layout are dropped.
+    /// with unknown temporality or a malformed bucket layout are dropped.
     fn process_histogram(
         chart_manager: &mut ChartManager,
         dp: &DataPointContext<'_>,
@@ -225,11 +222,6 @@ impl NetdataMetricsService {
         new_charts: &mut usize,
         budget: usize,
     ) -> PointOutcome {
-        // Skip NO_RECORDED_VALUE (flag bit 0).
-        if hdp.flags & 1 != 0 {
-            return PointOutcome::NoValue;
-        }
-
         // N explicit bounds imply N+1 buckets (the last one is "+Inf");
         // anything else is malformed.
         if hdp.bucket_counts.is_empty() {
@@ -404,7 +396,7 @@ impl NetdataMetricsService {
 
     /// Decompose one summary data point into up to three charts: count and
     /// sum cumulative lines, and a gauge line with one dimension per
-    /// quantile. Points flagged NO_RECORDED_VALUE are dropped.
+    /// quantile.
     fn process_summary(
         chart_manager: &mut ChartManager,
         dp: &DataPointContext<'_>,
@@ -414,11 +406,6 @@ impl NetdataMetricsService {
         new_charts: &mut usize,
         budget: usize,
     ) -> PointOutcome {
-        // Skip NO_RECORDED_VALUE (flag bit 0).
-        if sdp.flags & 1 != 0 {
-            return PointOutcome::NoValue;
-        }
-
         let chart_hash = dp.chart_hash();
         let timestamp_ns = sdp.time_unix_nano;
         let start_time_ns = sdp.start_time_unix_nano;
@@ -534,21 +521,18 @@ impl NetdataMetricsService {
         PointOutcome::Charted
     }
 
-    /// Route one number data point (a gauge or a sum) to the chart
-    /// `<metric>.<identity hash>`, creating the chart if the request's budget
-    /// allows. A point without a value is skipped.
+    /// Route the `value` of one number data point (a gauge or a sum) to the
+    /// chart `<metric>.<identity hash>`, creating the chart if the request's
+    /// budget allows.
     fn process_number(
         chart_manager: &mut ChartManager,
         dp: &DataPointContext<'_>,
+        value: f64,
         chart_config: ChartConfig,
         chart_name_buf: &mut String,
         new_charts: &mut usize,
         budget: usize,
     ) -> PointOutcome {
-        let Some(value) = dp.datapoint_ref.value_as_f64() else {
-            return PointOutcome::NoValue;
-        };
-
         let dimension_name = dp.dimension_name();
         let chart_hash = dp.chart_hash();
         let timestamp_ns = dp.datapoint_ref.time_unix_nano();
@@ -623,6 +607,11 @@ impl NetdataMetricsService {
         let now_ns = unix_now_ns();
 
         for dp in req.datapoint_iter(&ccm) {
+            // A point without a value is neither charted nor dropped.
+            let Some(value) = dp.datapoint_ref.value() else {
+                continue;
+            };
+
             // Per-chart timing: the metric's matched config merged over the
             // global defaults (chart_config.rs).
             let chart_config = ccm.resolve_chart_config(dp.metric_ref.config.as_deref());
@@ -632,9 +621,9 @@ impl NetdataMetricsService {
                 continue;
             }
 
-            let outcome = match &dp.datapoint_ref {
+            let outcome = match value {
                 // Bucket heatmap + count/sum/minmax lines.
-                DataPointRef::Histogram(hdp) => Self::process_histogram(
+                PointValue::Histogram(hdp) => Self::process_histogram(
                     &mut chart_manager,
                     &dp,
                     hdp,
@@ -644,7 +633,7 @@ impl NetdataMetricsService {
                     budget,
                 ),
                 // Count/sum/quantiles charts.
-                DataPointRef::Summary(sdp) => Self::process_summary(
+                PointValue::Summary(sdp) => Self::process_summary(
                     &mut chart_manager,
                     &dp,
                     sdp,
@@ -653,22 +642,21 @@ impl NetdataMetricsService {
                     &mut new_charts,
                     budget,
                 ),
-                DataPointRef::Number(_) => Self::process_number(
+                PointValue::Number(value) => Self::process_number(
                     &mut chart_manager,
                     &dp,
+                    value,
                     chart_config,
                     &mut chart_name_buf,
                     &mut new_charts,
                     budget,
                 ),
-                // There is no chart for exponential histograms.
-                DataPointRef::ExponentialHistogram(_) => PointOutcome::Dropped,
+                PointValue::ExponentialHistogram => PointOutcome::Dropped,
             };
 
             match outcome {
                 PointOutcome::Charted => charted += 1,
                 PointOutcome::Dropped => dropped += 1,
-                PointOutcome::NoValue => {}
             }
         }
 
@@ -838,6 +826,31 @@ mod tests {
             .unwrap();
 
         assert_eq!(counted(&service), (2, 1));
+    }
+
+    /// A point without a value is neither charted nor dropped, whatever
+    /// else is wrong with it: a number point with its value unset, and any
+    /// point the sender flagged `NO_RECORDED_VALUE`.
+    #[tokio::test]
+    async fn a_point_without_a_value_is_not_counted() {
+        const NO_RECORDED_VALUE: u32 = 1;
+        let service = NetdataMetricsService::default();
+        let now = now_ns();
+        let flagged = NumberDataPoint {
+            flags: NO_RECORDED_VALUE,
+            ..point(Some(f64::NAN), now)
+        };
+
+        service
+            .export_metrics(request(vec![
+                gauge("unset", vec![point(None, 0)]),
+                gauge("stale", vec![flagged]),
+            ]))
+            .await
+            .unwrap();
+
+        assert_eq!(counted(&service), (0, 0));
+        assert!(service.chart_manager.read().await.is_empty());
     }
 
     /// The chart shows the present: a data point far from now is rejected,
