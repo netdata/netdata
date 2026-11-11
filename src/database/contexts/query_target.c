@@ -1518,7 +1518,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 }
 
 // true when the dimension matches the pattern (or there is no pattern) by id or by name;
-// name is the caller's reference to the metric name (the name is replaced while we use it)
+// name is the metric's name, read by the caller under the instance lock it still holds (the name is replaced
+// and freed while we use it), or NULL when names are not matched
 static bool query_metric_name_matches(RRDMETRIC *rm, STRING *name, SIMPLE_PATTERN *sp,
                                       bool match_ids, bool match_names) {
     if(!sp)
