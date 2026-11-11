@@ -1,4 +1,4 @@
-# cargo-deny policy for the src/crates workspace; CI runs only `cargo deny check advisories`.
+# cargo-deny policy for the src/crates workspace. Not auto-discovered: pass it with --config. CI runs only `check advisories`.
 
 [advisories]
 # Unmaintained crates that were vetted and accepted. A vulnerability advisory against any of them still fails.

@@ -23,10 +23,9 @@ jobs:
       - name: Install cargo-deny
         id: install
         run: cargo install --locked cargo-deny --version 0.20.2
-      - name: Check advisories # Policy and vetted exceptions live in src/crates/deny.toml.
+      - name: Check advisories # Policy and vetted exceptions live in .github/cargo/deny.toml.
         id: check
-        working-directory: src/crates
-        run: cargo deny --locked check advisories
+        run: cargo deny --locked --manifest-path src/crates/Cargo.toml --config .github/cargo/deny.toml check advisories
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
