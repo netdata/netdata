@@ -55,6 +55,7 @@ use tokio_util::sync::CancellationToken;
 
 use file_lifecycle::component::Component;
 use file_lifecycle::ipc::{IndexerRequest, IndexerResponse};
+use file_registry::FileId;
 
 use crate::index_child::{self, IndexedFile};
 
@@ -281,16 +282,13 @@ impl IndexingOperations {
     fn run(
         &self,
         signal: Signal,
+        file_id: FileId,
         wal_path: PathBuf,
         sfst_path: PathBuf,
         decoded_size: Option<u64>,
         expected_memory: u64,
     ) -> impl Future<Output = (IndexerResponse, Option<Measured>)> + use<> {
-        // Parsed from the WAL file name; 0 when it doesn't parse. The ledger
-        // routes the response to a tenant by it.
-        let seq = file_registry::FileId::parse(&wal_path)
-            .map(|id| id.seq)
-            .unwrap_or(0);
+        let seq = file_id.seq;
 
         let mut command = Command::new(&self.executable);
         command
@@ -323,7 +321,7 @@ impl IndexingOperations {
                     let usage = e.usage().map(usage_text).unwrap_or_default();
                     tracing::error!("indexing failed wal={}{usage}: {e}", wal_path.display());
                     let failed = IndexerResponse::IndexFailed {
-                        path: wal_path,
+                        file_id,
                         error: e.to_string(),
                     };
                     return (failed, None);
@@ -343,8 +341,7 @@ impl IndexingOperations {
                     counters.succeeded.fetch_add(1, Ordering::Relaxed);
                     tracing::info!("indexing done seq={seq}{usage}{peak}");
                     let indexed = IndexerResponse::Indexed {
-                        seq,
-                        path: sfst_path,
+                        file_id,
                         summary,
                         size: file_registry::ByteSize(size),
                     };
@@ -362,7 +359,7 @@ impl IndexingOperations {
                     remove_unanswered_index(&sfst_path);
                     tracing::error!("indexing failed wal={}{usage}: {e:#}", wal_path.display());
                     let failed = IndexerResponse::IndexFailed {
-                        path: wal_path,
+                        file_id,
                         error: format!("{e:#}"),
                     };
                     (failed, None)
@@ -444,7 +441,7 @@ impl Component for Indexer {
             tokio::select! {
                 _ = cancel.cancelled() => break,
                 request = rx.recv() => match request {
-                    Some(IndexerRequest::Index { wal_path, sfst_path }) => {
+                    Some(IndexerRequest::Index { file_id, wal_path, sfst_path }) => {
                         // Sized and queued here, not in the operation's task:
                         // the operations must reach the scheduler in the order
                         // of their requests.
@@ -453,6 +450,7 @@ impl Component for Indexer {
 
                         let operation = indexing_operations.run(
                             signal,
+                            file_id,
                             wal_path,
                             sfst_path,
                             decoded_size,
@@ -483,10 +481,15 @@ mod tests {
 
     use super::*;
 
-    /// A WAL file name that parses to `seq`, under `dir`. The file need not
-    /// exist: the fake executables never read it.
+    /// The id of the test file with `seq`.
+    fn file_id(seq: u64) -> FileId {
+        crate::ledger::traces_fixtures::test_file_id(seq)
+    }
+
+    /// The WAL file name of [`file_id`]`(seq)`, under `dir`. The file need
+    /// not exist: the fake executables never read it.
     fn wal_path(dir: &Path, seq: u64) -> PathBuf {
-        dir.join(crate::ledger::traces_fixtures::test_file_id(seq).to_filename("wal"))
+        dir.join(file_id(seq).to_filename("wal"))
     }
 
     /// An executable shell script under `dir` to stand in for `otel-plugin`.
@@ -699,7 +702,14 @@ mod tests {
 
         let size = decoded_size(&wal).await;
         let (response, measured) = indexing_operations
-            .run(Signal::Logs, wal, dir.path().join("out.sfst"), size, 0)
+            .run(
+                Signal::Logs,
+                file_id(1),
+                wal,
+                dir.path().join("out.sfst"),
+                size,
+                0,
+            )
             .await;
 
         assert_eq!(size, Some(3 * 1024));
@@ -737,7 +747,7 @@ mod tests {
             let wal = dir.path().join(name);
             let sfst = dir.path().join("out.sfst");
             indexing_operations
-                .run(Signal::Logs, wal, sfst, None, 0)
+                .run(Signal::Logs, file_id(1), wal, sfst, None, 0)
                 .await;
         }
 
@@ -760,7 +770,7 @@ mod tests {
 
         let wal = dir.path().join("in.wal");
         let (response, _) = indexing_operations
-            .run(Signal::Logs, wal, sfst, None, 0)
+            .run(Signal::Logs, file_id(1), wal, sfst, None, 0)
             .await;
 
         assert!(
@@ -783,7 +793,7 @@ mod tests {
 
         let wal = dir.path().join("in.wal");
         let (response, _) = indexing_operations
-            .run(Signal::Logs, wal, sfst.clone(), None, 0)
+            .run(Signal::Logs, file_id(1), wal, sfst.clone(), None, 0)
             .await;
 
         assert!(
@@ -825,6 +835,7 @@ mod tests {
 
         indexer
             .send(IndexerRequest::Index {
+                file_id: file_id(7),
                 wal_path: wal.clone(),
                 sfst_path: sfst.clone(),
             })
@@ -832,15 +843,14 @@ mod tests {
         let response = indexer.recv().await.unwrap();
 
         let IndexerResponse::Indexed {
-            seq,
-            path,
+            file_id: got_file_id,
             summary: got_summary,
             size,
         } = response
         else {
             panic!("expected Indexed, got {response:?}");
         };
-        assert_eq!((seq, path, size.0), (7, sfst.clone(), 4096));
+        assert_eq!((got_file_id, size.0), (file_id(7), 4096));
         assert_eq!(got_summary, summary());
         assert_eq!(
             std::fs::read_to_string(&seen).unwrap(),
@@ -852,47 +862,50 @@ mod tests {
         );
     }
 
-    /// The `IndexFailed` error an indexer answers with when its operations run
-    /// `script`.
-    async fn failure_of(script: &str) -> (PathBuf, PathBuf, String) {
+    /// The `IndexFailed` error an indexer answers with, for the file with seq
+    /// 9, when its operations run `script`.
+    async fn failure_of(script: &str) -> String {
         let dir = tempfile::tempdir().unwrap();
-        let wal = wal_path(dir.path(), 9);
         let executable = fake_executable(dir.path(), script);
         let mut indexer = spawn_indexer(executable, &CancellationToken::new());
 
         indexer
             .send(IndexerRequest::Index {
-                wal_path: wal.clone(),
+                file_id: file_id(9),
+                wal_path: wal_path(dir.path(), 9),
                 sfst_path: dir.path().join("9.sfst"),
             })
             .unwrap();
         let response = indexer.recv().await.unwrap();
 
-        let IndexerResponse::IndexFailed { path, error } = response else {
+        let IndexerResponse::IndexFailed {
+            file_id: failed,
+            error,
+        } = response
+        else {
             panic!("expected IndexFailed, got {response:?}");
         };
-        (wal, path, error)
+        assert_eq!(failed, file_id(9));
+        error
     }
 
     #[tokio::test]
     async fn a_failed_child_answers_index_failed_with_its_error() {
-        let (wal, path, error) = failure_of("echo 'error: no such file' >&2; exit 1").await;
+        let error = failure_of("echo 'error: no such file' >&2; exit 1").await;
 
-        assert_eq!(path, wal);
         assert_eq!(error, "the job exited with status 1: error: no such file");
     }
 
     #[tokio::test]
     async fn a_killed_child_answers_index_failed_with_the_signal() {
-        let (wal, path, error) = failure_of("kill -KILL $$").await;
+        let error = failure_of("kill -KILL $$").await;
 
-        assert_eq!(path, wal);
         assert_eq!(error, "the job was ended by signal 9");
     }
 
     #[tokio::test]
     async fn an_answer_that_does_not_decode_answers_index_failed() {
-        let (_, _, error) = failure_of("printf garbage").await;
+        let error = failure_of("printf garbage").await;
 
         assert!(
             error.starts_with("decoding the index child's answer"),
@@ -922,9 +935,10 @@ mod tests {
         );
 
         let requested: Vec<PathBuf> = (1..=8).map(|seq| wal_path(dir.path(), seq)).collect();
-        for wal_path in &requested {
+        for (seq, wal_path) in (1..=8).zip(&requested) {
             indexer
                 .send(IndexerRequest::Index {
+                    file_id: file_id(seq),
                     wal_path: wal_path.clone(),
                     sfst_path: dir.path().join("out.sfst"),
                 })
@@ -955,6 +969,7 @@ mod tests {
         for seq in [1, 2] {
             indexer
                 .send(IndexerRequest::Index {
+                    file_id: file_id(seq),
                     wal_path: wal_path(dir.path(), seq),
                     sfst_path: dir.path().join(format!("{seq}.sfst")),
                 })
@@ -962,13 +977,13 @@ mod tests {
         }
         let mut finished = Vec::new();
         for _ in 0..2 {
-            let IndexerResponse::IndexFailed { path, .. } = indexer.recv().await.unwrap() else {
+            let IndexerResponse::IndexFailed { file_id, .. } = indexer.recv().await.unwrap() else {
                 panic!("expected IndexFailed");
             };
-            finished.push(path);
+            finished.push(file_id.seq);
         }
 
-        assert_eq!(finished, [wal_path(dir.path(), 2), wal_path(dir.path(), 1)]);
+        assert_eq!(finished, [2, 1]);
     }
 
     #[tokio::test]
@@ -984,6 +999,7 @@ mod tests {
 
         indexer
             .send(IndexerRequest::Index {
+                file_id: file_id(3),
                 wal_path: wal_path(dir.path(), 3),
                 sfst_path: dir.path().join("3.sfst"),
             })

@@ -49,17 +49,19 @@ impl Ledger {
     #[tracing::instrument(skip_all)]
     pub(super) async fn handle_indexer_resp(&mut self, signal: Signal, resp: IndexerResponse) {
         let (seq, summary, size) = match resp {
-            IndexerResponse::IndexFailed { path, error } => {
+            IndexerResponse::IndexFailed { file_id, error } => {
                 // Intentional divergence from `recover_unindexed`: at runtime
                 // the entry stays tracked (and queryable as a WAL) until the
                 // next restart's recovery retries the indexing operation and
                 // orphans it.
-                tracing::error!(path = %path.display(), "indexing failed: {error}");
+                tracing::error!(seq = file_id.seq, "indexing failed: {error}");
                 return;
             }
             IndexerResponse::Indexed {
-                seq, summary, size, ..
-            } => (seq, summary, size),
+                file_id,
+                summary,
+                size,
+            } => (file_id.seq, summary, size),
         };
 
         tracing::info!(seq, record_count = summary.record_count, "indexed");

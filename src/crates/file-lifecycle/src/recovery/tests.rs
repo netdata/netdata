@@ -1391,9 +1391,9 @@ impl crate::component::Component for FailingIndexer {
         _cancel: tokio_util::sync::CancellationToken,
     ) {
         while let Some(req) = rx.recv().await {
-            let crate::ipc::IndexerRequest::Index { wal_path, .. } = req;
+            let crate::ipc::IndexerRequest::Index { file_id, .. } = req;
             let _ = tx.send(crate::ipc::IndexerResponse::IndexFailed {
-                path: wal_path,
+                file_id,
                 error: "mock: undecodable".into(),
             });
         }

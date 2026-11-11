@@ -30,7 +30,7 @@
 use std::path::PathBuf;
 
 use ferryboat::{Connection, Endpoint, Listener};
-use file_registry::{Identity, SeqKey, TenantId};
+use file_registry::{FileId, Identity, SeqKey, TenantId};
 
 /// Socket path for the writer → ledger link — a default, not the value
 /// production uses: nothing in-tree references this constant. The
@@ -115,6 +115,9 @@ pub enum CleanerResponse {
 pub enum IndexerRequest {
     /// Index the given WAL file into an SFST.
     Index {
+        /// The file's identity; the response carries it back, so neither
+        /// side reads it out of a path.
+        file_id: FileId,
         /// Path to the `.wal` file to index.
         wal_path: PathBuf,
         /// Path where the `.sfst` index should be written.
@@ -125,15 +128,10 @@ pub enum IndexerRequest {
 /// Responses sent from the indexer back to the ledger.
 #[derive(Debug, Clone)]
 pub enum IndexerResponse {
-    /// The SFST has been written successfully.
+    /// The SFST has been written successfully, at the request's `sfst_path`.
     Indexed {
-        /// Seq of the indexed WAL file, parsed from its filename (`0` if the
-        /// name doesn't decode).
-        seq: u64,
-        /// Path the SFST was written to. Informational only: both consumers
-        /// (otel-ledger's response handler and recovery) recompute the path
-        /// from the registry, so nothing reads this field today.
-        path: PathBuf,
+        /// The indexed WAL file, as in the request.
+        file_id: FileId,
         /// Cheap summary fields (min/max timestamp, record count, opaque content_meta).
         /// Stored on the registry entry on `track`; used by the uploader
         /// response handler to build the catalog entry directly from the
@@ -145,7 +143,11 @@ pub enum IndexerResponse {
     /// Indexing failed for a file. Nothing is retried at runtime: the file
     /// stays WAL-tracked (still queryable) until the next restart's recovery
     /// retries the indexing operation and otherwise orphans it.
-    IndexFailed { path: PathBuf, error: String },
+    IndexFailed {
+        /// The WAL file that was not indexed, as in the request.
+        file_id: FileId,
+        error: String,
+    },
 }
 
 /// Requests sent from the ledger to the uploader.

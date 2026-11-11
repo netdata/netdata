@@ -72,6 +72,7 @@ impl Ledger {
                     .expect("tenant registry present after applying WAL event");
 
                 Some(IndexerRequest::Index {
+                    file_id,
                     wal_path: registry.wal.file_path(file_id),
                     sfst_path: registry.sfst.file_path(file_id),
                 })

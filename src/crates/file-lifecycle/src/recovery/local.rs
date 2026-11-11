@@ -74,6 +74,7 @@ pub async fn recover_unindexed(
     let requests: Vec<_> = unindexed
         .iter()
         .map(|&id| IndexerRequest::Index {
+            file_id: id,
             wal_path: registry.wal.file_path(id),
             sfst_path: registry.sfst.file_path(id),
         })
@@ -81,20 +82,12 @@ pub async fn recover_unindexed(
 
     let mut failures: usize = 0;
     batch_recover(requests, indexer, |resp| match resp {
-        IndexerResponse::Indexed { seq, summary, .. } => {
-            // Unreachable in practice: the batch's requests were built from
-            // tracked entries, and the indexer parses the seq back from that
-            // same WAL path. Skipping cleanup leaves the fresh SFST untracked
-            // on disk and the WAL tracked — the next restart recovers the
-            // SFST and re-runs the WAL delete as orphan recovery.
-            let wf = match registry.wal.get(seq) {
-                Some(wf) => wf,
-                None => {
-                    tracing::warn!("recovery: indexed unknown WAL seq={seq}, skipping cleanup");
-                    return;
-                }
-            };
-            let id = wf.id;
+        IndexerResponse::Indexed {
+            file_id: id,
+            summary,
+            ..
+        } => {
+            let seq = id.seq;
 
             // Fire-and-forget delete of the now-redundant WAL; the WAL entry
             // is untracked when `drain_wal_deletes` sees the confirmation.
@@ -131,7 +124,7 @@ pub async fn recover_unindexed(
                 tracing::info!("recovery: indexed seq={seq}");
             }
         }
-        IndexerResponse::IndexFailed { path, error } => {
+        IndexerResponse::IndexFailed { file_id, error } => {
             // Orphan policy (see the function doc): untrack the entry so the
             // planner never sees a WAL without an SFST, keep the file on
             // disk, and carry on serving.
@@ -139,22 +132,9 @@ pub async fn recover_unindexed(
             tracing::error!(
                 "recovery: indexing failed path={} error={error}; \
                  kept on disk as an orphan (untracked; retried next restart)",
-                path.display(),
+                registry.wal.file_path(file_id).display(),
             );
-            match file_registry::FileId::parse(&path) {
-                Some(id) => {
-                    registry.wal.remove_by_seq(id.seq);
-                }
-                None => {
-                    // Unreachable in practice: the path came from a tracked
-                    // FileId. Log rather than assume.
-                    tracing::error!(
-                        "recovery: cannot parse FileId from failed WAL path {}; \
-                         entry left tracked",
-                        path.display(),
-                    );
-                }
-            }
+            registry.wal.remove_by_seq(file_id.seq);
         }
     })
     .await?;
