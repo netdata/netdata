@@ -225,7 +225,7 @@ pub(crate) fn write_traces_wal(
 /// `ng_index::index_traces_range` — the same call the engine's
 /// on-query chunk indexing makes — over a fresh WAL holding one frame per
 /// request. Returns the indexing's own summary alongside the bytes.
-pub(crate) fn sealed_traces(reqs: Vec<ExportTraceServiceRequest>) -> (sfst::Summary, Vec<u8>) {
+pub(crate) fn indexed_traces(reqs: Vec<ExportTraceServiceRequest>) -> (sfst::Summary, Vec<u8>) {
     let staging = tempfile::tempdir().unwrap();
     let wal = write_traces_wal(staging.path(), reqs);
     let len = std::fs::metadata(&wal).unwrap().len();
@@ -241,7 +241,7 @@ pub(crate) async fn install_sealed(
     seq: u64,
     reqs: Vec<ExportTraceServiceRequest>,
 ) -> std::path::PathBuf {
-    let (summary, bytes) = sealed_traces(reqs);
+    let (summary, bytes) = indexed_traces(reqs);
     let id = test_file_id(seq);
     let mut guard = registries.write().await;
     let reg = guard.get_or_create(&TenantId::from(tenant));
@@ -374,7 +374,7 @@ impl TestRemote {
         reqs: Vec<ExportTraceServiceRequest>,
         readable: bool,
     ) -> Evicted {
-        let (summary, bytes) = sealed_traces(reqs);
+        let (summary, bytes) = indexed_traces(reqs);
         let id = FileId::new(identity, 1, seq, 7);
         let remote_key = if readable {
             let key = format!("traces/{}", id.to_filename("sfst"));

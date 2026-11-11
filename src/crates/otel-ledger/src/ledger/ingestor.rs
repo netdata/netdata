@@ -57,7 +57,7 @@ impl Ledger {
                 && valid_up_to.0 > 0
                 && let Some(registry) = registries.get(&msg.tenant_id)
             {
-                self.traces_prebuilder.synced(
+                self.traces_chunk_indexer.synced(
                     file_id.seq,
                     registry.wal.file_path(file_id),
                     valid_up_to.0,

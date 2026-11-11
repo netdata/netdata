@@ -204,7 +204,7 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     assert_eq!(ids.len(), 2, "one chunk + one tail: {ids:?}");
     assert_eq!(ids[0], format!("{}#chunk000000", wal_id(1)));
     let TraceSource::Sfst(chunk) = &sources[0] else {
-        panic!("first source must be the built chunk");
+        panic!("first source must be the indexed chunk");
     };
     // The chunk went through the traces indexing: its summary counts
     // the 6 spans of frames 0+1, and the bytes are servable in-memory.
@@ -561,7 +561,7 @@ async fn skip_plans_without_downloading_and_never_fails_too_large() {
 }
 
 #[tokio::test]
-async fn too_large_fails_before_any_download_or_chunk_build() {
+async fn too_large_fails_before_any_download_or_chunk_indexing() {
     let registries = make_registries();
     let remote = TestRemote::new(100);
     for seq in 1..=2 {
@@ -618,11 +618,11 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
     // indexed.
     let probe = supplier
         .chunk_cache
-        .get_or_build(test_file_id(9).seq, 0, async {
-            Err::<Arc<file_lifecycle::chunk::BuiltChunk>, &str>("not built")
+        .get_or_index(test_file_id(9).seq, 0, async {
+            Err::<Arc<file_lifecycle::chunk::IndexedChunk>, &str>("not indexed")
         })
         .await;
-    assert!(probe.is_err(), "no chunk was built");
+    assert!(probe.is_err(), "no chunk was indexed");
 }
 
 // A pre-cancelled call stops before the download phase: the evicted

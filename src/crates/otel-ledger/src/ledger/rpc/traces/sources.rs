@@ -58,7 +58,7 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use wal::prefix::tail_start;
 
-use crate::ledger::wal_prefix::{WalPrefixes, build_chunk};
+use crate::ledger::wal_prefix::{WalPrefixes, index_chunk};
 
 /// Filename extensions of the source-id derivation (the registries'
 /// own on-disk extensions, which those crates keep private).
@@ -469,19 +469,19 @@ impl TracesSourceSupplier {
             // joins its indexing or indexes it. (seq, index) keys never
             // collide with logs because seqs are process-global (one
             // shared highwater).
-            let init = build_chunk(ng_index::index_traces_range, wal.path.clone(), *chunk);
-            match self.chunk_cache.get_or_build(seq, chunk.index, init).await {
-                Ok(built) => chunks.push(ResolvedChunk {
+            let init = index_chunk(ng_index::index_traces_range, wal.path.clone(), *chunk);
+            match self.chunk_cache.get_or_index(seq, chunk.index, init).await {
+                Ok(indexed) => chunks.push(ResolvedChunk {
                     index: chunk.index,
                     range: chunk.range,
-                    summary: built.summary.clone(),
-                    bytes: Arc::clone(&built.bytes),
+                    summary: indexed.summary.clone(),
+                    bytes: Arc::clone(&indexed.bytes),
                 }),
                 Err(e) => {
                     tracing::warn!(
                         seq,
                         index = chunk.index,
-                        "traces chunk build failed; refusing this WAL: {e}"
+                        "traces chunk indexing failed; refusing this WAL: {e}"
                     );
                     return None;
                 }

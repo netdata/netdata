@@ -3,7 +3,7 @@
 //!
 //! Without it, the first query after a WAL crosses a chunk boundary
 //! indexes that chunk while the user waits. The ledger feeds every
-//! `Synced` event of the signal to [`ChunkPrebuilder::synced`]; the task
+//! `Synced` event of the signal to [`ChunkIndexer::synced`]; the task
 //! extends the WAL's boundaries ([`WalPrefixes`]) and indexes each new
 //! chunk through the shared `ChunkCache`, one chunk at a time. A query
 //! that needs a chunk the task is indexing joins that work (the cache's
@@ -13,7 +13,7 @@
 //! so later syncs neither re-index a chunk the cache evicted (a query
 //! indexes it on demand) nor refresh the recency of chunks nobody reads.
 //! When a WAL's chunks drop (its indexed file registered),
-//! [`ChunkPrebuilder::forget`] queues behind any `Synced` already sent,
+//! [`ChunkIndexer::forget`] queues behind any `Synced` already sent,
 //! then drops the WAL's boundaries and cached chunks again, so chunk
 //! indexing that raced the indexing operation leaves nothing behind.
 //!
@@ -30,7 +30,7 @@ use file_lifecycle::chunk::ChunkCache;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use super::wal_prefix::{ChunkSealFn, WalPrefixes, build_chunk};
+use super::wal_prefix::{ChunkIndexFn, WalPrefixes, index_chunk};
 
 /// One WAL's latest durable bound.
 struct Synced {
@@ -45,21 +45,21 @@ enum Msg {
 }
 
 /// The handle the ledger notifies; see the module docs.
-pub(crate) struct ChunkPrebuilder {
+pub(crate) struct ChunkIndexer {
     tx: mpsc::UnboundedSender<Msg>,
 }
 
-impl ChunkPrebuilder {
+impl ChunkIndexer {
     /// Spawn the task for one signal: its boundaries, its range indexing
     /// function, and the shared chunk cache. It stops with `cancel`.
     pub(crate) fn spawn(
         prefixes: Arc<WalPrefixes>,
-        seal: ChunkSealFn,
+        index_range: ChunkIndexFn,
         chunk_cache: Arc<ChunkCache>,
         cancel: CancellationToken,
     ) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(run(rx, prefixes, seal, chunk_cache, cancel));
+        tokio::spawn(run(rx, prefixes, index_range, chunk_cache, cancel));
         Self { tx }
     }
 
@@ -83,7 +83,7 @@ impl ChunkPrebuilder {
 async fn run(
     mut rx: mpsc::UnboundedReceiver<Msg>,
     prefixes: Arc<WalPrefixes>,
-    seal: ChunkSealFn,
+    index_range: ChunkIndexFn,
     chunk_cache: Arc<ChunkCache>,
     cancel: CancellationToken,
 ) {
@@ -130,7 +130,7 @@ async fn run(
                 Err(e) => {
                     // A WAL deleted by a rotation that raced this message
                     // fails here; a query reports any real problem.
-                    tracing::debug!(seq, "chunk prebuild: {e}");
+                    tracing::debug!(seq, "chunk indexing: {e}");
                     continue;
                 }
             };
@@ -139,9 +139,9 @@ async fn run(
                 if cancel.is_cancelled() {
                     return;
                 }
-                let build = build_chunk(seal, path.clone(), chunk);
-                if let Err(e) = chunk_cache.get_or_build(seq, chunk.index, build).await {
-                    tracing::debug!(seq, index = chunk.index, "chunk prebuild failed: {e}");
+                let indexing = index_chunk(index_range, path.clone(), chunk);
+                if let Err(e) = chunk_cache.get_or_index(seq, chunk.index, indexing).await {
+                    tracing::debug!(seq, index = chunk.index, "chunk indexing failed: {e}");
                     break;
                 }
                 next_index.insert(seq, chunk.index + 1);

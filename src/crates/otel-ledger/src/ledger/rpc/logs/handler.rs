@@ -33,7 +33,7 @@ use super::wire::{
     CatalogFileEntry, FilesResponse, InfoResponse, OtelLogsRequest, OtelLogsResponse,
     SfstFileEntry, StreamId, TenantFiles, WalFileEntry,
 };
-use file_lifecycle::chunk::{BuiltChunk, ChunkCache};
+use file_lifecycle::chunk::{ChunkCache, IndexedChunk};
 use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use wal::prefix::{chunk_boundaries, tail_start};
 use wal::registry::FileStatus;
@@ -232,25 +232,25 @@ impl OtelLogsHandler {
                                 summary.record_count
                             ))
                         } else {
-                            Ok(Arc::new(BuiltChunk {
+                            Ok(Arc::new(IndexedChunk {
                                 summary,
                                 bytes: Arc::new(bytes),
                             }))
                         }
                     }
                     Ok(Err(e)) => Err(format!("index_logs_range: {e}")),
-                    Err(e) => Err(format!("build task: {e}")),
+                    Err(e) => Err(format!("indexing task: {e}")),
                 }
             };
 
-            match self.chunk_cache.get_or_build(seq, chunk.index, init).await {
-                Ok(built) => candidates.push(SfstCandidate {
-                    summary: built.summary.clone(),
+            match self.chunk_cache.get_or_index(seq, chunk.index, init).await {
+                Ok(indexed) => candidates.push(SfstCandidate {
+                    summary: indexed.summary.clone(),
                     file_seq: seq,
                     // Chunks and the tail of one WAL share `seq`; the
                     // chunk index disambiguates them in the cursor order.
                     part: sfsq::logs::Part::Indexed(chunk.index),
-                    source: Source::Memory(Arc::clone(&built.bytes)),
+                    source: Source::Memory(Arc::clone(&indexed.bytes)),
                 }),
                 // Indexing failure (decode error, count mismatch, panic):
                 // refuse the whole WAL — see the failure policy above.
@@ -258,7 +258,7 @@ impl OtelLogsHandler {
                     tracing::warn!(
                         seq,
                         index = chunk.index,
-                        "chunk build failed; refusing to query this WAL: {e}"
+                        "chunk indexing failed; refusing to query this WAL: {e}"
                     );
                     return (Vec::new(), Vec::new());
                 }

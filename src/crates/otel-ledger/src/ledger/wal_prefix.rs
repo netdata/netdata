@@ -5,9 +5,9 @@
 //! from the start on every request repeats work: boundaries are
 //! append-only, so [`WalPrefixes`] keeps one [`wal::prefix::ChunkFold`]
 //! per WAL and scans only the frames written since the last call. Both
-//! the request path and the chunk indexer (`super::prebuild`) read it.
+//! the request path and the chunk indexer (`super::chunk_indexer`) read it.
 //!
-//! [`build_chunk`] is the one chunk indexing both of them hand to the
+//! [`index_chunk`] is the one chunk indexing both of them hand to the
 //! shared `ChunkCache`, so a request and the chunk indexer racing for one
 //! chunk join the same singleflight indexing.
 
@@ -15,12 +15,12 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use file_lifecycle::chunk::BuiltChunk;
+use file_lifecycle::chunk::IndexedChunk;
 use wal::prefix::{ChunkBoundary, ChunkFold};
 
 /// Indexes one WAL byte range into an SFST image (the signal's range
 /// indexing function, e.g. `ng_index::index_traces_range`).
-pub(crate) type ChunkSealFn =
+pub(crate) type ChunkIndexFn =
     fn(&Path, wal::FrameRange) -> Result<(sfst::Summary, Vec<u8>), ng_index::Error>;
 
 /// One WAL's fold and how far its frames were scanned.
@@ -95,15 +95,15 @@ impl WalPrefixes {
     }
 }
 
-/// Index `chunk` of the WAL at `path` with `seal` on a blocking thread,
+/// Index `chunk` of the WAL at `path` with `index_range` on a blocking thread,
 /// cross-checking the indexed record count against the scan's.
-pub(crate) async fn build_chunk(
-    seal: ChunkSealFn,
+pub(crate) async fn index_chunk(
+    index_range: ChunkIndexFn,
     path: PathBuf,
     chunk: ChunkBoundary,
-) -> Result<Arc<BuiltChunk>, String> {
+) -> Result<Arc<IndexedChunk>, String> {
     let (range, expected) = (chunk.range, chunk.entry_count);
-    match tokio::task::spawn_blocking(move || seal(&path, range)).await {
+    match tokio::task::spawn_blocking(move || index_range(&path, range)).await {
         Ok(Ok((summary, bytes))) => {
             if u64::from(summary.record_count) != expected {
                 Err(format!(
@@ -111,14 +111,14 @@ pub(crate) async fn build_chunk(
                     summary.record_count
                 ))
             } else {
-                Ok(Arc::new(BuiltChunk {
+                Ok(Arc::new(IndexedChunk {
                     summary,
                     bytes: Arc::new(bytes),
                 }))
             }
         }
-        Ok(Err(e)) => Err(format!("chunk seal: {e}")),
-        Err(e) => Err(format!("chunk build task: {e}")),
+        Ok(Err(e)) => Err(format!("chunk indexing: {e}")),
+        Err(e) => Err(format!("chunk indexing task: {e}")),
     }
 }
 

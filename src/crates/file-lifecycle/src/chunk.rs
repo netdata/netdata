@@ -14,7 +14,7 @@
 //! module owns the memoization:
 //!
 //! - [`ChunkCache`] — a process-wide memo of indexed chunks
-//!   ([`BuiltChunk`]: the SFST byte image and its summary), keyed
+//!   ([`IndexedChunk`]: the SFST byte image and its summary), keyed
 //!   `(wal_seq, chunk_index)`, with indexing singleflight and
 //!   a byte-budget LRU (both from `moka`). Concurrent queries that need
 //!   the same chunk index it once; a chunk, once indexed, is reused until
@@ -37,7 +37,7 @@
 //! (`ledger/mod.rs`, budget `CHUNK_CACHE_BYTES` — a fixed 256 MiB default
 //! shared by both signals, so logs and traces can evict each other's
 //! chunks under pressure). Both signals' query handlers are the
-//! `get_or_build` callers (`rpc/logs/handler.rs`,
+//! `get_or_index` callers (`rpc/logs/handler.rs`,
 //! `rpc/traces/sources.rs`); the indexer-response path
 //! (`ledger/indexer.rs`) is the `drop_seq` caller on rotation. Keys never
 //! collide across signals: [`file_registry::FileId::seq`] values are
@@ -53,7 +53,7 @@ use moka::future::Cache;
 /// One indexed chunk: the self-contained SFST byte image and the
 /// summary its indexing produced. Keeping the summary beside the bytes
 /// spares a query re-opening the image just to read it back.
-pub struct BuiltChunk {
+pub struct IndexedChunk {
     pub summary: sfst::Summary,
     pub bytes: Arc<Vec<u8>>,
 }
@@ -61,7 +61,7 @@ pub struct BuiltChunk {
 /// A process-wide memo of indexed chunks, keyed
 /// `(wal_seq, chunk_index)` — see `ChunkKey`.
 ///
-/// Values are [`BuiltChunk`]s; their bytes are an SFST parseable by
+/// Values are [`IndexedChunk`]s; their bytes are an SFST parseable by
 /// [`sfst::IndexReader::open`]. The cache validates nothing itself; the
 /// guarantee a hit makes is the caller's. Production callers
 /// (otel-ledger's query handlers, on a blocking thread) index the chunk
@@ -75,7 +75,7 @@ pub struct BuiltChunk {
 /// across every pipeline's query handlers and the indexer-response path
 /// (see the module consumers).
 pub struct ChunkCache {
-    cache: Cache<ChunkKey, Arc<BuiltChunk>>,
+    cache: Cache<ChunkKey, Arc<IndexedChunk>>,
     /// `wal_seq -> number of chunk indices ever indexed for it`, so
     /// [`drop_seq`](Self::drop_seq) can invalidate each key by hand
     /// (per-key `invalidate` is immediately consistent; moka's
@@ -89,7 +89,7 @@ pub struct ChunkCache {
     /// `drop_seq`; a `wal_seq` that rotates without one (every rotation
     /// path in the indexer-response handler calls it) leaks a single
     /// `u64 -> u32` entry until restart.
-    built: Mutex<HashMap<u64, u32>>,
+    indexed: Mutex<HashMap<u64, u32>>,
 }
 
 /// The memoization key: `wal_seq` is the WAL's [`file_registry::FileId`]
@@ -114,13 +114,13 @@ impl ChunkCache {
         debug_assert!(max_bytes > 0, "ChunkCache budget must be positive");
         let cache = Cache::builder()
             .max_capacity(max_bytes)
-            .weigher(|_k: &ChunkKey, v: &Arc<BuiltChunk>| {
+            .weigher(|_k: &ChunkKey, v: &Arc<IndexedChunk>| {
                 v.bytes.len().min(u32::MAX as usize) as u32
             })
             .build();
         Self {
             cache,
-            built: Mutex::new(HashMap::new()),
+            indexed: Mutex::new(HashMap::new()),
         }
     }
 
@@ -132,12 +132,12 @@ impl ChunkCache {
     /// is returned as `Arc<E>` because moka shares one error across all
     /// waiters; that sharing is also why moka requires the
     /// `Send + Sync + 'static` bound on `E`.
-    pub async fn get_or_build<E>(
+    pub async fn get_or_index<E>(
         &self,
         wal_seq: u64,
         chunk_index: u32,
-        init: impl Future<Output = Result<Arc<BuiltChunk>, E>>,
-    ) -> Result<Arc<BuiltChunk>, Arc<E>>
+        init: impl Future<Output = Result<Arc<IndexedChunk>, E>>,
+    ) -> Result<Arc<IndexedChunk>, Arc<E>>
     where
         E: Send + Sync + 'static,
     {
@@ -155,15 +155,15 @@ impl ChunkCache {
         // bytes, and the indexer sends the WAL delete to the cleaner only
         // after drop_seq, so the racing indexing normally still finds
         // the file; if the deletion wins, the indexing fails and the
-        // failure is not cached. The re-acquired `built` entry is bounded
+        // failure is not cached. The re-acquired `indexed` entry is bounded
         // to one per affected rotation (LRU reclaims the chunk memory; no
         // further drop_seq occurs for a rotated seq). In steady state the
         // window is unreached: the sealed SFST is registered before the
         // WAL is deleted, so later queries resolve the seq to the SFST
         // and never request its chunks.
         {
-            let mut built = self.built.lock().unwrap();
-            let n = built.entry(wal_seq).or_insert(0);
+            let mut indexed = self.indexed.lock().unwrap();
+            let n = indexed.entry(wal_seq).or_insert(0);
             *n = (*n).max(chunk_index + 1);
         }
         Ok(chunk)
@@ -176,7 +176,7 @@ impl ChunkCache {
     /// query starting after this never sees a dropped chunk; an in-flight
     /// query keeps the chunk bytes alive through its own `Arc` clone.
     pub async fn drop_seq(&self, wal_seq: u64) {
-        let count = self.built.lock().unwrap().remove(&wal_seq);
+        let count = self.indexed.lock().unwrap().remove(&wal_seq);
         if let Some(count) = count {
             for chunk_index in 0..count {
                 self.cache

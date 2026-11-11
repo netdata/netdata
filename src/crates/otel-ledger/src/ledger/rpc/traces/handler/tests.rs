@@ -15,8 +15,8 @@
 //! path in `handler/remote_tests.rs`.
 use super::*;
 use crate::ledger::rpc::traces::fixtures::{
-    install_sealed, install_sfst, install_wal, make_registries, otlp_req, otlp_req_svc,
-    sealed_traces,
+    indexed_traces, install_sealed, install_sfst, install_wal, make_registries, otlp_req,
+    otlp_req_svc,
 };
 use file_lifecycle::registry::TenantRegistries;
 use otel_bridge::function::ProgressState;
@@ -177,10 +177,10 @@ async fn handler_with_fixture_wal() -> OtelTracesHandler {
 }
 
 #[tokio::test]
-async fn a_sealed_traces_fixture_serves_as_a_local_sealed_file() {
+async fn an_indexed_traces_fixture_serves_as_a_local_sealed_file() {
     // The fixture is what traces indexing writes: its summary spans the
     // spans' seconds and counts them, and the file answers a lookup alone.
-    let (summary, _) = sealed_traces(vec![otlp_req(0x11, 3, 1_000_000_000)]);
+    let (summary, _) = indexed_traces(vec![otlp_req(0x11, 3, 1_000_000_000)]);
     assert_eq!(
         (
             summary.min_timestamp_s,

@@ -10,7 +10,7 @@
 //! wire `pipeline_id` is decoded to a `Signal` at each boundary, after
 //! which routing is total. Adding a signal means adding a `Pipeline` (and
 //! widening `PerSignal`), not reworking the shell. One exception: the
-//! traces chunk indexer (`traces_prebuilder`) is traces-only state on
+//! traces chunk indexer (`traces_chunk_indexer`) is traces-only state on
 //! the shell; it shares the traces WAL prefixes with the traces pipeline,
 //! and the ingestor and indexer handlers reach it by matching
 //! `Signal::Traces`.
@@ -24,11 +24,11 @@
 //! - function calls → the pipeline whose declared function name matches.
 
 mod catalog_builder;
+mod chunk_indexer;
 mod cleaner;
 mod indexer;
 mod ingestor;
 mod pipeline;
-mod prebuild;
 mod retention;
 mod rpc;
 mod traces_pipeline;
@@ -128,7 +128,7 @@ pub struct Ledger {
     /// Indexes the traces WALs' chunks as the writer syncs, so traces
     /// queries rarely index one; fed each traces `Synced` event, told to
     /// forget a WAL when its chunks drop.
-    traces_prebuilder: prebuild::ChunkPrebuilder,
+    traces_chunk_indexer: chunk_indexer::ChunkIndexer,
     /// Per-signal frame-sequence gap-check. The single writer process feeds every
     /// signal over one connection, but assigns a separate monotonic `frame_seq`
     /// per signal, so the next-expected seq is tracked per signal — a gap is then a
@@ -292,7 +292,7 @@ impl Ledger {
         let traces_prefixes = Arc::new(wal_prefix::WalPrefixes::new(
             traces_pipeline::TRACES_CHUNK_MIN_ENTRIES,
         ));
-        let traces_prebuilder = prebuild::ChunkPrebuilder::spawn(
+        let traces_chunk_indexer = chunk_indexer::ChunkIndexer::spawn(
             Arc::clone(&traces_prefixes),
             ng_index::index_traces_range,
             Arc::clone(&chunk_cache),
@@ -406,7 +406,7 @@ impl Ledger {
             upload_retry: file_lifecycle::upload_retry::UploadRetry::default(),
             retry_timer,
             chunk_cache,
-            traces_prebuilder,
+            traces_chunk_indexer,
             // Each signal's frame_seq stream starts at 1 (the ingestor's first
             // assigned frame_seq), so the gap-check's next-expected seeds to 1.
             expected_frame_seq: PerSignal { logs: 1, traces: 1 },

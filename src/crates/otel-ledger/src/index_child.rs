@@ -113,12 +113,12 @@ pub fn run(
     sfst_path: &Path,
     answer: &mut impl Write,
 ) -> Result<()> {
-    let build = match signal {
+    let index = match signal {
         Signal::Logs => ng_index::index_logs_file,
         Signal::Traces => ng_index::index_traces_file,
     };
 
-    let (summary, size) = build(wal_path, sfst_path, &ng_index::Metrics::new())
+    let (summary, size) = index(wal_path, sfst_path, &ng_index::Metrics::new())
         .with_context(|| format!("indexing {}", wal_path.display()))?;
 
     let indexed = IndexedFile {
@@ -200,19 +200,19 @@ mod tests {
     }
 
     /// An `ng-index` indexing function, as `run` calls it.
-    type Build =
+    type IndexFn =
         fn(&Path, &Path, &ng_index::Metrics) -> Result<(sfst::Summary, u64), ng_index::Error>;
 
     /// The child's answer and index file are those of a direct call of
-    /// `build`.
-    fn assert_same_as_direct_call(signal: Signal, wal_path: &Path, build: Build) {
+    /// `index`.
+    fn assert_same_as_direct_call(signal: Signal, wal_path: &Path, index: IndexFn) {
         let dir = tempfile::tempdir().unwrap();
         let (direct_path, child_path) = (
             dir.path().join("direct.sfst"),
             dir.path().join("child.sfst"),
         );
 
-        let (summary, size) = build(wal_path, &direct_path, &ng_index::Metrics::new()).unwrap();
+        let (summary, size) = index(wal_path, &direct_path, &ng_index::Metrics::new()).unwrap();
         let mut answer = Vec::new();
         run(signal, wal_path, &child_path, &mut answer).unwrap();
 
@@ -271,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn the_signal_selects_the_builder() {
+    fn the_signal_selects_the_index_function() {
         let dir = tempfile::tempdir().unwrap();
         let wal_path = write_logs_wal(dir.path(), 1);
         let mut answer = Vec::new();

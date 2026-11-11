@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use wal::prefix::chunk_boundaries;
 
 use super::*;
-use crate::ledger::prebuild::ChunkPrebuilder;
+use crate::ledger::chunk_indexer::ChunkIndexer;
 use crate::ledger::rpc::traces_fixtures::{install_wal, make_registries, otlp_req};
 
 /// A traces WAL of five frames (1, 2, 3, 1, 2 spans): with a threshold of
@@ -70,17 +70,17 @@ async fn a_forgotten_wal_is_scanned_again() {
 }
 
 #[tokio::test]
-async fn built_chunks_carry_their_records_and_summary() {
+async fn indexed_chunks_carry_their_records_and_summary() {
     let (path, frames) = five_frame_wal(3).await;
     let end = frames.last().unwrap().end_offset;
     let chunk = WalPrefixes::new(3).chunks(3, &path, end).await.unwrap()[0];
-    let built = build_chunk(ng_index::index_traces_range, path, chunk)
+    let indexed = index_chunk(ng_index::index_traces_range, path, chunk)
         .await
         .unwrap();
-    assert_eq!(u64::from(built.summary.record_count), chunk.entry_count);
+    assert_eq!(u64::from(indexed.summary.record_count), chunk.entry_count);
     assert_eq!(
-        sfst::IndexReader::open(&built.bytes).unwrap().summary(),
-        &built.summary
+        sfst::IndexReader::open(&indexed.bytes).unwrap().summary(),
+        &indexed.summary
     );
 }
 
@@ -88,8 +88,8 @@ async fn built_chunks_carry_their_records_and_summary() {
 /// always errs succeeds only on a hit.
 async fn cached(cache: &ChunkCache, seq: u64, index: u32) -> bool {
     cache
-        .get_or_build(seq, index, async {
-            Err::<Arc<BuiltChunk>, &str>("not built")
+        .get_or_index(seq, index, async {
+            Err::<Arc<IndexedChunk>, &str>("not indexed")
         })
         .await
         .is_ok()
@@ -112,46 +112,47 @@ async fn await_cached(cache: &ChunkCache, seq: u64, chunks: &[ChunkBoundary], wa
     }
 }
 
-fn spawn_prebuilder(
+fn spawn_chunk_indexer(
     prefixes: &Arc<WalPrefixes>,
-    seal: ChunkSealFn,
+    index_range: ChunkIndexFn,
     cache: &Arc<ChunkCache>,
     cancel: &CancellationToken,
-) -> ChunkPrebuilder {
-    ChunkPrebuilder::spawn(
+) -> ChunkIndexer {
+    ChunkIndexer::spawn(
         Arc::clone(prefixes),
-        seal,
+        index_range,
         Arc::clone(cache),
         cancel.clone(),
     )
 }
 
 #[tokio::test]
-async fn the_prebuilder_builds_new_chunks_on_its_own() {
+async fn the_chunk_indexer_indexes_new_chunks_on_its_own() {
     let (path, frames) = five_frame_wal(4).await;
     let end = frames.last().unwrap().end_offset;
     let prefixes = Arc::new(WalPrefixes::new(3));
     let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
     let cancel = CancellationToken::new();
-    let prebuilder = spawn_prebuilder(&prefixes, ng_index::index_traces_range, &cache, &cancel);
-    prebuilder.synced(4, path, end);
+    let chunk_indexer =
+        spawn_chunk_indexer(&prefixes, ng_index::index_traces_range, &cache, &cancel);
+    chunk_indexer.synced(4, path, end);
     await_cached(&cache, 4, &folded_up_to(&frames, end), true).await;
     cancel.cancel();
 }
 
-static SEALS: AtomicUsize = AtomicUsize::new(0);
+static INDEXED: AtomicUsize = AtomicUsize::new(0);
 
 /// The traces range indexing function, counted (only one test uses it).
-fn counting_seal(
+fn counting_index(
     path: &Path,
     range: wal::FrameRange,
 ) -> Result<(sfst::Summary, Vec<u8>), ng_index::Error> {
-    SEALS.fetch_add(1, Ordering::SeqCst);
+    INDEXED.fetch_add(1, Ordering::SeqCst);
     ng_index::index_traces_range(path, range)
 }
 
 #[tokio::test]
-async fn the_prebuilder_builds_each_chunk_once() {
+async fn the_chunk_indexer_indexes_each_chunk_once() {
     let (path, frames) = five_frame_wal(5).await;
     let (other, other_frames) = five_frame_wal(6).await;
     let (end, other_end) = (
@@ -165,21 +166,21 @@ async fn the_prebuilder_builds_each_chunk_once() {
     let prefixes = Arc::new(WalPrefixes::new(3));
     let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
     let cancel = CancellationToken::new();
-    let prebuilder = spawn_prebuilder(&prefixes, counting_seal, &cache, &cancel);
+    let chunk_indexer = spawn_chunk_indexer(&prefixes, counting_index, &cache, &cancel);
 
-    prebuilder.synced(5, path.clone(), end);
+    chunk_indexer.synced(5, path.clone(), end);
     await_cached(&cache, 5, &chunks, true).await;
-    assert_eq!(SEALS.load(Ordering::SeqCst), chunks.len());
+    assert_eq!(INDEXED.load(Ordering::SeqCst), chunks.len());
 
     // A later sync does not re-index a chunk the cache dropped; a query
     // indexes it on demand. WALs are served in arrival order, so once
     // WAL 6's chunks are cached, WAL 5's second sync was handled.
     cache.drop_seq(5).await;
-    prebuilder.synced(5, path, end);
-    prebuilder.synced(6, other, other_end);
+    chunk_indexer.synced(5, path, end);
+    chunk_indexer.synced(6, other, other_end);
     await_cached(&cache, 6, &other_chunks, true).await;
     assert_eq!(
-        SEALS.load(Ordering::SeqCst),
+        INDEXED.load(Ordering::SeqCst),
         chunks.len() + other_chunks.len()
     );
     assert!(!cached(&cache, 5, chunks[0].index).await);
@@ -194,13 +195,14 @@ async fn forgetting_a_wal_drops_its_boundaries_and_chunks() {
     let prefixes = Arc::new(WalPrefixes::new(3));
     let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
     let cancel = CancellationToken::new();
-    let prebuilder = spawn_prebuilder(&prefixes, ng_index::index_traces_range, &cache, &cancel);
-    prebuilder.synced(7, path, end);
+    let chunk_indexer =
+        spawn_chunk_indexer(&prefixes, ng_index::index_traces_range, &cache, &cancel);
+    chunk_indexer.synced(7, path, end);
     await_cached(&cache, 7, &chunks, true).await;
 
     // The boundaries go first, then the chunks: once the chunks are
     // gone, so is the WAL's entry.
-    prebuilder.forget(7);
+    chunk_indexer.forget(7);
     await_cached(&cache, 7, &chunks, false).await;
     assert!(prefixes.entries.lock().unwrap().is_empty());
     cancel.cancel();
@@ -220,11 +222,12 @@ async fn a_forget_right_behind_a_sync_leaves_nothing() {
     let prefixes = Arc::new(WalPrefixes::new(3));
     let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
     let cancel = CancellationToken::new();
-    let prebuilder = spawn_prebuilder(&prefixes, ng_index::index_traces_range, &cache, &cancel);
-    prebuilder.synced(8, path, end);
-    prebuilder.forget(8);
+    let chunk_indexer =
+        spawn_chunk_indexer(&prefixes, ng_index::index_traces_range, &cache, &cancel);
+    chunk_indexer.synced(8, path, end);
+    chunk_indexer.forget(8);
     // Served in arrival order: once WAL 9 is indexed, WAL 8 was handled.
-    prebuilder.synced(9, other, other_end);
+    chunk_indexer.synced(9, other, other_end);
     await_cached(&cache, 9, &folded_up_to(&other_frames, other_end), true).await;
     assert!(!cached(&cache, 8, chunks[0].index).await);
     let seqs: Vec<u64> = prefixes.entries.lock().unwrap().keys().copied().collect();

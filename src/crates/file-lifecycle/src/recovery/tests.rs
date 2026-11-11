@@ -1422,7 +1422,7 @@ impl crate::component::Component for IdleCleaner {
 }
 
 #[tokio::test]
-async fn recover_unindexed_orphans_unsealable_wals() {
+async fn recover_unindexed_orphans_unindexable_wals() {
     // Pins `recover_unindexed`'s orphan policy on a failed indexing
     // operation: the pass returns Ok (not fatal), the WAL entry is
     // untracked (the planner never sees it), the seq is not routable
@@ -1481,7 +1481,7 @@ async fn recover_unindexed_orphans_unsealable_wals() {
     // file and startup proceeds.
     recover_unindexed(&mut registry, &mut indexer, &mut cleaner)
         .await
-        .expect("seal failures are skipped, not fatal");
+        .expect("indexing failures are skipped, not fatal");
 
     // The entry is untracked (the planner never sees it)...
     assert!(registry.wal.get(seq).is_none(), "WAL entry untracked");
