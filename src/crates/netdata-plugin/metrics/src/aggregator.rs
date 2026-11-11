@@ -11,8 +11,8 @@
 //! updates them, and expiry marks them obsolete.
 
 use crate::batch::Batch;
-use crate::emit::Chunker;
 use crate::metric_set::{Labels, MetricSet, MetricSetInner};
+use netdata_plugin_protocol::Chunker;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 

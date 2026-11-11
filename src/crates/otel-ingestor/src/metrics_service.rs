@@ -13,7 +13,8 @@
 //! slots — chart.rs owns slot quantization, readiness, gap-fill and
 //! per-second rate division — and lib.rs's tick loop calls
 //! [`ChartManager::emit`] once per second, forwarding the CHART/BEGIN/SET/END
-//! text to the otel-plugin supervisor over ferryboat IPC. Metrics never
+//! text to the otel-plugin supervisor over ferryboat IPC, in chunks under the
+//! IPC message limit. Metrics never
 //! touch the WAL (logs and traces do).
 //!
 //! Chart creation is budgeted per request (`max_new_charts_per_request`,
@@ -40,6 +41,7 @@ use opentelemetry_proto::tonic::metrics::v1::{
     AggregationTemporality, HistogramDataPoint, SummaryDataPoint,
 };
 
+use netdata_plugin_protocol::Chunker;
 use otel_derived_metrics::DerivedMetrics;
 
 use crate::chart::{Chart, ChartAggregationType, ChartConfig};
@@ -112,13 +114,13 @@ impl ChartManager {
     ///
     /// Called once per second by lib.rs's tick loop; slot readiness,
     /// gap-fill and rate division all live in chart.rs.
-    pub fn emit(&mut self, slot_timestamp: u64, buf: &mut Vec<u8>) {
+    pub fn emit(&mut self, slot_timestamp: u64, out: &mut Chunker) {
         self.charts.retain(|_, chart| {
             if chart.is_expired() {
                 return false;
             }
 
-            chart.emit(slot_timestamp, buf);
+            chart.emit(slot_timestamp, out);
             true
         });
     }
@@ -861,17 +863,56 @@ mod tests {
         assert_eq!(counted(&service), (1, 3));
 
         // The current point's slot has ended 30 seconds from now.
-        let mut text = Vec::new();
+        let mut out = Chunker::new(usize::MAX);
         service
             .chart_manager
             .write()
             .await
-            .emit(now / 1_000_000_000 + 30, &mut text);
+            .emit(now / 1_000_000_000 + 30, &mut out);
+        let text = out.finish().concat();
         let blocks = text
             .split(|&byte| byte == b'\n')
             .filter(|line| line.starts_with(b"BEGIN "))
             .count();
         assert_eq!(blocks, 1);
+    }
+
+    /// One tick's chart text goes to the supervisor as messages of limited
+    /// size: however many charts emit, no chunk passes the budget, and the
+    /// chunks in order are valid chart text.
+    #[tokio::test]
+    async fn chart_text_comes_in_chunks_under_the_budget() {
+        const BUDGET: usize = 64 * 1024;
+        let service = NetdataMetricsService {
+            max_new_charts_per_request: usize::MAX,
+            ..NetdataMetricsService::default()
+        };
+        let now = now_ns();
+        let metrics = (0..2_000)
+            .map(|i| gauge(&format!("load.{i}"), vec![point(Some(1.0), now)]))
+            .collect();
+        service.export_metrics(request(metrics)).await.unwrap();
+
+        let mut out = Chunker::new(BUDGET);
+        service
+            .chart_manager
+            .write()
+            .await
+            .emit(now / 1_000_000_000 + 30, &mut out);
+        let chunks = out.finish();
+
+        assert!(chunks.len() > 1, "{} chunk(s)", chunks.len());
+        for chunk in &chunks {
+            assert!(chunk.len() <= BUDGET, "a chunk of {} bytes", chunk.len());
+            assert_eq!(chunk.last(), Some(&b'\n'));
+        }
+        let text = chunks.concat();
+        netdata_plugin_protocol::validate_chart_stream(&text).unwrap();
+        let charts = text
+            .split(|&byte| byte == b'\n')
+            .filter(|line| line.starts_with(b"CHART "))
+            .count();
+        assert_eq!(charts, 2_000);
     }
 
     #[tokio::test]

@@ -422,6 +422,52 @@ pub fn write_quoted(buf: &mut impl BufMut, text: &str) {
     buf.put_u8(b'\'');
 }
 
+/// Packs chart-protocol text into chunks under a byte budget, for a channel
+/// that limits the size of one message.
+///
+/// A chunk holds whole blocks. A block is what one call of [`Chunker::block`]
+/// writes: one chart definition, one update (`BEGIN`..`END`) or one obsolete
+/// mark. So each chunk can be written to the agent on its own, and the chunks
+/// in order are the text. A block larger than the budget gets a chunk of its
+/// own.
+pub struct Chunker {
+    max_chunk: usize,
+    chunks: Vec<Vec<u8>>,
+    current: Vec<u8>,
+    block: Vec<u8>,
+}
+
+impl Chunker {
+    /// A packer of chunks of at most `max_chunk` bytes; `usize::MAX` for one
+    /// chunk.
+    pub fn new(max_chunk: usize) -> Self {
+        Self {
+            max_chunk,
+            chunks: Vec::new(),
+            current: Vec::new(),
+            block: Vec::new(),
+        }
+    }
+
+    /// Add one block, written by `write`; a chunk never splits a block.
+    pub fn block(&mut self, write: impl FnOnce(&mut Vec<u8>)) {
+        self.block.clear();
+        write(&mut self.block);
+        if !self.current.is_empty() && self.current.len() + self.block.len() > self.max_chunk {
+            self.chunks.push(std::mem::take(&mut self.current));
+        }
+        self.current.extend_from_slice(&self.block);
+    }
+
+    /// The chunks, in the order to write them; none is empty.
+    pub fn finish(mut self) -> Vec<Vec<u8>> {
+        if !self.current.is_empty() {
+            self.chunks.push(self.current);
+        }
+        self.chunks
+    }
+}
+
 /// True when `id` is a valid chart id: `type.id` with both parts non-empty,
 /// no byte the agent's splitter treats as a separator or quote, and not
 /// starting with `SLOT:` (the agent would read the word as a slot number,
@@ -1043,6 +1089,25 @@ mod tests {
         assert!(!is_valid_dimension_id("a=b"));
         assert!(!is_valid_dimension_id("SLOT:1"));
         assert!(!is_valid_chart_id("SLOT:1.a"));
+    }
+
+    #[test]
+    fn a_chunk_holds_whole_blocks_under_the_budget() {
+        let mut chunker = Chunker::new(10);
+        for block in ["aaaa", "bbbb", "cccc", "a block of 22 bytes...", "dd", ""] {
+            chunker.block(|buf| buf.extend_from_slice(block.as_bytes()));
+        }
+
+        let chunks: Vec<String> = chunker
+            .finish()
+            .into_iter()
+            .map(|chunk| String::from_utf8(chunk).unwrap())
+            .collect();
+        // Two blocks fit, the third opens a chunk; the oversized block is
+        // alone; an empty block adds nothing.
+        assert_eq!(chunks, ["aaaabbbb", "cccc", "a block of 22 bytes...", "dd"]);
+
+        assert!(Chunker::new(10).finish().is_empty());
     }
 
     #[test]

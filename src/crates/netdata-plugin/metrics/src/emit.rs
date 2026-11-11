@@ -4,9 +4,9 @@
 use crate::chart::ChartTemplate;
 use crate::metric_set::{Labels, MetricSetInner};
 use netdata_plugin_protocol::{
-    ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
-    write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end_timed,
-    write_set_empty, write_set_float,
+    ChartLine, ChartOptions, Chunker, DimensionAlgorithm, DimensionLine, DimensionOptions,
+    LabelSource, write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension,
+    write_end_timed, write_set_empty, write_set_float,
 };
 
 impl MetricSetInner {
@@ -111,42 +111,5 @@ impl MetricSetInner {
                 },
             },
         );
-    }
-}
-
-/// Packs blocks (one definition, update or obsolete mark each) into chunks
-/// under a byte budget.
-pub(crate) struct Chunker {
-    max_chunk: usize,
-    chunks: Vec<Vec<u8>>,
-    current: Vec<u8>,
-    block: Vec<u8>,
-}
-
-impl Chunker {
-    pub(crate) fn new(max_chunk: usize) -> Self {
-        Self {
-            max_chunk,
-            chunks: Vec::new(),
-            current: Vec::new(),
-            block: Vec::new(),
-        }
-    }
-
-    /// Add one block, written by `write`; a chunk never splits a block.
-    pub(crate) fn block(&mut self, write: impl FnOnce(&mut Vec<u8>)) {
-        self.block.clear();
-        write(&mut self.block);
-        if !self.current.is_empty() && self.current.len() + self.block.len() > self.max_chunk {
-            self.chunks.push(std::mem::take(&mut self.current));
-        }
-        self.current.extend_from_slice(&self.block);
-    }
-
-    pub(crate) fn finish(mut self) -> Vec<Vec<u8>> {
-        if !self.current.is_empty() {
-            self.chunks.push(self.current);
-        }
-        self.chunks
     }
 }

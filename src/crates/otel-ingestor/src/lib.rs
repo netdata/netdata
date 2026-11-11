@@ -42,6 +42,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use ferryboat::{Connection, Endpoint};
+use netdata_plugin_protocol::Chunker;
 use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::LogsServiceServer;
 use opentelemetry_proto::tonic::collector::metrics::v1::metrics_service_server::MetricsServiceServer;
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
@@ -189,8 +190,6 @@ async fn run_ingestor(
     let tick_chart_manager = Arc::clone(&chart_manager);
     let tick_derived_metrics = Arc::clone(&derived_metrics);
     let tick_handle = tokio::spawn(async move {
-        let mut buf = Vec::new();
-
         // Wait until the next second boundary.
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -204,22 +203,22 @@ async fn run_ingestor(
                 .expect("system clock before UNIX epoch");
             let slot_timestamp = now.as_secs();
 
-            buf.clear();
-            {
-                let mut manager = tick_chart_manager.write().await;
-                manager.emit(slot_timestamp, &mut buf);
-            }
-
-            if !buf.is_empty() {
-                if chart_tx.send(buf.clone()).await.is_err() {
-                    break;
-                }
-            }
-            // Derived charts come as whole-chart chunks under
+            // Both kinds of charts come in chunks of whole blocks under
             // `otel_derived_metrics::MAX_CHUNK_BYTES`, so every send stays
-            // under the IPC frame limit.
+            // under the IPC frame limit. The chart registry is locked only
+            // while the text is written, not while it is sent.
+            let mut otlp_charts = Chunker::new(otel_derived_metrics::MAX_CHUNK_BYTES);
+            tick_chart_manager
+                .write()
+                .await
+                .emit(slot_timestamp, &mut otlp_charts);
+
             let mut closed = false;
-            for chunk in tick_derived_metrics.emit(slot_timestamp) {
+            let chunks = otlp_charts
+                .finish()
+                .into_iter()
+                .chain(tick_derived_metrics.emit(slot_timestamp));
+            for chunk in chunks {
                 if chart_tx.send(chunk).await.is_err() {
                     closed = true;
                     break;

@@ -16,7 +16,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
 
-use netdata_plugin_protocol::sanitize_chart_id;
+use netdata_plugin_protocol::{Chunker, sanitize_chart_id};
 use opentelemetry_proto::tonic::metrics::v1::AggregationTemporality;
 
 use crate::aggregation::{
@@ -317,7 +317,7 @@ impl Chart {
     /// 2. **Data pending but not ready**: slot hasn't fully elapsed yet — skip.
     /// 3. **No data at all**: respect grace period, then gap-fill one slot
     ///    per tick.
-    pub fn emit(&mut self, tick_timestamp: u64, buf: &mut Vec<u8>) {
+    pub fn emit(&mut self, tick_timestamp: u64, out: &mut Chunker) {
         // Chart must have received data at some point.
         let Some(last_ingest_instant) = self.last_ingest_instant else {
             return;
@@ -342,7 +342,7 @@ impl Chart {
         // Collect slots that are ready: after last_emission_slot, before cutoff.
         let ready_slots = self.dimensions.ready_slots(self.last_emission_slot, cutoff);
 
-        self.emit_definition_if_needed(buf);
+        self.emit_definition_if_needed(out);
 
         if !ready_slots.is_empty() {
             for &slot in &ready_slots {
@@ -351,14 +351,14 @@ impl Chart {
                     let mut catchup = last + self.update_every;
                     while catchup < slot {
                         let values = self.dimensions.gap_fill(self.update_every);
-                        write_data_slot(buf, &self.chart_id, self.update_every, catchup, &values);
+                        self.write_slot(out, catchup, &values);
                         catchup += self.update_every;
                     }
                 }
 
                 // Finalize this slot across all dimensions.
                 let values = self.dimensions.finalize_slot(slot, self.update_every);
-                write_data_slot(buf, &self.chart_id, self.update_every, slot, &values);
+                self.write_slot(out, slot, &values);
 
                 self.last_emission_slot = Some(slot);
             }
@@ -375,7 +375,7 @@ impl Chart {
             // are ready (fill_slot < cutoff).
             if fill_slot < cutoff {
                 let values = self.dimensions.gap_fill(self.update_every);
-                write_data_slot(buf, &self.chart_id, self.update_every, fill_slot, &values);
+                self.write_slot(out, fill_slot, &values);
 
                 self.last_emission_slot = Some(fill_slot);
             }
@@ -389,8 +389,14 @@ impl Chart {
         }
     }
 
-    /// Write the chart definition into `buf` if pending, then mark as emitted.
-    fn emit_definition_if_needed(&mut self, buf: &mut Vec<u8>) {
+    /// Write one data slot as one block of `out`.
+    fn write_slot(&self, out: &mut Chunker, slot: u64, values: &[DimensionValue]) {
+        out.block(|buf| write_data_slot(buf, &self.chart_id, self.update_every, slot, values));
+    }
+
+    /// Write the chart definition as one block of `out` if pending, then
+    /// mark as emitted.
+    fn emit_definition_if_needed(&mut self, out: &mut Chunker) {
         if !self.needs_definition() {
             return;
         }
@@ -403,10 +409,8 @@ impl Chart {
             }
         }
 
-        self.definition
-            .as_ref()
-            .expect("definition must be set")
-            .write(buf);
+        let definition = self.definition.as_ref().expect("definition must be set");
+        out.block(|buf| definition.write(buf));
 
         self.definition.mark_emitted();
     }
@@ -636,6 +640,19 @@ impl DimensionStore {
 mod tests {
     use super::*;
 
+    /// Emit into `buf` as one piece of text, whatever its size.
+    fn emit(chart: &mut Chart, tick_timestamp: u64, buf: &mut Vec<u8>) {
+        let mut out = Chunker::new(usize::MAX);
+        chart.emit(tick_timestamp, &mut out);
+        buf.extend(out.finish().concat());
+    }
+
+    fn emit_definition(chart: &mut Chart, buf: &mut Vec<u8>) {
+        let mut out = Chunker::new(usize::MAX);
+        chart.emit_definition_if_needed(&mut out);
+        buf.extend(out.finish().concat());
+    }
+
     /// The emitted chart text.
     fn text(buf: &[u8]) -> &str {
         std::str::from_utf8(buf).expect("chart text is UTF-8")
@@ -704,7 +721,7 @@ mod tests {
         chart.ingest("", 2.0, ns(100), 0);
 
         let mut buf = Vec::new();
-        chart.emit(102, &mut buf);
+        emit(&mut chart, 102, &mut buf);
 
         netdata_plugin_protocol::validate_chart_stream(&buf).unwrap();
         assert!(text(&buf).contains("BEGIN my_metric.42 "), "{}", text(&buf));
@@ -747,7 +764,7 @@ mod tests {
         chart.ingest("GET", 1.5, ns(100), 0);
 
         let mut buf = Vec::new();
-        chart.emit(102, &mut buf);
+        emit(&mut chart, 102, &mut buf);
 
         assert_eq!(
             text(&buf),
@@ -898,12 +915,12 @@ mod tests {
             chart.ingest("dim1", 45.0, ms(200), 0);
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
 
             // Gap fill: repeats last value (gauge behavior, not 0).
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
@@ -929,7 +946,7 @@ mod tests {
         fn tick_without_data_emits_nothing() {
             let mut chart = gauge_chart();
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -939,7 +956,7 @@ mod tests {
 
             chart.ingest("dim1", 42.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
             let sets = last_block_sets(text(&buf));
@@ -966,7 +983,7 @@ mod tests {
 
             // With zero expiry, the chart is immediately expired.
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -977,14 +994,14 @@ mod tests {
             // Ingest data, then tick to finalize.
             chart.ingest("dim1", 42.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(42.0));
 
             // Second tick with no new data and zero grace: gap-fills by
             // repeating the last gauge value.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
             assert!(text(&buf).contains("END 2\n")); // gap-fill slot 1 + interval 1
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(42.0));
@@ -997,12 +1014,12 @@ mod tests {
             // Ingest in slot 0. Slot 0 ends at t=1; with 1s buffer, ready at t=2.
             chart.ingest("dim1", 1.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(text(&buf).contains("END 1\n")); // slot 0 + interval 1
 
             // Next tick with no data and zero grace -> gap-fill slot 1.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(text(&buf).contains("END 2\n")); // gap-fill slot 1 + interval 1
         }
 
@@ -1022,13 +1039,13 @@ mod tests {
             // Ingest data and tick to emit.
             chart.ingest("dim1", 42.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
             // Tick again with no new data — grace period is still active,
             // so the tick should skip.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -1048,14 +1065,14 @@ mod tests {
             // Ingest data and tick to emit.
             chart.ingest("dim1", 42.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(42.0));
 
             // Tick with no new data and zero grace period — gap-fill repeats
             // the last gauge value.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
             assert!(text(&buf).contains("END 2\n")); // gap-fill slot 1 + interval 1
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(42.0));
@@ -1079,7 +1096,7 @@ mod tests {
 
             // Tick at t=11: slot 0 ends at t=10, +1s buffer -> ready.
             let mut buf = Vec::new();
-            chart.emit(11, &mut buf);
+            emit(&mut chart, 11, &mut buf);
             assert!(!buf.is_empty());
 
             // Ingest data in slot 10 (ns(15) -> slot 10).
@@ -1087,12 +1104,12 @@ mod tests {
 
             // Tick at t=16: slot 10 ends at t=20, not ready yet.
             buf.clear();
-            chart.emit(16, &mut buf);
+            emit(&mut chart, 16, &mut buf);
             assert!(buf.is_empty());
 
             // Tick at t=21: slot 10 ends at t=20, +1s buffer -> ready.
             buf.clear();
-            chart.emit(21, &mut buf);
+            emit(&mut chart, 21, &mut buf);
             assert!(!buf.is_empty());
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(43.0));
 
@@ -1101,12 +1118,12 @@ mod tests {
 
             // Tick at t=26: slot 20 ends at t=30, not ready yet.
             buf.clear();
-            chart.emit(26, &mut buf);
+            emit(&mut chart, 26, &mut buf);
             assert!(buf.is_empty());
 
             // Tick at t=31: slot 20 ends at t=30, +1s buffer -> ready.
             buf.clear();
-            chart.emit(31, &mut buf);
+            emit(&mut chart, 31, &mut buf);
             assert!(!buf.is_empty());
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(44.0));
         }
@@ -1127,7 +1144,7 @@ mod tests {
             chart.ingest("dim1", 10.0, ns(5), 0);
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -1146,12 +1163,12 @@ mod tests {
 
             chart.ingest("dim1", 10.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
             // Tick again with no new data — grace period is still active.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -1171,7 +1188,7 @@ mod tests {
             chart.ingest("dim1", 100.0, ns(5), 1_000_000_000);
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -1190,12 +1207,12 @@ mod tests {
 
             chart.ingest("dim1", 100.0, ms(500), 1_000_000_000);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
             // Tick again with no new data — grace period is still active.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(buf.is_empty());
         }
     }
@@ -1219,14 +1236,14 @@ mod tests {
             // Data at slot 0.
             chart.ingest("dim1", 1.0, ns(5), 0);
             let mut buf = Vec::new();
-            chart.emit(11, &mut buf);
+            emit(&mut chart, 11, &mut buf);
             assert!(!buf.is_empty());
 
             // Data at slot 30 — should produce gap-filled catchup slots at
             // 10 and 20 (repeating gauge value 1.0), then data at 30.
             chart.ingest("dim1", 2.0, ns(30), 0);
             buf.clear();
-            chart.emit(41, &mut buf);
+            emit(&mut chart, 41, &mut buf);
             assert!(!buf.is_empty());
 
             // 2 catchup slots + 1 data slot = 3 BEGIN lines.
@@ -1253,26 +1270,26 @@ mod tests {
             // Ingest in slot 0 and emit.
             chart.ingest("dim1", 1.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
             // Grace = ZERO, so each subsequent tick with no data emits one
             // gap-filled slot (repeating the last gauge value).
             buf.clear();
-            chart.emit(5, &mut buf);
+            emit(&mut chart, 5, &mut buf);
             assert_eq!(count_begins(text(&buf)), 1);
             assert_eq!(count_sets(text(&buf)), 1);
             assert!(text(&buf).contains("END 2\n")); // gap-fill slot 1 + interval 1
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(1.0));
 
             buf.clear();
-            chart.emit(5, &mut buf);
+            emit(&mut chart, 5, &mut buf);
             assert_eq!(count_begins(text(&buf)), 1);
             assert!(text(&buf).contains("END 3\n")); // gap-fill slot 2 + interval 1
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(1.0));
 
             buf.clear();
-            chart.emit(5, &mut buf);
+            emit(&mut chart, 5, &mut buf);
             assert!(text(&buf).contains("END 4\n")); // gap-fill slot 3 + interval 1
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(1.0));
         }
@@ -1284,7 +1301,7 @@ mod tests {
             // First data ever — no catchup slots should precede it.
             chart.ingest("dim1", 1.0, ns(100), 0);
             let mut buf = Vec::new();
-            chart.emit(102, &mut buf);
+            emit(&mut chart, 102, &mut buf);
 
             assert_eq!(count_begins(text(&buf)), 1);
             assert_eq!(count_sets(text(&buf)), 1);
@@ -1297,12 +1314,12 @@ mod tests {
 
             chart.ingest("dim1", 10.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(10.0));
 
             // No new data — gap-fill emits 0 for delta sums.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
             assert_eq!(count_sets(text(&buf)), 1);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(0.0));
@@ -1324,12 +1341,12 @@ mod tests {
             // Emit at slot 0 with value 42.0.
             chart.ingest("dim1", 42.0, ns(5), 0);
             let mut buf = Vec::new();
-            chart.emit(11, &mut buf);
+            emit(&mut chart, 11, &mut buf);
 
             // Data at slot 20 — catchup at slot 10 should repeat 42.0.
             chart.ingest("dim1", 99.0, ns(20), 0);
             buf.clear();
-            chart.emit(31, &mut buf);
+            emit(&mut chart, 31, &mut buf);
 
             // 1 catchup + 1 data = 2 BEGIN/SET/END blocks.
             assert_eq!(count_begins(text(&buf)), 2);
@@ -1354,13 +1371,13 @@ mod tests {
             // Emit at slot 0 with delta 10; divided by update_every (10) = 1.0/s.
             chart.ingest("dim1", 10.0, ns(5), 0);
             let mut buf = Vec::new();
-            chart.emit(11, &mut buf);
+            emit(&mut chart, 11, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(1.0));
 
             // Data at slot 20 — catchup at slot 10 should emit 0.
             chart.ingest("dim1", 5.0, ns(20), ns(10));
             buf.clear();
-            chart.emit(31, &mut buf);
+            emit(&mut chart, 31, &mut buf);
 
             // 1 catchup + 1 data = 2 BEGIN/SET/END blocks.
             assert_eq!(count_begins(text(&buf)), 2);
@@ -1390,13 +1407,13 @@ mod tests {
             // Slot 0: baseline (first slot returns None for cumulative sum).
             chart.ingest("dim1", 100.0, ns(5), START_TIME);
             let mut buf = Vec::new();
-            chart.emit(11, &mut buf);
+            emit(&mut chart, 11, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), None);
 
             // Data at slot 20 — catchup at slot 10 should gap-fill with 0.
             chart.ingest("dim1", 150.0, ns(20), START_TIME);
             buf.clear();
-            chart.emit(31, &mut buf);
+            emit(&mut chart, 31, &mut buf);
 
             // 1 catchup + 1 data = 2 BEGIN/SET/END blocks.
             assert_eq!(count_begins(text(&buf)), 2);
@@ -1421,7 +1438,7 @@ mod tests {
 
             // Both slots are in the BTreeMap. Emit drains them in order.
             let mut buf = Vec::new();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
 
             // Slot 0 emitted first (42.0), then slot 1 (50.0).
             // Last emitted block reflects the last finalized slot.
@@ -1436,7 +1453,7 @@ mod tests {
             // Ingest and emit slot 0.
             chart.ingest("dim1", 10.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
 
             // Late arrival for slot 0 — already emitted, should be dropped.
             chart.ingest("dim1", 99.0, ms(600), 0);
@@ -1445,7 +1462,7 @@ mod tests {
             chart.ingest("dim1", 50.0, ns(1), 0);
 
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
 
             // Only slot 1 emitted. The late 99.0 for slot 0 was dropped.
             assert_eq!(count_begins(text(&buf)), 1);
@@ -1464,7 +1481,7 @@ mod tests {
 
             // Tick at 2: both slots drained in order.
             let mut buf = Vec::new();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
 
             // Two slots emitted: slot 0 + slot 1.
             assert_eq!(count_begins(text(&buf)), 2);
@@ -1489,7 +1506,7 @@ mod tests {
 
             // Tick at 2: slot 0 (baseline, None) + slot 1 (delta=150-100=50).
             let mut buf = Vec::new();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
 
@@ -1511,7 +1528,7 @@ mod tests {
 
             // Tick at 3: should report 0 for the restart slot.
             let mut buf = Vec::new();
-            chart.emit(4, &mut buf);
+            emit(&mut chart, 4, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(0.0));
         }
 
@@ -1526,7 +1543,7 @@ mod tests {
 
             // Tick at 3: all three slots drained in order.
             let mut buf = Vec::new();
-            chart.emit(4, &mut buf);
+            emit(&mut chart, 4, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(30.0));
         }
 
@@ -1543,7 +1560,7 @@ mod tests {
 
             // Tick at 2: slot 0 and 1 drained. dim2 gap-fills for slot 1.
             let mut buf = Vec::new();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(15.0));
             assert_eq!(last_dim_value(text(&buf), "dim2"), Some(20.0));
         }
@@ -1555,7 +1572,7 @@ mod tests {
             // Ingest and emit slot 0.
             chart.ingest("dim1", 10.0, ns(0), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(10.0));
 
             // Late arrival for slot 0 — dropped (already emitted).
@@ -1564,7 +1581,7 @@ mod tests {
             chart.ingest("dim1", 5.0, ns(1), ns(0));
 
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
 
             // Only slot 1 emitted. The 3.0 was dropped because slot 0
             // was already emitted.
@@ -1594,7 +1611,7 @@ mod tests {
 
             // emit() drains both: slot 0 (10 deltas) + slot 10 (1 delta).
             let mut buf = Vec::new();
-            chart.emit(21, &mut buf);
+            emit(&mut chart, 21, &mut buf);
 
             // Slot 0 + slot 10 = 2 BEGIN blocks.
             assert_eq!(count_begins(text(&buf)), 2);
@@ -1617,7 +1634,7 @@ mod tests {
             chart.ingest("dim1", 20.0, ms(200), 0);
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(30.0));
         }
 
@@ -1631,7 +1648,7 @@ mod tests {
 
             // Tick at 1: finalizes slot 0.
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(10.0));
             assert_eq!(last_dim_value(text(&buf), "dim2"), Some(20.0));
 
@@ -1640,7 +1657,7 @@ mod tests {
 
             // Tick at 2: dim2 should be gap-filled with previous value.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(15.0));
             assert_eq!(last_dim_value(text(&buf), "dim2"), Some(20.0));
         }
@@ -1655,7 +1672,7 @@ mod tests {
             chart.ingest("dim1", 10.0, ms(100), 0);
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(30.0));
         }
 
@@ -1669,7 +1686,7 @@ mod tests {
             chart.ingest("dim3", 300.0, ms(500), 0);
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_block_sets(text(&buf)).len(), 3);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(100.0));
             assert_eq!(last_dim_value(text(&buf), "dim2"), Some(200.0));
@@ -1679,7 +1696,7 @@ mod tests {
             chart.ingest("dim1", 110.0, ms(1500), 0);
 
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(110.0));
             assert_eq!(last_dim_value(text(&buf), "dim2"), Some(200.0)); // gap-fill
             assert_eq!(last_dim_value(text(&buf), "dim3"), Some(300.0)); // gap-fill
@@ -1699,7 +1716,7 @@ mod tests {
             chart.ingest("dim1", 5.0, ms(300), ms(200));
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(35.0));
         }
 
@@ -1714,7 +1731,7 @@ mod tests {
             chart.ingest("dim1", 20.0, ms(400), ms(300));
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
 
@@ -1724,12 +1741,12 @@ mod tests {
 
             chart.ingest("dim1", 10.0, ms(500), 0);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(10.0));
 
             // No new data — gap-fill emits 0 for delta sums.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
             assert_eq!(count_sets(text(&buf)), 1);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(0.0));
@@ -1754,7 +1771,7 @@ mod tests {
             chart.ingest("dim1", 5.0, ms(300), ms(200));
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(12.0));
         }
     }
@@ -1770,7 +1787,7 @@ mod tests {
 
             chart.ingest("dim1", 100.0, ms(500), START_TIME);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), None);
         }
 
@@ -1781,13 +1798,13 @@ mod tests {
             // First tick: baseline in slot 0, no delta.
             chart.ingest("dim1", 100.0, ms(500), START_TIME);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), None);
 
             // Second tick: data in slot 1, delta = 150 - 100 = 50.
             chart.ingest("dim1", 150.0, ns(1), START_TIME);
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
 
@@ -1798,19 +1815,19 @@ mod tests {
             // Establish baseline in slot 0.
             chart.ingest("dim1", 100.0, ms(500), START_TIME);
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
 
             // Normal delta in slot 1.
             chart.ingest("dim1", 150.0, ns(1), START_TIME);
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
 
             // Restart in slot 2: new start_time.
             let new_start = START_TIME + 1_000_000;
             chart.ingest("dim1", 20.0, ns(2), new_start);
             buf.clear();
-            chart.emit(4, &mut buf);
+            emit(&mut chart, 4, &mut buf);
             assert_eq!(last_dim_value(text(&buf), "dim1"), Some(0.0));
         }
     }
@@ -1825,7 +1842,7 @@ mod tests {
             chart.init_definition("metric", "title", "units", vec![]);
             // Emit definition to mark as emitted.
             let mut buf = Vec::new();
-            chart.emit_definition_if_needed(&mut buf);
+            emit_definition(&mut chart, &mut buf);
             assert!(!chart.needs_definition());
 
             // Ingest a new dimension.
@@ -1856,7 +1873,7 @@ mod tests {
             chart.ingest("dim1", 1.0, ns(1), 0);
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
 
             // The CHART line should include 'store_first'.
             let chart_line = text(&buf)
@@ -1883,7 +1900,7 @@ mod tests {
             chart.ingest("dim1", 1.0, ns(1), 0);
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
 
             let chart_line = text(&buf)
                 .lines()
@@ -1909,7 +1926,7 @@ mod tests {
             chart.ingest("dim1", 1.0, ns(1), 0);
 
             let mut buf = Vec::new();
-            chart.emit(2, &mut buf);
+            emit(&mut chart, 2, &mut buf);
 
             let chart_line = text(&buf)
                 .lines()

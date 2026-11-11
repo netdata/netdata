@@ -91,8 +91,8 @@ pub use netdata_plugin_types::{
 /// Chart-protocol encoding: the chart vocabulary and one `write_*` function
 /// per line kind, all writing into a `bytes::BufMut`.
 pub use chart::{
-    ChartLine, ChartOptions, ChartType, DimensionAlgorithm, DimensionLine, DimensionOptions,
-    LabelSource, is_valid_chart_id, is_valid_dimension_id, sanitize_chart_id,
+    ChartLine, ChartOptions, ChartType, Chunker, DimensionAlgorithm, DimensionLine,
+    DimensionOptions, LabelSource, is_valid_chart_id, is_valid_dimension_id, sanitize_chart_id,
     sanitize_dimension_id, write_begin, write_chart, write_clabel, write_clabel_commit,
     write_dimension, write_end, write_end_timed, write_quoted, write_set_empty, write_set_float,
     write_set_int,
