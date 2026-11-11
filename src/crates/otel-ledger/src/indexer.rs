@@ -317,7 +317,7 @@ impl IndexingOperations {
                 Ok(finished) => finished,
                 Err(e) => {
                     counters.failed.fetch_add(1, Ordering::Relaxed);
-                    remove_partial_index(&sfst_path);
+                    remove_failed_index(&sfst_path);
                     let usage = e.usage().map(usage_text).unwrap_or_default();
                     tracing::error!("indexing failed wal={}{usage}: {e}", wal_path.display());
                     let failed = IndexerResponse::IndexFailed {
@@ -356,7 +356,7 @@ impl IndexingOperations {
                 }
                 Err(e) => {
                     counters.failed.fetch_add(1, Ordering::Relaxed);
-                    remove_unanswered_index(&sfst_path);
+                    remove_failed_index(&sfst_path);
                     tracing::error!("indexing failed wal={}{usage}: {e:#}", wal_path.display());
                     let failed = IndexerResponse::IndexFailed {
                         file_id,
@@ -369,20 +369,18 @@ impl IndexingOperations {
     }
 }
 
-/// Remove what a child that did not end well left of the index file at
-/// `sfst_path`: the temporary file it wrote to. A child that fails removes
-/// the file itself, but one that is killed while it writes cannot, and
-/// nothing else would remove the file before the next start.
-fn remove_partial_index(sfst_path: &Path) {
+/// Remove what a failed operation left of the index file at `sfst_path`:
+/// the temporary file its child wrote to, and the index file itself.
+///
+/// A child that fails removes its temporary file, but one that is killed
+/// while it writes cannot, and nothing else would remove the file before the
+/// next start. A child can also fail after it has put the index file in
+/// place: it exits with an error, is killed, or prints something that is not
+/// an answer. The ledger tracks an index file by its answer (the summary and
+/// the size), so that file would sit untracked next to its WAL file. A failed
+/// operation leaves no index file.
+fn remove_failed_index(sfst_path: &Path) {
     file_registry::durable::remove_stale_tmp(&file_registry::durable::tmp_path(sfst_path));
-}
-
-/// Remove the index file at `sfst_path` that a child put in place without a
-/// usable answer. The ledger tracks an index file by its answer (the summary
-/// and the size), so this one would sit untracked next to its WAL file; the
-/// operation counts as failed, and a failed one leaves no index file.
-fn remove_unanswered_index(sfst_path: &Path) {
-    remove_partial_index(sfst_path);
     match std::fs::remove_file(sfst_path) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -788,6 +786,28 @@ mod tests {
         // The child puts its index file in place and exits with status 0,
         // but what it prints is not an answer.
         let executable = fake_executable(dir.path(), r#": > "$7"; printf garbage"#);
+        let indexing_operations =
+            IndexingOperations::with_executable(executable, limits_from(None, None).unwrap());
+
+        let wal = dir.path().join("in.wal");
+        let (response, _) = indexing_operations
+            .run(Signal::Logs, file_id(1), wal, sfst.clone(), None, 0)
+            .await;
+
+        assert!(
+            matches!(response, IndexerResponse::IndexFailed { .. }),
+            "{response:?}"
+        );
+        assert!(!sfst.exists());
+    }
+
+    #[tokio::test]
+    async fn a_child_that_fails_after_its_index_file_is_in_place_leaves_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let sfst = dir.path().join("out.sfst");
+        // The child puts its index file in place and then fails, as one that
+        // cannot write its answer does.
+        let executable = fake_executable(dir.path(), r#": > "$7"; exit 1"#);
         let indexing_operations =
             IndexingOperations::with_executable(executable, limits_from(None, None).unwrap());
 
