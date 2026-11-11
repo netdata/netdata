@@ -484,6 +484,12 @@ pub fn scan_frame_boundaries(path: &Path, range: FrameRange) -> Result<Vec<Frame
 /// number of frames, not the size of the file. A torn tail is not counted.
 pub fn decoded_size(path: &Path) -> Result<u64> {
     let file_len = std::fs::metadata(path)?.len();
+    // Before the range is made: a range may not end before it starts.
+    if file_len < HEADER_SIZE as u64 {
+        return Err(Error::Deserialization(format!(
+            "file length ({file_len} bytes) is less than the header ({HEADER_SIZE} bytes)"
+        )));
+    }
     let frames = scan_frame_boundaries(path, FrameRange::new(HEADER_SIZE as u64, file_len))?;
 
     Ok(frames
@@ -800,6 +806,12 @@ mod tests {
 
         assert_eq!(decoded_size(&path).unwrap(), 3 * 7);
         assert!(decoded_size(&dir.path().join("missing.wal")).is_err());
+
+        // A file cut short inside its header: an error, as for any file that
+        // cannot be read.
+        let short = dir.path().join("short.wal");
+        std::fs::write(&short, [0u8; 10]).unwrap();
+        assert!(decoded_size(&short).is_err());
     }
 
     #[test]
