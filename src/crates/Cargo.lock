@@ -3741,6 +3741,7 @@ dependencies = [
  "file-registry",
  "libc",
  "netdata-plugin-error",
+ "netdata-plugin-metrics",
  "netdata-plugin-protocol",
  "netdata-plugin-types",
  "ng-flatten",

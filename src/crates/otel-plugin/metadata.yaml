@@ -418,7 +418,7 @@ modules:
             otel.<metric name>.
       scopes:
         - name: global
-          description: The plugin itself, with charts of the log records and spans that it receives.
+          description: The plugin itself, with charts of the log records and spans that it receives, and of the index builds that make stored logs and traces searchable.
           labels: []
           metrics:
             - name: netdata.otel.log_records
@@ -435,6 +435,26 @@ modules:
               dimensions:
                 - name: accepted
                 - name: rejected
+            - name: netdata.otel.index_builds
+              description: Index builds running and waiting
+              unit: builds
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: waiting
+            - name: netdata.otel.index_builds_oldest_wait
+              description: Longest wait of an index build that has not started
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: wait
+            - name: netdata.otel.index_builds_finished
+              description: Index builds finished
+              unit: builds/s
+              chart_type: stacked
+              dimensions:
+                - name: succeeded
+                - name: failed
         - name: signal
           description: One signal, logs or traces, that the per-service charts are made from, when `derived_metrics.enabled` is `true`.
           labels:

@@ -43,10 +43,12 @@ use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::Context;
 use otel_bridge::signals::Signal;
-use otel_job_scheduler::{Job, Limits, Scheduler, Usage};
+use otel_job_scheduler::{Job, Limits, Queue, Scheduler, Usage};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -203,6 +205,26 @@ struct Measured {
     peak_memory: u64,
 }
 
+/// How many index builds have ended since the ledger started, by outcome.
+#[derive(Debug, Default)]
+struct Finished {
+    succeeded: AtomicU64,
+    failed: AtomicU64,
+}
+
+/// The index builds of the ledger at one moment, for its charts
+/// (`index_build_charts`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Statistics {
+    /// The builds that run and the builds that wait.
+    pub(crate) queue: Queue,
+    /// How many builds have ended with an index file since the ledger
+    /// started.
+    pub(crate) succeeded: u64,
+    /// How many builds have ended without one since the ledger started.
+    pub(crate) failed: u64,
+}
+
 /// Starts index builds as child processes. One for the whole ledger, shared
 /// by the indexers of both signals, so that one limit covers them all.
 #[derive(Clone)]
@@ -210,6 +232,7 @@ pub struct IndexBuilds {
     scheduler: Scheduler,
     /// The executable to run as `otel-plugin index`.
     executable: PathBuf,
+    finished: Arc<Finished>,
 }
 
 impl IndexBuilds {
@@ -233,6 +256,16 @@ impl IndexBuilds {
         Self {
             scheduler: Scheduler::new(limits),
             executable,
+            finished: Arc::default(),
+        }
+    }
+
+    /// The builds of both signals as they are now.
+    pub(crate) fn statistics(&self) -> Statistics {
+        Statistics {
+            queue: self.scheduler.queue(),
+            succeeded: self.finished.succeeded.load(Ordering::Relaxed),
+            failed: self.finished.failed.load(Ordering::Relaxed),
         }
     }
 
@@ -279,6 +312,7 @@ impl IndexBuilds {
         let finished = match self.scheduler.run(job).await {
             Ok(finished) => finished,
             Err(e) => {
+                self.finished.failed.fetch_add(1, Ordering::Relaxed);
                 let usage = e.usage().map(usage_text).unwrap_or_default();
                 tracing::error!("indexing failed wal={}{usage}: {e}", wal_path.display());
                 let failed = IndexerResponse::IndexFailed {
@@ -299,6 +333,7 @@ impl IndexBuilds {
                 let peak = peak_memory
                     .map(|bytes| format!(" peak_rss_kb={}", bytes / 1024))
                     .unwrap_or_default();
+                self.finished.succeeded.fetch_add(1, Ordering::Relaxed);
                 tracing::info!("indexing done seq={seq}{usage}{peak}");
                 let indexed = IndexerResponse::Indexed {
                     seq,
@@ -315,6 +350,7 @@ impl IndexBuilds {
                 (indexed, measured)
             }
             Err(e) => {
+                self.finished.failed.fetch_add(1, Ordering::Relaxed);
                 tracing::error!("indexing failed wal={}{usage}: {e:#}", wal_path.display());
                 let failed = IndexerResponse::IndexFailed {
                     path: wal_path,
@@ -639,6 +675,35 @@ mod tests {
             (measured.decoded_size, measured.peak_memory),
             (3 * 1024, 77 * MIB)
         );
+    }
+
+    #[tokio::test]
+    async fn finished_builds_are_counted_by_their_outcome() {
+        let dir = tempfile::tempdir().unwrap();
+        let answer = dir.path().join("answer");
+        let indexed = IndexedFile {
+            summary: summary(),
+            size: 4096,
+            peak_memory: None,
+        };
+        std::fs::write(&answer, indexed.encode().unwrap()).unwrap();
+        // One answer that decodes, one that does not, one failed child.
+        let script = format!(
+            r#"case "$*" in *good.wal*) cat {};; *garbage.wal*) echo garbage;; *) exit 3;; esac"#,
+            answer.display()
+        );
+        let executable = fake_executable(dir.path(), &script);
+        let index_builds =
+            IndexBuilds::with_executable(executable, limits_from(None, None).unwrap());
+
+        for name in ["good.wal", "garbage.wal", "failed.wal"] {
+            let wal = dir.path().join(name);
+            let sfst = dir.path().join("out.sfst");
+            index_builds.build(Signal::Logs, wal, sfst, None, 0).await;
+        }
+
+        let statistics = index_builds.statistics();
+        assert_eq!((statistics.succeeded, statistics.failed), (1, 2));
     }
 
     #[tokio::test]

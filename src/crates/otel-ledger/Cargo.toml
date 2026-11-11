@@ -27,6 +27,7 @@ file-registry = { workspace = true }
 # proves the logs query reads catalogs off the registry lock needs a FIFO.
 libc = { workspace = true }
 netdata-plugin-error = { workspace = true }
+netdata-plugin-metrics = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
 netdata-plugin-types = { workspace = true }
 otel-catalog = { workspace = true }
@@ -47,6 +48,8 @@ wal = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+# test-support: the readable form of the chart text in the chart tests.
+netdata-plugin-protocol = { workspace = true, features = ["test-support"] }
 # test-util exposes the chunk-level writer for the hand-built SFST fixtures in
 # ledger/rpc/handler/tests.rs.
 sfst = { workspace = true, features = ["test-util"] }

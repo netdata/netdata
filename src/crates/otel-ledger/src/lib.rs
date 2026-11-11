@@ -21,6 +21,7 @@
 //! `otel-plugin index`.
 
 pub mod event;
+mod index_build_charts;
 pub mod index_child;
 pub mod indexer;
 mod ledger;

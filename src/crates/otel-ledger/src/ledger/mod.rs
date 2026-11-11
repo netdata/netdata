@@ -377,6 +377,17 @@ impl Ledger {
             .context("failed to signal ready to supervisor")?;
         tracing::info!("signaled ready to supervisor");
 
+        // Not before `Ready`: the supervisor accepts no other message until
+        // then, so the builds of the startup backlog are not charted.
+        let index_build_charts = crate::index_build_charts::IndexBuildCharts::new()
+            .context("failed to declare the charts of the index builds")?;
+        tokio::spawn(crate::index_build_charts::run(
+            index_build_charts,
+            index_builds.clone(),
+            outbound_tx.clone(),
+            cancel.child_token(),
+        ));
+
         let ingestor = file_lifecycle::ipc::accept_writer(writer_socket_path).await?;
         tracing::info!("ingestor connected");
 
