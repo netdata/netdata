@@ -359,6 +359,7 @@ impl IndexingOperations {
                 }
                 Err(e) => {
                     counters.failed.fetch_add(1, Ordering::Relaxed);
+                    remove_unanswered_index(&sfst_path);
                     tracing::error!("indexing failed wal={}{usage}: {e:#}", wal_path.display());
                     let failed = IndexerResponse::IndexFailed {
                         path: wal_path,
@@ -377,6 +378,19 @@ impl IndexingOperations {
 /// nothing else would remove the file before the next start.
 fn remove_partial_index(sfst_path: &Path) {
     file_registry::durable::remove_stale_tmp(&file_registry::durable::tmp_path(sfst_path));
+}
+
+/// Remove the index file at `sfst_path` that a child put in place without a
+/// usable answer. The ledger tracks an index file by its answer (the summary
+/// and the size), so this one would sit untracked next to its WAL file; the
+/// operation counts as failed, and a failed one leaves no index file.
+fn remove_unanswered_index(sfst_path: &Path) {
+    remove_partial_index(sfst_path);
+    match std::fs::remove_file(sfst_path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => tracing::warn!("cannot remove index={}: {e}", sfst_path.display()),
+    }
 }
 
 /// What the WAL file at `path` decodes to, in bytes, from its frame headers.
@@ -755,6 +769,28 @@ mod tests {
         );
         assert!(started.exists(), "the child did not get the index path");
         assert!(!temporary.exists());
+    }
+
+    #[tokio::test]
+    async fn a_child_whose_answer_does_not_decode_leaves_no_index_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let sfst = dir.path().join("out.sfst");
+        // The child puts its index file in place and exits with status 0,
+        // but what it prints is not an answer.
+        let executable = fake_executable(dir.path(), r#": > "$7"; printf garbage"#);
+        let indexing_operations =
+            IndexingOperations::with_executable(executable, limits_from(None, None).unwrap());
+
+        let wal = dir.path().join("in.wal");
+        let (response, _) = indexing_operations
+            .run(Signal::Logs, wal, sfst.clone(), None, 0)
+            .await;
+
+        assert!(
+            matches!(response, IndexerResponse::IndexFailed { .. }),
+            "{response:?}"
+        );
+        assert!(!sfst.exists());
     }
 
     #[tokio::test]
