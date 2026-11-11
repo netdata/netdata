@@ -7,9 +7,9 @@
 //! into them. Everything here comes from a sender (metric names, descriptions,
 //! units, attribute keys and values), so nothing is written verbatim: text
 //! fields go through the protocol crate's quoting, and chart.rs makes the ids
-//! valid with its `sanitize_*` functions before they come here. A malformed command stops the agent's
-//! parser, and the agent then restarts or disables the whole plugin
-//! (`src/plugins.d/plugins_d.c`), logs and traces included.
+//! valid with its `sanitize_*` functions before they come here. A malformed
+//! command stops the agent's parser, and the agent then restarts or disables
+//! the whole plugin (`src/plugins.d/plugins_d.c`), logs and traces included.
 //!
 //! These bytes are the ingestor's agent-facing output: chart.rs writes each
 //! definition, data slot and obsolete mark as one block, the lib.rs tick loop

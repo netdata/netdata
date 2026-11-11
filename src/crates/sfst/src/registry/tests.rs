@@ -26,9 +26,10 @@
 //! - retention: each of the three limits alone, files pending deletion,
 //!   and a file the caller does not let go.
 //!
-//! Not pinned here: `remove`/`clear_pending_deletion`/`file_path`, the per-tenant layer above this type (file-lifecycle's
-//! tenant registry, consumed by otel-ledger), and writer↔reader
-//! round-trips (`src/tests/round_trip.rs`).
+//! Not pinned here: `remove`/`clear_pending_deletion`/`file_path`, the
+//! per-tenant layer above this type (file-lifecycle's tenant registry,
+//! consumed by otel-ledger), and writer↔reader round-trips
+//! (`src/tests/round_trip.rs`).
 use super::*;
 use crate::PrefixMap;
 use crate::tests::fixture::FixtureWriter;
