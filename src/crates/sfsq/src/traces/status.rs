@@ -64,7 +64,7 @@ pub enum PartialReason {
     /// the file predates the rollup (pre-rollup retention — the reason
     /// disappears when the file ages out), or the file stored no real
     /// traces: an all-UNSET trace-id file accumulates no rollup rows,
-    /// writes no chunk by the seal's `is_meaningful` rule, and
+    /// writes no chunk by the writer's `is_meaningful` rule, and
     /// exclusion loses nothing.
     RollupAbsent,
     /// A source's bytes could not be obtained from remote storage (the

@@ -6,7 +6,7 @@
 //! cleaner/uploader/storage, wires the per-signal query handler (provided by the
 //! caller's `make_handler` closure), and detaches the per-pipeline worker
 //! response streams into Signal-tagged forwarders feeding the coordinator's merged
-//! channel. The caller pre-spawns the per-signal seal/index worker (it owns the
+//! channel. The caller pre-spawns the per-signal indexer (it owns the
 //! concrete `Component` implementor) and hands its handle in.
 //!
 //! [`build_logs_pipeline`] is the thin logs binding: it spawns the logs
@@ -281,7 +281,7 @@ where
 
     for (seq, tenant_id) in seq_routes {
         // Routes were collected before recovery, which may have dropped the
-        // seq since: an unsealable WAL untracked as an orphan, an empty WAL
+        // seq since: an unindexable WAL untracked as an orphan, an empty WAL
         // whose registry entry the cleaner drain removed (its empty SFST is
         // never tracked), or an SFST the retention pass evicted. A route to
         // a seq with no entry would dangle for the process lifetime — route

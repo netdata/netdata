@@ -2,7 +2,7 @@
 //!
 //! The core criterion: a trace whose spans are split across sealed files,
 //! an in-memory chunk SFST, and a WAL tail reconstructs IDENTICALLY to
-//! the same corpus sealed as one file — under source-order permutations,
+//! the same corpus indexed as one file — under source-order permutations,
 //! resends (equal and unequal payloads), shared client/server span ids,
 //! UNSET ids, and mixed partition_keys. Plus the status-honesty contract:
 //! failures, caps, and cancellation are reported, never silent. Also
@@ -200,7 +200,7 @@ fn split_many_ways_equals_single_file_under_source_permutations() {
     let dir = tempfile::tempdir().unwrap();
     let all = corpus();
 
-    // Oracle: everything sealed as ONE file.
+    // Oracle: everything indexed as ONE file.
     let whole_wal = write_wal(dir.path(), vec![req(&all)], "whole");
     let oracle = run(vec![sealed_source(dir.path(), &whole_wal, "oracle")]);
     assert_corpus_shape(&oracle);
@@ -680,8 +680,9 @@ fn field_kinds_are_exact_in_every_layout() {
 /// Sources that contribute no retained span add no kinds, whatever the
 /// bloom says: a losing unequal resend (`str`) and a span past the byte
 /// budget (`double`) each sit alone in their source, and the kept spans'
-/// key keeps only its own kind (`int`). Sealed in one file together, the
-/// file's schema covers all three — the documented over-approximation.
+/// key keeps only its own kind (`int`). Indexed in one file together,
+/// the file's schema covers all three — the documented
+/// over-approximation.
 #[test]
 fn non_contributing_sources_add_no_kinds() {
     use sfst::ValueKind::{Double, Int, Str};

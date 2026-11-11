@@ -344,8 +344,8 @@ impl TokenFilter {
                 m.mask |= bits;
             }
         }
-        // Only an unambiguous claim sets root bits — the seal's rule,
-        // as a sealed file's rollup claims are read.
+        // Only an unambiguous claim sets root bits — the indexing
+        // rule, as a sealed file's rollup claims are read.
         for (trace_id, pick) in roots {
             let Some((service, name)) = pick.as_ref().and_then(RootPick::true_root) else {
                 if pick.is_some()

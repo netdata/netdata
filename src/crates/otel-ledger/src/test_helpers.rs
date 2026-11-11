@@ -26,7 +26,7 @@ pub(crate) fn identity_for(stream: &otel_logs_identity::ServiceStream) -> (u64, 
 }
 
 /// A `Summary` for `stream` with the given range and record count, deriving
-/// `content_meta` with the real encoder — the blob the seal stores in the
+/// `content_meta` with the real encoder — the blob indexing stores in the
 /// summary verbatim from the WAL header (`src/crates/ng-index/src/sfst_build.rs`
 /// `build_sfst_file`). The partition key is NOT in the summary — it lives only
 /// in the file's

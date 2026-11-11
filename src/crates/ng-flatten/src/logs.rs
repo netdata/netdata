@@ -3,7 +3,7 @@
 //! substrate they build on (the [`Flattener`], [`SchemaTree`], ids, rendering,
 //! bincode codec) lives in [`crate::common`]; the span analog is [`crate::traces`].
 //!
-//! One record → one SFST row. What becomes what at seal time (the builder is
+//! One record → one SFST row. What becomes what at index time (the filler is
 //! `src/crates/ng-index/src/sfst_build.rs::populate_row_index`):
 //! - interned facets: `severity_number`, `severity_text`, `event_name`,
 //!   `body.*` (a JSON-object string body arrives pre-parsed into a kvlist, so

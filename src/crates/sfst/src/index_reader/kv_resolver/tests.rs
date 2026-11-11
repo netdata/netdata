@@ -1,5 +1,5 @@
-//! Tests for [`KvResolver`] over files built with the crate's own writer
-//! ([`RowIndex`] + [`IndexWriter::write_into`]).
+//! Tests for [`KvResolver`] over files written with the crate's own
+//! writer ([`RowIndex`] + [`IndexWriter::write_into`]).
 //!
 //! Pins, per fixture, for EVERY KvId of the file:
 //!

@@ -243,8 +243,8 @@ buckets. If it does not, the command stops with an error.
 `status.code`). `--limit` sets how many of the newest spans it lists
 (default 100, at most 200; 0 lists none). Each `--column` adds a key to
 each listed span. The keys of `--stack` and `--column` must have stored
-values, so `duration` and the ids are errors. A WAL file is built into an
-index whole before the query.
+values, so `duration` and the ids are errors. The command indexes each
+WAL file whole before the query.
 
 It prints one line per listed span, newest first:
 `<start-ns> <trace-id> <span-id> dur=<ns>ns KEY=VALUE…` (several values of

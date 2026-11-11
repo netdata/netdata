@@ -1,9 +1,9 @@
 //! Query engine over SFST indexes — the read side of the OTLP log/trace
 //! storage stack (`ng-flatten` owns the flattened frames the receivers
-//! append to the WAL, `ng-index` seals SFSTs from it, this crate
+//! append to the WAL, `ng-index` indexes it into SFSTs, this crate
 //! answers the queries). This crate is the query *mechanism*: it
 //! evaluates whatever sources it is handed — sealed SFST files,
-//! in-memory SFSTs built from active-WAL chunks, and WAL tails — and
+//! in-memory SFSTs indexed from active-WAL chunks, and WAL tails — and
 //! owns no storage; which bytes take which form is *policy*, resolved
 //! by the caller (`otel-ledger`'s ledger).
 //!

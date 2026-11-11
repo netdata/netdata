@@ -2,8 +2,8 @@
 //!
 //! The core criteria:
 //!
-//! - **Oracle equivalence under re-layouts:** the same corpus sealed as
-//!   one file, split across files, or served partly as an in-memory
+//! - **Oracle equivalence under re-layouts:** the same corpus indexed
+//!   as one file, split across files, or served partly as an in-memory
 //!   chunk / WAL tail returns IDENTICAL results (ids, order, summary
 //!   numbers).
 //! - **The over-approximation never leaks:** a trace whose only match is
@@ -2272,7 +2272,7 @@ const TEXT_TRACES: usize = 2400;
 const TEXT_BATCH: usize = 100;
 
 /// 2400 one-span traces in requests of 100, sized so each half (1200
-/// spans) seals `name` and `rq` into the high tier, `route` into the
+/// spans) indexes `name` and `rq` into the high tier, `route` into the
 /// mid tier and the rest into the low tier. Rare values: a low-card
 /// flag, status messages, an event (name + attribute), a link
 /// attribute, a resource attribute on batch 3 and a scope attribute on
@@ -3094,7 +3094,7 @@ fn root_is_the_earliest_recorded_claim_across_files() {
     assert_eq!(row_of(&rows, 3).root_name, None, "rootless");
 }
 
-/// A holder sealed before TRSS sends its candidates to assembly
+/// A holder indexed before TRSS sends its candidates to assembly
 /// (canonical counts); a trace held only by files with stats keeps
 /// stored-row counts. Trace 1 straddles both files, its resend pair in
 /// the legacy one.

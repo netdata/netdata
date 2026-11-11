@@ -1,4 +1,4 @@
-//! Tests for [`WalPrefixes`] and the chunk prebuilder over real traces
+//! Tests for [`WalPrefixes`] and the chunk indexer over real traces
 //! WALs written by the shared fixtures.
 
 use std::sync::Arc;
@@ -84,8 +84,8 @@ async fn built_chunks_carry_their_records_and_summary() {
     );
 }
 
-/// Whether chunk `index` of WAL `seq` is cached: an erring build
-/// succeeds only on a hit.
+/// Whether chunk `index` of WAL `seq` is cached: chunk indexing that
+/// always errs succeeds only on a hit.
 async fn cached(cache: &ChunkCache, seq: u64, index: u32) -> bool {
     cache
         .get_or_build(seq, index, async {
@@ -146,7 +146,7 @@ async fn the_prebuilder_builds_new_chunks_on_its_own() {
 
 static SEALS: AtomicUsize = AtomicUsize::new(0);
 
-/// The traces range seal, counted (only one test uses it).
+/// The traces range indexing function, counted (only one test uses it).
 fn counting_seal(
     path: &Path,
     range: wal::FrameRange,
@@ -176,8 +176,8 @@ async fn the_prebuilder_builds_each_chunk_once() {
     await_cached(&cache, 5, &chunks, true).await;
     assert_eq!(SEALS.load(Ordering::SeqCst), chunks.len());
 
-    // A later sync does not rebuild a chunk the cache dropped; a query
-    // builds it on demand. WALs are served in arrival order, so once
+    // A later sync does not re-index a chunk the cache dropped; a query
+    // indexes it on demand. WALs are served in arrival order, so once
     // WAL 6's chunks are cached, WAL 5's second sync was handled.
     cache.drop_seq(5).await;
     prebuilder.synced(5, path, end);
@@ -218,7 +218,7 @@ async fn forgetting_a_wal_drops_its_boundaries_and_chunks() {
 
 #[tokio::test]
 async fn a_forget_right_behind_a_sync_leaves_nothing() {
-    // Whether the two land in one batch or the sync is built first, the
+    // Whether the two land in one batch or the sync is indexed first, the
     // forget wins: WAL 8 ends with no boundaries and no chunks.
     let (path, frames) = five_frame_wal(8).await;
     let (other, other_frames) = five_frame_wal(9).await;
@@ -238,7 +238,7 @@ async fn a_forget_right_behind_a_sync_leaves_nothing() {
     );
     prebuilder.synced(8, path, end);
     prebuilder.forget(8);
-    // Served in arrival order: once WAL 9 is built, WAL 8 was handled.
+    // Served in arrival order: once WAL 9 is indexed, WAL 8 was handled.
     prebuilder.synced(9, other, other_end);
     await_cached(&cache, 9, &folded_up_to(&other_frames, other_end), true).await;
     assert!(!cached(&cache, 8, chunks[0].index).await);

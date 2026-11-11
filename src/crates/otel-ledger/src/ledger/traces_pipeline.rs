@@ -46,7 +46,7 @@ use super::rpc::OtelTracesHandler;
 /// spans) from scratch, at roughly 12 µs per span (measured with
 /// `sfsq-cli` on a 5,000-span live WAL tail, 20-run average), so the
 /// threshold bounds that per-request cost; the price is more, smaller
-/// chunks, each built once and cached.
+/// chunks, each indexed once and cached.
 pub(crate) const TRACES_CHUNK_MIN_ENTRIES: u64 = 4_096;
 
 /// Build the traces pipeline: spawn the shared [`Indexer`] for the traces

@@ -5,7 +5,7 @@
 //! sfsq/src/traces/search.rs).
 //!
 //! Fixtures come from tests/common/mod.rs: requests written to a WAL,
-//! sealed with `sealed_source` (or `sealed_source_at` after byte
+//! indexed with `sealed_source` (or `sealed_source_at` after byte
 //! surgery on the sealed file), plus `tail_source` for tail presence.
 //! Each query runs twice — gate on vs `trace_gate_for_tests(false)` —
 //! and superset tests compare the answers through `norm`; the
@@ -93,7 +93,7 @@ fn run(sources: SearchSources, query: SearchQuery) -> SearchData {
 
 /// Identical source vectors in both roles: `build()` runs once per
 /// role because `SearchSources` owns its vectors, and window ⊆
-/// completion holds trivially when both sides seal the same WALs.
+/// completion holds trivially when both sides index the same WALs.
 fn both_roles(build: impl Fn() -> Vec<TraceSource>) -> SearchSources {
     SearchSources {
         window: build(),
@@ -360,10 +360,11 @@ fn tail_presence_blocks_pruning() {
     assert_eq!(norm(&on), norm(&off));
 }
 
-/// A pre-rollup completion file (a real seal with its TRSU hidden, and
-/// in the second variant its TBLM too): every candidate it might hold
-/// is uncovered → unprunable; results match gate-off exactly, and NO
-/// SourceFailure appears — absence is a version fact, not corruption.
+/// A pre-rollup completion file (a real indexed file with its TRSU
+/// hidden, and in the second variant its TBLM too): every candidate it
+/// might hold is uncovered → unprunable; results match gate-off
+/// exactly, and NO SourceFailure appears — absence is a version fact,
+/// not corruption.
 #[test]
 fn absent_chunks_block_pruning_without_a_partial() {
     for hide_bloom_too in [false, true] {
@@ -715,7 +716,7 @@ fn corrupt_rollup_chunk_is_skipped_and_surfaced() {
         &[root_span(1, 0x11, 100 * NS, 101 * NS, "op")],
     )];
     let wal = write_wal(dir.path(), reqs, "corrupt-trsu");
-    // Seal once, corrupt in place, then build sources WITHOUT resealing.
+    // Index once, corrupt in place, then build sources WITHOUT re-indexing.
     drop(sealed_source(dir.path(), &wal, "one"));
     let path = sealed_path(dir.path(), "one");
     corrupt_chunk(&path, *b"TRSU");
@@ -1313,7 +1314,7 @@ fn zero_hit_straddlers_need_no_assembly() {
     };
     let window = sfsq::traces::TimeWindow::new(100 * NS as i64, 300 * NS as i64).unwrap();
     // Both paths: the rows path decides them; without it the token gate
-    // prunes them (the path of files sealed before TRSS).
+    // prunes them (the path of files indexed before TRSS).
     for rows in [true, false] {
         let data = run(
             sources(),

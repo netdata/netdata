@@ -19,8 +19,8 @@
 //! - **One range**: every section counts and lists over the grid's range,
 //!   so the rows' matched count equals the histogram's total.
 //! - **Every source one way**: sealed files and chunk images through the
-//!   index reader, a WAL tail built into an image with the seal's own
-//!   builder, so tokens evaluate identically everywhere.
+//!   index reader, a WAL tail indexed into an image by the same code
+//!   that indexes files, so tokens evaluate identically everywhere.
 //! - **Stack**: the [`STACK_DIMENSIONS_MAX`] values with the most spans,
 //!   the rest summed into `other`, spans without the key into `unset`. A
 //!   span carrying several values of the key counts under each. A file
@@ -482,8 +482,8 @@ enum Prepared {
     Outside,
 }
 
-/// Map a source, or build a WAL tail into an image with the seal's own
-/// builder, so it evaluates exactly like a sealed file.
+/// Map a source, or index a WAL tail into an image by the same code
+/// that indexes files, so it evaluates exactly like a sealed file.
 fn prepare(source: &TraceSource, window: &TimeWindow) -> Prepared {
     let overlaps = |summary: &sfst::Summary| {
         window.overlaps_summary(summary.min_timestamp_s, summary.max_timestamp_s)

@@ -78,8 +78,8 @@
 //! - [`remote_read`] — [`remote_read::RemoteRead::fetch`]: fetches
 //!   remote-only catalog entries back through the process's shared
 //!   download cache (`file-cache`).
-//! - [`chunk`] — the query-time [`chunk::ChunkCache`]: memoized per-chunk
-//!   SFST builds over durable WAL prefixes, with singleflight and a
+//! - [`chunk`] — the query-time [`chunk::ChunkCache`]: memoized chunk
+//!   indexing over durable WAL prefixes, with singleflight and a
 //!   byte-budget LRU.
 //! - [`query`] — per-tenant remote candidate selection: the remote-only
 //!   catalog entries a query must fetch back, planned as

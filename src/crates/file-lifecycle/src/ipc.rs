@@ -107,13 +107,13 @@ pub enum CleanerResponse {
 }
 
 /// Requests sent from the ledger to the indexer: one component per signal
-/// pipeline, spawned by otel-ledger with that signal's seal function (the
-/// indexer itself lives in otel-ledger because sealing is content-aware).
+/// pipeline, spawned by otel-ledger with that signal (the indexer itself
+/// lives in otel-ledger because indexing is content-aware).
 /// Sent on a `Closed` WAL event at runtime, and for unindexed WALs during
 /// recovery (`recovery/local.rs`, via `batch_recover`).
 #[derive(Debug, Clone)]
 pub enum IndexerRequest {
-    /// Build an SFST index for the given WAL file.
+    /// Index the given WAL file into an SFST.
     Index {
         /// Path to the `.wal` file to index.
         wal_path: PathBuf,
@@ -144,7 +144,7 @@ pub enum IndexerResponse {
     },
     /// Indexing failed for a file. Nothing is retried at runtime: the file
     /// stays WAL-tracked (still queryable) until the next restart's recovery
-    /// retries the seal and otherwise orphans it.
+    /// retries the indexing operation and otherwise orphans it.
     IndexFailed { path: PathBuf, error: String },
 }
 

@@ -155,7 +155,7 @@ const SUGGEST_DEADLINE: std::time::Duration = std::time::Duration::from_millis(2
 const TRACE_SPAN_CAP: usize = 10_000;
 
 pub(crate) struct OtelTracesHandler {
-    /// Live source resolution (registries snapshot + WAL chunk builds).
+    /// Live source resolution (registries snapshot + WAL chunk indexing).
     supplier: TracesSourceSupplier,
     /// Admission for suggestions (see [`SUGGEST_CONCURRENCY`]).
     suggestions: Arc<tokio::sync::Semaphore>,

@@ -5,8 +5,8 @@
 //!
 //! One capture assembles, per requested range: the registry snapshot's
 //! sealed SFSTs; each active WAL's durable prefix as chunk images plus a
-//! row-scanned tail, built OFF the registry lock through the shared
-//! singleflight [`ChunkCache`] (the traces seal:
+//! row-scanned tail, indexed OFF the registry lock through the shared
+//! singleflight [`ChunkCache`] (traces chunk indexing:
 //! `ng_index::build_sfst_traces_range`); and — with remote storage —
 //! the range's remote-only files, planned from catalogs read off the
 //! same lock and downloaded once through the shared download cache. A
@@ -18,9 +18,9 @@
 //! (`rpc/logs/handler.rs::resolve_wal`): descriptors captured under ONE
 //! brief registry read lock (one `valid_up_to` per WAL — the whole
 //! query sees one consistent durable prefix), and the logs failure
-//! policy: a WAL whose chunks won't build is refused WHOLE for
+//! policy: a WAL whose chunks won't index is refused WHOLE for
 //! this snapshot (logged; its data returns via the sealed SFST after
-//! rotation, or on a later query — build errors aren't cached). Unlike
+//! rotation, or on a later query — indexing errors aren't cached). Unlike
 //! the logs handler, the capture says so ([`Capture::refused`]) and every
 //! traces answer that lacks it is partial `source_failure`: spans quietly
 //! missing would read as data that does not exist.
@@ -76,8 +76,8 @@ struct ResolvedWal {
     tail: Option<wal::FrameRange>,
 }
 
-/// One built chunk of that WAL: its boundary identity (`index` within
-/// the WAL, byte `range`), the SFST summary from the build, and the
+/// One indexed chunk of that WAL: its boundary identity (`index` within
+/// the WAL, byte `range`), the SFST summary from indexing, and the
 /// `Arc`-shared byte image every copy that selected the WAL reuses.
 struct ResolvedChunk {
     index: u32,
@@ -96,7 +96,7 @@ pub(crate) struct Capture {
     pub(crate) sets: Vec<Vec<TraceSource>>,
     pub(crate) pins: Vec<file_cache::CachedFile>,
     /// Parallel to `sets`: whether `ranges[i]` selected a WAL that was
-    /// refused (its chunks would not build), so `sets[i]` lacks its data.
+    /// refused (its chunks would not index), so `sets[i]` lacks its data.
     pub(crate) refused: Vec<bool>,
 }
 
@@ -133,7 +133,7 @@ pub(crate) struct TracesSourceSupplier {
     registries: Arc<RwLock<TenantRegistries>>,
     chunk_cache: Arc<ChunkCache>,
     /// The active WALs' chunk boundaries, kept current across queries and
-    /// shared with the chunk prebuilder.
+    /// shared with the chunk indexer.
     prefixes: Arc<WalPrefixes>,
     /// Reading evicted files back; `None` when remote storage is disabled.
     remote: Option<RemoteRead>,
@@ -428,7 +428,7 @@ impl TracesSourceSupplier {
 
     /// Resolve one active WAL into chunk images + the tail range, or
     /// `None` to refuse the whole WAL (logs failure policy — see the
-    /// module docs). Polls `cancel` between chunk builds; a cancelled
+    /// module docs). Polls `cancel` between chunks; a cancelled
     /// call returns `None` (indistinguishable from refusal on purpose —
     /// the capture's result is discarded either way).
     async fn resolve_wal(&self, wal: &WalDesc, cancel: &CancellationToken) -> Option<ResolvedWal> {
@@ -463,11 +463,12 @@ impl TracesSourceSupplier {
                 return None;
             }
             let seq = wal.id.seq;
-            // The traces seal for this byte range, singleflighted through
-            // the shared cache — normally a hit, as the prebuilder built it
-            // when the writer synced; otherwise this joins its build or
-            // builds. (seq, index) keys never collide with logs because
-            // seqs are process-global (one shared highwater).
+            // Traces chunk indexing for this byte range, singleflighted
+            // through the shared cache — normally a hit, as the chunk
+            // indexer indexed it when the writer synced; otherwise this
+            // joins its indexing or indexes it. (seq, index) keys never
+            // collide with logs because seqs are process-global (one
+            // shared highwater).
             let init = build_chunk(ng_index::build_sfst_traces_range, wal.path.clone(), *chunk);
             match self.chunk_cache.get_or_build(seq, chunk.index, init).await {
                 Ok(built) => chunks.push(ResolvedChunk {

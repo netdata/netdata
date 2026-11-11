@@ -143,10 +143,11 @@ impl Ledger {
     /// Only the LOCAL writes are guaranteed: each `Rotated` handled here still
     /// registers the file and queues an upload (best effort; next boot's
     /// `reconcile_local_catalog_uploads` finishes the misses). The drain also
-    /// services `Indexer` responses (a late seal still registers its SFST and
-    /// queues its WAL delete) and counts a `WorkerGone` builder as done —
-    /// unlike the run loop, where worker death is fatal, the process is
-    /// exiting anyway and a dead builder must not hold the drain.
+    /// services `Indexer` responses (a late indexing operation still
+    /// registers its SFST and queues its WAL delete) and counts a
+    /// `WorkerGone` builder as done — unlike the run loop, where worker death
+    /// is fatal, the process is exiting anyway and a dead builder must not
+    /// hold the drain.
     pub(in crate::ledger) async fn flush_catalogs_on_shutdown(&mut self) {
         let mut pending = 0usize;
         for signal in [Signal::Logs, Signal::Traces] {
@@ -177,8 +178,9 @@ impl Ledger {
                         }
                         other => self.handle_catalog_builder_resp(signal, other).await,
                     },
-                    // A seal may still be completing; handle it rather than drop
-                    // it (it registers the SFST / queues its WAL delete).
+                    // An indexing operation may still be completing; handle it
+                    // rather than drop it (it registers the SFST / queues its
+                    // WAL delete).
                     Some((signal, PipelineResp::Indexer(resp))) => {
                         self.handle_indexer_resp(signal, resp).await
                     }

@@ -16,7 +16,7 @@
 //!
 //! # Two planes
 //!
-//! **Build/write** — a producer fills a [`RowIndex`] with interned
+//! **Fill/write** — a producer fills a [`RowIndex`] with interned
 //! `(timestamp, key=value)` rows, and `build` turns them into chunks
 //! through the container-level `ChunkWriter`, wrapped by [`IndexWriter`].
 //! Decoding WAL frames into rows is the producer's concern (`ng-index`
@@ -156,7 +156,7 @@ pub use schema::{
     SchemaEdge, SchemaNode, SchemaTree, SpanId, SpanIds, Step, StreamBatch, Summary, TraceId,
     TraceIds, ValueKind, ValueKinds,
 };
-// Writer-input-only vocabulary stays crate-internal (the build owns the writer).
+// Writer-input-only vocabulary stays crate-internal (Phase 2 owns the writer).
 pub(crate) use schema::{ALL_COLUMNS, ColumnSpec};
 
 // The chunk-level reader/writer surface, exposed only for test fixtures and
@@ -220,7 +220,7 @@ const CHUNK_TRACE_ROLLUP: chunk_file::ChunkId = *b"TRSU";
 const CHUNK_TRACE_ROLLUP_STATS: chunk_file::ChunkId = *b"TRSS";
 // Optional per-file trace-id bloom (cold region, after TIDX): a serialized
 // fastbloom filter over the file's distinct set trace ids — "definitely not in
-// this file" for cross-file trace-by-id, at a 5% build-time FP target. Same
+// this file" for cross-file trace-by-id, at a 5% write-time FP target. Same
 // additive TOC-indexed contract as TIDX (see `trace_bloom`).
 const CHUNK_TRACE_BLOOM: chunk_file::ChunkId = *b"TBLM";
 

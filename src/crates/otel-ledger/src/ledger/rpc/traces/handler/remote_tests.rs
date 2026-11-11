@@ -3,11 +3,11 @@
 //! remote data can be missing is reported, never silent.
 //!
 //! Fixtures come from the traces suite's shared `fixtures` module: real
-//! seals, either installed as local SFSTs or stored as remote objects
-//! behind `TestRemote`'s `fs://` store and download cache. One corpus
-//! carries the tests: files 1-2 under one test identity, traces A/B/C/E
-//! across a 100 s window. The mode contracts themselves — page and
-//! aggregate semantics, pagination, error shapes — are pinned in
+//! indexed files, either installed as local SFSTs or stored as remote
+//! objects behind `TestRemote`'s `fs://` store and download cache. One
+//! corpus carries the tests: files 1-2 under one test identity, traces
+//! A/B/C/E across a 100 s window. The mode contracts themselves — page
+//! and aggregate semantics, pagination, error shapes — are pinned in
 //! `tests.rs`; nothing here re-tests them.
 //!
 //! Not pinned here: cancellation, the planning-task panic error, and the

@@ -1,17 +1,19 @@
 //! Tests for [`ChunkCache`]: the real cache driven by canned async
-//! builders, pinning the parent module's contract.
+//! indexing futures, pinning the parent module's contract.
 //!
-//! - Build singleflight (moka `try_get_with`): concurrent requests for
-//!   one `(wal_seq, chunk_index)` run the builder exactly once, and
-//!   every waiter gets the built bytes.
+//! - Indexing singleflight (moka `try_get_with`): concurrent requests
+//!   for one `(wal_seq, chunk_index)` run the indexing exactly once,
+//!   and every waiter gets the indexed bytes.
 //! - Memoization is keyed `(wal_seq, chunk_index)`: different seqs and
-//!   chunk indices build independently; a repeat of a built key never
-//!   runs the fresh builder and serves the originally built bytes.
-//! - A build error is not cached: each failed request re-runs the
-//!   builder, and a later success populates the key normally.
-//! - `drop_seq` is a no-op for a seq that never built; for a built seq
-//!   it invalidates immediately — the dropped WAL's chunk rebuilds on
-//!   the next request, other WALs' chunks stay cached.
+//!   chunk indices are indexed independently; a repeat of an indexed
+//!   key never runs the fresh future and serves the originally indexed
+//!   bytes.
+//! - An indexing error is not cached: each failed request re-runs the
+//!   indexing, and a later success populates the key normally.
+//! - `drop_seq` is a no-op for a seq with no indexed chunk; for a
+//!   seq with indexed chunks it invalidates immediately — the dropped
+//!   WAL's chunk is re-indexed on the next request, other WALs' chunks
+//!   stay cached.
 //!
 //! Not pinned here: LRU eviction (the 64 MiB test budget dwarfs the
 //! few-byte chunks) and `Arc<E>` error sharing across concurrent
@@ -22,16 +24,16 @@ use std::time::Duration;
 
 use super::{BuiltChunk, ChunkCache};
 
-// ── ChunkCache (async, fake builder) ──────────────────────────────
+// ── ChunkCache (async, fake indexing) ─────────────────────────────
 
 #[derive(Debug, PartialEq, Eq)]
 struct BuildErr;
 
-/// The `init` future the build tests pass: records each actual run in
+/// The `init` future the cache tests pass: records each actual run in
 /// `counter`, sleeps 20 ms so concurrently spawned requests join the
-/// same in-flight build, then yields `bytes`. Runs only on a cache
-/// miss — a hit never invokes it — so the counters count builds, not
-/// requests.
+/// same in-flight indexing, then yields `bytes`. Runs only on a cache
+/// miss — a hit never invokes it — so the counters count indexing
+/// runs, not requests.
 async fn counting_build(
     counter: Arc<AtomicUsize>,
     bytes: Vec<u8>,
@@ -61,9 +63,9 @@ async fn concurrent_requests_build_a_chunk_once() {
     let cache = cache();
     let builds = Arc::new(AtomicUsize::new(0));
 
-    // 8 spawned tasks race the same (seq, index); the 20 ms build stays
-    // in flight long enough for all of them to join, so exactly one run
-    // is recorded and every waiter gets the same bytes.
+    // 8 spawned tasks race the same (seq, index); the 20 ms indexing
+    // stays in flight long enough for all of them to join, so exactly
+    // one run is recorded and every waiter gets the same bytes.
     let mut handles = Vec::new();
     for _ in 0..8 {
         let c = cache.clone();
@@ -100,7 +102,7 @@ async fn distinct_keys_build_independently() {
     assert_eq!(builds.load(Ordering::SeqCst), 3);
 
     // A repeat of an existing key is served from cache — the fresh
-    // builder (different bytes) never runs and the original image is
+    // future (different bytes) never runs and the original image is
     // returned.
     let chunk = cache
         .get_or_build(7, 0, counting_build(builds.clone(), vec![9]))
@@ -122,13 +124,14 @@ async fn build_errors_are_not_cached() {
 
     let r1 = cache.get_or_build(7, 0, failing(attempts.clone())).await;
     assert!(r1.is_err());
-    // A second request rebuilds rather than returning a cached error.
+    // A second request re-indexes rather than returning a cached
+    // error.
     let r2 = cache.get_or_build(7, 0, failing(attempts.clone())).await;
     assert!(r2.is_err());
     assert_eq!(attempts.load(Ordering::SeqCst), 2, "error not cached");
 
     // The failed attempts leave no residue: a later success on the same
-    // key builds and is served normally.
+    // key is indexed and served normally.
     let builds = Arc::new(AtomicUsize::new(0));
     let ok = cache
         .get_or_build(7, 0, counting_build(builds.clone(), vec![5]))
@@ -140,8 +143,8 @@ async fn build_errors_are_not_cached() {
 #[tokio::test]
 async fn drop_seq_unknown_is_a_noop() {
     let cache = cache();
-    // Nothing was ever built for seq 99 — the `built` map has no entry,
-    // so the drop is a no-op and must not panic.
+    // Nothing was ever indexed for seq 99 — the `built` map has no
+    // entry, so the drop is a no-op and must not panic.
     cache.drop_seq(99).await;
 }
 
@@ -167,7 +170,8 @@ async fn drop_seq_invalidates_every_chunk_of_a_wal() {
 
     cache.drop_seq(7).await;
 
-    // seq 7's chunk rebuilds (immediately consistent invalidation)...
+    // seq 7's chunk is re-indexed (immediately consistent
+    // invalidation)...
     cache
         .get_or_build(7, 0, counting_build(builds.clone(), vec![0]))
         .await

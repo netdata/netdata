@@ -194,7 +194,7 @@ fn build_mid_card_chunks<W: Write + Seek>(
     Ok(())
 }
 
-/// Build high-cardinality field chunks (bincode + zstd).
+/// Write high-cardinality field chunks (bincode + zstd).
 ///
 /// Each chunk is a [`crate::HighField`] — a string arena of sorted
 /// `key=value` keys plus their per-key `u8` batch-mask. Bit `b` of the mask
@@ -259,7 +259,7 @@ fn batch_mask(rb: &RoaringBitmap, time_order: &TimeOrder, batch_size: u32) -> u8
     mask
 }
 
-/// Build and write a split-fst index file — the body of
+/// Write a split-fst index file — the body of
 /// [`IndexWriter::write_file`](crate::IndexWriter::write_file).
 pub(crate) fn build_and_write(
     row_index: &RowIndex,
@@ -371,7 +371,7 @@ pub(crate) fn build_into<W: Write + Seek>(
 
     // Both identity halves are producer-supplied and opaque here: `content_meta`
     // lands verbatim in the summary, and the `partition_key` is not stored at all —
-    // the filename (`FileId`), propagated from the WAL file the SFST is built
+    // the filename (`FileId`), propagated from the WAL file the SFST is written
     // from, is its single source of truth and is deliberately not cross-checked
     // against the rows. See `FORMAT.md` ("Partition-key authority").
     let summary = crate::Summary {
@@ -390,8 +390,8 @@ pub(crate) fn build_into<W: Write + Seek>(
         span_id: row_index.span_ids.is_some(),
         flags: row_index.flags.is_some(),
         dropped_attributes_count: row_index.dropped_attribute_counts.is_some(),
-        // Span-only columns; the logs seal leaves these `None`, the
-        // traces seal fills them.
+        // Span-only columns; logs indexing leaves these `None`,
+        // traces indexing fills them.
         parent_span_id: row_index.parent_span_ids.is_some(),
         duration: row_index.durations.is_some(),
     };
@@ -430,21 +430,22 @@ pub(crate) fn build_into<W: Write + Seek>(
     let counts = ChunkCounts {
         columns: columns_present,
         // Built from the chronological `trace_id` column when the producer asks
-        // (the traces seal). The logs seal leaves `build_trace_id_index` false.
+        // (traces indexing). Logs indexing leaves `build_trace_id_index` false.
         trace_id_index: row_index.build_trace_id_index,
         // Bloom presence needs an up-front answer (the TOC is reserved before
         // any chunk exists): declared when the producer asks AND the file has
         // at least one set trace id (an empty filter is never written).
         trace_id_bloom: row_index.build_trace_id_bloom
             && row_index.trace_ids.as_ref().is_some_and(|t| t.any_set()),
-        // Span event/link structures (traces seal only; the logs seal leaves
-        // both `None`). Presence driven off the `RowIndex` `Option`s, like the
-        // per-row columns.
+        // Span event/link structures (traces indexing only; logs indexing
+        // leaves both `None`). Presence driven off the `RowIndex` `Option`s,
+        // like the per-row columns.
         event_index: row_index.events.is_some(),
         link_index: row_index.links.is_some(),
-        // The trace rollup (traces seal only): declared when the producer
-        // accumulated any rows — an empty rollup is never written (the
-        // `is_meaningful` rule the span structures also follow).
+        // The trace rollup (traces indexing only): declared when the
+        // producer accumulated any rows — an empty rollup is never
+        // written (the `is_meaningful` rule the span structures also
+        // follow).
         trace_rollup: row_index
             .trace_rollup
             .as_ref()
@@ -484,8 +485,8 @@ pub(crate) fn build_into<W: Write + Seek>(
     // its own chunk. Each is independent: a present column is written, an absent
     // one skipped; a present column whose length != row count is a caller bug
     // (checked, not panicked). Which columns appear is whatever the producer
-    // filled — the logs seal supplies the five log columns
-    // (`ng-index/src/sfst_build.rs` `populate_row_index`), the traces seal the
+    // filled — logs indexing supplies the five log columns
+    // (`ng-index/src/sfst_build.rs` `populate_row_index`), traces indexing the
     // span set (`sfst_build.rs` `populate_trace_row_index`).
     let n = total_rows as usize;
     let by_time = || time_order.iter_by_time().map(|ins| ins as usize);
@@ -527,8 +528,9 @@ pub(crate) fn build_into<W: Write + Seek>(
 
     // Optional `trace_id` index (TIDX), after the per-row columns (the writer's
     // TraceIndex stage). Built from the same chronological `trace_id` column just
-    // written, so its `sort_perm` positions index the rows correctly. Only the
-    // traces seal sets `build_trace_id_index`; the logs seal skips this entirely.
+    // written, so its `sort_perm` positions index the rows correctly. Only
+    // traces indexing sets `build_trace_id_index`; logs indexing skips this
+    // entirely.
     if row_index.build_trace_id_index {
         let trace_ids = chronological_trace_ids.as_ref().expect(
             "build_trace_id_index requires the trace_id column (ChunkWriter also enforces this)",

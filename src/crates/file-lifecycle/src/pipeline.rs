@@ -3,7 +3,7 @@
 //! The coordinator shell (the `otel-ledger` `Ledger`) owns one [`Pipeline`] per
 //! signal (today logs + traces). A `Pipeline` carries the per-signal state the
 //! shell does not: its tenant registries, lifecycle config, remote-key segment,
-//! the request senders of its per-signal seal/index and catalog-builder workers,
+//! the request senders of its per-signal indexer and catalog-builder workers,
 //! and its query handler (plus the declaration and args→payload shim the shell
 //! needs to advertise and dispatch it). The substrate-shared workers and caches
 //! (cleaner, uploader, remote storage, download cache, chunk cache) live on the
@@ -79,7 +79,7 @@ pub struct Pipeline {
     /// the shell's intake/worker/retention handlers, read by the query handler
     /// (lock model in the module docs).
     registries: Arc<RwLock<TenantRegistries>>,
-    /// Request sender for the per-pipeline seal/index worker: the intake path
+    /// Request sender for the per-pipeline indexer: the intake path
     /// sends [`IndexerRequest::Index`] when a WAL closes. Its response stream is
     /// forwarded, tagged with the owning signal, into the shell's merged channel.
     indexer_tx: mpsc::UnboundedSender<IndexerRequest>,
@@ -148,7 +148,7 @@ impl Pipeline {
         &self.registries
     }
 
-    /// Request sender for the per-pipeline seal/index worker.
+    /// Request sender for the per-pipeline indexer.
     pub fn indexer_tx(&self) -> &mpsc::UnboundedSender<IndexerRequest> {
         &self.indexer_tx
     }

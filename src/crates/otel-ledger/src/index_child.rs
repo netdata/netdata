@@ -1,7 +1,7 @@
 //! Indexing one WAL file in a process of its own.
 //!
-//! `otel-plugin index` runs [`run`]: it builds the index file of one closed
-//! WAL file with the signal's `ng-index` builder and writes its answer, an
+//! `otel-plugin index` runs [`run`]: it indexes one closed WAL file with the
+//! signal's `ng-index` indexing function and writes its answer, an
 //! [`IndexedFile`], to stdout. The ledger's
 //! [`Indexer`](crate::indexer::Indexer) starts it with [`arguments`] and
 //! reads the answer back with [`IndexedFile::decode`]. Both halves of the
@@ -13,8 +13,10 @@
 //! leaves no answer at all; its parent learns that from the wait status.
 //!
 //! A child that dies midway leaves the WAL file untouched and at most a
-//! temporary file beside the index path, which startup recovery removes: the
-//! builders write through `file_registry`'s atomic file.
+//! temporary file beside the index path: the indexing functions write through
+//! `file_registry`'s atomic file. The ledger removes that file when the child
+//! did not end well, and startup recovery removes it when the ledger was gone
+//! too.
 
 use std::ffi::OsString;
 use std::io::Write;
@@ -197,7 +199,7 @@ mod tests {
             .expect("a wal file was written")
     }
 
-    /// An `ng-index` builder, as `run` calls it.
+    /// An `ng-index` indexing function, as `run` calls it.
     type Build =
         fn(&Path, &Path, &ng_index::Metrics) -> Result<(sfst::Summary, u64), ng_index::Error>;
 

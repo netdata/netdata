@@ -1,10 +1,10 @@
-//! `ng-index`: build a standard SFST index file from a flattened-frame WAL.
+//! `ng-index`: index a flattened-frame WAL into a standard SFST index file.
 //!
 //! The WAL of flattened frames is written by the OTel receivers — `otel-ingestor`
 //! in production, `ng-ingest` standalone — in the frame format owned by `ng-flatten`.
 //! This crate decodes it, feeds the typed, array-collapsed entries into an
-//! [`sfst::RowIndex`], and seals a standard SFST file: logs via [`build_sfst`], traces
-//! via [`build_sfst_traces_file`]. Consumers: `otel-ledger` and `sfsq`.
+//! [`sfst::RowIndex`], and writes a standard SFST file: logs via [`build_sfst`],
+//! traces via [`build_sfst_traces_file`]. Consumers: `otel-ledger` and `sfsq`.
 
 use std::path::{Path, PathBuf};
 
@@ -22,7 +22,7 @@ pub use ng_flatten::{
     Entry, FlattenedLogRequest, NodeId, SchemaTree, Value, build_kv, decode_log_frame,
 };
 
-/// Errors reading a flattened WAL or building an SFST from it.
+/// Errors reading a flattened WAL or indexing it into an SFST.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     // Wrapper variants (`Wal`, `Io`, `Sfst`) are `transparent` — `#[from]` already

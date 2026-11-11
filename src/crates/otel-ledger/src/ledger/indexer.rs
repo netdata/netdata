@@ -1,14 +1,14 @@
 //! Ledger-side handling of responses from the indexer component (sealed WALs).
 //!
-//! The seal itself runs in `crate::indexer` (src/crates/otel-ledger/src/indexer.rs):
-//! one component per pipeline turns closed WAL files into SFSTs and replies
-//! with an `IndexerResponse`. This module is the reply's consumer —
-//! `handle_indexer_resp` registers the sealed SFST (or suppresses an empty
-//! one), drops the WAL's query-time chunks, queues the WAL delete, optionally
-//! queues an upload, and runs retention. Dispatched from the run loop
-//! ([`crate::Ledger::run`]) and from the shutdown flush drain
-//! (`Ledger::flush_catalogs_on_shutdown`), so a seal completing during
-//! shutdown is still applied.
+//! The indexing operation itself runs in `crate::indexer`
+//! (src/crates/otel-ledger/src/indexer.rs): one component per pipeline turns
+//! closed WAL files into SFSTs and replies with an `IndexerResponse`. This
+//! module is the reply's consumer — `handle_indexer_resp` registers the
+//! sealed SFST (or suppresses an empty one), drops the WAL's query-time
+//! chunks, queues the WAL delete, optionally queues an upload, and runs
+//! retention. Dispatched from the run loop ([`crate::Ledger::run`]) and from
+//! the shutdown flush drain (`Ledger::flush_catalogs_on_shutdown`), so an
+//! indexing operation completing during shutdown is still applied.
 
 use std::path::PathBuf;
 
@@ -52,7 +52,8 @@ impl Ledger {
             IndexerResponse::IndexFailed { path, error } => {
                 // Intentional divergence from `recover_unindexed`: at runtime
                 // the entry stays tracked (and queryable as a WAL) until the
-                // next restart's recovery retries the seal and orphans it.
+                // next restart's recovery retries the indexing operation and
+                // orphans it.
                 tracing::error!(path = %path.display(), "indexing failed: {error}");
                 return;
             }
@@ -133,7 +134,7 @@ impl Ledger {
                     seq = file_id.seq,
                     "indexed an empty WAL (0 log rows); deleting WAL + empty index, not uploading",
                 );
-                // A query may have built a chunk for this seq against the
+                // A query may have indexed a chunk for this seq against the
                 // active WAL; drop it.
                 self.chunk_cache.drop_seq(file_id.seq).await;
                 if signal == Signal::Traces {

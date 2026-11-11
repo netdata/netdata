@@ -6,7 +6,7 @@
 //! underfilled refusals), and pack round-trips for every chunk kind it
 //! streams.
 //!
-//! Fixtures are tiny in-memory files (`Cursor<Vec<u8>>`) built through the
+//! Fixtures are tiny in-memory files (`Cursor<Vec<u8>>`) written through the
 //! shared helpers below and verified by re-opening them with the crate's own
 //! `ChunkReader`, so writer and reader must agree on every payload.
 //!
@@ -25,7 +25,7 @@
 //!
 //! Not pinned here: event/link/rollup chunk writes, compression levels and
 //! wire encodings, exact misuse message strings, the container/TOC layer
-//! (chunk-file), and the higher-level seal path (index_writer.rs,
+//! (chunk-file), and the higher-level write path (index_writer.rs,
 //! src/tests/round_trip.rs).
 use std::io::Cursor;
 
@@ -856,7 +856,7 @@ fn bloom_counts() -> ChunkCounts {
 fn trace_id_bloom_round_trips_and_answers() {
     // The TBLM round-trips as packed and answers membership: both trace ids in
     // the file pass might_contain, and distinct_ids — the bloom's own
-    // build-time count — reports 2.
+    // write-time count — reports 2.
     let (trace, a, b) = three_span_traces();
     let index = TraceIdIndex::build(&trace);
     let bloom = crate::TraceIdBloom::build(&index, &trace).expect("set ids");

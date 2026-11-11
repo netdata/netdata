@@ -120,10 +120,11 @@ pub struct Entry {
     pub value: Value,
     /// Pre-computed `xxhash64` of this entry's `key=value` rendering, filled at
     /// emit time by the [`Flattener`] (an invariant, not a later fill pass).
-    /// Lets the SFST build's interner resolve a repeat pair via `lookup_hash`
-    /// without re-hashing the string; the build still re-renders the pair and
-    /// string-verifies each hit, so a collision falls through to the
-    /// string-path `intern` (feed at `src/crates/ng-index/src/sfst_build.rs`).
+    /// Lets the interner used in SFST indexing resolve a repeat pair via
+    /// `lookup_hash` without re-hashing the string; indexing still re-renders
+    /// the pair and string-verifies each hit, so a collision falls through to
+    /// the string-path `intern` (feed at
+    /// `src/crates/ng-index/src/sfst_build.rs`).
     pub hash: u64,
 }
 
@@ -590,7 +591,7 @@ impl Flattener {
     ///   (`SERVER`, `ERROR`, …) — what an operator queries; a variant unknown to
     ///   this build is labelled with its decimal number, so the label is total;
     /// - the `_`-prefixed name (`_kind`, `_status_code`) carries the raw **int**
-    ///   for internal use (the seal's rollup reads `_kind`, and takes the status
+    ///   for internal use (indexing's rollup reads `_kind`, and takes the status
     ///   from the `status.code` label); it never surfaces as a key.
     ///
     /// Defaults are stored too (`UNSPECIFIED` kind; `UNSET` status — also what
@@ -867,7 +868,7 @@ pub struct TimeBounds {
 /// `out`: strings raw, ints/doubles decimal, bools `true`/`false`, bytes
 /// lowercase hex, `Null` nothing, the flatten-only empties structurally
 /// (`[]`/`{}`). This is the single canonical rendering shared by the
-/// flattener's emit-time hash and the SFST build, so both agree on the exact
+/// flattener's emit-time hash and SFST indexing, so both agree on the exact
 /// `key=value` bytes.
 pub fn append_value(value: &Value, out: &mut String) {
     use std::fmt::Write as _;

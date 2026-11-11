@@ -426,7 +426,7 @@ fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
     wals.pop().unwrap()
 }
 
-/// Build the sealed SFST from the flattened WAL via `ng_index::build_sfst` and
+/// Index the flattened WAL into the sealed SFST via `ng_index::build_sfst` and
 /// wrap it as an engine candidate — the sealed-file identity: the whole file
 /// as one index under `file_seq` 1 / `Indexed(0)`, summary read back from the
 /// written bytes.
@@ -735,11 +735,11 @@ fn ng_flattened_tail_matches_sealed_index() {
 }
 
 // ---------------------------------------------------------------------------
-// Run-level equivalence over the live production split: chunk SFSTs built by
-// `ng_index::build_sfst_range` (fed as `Source::Memory`) plus the row-scanned
-// tail (`run` scans it with `scan_flattened_range`), folded by `run`, must
-// match indexing the whole WAL — the partition the otel-ledger handler
-// drives (`resolve_wal`: scan_frame_boundaries → chunk_boundaries →
+// Run-level equivalence over the live production split: chunk SFSTs indexed
+// by `ng_index::build_sfst_range` (fed as `Source::Memory`) plus the
+// row-scanned tail (`run` scans it with `scan_flattened_range`), folded by
+// `run`, must match indexing the whole WAL — the partition the otel-ledger
+// handler drives (`resolve_wal`: scan_frame_boundaries → chunk_boundaries →
 // build_sfst_range + one tail).
 // ---------------------------------------------------------------------------
 

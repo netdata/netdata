@@ -13,7 +13,7 @@
 //!   `rotated_catalog_passes_validate_catalog` pins a real builder-rotation
 //!   round-trip.
 //! - `local` (per-tenant replay): `recover_unindexed_*` pins skip-and-orphan
-//!   on a failed seal plus the `holds_seq` routing predicate;
+//!   on a failed indexing operation plus the `holds_seq` routing predicate;
 //!   `recover_retention_*` pins SFST eviction gated on `is_remote_cataloged`
 //!   (ungated with storage disabled); `seed_*` pins replay of local catalogs
 //!   into uploaded/rotated state and the D-P8.1 corrupt-catalog matrix
@@ -1373,7 +1373,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
     cancel.cancel();
 }
 
-// ── recover_unindexed: skip-and-orphan on seal failure ──────────────────
+// ── recover_unindexed: skip-and-orphan on indexing failure ──────────────
 
 /// Indexer mock that fails every request — drives the skip-and-orphan path
 /// without needing an undecodable fixture.
@@ -1423,10 +1423,11 @@ impl crate::component::Component for IdleCleaner {
 
 #[tokio::test]
 async fn recover_unindexed_orphans_unsealable_wals() {
-    // Pins `recover_unindexed`'s orphan policy on a failed seal: the pass
-    // returns Ok (not fatal), the WAL entry is untracked (the planner never
-    // sees it), the seq is not routable (`holds_seq`), the bytes stay on
-    // disk, and the next restart re-discovers and re-orphans the file.
+    // Pins `recover_unindexed`'s orphan policy on a failed indexing
+    // operation: the pass returns Ok (not fatal), the WAL entry is
+    // untracked (the planner never sees it), the seq is not routable
+    // (`holds_seq`), the bytes stay on disk, and the next restart
+    // re-discovers and re-orphans the file.
     //
     // Setup: a real archived WAL file, tracked by directory recovery.
     let wal_dir = tempfile::tempdir().unwrap();
@@ -1476,8 +1477,8 @@ async fn recover_unindexed_orphans_unsealable_wals() {
         crate::component::ComponentHandle::spawn::<FailingIndexer>((), cancel.clone());
     let mut cleaner = crate::component::ComponentHandle::spawn::<IdleCleaner>((), cancel.clone());
 
-    // A seal failure must not fail recovery: the pass skips the file and
-    // startup proceeds.
+    // An indexing failure must not fail recovery: the pass skips the
+    // file and startup proceeds.
     recover_unindexed(&mut registry, &mut indexer, &mut cleaner)
         .await
         .expect("seal failures are skipped, not fatal");
@@ -1491,8 +1492,8 @@ async fn recover_unindexed_orphans_unsealable_wals() {
     assert!(wal_path.exists(), "orphan file kept on disk");
 
     // Second restart: the orphan is re-discovered (its header is valid),
-    // the seal is retried, and it re-orphans — the self-healing loop the
-    // policy promises, not a one-shot skip.
+    // the indexing operation is retried, and it re-orphans — the
+    // self-healing loop the policy promises, not a one-shot skip.
     let mut wal_reg2 = wal::Registry::new(wal_dir.path());
     wal_reg2.recover().unwrap();
     let sfst_dir2 = tempfile::tempdir().unwrap();

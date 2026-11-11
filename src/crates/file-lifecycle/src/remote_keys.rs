@@ -14,7 +14,7 @@
 //! ascribes the segment no meaning beyond the path: each pipeline passes its
 //! own segment — sourced from `otel_bridge::signals::Signal::segment` (the single
 //! signal ↔ segment map) — as an opaque `&str`. The `sfst` segment is the
-//! artifact *type* (the SFST container), shared by every signal that seals
+//! artifact *type* (the SFST container), shared by every signal that indexes
 //! into it — the `{signal}` segment, not the extension, distinguishes one
 //! signal's SFSTs from another's.
 //!

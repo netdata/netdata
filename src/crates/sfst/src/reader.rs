@@ -489,8 +489,9 @@ impl<'a> ChunkReader<'a> {
     /// results, never a panic.
     pub fn trace_id_index(&self) -> Result<TraceIdIndex, Error> {
         // The index resolves positions against the `TRCE` column, so the column
-        // must be present — the writer guarantees TIDX ⟹ trace_id at seal; this
-        // is the symmetric read-side guard for a file produced out-of-band.
+        // must be present — the writer guarantees TIDX ⟹ trace_id at write
+        // time; this is the symmetric read-side guard for a file produced
+        // out-of-band.
         self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
         let index: TraceIdIndex = unpack(self.chunk_raw_by_id(CHUNK_TRACE_INDEX)?)?;
         index.validate(self.record_count()?)?;
@@ -509,10 +510,10 @@ impl<'a> ChunkReader<'a> {
     /// [`has_trace_id_bloom`](Self::has_trace_id_bloom).
     pub fn trace_id_bloom(&self) -> Result<crate::TraceIdBloom, Error> {
         // Guard the full dependency chain TBLM ⟹ TIDX ⟹ TRCE — the writer
-        // guarantees it at seal; this is the read-side check for files
-        // produced out-of-band. Without it, a definite bloom miss on such a
-        // file would silently answer "trace absent" instead of surfacing
-        // the corruption.
+        // guarantees it at write time; this is the read-side check for
+        // files produced out-of-band. Without it, a definite bloom miss on
+        // such a file would silently answer "trace absent" instead of
+        // surfacing the corruption.
         if !self.has_trace_id_index() {
             return Err(Error::CorruptIndex(
                 "trace_id bloom without the trace_id index it derives from".into(),
@@ -557,9 +558,10 @@ impl<'a> ChunkReader<'a> {
     /// guard — a length mismatch is a decode error, not a panic later).
     pub fn trace_rollup(&self) -> Result<crate::TraceRollup, Error> {
         // The rollup summarizes the `TRCE` column — the writer guarantees
-        // TRSU ⟹ trace_id at seal; this is the read-side guard for files
-        // produced out-of-band, same as TIDX and TBLM (without it a missing
-        // rollup row would answer "trace absent" instead of surfacing it).
+        // TRSU ⟹ trace_id at write time; this is the read-side guard for
+        // files produced out-of-band, same as TIDX and TBLM (without it a
+        // missing rollup row would answer "trace absent" instead of
+        // surfacing it).
         self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
         let rollup: crate::TraceRollup = unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP)?)?;
         // Structural validation lives on the type (unit-tested there):

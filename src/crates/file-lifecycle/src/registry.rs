@@ -15,8 +15,8 @@
 //! the run loop (write) and the query handlers (read). Every method is
 //! synchronous; readers return **owned** data — paths, summaries, and ranges
 //! copied under the lock — so a query drops the read lock before any file
-//! I/O: catalog reads, WAL chunk/tail builds, and remote plans all run after
-//! it.
+//! I/O: catalog reads, WAL chunk indexing and tail scans, and remote plans
+//! all run after it.
 //!
 //! Errors: [`TenantRegistries::apply_wal_event`] surfaces `wal::Registry`'s
 //! event-bookkeeping rejections, which the caller logs and drops;
@@ -38,7 +38,7 @@ use file_registry::{FileId, SeqKey, TenantId};
 /// owned, so it outlives the registry read lock. The query layer resolves it
 /// off the lock into chunk SFSTs plus a row-scanned tail over the durable
 /// prefix `[HEADER_SIZE, valid_up_to)` (partitioned by `wal::prefix`, chunk
-/// builds memoized by [`crate::chunk::ChunkCache`]), each chunk's built
+/// indexing memoized by [`crate::chunk::ChunkCache`]), each chunk's indexed
 /// record count cross-checked against its frame-scan count.
 #[derive(Debug)]
 pub struct WalDesc {
@@ -256,9 +256,9 @@ impl Registry {
 
     /// Whether any artifact for `seq` is still tracked (a WAL entry or an
     /// SFST entry). The post-recovery routing filter keys on this: a seq
-    /// recovery dropped entirely (an unsealable orphan, a drained empty-WAL
-    /// seal) must not be routed, or its `seq_to_tenant` entry dangles for
-    /// the process lifetime.
+    /// recovery dropped entirely (an orphan that cannot be indexed, an
+    /// empty WAL drained after indexing) must not be routed, or its
+    /// `seq_to_tenant` entry dangles for the process lifetime.
     pub fn holds_seq(&self, seq: u64) -> bool {
         self.wal.get(seq).is_some() || self.sfst.get(seq).is_some()
     }
@@ -598,8 +598,8 @@ impl TenantRegistries {
     /// ever reports a range without a durable prefix.)
     ///
     /// Both lists are owned, so the caller can drop the read lock before
-    /// resolving the WALs (chunk partitioning + chunk/tail builds) off the
-    /// lock. An unknown tenant yields empty lists.
+    /// resolving the WALs (chunk partitioning + chunk indexing + tail
+    /// ranges) off the lock. An unknown tenant yields empty lists.
     pub fn query_snapshot(
         &self,
         tenant: &TenantId,

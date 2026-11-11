@@ -9,7 +9,7 @@
 //!   straddling sources counts once with its envelope merged; legacy
 //!   pre-rollup files are excluded and flagged `RollupAbsent`, never
 //!   mixed in; shard merge is associative across source shapes (the
-//!   tail/seal parity underneath is tests/traces_rollup_tail.rs's
+//!   tail/file parity underneath is tests/traces_rollup_tail.rs's
 //!   contract); ceiling termination with the deterministic prefix;
 //!   all-or-empty cancellation; per-source failure honesty while the
 //!   rest count.
@@ -21,7 +21,7 @@
 //!   list population.
 //!
 //! Fixtures: tests/common/mod.rs — real WALs through the production
-//! write/seal pipeline, mixed sealed/tail source shapes, and the
+//! write/index pipeline, mixed sealed/tail source shapes, and the
 //! hand-built legacy no-rollup file. Grids are tiny (one-second
 //! buckets, [`grid`]); budgets are forced with
 //! `fold_rows_ceiling_for_tests`, `filter_units_ceiling_for_tests` and
@@ -250,8 +250,8 @@ fn legacy_file_without_the_rollup_is_excluded_and_flagged_never_mixed() {
 
 /// Where the data is split cannot change the aggregate: the corpus
 /// split across a sealed file and a tail gives the same cells and
-/// totals as the whole corpus sealed — the overview-level face of the
-/// tail/seal parity tests/traces_rollup_tail.rs pins per trace.
+/// totals as the whole corpus indexed — the overview-level face of
+/// the tail/file parity tests/traces_rollup_tail.rs pins per trace.
 #[test]
 fn shard_merge_is_associative_across_source_shapes() {
     let (half_a, half_b) = {
@@ -745,7 +745,7 @@ fn a_failed_filter_scan_leaves_the_files_traces_unflagged() {
     let c = corpus();
     let wal_bad = write_wal(dir.path(), vec![req(&c[2..])], "bad"); // B, C
     let wal_ok = write_wal(dir.path(), vec![req(&c[..2])], "ok"); // A
-    // Seal once, corrupt in place, then build sources WITHOUT resealing.
+    // Index once, corrupt in place, then build sources WITHOUT re-indexing.
     drop(sealed_source(dir.path(), &wal_bad, "bad"));
     let bad_path = dir.path().join("bad.sfst");
     corrupt_chunk(&bad_path, *b"TRCE");

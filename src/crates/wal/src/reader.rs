@@ -9,7 +9,7 @@
 //! [`Reader::open_range`] reads a half-open `[start, end)` window of frame
 //! boundaries: a query's read of an active file's durable prefix (`end` = the
 //! tracked file's `valid_up_to`, the last fsync boundary — carried by
-//! `registry.rs`), a chunk build over that prefix, or an intact prefix of an
+//! `registry.rs`), chunk indexing over that prefix, or an intact prefix of an
 //! offline file. The modes differ only on a frame extending past the
 //! available bytes:
 //!
@@ -17,11 +17,11 @@
 //!   the last fsync may hold a partially flushed frame); the read stops
 //!   cleanly and stays stopped. Callers that must surface a shortfall
 //!   cross-check yielded counts against [`scan_frame_boundaries`] counts
-//!   first (the chunk builders do).
+//!   first (chunk indexing does).
 //! - Unbounded: a payload shorter than its header promises is corruption and
-//!   errors — whole-file callers (seal-time indexing) have no entry-count
-//!   cross-check to catch a silently dropped final frame. A frame *header*
-//!   torn by EOF ends either mode cleanly.
+//!   errors — whole-file callers (indexing a closed WAL file) have no
+//!   entry-count cross-check to catch a silently dropped final frame. A
+//!   frame *header* torn by EOF ends either mode cleanly.
 //!
 //! # Verification
 //!
@@ -40,8 +40,8 @@
 //!
 //! # Consumers (grep-verified)
 //!
-//! `ng-index` (`sfst_build.rs`): the indexing of whole files at seal time via
-//! `open`, in-memory query chunks via `open_range` (counts cross-checked).
+//! `ng-index` (`sfst_build.rs`): indexing closed WAL files via `open`,
+//! chunk indexing for queries via `open_range` (counts cross-checked).
 //! `sfsq` (`logs/wal_scan.rs`, `traces/wal_scan.rs`): tail row-scans via
 //! `open_range`, whole files via `open` in tests/tooling. `otel-ledger`
 //! (`rpc/logs/handler.rs`, `rpc/traces/sources.rs`): per-query chunk + tail
@@ -122,7 +122,7 @@ impl Reader {
     /// This is how a query reads the durable, fully-written prefix of a
     /// file another process is still appending to (`end` = the tracked
     /// file's `valid_up_to`, the last fsync boundary), how the ledger's
-    /// chunk builders read one chunk, or how an offline scan reads an
+    /// chunk indexing reads one chunk, or how an offline scan reads an
     /// intact prefix (`sfsq-cli` scans boundaries first and clamps to the
     /// last complete frame). Both `start` and `end` must be
     /// **frame boundaries** — `HEADER_SIZE` or a frame end offset
@@ -277,7 +277,7 @@ impl Reader {
         // the durable bound — a torn tail past `valid_up_to`. Don't read
         // the partial payload; latch the reader at `end` (so a re-call
         // also stops) and stop cleanly. Yielding short is observable to
-        // callers that cross-check entry counts (the chunk builders).
+        // callers that cross-check entry counts (chunk indexing).
         // (For an unbounded read this branch is skipped, so a truncated
         // payload reaches the `read_exact` below and errors — corruption
         // is not silently dropped.)
@@ -392,7 +392,7 @@ impl FrameRange {
 /// and `entry_count`) and seeks past the payload + padding to the next.
 /// Cheap relative to indexing — no decompression, no CRC — so it can run
 /// on the durable prefix of an active file to plan chunk boundaries
-/// before paying to build any.
+/// before paying to index any.
 ///
 /// Same windowing and soundness rules as [`Reader::open_range`]: `start`
 /// and `end` must be frame boundaries (`HEADER_SIZE` / a prior

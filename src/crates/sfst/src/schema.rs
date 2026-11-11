@@ -22,7 +22,7 @@
 //! - [`KvId`]s share one tier-aligned id space across `PRIM`, `MF`, `HF`,
 //!   and `SB` (low → mid → high; bounds in [`IdRanges`]).
 //!
-//! The index build (`IndexWriter`) constructs these; consumers decode
+//! The index writer (`IndexWriter`) constructs these; consumers decode
 //! them via the typed accessors on [`crate::ChunkReader`]. Decoded
 //! payloads are untrusted input: structural checks run at decode
 //! ([`SchemaTree::validate`], the `rebuild_offsets` guards) and degrade
@@ -147,9 +147,9 @@ impl FieldTier {
 }
 
 /// Default cardinality threshold for [`FieldTier`] classification.
-/// Public so every producer of field tables — the index build here and
-/// the WAL row scan in `sfsq` — classifies with the same boundaries
-/// unless explicitly overridden.
+/// Public so every producer of field tables — the index writer here
+/// and the WAL row scan in `sfsq` — classifies with the same
+/// boundaries unless explicitly overridden.
 pub const DEFAULT_CARDINALITY_THRESHOLD: u32 = 100;
 
 impl FieldEntry {
@@ -391,7 +391,7 @@ impl SchemaTree {
     }
 
     /// Fill each leaf node's [`LeafStats`] from `fields`, matched by collapsed
-    /// path. Used at build time to attach per-path cardinality/tier to a tree
+    /// path. Used at write time to attach per-path cardinality/tier to a tree
     /// built structurally (kinds known, stats not — the `ng-index` path). A
     /// polymorphic path's sibling leaves all match the same field entry and so
     /// share its stats. A leaf whose path is absent from `fields` keeps
@@ -1002,7 +1002,7 @@ macro_rules! scalar_column {
                 self.0.is_empty()
             }
             /// A copy reordered by `positions` (insertion-order indices in the
-            /// desired output order) — the build-time insertion→chronological remap.
+            /// desired output order) — the write-time insertion→chronological remap.
             pub fn reordered(&self, positions: impl Iterator<Item = usize>) -> Self {
                 $ty(positions.map(|i| self.0[i]).collect())
             }
@@ -1268,7 +1268,7 @@ macro_rules! id_arena {
             }
 
             /// A copy reordered by `positions` (insertion-order indices in the
-            /// desired output order) — the build-time insertion→chronological remap.
+            /// desired output order) — the write-time insertion→chronological remap.
             pub fn reordered(&self, positions: impl Iterator<Item = usize>) -> Self {
                 let mut out = Self::with_capacity(self.len());
                 for i in positions {

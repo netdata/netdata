@@ -163,19 +163,19 @@ impl OtelLogsHandler {
     /// Resolve one active-WAL descriptor into in-memory chunk SFST
     /// candidates plus the byte range to row-scan as its tail. Runs off
     /// the registry lock, over the descriptor's `valid_up_to` durable
-    /// bound. Polls `cancel` between chunk builds (each build is one
+    /// bound. Polls `cancel` between chunks (indexing each chunk is one
     /// `spawn_blocking`); a cancelled call returns empty — the caller is
     /// about to discard the result anyway.
     ///
     /// Scans the durable prefix's frame boundaries, groups them into
-    /// chunks of at least `min_entries` records, and builds each through
+    /// chunks of at least `min_entries` records, and indexes each through
     /// the chunk cache (singleflight per `(seq, index)`). Failure policy:
-    /// a chunk that fails to build or parse makes the **whole WAL**
+    /// a chunk that fails to index or parse makes the **whole WAL**
     /// un-queryable for this query — no candidates and no tails — rather
     /// than silently dropping only the broken range. The WAL's data
     /// reappears once it rotates into a sealed SFST — or, for a transient
     /// failure (e.g. a count mismatch on an actively-written WAL), on a
-    /// later query, since build errors are not cached. The same empty
+    /// later query, since indexing errors are not cached. The same empty
     /// result covers a WAL that can't be read at all (rotated/deleted
     /// under us).
     ///
@@ -217,7 +217,7 @@ impl OtelLogsHandler {
             let seq = wal.id.seq;
             let path = wal.path.clone();
             let (range, expected) = (chunk.range, chunk.entry_count);
-            // The build future: index the byte range on a blocking
+            // The indexing future: index the byte range on a blocking
             // thread and cross-check the record count (the truncation
             // check wal::Reader::open_range defers). Runs at most once
             // per (seq, index) — singleflight; skipped on a cache hit.
@@ -252,7 +252,7 @@ impl OtelLogsHandler {
                     part: sfsq::logs::Part::Indexed(chunk.index),
                     source: Source::Memory(Arc::clone(&built.bytes)),
                 }),
-                // Build failure (decode error, count mismatch, panic):
+                // Indexing failure (decode error, count mismatch, panic):
                 // refuse the whole WAL — see the failure policy above.
                 Err(e) => {
                     tracing::warn!(
@@ -385,9 +385,9 @@ impl FunctionHandler for OtelLogsHandler {
         let required_params = stream_required_params(local_streams.with_catalog(&selector_catalog));
 
         // Resolve each WAL into in-memory chunk SFSTs + a tail (off the
-        // lock; chunk builds are singleflighted through the cache). The
-        // chunk-building phase can be the slow one, so it polls the
-        // call's cancellation token between builds.
+        // lock; chunk indexing is singleflighted through the cache). The
+        // chunk-indexing phase can be the slow one, so it polls the
+        // call's cancellation token between chunks.
         let mut wal_tails: Vec<WalTail> = Vec::new();
         for wal in wal_descs {
             let (chunks, tails) = self.resolve_wal(wal, &ctx.cancellation).await;

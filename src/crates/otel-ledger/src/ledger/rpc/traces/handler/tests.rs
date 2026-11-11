@@ -6,7 +6,7 @@
 //! status boundary (shape errors 400, semantic errors 500).
 //!
 //! Fixtures are real traces: OTLP requests written into real WALs or
-//! sealed by the production traces seal, installed through the shared
+//! indexed by the production indexing, installed through the shared
 //! `fixtures` module into fresh registries over throwaway dirs. What
 //! the lower layers already pin is not re-tested here: wire shapes in
 //! `wire/tests.rs`, adapter mappings and window resolution in
@@ -24,9 +24,9 @@ use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
 fn make_handler_over(registries: Arc<RwLock<TenantRegistries>>) -> OtelTracesHandler {
-    // min_entries 4: the 8-entry search-corpus WAL seals into two real
+    // min_entries 4: the 8-entry search-corpus WAL indexes into two real
     // chunks, a 3-span fixture WAL stays a tail — the end-to-end tests
-    // cross the chunk-build and tail paths for real.
+    // cross the chunk-indexing and tail paths for real.
     OtelTracesHandler::new(
         registries,
         Arc::new(ChunkCache::new(64 * 1024 * 1024)),
@@ -178,7 +178,7 @@ async fn handler_with_fixture_wal() -> OtelTracesHandler {
 
 #[tokio::test]
 async fn a_sealed_traces_fixture_serves_as_a_local_sealed_file() {
-    // The fixture is what the traces seal writes: its summary spans the
+    // The fixture is what traces indexing writes: its summary spans the
     // spans' seconds and counts them, and the file answers a lookup alone.
     let (summary, _) = sealed_traces(vec![otlp_req(0x11, 3, 1_000_000_000)]);
     assert_eq!(
@@ -355,7 +355,7 @@ async fn trace_by_id_assembles_the_fixture_trace_end_to_end() {
     assert_eq!(s0["span_id"], "01".repeat(8));
     assert!(s0.get("parent_span_id").is_none());
     assert_eq!(v["spans"][1]["parent_span_id"], "01".repeat(8));
-    // The seal indexed the OTLP name into the row facets.
+    // Indexing put the OTLP name into the row facets.
     assert!(
         s0["fields"]
             .as_array()
@@ -888,7 +888,7 @@ fn ids(v: &serde_json::Value) -> Vec<String> {
         .collect()
 }
 
-/// A WAL whose chunks will not build is refused for the request: every
+/// A WAL whose chunks will not index is refused for the request: every
 /// mode's answer says a source failed, instead of looking complete.
 #[tokio::test]
 async fn a_refused_wal_is_a_failed_source_in_every_mode() {

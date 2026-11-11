@@ -24,18 +24,18 @@
 //!   when it matches, its row is built from its holders' rollup parts
 //!   (`TRSU` + `TRSS`) and the tails' decoded spans: no span assembles.
 //! - **Fallback (assembly):** a candidate whose row cannot be built that
-//!   way — a holder sealed before `TRSS`, a rollup or evidence read that
-//!   fails — and every candidate once the rows ceiling is breached, or
-//!   of a query whose window holds no `TRSS` file (the rows path is then
-//!   skipped), assembles through the shared combiner over ALL completion
-//!   sources (sessions opened once, reused for every candidate — the
-//!   by-id pattern), every token re-evaluates against the retained
-//!   CANONICAL spans, a non-match drops, and the row numbers are
-//!   canonical. When the rows path decided first, its stored-row
-//!   evidence has already excluded a trace any stored copy of which
-//!   matches a negated token, so the trace lists only when both agree;
-//!   otherwise the canonical verdict alone decides (decision 52). The
-//!   gates pre-filter only this path.
+//!   way — a holder indexed before `TRSS`, a rollup or evidence read
+//!   that fails — and every candidate once the rows ceiling is breached,
+//!   or of a query whose window holds no `TRSS` file (the rows path is
+//!   then skipped), assembles through the shared combiner over ALL
+//!   completion sources (sessions opened once, reused for every
+//!   candidate — the by-id pattern), every token re-evaluates against
+//!   the retained CANONICAL spans, a non-match drops, and the row
+//!   numbers are canonical. When the rows path decided first, its
+//!   stored-row evidence has already excluded a trace any stored copy of
+//!   which matches a negated token, so the trace lists only when both
+//!   agree; otherwise the canonical verdict alone decides (decision 52).
+//!   The gates pre-filter only this path.
 //!
 //! # Tokens
 //!
@@ -140,7 +140,7 @@
 //! while the post-assembly truth evaluates the assembled TRUE root
 //! (above). The recorded claims can diverge from the assembled pick;
 //! explicit project ruling accepts the divergence as ignore-and-document,
-//! recall-miss only (seal-side hardening beyond the tie abstention was
+//! recall-miss only (write-side hardening beyond the tie abstention was
 //! rejected as unjustified recorder/combiner lockstep; the mechanism
 //! detail lives in the gate and sfst trace_rollup module docs):
 //!
@@ -148,8 +148,8 @@
 //!   abstention: on any recorded-facet difference it claims nothing, so
 //!   the gate has nothing to prune on (facet-identical ties keep a
 //!   claim, but the gate only ever tests those equal facets).
-//! - Multi-valued `name` — CLOSED by the seal's first-entry capture:
-//!   every evaluation path reads the same recorded value.
+//! - Multi-valued `name` — CLOSED by the indexing first-entry
+//!   capture: every evaluation path reads the same recorded value.
 //! - Stored-vs-retained copies — RESIDUAL: the recorder folds STORED
 //!   rows, the combiner retains canonical copies, so a recorded root
 //!   can mask a real, later true root ("phantom root"; requires
@@ -1838,8 +1838,9 @@ pub fn search(
     // assemble without reading them again.
     let mut rows_failed: HashSet<usize> = HashSet::new();
     let mut evidence_failed: HashSet<usize> = HashSet::new();
-    // With files but none sealed with stats every row would fall back:
-    // skip the rows path (a TOC check per file). Tails need no stats.
+    // With files but none indexed with stats every row would fall
+    // back: skip the rows path (a TOC check per file). Tails need no
+    // stats.
     let rows = query.rows && (sessions.is_empty() || sessions.iter().any(|s| s.has_rollup_stats()));
     let mut assembled_count = 0usize;
     let mut finals: Vec<Assembled> = Vec::new();
@@ -1949,8 +1950,8 @@ pub fn search(
             };
             // The rows path (decision 49) first: it decides exactly from
             // the holders' rollup parts, so the gates below run only for
-            // the candidates it leaves to assembly (a holder sealed before
-            // the stats, a read that fails, a breached ceiling).
+            // the candidates it leaves to assembly (a holder indexed
+            // before the stats, a read that fails, a breached ceiling).
             if rows && !breached(&work) {
                 let parts_of_tails = tail_parts.get_or_insert_with(|| {
                     let mut parts: HashMap<TraceId, Vec<TracePart>> = HashMap::new();

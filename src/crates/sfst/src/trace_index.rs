@@ -23,9 +23,9 @@
 //!
 //! # Lifecycle
 //!
-//! Built at seal from the just-written chronological `TRCE` column (`build.rs`)
-//! and written as the bincode `TIDX` chunk (zstd-packed, cold region,
-//! `writer.rs`). On read,
+//! Built at write time from the just-written chronological `TRCE` column
+//! (`build.rs`) and written as the bincode `TIDX` chunk (zstd-packed, cold
+//! region, `writer.rs`). On read,
 //! `reader.rs` decodes and [`validate`](TraceIdIndex::validate)s it;
 //! `index_reader.rs` re-exposes it and `session.rs` resolves each bloom
 //! "maybe" with [`positions`](TraceIdIndex::positions) — the exact-lookup path
@@ -109,7 +109,8 @@ impl<'de> Deserialize<'de> for Fanout {
 }
 
 /// The `trace_id` index: a first-byte fanout over row positions sorted by their
-/// 16-byte `trace_id`. Built at seal from the `TRCE` column, read on lookup.
+/// 16-byte `trace_id`. Built at write time from the `TRCE` column, read on
+/// lookup.
 ///
 /// Self-contained for the bucket step (`fanout`); the comparison step reads the
 /// `TRCE` column the index was built from (positions are indices into it).
@@ -197,7 +198,7 @@ impl TraceIdIndex {
     /// adjacent-dedup over the sorted permutation, so no hashing and no
     /// allocation. `trace_ids` MUST be the `TRCE` column this index was built
     /// from (same coupling as [`positions`](Self::positions)). Sole consumer:
-    /// the `TBLM` bloom build (`trace_bloom.rs`).
+    /// building the `TBLM` bloom (`trace_bloom.rs`).
     pub(crate) fn distinct_ids<'s>(
         &'s self,
         trace_ids: &'s TraceIds,

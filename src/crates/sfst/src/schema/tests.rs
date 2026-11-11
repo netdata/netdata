@@ -21,7 +21,7 @@
 //! - `validate` rejects every malformed tree shape as `Error::CorruptIndex`
 //!   at the META decode trust boundary;
 //! - `fill_field_stats` then `derive_field_table` reproduces the input table
-//!   exactly (the build-time invariant), and inconsistent arenas fail
+//!   exactly (the write-time invariant), and inconsistent arenas fail
 //!   `rebuild_offsets` instead of corrupting later reads.
 //!
 //! Not pinned here: cardinality-threshold classification (every fixture
@@ -126,7 +126,7 @@ use crate::{
 /// `derive_field_table` over a `flat` tree hands the input table back,
 /// canonically reordered low → mid → high then by name regardless of the
 /// order it was built in. The tier machinery (`num_mid`/`locate_field`/
-/// `high_kv_id`) and build-time KvId assignment depend on this order.
+/// `high_kv_id`) and write-time KvId assignment depend on this order.
 #[test]
 fn derive_field_table_is_canonically_ordered() {
     let fields: FieldTable = vec![
@@ -477,7 +477,7 @@ fn metadata_tree_round_trips() {
 /// `fill_field_stats` attaches per-path cardinality/tier to a structurally
 /// built tree (the `ng-index` path: kinds known, stats `None`), and the
 /// derived table then reproduces the input field table exactly — the
-/// build-time invariant. Covers a nested path, a polymorphic path
+/// write-time invariant. Covers a nested path, a polymorphic path
 /// (deduped), and an interior node (excluded).
 #[test]
 fn fill_field_stats_then_derive_matches_fields() {

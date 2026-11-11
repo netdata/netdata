@@ -7,7 +7,7 @@
 //! module owns the partitioning rule, next to the
 //! [`scan_frame_boundaries`](crate::scan_frame_boundaries) scan whose
 //! output it folds; it is pure framing math — nothing here knows what
-//! the frames contain or what the consumer builds from a chunk.
+//! the frames contain or what the consumer indexes from a chunk.
 //!
 //! The fold's input is one scan over the WAL's durable bound:
 //! `FrameRange::new(HEADER_SIZE, valid_up_to)` — `valid_up_to` is the
@@ -20,13 +20,13 @@
 //!
 //! Both parts are read back with
 //! [`Reader::open_range`](crate::Reader::open_range), the bounded mode
-//! of `reader.rs`. A chunk's range is one window: the ledger builds it
-//! into an SFST with `ng_index::build_sfst_range` /
+//! of `reader.rs`. A chunk's range is one window: the ledger indexes
+//! it into an SFST with `ng_index::build_sfst_range` /
 //! `build_sfst_traces_range` (record count cross-checked against
 //! [`ChunkBoundary::entry_count`]) and memoizes the image
-//! (file-lifecycle's `ChunkCache`). The tail from
-//! [`tail_start`] to `valid_up_to` is row-scanned per query by sfsq's
-//! WAL scans; a frame crossing the bound stops the read cleanly.
+//! (file-lifecycle's `ChunkCache`). The tail from [`tail_start`] to
+//! `valid_up_to` is row-scanned per query by sfsq's WAL scans; a frame
+//! crossing the bound stops the read cleanly.
 //!
 //! Chunk boundaries are **append-only and immutable**: a boundary is
 //! fixed by the frame entry counts up to it, so a durable bound
@@ -71,8 +71,8 @@ pub struct ChunkBoundary {
     pub range: crate::FrameRange,
     /// Log records in the chunk — the sum of the frames' entry counts,
     /// at least `min_entries`. The ledger passes this as the expected
-    /// count its chunk builds cross-check the built SFST against (the
-    /// shortfall check `reader.rs` defers to its callers).
+    /// count its chunk indexing cross-checks the indexed chunk against
+    /// (the shortfall check `reader.rs` defers to its callers).
     pub entry_count: u64,
 }
 

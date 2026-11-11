@@ -5,11 +5,11 @@
 //! flattened *log* frames (a WAL directory instead of a single file).
 //!
 //! The binary is a developer/ops tool: nothing wires it into the live
-//! `otel-ledger` pipeline. Its seal, though, is the pipeline's seal — the same
-//! `ng_index::build_sfst_traces_file` the `otel-ledger` traces indexer runs
-//! (`src/crates/otel-ledger/src/ledger/traces_pipeline.rs`) — so an index
-//! built here is exactly what the live query path serves. The input WAL is
-//! produced by `ng-ingest-traces`.
+//! `otel-ledger` pipeline. Its `seal`, though, is the pipeline's indexing —
+//! the same `ng_index::build_sfst_traces_file` the `otel-ledger` traces
+//! indexer runs (`src/crates/otel-ledger/src/ledger/traces_pipeline.rs`) — so
+//! an index written here is exactly what the live query path serves. The input
+//! WAL is produced by `ng-ingest-traces`.
 //!
 //! ```text
 //! ng-index-traces seal  --in ~/repos/tmp/ng/<wal> --out /tmp/traces.sfst
@@ -39,7 +39,7 @@ struct Args {
 #[derive(Subcommand)]
 enum Cmd {
     /// Seal a flattened traces WAL file (from `ng-ingest-traces`) into an SFST index,
-    /// building the per-row span columns and the `trace_id` index.
+    /// writing the per-row span columns and the `trace_id` index.
     Seal {
         /// The flattened traces WAL file.
         #[arg(long = "in")]

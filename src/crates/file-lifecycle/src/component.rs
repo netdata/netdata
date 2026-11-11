@@ -71,7 +71,7 @@
 //!   the storage backend).
 //! - `otel-ledger/src/ledger/pipeline.rs` and `traces_pipeline.rs`, one pair
 //!   per signal: otel-ledger's indexer (spawned by the per-signal build
-//!   functions, which own its seal-fn arg) and
+//!   functions, which pass it the signal) and
 //!   [`crate::catalog_builder::CatalogBuilder`] (spawned inside the shared
 //!   `build_pipeline`).
 //!

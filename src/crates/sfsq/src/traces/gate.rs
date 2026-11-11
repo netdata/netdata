@@ -4,8 +4,8 @@
 //!
 //! Since the rows path (decision 49) the gates run only for the
 //! candidates it leaves to assembly — mostly traces held by files
-//! sealed before `TRSS` — and as rollup discovery's single-source
-//! pre-filter.
+//! indexed before `TRSS` — and as rollup discovery's
+//! single-source pre-filter.
 //!
 //! Trace-level predicates (`root_service_name` / `root_name`
 //! selections, `trace_duration` lower bounds) are decided

@@ -4,9 +4,9 @@
 //! [`Indexer`] for its signal (`ledger/pipeline.rs`,
 //! `ledger/traces_pipeline.rs`). Every indexing operation runs in a child
 //! process: this executable as `otel-plugin index` ([`crate::index_child`]),
-//! which picks the signal's `ng-index` builder. So the memory an operation
-//! needs goes back to the system when the operation ends, and an operation that
-//! the kernel kills takes only itself down.
+//! which picks the signal's `ng-index` indexing function. So the memory an
+//! operation needs goes back to the system when the operation ends, and an
+//! operation that the kernel kills takes only itself down.
 //!
 //! The indexers of both signals start their operations through one
 //! [`IndexingOperations`], whose scheduler decides how many run at once across
@@ -31,8 +31,8 @@
 //! (`file_lifecycle::recovery::recover_unindexed`); responses go back to
 //! the ledger's `handle_indexer_resp` (`ledger/indexer.rs` — a different
 //! indexer.rs: the response handler, not this component) or to the recovery
-//! drains, in the order the operations finish. Live-tail chunk range builds
-//! (`ng_index::build_sfst_range`) bypass this component.
+//! drains, in the order the operations finish. Chunk indexing for live
+//! queries (`ng_index::build_sfst_range`) bypasses this component.
 //!
 //! Cancelling or closing the request channel exits the loop and kills the
 //! operations that still run. That loses nothing: an operation writes its index

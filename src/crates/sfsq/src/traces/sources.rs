@@ -28,8 +28,8 @@
 //!   check could not see it at all.
 //!
 //! What it CANNOT validate, caller-owned: a sealed file and an active
-//! WAL holding the same data (the seal-vs-rotation window) must not
-//! both be offered — a sealed file carries no coverage to collide
+//! WAL holding the same data (the indexing-vs-rotation window) must
+//! not both be offered — a sealed file carries no coverage to collide
 //! with. The caller's registry snapshot owns that invariant, as it
 //! does for the logs engine.
 
@@ -77,8 +77,8 @@ pub struct WalCoverage {
     /// The WAL's identity, opaque to the library (same derivation rules
     /// as [`SourceId`]).
     pub wal_id: Arc<str>,
-    /// The half-open byte range of the WAL this source was built from /
-    /// scans.
+    /// The half-open byte range of the WAL this source was indexed from
+    /// (or scans).
     pub range: wal::FrameRange,
 }
 

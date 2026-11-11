@@ -4,10 +4,10 @@
 //! `otel-logs`/`otel-traces` query handlers over the wire-neutral `sfsq`
 //! engines (`ledger::rpc`), and the shared indexer component (`indexer`,
 //! spawned per signal; its indexing operations run in child processes,
-//! `index_child`, with that signal's `ng-index` builder — `build_sfst_file`
-//! for logs, `build_sfst_traces_file` for traces). The reusable machinery
-//! (registry, catalog, upload/download, cache, recovery, the per-signal
-//! `Pipeline` shell) lives in `file-lifecycle`.
+//! `index_child`, with that signal's `ng-index` indexing function —
+//! `build_sfst_file` for logs, `build_sfst_traces_file` for traces). The
+//! reusable machinery (registry, catalog, upload/download, cache, recovery,
+//! the per-signal `Pipeline` shell) lives in `file-lifecycle`.
 //!
 //! One ledger worker process per plugin run: the supervisor re-execs the
 //! plugin binary as a `worker ledger` subprocess and its main dispatches to

@@ -55,7 +55,7 @@ pub enum LedgerEvent {
 /// selects on in [`crate::Ledger::run`]. The shared cleaner/uploader keep
 /// their own channels because there is exactly one of each.
 pub enum PipelineResp {
-    /// A response from a pipeline's seal/index worker.
+    /// A response from a pipeline's indexer.
     Indexer(IndexerResponse),
     /// A response from a pipeline's catalog builder.
     CatalogBuilder(CatalogBuilderResponse),

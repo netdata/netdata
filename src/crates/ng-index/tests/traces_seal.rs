@@ -1,12 +1,12 @@
 //! End-to-end traces oracle: synthetic OTLP requests ingested through the
-//! shared flatten recipe (the `seal()` helper below), sealed by the real
+//! shared flatten recipe (the `seal()` helper below), indexed by the real
 //! `ng_index::build_sfst_traces_file`, and read back through the real
 //! `sfst::IndexReader::trace_by_id`. Two layers:
 //!  1. hand-built fixtures pin the tree-build edge cases (missing parents,
 //!     multiple roots, parent cycles, duplicate/unset span ids, clock skew,
 //!     large fan-out) — these can't be triggered reliably in real data —
-//!     plus the seal's additive chunks (EVNB/LNKB, TBLM, TRSU) and the
-//!     lossless field round trip;
+//!     plus the additive chunks indexing writes (EVNB/LNKB, TBLM, TRSU)
+//!     and the lossless field round trip;
 //!  2. a `#[ignore]`d self-consistency oracle runs against a WAL captured
 //!     from the real receiver (`ng-ingest-traces`): independently decode it,
 //!     then assert a sampled slice of its traces reconstructs via
@@ -85,11 +85,11 @@ fn count_spans(req: &ExportTraceServiceRequest) -> usize {
         .sum()
 }
 
-/// Ingest the requests into a traces WAL, then seal it into an SFST and return the
+/// Ingest the requests into a traces WAL, then index it into an SFST and return the
 /// sealed bytes. Mirrors `ng-ingest::write_trace_request` inline (normalize → flatten
 /// → emit-time hashes → encode → WAL frame), keeping the test self-contained; the
 /// real writer path is exercised by the `#[ignore]`d real-WAL oracle below. Rotation
-/// is disabled so every request lands in one `.wal` file — the seal consumes a
+/// is disabled so every request lands in one `.wal` file — indexing consumes a
 /// single WAL file.
 fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
     let dir = tempfile::tempdir().unwrap();
@@ -125,7 +125,7 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
         let ingestion_ns = clock.now_ns();
         // The production content_meta: the version-tagged empty-ServiceStream
         // blob the unattributed stream carries (not a bare empty slice), so
-        // the seal is exercised against production-shaped WAL headers.
+        // indexing is exercised against production-shaped WAL headers.
         let content_meta = otel_logs_identity::encode_content_meta(
             &otel_logs_identity::ServiceStream::new("", ""),
         )
@@ -158,7 +158,7 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
 
 #[test]
 fn traces_build_refuses_logs_payload_format() {
-    // The TRACES build must refuse a WAL stamped with the logs frame codec —
+    // TRACES indexing must refuse a WAL stamped with the logs frame codec —
     // the cross-signal mixup the per-file format tag exists to catch.
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
@@ -546,7 +546,7 @@ fn oracle_real_wal_self_consistency() {
     }
     assert!(!truth.is_empty(), "the WAL had no trace-bearing spans");
 
-    // Seal + reopen.
+    // Index + reopen.
     let out = tempfile::tempdir().unwrap();
     let sfst_path = out.path().join("traces.sfst");
     let (summary, _size) = build_sfst_traces_file(&wal_path, &sfst_path, &Metrics::new()).unwrap();
@@ -557,7 +557,7 @@ fn oracle_real_wal_self_consistency() {
     // opens a fresh session (columns, string resolutions and batches decode
     // from scratch), so checking every distinct id would be far too slow at
     // 500K. A sorted sample of a few hundred still surfaces any systemic
-    // seal/index/materialize bug (they'd fail uniformly, not per-trace).
+    // write/index/materialize bug (they'd fail uniformly, not per-trace).
     const SAMPLE: usize = 500;
     let mut ids: Vec<[u8; 16]> = truth.keys().copied().collect();
     ids.sort_unstable();
@@ -580,8 +580,8 @@ fn oracle_real_wal_self_consistency() {
     );
 }
 
-/// Round-trip oracle for the lossless fields (events, links,
-/// trace_state, status.message, dropped counts): OTLP → WAL frame → seal →
+/// Round-trip oracle for the lossless fields (events, links, trace_state,
+/// status.message, dropped counts): OTLP → WAL frame → indexing →
 /// `trace_by_id` returns every field, with per-event grouping/order intact,
 /// while the flat `events.`/`links.` search tokens stay out of the span's
 /// facet list (they are represented structurally).
@@ -661,8 +661,9 @@ fn events_links_and_deferred_scalars_round_trip() {
     // it flattens under `attributes.events.name`, so the reader's `events.`
     // facet filter must NOT drop it.
     root.attributes.push(kv("events.name", "decoy"));
-    // A second span, chronologically EARLIER but ingested after: the seal's
-    // time remap reorders rows, and each span's events must stay its own.
+    // A second span, chronologically EARLIER but ingested after: the
+    // writer's time remap reorders rows, and each span's events must stay
+    // its own.
     let mut early = span(trace, [2; 8], [1; 8], 1_000, 1_400, "child");
     early.events = vec![Event {
         time_unix_nano: 1_100,
@@ -815,10 +816,10 @@ fn dropped_count_alone_preserves_the_chunk() {
     assert_eq!(tr.spans[0].dropped_events_count, 9);
 }
 
-/// The trace-id bloom (`TBLM`): the traces seal writes it, membership answers
-/// have no false negatives, and an absent id resolves to an empty trace
-/// through the bloom pre-check (same observable result as an exact lookup,
-/// cheaper path).
+/// The trace-id bloom (`TBLM`): indexing the traces WAL writes it,
+/// membership answers have no false negatives, and an absent id resolves to
+/// an empty trace through the bloom pre-check (same observable result as an
+/// exact lookup, cheaper path).
 #[test]
 fn seal_writes_trace_id_bloom() {
     let traces: Vec<[u8; 16]> = (1..=40u8).map(|i| [i; 16]).collect();
@@ -899,7 +900,7 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
     assert_eq!(tr.spans.len(), 2, "assembly still dedups the resend");
 }
 
-/// The seal writes the rollup's per-row stats beside it: stored spans
+/// Indexing writes the rollup's per-row stats beside it: stored spans
 /// and errors per resource service (resends count; a resource without
 /// `service.name` is the sentinel entry), and the max and root starts
 /// as offsets from the row's first start.

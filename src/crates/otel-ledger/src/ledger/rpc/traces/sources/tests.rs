@@ -9,8 +9,8 @@
 //! files are tracked in the registry WITHOUT bytes on disk — capture
 //! never opens sealed files, so registry summaries pass through and
 //! the engine opens files later — while WAL tests write REAL trace
-//! WALs (OTLP → ng-flatten trace frames) so chunk builds run the
-//! actual traces seal.
+//! WALs (OTLP → ng-flatten trace frames) so chunk indexing runs the
+//! actual traces indexing.
 //!
 //! Not pinned here: the wire layer above (`handler/tests.rs`,
 //! `remote_tests.rs`), the `EvictionFailed`/`Planning` capture errors,
@@ -206,7 +206,7 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     let TraceSource::Sfst(chunk) = &sources[0] else {
         panic!("first source must be the built chunk");
     };
-    // The chunk was built through the traces seal: its summary counts
+    // The chunk went through the traces indexing: its summary counts
     // the 6 spans of frames 0+1, and the bytes are servable in-memory.
     assert_eq!(chunk.summary.record_count, 6);
     assert!(matches!(&chunk.source, sfsq::Source::Memory(_)));
@@ -576,7 +576,7 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
             .await;
     }
     // A local WAL the capture would have chunked, so the probe below
-    // can prove no chunk was built.
+    // can prove no chunk was indexed.
     install_wal(
         &registries,
         "default",
@@ -615,7 +615,7 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
     );
     // An erring init makes the probe succeed only if a chunk image was
     // already cached under (seq, index): the error proves nothing was
-    // built.
+    // indexed.
     let probe = supplier
         .chunk_cache
         .get_or_build(test_file_id(9).seq, 0, async {

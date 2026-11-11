@@ -8,8 +8,8 @@
 //!
 //! Every fixture is synthetic SFST bytes written in memory by the
 //! production [`ChunkWriter`] — no on-disk fixtures; the small
-//! hand-built layouts pin KvId assignment, tier placement, and bucket
-//! arithmetic exactly.
+//! hand-written layouts pin KvId assignment, tier placement, and
+//! bucket arithmetic exactly.
 
 use crate::writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
 use crate::*;
@@ -758,7 +758,7 @@ fn timeline_absent_field_routes_all_logs_to_unset() {
 }
 
 /// Fixture with a value dense enough to be stored *complemented* (inverted
-/// treight bitmap), mirroring what the index builder's `remap_one_bitmap`
+/// treight bitmap), mirroring what the writer's `remap_one_bitmap`
 /// (`src/build.rs`) does for dense values. 6 logs:
 ///
 /// `lvl` (low-card): `hi` at positions 0..=4 (5/6 → stored as the

@@ -1,6 +1,6 @@
 //! SFST's one error type: the container/format read-write layer
 //! ([`ChunkWriter`](crate::ChunkWriter), [`ChunkReader`](crate::ChunkReader)),
-//! the index build ([`IndexWriter`](crate::IndexWriter)), and the query/trace
+//! the index writer ([`IndexWriter`](crate::IndexWriter)), and the query/trace
 //! APIs on [`IndexReader`](crate::IndexReader). Three variants are lifted
 //! implicitly — `Io` and the two bincode wrappers ride `#[from]` on `?` —
 //! every other variant is raised by name at the sites its doc comment lists
@@ -10,9 +10,10 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// Underlying I/O failed — file open/read/seek, chunk and TOC writes,
-    /// flush/fsync — lifted through the derived `#[from]`; the index build
-    /// re-wraps `Io` with an op + temp-path annotation before it escapes
-    /// (the `annotate_io` closure in `build.rs` `build_and_write`).
+    /// flush/fsync — lifted through the derived `#[from]`; the index
+    /// writer re-wraps `Io` with an op + temp-path annotation before
+    /// it escapes (the `annotate_io` closure in `build.rs`
+    /// `build_and_write`).
     /// Transparent: `Display` and `source()` delegate to
     /// the wrapped error, so embedding it in a message too would print it
     /// twice in anyhow chains.
@@ -88,7 +89,7 @@ pub enum Error {
     #[error("invalid stream-batch count: {0} (expected 1..=8)")]
     InvalidStreamBatchCount(u8),
 
-    /// A per-row column handed to the index build has a length other than
+    /// A per-row column handed to the index writer has a length other than
     /// the row count, so it cannot be aligned per row (`check_column_len`
     /// in `build.rs`; the event/link structures are checked the same way).
     /// A caller bug (each column must hold exactly one value per row);

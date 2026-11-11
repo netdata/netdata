@@ -5,12 +5,12 @@
 //! workers (cleaner, uploader), the shared chunk cache and upload-retry
 //! queue, the function-response funnel, and the `select!` run-loop that
 //! dispatches every event. Per-signal state — tenant registries, lifecycle
-//! config, the seal/index and catalog-builder workers, and the query
+//! config, the indexer and catalog-builder workers, and the query
 //! handler — lives in a [`Pipeline`] per signal (today logs + traces); the
 //! wire `pipeline_id` is decoded to a `Signal` at each boundary, after
 //! which routing is total. Adding a signal means adding a `Pipeline` (and
 //! widening `PerSignal`), not reworking the shell. One exception: the
-//! traces chunk prebuilder (`traces_prebuilder`) is traces-only state on
+//! traces chunk indexer (`traces_prebuilder`) is traces-only state on
 //! the shell; it shares the traces WAL prefixes with the traces pipeline,
 //! and the ingestor and indexer handlers reach it by matching
 //! `Signal::Traces`.
@@ -125,8 +125,8 @@ pub struct Ledger {
     /// global byte budget), keyed by `(seq, chunk index)`. A WAL's chunks are
     /// dropped when its authoritative SFST registers (or the WAL proves empty).
     chunk_cache: Arc<ChunkCache>,
-    /// Builds the traces WALs' chunks as the writer syncs, so traces
-    /// queries rarely build one; fed each traces `Synced` event, told to
+    /// Indexes the traces WALs' chunks as the writer syncs, so traces
+    /// queries rarely index one; fed each traces `Synced` event, told to
     /// forget a WAL when its chunks drop.
     traces_prebuilder: prebuild::ChunkPrebuilder,
     /// Per-signal frame-sequence gap-check. The single writer process feeds every
@@ -286,8 +286,8 @@ impl Ledger {
         let chunk_cache = Arc::new(ChunkCache::new(CHUNK_CACHE_BYTES));
 
         // Traces chunk boundaries, kept current across queries, and the
-        // prebuilder that builds new chunks as the writer syncs (traces
-        // only: logs have no per-keystroke query path, and prebuilding
+        // chunk indexer that indexes new chunks as the writer syncs (traces
+        // only: logs have no per-keystroke query path, and indexing ahead
         // chunks nobody queries spends CPU and the shared cache).
         let traces_prefixes = Arc::new(wal_prefix::WalPrefixes::new(
             traces_pipeline::TRACES_CHUNK_MIN_ENTRIES,
@@ -329,7 +329,7 @@ impl Ledger {
         // The traces pipeline: shares the same cleaner/uploader/storage, the
         // download cache and the chunk cache (seqs are process-global, so
         // cache keys never collide across signals) but has its own
-        // `{base}/traces/...` dirs, the traces seal
+        // `{base}/traces/...` dirs, traces indexing
         // (`ng_index::build_sfst_traces_file`), and the `otel-traces`
         // Function handler.
         let traces = traces_pipeline::build_traces_pipeline(

@@ -14,7 +14,7 @@
 //!
 //! Both tiers match by partition key — the SFST `Query` carries the stream's
 //! key, and the WAL is matched on its `FileId.partition_key` — mirroring the
-//! live planner. Dedup mirrors it too: a WAL whose sequence is already sealed
+//! live planner. Dedup mirrors it too: a WAL whose sequence is already indexed
 //! into an SFST is skipped (SFST wins), but the dedup set is built from the
 //! *windowed* SFST candidates, so an SFST entirely outside the query window is
 //! not added and its WAL twin is scanned as a tail. Results stay correct — the
@@ -99,7 +99,7 @@ pub fn discover(
             // results are unaffected — the engine re-sorts rows by cursor.
             files.sort_by_key(|(id, _)| id.seq);
             for (id, meta) in files {
-                // SFST wins over WAL for the same sequence (already sealed).
+                // SFST wins over WAL for the same sequence (already indexed).
                 if sfst_seqs.contains(&id.seq) {
                     continue;
                 }

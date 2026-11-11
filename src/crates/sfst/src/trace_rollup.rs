@@ -26,16 +26,15 @@
 //!
 //! ng-index's span walk (`src/crates/ng-index/src/sfst_build.rs`) folds
 //! every stored span into [`TraceRollupRows`] — the `EventRows`
-//! pattern: build-side interner [`KvSlot`]s, translated to file
-//! [`KvId`]s at seal (`build.rs`), rows emitted sorted by trace id
-//! after the span structures. `writer.rs` packs the additive,
+//! pattern: write-side interner [`KvSlot`]s, translated to file
+//! [`KvId`]s at write time (`build.rs`), rows emitted sorted by trace
+//! id after the span structures. `writer.rs` packs the additive,
 //! TOC-indexed chunk (like `TIDX`/`EVNB`; no format version bump — a
 //! reader that predates `TRSU` never looks the id up). `reader.rs`
 //! decodes the chunk and rejects a file whose `TRCE` column is missing,
 //! so a missing rollup row can never prove "trace absent". Consumers:
-//! sfsq's traces fold and root gate (`src/crates/sfsq/src/traces/`)
-//! and the per-file root-ref resolver
-//! (`index_reader/rollup_resolver.rs`).
+//! sfsq's traces fold and root gate (`src/crates/sfsq/src/traces/`) and
+//! the per-file root-ref resolver (`index_reader/rollup_resolver.rs`).
 
 use std::collections::HashMap;
 
@@ -388,13 +387,13 @@ struct Acc {
     /// The earliest unset-parent span seen so far, when any.
     root: Option<Root>,
     /// The incumbent took a full tie against a root candidate with
-    /// different recorded facets: the seal abstains from claiming a
-    /// root. Cleared when a strictly earlier candidate installs.
+    /// different recorded facets: the writer abstains from claiming
+    /// a root. Cleared when a strictly earlier candidate installs.
     root_ambiguous: bool,
 }
 
 /// A root candidate: what the rollup keeps about the span that would be
-/// the trace's root (`service`/`name` are build-side interner slots).
+/// the trace's root (`service`/`name` are write-side interner slots).
 #[derive(Debug, Clone)]
 struct Root {
     start_ns: i64,
@@ -404,9 +403,9 @@ struct Root {
     name: Option<KvSlot>,
 }
 
-/// Insertion-order accumulator for [`TraceRollup`]. The indexer's span
+/// Insertion-order accumulator for [`TraceRollup`]. ng-index's span
 /// walk (`ng-index/src/sfst_build.rs`) calls
-/// [`record_span`](Self::record_span) once per stored span; the seal
+/// [`record_span`](Self::record_span) once per stored span; the writer
 /// calls `sealed`, translating interner [`KvSlot`]s to
 /// file [`KvId`]s and emitting rows sorted by trace id.
 #[derive(Debug, Clone, Default)]
@@ -475,8 +474,8 @@ impl TraceRollupRows {
         // FULL (start_ns, span_id) tie the combiner keeps tie-breaking
         // through keys (kind, content) this recorder does not model, so
         // a challenger with different recorded facets (kind, service,
-        // name) marks the claim AMBIGUOUS and the seal emits no root —
-        // honest-or-absent, storage-order independent, never a wrong
+        // name) marks the claim AMBIGUOUS and the writer emits no root
+        // — honest-or-absent, storage-order independent, never a wrong
         // claim a pruning consumer could act on. Identical-facet ties
         // (plain resends) keep the claim; a strictly earlier span
         // installs a fresh unambiguous incumbent.
@@ -513,10 +512,10 @@ impl TraceRollupRows {
         !self.map.is_empty()
     }
 
-    /// Seal the accumulator into the stored form: translate root-ref
-    /// slots to file KvIds through the build's shared `kv_to_file` table
-    /// (so refs point at exactly the ids the rows carry) and emit rows
-    /// sorted by trace id.
+    /// Convert the accumulator into the stored form: translate root-ref
+    /// slots to file KvIds through the writer's shared `kv_to_file`
+    /// table (so refs point at exactly the ids the rows carry) and emit
+    /// rows sorted by trace id.
     #[cfg(test)]
     pub(crate) fn sealed(&self, kv_to_file: &[KvId]) -> TraceRollup {
         self.sealed_with_stats(kv_to_file).0

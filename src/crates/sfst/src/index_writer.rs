@@ -1,10 +1,10 @@
 //! The high-level SFST writer — the write-side counterpart of
 //! [`IndexReader`](crate::IndexReader). A thin facade: both entry points
-//! delegate to the Phase-2 builder in `build.rs` (this file is its only
+//! delegate to the Phase-2 writer in `build.rs` (this file is its only
 //! consumer; the format pipeline is documented there, down to the
 //! low-level container writer in `writer.rs`). Production callers:
-//! `ng-index/src/sfst_build.rs` — seal-time file builds and in-memory
-//! range builds over active WALs — plus this crate's own tests.
+//! `ng-index/src/sfst_build.rs` — indexing of closed WAL files and chunk
+//! indexing over active ones — plus this crate's own tests.
 
 use std::io::{Seek, Write};
 use std::path::Path;
@@ -18,7 +18,7 @@ use crate::{Error, Metadata, Summary, build};
 /// timestamps, optional per-row columns — see `row_index.rs`) and hands
 /// it to [`write_file`](Self::write_file) (durable file) or
 /// [`write_into`](Self::write_into) (any `Write + Seek` sink). The writer
-/// owns the whole Phase-2 build — time-sorting, FST construction, chunk
+/// owns the whole of Phase 2 — time-sorting, FST construction, chunk
 /// packing, the canonical chunk order — all driven by the cardinality
 /// tiers the [`RowIndex`] already carries; callers never touch chunk
 /// mechanics.
@@ -28,7 +28,7 @@ use crate::{Error, Metadata, Summary, build};
 pub struct IndexWriter;
 
 impl IndexWriter {
-    /// Build and durably write an SFST file at `out_path`: stream the
+    /// Durably write an SFST file at `out_path`: stream the
     /// chunks to `<out_path>.tmp`, then fsync → rename → parent-dir fsync
     /// (`file_registry::durable::AtomicFile`). Any failure or crash reaps
     /// the temp, so `out_path` never holds a partial file.
@@ -47,7 +47,7 @@ impl IndexWriter {
 
     /// Stream an SFST into `sink` (positioned at offset 0), returning the
     /// sink plus the [`Summary`] / [`Metadata`] the file carries — the
-    /// in-memory builds feed a `Cursor` and open the resulting bytes with
+    /// in-memory writes feed a `Cursor` and open the resulting bytes with
     /// [`IndexReader::open`](crate::IndexReader::open). Beyond the
     /// [`RowIndex`] itself, the stream-batch stage materialises every
     /// row's translated id list before writing the batch chunks; the

@@ -1,8 +1,8 @@
 //! Tests for sfst's per-directory [`Registry`] (registry.rs): recovery of
 //! tracked state from disk, the `track()` rotation path, and the pure
 //! `candidates()` query filter. Every fixture is a real on-disk `.sfst` in
-//! a tempdir, built with the buffer-all `FixtureWriter` (PRIM + TIMS + one
-//! stream batch + SUMR, no META — recovery reads header, TOC, and SUMR
+//! a tempdir, written with the buffer-all `FixtureWriter` (PRIM + TIMS +
+//! one stream batch + SUMR, no META — recovery reads header, TOC, and SUMR
 //! only, so that's enough).
 //!
 //! Pins:
@@ -39,7 +39,7 @@ use crate::writer::pack;
 /// recovery reads only header + TOC + SUMR.
 fn write_sfst_with_summary(dir: &Path, id: FileId, summary: &Summary) {
     let primary: PrefixMap<u64> = PrefixMap::build([("k", 1u64)]).unwrap();
-    // The buffer-all fixture builder permits a missing META chunk, and
+    // The buffer-all fixture writer permits a missing META chunk, and
     // recovery's read touches only header + TOC + SUMR — a META-less
     // file exercises the SUMR round-trip just fine.
     let mut writer = FixtureWriter::new();

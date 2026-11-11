@@ -5,9 +5,9 @@
 //! here and appends the bincode frame to a WAL — `otel-ingestor` (the production
 //! receiver) and `ng-ingest` (a standalone receiver), both via
 //! [`prepare_log_frame`]/[`prepare_trace_frame`]. Downstream, `ng-index` merges
-//! the per-frame trees into one global tree ([`Flattener::merge_tree`]) and seals
-//! it into an SFST index; `sfsq` scans frames straight off the WAL tail for live
-//! queries.
+//! the per-frame trees into one global tree ([`Flattener::merge_tree`]) and
+//! writes it into an SFST index; `sfsq` scans frames straight off the WAL tail
+//! for live queries.
 //!
 //! # Modules
 //!
@@ -1416,8 +1416,8 @@ mod tests {
     fn flatten_populates_and_dedups_entry_hashes() {
         // Two spans share `http.method=GET`; a resource attr is present too. At
         // flatten time, every entry (resource/scope/span) must carry its hash,
-        // identical key=value must hash the same (enables the seal fast path), and
-        // distinct key=value must differ.
+        // identical key=value must hash the same (enables the indexing fast
+        // path), and distinct key=value must differ.
         let span = |name: &str| Span {
             name: name.into(),
             attributes: vec![kv("http.method", Av::StringValue("GET".into()))],

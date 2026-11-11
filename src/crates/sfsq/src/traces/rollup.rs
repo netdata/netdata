@@ -8,17 +8,17 @@
 //!   [`sealed_trace_envelopes`].
 //! - **WAL tails** have no rollup; [`tail_trace_aggregates`] folds the
 //!   scan's decoded spans directly, with the SAME pinned semantics the
-//!   seal accumulator applies:
+//!   indexing accumulator applies:
 //!   - stored-row counts (a resent span counts every time it is stored;
 //!     canonical dedup belongs to assembly),
 //!   - the all-zero UNSET trace id excluded,
 //!   - envelope end saturating.
 //!
 //! Parity contract (test-pinned, `tests/traces_rollup_tail.rs`):
-//! folding a tail equals reading the `TRSU` of sealing the same data,
-//! and a tail's [`TracePart`]s equal the `TRSU` + `TRSS` rows of
-//! sealing it ([`sealed_trace_part`]), root claims and per-service
-//! counts included.
+//! folding a tail equals reading the `TRSU` of indexing the same
+//! data, and a tail's [`TracePart`]s equal the `TRSU` + `TRSS` rows
+//! of indexing it ([`sealed_trace_part`]), root claims and
+//! per-service counts included.
 
 use std::collections::HashMap;
 
@@ -43,7 +43,7 @@ pub struct TraceAggregate {
 /// trace id (the sealed rows' order).
 pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
     // Storage name via the vocabulary — never hand-built (the same
-    // spelling the seal-side capture and `summarize` use).
+    // spelling the write-side capture and `summarize` use).
     let status_field = BuiltinField::Status
         .dictionary_field()
         .expect("Status is dictionary-backed");
@@ -70,7 +70,7 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
         acc.min_start_ns = acc.min_start_ns.min(span.start_ns);
         acc.max_end_ns = acc.max_end_ns.max(end_ns);
         // Counts clamp at u32::MAX — the TRSU count columns' width,
-        // where the seal saturates too — so the parity contract holds
+        // where indexing saturates too — so the parity contract holds
         // even at the (astronomical) saturation point.
         acc.span_count = (acc.span_count + 1).min(u64::from(u32::MAX));
         if span_field(span, status_field) == Some("ERROR") {
@@ -92,10 +92,10 @@ pub fn tail_trace_aggregates(scan: &TraceWalScan) -> Vec<TraceAggregate> {
     out
 }
 
-/// One source's root claim for a trace, under the seal's rollup rules
-/// (`sfst::TraceRollupRows::record_span`): the earliest unset-parent
-/// span by `(start, span id)`; a full tie whose spans differ in kind,
-/// service or name withholds the claim.
+/// One source's root claim for a trace, under the indexing rollup
+/// rules (`sfst::TraceRollupRows::record_span`): the earliest
+/// unset-parent span by `(start, span id)`; a full tie whose spans
+/// differ in kind, service or name withholds the claim.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootClaim {
     /// No unset-parent span of the trace in this source.
@@ -123,7 +123,7 @@ pub struct TracePart {
     pub services: Vec<(Option<String>, u64, u64)>,
 }
 
-/// The running root pick of one trace in one source (the seal's rule).
+/// The running root pick of one trace in one source (the indexing rule).
 pub(crate) struct RootPick<'s> {
     start_ns: i64,
     span_id: sfst::SpanId,
@@ -196,7 +196,7 @@ fn sort_services(services: &mut [(Option<String>, u64, u64)]) {
 }
 
 /// Fold a WAL tail's decoded spans into per-trace parts, sorted by trace
-/// id (the sealed rows' order), under the seal's rules.
+/// id (the sealed rows' order), under the indexing rules.
 pub fn tail_trace_parts(scan: &TraceWalScan) -> Vec<TracePart> {
     let status_field = BuiltinField::Status
         .dictionary_field()

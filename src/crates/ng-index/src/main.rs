@@ -1,7 +1,7 @@
-//! `ng-index`: build a standard SFST index file from the flattened-frame WAL that
-//! `ng-ingest` writes, then smoke-test the result. This is the standalone
+//! `ng-index`: index the flattened-frame WAL that `ng-ingest` writes into a
+//! standard SFST index file, then smoke-test the result. This is the standalone
 //! logs-side CLI; the traces analog is `ng-index-traces` (`src/bin/traces.rs`),
-//! while the production seal path is the library's `build_sfst_file`, which
+//! while the production indexing path is the library's `build_sfst_file`, which
 //! `otel-ledger`'s indexer calls directly.
 //!
 //! ```text
@@ -30,7 +30,7 @@ use sfst::IndexReader;
 )]
 struct Args {
     /// Directory holding the flattened WAL written by `ng-ingest`. Must contain
-    /// exactly one `.wal` file (the build errors otherwise).
+    /// exactly one `.wal` file (indexing errors otherwise).
     #[arg(long)]
     flat: PathBuf,
 
@@ -46,7 +46,7 @@ fn main() -> ExitCode {
     run_sfst(&args, &out, &metrics)
 }
 
-/// Build the SFST index at `out_path` from the WAL in `args.flat`, print the run
+/// Index the WAL in `args.flat` into the SFST file at `out_path`, print the run
 /// report, then smoke-test the output: re-open the file and print its record count
 /// and collapsed-array (`[]`) field names. A successful re-open is the only
 /// automated check — the counts are printed for eyeballing, nothing is asserted.

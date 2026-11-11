@@ -263,9 +263,9 @@ pub fn whole_range(wal_path: &Path) -> wal::FrameRange {
     wal::FrameRange::new(wal::HEADER_SIZE as u64, len)
 }
 
-/// Seal `wal_path` into `<id>.sfst` under `dir` with the production
-/// sealer (`ng_index::build_sfst_traces_file`) and return the sealed
-/// source over it — the standard "a sealed file" fixture.
+/// Index `wal_path` into `<id>.sfst` under `dir` with the production
+/// indexing function (`ng_index::build_sfst_traces_file`) and return
+/// the sealed source over it — the standard "a sealed file" fixture.
 pub fn sealed_source(dir: &Path, wal_path: &Path, id: &str) -> TraceSource {
     let out = dir.join(format!("{id}.sfst"));
     ng_index::build_sfst_traces_file(wal_path, &out, &ng_index::Metrics::new()).unwrap();
@@ -274,7 +274,8 @@ pub fn sealed_source(dir: &Path, wal_path: &Path, id: &str) -> TraceSource {
 
 /// Make chunk `id` ABSENT from a sealed SFST by renaming its TOC entry
 /// to an id no reader asks for — the "older file without this chunk"
-/// shape, built from a real modern seal (payload bytes untouched).
+/// shape, made from a real modern indexed file (payload bytes
+/// untouched).
 pub fn hide_chunk(path: &Path, id: [u8; 4]) {
     let mut bytes = std::fs::read(path).unwrap();
     let num_chunks = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
@@ -309,9 +310,9 @@ pub fn corrupt_chunk(path: &Path, id: [u8; 4]) {
 }
 
 /// A sealed-file source over an ALREADY-WRITTEN `.sfst` — for suites
-/// that doctor the sealed bytes (chunk corruption) and must not
-/// re-seal over their surgery when building the source vectors. Pattern:
-/// seal once, corrupt in place, then source the doctored file.
+/// that doctor the sealed bytes (chunk corruption) and must not re-index
+/// over their surgery when building the source vectors. Pattern: index
+/// once, corrupt in place, then source the doctored file.
 pub fn sealed_source_at(path: &Path, id: &str) -> TraceSource {
     let bytes = std::fs::read(path).unwrap();
     let summary = sfst::read_summary(&bytes).unwrap();

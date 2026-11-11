@@ -5,11 +5,11 @@
 //! from the start on every request repeats work: boundaries are
 //! append-only, so [`WalPrefixes`] keeps one [`wal::prefix::ChunkFold`]
 //! per WAL and scans only the frames written since the last call. Both
-//! the request path and the chunk prebuilder (`super::prebuild`) read it.
+//! the request path and the chunk indexer (`super::prebuild`) read it.
 //!
-//! [`build_chunk`] is the one chunk build both of them hand to the shared
-//! `ChunkCache`, so a request and the prebuilder racing for one chunk
-//! join the same singleflight build.
+//! [`build_chunk`] is the one chunk indexing both of them hand to the
+//! shared `ChunkCache`, so a request and the chunk indexer racing for one
+//! chunk join the same singleflight indexing.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -18,8 +18,8 @@ use std::sync::Arc;
 use file_lifecycle::chunk::BuiltChunk;
 use wal::prefix::{ChunkBoundary, ChunkFold};
 
-/// Seals one WAL byte range into an SFST image (the signal's range seal,
-/// e.g. `ng_index::build_sfst_traces_range`).
+/// Indexes one WAL byte range into an SFST image (the signal's range
+/// indexing function, e.g. `ng_index::build_sfst_traces_range`).
 pub(crate) type ChunkSealFn =
     fn(&Path, wal::FrameRange) -> Result<(sfst::Summary, Vec<u8>), ng_index::Error>;
 
@@ -95,8 +95,8 @@ impl WalPrefixes {
     }
 }
 
-/// Build `chunk` of the WAL at `path` with `seal` on a blocking thread,
-/// cross-checking the sealed record count against the scan's.
+/// Index `chunk` of the WAL at `path` with `seal` on a blocking thread,
+/// cross-checking the indexed record count against the scan's.
 pub(crate) async fn build_chunk(
     seal: ChunkSealFn,
     path: PathBuf,

@@ -1,5 +1,5 @@
 //! The query-time chunk cache for the OTel storage stack: memoized
-//! per-chunk SFST builds over active WAL files.
+//! chunk indexing over active WAL files.
 //!
 //! A query that needs a WAL not yet superseded by its sealed SFST — still
 //! being written, or sealed but not yet indexed — is served from its
@@ -8,16 +8,16 @@
 //! pure framing math in [`wal::prefix`]: `chunk_boundaries` folds a
 //! frame-boundary scan over `[HEADER_SIZE, valid_up_to)` (the durable
 //! read bound, whose soundness rules live in `wal::reader`) into chunk
-//! windows, and each window is built into an SFST with
-//! `ng_index::build_sfst_range` / `build_sfst_traces_range`, the built
+//! windows, and each window is indexed into an SFST with
+//! `ng_index::build_sfst_range` / `build_sfst_traces_range`, the indexed
 //! record count cross-checked against the scan's `entry_count`. This
 //! module owns the memoization:
 //!
-//! - [`ChunkCache`] — a process-wide memo of built chunks
+//! - [`ChunkCache`] — a process-wide memo of indexed chunks
 //!   ([`BuiltChunk`]: the SFST byte image and its summary), keyed
-//!   `(wal_seq, chunk_index)`, with build singleflight and
+//!   `(wal_seq, chunk_index)`, with indexing singleflight and
 //!   a byte-budget LRU (both from `moka`). Concurrent queries that need
-//!   the same chunk build it once; a chunk, once built, is reused until
+//!   the same chunk index it once; a chunk, once indexed, is reused until
 //!   the WAL rotates ([`ChunkCache::drop_seq`]) or the budget evicts it.
 //!   The write-once memo is sound because chunk boundaries are
 //!   append-only and immutable (see [`wal::prefix`]): a longer durable
@@ -27,7 +27,7 @@
 //! The per-query orchestration that uses these — capturing the
 //! durable-prefix snapshot under the registry lock
 //! (`registry::TenantRegistries::query_snapshot`, where an SFST wins over
-//! the WAL of the same seq), building the missing chunks off the lock,
+//! the WAL of the same seq), indexing the missing chunks off the lock,
 //! and handing the chunk images + tail range to the query engine — is
 //! otel-ledger's query wiring, not here.
 //!
@@ -50,41 +50,41 @@ use std::sync::Mutex;
 
 use moka::future::Cache;
 
-/// One built chunk: the self-contained SFST byte image and the summary
-/// its builder produced. Keeping the summary beside the bytes spares a
-/// query re-opening the image just to read it back.
+/// One indexed chunk: the self-contained SFST byte image and the
+/// summary its indexing produced. Keeping the summary beside the bytes
+/// spares a query re-opening the image just to read it back.
 pub struct BuiltChunk {
     pub summary: sfst::Summary,
     pub bytes: Arc<Vec<u8>>,
 }
 
-/// A process-wide memo of built chunks, keyed `(wal_seq, chunk_index)` —
-/// see `ChunkKey`.
+/// A process-wide memo of indexed chunks, keyed
+/// `(wal_seq, chunk_index)` — see `ChunkKey`.
 ///
 /// Values are [`BuiltChunk`]s; their bytes are an SFST parseable by
 /// [`sfst::IndexReader::open`]. The cache validates nothing itself; the
-/// guarantee a hit makes is the builder's. Production builders
-/// (otel-ledger's query handlers, on a blocking thread) build the chunk
+/// guarantee a hit makes is the caller's. Production callers
+/// (otel-ledger's query handlers, on a blocking thread) index the chunk
 /// window and cross-check its record count, so a hit serves an SFST
 /// holding exactly that chunk's records.
 ///
-/// The cache owns build singleflight (one build per key under contention)
-/// and a byte-budget LRU; it does **not** know how to build a chunk — the
-/// caller passes the build future, so the same cache serves production
-/// and tests (a canned builder). Shared as one `Arc` across every
-/// pipeline's query handlers and the indexer-response path (see the
-/// module consumers).
+/// The cache owns indexing singleflight (one indexing per key under
+/// contention) and a byte-budget LRU; it does **not** know how to index
+/// a chunk — the caller passes the indexing future, so the same cache
+/// serves production and tests (a canned future). Shared as one `Arc`
+/// across every pipeline's query handlers and the indexer-response path
+/// (see the module consumers).
 pub struct ChunkCache {
     cache: Cache<ChunkKey, Arc<BuiltChunk>>,
-    /// `wal_seq -> number of chunk indices ever built for it`, so
+    /// `wal_seq -> number of chunk indices ever indexed for it`, so
     /// [`drop_seq`](Self::drop_seq) can invalidate each key by hand
     /// (per-key `invalidate` is immediately consistent; moka's
     /// predicate-based bulk invalidation is not).
     ///
     /// May **overcount** relative to moka's live contents — moka can
     /// evict a chunk under byte pressure that this still tracks — but
-    /// never undercounts: every successful build is recorded. Overcount
-    /// is benign: [`drop_seq`](Self::drop_seq) invalidating an
+    /// never undercounts: every chunk indexed successfully is recorded.
+    /// Overcount is benign: [`drop_seq`](Self::drop_seq) invalidating an
     /// already-evicted key is a no-op. Entries are removed only by
     /// `drop_seq`; a `wal_seq` that rotates without one (every rotation
     /// path in the indexer-response handler calls it) leaks a single
@@ -106,9 +106,9 @@ impl ChunkCache {
     /// Create a cache bounded to roughly `max_bytes` of chunk images
     /// (LRU eviction by serialized size). Eviction is safe at any time:
     /// a chunk is a pure function of immutable WAL bytes, so an evicted
-    /// chunk simply rebuilds on its next request.
+    /// chunk is simply re-indexed on its next request.
     pub fn new(max_bytes: u64) -> Self {
-        // A budget below one chunk would thrash (rebuild every query).
+        // A budget below one chunk would thrash (re-index every query).
         // The caller sizes the budget (otel-ledger's `CHUNK_CACHE_BYTES`
         // today); guard the obviously-broken zero.
         debug_assert!(max_bytes > 0, "ChunkCache budget must be positive");
@@ -124,12 +124,12 @@ impl ChunkCache {
         }
     }
 
-    /// Return chunk `(wal_seq, chunk_index)`, building it with
+    /// Return chunk `(wal_seq, chunk_index)`, indexing it with
     /// `init` only if absent; on a hit `init` never runs. Under
     /// contention for the same key exactly one `init` runs and the rest
-    /// await its result (moka's `try_get_with` singleflight). A build
-    /// error is **not** cached — a later request retries — and is
-    /// returned as `Arc<E>` because moka shares one error across all
+    /// await its result (moka's `try_get_with` singleflight). An
+    /// indexing error is **not** cached — a later request retries — and
+    /// is returned as `Arc<E>` because moka shares one error across all
     /// waiters; that sharing is also why moka requires the
     /// `Send + Sync + 'static` bound on `E`.
     pub async fn get_or_build<E>(
@@ -151,16 +151,16 @@ impl ChunkCache {
         //
         // RACE: a query that began before rotation can resolve its
         // try_get_with after drop_seq(wal_seq) already ran, re-inserting
-        // the seq here. Benign: the chunk is built from immutable WAL
+        // the seq here. Benign: the chunk is indexed from immutable WAL
         // bytes, and the indexer sends the WAL delete to the cleaner only
-        // after drop_seq, so the racing build normally still finds the
-        // file; if the deletion wins, the build fails and the failure is
-        // not cached. The re-acquired `built` entry is bounded to one per
-        // affected rotation (LRU reclaims the chunk memory; no further
-        // drop_seq occurs for a rotated seq). In steady state the window
-        // is unreached: the sealed SFST is registered before the WAL is
-        // deleted, so later queries resolve the seq to the SFST and never
-        // request its chunks.
+        // after drop_seq, so the racing indexing normally still finds
+        // the file; if the deletion wins, the indexing fails and the
+        // failure is not cached. The re-acquired `built` entry is bounded
+        // to one per affected rotation (LRU reclaims the chunk memory; no
+        // further drop_seq occurs for a rotated seq). In steady state the
+        // window is unreached: the sealed SFST is registered before the
+        // WAL is deleted, so later queries resolve the seq to the SFST
+        // and never request its chunks.
         {
             let mut built = self.built.lock().unwrap();
             let n = built.entry(wal_seq).or_insert(0);

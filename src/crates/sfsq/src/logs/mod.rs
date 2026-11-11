@@ -7,8 +7,8 @@
 //! One query semantics for two source kinds, handed over as one mixed
 //! list ([`LogSource`]) the engine never pre-buckets:
 //! - [`SfstCandidate`] — an indexed source: a sealed on-disk SFST, or
-//!   an in-memory SFST built from a chunk of an active WAL's durable
-//!   prefix; evaluated through the SFST engine.
+//!   an in-memory SFST indexed from a chunk of an active WAL's
+//!   durable prefix; evaluated through the SFST engine.
 //! - [`WalTail`] — an active WAL's most-recent records, not yet in any
 //!   SFST; evaluated by a bounded row scan ([`WalScan`]) instead of an
 //!   index.

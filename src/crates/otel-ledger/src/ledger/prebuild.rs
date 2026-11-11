@@ -1,25 +1,26 @@
-//! Builds active WALs' chunks as the writer syncs, off the query path.
+//! The chunk indexer: indexes active WALs' chunks as the writer syncs,
+//! off the query path.
 //!
 //! Without it, the first query after a WAL crosses a chunk boundary
-//! builds that chunk while the user waits. The ledger feeds every
+//! indexes that chunk while the user waits. The ledger feeds every
 //! `Synced` event of the signal to [`ChunkPrebuilder::synced`]; the task
-//! extends the WAL's boundaries ([`WalPrefixes`]) and builds each new
-//! chunk through the shared `ChunkCache`, one build at a time. A query
-//! that needs a chunk the task is building joins that build (the cache's
+//! extends the WAL's boundaries ([`WalPrefixes`]) and indexes each new
+//! chunk through the shared `ChunkCache`, one chunk at a time. A query
+//! that needs a chunk the task is indexing joins that work (the cache's
 //! singleflight) instead of starting another.
 //!
-//! Each chunk is built once: the task remembers the next index per WAL,
-//! so later syncs neither rebuild a chunk the cache evicted (a query
-//! builds it on demand) nor refresh the recency of chunks nobody reads.
-//! When a WAL's chunks drop (its seal registered),
+//! Each chunk is indexed once: the task remembers the next index per WAL,
+//! so later syncs neither re-index a chunk the cache evicted (a query
+//! indexes it on demand) nor refresh the recency of chunks nobody reads.
+//! When a WAL's chunks drop (its indexed file registered),
 //! [`ChunkPrebuilder::forget`] queues behind any `Synced` already sent,
-//! then drops the WAL's boundaries and cached chunks again, so a build
-//! that raced the seal leaves nothing behind.
+//! then drops the WAL's boundaries and cached chunks again, so chunk
+//! indexing that raced the indexing operation leaves nothing behind.
 //!
 //! Fire-and-forget: the channel is unbounded and messages are idempotent
 //! (a later `Synced` subsumes an earlier one of the same WAL), so the
-//! ledger's event loop never waits on a build. Queued messages of one WAL
-//! coalesce to its latest bound; WALs are served in arrival order.
+//! ledger's event loop never waits on chunk indexing. Queued messages of
+//! one WAL coalesce to its latest bound; WALs are served in arrival order.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -49,8 +50,8 @@ pub(crate) struct ChunkPrebuilder {
 }
 
 impl ChunkPrebuilder {
-    /// Spawn the task for one signal: its boundaries, its range seal, and
-    /// the shared chunk cache. It stops with `cancel`.
+    /// Spawn the task for one signal: its boundaries, its range indexing
+    /// function, and the shared chunk cache. It stops with `cancel`.
     pub(crate) fn spawn(
         prefixes: Arc<WalPrefixes>,
         seal: ChunkSealFn,
@@ -73,7 +74,7 @@ impl ChunkPrebuilder {
     }
 
     /// WAL `seq`'s chunks dropped: forget its boundaries and drop any
-    /// chunk built since.
+    /// chunk indexed since.
     pub(crate) fn forget(&self, seq: u64) {
         let _ = self.tx.send(Msg::Forget(seq));
     }
@@ -86,7 +87,7 @@ async fn run(
     chunk_cache: Arc<ChunkCache>,
     cancel: CancellationToken,
 ) {
-    // Per WAL, the first chunk index not built yet.
+    // Per WAL, the first chunk index not indexed yet.
     let mut next_index: HashMap<u64, u32> = HashMap::new();
     loop {
         let first = tokio::select! {

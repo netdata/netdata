@@ -2,8 +2,8 @@
 
 SFST is the on-disk format for one index file. Each file holds the
 indexed contents of one content stream (the producer's partition,
-opaque to this crate) and is built from one WAL file via this crate's
-`IndexWriter`. The container is chunk-based with
+opaque to this crate) and is written from one WAL file by this
+crate's `IndexWriter`. The container is chunk-based with
 a `chunk-file` table of contents; every chunk has a 4-byte id naming
 its role.
 
@@ -134,8 +134,8 @@ the **cold region after `PRIM`**, so a query decodes a column only on demand.
 `PSPN` (parent span id, 8-byte arena like `SPAN`; all-zero = root) and `DURN`
 (span duration in ns) are the **traces** signal's columns, and `OBTS` is
 logs-only (spans have no observed time); `trace_id`/`span_id`/`flags`/`DRAC`
-are written by both signals. In-tree, the logs seal supplies exactly the five
-log columns and the traces seal the six span columns.
+are written by both signals. In-tree, logs indexing supplies exactly the five
+log columns and traces indexing the six span columns.
 A column is present iff the `META` `ColumnsTable` lists it; readers consult the
 manifest (not the chunk table) for presence + type. Each holds exactly one
 value per row, in the same chronological order as `TIMS` and the stream
@@ -165,13 +165,13 @@ distinct count for validation. It answers "is trace X definitely NOT in this
 file?" so a cross-file trace-by-id skips a file with one small chunk read,
 never touching `TIDX`/`TRCE` (the single-file `trace_by_id` uses it as the
 same pre-check). False negatives are impossible; false positives (0.001%
-build-time target, ≈24 bits per distinct id; files sealed earlier carry a 5%
+write-time target, ≈24 bits per distinct id; files sealed earlier carry a 5%
 target, ≈6.25 bits) merely fall through to the exact `TIDX` lookup. The
 payload is self-describing — the filter's bit length, hash count, and seeded
-hasher state all serialize with it — so readers never depend on the build-time
+hasher state all serialize with it — so readers never depend on the write-time
 constants (a reader that looks up many ids in a file with a loose filter
-builds a tighter one at query time); the build uses a fixed seed, making
-identical inputs seal to identical bytes. It lives in the cold region after
+builds a tighter one at query time); the writer uses a fixed seed, so
+identical inputs write identical bytes. It lives in the cold region after
 `TIDX` and before `EVNB`, so a reader that ignores it skips it like any other
 optional chunk. Written only when the file has at least one set (non-zero)
 trace id, and only together with `TIDX` (the bloom is derived from the index's
@@ -278,8 +278,8 @@ within a row, so the sentinel sorts last), `service_spans` and
 `service_errors` (`Vec<u32>`, stored spans and ERROR spans of that service).
 Counts are stored-row statistics, like the rollup's.
 
-It follows `TRSU` directly, requires it, and is written with it by the
-traces seal. A reader reaches it only through the decoded rollup, so a
+It follows `TRSU` directly, requires it, and is written with it by
+traces indexing. A reader reaches it only through the decoded rollup, so a
 `TRSS` without a `TRSU` is never read (and not rejected). Readers
 validate it against the decoded rollup
 (`IndexReader::trace_rollup_stats`): one row per rollup row, offsets from 0
@@ -293,8 +293,8 @@ root start on rows without a root candidate. Files sealed before it carry
 The signal split is producer policy, not format law: the format only fixes
 what each id carries and that everything but `TIMS`/`PRIM`/one `SB{i}` is
 optional. In-tree, `TIDX`/`TBLM`/`EVNB`/`LNKB`/`TRSU`/`TRSS` are written only by
-the traces seal (log trace ids are correlation ids, not a grouping key);
-the logs seal emits none of them.
+traces indexing (log trace ids are correlation ids, not a grouping key);
+logs indexing emits none of them.
 
 The rows are listed in the order the canonical producer emits chunk
 bodies. This order is **not** part of the format contract — readers
@@ -680,7 +680,7 @@ All chunk payloads go through:
     serialized = bincode::serde::encode_to_vec(value, bincode::config::standard())
     payload    = zstd::encode_all(serialized, level)
 
-The packing is internal to the crate: the build hands typed payloads
+The packing is internal to the crate: the writer hands typed payloads
 to `ChunkWriter`, which packs FST chunks (PRIM, `MF{i}`) at an
 elevated zstd level (3) and everything else at the default level (1).
 The format itself does not fix the level — zstd frames are

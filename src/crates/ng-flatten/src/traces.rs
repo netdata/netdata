@@ -5,7 +5,7 @@
 //! resource/scope flattening is shared via [`Flattener::flatten_resource`] /
 //! [`Flattener::flatten_scope`].
 //!
-//! One span → one SFST row. What becomes what at seal time (the builder is
+//! One span → one SFST row. What becomes what at index time (the filler is
 //! `src/crates/ng-index/src/sfst_build.rs::populate_trace_row_index`):
 //! - interned facets: `name`, `kind`/`_kind`, `role`, `status.code`/`_status_code`,
 //!   `status.message`, `trace_state`, `attributes.*` (emitted by
@@ -13,7 +13,7 @@
 //!   entries — searchable tokens in the shared [`SchemaTree`];
 //! - per-row columns from [`SpanRecord`]: `ts` (row key), `duration`,
 //!   `trace_id`/`span_id`/`parent_span_id`, `flags`, `dropped_attributes_count`,
-//!   with the `TIDX` index + `TBLM` bloom built from the chronological
+//!   with the `TIDX` index + `TBLM` bloom written from the chronological
 //!   `trace_id` column, the `EVNB`/`LNKB` event/link chunks fed by the
 //!   structured lists, and the trace rollup capturing the `name`/`_kind`/
 //!   `status.code` facets plus the resource's `service.name`.
@@ -63,16 +63,16 @@ pub struct SpanScopeGroup {
 /// `status.message`, `trace_state`, plus the derived `role`) and
 /// `attributes.*` live in [`entries`](Self::entries); events and links are
 /// the structured lists ([`EventRecord`] / [`LinkRecord`]) whose searchable
-/// parts double as entries at seal time.
+/// parts double as entries at index time.
 ///
 /// Per-row columns (NOT facets): `ts` = the resolved `start_time_unix_nano`
-/// (the row-ordering key at seal); `duration` = `end - start` ns clamped to 0
-/// (see `span_duration`); `trace_id`/`span_id`/`parent_span_id` typed raw
+/// (the row-ordering key when indexed); `duration` = `end - start` ns clamped
+/// to 0 (see `span_duration`); `trace_id`/`span_id`/`parent_span_id` typed raw
 /// bytes — absent or normalized-away ids become the all-zero UNSET sentinel, so
 /// an UNSET `parent_span_id` is the downstream root-span marker; `flags` /
 /// `dropped_attributes_count` verbatim. There is no `observed_ts` (spans have
-/// none). `dropped_events_count`/`dropped_links_count` seal as per-row counts
-/// alongside the event/link structures (`EVNB`/`LNKB`).
+/// none). `dropped_events_count`/`dropped_links_count` are written as per-row
+/// counts alongside the event/link structures (`EVNB`/`LNKB`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpanRecord {
     pub ts: i64,
@@ -91,9 +91,10 @@ pub struct SpanRecord {
 
 /// One span event (OTLP `Span.Event`), flattened: the per-event scalars plus its
 /// name/attribute [`Entry`]s. The entries share the frame's [`SchemaTree`]
-/// (`events.name`, `events.attributes.*`) so at seal they intern into the same
-/// token space as the row's other facets — searchable via the normal tiers —
-/// while the per-event grouping/order lives in the sealed `EVNB` structure.
+/// (`events.name`, `events.attributes.*`) so at index time they intern into
+/// the same token space as the row's other facets — searchable via the normal
+/// tiers — while the per-event grouping/order lives in the sealed `EVNB`
+/// structure.
 ///
 /// `time_unix_nano` is stored **raw** (no normalization — a zero stays zero);
 /// `name` is always present as an entry, even for a (malformed) empty name, so
@@ -110,7 +111,7 @@ pub struct EventRecord {
 /// scalars plus its attribute [`Entry`]s (`links.attributes.*`). Link ids are
 /// deliberately NOT entries (near-unique identifiers don't belong in facets —
 /// the same rule that keeps log correlation ids out, see `crate::logs`); they
-/// seal into the `LNKB` structure. `trace_state` is carried verbatim.
+/// are written into the `LNKB` structure. `trace_state` is carried verbatim.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinkRecord {
     pub trace_id: TraceId,
@@ -257,7 +258,7 @@ pub struct TraceNormalization {
 ///    with an absurd end is rejected.
 /// 3. **Clears malformed trace/span ids**: any non-empty
 ///    `trace_id`/`span_id`/`parent_span_id` — including each link's ids — whose
-///    length is not the spec width (16/8) becomes absent (sealed as the
+///    length is not the spec width (16/8) becomes absent (written as the
 ///    all-zero "unset" sentinel).
 ///
 /// Scopes emptied by the bounds filter (and resources emptied of scopes) are
@@ -453,7 +454,7 @@ pub const TRACE_FRAME_PAYLOAD_FORMAT: u16 = 3;
 /// Encode a [`FlattenedTraceRequest`] to the bincode bytes stored in a traces WAL
 /// frame — the span analog of [`crate::logs::encode_log_frame`], same codec.
 /// Span `Entry.hash`es are filled at emit time by the flattener (as the logs
-/// path does before [`crate::logs::encode_log_frame`]), so the seal rides the
+/// path does before [`crate::logs::encode_log_frame`]), so indexing rides the
 /// interner fast path.
 pub fn encode_trace_frame(
     req: &FlattenedTraceRequest,

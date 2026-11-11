@@ -1,9 +1,9 @@
-//! Format-layer spike for ng-index's SFST build: feed plain
-//! `(timestamp_ns, [key=value])` rows — the stringified shape the seal hands
+//! Format-layer spike for ng-index's SFST indexing: feed plain
+//! `(timestamp_ns, [key=value])` rows — the stringified shape indexing hands
 //! `sfst` (ng-index/src/sfst_build.rs) — to `RowIndex` + `IndexWriter`, then
 //! query the file back through `IndexReader`. Two contracts:
 //!
-//! - log-shaped rows build from out-of-order timestamps and count correctly
+//! - log-shaped rows index from out-of-order timestamps and count correctly
 //!   under exact, regex and AND filters;
 //! - with the span columns set and `build_trace_id_index` on, every column
 //!   lands in the file chronological and row-aligned, and the `TIDX`
@@ -22,7 +22,7 @@ use sfst::{
 };
 use sfst::{IndexWriter, RowIndex};
 
-/// Build an SFST file from `(timestamp_ns, &[key=value])` rows; return its bytes.
+/// Write an SFST file from `(timestamp_ns, &[key=value])` rows; return its bytes.
 fn build_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {
     let arena = Bump::new();
     let mut ri = RowIndex::new(&arena, 100);
@@ -50,8 +50,8 @@ fn count(reader: &IndexReader, filter: Filter) -> u64 {
 
 #[test]
 fn build_sfst_from_our_rows_and_query_back() {
-    // Timestamps deliberately out of arrival order: the build's time-sort must
-    // make the counts independent of insertion order.
+    // Timestamps deliberately out of arrival order: the writer's time-sort
+    // must make the counts independent of insertion order.
     let rows: &[(i64, &[&str])] = &[
         (
             300,
@@ -103,9 +103,9 @@ fn build_sfst_from_our_rows_and_query_back() {
 /// Pins the traces wiring on `RowIndex` at the format layer: the span
 /// columns (`trace_ids`/`span_ids`/`parent_span_ids`/`durations`/`flags`/
 /// `dropped_attribute_counts`) plus the `build_trace_id_index` flag must
-/// flow through the build into one valid file — each column written
-/// chronologically and row-aligned, and a `TIDX` built from the
-/// chronological `trace_id` column. The logs seal leaves all of these
+/// flow through the writer into one valid file — each column written
+/// chronologically and row-aligned, and a `TIDX` written from the
+/// chronological `trace_id` column. Logs indexing leaves all of these
 /// dormant. Only what is asserted is pinned: span ids / flags / dropped
 /// counts are written but not read back, and the `TBLM` bloom
 /// (`build_trace_id_bloom`) stays off. The full traces pipeline has its own
@@ -114,7 +114,7 @@ fn build_sfst_from_our_rows_and_query_back() {
 fn build_into_writes_span_columns_and_trace_id_index() {
     let a = TraceId::from([0xAA; 16]);
     let b = TraceId::from([0xBB; 16]);
-    // Timestamps out of arrival order so the build-time time-sort reorders the
+    // Timestamps out of arrival order so the write-time time-sort reorders the
     // columns; two rows share trace A, one is trace B.
     let rows: &[(i64, TraceId, [u8; 8], i64)] = &[
         (300, a, [0x01; 8], 30), // insertion row 0

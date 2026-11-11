@@ -56,9 +56,9 @@ use super::now_ns;
 /// an SFST counterpart survives — the query planner never sees it), and the
 /// bytes stay on disk. No quarantine, no auto-delete, and startup proceeds.
 /// The next restart re-discovers the file (its header is valid), retries the
-/// seal, and re-orphans it on failure — so a transient cause (e.g. a disk
-/// error) self-heals, while an undecodable file is retried and logged once
-/// per restart, never silently dropped.
+/// indexing operation, and re-orphans it on failure — so a transient cause
+/// (e.g. a disk error) self-heals, while an undecodable file is retried and
+/// logged once per restart, never silently dropped.
 pub async fn recover_unindexed(
     registry: &mut Registry,
     indexer: &mut ComponentHandle<IndexerRequest, IndexerResponse>,

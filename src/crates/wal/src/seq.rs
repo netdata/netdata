@@ -2,7 +2,7 @@
 //! `FileId` (`machine_id`/`instance_id`/`pipeline_id`/`seq`/`partition_key`).
 //! One seq is allocated per WAL file creation (`writer.rs` `ensure_file`)
 //! and stamped into every local filename, every remote object key, and
-//! every catalog stem; the SFST built from a WAL file and the catalog
+//! every catalog stem; the SFST indexed from a WAL file and the catalog
 //! entry describing it inherit the same seq. The 17-byte `NSEQ`
 //! high-water envelope below is this crate's on-disk contract.
 //!

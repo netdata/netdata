@@ -5,14 +5,14 @@
 //!
 //! Fixtures go through the production path: OTLP `ResourceLogs` →
 //! `ng_flatten` flatten + `encode_log_frame` → `wal::Writer` →
-//! `ng_index::build_sfst_file` at seal time. Files are FileId-named (the
+//! `ng_index::build_sfst_file` at index time. Files are FileId-named (the
 //! writer names WAL files; a sealed SFST reuses its source WAL's FileId,
-//! sharing the sequence — exactly how the ledger names a seal,
+//! sharing the sequence — exactly how the ledger names an indexed file,
 //! otel-ledger/src/ledger/ingestor.rs), so the CLI's directory-scan discovery
 //! picks them up and its SFST-wins dedup gets a real WAL/SFST pair.
 //!
 //! The strongest assertion here is tail-vs-sealed equivalence: querying a WAL
-//! through the row-scanned tail must return the same rows as sealing it into
+//! through the row-scanned tail must return the same rows as indexing it into
 //! an SFST and querying that — the correctness premise of the offline WAL
 //! path. The engine-side twin of that pin lives in sfsq's
 //! tests/ng_wal_equivalence.rs; this file is the CLI-facing one.
@@ -144,9 +144,9 @@ fn encode_ng_frame(batch: Vec<ResourceLogs>) -> (Vec<u8>, usize) {
 }
 
 /// As [`write_wal`], but with an explicit starting sequence (the ephemeral
-/// allocator's first seq is `seq_start + 1`), so multiple WAL files sealed
+/// allocator's first seq is `seq_start + 1`), so multiple WAL files indexed
 /// separately get distinct FileIds — the filename embeds the seq. The tenant
-/// dir must hold no other `*.wal` at call time (seal + remove the previous
+/// dir must hold no other `*.wal` at call time (index + remove the previous
 /// one first); the assert inside pins one file per call.
 fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start: u64) -> PathBuf {
     std::fs::create_dir_all(wal_tenant_dir).unwrap();
@@ -194,10 +194,10 @@ fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start
     wals.pop().unwrap()
 }
 
-/// Seal `wal_path` into an SFST under `sfst_tenant_dir`, named after the
-/// WAL's own FileId — same sequence, exactly how the ledger names a seal
-/// (otel-ledger/src/ledger/ingestor.rs) — so discovery's SFST-wins dedup
-/// sees the production relationship.
+/// Index `wal_path` into an SFST under `sfst_tenant_dir`, named after
+/// the WAL's own FileId — same sequence, exactly how the ledger names an
+/// indexed file (otel-ledger/src/ledger/ingestor.rs) — so discovery's
+/// SFST-wins dedup sees the production relationship.
 fn seal_to_sfst(wal_path: &Path, sfst_tenant_dir: &Path) -> PathBuf {
     std::fs::create_dir_all(sfst_tenant_dir).unwrap();
     let id = FileId::parse(wal_path).expect("wal fileid");
@@ -268,7 +268,7 @@ fn limit_returns_newest_n_and_reports_total_matched() {
 #[test]
 fn tail_equals_sealed_sfst() {
     // The core equivalence: row-scanning a WAL tail must equal querying the
-    // SFST that WAL seals into.
+    // SFST that WAL is indexed into.
     let tmp = tempfile::tempdir().unwrap();
     let dirs = Dirs {
         wal: tmp.path().join("wal"),
@@ -282,7 +282,7 @@ fn tail_equals_sealed_sfst() {
     // Via tail (no SFST present yet).
     let (tail_matched, tail_rows) = query_all(&dirs);
 
-    // Seal to SFST, remove the WAL → query the SFST only.
+    // Index to SFST, remove the WAL → query the SFST only.
     seal_to_sfst(&wal_path, &dirs.sfst.join("default"));
     std::fs::remove_file(&wal_path).unwrap();
     let (sfst_matched, sfst_rows) = query_all(&dirs);
@@ -525,8 +525,9 @@ fn stream_filter_selects_matching_sfst() {
     let wal = dirs.wal.join("default");
     let sfst = dirs.sfst.join("default");
 
-    // Distinct seqs → distinct FileIds → two coexisting SFSTs. Seal + remove
-    // each WAL before writing the next (write_wal_seq expects an empty dir).
+    // Distinct seqs → distinct FileIds → two coexisting SFSTs. Index +
+    // remove each WAL before writing the next (write_wal_seq expects an
+    // empty dir).
     let a = write_wal_seq(&wal, &[batch_for(records(0..20), "nsA", "svcA")], 0);
     seal_to_sfst(&a, &sfst);
     std::fs::remove_file(&a).unwrap();

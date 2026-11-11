@@ -1,7 +1,7 @@
-//! The tail/seal rollup parity contract — the test pin behind the
+//! The tail/file rollup parity contract — the test pin behind the
 //! "Parity contract (test-pinned)" note in `src/traces/rollup.rs`:
 //! folding a WAL tail's decoded spans (`tail_trace_aggregates`) equals
-//! reading the `TRSU` rollup of sealing the SAME data
+//! reading the `TRSU` rollup of indexing the SAME data
 //! (`sealed_trace_envelopes`) — value-for-value across envelopes and
 //! stored-row counts.
 //!
@@ -98,7 +98,7 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     let scan = TraceWalScan::scan(&wal).unwrap();
     let tail = tail_trace_aggregates(&scan);
 
-    // Sealed side: run the production sealer over the SAME WAL, then
+    // Sealed side: run production indexing over the SAME WAL, then
     // read its TRSU.
     let out = dir.path().join("parity.sfst");
     ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
@@ -109,7 +109,7 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     assert_eq!(tail, sealed, "the parity contract");
 }
 
-/// A tail's parts equal the `TRSU` + `TRSS` rows of sealing the same
+/// A tail's parts equal the `TRSU` + `TRSS` rows of indexing the same
 /// data: max starts, per-service counts and every kind of root claim.
 #[test]
 fn tail_parts_match_the_sealed_rollup_and_stats() {
@@ -156,8 +156,8 @@ fn tail_parts_match_the_sealed_rollup_and_stats() {
     assert_eq!((tail[0].services[0].1, tail[0].services[0].2), (4, 1));
 }
 
-/// The heatmap's root tokens read a tail's claims by the seal's rules: a
-/// full tie with different facets sets no root bit, as in the sealed
+/// The heatmap's root tokens read a tail's claims by the indexing rules:
+/// a full tie with different facets sets no root bit, as in the sealed
 /// file.
 #[test]
 fn tail_root_claim_withholds_like_the_seal() {

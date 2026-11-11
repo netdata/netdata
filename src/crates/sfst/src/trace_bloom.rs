@@ -13,9 +13,9 @@
 //! count, and seeded hasher state all travel with it. The crate is pinned
 //! and audited `unsafe`-free per version (see the workspace `Cargo.toml`).
 //!
-//! Build-time policy lives here: a 0.001% false-positive target over the
+//! Write-time policy lives here: a 0.001% false-positive target over the
 //! file's DISTINCT non-unset trace ids, one filter per file, a constant seed
-//! so identical inputs seal to identical bytes, ~24 bits per distinct id
+//! so identical inputs write identical bytes, ~24 bits per distinct id
 //! (≈3 MB per million). The target is tight because one query probes every
 //! file's filter per candidate and a false positive costs a decode (~0.5 ms
 //! against a ~50 ns probe): at 5% a trace lookup decoded ~12 files' lookup
@@ -56,13 +56,13 @@ const FALSE_POSITIVE_RATE: f64 = 0.000_01;
 /// sizing details never matter; a 5% filter is far above it).
 const TIGHT_FALSE_POSITIVE_RATE: f64 = 0.000_1;
 
-/// Constant hashing seed: identical inputs seal to byte-identical chunks
+/// Constant hashing seed: identical inputs write byte-identical chunks
 /// (reproducible files), and the seed state serializes with the filter so
 /// readers never depend on this constant.
 const SEED: u128 = 0x6e64_5442_4c4d_2031; // arbitrary, stable ("ndTBLM 1")
 
 /// Body of the `TBLM` chunk. `distinct_ids` is carried for validation and
-/// diagnostics (the filter itself does not expose its build-time item count).
+/// diagnostics (the filter itself does not expose its write-time item count).
 ///
 /// Equality note: the derived `PartialEq` delegates to fastbloom's, which
 /// compares bits + hash count but NOT the hasher seed — `==` is structural,
@@ -75,9 +75,9 @@ pub struct TraceIdBloom {
 
 impl TraceIdBloom {
     /// Build the per-file filter from the file's sorted trace-id index.
-    /// Returns `None` when the file has no set (non-zero) trace ids: no chunk
-    /// is written (the seal declares `TBLM` only when a set id exists), and a
-    /// reader treats absence as "cannot skip".
+    /// Returns `None` when the file has no set (non-zero) trace ids: no
+    /// chunk is written (the writer declares `TBLM` only when a set id
+    /// exists), and a reader treats absence as "cannot skip".
     ///
     /// `trace_ids` MUST be the chronological `TRCE` column `index` was built
     /// from (the same coupling `TraceIdIndex::positions` documents).
@@ -115,7 +115,7 @@ impl TraceIdBloom {
         !id.is_unset() && self.filter.contains(id.as_bytes())
     }
 
-    /// Distinct set trace ids at build time.
+    /// Distinct set trace ids the filter was built from.
     pub fn distinct_ids(&self) -> u32 {
         self.distinct_ids
     }

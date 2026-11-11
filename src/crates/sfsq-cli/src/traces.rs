@@ -631,7 +631,7 @@ pub struct ExploreArgs {
     #[arg(long = "sfst")]
     pub sfsts: Vec<PathBuf>,
 
-    /// A flattened traces WAL file, built into an image whole. Repeatable.
+    /// A flattened traces WAL file, indexed into an image whole. Repeatable.
     #[arg(long = "wal")]
     pub wals: Vec<PathBuf>,
 

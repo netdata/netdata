@@ -9,15 +9,15 @@
 //!
 //! - the payload-format gate (`check_payload_format` in ng-index's
 //!   `sfst_build.rs`): a WAL stamped with the traces codec is refused by the
-//!   logs build before any frame decode (`Error::PayloadFormat`);
-//! - rows in = rows indexed: frame/record counts survive the build and re-open;
+//!   logs indexing before any frame decode (`Error::PayloadFormat`);
+//! - rows in = rows indexed: frame/record counts survive indexing and re-open;
 //! - the five per-row log columns (observed_ts, trace_id, span_id, flags,
 //!   dropped_attributes_count) are persisted and permuted to chronological
 //!   order, row-aligned with the timestamps;
 //! - the typed schema tree + coalesced scalar kinds (an Int+Str path coalesces
 //!   to Str) and the derived field table;
-//! - `build_sfst_range` parity: the in-memory build is byte-identical to the
-//!   file build, and frame-aligned splits partition record counts;
+//! - `build_sfst_range` parity: the indexed chunk is byte-identical to the
+//!   indexed file, and frame-aligned splits partition record counts;
 //! - '=' in an attribute key is sanitized at flatten and stays queryable.
 //!
 //! Not pinned here: the traces pipeline (`tests/traces_seal.rs`), SFST query
@@ -98,7 +98,7 @@ fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
 
 #[test]
 fn wrong_payload_format_refuses_to_build() {
-    // A WAL stamped with the traces codec must be refused by the logs build
+    // A WAL stamped with the traces codec must be refused by logs indexing
     // before any frame decode: `Error::PayloadFormat` carrying the two format
     // ids — the header check, not a decode error.
     let flat = tempfile::tempdir().unwrap();
@@ -147,7 +147,7 @@ fn flattened_wal_builds_and_roundtrips_an_sfst() {
     let flat = tempfile::tempdir().unwrap();
     write_flattened_wal(flat.path(), &[3, 5, 2]);
 
-    // The build summary counts what went in: 3 frames, 10 records.
+    // The summary counts what went in: 3 frames, 10 records.
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("count.sfst");
     let sfst = build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
@@ -162,7 +162,7 @@ fn flattened_wal_builds_and_roundtrips_an_sfst() {
 }
 
 /// `n` records inserted in reverse-chronological order: record `i` gets the
-/// `(n - i)`-th timestamp, so the build's insertion→chronological remap must
+/// `(n - i)`-th timestamp, so the writer's insertion→chronological remap must
 /// permute every column. Each record tags its `observed_ts`, `trace_id`,
 /// `span_id`, `flags` and `dropped_attributes_count` with its insertion index
 /// `i` (flags keep a `0x100` prefix) so the permutation is verifiable.
@@ -226,7 +226,7 @@ fn per_row_columns_roundtrip_in_chronological_order() {
         .unwrap();
     writer.shutdown_all().unwrap();
 
-    // Build the SFST and re-open the sealed file through the format reader.
+    // Index the WAL and re-open the sealed file through the format reader.
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("cols.sfst");
     build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
@@ -367,13 +367,13 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
     let data = std::fs::read(&out).unwrap();
     let reader = IndexReader::open(&data).unwrap();
 
-    // The typed schema tree survives sealing: the file carries leaf nodes, not
-    // just the bare root.
+    // The typed schema tree survives indexing: the file carries leaf nodes,
+    // not just the bare root.
     let tree = reader.tree();
     assert!(tree.len() > 1, "tree should carry leaf nodes");
 
-    // Every kind a path held survives sealing, uncoalesced: the polymorphic
-    // path holds Int and Str, the always-Int path Int alone.
+    // Every kind a path held survives indexing, uncoalesced: the
+    // polymorphic path holds Int and Str, the always-Int path Int alone.
     let kinds: std::collections::HashMap<String, sfst::ValueKinds> =
         tree.derive_leaf_kinds().into_iter().collect();
     let set = |list: &[sfst::ValueKind]| list.iter().copied().collect::<sfst::ValueKinds>();
@@ -449,11 +449,11 @@ fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path
     (flat, wal_path)
 }
 
-/// The in-memory whole-file range build (`build_sfst_range`) must be
-/// byte-identical to the on-disk file build (`build_sfst`) over the same
+/// Indexing the whole file as one chunk (`build_sfst_range`) must be
+/// byte-identical to indexing it to disk (`build_sfst`) over the same
 /// frames — same typed tree + columns, deterministic, only the sink differs.
-/// This is the parity that lets the on-query chunk build over an active WAL
-/// and the seal-time file build share one format.
+/// This is the parity that lets on-query chunk indexing over an active WAL
+/// and indexing a closed WAL file share one format.
 #[test]
 fn build_sfst_range_whole_file_matches_file_build() {
     let (dir, wal_path) = write_multiframe_flat_wal(3);
@@ -479,7 +479,7 @@ fn build_sfst_range_whole_file_matches_file_build() {
 }
 
 /// A frame-aligned split — the cut is a scanned frame boundary — partitions the
-/// records exactly: the two chunk builds' record counts sum to the whole.
+/// records exactly: the two indexed chunks' record counts sum to the whole.
 /// Exercises `build_sfst_range` over interior frame ranges (the on-query
 /// active-WAL chunk case).
 #[test]
@@ -521,7 +521,7 @@ fn build_sfst_range_split_partitions_records() {
 /// schema-tree leaf path was `attributes.a=b`, so the leaf silently dropped
 /// from the reader-derived field table (debug builds panicked on the
 /// `fill_field_stats` round-trip assert). Keys are now sanitized ('=' → '_')
-/// at flatten time, so the field survives sealing and is queryable.
+/// at flatten time, so the field survives indexing and is queryable.
 #[test]
 fn attribute_key_containing_eq_is_sanitized_and_queryable() {
     let req = ExportLogsServiceRequest {

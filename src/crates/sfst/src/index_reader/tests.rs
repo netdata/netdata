@@ -1,7 +1,7 @@
 //! Tests for [`IndexReader::trace_by_id`], the single-file entry into the
 //! shared trace combiner (`trace_combine.rs`, driven through the per-file
 //! session in session.rs) — exercised end to end over in-memory SFST files
-//! this module builds with the crate's own writer (see `trace_file`).
+//! this module writes with the crate's own writer (see `trace_file`).
 //!
 //! Pins:
 //!
@@ -32,7 +32,7 @@ fn sid(b: u8) -> SpanId {
     SpanId::from([b; 8])
 }
 
-/// Build a minimal traces SFST whose rows all share one `trace_id`, from
+/// Write a minimal traces SFST whose rows all share one `trace_id`, from
 /// `(span_id, parent_span_id)` pairs given in row order (ascending
 /// timestamps are assigned, so row order == start order). Attribute
 /// fields stay empty — the tests exercise ids, parents, and row scalars,

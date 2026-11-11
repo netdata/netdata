@@ -89,7 +89,7 @@
 //! (per-tenant [`Registry`], event application, seq high-water persistence,
 //! the IPC link), `otel-ledger` (event intake + gap-check, active-WAL
 //! queries via `prefix`, the indexer), `ng-index` (frame decoding for SFST
-//! builds), `sfsq` (WAL scans backing logs + traces queries), `sfsq-cli`
+//! indexing), `sfsq` (WAL scans backing logs + traces queries), `sfsq-cli`
 //! (offline discovery via [`scan_frame_boundaries`]), and `ng-ingest`
 //! (synthetic ingest writing WALs). Tests across the stack fabricate
 //! fixtures with the writers/readers and the re-exported [`test_identity`].

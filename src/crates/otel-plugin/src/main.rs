@@ -13,7 +13,7 @@
 //!   (`lifeline`).
 //! - `logs`: the embedded `sfsq-cli` query over stored WAL/SFST files, for
 //!   operators inspecting logs without a running agent.
-//! - `index`: build the index file of one WAL file and exit
+//! - `index`: index one closed WAL file into its index file and exit
 //!   (`otel_ledger::index_child`); started by the plugin, not by operators.
 //!
 //! The supervisor and the workers run on a tokio runtime; `logs` and `index`
@@ -60,8 +60,8 @@ enum WorkerKind {
     },
 }
 
-/// The signal a WAL file of `index` belongs to. It selects the builder: a
-/// logs file and a traces file hold different frames.
+/// The signal a WAL file of `index` belongs to. It selects the indexing
+/// function: a logs file and a traces file hold different frames.
 #[derive(Clone, Copy, ValueEnum)]
 enum IndexSignal {
     Logs,
@@ -101,10 +101,10 @@ enum CliCommand {
     /// the small worker variants; clap flattens `Box<Args>` since
     /// `Box<T: Args>: Args`.
     Logs(Box<sfsq_cli::Args>),
-    /// Build the index file of one closed WAL file and exit; started by the
-    /// plugin, not an operator command. On success the answer goes to stdout
-    /// (`otel_ledger::index_child`); on failure the error goes to stderr and
-    /// the exit status is 1.
+    /// Index one closed WAL file into its index file and exit; started by
+    /// the plugin, not an operator command. On success the answer goes to
+    /// stdout (`otel_ledger::index_child`); on failure the error goes to
+    /// stderr and the exit status is 1.
     Index {
         /// The signal the WAL file belongs to.
         #[arg(long, value_enum)]

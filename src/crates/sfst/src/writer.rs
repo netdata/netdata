@@ -6,7 +6,7 @@
 //! format pairs with each chunk kind), so producers hand it typed
 //! payloads and can neither misorder nor underfill a file.
 //!
-//! Production plumbing: the only driver is the Phase-2 builder in
+//! Production plumbing: the only driver is Phase 2 in
 //! `build.rs` (behind the `index_writer.rs` facade); the `lib.rs`
 //! re-export is `test-util`-gated for test fixtures and raw-format
 //! introspection. The read-side counterpart is `reader.rs`
@@ -44,7 +44,7 @@ pub(crate) fn pack<T: Serialize + ?Sized>(value: &T, zstd_level: i32) -> Result<
 /// Write a minimal, content-light SFST containing only the `SUMR` summary chunk.
 ///
 /// [`ChunkWriter`] cannot express this shape — a file always carries at
-/// least one stream batch — so this seals the format's floor (the
+/// least one stream batch — so this writes the format's floor (the
 /// smallest valid SFST a reader must accept) directly through the
 /// container's `StreamingWriter`. Test-only: summary-only files stay
 /// valid on the read side (registry recovery reads just the summary),
@@ -242,8 +242,8 @@ impl<W: Write + Seek> ChunkWriter<W> {
                 "trace_id index declared without the trace_id column it indexes".into(),
             ));
         }
-        // The bloom is derived from the index's sorted permutation at build, so
-        // a file cannot carry TBLM without TIDX.
+        // The bloom is derived from the index's sorted permutation at write
+        // time, so a file cannot carry TBLM without TIDX.
         if counts.trace_id_bloom && !counts.trace_id_index {
             return Err(Error::WriterMisuse(
                 "trace_id bloom declared without the trace_id index it derives from".into(),

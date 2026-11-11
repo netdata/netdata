@@ -468,7 +468,7 @@ fn work_counts_one_shared_stream_batch_pass() {
 
     // Batch masking itself is proven by
     // `narrow_high_terms_visit_only_their_masked_batches` — this 256-row
-    // fixture seals into a single stream batch (num_stream_batches(256)
+    // fixture is written as one stream batch (num_stream_batches(256)
     // == 1), so any per-batch expectation here would equal a full scan.
 }
 
