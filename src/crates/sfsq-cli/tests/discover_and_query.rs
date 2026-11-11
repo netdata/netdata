@@ -198,7 +198,7 @@ fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start
 /// the WAL's own FileId — same sequence, exactly how the ledger names an
 /// indexed file (otel-ledger/src/ledger/ingestor.rs) — so discovery's
 /// SFST-wins dedup sees the production relationship.
-fn seal_to_sfst(wal_path: &Path, sfst_tenant_dir: &Path) -> PathBuf {
+fn index_to_sfst(wal_path: &Path, sfst_tenant_dir: &Path) -> PathBuf {
     std::fs::create_dir_all(sfst_tenant_dir).unwrap();
     let id = FileId::parse(wal_path).expect("wal fileid");
     let out = sfst_tenant_dir.join(id.to_filename("sfst"));
@@ -283,7 +283,7 @@ fn tail_equals_sealed_sfst() {
     let (tail_matched, tail_rows) = query_all(&dirs);
 
     // Index to SFST, remove the WAL → query the SFST only.
-    seal_to_sfst(&wal_path, &dirs.sfst.join("default"));
+    index_to_sfst(&wal_path, &dirs.sfst.join("default"));
     std::fs::remove_file(&wal_path).unwrap();
     let (sfst_matched, sfst_rows) = query_all(&dirs);
 
@@ -384,7 +384,7 @@ fn dedup_sfst_wins_over_wal_same_seq() {
         sfst: tmp.path().join("sfst"),
     };
     let wal_path = write_wal(&dirs.wal.join("default"), &[batch(records(0..40))]);
-    seal_to_sfst(&wal_path, &dirs.sfst.join("default")); // WAL left in place
+    index_to_sfst(&wal_path, &dirs.sfst.join("default")); // WAL left in place
 
     let d = discover(&dirs, "default", None, 0..u32::MAX).unwrap();
     assert_eq!(d.sources.len(), 1, "the shared seq must yield one source");
@@ -437,7 +437,7 @@ fn time_window_prunes_sfst() {
         sfst: tmp.path().join("sfst"),
     };
     let wal_path = write_wal(&dirs.wal.join("default"), &[batch(records(0..30))]);
-    seal_to_sfst(&wal_path, &dirs.sfst.join("default"));
+    index_to_sfst(&wal_path, &dirs.sfst.join("default"));
     // The WAL must go so the layout is SFST-only: discovery's dedup set holds
     // only windowed SFST candidates (sfsq-cli/src/discover.rs), so a WAL left
     // behind would still be scanned as a tail despite the pruned SFST.
@@ -529,10 +529,10 @@ fn stream_filter_selects_matching_sfst() {
     // remove each WAL before writing the next (write_wal_seq expects an
     // empty dir).
     let a = write_wal_seq(&wal, &[batch_for(records(0..20), "nsA", "svcA")], 0);
-    seal_to_sfst(&a, &sfst);
+    index_to_sfst(&a, &sfst);
     std::fs::remove_file(&a).unwrap();
     let b = write_wal_seq(&wal, &[batch_for(records(20..50), "nsB", "svcB")], 1);
-    seal_to_sfst(&b, &sfst);
+    index_to_sfst(&b, &sfst);
     std::fs::remove_file(&b).unwrap();
 
     let stream_a = ServiceStream::new("nsA", "svcA");

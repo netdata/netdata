@@ -502,7 +502,7 @@ fn prepare(source: &TraceSource, window: &TimeWindow) -> Prepared {
             match ng_index::index_traces_range(&tail.path, tail.coverage.range) {
                 Ok((summary, _)) if !overlaps(&summary) => Prepared::Outside,
                 Ok((_, bytes)) => Prepared::Open(Mapped::Memory(Arc::new(bytes))),
-                Err(error) => Prepared::Failed(format!("building the tail image: {error}")),
+                Err(error) => Prepared::Failed(format!("indexing the tail image: {error}")),
             }
         }
         TraceSource::Unavailable(unavailable) => {

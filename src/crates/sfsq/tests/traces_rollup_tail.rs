@@ -160,7 +160,7 @@ fn tail_parts_match_the_sealed_rollup_and_stats() {
 /// a full tie with different facets sets no root bit, as in the sealed
 /// file.
 #[test]
-fn tail_root_claim_withholds_like_the_seal() {
+fn tail_root_claim_withholds_like_indexing() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&corpus())], "claims");
     let grid = sfst::Grid::new(0, 1_000, 10);
