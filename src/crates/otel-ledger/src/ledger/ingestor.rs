@@ -1,4 +1,4 @@
-//! Writer-event handling: gap-check, apply to registries, index on close.
+//! Writer-event handling: apply to registries, index on close.
 
 use super::Ledger;
 use file_lifecycle::ipc::IndexerRequest;
@@ -7,7 +7,7 @@ use otel_bridge::signals::Signal;
 impl Ledger {
     #[tracing::instrument(
         skip_all,
-        fields(tenant = %msg.tenant_id, frame_seq = msg.frame_seq, event = ?msg.event),
+        fields(tenant = %msg.tenant_id, event = ?msg.event),
     )]
     pub(super) async fn handle_ingestor_msg(&mut self, msg: wal::Message) {
         // `pipeline_id` is a raw u16 stamped by the writer process; decode it
@@ -22,20 +22,6 @@ impl Ledger {
                 return;
             }
         };
-
-        // Per-signal frame-seq gap-check: signals interleave on one connection
-        // but each has its own monotonic `frame_seq`, so a gap is a genuinely
-        // lost event of THIS signal (fire-and-forget IPC). Log it, apply anyway.
-        let expected = self.expected_frame_seq.get_mut(signal);
-        if msg.frame_seq != *expected {
-            tracing::error!(
-                pipeline_id,
-                "ingestor frame gap: expected={} got={}",
-                *expected,
-                msg.frame_seq,
-            );
-        }
-        *expected = msg.frame_seq + 1;
 
         let pipeline = self.pipelines.get(signal);
 

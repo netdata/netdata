@@ -8,12 +8,12 @@
 //! The ingestor owns one [`Writer`] per (tenant, signal), writes
 //! content-plane payloads as frames, and syncs + drains the queued
 //! [`FileEvent`]s at its batch boundary. Events cross the ingestor→ledger
-//! link as [`Message`]s (`frame_seq` + `tenant_id` + event). This crate owns
+//! link as [`Message`]s (`tenant_id` + event). This crate owns
 //! the wire types, not the transport — its only stack dependency is
 //! `file-registry` (no ferryboat): the link is ferryboat framing over
 //! `file_lifecycle::ipc`, accepted on the ledger by
-//! `file_lifecycle::ipc::accept_writer`, where each `frame_seq` is
-//! gap-checked per signal and applied to the owning tenant's [`Registry`]
+//! `file_lifecycle::ipc::accept_writer`, where each event is applied to
+//! the owning tenant's [`Registry`]
 //! (the ledger's per-tenant registries, via file-lifecycle, are the only
 //! production holders). A `FileEvent::Closed` then sends the sealed file to
 //! the indexer, which decodes it back ([`Reader`], via `ng_index`) into an
@@ -87,7 +87,7 @@
 //! (per-tenant writers, the shared [`SeqAllocator`], the startup seq seed
 //! via [`scan_max_sequence_recursive`], event forwarding), `file-lifecycle`
 //! (per-tenant [`Registry`], event application, seq high-water persistence,
-//! the IPC link), `otel-ledger` (event intake + gap-check, active-WAL
+//! the IPC link), `otel-ledger` (event intake, active-WAL
 //! queries via `prefix`, the indexer), `ng-index` (frame decoding for SFST
 //! indexing), `sfsq` (WAL scans backing logs + traces queries), `sfsq-cli`
 //! (offline discovery via [`scan_frame_boundaries`]), and `ng-ingest`

@@ -17,7 +17,7 @@
 //!
 //! Routing:
 //! - writer events → `Signal::try_from(msg.event.pipeline_id())` →
-//!   `pipelines[signal]`, after the per-signal frame-seq gap-check;
+//!   `pipelines[signal]`;
 //! - shared-worker responses → the pipeline whose inline `pipeline_id` they carry;
 //! - per-pipeline worker responses → funneled into one merged channel, tagged
 //!   with the owning `Signal` by a forwarder;
@@ -72,7 +72,7 @@ const UPLOAD_CONCURRENCY: usize = 8;
 
 /// A value held once per signal. The signal axis is a closed enum, so a fixed
 /// pair (not a `HashMap<u16, _>`) is the total, exhaustive container: every signal
-/// is always present and `get`/`get_mut` cannot miss. The only place an out-of-set
+/// is always present and `get` cannot miss. The only place an out-of-set
 /// id can appear is decoding a raw `pipeline_id` off the wire/disk, which is a
 /// `Signal::try_from` at that boundary — after which routing is total.
 struct PerSignal<T> {
@@ -85,13 +85,6 @@ impl<T> PerSignal<T> {
         match signal {
             Signal::Logs => &self.logs,
             Signal::Traces => &self.traces,
-        }
-    }
-
-    fn get_mut(&mut self, signal: Signal) -> &mut T {
-        match signal {
-            Signal::Logs => &mut self.logs,
-            Signal::Traces => &mut self.traces,
         }
     }
 
@@ -131,11 +124,6 @@ pub struct Ledger {
     /// queries rarely index one; fed each traces `Synced` event, told to
     /// forget a WAL when its chunks drop.
     traces_chunk_indexer: chunk_indexer::ChunkIndexer,
-    /// Per-signal frame-sequence gap-check. The single writer process feeds every
-    /// signal over one connection, but assigns a separate monotonic `frame_seq`
-    /// per signal, so the next-expected seq is tracked per signal — a gap is then a
-    /// real lost event for that signal, not inter-signal interleaving.
-    expected_frame_seq: PerSignal<u64>,
     pub(crate) cancel: CancellationToken,
 
     /// Sender side of the outbound funnel. Spawned function-handler
@@ -410,9 +398,6 @@ impl Ledger {
             periodic_timer,
             chunk_cache,
             traces_chunk_indexer,
-            // Each signal's frame_seq stream starts at 1 (the ingestor's first
-            // assigned frame_seq), so the gap-check's next-expected seeds to 1.
-            expected_frame_seq: PerSignal { logs: 1, traces: 1 },
             cancel,
             outbound_tx,
             outbound_rx,
@@ -523,18 +508,17 @@ mod tests {
 
     /// `PerSignal::iter()` backs the declaration scan and function-name dispatch,
     /// so pin that it yields every signal (in the fixed logs→traces order) and
-    /// that `get`/`get_mut` address the matching slot. Unlike the `get`/`get_mut`
-    /// matches, `iter()`'s hand-written array is not compiler-checked against the
+    /// that `get` addresses the matching slot. Unlike the `get`
+    /// match, `iter()`'s hand-written array is not compiler-checked against the
     /// `Signal` variant set, so this test is the guard if a variant is added.
     #[test]
     fn per_signal_get_and_iter_cover_every_signal() {
-        let mut ps = PerSignal {
+        let ps = PerSignal {
             logs: 1u8,
             traces: 2u8,
         };
         assert_eq!(*ps.get(Signal::Logs), 1);
         assert_eq!(*ps.get(Signal::Traces), 2);
-        *ps.get_mut(Signal::Traces) = 9;
-        assert_eq!(ps.iter().copied().collect::<Vec<_>>(), vec![1, 9]);
+        assert_eq!(ps.iter().copied().collect::<Vec<_>>(), vec![1, 2]);
     }
 }

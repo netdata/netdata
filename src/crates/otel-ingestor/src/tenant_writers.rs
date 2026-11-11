@@ -143,8 +143,8 @@ pub(crate) struct TenantWriters {
     /// `otel_bridge::config::PluginConfig::identity`).
     instance_identity: Identity,
     /// Shared with the other signal's writers: the writer → ledger IPC
-    /// accepts exactly one connection (the ledger gap-checks frame sequences
-    /// per signal), so every signal's events MUST funnel through one sender.
+    /// accepts exactly one connection, so every signal's events MUST funnel
+    /// through one sender.
     ledger_sender: Arc<LedgerSender>,
 }
 
@@ -489,5 +489,123 @@ mod tests {
         let an_hour_ns = 3600 * 1_000_000_000;
         writers.rotate_expired(TimestampNs(clock.now_ns().0 + an_hour_ns));
         assert_eq!(next_kind().await, "closed");
+    }
+
+    /// The link's contract: the ledger gets the events of one file in the
+    /// file's order (`Created`, any number of `Synced`, `Closed`), whatever
+    /// other tenants and the sweep do at the same time. Nothing orders the
+    /// events of different files.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn the_ledger_gets_the_events_of_each_file_in_the_order_of_the_file() {
+        use ferryboat::{Endpoint, Listener};
+        use wal::FileEvent::{Closed, Created, Synced};
+
+        const TENANTS: [&str; 4] = ["a", "b", "c", "d"];
+        let tmp = tempfile::tempdir().unwrap();
+        let socket = format!(
+            "/tmp/netdata-tenant-writers-order-test-{}.sock",
+            std::process::id()
+        );
+        let _ = std::fs::remove_file(&socket);
+        // Ledger side: capture every event the writers send.
+        let mut listener = Listener::<(), wal::Message>::bind(Endpoint::ipc(&socket))
+            .open()
+            .expect("bind ledger listener");
+        let writers = Arc::new(tenant_writers(tmp.path(), &socket));
+        let mut conn = listener.accept().await.expect("accept writer connection");
+        // Past the one-hour rotation of every file written below.
+        let two_hours_ns = 2 * 3600 * 1_000_000_000;
+        let later = TimestampNs(MonotonicClock::new().now_ns().0 + two_hours_ns);
+
+        // The tenants write and sync at the same time, while the sweep seals
+        // their files under them.
+        let mut tenants = Vec::new();
+        for tenant in TENANTS {
+            let writers = Arc::clone(&writers);
+            tenants.push(tokio::spawn(async move {
+                let mut clock = MonotonicClock::new();
+                let writer = writers.writer_for(&TenantId::from(tenant)).unwrap();
+                for _ in 0..200 {
+                    let mark = {
+                        let mut writer = writer.lock();
+                        let meta = wal::FrameMeta {
+                            entry_count: 1,
+                            ingestion_ns: clock.now_ns(),
+                            log_ts_range: None,
+                        };
+                        writer.write_frame(1, &[], b"frame", meta).unwrap();
+                        writer.write_mark()
+                    };
+                    writer.make_durable(mark).await.unwrap();
+                }
+            }));
+        }
+        let sweeper = {
+            let writers = Arc::clone(&writers);
+            tokio::task::spawn_blocking(move || {
+                for _ in 0..50 {
+                    writers.rotate_expired(later);
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+            })
+        };
+        for tenant in tenants {
+            tenant.await.unwrap();
+        }
+        sweeper.await.unwrap();
+        // Seal what is still open, so that every file has all its events.
+        writers.rotate_expired(later);
+
+        let mut files_on_disk = 0;
+        for tenant in TENANTS {
+            for entry in std::fs::read_dir(tmp.path().join(tenant)).unwrap() {
+                if entry.unwrap().path().extension() == Some("wal".as_ref()) {
+                    files_on_disk += 1;
+                }
+            }
+        }
+
+        let mut events_of_file: HashMap<u64, Vec<wal::FileEvent>> = HashMap::new();
+        let mut closed_files = 0;
+        while closed_files < files_on_disk {
+            let message = tokio::time::timeout(Duration::from_secs(10), conn.recv())
+                .await
+                .expect("the `Closed` of every file must reach the ledger")
+                .expect("recv wal message");
+            let seq = match &message.event {
+                Created { file_id, .. } | Synced { file_id, .. } | Closed { file_id, .. } => {
+                    file_id.seq
+                }
+            };
+            if matches!(message.event, Closed { .. }) {
+                closed_files += 1;
+            }
+            events_of_file.entry(seq).or_default().push(message.event);
+        }
+
+        assert_eq!(events_of_file.len(), files_on_disk);
+        assert!(files_on_disk > TENANTS.len(), "the sweep sealed no file");
+        for (seq, events) in &events_of_file {
+            assert!(
+                matches!(events.first(), Some(Created { .. })),
+                "file {seq} does not start with `Created`: {events:?}"
+            );
+            assert!(
+                matches!(events.last(), Some(Closed { .. })),
+                "file {seq} does not end with `Closed`: {events:?}"
+            );
+            // Between them only `Synced`, and the durable prefix never
+            // shrinks.
+            let mut durable = file_registry::ByteSize::ZERO;
+            for (at, event) in events.iter().enumerate().skip(1) {
+                let valid_up_to = match event {
+                    Synced { valid_up_to, .. } => *valid_up_to,
+                    Closed { valid_up_to, .. } if at == events.len() - 1 => *valid_up_to,
+                    _ => panic!("file {seq} has {event:?} at {at}: {events:?}"),
+                };
+                assert!(valid_up_to >= durable, "file {seq}: {events:?}");
+                durable = valid_up_to;
+            }
+        }
     }
 }

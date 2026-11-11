@@ -241,8 +241,7 @@ async fn run_ingestor(
 
     // Set up the logs + traces pipelines. They SHARE one writer→ledger sender
     // and one global seq allocator: the ledger accepts a single writer
-    // connection (and gap-checks the frame sequence per signal), and file
-    // `seq` must be globally unique across signals.
+    // connection, and file `seq` must be globally unique across signals.
     let (ledger_sender, seq_allocator) =
         create_shared_writer_state(&config, &config.writer_socket_path)?;
     // One process-wide monotonic clock, shared across signals — the WAL writer's
@@ -471,9 +470,8 @@ fn start_service_map(
 }
 
 /// Build the writer→ledger state shared by every ingestion signal: one
-/// `LedgerSender` (the ledger accepts a single writer connection; the frame
-/// sequence is kept per signal inside the sender) and one global `SeqAllocator`
-/// (file `seq` is globally unique across signals).
+/// `LedgerSender` (the ledger accepts a single writer connection) and one
+/// global `SeqAllocator` (file `seq` is globally unique across signals).
 ///
 /// The seq is GLOBAL across signals (one allocator → one highwater file), so the
 /// seed scans BOTH signals' dirs and takes the max. Seeding from one signal alone

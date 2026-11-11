@@ -36,10 +36,8 @@
 //! writer never sends anything itself. The caller (the ingestor) drains and
 //! forwards them to the ledger, which rebuilds live registry state from the
 //! events — disk recovery cannot reconstruct any of it (see `registry.rs`).
-//! The ledger's gap check runs on the per-signal `frame_seq` the caller's
-//! sender assigns, not on anything the writer produces; the events travel as
-//! `wal::Message` over the ingestor→ledger ferryboat link (its size limits
-//! are ferryboat's, not this file's concern).
+//! The events travel as `wal::Message` over the ingestor→ledger ferryboat
+//! link (its size limits are ferryboat's, not this file's concern).
 //!
 //! All methods take `&mut self` with no internal synchronization: the caller
 //! serializes access (the ingestor holds one std mutex per tenant writer).

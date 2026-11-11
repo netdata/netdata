@@ -8,10 +8,10 @@
 //! - Event application ([`Registry::apply_event`]): every event re-reports
 //!   the writer's current accumulator state (not a delta), so applying one
 //!   is an overwrite; `Closed` is authoritative and final — a late `Synced`
-//!   is ignored. The per-signal `frame_seq` gap-check runs upstream
-//!   (otel-ledger's ingestor), so a genuinely lost event leaves an entry
-//!   stale or untracked; it cannot corrupt one. Field semantics are
-//!   `format.rs`'s.
+//!   is ignored. The link delivers a file's events once and in order
+//!   (`format.rs`, [`Message`](crate::Message)); an event that never comes,
+//!   as when the ingestor stops, leaves an entry stale or untracked and
+//!   cannot corrupt one. Field semantics are `format.rs`'s.
 //! - Candidate filtering ([`Registry::candidates`]): the pure in-memory
 //!   time + partition filter the live query planner and the stream selector
 //!   drive. It scales the seconds-based `Query` to the registry's

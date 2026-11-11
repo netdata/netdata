@@ -25,8 +25,8 @@
 //! by `wal::Writer` in the ingestor and, wrapped in [`Message`], applied by
 //! the ledger's per-tenant registries (`file-lifecycle` forwards to
 //! `wal::Registry::apply_event`); `Message` is that link's envelope,
-//! produced by the ingestor's `LedgerSender` and gap-checked + routed in
-//! `otel-ledger`'s ingestor.
+//! produced by the ingestor's `LedgerSender` and routed in `otel-ledger`'s
+//! ingestor.
 //! `Message` rides the ingestor→ledger ferryboat IPC link (length-delimited
 //! bincode, 8 MiB default) — that framing is the transport's, independent of
 //! the WAL frame layout below.
@@ -301,10 +301,9 @@ pub enum FileEvent {
 
 impl FileEvent {
     /// The signal axis (`pipeline_id`) of the file this event concerns. Every
-    /// variant carries a `FileId`, which carries the pipeline. The ingestor
-    /// keys its per-signal `Message::frame_seq` stream by this value, and the
-    /// ledger routes the event to the owning pipeline by it (decoding the raw
-    /// id via `otel_bridge::signals::Signal::try_from`).
+    /// variant carries a `FileId`, which carries the pipeline. The ledger
+    /// routes the event to the owning pipeline by it (decoding the raw id via
+    /// `otel_bridge::signals::Signal::try_from`).
     pub fn pipeline_id(&self) -> u16 {
         match self {
             FileEvent::Created { file_id, .. }
@@ -320,13 +319,13 @@ impl FileEvent {
 /// Cross-process wire contract: the two ends are separate processes
 /// exchanging bincode over the ferryboat link (8 MiB default), so enum
 /// variant order and field shapes must not change silently.
+///
+/// The link is one reliable ordered stream, and the ingestor queues a file's
+/// events under that file's writer lock: the ledger gets every event once,
+/// and the events of one file in the file's order. The messages carry no
+/// number, because the order of the events of different files means nothing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
-    /// The link's per-signal message sequence, not a WAL frame index: the
-    /// ingestor numbers each signal's messages from 1 (keyed by
-    /// [`FileEvent::pipeline_id`]) and the ledger gap-checks per signal — a
-    /// gap is a genuinely lost event for that signal.
-    pub frame_seq: u64,
     /// Tenant the event's file belongs to; routes the event to that tenant's
     /// registry (the event itself carries no tenant).
     pub tenant_id: TenantId,
