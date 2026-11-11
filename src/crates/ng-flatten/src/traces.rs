@@ -21,8 +21,8 @@
 //! [`prepare_trace_frame`] is the single normalize → flatten → encode recipe;
 //! producers: `ng-ingest::write_trace_request` (no bounds — dev/bench) and the
 //! `otel-ingestor` trace service (with bounds). Readers decode via
-//! [`decode_trace_frame`]: `ng-index::sfst_build` (index build) and
-//! `sfsq::traces` (unindexed WAL-tail scan). Same frame rule as logs:
+//! [`decode_trace_frame`]: `ng-index::sfst_build` (the indexing of a closed WAL
+//! file) and `sfsq::traces` (unindexed WAL-tail scan). Same frame rule as logs:
 //! positional bincode with no inner version — the WAL header's
 //! `payload_format` id ([`TRACE_FRAME_PAYLOAD_FORMAT`]) carries the version
 //! (see [`crate::logs`]).

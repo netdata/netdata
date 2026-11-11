@@ -40,7 +40,7 @@
 //!
 //! # Consumers (grep-verified)
 //!
-//! `ng-index` (`sfst_build.rs`): whole-file SFST builds at seal time via
+//! `ng-index` (`sfst_build.rs`): the indexing of whole files at seal time via
 //! `open`, in-memory query chunks via `open_range` (counts cross-checked).
 //! `sfsq` (`logs/wal_scan.rs`, `traces/wal_scan.rs`): tail row-scans via
 //! `open_range`, whole files via `open` in tests/tooling. `otel-ledger`
@@ -111,7 +111,7 @@ impl Reader {
     /// With no durable bound there is no expected torn tail: a payload
     /// shorter than its frame header promises is a truncated or corrupt file
     /// and errors (the `end_bound` field doc has the full contract).
-    /// Whole-file callers: seal-time SFST builds in `ng-index`, test fixtures.
+    /// Whole-file callers: indexing operations in `ng-index`, test fixtures.
     pub fn open(path: &Path) -> Result<Self> {
         Self::open_inner(path, HEADER_SIZE as u64, None)
     }

@@ -1,4 +1,4 @@
-//! Minimal, always-on perf tracking for the index build: named phase timers plus
+//! Minimal, always-on perf tracking for an indexing operation: named phase timers plus
 //! byte/frame/record counters ([`Metrics`]), summarized by [`Metrics::report`] at
 //! end of run, plus a Linux-only RSS reader ([`read_rss`]) for the peak-memory line.
 //!

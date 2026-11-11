@@ -25,8 +25,8 @@
 //! [`prepare_log_frame`] is the single normalize → flatten → encode recipe;
 //! producers: `ng-ingest::write_request` (no bounds) and the `otel-ingestor`
 //! logs service (with ingestion bounds). Readers decode via [`decode_log_frame`]:
-//! `ng-index::sfst_build` (seal-time index build) and `sfsq::logs` (unindexed
-//! WAL-tail scan).
+//! `ng-index::sfst_build` (the indexing of a closed WAL file) and `sfsq::logs`
+//! (unindexed WAL-tail scan).
 
 use serde::{Deserialize, Serialize};
 
