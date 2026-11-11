@@ -40,7 +40,8 @@
 //!   unknown tenant lists nothing.
 //!
 //! Not pinned here: `recover` (including its fatal WAL-scan panic),
-//! `apply_wal_event`'s route-on-Created/Closed and its error surfacing,
+//! `apply_wal_event`'s route on an applied `Created` (only "a refused event
+//! leaves no route" is pinned),
 //! `discover_tenants`, `get_or_create`'s directory layout and its
 //! no-recovery-on-create contract, `sfst_candidates` standalone, the WAL
 //! side of `query_snapshot` (SFST-wins dedup and the `valid_up_to == 0`
@@ -220,6 +221,36 @@ fn for_seq_mut_round_trips_routing() {
 
     let forgotten = tr.forget_seq(10);
     assert_eq!(forgotten, Some(tenant_a));
+    assert!(tr.for_seq(10).is_none());
+}
+
+/// An event the WAL registry refuses leaves no route behind: a route says
+/// that the tenant's registry tracks the file.
+#[test]
+fn a_refused_wal_event_leaves_no_route() {
+    let wal_base = tempfile::tempdir().unwrap();
+    let index_base = tempfile::tempdir().unwrap();
+    let catalog_base = tempfile::tempdir().unwrap();
+    let mut tr = TenantRegistries::new(
+        wal_base.path().to_path_buf(),
+        index_base.path().to_path_buf(),
+        catalog_base.path().to_path_buf(),
+    );
+    let tenant = TenantId::from("tenant-a");
+    // The `Closed` of a file whose `Created` never came.
+    let closed = wal::FileEvent::Closed {
+        file_id: file_registry::FileId::new(ident(), 0, 10, 0),
+        frame_count: 1,
+        min_timestamp_ns: file_registry::TimestampNs(1),
+        max_timestamp_ns: file_registry::TimestampNs(2),
+        size: file_registry::ByteSize(100),
+        valid_up_to: file_registry::ByteSize(100),
+        entry_count: 1,
+    };
+
+    let err = tr.apply_wal_event(&tenant, &closed).unwrap_err();
+
+    assert!(matches!(err, wal::Error::UnknownSequence(10)), "{err}");
     assert!(tr.for_seq(10).is_none());
 }
 

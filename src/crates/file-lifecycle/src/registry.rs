@@ -453,26 +453,29 @@ impl TenantRegistries {
         self.seq_to_tenant.insert(seq, tenant_id);
     }
 
-    /// Apply a WAL event for `tenant_id`: route the seq to the tenant on
-    /// file-lifecycle events, create the tenant's registry on first sight, and
-    /// hand the event to [`Registry::wal`].
+    /// Apply a WAL event for `tenant_id`: create the tenant's registry on
+    /// first sight, hand the event to [`Registry::wal`], and route the seq to
+    /// the tenant once the file's `Created` is applied.
     ///
     /// Errors are `wal::Registry::apply_event`'s bookkeeping rejections
     /// (`Error::DuplicateSequence` for a replayed `Created`,
     /// `Error::UnknownSequence` for a `Synced`/`Closed` whose `Created` was
-    /// lost); the caller (otel-ledger's ingestor) logs and drops the event.
+    /// lost, `Error::AlreadyClosed` for a second `Closed`); the caller
+    /// (otel-ledger's ingestor) logs and drops the event. A refused event
+    /// leaves no route: a route says that the tenant's registry tracks the
+    /// file.
     pub fn apply_wal_event(
         &mut self,
         tenant_id: &TenantId,
         event: &wal::FileEvent,
     ) -> wal::Result<()> {
-        // Synced fires mid-file and adds no new (seq, tenant) mapping.
-        if let wal::FileEvent::Created { file_id, .. } | wal::FileEvent::Closed { file_id, .. } =
-            event
-        {
+        self.get_or_create(tenant_id).wal.apply_event(event)?;
+
+        // `Synced` and `Closed` name a file that `Created` already routed.
+        if let wal::FileEvent::Created { file_id, .. } = event {
             self.route_seq_to(file_id.seq, tenant_id.clone());
         }
-        self.get_or_create(tenant_id).wal.apply_event(event)
+        Ok(())
     }
 
     /// Look up the registry that owns `seq`. Returns the tenant id and a

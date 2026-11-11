@@ -22,7 +22,7 @@
 //!   (`writer.rs`) raise `InvalidHeader` for the reserved `payload_format`
 //!   0 and an oversized `content_meta`.
 //! - Registry event bookkeeping: `Registry::apply_event` (`registry.rs`)
-//!   raises `DuplicateSequence` and `UnknownSequence`.
+//!   raises `DuplicateSequence`, `UnknownSequence` and `AlreadyClosed`.
 //!
 //! Consumers (grep-verified): `sfsq-cli/src/traces.rs` matches
 //! `Error::Io(_)` by name — I/O there is a path-level failure (fatal for the
@@ -162,6 +162,14 @@ pub enum Error {
     /// file untracked. Message-only.
     #[error("unknown sequence {0}: file not tracked")]
     UnknownSequence(u64),
+
+    /// `Registry::apply_event` got a `Closed` naming a file that is already
+    /// closed. A writer closes a file once, and the ledger starts an
+    /// indexing operation for every `Closed` it applies: a second one must
+    /// not start a second operation on the same file. otel-ledger logs and
+    /// drops the event. Message-only.
+    #[error("sequence {0} is already closed")]
+    AlreadyClosed(u64),
 
     /// An fsync of a WAL file failed. The kernel reports a failed
     /// write-back once per open file: the next fsync of the same file

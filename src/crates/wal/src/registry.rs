@@ -243,12 +243,14 @@ impl Registry {
     /// - `Closed`: seal — set `Archived` and write the final size, range,
     ///   and durable prefix. The event carries the durable prefix itself,
     ///   so the sealed entry is correct even if the final `Synced` was
-    ///   reordered or lost in flight.
+    ///   reordered or lost in flight. `Error::AlreadyClosed` for a file that
+    ///   is `Archived` already: a file is closed once, and the caller starts
+    ///   an indexing operation for every `Closed` that is applied.
     ///
     /// Errors: `Error::UnknownSequence` when `Synced`/`Closed` names a file
     /// the registry does not track (its `Created` was lost, or the entry
-    /// was already removed). otel-ledger logs and drops the event on either
-    /// error. The `frame_count` field is informational; the registry
+    /// was already removed). otel-ledger logs and drops the event on any
+    /// of the three errors. The `frame_count` field is informational; the registry
     /// ignores it.
     pub fn apply_event(&mut self, event: &FileEvent) -> Result<()> {
         match event {
@@ -307,6 +309,9 @@ impl Registry {
                     .files
                     .get_mut(file_id.seq)
                     .ok_or(Error::UnknownSequence(file_id.seq))?;
+                if entry.status == FileStatus::Archived {
+                    return Err(Error::AlreadyClosed(file_id.seq));
+                }
                 entry.status = FileStatus::Archived;
                 entry.size = *size;
                 entry.min_timestamp_ns = *min_timestamp_ns;
@@ -958,6 +963,37 @@ mod tests {
             partition_keys: Vec::new(),
         };
         assert!(reg.candidates(&q).next().is_none());
+    }
+
+    /// A file is closed once. The ledger starts an indexing operation for
+    /// every `Closed` it applies, so a second one must not be applied.
+    #[test]
+    fn a_second_closed_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let id = test_file_id(1);
+        let closed = FileEvent::Closed {
+            file_id: id,
+            frame_count: 2,
+            min_timestamp_ns: TimestampNs(150),
+            max_timestamp_ns: TimestampNs(400),
+            size: ByteSize(200),
+            valid_up_to: ByteSize(200),
+            entry_count: 2,
+        };
+
+        let mut registry = Registry::new(dir.path());
+        registry.recover().unwrap();
+        registry
+            .apply_event(&FileEvent::Created {
+                file_id: id,
+                created_at_ns: TimestampNs(1_000_000_000),
+                content_meta: Vec::new(),
+            })
+            .unwrap();
+        registry.apply_event(&closed).unwrap();
+
+        let err = registry.apply_event(&closed).unwrap_err();
+        assert!(matches!(err, Error::AlreadyClosed(1)), "{err}");
     }
 
     #[test]
