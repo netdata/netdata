@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"unicode/utf8"
 )
 
 // BotPatternJS is the bot pattern the snippet tests navigator.userAgent
@@ -21,13 +22,26 @@ type contextRule struct {
 }
 
 var (
-	botOnce  sync.Once
-	botPlain *regexp.Regexp
-	botRules []contextRule
+	botOnce    sync.Once
+	botEntries []*regexp.Regexp
+	botRules   []contextRule
 )
 
+// botFolded is every plain entry as one case-folding expression. Matching it
+// walks all alternatives for each input character, so it serves only input
+// with non-ASCII bytes: lower-casing such text is not equivalent to folding
+// (ſ, K and İ change which letters and word boundaries match).
+var botFolded = sync.OnceValue(func() *regexp.Regexp {
+	return regexp.MustCompile("(?i)" + strings.Join(botPatternsRE2, "|"))
+})
+
 func compileBots() {
-	botPlain = regexp.MustCompile("(?i)" + strings.Join(botPatternsRE2, "|"))
+	// Entries are lower-case; compiled separately they match lower-cased ASCII
+	// text exactly like botFolded, and literal entries use substring search.
+	botEntries = make([]*regexp.Regexp, len(botPatternsRE2))
+	for i, entry := range botPatternsRE2 {
+		botEntries[i] = regexp.MustCompile(entry)
+	}
 	rule := func(core string, notBefore, notAfter []string) contextRule {
 		return contextRule{regexp.MustCompile(core), notBefore, notAfter}
 	}
@@ -48,10 +62,16 @@ func IsBot(ua string) bool {
 		return false
 	}
 	botOnce.Do(compileBots)
-	if botPlain.MatchString(ua) {
+	lower := strings.ToLower(ua)
+	if isASCII(ua) {
+		for _, entry := range botEntries {
+			if entry.MatchString(lower) {
+				return true
+			}
+		}
+	} else if botFolded().MatchString(ua) {
 		return true
 	}
-	lower := strings.ToLower(ua)
 	for _, r := range botRules {
 		for _, m := range r.core.FindAllStringIndex(lower, -1) {
 			if !endsWithAny(lower[:m[0]], r.notBefore) && !startsWithAny(lower[m[1]:], r.notAfter) {
@@ -60,6 +80,15 @@ func IsBot(ua string) bool {
 		}
 	}
 	return false
+}
+
+func isASCII(s string) bool {
+	for i := range len(s) {
+		if s[i] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
 }
 
 func endsWithAny(s string, suffixes []string) bool {
