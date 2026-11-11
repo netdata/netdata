@@ -58,3 +58,39 @@ func TestTopologyFocusValidationPipeline(t *testing.T) {
 		}
 	}
 }
+
+func TestAppliedFocusValidationPipeline(t *testing.T) {
+	schema := readTestFile(t, filepath.Join("..", "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json"))
+	fixture := readTestFile(t, filepath.Join("..", "fixtures", "topology-v1", "snmp-l2.json"))
+	for _, test := range []struct {
+		name  string
+		focus map[string]any
+		valid bool
+	}{
+		{"unlimited", map[string]any{"roots": []int{0}}, true},
+		{"zero depth", map[string]any{"roots": []int{0}, "depth": 0}, true},
+		{"empty roots", map[string]any{"roots": []int{}}, true},
+		{"out of bounds", map[string]any{"roots": []int{1000000}}, false},
+		{"negative depth", map[string]any{"roots": []int{0}, "depth": -1}, false},
+		{"missing roots", map[string]any{"depth": 1}, false},
+		{"null roots", map[string]any{"roots": nil}, false},
+		{"unknown member", map[string]any{"roots": []int{0}, "unknown": true}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var payload map[string]any
+			require.NoError(t, json.Unmarshal(fixture, &payload))
+			payload["data"].(map[string]any)["view"] = map[string]any{"focus": test.focus}
+			encoded, err := json.Marshal(payload)
+			require.NoError(t, err)
+			got, err := validateJSON(schema, encoded)
+			if !test.valid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			output, err := json.Marshal(got)
+			require.NoError(t, err)
+			assert.JSONEq(t, string(encoded), string(output))
+		})
+	}
+}

@@ -73,6 +73,9 @@ func ValidateDecodedData(data map[string]any) error {
 	if err != nil {
 		return fmt.Errorf("data.actors: %w", err)
 	}
+	if err := validateViewFocus(data["view"], actorRows); err != nil {
+		return err
+	}
 	linkRows, err := decodedTableRows(data["links"])
 	if err != nil {
 		return fmt.Errorf("data.links: %w", err)

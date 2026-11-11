@@ -363,6 +363,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "focus": {
+          "$ref": "#/$defs/view_focus"
+        },
         "id": {
           "$ref": "#/$defs/id"
         },
@@ -398,6 +401,21 @@
           "uniqueItems": true,
           "default": []
         }
+      }
+    },
+    "view_focus": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Applied focus in the returned map. Omit focus when no focus was applied; omit depth for unlimited traversal.",
+      "required": ["roots"],
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0},
+          "uniqueItems": true,
+          "description": "Distinct zero-based actor row references in this response after filtering and remapping. An empty array means no selected roots survived."
+        },
+        "depth": {"type": "integer", "minimum": 0}
       }
     },
     "dictionaries": {

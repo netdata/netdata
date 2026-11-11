@@ -22,7 +22,7 @@ Read the owner for the plane you touch; do not work from memory of it.
 | `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Every required field and closed token (icons, colors, layout, cell types, visibility, projections, arrow, direction, severities, rule classes). Named record definitions are `additionalProperties: false`; the type registries, `evidence`, `scale_keys`, `correlation.rules`, and the maps under `data.tables.actor` / `.relationship` are maps keyed by producer-chosen ids (`propertyNames` = `id`); `dictionaries`, `stats`, `extensions`, `badge_map`, and `link_aggregation.metrics` are open maps; `required_params[]` stays open except for optional typed focus metadata. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | The payload contract, plane by plane, plus per-producer Shape sections and the aggregator rules a producer relies on. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` | Migration state per producer, Cloud aggregator and frontend scope, the CTS gate, and design that is not yet in the schema. |
-| `src/go/pkg/topology/v1` | Go builders and semantic validators (`validate.go`, `validate_notification.go`, `validate_focus.go`). |
+| `src/go/pkg/topology/v1` | Go builders and semantic validators (`validate.go`, `validate_notification.go`, `validate_focus.go`, `validate_view.go`). |
 | `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md` | SNMP producer internals, where to change what, and its validation commands. |
 | `src/go/pkg/l2topology/parity/README.md` | The L2 parity runbook against the enlinkd oracle. |
 | `src/go/tools/functions-validation/README.md#validate-topology-v1-fixtures` | Validating any topology payload file from the CLI. |
@@ -68,7 +68,8 @@ summary alone; distinguish intended contract from what the checked implementatio
   vocabularies. Structural tokens (`orientation`, `direction_role`, `link_type.aggregation.*`, `evidence_type.role`,
   `column.role`, `layer`, `view.mode`, `supported_modes`, `evidence_policy`) are schema-only. Whole-response focus
   validation also checks role/option consistency, binding-table actor ownership/detail/append semantics, binding
-  options/actor refs and traversal type references. Outside this focus obligation, table role/aggregation remain
+  options/actor refs and traversal type references. Applied `data.view.focus` validates distinct returned-map
+  actor references and optional non-negative depth. Outside this focus obligation, table role/aggregation remain
   schema-only. See `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus`.
   Producer data-only tests call `ValidateDecodedData`
   (`cato_networks/topology_test.go` is the reference shape). The CLI tool always validates against one JSON Schema

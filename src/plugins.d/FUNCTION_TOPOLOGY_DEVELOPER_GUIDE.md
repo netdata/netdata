@@ -239,6 +239,15 @@ link arrow direction:
    while it has a retained incident link of the specified type. Parallel links do
    not count as distinct neighbors. Empty pruning declarations disable this step.
 
+A response that reports applied focus uses optional `data.view.focus`:
+`roots` contains distinct zero-based actor row references in the **returned** map,
+after filtering and remapping. `depth` is a non-negative integer; omit it for
+unlimited traversal. An empty `roots` array is valid when no selected roots
+survive. Omit `focus` entirely when no focus was applied. This describes the
+applied operation; it does not replace selector declarations or source bindings.
+Consumers that do not use this metadata may ignore it. Existing producers are
+not required to add it to their direct per-node responses.
+
 SNMP emits bindings as `data.tables.actor.focus_roots`, with columns `option` and
 `actor`. Choices and bindings use the same reconciled managed-device addresses as
 direct focus, not raw SNMP aliases. Its `segment` type is a connector and

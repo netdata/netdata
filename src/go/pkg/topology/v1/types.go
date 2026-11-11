@@ -76,11 +76,19 @@ type Notification struct {
 }
 
 type View struct {
-	ID             string   `json:"id,omitempty"`
-	Scope          string   `json:"scope,omitempty"`
-	Mode           string   `json:"mode,omitempty"`
-	SupportedModes []string `json:"supported_modes,omitempty"`
-	GroupBy        []string `json:"group_by,omitempty"`
+	ID             string     `json:"id,omitempty"`
+	Scope          string     `json:"scope,omitempty"`
+	Mode           string     `json:"mode,omitempty"`
+	SupportedModes []string   `json:"supported_modes,omitempty"`
+	GroupBy        []string   `json:"group_by,omitempty"`
+	Focus          *ViewFocus `json:"focus,omitempty"`
+}
+
+// ViewFocus describes applied focus using actor rows in the returned map.
+// Omit Depth for unlimited traversal; zero keeps only the roots and connecting paths.
+type ViewFocus struct {
+	Roots []int `json:"roots"`
+	Depth *int  `json:"depth,omitempty"`
 }
 
 type Dictionaries map[string][]any
