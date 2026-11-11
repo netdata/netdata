@@ -73,7 +73,32 @@ void send_resource_usage_to_netdata(usec_t dt) {
                 "DIMENSION new_pids 'new pids' incremental 1 1\n"
                 , update_every
         );
+
+        // dynamic targets per family (apps_groups.conf groups excluded), and the
+        // ones retired after being idle; the overflow targets carry what the cap
+        // refused, under the 'other' charts of each family
+        fprintf(stdout,
+                "CHART netdata.apps_targets '' 'Apps Plugin Dynamic Targets' 'targets' apps.plugin netdata.apps_targets line 140002 %d\n",
+                update_every);
+        for(size_t fi = 0; fi < TARGET_FAMILY_MAX ; fi++)
+            fprintf(stdout, "DIMENSION %s '' absolute 1 1\n", target_families[fi].type);
+
+        fprintf(stdout,
+                "CHART netdata.apps_targets_retired '' 'Apps Plugin Retired Targets' 'targets/s' apps.plugin netdata.apps_targets_retired line 140003 %d\n",
+                update_every);
+        for(size_t fi = 0; fi < TARGET_FAMILY_MAX ; fi++)
+            fprintf(stdout, "DIMENSION %s '' incremental 1 1\n", target_families[fi].type);
     }
+
+    fprintf(stdout, "BEGIN netdata.apps_targets %"PRIu64"\n", dt);
+    for(size_t fi = 0; fi < TARGET_FAMILY_MAX ; fi++)
+        fprintf(stdout, "SET %s = %zu\n", target_families[fi].type, target_families[fi].dynamic);
+    fprintf(stdout, "END\n");
+
+    fprintf(stdout, "BEGIN netdata.apps_targets_retired %"PRIu64"\n", dt);
+    for(size_t fi = 0; fi < TARGET_FAMILY_MAX ; fi++)
+        fprintf(stdout, "SET %s = %zu\n", target_families[fi].type, target_families[fi].retired);
+    fprintf(stdout, "END\n");
 
     fprintf(stdout,
             "BEGIN netdata.apps_cpu %"PRIu64"\n"
@@ -107,10 +132,11 @@ void send_resource_usage_to_netdata(usec_t dt) {
     );
 }
 
-void send_collected_data_to_netdata(struct target *root, const char *type, usec_t dt) {
+void send_collected_data_to_netdata(struct target_family *f, usec_t dt) {
+    const char *type = f->type;
     struct target *w;
 
-    for (w = root; w ; w = w->next) {
+    for (w = *f->root; w ; w = w->next) {
         if (unlikely(!w->exposed))
             continue;
 
@@ -273,23 +299,30 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
 // ----------------------------------------------------------------------------
 // generate the charts
 
-static void send_file_charts_to_netdata(struct target *w, const char *type, const char *lbl_name, const char *title, bool obsolete) {
-#if (PROCESSES_HAVE_FDS == 1)
-    fprintf(stdout, "CHART %s.%s_fds_open_limit '' '%s open file descriptors limit' '%%' fds %s.fds_open_limit line 20200 %d %s\n",
-            type, string2str(w->clean_name), title, type, update_every, obsolete ? "obsolete" : "");
+// Announce one chart of a target, or mark it obsolete. Returns true when the
+// caller must follow with the chart's DIMENSION lines.
+static bool send_target_chart(struct target *w, const struct target_family *f, bool obsolete,
+                              const char *suffix, const char *title, const char *units,
+                              const char *family, const char *chart_type, int priority) {
+    fprintf(stdout, "CHART %s.%s_%s '' '%s %s' '%s' %s %s.%s %s %d %d%s\n",
+            f->type, string2str(w->clean_name), suffix, f->title, title, units, family,
+            f->type, suffix, chart_type, priority, update_every, obsolete ? " obsolete" : "");
 
-    if(!obsolete) {
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(obsolete)
+        return false;
+
+    send_CLABEL_COMMIT(f->lbl_name, string2str(w->name));
+    return true;
+}
+
+static void send_file_charts_to_netdata(struct target *w, const struct target_family *f, bool obsolete) {
+#if (PROCESSES_HAVE_FDS == 1)
+    if(send_target_chart(w, f, obsolete, "fds_open_limit", "open file descriptors limit", "%", "fds", "line", 20200))
         fprintf(stdout, "DIMENSION limit '' absolute 1 100\n");
-    }
 #endif
 
 #if (PROCESSES_HAVE_FDS == 1) || (PROCESSES_HAVE_HANDLES == 1)
-    fprintf(stdout, "CHART %s.%s_fds_open '' '%s open files descriptors' 'fds' fds %s.fds_open stacked 20210 %d %s\n",
-            type, string2str(w->clean_name), title, type, update_every, obsolete ? "obsolete" : "");
-
-    if(!obsolete) {
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "fds_open", "open files descriptors", "fds", "fds", "stacked", 20210)) {
 #if (PROCESSES_HAVE_FDS == 1)
         fprintf(stdout, "DIMENSION files '' absolute 1 1\n");
         fprintf(stdout, "DIMENSION sockets '' absolute 1 1\n");
@@ -306,6 +339,11 @@ static void send_file_charts_to_netdata(struct target *w, const char *type, cons
 #endif // PROCESSES_HAVE_HANDLES
     }
 #endif // PROCESSES_HAVE_FDS || PROCESSES_HAVE_HANDLES
+
+    if(obsolete)
+        w->charts &= ~TARGET_CHARTS_FILES;
+    else
+        w->charts |= TARGET_CHARTS_FILES;
 }
 
 #if defined(OS_LINUX)
@@ -344,29 +382,35 @@ static inline const char *apps_ebpf_chart_id(const struct apps_ebpf_chart *chart
 
 /* with_errors selects whether the errors_only charts are included.  It MUST hold
  * the same value here and in send_ebpf_data_to_netdata for a given module: a SET
- * to a chart that was never declared makes pluginsd log an error every cycle. */
+ * to a chart that was never declared makes pluginsd log an error every cycle.
+ * eBPF charts exist for the app family only: send_charts_updates_to_netdata()
+ * announces them for that family alone, so the per-target TARGET_CHARTS_EBPF_*
+ * bits record exactly what was sent and the obsolete path follows them. */
 static void send_ebpf_charts_to_netdata(
     struct target *w,
-    const char *type,
-    const char *lbl_name,
+    const struct target_family *f,
     const char *family,
     const struct apps_ebpf_chart *charts,
     size_t count,
-    bool with_errors)
+    bool with_errors,
+    bool obsolete)
 {
-    if (strcmp(type, NETDATA_APP_FAMILY) != 0)
-        return;
-
+    const char *type = f->type;
     const char *name = string2str(w->clean_name);
     const char *wname = string2str(w->name);
     for (size_t i = 0; i < count; i++) {
         if (charts[i].errors_only && !with_errors)
             continue;
 
-        fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' %s %s.%s %s %d %d\n",
+        fprintf(stdout, "CHART %s.%s_%s '' '%s' '%s' %s %s.%s %s %d %d%s\n",
                 type, name, apps_ebpf_chart_id(&charts[i]), charts[i].title, charts[i].units, family,
-                type, charts[i].suffix, charts[i].style, charts[i].priority, update_every);
-        send_CLABEL_COMMIT(lbl_name, wname);
+                type, charts[i].suffix, charts[i].style, charts[i].priority, update_every,
+                obsolete ? " obsolete" : "");
+
+        if (obsolete)
+            continue;
+
+        send_CLABEL_COMMIT(f->lbl_name, wname);
         fprintf(stdout, "DIMENSION %s '' %s 1 1\n", charts[i].dim, charts[i].algo);
     }
 }
@@ -433,9 +477,13 @@ static const struct apps_ebpf_chart apps_fd_charts[] = {
     { "ebpf_file_close_error", "Fails to close files.", "calls/s", "stacked", 20223, "calls", "incremental", NULL, true  },
 };
 
-static void send_cachestat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
-    send_ebpf_charts_to_netdata(w, type, lbl_name, "page_cache",
-                                apps_cachestat_charts, _countof(apps_cachestat_charts), true);
+static void send_cachestat_charts_to_netdata(struct target *w, const struct target_family *f, bool obsolete) {
+    send_ebpf_charts_to_netdata(w, f, "page_cache",
+                                apps_cachestat_charts, _countof(apps_cachestat_charts), true, obsolete);
+    if (obsolete)
+        w->charts &= ~TARGET_CHARTS_EBPF_CACHESTAT;
+    else
+        w->charts |= TARGET_CHARTS_EBPF_CACHESTAT;
 }
 
 static void send_cachestat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
@@ -449,9 +497,13 @@ static void send_cachestat_data_to_netdata(struct target *w, const char *type, u
     send_ebpf_data_to_netdata(w, type, dt, apps_cachestat_charts, values, _countof(values), true);
 }
 
-static void send_dcstat_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
-    send_ebpf_charts_to_netdata(w, type, lbl_name, "directory_cache",
-                                apps_dcstat_charts, _countof(apps_dcstat_charts), true);
+static void send_dcstat_charts_to_netdata(struct target *w, const struct target_family *f, bool obsolete) {
+    send_ebpf_charts_to_netdata(w, f, "directory_cache",
+                                apps_dcstat_charts, _countof(apps_dcstat_charts), true, obsolete);
+    if (obsolete)
+        w->charts &= ~TARGET_CHARTS_EBPF_DCSTAT;
+    else
+        w->charts |= TARGET_CHARTS_EBPF_DCSTAT;
 }
 
 static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec_t dt) {
@@ -465,10 +517,19 @@ static void send_dcstat_data_to_netdata(struct target *w, const char *type, usec
     send_ebpf_data_to_netdata(w, type, dt, apps_dcstat_charts, values, _countof(values), true);
 }
 
-static void send_fd_charts_to_netdata(struct target *w, const char *type, const char *lbl_name) {
-    send_ebpf_charts_to_netdata(w, type, lbl_name, "fds",
-                                apps_fd_charts, _countof(apps_fd_charts),
-                                apps_ebpf_fd_errors_are_available());
+/* On obsoletion the error charts are included only if this target announced them. */
+static void send_fd_charts_to_netdata(struct target *w, const struct target_family *f, bool obsolete) {
+    bool with_errors = obsolete ? (w->charts & TARGET_CHARTS_EBPF_FD_ERRORS) : apps_ebpf_fd_errors_are_available();
+
+    send_ebpf_charts_to_netdata(w, f, "fds", apps_fd_charts, _countof(apps_fd_charts), with_errors, obsolete);
+
+    if (obsolete)
+        w->charts &= ~(TARGET_CHARTS_EBPF_FD | TARGET_CHARTS_EBPF_FD_ERRORS);
+    else {
+        w->charts |= TARGET_CHARTS_EBPF_FD;
+        if (with_errors)
+            w->charts |= TARGET_CHARTS_EBPF_FD_ERRORS;
+    }
 }
 
 static void send_fd_data_to_netdata(struct target *w, const char *type, usec_t dt) {
@@ -484,184 +545,183 @@ static void send_fd_data_to_netdata(struct target *w, const char *type, usec_t d
 }
 #endif
 
-void send_charts_updates_to_netdata(struct target *root, const char *type, const char *lbl_name, const char *title) {
-    struct target *w;
-
-    bool disable_file_charts_on_this_run = obsolete_file_charts;
-    obsolete_file_charts = false;
-
-    for (w = root; w; w = w->next) {
-        if (likely(w->exposed || (!w->values[PDF_PROCESSES]))) {
-            if(w->exposed && disable_file_charts_on_this_run)
-                send_file_charts_to_netdata(w, type, lbl_name, title, true);
-            continue;
-        }
-
-        w->exposed = true;
-
-        fprintf(stdout, "CHART %s.%s_cpu_utilization '' '%s CPU utilization (100%% = 1 core)' 'percentage' cpu %s.cpu_utilization stacked 20001 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+// The charts every exposed target has. obsolete=true marks them obsolete instead
+// of defining them; the optional ones follow the startup-only options, so the
+// same conditions select exactly what was defined.
+static void send_target_base_charts(struct target *w, const struct target_family *f, bool obsolete) {
+    if(send_target_chart(w, f, obsolete, "cpu_utilization", "CPU utilization (100% = 1 core)", "percentage", "cpu", "stacked", 20001)) {
         fprintf(stdout, "DIMENSION user '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
         fprintf(stdout, "DIMENSION system '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
+    }
 
 #if (PROCESSES_HAVE_CPU_GUEST_TIME == 1)
-        if (enable_guest_charts) {
-            fprintf(stdout, "CHART %s.%s_cpu_guest_utilization '' '%s CPU guest utlization (100%% = 1 core)' 'percentage' cpu %s.cpu_guest_utilization line 20005 %d\n",
-                    type, string2str(w->clean_name), title, type, update_every);
-            send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if (enable_guest_charts) {
+        if(send_target_chart(w, f, obsolete, "cpu_guest_utilization", "CPU guest utlization (100% = 1 core)", "percentage", "cpu", "line", 20005))
             fprintf(stdout, "DIMENSION guest '' absolute 1 %llu\n", NSEC_PER_SEC / 100ULL);
-        }
+    }
 #endif
 
 #ifndef OS_WINDOWS
-        fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20050 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "mem_private_usage", "memory usage without shared", "MiB", "mem", "area", 20050))
         fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 #endif //OS_WINDOWS
 
 #if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
-        fprintf(stdout, "CHART %s.%s_cpu_context_switches '' '%s CPU context switches' 'switches/s' cpu %s.cpu_context_switches stacked 20010 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "cpu_context_switches", "CPU context switches", "switches/s", "cpu", "stacked", 20010)) {
 #if (PROCESSES_HAVE_VOLCTX == 1)
         fprintf(stdout, "DIMENSION voluntary '' absolute 1 %llu\n", RATES_DETAIL);
 #endif
 #if (PROCESSES_HAVE_NVOLCTX == 1)
         fprintf(stdout, "DIMENSION involuntary '' absolute 1 %llu\n", RATES_DETAIL);
 #endif
+    }
 #endif
 
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
-        if(pss_refresh_period > 0) {
-            fprintf(stdout, "CHART %s.%s_estimated_mem_usage '' '%s estimated memory usage (RSS with shared scaling)' 'MiB' mem %s.estimated_mem_usage area 20055 %d\n",
-                    type, string2str(w->clean_name), title, type, update_every);
-            send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(pss_refresh_period > 0) {
+        if(send_target_chart(w, f, obsolete, "estimated_mem_usage", "estimated memory usage (RSS with shared scaling)", "MiB", "mem", "area", 20055))
             fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
-        }
+    }
 #endif
 
-        fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20055 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "mem_usage", "memory RSS usage", "MiB", "mem", "area", 20055))
         fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 
-        fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "vmem_usage", "virtual memory size", "MiB", "mem", "line", 20065))
         fprintf(stdout, "DIMENSION vmem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 
-        fprintf(stdout, "CHART %s.%s_mem_page_faults '' '%s memory page faults' 'pgfaults/s' mem %s.mem_page_faults stacked 20060 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "mem_page_faults", "memory page faults", "pgfaults/s", "mem", "stacked", 20060)) {
         fprintf(stdout, "DIMENSION minor '' absolute 1 %llu\n", RATES_DETAIL);
 #if (PROCESSES_HAVE_MAJFLT == 1)
         fprintf(stdout, "DIMENSION major '' absolute 1 %llu\n", RATES_DETAIL);
 #endif
+    }
 
 #if (PROCESSES_HAVE_VMSWAP == 1)
-        fprintf(stdout, "CHART %s.%s_swap_usage '' '%s swap usage' 'MiB' mem %s.swap_usage area 20065 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "swap_usage", "swap usage", "MiB", "mem", "area", 20065))
         fprintf(stdout, "DIMENSION swap '' absolute %ld %ld\n", 1L, 1024L * 1024L);
 #endif
 
 #if (PROCESSES_HAVE_PHYSICAL_IO == 1)
-        fprintf(stdout, "CHART %s.%s_disk_physical_io '' '%s disk physical IO' 'KiB/s' disk %s.disk_physical_io area 20100 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "disk_physical_io", "disk physical IO", "KiB/s", "disk", "area", 20100)) {
         fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
         fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
+    }
 #endif
 
 #if (PROCESSES_HAVE_LOGICAL_IO == 1)
-        fprintf(stdout, "CHART %s.%s_disk_logical_io '' '%s disk logical IO' 'KiB/s' disk %s.disk_logical_io area 20105 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "disk_logical_io", "disk logical IO", "KiB/s", "disk", "area", 20105)) {
         fprintf(stdout, "DIMENSION reads '' absolute 1 %llu\n", 1024LLU * RATES_DETAIL);
         fprintf(stdout, "DIMENSION writes '' absolute -1 %llu\n", 1024LLU * RATES_DETAIL);
+    }
 #endif
 
-        fprintf(stdout, "CHART %s.%s_processes '' '%s processes' 'processes' processes %s.processes line 20150 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "processes", "processes", "processes", "processes", "line", 20150))
         fprintf(stdout, "DIMENSION processes '' absolute 1 1\n");
 
-        fprintf(stdout, "CHART %s.%s_threads '' '%s threads' 'threads' processes %s.threads line 20155 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "threads", "threads", "threads", "processes", "line", 20155))
         fprintf(stdout, "DIMENSION threads '' absolute 1 1\n");
 
-        if (enable_file_charts)
-            send_file_charts_to_netdata(w, type, lbl_name, title, false);
-
-#if defined(OS_LINUX)
-        if (apps_ebpf_cachestat_is_available())
-            send_cachestat_charts_to_netdata(w, type, lbl_name);
-        if (apps_ebpf_dcstat_is_available())
-            send_dcstat_charts_to_netdata(w, type, lbl_name);
-        if (apps_ebpf_fd_is_available())
-            send_fd_charts_to_netdata(w, type, lbl_name);
-#endif
-
-        fprintf(stdout, "CHART %s.%s_uptime '' '%s uptime' 'seconds' uptime %s.uptime line 20250 %d\n",
-                type, string2str(w->clean_name), title, type, update_every);
-        send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if(send_target_chart(w, f, obsolete, "uptime", "uptime", "seconds", "uptime", "line", 20250))
         fprintf(stdout, "DIMENSION uptime '' absolute 1 1\n");
 
-        if (enable_detailed_uptime_charts) {
-            fprintf(stdout, "CHART %s.%s_uptime_summary '' '%s uptime summary' 'seconds' uptime %s.uptime_summary area 20255 %d\n",
-                    type, string2str(w->clean_name), title, type, update_every);
-            send_CLABEL_COMMIT(lbl_name, string2str(w->name));
+    if (enable_detailed_uptime_charts) {
+        if(send_target_chart(w, f, obsolete, "uptime_summary", "uptime summary", "seconds", "uptime", "area", 20255)) {
             fprintf(stdout, "DIMENSION min '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION avg '' absolute 1 1\n");
             fprintf(stdout, "DIMENSION max '' absolute 1 1\n");
         }
     }
 
+    if(obsolete)
+        w->charts &= ~TARGET_CHARTS_BASE;
+    else
+        w->charts |= TARGET_CHARTS_BASE;
+}
+
+// Obsolete every chart a retiring target announced.
+void send_target_charts_obsolete(struct target *w, const struct target_family *f) {
+    if(w->charts & TARGET_CHARTS_BASE)
+        send_target_base_charts(w, f, true);
+
+    if(w->charts & TARGET_CHARTS_FILES)
+        send_file_charts_to_netdata(w, f, true);
+
+#if defined(OS_LINUX)
+    if(w->charts & TARGET_CHARTS_EBPF_CACHESTAT)
+        send_cachestat_charts_to_netdata(w, f, true);
+    if(w->charts & TARGET_CHARTS_EBPF_DCSTAT)
+        send_dcstat_charts_to_netdata(w, f, true);
+    if(w->charts & TARGET_CHARTS_EBPF_FD)
+        send_fd_charts_to_netdata(w, f, true);
+#endif
+
+    w->exposed = false;
+}
+
+void send_charts_updates_to_netdata(struct target_family *f) {
+    struct target *root = *f->root;
+    struct target *w;
+
+#if defined(OS_LINUX)
+    const bool ebpf_charts = strcmp(f->type, NETDATA_APP_FAMILY) == 0;
+#endif
+
+    for (w = root; w; w = w->next) {
+        if (likely(w->exposed || (!w->values[PDF_PROCESSES]))) {
+            // the file charts were disabled at runtime (too many open files)
+            if(w->exposed && !enable_file_charts && (w->charts & TARGET_CHARTS_FILES))
+                send_file_charts_to_netdata(w, f, true);
+            continue;
+        }
+
+        w->exposed = true;
+
+        send_target_base_charts(w, f, false);
+
+        if (enable_file_charts)
+            send_file_charts_to_netdata(w, f, false);
+
+#if defined(OS_LINUX)
+        if (ebpf_charts) {
+            if (apps_ebpf_cachestat_is_available())
+                send_cachestat_charts_to_netdata(w, f, false);
+            if (apps_ebpf_dcstat_is_available())
+                send_dcstat_charts_to_netdata(w, f, false);
+            if (apps_ebpf_fd_is_available())
+                send_fd_charts_to_netdata(w, f, false);
+        }
+#endif
+    }
+
 #if defined(OS_LINUX)
     /* Targets exposed before ebpfgo.plugin published its first snapshot miss the
-     * chart-creation window above (it is one-shot per target).  When cachestat
-     * becomes available, do a single catch-up pass over all already-exposed
-     * targets.  Re-sending CHART/DIMENSION for a target that got its charts in
-     * the same cycle is benign -- the Netdata protocol treats it as an update. */
-    static bool cachestat_charts_announced = false;
-    if (!cachestat_charts_announced && apps_ebpf_cachestat_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
+     * chart-creation window above.  When a module becomes available, announce
+     * its charts on every exposed target that does not have them yet.  The
+     * per-target bits make this a no-op once every target has them. */
+    if (ebpf_charts) {
+        bool cachestat = apps_ebpf_cachestat_is_available();
+        bool dcstat = apps_ebpf_dcstat_is_available();
+        bool fd = apps_ebpf_fd_is_available();
+
+        /* fd needs to know about its error charts too.  They are announced only
+         * while the producer reports EBPFGO_SHM_FLAG_FD_ERRORS, and that bit can
+         * arrive after the base charts were already announced - an operator
+         * switching `ebpf load mode` from entry to return restarts ebpf-go.plugin
+         * while apps.plugin keeps running.  Without re-announcing,
+         * send_fd_data_to_netdata() would SET the error dimensions of a chart
+         * that was never declared, and pluginsd logs an error for every one. */
+        bool fd_errors = fd && apps_ebpf_fd_errors_are_available();
+
         for (w = root; w; w = w->next) {
             if (!w->exposed) continue;
-            send_cachestat_charts_to_netdata(w, type, lbl_name);
-        }
-        cachestat_charts_announced = true;
-    }
 
-    static bool dcstat_charts_announced = false;
-    if (!dcstat_charts_announced && apps_ebpf_dcstat_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
-        for (w = root; w; w = w->next) {
-            if (!w->exposed) continue;
-            send_dcstat_charts_to_netdata(w, type, lbl_name);
-        }
-        dcstat_charts_announced = true;
-    }
-
-    /* fd needs two latches, not one.  The error charts are announced only while
-     * the producer reports EBPFGO_SHM_FLAG_FD_ERRORS, and that bit can arrive
-     * after the base charts were already announced — an operator switching
-     * `ebpf load mode` from entry to return restarts ebpf-go.plugin while
-     * apps.plugin keeps running.  Without the second latch the announcement stays
-     * done, send_fd_data_to_netdata() starts SETting the error dimensions, and
-     * pluginsd logs an error for every SET to a chart that was never declared. */
-    static bool fd_charts_announced = false;
-    static bool fd_error_charts_announced = false;
-    if (apps_ebpf_fd_is_available() && strcmp(type, NETDATA_APP_FAMILY) == 0) {
-        bool fd_errors = apps_ebpf_fd_errors_are_available();
-        if (!fd_charts_announced || (fd_errors && !fd_error_charts_announced)) {
-            for (w = root; w; w = w->next) {
-                if (!w->exposed) continue;
-                send_fd_charts_to_netdata(w, type, lbl_name);
-            }
-            fd_charts_announced = true;
-            fd_error_charts_announced = fd_errors;
+            if (cachestat && !(w->charts & TARGET_CHARTS_EBPF_CACHESTAT))
+                send_cachestat_charts_to_netdata(w, f, false);
+            if (dcstat && !(w->charts & TARGET_CHARTS_EBPF_DCSTAT))
+                send_dcstat_charts_to_netdata(w, f, false);
+            if (fd && (!(w->charts & TARGET_CHARTS_EBPF_FD) || (fd_errors && !(w->charts & TARGET_CHARTS_EBPF_FD_ERRORS))))
+                send_fd_charts_to_netdata(w, f, false);
         }
     }
 #endif
