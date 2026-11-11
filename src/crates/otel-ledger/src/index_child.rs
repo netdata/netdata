@@ -59,6 +59,31 @@ impl IndexedFile {
     }
 }
 
+/// The nice level an index child gives itself.
+#[cfg(unix)]
+const NICE: libc::c_int = 10;
+
+/// Lower the CPU priority of this process to that of background work.
+///
+/// `otel-plugin index` calls it before anything else, on its first thread,
+/// so that an index build gives way to the ledger, the ingestor and
+/// everything else on the host when CPUs are short. It costs a build nothing
+/// while CPUs are idle. If the system refuses, the build runs at the priority
+/// it was started with.
+///
+/// One implementation per system. On Linux the level belongs to the calling
+/// thread and to the threads it starts later, which is why this comes first.
+/// A system without an implementation here runs its builds at normal
+/// priority.
+pub fn lower_priority() {
+    #[cfg(unix)]
+    // SAFETY: `setpriority` takes integers only and reads or writes no memory
+    // of this process.
+    unsafe {
+        libc::setpriority(libc::PRIO_PROCESS, 0, NICE);
+    }
+}
+
 /// The arguments that make `otel-plugin` index the WAL file at `wal_path`
 /// into `sfst_path`: the `index` subcommand of its `main`. The child also
 /// exits when its stdin closes (`--lifeline`).
@@ -202,6 +227,26 @@ mod tests {
             std::fs::read(&child_path).unwrap(),
             std::fs::read(&direct_path).unwrap()
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn lower_priority_brings_the_calling_thread_to_the_nice_level() {
+        // On a thread of its own: on Linux the level is the thread's, so the
+        // other tests keep theirs.
+        let (before, after) = std::thread::spawn(|| {
+            // SAFETY: `getpriority` takes integers only.
+            let nice = || unsafe { libc::getpriority(libc::PRIO_PROCESS, 0) };
+            let before = nice();
+            lower_priority();
+            (before, nice())
+        })
+        .join()
+        .unwrap();
+
+        // A process cannot raise its priority: one that starts below the
+        // level stays where it is.
+        assert_eq!(after, before.max(NICE));
     }
 
     #[test]

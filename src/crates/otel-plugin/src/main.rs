@@ -214,6 +214,8 @@ fn main() {
             sfst,
             lifeline: has_lifeline,
         }) => {
+            // Before the first thread is started: it inherits the priority.
+            otel_ledger::index_child::lower_priority();
             if has_lifeline && let Err(e) = lifeline::exit_when_stdin_closes() {
                 eprintln!("error: failed to watch the lifeline: {e}");
                 std::process::exit(1);
