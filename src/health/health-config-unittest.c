@@ -2084,16 +2084,12 @@ static int test_alarms_json_escapes_alert_text(int *passed) {
     snprintfz(chart, sizeof(chart), "%s.%s", chart_type, chart_id);
     snprintfz(dyncfg_id, sizeof(dyncfg_id), "health:alert:prototype:%s", name);
 
-    // linking an alert writes a health log entry: the health log allocator must exist (idempotent)
+    // linking an alert writes a health log entry, so the health log allocator must exist; this also creates
+    // the prototypes dictionary (idempotent)
     health_plugin_init();
 
     int failed = 0;
     bool added = false;
-    bool initialized_prototypes = !health_globals.prototypes.dict;
-    if(initialized_prototypes) {
-        health_init_prototypes();
-        health_dyncfg_register_all_prototypes();
-    }
 
     unittest_alarms_json_payload(payload, chart);
     int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_ADD, name,
@@ -2227,12 +2223,6 @@ cleanup:
             fprintf(stderr, "FAILED [alarms json cleanup]: code=%d response='%s'\n", code, buffer_tostring(result));
             failed++;
         }
-    }
-
-    if(initialized_prototypes) {
-        health_dyncfg_unregister_all_prototypes();
-        dictionary_destroy(health_globals.prototypes.dict);
-        health_globals.prototypes.dict = NULL;
     }
 
     return failed;
