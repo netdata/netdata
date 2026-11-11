@@ -519,7 +519,7 @@ fn fs_operator() -> (opendal::Operator, tempfile::TempDir) {
     let tmp = tempfile::tempdir().unwrap();
     let mut builder = opendal::services::Fs::default();
     builder = builder.root(tmp.path().to_str().unwrap());
-    let op = opendal::Operator::new(builder).unwrap().finish();
+    let op = opendal::Operator::new(builder).unwrap();
     (op, tmp)
 }
 
