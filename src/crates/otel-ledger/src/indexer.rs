@@ -9,9 +9,18 @@
 //! takes only itself down.
 //!
 //! The indexers of both signals start their builds through one
-//! [`IndexBuilds`], whose scheduler bounds how many run at once across the
-//! process ([`MAX_INDEX_BUILDS`]); the builds beyond that wait in its queue,
-//! in the order they were requested.
+//! [`IndexBuilds`], whose scheduler decides how many run at once across the
+//! process: at most all CPUs but one ([`max_index_builds`]), and only while
+//! the memory the running builds are expected to need stays within three
+//! quarters of what is free ([`MEMORY_PERCENT`]). The builds beyond that wait
+//! in its queue, in the order they were requested. A host that ingests
+//! enough to queue index builds is taken to be there for that work, so the
+//! builds may use most of it; what is left is the room for queries and for
+//! everything else, which this side does not look at.
+//!
+//! What a build is expected to need is its WAL file's decoded size times a
+//! ratio that each indexer learns from the peaks its children report
+//! ([`ExpectedMemory`]).
 //!
 //! Requests arrive from the ingestor on a WAL `FileEvent::Closed`
 //! (`ledger/ingestor.rs`) and from startup recovery of unindexed WALs
@@ -26,7 +35,8 @@
 //! through a temporary file and leaves its WAL file alone, and the next start
 //! indexes the file again.
 
-use std::path::PathBuf;
+use std::collections::VecDeque;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::Context;
@@ -41,9 +51,82 @@ use file_lifecycle::ipc::{IndexerRequest, IndexerResponse};
 
 use crate::index_child::{self, IndexedFile};
 
-/// How many index builds run at once, over both signals. It is the number
-/// that could run before the builds moved to child processes: one per signal.
-pub const MAX_INDEX_BUILDS: usize = 2;
+/// The share of the free memory, in percent, that the index builds of both
+/// signals may be expected to need together.
+pub const MEMORY_PERCENT: u8 = 75;
+
+/// How many index builds may run at once, over both signals: all the CPUs
+/// this process may use but one, and at least one. A build keeps one CPU
+/// busy.
+pub fn max_index_builds() -> usize {
+    let cpus = std::thread::available_parallelism().map_or(1, |cpus| cpus.get());
+
+    cpus.saturating_sub(1).max(1)
+}
+
+/// The memory an index build is expected to need, learned from the builds of
+/// one signal.
+///
+/// A build needs memory in proportion to what its WAL file decodes to, by a
+/// ratio that depends on the data: about 4 for the data sets measured so
+/// far. The expectation uses the highest ratio among the last
+/// [`RECENT_BUILDS`](Self::RECENT_BUILDS) builds that reported their peak,
+/// so it follows the data and leans to the high side, and adds a margin.
+/// Until a build has reported, the ratio is
+/// [`FIRST_RATIO`](Self::FIRST_RATIO).
+#[derive(Debug, Default)]
+struct ExpectedMemory {
+    /// Peak memory over decoded size, of the most recent builds that taught
+    /// it, oldest first.
+    recent_ratios: VecDeque<f64>,
+}
+
+impl ExpectedMemory {
+    /// The ratio before any build has reported: above what was measured.
+    const FIRST_RATIO: f64 = 5.0;
+    /// How many builds the ratio looks back on.
+    const RECENT_BUILDS: usize = 32;
+    /// What the expectation adds on top of the highest recent ratio.
+    const MARGIN: f64 = 1.15;
+    /// Only a build of a file that decodes to at least this much teaches the
+    /// ratio. A child holds about 15 MiB whatever it indexes; for a small
+    /// file that is most of its peak and would make the ratio many times too
+    /// high.
+    const SMALLEST_TEACHING_SIZE: u64 = 16 << 20;
+
+    /// What a build of a file that decodes to `decoded_size` bytes is
+    /// expected to need at its peak, in bytes.
+    fn of(&self, decoded_size: u64) -> u64 {
+        let ratio = self
+            .recent_ratios
+            .iter()
+            .copied()
+            .reduce(f64::max)
+            .unwrap_or(Self::FIRST_RATIO);
+
+        (decoded_size as f64 * ratio * Self::MARGIN) as u64
+    }
+
+    /// Take in what a build reported: the peak memory of the build of a file
+    /// that decodes to `decoded_size` bytes.
+    fn learn(&mut self, decoded_size: u64, peak_memory: u64) {
+        if decoded_size < Self::SMALLEST_TEACHING_SIZE {
+            return;
+        }
+
+        if self.recent_ratios.len() == Self::RECENT_BUILDS {
+            self.recent_ratios.pop_front();
+        }
+        self.recent_ratios
+            .push_back(peak_memory as f64 / decoded_size as f64);
+    }
+}
+
+/// What the build of one file needed, for [`ExpectedMemory::learn`].
+struct Measured {
+    decoded_size: u64,
+    peak_memory: u64,
+}
 
 /// Starts index builds as child processes. One for the whole ledger, shared
 /// by the indexers of both signals, so that one limit covers them all.
@@ -68,20 +151,28 @@ impl IndexBuilds {
     fn with_executable(executable: PathBuf) -> Self {
         Self {
             scheduler: Scheduler::new(Limits {
-                jobs: MAX_INDEX_BUILDS,
-                memory_percent: 100,
+                jobs: max_index_builds(),
+                memory_percent: MEMORY_PERCENT,
             }),
             executable,
         }
     }
 
-    /// Build the index file a request asks for and wait for the result.
-    async fn build(&self, signal: Signal, request: IndexerRequest) -> IndexerResponse {
-        let IndexerRequest::Index {
-            wal_path,
-            sfst_path,
-        } = request;
-
+    /// Build the index file of the WAL file at `wal_path` at `sfst_path` and
+    /// wait for the result. `decoded_size` is what the WAL file decodes to,
+    /// when that could be read, and `expected_memory` what the build is
+    /// expected to need.
+    ///
+    /// Returns the response for the ledger and, when the build reported its
+    /// peak, what it needed.
+    async fn build(
+        &self,
+        signal: Signal,
+        wal_path: PathBuf,
+        sfst_path: PathBuf,
+        decoded_size: Option<u64>,
+        expected_memory: u64,
+    ) -> (IndexerResponse, Option<Measured>) {
         // Parsed from the WAL file name; 0 when it doesn't parse. The ledger
         // routes the response to a tenant by it.
         let seq = file_registry::FileId::parse(&wal_path)
@@ -96,26 +187,27 @@ impl IndexBuilds {
             .env("MALLOC_ARENA_MAX", "1");
 
         tracing::info!(
-            "indexing queued wal={} index={}",
+            "indexing queued wal={} index={} decoded_kb={} expected_rss_kb={}",
             wal_path.display(),
             sfst_path.display(),
+            decoded_size.unwrap_or(0) / 1024,
+            expected_memory / 1024,
         );
 
         let job = Job {
             command,
-            // Not known yet: the limit on the number of builds is the only
-            // one in force.
-            expected_memory: 0,
+            expected_memory,
         };
         let finished = match self.scheduler.run(job).await {
             Ok(finished) => finished,
             Err(e) => {
                 let usage = e.usage().map(usage_text).unwrap_or_default();
                 tracing::error!("indexing failed wal={}{usage}: {e}", wal_path.display());
-                return IndexerResponse::IndexFailed {
+                let failed = IndexerResponse::IndexFailed {
                     path: wal_path,
                     error: e.to_string(),
                 };
+                return (failed, None);
             }
         };
 
@@ -130,21 +222,46 @@ impl IndexBuilds {
                     .map(|bytes| format!(" peak_rss_kb={}", bytes / 1024))
                     .unwrap_or_default();
                 tracing::info!("indexing done seq={seq}{usage}{peak}");
-                IndexerResponse::Indexed {
+                let indexed = IndexerResponse::Indexed {
                     seq,
                     path: sfst_path,
                     summary,
                     size: file_registry::ByteSize(size),
-                }
+                };
+                let measured = decoded_size
+                    .zip(peak_memory)
+                    .map(|(decoded_size, peak_memory)| Measured {
+                        decoded_size,
+                        peak_memory,
+                    });
+                (indexed, measured)
             }
             Err(e) => {
                 tracing::error!("indexing failed wal={}{usage}: {e:#}", wal_path.display());
-                IndexerResponse::IndexFailed {
+                let failed = IndexerResponse::IndexFailed {
                     path: wal_path,
                     error: format!("{e:#}"),
-                }
+                };
+                (failed, None)
             }
         }
+    }
+}
+
+/// What the WAL file at `path` decodes to, in bytes, from its frame headers.
+/// `None` when the file cannot be read: its build then expects no memory,
+/// and reports what is wrong with the file.
+async fn decoded_size(path: &Path) -> Option<u64> {
+    let wal_path = path.to_owned();
+    let size = tokio::task::spawn_blocking(move || wal::decoded_size(&wal_path)).await;
+
+    match size {
+        Ok(Ok(size)) => Some(size),
+        Ok(Err(e)) => {
+            tracing::warn!("cannot size wal={}: {e}", path.display());
+            None
+        }
+        Err(_) => None,
     }
 }
 
@@ -173,6 +290,7 @@ impl Component for Indexer {
         tx: mpsc::UnboundedSender<IndexerResponse>,
         cancel: CancellationToken,
     ) {
+        let mut expected_memory = ExpectedMemory::default();
         // Dropped when the loop exits, which abandons the builds still in it.
         let mut builds = JoinSet::new();
 
@@ -180,16 +298,29 @@ impl Component for Indexer {
             tokio::select! {
                 _ = cancel.cancelled() => break,
                 request = rx.recv() => match request {
-                    Some(request) => {
+                    Some(IndexerRequest::Index { wal_path, sfst_path }) => {
+                        // Sized here, not in the build's task: the builds
+                        // must reach the scheduler in the order of their
+                        // requests.
+                        let decoded_size = decoded_size(&wal_path).await;
+                        let expected = decoded_size.map_or(0, |size| expected_memory.of(size));
+
                         let index_builds = index_builds.clone();
-                        builds.spawn(async move { index_builds.build(signal, request).await });
+                        builds.spawn(async move {
+                            index_builds
+                                .build(signal, wal_path, sfst_path, decoded_size, expected)
+                                .await
+                        });
                     }
                     None => break,
                 },
                 Some(built) = builds.join_next() => {
                     // A build task ends without a response only if it
                     // panicked: there is nothing to forward then.
-                    if let Ok(response) = built {
+                    if let Ok((response, measured)) = built {
+                        if let Some(measured) = measured {
+                            expected_memory.learn(measured.decoded_size, measured.peak_memory);
+                        }
                         let _ = tx.send(response);
                     }
                 }
@@ -200,8 +331,6 @@ impl Component for Indexer {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use file_lifecycle::component::ComponentHandle;
 
     use super::*;
@@ -246,6 +375,148 @@ mod tests {
             record_count: 3,
             content_meta: b"meta".to_vec(),
         }
+    }
+
+    const MIB: u64 = 1 << 20;
+
+    /// What `ExpectedMemory` makes of `decoded_size` bytes at `ratio`.
+    fn at_ratio(decoded_size: u64, ratio: f64) -> u64 {
+        (decoded_size as f64 * ratio * ExpectedMemory::MARGIN) as u64
+    }
+
+    #[test]
+    fn expected_memory_starts_from_the_first_ratio() {
+        let expected_memory = ExpectedMemory::default();
+
+        assert_eq!(
+            expected_memory.of(100 * MIB),
+            at_ratio(100 * MIB, ExpectedMemory::FIRST_RATIO)
+        );
+        // 100 MiB at 5 with 15% on top.
+        assert_eq!(expected_memory.of(100 * MIB), 575 * MIB);
+    }
+
+    #[test]
+    fn expected_memory_follows_the_highest_recent_ratio() {
+        let mut expected_memory = ExpectedMemory::default();
+
+        expected_memory.learn(100 * MIB, 300 * MIB);
+        expected_memory.learn(100 * MIB, 400 * MIB);
+        expected_memory.learn(100 * MIB, 350 * MIB);
+
+        assert_eq!(expected_memory.of(10 * MIB), at_ratio(10 * MIB, 4.0));
+    }
+
+    #[test]
+    fn expected_memory_forgets_the_builds_before_the_recent_ones() {
+        let mut expected_memory = ExpectedMemory::default();
+
+        expected_memory.learn(100 * MIB, 900 * MIB);
+        for _ in 0..ExpectedMemory::RECENT_BUILDS - 1 {
+            expected_memory.learn(100 * MIB, 300 * MIB);
+        }
+        assert_eq!(expected_memory.of(10 * MIB), at_ratio(10 * MIB, 9.0));
+
+        expected_memory.learn(100 * MIB, 300 * MIB);
+        assert_eq!(expected_memory.of(10 * MIB), at_ratio(10 * MIB, 3.0));
+    }
+
+    #[test]
+    fn a_build_of_a_small_file_does_not_teach_the_ratio() {
+        let mut expected_memory = ExpectedMemory::default();
+
+        // A child's own 15 MiB over a 1 MiB file: a ratio of 15.
+        expected_memory.learn(MIB, 15 * MIB);
+        expected_memory.learn(ExpectedMemory::SMALLEST_TEACHING_SIZE - 1, 900 * MIB);
+        assert_eq!(
+            expected_memory.of(100 * MIB),
+            at_ratio(100 * MIB, ExpectedMemory::FIRST_RATIO)
+        );
+
+        expected_memory.learn(ExpectedMemory::SMALLEST_TEACHING_SIZE, 64 * MIB);
+        assert_eq!(expected_memory.of(100 * MIB), at_ratio(100 * MIB, 4.0));
+    }
+
+    #[test]
+    fn index_builds_leave_one_cpu_and_never_drop_to_none() {
+        let cpus = std::thread::available_parallelism().unwrap().get();
+
+        assert_eq!(max_index_builds(), if cpus > 1 { cpus - 1 } else { 1 });
+    }
+
+    /// A WAL file under `dir` whose frames decode to `frames` times 1 KiB.
+    /// The bytes are not log records: only its headers are ever read.
+    fn write_wal(dir: &Path, frames: usize) -> PathBuf {
+        let mut writer = wal::Writer::new(
+            dir,
+            wal::Config::default(),
+            std::sync::Arc::new(wal::SeqAllocator::ephemeral(0)),
+            wal::FileStamp {
+                pipeline_id: Signal::Logs.pipeline_id(),
+                payload_format: ng_flatten::LOG_FRAME_PAYLOAD_FORMAT,
+            },
+            wal::test_identity(),
+        )
+        .unwrap();
+        for frame in 0..frames {
+            writer
+                .write_frame(
+                    0,
+                    &[],
+                    &[0u8; 1024],
+                    wal::FrameMeta {
+                        entry_count: 1,
+                        ingestion_ns: file_registry::TimestampNs(frame as u64 + 1),
+                        log_ts_range: None,
+                    },
+                )
+                .unwrap();
+        }
+        writer.shutdown_all().unwrap();
+
+        std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| path.extension().is_some_and(|ext| ext == "wal"))
+            .expect("a wal file was written")
+    }
+
+    #[tokio::test]
+    async fn a_build_reports_the_decoded_size_and_the_peak_its_child_answered() {
+        let dir = tempfile::tempdir().unwrap();
+        let wal = write_wal(dir.path(), 3);
+        let answer = dir.path().join("answer");
+        let indexed = IndexedFile {
+            summary: summary(),
+            size: 4096,
+            peak_memory: Some(77 * MIB),
+        };
+        std::fs::write(&answer, indexed.encode().unwrap()).unwrap();
+        let executable = fake_executable(dir.path(), &format!("cat {}", answer.display()));
+        let index_builds = IndexBuilds::with_executable(executable);
+
+        let size = decoded_size(&wal).await;
+        let (response, measured) = index_builds
+            .build(Signal::Logs, wal, dir.path().join("out.sfst"), size, 0)
+            .await;
+
+        assert_eq!(size, Some(3 * 1024));
+        assert!(
+            matches!(response, IndexerResponse::Indexed { .. }),
+            "{response:?}"
+        );
+        let measured = measured.expect("the build reported what it needed");
+        assert_eq!(
+            (measured.decoded_size, measured.peak_memory),
+            (3 * 1024, 77 * MIB)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_file_that_cannot_be_sized_is_built_without_an_expectation() {
+        let dir = tempfile::tempdir().unwrap();
+
+        assert_eq!(decoded_size(&dir.path().join("missing.wal")).await, None);
     }
 
     #[tokio::test]
