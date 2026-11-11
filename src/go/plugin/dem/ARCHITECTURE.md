@@ -37,7 +37,9 @@ relative to `src/go/`.
   configured through DynCfg, scheduled by the framework, publishing charts. Stock alerts cover RUM Web Vitals (LCP,
   INP, CLS), OTLP export failures and loss, and journey failures.
 - Beyond charts, DEM keeps sampled investigation detail in a journal and optional screenshots/reports on disk. Process
-  Functions expose both, and keep working even when every collector is disabled.
+  Functions expose both when a corresponding job is active or retained data has been observed. Retained-data access
+  works with every collector disabled; already-announced Functions remain callable for that framework generation.
+  An empty fresh installation announces only `dem-history-status`.
 - The command (`cmd/demplugin`) owns the shared stores. Jobs only borrow them, and the stores close only after a clean
   shutdown.
 

@@ -98,7 +98,8 @@ SDK CDN connection. Client IP addresses are used for rate limiting/geolocation a
 retained; the five synthetics Functions appear once a journey or Lighthouse job is active, or synthetic history or
 published captures are retained. Retained data makes the corresponding group available after restart even without
 jobs. A receiver alone does not enable RUM Functions. Once announced, a group stays available for that framework run,
-even after the last job stops or its data expires. A process restart rechecks retained data.
+even after the last job stops or its data expires. A process restart reconstructs availability from data present when
+the stores open. If startup retention then expires that data, its group still appears for that process lifetime.
 
 RUM and synthetic Function providers are independent of collector selection. Disabling `rum` or `journey`, selecting
 only `lighthouse`, or disabling all collectors preserves investigation of retained history while the plugin is enabled.
