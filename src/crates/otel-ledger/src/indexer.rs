@@ -24,7 +24,7 @@
 //!
 //! What an operation is expected to need is its WAL file's decoded size times a
 //! ratio that each indexer learns from the peaks its children report
-//! ([`ExpectedMemory`]).
+//! (`ExpectedMemory`).
 //!
 //! Requests arrive from the ingestor on a WAL `FileEvent::Closed`
 //! (`ledger/ingestor.rs`) and from startup recovery of unindexed WALs
