@@ -39,10 +39,11 @@ pub enum LedgerEvent {
     /// run-loop exclusively owns `self.supervisor`, so handlers funnel
     /// through this arm.
     OutboundResp(LedgerResponse),
-    /// The shared upload-retry timer fired (the 30 s `retry_timer` interval
+    /// The ledger's periodic timer fired (the 30 s `periodic_timer` interval
     /// built in `Ledger::new`): re-issue any failed uploads whose backoff has
-    /// elapsed (`Ledger::handle_retry_tick`).
-    RetryTick,
+    /// elapsed (`Ledger::handle_retry_tick`), and run retention for every
+    /// tenant (`Ledger::evaluate_retention_of_all_tenants`).
+    PeriodicTick,
 }
 
 /// A response funneled from one pipeline's per-signal workers into the

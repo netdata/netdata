@@ -569,6 +569,11 @@ impl TenantRegistries {
         self.tenants.iter_mut()
     }
 
+    /// The tenants that have a registry.
+    pub fn tenant_ids(&self) -> Vec<TenantId> {
+        self.tenants.keys().cloned().collect()
+    }
+
     pub fn get(&self, tenant_id: &TenantId) -> Option<&Registry> {
         self.tenants.get(tenant_id)
     }

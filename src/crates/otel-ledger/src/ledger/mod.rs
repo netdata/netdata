@@ -115,12 +115,14 @@ pub struct Ledger {
     /// Every send site is gated on storage being enabled, so a `None` uploader
     /// is never asked to upload. Its responses carry the owning `pipeline_id`.
     uploader: Option<ComponentHandle<UploaderRequest, UploaderResponse>>,
-    /// Re-issue queue for failed uploads, drained by `retry_timer`. Shared
+    /// Re-issue queue for failed uploads, drained by `periodic_timer`. Shared
     /// across pipelines (the uploader is shared); keyed by seq/remote-key, both
     /// globally unique, so no per-pipeline partitioning is needed.
     upload_retry: file_lifecycle::upload_retry::UploadRetry,
-    /// Fires every 30s to re-drive `upload_retry` (due entries only).
-    retry_timer: tokio::time::Interval,
+    /// Fires every 30s: re-drives `upload_retry` (due entries only), and
+    /// runs retention, so a tenant that gets no new data still loses the
+    /// files that grow past their age.
+    periodic_timer: tokio::time::Interval,
     /// Query-time chunk SFSTs of active WALs; shared across pipelines (one
     /// global byte budget), keyed by `(seq, chunk index)`. A WAL's chunks are
     /// dropped when its authoritative SFST registers (or the WAL proves empty).
@@ -392,11 +394,12 @@ impl Ledger {
         let ingestor = file_lifecycle::ipc::accept_writer(writer_socket_path).await?;
         tracing::info!("ingestor connected");
 
-        // Drives the upload-retry queue. Skip missed ticks (don't fire a burst
-        // of catch-up ticks after a slow run-loop turn); one drain per period is
-        // enough since each due item carries its own backoff.
-        let mut retry_timer = tokio::time::interval(std::time::Duration::from_secs(30));
-        retry_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // Drives the upload-retry queue and the periodic retention pass. Skip
+        // missed ticks (don't fire a burst of catch-up ticks after a slow
+        // run-loop turn); one turn per period is enough: each due upload
+        // carries its own backoff, and a retention pass looks at everything.
+        let mut periodic_timer = tokio::time::interval(std::time::Duration::from_secs(30));
+        periodic_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
         Ok(Self {
             supervisor,
@@ -404,7 +407,7 @@ impl Ledger {
             cleaner,
             uploader,
             upload_retry: file_lifecycle::upload_retry::UploadRetry::default(),
-            retry_timer,
+            periodic_timer,
             chunk_cache,
             traces_chunk_indexer,
             // Each signal's frame_seq stream starts at 1 (the ingestor's first
@@ -467,7 +470,7 @@ impl Ledger {
                     |e| tracing::error!("supervisor recv failed: {e}"),
                 )?),
                 Some(out) = self.outbound_rx.recv() => LedgerEvent::OutboundResp(out),
-                _ = self.retry_timer.tick() => LedgerEvent::RetryTick,
+                _ = self.periodic_timer.tick() => LedgerEvent::PeriodicTick,
             };
 
             match event {
@@ -505,7 +508,10 @@ impl Ledger {
                         tracing::error!("failed to forward response to supervisor: {e}")
                     })?;
                 }
-                LedgerEvent::RetryTick => self.handle_retry_tick().await,
+                LedgerEvent::PeriodicTick => {
+                    self.handle_retry_tick().await;
+                    self.evaluate_retention_of_all_tenants().await;
+                }
             }
         }
     }

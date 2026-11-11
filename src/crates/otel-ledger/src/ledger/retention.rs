@@ -2,9 +2,13 @@
 //! tenant's policy limits and catalog files past the archive horizon, handing
 //! the deletions to the shared cleaner.
 //!
-//! There is no timer: `evaluate_retention` runs on the ledger's indexer
-//! response path after every WAL rotation (both call sites in
-//! `Ledger::handle_indexer_resp`, `ledger/indexer.rs`). Each pass collects
+//! `evaluate_retention` runs for a tenant on the ledger's indexer response
+//! path after every WAL rotation of that tenant (both call sites in
+//! `Ledger::handle_indexer_resp`, `ledger/indexer.rs`), which is when the
+//! tenant's files can pass a count or a size limit. It also runs for every
+//! tenant on the ledger's periodic timer, because a file passes its age
+//! limit by time alone: a tenant with no new data has no rotation. Each
+//! pass collects
 //! decisions under the tenant registry's write lock, then marks entries
 //! pending deletion and dispatches the `CleanerRequest`s after dropping the
 //! lock. The cleaner's response handler completes the flow — success removes
@@ -21,6 +25,18 @@ use super::Ledger;
 use file_lifecycle::helpers::{catalog_retention_days, sfst_retention_policy};
 
 impl Ledger {
+    /// Run retention for every tenant of every signal.
+    pub(super) async fn evaluate_retention_of_all_tenants(&mut self) {
+        for signal in [Signal::Logs, Signal::Traces] {
+            let registries = self.pipelines.get(signal).registries().clone();
+            let tenant_ids = registries.read().await.tenant_ids();
+
+            for tenant_id in tenant_ids {
+                self.evaluate_retention(signal, &tenant_id).await;
+            }
+        }
+    }
+
     /// Cancel-safety invariant: the mark-then-send-then-clear-on-failure
     /// pattern below is only safe because `self.cleaner.send` is non-awaiting
     /// (`ComponentHandle::send`, an unbounded mpsc send —
@@ -68,12 +84,15 @@ impl Ledger {
                 now_ns(),
                 storage_enabled,
             );
-            for seq in evictions.deferred {
-                if let Some(key) = registry.sfst.get(seq).map(|e| SeqKey::from(&e.id)) {
-                    tracing::warn!(
-                        "retention: deferring eviction of seq={key} (catalog not yet confirmed on remote)"
-                    );
-                }
+            // One line per pass, not per file: the pass repeats on a timer.
+            if let Some(&oldest) = evictions.deferred.first() {
+                tracing::warn!(
+                    signal = signal.segment(),
+                    tenant = %tenant_id,
+                    "retention: {} index file(s) are over the limits and stay until their catalog \
+                     entries are confirmed on the remote (the oldest is seq={oldest})",
+                    evictions.deferred.len(),
+                );
             }
 
             let mut reqs = Vec::with_capacity(evictions.evict.len());
