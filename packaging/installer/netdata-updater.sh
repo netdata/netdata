@@ -21,7 +21,7 @@
 #  - NETDATA_BASE_URL (legacy release/repository base URL override)
 #  - NETDATA_ARTIFACT_URL_PREFIX (override the release artifact directory)
 
-# Next unused error code: U002E
+# Next unused error code: U002F
 
 set -e
 
@@ -38,6 +38,28 @@ NETDATA_DEFAULT_ACCEPT_MAJOR_VERSIONS="1 2"
 NETDATA_UPDATER_JITTER=3600
 NETDATA_NO_SYSTEMD_JOURNAL=0
 NETDATA_ACCEPT_MAJOR_VERSIONS=''
+
+# List of known compromised TLS certificates to reject.
+#
+# Certs matching these SHA1/SHA256 fingerprints will be excluded from
+# the CA bundle used for remote connections.
+#
+# Currently this just covers the eMudhra intermediates publicly
+# identified as compromised on 2026-10-17.
+NETDATA_REJECT_CERT_FINGERPRINTS="
+01:64:D7:CE:AE:5B:B9:09:C2:72:AF:15:1F:F4:4B:11:77:AE:9B:47:D9:42:4B:94:F1:D9:55:8C:30:93:4D:19
+42:C4:AC:CD:12:C4:F5:95:97:92:5E:1A:08:A7:A9:01:02:60:85:43:80:93:08:D5:0E:C4:27:E1:18:BA:14:93
+43:2E:C2:5F:0D:28:DE:90:06:D9:7B:F7:52:F1:7B:BB:2C:D4:1F:66:99:33:FC:B0:72:D9:A1:14:8D:02:61:F3
+45:A8:83:F3:49:AE:DF:D5:F3:A6:49:B5:49:8F:FB:12:17:12:BA:8B:44:8F:3F:2A:91:DB:C5:A7:66:FC:DD:BE
+57:94:80:AE:A1:66:29:0B:D3:C6:43:58:9E:79:5F:C0:D0:E5:4E:86:50:5D:18:0F:1D:FF:99:EF:D3:19:95:12
+5F:1D:ED:4D:D5:90:AF:74:63:12:90:CF:07:3B:12:2A:2A:AC:6A:1F:A4:79:77:8A:0B:D4:35:79:BD:83:26:99
+62:B7:F9:86:82:63:F7:2F:69:11:FC:78:CE:AF:72:C1:97:91:58:B7:36:8B:F6:48:68:3B:B2:AA:39:B0:2E:72
+74:85:B5:1C:0E:D1:92:87:8F:A1:D2:F9:48:FB:52:9A:E1:84:2C:C5:08:6C:4B:67:F7:BE:5B:20:39:DE:94:89
+98:B8:96:62:5C:0C:23:0A:DE:EC:3E:B2:CF:6A:AD:50:01:EC:F9:15:6A:68:64:4E:82:37:4C:E5:83:3B:C2:5B
+CB:6E:15:16:5A:C8:02:E9:B3:F9:93:F1:6C:25:D4:1F:4E:81:C2:1E:BD:E7:1A:E1:B0:12:AC:00:BF:9C:7C:3F
+E7:56:8F:E6:E1:23:31:F4:FD:7D:E6:1D:A4:C7:55:9D:0F:8E:B1:92:A2:18:D4:74:1A:3B:A7:51:84:33:38:38
+FD:9D:5C:2D:BB:D4:99:5A:B6:9B:8D:50:C4:39:D9:52:7B:00:52:91:99:C2:FD:01:B2:17:4E:B5:8F:07:02:1F
+"
 
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
@@ -60,6 +82,144 @@ if [ -n "${script_source}" ]; then
 else
   script_name="netdata-updater.sh"
 fi
+
+# Keep this block identical in kickstart.sh and netdata-updater.sh: both scripts
+# must work standalone, before any other installer files can be downloaded.
+# NETDATA_REJECT_CERT_FINGERPRINTS accepts whitespace/comma-separated SHA-256 or
+# SHA-1 hex fingerprints, optionally colon-delimited, in either case. This only
+# controls direct curl/wget requests, not package managers or child installers.
+NETDATA_CA_DIR=
+NETDATA_CA_BUNDLE=
+
+build_filtered_ca_bundle() (
+  # A subshell keeps parser variables and pathname expansion settings local.
+  LC_ALL=C
+  export LC_ALL
+  set -f
+  reject_list="$(printf '%s' "${NETDATA_REJECT_CERT_FINGERPRINTS}" | tr ',' ' ' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+  [ -n "${reject_list}" ] || return 1
+  have_fingerprints=0
+  for fingerprint in ${reject_list}; do
+    case "${fingerprint}" in *[!0123456789abcdef]*) return 1 ;; esac
+    case "${#fingerprint}" in 40|64) ;; *) return 1 ;; esac
+    have_fingerprints=1
+  done
+  [ "${have_fingerprints}" = 1 ] || return 1
+
+  # Respect an explicit OpenSSL trust file, otherwise locate the system bundle.
+  ca_source="${SSL_CERT_FILE}"
+  if [ -z "${ca_source}" ]; then
+    openssl_dir="$(openssl version -d)" || return 1
+    openssl_dir="${openssl_dir#*\"}"
+    openssl_dir="${openssl_dir%\"*}"
+    for candidate in /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt \
+      /etc/ssl/ca-bundle.pem /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem \
+      /etc/ssl/cert.pem /usr/local/share/certs/ca-root-nss.crt "${openssl_dir}/cert.pem"; do
+      if [ -r "${candidate}" ] && [ -s "${candidate}" ]; then
+        ca_source="${candidate}"
+        break
+      fi
+    done
+  fi
+  [ -r "${ca_source}" ] && [ -s "${ca_source}" ] || return 1
+
+  # Split only complete PEM certificates. Reject malformed/truncated input rather
+  # than accidentally producing a weaker or incomplete trust configuration.
+  NETDATA_CA_SPLIT_DIR="${NETDATA_CA_DIR}" awk '
+    BEGIN { dir = ENVIRON["NETDATA_CA_SPLIT_DIR"] }
+    /-----BEGIN CERTIFICATE-----/ {
+      if (inside) exit 1
+      inside = 1; count++; file = dir "/cert-" count ".pem"
+    }
+    inside { print > file }
+    /-----END CERTIFICATE-----/ {
+      if (!inside) exit 1
+      close(file); inside = 0
+    }
+    END { if (inside || !count) exit 1 }
+  ' "${ca_source}" || return 1
+
+  : > "${NETDATA_CA_DIR}/bundle.pem" || return 1
+  # Restore globbing only for the private, generated certificate filenames.
+  set +f
+  for certificate in "${NETDATA_CA_DIR}"/cert-*.pem; do
+    sha256="$(openssl x509 -in "${certificate}" -noout -fingerprint -sha256)" || return 1
+    sha1="$(openssl x509 -in "${certificate}" -noout -fingerprint -sha1)" || return 1
+    sha256="$(printf '%s' "${sha256#*=}" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+    sha1="$(printf '%s' "${sha1#*=}" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+    rejected=0
+    set -f
+    for fingerprint in ${reject_list}; do
+      if [ "${fingerprint}" = "${sha256}" ] || [ "${fingerprint}" = "${sha1}" ]; then
+        rejected=1
+        break
+      fi
+    done
+    set +f
+    if [ "${rejected}" = 0 ]; then
+      cat "${certificate}" >> "${NETDATA_CA_DIR}/bundle.pem" || return 1
+    fi
+    rm -f "${certificate}" || return 1
+  done
+  # An empty CA file is not consistently interpreted by TLS backends.
+  [ -s "${NETDATA_CA_DIR}/bundle.pem" ]
+)
+
+setup_filtered_ca_bundle() {
+  [ -n "${NETDATA_REJECT_CERT_FINGERPRINTS}" ] || return 0
+  [ -n "${NETDATA_CA_BUNDLE}" ] && return 0
+  command -v openssl >/dev/null 2>&1 || return 1
+  NETDATA_CA_DIR="$(mktemp -d "${TMPDIR:-/tmp}/netdata-ca.XXXXXXXXXX")" || return 1
+  NETDATA_CA_DIR="$(CDPATH='' cd "${NETDATA_CA_DIR}" && pwd -P)" || return 1
+  mkdir "${NETDATA_CA_DIR}/empty" || return 1
+  build_filtered_ca_bundle || return 1
+  NETDATA_CA_BUNDLE="${NETDATA_CA_DIR}/bundle.pem"
+}
+
+netdata_curl() {
+  if [ -n "${NETDATA_REJECT_CERT_FINGERPRINTS}" ]; then
+    # Never send telemetry (including error reports) with unfiltered trust if
+    # setup failed. --capath also disables the default hashed CA directory.
+    [ -n "${NETDATA_CA_BUNDLE}" ] || return 1
+    netdata_http_client="${1}"
+    shift
+    # HTTPS proxies have their own trust settings (curl >= 7.52). Only pass
+    # these options when needed, so older curl remains usable without a proxy.
+    case "${https_proxy:-} ${HTTPS_PROXY:-} ${http_proxy:-} ${all_proxy:-} ${ALL_PROXY:-}" in
+      *[hH][tT][tT][pP][sS]://*)
+        set -- --proxy-cacert "${NETDATA_CA_BUNDLE}" --proxy-capath "${NETDATA_CA_DIR}/empty" "$@"
+        ;;
+    esac
+    # NSS-backed curl also opens an independent certificate database via SSL_DIR.
+    SSL_DIR="${NETDATA_CA_DIR}/empty" \
+    SSL_CERT_FILE="${NETDATA_CA_BUNDLE}" SSL_CERT_DIR="${NETDATA_CA_DIR}/empty" \
+      "${netdata_http_client}" -q --cacert "${NETDATA_CA_BUNDLE}" --capath "${NETDATA_CA_DIR}/empty" "$@"
+  else
+    "$@"
+  fi
+}
+
+netdata_wget() {
+  if [ -n "${NETDATA_REJECT_CERT_FINGERPRINTS}" ]; then
+    [ -n "${NETDATA_CA_BUNDLE}" ] || return 1
+    netdata_http_client="${1}"
+    shift
+    # BusyBox builds without these options fail closed, rather than ignoring
+    # the rejection policy. GNU Wget and Wget2 support both options.
+    SSL_CERT_FILE="${NETDATA_CA_BUNDLE}" SSL_CERT_DIR="${NETDATA_CA_DIR}/empty" \
+      "${netdata_http_client}" --check-certificate --ca-certificate="${NETDATA_CA_BUNDLE}" --ca-directory="${NETDATA_CA_DIR}/empty" "$@"
+  else
+    "$@"
+  fi
+}
+cleanup_filtered_ca_bundle() {
+  if [ -n "${NETDATA_CA_DIR}" ]; then
+    rm -rf "${NETDATA_CA_DIR}"
+    NETDATA_CA_DIR=
+    NETDATA_CA_BUNDLE=
+  fi
+}
+# End standalone CA filtering block.
 
 info() {
   echo >&3 "$(date) : INFO: ${script_name}: " "${1}"
@@ -532,6 +692,7 @@ safe_sha256sum() {
 }
 
 cleanup() {
+  cleanup_filtered_ca_bundle
   if [ -n "${logfile}" ]; then
     cat >&2 "${logfile}"
     rm "${logfile}"
@@ -623,7 +784,7 @@ _safe_download() {
 
   if [ -n "${curl}" ]; then
     set +e
-    "${curl}" --silent --fail --location --write-out "%{http_code}" --connect-timeout 10 --retry 3 "${url}" --output "${dest}" > "${dl_log}"
+    netdata_curl "${curl}" --silent --fail --location --write-out "%{http_code}" --connect-timeout 10 --retry 3 "${url}" --output "${dest}" > "${dl_log}"
     result="$?"
     set -e
 
@@ -653,7 +814,7 @@ _safe_download() {
     esac
   elif [ -n "${wget}" ]; then
     set +e
-    "${wget}" -T 15 -S -o "${dl_log}" -O "${dest}" "${url}"
+    netdata_wget "${wget}" -T 15 -S -o "${dl_log}" -O "${dest}" "${url}"
     result="$?"
     set -e
 
@@ -725,16 +886,17 @@ check_for_remote_file() {
   if [ -n "${curl}" ]; then
     checked=1
 
-    if "${curl}" --output /dev/null --silent --head --fail "${url}"; then
+    if netdata_curl "${curl}" --output /dev/null --silent --head --fail "${url}"; then
       succeeded=1
     fi
   fi
 
   if [ "${succeeded}" -eq 0 ]; then
-    if command -v wget > /dev/null 2>&1; then
+    check_for_wget
+    if [ -n "${wget}" ]; then
       checked=1
 
-      if wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK'; then
+      if netdata_wget "${wget}" -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK'; then
         succeeded=1
       fi
     fi
@@ -760,12 +922,12 @@ get_netdata_latest_tag() {
   fi
 
   if [ -n "${curl}" ]; then
-    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' || true)
+    tag=$(netdata_curl "${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' || true)
   fi
 
   if [ -z "${tag}" ]; then
     if [ -n "${wget}" ]; then
-      tag=$("${wget}" -S -O /dev/null "${url}" 2>&1 | grep Location || true)
+      tag=$(netdata_wget "${wget}" -S -O /dev/null "${url}" 2>&1 | grep Location || true)
     fi
   fi
 
@@ -867,6 +1029,8 @@ self_update() {
       [ "$INTERACTIVE" = "0" ] && cmd="$cmd --non-interactive"
       cmd="$cmd --tmpdir-path $(pwd)"
 
+      # exec does not run the EXIT trap; the new updater creates its own bundle.
+      cleanup_filtered_ca_bundle
       exec $cmd
     else
       error "Failed to download newest version of updater script, continuing with current version."
@@ -1692,6 +1856,8 @@ export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 if echo "$INSTALL_TYPE" | grep -qv ^binpkg && [ "${INSTALL_UID}" != "$(id -u)" ]; then
   fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)" U0011
 fi
+
+setup_filtered_ca_bundle || fatal "Unable to prepare filtered CA trust. Check NETDATA_REJECT_CERT_FINGERPRINTS, the system CA bundle, and openssl." U002E
 
 self_update
 
