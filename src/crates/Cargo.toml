@@ -100,7 +100,7 @@ memchr = "2.7"
 uuid = { version = "1.0"}
 nix = { version = "0.30" }
 
-ruzstd = "0.8"
+ruzstd = "0.9.1"
 siphasher = "1.0"
 hashers = "1.0"
 twox-hash = { version = "2.1", default-features = false }
