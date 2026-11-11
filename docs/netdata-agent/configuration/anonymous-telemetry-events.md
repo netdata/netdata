@@ -13,7 +13,7 @@ We use the statistics gathered from this information for two purposes:
 Netdata collects usage information via two different channels:
 
 - **Agent dashboard**: When you access an [Agent's dashboard](/docs/dashboards-and-charts/README.md), it loads PostHog, Google Tag Manager, Reo.dev and Sentry, which send product usage events and error reports.
-- **Agent backend**: When the `netdata` daemon starts, it reports how its previous run ended (a restart or a crash) to `agent-events.netdata.cloud` over HTTPS. Builds with Sentry support also send crash reports to Sentry.
+- **Agent backend**: When the `netdata` daemon starts, it reports how its previous run ended (a restart or a crash; on the first start, its current status) to `agent-events.netdata.cloud` over HTTPS. Builds with Sentry support also send crash reports to Sentry.
 
 ## What data is collected
 
@@ -84,8 +84,8 @@ All opt-out methods prevent:
 
 - The daemon from starting Sentry crash reporting
 - The dashboard from loading PostHog, Google Tag Manager, Reo.dev and Sentry, so it sends them no data
-- The restart and crash reports, unless the Agent is connected to Netdata Cloud (set `crash reports = off` in
-  `netdata.conf` to stop them in that case too)
+- The restart and crash reports, unless `crash reports` is set explicitly in `netdata.conf`, or the Agent is, or was in
+  its previous run, connected to Netdata Cloud. Set `crash reports = off` to stop them in every case
 
 :::
 
@@ -225,7 +225,7 @@ To confirm that telemetry is disabled:
 
 :::note
 
-If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer load PostHog, Google Tag Manager, Reo.dev or Sentry, and the daemon will not start Sentry or, unless it is connected to Netdata Cloud, send restart and crash reports.
+If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer load PostHog, Google Tag Manager, Reo.dev or Sentry, and the daemon will not start Sentry. It also stops sending restart and crash reports, unless `crash reports` is set explicitly or the Agent is, or was in its previous run, connected to Netdata Cloud.
 
 :::
 
