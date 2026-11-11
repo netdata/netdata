@@ -313,6 +313,7 @@ impl IndexBuilds {
             Ok(finished) => finished,
             Err(e) => {
                 self.finished.failed.fetch_add(1, Ordering::Relaxed);
+                remove_partial_index(&sfst_path);
                 let usage = e.usage().map(usage_text).unwrap_or_default();
                 tracing::error!("indexing failed wal={}{usage}: {e}", wal_path.display());
                 let failed = IndexerResponse::IndexFailed {
@@ -360,6 +361,14 @@ impl IndexBuilds {
             }
         }
     }
+}
+
+/// Remove what a child that did not end well left of the index file at
+/// `sfst_path`: the temporary file it wrote to. A child that fails removes
+/// the file itself, but one that is killed while it writes cannot, and
+/// nothing else would remove the file before the next start.
+fn remove_partial_index(sfst_path: &Path) {
+    file_registry::durable::remove_stale_tmp(&file_registry::durable::tmp_path(sfst_path));
 }
 
 /// What the WAL file at `path` decodes to, in bytes, from its frame headers.
@@ -704,6 +713,30 @@ mod tests {
 
         let statistics = index_builds.statistics();
         assert_eq!((statistics.succeeded, statistics.failed), (1, 2));
+    }
+
+    #[tokio::test]
+    async fn a_killed_child_leaves_no_temporary_index_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let sfst = dir.path().join("out.sfst");
+        let temporary = file_registry::durable::tmp_path(&sfst);
+        let started = dir.path().join("out.sfst.started");
+        // The child opens the temporary file of its index and is killed
+        // before it can rename it.
+        let executable =
+            fake_executable(dir.path(), r#": > "$7.started"; : > "$7.tmp"; kill -9 $$"#);
+        let index_builds =
+            IndexBuilds::with_executable(executable, limits_from(None, None).unwrap());
+
+        let wal = dir.path().join("in.wal");
+        let (response, _) = index_builds.build(Signal::Logs, wal, sfst, None, 0).await;
+
+        assert!(
+            matches!(response, IndexerResponse::IndexFailed { .. }),
+            "{response:?}"
+        );
+        assert!(started.exists(), "the child did not get the index path");
+        assert!(!temporary.exists());
     }
 
     #[tokio::test]

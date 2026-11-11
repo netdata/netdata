@@ -68,7 +68,7 @@ pub const TMP_SUFFIX: &str = ".tmp";
 /// The temp path for `final_path`: the suffix is appended, never
 /// substituted, so the final name (and its extension) stays visible in
 /// directory listings of interrupted writes.
-fn tmp_path(final_path: &Path) -> PathBuf {
+pub fn tmp_path(final_path: &Path) -> PathBuf {
     let mut os = final_path.as_os_str().to_owned();
     os.push(TMP_SUFFIX);
     PathBuf::from(os)
