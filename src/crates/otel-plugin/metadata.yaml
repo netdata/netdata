@@ -183,6 +183,8 @@ modules:
               required: false
             - name: metrics.expiry_duration_secs
               description: Time without data after which a chart is removed.
+              detailed_description: |
+                The plugin also rejects a metric data point when its timestamp is further from the current time than this value, in the past or in the future.
               default_value: 900
               required: false
             - name: metrics.max_new_charts_per_request
@@ -393,6 +395,9 @@ modules:
           - name: Large exports are rejected
             description: |
               The plugin rejects an export request larger than 4 MiB as a whole, and the Collector drops that batch. Make the batches smaller. On the exporter, cap them by size with `sending_queue: { batch: { sizer: bytes, max_size: 3000000 } }`. Alternatively, lower `send_batch_max_size` on the `batch` processor; it counts items (spans, data points, log records), not bytes.
+          - name: Some exported metric data points are missing
+            description: |
+              The plugin rejects a metric data point when its timestamp is further from the current time than the expiry of its chart (`metrics.expiry_duration_secs`, 15 minutes by default), in the past or in the future. The chart `netdata.otel.metric_data_points` shows these data points on its `rejected` dimension, and the plugin logs a warning in the Agent journal. Check the clock of the host that produced the metrics.
           - name: Some exported logs are missing
             description: |
               By default, the plugin rejects log records timestamped more than 24 hours in the past or more than 10 minutes in the future. The Collector logs a `Partial success response` warning for rejected records. Check the clock of the host that produced the logs, how old the backfilled records are, the Collector log, and the Agent journal.

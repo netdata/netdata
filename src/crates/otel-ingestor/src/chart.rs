@@ -60,6 +60,22 @@ pub struct ChartConfig {
     pub expiry_duration: Duration,
 }
 
+impl ChartConfig {
+    /// Whether a chart with this timing can show a data point of time
+    /// `timestamp_ns` at `now_ns`: the point is not further from now than
+    /// the chart's expiry, in either direction.
+    ///
+    /// A chart follows the wall clock: it emits one slot after the other up
+    /// to now and fills the slots without data. A point from long ago would
+    /// make it fill every slot from there to now; a point from far ahead
+    /// would wait in memory for its slot to come. The sender sets the
+    /// timestamp, so the ingestor checks it before a chart sees the point.
+    pub fn shows(&self, timestamp_ns: u64, now_ns: u64) -> bool {
+        let window_ns = u64::try_from(self.expiry_duration.as_nanos()).unwrap_or(u64::MAX);
+        timestamp_ns.abs_diff(now_ns) <= window_ns
+    }
+}
+
 impl Default for ChartConfig {
     fn default() -> Self {
         Self {
@@ -697,6 +713,23 @@ mod tests {
     /// The whole text of a chart whose names need no change. The agent reads
     /// it as it read the text the ingestor wrote before it used the shared
     /// writer; the one difference in bytes is the quoted dimension name.
+    #[test]
+    fn a_chart_shows_points_within_its_expiry_of_now() {
+        let config = ChartConfig {
+            expiry_duration: Duration::from_secs(900),
+            ..ChartConfig::default()
+        };
+        let now = ns(1_000_000);
+
+        assert!(config.shows(now, now));
+        assert!(config.shows(now - ns(900), now));
+        assert!(config.shows(now + ns(900), now));
+        assert!(!config.shows(now - ns(901), now));
+        assert!(!config.shows(now + ns(901), now));
+        assert!(!config.shows(0, now));
+        assert!(!config.shows(u64::MAX, now));
+    }
+
     #[test]
     fn chart_text_of_plain_names() {
         let mut chart = Chart::new(

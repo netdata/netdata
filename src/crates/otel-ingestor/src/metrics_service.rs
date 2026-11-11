@@ -19,7 +19,9 @@
 //! Chart creation is budgeted per request (`max_new_charts_per_request`,
 //! from otel.yaml's `metrics.max_new_charts_per_request`, default 100); once
 //! the budget is exhausted, points for not-yet-created charts are dropped
-//! with one warn. The export core always answers Ok, never a transport
+//! with one warn. A data point whose timestamp is further from now than its
+//! chart's expiry is dropped as well (`ChartConfig::shows`): the timestamp
+//! is the sender's. The export core always answers Ok, never a transport
 //! error: what became of a request's data points shows on the chart
 //! `netdata.otel.metric_data_points` (see [`PointOutcome`]).
 
@@ -139,9 +141,9 @@ impl ChartManager {
 enum PointOutcome {
     /// It reached at least one chart.
     Charted,
-    /// The plugin could not chart it: a metric type or temporality it has no
-    /// chart for, a malformed histogram, or a new chart past the request's
-    /// budget.
+    /// The plugin could not chart it: a timestamp too far from now, a metric
+    /// type or temporality it has no chart for, a malformed histogram, or a
+    /// new chart past the request's budget.
     Dropped,
     /// It carries no value: the sender flagged it `NO_RECORDED_VALUE`, or
     /// left a number point's value unset.
@@ -214,7 +216,7 @@ impl NetdataMetricsService {
         chart_manager: &mut ChartManager,
         dp: &DataPointContext<'_>,
         hdp: &HistogramDataPoint,
-        ccm: &ChartConfigManager,
+        chart_config: ChartConfig,
         chart_name_buf: &mut String,
         new_charts: &mut usize,
         budget: usize,
@@ -234,7 +236,6 @@ impl NetdataMetricsService {
         }
 
         let chart_hash = dp.chart_hash();
-        let chart_config = ccm.resolve_chart_config(dp.metric_ref.config.as_deref());
         let temporality = dp.aggregation_temporality();
         let timestamp_ns = hdp.time_unix_nano;
         let start_time_ns = hdp.start_time_unix_nano;
@@ -404,7 +405,7 @@ impl NetdataMetricsService {
         chart_manager: &mut ChartManager,
         dp: &DataPointContext<'_>,
         sdp: &SummaryDataPoint,
-        ccm: &ChartConfigManager,
+        chart_config: ChartConfig,
         chart_name_buf: &mut String,
         new_charts: &mut usize,
         budget: usize,
@@ -415,7 +416,6 @@ impl NetdataMetricsService {
         }
 
         let chart_hash = dp.chart_hash();
-        let chart_config = ccm.resolve_chart_config(dp.metric_ref.config.as_deref());
         let timestamp_ns = sdp.time_unix_nano;
         let start_time_ns = sdp.start_time_unix_nano;
 
@@ -536,7 +536,7 @@ impl NetdataMetricsService {
     fn process_number(
         chart_manager: &mut ChartManager,
         dp: &DataPointContext<'_>,
-        ccm: &ChartConfigManager,
+        chart_config: ChartConfig,
         chart_name_buf: &mut String,
         new_charts: &mut usize,
         budget: usize,
@@ -579,9 +579,6 @@ impl NetdataMetricsService {
             return PointOutcome::Dropped;
         }
 
-        // Per-chart timing/config: the metric's matched config merged
-        // over the global defaults (chart_config.rs).
-        let chart_config = ccm.resolve_chart_config(dp.metric_ref.config.as_deref());
         let Some(chart) = chart_manager.create_chart(chart_name_buf, dp, chart_config) else {
             // Unsupported metric type: no aggregation mapping (create_chart).
             return PointOutcome::Dropped;
@@ -618,15 +615,26 @@ impl NetdataMetricsService {
         let budget = self.max_new_charts_per_request;
         let mut charted: u64 = 0;
         let mut dropped: u64 = 0;
+        let mut far_from_now: u64 = 0;
+        let now_ns = unix_now_ns();
 
         for dp in req.datapoint_iter(&ccm) {
+            // Per-chart timing: the metric's matched config merged over the
+            // global defaults (chart_config.rs).
+            let chart_config = ccm.resolve_chart_config(dp.metric_ref.config.as_deref());
+            if !chart_config.shows(dp.datapoint_ref.time_unix_nano(), now_ns) {
+                far_from_now += 1;
+                dropped += 1;
+                continue;
+            }
+
             let outcome = match &dp.datapoint_ref {
                 // Bucket heatmap + count/sum/minmax lines.
                 DataPointRef::Histogram(hdp) => Self::process_histogram(
                     &mut chart_manager,
                     &dp,
                     hdp,
-                    &ccm,
+                    chart_config,
                     &mut chart_name_buf,
                     &mut new_charts,
                     budget,
@@ -636,7 +644,7 @@ impl NetdataMetricsService {
                     &mut chart_manager,
                     &dp,
                     sdp,
-                    &ccm,
+                    chart_config,
                     &mut chart_name_buf,
                     &mut new_charts,
                     budget,
@@ -644,7 +652,7 @@ impl NetdataMetricsService {
                 DataPointRef::Number(_) => Self::process_number(
                     &mut chart_manager,
                     &dp,
-                    &ccm,
+                    chart_config,
                     &mut chart_name_buf,
                     &mut new_charts,
                     budget,
@@ -668,6 +676,13 @@ impl NetdataMetricsService {
             );
         }
 
+        if far_from_now > 0 {
+            tracing::warn!(
+                "{far_from_now} metric data points dropped: their timestamps are further from \
+                 now than their charts' expiry (check the sender's clock)"
+            );
+        }
+
         self.derived_metrics
             .record_metric_data_points(charted, dropped);
     }
@@ -688,6 +703,14 @@ impl NetdataMetricsService {
             partial_success: None,
         })
     }
+}
+
+/// Nanoseconds since the Unix epoch, by the wall clock.
+fn unix_now_ns() -> u64 {
+    let since_epoch = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    u64::try_from(since_epoch.as_nanos()).unwrap_or(u64::MAX)
 }
 
 /// Defaults for standalone use: stock per-metric configs, an empty chart
@@ -731,10 +754,7 @@ mod tests {
     use super::*;
 
     fn now_ns() -> u64 {
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64
+        unix_now_ns()
     }
 
     fn request(metrics: Vec<Metric>) -> ExportMetricsServiceRequest {
@@ -814,6 +834,44 @@ mod tests {
             .unwrap();
 
         assert_eq!(counted(&service), (2, 1));
+    }
+
+    /// The chart shows the present: a data point far from now is rejected,
+    /// and it cannot make the chart write a block for every slot between
+    /// its time and now.
+    #[tokio::test]
+    async fn a_data_point_far_from_now_is_rejected() {
+        const TEN_DAYS_NS: u64 = 10 * 24 * 3600 * 1_000_000_000;
+        let service = NetdataMetricsService::default();
+        let now = now_ns();
+
+        service
+            .export_metrics(request(vec![gauge(
+                "load",
+                vec![
+                    point(Some(1.0), now - TEN_DAYS_NS),
+                    point(Some(2.0), now + TEN_DAYS_NS),
+                    point(Some(3.0), 0),
+                    point(Some(4.0), now),
+                ],
+            )]))
+            .await
+            .unwrap();
+
+        assert_eq!(counted(&service), (1, 3));
+
+        // The current point's slot has ended 30 seconds from now.
+        let mut text = Vec::new();
+        service
+            .chart_manager
+            .write()
+            .await
+            .emit(now / 1_000_000_000 + 30, &mut text);
+        let blocks = text
+            .split(|&byte| byte == b'\n')
+            .filter(|line| line.starts_with(b"BEGIN "))
+            .count();
+        assert_eq!(blocks, 1);
     }
 
     #[tokio::test]
