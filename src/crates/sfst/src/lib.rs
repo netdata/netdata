@@ -220,7 +220,7 @@ const CHUNK_TRACE_ROLLUP: chunk_file::ChunkId = *b"TRSU";
 const CHUNK_TRACE_ROLLUP_STATS: chunk_file::ChunkId = *b"TRSS";
 // Optional per-file trace-id bloom (cold region, after TIDX): a serialized
 // fastbloom filter over the file's distinct set trace ids — "definitely not in
-// this file" for cross-file trace-by-id, at a 5% write-time FP target. Same
+// this file" for cross-file trace-by-id, at a 0.001% write-time FP target. Same
 // additive TOC-indexed contract as TIDX (see `trace_bloom`).
 const CHUNK_TRACE_BLOOM: chunk_file::ChunkId = *b"TBLM";
 
