@@ -12,8 +12,9 @@ The repo-root `AGENTS.md` applies in full; where the two conflict, this more spe
 
 ## Dependency Advisories
 
-- `.github/workflows/rust-advisories.yml` runs `cargo deny check advisories` on master daily and posts to Slack on
-  failure. Run the same check locally from the repository root:
+- `.github/workflows/rust-advisories.yml` runs `cargo deny check advisories` on master daily (Slack alert on
+  failure) and on PRs that change a `Cargo.toml`, `Cargo.lock`, or the policy. Run the same check locally from the
+  repository root:
   `cargo deny --locked --manifest-path src/crates/Cargo.toml --config .github/cargo/deny.toml check advisories`.
 - `.github/cargo/deny.toml` holds the policy and vetted exceptions as `ignore` entries, each with a reason. cargo-deny
   does not find it on its own; always pass `--config`. Add an entry only for an advisory that was vetted; do not

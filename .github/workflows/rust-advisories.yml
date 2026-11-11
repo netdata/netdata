@@ -1,9 +1,15 @@
 ---
-# Daily RustSec advisory scan of src/crates/Cargo.lock; posts to Slack on failure.
+# RustSec advisory scan of src/crates/Cargo.lock: daily, and on PRs that change Cargo manifests or this check.
 name: Rust Advisories
 on:
   schedule:
     - cron: '30 5 * * *'
+  pull_request:
+    paths:
+      - 'src/crates/Cargo.lock'
+      - 'src/crates/**/Cargo.toml'
+      - '.github/cargo/deny.toml'
+      - '.github/workflows/rust-advisories.yml'
   workflow_dispatch: null
 concurrency:
   group: rust-advisories-${{ github.ref }}
@@ -41,4 +47,4 @@ jobs:
               Check advisories: ${{ steps.check.outcome }}
               Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: failure()
+        if: failure() && github.event_name != 'pull_request' # PR authors see the failed check instead.
