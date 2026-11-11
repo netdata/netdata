@@ -12,7 +12,8 @@
 //! it and nothing passes it, so a large job cannot be starved by smaller ones
 //! behind it. One job may always run, whatever its size, so the queue always
 //! moves. The queue itself has no bound: the limits are on what runs, not on
-//! what waits.
+//! what waits. [`Scheduler::queue`] tells how many jobs run, how many wait,
+//! and for how long the first of them has.
 //!
 //! The work runs in processes, not threads, for three reasons. The memory a
 //! job needs goes back to the system when the job ends. A job that fails,
@@ -35,7 +36,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use tokio::process::Command;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, watch};
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 
@@ -55,6 +56,18 @@ pub struct Limits {
     /// On a system where the scheduler cannot read these numbers, only `jobs`
     /// limits it.
     pub memory_percent: u8,
+}
+
+/// A scheduler's queue at one moment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Queue {
+    /// How many jobs run.
+    pub running: usize,
+    /// How many jobs wait for their start.
+    pub waiting: usize,
+    /// How long the job at the head of the queue has waited; `None` when no
+    /// job waits.
+    pub oldest_wait: Option<Duration>,
 }
 
 /// A job: a command to run as a child process.
@@ -136,6 +149,15 @@ struct Queued {
     result: oneshot::Sender<Result>,
 }
 
+/// What the dispatcher tells of its queue, after every change of it.
+#[derive(Debug, Clone, Copy, Default)]
+struct QueueState {
+    running: usize,
+    waiting: usize,
+    /// When the job at the head of the queue was submitted.
+    oldest_queued_at: Option<Instant>,
+}
+
 /// What the dispatcher knows of a job that runs.
 struct Running {
     expected_memory: u64,
@@ -151,6 +173,7 @@ struct Running {
 #[derive(Clone)]
 pub struct Scheduler {
     queue: mpsc::UnboundedSender<Queued>,
+    queue_state: watch::Receiver<QueueState>,
 }
 
 impl Scheduler {
@@ -174,9 +197,23 @@ impl Scheduler {
         );
 
         let (queue, jobs) = mpsc::unbounded_channel();
-        tokio::spawn(dispatch(limits, system, jobs));
+        let (state, queue_state) = watch::channel(QueueState::default());
+        tokio::spawn(dispatch(limits, system, jobs, state));
 
-        Self { queue }
+        Self { queue, queue_state }
+    }
+
+    /// The queue as the dispatcher last left it: a job counts from the
+    /// moment the dispatcher has taken it in, which is at once unless the
+    /// runtime is busy.
+    pub fn queue(&self) -> Queue {
+        let state = *self.queue_state.borrow();
+
+        Queue {
+            running: state.running,
+            waiting: state.waiting,
+            oldest_wait: state.oldest_queued_at.map(|queued_at| queued_at.elapsed()),
+        }
     }
 
     /// Run `job` and wait for its result.
@@ -204,8 +241,13 @@ impl Scheduler {
 /// the head while the limits allow it. Ends when every [`Scheduler`] is gone;
 /// dropping `waiting` and `running` then fails the jobs that have not
 /// finished, and aborting the running ones kills their children.
-async fn dispatch(limits: Limits, system: impl System, mut jobs: mpsc::UnboundedReceiver<Queued>) {
-    let mut waiting = VecDeque::new();
+async fn dispatch(
+    limits: Limits,
+    system: impl System,
+    mut jobs: mpsc::UnboundedReceiver<Queued>,
+    state: watch::Sender<QueueState>,
+) {
+    let mut waiting: VecDeque<Queued> = VecDeque::new();
     let mut running = JoinSet::new();
     let mut running_jobs = HashMap::new();
 
@@ -221,6 +263,12 @@ async fn dispatch(limits: Limits, system: impl System, mut jobs: mpsc::Unbounded
             let task = running.spawn(run_job(queued, Arc::clone(&job.pid)));
             running_jobs.insert(task.id(), job);
         }
+
+        state.send_replace(QueueState {
+            running: running_jobs.len(),
+            waiting: waiting.len(),
+            oldest_queued_at: waiting.front().map(|queued| queued.queued_at),
+        });
 
         tokio::select! {
             queued = jobs.recv() => match queued {
@@ -520,6 +568,46 @@ mod tests {
             "{err}"
         );
         assert!(std::error::Error::source(&err).is_none());
+    }
+
+    #[tokio::test]
+    async fn the_queue_tells_what_runs_and_what_waits() {
+        let scheduler = scheduler(1);
+        let empty = Queue {
+            running: 0,
+            waiting: 0,
+            oldest_wait: None,
+        };
+        assert_eq!(scheduler.queue(), empty);
+
+        let first = scheduler.run(sh("sleep 30"));
+        let second = scheduler.run(sh("sleep 30"));
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        let third = scheduler.run(sh("sleep 30"));
+        queue_becomes(&scheduler, |queue| queue.waiting == 2).await;
+
+        let queue = scheduler.queue();
+        assert_eq!(queue.running, 1);
+        // The second job's wait, not the third's.
+        assert!(queue.oldest_wait.unwrap() >= Duration::from_millis(150));
+
+        // Abandoned: the running job's child is killed, and the waiting ones
+        // leave the queue as they reach its head.
+        drop((first, second, third));
+        queue_becomes(&scheduler, |queue| queue == empty).await;
+    }
+
+    /// Wait until the scheduler's queue is as `wanted` says.
+    async fn queue_becomes(scheduler: &Scheduler, wanted: impl Fn(Queue) -> bool) {
+        let became = async {
+            while !wanted(scheduler.queue()) {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        };
+
+        tokio::time::timeout(Duration::from_secs(10), became)
+            .await
+            .expect("the queue did not get there");
     }
 
     #[tokio::test]
