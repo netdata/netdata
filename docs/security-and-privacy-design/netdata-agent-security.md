@@ -98,7 +98,7 @@ Understanding each path, its default state, and how to disable it is essential w
 
 | **Communication Path**              | **Default State**      | **Trigger**                       | **Destination**                                                           | **How to Disable**                                                                                                             |
 |:------------------------------------|:-----------------------|:----------------------------------|:--------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------|
-| Restart and crash reports (backend) | On                     | Agent start after a restart or crash | `agent-events.netdata.cloud` over HTTPS; Sentry on builds with it      | Opt out of telemetry (below): stops Sentry, and the status reports when the Agent is not connected to Netdata Cloud. `crash reports = off` in `netdata.conf` stops the status reports only |
+| Restart and crash reports (backend) | On                     | Agent start                          | `agent-events.netdata.cloud` over HTTPS; Sentry on builds with it      | Opt out of telemetry (below): stops Sentry, and the status reports unless `crash reports` is set explicitly or the Agent is, or was, connected to Netdata Cloud. `crash reports = off` in `netdata.conf` stops the status reports in every case |
 | Anonymous telemetry (dashboard)     | On                     | Viewing the local Agent dashboard | PostHog (anonymized page-view events)                                     | Same as above (shared opt-out controls)                                                                                        |
 | Agent-Cloud Link (ACLK)             | Off until connected    | Connecting a node to a Space      | `app.netdata.cloud`, `api.netdata.cloud`, `mqtt.netdata.cloud` (WSS, 443) | Do not connect the Agent to Netdata Cloud                                                                                      |
 | Installer script download           | n/a (install time)     | Running `kickstart.sh`            | `get.netdata.cloud`                                                       | Pre-download the script for an offline install                                                                                 |
@@ -108,10 +108,10 @@ Understanding each path, its default state, and how to disable it is essential w
 
 By default, Netdata collects anonymous usage information through two channels:
 
-- **Agent backend**: When the `netdata` daemon starts, it reports how its previous run ended (a restart or a crash) to `agent-events.netdata.cloud` over HTTPS, with version, system and crash information. Builds with Sentry support also send crash reports to Sentry. The `crash reports` option in `netdata.conf` controls the status reports; Sentry follows the telemetry opt-out.
+- **Agent backend**: When the `netdata` daemon starts, it reports how its previous run ended (a restart or a crash; on the first start, its current status) to `agent-events.netdata.cloud` over HTTPS, with version, system and crash information. Builds with Sentry support also send crash reports to Sentry. The `crash reports` option in `netdata.conf` controls the status reports; Sentry follows the telemetry opt-out.
 - **Agent dashboard**: When you view the local dashboard (`http://NODE:19999`), PostHog JavaScript sends anonymized page-view events. Sensitive attributes (such as IP and hostname) are overwritten with constant values before any event is sent.
 
-Telemetry is **on by default** and never carries metric data. See [Anonymous telemetry events](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) for exactly what is collected and the opt-out methods.
+Telemetry is **on by default** and never carries metric samples (time-series values). See [Anonymous telemetry events](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) for exactly what is collected and the opt-out methods.
 
 ### Agent-Cloud Link (ACLK)
 

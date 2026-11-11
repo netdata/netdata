@@ -115,9 +115,13 @@ void info_fields_notification_methods_main(void *ptr) {
         return;
     }
 
-    // exec, so that a kill on timeout reaches the script, not the /bin/sh -c wrapper
+    // quoted like health quotes it; exec, so that a kill on timeout reaches the script, not the /bin/sh -c wrapper
+    char quoted[FILENAME_MAX * 4 + 1];
+    if(!sanitize_command_argument_string(quoted, script, sizeof(quoted)))
+        return;
+
     CLEAN_BUFFER *cmd = buffer_create(FILENAME_MAX, NULL);
-    buffer_sprintf(cmd, "exec %s dump_methods", script);
+    buffer_sprintf(cmd, "exec '%s' dump_methods", quoted);
 
     POPEN_INSTANCE *pi = spawn_popen_run(buffer_tostring(cmd));
     if(!pi)

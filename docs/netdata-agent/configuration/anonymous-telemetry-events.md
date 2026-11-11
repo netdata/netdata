@@ -13,7 +13,7 @@ We use the statistics gathered from this information for two purposes:
 Netdata collects usage information via two different channels:
 
 - **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](/docs/dashboards-and-charts/README.md).
-- **Agent backend**: When the `netdata` daemon starts, it reports how its previous run ended (a restart or a crash) to `agent-events.netdata.cloud` over HTTPS. Builds with Sentry support also send crash reports to Sentry.
+- **Agent backend**: When the `netdata` daemon starts, it reports how its previous run ended (a restart or a crash; on the first start, its current status) to `agent-events.netdata.cloud` over HTTPS. Builds with Sentry support also send crash reports to Sentry.
 
 ## What data is collected
 
@@ -89,8 +89,8 @@ All opt-out methods prevent:
 
 - The daemon from starting Sentry crash reporting
 - The PostHog JavaScript snippet (which remains on the dashboard) from firing and sending any data to Netdata PostHog
-- The restart and crash reports, unless the Agent is connected to Netdata Cloud (set `crash reports = off` in
-  `netdata.conf` to stop them in that case too)
+- The restart and crash reports, unless `crash reports` is set explicitly in `netdata.conf`, or the Agent is, or was in
+  its previous run, connected to Netdata Cloud. Set `crash reports = off` to stop them in every case
 
 :::
 
@@ -230,7 +230,7 @@ To confirm that telemetry is disabled:
 
 :::note
 
-If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer send PostHog events, and the daemon will not start Sentry or, unless it is connected to Netdata Cloud, send restart and crash reports.
+If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer send PostHog events, and the daemon will not start Sentry. It also stops sending restart and crash reports, unless `crash reports` is set explicitly or the Agent is, or was in its previous run, connected to Netdata Cloud.
 
 :::
 
