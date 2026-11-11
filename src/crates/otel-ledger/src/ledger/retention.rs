@@ -60,32 +60,27 @@ impl Ledger {
 
             // The resolved config is lowered onto sfst's plain-data policy
             // (`sfst_retention_policy`, `file-lifecycle/src/helpers.rs`); the
-            // registry walks eligible files oldest-first and returns the seqs
-            // to evict.
-            let to_evict = registry
-                .sfst
-                .evaluate_retention(&sfst_retention_policy(&retention), now_ns());
-            let mut reqs = Vec::with_capacity(to_evict.len());
-            for seq in to_evict {
-                // The seq came from the local SFST retention scan, so its entry
-                // (and full identity) is present; key the confirm gate by it.
-                let Some(key) = registry.sfst.get(seq).map(|e| SeqKey::from(&e.id)) else {
-                    continue;
-                };
-                // Don't evict the local SFST until its catalog entry is
-                // confirmed present on the remote — covers "not yet uploaded",
-                // "uploaded but not yet cataloged", and "cataloged locally but
-                // the catalog upload hasn't landed". Deleting earlier would
-                // orphan the remote SFST (referenced by no remote catalog).
-                if storage_enabled && !registry.is_remote_cataloged(key) {
+            // registry walks the files oldest-first and says which to evict,
+            // and which it would evict if their catalog entry were already
+            // confirmed on the remote (`Registry::index_evictions`).
+            let evictions = registry.index_evictions(
+                &sfst_retention_policy(&retention),
+                now_ns(),
+                storage_enabled,
+            );
+            for seq in evictions.deferred {
+                if let Some(key) = registry.sfst.get(seq).map(|e| SeqKey::from(&e.id)) {
                     tracing::warn!(
                         "retention: deferring eviction of seq={key} (catalog not yet confirmed on remote)"
                     );
-                    continue;
                 }
+            }
 
+            let mut reqs = Vec::with_capacity(evictions.evict.len());
+            for seq in evictions.evict {
                 registry.sfst.mark_pending_deletion(seq);
                 if let Some(entry) = registry.sfst.get(seq) {
+                    let key = SeqKey::from(&entry.id);
                     let path = registry.sfst.file_path(entry.id);
                     tracing::info!("retention: evicting seq={key} path={}", path.display());
                     reqs.push(CleanerRequest::DeleteIndexFile {

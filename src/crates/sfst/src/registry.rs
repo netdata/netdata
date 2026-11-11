@@ -42,6 +42,16 @@ pub struct RetentionPolicy {
     pub max_age: std::time::Duration,
 }
 
+/// What [`Registry::evaluate_retention`] decides, as seqs, oldest first.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Evictions {
+    /// The files to evict.
+    pub evict: Vec<u64>,
+    /// The files that are over a limit, but that the caller does not let go
+    /// yet. They stay.
+    pub deferred: Vec<u64>,
+}
+
 /// One tracked `.sfst` file: identity, size, inline summary, and
 /// deletion state.
 #[derive(Debug, Clone)]
@@ -229,21 +239,30 @@ impl Registry {
         self.inner.is_empty()
     }
 
-    /// Evaluate the retention policy and return the seqs to evict, oldest
-    /// first.
+    /// Evaluate the retention policy over the files, oldest first (by
+    /// sequence number), and say which to evict.
     ///
     /// Files already pending deletion are ignored and don't count toward
-    /// the limits. Eligible files are walked oldest-first (by sequence
-    /// number): the `max_files` / `max_total_size` limits are checked
-    /// against the totals remaining after earlier evictions, so files are
-    /// dropped until both fit, while `max_age` is a per-file check.
+    /// the limits. The `max_files` / `max_total_size` limits are checked
+    /// against the totals that remain after the evictions decided so far, so
+    /// files are dropped until both fit, while `max_age` is a per-file check.
+    ///
+    /// `may_evict` is the caller's word on a file that is over a limit: a
+    /// file it refuses stays, still counts toward the limits, and comes back
+    /// as deferred. So the walk goes on to younger files, and the limits
+    /// hold with the files that may go.
     ///
     /// Age is measured against `summary.max_timestamp_s` — the most recent
     /// log entry in the file — compared against `now_ns` truncated to
     /// whole seconds. An empty SFST (`record_count == 0`, so
     /// `max_timestamp_s == 0`) is older than any real age and evicts on
     /// the first pass.
-    pub fn evaluate_retention(&self, policy: &RetentionPolicy, now_ns: u64) -> Vec<u64> {
+    pub fn evaluate_retention(
+        &self,
+        policy: &RetentionPolicy,
+        now_ns: u64,
+        may_evict: impl Fn(&File) -> bool,
+    ) -> Evictions {
         let max_files = policy.max_files;
         let max_total_size = policy.max_total_size.as_u64();
         let max_age_s = policy.max_age.as_secs();
@@ -255,34 +274,28 @@ impl Registry {
             .filter(|f| !f.pending_deletion)
             .collect();
 
-        let total_files = eligible.len();
-        let total_size: u64 = eligible.iter().map(|f| f.size.as_u64()).sum();
+        let mut evictions = Evictions::default();
+        let mut remaining_files = eligible.len();
+        let mut remaining_size: u64 = eligible.iter().map(|f| f.size.as_u64()).sum();
 
-        let mut to_evict = Vec::new();
-        let mut remaining_files = total_files;
-        let mut remaining_size = total_size;
-
-        for entry in &eligible {
-            let mut should_evict = false;
-
-            if remaining_files > max_files {
-                should_evict = true;
-            }
-            if remaining_size > max_total_size {
-                should_evict = true;
-            }
-            if now_s.saturating_sub(entry.summary.max_timestamp_s as u64) > max_age_s {
-                should_evict = true;
+        for entry in eligible {
+            let over_a_limit = remaining_files > max_files
+                || remaining_size > max_total_size
+                || now_s.saturating_sub(entry.summary.max_timestamp_s as u64) > max_age_s;
+            if !over_a_limit {
+                continue;
             }
 
-            if should_evict {
-                to_evict.push(entry.id.seq);
+            if may_evict(entry) {
+                evictions.evict.push(entry.id.seq);
                 remaining_files -= 1;
                 remaining_size -= entry.size.as_u64();
+            } else {
+                evictions.deferred.push(entry.id.seq);
             }
         }
 
-        to_evict
+        evictions
     }
 }
 

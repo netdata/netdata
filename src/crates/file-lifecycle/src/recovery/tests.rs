@@ -609,6 +609,35 @@ async fn recover_retention_evicts_only_remote_cataloged() {
 }
 
 #[tokio::test]
+async fn recover_retention_keeps_its_limit_with_the_files_it_may_evict() {
+    // Three files where two may stay. The oldest is not on the remote yet,
+    // so it cannot go: it still takes one of the two places, and the next
+    // oldest, which is on the remote, goes instead.
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    for seq in [1u64, 2, 3] {
+        let id = file_registry::FileId::new(ident(), 0, seq, 0);
+        reg.sfst.track(id, ByteSize(1), empty_summary());
+    }
+    for seq in [2, 3] {
+        reg.mark_rotated(sk(seq));
+        reg.mark_remote_cataloged([sk(seq)]);
+    }
+    let two_files = otel_bridge::config::RetentionConfig {
+        max_files: 2,
+        ..evict_all_retention()
+    };
+
+    run_recover_retention(&mut reg, &two_files, true).await;
+
+    let kept: Vec<u64> = [1, 2, 3]
+        .into_iter()
+        .filter(|&seq| reg.sfst.get(seq).is_some())
+        .collect();
+    assert_eq!(kept, [1, 3]);
+}
+
+#[tokio::test]
 async fn recover_retention_evicts_all_when_storage_disabled() {
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());

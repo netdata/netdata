@@ -23,10 +23,10 @@
 //! - files marked pending-deletion are invisible to `candidates()`;
 //! - a fresh registry over an empty directory yields no candidates.
 //!
-//! Not pinned here: `evaluate_retention`/`RetentionPolicy` (no unit test
-//! in this crate — exercised indirectly by file-lifecycle's
-//! `recover_retention` tests), `remove`/`clear_pending_deletion`/
-//! `file_path`, the per-tenant layer above this type (file-lifecycle's
+//! - retention: each of the three limits alone, files pending deletion,
+//!   and a file the caller does not let go.
+//!
+//! Not pinned here: `remove`/`clear_pending_deletion`/`file_path`, the per-tenant layer above this type (file-lifecycle's
 //! tenant registry, consumed by otel-ledger), and writer↔reader
 //! round-trips (`src/tests/round_trip.rs`).
 use super::*;
@@ -337,4 +337,112 @@ fn candidates_on_empty_registry() {
         partition_keys: Vec::new(),
     };
     assert!(reg.candidates(&q).next().is_none());
+}
+
+// ── Retention (`evaluate_retention`) ─────────────────────────────
+
+/// A registry of files `(seq, size, newest record's second)`.
+fn registry_of(files: &[(u64, u64, u32)]) -> (Registry, tempfile::TempDir) {
+    let dir = tempfile::tempdir().unwrap();
+    let mut reg = Registry::new(dir.path());
+    for &(seq, size, max_s) in files {
+        reg.track(
+            FileId::new(file_registry::test_identity(), 0, seq, 0),
+            ByteSize(size),
+            Summary {
+                min_timestamp_s: max_s,
+                max_timestamp_s: max_s,
+                record_count: 1,
+                content_meta: Vec::new(),
+            },
+        );
+    }
+    (reg, dir)
+}
+
+/// A policy that keeps everything; a test lowers the limit it is about.
+const KEEP_ALL: RetentionPolicy = RetentionPolicy {
+    max_files: usize::MAX,
+    max_total_size: ByteSize(u64::MAX),
+    max_age: std::time::Duration::from_secs(u64::MAX / 2),
+};
+
+/// Now, as nanoseconds: second 1,000.
+const NOW_NS: u64 = 1_000 * 1_000_000_000;
+
+fn evict(seqs: &[u64]) -> Evictions {
+    Evictions {
+        evict: seqs.to_vec(),
+        deferred: Vec::new(),
+    }
+}
+
+#[test]
+fn retention_drops_the_oldest_files_until_the_limits_fit() {
+    // Four files of 10 bytes each, the newest record of each at second 900.
+    let files = [(1, 10, 900), (2, 10, 900), (3, 10, 900), (4, 10, 900)];
+    let (reg, _dir) = registry_of(&files);
+    let pass = |policy| reg.evaluate_retention(&policy, NOW_NS, |_| true);
+
+    assert_eq!(pass(KEEP_ALL), evict(&[]));
+    let two_files = RetentionPolicy {
+        max_files: 2,
+        ..KEEP_ALL
+    };
+    assert_eq!(pass(two_files), evict(&[1, 2]));
+    let thirty_bytes = RetentionPolicy {
+        max_total_size: ByteSize(30),
+        ..KEEP_ALL
+    };
+    assert_eq!(pass(thirty_bytes), evict(&[1]));
+}
+
+#[test]
+fn retention_drops_every_file_older_than_the_age() {
+    // The age is per file: the two old ones go, wherever they are.
+    let (reg, _dir) = registry_of(&[(1, 10, 100), (2, 10, 950), (3, 10, 200)]);
+    let one_minute_and_a_half = RetentionPolicy {
+        max_age: std::time::Duration::from_secs(90),
+        ..KEEP_ALL
+    };
+
+    let evictions = reg.evaluate_retention(&one_minute_and_a_half, NOW_NS, |_| true);
+
+    assert_eq!(evictions, evict(&[1, 3]));
+}
+
+#[test]
+fn retention_does_not_count_a_file_that_is_pending_deletion() {
+    let (mut reg, _dir) = registry_of(&[(1, 10, 900), (2, 10, 900), (3, 10, 900)]);
+    reg.mark_pending_deletion(1);
+    let two_files = RetentionPolicy {
+        max_files: 2,
+        ..KEEP_ALL
+    };
+
+    assert_eq!(
+        reg.evaluate_retention(&two_files, NOW_NS, |_| true),
+        evict(&[])
+    );
+}
+
+#[test]
+fn a_file_that_may_not_go_stays_and_still_counts() {
+    // Two files may stay. The oldest may not go: it keeps one of the two
+    // places, so the next oldest goes in its stead.
+    let (reg, _dir) = registry_of(&[(1, 10, 900), (2, 10, 900), (3, 10, 900)]);
+    let two_files = RetentionPolicy {
+        max_files: 2,
+        ..KEEP_ALL
+    };
+
+    let evictions = reg.evaluate_retention(&two_files, NOW_NS, |file| file.id.seq != 1);
+
+    assert_eq!(
+        evictions,
+        Evictions {
+            evict: vec![2],
+            deferred: vec![1],
+        }
+    );
 }

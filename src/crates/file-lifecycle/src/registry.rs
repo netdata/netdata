@@ -355,9 +355,28 @@ impl Registry {
         }
     }
 
+    /// What retention does with the tenant's index files now: the retention
+    /// policy over the local files (`sfst::Registry::evaluate_retention`),
+    /// with the one rule about remote storage. When storage is enabled, a
+    /// local SFST may go only once its catalog entry is confirmed on the
+    /// remote: before that it is not uploaded, or uploaded but in no
+    /// catalog, or in a catalog that is only local, and deleting it would
+    /// leave the remote copy, if any, with nothing that refers to it. Such a
+    /// file comes back as deferred.
+    pub fn index_evictions(
+        &self,
+        policy: &sfst::RetentionPolicy,
+        now_ns: u64,
+        storage_enabled: bool,
+    ) -> sfst::Evictions {
+        self.sfst.evaluate_retention(policy, now_ns, |file| {
+            !storage_enabled || self.is_remote_cataloged(SeqKey::from(&file.id))
+        })
+    }
+
     /// Whether this SFST's catalog entry is confirmed present in remote
-    /// storage. The eviction guard consults this before deleting a local
-    /// SFST (retention defers otherwise); the files inventory reports it.
+    /// storage. [`Self::index_evictions`] consults this before a local SFST
+    /// may be deleted; the files inventory reports it.
     pub fn is_remote_cataloged(&self, key: SeqKey) -> bool {
         // `>=` (not `==`) for the "reaches Remote" semantics, mirroring
         // `is_rotated`; equivalent today since `Remote` is the max stage, but

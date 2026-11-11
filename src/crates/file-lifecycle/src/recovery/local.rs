@@ -262,32 +262,20 @@ pub async fn recover_retention(
     retention: &otel_bridge::config::RetentionConfig,
     storage_enabled: bool,
 ) -> anyhow::Result<()> {
-    // SFST pass.
-    let to_evict_sfst = registry
-        .sfst
-        .evaluate_retention(&crate::helpers::sfst_retention_policy(retention), now_ns());
-    // The remote-confirmation gate of the function doc, applied per seq: it
-    // keys on the SFST's full identity. The seq came from this scan, so its
-    // entry (and identity) is present; an absent entry (the defensive `None`
-    // arm of `is_some_and`) defers, it is never evicted.
-    let (evictable_sfst, deferred_sfst): (Vec<u64>, Vec<u64>) =
-        to_evict_sfst.into_iter().partition(|&seq| {
-            !storage_enabled
-                || registry
-                    .sfst
-                    .get(seq)
-                    .is_some_and(|e| registry.is_remote_cataloged(SeqKey::from(&e.id)))
-        });
+    // SFST pass, with the remote-confirmation gate of the function doc.
+    let sfst::Evictions {
+        evict: evictable_sfst,
+        deferred: deferred_sfst,
+    } = registry.index_evictions(
+        &crate::helpers::sfst_retention_policy(retention),
+        now_ns(),
+        storage_enabled,
+    );
     for seq in deferred_sfst {
-        // Name the deferral by identity+seq while the entry is tracked; the
-        // bare-seq fallback covers the absent-entry arm of the gate above.
-        match registry.sfst.get(seq).map(|e| SeqKey::from(&e.id)) {
-            Some(key) => tracing::warn!(
+        if let Some(key) = registry.sfst.get(seq).map(|e| SeqKey::from(&e.id)) {
+            tracing::warn!(
                 "recovery: deferring eviction of seq={key} (catalog not yet confirmed on remote)"
-            ),
-            None => tracing::warn!(
-                "recovery: deferring eviction of seq={seq} (catalog not yet confirmed on remote)"
-            ),
+            );
         }
     }
 

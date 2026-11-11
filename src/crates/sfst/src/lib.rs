@@ -118,7 +118,7 @@ pub use query::{
     compile_pattern, compile_query,
 };
 pub use reader::{read_summary, read_summary_path};
-pub use registry::{File, Registry, RetentionPolicy};
+pub use registry::{Evictions, File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
 pub use trace_bloom::{RepeatFilter, TraceIdBloom};
