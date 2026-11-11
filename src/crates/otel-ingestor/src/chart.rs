@@ -17,7 +17,9 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
 
-use netdata_plugin_protocol::{Chunker, sanitize_chart_id, sanitize_dimension_id};
+use netdata_plugin_protocol::{
+    Chunker, MAX_LABEL_KEY_BYTES, MAX_LABEL_VALUE_BYTES, sanitize_chart_id, sanitize_dimension_id,
+};
 use opentelemetry_proto::tonic::metrics::v1::AggregationTemporality;
 
 use crate::aggregation::{
@@ -35,10 +37,24 @@ pub const MAX_NAME_BYTES: usize = 255;
 
 /// The most dimensions one chart takes. A chart's definition and each of its
 /// updates is one block of text that leaves as one message, with a line per
-/// dimension: with this limit and [`MAX_NAME_BYTES`] a block stays near
-/// 2 MiB, under the 16 MiB a message may have
-/// (`otel_bridge::IPC_MAX_MESSAGE_SIZE`).
+/// dimension: with this limit and [`MAX_NAME_BYTES`] the dimensions' lines
+/// stay near 2 MiB of a block.
+///
+/// The whole of a block stays under the 16 MiB a message may have
+/// (`otel_bridge::IPC_MAX_MESSAGE_SIZE`): next to its dimensions, a
+/// definition has its labels ([`MAX_LABELS`], near 1 MiB) and one copy of
+/// the metric's description and unit, which are part of one request (at most
+/// 4 MiB).
 pub const MAX_DIMENSIONS: usize = 4096;
+
+/// The most labels one chart takes; the rest of a longer set is left out.
+/// The labels are the sender's attributes, and they can be many times larger
+/// than the request that carried them: a nested attribute gives one label
+/// per leaf, each with the whole path as its key. With this limit, and each
+/// key and value cut to what the agent keeps of it
+/// ([`MAX_LABEL_KEY_BYTES`], [`MAX_LABEL_VALUE_BYTES`]), a definition's
+/// labels stay near 1 MiB.
+pub const MAX_LABELS: usize = 1024;
 
 /// One dimension of a chart: a cross-slot context plus per-slot accumulators.
 ///
@@ -478,7 +494,9 @@ impl Chart {
         self.definition.mark_emitted();
     }
 
-    /// Initialize the chart definition from metric metadata.
+    /// Initialize the chart definition from metric metadata. Of `labels` it
+    /// takes the first [`MAX_LABELS`], each key and value cut to what the
+    /// agent keeps of it.
     ///
     /// Debug-asserts the definition is still unset; callers gate on
     /// [`has_definition()`](Self::has_definition) first.
@@ -487,9 +505,15 @@ impl Chart {
         metric_name: &str,
         title: &str,
         units: &str,
-        labels: Vec<(String, String)>,
+        mut labels: Vec<(String, String)>,
     ) {
         debug_assert!(matches!(self.definition, DefinitionState::Unset));
+
+        labels.truncate(MAX_LABELS);
+        for (key, value) in &mut labels {
+            key.truncate(key.floor_char_boundary(MAX_LABEL_KEY_BYTES));
+            value.truncate(value.floor_char_boundary(MAX_LABEL_VALUE_BYTES));
+        }
 
         // Rate-normalized charts emit per-second values; reflect that in the units.
         let units = if self.is_rate_normalized() && !units.is_empty() {
@@ -808,6 +832,40 @@ mod tests {
 
         netdata_plugin_protocol::validate_chart_stream(&buf).unwrap();
         assert!(text(&buf).contains("BEGIN my_metric.42 "), "{}", text(&buf));
+    }
+
+    /// A chart's labels come from the request's attributes, in any number
+    /// and of any length: the definition takes a limited number of them, each
+    /// cut to what the agent keeps, so its block of text has a limit too.
+    #[test]
+    fn a_definition_takes_a_limited_number_of_labels_of_limited_length() {
+        let mut chart = gauge_chart();
+        let mut labels: Vec<(String, String)> = (0..2 * MAX_LABELS)
+            .map(|i| (format!("key.{i:04}"), "€".repeat(2_000)))
+            .collect();
+        labels[0].0 = "k".repeat(MAX_LABEL_KEY_BYTES + 1);
+        chart.init_definition("load", "Load", "load", labels);
+        chart.ingest("value", 1.0, ns(100), 0);
+
+        let mut buf = Vec::new();
+        emit(&mut chart, 102, &mut buf);
+
+        netdata_plugin_protocol::validate_chart_stream(&buf).unwrap();
+        let chart_text = text(&buf);
+        let label_lines: Vec<&str> = chart_text
+            .lines()
+            .filter(|line| line.starts_with("CLABEL '"))
+            .collect();
+        assert_eq!(label_lines.len(), MAX_LABELS);
+        // The first labels are the ones taken; a key and a value are cut at
+        // a character boundary ("€" is three bytes, 800 is not a multiple).
+        let cut_key = "k".repeat(MAX_LABEL_KEY_BYTES);
+        let cut_value = "€".repeat(MAX_LABEL_VALUE_BYTES / 3);
+        assert_eq!(
+            label_lines[0],
+            format!("CLABEL '{cut_key}' '{cut_value}' 1")
+        );
+        assert_eq!(label_lines[1], format!("CLABEL 'key.0001' '{cut_value}' 1"));
     }
 
     #[test]

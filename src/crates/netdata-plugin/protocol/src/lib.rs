@@ -92,10 +92,10 @@ pub use netdata_plugin_types::{
 /// per line kind, all writing into a `bytes::BufMut`.
 pub use chart::{
     ChartLine, ChartOptions, ChartType, Chunker, DimensionAlgorithm, DimensionLine,
-    DimensionOptions, LabelSource, MAX_CHART_ID_BYTES, is_valid_chart_id, is_valid_dimension_id,
-    sanitize_chart_id, sanitize_dimension_id, write_begin, write_chart, write_clabel,
-    write_clabel_commit, write_dimension, write_end, write_end_timed, write_quoted,
-    write_set_empty, write_set_float, write_set_int,
+    DimensionOptions, LabelSource, MAX_CHART_ID_BYTES, MAX_LABEL_KEY_BYTES, MAX_LABEL_VALUE_BYTES,
+    is_valid_chart_id, is_valid_dimension_id, sanitize_chart_id, sanitize_dimension_id,
+    write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end,
+    write_end_timed, write_quoted, write_set_empty, write_set_float, write_set_int,
 };
 #[cfg(any(test, feature = "test-support"))]
 pub use chart::{read_float_value, readable_chart_stream, validate_chart_stream};

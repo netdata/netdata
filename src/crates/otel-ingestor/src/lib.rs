@@ -203,10 +203,12 @@ async fn run_ingestor(
                 .expect("system clock before UNIX epoch");
             let slot_timestamp = now.as_secs();
 
-            // Both kinds of charts come in chunks of whole blocks under
-            // `otel_derived_metrics::MAX_CHUNK_BYTES`, so every send stays
-            // under the IPC frame limit. The chart registry is locked only
-            // while the text is written, not while it is sent.
+            // Both kinds of charts come in chunks of whole blocks. A chunk
+            // stays under `otel_derived_metrics::MAX_CHUNK_BYTES`, unless
+            // one block is larger: that block is a chunk of its own, and
+            // the limits of an OTLP metrics chart keep it under the IPC
+            // frame limit (`chart::MAX_DIMENSIONS`). The chart registry is
+            // locked only while the text is written, not while it is sent.
             let mut otlp_charts = Chunker::new(otel_derived_metrics::MAX_CHUNK_BYTES);
             tick_chart_manager
                 .write()

@@ -483,6 +483,15 @@ impl Chunker {
 /// error.
 pub const MAX_CHART_ID_BYTES: usize = 1199;
 
+/// The agent keeps at most this many bytes of a label key
+/// (`RRDLABELS_MAX_NAME_LENGTH`, src/database/rrdlabels.h) and cuts the rest.
+pub const MAX_LABEL_KEY_BYTES: usize = 200;
+
+/// The agent keeps at most this many bytes of a label value
+/// (`RRDLABELS_MAX_VALUE_LENGTH`, src/database/rrdlabels.h) and cuts the
+/// rest.
+pub const MAX_LABEL_VALUE_BYTES: usize = 800;
+
 /// True when `id` is a valid chart id: `type.id` with both parts non-empty,
 /// no byte the agent's splitter treats as a separator or quote, not
 /// starting with `SLOT:` (the agent would read the word as a slot number,

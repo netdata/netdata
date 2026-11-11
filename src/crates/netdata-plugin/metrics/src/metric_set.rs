@@ -4,15 +4,10 @@
 use crate::chart::{self, ChartDescriptor, Charts};
 use crate::error::Error;
 use crate::layout::{Aggregation, ColumnRange, Schema};
+use netdata_plugin_protocol::{MAX_LABEL_KEY_BYTES, MAX_LABEL_VALUE_BYTES};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
-
-/// The agent keeps at most this many bytes of a label key.
-const MAX_LABEL_KEY_BYTES: usize = 200;
-
-/// The agent keeps at most this many bytes of a label value.
-const MAX_LABEL_VALUE_BYTES: usize = 800;
 
 /// The longest collection interval, in seconds: the agent reads a chart's
 /// `update_every` as an `int`.
