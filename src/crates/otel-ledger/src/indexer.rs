@@ -112,8 +112,15 @@ impl IndexBuilds {
 
         let usage = usage_text(finished.usage);
         match IndexedFile::decode(&finished.stdout) {
-            Ok(IndexedFile { summary, size }) => {
-                tracing::info!("indexing done seq={seq}{usage}");
+            Ok(IndexedFile {
+                summary,
+                size,
+                peak_memory,
+            }) => {
+                let peak = peak_memory
+                    .map(|bytes| format!(" peak_rss_kb={}", bytes / 1024))
+                    .unwrap_or_default();
+                tracing::info!("indexing done seq={seq}{usage}{peak}");
                 IndexerResponse::Indexed {
                     seq,
                     path: sfst_path,
@@ -132,19 +139,14 @@ impl IndexBuilds {
     }
 }
 
-/// What a build cost, as the fields that follow the subject of its log line:
-/// the time it waited for a slot, the time its child ran, and the most
-/// memory the child held (absent when the child ended before it was read).
+/// What a build cost in time, as the fields that follow the subject of its
+/// log line: the time it waited for a slot and the time its child ran.
 fn usage_text(usage: Usage) -> String {
-    let mut text = format!(
+    format!(
         " waited_ms={} ran_ms={}",
         usage.waited.as_millis(),
         usage.ran.as_millis(),
-    );
-    if let Some(peak_memory) = usage.peak_memory {
-        text.push_str(&format!(" peak_rss_kb={}", peak_memory / 1024));
-    }
-    text
+    )
 }
 
 /// The indexer component: a unit struct — all state lives in
@@ -237,22 +239,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn usage_text_lists_the_wait_the_run_and_the_peak_when_it_was_read() {
-        let mut usage = Usage {
-            waited: std::time::Duration::from_millis(5),
-            ran: std::time::Duration::from_millis(1500),
-            peak_memory: Some(2048 * 1024),
-        };
-        assert_eq!(
-            usage_text(usage),
-            " waited_ms=5 ran_ms=1500 peak_rss_kb=2048"
-        );
-
-        usage.peak_memory = None;
-        assert_eq!(usage_text(usage), " waited_ms=5 ran_ms=1500");
-    }
-
     #[tokio::test]
     async fn a_build_runs_the_index_command_and_answers_with_the_childs_answer() {
         let dir = tempfile::tempdir().unwrap();
@@ -261,6 +247,7 @@ mod tests {
         let indexed = IndexedFile {
             summary: summary(),
             size: 4096,
+            peak_memory: Some(1 << 30),
         };
         std::fs::write(&answer, indexed.encode().unwrap()).unwrap();
         // The fake records its arguments and its arena limit, one per line,

@@ -3,7 +3,7 @@
 //! A [`Scheduler`] takes jobs from any number of callers. A job is a command;
 //! the scheduler starts it as a child process when a slot is free, in the
 //! order the jobs were submitted, and gives the caller what the child wrote to
-//! stdout or the way it failed ([`Error`]), with what the job cost
+//! stdout or the way it failed ([`Error`]), with the time the job took
 //! ([`Usage`]). Jobs beyond the limit wait in a queue that has no bound: the
 //! limit is on what runs, not on what waits.
 //!
@@ -25,28 +25,18 @@ use std::time::Duration;
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinSet;
-use tokio::time::{Instant, MissedTickBehavior};
+use tokio::time::Instant;
 
-/// How often the memory of a running child is read.
-const MEMORY_READ_INTERVAL: Duration = Duration::from_millis(100);
-
-/// What a job cost.
+/// What a job cost in time.
+///
+/// Not what it cost in memory: the scheduler does not measure that. A job
+/// that should report its memory measures itself and says so on stdout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Usage {
     /// How long the job waited in the queue before its child was started.
     pub waited: Duration,
     /// How long its child ran.
     pub ran: Duration,
-    /// The most memory the child held at once, in bytes: the high-water mark
-    /// of its resident set, as last read while it ran (every
-    /// [`MEMORY_READ_INTERVAL`]), so what it added after the last reading is
-    /// not in it. `None` when it was never read: the child ended before the
-    /// first reading, or the system has no `/proc`.
-    ///
-    /// Not the `ru_maxrss` that waiting for a child reports: on Linux that
-    /// number is at least the resident set of the process that started the
-    /// child.
-    pub peak_memory: Option<u64>,
 }
 
 /// A job whose child ended with success.
@@ -202,8 +192,7 @@ async fn run_job(job: Job) {
     }
 }
 
-/// Start `command` as a child process and wait for it to end, reading its
-/// memory while it runs.
+/// Start `command` as a child process and wait for it to end.
 async fn run_child(command: std::process::Command, queued_at: Instant) -> Result {
     let started_at = Instant::now();
     let mut child = Command::from(command)
@@ -213,35 +202,15 @@ async fn run_child(command: std::process::Command, queued_at: Instant) -> Result
         .kill_on_drop(true)
         .spawn()
         .map_err(Error::Spawn)?;
-    let pid = child.id();
 
     // Taken out of the child so that waiting does not close it: the write end
     // stays open, unwritten, until the child has ended.
     let _lifeline = child.stdin.take();
 
-    let mut peak_memory = None;
-    let mut memory_reads =
-        tokio::time::interval_at(started_at + MEMORY_READ_INTERVAL, MEMORY_READ_INTERVAL);
-    memory_reads.set_missed_tick_behavior(MissedTickBehavior::Delay);
-
-    let ended = child.wait_with_output();
-    tokio::pin!(ended);
-    let output = loop {
-        tokio::select! {
-            output = &mut ended => break output.map_err(Error::Wait)?,
-            // The mark only rises, so the last reading is the highest. The
-            // child is not reaped before `ended` completes: until then the
-            // pid is its own.
-            _ = memory_reads.tick() => {
-                peak_memory = pid.and_then(memory_high_water).or(peak_memory);
-            }
-        }
-    };
-
+    let output = child.wait_with_output().await.map_err(Error::Wait)?;
     let usage = Usage {
         waited: started_at.duration_since(queued_at),
         ran: started_at.elapsed(),
-        peak_memory,
     };
     if output.status.success() {
         return Ok(Finished {
@@ -251,21 +220,6 @@ async fn run_child(command: std::process::Command, queued_at: Instant) -> Result
     }
 
     Err(failure(output.status, &output.stderr, usage))
-}
-
-/// The high-water mark of the resident set of process `pid`, in bytes:
-/// `VmHWM` of `/proc/<pid>/status`. `None` when it cannot be read; a process
-/// that has ended but is not reaped has no such line.
-fn memory_high_water(pid: u32) -> Option<u64> {
-    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
-    let kib = status
-        .lines()
-        .find_map(|line| line.strip_prefix("VmHWM:"))?
-        .trim()
-        .strip_suffix("kB")?
-        .trim();
-
-    Some(kib.parse::<u64>().ok()? * 1024)
 }
 
 /// The error of a child that ended with `status`, which is not a success.
@@ -506,25 +460,6 @@ mod tests {
         let (short, long) = (Duration::from_millis(150), Duration::from_millis(300));
         assert!(first.waited < short && first.ran >= long, "{first:?}");
         assert!(second.waited >= long && second.ran < short, "{second:?}");
-    }
-
-    #[tokio::test]
-    async fn usage_holds_the_most_memory_the_child_held() {
-        let scheduler = Scheduler::new(1);
-
-        // The shell holds a string of 40 million characters for longer than
-        // the interval between two readings.
-        let held = scheduler.run(sh(
-            "held=$(head -c 40000000 /dev/zero | tr '\\0' x); sleep 0.3",
-        ));
-        let quick = scheduler.run(sh("true"));
-        let (held, quick) = (held.await.unwrap().usage, quick.await.unwrap().usage);
-
-        let megabyte = 1_000_000;
-        let peak = held.peak_memory.expect("the child's memory was read");
-        assert!((40 * megabyte..400 * megabyte).contains(&peak), "{peak}");
-        // It ended before the first reading.
-        assert_eq!(quick.peak_memory, None);
     }
 
     #[tokio::test]

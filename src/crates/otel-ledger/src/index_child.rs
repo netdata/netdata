@@ -31,6 +31,10 @@ pub struct IndexedFile {
     pub summary: sfst::Summary,
     /// Size of the written index file in bytes.
     pub size: u64,
+    /// The most memory the child held at once, in bytes, as the child read
+    /// it from its own system when the build was done. `None` on a system
+    /// where `ng_index::read_rss` has no way to read it.
+    pub peak_memory: Option<u64>,
 }
 
 impl IndexedFile {
@@ -90,7 +94,11 @@ pub fn run(
     let (summary, size) = build(wal_path, sfst_path, &ng_index::Metrics::new())
         .with_context(|| format!("indexing {}", wal_path.display()))?;
 
-    let indexed = IndexedFile { summary, size };
+    let indexed = IndexedFile {
+        summary,
+        size,
+        peak_memory: ng_index::read_rss().map(|rss| rss.peak_kb * 1024),
+    };
     answer
         .write_all(&indexed.encode()?)
         .and_then(|()| answer.flush())
@@ -181,10 +189,15 @@ mod tests {
         let mut answer = Vec::new();
         run(signal, wal_path, &child_path, &mut answer).unwrap();
 
+        let indexed = IndexedFile::decode(&answer).unwrap();
+        assert_eq!((indexed.summary, indexed.size), (summary, size));
+        // The peak of this test process stands in for the child's: it is
+        // what `run` reads, where the system has it.
         assert_eq!(
-            IndexedFile::decode(&answer).unwrap(),
-            IndexedFile { summary, size }
+            indexed.peak_memory.is_some(),
+            ng_index::read_rss().is_some()
         );
+        assert!(indexed.peak_memory.is_none_or(|peak| peak > 1 << 20));
         assert_eq!(
             std::fs::read(&child_path).unwrap(),
             std::fs::read(&direct_path).unwrap()
@@ -261,6 +274,7 @@ mod tests {
                 content_meta: b"meta".to_vec(),
             },
             size: 4,
+            peak_memory: Some(5),
         };
         let mut answer = indexed.encode().unwrap();
         assert_eq!(IndexedFile::decode(&answer).unwrap(), indexed);
