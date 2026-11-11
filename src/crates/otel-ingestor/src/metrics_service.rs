@@ -108,15 +108,17 @@ impl ChartManager {
         self.charts.get_mut(chart_name).unwrap()
     }
 
-    /// Make every chart emit what is ready for `slot_timestamp` into `buf`
-    /// (plugin-protocol text; see chart.rs), and drop charts that have had
-    /// no data for longer than their expiry duration.
+    /// Make every chart emit what is ready for `slot_timestamp` into `out`
+    /// (plugin-protocol text; see chart.rs). A chart that has had no data for
+    /// longer than its expiry duration is dropped, after it has told the
+    /// agent that it is obsolete.
     ///
     /// Called once per second by lib.rs's tick loop; slot readiness,
     /// gap-fill and rate division all live in chart.rs.
     pub fn emit(&mut self, slot_timestamp: u64, out: &mut Chunker) {
         self.charts.retain(|_, chart| {
             if chart.is_expired() {
+                chart.emit_obsolete(out);
                 return false;
             }
 
@@ -875,6 +877,45 @@ mod tests {
             .filter(|line| line.starts_with(b"BEGIN "))
             .count();
         assert_eq!(blocks, 1);
+    }
+
+    /// The agent keeps a chart until it is told the chart is obsolete: a
+    /// chart that expires says so before the registry forgets it.
+    #[test]
+    fn an_expired_chart_is_marked_obsolete() {
+        let mut manager = ChartManager::new();
+        let config = ChartConfig {
+            collection_interval: 1,
+            grace_period: std::time::Duration::ZERO,
+            expiry_duration: std::time::Duration::from_millis(20),
+        };
+        let chart = manager.create_typed_chart(
+            "load.42",
+            ChartAggregationType::Gauge,
+            ChartType::Line,
+            config,
+        );
+        chart.init_definition("load", "Load", "load", Vec::new());
+        chart.ingest("value", 1.0, 100 * 1_000_000_000, 0);
+
+        let emit = |manager: &mut ChartManager, tick: u64| {
+            let mut out = Chunker::new(usize::MAX);
+            manager.emit(tick, &mut out);
+            String::from_utf8(out.finish().concat()).unwrap()
+        };
+        let live = emit(&mut manager, 102);
+        assert!(live.contains("BEGIN load.42 "), "{live}");
+
+        std::thread::sleep(std::time::Duration::from_millis(40));
+        let expired = emit(&mut manager, 103);
+
+        assert_eq!(
+            expired,
+            "CHART load.42 '' 'Load' 'load' 'load' 'otel.load' line 1 1 'obsolete store_first'\n"
+        );
+        assert!(manager.is_empty());
+        netdata_plugin_protocol::validate_chart_stream(format!("{live}{expired}").as_bytes())
+            .unwrap();
     }
 
     /// One tick's chart text goes to the supervisor as messages of limited

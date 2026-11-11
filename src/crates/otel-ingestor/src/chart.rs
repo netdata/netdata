@@ -125,36 +125,52 @@ impl ChartAggregationType {
     }
 }
 
-/// Tracks whether the chart definition has been emitted.
+/// The chart's definition, and what the agent knows of it.
 enum DefinitionState {
     /// No definition set yet.
     Unset,
-    /// Definition ready but not yet written to output.
+    /// Ready, never written to output: the agent does not have the chart.
     Pending(ChartDefinition),
-    /// Definition has been written to output.
+    /// Written to output as it is.
     Emitted(ChartDefinition),
+    /// Written to output, and changed since (a new dimension): the agent has
+    /// the chart, with an older definition.
+    Changed(ChartDefinition),
 }
 
 impl DefinitionState {
     fn as_ref(&self) -> Option<&ChartDefinition> {
         match self {
-            Self::Pending(def) | Self::Emitted(def) => Some(def),
+            Self::Pending(def) | Self::Emitted(def) | Self::Changed(def) => Some(def),
             Self::Unset => None,
         }
     }
 
     fn as_mut(&mut self) -> Option<&mut ChartDefinition> {
         match self {
-            Self::Pending(def) | Self::Emitted(def) => Some(def),
+            Self::Pending(def) | Self::Emitted(def) | Self::Changed(def) => Some(def),
             Self::Unset => None,
         }
     }
 
-    /// Mark the definition as needing (re-)emission.
-    fn mark_pending(&mut self) {
+    /// The definition, if the agent has the chart.
+    fn known_to_the_agent(&self) -> Option<&ChartDefinition> {
+        match self {
+            Self::Emitted(def) | Self::Changed(def) => Some(def),
+            Self::Unset | Self::Pending(_) => None,
+        }
+    }
+
+    /// Whether the definition must be written (again).
+    fn needs_emission(&self) -> bool {
+        matches!(self, Self::Pending(_) | Self::Changed(_))
+    }
+
+    /// The definition changed: it needs (re-)emission.
+    fn mark_changed(&mut self) {
         let prev = std::mem::replace(self, Self::Unset);
         *self = match prev {
-            Self::Emitted(def) => Self::Pending(def),
+            Self::Emitted(def) => Self::Changed(def),
             other => other,
         };
     }
@@ -163,7 +179,7 @@ impl DefinitionState {
     fn mark_emitted(&mut self) {
         let prev = std::mem::replace(self, Self::Unset);
         *self = match prev {
-            Self::Pending(def) => Self::Emitted(def),
+            Self::Pending(def) | Self::Changed(def) => Self::Emitted(def),
             other => other,
         };
     }
@@ -295,7 +311,7 @@ impl Chart {
             if let Some(def) = self.definition.as_mut() {
                 def.dimensions.push(dimension_name.to_string());
             }
-            self.definition.mark_pending();
+            self.definition.mark_changed();
         }
     }
 
@@ -463,7 +479,15 @@ impl Chart {
 
     /// Returns `true` if the chart needs its definition (re-)emitted.
     fn needs_definition(&self) -> bool {
-        matches!(self.definition, DefinitionState::Pending(_))
+        self.definition.needs_emission()
+    }
+
+    /// Tell the agent that the chart is obsolete, as one block of `out`, if
+    /// the agent has the chart. The agent keeps a chart until it is told so.
+    pub fn emit_obsolete(&self, out: &mut Chunker) {
+        if let Some(definition) = self.definition.known_to_the_agent() {
+            out.block(|buf| definition.write_obsolete(buf));
+        }
     }
 
     /// Whether the chart has expired (no data for longer than the expiry duration).

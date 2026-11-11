@@ -1,6 +1,6 @@
 //! The OTLP metrics charts as chart-protocol text: a chart's definition
-//! (`CHART`, `CLABEL`, `CLABEL_COMMIT`, `DIMENSION`) and its data slots
-//! (`BEGIN`, `SET`, `END`).
+//! (`CHART`, `CLABEL`, `CLABEL_COMMIT`, `DIMENSION`), its data slots
+//! (`BEGIN`, `SET`, `END`) and its obsolete mark.
 //!
 //! The lines are written by `netdata_plugin_protocol`, the owner of the rules
 //! that keep a line parseable by the agent; this module only decides what goes
@@ -66,8 +66,14 @@ pub struct ChartDefinition {
 }
 
 impl ChartDefinition {
-    /// Write the definition block into `buf`.
-    pub fn write(&self, buf: &mut Vec<u8>) {
+    /// Write the chart's obsolete mark into `buf`: its `CHART` line with the
+    /// `obsolete` option. The agent then stops expecting updates and frees
+    /// the chart after its cleanup delay; a later definition revives it.
+    pub fn write_obsolete(&self, buf: &mut Vec<u8>) {
+        self.write_chart_line(buf, true);
+    }
+
+    fn write_chart_line(&self, buf: &mut Vec<u8>, obsolete: bool) {
         // The alternate name stays empty: the agent keys the chart by id
         // alone. `store_first` keeps the first collected point instead of
         // dropping it during interpolation (src/database/rrdset.h).
@@ -84,11 +90,17 @@ impl ChartDefinition {
                 priority: PRIORITY,
                 update_every: self.update_every,
                 options: ChartOptions {
+                    obsolete,
                     store_first: true,
-                    ..ChartOptions::default()
+                    hidden: false,
                 },
             },
         );
+    }
+
+    /// Write the definition block into `buf`.
+    pub fn write(&self, buf: &mut Vec<u8>) {
+        self.write_chart_line(buf, false);
 
         // The commit applies the set: labels not re-sent since the last
         // commit are removed.
