@@ -187,6 +187,7 @@ mod tests {
         FrameBoundary {
             end_offset,
             entry_count,
+            decoded_len: 0,
         }
     }
 

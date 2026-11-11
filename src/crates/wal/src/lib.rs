@@ -118,7 +118,7 @@ pub use format::HEADER_SIZE;
 /// of failing the batch.
 pub use format::MAX_CONTENT_META_BYTES;
 pub use format::{FileEvent, Message};
-pub use reader::{Frame, FrameBoundary, FrameRange, Reader, scan_frame_boundaries};
+pub use reader::{Frame, FrameBoundary, FrameRange, Reader, decoded_size, scan_frame_boundaries};
 pub use registry::{File, Registry};
 pub use seq::{DEFAULT_RESERVE_BATCH, SeqAllocator, read_seq_highwater, write_seq_highwater};
 pub use writer::{FileStamp, FileSync, FrameMeta, SyncTicket, WriteMark, Writer};

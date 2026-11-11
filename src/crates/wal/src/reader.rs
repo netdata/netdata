@@ -348,6 +348,8 @@ pub struct FrameBoundary {
     pub end_offset: u64,
     /// Log records in this frame.
     pub entry_count: u32,
+    /// Size of this frame's payload once decoded, in bytes.
+    pub decoded_len: u32,
 }
 
 /// A half-open `[start, end)` byte range into a WAL, with both offsets on
@@ -444,6 +446,7 @@ pub fn scan_frame_boundaries(path: &Path, range: FrameRange) -> Result<Vec<Frame
         }
 
         let payload_len = u32::from_le_bytes(frame_header[0..4].try_into().unwrap()) as usize;
+        let decoded_len = u32::from_le_bytes(frame_header[4..8].try_into().unwrap());
         let entry_count = u32::from_le_bytes(frame_header[8..12].try_into().unwrap());
         if payload_len > MAX_FRAME_PAYLOAD {
             return Err(Error::Deserialization(format!(
@@ -463,6 +466,7 @@ pub fn scan_frame_boundaries(path: &Path, range: FrameRange) -> Result<Vec<Frame
         boundaries.push(FrameBoundary {
             end_offset: position,
             entry_count,
+            decoded_len,
         });
 
         // Skip the payload + padding (we already consumed the header).
@@ -470,6 +474,22 @@ pub fn scan_frame_boundaries(path: &Path, range: FrameRange) -> Result<Vec<Frame
     }
 
     Ok(boundaries)
+}
+
+/// The size of everything the frames of the WAL file at `path` decode to,
+/// in bytes.
+///
+/// Read from the frame headers alone ([`scan_frame_boundaries`] over the
+/// whole file): no payload is read or decompressed, so the cost follows the
+/// number of frames, not the size of the file. A torn tail is not counted.
+pub fn decoded_size(path: &Path) -> Result<u64> {
+    let file_len = std::fs::metadata(path)?.len();
+    let frames = scan_frame_boundaries(path, FrameRange::new(HEADER_SIZE as u64, file_len))?;
+
+    Ok(frames
+        .iter()
+        .map(|frame| u64::from(frame.decoded_len))
+        .sum())
 }
 
 #[cfg(test)]
@@ -745,15 +765,18 @@ mod tests {
             vec![
                 FrameBoundary {
                     end_offset: bounds[0],
-                    entry_count: 5
+                    entry_count: 5,
+                    decoded_len: 7,
                 },
                 FrameBoundary {
                     end_offset: bounds[1],
-                    entry_count: 3
+                    entry_count: 3,
+                    decoded_len: 7,
                 },
                 FrameBoundary {
                     end_offset: bounds[2],
-                    entry_count: 7
+                    entry_count: 7,
+                    decoded_len: 7,
                 },
             ]
         );
@@ -769,6 +792,17 @@ mod tests {
     }
 
     #[test]
+    fn decoded_size_sums_what_the_frames_decode_to() {
+        let dir = tempfile::tempdir().unwrap();
+        // Every frame of `write_counted_frames` holds the 7 bytes of
+        // `b"payload"`, stored LZ4-compressed.
+        let (path, _) = write_counted_frames(dir.path(), &[5, 3, 7]);
+
+        assert_eq!(decoded_size(&path).unwrap(), 3 * 7);
+        assert!(decoded_size(&dir.path().join("missing.wal")).is_err());
+    }
+
+    #[test]
     fn scan_boundaries_respects_start_and_end() {
         let dir = tempfile::tempdir().unwrap();
         let (path, bounds) = write_counted_frames(dir.path(), &[5, 3, 7]);
@@ -780,11 +814,13 @@ mod tests {
             vec![
                 FrameBoundary {
                     end_offset: bounds[1],
-                    entry_count: 3
+                    entry_count: 3,
+                    decoded_len: 7,
                 },
                 FrameBoundary {
                     end_offset: bounds[2],
-                    entry_count: 7
+                    entry_count: 7,
+                    decoded_len: 7,
                 },
             ]
         );
