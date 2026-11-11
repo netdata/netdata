@@ -452,7 +452,7 @@ fn trace_file_of(threshold: u32, rows: &[Vec<String>]) -> Vec<u8> {
     ri.durations = Some(crate::Durations(vec![5; n]));
     ri.flags = Some(crate::Flags(vec![0; n]));
     ri.dropped_attribute_counts = Some(crate::DroppedAttributeCounts(vec![0; n]));
-    ri.build_trace_id_index = true;
+    ri.write_trace_id_index = true;
     let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     buf.into_inner()
 }
@@ -573,7 +573,7 @@ fn a_large_trace_decodes_each_field_chunk_once() {
     ri.flags = Some(crate::Flags(vec![0; SPANS]));
     ri.dropped_attribute_counts = Some(crate::DroppedAttributeCounts(vec![0; SPANS]));
     ri.events = Some(events);
-    ri.build_trace_id_index = true;
+    ri.write_trace_id_index = true;
     let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
     let bytes = buf.into_inner();
     let idx = IndexReader::open(&bytes).unwrap();

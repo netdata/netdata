@@ -550,7 +550,7 @@ fn session_reads_rollup_parts() {
         );
     }
     ri.trace_ids = Some(ids);
-    ri.build_trace_id_index = true;
+    ri.write_trace_id_index = true;
     ri.trace_rollup = Some(rollup);
     let (buf, _s, _m) =
         crate::IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
@@ -608,7 +608,7 @@ fn rollup_rows_stream_from_the_session() {
         rollup.record_span(id, sid(i as u8 + 1), true, 1_000, 10, 0, false, None, None);
     }
     ri.trace_ids = Some(ids);
-    ri.build_trace_id_index = true;
+    ri.write_trace_id_index = true;
     ri.trace_rollup = Some(rollup);
     let (buf, _s, _m) =
         crate::IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();

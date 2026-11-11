@@ -24,7 +24,7 @@
 //! # Lifecycle
 //!
 //! Built at write time from the just-written chronological `TRCE` column
-//! (`build.rs`) and written as the bincode `TIDX` chunk (zstd-packed, cold
+//! (`index_writer.rs`) and written as the bincode `TIDX` chunk (zstd-packed, cold
 //! region, `writer.rs`). On read,
 //! `reader.rs` decodes and [`validate`](TraceIdIndex::validate)s it;
 //! `index_reader.rs` re-exposes it and `session.rs` resolves each bloom

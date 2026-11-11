@@ -46,7 +46,7 @@
 //!
 //! # Users (grep-verified)
 //!
-//! - Streaming atomic write: `sfst::build` — the only direct [`AtomicFile`]
+//! - Streaming atomic write: `sfst::index_writer` — the only direct [`AtomicFile`]
 //!   user (`create` + [`annotate`] + `commit`).
 //! - [`write_atomic`]: file-lifecycle catalog rotation and startup install
 //!   (both under `spawn_blocking`), the WAL seq high-water file, file-cache

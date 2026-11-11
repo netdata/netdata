@@ -27,7 +27,7 @@
 //! ng-index's span walk (`src/crates/ng-index/src/indexing.rs`) folds
 //! every stored span into [`TraceRollupRows`] — the `EventRows`
 //! pattern: write-side interner [`KvSlot`]s, translated to file
-//! [`KvId`]s at write time (`build.rs`), rows emitted sorted by trace
+//! [`KvId`]s at write time (`index_writer.rs`), rows emitted sorted by trace
 //! id after the span structures. `writer.rs` packs the additive,
 //! TOC-indexed chunk (like `TIDX`/`EVNB`; no format version bump — a
 //! reader that predates `TRSU` never looks the id up). `reader.rs`

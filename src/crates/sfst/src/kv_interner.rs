@@ -42,7 +42,7 @@
 //! orders all slots canonically — low → mid → high, fields by name,
 //! values sorted — and that ordering is the contract the on-disk ID
 //! translation depends on: `build_id_translation` in
-//! `src/crates/sfst/src/build.rs` numbers the concatenated tiers 0.. and
+//! `src/crates/sfst/src/index_writer.rs` numbers the concatenated tiers 0.. and
 //! assigns `table[slot.idx()] = KvId(i)`, recording the cumulative tier
 //! boundaries as `IdRanges`. The tier also routes the on-disk home: low
 //! fields into the primary FST (`PRIM`), mid fields into per-field FST
@@ -255,7 +255,7 @@ impl<'a> KeyValueInterner<'a> {
     /// Returns three vectors of [`KvSlot`]s, one per tier.
     ///
     /// This ordering is the on-disk `KvId` order: `build_id_translation`
-    /// in `src/crates/sfst/src/build.rs` numbers the concatenated tiers.
+    /// in `src/crates/sfst/src/index_writer.rs` numbers the concatenated tiers.
     pub fn tier_assignment(&self) -> [Vec<KvSlot>; 3] {
         // Reusable decorate buffer of (value suffix, slot). Cheaper than
         // sorting the slots directly by `self.strings[idx]`:

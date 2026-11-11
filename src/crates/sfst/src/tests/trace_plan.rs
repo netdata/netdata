@@ -499,7 +499,10 @@ fn narrow_high_terms_visit_only_their_masked_batches() {
     let idx = IndexReader::open(&bytes).unwrap();
 
     let batch_size = crate::stream_batch_size(ROWS as u32);
-    assert_eq!(batch_size, 1024, "the fixture must seal into two batches");
+    assert_eq!(
+        batch_size, 1024,
+        "the fixture must be written as two batches"
+    );
 
     // Each needle's visit count is ONE batch — half the file. A masking
     // regression that scans every batch reports 2048 and fails.

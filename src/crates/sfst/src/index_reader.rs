@@ -1838,7 +1838,7 @@ impl PosSet {
     /// `Copy`; only the tree bytes are cloned.
     ///
     /// Invariant: the writer builds every value bitmap at the same
-    /// `universe_size` (`== record_count`; build.rs remaps insertion-order
+    /// `universe_size` (`== record_count`; index_writer.rs remaps insertion-order
     /// rows to chronological positions), which is what lets the resulting
     /// set combine with `range`/`full`/other values via `and`/`or`. Treight
     /// enforces the match: a `debug_assert` on the `Bitmap` wrapper

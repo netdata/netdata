@@ -5,7 +5,7 @@
 //!
 //! - log-shaped rows index from out-of-order timestamps and count correctly
 //!   under exact, regex and AND filters;
-//! - with the span columns set and `build_trace_id_index` on, every column
+//! - with the span columns set and `write_trace_id_index` on, every column
 //!   lands in the file chronological and row-aligned, and the `TIDX`
 //!   resolves trace ids against that same column.
 //!
@@ -102,13 +102,13 @@ fn write_sfst_from_our_rows_and_query_back() {
 
 /// Pins the traces wiring on `RowIndex` at the format layer: the span
 /// columns (`trace_ids`/`span_ids`/`parent_span_ids`/`durations`/`flags`/
-/// `dropped_attribute_counts`) plus the `build_trace_id_index` flag must
+/// `dropped_attribute_counts`) plus the `write_trace_id_index` flag must
 /// flow through the writer into one valid file — each column written
 /// chronologically and row-aligned, and a `TIDX` written from the
 /// chronological `trace_id` column. Logs indexing leaves all of these
 /// dormant. Only what is asserted is pinned: span ids / flags / dropped
 /// counts are written but not read back, and the `TBLM` bloom
-/// (`build_trace_id_bloom`) stays off. The full traces pipeline has its own
+/// (`write_trace_id_bloom`) stays off. The full traces pipeline has its own
 /// oracle in `ng-index/tests/traces_indexing.rs`.
 #[test]
 fn writer_stores_span_columns_and_trace_id_index() {
@@ -146,7 +146,7 @@ fn writer_stores_span_columns_and_trace_id_index() {
     ri.durations = Some(Durations(durations));
     ri.flags = Some(Flags(flags));
     ri.dropped_attribute_counts = Some(DroppedAttributeCounts(dropped));
-    ri.build_trace_id_index = true;
+    ri.write_trace_id_index = true;
 
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("spans.sfst");

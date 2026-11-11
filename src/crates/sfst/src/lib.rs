@@ -84,7 +84,6 @@
 //! ```
 
 mod bitset;
-mod build;
 mod error;
 mod index_reader;
 mod index_writer;

@@ -14,7 +14,7 @@
 //! `key=value` strings of low- and mid-cardinality fields, values are
 //! the row bitmaps where each pair occurs. The writer builds one map per
 //! chunk — `PRIM` via `writer.rs::primary`, fed by
-//! `build.rs::build_primary_fst`, and one `MF{hi}{lo}` chunk per
+//! `index_writer.rs::write_primary_chunk`, and one `MF{hi}{lo}` chunk per
 //! mid-card field — serializing it bincode+zstd at `ZSTD_LEVEL_FST`
 //! (`writer.rs::pack`). The reader unpacks them back into this map
 //! (`reader.rs::primary` / `mid_field`); `IndexReader`

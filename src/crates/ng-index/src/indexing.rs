@@ -394,7 +394,7 @@ pub fn index_traces_range(
 /// intern each span's entries (resource ++ scope ++ span), feed one row per span keyed
 /// on the span's start `ts`, and accumulate the span per-row columns — `trace_id`,
 /// `span_id`, `parent_span_id`, `duration`, `flags`, `dropped_attributes_count`. There
-/// is no `observed_ts` (spans have none). Sets `build_trace_id_index` so the writer
+/// is no `observed_ts` (spans have none). Sets `write_trace_id_index` so the writer
 /// writes the `TIDX` index from the chronological `trace_id` column. Span entries
 /// carry ingest-filled hashes (see `ng-ingest::write_trace_request`), so the interner
 /// fast path is safe here.
@@ -638,10 +638,10 @@ fn populate_trace_row_index(
     row_index.flags = Some(Flags(flags));
     row_index.dropped_attribute_counts = Some(DroppedAttributeCounts(dropped_attrs));
     // Spans turn the index on: the writer writes TIDX from the chronological TRCE.
-    row_index.build_trace_id_index = true;
+    row_index.write_trace_id_index = true;
     // ...and the per-file trace-id bloom derived from it (skipped by the
     // writer when no set trace id exists).
-    row_index.build_trace_id_bloom = true;
+    row_index.write_trace_id_bloom = true;
     // Event/link structures only when they carry information (≥1 item or a
     // nonzero span-level dropped count) — an all-empty accumulator writes no chunk.
     row_index.events = events.is_meaningful().then_some(events);

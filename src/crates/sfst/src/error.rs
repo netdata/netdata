@@ -12,8 +12,8 @@ pub enum Error {
     /// Underlying I/O failed — file open/read/seek, chunk and TOC writes,
     /// flush/fsync — lifted through the derived `#[from]`; the index
     /// writer re-wraps `Io` with an op + temp-path annotation before
-    /// it escapes (the `annotate_io` closure in `build.rs`
-    /// `build_and_write`).
+    /// it escapes (the `annotate_io` closure in `index_writer.rs`
+    /// `write_file`).
     /// Transparent: `Display` and `source()` delegate to
     /// the wrapped error, so embedding it in a message too would print it
     /// twice in anyhow chains.
@@ -91,7 +91,7 @@ pub enum Error {
 
     /// A per-row column handed to the index writer has a length other than
     /// the row count, so it cannot be aligned per row (`check_column_len`
-    /// in `build.rs`; the event/link structures are checked the same way).
+    /// in `index_writer.rs`; the event/link structures are checked the same way).
     /// A caller bug (each column must hold exactly one value per row);
     /// recoverable, not a panic.
     #[error("per-row column {column} has {got} values, expected {expected} (one per row)")]

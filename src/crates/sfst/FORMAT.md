@@ -15,7 +15,7 @@ scope here.
 Normative sources (the code this document restates): the container
 `src/crates/chunk-file/src/{lib.rs,container.rs}`; the crate constants
 and chunk ids `src/crates/sfst/src/lib.rs`; the writer
-`src/crates/sfst/src/{writer.rs,build.rs}`; the readers
+`src/crates/sfst/src/{writer.rs,index_writer.rs}`; the readers
 `src/crates/sfst/src/{reader.rs,index_reader.rs,index_reader/session.rs}`;
 payload types `src/crates/sfst/src/schema.rs`; the trace chunks
 `src/crates/sfst/src/{trace_index.rs,trace_bloom.rs,span_extras.rs,trace_rollup.rs}`;

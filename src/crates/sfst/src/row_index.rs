@@ -1,6 +1,6 @@
 //! Phase 1 of indexing: the in-memory [`RowIndex`] a producer fills
 //! while reading its source — for the in-tree producer, decoding WAL frames
-//! (`src/crates/ng-index/src/indexing.rs`) — before Phase 2 (`build.rs`,
+//! (`src/crates/ng-index/src/indexing.rs`) — before Phase 2 (`index_writer.rs`,
 //! behind [`crate::IndexWriter`]) streams it out as on-disk chunks.
 //!
 //! Core structures, plus the optional per-row columns on [`RowIndex`]:
@@ -26,7 +26,7 @@
 //!
 //! [`RowIndex::new`] → intern pairs (`lookup_hash`/`intern`) and call `row`
 //! per record → attach whichever optional columns/accumulators apply → hand
-//! the value to [`crate::IndexWriter::write_file`]. Only `build.rs` reads the
+//! the value to [`crate::IndexWriter::write_file`]. Only `index_writer.rs` reads the
 //! struct's fields. Interned strings live in the caller's [`Bump`] arena, so
 //! the index borrows it through filling and writing; Phase 1 materializes
 //! every row in memory, and Phase 2's peak beyond the `RowIndex` itself is a
@@ -82,16 +82,16 @@ pub struct RowIndex<'a> {
     pub durations: Option<Durations>,
     /// Producer signal: write the `trace_id` index (`TIDX`). The index
     /// is built in Phase 2 from the chronological `trace_ids` column, so this
-    /// MUST only be set together with `trace_ids` (enforced in `build.rs`).
+    /// MUST only be set together with `trace_ids` (enforced in `index_writer.rs`).
     /// The logs path leaves it `false` — its `trace_ids` are per-record
     /// correlation ids, not a trace key to group rows by.
-    pub build_trace_id_index: bool,
+    pub write_trace_id_index: bool,
     /// Producer signal: write the per-file trace-id bloom (`TBLM`).
     /// Derived from the trace-id index, so this MUST only be set together with
-    /// [`build_trace_id_index`](Self::build_trace_id_index); the chunk is also
+    /// [`write_trace_id_index`](Self::write_trace_id_index); the chunk is also
     /// skipped when the file has no set trace id. The logs path leaves it
     /// `false`.
-    pub build_trace_id_bloom: bool,
+    pub write_trace_id_bloom: bool,
     /// Span event structure accumulator (`EVNB` chunk; traces indexing only).
     /// When present it MUST have exactly one ended row per
     /// [`row`](RowIndex::row) call ([`crate::Error::ColumnLengthMismatch`] at
@@ -132,8 +132,8 @@ impl<'a> RowIndex<'a> {
             dropped_attribute_counts: None,
             parent_span_ids: None,
             durations: None,
-            build_trace_id_index: false,
-            build_trace_id_bloom: false,
+            write_trace_id_index: false,
+            write_trace_id_bloom: false,
             events: None,
             links: None,
             trace_rollup: None,
@@ -185,9 +185,9 @@ impl<'a> RowIndex<'a> {
     }
 
     /// All slots in canonical order — low → mid → high tier, fields by name,
-    /// values sorted — the ordering `build.rs`'s `KvId` translation depends
+    /// values sorted — the ordering `index_writer.rs`'s `KvId` translation depends
     /// on. Delegates to the interner; the [`FieldTier`](crate::FieldTier)
-    /// labels themselves are assigned in `build.rs`.
+    /// labels themselves are assigned in `index_writer.rs`.
     pub(crate) fn tier_assignment(&self) -> [Vec<KvSlot>; 3] {
         self.kv_interner.tier_assignment()
     }

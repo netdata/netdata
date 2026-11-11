@@ -7,7 +7,7 @@
 //! payloads and can neither misorder nor underfill a file.
 //!
 //! Production plumbing: the only driver is Phase 2 in
-//! `build.rs` (behind the `index_writer.rs` facade); the `lib.rs`
+//! `index_writer.rs`; the `lib.rs`
 //! re-export is `test-util`-gated for test fixtures and raw-format
 //! introspection. The read-side counterpart is `reader.rs`
 //! (`ChunkReader`), and the container framing underneath is chunk-file's
