@@ -103,7 +103,6 @@ void log_stack_push(struct log_stack_entry *lgs);
 #define D_EXPORTING         (1ULL << 19)
 #define D_STATSD            (1ULL << 20)
 #define D_STREAM            (1ULL << 21)
-#define D_ANALYTICS         (1ULL << 22)
 #define D_RRDENGINE         (1ULL << 23)
 #define D_ACLK              (1ULL << 24)
 #define D_WEBSOCKET         (1ULL << 25)

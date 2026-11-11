@@ -113,11 +113,6 @@ LABEL org.opencontainers.image.vendor="Netdata Inc."
 LABEL org.opencontainers.image.created=${BUILD_DATE}
 LABEL org.opencontainers.image.version=${BUILD_VERSION}
 
-ARG OFFICIAL_IMAGE=false
-ENV NETDATA_OFFICIAL_IMAGE=$OFFICIAL_IMAGE
-
-ONBUILD ENV NETDATA_OFFICIAL_IMAGE=false
-
 ARG NETDATA_UID=201
 ARG NETDATA_GID=201
 ENV DOCKER_GRP=netdata

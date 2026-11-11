@@ -1,6 +1,6 @@
 # Anonymous telemetry events
 
-By default, Netdata collects anonymous usage information from the open-source monitoring Agent. For events like start, stop, crash, etc., we use our own cloud function in GCP. For frontend telemetry (page views, etc.) on the dashboard itself, we use the open-source product analytics platform [PostHog](https://github.com/PostHog/posthog).
+By default, Netdata collects usage and stability information from the open-source monitoring Agent. For Agent restarts and crashes, the `netdata` daemon sends a status report to Netdata. For frontend telemetry (page views, etc.) on the dashboard itself, we use the open-source product analytics platform [PostHog](https://github.com/PostHog/posthog).
 
 We are strongly committed to your [data privacy](https://netdata.cloud/privacy/).
 
@@ -13,7 +13,7 @@ We use the statistics gathered from this information for two purposes:
 Netdata collects usage information via two different channels:
 
 - **Agent dashboard**: We use the [PostHog JavaScript integration](https://posthog.com/docs/integrations/js-integration) (with sensitive event attributes overwritten to be anonymized) to send product usage events when you access an [Agent's dashboard](/docs/dashboards-and-charts/README.md).
-- **Agent backend**: The `netdata` daemon executes the [`anonymous-statistics.sh`](https://github.com/netdata/netdata/blob/master/src/daemon/anonymous-statistics.sh.in) script when Netdata starts, stops cleanly, or fails.
+- **Agent backend**: When the `netdata` daemon starts, it reports how its previous run ended (a restart or a crash) to `agent-events.netdata.cloud` over HTTPS. Builds with Sentry support also send crash reports to Sentry.
 
 ## What data is collected
 
@@ -37,32 +37,36 @@ In the above snippet, a Netdata PostHog session is initialized and the `ip`, `cu
 
 We have configured the dashboard to trigger the PostHog JavaScript code only when the variable `anonymous_statistics` is true. The value of this variable is controlled via the [opt-out mechanism](#opt-out-methods).
 
-### Agent Backend - Anonymous Statistics Script
+### Agent Backend - Restart and Crash Reports
 
-Every time the daemon is started or stopped, and every time a fatal condition is encountered, Netdata uses the anonymous statistics script to collect system information and send it to the Netdata telemetry cloud function via an HTTPS call.
+When the daemon starts, it reads the status file it saved during its previous run and, if reporting is enabled, sends
+it to `https://agent-events.netdata.cloud/agent-events`. Each kind of event is deduplicated and reported at most once
+per day.
 
-**Information collected for all events:**
+**Information in a report:**
 
-- Netdata version, build information, release channel, install type
-- OS name, version, ID, and detection method
-- Kernel name, version, and architecture
-- Virtualization and containerization technology
-- System CPU information (model, vendor, frequency, core count)
-- System disk and RAM information (total sizes)
-- Netdata configuration (streaming, memory mode, web enabled, HTTPS, etc.)
-- Alert counts (normal, warning, critical)
-- Chart and metric counts
-- Collector information
-- Cloud connection status and availability
-- Streaming/mirroring configuration
+- Netdata version, install type, database mode, and the Agent's uptime and restart count
+- How the previous run ended: the exit reason, and the duration of the startup and shutdown steps
+- For crashes and fatal errors: the signal, the thread, the source function, filename and line, the error message, and
+  a stack trace when one is available
+- OS, kernel, architecture, virtualization and container technology, cloud provider, instance type and region, and
+  timezone
+- Hardware: CPU, RAM and disk sizes, and the vendor and model of the system, board and chassis
+- Memory use and database sizes of the Agent
+- Identifiers: the Agent's machine GUID, the host's machine and boot IDs and the system UUID, and the Netdata Cloud
+  node and claim IDs when the Agent is connected to Netdata Cloud
 
-**For FATAL events only:**
+The `crash reports` option in the `[global]` section of `netdata.conf` controls these reports: `all` (restarts and
+crashes), `crashes` (crashes only) or `off`. Its default is `all` when telemetry is enabled or the Agent is connected to
+Netdata Cloud (directly or through a Netdata Parent), and `off` otherwise.
 
-The FATAL event sends the Netdata process and thread name, along with the source code function, source code filename, and source code line number of the fatal error.
+**Sentry crash reports:** builds that include Sentry support (some native packages) also send a crash report to
+Sentry when the daemon crashes. Sentry is not started when telemetry is disabled.
 
 :::note
 
-To see exactly what and how is collected, you can review the script template `src/daemon/anonymous-statistics.sh.in`. The template is converted to a bash script called `anonymous-statistics.sh`, installed under the Netdata `plugins directory`, which is usually `/usr/libexec/netdata/plugins.d`.
+To see exactly what is sent, review the status file the Agent saves in its library directory (`status-netdata.json`,
+usually under `/var/lib/netdata`), and the code in `src/daemon/status-file.c`.
 
 :::
 
@@ -82,10 +86,10 @@ To see exactly what and how is collected, you can review the script template `sr
 
 All opt-out methods prevent:
 
-- The daemon from executing the anonymous statistics script
+- The daemon from starting Sentry crash reporting
 - The PostHog JavaScript snippet (which remains on the dashboard) from firing and sending any data to Netdata PostHog
-
-When opt-out is enabled, the anonymous statistics script exits immediately without sending any data.
+- The restart and crash reports, unless the Agent is connected to Netdata Cloud (set `crash reports = off` in
+  `netdata.conf` to stop them in that case too)
 
 :::
 
@@ -225,7 +229,7 @@ To confirm that telemetry is disabled:
 
 :::note
 
-If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer send PostHog events, and the backend statistics script will not execute.
+If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer send PostHog events, and the daemon will not start Sentry or, unless it is connected to Netdata Cloud, send restart and crash reports.
 
 :::
 

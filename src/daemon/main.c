@@ -25,7 +25,6 @@
 #endif
 
 bool unittest_running = false;
-bool netdata_anonymous_statistics_enabled = true;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 bool ieee754_doubles = false;
@@ -349,7 +348,6 @@ static void fatal_status_file_save(void) {
 int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
     string_init();
-    analytics_init();
     nd_log_initialize_mutexes();
 
     // Register the daemon's per-thread cleanup callback. Each subsystem
@@ -1249,9 +1247,8 @@ int netdata_main(int argc, char **argv) {
         fatal("Cannot cd to '%s'", netdata_configured_user_config_dir);
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("analytics");
+    delta_startup_time("timezone");
 
-    analytics_reset();
     get_system_timezone();
     rrdlabels_aral_init(true);
 
@@ -1419,7 +1416,7 @@ int netdata_main(int argc, char **argv) {
 
     get_install_type(system_info);
 
-    set_late_analytics_variables(system_info);
+    info_fields_buildinfo_init();
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("RRD structures");
@@ -1499,15 +1496,12 @@ int netdata_main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------------------------
 
-    {
-        if(analytics_check_enabled())
-            delta_startup_time("anonymous analytics");
-        else // collect data but do not send it (needed in /api/v1/info)
-            delta_startup_time("anonymous analytics (disabled)");
+    delta_startup_time("notification methods");
 
-        // check if ANALYTICS needs to start
+    {
+        // one-shot probe for /api/v1/info, kept off the startup path
         for (i = 0; static_threads[i].name != NULL; i++) {
-            if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
+            if (!strcmp(static_threads[i].name, "NOTIFY-METHODS")) {
                 struct netdata_static_thread *st = &static_threads[i];
                 st->enabled = 1;
                 netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);

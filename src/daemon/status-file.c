@@ -1325,7 +1325,7 @@ enum crash_report_t {
 };
 
 static enum crash_report_t check_crash_reports_config(void) {
-    bool default_enabled = analytics_check_enabled() ||
+    bool default_enabled = telemetry_enabled() ||
                            !UUIDiszero(session_status.node_id) || !UUIDiszero(last_session_status.node_id) ||
                            !UUIDiszero(session_status.claim_id) || !UUIDiszero(last_session_status.claim_id);
 

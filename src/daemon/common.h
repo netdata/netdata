@@ -68,10 +68,9 @@ extern "C" {
 #include "signal-handler.h"
 #include "commands.h"
 #include "pipename.h"
-#include "analytics.h"
-
-// global netdata daemon variables
-extern bool netdata_anonymous_statistics_enabled;
+#include "telemetry-optout.h"
+#include "timezone.h"
+#include "api-v1-info-fields.h"
 
 // Thread-safe system timezone access.
 // Use system_tz_get() to read; the returned struct owns strdup'd copies

@@ -256,6 +256,10 @@ extern struct instance *prometheus_exporter_instance;
 
 void exporting_main(void *ptr);
 
+// for /api/v1/info: published once the exporting configuration is read
+bool exporting_info_enabled(void);
+const char *exporting_info_connectors(void);
+
 struct engine *read_exporting_config();
 EXPORTING_CONNECTOR_TYPE exporting_select_type(const char *type);
 

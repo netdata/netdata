@@ -56,35 +56,20 @@ typedef wchar_t WCHAR;
 #define ERROR_BUFFER_OVERFLOW 4
 #define NO_ERROR 0
 #define GAA_FLAG_INCLUDE_PREFIX 1
-#define NETDATA_WIN_DETECTION_METHOD "windows-api"
-struct rrdhost_system_info { char value[64]; unsigned writes, detection_writes; };
+struct rrdhost_system_info { char value[64]; unsigned writes; };
 static const char *expected_key;
 static bool expected_runtime = true;
-static unsigned environment_writes;
 static void rrdhost_system_info_detected_set(struct rrdhost_system_info *si, const char *key, const char *value) {
     assert(expected_runtime);
     assert(!strcmp(key, expected_key));
     snprintf(si->value, sizeof(si->value), "%s", value);
     si->writes++;
 }
-static int nd_setenv(const char *key, const char *value, int overwrite) {
-    assert(!expected_runtime);
-    assert(!strcmp(key, "NETDATA_SYSTEM_DISK_DETECTION"));
-    assert(!strcmp(value, NETDATA_WIN_DETECTION_METHOD) && overwrite == 1);
-    environment_writes++;
-    return 0;
-}
 static void rrdhost_system_info_set_by_name(struct rrdhost_system_info *si, const char *key, const char *value) {
     assert(!expected_runtime);
-    if (!strcmp(key, "NETDATA_SYSTEM_DISK_DETECTION")) {
-        assert(!strcmp(value, NETDATA_WIN_DETECTION_METHOD));
-        si->detection_writes++;
-    }
-    else {
-        assert(!strcmp(key, expected_key));
-        snprintf(si->value, sizeof(si->value), "%s", value);
-        si->writes++;
-    }
+    assert(!strcmp(key, expected_key));
+    snprintf(si->value, sizeof(si->value), "%s", value);
+    si->writes++;
 }
 typedef struct { unsigned dwNumberOfProcessors; unsigned wProcessorArchitecture; } SYSTEM_INFO;
 static void GetSystemInfo(SYSTEM_INFO *si) { si->dwNumberOfProcessors = 8; si->wProcessorArchitecture = 9; }
@@ -182,7 +167,7 @@ static void startup_disk_tests(void) {
     struct rrdhost_system_info si = { .value = "previous" };
     expected_runtime = false;
     expected_key = "NETDATA_SYSTEM_TOTAL_DISK_SIZE";
-    opened = closed = environment_writes = 0;
+    opened = closed = 0;
     drive_mask = (1U << 2) | (1U << 3) | (1U << 4) | (1U << 5);
     drive_types[2] = drive_types[5] = DRIVE_FIXED;
     drive_types[3] = 5; /* optical drive: never opened, even when populated */
@@ -191,19 +176,16 @@ static void startup_disk_tests(void) {
     netdata_windows_get_total_disk_size(&si, false);
     assert(si.writes == 1 && !strcmp(si.value, "3072"));
     assert(opened == 2 && closed == 2);
-    assert(si.detection_writes == 1 && environment_writes == 1);
 
-    /* Startup preserves its best-effort partial sum and detection metadata. */
+    /* Startup preserves its best-effort partial sum. */
     fail_open = 5;
     netdata_windows_get_total_disk_size(&si, false);
     assert(si.writes == 2 && !strcmp(si.value, "1024"));
     assert(opened == 4 && closed == 3);
-    assert(si.detection_writes == 2 && environment_writes == 2);
     fail_open = -1; fail_ioctl = 2;
     netdata_windows_get_total_disk_size(&si, false);
     assert(si.writes == 3 && !strcmp(si.value, "2048"));
     assert(opened == 6 && closed == 5);
-    assert(si.detection_writes == 3 && environment_writes == 3);
     fail_ioctl = -1;
 
     /* An inventory containing only non-fixed drives publishes zero at startup. */
@@ -211,11 +193,9 @@ static void startup_disk_tests(void) {
     netdata_windows_get_total_disk_size(&si, false);
     assert(si.writes == 4 && !strcmp(si.value, "0"));
     assert(opened == 6 && closed == 5);
-    assert(si.detection_writes == 4 && environment_writes == 4);
     drive_mask = 0;
     netdata_windows_get_total_disk_size(&si, false);
     assert(si.writes == 4 && !strcmp(si.value, "0"));
-    assert(si.detection_writes == 4 && environment_writes == 4);
     expected_runtime = true;
 }
 static void network_tests(void) {

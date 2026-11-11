@@ -470,12 +470,6 @@ endif()
 #
 # TODO: check the following files for correct substitutions
 #
-configure_file(src/daemon/anonymous-statistics.sh.in src/daemon/anonymous-statistics.sh @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/src/daemon/anonymous-statistics.sh
-        COMPONENT netdata
-        DESTINATION ${PLUGINS_DEST})
-
 configure_file(src/daemon/get-kubernetes-labels.sh.in src/daemon/get-kubernetes-labels.sh @ONLY)
 install(PROGRAMS
         ${CMAKE_BINARY_DIR}/src/daemon/get-kubernetes-labels.sh
