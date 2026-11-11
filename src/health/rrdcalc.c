@@ -700,12 +700,16 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
 
     bool ret = true;
 
+    // archiving the host destroys this index and leaves NULL behind
+    DICTIONARY *dict = host->rrdcalc_root_index;
+    if(unlikely(!dict))
+        return false;
+
     // the react callback links the new alert to its chart after the dictionary has released its own locks;
     // hold the write lock across the whole set, so that no walker can find and unlink the alert half-linked
-    dictionary_write_lock(host->rrdcalc_root_index);
-    dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)key_len,
-                            NULL, sizeof(RRDCALC), &tmp);
-    dictionary_write_unlock(host->rrdcalc_root_index);
+    dictionary_write_lock(dict);
+    dictionary_set_advanced(dict, key, (ssize_t)key_len, NULL, sizeof(RRDCALC), &tmp);
+    dictionary_write_unlock(dict);
 
     if(tmp.react_action != RRDCALC_REACT_NEW)
         ret = false;
@@ -714,10 +718,16 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
 }
 
 void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock) {
+    // archiving the host destroys this index and leaves NULL behind, after rrdcalc_delete_all() has already
+    // unlinked every alert; a reentrant walker still holding one of them has nothing left to do
+    DICTIONARY *dict = host->rrdcalc_root_index;
+    if(unlikely(!dict))
+        return;
+
     // alerts are linked and unlinked only under this write lock: it serializes with rrdcalc_add_from_prototype()
-    // and keeps out the health thread, which reads rc->rrdset under the read lock. It is recursive for the
-    // callers that already hold it; the reentrant ones do not.
-    dictionary_write_lock(host->rrdcalc_root_index);
+    // and keeps out the health thread, which reads rc->rrdset under the read lock. The lock is recursive:
+    // chart and host cleanup already hold it; reentrant prototype walkers acquire it here.
+    dictionary_write_lock(dict);
 
     // remove from the name index first, while rc and host are both in hand and
     // the caller's lock state is known; the delete callback repeats this
@@ -727,10 +737,10 @@ void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock
     rrdcalc_unlink_from_rrdset(rc, having_ll_wrlock);
 
     thread_having_ll_wrlock = having_ll_wrlock;
-    dictionary_del_advanced(host->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key));
+    dictionary_del_advanced(dict, string2str(rc->key), (ssize_t)string_strlen(rc->key));
     thread_having_ll_wrlock = false;
 
-    dictionary_write_unlock(host->rrdcalc_root_index);
+    dictionary_write_unlock(dict);
 }
 
 // ----------------------------------------------------------------------------
