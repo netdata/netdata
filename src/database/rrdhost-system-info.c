@@ -122,8 +122,7 @@ int rrdhost_system_info_set_by_name(struct rrdhost_system_info *si, const char *
 
     // Recognized startup environment exports that have no stored system-info member.
     static const char *auxiliary[] = {
-        "NETDATA_PROTOCOL_VERSION", "NETDATA_SYSTEM_CPU_VENDOR", "NETDATA_SYSTEM_CPU_DETECTION",
-        "NETDATA_SYSTEM_RAM_DETECTION", "NETDATA_SYSTEM_DISK_DETECTION", "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE",
+        "NETDATA_PROTOCOL_VERSION",
     };
     for (size_t n = 0; n < _countof(auxiliary); n++)
         if (!strcmp(name, auxiliary[n]))

@@ -509,7 +509,7 @@ assert_startup_record() {
 }
 startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
     TEST_METADATA_FAIL=true TEST_INVENTORY_FAIL=true /bin/sh "${system_info_script}" --bounded)
-for field in CPU_MODEL CPU_VENDOR CPU_FREQ; do
+for field in CPU_MODEL CPU_FREQ; do
     assert_startup_record "NETDATA_SYSTEM_$field" ''
 done
 assert_startup_record NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT 8
@@ -522,11 +522,9 @@ done
 startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
     TEST_KERNEL=FreeBSD /bin/sh "${system_info_script}" --bounded)
 assert_startup_record NETDATA_SYSTEM_TOTAL_DISK_SIZE 1073741824
-assert_startup_record NETDATA_SYSTEM_DISK_DETECTION geom
 startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
     TEST_KERNEL=FreeBSD TEST_DISK_FAIL=true /bin/sh "${system_info_script}" --bounded)
 assert_startup_record NETDATA_SYSTEM_TOTAL_DISK_SIZE unknown
-assert_startup_record NETDATA_SYSTEM_DISK_DETECTION geom
 startup_output=$(PATH="${test_dir}/runtime-bin:${PATH}" RUNTIME_PROBE_LOG="${test_dir}/runtime-probes.log" \
     TEST_CLOUD_FAILURE=true VIRTUALIZATION=kvm /bin/sh "${system_info_script}" --bounded)
 assert_startup_record NETDATA_INSTANCE_CLOUD_TYPE AWS

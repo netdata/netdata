@@ -203,7 +203,7 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not
     spinlock_unlock(&registry_cloud_base_url_spinlock);
 
     buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
-    buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", do_not_track ? false : netdata_anonymous_statistics_enabled);
+    buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", do_not_track ? false : telemetry_enabled());
     buffer_json_member_add_boolean(w->response.data, "X-Netdata-Auth", true);
 
     buffer_json_member_add_array(w->response.data, "nodes");
