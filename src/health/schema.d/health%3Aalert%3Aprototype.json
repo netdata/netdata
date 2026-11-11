@@ -445,7 +445,8 @@
         "properties": {
           "execute": {
             "type": "string",
-            "title": "Command to execute when the alert transitions states"
+            "title": "Command to execute when the alert transitions states",
+            "readOnly": true
           },
           "recipient": {
             "type": "string",
@@ -838,7 +839,8 @@
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
             "execute": {
               "ui:classNames": "dyncfg-grid-col-span-1-3",
-              "ui:help": "Leave this empty to get the default alert notification"
+              "ui:readonly": true,
+              "ui:help": "Set on the agent: the [health] 'script to execute on alarm' option in netdata.conf, or 'exec' in health.d files"
             },
             "recipient": {
               "ui:classNames": "dyncfg-grid-col-span-4-1",

@@ -3252,6 +3252,12 @@ if(OS_LINUX)
         target_compile_options(http-auth-bearer-test PRIVATE -ffunction-sections -fdata-sections)
         target_link_options(http-auth-bearer-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
         target_link_libraries(http-auth-bearer-test libnetdata)
+
+        add_executable(api-v3-settings-test EXCLUDE_FROM_ALL
+                src/web/api/tests/api-v3-settings-test.c)
+        target_compile_options(api-v3-settings-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(api-v3-settings-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(api-v3-settings-test libnetdata)
 endif()
 
 if(ENABLE_CGROUPS_LOOKUP_SERVER)
@@ -3414,8 +3420,19 @@ if(ENABLE_PLUGIN_EBPF)
     string(APPEND EBPF_GO_CGO_CFLAGS " -I${CMAKE_SOURCE_DIR}/src/collectors/ebpf.plugin")
     string(APPEND EBPF_GO_CGO_CFLAGS " -I${ebpf-co-re_SOURCE_DIR}")
     string(STRIP "${EBPF_GO_CGO_CFLAGS}" EBPF_GO_CGO_CFLAGS)
-    set(EBPF_GO_CGO_LDFLAGS
-            "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz")
+    set(EBPF_GO_LDFLAGS
+            "-X 'main.netdataPluginsDir=${PLUGINS_DIR}' -X 'main.netdataUserConfigDir=${CONFIG_DIR}' -X 'main.netdataStockConfigDir=${LIBCONFIG_DIR}'")
+    if(STATIC_BUILD)
+        # go build does not see CMAKE_EXE_LINKER_FLAGS: ask its external linker for a static
+        # binary, and link libelf with its private dependencies (zstd in the static builder).
+        list(JOIN ELF_STATIC_LDFLAGS " " EBPF_GO_ELF_LDFLAGS)
+        set(EBPF_GO_CGO_LDFLAGS
+                "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf ${EBPF_GO_ELF_LDFLAGS} -lz")
+        string(APPEND EBPF_GO_LDFLAGS " -linkmode=external -extldflags=-static")
+    else()
+        set(EBPF_GO_CGO_LDFLAGS
+                "-L${libbpf_SOURCE_DIR}/usr/${EBPF_GO_LIBBPF_LIB_DIR} -lbpf -lelf -lz")
+    endif()
     if(HAVE_LIBRT)
         string(APPEND EBPF_GO_CGO_LDFLAGS " -lrt")
     endif()
@@ -3430,7 +3447,7 @@ if(ENABLE_PLUGIN_EBPF)
                         CGO_LDFLAGS=${EBPF_GO_CGO_LDFLAGS}
                         GOPROXY=https://proxy.golang.org,direct
                         "${GO_EXECUTABLE}" build -buildvcs=false
-                        -ldflags "-X 'main.netdataPluginsDir=${PLUGINS_DIR}' -X 'main.netdataUserConfigDir=${CONFIG_DIR}' -X 'main.netdataStockConfigDir=${LIBCONFIG_DIR}'"
+                        -ldflags "${EBPF_GO_LDFLAGS}"
                         -tags netdata_ebpf_libbpf
                         -o "${CMAKE_BINARY_DIR}/ebpf-go.plugin"
                         "."

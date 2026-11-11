@@ -345,6 +345,38 @@ cleanup:
     return NULL;
 }
 
+// The notification program runs through /bin/sh with the alert's recipient as its first argument,
+// so dyncfg, which remote users can reach, must not choose it. Only the agent's configured default
+// is accepted, or nothing (which means the default). health.d files can still set any program.
+// STRINGs are interned, so comparing the pointers compares the text.
+bool health_prototype_exec_is_allowed(RRD_ALERT_PROTOTYPE *base, bool replay, BUFFER *error) {
+    size_t replaced = 0, rule = 0;
+    for(RRD_ALERT_PROTOTYPE *ap = base; ap; ap = ap->_internal.next, rule++) {
+        if(!ap->config.exec || ap->config.exec == health_globals.config.default_exec)
+            continue;
+
+        if(!replay) {
+            buffer_sprintf(error,
+                           "rule %zu: the notification program cannot be set through dynamic configuration; "
+                           "leave 'execute' empty, the agent uses its own", rule);
+            return false;
+        }
+
+        // a configuration saved before this check existed: keep the alert, drop the program
+        string_freez(ap->config.exec);
+        ap->config.exec = NULL;
+        replaced++;
+    }
+
+    if(replaced)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "HEALTH DYNCFG: saved alert prototype '%s' sets a custom notification program in %zu rule(s); "
+               "using the agent's default instead. Save the alert again to remove this message.",
+               string2str(base->config.name), replaced);
+
+    return true;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // generate the json object of an alert definition
 
@@ -644,12 +676,21 @@ static int health_dyncfg_reject(BUFFER *result, const char *cmd, const char *ale
     return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, reason);
 }
 
-static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS cmd, const char *add_name, BUFFER *payload, const char *source __maybe_unused) {
+static RRD_ALERT_PROTOTYPE *health_dyncfg_prototype_parse(BUFFER *payload, BUFFER *error, const char *name, unsigned flags, bool replay) {
+    RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, name, flags);
+    if(nap && !health_prototype_exec_is_allowed(nap, replay, error)) {
+        health_prototype_free(nap);
+        nap = NULL;
+    }
+    return nap;
+}
+
+static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS cmd, const char *add_name, BUFFER *payload, const char *source __maybe_unused, bool replay) {
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
     switch(cmd) {
         case DYNCFG_CMD_ADD: {
             CLEAN_BUFFER *error = buffer_create(0, NULL);
-            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name, JSONC_REQUIRED);
+            RRD_ALERT_PROTOTYPE *nap = health_dyncfg_prototype_parse(payload, error, add_name, JSONC_REQUIRED, replay);
             if(!nap)
                 code = health_dyncfg_reject(result, "add", add_name, buffer_tostring(error));
             else {
@@ -684,7 +725,7 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
 
         case DYNCFG_CMD_USERCONFIG: {
             CLEAN_BUFFER *error = buffer_create(0, NULL);
-            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name, JSONC_OPTIONAL);
+            RRD_ALERT_PROTOTYPE *nap = health_dyncfg_prototype_parse(payload, error, add_name, JSONC_OPTIONAL, false);
             if(!nap)
                 code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
             else {
@@ -719,7 +760,7 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
     return code;
 }
 
-static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source __maybe_unused, const char *alert_name) {
+static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source __maybe_unused, const char *alert_name, bool replay) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(health_globals.prototypes.dict, alert_name);
     if(!item)
         return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "no alert prototype is available by the name given");
@@ -775,7 +816,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 
         case DYNCFG_CMD_UPDATE: {
                 CLEAN_BUFFER *error = buffer_create(0, NULL);
-                RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name, JSONC_REQUIRED);
+                RRD_ALERT_PROTOTYPE *nap = health_dyncfg_prototype_parse(payload, error, alert_name, JSONC_REQUIRED, replay);
                 if(!nap)
                     code = health_dyncfg_reject(result, "update", alert_name, buffer_tostring(error));
                 else {
@@ -801,7 +842,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 
         case DYNCFG_CMD_USERCONFIG: {
             CLEAN_BUFFER *error = buffer_create(0, NULL);
-            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name, JSONC_OPTIONAL);
+            RRD_ALERT_PROTOTYPE *nap = health_dyncfg_prototype_parse(payload, error, alert_name, JSONC_OPTIONAL, false);
             if(!nap)
                 code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
             else {
@@ -833,7 +874,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
     return code;
 }
 
-int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYNCFG_CMDS cmd, const char *add_name,
+int dyncfg_health_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd, const char *add_name,
                      BUFFER *payload, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                      BUFFER *result, HTTP_ACCESS access __maybe_unused, const char *source, void *data __maybe_unused) {
     CLEAN_CHAR_P *buf = strdupz(id);
@@ -855,16 +896,19 @@ int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYN
     if(!type_prefix || !*type_prefix || strcmp(type_prefix, "prototype") != 0)
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "third component of id is not 'prototype'");
 
+    // a saved configuration replayed by dyncfg is coerced instead of rejected (see health_prototype_exec_is_allowed())
+    bool replay = (cmd & (DYNCFG_CMD_ADD | DYNCFG_CMD_UPDATE)) && dyncfg_transaction_is_echo(transaction);
+
     char *alert_name = get_word(words, num_words, i++);
     if(!alert_name || !*alert_name) {
         // action on the prototype template
 
-        code = dyncfg_health_prototype_template_action(result, cmd, add_name, payload, source);
+        code = dyncfg_health_prototype_template_action(result, cmd, add_name, payload, source, replay);
     }
     else {
         // action on a specific alert prototype
 
-        code = dyncfg_health_prototype_job_action(result, cmd, payload, source, alert_name);
+        code = dyncfg_health_prototype_job_action(result, cmd, payload, source, alert_name, replay);
     }
     return code;
 }

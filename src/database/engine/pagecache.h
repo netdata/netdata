@@ -57,4 +57,6 @@ void pgc_open_add_hot_page(
     uint64_t extent_offset,
     unsigned extent_size);
 
+int pagecache_flush_drop_unittest(void);
+
 #endif /* NETDATA_PAGECACHE_H */

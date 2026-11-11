@@ -229,13 +229,11 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
     rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
 }
 
-static bool njfv2idx_remove_internal(struct rrdengine_datafile *datafile, bool required) {
+static bool njfv2idx_remove_if_indexed(struct rrdengine_datafile *datafile) {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
     rw_spinlock_write_lock(&ctx->njfv2idx.spinlock);
 
     if(!datafile->journalfile->njfv2idx.indexed_as) {
-        if(required)
-            internal_fatal(true, "DBENGINE: NJFV2IDX journalfile to remove is not indexed");
         rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
         return false;
     }
@@ -248,14 +246,6 @@ static bool njfv2idx_remove_internal(struct rrdengine_datafile *datafile, bool r
 
     rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
     return true;
-}
-
-static void njfv2idx_remove(struct rrdengine_datafile *datafile) {
-    (void)njfv2idx_remove_internal(datafile, true);
-}
-
-static bool njfv2idx_remove_if_indexed(struct rrdengine_datafile *datafile) {
-    return njfv2idx_remove_internal(datafile, false);
 }
 
 // ----------------------------------------------------------------------------
@@ -598,8 +588,11 @@ static void journalfile_v2_data_clear_unmapped_state(struct rrdengine_journalfil
     } while(has_references);
 }
 
+// Before a datafile is freed: whatever its availability (a failed mapping or populate
+// clears it while the journal can still be indexed), nothing may reach it through
+// ctx->njfv2idx, and its v2 is unmapped and closed.
 static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *journalfile) {
-    njfv2idx_remove(journalfile->datafile);
+    (void)njfv2idx_remove_if_indexed(journalfile->datafile);
     journalfile_v2_data_clear_unmapped_state(journalfile);
 }
 
@@ -636,12 +629,21 @@ static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
 
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
-    if(journalfile_v2_data_available(journalfile)) {
-        journalfile_v2_data_unmap_permanently(journalfile);
+    // v2.12 port: the v1 is open only while no v2 was loaded, as before; the v2 is now
+    // unmapped and dropped from the index even when it is no longer available
+    bool v2_available = journalfile_v2_data_available(journalfile);
+    journalfile_v2_data_unmap_permanently(journalfile);
+    if(v2_available)
         return 0;
-    }
 
     return close_uv_file(datafile, journalfile->file);
+}
+
+// v2.12 port of #24509: the failed-pair path of scan_data_files() needs only the v2
+// teardown - the v1 of such a pair is never open there.
+void journalfile_v2_close(struct rrdengine_journalfile *journalfile)
+{
+    journalfile_v2_data_unmap_permanently(journalfile);
 }
 
 int journalfile_unlink(struct rrdengine_journalfile *journalfile)
@@ -660,46 +662,59 @@ int journalfile_unlink(struct rrdengine_journalfile *journalfile)
     return ret;
 }
 
+// A missing file is not an error: a journal v2 does not always exist next to its v1.
+static int journalfile_unlink_if_exists(struct rrdengine_instance *ctx, const char *path)
+{
+    uv_fs_t req;
+    int ret = uv_fs_unlink(NULL, &req, path, NULL);
+    if (ret != 0 && ret != UV_ENOENT) {
+        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
+        ctx_fs_error(ctx);
+    }
+    uv_fs_req_cleanup(&req);
+
+    return ret;
+}
+
+int journalfile_v2_unlink(struct rrdengine_journalfile *journalfile)
+{
+    struct rrdengine_datafile *datafile = journalfile->datafile;
+    struct rrdengine_instance *ctx = datafile_ctx(datafile);
+
+    char path[RRDENG_PATH_MAX];
+    journalfile_v2_generate_path(datafile, path, sizeof(path));
+
+    int ret = journalfile_unlink_if_exists(ctx, path);
+    if (ret == 0)
+        __atomic_add_fetch(&ctx->stats.journalfile_deletions, 1, __ATOMIC_RELAXED);
+
+    return ret;
+}
+
 uint8_t journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
-    int ret;
-    uv_fs_t req_v2 = { 0 };
-    uv_fs_t req_v1 = { 0 };
     char path[RRDENG_PATH_MAX];
     char path_v2[RRDENG_PATH_MAX];
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    journalfile_v2_generate_path(datafile, path_v2, sizeof(path));
+    journalfile_v2_generate_path(datafile, path_v2, sizeof(path_v2));
 
     if (journalfile->file)
         (void)close_uv_file(datafile, journalfile->file);
 
     // Wait for all references to be released and unmap before deleting files.
     // This prevents SIGBUS when threads are still accessing the mmap'd data.
-    if(journalfile_v2_data_available(journalfile))
-        journalfile_v2_data_unmap_permanently(journalfile);
+    journalfile_v2_data_unmap_permanently(journalfile);
 
     // Now safe to delete the files - no threads are accessing them
     uint8_t deleted = 0;
 
-    ret = uv_fs_unlink(NULL, &req_v2, path_v2, NULL);
-    if (ret == 0)
+    if (journalfile_unlink_if_exists(ctx, path_v2) == 0)
         deleted |= JOURNALFILE_DELETED_V2;
-    else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path_v2, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req_v2);
 
-    ret = uv_fs_unlink(NULL, &req_v1, path, NULL);
-    if (ret == 0)
+    if (journalfile_unlink_if_exists(ctx, path) == 0)
         deleted |= JOURNALFILE_DELETED_V1;
-    else if (ret != UV_ENOENT) {
-        netdata_log_error("DBENGINE: uv_fs_unlink(\"%s\"): %s", path, uv_strerror(ret));
-        ctx_fs_error(ctx);
-    }
-    uv_fs_req_cleanup(&req_v1);
 
     __atomic_add_fetch(&ctx->stats.journalfile_deletions, __builtin_popcount(deleted), __ATOMIC_RELAXED);
 
@@ -1309,11 +1324,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
         // refcount, so no concurrent journalfile_v2_data_acquire_with_hint()
         // can succeed and walk the (potentially corrupted) mmap between here
         // and the permanent unmap. The bounds, CRC, and signal-recovery paths
-        // all converge through this single transition; without it, teardown
-        // (journalfile_close / journalfile_destroy_unsafe) would gate on
-        // IS_AVAILABLE and skip journalfile_v2_data_unmap_permanently(),
-        // leaving a dangling njfv2idx entry, an unclosed fd, and an unmapped
-        // region.
+        // all converge through this single transition.
         spinlock_tracked_lock(&journalfile->data_spinlock);
         journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_AVAILABLE;
         spinlock_tracked_unlock(&journalfile->data_spinlock);

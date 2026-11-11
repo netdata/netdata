@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "query-internal.h"
+#include "median/median.h"
+#include "percentile/percentile.h"
+#include "trimmed_mean/trimmed_mean.h"
 
 static bool query_metric_is_valid_tier(QUERY_METRIC *qm, size_t tier) {
     if(!qm->tiers[tier].smh || !qm->tiers[tier].db_first_time_s || !qm->tiers[tier].db_last_time_s || !qm->tiers[tier].db_update_every_s)
@@ -834,6 +837,108 @@ static int query_plan_unittest_expect_result_expiry(void) {
     return 0;
 }
 
+static int query_plan_unittest_expect_resampling_time_normalize(void) {
+    struct {
+        time_t requested;
+        time_t expected;
+    } cases[] = {
+        { .requested = -60, .expected = 0 },
+        { .requested = 0, .expected = 0 },
+        { .requested = 60, .expected = 60 },
+        { .requested = API_QUERY_TIME_SPAN_MAX, .expected = API_QUERY_TIME_SPAN_MAX },
+        { .requested = API_QUERY_TIME_SPAN_MAX + 1, .expected = API_QUERY_TIME_SPAN_MAX },
+        { .requested = nd_time_t_max(), .expected = API_QUERY_TIME_SPAN_MAX },
+    };
+
+    int errors = 0;
+    for(size_t i = 0; i < _countof(cases); i++) {
+        time_t got = rrdr_resampling_time_normalize(cases[i].requested);
+        if(got != cases[i].expected) {
+            fprintf(stderr, "QUERY PLAN UNITTEST: resampling time %lld normalized to %lld, expected %lld\n",
+                    (long long)cases[i].requested, (long long)got, (long long)cases[i].expected);
+            errors++;
+        }
+    }
+
+    return errors;
+}
+
+static size_t query_plan_unittest_series_size(RRDR *r) {
+    switch(r->time_grouping.add_flush) {
+        case RRDR_GROUPING_MEDIAN:
+            return ((struct tg_median *)r->time_grouping.data)->series_size;
+
+        case RRDR_GROUPING_PERCENTILE:
+            return ((struct tg_percentile *)r->time_grouping.data)->series_size;
+
+        case RRDR_GROUPING_TRIMMED_MEAN:
+            return ((struct tg_trimmed_mean *)r->time_grouping.data)->series_size;
+
+        default:
+            return SIZE_MAX;
+    }
+}
+
+// a huge group must not decide the initial series size, the series must still hold every
+// point added after it grows, and growing must not leave buffers behind in the query's
+// one-way allocator (it releases memory only when the query ends)
+static int query_plan_unittest_expect_time_grouping_series_grows(void) {
+    struct {
+        RRDR_TIME_GROUPING grouping;
+        const char *options;    // options that make each method use every point
+    } cases[] = {
+        { .grouping = RRDR_GROUPING_MEDIAN, .options = "0" },
+        { .grouping = RRDR_GROUPING_PERCENTILE, .options = "100" },
+        { .grouping = RRDR_GROUPING_TRIMMED_MEAN, .options = "0" },
+    };
+
+    const size_t points = 5001;             // the average and the median of 1..5001 are both 2501
+    const NETDATA_DOUBLE expected = 2501.0;
+    int errors = 0;
+
+    for(size_t i = 0; i < _countof(cases); i++) {
+        ONEWAYALLOC *owa = onewayalloc_create(0);
+        RRDR r = {
+            .internal = { .owa = owa },
+            .view = { .group = (size_t)1 << 16 },
+        };
+
+        size_t owa_memory = onewayalloc_allocated_memory();
+        rrdr_set_grouping_function(&r, cases[i].grouping);
+        r.time_grouping.create(&r, cases[i].options);
+
+        size_t initial = query_plan_unittest_series_size(&r);
+        if(initial > QUERY_TIME_GROUPING_SERIES_INITIAL_MAX) {
+            fprintf(stderr, "QUERY PLAN UNITTEST: %s preallocated %zu points for group %zu, expected at most %d\n",
+                    time_grouping_id2txt(cases[i].grouping), initial, r.view.group,
+                    QUERY_TIME_GROUPING_SERIES_INITIAL_MAX);
+            errors++;
+        }
+
+        for(size_t v = points; v > 0; v--)
+            r.time_grouping.add(&r, (NETDATA_DOUBLE)v);
+
+        if(onewayalloc_allocated_memory() != owa_memory) {
+            fprintf(stderr, "QUERY PLAN UNITTEST: %s grew its series inside the query's one-way allocator (%zu -> %zu bytes)\n",
+                    time_grouping_id2txt(cases[i].grouping), owa_memory, onewayalloc_allocated_memory());
+            errors++;
+        }
+
+        RRDR_VALUE_FLAGS flags = RRDR_VALUE_NOTHING;
+        NETDATA_DOUBLE value = r.time_grouping.flush(&r, &flags);
+        if(flags & RRDR_VALUE_EMPTY || value != expected) {
+            fprintf(stderr, "QUERY PLAN UNITTEST: %s of 1..%zu returned " NETDATA_DOUBLE_FORMAT ", expected " NETDATA_DOUBLE_FORMAT "\n",
+                    time_grouping_id2txt(cases[i].grouping), points, value, expected);
+            errors++;
+        }
+
+        r.time_grouping.free(&r);
+        onewayalloc_destroy(owa);
+    }
+
+    return errors;
+}
+
 int query_plan_unittest(void) {
     size_t old_storage_tiers = nd_profile.storage_tiers;
     time_t old_update_every = nd_profile.update_every;
@@ -1097,6 +1202,8 @@ int query_plan_unittest(void) {
 
     errors += query_plan_unittest_expect_ops_cache_is_local();
     errors += query_plan_unittest_expect_result_expiry();
+    errors += query_plan_unittest_expect_resampling_time_normalize();
+    errors += query_plan_unittest_expect_time_grouping_series_grows();
 
     nd_profile.storage_tiers = old_storage_tiers;
     nd_profile.update_every = old_update_every;

@@ -228,10 +228,12 @@ int https_client_chunked_unittest(void);
 int mqtt_wss_client_timeout_unittest(void);
 int pgc_unittest(void);
 int mrg_unittest(void);
+int pagecache_flush_drop_unittest(void);
 int pluginsd_parser_unittest(void);
 int pluginsd_vnodes_unittest(void);
 int websocket_compression_unittest(void);
 int web_client_registry_cookie_unittest(void);
+int web_client_header_parsing_unittest(void);
 int web_client_request_size_unittest(void);
 int web_client_forwarded_for_unittest(void);
 int rrdhost_machine_guid_unittest(void);
@@ -265,6 +267,7 @@ int perflib_processor_unittest(void);
 #endif
 int query_plan_unittest(void);
 int api_v1_allmetrics_json_unittest(void);
+int rrdr2csv_unittest(void);
 int exporting_json_connector_unittest(void);
 int exporting_graphite_unittest(void);
 int exporting_opentsdb_http_unittest(void);
@@ -511,6 +514,7 @@ int netdata_main(int argc, char **argv) {
                             if (pluginsd_parser_unittest()) return 1;
                             if (websocket_compression_unittest()) return 1;
                             if (web_client_registry_cookie_unittest()) return 1;
+                            if (web_client_header_parsing_unittest()) return 1;
                             if (web_client_request_size_unittest()) return 1;
                             if (web_client_forwarded_for_unittest()) return 1;
                             if (rrdhost_machine_guid_unittest()) return 1;
@@ -520,7 +524,9 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
                             if (url_unittest()) return 1;
+                            if (command_argument_sanitization_tests()) return 1;
                             if (api_v1_allmetrics_json_unittest()) return 1;
+                            if (rrdr2csv_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_graphite_unittest()) return 1;
                             if (exporting_opentsdb_http_unittest()) return 1;
@@ -588,6 +594,7 @@ int netdata_main(int argc, char **argv) {
                             if (uuidmap_unittest()) return 1;
 #ifdef ENABLE_DBENGINE
                             if (mrg_unittest()) return 1;
+                            if (pagecache_flush_drop_unittest()) return 1;
 #endif
                             if (paths_unittest()) return 1;
 #ifdef HAVE_STACKTRACE
@@ -797,6 +804,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
                             return mrg_unittest();
+                        }
+                        else if(strcmp(optarg, "pagecachetest") == 0) {
+                            unittest_running = true;
+                            return pagecache_flush_drop_unittest();
                         }
                         else if(strcmp(optarg, "mrgretentionbench") == 0) {
                             unittest_running = true;
