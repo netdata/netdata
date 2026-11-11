@@ -387,9 +387,7 @@ async fn run_child(command: std::process::Command, queued_at: Instant, pid: &Ato
 
 /// The error of a child that ended with `status`, which is not a success.
 fn failure(status: ExitStatus, stderr: &[u8], usage: Usage) -> Error {
-    use std::os::unix::process::ExitStatusExt;
-
-    match (status.code(), status.signal()) {
+    match (status.code(), system::ending_signal(&status)) {
         (Some(code), _) => Error::Exited {
             code,
             stderr: String::from_utf8_lossy(stderr).into_owned(),

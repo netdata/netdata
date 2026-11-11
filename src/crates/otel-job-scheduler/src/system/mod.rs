@@ -5,6 +5,11 @@
 //! system has its implementation in a module of its own and [`Host`] picks
 //! the one this build is for. A system without one answers `None`, and the
 //! scheduler then runs without a memory budget.
+//!
+//! And one question about a child that has ended: which signal ended it
+//! ([`ending_signal`]). A system without signals answers `None`.
+
+use std::process::ExitStatus;
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -42,5 +47,22 @@ impl System for Host {
             let _ = pid;
             None
         }
+    }
+}
+
+/// The signal that ended the child whose wait status is `status`. `None`
+/// when no signal did, and on a system that has no signals.
+pub(crate) fn ending_signal(status: &ExitStatus) -> Option<i32> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+
+        status.signal()
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = status;
+        None
     }
 }
