@@ -107,7 +107,7 @@ impl ChartManager {
     ///
     /// Called once per second by lib.rs's tick loop; slot readiness,
     /// gap-fill and rate division all live in chart.rs.
-    pub fn emit(&mut self, slot_timestamp: u64, buf: &mut String) {
+    pub fn emit(&mut self, slot_timestamp: u64, buf: &mut Vec<u8>) {
         self.charts.retain(|_, chart| {
             if chart.is_expired() {
                 return false;

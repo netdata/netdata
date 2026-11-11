@@ -17,6 +17,7 @@ otel-derived-metrics = { workspace = true }
 ferryboat = { workspace = true }
 flatten-otel = { workspace = true }
 ng-flatten = { workspace = true }
+netdata-plugin-protocol = { workspace = true }
 netdata-plugin-types = { workspace = true }
 
 # WAL writing

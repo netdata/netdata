@@ -187,7 +187,7 @@ async fn run_ingestor(
     let tick_chart_manager = Arc::clone(&chart_manager);
     let tick_derived_metrics = Arc::clone(&derived_metrics);
     let tick_handle = tokio::spawn(async move {
-        let mut buf = String::new();
+        let mut buf = Vec::new();
 
         // Wait until the next second boundary.
         let now = SystemTime::now()
@@ -209,7 +209,7 @@ async fn run_ingestor(
             }
 
             if !buf.is_empty() {
-                if chart_tx.send(buf.as_bytes().to_vec()).await.is_err() {
+                if chart_tx.send(buf.clone()).await.is_err() {
                     break;
                 }
             }

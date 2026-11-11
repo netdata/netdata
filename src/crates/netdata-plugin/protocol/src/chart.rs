@@ -23,6 +23,8 @@
 //! Debug builds assert both. `validate_chart_stream` (feature
 //! `test-support`) checks whole streams in tests.
 
+use std::borrow::Cow;
+
 use bytes::BufMut;
 
 /// Chart rendering type on the `CHART` line.
@@ -439,10 +441,65 @@ pub fn is_valid_dimension_id(id: &str) -> bool {
 }
 
 fn is_plain_word(word: &str) -> bool {
-    !word.starts_with("SLOT:")
-        && word
-            .bytes()
-            .all(|b| !matches!(b, b'\'' | b'"' | b'\\' | b'=' | 0x00..=0x20 | 0x7f))
+    !word.starts_with("SLOT:") && !word.bytes().any(splits_or_quotes)
+}
+
+/// True for a byte the agent's splitter treats as a separator or a quote, and
+/// for `=`, which separates a `SET` line's dimension from its value.
+fn splits_or_quotes(byte: u8) -> bool {
+    matches!(byte, b'\'' | b'"' | b'\\' | b'=' | 0x00..=0x20 | 0x7f)
+}
+
+/// A valid chart id made from `id`: `id` itself when it is valid
+/// ([`is_valid_chart_id`]). Otherwise every byte the agent's splitter would
+/// misread becomes `_`, a leading `SLOT:` becomes `SLOT_`, and an empty type
+/// or id part becomes `_` (`cpu` becomes `cpu._`). Ids that differ only in
+/// replaced bytes become one id.
+///
+/// For ids built from text the plugin does not control, such as a metric name
+/// a sender chose.
+pub fn sanitize_chart_id(id: &str) -> Cow<'_, str> {
+    if is_valid_chart_id(id) {
+        return Cow::Borrowed(id);
+    }
+
+    let word = plain_word(id);
+    let (kind, rest) = word.split_once('.').unwrap_or((&word, ""));
+    let or_placeholder = |part| if str::is_empty(part) { "_" } else { part };
+    Cow::Owned(format!("{}.{}", or_placeholder(kind), or_placeholder(rest)))
+}
+
+/// A valid dimension id made from `id`: `id` itself when it is valid
+/// ([`is_valid_dimension_id`]). Otherwise every byte the agent's splitter
+/// would misread becomes `_`, a leading `SLOT:` becomes `SLOT_`, and an empty
+/// id becomes `_`. Ids that differ only in replaced bytes become one id.
+pub fn sanitize_dimension_id(id: &str) -> Cow<'_, str> {
+    if is_valid_dimension_id(id) {
+        return Cow::Borrowed(id);
+    }
+
+    let word = plain_word(id);
+    Cow::Owned(if word.is_empty() {
+        "_".to_string()
+    } else {
+        word
+    })
+}
+
+/// `text` with every byte of [`splits_or_quotes`] replaced by `_` and a
+/// leading `SLOT:` turned into `SLOT_`.
+fn plain_word(text: &str) -> String {
+    let mut word: String = text
+        .chars()
+        .map(|c| match u8::try_from(c) {
+            Ok(byte) if splits_or_quotes(byte) => '_',
+            _ => c,
+        })
+        .collect();
+    if word.starts_with("SLOT:") {
+        word.replace_range(4..5, "_");
+    }
+    word
 }
 
 fn write_set_prefix(buf: &mut impl BufMut, dimension_id: &str) {
@@ -986,6 +1043,61 @@ mod tests {
         assert!(!is_valid_dimension_id("a=b"));
         assert!(!is_valid_dimension_id("SLOT:1"));
         assert!(!is_valid_chart_id("SLOT:1.a"));
+    }
+
+    #[test]
+    fn sanitized_ids() {
+        let chart = |id: &str| sanitize_chart_id(id).into_owned();
+        assert_eq!(chart("system.cpu"), "system.cpu");
+        assert_eq!(chart("my metric.42"), "my_metric.42");
+        assert_eq!(chart("it's=odd\\\n.1"), "it_s_odd__.1");
+        assert_eq!(chart("cpu"), "cpu._");
+        assert_eq!(chart(".42"), "_.42");
+        assert_eq!(chart("cpu."), "cpu._");
+        assert_eq!(chart(""), "_._");
+        assert_eq!(chart("SLOT:1.a"), "SLOT_1.a");
+        assert_eq!(chart("μετρική.1"), "μετρική.1");
+
+        let dimension = |id: &str| sanitize_dimension_id(id).into_owned();
+        assert_eq!(dimension("0.005"), "0.005");
+        assert_eq!(dimension("+Inf"), "+Inf");
+        assert_eq!(dimension("GET /users"), "GET_/users");
+        assert_eq!(dimension("a=b"), "a_b");
+        assert_eq!(dimension(""), "_");
+        assert_eq!(dimension("SLOT:1"), "SLOT_1");
+    }
+
+    /// Every string up to four characters over an alphabet that holds each
+    /// kind of troublesome byte.
+    #[test]
+    fn a_sanitized_id_is_valid_and_a_valid_id_is_unchanged() {
+        const ALPHABET: [char; 10] = ['a', '.', ' ', '\'', '"', '\\', '=', '\n', ':', 'μ'];
+        let mut texts = vec![String::new()];
+        for _ in 0..4 {
+            let longer: Vec<String> = texts
+                .iter()
+                .flat_map(|text| ALPHABET.iter().map(move |c| format!("{text}{c}")))
+                .collect();
+            texts.extend(longer);
+        }
+        texts.extend(["SLOT:1.a", "SLOT:", "SLOT:.", "S.LOT:"].map(String::from));
+
+        for text in &texts {
+            let chart_id = sanitize_chart_id(text);
+            assert!(is_valid_chart_id(&chart_id), "{text:?} -> {chart_id:?}");
+            assert_eq!(is_valid_chart_id(text), chart_id == *text, "{text:?}");
+
+            let dimension_id = sanitize_dimension_id(text);
+            assert!(
+                is_valid_dimension_id(&dimension_id),
+                "{text:?} -> {dimension_id:?}"
+            );
+            assert_eq!(
+                is_valid_dimension_id(text),
+                dimension_id == *text,
+                "{text:?}"
+            );
+        }
     }
 
     mod validator {

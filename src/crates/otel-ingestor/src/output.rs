@@ -1,44 +1,34 @@
-//! Plugin-protocol output formatting for the OTel ingestor: renders chart
-//! definitions and data slots as the line-based chart commands the agent
-//! parses (`src/plugins.d/pluginsd_parser.c`: CHART, CLABEL, CLABEL_COMMIT,
-//! DIMENSION, BEGIN, SET, END).
+//! The OTLP metrics charts as chart-protocol text: a chart's definition
+//! (`CHART`, `CLABEL`, `CLABEL_COMMIT`, `DIMENSION`) and its data slots
+//! (`BEGIN`, `SET`, `END`).
 //!
-//! These bytes are the ingestor's agent-facing output: chart.rs renders them
-//! into a String buffer, the lib.rs tick loop hands the buffer to the main
-//! loop, and the main loop forwards it as `IngestorResponse::ChartData` over
-//! ferryboat IPC; the otel-plugin supervisor then writes it raw to stdout
-//! (`netdata-plugin/protocol/src/transport.rs` `write_raw` bypasses the IPC
-//! framing). Line order here is wire order, every line must be
-//! newline-terminated, and a malformed command stops the agent's parser: the
-//! plugin is disabled outright if it never collected data, and otherwise
-//! restarted with backoff until it is disabled (src/plugins.d/plugins_d.c).
+//! The lines are written by `netdata_plugin_protocol`, the owner of the rules
+//! that keep a line parseable by the agent; this module only decides what goes
+//! into them. Everything here comes from a sender (metric names, descriptions,
+//! units, attribute keys and values), so nothing is written verbatim: text
+//! fields go through the protocol crate's quoting, and ids are made valid
+//! with its `sanitize_*` functions. A malformed command stops the agent's
+//! parser, and the agent then restarts or disables the whole plugin
+//! (`src/plugins.d/plugins_d.c`), logs and traces included.
 //!
-//! Consumers: chart.rs uses everything here but `PRECISION_DIVISOR`;
-//! metrics_service.rs only [`ChartType`].
+//! These bytes are the ingestor's agent-facing output: chart.rs writes them
+//! into a buffer, the lib.rs tick loop hands the buffer to the main loop, the
+//! main loop forwards it as `IngestorResponse::ChartData`, and the otel-plugin
+//! supervisor writes it to stdout as it is. Line order here is wire order.
+//!
+//! Consumers: chart.rs uses everything here; metrics_service.rs only
+//! [`ChartType`].
 
-use std::fmt::{self, Write as _};
+use netdata_plugin_protocol::{
+    ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
+    sanitize_dimension_id, write_begin, write_chart, write_clabel, write_clabel_commit,
+    write_dimension, write_end, write_set_empty, write_set_int,
+};
 
-/// The chart rendering type, written into the CHART line's chart-type field.
-///
-/// The agent recognizes line, area, stacked and heatmap; this ingestor emits
-/// only line and heatmap — line for every chart except the histogram bucket
-/// charts, which are heatmap (metrics_service.rs). `fmt::Display` writes
-/// the agent's exact keywords.
-#[derive(Debug, Clone, Copy, Default)]
-pub enum ChartType {
-    #[default]
-    Line,
-    Heatmap,
-}
-
-impl fmt::Display for ChartType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ChartType::Line => f.write_str("line"),
-            ChartType::Heatmap => f.write_str("heatmap"),
-        }
-    }
-}
+/// The chart rendering type. This ingestor emits only `Line` and `Heatmap`:
+/// line for every chart except the histogram bucket charts
+/// (metrics_service.rs).
+pub use netdata_plugin_protocol::ChartType;
 
 /// Fixed-point divisor shared by SET and DIMENSION.
 ///
@@ -47,43 +37,21 @@ impl fmt::Display for ChartType {
 /// divisor (multiplier 1), and the agent scales back when storing:
 /// `value = SET_value * 1 / 1000` (src/database/rrdset-collection.c). This
 /// preserves three decimal digits of the original float.
-pub const PRECISION_DIVISOR: i64 = 1000;
+const PRECISION_DIVISOR: i64 = 1000;
 
-/// Quotes a string for use in a single-quoted CHART/CLABEL field.
+/// Dashboard order of every OTLP metrics chart.
+const PRIORITY: i32 = 1;
+
+/// A chart definition: one `CHART` line, then the labels and a
+/// `CLABEL_COMMIT` when there are labels, then one `DIMENSION` line per entry
+/// in `dimensions`, in that order.
 ///
-/// The agent splits each line into words treating `'` and `"` as field
-/// delimiters, with only incomplete escape support
-/// (src/libnetdata/line_splitter/line_splitter.h), and commands are
-/// newline-delimited: an embedded newline would split one command in two,
-/// and a malformed command stops the agent's parser
-/// (src/plugins.d/pluginsd_internals.c — the module header records the
-/// disable policy). Nothing can be escaped, so `'` is
-/// rewritten as `"` and `\n`/`\r` as their literal two-character forms.
-struct SanitizedQuote<'a>(&'a str);
-
-impl fmt::Display for SanitizedQuote<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for ch in self.0.chars() {
-            match ch {
-                '\'' => f.write_char('"')?,
-                '\n' => f.write_str("\\n")?,
-                '\r' => f.write_str("\\r")?,
-                _ => f.write_char(ch)?,
-            }
-        }
-        Ok(())
-    }
-}
-
-/// A chart definition: renders as one CHART line, then optional CLABEL
-/// lines + CLABEL_COMMIT, then one DIMENSION line per entry in
-/// `dimensions`, in that order.
-///
-/// The agent requires this block before the first BEGIN for the chart, so
+/// The agent requires this block before the first `BEGIN` for the chart, so
 /// chart.rs emits it once per (re)definition and only then streams data
 /// slots via [`write_data_slot`].
 pub struct ChartDefinition {
-    pub chart_name: String,
+    /// A valid chart id (`netdata_plugin_protocol::sanitize_chart_id`).
+    pub chart_id: String,
     pub title: String,
     pub units: String,
     pub family: String,
@@ -91,60 +59,63 @@ pub struct ChartDefinition {
     pub chart_type: ChartType,
     pub update_every: u64,
     pub labels: Vec<(String, String)>,
+    /// The dimensions' names as the sender gave them. A dimension's id on the
+    /// wire is its name made valid ([`dimension_id`]), and its display name
+    /// is the name itself.
     pub dimensions: Vec<String>,
 }
 
-impl fmt::Display for ChartDefinition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // CHART <id> <name> <title> <units> <family> <context> <type>
-        // <priority> <update_every> <options>: alternate name empty (the
-        // agent keys the chart by id alone), priority fixed at 1, and
-        // `store_first` keeps the first collected point instead of dropping
-        // it during interpolation (src/database/rrdset.h).
-        writeln!(
-            f,
-            "CHART {} '' '{}' '{}' '{}' '{}' {} 1 {} 'store_first'",
-            self.chart_name,
-            SanitizedQuote(&self.title),
-            SanitizedQuote(&self.units),
-            SanitizedQuote(&self.family),
-            SanitizedQuote(&self.context),
-            self.chart_type,
-            self.update_every,
-        )?;
+impl ChartDefinition {
+    /// Write the definition block into `buf`.
+    pub fn write(&self, buf: &mut Vec<u8>) {
+        // The alternate name stays empty: the agent keys the chart by id
+        // alone. `store_first` keeps the first collected point instead of
+        // dropping it during interpolation (src/database/rrdset.h).
+        write_chart(
+            buf,
+            &ChartLine {
+                id: &self.chart_id,
+                name: "",
+                title: &self.title,
+                units: &self.units,
+                family: &self.family,
+                context: &self.context,
+                chart_type: self.chart_type,
+                priority: PRIORITY,
+                update_every: self.update_every,
+                options: ChartOptions {
+                    store_first: true,
+                    ..ChartOptions::default()
+                },
+            },
+        );
 
-        // CLABEL <key> <value> <source>, with source 1 = RRDLABEL_SRC_AUTO
-        // (src/database/rrdlabels.h). The commit applies the set: labels not
-        // re-sent since the last commit are removed.
+        // The commit applies the set: labels not re-sent since the last
+        // commit are removed.
         if !self.labels.is_empty() {
             for (key, value) in &self.labels {
-                writeln!(
-                    f,
-                    "CLABEL '{}' '{}' 1",
-                    SanitizedQuote(key),
-                    SanitizedQuote(value),
-                )?;
+                write_clabel(buf, key, value, LabelSource::Auto);
             }
-            writeln!(f, "CLABEL_COMMIT")?;
+            write_clabel_commit(buf);
         }
 
-        // DIMENSION <id> <name> <algorithm> <multiplier> <divisor>: id and
-        // name are the same string, the one SET lines reference. `absolute`
-        // stores each SET value as-is, scaled by multiplier / divisor — the
-        // divisor is [`PRECISION_DIVISOR`].
-        for dim_name in &self.dimensions {
-            writeln!(
-                f,
-                "DIMENSION {} {} absolute 1 {}",
-                dim_name, dim_name, PRECISION_DIVISOR,
-            )?;
+        // `absolute` stores each SET value as it is, scaled by multiplier /
+        // divisor.
+        for name in &self.dimensions {
+            write_dimension(
+                buf,
+                &DimensionLine {
+                    id: &dimension_id(name),
+                    name,
+                    algorithm: DimensionAlgorithm::Absolute,
+                    multiplier: 1,
+                    divisor: PRECISION_DIVISOR,
+                    options: DimensionOptions::default(),
+                },
+            );
         }
-
-        Ok(())
     }
-}
 
-impl ChartDefinition {
     /// Sort `dimensions` numerically ascending, with `+Inf` last.
     ///
     /// Names that fail to parse are also treated as `+Inf`. Used for heatmap
@@ -170,10 +141,18 @@ impl ChartDefinition {
     }
 }
 
-/// One dimension value in a data slot. `None` renders as `SET <name> =`,
-/// which stores no value for that dimension in this update.
+/// A dimension's id on the wire: its name, made valid. Both the `DIMENSION`
+/// line and every `SET` line of the dimension go through here, so they agree.
+/// Two names that differ only in bytes an id cannot hold share an id.
+fn dimension_id(name: &str) -> std::borrow::Cow<'_, str> {
+    sanitize_dimension_id(name)
+}
+
+/// One dimension value in a data slot. `None` renders as `SET <id> =`, which
+/// stores no value for that dimension in this update.
 #[derive(Debug)]
 pub struct DimensionValue {
+    /// The dimension's name, as in [`ChartDefinition::dimensions`].
     pub name: String,
     pub value: Option<f64>,
 }
@@ -189,24 +168,21 @@ pub struct DimensionValue {
 /// update_every` — the slot's end boundary — because the agent timestamps
 /// the point at END: a point at time T covers `[T - update_every, T]`.
 pub fn write_data_slot(
-    f: &mut impl fmt::Write,
-    chart_name: &str,
+    buf: &mut Vec<u8>,
+    chart_id: &str,
     update_every: u64,
     slot_timestamp: u64,
     dimensions: &[DimensionValue],
-) -> fmt::Result {
-    writeln!(f, "BEGIN {} {}", chart_name, update_every * 1_000_000)?;
+) {
+    write_begin(buf, chart_id, update_every * 1_000_000);
 
-    for dim in dimensions {
-        match dim.value {
-            Some(v) => {
-                let scaled = (v * PRECISION_DIVISOR as f64) as i64;
-                writeln!(f, "SET {} = {}", dim.name, scaled)?;
-            }
-            None => writeln!(f, "SET {} =", dim.name)?,
+    for dimension in dimensions {
+        let id = dimension_id(&dimension.name);
+        match dimension.value {
+            Some(value) => write_set_int(buf, &id, (value * PRECISION_DIVISOR as f64) as i64),
+            None => write_set_empty(buf, &id),
         }
     }
 
-    writeln!(f, "END {}", slot_timestamp + update_every)?;
-    Ok(())
+    write_end(buf, slot_timestamp + update_every);
 }
