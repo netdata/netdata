@@ -85,6 +85,25 @@ func (w *functionWire) request(t *testing.T, input io.Writer, id, command, paylo
 	require.NoError(t, json.Unmarshal([]byte(body), &response))
 	return response
 }
+
+// selectionData returns a table response's rows without its age columns. An
+// age counts whole seconds back from the clock of its own call, so two calls
+// that select the same rows can differ by one across a second boundary.
+func selectionData(response map[string]any) any {
+	columns, _ := response["columns"].(map[string]any)
+	rows, _ := response["data"].([]any)
+	for key, column := range columns {
+		if !strings.HasSuffix(key, "_age_s") {
+			continue
+		}
+		index := int(column.(map[string]any)["index"].(float64))
+		for _, row := range rows {
+			row.([]any)[index] = nil
+		}
+	}
+	return response["data"]
+}
+
 func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 	raw, err := os.ReadFile("../../../plugins.d/FUNCTION_UI_SCHEMA.json")
 	require.NoError(t, err)
@@ -245,7 +264,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 					}
 					byName := output.call(t, writer, "name-"+id, method+args+" vnode:storefront")
 					byGUID := output.call(t, writer, "guid-"+id, method+args+" vnode_guid:"+siteGUID)
-					assert.Equal(t, byGUID["data"], byName["data"])
+					assert.Equal(t, selectionData(byGUID), selectionData(byName))
 					assert.Contains(t, byName["accepted_params"], "vnode")
 					for n, selector := range []string{"vnode:unknown", "vnode:", "vnode:storefront vnode_guid:", "vnode:storefront vnode:storefront"} {
 						output.request(t, writer, fmt.Sprintf("invalid-%s-%d", id, n), method+args+" "+selector, "", 400)
