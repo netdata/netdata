@@ -23,6 +23,9 @@ func (h *Handler) checks(
 	rows := make([][]any, 0)
 	truncated := false
 	for _, j := range h.deps.Jobs(time.Now()) {
+		if args["vnode_guid"] != "" && args["vnode_guid"] != j.VnodeGUID {
+			continue
+		}
 		if args["job_id"] != "" && args["job_id"] != j.JobID {
 			continue
 		}
@@ -34,7 +37,13 @@ func (h *Handler) checks(
 			break
 		}
 		var id, outcome, detail, historyErr string
-		var completed, duration any
+		var completed, duration, queueAge, delay any
+		if j.Schedule.QueuedUS > 0 {
+			queueAge = j.Schedule.QueueAge.Seconds()
+		}
+		if j.Schedule.AdmittedUS > 0 {
+			delay = j.Schedule.SchedulingDelay.Seconds()
+		}
 		if last := j.Latest; last != nil {
 			id = last.ID
 			outcome = string(last.Outcome)
@@ -60,6 +69,14 @@ func (h *Handler) checks(
 				timestamp(j.LastFailureUS),
 				detail,
 				historyErr,
+				j.VnodeGUID,
+				j.CadenceSeconds,
+				j.Schedule.Scheduled,
+				j.Schedule.Admitted,
+				j.Schedule.Coalesced,
+				j.Schedule.Pending,
+				queueAge,
+				delay,
 			},
 		)
 	}
@@ -72,9 +89,9 @@ func (h *Handler) checks(
 var checksMethod = method{
 	id:     "synthetics-checks",
 	title:  "Synthetic monitors",
-	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt.",
+	help:   "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt. Check interval controls browser execution. Occurrence counters reset on native activation and continue across vnode changes; coalesced occurrences never ran. Queue age preserves the oldest admission wait, while admission delay describes the selected due occurrence. Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 	sort:   "job_id",
-	params: []string{"job_id", "kind", "limit"},
+	params: []string{"job_id", "kind", "limit", "vnode", "vnode_guid"},
 	columns: columns(
 		column{
 			"job_id",
@@ -91,9 +108,17 @@ var checksMethod = method{
 		column{"outcome", "Last outcome", funcapi.FieldTypeString, ""},
 		column{"completed_us", "Last completion", funcapi.FieldTypeTimestamp, ""},
 		column{"duration_ms", "Attempt duration", funcapi.FieldTypeFloat, "ms"},
-		column{"last_success_us", "Last success in this activation", funcapi.FieldTypeTimestamp, ""},
-		column{"last_failure_us", "Last failure in this activation", funcapi.FieldTypeTimestamp, ""},
+		column{"last_success_us", "Last success in this vnode association", funcapi.FieldTypeTimestamp, ""},
+		column{"last_failure_us", "Last failure in this vnode association", funcapi.FieldTypeTimestamp, ""},
 		column{"error", "Last error", funcapi.FieldTypeString, ""},
 		column{"history_error", "History error", funcapi.FieldTypeString, ""},
+		column{"vnode_guid", "Vnode GUID", funcapi.FieldTypeString, ""},
+		column{"check_every", "Check interval", funcapi.FieldTypeInteger, "s"},
+		column{"scheduled", "Scheduled occurrences", funcapi.FieldTypeInteger, ""},
+		column{"admitted", "Admitted attempts", funcapi.FieldTypeInteger, ""},
+		column{"coalesced", "Coalesced occurrences", funcapi.FieldTypeInteger, ""},
+		column{"pending", "Pending occurrence", funcapi.FieldTypeBoolean, ""},
+		column{"queue_age", "Oldest admission wait", funcapi.FieldTypeFloat, "s"},
+		column{"scheduling_delay", "Latest admission delay", funcapi.FieldTypeFloat, "s"},
 	),
 }

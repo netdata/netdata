@@ -191,6 +191,12 @@ while IFS= read -r package_path; do
   [ -e "${path}" ] || [ -L "${path}" ] || continue
   if [ -d "${path}" ] && [ ! -L "${path}" ]; then
     run chmod go+rx "${path}" || exit 1
+    # Only shipped executable directories belong to this permission migration.
+    # Do not discover descendants or change plugin files and application state.
+    case "${package_path}" in
+      . | ./bin | ./bin/* | ./usr | ./usr/libexec | ./usr/libexec/* | ./system | ./system/*)
+        run chmod go-w "${path}" || exit 1 ;;
+    esac
   fi
   case "${package_path}" in
     ./usr/libexec/netdata/plugins.d/ebpf.d | ./usr/libexec/netdata/plugins.d/ebpf.d/*)

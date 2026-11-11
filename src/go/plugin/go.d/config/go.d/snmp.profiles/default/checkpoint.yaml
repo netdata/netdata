@@ -56,7 +56,7 @@ metadata:
           name: osName # OS name
       os_version:
         symbol:
-          OID: 1.3.6.1.4.1.2620.1.2.1.1.0
+          OID: 1.3.6.1.2.1.1.1.0
           name: sysDescr
           extract_value: 'Linux\s+\S+\s+(\d+(?:\.\d+)*)'
           # Example: `3.10.0` in `Linux host1 3.10.0-957.21.3cpx86_64`
@@ -102,8 +102,8 @@ metrics:
           unit: "%"
     metric_tags:
       - symbol:
-          OID: 1.3.6.1.4.1.2620.1.6.7.5.1.1
           name: multiProcIndex
+        index: 1
         tag: cpu_core
   - MIB: CHECKPOINT-MIB
     symbol:
@@ -209,8 +209,8 @@ metrics:
           unit: "%"
     metric_tags:
       - symbol:
-          OID: 1.3.6.1.4.1.2620.1.6.7.6.1.1
           name: multiDiskIndex
+        index: 1
         tag: disk_index
       - symbol:
           OID: 1.3.6.1.4.1.2620.1.6.7.6.1.2
@@ -240,8 +240,8 @@ metrics:
           2: reading_error
     metric_tags:
       - symbol:
-          OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.1
           name: fanSpeedSensorIndex
+        index: 1
         tag: sensor_index
       - symbol:
           OID: 1.3.6.1.4.1.2620.1.6.7.8.2.1.2
@@ -270,8 +270,8 @@ metrics:
           2: reading_error
     metric_tags:
       - symbol:
-          OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.1
           name: tempertureSensorIndex
+        index: 1
         tag: sensor_index
       - symbol:
           OID: 1.3.6.1.4.1.2620.1.6.7.8.1.1.2

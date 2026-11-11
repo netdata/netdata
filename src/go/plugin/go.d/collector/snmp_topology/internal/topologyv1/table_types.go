@@ -22,6 +22,7 @@ func snmpTopologyV1PortModalColumns() []topologyapi.ModalColumn {
 	return []topologyapi.ModalColumn{
 		modalDirectColumn("if_index", "Port ID", "if_index", "number"),
 		modalDirectColumn("name", "Port", "name", "text"),
+		modalDirectColumn("if_alias", "Alias", "if_alias", "text"),
 		modalDirectColumn("oper_status", "Status", "oper_status", "badge"),
 		modalDirectColumn("admin_status", "Admin", "admin_status", "badge"),
 		modalDirectColumn("port_type", "Type", "port_type", "badge"),
@@ -35,7 +36,9 @@ func snmpTopologyV1PortModalColumns() []topologyapi.ModalColumn {
 		modalDirectColumnWithVisibility("neighbor_port_name", "Neighbor Port", "neighbor_port_name", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_name", "ifName", "if_name", "text", "expanded"),
 		modalDirectColumnWithVisibility("if_descr", "ifDescr", "if_descr", "text", "expanded"),
-		modalDirectColumnWithVisibility("if_alias", "Alias", "if_alias", "text", "expanded"),
+		// The full alias, which the visible Alias column may truncate; it stays after Alias so
+		// consumers that resolve a column label by its source column still find "Alias" first.
+		modalDirectColumnWithVisibility("if_alias_mib", "ifAlias", "if_alias", "text", "expanded"),
 		modalDirectColumnWithVisibility("port_id", "Source Port ID", "port_id", "text", "expanded"),
 		modalDirectColumnWithVisibility("mac", "MAC", "mac", "text", "expanded"),
 		modalDirectColumnWithVisibility("speed", "Speed", "speed", "number", "expanded"),
@@ -146,6 +149,7 @@ func snmpTopologyV1BGPPeerModalColumns() []topologyapi.ModalColumn {
 		modalDirectColumn("remote_as", "Remote AS", "remote_as", "text"),
 		modalDirectColumn("state", "State", "state", "badge"),
 		modalActorRefColumn("remote_actor", "Remote Actor", "remote_actor"),
+		modalDirectColumnWithVisibility("process_id", "Process ID", "process_id", "text", "expanded"),
 		modalDirectColumnWithVisibility("routing_instance", "Routing Instance", "routing_instance", "text", "expanded"),
 		modalDirectColumnWithVisibility("admin_status", "Admin", "admin_status", "badge", "expanded"),
 		modalDirectColumnWithVisibility("local_ip", "Local IP", "local_ip", "text", "expanded"),
@@ -251,6 +255,7 @@ func snmpTopologyV1BGPPeersColumns() []topologyapi.Column {
 	return []topologyapi.Column{
 		topologyapi.NewColumn("actor", "actor_ref", topologyapi.WithRole("reference")),
 		topologyapi.NewColumn("remote_actor", "actor_ref", topologyapi.WithNullable(), topologyapi.WithRole("reference")),
+		topologyapi.NewColumn("process_id", "string_ref", topologyapi.WithNullable(), topologyapi.WithDictionary("strings")),
 		topologyapi.NewColumn("routing_instance", "string_ref", topologyapi.WithNullable(), topologyapi.WithDictionary("strings")),
 		topologyapi.NewColumn("neighbor_ip", "string_ref", topologyapi.WithNullable(), topologyapi.WithDictionary("strings")),
 		topologyapi.NewColumn("remote_as", "string_ref", topologyapi.WithNullable(), topologyapi.WithDictionary("strings")),

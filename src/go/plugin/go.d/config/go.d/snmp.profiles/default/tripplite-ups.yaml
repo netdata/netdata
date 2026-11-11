@@ -159,8 +159,8 @@ metrics:
     metric_tags:
       - tag: tl_ups_input_voltage_index
         symbol:
-          OID: 1.3.6.1.4.1.850.100.1.3.2.1.1
           name: tlUpsInputVoltageIndex
+        index: 1
       - tag: tl_ups_input_voltage_type
         symbol:
           OID: 1.3.6.1.4.1.850.100.1.3.2.1.2
@@ -232,8 +232,8 @@ metrics:
 
   - MIB: TRIPPLITE-12X
     table:
-      OID: 1.3.6.1.4.1.850.100.1.10.2
-      name: tlUpsOutletTable
+      OID: 1.3.6.1.4.1.850.100.1.11.2
+      name: tlUpsOutletGroupTable
     symbols:
       - OID: 1.3.6.1.4.1.850.100.1.11.2.1.5
         name: tlUpsOutletGroupState

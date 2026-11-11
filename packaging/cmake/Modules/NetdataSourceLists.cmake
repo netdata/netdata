@@ -753,6 +753,7 @@ set(FREEBSD_PLUGIN_FILES
         src/collectors/freebsd.plugin/freebsd_devstat.c
         src/collectors/freebsd.plugin/freebsd_kstat_zfs.c
         src/collectors/freebsd.plugin/freebsd_ipfw.c
+        src/collectors/freebsd.plugin/freebsd_acpi_battery.c
         src/collectors/proc.plugin/zfs_common.c
         src/collectors/proc.plugin/zfs_common.h
 )
@@ -767,6 +768,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetServicesStatus.c
         src/collectors/windows.plugin/GetSensors.c
         src/collectors/windows.plugin/GetHardwareInfo.c
+        src/collectors/windows.plugin/GetFSRMQuota.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c

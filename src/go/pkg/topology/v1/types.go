@@ -250,6 +250,7 @@ type PortSourcePresentation struct {
 	Evidence      string `json:"evidence,omitempty"`
 	ActorColumn   string `json:"actor_column"`
 	NameColumn    string `json:"name_column"`
+	LabelColumn   string `json:"label_column,omitempty"`
 	ValueColumn   string `json:"value_column,omitempty"`
 	TypeColumn    string `json:"type_column,omitempty"`
 	DefaultType   string `json:"default_type,omitempty"`

@@ -180,11 +180,27 @@ static void http_header_x_forwarded_host(struct web_client *w, const char *v, si
     w->forwarded_host = strdupz(buffer);
 }
 
+// a port number written after an address: 1 to 65535, digits only
+static bool http_header_port_is_valid(const char *s, const char *end) {
+    if(s >= end || end - s > 5)
+        return false;
+
+    unsigned port = 0;
+    for(; s < end; s++) {
+        if(*s < '0' || *s > '9')
+            return false;
+        port = port * 10 + (unsigned)(*s - '0');
+    }
+
+    return port >= 1 && port <= 65535;
+}
+
 static void http_header_x_forwarded_for(struct web_client *w, const char *v, size_t len) {
     // X-Forwarded-For is a comma separated list of addresses, the first one being the client.
     // The stored value is serialized into the comma separated key=value source string of
     // function calls and quoted into the FUNCTION lines sent to plugins and children,
     // so keep only the first entry, and only when it is an IPv4 or IPv6 address.
+    // Some proxies add the client port (IPv4:port, [IPv6]:port); keep only the address.
     const char *end = v + len;
     while(v < end && isspace((uint8_t)*v))
         v++;
@@ -196,16 +212,54 @@ static void http_header_x_forwarded_for(struct web_client *w, const char *v, siz
     while(e > v && isspace((uint8_t)e[-1]))
         e--;
 
-    size_t address_len = (size_t)(e - v);
+    // an empty first entry carries no address
+    if(e == v)
+        return;
+
+    // the address part of the entry, and the family it must parse as (AF_UNSPEC: either)
+    const char *address_end = e;
+    int family = AF_UNSPEC;
+
+    if(v < e && *v == '[') {
+        // [IPv6] or [IPv6]:port
+        const char *close = memchr(v, ']', (size_t)(e - v));
+        if(!close)
+            return;
+
+        if(close + 1 < e && (close[1] != ':' || !http_header_port_is_valid(close + 2, e)))
+            return;
+
+        v++;
+        address_end = close;
+        family = AF_INET6;
+    }
+    else {
+        // exactly one colon is IPv4:port; two or more is a bare IPv6 address,
+        // which is never split, since 2001:db8::7:8080 is itself an address
+        const char *colon = memchr(v, ':', (size_t)(e - v));
+        if(colon && !memchr(colon + 1, ':', (size_t)(e - colon - 1))) {
+            if(!http_header_port_is_valid(colon + 1, e))
+                return;
+
+            address_end = colon;
+            family = AF_INET;
+        }
+    }
+
+    size_t address_len = (size_t)(address_end - v);
     if(!address_len || address_len >= sizeof(w->user_auth.forwarded_for))
         return;
 
-    char buffer[INET6_ADDRSTRLEN];
+    char buffer[sizeof(w->user_auth.forwarded_for)];
     memcpy(buffer, v, address_len);
     buffer[address_len] = '\0';
 
     unsigned char address[sizeof(struct in6_addr)];
-    if(inet_pton(AF_INET, buffer, address) != 1 && inet_pton(AF_INET6, buffer, address) != 1)
+    if(family != AF_UNSPEC) {
+        if(inet_pton(family, buffer, address) != 1)
+            return;
+    }
+    else if(inet_pton(AF_INET, buffer, address) != 1 && inet_pton(AF_INET6, buffer, address) != 1)
         return;
 
     memcpy(w->user_auth.forwarded_for, buffer, address_len + 1);

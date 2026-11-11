@@ -105,31 +105,31 @@ func decimal(value []byte) (int64, error) {
 
 // appendEnvelope derives index coverage at the single append boundary. Callers
 // cannot declare their own schema or bucket and accidentally bypass this encoder.
-func appendEnvelope(fields []journal.Field) ([]journal.Field, error) {
+func appendEnvelope(fields []journal.Field) ([]journal.Field, string, error) {
 	var env Envelope
 	for _, field := range fields {
 		switch field.Name {
 		case schemaField, rumBucket, syntheticBucket:
-			return nil, fmt.Errorf("history field %s is reserved for the journal envelope", field.Name)
+			return nil, "", fmt.Errorf("history field %s is reserved for the journal envelope", field.Name)
 		}
 		if err := env.Observe([]byte(field.Name), field.Value); err != nil {
-			return nil, err
+			return nil, "", err
 		}
 	}
 	var bucket string
 	switch env.kind {
 	case "rum":
 		if env.seen != 2|4 {
-			return nil, fmt.Errorf("RUM history requires exactly one observation timestamp")
+			return nil, "", fmt.Errorf("RUM history requires exactly one observation timestamp")
 		}
 		bucket = rumBucket
 	case "synthetic":
 		if env.seen != 2|8 || env.timestamp == 0 {
-			return nil, fmt.Errorf("synthetic history requires exactly one positive start timestamp")
+			return nil, "", fmt.Errorf("synthetic history requires exactly one positive start timestamp")
 		}
 		bucket = syntheticBucket
 	default:
-		return nil, fmt.Errorf("invalid DEM_KIND %q", env.kind)
+		return nil, "", fmt.Errorf("invalid DEM_KIND %q", env.kind)
 	}
-	return append(fields, journal.StringField(schemaField, schemaVersion), journal.StringField(bucket, strconv.FormatInt(env.timestamp/minuteUS, 10))), nil
+	return append(fields, journal.StringField(schemaField, schemaVersion), journal.StringField(bucket, strconv.FormatInt(env.timestamp/minuteUS, 10))), env.kind, nil
 }

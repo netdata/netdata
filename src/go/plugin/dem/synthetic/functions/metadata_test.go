@@ -28,7 +28,7 @@ func TestBothIntegrationsDocumentSharedProcessFunctions(t *testing.T) {
 				require.NotContains(t, docs, doc.ID)
 				docs[doc.ID] = doc
 			}
-			h := syntheticfunctions.New(nil)
+			h := syntheticfunctions.New(nil, nil)
 			for _, decl := range declarations {
 				t.Run(decl.ID, func(t *testing.T) {
 					// Registration must match the handler's own 0x1b permission check.

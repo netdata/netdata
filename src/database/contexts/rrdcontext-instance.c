@@ -5,34 +5,30 @@
 // ----------------------------------------------------------------------------
 // helper one-liners for RRDINSTANCE
 
-bool rrdinstance_acquired_id_and_name_are_same(RRDINSTANCE_ACQUIRED *ria) {
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return ri->id == ri->name;
-}
-
 inline const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
     return string2str(ri->id);
 }
 
-inline const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria) {
+// The id never changes, but name, title, units and family are replaced while the instance is in use
+// (rrdinstance_conflict_callback(), rrdinstance_updated_rrdset_name()), and the replaced strings are freed.
+// Holding the instance does not keep its current strings alive: readers take their own reference under
+// the instance spinlock, which the writers hold while they swap them.
+
+STRING *rrdinstance_acquired_name_dup(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return string2str(ri->name);
+    spinlock_lock(&ri->spinlock);
+    STRING *name = string_dup(ri->name);
+    spinlock_unlock(&ri->spinlock);
+    return name;
 }
 
-inline bool rrdinstance_acquired_has_name(RRDINSTANCE_ACQUIRED *ria) {
+STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return (ri->name && ri->name != ri->id);
-}
-
-inline const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria) {
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return string2str(ri->units);
-}
-
-inline STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria) {
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return string_dup(ri->units);
+    spinlock_lock(&ri->spinlock);
+    STRING *units = string_dup(ri->units);
+    spinlock_unlock(&ri->spinlock);
+    return units;
 }
 
 // An instance's labels are its chart's while it is linked to one, and its own once archived.
@@ -222,6 +218,11 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
+    // the metadata strings are swapped under the instance spinlock: their readers take their references
+    // under the same lock (rrdinstance_acquired_*_dup(), rrdcontext_update_from_collected_rrdinstance()),
+    // before rrdinstance_free(ri_new) below releases the old strings
+    spinlock_lock(&ri->spinlock);
+
     if(ri->name != ri_new->name) {
         SWAP(ri->name, ri_new->name);
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
@@ -259,8 +260,6 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
 
     // a chart re-created with the same id takes the instance over, even while the old chart still exists:
     // the old chart's teardown (rrdinstance_rrdset_is_freed()) then finds it is no longer the owner
-    spinlock_lock(&ri->spinlock);
-
     RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
     if(ri_new->rrdset && st != ri_new->rrdset) {
         st = ri_new->rrdset;
@@ -586,12 +585,18 @@ inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
     RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
     if(unlikely(!ri)) return;
 
+    // readers take their references to the name under the instance spinlock
+    spinlock_lock(&ri->spinlock);
+    STRING *old = NULL;
     if(st->name != ri->name) {
-        STRING *old = ri->name;
+        old = ri->name;
         ri->name = string_dup(st->name);
-        string_freez(old);
-
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
+    }
+    spinlock_unlock(&ri->spinlock);
+
+    if(old) {
+        string_freez(old);
         rrdinstance_trigger_updates(ri, __FUNCTION__ );
     }
 }

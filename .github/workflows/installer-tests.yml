@@ -103,13 +103,25 @@ jobs:
           cp "$(command -v bash)" "$fixture_root_bin"
           chmod 755 "$fixture_root_bin"
           printf '%s\n' \
-            'import socket, sys, time' \
+            'import signal, socket, sys' \
             's = socket.socket(socket.AF_INET, socket.SOCK_STREAM)' \
             's.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)' \
             's.bind(("127.0.0.1", 0))' \
             's.listen(1)' \
             'open(sys.argv[1], "w").write(str(s.getsockname()[1]))' \
-            'time.sleep(30)' > "$fixture_child_script"
+            'signal.pause()' > "$fixture_child_script"
+          # the fixture must outlive the whole collection, however slow the
+          # runner: it runs until this trap stops it, on every exit path
+          fixture_root_pid=
+          stop_fixture() {
+            if [ -n "$fixture_root_pid" ]; then
+              # children first: once the root is gone they cannot be found by parent
+              pkill -TERM -P "$fixture_root_pid" 2>/dev/null || true
+              kill "$fixture_root_pid" 2>/dev/null || true
+              wait "$fixture_root_pid" 2>/dev/null || true
+            fi
+          }
+          trap stop_fixture EXIT
           "$fixture_root_bin" -c 'python3 "$1" "$2" & child=$!; echo "$child" > "$3"; wait' \
             fixture-root "$fixture_child_script" "$fixture_port_file" "$fixture_child_pid_file" &
           fixture_root_pid=$!
@@ -124,12 +136,15 @@ jobs:
             sleep 0.1
           done
           test -s "$fixture_port_file"
-          trap 'kill "$fixture_root_pid" "$fixture_child_pid" 2>/dev/null || true; wait "$fixture_root_pid" 2>/dev/null || true' EXIT
           output=$(mktemp -d)
           extract=$(mktemp -d)
           printf '{"cause":"UNTRUSTED-TMP-SENTINEL"}\n' > /tmp/status-netdata.json
           sudo sh -c 'printf "fixture\n" > /var/lib/netdata/private-job-INVENTORY-SENTINEL'
           sh packaging/installer/netdata-support-bundle --timeout 3 --since 1 --include-snmp-diagnostics -o "$output"
+          if ! kill -0 "$fixture_child_pid" 2>/dev/null; then
+            echo "socket fixture child $fixture_child_pid exited during collection" >&2
+            exit 1
+          fi
           bundle=$(find "$output" -maxdepth 1 \( -name '*.tar.gz' -o -name '*.tar.zst' \) -print -quit)
           test -n "$bundle"
           tar -xaf "$bundle" -C "$extract"
@@ -141,10 +156,14 @@ jobs:
           fi
           test -s "$root/08-network/resolv-conf.txt"
           test -s "$root/08-network/netdata-sockets.txt"
-          awk -v pid="$fixture_child_pid" '
+          if ! awk -v pid="$fixture_child_pid" '
             $2 == pid || $3 == pid || $0 ~ ("pid=" pid "([,)]|$)") { found = 1 }
             END { exit !found }
-          ' "$root/08-network/netdata-sockets.txt"
+          ' "$root/08-network/netdata-sockets.txt"; then
+            echo "socket fixture child PID $fixture_child_pid was not collected:" >&2
+            cat "$root/08-network/netdata-sockets.txt" >&2
+            exit 1
+          fi
           test ! -e "$root/08-network/listening-sockets.txt"
           grep -qF 'KEEP-NONSECRET-CONTENT' "$root/04-config/netdata.conf"
           if grep -R -q 'SENTINEL-E2E-PASSWORD' "$root"; then
@@ -253,13 +272,14 @@ jobs:
           $fixtureRootScript = Join-Path $fixtureDir 'netdata-root.ps1'
           $fixturePortFile = Join-Path $fixtureDir 'port.txt'
           $fixtureChildPidFile = Join-Path $fixtureDir 'child.pid'
+          # the fixture must outlive the whole collection, however slow the
+          # runner: it runs until the finally below terminates it
           @'
           param([string]$PortFile)
           $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
           $listener.Start()
           $listener.LocalEndpoint.Port | Set-Content -NoNewline $PortFile
-          Start-Sleep -Seconds 30
-          $listener.Stop()
+          [System.Threading.Thread]::Sleep([System.Threading.Timeout]::Infinite)
           '@ | Set-Content -Encoding UTF8 $fixtureChildScript
           @'
           $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $args[0], $args[1]) -PassThru
@@ -268,19 +288,46 @@ jobs:
           '@ | Set-Content -Encoding UTF8 $fixtureRootScript
           $fixtureRootBin = Join-Path $fixtureDir 'netdata.exe'
           Copy-Item (Join-Path $PSHOME 'powershell.exe') $fixtureRootBin
-          $fixtureRoot = Start-Process -FilePath $fixtureRootBin -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $fixtureRootScript, $fixtureChildScript, $fixturePortFile, $fixtureChildPidFile) -PassThru
-          for ($i = 0; $i -lt 30 -and -not (Test-Path $fixtureChildPidFile); $i++) { Start-Sleep -Milliseconds 100 }
-          if (-not (Test-Path $fixtureChildPidFile)) { throw 'socket fixture child did not start' }
-          $fixtureChildPid = [int](Get-Content $fixtureChildPidFile -Raw)
-          for ($i = 0; $i -lt 30 -and -not (Test-Path $fixturePortFile); $i++) { Start-Sleep -Milliseconds 100 }
-          if (-not (Test-Path $fixturePortFile)) { throw 'socket fixture did not open a listener' }
-          $output = Join-Path $env:RUNNER_TEMP ('netdata-support-bundle-e2e-' + [guid]::NewGuid())
-          .\packaging\installer\netdata-support-bundle.ps1 -Output $output -TimeoutSeconds 3 -SinceHours 1 -IncludeSnmpDiagnostics
-          $zip = Get-ChildItem $output -Filter '*.zip' | Select-Object -First 1
-          if (-not $zip) { throw 'bundle zip was not created' }
-          Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
+          # returns the positive integer a fixture process writes to $path, and
+          # fails fast when that process exits first
+          function Wait-FixtureNumber([string]$path, [System.Diagnostics.Process]$writer) {
+              $deadline = (Get-Date).AddSeconds(60)
+              do {
+                  $text = $null
+                  try { $text = [System.IO.File]::ReadAllText($path) } catch { }
+                  $number = 0
+                  if ([int]::TryParse("$text", [ref]$number) -and $number -gt 0) { return $number }
+                  if ($writer.HasExited) { throw "socket fixture process $($writer.Id) exited with code $($writer.ExitCode) before writing $path" }
+                  Start-Sleep -Milliseconds 100
+              } while ((Get-Date) -lt $deadline)
+              throw "socket fixture did not write $path within 60s"
+          }
+          $fixtureRoot = $null
+          $fixtureChild = $null
+          $archive = $null
           try {
+              $fixtureRoot = Start-Process -FilePath $fixtureRootBin -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $fixtureRootScript, $fixtureChildScript, $fixturePortFile, $fixtureChildPidFile) -PassThru
+              # cleanup terminates through these handles, never through a PID
+              # that Windows may have reused after a fixture process exited
+              $null = $fixtureRoot.Handle
+              $fixtureChildPid = Wait-FixtureNumber $fixtureChildPidFile $fixtureRoot
+              $pinnedChild = Get-Process -Id $fixtureChildPid
+              $null = $pinnedChild.Handle
+              # the root holds its child's handle until it exits, so while the root
+              # runs this PID cannot have been reused: the pinned process is the child
+              if ($fixtureRoot.HasExited) { throw "socket fixture root exited with code $($fixtureRoot.ExitCode) before its child was pinned" }
+              $fixtureChild = $pinnedChild
+              $fixturePort = Wait-FixtureNumber $fixturePortFile $fixtureChild
+              $output = Join-Path $env:RUNNER_TEMP ('netdata-support-bundle-e2e-' + [guid]::NewGuid())
+              # default per-command timeout: the socket assertion needs its capture
+              # to finish, and a Start-Job capture of CIM data can take several
+              # seconds on hosted runners
+              .\packaging\installer\netdata-support-bundle.ps1 -Output $output -SinceHours 1 -IncludeSnmpDiagnostics
+              if ($fixtureChild.HasExited) { throw "socket fixture child exited with code $($fixtureChild.ExitCode) during collection" }
+              $zip = Get-ChildItem $output -Filter '*.zip' | Select-Object -First 1
+              if (-not $zip) { throw 'bundle zip was not created' }
+              Add-Type -AssemblyName System.IO.Compression.FileSystem
+              $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
               $manifestEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])MANIFEST.json$' } | Select-Object -First 1
               $configEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])04-config[\\/]netdata.conf$' } | Select-Object -First 1
               if (-not $manifestEntry -or -not $configEntry -or $configEntry.Length -eq 0) { throw 'required non-empty entries are missing' }
@@ -302,7 +349,11 @@ jobs:
               if (-not $socketEntry) { throw 'Netdata socket inventory missing' }
               $socketReader = New-Object System.IO.StreamReader($socketEntry.Open(), $utf8, $true)
               try { $socketText = $socketReader.ReadToEnd() } finally { $socketReader.Dispose() }
-              if ($socketText -notmatch "(?m)\b$fixtureChildPid\b") { throw "socket fixture child PID $fixtureChildPid was not collected" }
+              # the fixture's TCP row: its port as LocalPort and its PID as
+              # OwningProcess, followed by ProcessName unless the table dropped it
+              if ($socketText -notmatch "(?m)^TCP\s+\S+\s+$fixturePort\s.*\s$fixtureChildPid(\s+\S+)?\s*$") {
+                  throw "socket fixture child PID $fixtureChildPid listening on port $fixturePort was not collected:`n$socketText"
+              }
 
               if ($manifest.snmp_diagnostics.files -ne 1 -or $manifest.snmp_diagnostics.status -ne 'complete' -or
                   $manifest.secrets_redacted -or $manifest.pii_obfuscated) { throw 'raw SNMP manifest contract failed' }
@@ -344,7 +395,19 @@ jobs:
               if (-not ($archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])09-permissions[\\/]plugins-d.txt$' })) {
                   throw '09-permissions/plugins-d.txt is missing'
               }
-          } finally { $archive.Dispose(); Stop-Process -Id $fixtureChildPid, $fixtureRoot.Id -Force -ErrorAction SilentlyContinue }
+          } finally {
+              # warnings only: an error thrown here would replace the original failure
+              try { if ($archive) { $archive.Dispose() } } catch { Write-Warning "bundle archive: $_" }
+              # root first: it exits by itself once its child is gone, which would
+              # race with Kill()
+              foreach ($fixtureProcess in @($fixtureRoot, $fixtureChild)) {
+                  if (-not $fixtureProcess) { continue }
+                  try {
+                      if (-not $fixtureProcess.HasExited) { $fixtureProcess.Kill() }
+                      if (-not $fixtureProcess.WaitForExit(10000)) { Write-Warning "socket fixture process $($fixtureProcess.Id) did not exit" }
+                  } catch { Write-Warning "socket fixture cleanup: $_" }
+              }
+          }
 
   install-state:
     name: Install State

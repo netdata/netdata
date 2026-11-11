@@ -5688,63 +5688,44 @@ paths:
       operationId: settings_get
       tags:
         - settings
-      summary: Retrieve user settings/preferences (GET)
+      summary: Retrieve the agent-wide dashboard settings (GET)
       description: |
         **V3 SPECIFIC ENDPOINT**
 
-        Retrieves stored user settings and preferences from Netdata's settings storage.
-        The settings API provides persistent key-value storage for UI preferences, dashboard layouts,
-        alert configurations, and other user-specific data.
+        Retrieves the agent's dashboard settings object.
 
         **Settings System:**
-        - **Persistent storage**: Settings survive agent restarts
-        - **Version-controlled**: Each update increments version for conflict detection
-        - **User-scoped**: Authenticated users can have multiple named settings files
-        - **Anonymous access**: Limited to 'default' file only
-        - **JSON format**: All settings stored as JSON with mandatory 'version' field
+        - **One object per agent**: there is a single settings object, `default`. It is shared by every caller
+          admitted to this API, anonymous or authenticated; it is not scoped to a user.
+        - **Persistent storage**: stored as `settings/default` in Netdata's var/lib directory; survives restarts
+        - **Version-controlled**: each update increments `version` for conflict detection
+        - **JSON format**: a JSON object with a mandatory integer `version` field
 
-        **File-Based Storage:**
-        Settings are stored as individual files in Netdata's var/lib directory:
-        - Anonymous users: Only `file=default` allowed
-        - Authenticated users: Can create custom files (e.g., `file=my-dashboard`)
-        - File names: Alphanumeric, dashes, underscores only
+        The dashboard keeps agent-wide preferences here, such as the preferred nodes of the agent's local space.
+        Do not store per-user or sensitive data in it.
 
         **Version Control:**
-        Each settings object has a `version` field:
-        - Starts at version 1 for new files
+        - A missing object reads as version 1
         - Auto-incremented on each PUT operation
         - Used for optimistic locking to prevent conflicts
 
-        **Use Cases:**
-        - **Dashboard preferences**: Store layout, theme, selected metrics
-        - **Alert customization**: Save user-specific alert thresholds
-        - **UI state**: Remember filters, time ranges, node selections
-        - **Multi-device sync**: Share settings across browsers/devices (for authenticated users)
-
-        **Common Usage Patterns:**
-
-        1. **Get default settings (anonymous user):**
-           ```
-           GET /api/v3/settings?file=default
-           ```
-
-        2. **Get named settings file (authenticated):**
-           ```
-           GET /api/v3/settings?file=production-dashboard
-           ```
+        **Usage:**
+        ```
+        GET /api/v3/settings?file=default
+        ```
 
         **Response Structure:**
         ```json
         {
           "version": 3,
-          "theme": "dark",
-          "defaultTimeRange": "-3600",
-          "favoriteMetrics": ["system.cpu", "system.ram"]
+          "value": {
+            "preferred_node_ids": ["..."]
+          }
         }
         ```
 
-        **New Files:**
-        If requested file doesn't exist, returns initial version:
+        **New Object:**
+        If the object doesn't exist (or its stored `version` is not an integer from 1 to 9223372036854775806), returns the initial version:
         ```json
         {
           "version": 1
@@ -5767,32 +5748,15 @@ paths:
         - name: file
           in: query
           required: false
+          allowEmptyValue: true
           description: |
-            Name of the settings file to retrieve.
-
-            **File Naming Rules:**
-            - Alphanumeric characters only
-            - Dashes (-) and underscores (_) allowed
-            - No spaces or special characters
-            - Case-sensitive
-
-            **Access Control:**
-            - **Anonymous users**: Only `file=default` allowed
-            - **Authenticated users (bearer token)**: Any valid file name
-
-            **Examples:**
-            - `default` - Default settings file
-            - `my-dashboard` - Custom dashboard settings
-            - `prod-alerts` - Production alert preferences
-            - `mobile-view` - Mobile UI settings
-
-            **Invalid File Names:**
-            - Missing or empty: Returns 400 Bad Request
-            - Special characters: Returns 400 Bad Request
-            - Non-default for anonymous: Returns 400 Bad Request
+            Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty
+            value) selects `default`. Any other value returns 400 Bad Request.
           schema:
             type: string
-            pattern: '^[a-zA-Z0-9_-]+$'
+            enum:
+              - default
+              - ""
             default: "default"
           example: "default"
       responses:
@@ -5811,43 +5775,41 @@ paths:
                 properties:
                   version:
                     type: integer
+                    format: int64
                     description: Current version number (auto-incremented on updates)
                     minimum: 1
+                    maximum: 9223372036854775806
                 additionalProperties: true
               examples:
-                new_file:
+                new_object:
                   value:
                     version: 1
-                  summary: Newly created settings file with just version
-                existing_file:
+                  summary: No settings stored yet
+                existing_object:
                   value:
                     version: 5
-                    theme: "dark"
-                    language: "en"
-                    dashboard:
-                      layout: "grid"
-                      columns: 3
-                    notifications:
-                      enabled: true
-                      sound: false
-                  summary: Existing settings with custom fields
+                    value:
+                      preferred_node_ids:
+                        - "11111111-2222-3333-4444-555555555555"
+                  summary: Settings stored by the dashboard
         "400":
           description: |
             Bad request. Common causes:
-            - Invalid file name (contains special characters)
-            - Anonymous user trying to access non-default file
-            - Empty file name
+            - `file` is not `default`
+            - The request is not for the agent node
         "500":
           description: Internal server error during settings retrieval.
     put:
       operationId: settings_put
       tags:
         - settings
-      summary: Create or update user settings/preferences (PUT)
+      summary: Create or update the agent-wide dashboard settings (PUT)
       description: |
         **V3 SPECIFIC ENDPOINT**
 
-        Creates or updates user settings with optimistic locking to prevent concurrent modification conflicts.
+        Creates or updates the agent's single settings object (`default`), with optimistic locking to prevent
+        concurrent modification conflicts. The object is shared by every caller admitted to this API, anonymous
+        or authenticated; it is not scoped to a user.
 
         **Update Process:**
         1. Client GET current settings (to get current version)
@@ -5867,14 +5829,14 @@ paths:
         **Optimistic Locking Flow:**
         ```javascript
         // 1. Get current settings
-        const response = await fetch('/api/v3/settings?file=my-dashboard');
+        const response = await fetch('/api/v3/settings?file=default');
         const settings = await response.json(); // { version: 3, ... }
 
         // 2. Modify settings
-        settings.theme = 'dark';
+        settings.value = { ...settings.value, preferred_node_ids: nodeIds };
 
         // 3. PUT with ORIGINAL version (still 3)
-        const result = await fetch('/api/v3/settings?file=my-dashboard', {
+        const result = await fetch('/api/v3/settings?file=default', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(settings) // version: 3
@@ -5889,7 +5851,7 @@ paths:
 
         **Payload Requirements:**
         - MUST be valid JSON
-        - MUST include `version` field with current file version
+        - MUST include an integer `version` field with the current version (1 when nothing is stored yet)
         - MAY include any additional fields
         - Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
 
@@ -5898,12 +5860,6 @@ paths:
         - Netdata verifies version matches file on disk
         - Netdata increments version before saving
         - Saved file has version + 1
-
-        **Use Cases:**
-        - Save dashboard configuration changes
-        - Update user preferences
-        - Store UI state
-        - Persist alert customizations
 
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
@@ -5918,33 +5874,23 @@ paths:
         - name: file
           in: query
           required: false
+          allowEmptyValue: true
           description: |
-            Name of the settings file to create or update.
-
-            **File Naming Rules:**
-            - Alphanumeric characters only
-            - Dashes (-) and underscores (_) allowed
-            - No spaces or special characters
-            - Case-sensitive
-
-            **Access Control:**
-            - **Anonymous users**: Only `file=default` allowed
-            - **Authenticated users (bearer token)**: Any valid file name
-
-            **File Creation:**
-            - If file doesn't exist: Created with initial payload
-            - If file exists: Updated with new payload (version check applies)
+            Name of the settings object. Only `default` is supported; omitting the parameter (or giving it an empty
+            value) selects `default`. Any other value returns 400 Bad Request.
           schema:
             type: string
-            pattern: '^[a-zA-Z0-9_-]+$'
+            enum:
+              - default
+              - ""
             default: "default"
-          example: "my-dashboard"
+          example: "default"
       requestBody:
         description: |
           JSON object containing settings data with mandatory `version` field.
 
           **Required Fields:**
-          - `version`: Integer matching current file version (or 0 for non-existent files)
+          - `version`: Integer matching the current version (1 when nothing is stored yet)
 
           **Optional Fields:**
           - Any user-defined fields
@@ -5953,8 +5899,10 @@ paths:
           Maximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
 
           **Version Rules:**
-          - New file: version can be 0 or 1
-          - Existing file: version MUST match current file version exactly
+          - MUST be a JSON integer from 1 to 9223372036854775806 (strings, decimals and booleans return 400)
+          - A stored version that has reached 9223372036854775806 cannot be incremented; such a PUT returns 400
+          - Nothing stored yet: version MUST be 1
+          - Existing object: version MUST match the stored version exactly
           - Mismatch causes 409 Conflict
         required: true
         content:
@@ -5966,23 +5914,25 @@ paths:
               properties:
                 version:
                   type: integer
+                  format: int64
                   description: Current version from GET request
-                  minimum: 0
+                  minimum: 1
+                  maximum: 9223372036854775806
               additionalProperties: true
             examples:
               create_new:
                 value:
-                  version: 0
-                  theme: "dark"
-                  language: "en"
-                summary: Creating new settings file
+                  version: 1
+                  value:
+                    preferred_node_ids: []
+                summary: Creating the settings object (nothing stored yet)
               update_existing:
                 value:
                   version: 5
-                  theme: "light"
-                  dashboard:
-                    layout: "list"
-                summary: Updating existing file (version from previous GET)
+                  value:
+                    preferred_node_ids:
+                      - "11111111-2222-3333-4444-555555555555"
+                summary: Updating the stored object (version from previous GET)
       responses:
         "200":
           description: |
@@ -5992,17 +5942,19 @@ paths:
               schema:
                 type: object
                 properties:
-                  message:
+                  status:
+                    type: integer
+                    example: 200
+                  errorMessage:
                     type: string
                     example: "OK"
         "400":
           description: |
             Bad request. Common causes:
-            - Invalid file name
-            - Missing `version` field in payload
+            - `file` is not `default`
+            - Missing `version` field in payload, `version` is not a valid integer, or it cannot be incremented
             - Invalid JSON payload
             - Empty payload
-            - Anonymous user trying to access non-default file
         "409":
           description: |
             Conflict. Version mismatch detected.
@@ -6018,7 +5970,10 @@ paths:
               schema:
                 type: object
                 properties:
-                  message:
+                  status:
+                    type: integer
+                    example: 409
+                  errorMessage:
                     type: string
                     example: "Payload version does not match the version of the stored object"
         "413":
@@ -6450,9 +6405,10 @@ paths:
         - **Windows:** `more C:\path\to\netdata_random_session_id`
 
         **Response Formats:**
-        - **Info Response:** Returns cloud status, can_be_claimed flag, verification command, and agents info
-        - **Success Response:** Includes success=true, message="ok", updated cloud status
-        - **Error Response:** Includes success=false, error message, and can_be_claimed flag
+        - **Info Response:** Returns cloud status, can_be_claimed flag, verification command, and agent info
+        - **Success Response:** Includes success=true, message="ok", updated cloud status, and agent info
+        - **Error Response:** Includes success=false, error message, cloud status, can_be_claimed flag, verification command, and agent info. When the agent can be claimed, a wrong key or invalid parameters return HTTP 400; a claim that Netdata Cloud rejects returns HTTP 200
+        - The verification command (`key_filename`, `cmd`, `help`) is present only after the verification key file has been published successfully at least once
 
         **Important Notes:**
         - Agent must be in AVAILABLE, OFFLINE, or INDIRECT state to be claimed
@@ -6590,108 +6546,15 @@ paths:
       responses:
         "200":
           description: |
-            Claiming request processed successfully. Check the `success` field to determine if claiming succeeded.
-            - **Info response** (no key provided): Returns cloud status, verification command, and can_be_claimed flag
+            Claiming request processed successfully. When `success` is present, it tells whether claiming succeeded; info responses do not carry it.
+            - **Info response** (no key provided, or the agent cannot be claimed): Returns cloud status, verification command, and can_be_claimed flag
             - **Success response** (key provided, claim succeeded): Returns success=true with updated cloud status
-            - **Action failed response** (key provided, claim failed): Returns success=false with failure reason
+            - **Action failed response** (valid key and parameters, claim failed): Returns success=false with failure reason
+            When the agent can be claimed, a wrong key or invalid parameters return HTTP 400 instead (see below).
           content:
             application/json:
               schema:
-                type: object
-                required: [cloud]
-                properties:
-                  success:
-                    type: boolean
-                    description: |
-                      Present only for claim action responses (when key is provided).
-                      true = claiming succeeded, false = claiming failed.
-                      Not present in info responses (when requesting claim status without key).
-                  message:
-                    type: string
-                    description: |
-                      Result message. Present only for claim action responses.
-                      - Success: "ok"
-                      - Failure: Reason for failure (e.g., "invalid key", "invalid parameters", cloud connection error)
-                  cloud:
-                    type: object
-                    description: Current Netdata Cloud connection state.
-                    required: [id, status, since, age, url, reason]
-                    properties:
-                      id:
-                        type: integer
-                        minimum: 0
-                        description: Cloud connection ID counter.
-                      status:
-                        type: string
-                        enum: [available, offline, indirect, online, banned]
-                        description: |
-                          Current cloud connection status of the agent.
-                          - available: Not claimed yet, can be claimed
-                          - offline: Claimed but currently disconnected
-                          - indirect: Connected through parent agent
-                          - online: Claimed and connected (cannot re-claim)
-                          - banned: Banned from cloud (cannot claim)
-                      since:
-                        type: integer
-                        format: int64
-                        description: Unix timestamp of the latest cloud connection state change.
-                      age:
-                        type: integer
-                        format: int64
-                        description: Signed difference in seconds between response generation time and `since`; may be negative after a backward system-clock adjustment.
-                      url:
-                        type: string
-                        nullable: true
-                        description: |
-                          Netdata Cloud URL. Emitted for every status and may be null when the active ACLK URL is unavailable.
-                          For banned status, the current runtime emits this member twice from two URL sources; OpenAPI represents it as one logical property.
-                      reason:
-                        type: string
-                        description: Status explanation or connection error; an empty string when online.
-                      claim_id:
-                        type: string
-                        description: |
-                          Present for banned, offline, online, and indirect statuses.
-                          Contains the canonical claim UUID when one is available; it can be empty when no claim ID is available.
-                      next_check:
-                        type: integer
-                        format: int64
-                        description: Unix timestamp of the next connection attempt; present only for offline status when scheduled in the future.
-                      next_in:
-                        type: integer
-                        format: int64
-                        minimum: 1
-                        description: Seconds until `next_check`; present only when `next_check` is present.
-                  can_be_claimed:
-                    type: boolean
-                    description: |
-                      Whether the agent can currently be claimed. Present in info and error responses.
-                      true for available/offline/indirect states, false for online/banned.
-                  key_filename:
-                    type: string
-                    description: |
-                      Full path to the file containing the verification key.
-                      Present in info and error responses after the verification key file has been published successfully at least once.
-                      Not present after a successful claim or if no verification key file has ever been published successfully.
-                      Platform-specific path (Linux: /var/lib/netdata/..., Windows: C:\...).
-                  cmd:
-                    type: string
-                    description: |
-                      OS-specific command to retrieve the verification key.
-                      Present in info and error responses after the verification key file has been published successfully at least once.
-                      - Linux: "sudo cat /var/lib/netdata/netdata_random_session_id"
-                      - Docker: "docker exec netdata cat /var/lib/netdata/netdata_random_session_id"
-                      - Windows: "more C:\path\to\netdata_random_session_id"
-                  help:
-                    type: string
-                    description: |
-                      Human-readable instructions for obtaining the verification key.
-                      Present in info and error responses after the verification key file has been published successfully at least once.
-                  agents:
-                    type: array
-                    description: Agent information for the claimed node(s)
-                    items:
-                      type: object
+                $ref: "#/components/schemas/claim_response"
               examples:
                 info_response:
                   value:
@@ -6706,9 +6569,11 @@ paths:
                     key_filename: "/var/lib/netdata/netdata_random_session_id"
                     cmd: "sudo cat /var/lib/netdata/netdata_random_session_id"
                     help: "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:"
-                    agents:
-                      - hostname: "my-server"
-                        machine_guid: "12345678-1234-1234-1234-123456789abc"
+                    agent:
+                      mg: "12345678-1234-1234-1234-123456789abc"
+                      nd: null
+                      nm: "my-server"
+                      now: 1720000120
                   summary: Info response (no claim attempt)
                 success_response:
                   value:
@@ -6717,17 +6582,52 @@ paths:
                     cloud:
                       id: 1
                       status: online
-                      since: 1720000120
+                      since: 1720000125
                       age: 0
                       url: "https://app.netdata.cloud"
                       reason: ""
                       claim_id: "12345678-1234-1234-1234-123456789abc"
-                    agents:
-                      - hostname: "my-server"
-                        machine_guid: "12345678-1234-1234-1234-123456789abc"
-                        claimed_id: "cloud-node-id-123"
+                    agent:
+                      mg: "12345678-1234-1234-1234-123456789abc"
+                      nd: "87654321-4321-4321-4321-cba987654321"
+                      nm: "my-server"
+                      now: 1720000125
                   summary: Successful claim
                 error_response:
+                  value:
+                    success: false
+                    message: "Failed: token is expired, not found, or invalid"
+                    cloud:
+                      id: 0
+                      status: available
+                      since: 1720000000
+                      age: 120
+                      url: "https://app.netdata.cloud"
+                      reason: "Failed: token is expired, not found, or invalid"
+                    can_be_claimed: true
+                    key_filename: "/var/lib/netdata/netdata_random_session_id"
+                    cmd: "sudo cat /var/lib/netdata/netdata_random_session_id"
+                    help: "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:"
+                    agent:
+                      mg: "12345678-1234-1234-1234-123456789abc"
+                      nd: null
+                      nm: "my-server"
+                      now: 1720000120
+                  summary: Failed claim (rejected by Netdata Cloud)
+        "400":
+          description: |
+            The claim request was rejected before contacting Netdata Cloud (only when the agent can be claimed; otherwise
+            any key is ignored and the 200 info response is returned). The body is JSON with the same
+            fields as the 200 error response (`success`=false, `message`, `cloud`, `can_be_claimed`, `agent`, and
+            `key_filename`, `cmd`, `help` once the verification key file has been published). Reasons:
+            - `invalid key`: the key does not match the current verification key
+            - `invalid parameters`: missing token/url, or invalid characters in token, url or rooms
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/claim_response"
+              examples:
+                invalid_key:
                   value:
                     success: false
                     message: "invalid key"
@@ -6742,17 +6642,12 @@ paths:
                     key_filename: "/var/lib/netdata/netdata_random_session_id"
                     cmd: "sudo cat /var/lib/netdata/netdata_random_session_id"
                     help: "We need to verify this server is yours. SSH to this server and run this command. It will give you a UUID. Copy and paste this UUID to this box:"
-                    agents:
-                      - hostname: "my-server"
-                        machine_guid: "12345678-1234-1234-1234-123456789abc"
-                  summary: Failed claim (invalid key)
-        "400":
-          description: |
-            Bad request (only in v2 API or earlier). V3 returns errors as JSON with HTTP 200.
-            Reasons include:
-            - Invalid key (doesn't match generated session ID)
-            - Invalid parameters (missing token/url, or invalid characters)
-            - Cloud connection failure
+                    agent:
+                      mg: "12345678-1234-1234-1234-123456789abc"
+                      nd: null
+                      nm: "my-server"
+                      now: 1720000120
+                  summary: Wrong verification key
   /api/v3/bearer_protection:
     get:
       operationId: bearerProtection3
@@ -6762,7 +6657,7 @@ paths:
       description: |
         **Bearer Token Authentication Control**
 
-        This endpoint controls whether the Netdata agent requires bearer token authentication for API access. Bearer protection adds an additional security layer by downgrading unauthenticated requests to `HTTP_ACCESS_NONE` when enabled. To reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`, an unauthenticated direct HTTP request must present a valid bearer token in the `Authorization` header. API messages sent over an established WebRTC data channel are not parsed for an `Authorization` header (unlike the initial HTTP `rtc_offer` signaling request, which is), so an unauthenticated call made over the data channel cannot supply a bearer token and is rejected for such routes. Already-authenticated sessions (for example Netdata Cloud/ACLK) keep their permissions and are unaffected. Routes declared with `HTTP_ACCESS_NONE` do not acquire a generic bearer-token requirement; their own ACL, transport, and callback authorization still apply.
+        This endpoint controls whether the Netdata Agent requires bearer token authentication for API access. Bearer protection adds an additional security layer by downgrading unauthenticated requests to `HTTP_ACCESS_NONE` when enabled. To reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`, an unauthenticated direct HTTP request must present a valid bearer token in the `Authorization` header. API messages sent over an established WebRTC data channel are not parsed for an `Authorization` header (unlike the initial HTTP `rtc_offer` signaling request, which is), so an unauthenticated call made over the data channel cannot supply a bearer token and is rejected for such routes. Already-authenticated sessions (for example Netdata Cloud/ACLK) keep their permissions and are unaffected. Routes declared with `HTTP_ACCESS_NONE` do not acquire a generic bearer-token requirement; their own ACL, transport, and callback authorization still apply.
 
         **Use Cases:**
         - **Cloud Integration:** Enable bearer protection when agent is claimed to Netdata Cloud
@@ -6816,18 +6711,19 @@ paths:
         - name: bearer_protection
           in: query
           required: false
+          allowEmptyValue: true
           schema:
-            type: string
-            enum: [on, off, true, false, yes, no]
+            $ref: "#/components/schemas/bearerProtectionValue"
           description: |
             **Whether to enable or disable bearer token authentication requirement.**
 
-            **Valid Values:**
+            **Valid Values** (matched case-insensitively, so `ON` and `True` also work):
             - Enable: `on`, `true`, `yes`
             - Disable: `off`, `false`, `no`
+            - Any other value is rejected with HTTP 400 and the protection state is not changed
 
             **Default Behavior:**
-            - If omitted, maintains current bearer protection state
+            - If omitted or empty, the protection state is not changed and the current state is returned
             - When agent is unclaimed, defaults to disabled
             - When agent is claimed, typically enabled by Netdata Cloud
 
@@ -6915,7 +6811,7 @@ paths:
             Example: `node_id=23456789-2345-2345-2345-234567890abc`
       responses:
         "200":
-          description: Bearer protection state successfully changed.
+          description: Current bearer protection state, after applying the requested change if one was given.
           content:
             application/json:
               schema:
@@ -6932,7 +6828,8 @@ paths:
             - claim_id doesn't match the agent's claim ID
             - machine_guid doesn't match the agent's machine GUID
             - node_id doesn't match or is missing
-            - Invalid parameter values
+            - bearer_protection has a value other than on/off, true/false or yes/no (case-insensitive); the
+              protection state is not changed
   /api/v3/bearer_get_token:
     get:
       operationId: bearerGetToken3
@@ -7871,10 +7768,10 @@ paths:
         - name: bearer_protection
           in: query
           required: false
+          allowEmptyValue: true
           schema:
-            type: string
-            enum: [on, off, true, false, yes, no]
-          description: Enable or disable bearer protection
+            $ref: "#/components/schemas/bearerProtectionValue"
+          description: Enable (`on`, `true`, `yes`) or disable (`off`, `false`, `no`) bearer protection, matched case-insensitively. Any other value returns HTTP 400 without changing the state; if omitted or empty, the state is not changed.
         - name: claim_id
           in: query
           required: true
@@ -7896,9 +7793,19 @@ paths:
           description: Agent's node UUID
       responses:
         "200":
-          description: Bearer protection state successfully changed
+          description: Current bearer protection state, after applying the requested change if one was given
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bearer_protection:
+                    type: boolean
+                    description: Current bearer protection state after the operation (true = enabled, false = disabled)
+              example:
+                bearer_protection: true
         "400":
-          description: Invalid parameters or verification failed
+          description: Identity verification failed, or bearer_protection has a value other than on/off, true/false or yes/no (case-insensitive); the protection state is not changed
   /api/v2/bearer_get_token:
     get:
       deprecated: true
@@ -9449,7 +9356,7 @@ components:
       name: gtime
       in: query
       description: |
-        The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute).
+        The grouping number of seconds. This is used in conjunction with group=average to change the units of metrics (ie when the data is per-second, setting gtime=60 will turn them to per-minute). Values above 315360000 (10 years) are treated as 315360000.
       required: false
       allowEmptyValue: false
       schema:
@@ -9460,7 +9367,7 @@ components:
       name: time_resampling
       in: query
       description: |
-        For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average.
+        For incremental values that are "per second", this value is used to resample them to "per minute` (60) or "per hour" (3600). It can only be used in conjunction with group=average. Values above 315360000 (10 years) are treated as 315360000.
       required: false
       schema:
         type: number
@@ -9669,6 +9576,10 @@ components:
           - anomaly-rate
           - value
   schemas:
+    bearerProtectionValue:
+      type: string
+      description: "`on`, `true` or `yes` enable; `off`, `false` or `no` disable; matched case-insensitively. Empty means no change."
+      pattern: '^(?:[oO][nN]|[oO][fF][fF]|[tT][rR][uU][eE]|[fF][aA][lL][sS][eE]|[yY][eE][sS]|[nN][oO])?$'
     info:
       type: object
       properties:
@@ -11482,3 +11393,113 @@ components:
           type: object
           description: The data payload of the response, contents vary depending on the specific request and action.
           additionalProperties: true
+    claim_response:
+      type: object
+      required: [cloud, agent]
+      properties:
+        success:
+          type: boolean
+          description: |
+            Present only for claim action responses (when key is provided).
+            true = claiming succeeded, false = claiming failed.
+            Not present in info responses (when requesting claim status without key).
+        message:
+          type: string
+          description: |
+            Result message. Present only for claim action responses.
+            - Success: "ok"
+            - Failure: Reason the claim failed (e.g., "Failed: token is expired, not found, or invalid", "Failed: Netdata Cloud is unavailable")
+            - HTTP 400: "invalid key" or "invalid parameters"
+        cloud:
+          type: object
+          description: Current Netdata Cloud connection state.
+          required: [id, status, since, age, url, reason]
+          properties:
+            id:
+              type: integer
+              minimum: 0
+              description: Cloud connection ID counter.
+            status:
+              type: string
+              enum: [available, offline, indirect, online, banned]
+              description: |
+                Current cloud connection status of the agent.
+                - available: Not claimed yet, can be claimed
+                - offline: Claimed but currently disconnected
+                - indirect: Connected through parent agent
+                - online: Claimed and connected (cannot re-claim)
+                - banned: Banned from cloud (cannot claim)
+            since:
+              type: integer
+              format: int64
+              description: Unix timestamp of the latest cloud connection state change.
+            age:
+              type: integer
+              format: int64
+              description: Signed difference in seconds between response generation time and `since`; may be negative after a backward system-clock adjustment.
+            url:
+              type: string
+              nullable: true
+              description: |
+                Netdata Cloud URL. Emitted for every status and may be null when the active ACLK URL is unavailable.
+                For banned status, the current runtime emits this member twice from two URL sources; OpenAPI represents it as one logical property.
+            reason:
+              type: string
+              description: Status explanation or connection error; an empty string when online.
+            claim_id:
+              type: string
+              description: |
+                Present for banned, offline, online, and indirect statuses.
+                Contains the canonical claim UUID when one is available; it can be empty when no claim ID is available.
+            next_check:
+              type: integer
+              format: int64
+              description: Unix timestamp of the next connection attempt; present only for offline status when scheduled in the future.
+            next_in:
+              type: integer
+              format: int64
+              minimum: 1
+              description: Seconds until `next_check`; present only when `next_check` is present.
+        can_be_claimed:
+          type: boolean
+          description: |
+            Whether the agent can currently be claimed. Present in info and error responses.
+            true for available/offline/indirect states, false for online/banned.
+        key_filename:
+          type: string
+          description: |
+            Full path to the file containing the verification key.
+            Present in info and error responses after the verification key file has been published successfully at least once.
+            Not present after a successful claim or if no verification key file has ever been published successfully.
+            Platform-specific path (Linux: /var/lib/netdata/..., Windows: C:\...).
+        cmd:
+          type: string
+          description: |
+            OS-specific command to retrieve the verification key.
+            Present in info and error responses after the verification key file has been published successfully at least once.
+            - Linux: "sudo cat /var/lib/netdata/netdata_random_session_id"
+            - Docker: "docker exec netdata cat /var/lib/netdata/netdata_random_session_id"
+            - Windows: "more C:\path\to\netdata_random_session_id"
+        help:
+          type: string
+          description: |
+            Human-readable instructions for obtaining the verification key.
+            Present in info and error responses after the verification key file has been published successfully at least once.
+        agent:
+          type: object
+          description: Identity of this agent. Present in every response.
+          properties:
+            mg:
+              type: string
+              description: Machine GUID.
+            nd:
+              type: string
+              nullable: true
+              description: Node ID (UUID); null until the node has one.
+            nm:
+              type: string
+              description: Hostname.
+            now:
+              type: integer
+              format: int64
+              description: Unix timestamp the response was generated.

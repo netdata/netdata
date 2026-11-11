@@ -80,6 +80,13 @@ func Test_HuaweiBGPProfileUsesTypedRows(t *testing.T) {
 			row := requireBGPRowByID(t, profile, tc.id)
 			assert.Equal(t, tc.kind, row.Kind)
 			assert.Equal(t, tc.table, row.Table.Name)
+			assert.False(t, row.Descriptors.Description.IsSet())
+			if tc.kind == ddprofiledefinition.BGPRowKindPeer {
+				assert.EqualValues(t, 1, row.Identity.ProcessID.Index)
+				assert.EqualValues(t, 2, row.Identity.RoutingInstance.Index)
+				assert.False(t, row.Identity.RemoteAS.IsSet())
+				assert.False(t, row.Descriptors.BGPVersion.IsSet())
+			}
 		})
 	}
 }

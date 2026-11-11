@@ -38,7 +38,7 @@ func TestQualificationViewSharesAdmissionAndKeepsMonitoringSource(t *testing.T) 
 	paths := e.source.(fixtureRuntime).Paths
 	paths.Identity.Version = "candidate-b"
 	paths.Identity.SHA256 = strings.Repeat("b", 64)
-	candidate := e.qualificationView(fixtureRuntime{Paths: paths}, artifacts)
+	candidate := e.unrecordedView(fixtureRuntime{Paths: paths}, artifacts)
 	done := make(chan synthetic.Execution, 1)
 	go func() { done <- e.Execute(context.Background(), journey(), nil) }()
 	<-started
@@ -52,6 +52,7 @@ func TestQualificationViewSharesAdmissionAndKeepsMonitoringSource(t *testing.T) 
 	require.Equal(t, synthetic.Success, (<-done).Run.Outcome)
 	qualified := candidate.Execute(context.Background(), journey(), nil)
 	require.Equal(t, synthetic.Success, qualified.Run.Outcome)
+	assert.Empty(t, qualified.Run.HistoryError)
 	require.NotNil(t, qualified.Run.Runtime)
 	assert.Equal(t, "candidate-b", qualified.Run.Runtime.Version)
 	monitored := e.Execute(context.Background(), journey(), nil)
@@ -72,7 +73,7 @@ func TestQualificationViewReportsUnverifiedDrainToMonitoringOwner(t *testing.T) 
 		calls.Add(1)
 		return ndexec.TreeResult{Drained: false, Err: errors.New("qualification lost drainage proof")}
 	})
-	candidate := e.qualificationView(e.source, artifacts)
+	candidate := e.unrecordedView(e.source, artifacts)
 	result := candidate.Execute(context.Background(), journey(), nil)
 	assert.False(t, result.Drained)
 	select {

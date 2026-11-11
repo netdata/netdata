@@ -278,7 +278,21 @@ func ensureStoreRoot(path string) (string, error) {
 	return ensureRuntimeRoot(path, managedRootLayout)
 }
 
-func ensureRuntimeRoot(path string, layout runtimeRootLayout) (string, error) {
+// CanonicalRoot resolves existing symlink ancestors and appends a missing suffix
+// without creating a store or reconciling its publication state. Existing roots
+// and ancestors must resolve to directories.
+func CanonicalRoot(path string) (string, error) {
+	if !filepath.IsAbs(path) {
+		return "", errors.New("runtime root must be absolute")
+	}
+	ancestor, missing, err := resolveRuntimeAncestor(filepath.Clean(path))
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(append([]string{ancestor}, missing...)...), nil
+}
+
+func resolveRuntimeAncestor(path string) (string, []string, error) {
 	ancestor := path
 	var missing []string
 	for {
@@ -287,12 +301,27 @@ func ensureRuntimeRoot(path string, layout runtimeRootLayout) (string, error) {
 			break
 		}
 		if !errors.Is(err, os.ErrNotExist) {
-			return "", err
+			return "", nil, err
 		}
 		missing = append([]string{filepath.Base(ancestor)}, missing...)
 		ancestor = filepath.Dir(ancestor)
 	}
 	canonical, err := filepath.EvalSymlinks(ancestor)
+	if err != nil {
+		return "", nil, err
+	}
+	info, err := os.Stat(canonical)
+	if err != nil {
+		return "", nil, err
+	}
+	if !info.IsDir() {
+		return "", nil, fmt.Errorf("runtime root ancestor is not a directory: %s", canonical)
+	}
+	return canonical, missing, nil
+}
+
+func ensureRuntimeRoot(path string, layout runtimeRootLayout) (string, error) {
+	canonical, missing, err := resolveRuntimeAncestor(path)
 	if err != nil {
 		return "", err
 	}

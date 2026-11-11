@@ -53,6 +53,13 @@ int command_argument_sanitization_tests(void) {
         { "'a",          "'\\''a" },
         { "a'",          "a'\\''" },
         { "--foo'a'''b", "foo'\\''a'\\'''\\'''\\''b" },
+
+        // alarm-notify.sh builds variable names from the recipient roles it receives; it relies on
+        // backticks becoming quotes and '$' becoming '_' here, so that nothing in them is ever expanded
+        { "a`id`b",      "a'\\''id'\\''b" },
+        { "a$(id)b",     "a_(id)b" },
+        { "x[$(id)]",    "x[_(id)]" },
+        { "${HOME}",     "_{HOME}" },
     };
 
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
@@ -3523,11 +3530,21 @@ static int test_query_window_resampling_boundaries(void) {
             .priority = STORAGE_PRIORITY_SYNCHRONOUS,
         };
 
-        QUERY_WINDOW_CHECK(!query_target_create(&request),
-                           "query target accepted an unrepresentable resampling window");
-
-        request.resampling_time = 60;
+        // the request's resampling time is clamped before the window is calculated
         QUERY_TARGET *qt = query_target_create(&request);
+        QUERY_WINDOW_CHECK(qt && qt->request.resampling_time == API_QUERY_TIME_SPAN_MAX &&
+                               qt->window.group >= (size_t)API_QUERY_TIME_SPAN_MAX,
+                           "query target did not clamp the maximum resampling time");
+        query_target_release(qt);
+
+        // a window that cannot be represented is still rejected, and the pool recovers
+        request.resampling_time = 60;
+        request.after = nd_time_t_min();
+        QUERY_WINDOW_CHECK(!query_target_create(&request),
+                           "query target accepted an unrepresentable window");
+
+        request.after = 1000000000;
+        qt = query_target_create(&request);
         QUERY_WINDOW_CHECK(qt, "query target pool did not recover after rejected window");
         query_target_release(qt);
     }

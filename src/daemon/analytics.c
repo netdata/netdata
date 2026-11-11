@@ -189,9 +189,6 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_prebuilt_distro);
     analytics_data.netdata_prebuilt_distro = NULL;
 
-    freez(analytics_data.netdata_fail_reason);
-    analytics_data.netdata_fail_reason = NULL;
-
     spinlock_unlock(&analytics_data.spinlock);
 }
 
@@ -1601,7 +1598,6 @@ void analytics_reset(void) {
     analytics_set_data(&analytics_data.netdata_config_use_private_registry, "null");
     analytics_set_data(&analytics_data.netdata_config_oom_score, "null");
     analytics_set_data(&analytics_data.netdata_prebuilt_distro, "null");
-    analytics_set_data(&analytics_data.netdata_fail_reason, "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;

@@ -3,6 +3,8 @@ package query_test
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,6 +20,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// fixtureRunID returns a fresh run ID: artifacts.Store.Begin creates a /tmp/nd-dem-<id> alias that is shared by
+// every test process on the host, so fixed IDs collide across parallel packages and concurrent checkouts.
+func fixtureRunID() string {
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(id[:])
+}
 
 func TestRunUsesCopiedActiveEvidenceThenRetainedHistory(t *testing.T) {
 	ctx := context.Background()
@@ -71,8 +83,8 @@ func TestEvidenceUsesManifestMembershipAndPreservesExpiredMetadata(t *testing.T)
 	captures, err := artifacts.Open(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, captures.Close()) })
-	const runID = "0123456789abcdef0123456789abcdef"
-	work, err := captures.Begin(runID, "lighthouse:home")
+	runID := fixtureRunID()
+	work, err := captures.Begin(runID, "lighthouse:home", "")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	content := []byte("<html>private report</html>")
@@ -130,9 +142,9 @@ func TestRetainedCapturesOutliveHistoryAndActiveJobs(t *testing.T) {
 		root := t.TempDir()
 		captures, err := artifacts.Open(root)
 		require.NoError(t, err)
-		const runID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		runID := fixtureRunID()
 		const jobID = "lighthouse:retired"
-		work, err := captures.Begin(runID, jobID)
+		work, err := captures.Begin(runID, jobID, "")
 		require.NoError(t, err)
 		body := []byte("<html>retained report</html>")
 		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
@@ -199,8 +211,8 @@ func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {
 			captures, err := artifacts.Open(root)
 			require.NoError(t, err)
 			defer captures.Close()
-			const runID = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-			work, err := captures.Begin(runID, "lighthouse:owner")
+			runID := fixtureRunID()
+			work, err := captures.Begin(runID, "lighthouse:owner", "")
 			require.NoError(t, err)
 			require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 			require.NoError(t, os.WriteFile(filepath.Join(work, "output/report.html"), []byte("report"), 0600))

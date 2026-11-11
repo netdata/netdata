@@ -167,6 +167,12 @@ set at the end.
 | CASE-023/mcp-valid-query-annotations | valid MCP condition queries preserve the exact RESET point-annotation bitmap independently of the grouped value | n/a |  |
 | CASE-023/mcp-invalid-options | non-string, malformed, non-finite or NUL-bearing MCP condition expressions return structured -32602 INVALID_PARAMS errors | n/a |  |
 | CASE-023/mcp-invalid-numeric-options | NUL-bearing numeric time_group_options for percentile, trimmed-mean and trimmed-median return structured -32602 INVALID_PARAMS errors | n/a |  |
+| CASE-023/mcp-invalid-time-group | invalid MCP time_group values return structured -32602 INVALID_PARAMS errors naming the parameter and listing exactly the advertised names without echoing a non-empty rejected string | n/a |  |
+| CASE-023/mcp-time-group-null-missing | a present JSON null time_group returns the established -32600 missing-parameter error | n/a |  |
+| CASE-023/mcp-time-group-accepted-names | MCP time_group accepts max, the avg alias and percentile95, and echoes canonical names where applicable | n/a |  |
+| CASE-023/mcp-invalid-aggregation | invalid MCP aggregation values return structured -32602 INVALID_PARAMS errors naming the parameter and listing exactly the advertised names without echoing a non-empty rejected string | n/a |  |
+| CASE-023/mcp-aggregation-null-missing | a present JSON null aggregation returns the established -32600 missing-parameter error | n/a |  |
+| CASE-023/mcp-aggregation-accepted-names | MCP aggregation accepts max, the avg alias and percentage, and echoes their canonical names | n/a |  |
 | CASE-023/weights-invalid-options | the public weights endpoint rejects a malformed expression instead of silently executing the default ==0 condition | n/a |  |
 | CASE-023/badge-invalid-options | the public badge endpoint rejects a malformed expression instead of silently rendering the default ==0 condition | n/a |  |
 | CASE-023/v1-data-invalid-options | the public v1 data endpoint rejects a malformed expression without allowing its HTTP 400 response to be cached | n/a |  |

@@ -22,7 +22,7 @@ func TestSitesGeoIPSourceEvidence(t *testing.T) {
 	t.Cleanup(resolver.Close)
 	require.NoError(t, resolver.Refresh())
 	hub := registry.New()
-	handler := rumfunctions.New(query.New(hub, nil))
+	handler := rumfunctions.New(query.New(hub, nil), nil)
 	collector := func() map[string]any {
 		response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 			Method: "rum-sites",

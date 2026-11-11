@@ -32,7 +32,7 @@ func TestTrafficCollection(t *testing.T) {
 		metricApplianceUplinkTrafficSent:     8,
 		metricApplianceUplinkTrafficReceived: 16,
 	} {
-		points := trafficPoints(c, metric)
+		points := metricPoints(c, metric)
 		require.Len(t, points, 1, metric)
 		p := points[0]
 		assert.Equal(t, value, p.Value, metric)
@@ -107,9 +107,9 @@ func TestTrafficOptionsAreIndependent(t *testing.T) {
 			require.Len(t, f.calls(), 1, "Check stays one probe")
 			require.NoError(t, collectCycle(t.Context(), c))
 			assert.Len(t, f.calls(), 1+tc.wantRequests)
-			assert.Len(t, trafficPoints(c, metricSwitchPortTrafficSent), boolCount(tc.portTraffic))
-			assert.Len(t, trafficPoints(c, metricSwitchPortPacketsSent), boolCount(tc.portPackets))
-			assert.Len(t, trafficPoints(c, metricApplianceUplinkTrafficSent), boolCount(tc.uplinks))
+			assert.Len(t, metricPoints(c, metricSwitchPortTrafficSent), boolCount(tc.portTraffic))
+			assert.Len(t, metricPoints(c, metricSwitchPortPacketsSent), boolCount(tc.portPackets))
+			assert.Len(t, metricPoints(c, metricApplianceUplinkTrafficSent), boolCount(tc.uplinks))
 		})
 	}
 }
@@ -135,12 +135,12 @@ func TestTrafficZeroIsAValueAndMissingIsAGap(t *testing.T) {
 	require.NoError(t, collectCycle(t.Context(), c))
 
 	zero := []metrix.SampleValue{0}
-	assert.Equal(t, zero, trafficValues(c, metricSwitchPortTrafficSent))
-	assert.Equal(t, zero, trafficValues(c, metricSwitchPortPacketsSent))
-	assert.Equal(t, zero, trafficValues(c, metricApplianceUplinkTrafficSent))
-	assert.Empty(t, trafficValues(c, metricSwitchPortTrafficReceived))
-	assert.Empty(t, trafficValues(c, metricSwitchPortPacketsReceived))
-	assert.Empty(t, trafficValues(c, metricApplianceUplinkTrafficReceived))
+	assert.Equal(t, zero, metricValues(c, metricSwitchPortTrafficSent))
+	assert.Equal(t, zero, metricValues(c, metricSwitchPortPacketsSent))
+	assert.Equal(t, zero, metricValues(c, metricApplianceUplinkTrafficSent))
+	assert.Empty(t, metricValues(c, metricSwitchPortTrafficReceived))
+	assert.Empty(t, metricValues(c, metricSwitchPortPacketsReceived))
+	assert.Empty(t, metricValues(c, metricApplianceUplinkTrafficReceived))
 }
 
 func TestSwitchPortTrafficIntervalSelection(t *testing.T) {
@@ -259,12 +259,12 @@ func TestSwitchPortTrafficIntervalSelection(t *testing.T) {
 			require.NoError(t, collectCycle(t.Context(), c))
 
 			assert.Equal(t, tc.want, want{
-				sent:     trafficValues(c, metricSwitchPortTrafficSent),
-				received: trafficValues(c, metricSwitchPortTrafficReceived),
-				age:      trafficValues(c, metricSwitchPortTrafficIntervalAge),
+				sent:     metricValues(c, metricSwitchPortTrafficSent),
+				received: metricValues(c, metricSwitchPortTrafficReceived),
+				age:      metricValues(c, metricSwitchPortTrafficIntervalAge),
 			})
-			assert.Len(t, trafficPoints(c, metricSwitchPortPacketsSent), 1, "packets are independent")
-			assert.Len(t, trafficPoints(c, metricApplianceUplinkTrafficSent), 1, "uplinks are independent")
+			assert.Len(t, metricPoints(c, metricSwitchPortPacketsSent), 1, "packets are independent")
+			assert.Len(t, metricPoints(c, metricApplianceUplinkTrafficSent), 1, "uplinks are independent")
 		})
 	}
 }
@@ -302,7 +302,7 @@ func TestSwitchPortPacketsDuplicates(t *testing.T) {
 				},
 			)
 			require.NoError(t, collectCycle(t.Context(), c))
-			assert.Equal(t, tc.wantSent, trafficValues(c, metricSwitchPortPacketsSent))
+			assert.Equal(t, tc.wantSent, metricValues(c, metricSwitchPortPacketsSent))
 		})
 	}
 }
@@ -348,7 +348,7 @@ func TestApplianceUplinkTrafficAttribution(t *testing.T) {
 				body: fmt.Sprintf(`[{"networkId":%q,"byUplink":[%s]}]`, network, tc.uplinks),
 			})
 			require.NoError(t, collectCycle(t.Context(), c))
-			assert.Equal(t, tc.wantSent, trafficValues(c, metricApplianceUplinkTrafficSent))
+			assert.Equal(t, tc.wantSent, metricValues(c, metricApplianceUplinkTrafficSent))
 		})
 	}
 }
@@ -376,13 +376,13 @@ func TestTrafficFailureLeavesOnlyItsGaps(t *testing.T) {
 				assert.Len(t, readDevices(c), 3)
 				assert.Equal(t, metrix.SampleValue(3), readOrganization(c)[metricOrganizationAssignedDevices])
 				for path, metric := range trafficFamilies {
-					assert.Len(t, trafficPoints(c, metric), boolCount(path != failing), metric)
+					assert.Len(t, metricPoints(c, metric), boolCount(path != failing), metric)
 				}
 
 				f.set(failing, valid)
 				require.NoError(t, collectCycle(t.Context(), c))
 				for _, metric := range trafficFamilies {
-					assert.Len(t, trafficPoints(c, metric), 1, metric)
+					assert.Len(t, metricPoints(c, metric), 1, metric)
 				}
 			})
 		}
@@ -430,7 +430,7 @@ func TestTraffic429StopsTrafficRequests(t *testing.T) {
 func TestTrafficSurvivesRenames(t *testing.T) {
 	f, c, _ := newTrafficFixture(t)
 	require.NoError(t, collectCycle(t.Context(), c))
-	before := trafficPoints(c, metricSwitchPortTrafficSent)[0]
+	before := metricPoints(c, metricSwitchPortTrafficSent)[0]
 
 	f.set("/organizations/org/devices", fixtureResponse{
 		body: `[{"serial":"S1","networkId":"N1","name":"Renamed","model":"MS120","productType":"switch"},` +
@@ -442,12 +442,12 @@ func TestTrafficSurvivesRenames(t *testing.T) {
 	})
 	require.NoError(t, collectCycle(t.Context(), c))
 
-	ports := trafficPoints(c, metricSwitchPortTrafficSent)
+	ports := metricPoints(c, metricSwitchPortTrafficSent)
 	require.Len(t, ports, 1)
 	assert.Equal(t, before.Scope.GUID, ports[0].Scope.GUID)
 	assert.Equal(t, "1/0", ports[0].Labels["port_id"])
 	assert.Equal(t, "Renamed", ports[0].Labels["device_name"])
-	uplinks := trafficPoints(c, metricApplianceUplinkTrafficSent)
+	uplinks := metricPoints(c, metricApplianceUplinkTrafficSent)
 	require.Len(t, uplinks, 1)
 	assert.Equal(t, "N1", uplinks[0].Labels["network_id"])
 	assert.Equal(t, "Renamed office", uplinks[0].Labels["network_name"])

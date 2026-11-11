@@ -24,7 +24,7 @@ Module: journey
 
 Monitor whether browser workflow checks execute and pass with real Playwright Test. Inspect test outcomes, attempt durations and retained failure details.
 
-Runs the configured Playwright Test entry with sandboxed Chromium at the native job interval, using one worker without retries. Workflows can perform the actions their scripts request on the target website. Configuration Test validates preparation without executing the workflow.
+Runs the configured Playwright Test entry with sandboxed Chromium at the native job interval, using one worker without retries. Workflows can perform the actions their scripts request on the target website. Configuration Test executes the submitted draft, including resolved secrets, without saving monitoring results or captures. Test actions on the target website are real and are not rolled back.
 
 This collector is only supported on the following platforms:
 
@@ -47,11 +47,11 @@ Jobs require explicit configuration; no websites or scripts are discovered autom
 
 #### Limits
 
-Empty suites, skipped tests and expected failures cannot establish successful coverage. A failed check takes precedence over incomplete coverage. Waiting and running attempts retain the prior result for diagnosis; that observation becomes stale after two collection intervals and does not imply recovery. Failure screenshots are disabled unless requested.
+Empty suites, skipped tests and expected failures cannot establish successful coverage. A failed check takes precedence over incomplete coverage. Waiting and running attempts retain the prior result for diagnosis; that observation becomes stale after two collection intervals and does not imply recovery. Failure screenshots are disabled unless requested. Configuration Test returns pass/fail within the caller's request deadline; long drafts may time out. Test does not retain screenshots.
 
 #### Performance Impact
 
-Each attempt starts a fresh browser and consumes CPU, memory and target website requests. Increasing update_every reduces frequency. Jobs share one browser admission slot, so concurrent due jobs can wait. Optional captures consume local disk space.
+Each attempt starts a fresh browser and consumes CPU, memory and target website requests. Increasing update_every reduces frequency. Jobs share one browser admission slot, so concurrent due jobs and configuration tests can wait. A running Test can delay monitoring. Optional monitoring captures consume local disk space.
 
 ## Setup
 
@@ -60,12 +60,14 @@ Each attempt starts a fresh browser and consumes CPU, memory and target website 
 
 #### Prepare the browser sandbox policy
 
-Managed bundles and preloads on Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04,
-require administrator-prepared AppArmor policy. DEM does not automatically allow service-writable
-browser paths. The native runtime package supplies its own profile for its root-owned browser.
-Containers also require compatible host and container namespace, AppArmor and seccomp policies.
-Follow the [runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
-and keep Chromium's sandbox enabled when qualifying the actual service deployment.
+On Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04, run kickstart with
+`--install-dem-runtime` for a static or source installation. The native runtime package supplies its own policy.
+For local, rootful Docker on Linux, use the documented Netdata container configuration, including
+`apparmor=unconfined` on AppArmor hosts. Run kickstart with `--install-dem-runtime --docker-container NAME`
+on the daemon host, then run `docker restart NAME` after the first installation succeeds.
+Rootless, nested and remote Docker require separate administrator setup.
+Follow the [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md)
+for commands, offline setup and removal. Keep Chromium's sandbox enabled and qualify the actual service deployment.
 
 
 #### Set up the browser runtime

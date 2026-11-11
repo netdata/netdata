@@ -102,8 +102,8 @@ metrics:
     metric_tags:
       - tag: ubiquiti_unifi_radio_index
         symbol:
-          OID: 1.3.6.1.4.1.41112.1.6.1.1.1.1
           name: ubiquiti.unifiRadioIndex
+        index: 1
       - tag: ubiquiti_unifi_radio_name
         symbol:
           OID: 1.3.6.1.4.1.41112.1.6.1.1.1.2

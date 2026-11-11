@@ -761,6 +761,23 @@ bool sql_metadata_wal_size_acceptable()
 }
 
 // Init
+
+// Why the last sql_init_meta_database() failed; written and read on the thread that initializes the database.
+static __thread SQLITE_INIT_FAILURE meta_init_failure;
+
+void sql_init_meta_failure_reason(char *dst, size_t dst_size, int *os_errno)
+{
+    sqlite_init_failure_format(&meta_init_failure, dst, dst_size);
+    if (os_errno) {
+#if defined(OS_WINDOWS)
+        // a GetLastError() code is not an errno; the reason above carries it
+        *os_errno = 0;
+#else
+        *os_errno = meta_init_failure.os_errno;
+#endif
+    }
+}
+
 /*
  * Initialize the SQLite database
  * Return 0 on success
@@ -770,6 +787,9 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     char *err_msg = NULL;
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
+
+    memset(&meta_init_failure, 0, sizeof(meta_init_failure));
+    sqlite_init_failure_clear();
 
     if (likely(!memory)) {
         snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
@@ -801,11 +821,8 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
 
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
+        sqlite_init_failure_record(db_meta, "meta_open", NULL, rc);
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
-        char *error_str = get_database_extented_error(db_meta, 0, "meta_open");
-        if (error_str)
-            analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
-        freez(error_str);
         goto close_database;
     }
 
@@ -874,6 +891,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     return 0;
 
 close_database:
+    sqlite_init_failure_get(&meta_init_failure);
     sqlite3_close_v2(db_meta);
     db_meta = NULL;
     return 1;

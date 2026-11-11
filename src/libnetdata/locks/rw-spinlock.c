@@ -34,26 +34,27 @@ _Static_assert(sizeof(RW_SPINLOCK) == 8, "RW_SPINLOCK must stay 8 bytes");
 // Zero bytes added to the lock, no change to the uncontended fast path.
 typedef struct rw_spinlock_wait {
     usec_t timestamp;       // when we first noticed we were spinning (0 = not seeded yet)
-    pid_t first_writer;     // rw_spinlock->writer as sampled at that moment
+    uint32_t first_writer;  // rw_spinlock->writer as sampled at that moment
     uint32_t readers_min;
     uint32_t readers_max;
 } RW_SPINLOCK_WAIT;
 
 #define RW_SPINLOCK_WAIT_INIT (RW_SPINLOCK_WAIT){ 0 }
 
-void rw_spinlock_deadlock_holder_format(char *dst, size_t dst_size, pid_t self, pid_t writer, pid_t first_writer,
+void rw_spinlock_deadlock_holder_format(char *dst, size_t dst_size,
+                                        uint32_t self, uint32_t writer, uint32_t first_writer,
                                         uint32_t readers, uint32_t readers_min, uint32_t readers_max) {
     char now_txt[40], first_txt[48];
 
     if (writer)
-        snprintfz(now_txt, sizeof(now_txt), "writer tid=%d%s", writer, writer == self ? " (this thread)" : "");
+        snprintfz(now_txt, sizeof(now_txt), "writer tid=%u%s", writer, writer == self ? " (this thread)" : "");
     else
         snprintfz(now_txt, sizeof(now_txt), "no writer");
 
     if (writer == first_writer)
         snprintfz(first_txt, sizeof(first_txt), "same at the first check");
     else if (first_writer)
-        snprintfz(first_txt, sizeof(first_txt), "was tid=%d at the first check", first_writer);
+        snprintfz(first_txt, sizeof(first_txt), "was tid=%u at the first check", first_writer);
     else
         snprintfz(first_txt, sizeof(first_txt), "no writer at the first check");
 
@@ -65,7 +66,7 @@ void rw_spinlock_deadlock_holder_format(char *dst, size_t dst_size, pid_t self, 
 static NEVER_INLINE void rw_spinlock_deadlock_detect(RW_SPINLOCK_WAIT *w, const char *type, const char *func,
                                                      RW_SPINLOCK *rw_spinlock, uint32_t readers_now) {
     // Can be stale by the time we print it; it is only ever printed, never dereferenced.
-    pid_t writer_now = __atomic_load_n(&rw_spinlock->writer, __ATOMIC_RELAXED);
+    uint32_t writer_now = __atomic_load_n(&rw_spinlock->writer, __ATOMIC_RELAXED);
 
     if (!w->timestamp) {
         w->timestamp = now_monotonic_usec();
@@ -85,7 +86,8 @@ static NEVER_INLINE void rw_spinlock_deadlock_detect(RW_SPINLOCK_WAIT *w, const 
     int64_t waited_s = (int64_t)((now - w->timestamp) / USEC_PER_SEC);
 
     char holder[256];
-    rw_spinlock_deadlock_holder_format(holder, sizeof(holder), gettid_cached(), writer_now, w->first_writer,
+    rw_spinlock_deadlock_holder_format(holder, sizeof(holder),
+                                       (uint32_t)gettid_cached(), writer_now, w->first_writer,
                                        readers_now, w->readers_min, w->readers_max);
 
     fatal("DEADLOCK DETECTED: %s in function '%s' could not be acquired for %"PRIi64" seconds %s",
@@ -163,7 +165,7 @@ ALWAYS_INLINE bool rw_spinlock_trywrite_lock_with_trace(RW_SPINLOCK *rw_spinlock
     uint32_t old = __atomic_fetch_or(&rw_spinlock->counter, WRITER_BIT, __ATOMIC_ACQUIRE);
 
     if(old == 0) {
-        __atomic_store_n(&rw_spinlock->writer, gettid_cached(), __ATOMIC_RELAXED);
+        __atomic_store_n(&rw_spinlock->writer, (uint32_t)gettid_cached(), __ATOMIC_RELAXED);
         worker_spinlock_contention(func, 0);
         nd_thread_rwspinlock_write_locked();
         return true;
@@ -193,7 +195,7 @@ ALWAYS_INLINE void rw_spinlock_write_lock_with_trace(RW_SPINLOCK *rw_spinlock, c
 
         // Check if we were the only one
         if (old == 0) {
-            __atomic_store_n(&rw_spinlock->writer, gettid_cached(), __ATOMIC_RELAXED);
+            __atomic_store_n(&rw_spinlock->writer, (uint32_t)gettid_cached(), __ATOMIC_RELAXED);
             worker_spinlock_contention(func, spins);
             nd_thread_rwspinlock_write_locked();
             return;

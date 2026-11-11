@@ -58,6 +58,7 @@ type OSPFNeighbor struct {
 
 type BGPPeer struct {
 	DeviceID              string
+	ProcessID             string
 	RoutingInstance       string
 	NeighborIP            string
 	RemoteAS              string
@@ -88,6 +89,7 @@ type OSPFNeighborDetailRow struct {
 
 type BGPPeerDetailRow struct {
 	RemoteActorHandle     ActorHandle
+	ProcessID             string
 	RoutingInstance       string
 	NeighborIP            string
 	RemoteAS              string

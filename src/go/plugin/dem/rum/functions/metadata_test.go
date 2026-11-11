@@ -25,7 +25,7 @@ func TestMetadataDocumentsProcessFunctions(t *testing.T) {
 		require.NotContains(t, documented, function.ID)
 		documented[function.ID] = function
 	}
-	handler := rumfunctions.New(metadataFunctionSource{})
+	handler := rumfunctions.New(metadataFunctionSource{}, nil)
 	for _, declaration := range declarations {
 		t.Run(declaration.ID, func(t *testing.T) {
 			// RUM rows carry visitor sessions, locations and errors: sensitive data.
@@ -75,7 +75,7 @@ func (metadataFunctionSource) Receiver() query.Receiver {
 		Serving: true,
 	}
 }
-func (metadataFunctionSource) Sites(context.Context) ([]query.Site, error) {
+func (metadataFunctionSource) Sites(context.Context, string) ([]query.Site, error) {
 	return []query.Site{
 		{Name: "shop", Label: "shop", Sampling: query.Sampling{
 			MeasureRate:     1,
@@ -83,19 +83,19 @@ func (metadataFunctionSource) Sites(context.Context) ([]query.Site, error) {
 		}},
 	}, nil
 }
-func (metadataFunctionSource) Pages(context.Context, string) ([]query.Page, error) {
+func (metadataFunctionSource) Pages(context.Context, string, string) ([]query.Page, error) {
 	return []query.Page{{Site: "shop", Page: "/"}}, nil
 }
-func (metadataFunctionSource) Live(context.Context, string, string, int) ([]query.LiveEvent, string, error) {
+func (metadataFunctionSource) Live(context.Context, string, string, int, string) ([]query.LiveEvent, string, error) {
 	return nil, "", nil
 }
-func (metadataFunctionSource) Sessions(context.Context, string, string, int64, int64) ([]query.Session, error) {
+func (metadataFunctionSource) Sessions(context.Context, string, string, int64, int64, string) ([]query.Session, error) {
 	return []query.Session{{Site: "shop", SessionID: "visit"}}, nil
 }
-func (metadataFunctionSource) SessionEvents(context.Context, string, string) ([]query.SessionEvent, error) {
+func (metadataFunctionSource) SessionEvents(context.Context, string, string, string) ([]query.SessionEvent, error) {
 	return []query.SessionEvent{{Site: "shop", SessionID: "visit", Type: "pageview", Page: "/"}}, nil
 }
-func (metadataFunctionSource) Errors(context.Context, string, string, int64, int64) ([]query.ErrorGroup, error) {
+func (metadataFunctionSource) Errors(context.Context, string, string, int64, int64, string) ([]query.ErrorGroup, error) {
 	return nil, nil
 }
 
@@ -104,7 +104,7 @@ func TestObservationTimestampColumnsDeclareMicroseconds(t *testing.T) {
 		"rum-live": "ts", "rum-session-events": "ts", "rum-sessions": "last_observed_us",
 	} {
 		t.Run(method, func(t *testing.T) {
-			handler := rumfunctions.New(metadataFunctionSource{})
+			handler := rumfunctions.New(metadataFunctionSource{}, nil)
 			args := []string{"site:shop"}
 			if method == "rum-session-events" {
 				args = append(args, "session_id:visit")

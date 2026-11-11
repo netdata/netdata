@@ -590,7 +590,7 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
         rrddim_set_by_pointer(st_thp_file, rd_alloc, thp_file_alloc);
         rrddim_set_by_pointer(st_thp_file, rd_fallback, thp_file_fallback);
-        rrddim_set_by_pointer(st_thp_file, rd_mapped, thp_file_fallback_charge);
+        rrddim_set_by_pointer(st_thp_file, rd_mapped, thp_file_mapped);
         rrddim_set_by_pointer(st_thp_file, rd_fallback_charge, thp_file_fallback_charge);
 
         rrdset_done(st_thp_file);

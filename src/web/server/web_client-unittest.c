@@ -845,7 +845,7 @@ int web_client_forwarded_for_unittest(void)
     // The stored value is serialized into the comma separated key=value source
     // string of function calls and quoted into the FUNCTION lines sent to plugins
     // and children, so only the first entry of the list is kept, and only when it
-    // is an IPv4 or IPv6 address.
+    // is an IPv4 or IPv6 address. A port added by the proxy is dropped.
     static const struct {
         const char *header;
         const char *expected;
@@ -859,9 +859,34 @@ int web_client_forwarded_for_unittest(void)
         { "role=admin", "" },
         { "203.0.113.7 role=admin", "" },
         { "203.0.113.7\" \"x", "" },
-        { "203.0.113.7:8080", "" },
         { "unknown", "" },
         { "", "" },
+        { ",203.0.113.7", "" },
+        { " \t, 203.0.113.7", "" },
+
+        // address with a port
+        { "203.0.113.7:8080", "203.0.113.7" },
+        { "203.0.113.7:1, 198.51.100.1:2", "203.0.113.7" },
+        { "203.0.113.7:65535", "203.0.113.7" },
+        { "[2001:db8::7]:443", "2001:db8::7" },
+        { "[2001:db8::7]", "2001:db8::7" },
+        { "[ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255]:65535", "ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255" },
+        { "2001:db8::7:8080", "2001:db8::7:8080" },
+        { "203.0.113.7:", "" },
+        { "203.0.113.7:0", "" },
+        { "203.0.113.7:65536", "" },
+        { "203.0.113.7:080080", "" },
+        { "203.0.113.7:80x", "" },
+        { "203.0.113.7: 80", "" },
+        { ":80", "" },
+        { "role=admin:80", "" },
+        { "[2001:db8::7", "" },
+        { "[2001:db8::7]x", "" },
+        { "[2001:db8::7]:", "" },
+        { "[2001:db8::7]:0", "" },
+        { "[]:80", "" },
+        { "[203.0.113.7]:80", "" },
+        { "[ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.2550]:80", "" },
     };
 
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
@@ -904,6 +929,11 @@ int web_client_forwarded_for_unittest(void)
         (int)w->user_auth.method,
         (int)w->user_auth.user_role,
         (unsigned long long)w->user_auth.access);
+    WEB_CLIENT_TEST(
+        strcmp(parsed.forwarded_for, "203.0.113.7") == 0,
+        "source '%s' parsed back with forwarded_for '%s', expected '203.0.113.7'",
+        buffer_tostring(source),
+        parsed.forwarded_for);
 
     web_client_free(w);
     WEB_CLIENT_TEST(memory_accounting == 0, "web client leaked %zu accounted bytes", memory_accounting);

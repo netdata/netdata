@@ -859,6 +859,7 @@
           "columns": [
             "actor:actor_ref:role=reference",
             "remote_actor:actor_ref:nullable:role=reference",
+            "process_id:string_ref:dict=strings:nullable",
             "routing_instance:string_ref:dict=strings:nullable",
             "neighbor_ip:string_ref:dict=strings:nullable",
             "remote_as:string_ref:dict=strings:nullable",
@@ -2006,6 +2007,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -2128,8 +2138,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -2838,6 +2848,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -2982,6 +3002,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -3134,6 +3155,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -3256,8 +3286,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -3966,6 +3996,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -4110,6 +4150,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -4413,6 +4454,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -4535,8 +4585,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -5245,6 +5295,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -5389,6 +5449,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -5714,6 +5775,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -5836,8 +5906,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -6546,6 +6616,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -6690,6 +6770,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -7003,6 +7084,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -7125,8 +7215,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -7835,6 +7925,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -7979,6 +8079,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -8131,6 +8232,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -8253,8 +8363,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -8963,6 +9073,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -9107,6 +9227,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -9259,6 +9380,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -9381,8 +9511,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -10091,6 +10221,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -10235,6 +10375,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -10387,6 +10528,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -10509,8 +10659,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -11219,6 +11369,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -11363,6 +11523,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -11674,6 +11835,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -11796,8 +11966,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -12506,6 +12676,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -12650,6 +12830,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -12802,6 +12983,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -12924,8 +13114,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -13634,6 +13824,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -13778,6 +13978,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -13930,6 +14131,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -14052,8 +14262,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -14762,6 +14972,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -14906,6 +15126,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -15058,6 +15279,15 @@
                     }
                   },
                   {
+                    "cell": "text",
+                    "id": "if_alias",
+                    "label": "Alias",
+                    "projection": {
+                      "column": "if_alias",
+                      "kind": "direct"
+                    }
+                  },
+                  {
                     "cell": "badge",
                     "id": "oper_status",
                     "label": "Status",
@@ -15180,8 +15410,8 @@
                   },
                   {
                     "cell": "text",
-                    "id": "if_alias",
-                    "label": "Alias",
+                    "id": "if_alias_mib",
+                    "label": "ifAlias",
                     "projection": {
                       "column": "if_alias",
                       "kind": "direct"
@@ -15890,6 +16120,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -16034,6 +16274,7 @@
               {
                 "actor_column": "actor",
                 "default_type": "topology",
+                "label_column": "if_alias",
                 "mode_column": "link_mode",
                 "name_column": "name",
                 "role_column": "topology_role",
@@ -18159,6 +18400,12 @@
           },
           {
             "dictionary": "strings",
+            "id": "process_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "routing_instance",
             "nullable": true,
             "type": "string_ref"
@@ -18284,6 +18531,16 @@
                 "actor_column": "remote_actor",
                 "kind": "actor_ref_label"
               }
+            },
+            {
+              "cell": "text",
+              "id": "process_id",
+              "label": "Process ID",
+              "projection": {
+                "column": "process_id",
+                "kind": "direct"
+              },
+              "visibility": "expanded"
             },
             {
               "cell": "text",
@@ -19143,6 +19400,15 @@
               }
             },
             {
+              "cell": "text",
+              "id": "if_alias",
+              "label": "Alias",
+              "projection": {
+                "column": "if_alias",
+                "kind": "direct"
+              }
+            },
+            {
               "cell": "badge",
               "id": "oper_status",
               "label": "Status",
@@ -19265,8 +19531,8 @@
             },
             {
               "cell": "text",
-              "id": "if_alias",
-              "label": "Alias",
+              "id": "if_alias_mib",
+              "label": "ifAlias",
               "projection": {
                 "column": "if_alias",
                 "kind": "direct"

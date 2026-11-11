@@ -8,10 +8,10 @@ import (
 )
 
 type PageInfo struct {
+	VnodeGUID                               string
 	Site, Page                              string
 	PageviewsWindow, Sessions, ErrorsWindow int
 	Vitals                                  map[string]VitalStats
-	Lost, SessionsLost                      uint64
 	LCPElement, INPElement, CLSElement      string
 	FrustrationWindow                       int
 	FrustrationsKnown                       bool
@@ -21,31 +21,40 @@ type elemSample struct {
 	poor       bool
 }
 
+func hasPageElement(v *vitalObservation) bool {
+	return v.element != "" && (v.key.name == beacon.LCP || v.key.name == beacon.INP || v.key.name == beacon.CLS)
+}
+
 // Pages returns all retained page groups, independent of the chart top-N.
-// Its inventory is bounded by the canonical retained observations.
-func (a *Aggregator) Pages() []PageInfo {
+// An empty vnodeGUID selects all current associations. Its inventory is bounded
+// by the canonical retained observations.
+func (a *Aggregator) Pages(vnodeGUID string) []PageInfo {
 	a.mu.Lock()
-	defer a.mu.Unlock()
+	if vnodeGUID != "" && a.site.cfg.VnodeGUID != vnodeGUID {
+		a.mu.Unlock()
+		return nil
+	}
+	cfg := a.site.cfg
 	r := a.site.readWindow(a.now(), true)
+	a.mu.Unlock()
 	var out []PageInfo
-	for key, p := range r.groups {
-		if key.kind != KindPage {
-			continue
-		}
+	if len(r.groups[facetPage]) > 0 {
+		out = make([]PageInfo, 0, len(r.groups[facetPage]))
+	}
+	for page, p := range r.groups[facetPage] {
 		out = append(out, PageInfo{
-			Site:              a.site.cfg.Name,
-			Page:              key.value,
+			Site:              cfg.Name,
+			VnodeGUID:         cfg.VnodeGUID,
+			Page:              page,
 			PageviewsWindow:   int(p.documents),
 			Sessions:          p.sessions,
 			ErrorsWindow:      int(p.errors),
 			Vitals:            r.vitals(p),
-			Lost:              r.windowLost,
-			SessionsLost:      r.pageSessionsLost,
 			LCPElement:        topElement(p.elements, beacon.LCP),
 			INPElement:        topElement(p.elements, beacon.INP),
 			CLSElement:        topElement(p.elements, beacon.CLS),
 			FrustrationWindow: int(p.frustrations),
-			FrustrationsKnown: a.site.cfg.FrustrationSignals,
+			FrustrationsKnown: cfg.FrustrationSignals,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Page < out[j].Page })

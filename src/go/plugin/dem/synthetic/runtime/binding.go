@@ -49,23 +49,8 @@ func bindPrefix(root *os.Root, final string, m Manifest) error {
 			return err
 		}
 	}
-	for _, name := range []string{m.Layout.Node, m.Layout.Browser, m.Layout.Loader} {
-		info, err := root.Lstat(name)
-		if err != nil || !info.Mode().IsRegular() || info.Mode()&0100 == 0 {
-			return fmt.Errorf("runtime executable is missing or not a plain executable: %s", name)
-		}
-	}
-	for _, name := range []string{m.Layout.Dependencies, m.Layout.Fonts} {
-		info, err := root.Lstat(name)
-		if err != nil || !info.IsDir() {
-			return fmt.Errorf("runtime directory is missing: %s", name)
-		}
-	}
-	if err := plainExistingParents(root, m.Layout.EntryPoint); err != nil {
+	if err := validatePayloadLayout(root, m); err != nil {
 		return err
-	}
-	if info, err := root.Lstat(m.Layout.EntryPoint); err != nil || !info.Mode().IsRegular() {
-		return errors.New("runtime entrypoint must be a plain regular file")
 	}
 	fonts, launcher, err := boundConfiguration(final, m.Layout)
 	if err != nil {
@@ -75,6 +60,50 @@ func bindPrefix(root *os.Root, final string, m Manifest) error {
 		return err
 	}
 	return writeNewFile(root, "chrome", launcher, 0500)
+}
+
+// payloadLayoutError records a directly observed structural violation.
+type payloadLayoutError string
+
+func (e payloadLayoutError) Error() string { return string(e) }
+
+// Check fixed entry paths without walking the payload or executing it.
+func validatePayloadLayout(root *os.Root, m Manifest) error {
+	for _, name := range []string{m.Layout.Node, m.Layout.Browser, m.Layout.Loader} {
+		if err := plainExistingParents(root, name); err != nil {
+			return err
+		}
+		info, err := root.Lstat(name)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() || info.Mode()&0100 == 0 {
+			return payloadLayoutError(fmt.Sprintf("runtime executable is missing or not a plain executable: %s", name))
+		}
+	}
+	for _, name := range []string{m.Layout.Dependencies, m.Layout.Fonts} {
+		if err := plainExistingParents(root, name); err != nil {
+			return err
+		}
+		info, err := root.Lstat(name)
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			return payloadLayoutError(fmt.Sprintf("runtime directory is missing: %s", name))
+		}
+	}
+	if err := plainExistingParents(root, m.Layout.EntryPoint); err != nil {
+		return err
+	}
+	info, err := root.Lstat(m.Layout.EntryPoint)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return payloadLayoutError("runtime entrypoint must be a plain regular file")
+	}
+	return nil
 }
 
 func boundConfiguration(final string, layout Layout) ([]byte, []byte, error) {
@@ -122,13 +151,19 @@ func bindInterpreter(root *os.Root, binding Binding, interpreter []byte) error {
 }
 
 func plainExistingParents(root *os.Root, name string) error {
+	var parents []string
 	for parent := filepath.Dir(name); parent != "."; parent = filepath.Dir(parent) {
-		info, err := root.Lstat(parent)
+		parents = append(parents, parent)
+	}
+	// Inspect outer ancestors before traversing them, so invalid symlinks are
+	// observed as structural violations rather than failed child lookups.
+	for i := len(parents) - 1; i >= 0; i-- {
+		info, err := root.Lstat(parents[i])
 		if err != nil {
 			return err
 		}
 		if !info.IsDir() {
-			return errors.New("runtime path contains a non-directory parent")
+			return payloadLayoutError("runtime path contains a non-directory parent")
 		}
 	}
 	return nil

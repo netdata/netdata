@@ -102,6 +102,7 @@ func semanticBGPRowFromAcquisition(row AcquisitionBGPRowValue) ddsnmp.BGPRow {
 		StructuralID:    row.StructuralID,
 		Kind:            row.Kind,
 		Identity: ddsnmp.BGPIdentity{
+			ProcessID:       row.ProcessID,
 			RoutingInstance: row.RoutingInstance,
 			Neighbor:        row.Neighbor,
 			RemoteAS:        row.RemoteAS,

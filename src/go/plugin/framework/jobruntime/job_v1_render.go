@@ -105,15 +105,15 @@ func (tx *jobV1Emission) createChart(change *jobV1ChartChange) {
 			if ls == 0 {
 				ls = collectorapi.LabelSourceAuto
 			}
-			j.api.CLABEL(l.Key, lblValueReplacer.Replace(l.Value), ls)
+			j.api.CLABEL(netdataapi.SanitizeWireValue(l.Key), netdataapi.SanitizeWireValue(l.Value), ls)
 		}
 	}
 	for k, v := range j.labels {
 		if !seen[k] {
-			j.api.CLABEL(k, lblValueReplacer.Replace(v), collectorapi.LabelSourceConf)
+			j.api.CLABEL(netdataapi.SanitizeWireValue(k), netdataapi.SanitizeWireValue(v), collectorapi.LabelSourceConf)
 		}
 	}
-	j.api.CLABEL("_collect_job", lblValueReplacer.Replace(j.Name()), collectorapi.LabelSourceAuto)
+	j.api.CLABEL("_collect_job", netdataapi.SanitizeWireValue(j.Name()), collectorapi.LabelSourceAuto)
 	j.api.CLABELCOMMIT()
 
 	for _, dim := range chart.Dims {

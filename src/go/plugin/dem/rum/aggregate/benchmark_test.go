@@ -26,6 +26,7 @@ func BenchmarkIngest(b *testing.B) {
 		}
 		b.Run(name, func(b *testing.B) {
 			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+				VnodeGUID: "11111111-1111-4111-8111-111111111111",
 				Investigate: aggregate.InvestigateCfg{
 					Rate: 1,
 				},
@@ -63,6 +64,7 @@ func BenchmarkIngest(b *testing.B) {
 }
 func BenchmarkSnapshot(b *testing.B) {
 	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+		VnodeGUID: "11111111-1111-4111-8111-111111111111",
 		Investigate: aggregate.InvestigateCfg{
 			Rate: 1,
 		},
@@ -98,6 +100,7 @@ func BenchmarkSnapshot(b *testing.B) {
 // it does not traverse persisted history. Timings are local trends, not CI gates.
 func BenchmarkIngestErrors(b *testing.B) {
 	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+		VnodeGUID: "11111111-1111-4111-8111-111111111111",
 		Investigate: aggregate.InvestigateCfg{
 			Rate: 1,
 		},
@@ -113,7 +116,7 @@ func BenchmarkIngestErrors(b *testing.B) {
 		Browser:   "Chrome",
 		Received:  time.Now(),
 		Errors: []beacon.Error{
-			{Type: "TypeError", Message: "checkout failed", Stack: "at checkout()", Fingerprint: "checkout"},
+			{Type: "TypeError", Message: "checkout failed", Stack: "at checkout()", Fingerprint: beacon.Fingerprint("TypeError", "checkout failed", "at checkout()")},
 		},
 	}
 	b.ReportAllocs()
@@ -126,6 +129,7 @@ func BenchmarkIngestErrors(b *testing.B) {
 // Replayed SDK batches must not allocate work proportional to retained state.
 func BenchmarkIngestDuplicate(b *testing.B) {
 	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+		VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 		Name:       "shop",
 		PageGroups: 20,
 		Countries:  20,
@@ -150,6 +154,7 @@ func BenchmarkIngestDuplicateRetained(b *testing.B) {
 	for _, size := range []int{1, 10000} {
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Name:       "shop",
 				PageGroups: 20,
 				Countries:  20,
@@ -178,6 +183,7 @@ func BenchmarkActivity(b *testing.B) {
 	for _, size := range []int{100, 10000} {
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Name:       "shop",
 				PageGroups: 20,
 				Countries:  20,
@@ -213,6 +219,7 @@ func BenchmarkActivity(b *testing.B) {
 // Receipt updates require O(log retained) heap work; duplicate checks remain O(1).
 func BenchmarkRetainedUpdate(b *testing.B) {
 	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+		VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 		Name:       "shop",
 		PageGroups: 20,
 		Countries:  20,
@@ -237,12 +244,13 @@ func BenchmarkRetainedUpdate(b *testing.B) {
 	}
 }
 
-// All derived groups are bounded by canonical observations, not a second
-// lossy grouping cap. Measure the upper retained cardinality on read paths.
+// Derived groups follow retained observations. This fixture measures 10,000
+// distinct page/version groups independently of the chart top-N.
 func BenchmarkHighCardinalityReads(b *testing.B) {
 	for _, kind := range []string{"snapshot", "pages"} {
 		b.Run(kind, func(b *testing.B) {
 			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Name:       "shop",
 				PageGroups: 20,
 				Countries:  20,
@@ -267,7 +275,45 @@ func BenchmarkHighCardinalityReads(b *testing.B) {
 				if kind == "snapshot" {
 					a.Snapshot()
 				} else {
-					a.Pages()
+					a.Pages("")
+				}
+			}
+		})
+	}
+}
+
+// A hot site at 500 new documents/s retains 150,000 documents in five minutes.
+// Three vitals and a resource per document expose reduction/sorting costs even
+// with only 20 pages and three versions. Timings are local trends, not an SLO.
+func BenchmarkDenseWindowReads(b *testing.B) {
+	for _, kind := range []string{"snapshot", "pages"} {
+		b.Run(kind, func(b *testing.B) {
+			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{Name: "shop", PageGroups: 20, Countries: 20})
+			now := time.Now()
+			for i := range 150000 {
+				a.Ingest(&beacon.Beacon{
+					Site: "shop", ExperienceID: strconv.Itoa(i), SessionID: strconv.Itoa(i),
+					PageGroup: "/page_" + strconv.Itoa(i%20), PageHost: "example.org", AppVersion: strconv.Itoa(i % 3),
+					Browser: "Chrome", Device: "desktop", Country: "GR", Received: now,
+					Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
+					Vitals: []beacon.Vital{
+						{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: float64((i * 37) % 10000)},
+						{ID: "inp", Revision: 1, Name: beacon.INP, Value: float64((i * 23) % 1000)},
+						{ID: "cls", Revision: 1, Name: beacon.CLS, Value: float64(i%100) / 100},
+					},
+					Resources: []beacon.Resource{{ID: "resource", Host: "example.org", Initiator: "fetch", HasDuration: true, DurationMS: float64(i % 1000)}},
+				})
+			}
+			if got := a.Activity().PageviewsWindow; got != 150000 {
+				b.Fatalf("retained document activity: got %d, want 150000", got)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				if kind == "snapshot" {
+					a.Snapshot()
+				} else {
+					a.Pages("")
 				}
 			}
 		})

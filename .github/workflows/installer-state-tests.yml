@@ -4,13 +4,17 @@ on:
   pull_request:
     paths:
       - '.github/workflows/installer-state-tests.yml'
+      - 'netdata-installer.sh'
       - 'packaging/installer/functions.sh'
       - 'packaging/installer/tests/test_install_state.py'
+      - 'packaging/installer/tests/test_source_install_permissions.py'
       - 'packaging/installer/tests/test_prepare_fleet.py'
       - 'packaging/makeself/prepare-fleet.py'
       - 'packaging/makeself/install-or-update.sh'
       - 'packaging/makeself/create-package-manifest.sh'
       - 'packaging/makeself/functions.sh'
+      - 'packaging/makeself/jobs/00-prepare-destination.install.sh'
+      - 'packaging/makeself/jobs/90-prepare-archive-source.sh'
       - 'packaging/makeself/jobs/97-create-package-manifest.sh'
       - 'packaging/makeself/jobs/98-create-archive.sh'
       - 'packaging/makeself/makeself*.sh'
@@ -20,13 +24,17 @@ on:
       - master
     paths:
       - '.github/workflows/installer-state-tests.yml'
+      - 'netdata-installer.sh'
       - 'packaging/installer/functions.sh'
       - 'packaging/installer/tests/test_install_state.py'
+      - 'packaging/installer/tests/test_source_install_permissions.py'
       - 'packaging/installer/tests/test_prepare_fleet.py'
       - 'packaging/makeself/prepare-fleet.py'
       - 'packaging/makeself/install-or-update.sh'
       - 'packaging/makeself/create-package-manifest.sh'
       - 'packaging/makeself/functions.sh'
+      - 'packaging/makeself/jobs/00-prepare-destination.install.sh'
+      - 'packaging/makeself/jobs/90-prepare-archive-source.sh'
       - 'packaging/makeself/jobs/97-create-package-manifest.sh'
       - 'packaging/makeself/jobs/98-create-archive.sh'
       - 'packaging/makeself/makeself*.sh'
@@ -44,15 +52,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Shell validation
         run: |
+          bash -n netdata-installer.sh
           bash -n packaging/makeself/install-or-update.sh
           bash -n packaging/makeself/create-package-manifest.sh
+          bash -n packaging/makeself/jobs/00-prepare-destination.install.sh
+          bash -n packaging/makeself/jobs/90-prepare-archive-source.sh
           bash -n packaging/makeself/jobs/97-create-package-manifest.sh
           sh -n packaging/installer/functions.sh
           shellcheck packaging/makeself/create-package-manifest.sh packaging/makeself/install-or-update.sh packaging/installer/functions.sh
-          shellcheck -x packaging/makeself/jobs/97-create-package-manifest.sh
+          shellcheck -x packaging/makeself/jobs/00-prepare-destination.install.sh packaging/makeself/jobs/90-prepare-archive-source.sh packaging/makeself/jobs/97-create-package-manifest.sh
       - name: Unprivileged isolated fixtures
         run: python3 packaging/installer/tests/test_install_state.py -v
       - name: Root ownership and tmpfiles fixtures
         run: sudo python3 packaging/installer/tests/test_install_state.py -v
+      - name: Source install creation permissions
+        run: |
+          command -v cmake make
+          python3 packaging/installer/tests/test_source_install_permissions.py -v
+          sudo python3 packaging/installer/tests/test_source_install_permissions.py -v
       - name: Fleet package inventory fixtures
         run: python3 packaging/installer/tests/test_prepare_fleet.py -v

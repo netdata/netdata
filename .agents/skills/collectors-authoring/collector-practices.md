@@ -28,7 +28,9 @@ Labels — is the model. Every dashboard-shaping mechanism (§3) feeds into it.
 
 Chart `context`, chart IDs, dimension IDs, instance labels — once shipped, they bind health alerts, dashboards, exports,
 anomaly detection, ML jobs, streaming consumers, and Netdata Cloud. Renaming silently breaks all of them. Treat them as
-permanent.
+permanent outside an approved change. The explicit V1-to-V2 migration exception is owned by
+`src/go/plugin/go.d/docs/migrate-v1-to-v2.md#chart-and-dimension-ids`: normal V2 IDs are allowed while contexts and
+dimension names remain stable.
 
 ### 1.4 Gaps are data
 
@@ -240,7 +242,9 @@ concern; see §1.5.) The bound is a per-domain decision, recorded in the design 
   so totals stay truthful; for percentiles, temperatures, timestamps, or states, do not invent an aggregate: disclose
   the excluded coverage explicitly (for example a charted-versus-reported count). A cap alone silently truncates
   whatever lands in the first N entries, so pair it with a selector that lets the operator choose which entities
-  survive.
+  survive. Worked example: apps.plugin (`src/collectors/apps.plugin/apps_targets.c`) - per-family `max-targets` cap,
+  an `other` target aggregated from per-process values, idle retirement (§1.5); `apps_groups.conf` selects permanent
+  application groups only, so the user, group, SID and service families have no selector.
 
 A public `max_*` option or selector is a config option like any other: it MUST name the operator decision it enables
 (`.agents/skills/collectors-go-design/operator-surface.md`). A bounded, low-cardinality entity set needs no knob.
@@ -325,8 +329,11 @@ mechanism that matches your collector and *learn how it shapes the result*.
 
 **N**odes, **I**nstances, **D**imensions, **L**abels. This is the conceptual model every other mechanism feeds into.
 Read `docs/NIDL-Framework.md` before designing metrics. Group dimensions into charts that answer *one operational
-question*. Use labels for instance and context annotations. Pick the right chart type (`line`, `area`, `stacked`,
-`heatmap` — see `src/database/rrdset-type.h`) and dimension algorithm (`absolute`, `incremental`,
+question*. Use labels for instance and context annotations. Free-text label values (descriptions, aliases) need no
+collector-side content sanitization: the Agent normalizes every chart label value on ingest (`rrdlabels_sanitize_value`
+in `src/libnetdata/sanitizers/sanitizers-labels.c`), replacing control characters, quotes and several symbols, mapping
+`\` to `/`, capping the length, and storing an empty value as `[none]`. Pick the right chart type (`line`, `area`,
+`stacked`, `heatmap` — see `src/database/rrdset-type.h`) and dimension algorithm (`absolute`, `incremental`,
 `percentage-of-incremental-row`, `percentage-of-absolute-row` — see `src/database/rrd-algorithm.h`, documented in
 `src/plugins.d/README.md`).
 

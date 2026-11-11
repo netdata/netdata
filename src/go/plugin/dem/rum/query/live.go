@@ -16,11 +16,12 @@ type livePosition struct {
 	Sequence   uint64 `json:"s"`
 }
 type liveCursor struct {
-	Version int                     `json:"v"`
-	Sites   map[string]livePosition `json:"sites"`
+	VnodeGUID string                  `json:"vnode_guid,omitempty"`
+	Version   int                     `json:"v"`
+	Sites     map[string]livePosition `json:"sites"`
 }
 
-func (s *Service) Live(ctx context.Context, filter, after string, limit int) ([]LiveEvent, string, error) {
+func (s *Service) Live(ctx context.Context, filter, after string, limit int, vnodeGUID string) ([]LiveEvent, string, error) {
 	cursor := liveCursor{
 		Version: 1,
 		Sites:   map[string]livePosition{},
@@ -38,6 +39,11 @@ func (s *Service) Live(ctx context.Context, filter, after string, limit int) ([]
 			}
 		}
 	}
+	// Positions belong to one GUID selection. Switching selection starts its retained view.
+	if cursor.VnodeGUID != vnodeGUID {
+		cursor.Sites = map[string]livePosition{}
+	}
+	cursor.VnodeGUID = vnodeGUID
 	if limit <= 0 {
 		return nil, "", errors.New("live row limit must be positive")
 	}
@@ -61,7 +67,7 @@ func (s *Service) Live(ctx context.Context, filter, after string, limit int) ([]
 			}
 		}
 		cursor.Sites[key] = pos
-		batch, _ := site.Aggregator.Live(pos.Sequence, limit)
+		batch, _ := site.Aggregator.Live(pos.Sequence, limit, vnodeGUID)
 		redact := siteRedactor(site)
 		stream := make([]LiveEvent, 0, len(batch))
 		for _, row := range batch {

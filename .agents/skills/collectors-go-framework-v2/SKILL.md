@@ -224,8 +224,8 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - For migrations, first create a compatibility manifest covering chart IDs,
   contexts, dimension IDs/names, labels, config keys, DynCfg schema keys,
   stock config, alerts, docs, and lifecycle behavior.
-- Migrations MUST preserve existing public contracts unless the SOW records an
-  explicit breaking decision.
+- Migrations MUST preserve the contracts defined in `src/go/plugin/go.d/docs/migrate-v1-to-v2.md#what-must-stay-stable`.
+  Its chart/dimension ID policy permits normal V2 IDs while requiring the existing contexts and dimension names.
 - Migrations MUST keep old YAML/JSON field names. Add new config as opt-in when
   cardinality, cost, or user-visible identity could surprise existing users.
 - Collector integration artifacts MUST follow
@@ -330,8 +330,8 @@ Tests are evidence only when they have an independent oracle:
 - The PR description or design note MUST enumerate affected collector
   consistency artifacts and justify every artifact that did not need a matching
   change. SHOULD-level exceptions and escape hatches MUST be reviewer-visible.
-- Existing public chart/metric/config identity MUST be preserved unless the SOW
-  records an explicit breaking decision.
+- Existing public chart/metric/config identity MUST be preserved unless the SOW records an explicit breaking decision
+  or the migration guide's chart/dimension ID policy applies. Check contexts and dimension names independently of IDs.
 - New labels and scopes MUST be bounded and documented.
 - Enrichment SHOULD be split from the V2 compatibility migration when possible.
 - Final sweep: dead fields and helpers, duplicated defaults, unused persisted

@@ -9,10 +9,15 @@ static struct proc_module {
     const char *dim;
     int enabled;
     int update_every;
+    // Always run on a dedicated thread, so a blocking data source cannot stall the shared loop.
+    bool dedicated_thread;
     int (*func)(int update_every, usec_t dt);
     RRDDIM *rd;
     ND_THREAD *thread;
     void (*cleanup)();
+    // Optional; called from the main thread at shutdown, before joining the module's thread, to abort a blocking
+    // call (e.g. a WMI ConnectServer, up to ~2 minutes) that would otherwise delay the unbounded join.
+    void (*interrupt)(void);
 } win_modules[] = {
 
     // system metrics
@@ -229,7 +234,6 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = NULL},
-    // the terminator of this array
     {.name = "PerflibASP",
      .dim = "PerflibASP",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -238,6 +242,18 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = NULL},
+
+    // WMI metrics
+    {.name = "GetFSRMQuota",
+     .dim = "GetFSRMQuota",
+     .enabled = CONFIG_BOOLEAN_NO,
+     .update_every = 10 * UPDATE_EVERY_MIN,
+     .dedicated_thread = true,
+     .func = do_GetFSRMQuota,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_GetFSRMQuota_cleanup,
+     .interrupt = do_GetFSRMQuota_interrupt},
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL, .rd = NULL, .thread = NULL, .cleanup = NULL}};
 
@@ -290,6 +306,10 @@ static void windows_plugin_thread_worker(void *ptr __maybe_unused)
         mod->func(update_every, now - last);
         last = now;
     }
+
+    // Thread-owned resources (e.g. COM/WMI) must be released on the thread that created them.
+    if (mod->dedicated_thread && mod->cleanup)
+        mod->cleanup();
 }
 
 void win_plugin_main(void *ptr)
@@ -315,10 +335,15 @@ void win_plugin_main(void *ptr)
         pm->update_every = (int)inicfg_get_duration_seconds(
             &netdata_config, buf, "update every", (update_every != pm->update_every) ? pm->update_every : update_every);
 
-        if (pm->enabled && unlikely(update_every != pm->update_every)) {
+        if (pm->enabled && (pm->dedicated_thread || unlikely(update_every != pm->update_every))) {
             char tag_name[ND_THREAD_TAG_MAX];
             snprintfz(tag_name, ND_THREAD_TAG_MAX - 1, "WIN_PLUGIN[%d]", i);
             pm->thread = nd_thread_create(tag_name, NETDATA_THREAD_OPTION_DEFAULT, windows_plugin_thread_worker, pm);
+            if (!pm->thread && pm->dedicated_thread) {
+                // Running it inline could block every other module, so leave it disabled.
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "%s: cannot create its thread; module disabled", pm->name);
+                pm->enabled = 0;
+            }
         }
 
         worker_register_job_name(i, win_modules[i].dim);
@@ -363,16 +388,24 @@ void win_plugin_main(void *ptr)
         }
     }
 
+    // Abort blocking calls in every module thread first, so their joins below do not wait on each other.
+    for (i = 0; win_modules[i].name; i++) {
+        struct proc_module *pm = &win_modules[i];
+        if (pm->thread && pm->interrupt)
+            pm->interrupt();
+    }
+
     // Join threads
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
+        bool cleaned_by_thread = pm->thread && pm->dedicated_thread;
 
         if (pm->thread) {
             nd_thread_join(pm->thread);
             pm->thread = NULL;
         }
 
-        if (pm->cleanup)
+        if (pm->cleanup && !cleaned_by_thread)
             pm->cleanup();
     }
 }

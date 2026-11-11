@@ -848,28 +848,52 @@ _Static_assert(sizeof(struct nd_ebpf_pid_event) == 48, "nd_ebpf_pid_event must m
 
 /* NETDATA_ARENA_EVENT_SLOTS in ebpf-co-re/includes/netdata_arena_common.h */
 #define ND_EBPF_ARENA_EVENT_SLOTS 1024
+#define ND_EBPF_ARENA_QUEUE_VERSION 0x4e444151U
 
-/* Layout of the NETDATA_ARENA_QUEUE_DECL state: a head counter followed by the
- * slot ring.  The 4 bytes of padding after head come from the events[] 8-byte
- * alignment. */
-struct nd_ebpf_arena_state {
-    uint32_t head;
+struct nd_ebpf_arena_slot {
+    uint32_t ready;
     uint32_t _pad;
-    struct nd_ebpf_pid_event events[ND_EBPF_ARENA_EVENT_SLOTS];
+    struct nd_ebpf_pid_event event;
 };
 
-_Static_assert(sizeof(struct nd_ebpf_arena_state) == 49160, "nd_ebpf_arena_state does not match the BPF-side layout");
+struct nd_ebpf_arena_state {
+    uint32_t head;
+    uint32_t tail;
+    uint32_t version;
+    uint32_t reserved;
+    uint64_t dropped;
+    struct nd_ebpf_arena_slot slots[ND_EBPF_ARENA_EVENT_SLOTS];
+};
+
+_Static_assert(sizeof(struct nd_ebpf_arena_state) == 57368, "nd_ebpf_arena_state does not match the BPF-side layout");
+
+static inline uint64_t nd_ebpf_arena_dropped(const void *arena_state)
+{
+    if (!arena_state)
+        return 0;
+    const struct nd_ebpf_arena_state *state = arena_state;
+    return __atomic_load_n(&state->dropped, __ATOMIC_ACQUIRE);
+}
 
 #if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+static inline int nd_ebpf_arena_state_valid(struct bpf_map *map, const void *state, size_t expected_size)
+{
+    size_t data_size = 0;
+    if (!map || !state || !bpf_map__initial_value(map, &data_size) || data_size != expected_size)
+        return -EINVAL;
+
+    const struct nd_ebpf_arena_state *queue = state;
+    return __atomic_load_n(&queue->version, __ATOMIC_ACQUIRE) == ND_EBPF_ARENA_QUEUE_VERSION ? 0 : -EPROTONOSUPPORT;
+}
+
 static inline int nd_ebpf_raw_arena_get_state(struct nd_ebpf_raw_arena *arena, void **state)
 {
     if (!arena || !arena->state || !state)
         return -EINVAL;
 
-    size_t data_size = 0;
-    void *mapped = bpf_map__initial_value(arena->map, &data_size);
-    if (!mapped || data_size < sizeof(struct nd_ebpf_arena_state))
-        return -EINVAL;
+    int err = nd_ebpf_arena_state_valid(arena->map, arena->state, sizeof(struct nd_ebpf_arena_state));
+    if (err)
+        return err;
 
     *state = arena->state;
     return 0;
@@ -878,25 +902,25 @@ static inline int nd_ebpf_raw_arena_get_state(struct nd_ebpf_raw_arena *arena, v
 
 typedef void (*nd_ebpf_event_fn)(void *ctx, const struct nd_ebpf_pid_event *ev);
 
-/* Consumes every slot published since tail and returns the new tail.
- *
- * NOT re-entrant: fn must not drain the same arena_state.  head is sampled once,
- * so a nested drain would consume events this call still has to replay and the
- * outer loop would process them twice. */
-static inline uint32_t nd_ebpf_arena_drain(const void *arena_state, uint32_t tail, nd_ebpf_event_fn fn, void *ctx)
+/* Not re-entrant: a slot is released only after its callback finishes. */
+static inline void nd_ebpf_arena_drain(void *arena_state, nd_ebpf_event_fn fn, void *ctx)
 {
     if (!arena_state)
-        return tail;
+        return;
 
-    const struct nd_ebpf_arena_state *state = (const struct nd_ebpf_arena_state *)arena_state;
+    struct nd_ebpf_arena_state *state = arena_state;
     uint32_t head = __atomic_load_n(&state->head, __ATOMIC_ACQUIRE);
+    uint32_t tail = __atomic_load_n(&state->tail, __ATOMIC_RELAXED);
 
     while (tail != head) {
-        fn(ctx, &state->events[tail % ND_EBPF_ARENA_EVENT_SLOTS]);
+        struct nd_ebpf_arena_slot *slot = &state->slots[tail % ND_EBPF_ARENA_EVENT_SLOTS];
+        if (!__atomic_load_n(&slot->ready, __ATOMIC_ACQUIRE))
+            break;
+        fn(ctx, &slot->event);
+        __atomic_store_n(&slot->ready, 0, __ATOMIC_RELEASE);
         tail++;
+        __atomic_store_n(&state->tail, tail, __ATOMIC_RELEASE);
     }
-
-    return head;
 }
 
 /* Opens the named ring buffer map.  module is used only for error reporting. */

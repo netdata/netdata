@@ -73,6 +73,9 @@ special unconfined profile declares ABI 3, whose compatibility rules permit
 user namespaces on restricted Ubuntu. The same file parses with AppArmor 3 and
 4. Chromium still runs its own namespace/seccomp sandbox as the service user;
 qualification must pass without disabling that sandbox.
+Root ownership protects payload replacement; it does not make this profile an
+exclusive browser authorization boundary. Other unconfined processes may adopt
+named profiles, depending on host policy.
 
 The profile is a Debian conffile and RPM `%config(noreplace)` file. Administrator
 body/ABI edits and parser ABI overrides remain authoritative; keep the profile

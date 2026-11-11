@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
@@ -41,8 +43,15 @@ func init() {
 }
 func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
-	if handled, err := runRuntimeCommand(context.Background(), os.Args[1:], os.Stdout, os.Stderr); handled {
-		if err != nil {
+	runtimeContext := context.Background()
+	stopRuntimeSignals := func() {}
+	if len(os.Args) > 1 && os.Args[1] == "runtime" {
+		runtimeContext, stopRuntimeSignals = signal.NotifyContext(runtimeContext, os.Interrupt, syscall.SIGTERM)
+	}
+	handled, runtimeError := runRuntimeCommandWithInput(runtimeContext, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	stopRuntimeSignals()
+	if handled {
+		if err := runtimeError; err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -113,7 +122,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "initial DEM artifact cleanup failed: %v\n", err)
 	}
 	runtimeHandle := dem.OpenRuntime(cfg.Runtime, pluginconfig.VarLibDir())
-	executor := runner.New(runtimeHandle.Source, synthetichistory.NewStore(history), captures)
+	executor, err := runner.New(runtimeHandle.Source, synthetichistory.NewStore(history), captures, cfg.Browser.Concurrency)
+	if err != nil {
+		_ = history.Close()
+		fmt.Fprintf(os.Stderr, "initializing DEM browser execution: %v\n", err)
+		os.Exit(1)
+	}
 	if runtimeHandle.Store != nil && runtimeHandle.Host != nil {
 		runtimeHandle.Updater = runtimehost.NewUpdater(runtimeHandle.Host, executor, cfg.Runtime.ReleaseLoader("", true))
 	}
