@@ -832,8 +832,24 @@ static void perflib_check_counter_layout(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
         if(!pCounter)
             break;
 
-        // Base counters and unsupported types are not read as values of their own.
+        // Base counters are read as denominators (getCounterData), at these widths; unsupported types are not read.
         size_t size = getCounterDataSize(pCounter);
+        if(!size) {
+            switch(pCounter->CounterType) {
+                case PERF_SAMPLE_BASE:
+                case PERF_AVERAGE_BASE:
+                case PERF_RAW_BASE:
+                    size = sizeof(DWORD);
+                    break;
+
+                case PERF_LARGE_RAW_BASE:
+                    size = sizeof(ULONGLONG);
+                    break;
+
+                default:
+                    break;
+            }
+        }
         if(!size)
             continue;
 
