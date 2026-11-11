@@ -9,6 +9,11 @@
 //!   hand-checked builds, and `from_sorted_iter`/`from_range` round
 //!   trips (ascending input required, duplicates tolerated, an empty
 //!   iterator appends nothing).
+//! - Byte-level builder pins at every tree depth up to `u32::MAX`:
+//!   `from_sorted_iter` against the insert-built oracle
+//!   (`build_by_insert`), and `from_range` against `from_sorted_iter`
+//!   over the same range, exhaustively in small universes and as
+//!   proptests.
 //! - Queries over the raw blob: `contains`, ascending `iter`, `len`,
 //!   `is_empty`, `min`/`max`, `range_cardinality`.
 //! - The four set ops as pure blob-to-blob functions, with
@@ -19,11 +24,18 @@
 //! - `estimate_data_size`'s exactness against real builds (the fuzz
 //!   target re-asserts the tie after arbitrary op sequences,
 //!   `fuzz/fuzz_targets/against_roaring.rs`).
+//! - All four set ops against a sorted-merge oracle at every depth 1-11
+//!   (bulk tails included), without the `roaring` feature.
+//! - Subtree skipping and counting (node.rs `skip_subtree_at`,
+//!   `NodeReader::skip`/`skip_subtree`, and `len`): every subtree ends,
+//!   and counts, as a byte-by-byte reference walk says, at every depth
+//!   1-11 and as a proptest.
 //!
 //! Not pinned here: descending or out-of-range values fed to
 //! `from_sorted_iter` (both undefined; no test feeds them), and roaring
 //! equivalence over long mutation sequences (fuzz-target territory).
 use crate::*;
+use proptest::prelude::*;
 
 // The level curve at its boundaries: 0 maps to 0 levels (no tree at
 // all), and exact powers of 8 stay on the lower level.
@@ -1081,10 +1093,131 @@ fn test_from_sorted_iter_large_universe() {
     assert!(!bm.contains(&data, 1));
 }
 
+/// Build `values` (ascending) by repeated `insert` into an empty blob.
+/// `insert` patches the tree in place and shares no code with the
+/// builders, and canonical storage admits one blob per set, so this is
+/// an independent byte-level oracle for every builder.
+pub(crate) fn build_by_insert(universe_size: u32, values: &[u32]) -> Vec<u8> {
+    let bm = RawBitmap::empty(universe_size);
+    let mut data = Vec::new();
+    for &v in values {
+        bm.insert(&mut data, v);
+    }
+    data
+}
+
+/// Strategy for a universe at a uniformly drawn tree depth: anywhere in
+/// `(8^(levels-1), 8^levels]` for `levels` in 1-11, capped at `u32::MAX`.
+/// A universe drawn uniformly up to `u32::MAX` would be 10 or 11 levels
+/// deep in almost every case.
+pub(crate) fn arb_universe() -> impl Strategy<Value = u32> {
+    (1u32..=11).prop_flat_map(|levels| {
+        let lo = if levels == 1 {
+            1
+        } else {
+            (1u64 << (3 * (levels - 1))) + 1
+        };
+        let hi = (1u64 << (3 * levels)).min(u32::MAX as u64);
+        (lo as u32)..=(hi as u32)
+    })
+}
+
+/// Strategy for the byte-level builder pins: a universe at any tree depth
+/// (`arb_universe`) and up to 512 ascending values, half scattered and
+/// half clustered around a random base, so leaves are both shared and
+/// lone.
+fn arb_values_any_universe() -> impl Strategy<Value = (u32, Vec<u32>)> {
+    arb_universe().prop_flat_map(|universe| {
+        (
+            proptest::collection::vec(0..universe, 0..=256usize),
+            0..universe,
+            proptest::collection::vec(0u32..4096, 0..=256usize),
+        )
+            .prop_map(move |(mut vals, base, offsets)| {
+                vals.extend(
+                    offsets
+                        .into_iter()
+                        .filter_map(|o| base.checked_add(o))
+                        .filter(|&v| v < universe),
+                );
+                vals.sort_unstable();
+                vals.dedup();
+                (universe, vals)
+            })
+    })
+}
+
+// Byte-level pin: from_sorted_iter writes exactly the insert oracle's
+// blob, from 1-level trees up to the 11-level u32::MAX universe, for
+// sparse, clustered and dense inputs.
+#[test]
+fn test_from_sorted_iter_matches_insert_oracle() {
+    let cases: Vec<(u32, Vec<u32>)> = vec![
+        (1, vec![0]),
+        (8, (0..8).collect()),
+        (9, vec![0, 8]),
+        (64, vec![7, 8, 63]),
+        (513, (0..513).step_by(7).collect()),
+        (4096, (0..20).chain(500..530).chain(4000..4096).collect()),
+        (1_000_000, vec![0, 7, 8, 63, 64, 511, 512, 999_999]),
+        (
+            u32::MAX,
+            vec![0, 1 << 30, (1 << 31) + 5, u32::MAX - 9, u32::MAX - 1],
+        ),
+    ];
+    for (universe, values) in &cases {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(values.iter().copied(), *universe, &mut data);
+        assert_eq!(
+            data,
+            build_by_insert(*universe, values),
+            "universe={universe}"
+        );
+    }
+}
+
+proptest! {
+    /// The same byte-level pin over generated sets at every tree depth.
+    #[test]
+    fn from_sorted_iter_matches_insert_oracle((universe, vals) in arb_values_any_universe()) {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
+        prop_assert_eq!(data, build_by_insert(universe, &vals));
+    }
+
+    /// `estimate_data_size` counts exactly the bytes the builder writes,
+    /// at every tree depth (`tests_roaring.rs` pins it for small
+    /// universes only).
+    #[test]
+    fn estimate_data_size_matches_builder((universe, vals) in arb_values_any_universe()) {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
+        prop_assert_eq!(estimate_data_size(universe, vals.iter().copied()), data.len());
+    }
+
+    /// `from_range` writes the same bytes as `from_sorted_iter` over the
+    /// same range (itself pinned to the insert oracle above), for ranges
+    /// of up to 20,000 values anywhere in universes of every depth.
+    #[test]
+    fn from_range_matches_from_sorted_iter(
+        universe in arb_universe(),
+        start_frac in 0.0f64..=1.0,
+        len in 0u32..=20_000,
+    ) {
+        let start = (universe as f64 * start_frac) as u32;
+        let end = start.saturating_add(len).min(universe);
+        let mut got = Vec::new();
+        RawBitmap::from_range(start..end, universe, &mut got);
+        let mut want = Vec::new();
+        RawBitmap::from_sorted_iter(start..end, universe, &mut want);
+        prop_assert_eq!(got, want);
+    }
+}
+
 // from_range normalizes any RangeBounds<u32> into a half-open
 // start..end (an inclusive end widens by one, the end is clamped to
-// the universe) and delegates to from_sorted_iter. An inverted or
-// empty range yields an empty set, never a panic.
+// the universe) and builds that range. An inverted or empty range
+// yields an empty set, never a panic.
 #[test]
 fn test_from_range_full() {
     let mut data = Vec::new();
@@ -1163,30 +1296,48 @@ fn test_from_range_clamped_to_universe() {
     assert_eq!(bm.iter(&data).collect::<Vec<_>>(), vec![60, 61, 62, 63]);
 }
 
-// The delegate must agree with the direct builder: same membership
-// for full and middle ranges at every depth tested.
+// Byte-level pin: from_range writes the same blob as from_sorted_iter
+// over the same range, for every start..end in universes at each level
+// boundary (full, empty and single-value ranges included).
 #[test]
-fn test_from_range_matches_from_sorted_iter() {
-    for &universe in &[8, 64, 512, 4096] {
-        let mut data1 = Vec::new();
-        let from_range = RawBitmap::from_range(0..universe, universe, &mut data1);
-        let mut data2 = Vec::new();
-        let from_iter = RawBitmap::from_sorted_iter(0..universe, universe, &mut data2);
-        assert!(
-            bitmaps_equal(&from_range, &data1, &from_iter, &data2),
-            "universe={universe}"
-        );
+fn test_from_range_bytes_exhaustive() {
+    for universe in [1u32, 2, 7, 8, 9, 63, 64, 65, 100, 511, 512, 513] {
+        for start in 0..=universe {
+            for end in start..=universe {
+                let mut got = Vec::new();
+                RawBitmap::from_range(start..end, universe, &mut got);
+                let mut want = Vec::new();
+                RawBitmap::from_sorted_iter(start..end, universe, &mut want);
+                assert_eq!(got, want, "universe={universe} range={start}..{end}");
+            }
+        }
+    }
+}
 
-        let start = universe / 4;
-        let end = universe * 3 / 4;
-        let mut data3 = Vec::new();
-        let from_range = RawBitmap::from_range(start..end, universe, &mut data3);
-        let mut data4 = Vec::new();
-        let from_iter = RawBitmap::from_sorted_iter(start..end, universe, &mut data4);
-        assert!(
-            bitmaps_equal(&from_range, &data3, &from_iter, &data4),
-            "universe={universe} range={start}..{end}"
-        );
+// The same pin at large universes and the 11-level u32::MAX tree, whose
+// root spans 8^11 = 2^33 values, past u32; ranges of millions of values
+// cover tall full subtrees (the fuzz target caps its ranges at 4,096).
+#[test]
+fn test_from_range_bytes_large_universes() {
+    let cases: [(u32, u32, u32); 10] = [
+        (4096, 1024, 3072),
+        (1 << 24, 0, 1),
+        (1 << 24, 12_345, 112_345),
+        // Full subtrees up to 7 levels tall (8^7 = 2,097,152 values).
+        (1 << 24, 1_000, 3_000_000),
+        (u32::MAX, 2_000_000, 4_300_000),
+        (1 << 24, (1 << 24) - 70_000, 1 << 24),
+        (1_000_000, 262_143, 262_145),
+        (u32::MAX, 0, 9),
+        (u32::MAX, (1 << 30) - 3, (1 << 30) + 70_000),
+        (u32::MAX, u32::MAX - 40_000, u32::MAX),
+    ];
+    for (universe, start, end) in cases {
+        let mut got = Vec::new();
+        RawBitmap::from_range(start..end, universe, &mut got);
+        let mut want = Vec::new();
+        RawBitmap::from_sorted_iter(start..end, universe, &mut want);
+        assert_eq!(got, want, "universe={universe} range={start}..{end}");
     }
 }
 
@@ -1392,4 +1543,392 @@ fn test_estimate_data_size_dense() {
     let (_, data) = make_bitmap(64, &values);
     let estimated = estimate_data_size(64, values.iter().copied());
     assert_eq!(estimated, data.len());
+}
+
+// ── Subtree skipping ───────────────────────────────────────────────
+
+/// Every node of a canonical tree as `(start, height, end, values)`, found
+/// by a byte-by-byte pre-order walk that reads every node and sums its
+/// leaves' bits — the reference the fast skip (node.rs `skip_subtree_at`,
+/// which never reads leaf bytes) and the popcount count
+/// (`subtree_population`) must agree with.
+fn reference_spans(data: &[u8], levels: u32) -> Vec<(usize, u32, usize, u64)> {
+    fn walk(
+        data: &[u8],
+        pos: usize,
+        height: u32,
+        spans: &mut Vec<(usize, u32, usize, u64)>,
+    ) -> (usize, u64) {
+        let slot = spans.len();
+        spans.push((pos, height, 0, 0));
+        let node = data[pos];
+        let mut end = pos + 1;
+        let mut values = 0;
+        if height == 1 {
+            values = node.count_ones() as u64;
+        } else {
+            for child in 0..8 {
+                if node & (1 << child) != 0 {
+                    let (child_end, child_values) = walk(data, end, height - 1, spans);
+                    end = child_end;
+                    values += child_values;
+                }
+            }
+        }
+        spans[slot].2 = end;
+        spans[slot].3 = values;
+        (end, values)
+    }
+    let mut spans = Vec::new();
+    if !data.is_empty() {
+        let (end, _) = walk(data, 0, levels, &mut spans);
+        assert_eq!(
+            end,
+            data.len(),
+            "reference walk must consume the whole blob"
+        );
+    }
+    spans
+}
+
+/// Skip and count every subtree of `data` with each entry point and
+/// compare with the reference walk; `len` must equal the root's count.
+fn assert_skips_match(universe: u32, data: &[u8]) {
+    let levels = ceil_log8(universe);
+    let spans = reference_spans(data, levels);
+    for &(start, height, end, values) in &spans {
+        let label = format!("universe={universe} start={start} height={height}");
+        assert_eq!(
+            crate::node::skip_subtree_at(data, start, height),
+            end,
+            "{label}"
+        );
+        let mut reader = crate::node::NodeReader {
+            nodes: data,
+            pos: start,
+        };
+        reader.skip(height);
+        assert_eq!(reader.pos, end, "{label}");
+        let mut reader = crate::node::NodeReader {
+            nodes: data,
+            pos: start,
+        };
+        assert_eq!(reader.skip_subtree(height), values, "{label}");
+        assert_eq!(reader.pos, end, "{label}");
+    }
+    let len = spans.first().map_or(0, |span| span.3);
+    assert_eq!(
+        RawBitmap::empty(universe).len(data),
+        len,
+        "universe={universe}"
+    );
+}
+
+// The fast skip lands where a byte-by-byte walk does, and the count
+// matches its leaf bits, for every node of sparse, clustered and dense
+// trees at every depth 1-11: single values, full trees (every height-2
+// node with 8 children), and ranges.
+#[test]
+fn test_skip_matches_reference_walk() {
+    let mut cases: Vec<(u32, Vec<u8>)> = Vec::new();
+    for levels in 1..=11u32 {
+        let top = (1u64 << (3 * levels)).min(u32::MAX as u64) as u32;
+        for universe in [top, top / 2 + 1] {
+            let span = universe.min(1 << 15);
+            for values in [
+                vec![0],
+                vec![universe - 1],
+                (0..span).step_by(7).collect::<Vec<u32>>(),
+                (universe - span..universe).collect::<Vec<u32>>(),
+                (0..span).filter(|v| v % 64 < 3).collect::<Vec<u32>>(),
+            ] {
+                let (_, data) = make_bitmap(universe, &values);
+                cases.push((universe, data));
+            }
+        }
+    }
+    for universe in [8, 64, 512, 4096, 32768, 262_144] {
+        let mut data = Vec::new();
+        RawBitmap::from_range(0..universe, universe, &mut data);
+        cases.push((universe, data));
+    }
+    for (universe, data) in &cases {
+        assert_skips_match(*universe, data);
+    }
+}
+
+proptest! {
+    /// The same agreement over generated sets at every tree depth.
+    #[test]
+    fn skip_matches_reference_walk((universe, vals) in arb_values_any_universe()) {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
+        assert_skips_match(universe, &data);
+    }
+}
+
+// Range counts whose end falls on, just before and just after every child
+// edge at every height, where `range_count` stops early: compared with a
+// sorted-value oracle for sparse, clustered and dense sets at depths 1-7,
+// with starts at 0, mid-range and one below the end.
+#[test]
+fn test_range_cardinality_ends_at_child_edges() {
+    for levels in 1..=7u32 {
+        let universe = 1u32 << (3 * levels);
+        let span = universe.min(1 << 14);
+        let sets: [Vec<u32>; 3] = [
+            (0..universe)
+                .step_by((universe as usize / 97).max(1))
+                .collect(),
+            (universe - span..universe).filter(|v| v % 9 != 4).collect(),
+            (0..span).collect(),
+        ];
+        for values in &sets {
+            let (bm, data) = make_bitmap(universe, values);
+            let count = |a: u32, b: u32| {
+                (values.partition_point(|&v| v < b) - values.partition_point(|&v| v < a)) as u64
+            };
+            for height in 0..levels {
+                let stride = 1u64 << (3 * height);
+                for k in (1..(universe as u64 / stride))
+                    .step_by(((universe as u64 / stride) / 40).max(1) as usize)
+                {
+                    let edge = (k * stride) as u32;
+                    for end in [edge - 1, edge, edge + 1] {
+                        for start in [0, end / 2, end.saturating_sub(1)] {
+                            assert_eq!(
+                                bm.range_cardinality(&data, start..end),
+                                count(start, end),
+                                "universe={universe} height={height} {start}..{end}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// `iter` yields exactly the stored values in order at every depth 1-11:
+// one value at either end of the universe, strided, clustered and dense
+// sets, so leaves under height-2 nodes and height-2 nodes under taller
+// ones open and close in every position.
+#[test]
+fn test_iter_matches_values_every_depth() {
+    for levels in 1..=11u32 {
+        let top = (1u64 << (3 * levels)).min(u32::MAX as u64) as u32;
+        for universe in [top, top / 2 + 1] {
+            let span = universe.min(1 << 15);
+            for values in [
+                vec![0],
+                vec![universe - 1],
+                (0..span).step_by(7).collect::<Vec<u32>>(),
+                (universe - span..universe).collect::<Vec<u32>>(),
+                (0..span).filter(|v| v % 64 < 3).collect::<Vec<u32>>(),
+            ] {
+                let (bm, data) = make_bitmap(universe, &values);
+                assert!(
+                    bm.iter(&data).eq(values.iter().copied()),
+                    "universe={universe}"
+                );
+            }
+        }
+    }
+}
+
+proptest! {
+    /// The same over generated sets at every tree depth.
+    #[test]
+    fn iter_matches_values((universe, vals) in arb_values_any_universe()) {
+        let mut data = Vec::new();
+        let bm = RawBitmap::from_sorted_iter(vals.iter().copied(), universe, &mut data);
+        prop_assert!(bm.iter(&data).eq(vals.iter().copied()));
+    }
+}
+
+// ── The set-op `need` flag ─────────────────────────────────────────
+
+/// Two overlapping sets in one universe at any tree depth: `b` keeps a
+/// random part of `a` and adds up to 64 values, so pairs share some
+/// subtrees and differ in others.
+fn arb_pair_any_universe() -> impl Strategy<Value = (u32, Vec<u32>, Vec<u32>)> {
+    arb_values_any_universe().prop_flat_map(|(universe, a)| {
+        let n = a.len();
+        (
+            Just(universe),
+            Just(a),
+            proptest::collection::vec(any::<bool>(), n),
+            proptest::collection::vec(0..universe, 0..=64usize),
+        )
+            .prop_map(|(universe, a, keep, extra)| {
+                let mut b: Vec<u32> = a
+                    .iter()
+                    .zip(&keep)
+                    .filter(|(_, k)| **k)
+                    .map(|(v, _)| *v)
+                    .collect();
+                b.extend(extra);
+                b.sort_unstable();
+                b.dedup();
+                (universe, a, b)
+            })
+    })
+}
+
+/// The walkers that take `need` (ops.rs `intersect_subtree`,
+/// `difference_subtree`) write the same bytes either way, and with `need`
+/// set leave both cursors at the end of their trees, which a later sibling
+/// or ancestor relies on when it reads on.
+fn assert_need_contract(universe: u32, a: &[u32], b: &[u32]) {
+    use crate::node::NodeReader;
+    use crate::ops::{difference_subtree, intersect_subtree};
+
+    let (_, da) = make_bitmap(universe, a);
+    let (_, db) = make_bitmap(universe, b);
+    if da.is_empty() || db.is_empty() {
+        return;
+    }
+    let levels = ceil_log8(universe);
+    let label = format!("universe={universe} a={} b={}", a.len(), b.len());
+
+    type Walker = fn(&mut NodeReader, &mut NodeReader, u32, &mut Vec<u8>, bool);
+    let intersect: Walker = |a, b, level, out, need| {
+        intersect_subtree(a, b, level, out, need);
+    };
+    let difference: Walker = |a, b, level, out, need| {
+        difference_subtree(a, b, level, out, need);
+    };
+    for (name, walker) in [("intersect", intersect), ("difference", difference)] {
+        let mut lazy = Vec::new();
+        walker(
+            &mut NodeReader::new(&da),
+            &mut NodeReader::new(&db),
+            levels,
+            &mut lazy,
+            false,
+        );
+        let mut needed = Vec::new();
+        let (mut ra, mut rb) = (NodeReader::new(&da), NodeReader::new(&db));
+        walker(&mut ra, &mut rb, levels, &mut needed, true);
+        assert_eq!(lazy, needed, "{name} {label}");
+        assert_eq!(
+            (ra.pos, rb.pos),
+            (da.len(), db.len()),
+            "{name} cursors {label}"
+        );
+    }
+}
+
+// The `need` contract on hand-picked shapes at depths 1-11: identical sets,
+// disjoint sets, one value apart, and a set against its own prefix and
+// suffix.
+#[test]
+fn test_set_op_need_contract() {
+    for levels in 1..=11u32 {
+        let universe = (1u64 << (3 * levels)).min(u32::MAX as u64) as u32;
+        let span = universe.min(1 << 12);
+        let base: Vec<u32> = (0..span).step_by(3).collect();
+        let shifted: Vec<u32> = base
+            .iter()
+            .map(|v| v + 1)
+            .filter(|&v| v < universe)
+            .collect();
+        let prefix: Vec<u32> = base[..base.len() / 2].to_vec();
+        let suffix: Vec<u32> = base[base.len() / 2..].to_vec();
+        let high = vec![universe - 1];
+        for (a, b) in [
+            (&base, &base),
+            (&base, &shifted),
+            (&base, &prefix),
+            (&prefix, &base),
+            (&base, &suffix),
+            (&suffix, &base),
+            (&base, &high),
+            (&high, &base),
+        ] {
+            assert_need_contract(universe, a, b);
+        }
+    }
+}
+
+proptest! {
+    /// The same contract over generated overlapping pairs at every depth.
+    #[test]
+    fn set_op_need_contract((universe, a, b) in arb_pair_any_universe()) {
+        assert_need_contract(universe, &a, &b);
+    }
+}
+
+// ── Set ops against a sorted-merge oracle at every depth ───────────
+
+/// All four raw set ops write exactly the canonical bytes of the oracle
+/// result (a sorted merge of the value lists, built by `from_sorted_iter`),
+/// in both operand orders. Covers bulk tails (ops.rs) wherever one operand
+/// runs out, at any depth 1-11, with no feature flags.
+fn assert_set_ops_match_oracle(universe: u32, a: &[u32], b: &[u32]) {
+    use std::collections::BTreeSet;
+
+    let (ra, da) = make_bitmap(universe, a);
+    let (rb, db) = make_bitmap(universe, b);
+    let sa: BTreeSet<u32> = a.iter().copied().collect();
+    let sb: BTreeSet<u32> = b.iter().copied().collect();
+    let canonical = |set: BTreeSet<u32>| {
+        let mut data = Vec::new();
+        RawBitmap::from_sorted_iter(set.into_iter(), universe, &mut data);
+        data
+    };
+    let label = format!("universe={universe} a={} b={}", a.len(), b.len());
+
+    let mut out = Vec::new();
+    ra.union(&da, &rb, &db, &mut out);
+    assert_eq!(out, canonical(&sa | &sb), "union {label}");
+    out.clear();
+    ra.intersect(&da, &rb, &db, &mut out);
+    assert_eq!(out, canonical(&sa & &sb), "intersect {label}");
+    out.clear();
+    ra.difference(&da, &rb, &db, &mut out);
+    assert_eq!(out, canonical(&sa - &sb), "difference {label}");
+    out.clear();
+    ra.symmetric_difference(&da, &rb, &db, &mut out);
+    assert_eq!(out, canonical(&sa ^ &sb), "symmetric_difference {label}");
+}
+
+// Shapes where one operand runs out early, so a bulk tail starts deep in
+// the tree and its "done" result climbs through every ancestor: a set
+// against its own prefix, its first value, and its last value, plus
+// interleaved sets, at depths 1-11.
+#[test]
+fn test_set_ops_match_oracle_every_depth() {
+    for levels in 1..=11u32 {
+        let universe = (1u64 << (3 * levels)).min(u32::MAX as u64) as u32;
+        let step = (universe / 509).max(1);
+        let spread: Vec<u32> = (0..universe).step_by(step as usize).take(512).collect();
+        let prefix: Vec<u32> = spread[..spread.len() / 3].to_vec();
+        let odd: Vec<u32> = spread
+            .iter()
+            .map(|v| v | 1)
+            .filter(|&v| v < universe)
+            .collect();
+        let first = vec![spread[0]];
+        let last = vec![*spread.last().unwrap()];
+        for (a, b) in [
+            (&spread, &prefix),
+            (&spread, &first),
+            (&spread, &last),
+            (&spread, &odd),
+            (&prefix, &odd),
+        ] {
+            assert_set_ops_match_oracle(universe, a, b);
+            assert_set_ops_match_oracle(universe, b, a);
+        }
+    }
+}
+
+proptest! {
+    /// The same oracle over generated overlapping pairs at every depth.
+    #[test]
+    fn set_ops_match_oracle((universe, a, b) in arb_pair_any_universe()) {
+        assert_set_ops_match_oracle(universe, &a, &b);
+        assert_set_ops_match_oracle(universe, &b, &a);
+    }
 }

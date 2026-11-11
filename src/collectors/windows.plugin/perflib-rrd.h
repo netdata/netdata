@@ -16,6 +16,9 @@ bool perflib_counter_type_is_incremental(uint32_t counter_type);
 bool perflib_counter_type_is_32bit(uint32_t counter_type);
 bool perflib_counter_type_is_32bit_rate(uint32_t counter_type);
 uint64_t perflib_counter_delta(uint64_t previous, uint64_t current, bool is_32bit);
+bool perflib_average_timer_ms(const COUNTER_DATA *d, double *ms);
+bool perflib_average_bulk(const COUNTER_DATA *d, double *value);
+bool perflib_average_bulk_integer(const COUNTER_DATA *d, uint64_t *value);
 enum perflib_aggregate_mode {
     PERFLIB_AGGREGATE_SUM,
     PERFLIB_AGGREGATE_INCREMENTAL,

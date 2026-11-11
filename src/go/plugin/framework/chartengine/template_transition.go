@@ -25,6 +25,7 @@ func (t *templateTransition) install(state *engineState) {
 	state.cfg.autogenRules = t.set.policy.autogenRules
 	state.cfg.autogenCounterRaw = t.set.policy.autogenCounterRaw
 	state.cfg.selector = t.set.policy.selector
+	state.cfg.maxOutputSeriesPerContext = t.set.policy.maxOutputSeriesPerContext
 	state.cfg.autogenContextNamespace = t.set.global.namespace
 }
 

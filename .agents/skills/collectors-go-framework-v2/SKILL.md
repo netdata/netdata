@@ -70,6 +70,13 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
   than once, including after partial `Init` / `Check` setup.
 - `Check()` MUST stay a cheap detection path: no reservation, no remote side
   effect, no state it must later release.
+- A collector needing an output budget per context SHOULD supply
+  `EnginePolicy.MaxOutputSeriesPerContext` through `CollectorV2EnginePolicy`; use the shared planner's
+  post-aggregation admission and commit-time reporting rather than pruning collector input families or enabling
+  route diagnostics in production. Input admission remains a separate collector policy. Units, lifecycle and
+  reporting are defined in `src/go/plugin/framework/chartengine/README.md#output-limit-per-context`.
+  Admission and reporting use the published context identity from the same wire normalization as chartemit;
+  raw authoring strings can alias and MUST NOT receive separate output budgets.
 - Cleanup either honors the caller's context or uses a detached best-effort
   context with a fixed budget that does not scale with public request or retry
   settings; trace that deadline through every cleanup I/O and keep unfinished
@@ -217,8 +224,8 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
 - For migrations, first create a compatibility manifest covering chart IDs,
   contexts, dimension IDs/names, labels, config keys, DynCfg schema keys,
   stock config, alerts, docs, and lifecycle behavior.
-- Migrations MUST preserve existing public contracts unless the SOW records an
-  explicit breaking decision.
+- Migrations MUST preserve the contracts defined in `src/go/plugin/go.d/docs/migrate-v1-to-v2.md#what-must-stay-stable`.
+  Its chart/dimension ID policy permits normal V2 IDs while requiring the existing contexts and dimension names.
 - Migrations MUST keep old YAML/JSON field names. Add new config as opt-in when
   cardinality, cost, or user-visible identity could surprise existing users.
 - Collector integration artifacts MUST follow
@@ -226,6 +233,8 @@ shape. Older V2 collectors can supply local patterns, but check for stale style 
   partial local artifact checklist in V2 collector work.
 - MUST NOT log raw secrets, DSNs, bearer tokens, or URLs with embedded
   credentials.
+  Configured-file diagnostic and error-chain handling is owned by
+  `.agents/skills/collectors-authoring/collector-practices.md#file-content-diagnostics`.
 
 ## Hot-Path Logging
 
@@ -304,6 +313,15 @@ Tests are evidence only when they have an independent oracle:
   must fail the test without changing the fake. Inspect the production adapter
   and its construction order as well as the fake (transport set before the
   credential provider, deadlines per endpoint, error classification).
+- State that mirrors a remote log or table read in pieces while the source can
+  change between commands SHOULD also have a randomized model test: seeded
+  interleavings of every change the provider allows, reads and failures, checked
+  against the fake's own state once changes stop. Also check retained-state bounds
+  during sustained changes: convergence-only checks miss growth when reads never
+  catch up. For event streams, compare each sample allowed by the measurement
+  contract with the independent oracle: final totals can hide compensating losses
+  and duplicates. Case tests of known races miss the next interleaving. Exemplar:
+  `src/go/plugin/ipmi/collector/ipmi/internal/bmc/sel_model_test.go`.
 
 ## Pre-PR Check
 
@@ -312,8 +330,8 @@ Tests are evidence only when they have an independent oracle:
 - The PR description or design note MUST enumerate affected collector
   consistency artifacts and justify every artifact that did not need a matching
   change. SHOULD-level exceptions and escape hatches MUST be reviewer-visible.
-- Existing public chart/metric/config identity MUST be preserved unless the SOW
-  records an explicit breaking decision.
+- Existing public chart/metric/config identity MUST be preserved unless the SOW records an explicit breaking decision
+  or the migration guide's chart/dimension ID policy applies. Check contexts and dimension names independently of IDs.
 - New labels and scopes MUST be bounded and documented.
 - Enrichment SHOULD be split from the V2 compatibility migration when possible.
 - Final sweep: dead fields and helpers, duplicated defaults, unused persisted

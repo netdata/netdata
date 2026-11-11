@@ -58,7 +58,8 @@ struct aclk_sync_config_s {
     struct completion handles_closed; // released when phase reaches ACLK_SYNC_HANDLES_CLOSED
     bool shutdown_requested;
     mqtt_wss_client client;
-    int aclk_queries_running;
+    ND_WORK_QUEUE *query_queue;       // the threads that run Cloud data queries (HTTP_API_V2)
+    int aclk_queries_running;         // atomic: incremented by the loop, decremented by the query threads
     bool run_query_batch;
     bool alert_push_running;
     bool aclk_batch_job_is_running;
@@ -221,7 +222,17 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
         host->stream.rcv.status.last_disconnected = now_realtime_sec();
     }
 
-    host->rrdlabels = sql_load_host_labels(&host_uuid);
+    // A new archived host has no labels yet. One that rrdhost_find_or_create() found already has a set, which
+    // other threads may be reading: refill it, never replace it (the replaced set would also leak).
+    RRDLABELS *loaded_labels = sql_load_host_labels(&host_uuid);
+    if (loaded_labels) {
+        if (!host->rrdlabels)
+            host->rrdlabels = loaded_labels;
+        else {
+            rrdlabels_migrate_to_these(host->rrdlabels, loaded_labels);
+            rrdlabels_destroy(loaded_labels);
+        }
+    }
     host->stream.snd.status.last_connected = last_connected;
 
     pulse_host_status(host, 0, 0); // this will detect the receiver status
@@ -234,6 +245,9 @@ static RRDHOST *load_archived_host_from_row(sqlite3_stmt *res)
                    rrdhost_hostname(host), host->machine_guid, node_str, is_ephemeral);
 #endif
 
+    // the pin from rrdhost_find_or_create() covered the initialization above; from here on an
+    // archived host is kept by RRDHOST_FLAG_PENDING_CONTEXT_LOAD, which every remover skips
+    rrdhost_pin_release(host);
     return host;
 }
 
@@ -335,14 +349,6 @@ static void async_cb(uv_async_t *handle __maybe_unused)
 }
 
 #define TIMER_PERIOD_MS (1000)
-
-static void after_aclk_run_query_job(uv_work_t *req, int status __maybe_unused)
-{
-    worker_data_t *worker = req->data;
-    struct aclk_sync_config_s *config = worker->config;
-    config->aclk_queries_running--;
-    return_worker(&config->worker_pool, worker);
-}
 
 static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *query)
 {
@@ -449,13 +455,13 @@ static void aclk_run_query(struct aclk_sync_config_s *config, aclk_query_t *quer
     aclk_query_free(query);
 }
 
-static void aclk_run_query_job(uv_work_t *req)
+// Runs on an ACLK query thread (config->query_queue), NEVER on the libuv threadpool: a data query waits
+// on dbengine query preparation and extent reads, which run on that pool. Enough queries occupying pool
+// threads leave nothing to run what they wait for, and the agent freezes.
+static void aclk_run_query_job(void *data)
 {
-    register_libuv_worker_jobs();
-
-    worker_data_t *worker = req->data;
-    struct aclk_sync_config_s *config = worker->config;
-    aclk_query_t *query = (aclk_query_t *)worker->payload;
+    struct aclk_sync_config_s *config = &aclk_sync_config;
+    aclk_query_t *query = data;
 
     // aclk_run_query() frees the query; if we're shutting down we must still free it here
     if (unlikely(__atomic_load_n(&config->shutdown_requested, __ATOMIC_RELAXED)))
@@ -463,6 +469,19 @@ static void aclk_run_query_job(uv_work_t *req)
     else
         aclk_run_query(config, query);
     worker_is_idle();
+
+    __atomic_sub_fetch(&config->aclk_queries_running, 1, __ATOMIC_RELEASE);
+
+    // Wake the loop so it can start a pending query on the slot just freed. A refused or dropped ping
+    // is harmless: the loop's timer also starts pending queries.
+    cmd_data_t cmd = { .opcode = ACLK_QUERY_EXECUTE };
+    (void) aclk_database_enq_cmd(&cmd, false);
+}
+
+static void aclk_query_thread_init(void *data __maybe_unused)
+{
+    worker_register("ACLKQUERY");
+    register_libuv_worker_job_names();
 }
 
 static void after_aclk_execute_batch(uv_work_t *req, int status __maybe_unused)
@@ -614,24 +633,19 @@ static void start_alert_push(uv_work_t *req)
 
 #define MAX_BATCH_SIZE (64)
 
-// Take a query, and try to schedule it in a worker
-// Update config->aclk_queries_running if success
-// config->aclk_queries_running is only accessed from the vent loop
-// On failure: free the payload
-
-int schedule_query_in_worker(uv_loop_t *loop, struct aclk_sync_config_s *config, aclk_query_t *query) {
-
-    worker_data_t *worker = get_worker(&config->worker_pool);
-    worker->payload = query;
-    worker->config = config;
-
-    config->aclk_queries_running++;
-    int rc = uv_queue_work(loop, &worker->request, aclk_run_query_job, after_aclk_run_query_job);
-    if (rc) {
-        config->aclk_queries_running--;
-        return_worker(&config->worker_pool, worker);
+// Take a query and start it on a query thread. Called from the event loop only.
+// Returns non-zero when the query was not started: the caller still owns it.
+static int schedule_query_in_worker(struct aclk_sync_config_s *config, aclk_query_t *query) {
+    __atomic_add_fetch(&config->aclk_queries_running, 1, __ATOMIC_RELAXED);
+    if (!nd_work_queue_submit(config->query_queue, aclk_run_query_job, query)) {
+        __atomic_sub_fetch(&config->aclk_queries_running, 1, __ATOMIC_RELAXED);
+        return 1;
     }
-    return rc;
+    return 0;
+}
+
+static inline int aclk_queries_running(struct aclk_sync_config_s *config) {
+    return __atomic_load_n(&config->aclk_queries_running, __ATOMIC_ACQUIRE);
 }
 
 static void free_query_list(Pvoid_t JudyL)
@@ -692,7 +706,7 @@ static bool aclk_loop_has_open_handles(uv_loop_t *loop)
 }
 
 #define ACLK_JOBS_ARE_RUNNING                                                                                          \
-    (config->aclk_queries_running || config->alert_push_running || config->aclk_batch_job_is_running)
+    (aclk_queries_running(config) || config->alert_push_running || config->aclk_batch_job_is_running)
 
 static void aclk_synchronization_event_loop(void *arg)
 {
@@ -735,6 +749,7 @@ static void aclk_synchronization_event_loop(void *arg)
 
     int query_thread_count = (int) netdata_conf_cloud_query_threads();
     netdata_log_info("Starting ACLK synchronization thread with %d parallel query threads", query_thread_count);
+    config->query_queue = nd_work_queue_create("ACLKQRY", (size_t)query_thread_count, 60 * USEC_PER_SEC, aclk_query_thread_init, NULL);
 
     // This holds queries that need to be executed one by one
     struct judy_list_t *aclk_query_batch = NULL;
@@ -757,6 +772,10 @@ static void aclk_synchronization_event_loop(void *arg)
         aclk_query_t *query;
         worker_is_idle();
         uv_run(loop, UV_RUN_ONCE);
+
+        // set when a query thread could not be started; the pending queries then wait for the next
+        // wake-up (the timer, or a finished query) instead of being retried on every pass of the inner loop
+        bool query_start_refused = false;
 
         do {
             cmd_data_t cmd;
@@ -798,7 +817,8 @@ static void aclk_synchronization_event_loop(void *arg)
             }
 
             // Check if we have pending commands to execute
-            if (opcode == ACLK_DATABASE_NOOP && pending_queries && config->aclk_queries_running < query_thread_count) {
+            if (opcode == ACLK_DATABASE_NOOP && pending_queries && !query_start_refused &&
+                aclk_queries_running(config) < query_thread_count) {
                 opcode = ACLK_QUERY_EXECUTE;
                 cmd.param[0] = NULL;
             }
@@ -885,7 +905,7 @@ static void aclk_synchronization_event_loop(void *arg)
                 case ACLK_QUERY_EXECUTE:
                     query = (aclk_query_t *) cmd.param[0];
 
-                    bool too_busy = (config->aclk_queries_running >= query_thread_count);
+                    bool too_busy = (aclk_queries_running(config) >= query_thread_count);
 
                     // If we are busy and it's just a ping to run, leave
                     if (too_busy && !query)
@@ -909,7 +929,7 @@ static void aclk_synchronization_event_loop(void *arg)
                     // if we dont, it was a ping from the callback
 
                     // Lets try to queue as many of the pending commands
-                    while(!too_busy && pending_queries && config->aclk_queries_running < query_thread_count) {
+                    while(!too_busy && pending_queries && aclk_queries_running(config) < query_thread_count) {
 
                         Word_t Index = 0;
                         Pvalue = JudyLFirst(aclk_query_execute->JudyL, &Index, PJE0);
@@ -920,7 +940,9 @@ static void aclk_synchronization_event_loop(void *arg)
                         aclk_query_t *query_in_queue = *Pvalue;
 
                         // Schedule it and increase running
-                        too_busy = schedule_query_in_worker(loop, config, query_in_queue);
+                        too_busy = schedule_query_in_worker(config, query_in_queue);
+                        if (too_busy)
+                            query_start_refused = true;
 
                         // It was scheduled in worker, remove it from pending
                         if (!too_busy) {
@@ -934,8 +956,11 @@ static void aclk_synchronization_event_loop(void *arg)
                         break;
 
                     // We have a query, if not busy lets run it
-                    if (!too_busy)
-                        too_busy = schedule_query_in_worker(loop, config, query);
+                    if (!too_busy) {
+                        too_busy = schedule_query_in_worker(config, query);
+                        if (too_busy)
+                            query_start_refused = true;
+                    }
 
                     // We were either busy, or failed to start worker, schedule for later
                     if (too_busy) {
@@ -1129,13 +1154,14 @@ static void aclk_synchronization_event_loop(void *arg)
                 "ACLK: shutdown watchdog timeout (%d seconds) exceeded, abandoning outstanding libuv jobs "
                 "(queries_running=%d, alert_push_running=%d, batch_job_running=%d)",
                 ACLK_SHUTDOWN_WATCHDOG_TIMEOUT_SECONDS,
-                config->aclk_queries_running,
+                aclk_queries_running(config),
                 config->alert_push_running,
                 config->aclk_batch_job_is_running);
 
             // Same reasoning as the metadata loop: these jobs run on libuv threadpool
-            // threads that nothing joins, and they use db_meta. Suppress the SQLite
-            // teardown so their handles and statements outlive this shutdown.
+            // threads (queries: on the ACLK query threads) that nothing joins, and they use
+            // db_meta. Suppress the SQLite teardown so their handles and statements outlive
+            // this shutdown.
             sqlite_mark_teardown_unsafe(
                 "an ACLK libuv job outlived the shutdown watchdog and may still be using the databases");
             break;
@@ -1146,13 +1172,19 @@ static void aclk_synchronization_event_loop(void *arg)
                 NDLP_WARNING,
                 "ACLK: waiting for outstanding libuv jobs during shutdown "
                 "(queries_running=%d, alert_push_running=%d, batch_job_running=%d)",
-                config->aclk_queries_running,
+                aclk_queries_running(config),
                 config->alert_push_running,
                 config->aclk_batch_job_is_running);
         }
 
         sleep_usec(SHUTDOWN_SLEEP_INTERVAL_MS * USEC_PER_MS);
     }
+
+    // No query is running here, so the query threads are idle and exit at once - unless the watchdog
+    // above gave up on one. A thread still inside a query keeps using its queue, so the queue is then
+    // left allocated (nd_work_queue_stop_and_free() refuses to free it).
+    (void) nd_work_queue_stop_and_free(config->query_queue, aclk_queries_running(config) ? 0 : 5 * USEC_PER_SEC);
+    config->query_queue = NULL;
 
     (void) uv_loop_close(loop);
 

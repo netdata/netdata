@@ -58,9 +58,6 @@ The collector can automatically detect Oracle DB instances running on:
 > **Note**: Oracle DB requires a username and password. While Netdata can automatically discover Oracle DB instances and create data collection jobs, these jobs will fail unless you provide the correct credentials.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

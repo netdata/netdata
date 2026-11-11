@@ -57,9 +57,40 @@ Each attempt starts a fresh browser and consumes CPU, memory and target website 
 
 ### Prerequisites
 
-#### Prepare the browser runtime
+#### Prepare the browser sandbox policy
 
-Configure the Node executable, pinned Playwright and Lighthouse dependencies, and full Chromium binary in the runtime section of dem.conf. Chromium must run with its sandbox enabled as the Netdata service account. Restart dem.plugin after changing runtime paths; the plugin does not download dependencies. Follow the [DEM runtime preparation guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md) for the pinned versions and setup commands.
+On Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04, run kickstart with
+`--install-dem-runtime` for a static or source installation. The native runtime package supplies its own policy.
+For local, rootful Docker on Linux, use the documented Netdata container configuration, including
+`apparmor=unconfined` on AppArmor hosts. Run kickstart with `--install-dem-runtime --docker-container NAME`
+on the daemon host, then run `docker restart NAME` after the first installation succeeds.
+Rootless, nested and remote Docker require separate administrator setup.
+Follow the [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md)
+for commands, offline setup and removal. Keep Chromium's sandbox enabled and qualify the actual service deployment.
+
+
+#### Set up the browser runtime
+
+Browser monitoring requires an explicitly installed runtime on Linux amd64 or arm64, running as the
+unprivileged Netdata service account with Chromium sandboxing enabled. Native installations use the optional
+`netdata-dem-runtime` package on live systemd hosts; package hooks may restart the Agent. Other installation
+methods use managed bundles or protected preloads. Production publication still requires release and platform qualification.
+
+For offline managed installation, set `runtime.offline_keyring` in `dem.conf` to the path of an
+administrator-provisioned public OpenPGP keyring. Obtain a signed release descriptor and matching archive,
+then run as the service account:
+
+```sh
+dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
+dem.plugin runtime status
+```
+
+Restart DEM to activate the installation. Explicit install enables automatic update preparation; add
+--manual-updates for manual control. Enabling a monitor never downloads a runtime.
+Use `dem.plugin runtime qualify` under the service's execution policy to check both journeys and Lighthouse.
+See the [runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
+for updates, explicit downloads, installation paths and protected preloads.
+
 
 
 ### Configuration
@@ -364,4 +395,4 @@ Retained capture metadata remains available after run history expires. Fetch ver
 
 #### No conclusive observations
 
-Inspect native job status and synthetic inventory for runtime preparation errors, waiting attempts or execution inability. Open the latest retained run for errors and actual failure phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not recovery.
+Inspect native job status for unavailable dependencies and plugin logs for runtime preparation errors, waiting attempts or execution inability. Open the latest retained run for errors and actual failure phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not recovery.

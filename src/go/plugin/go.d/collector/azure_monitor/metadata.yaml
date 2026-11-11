@@ -29,7 +29,7 @@ modules:
 
           - **Multi-subscription** -- monitor resources across one or more Azure subscriptions in a single job
           - **Automatic service detection** -- discovers resources and enables matching metric profiles without manual configuration
-          - **[38 built-in service profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default)** -- covers databases, compute, networking, storage, AI, analytics, and more
+          - **[39 built-in service profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default)** -- covers databases, compute, networking, storage, AI, analytics, and more
           - **Flexible discovery** -- use structured filters (resource groups, regions, tags) or a custom Azure Resource Graph KQL query
         method_description: &method_description |
           It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/migrate-to-batch-api) to collect metrics, grouping requests by subscription, region, and time grain. Resources are discovered via [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) queries at startup and refreshed periodically. Authentication is handled through [Microsoft Entra ID](https://learn.microsoft.com/en-us/entra/identity/) (service principal, managed identity, or default credentials).
@@ -133,6 +133,19 @@ modules:
 
             User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
             Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
+
+            **Resource properties in profiles:**
+
+            Besides Azure Monitor metrics, a profile can read [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) properties of each resource during discovery:
+
+            | Profile key | Purpose |
+            |:------------|:--------|
+            | `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+            | `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and neither `name` nor `name_from_label` expands into one 0/1 dimension per state; the collector supplies the state label for any valid ID, including `phase` or `power`. Missing or unrecognized values produce no state observation. |
+
+            In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+            Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
           folding:
             title: Config options
             enabled: true
@@ -210,7 +223,7 @@ modules:
               required: false
               group: Authentication
             - name: discovery.refresh_every
-              description: "How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup."
+              description: "How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts."
               default_value: 300
               required: false
               group: Discovery
@@ -1639,7 +1652,7 @@ modules:
       id: collector-go.d.plugin-azure_monitor-virtual_machines
       monitored_instance:
         name: Azure Virtual Machine
-        description: Monitor compute, memory, disk, network, throttling, and availability metrics for Azure Virtual Machine resources.
+        description: Monitor compute, memory, disk, network, throttling, and availability metrics and power state for Azure Virtual Machine resources.
         link: https://learn.microsoft.com/azure/virtual-machines/
         icon_filename: azure.svg
         categories:
@@ -1670,6 +1683,7 @@ modules:
           - **Disk cache** -- premium OS and data disk cache hit/miss rates
           - **Network** -- traffic in/out, network flows, flow creation rate
           - **Availability** -- VM availability state
+          - **Power state** -- running, stopped, deallocated, and transitional states, refreshed through Azure Resource Graph at `discovery.refresh_every`. State charts are disabled when this interval is zero and show gaps when a scheduled refresh fails.
           - **Throttling** -- cached and uncached I/O bandwidth/IOPS throttling
         method_description: *method_description
     metrics:
@@ -1696,6 +1710,10 @@ modules:
               description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
+            - name: vm_size
+              description: "The virtual machine size (SKU), from Azure Resource Graph."
+            - name: os_type
+              description: "The operating system type of the OS disk (Linux or Windows), from Azure Resource Graph."
           metrics:
             - name: azure_monitor.virtual_machines.cpu
               description: Azure Virtual Machine CPU Utilization
@@ -1728,6 +1746,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: average
+            - name: azure_monitor.virtual_machines.power_state
+              description: Azure Virtual Machine Power State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: running
+                - name: stopped
+                - name: deallocated
+                - name: starting
+                - name: stopping
+                - name: deallocating
+                - name: unknown
             - name: azure_monitor.virtual_machines.network_traffic
               description: Azure Virtual Machine Network Traffic
               unit: bytes/s
@@ -2425,6 +2455,8 @@ modules:
               description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
+            - name: app_service_plan
+              description: "The name of the App Service plan hosting the app, from Azure Resource Graph."
           metrics:
             - name: azure_monitor.app_service.requests
               description: Azure App Service Requests
@@ -2602,6 +2634,115 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-go.d.plugin-azure_monitor-app_service_plan
+      monitored_instance:
+        name: Azure App Service Plan
+        description: Monitor CPU, memory, queue, network, and socket metrics for Azure App Service plans through Azure Monitor.
+        link: https://learn.microsoft.com/azure/app-service/overview-hosting-plans
+        icon_filename: azure.svg
+        categories:
+          - data-collection.cloud-and-devops
+      keywords:
+        - azure
+        - app
+        - service
+        - plan
+        - serverfarm
+        - paas
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          :::info
+
+          This is part of the [Azure Monitor](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_monitor.md) collector. No separate setup is needed -- a single Azure Monitor job discovers and monitors all supported resource types automatically.
+
+          :::
+
+          Monitor Azure App Service plans (`Microsoft.Web/serverfarms`) with metrics covering:
+
+          - **Compute** -- CPU utilization across the plan's instances (average and busiest instance)
+          - **Memory** -- memory utilization across the plan's instances (average and busiest instance)
+          - **Queues** -- HTTP queue length and disk queue length
+          - **Network** -- data received and sent, inbound and outbound sockets, outbound socket states
+
+          Apps running on a plan carry the plan name in the `app_service_plan` label of the [Azure App Service](/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_app_service.md) metrics.
+        method_description: *method_description
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: resource
+          description: "These metrics refer to each monitored Azure resource."
+          labels:
+            - name: resource_name
+              description: "The Azure resource name."
+            - name: resource_group
+              description: "The Azure resource group."
+            - name: region
+              description: "The Azure region where the resource is deployed."
+            - name: resource_type
+              description: "The Azure resource type identifier."
+            - name: profile
+              description: "The Azure Monitor profile basename."
+            - name: subscription_id
+              description: "The Azure subscription identifier."
+            - name: resource_uid
+              description: "The unique Azure resource identifier."
+          metrics:
+            - name: azure_monitor.app_service_plan.cpu
+              description: Azure App Service Plan CPU Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: maximum
+            - name: azure_monitor.app_service_plan.memory
+              description: Azure App Service Plan Memory Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: maximum
+            - name: azure_monitor.app_service_plan.http_queue
+              description: Azure App Service Plan HTTP Queue Length
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: azure_monitor.app_service_plan.disk_queue
+              description: Azure App Service Plan Disk Queue Length
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: azure_monitor.app_service_plan.network_traffic
+              description: Azure App Service Plan Network Traffic
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+            - name: azure_monitor.app_service_plan.sockets
+              description: Azure App Service Plan Sockets
+              unit: sockets
+              chart_type: line
+              dimensions:
+                - name: inbound
+                - name: outbound
+            - name: azure_monitor.app_service_plan.outbound_socket_states
+              description: Azure App Service Plan Outbound Socket States
+              unit: sockets
+              chart_type: line
+              dimensions:
+                - name: established
+                - name: time_wait
+  - <<: *module
+    meta:
+      <<: *meta
       id: collector-go.d.plugin-azure_monitor-azure_functions
       monitored_instance:
         name: Azure Functions
@@ -2660,6 +2801,8 @@ modules:
               description: "The Azure subscription identifier."
             - name: resource_uid
               description: "The unique Azure resource identifier."
+            - name: app_service_plan
+              description: "The name of the App Service plan hosting the app, from Azure Resource Graph."
           metrics:
             - name: azure_monitor.app_service.requests
               description: Azure App Service Requests

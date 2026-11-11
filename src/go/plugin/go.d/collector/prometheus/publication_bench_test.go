@@ -29,8 +29,8 @@ func BenchmarkPublication(b *testing.B) {
 			collr.Profiles = ProfilesConfig{
 				Mode: profilesModeNone,
 			}
-			collr.MaxTS = 100 * seriesPerType
-			collr.MaxTSPerMetric = 10 * seriesPerType
+			collr.MaxInputSeries = 100 * seriesPerType
+			collr.MaxOutputSeriesPerContext = 10 * seriesPerType
 			require.NoError(b, collr.Init(context.Background()))
 			require.NoError(b, collr.Check(context.Background()))
 

@@ -225,11 +225,11 @@ USAGE: ${PROGRAM} [options]
   --disable-plugin-ibm       Explicitly disable the IBM ecosystem monitoring plugin.
   --enable-plugin-scripts    Enable the scripts.d plugin. Default: Enabled when possible.
   --disable-plugin-scripts   Explicitly disable the scripts.d plugin.
-  --enable-plugin-dem        Enable the experimental DEM plugin. Default: disabled.
+  --enable-plugin-dem        Enable the DEM plugin. Default: enabled on Linux.
   --disable-plugin-dem       Explicitly disable the DEM plugin.
   --enable-plugin-statsd     Enable the experimental Go StatsD plugin. Default: disabled.
   --disable-plugin-statsd    Explicitly disable the Go StatsD plugin.
-  --enable-plugin-ipmi       Enable the experimental Go IPMI plugin (Linux). Default: disabled.
+  --enable-plugin-ipmi       Enable the Go IPMI plugin (Linux). Default: enabled on Linux.
   --disable-plugin-ipmi      Explicitly disable the Go IPMI plugin.
   --enable-exporting-kinesis Enable AWS Kinesis exporting connector. Default: enable it when libaws_cpp_sdk_kinesis
                              and its dependencies are available.
@@ -279,7 +279,9 @@ ENABLE_IBM=0
 ENABLE_SCRIPTS=1
 ENABLE_STATSD=0
 ENABLE_IPMI=0
+[ "$(uname -s)" = "Linux" ] && ENABLE_IPMI=1
 ENABLE_DEM=0
+[ "$(uname -s)" = Linux ] && ENABLE_DEM=1
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 REMOVE_BUILD=1
@@ -309,7 +311,14 @@ while [ -n "${1}" ]; do
     "--disable-dbengine") ENABLE_DBENGINE=0 ;;
     "--enable-plugin-go") ENABLE_GO=1 ;;
     "--disable-plugin-go") ENABLE_GO=0 ;;
-    "--disable-go") ENABLE_GO=0 ;;
+    "--disable-go")
+      ENABLE_GO=0
+      ENABLE_IBM=0
+      ENABLE_SCRIPTS=0
+      ENABLE_STATSD=0
+      ENABLE_IPMI=0
+      ENABLE_DEM=0
+      ;;
     "--enable-plugin-python") ENABLE_PYTHON=1 ;;
     "--disable-plugin-python") ENABLE_PYTHON=0 ;;
     "--enable-plugin-charts") ENABLE_CHARTS=1 ;;
@@ -554,14 +563,23 @@ if [ ${DONOTWAIT} -eq 0 ]; then
 fi
 
 cmake_install() {
+    cmake_install_umask="$(umask)"
+    # New root-owned executable ancestors must not inherit the build's group-write
+    # mask. Existing shared directories and nonroot installations keep their policy.
+    if [ "$(id -u)" -eq 0 ]; then
+        umask 022
+    fi
     # run cmake --install ${1}
     # The above command should be used to replace the logic below once we no longer support
     # versions of CMake less than 3.15.
+    cmake_install_status=0
     if [ -n "${ninja}" ]; then
-        run ${ninja} -C "${1}" install
+        run ${ninja} -C "${1}" install || cmake_install_status=$?
     else
-        run ${make} -C "${1}" install
+        run ${make} -C "${1}" install || cmake_install_status=$?
     fi
+    umask "${cmake_install_umask}"
+    return "${cmake_install_status}"
 }
 
 # shellcheck disable=SC2329
@@ -1022,6 +1040,11 @@ if [ "$(id -u)" -eq 0 ]; then
     if [ $capabilities -eq 0 ]; then
       run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/slabinfo.plugin"
     fi
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ipmi.plugin" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ipmi.plugin"
+    run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/ipmi.plugin"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/freeipmi.plugin" ]; then

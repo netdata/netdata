@@ -1808,7 +1808,10 @@ func validatePortSourcePresentation(path string, source map[string]any, shape to
 	if err != nil {
 		return err
 	}
-	defaultType, _ := source["default_type"].(string)
+	defaultType, err := optionalString(path+".default_type", source["default_type"])
+	if err != nil {
+		return err
+	}
 	if defaultType != "" {
 		if _, ok := shape.portTypes[defaultType]; !ok {
 			return fmt.Errorf("%s.default_type references unknown port type %q", path, defaultType)
@@ -1859,7 +1862,23 @@ func validatePortSourcePresentation(path string, source map[string]any, shape to
 	if columnType := columns[nameColumn]; !isDisplayColumnType(columnType) {
 		return fmt.Errorf("%s.name_column references non-display source column %q (%s)", path, nameColumn, columnType)
 	}
-	valueColumn, _ := source["value_column"].(string)
+	labelColumn, err := optionalString(path+".label_column", source["label_column"])
+	if err != nil {
+		return err
+	}
+	if labelColumn != "" {
+		columnType, ok := columns[labelColumn]
+		if !ok {
+			return fmt.Errorf("%s.label_column references unknown source column %q", path, labelColumn)
+		}
+		if !isDisplayColumnType(columnType) {
+			return fmt.Errorf("%s.label_column references non-display source column %q (%s)", path, labelColumn, columnType)
+		}
+	}
+	valueColumn, err := optionalString(path+".value_column", source["value_column"])
+	if err != nil {
+		return err
+	}
 	if valueColumn != "" {
 		columnType, ok := columns[valueColumn]
 		if !ok {
@@ -1870,7 +1889,10 @@ func validatePortSourcePresentation(path string, source map[string]any, shape to
 		}
 	}
 	for _, field := range []string{"type_column", "status_column", "mode_column", "role_column", "sources_column"} {
-		column, _ := source[field].(string)
+		column, err := optionalString(path+"."+field, source[field])
+		if err != nil {
+			return err
+		}
 		if column == "" {
 			continue
 		}
@@ -2476,17 +2498,27 @@ func requiredEnum(path string, raw any, allowed ...string) (string, error) {
 }
 
 func optionalEnum(path string, raw any, allowed ...string) error {
-	if raw == nil {
-		return nil
-	}
-	value, ok := raw.(string)
-	if !ok || value == "" {
-		return fmt.Errorf("%s is not a non-empty string", path)
+	value, err := optionalString(path, raw)
+	if err != nil || value == "" {
+		return err
 	}
 	if !stringInSet(value, allowed) {
 		return fmt.Errorf("%s has unsupported value %q", path, value)
 	}
 	return nil
+}
+
+// optionalString returns the value of an optional field, rejecting a present value
+// that is not a non-empty string. Absent and null fields return "".
+func optionalString(path string, raw any) (string, error) {
+	if raw == nil {
+		return "", nil
+	}
+	value, ok := raw.(string)
+	if !ok || value == "" {
+		return "", fmt.Errorf("%s is not a non-empty string", path)
+	}
+	return value, nil
 }
 
 func stringValue(raw any) string {

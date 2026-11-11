@@ -4,8 +4,10 @@ package libbpfloader
 
 /*
 #include <stdlib.h>
+#include <stdint.h>
 
 struct netdata_ebpf_fd_runtime;
+uint64_t netdata_fd_runtime_arena_drops(struct netdata_ebpf_fd_runtime *rt);
 struct netdata_ebpf_fd_snapshot {
     unsigned long long open_call;
     unsigned long long open_err;
@@ -281,4 +283,10 @@ func (r *FDRuntime) Close() {
 	C.netdata_fd_runtime_close(r.ptr)
 	r.ptr = nil
 	r.appsBuf = nil
+}
+func (r *FDRuntime) ArenaDropped() uint64 {
+	if r == nil || r.ptr == nil {
+		return 0
+	}
+	return uint64(C.netdata_fd_runtime_arena_drops(r.ptr))
 }

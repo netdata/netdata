@@ -1,8 +1,9 @@
 // Differential fuzz target: replays random op sequences on a
 // `treight::RawBitmap` and a `roaring::RoaringBitmap` (the oracle) built
 // from the same values, asserting the two implementations always agree on
-// len, min/max, emptiness, membership, ranges, ascending iteration and
-// set-op results; the serialize roundtrip checks treight alone.
+// len, min/max, emptiness, membership, ranges, ascending iteration,
+// range construction and set-op results; the serialize roundtrip checks
+// treight alone.
 //
 // A treight bitmap is a `Copy` descriptor whose tree bytes live in an
 // external blob (src/crates/treight/src/raw.rs `RawBitmap`), so each side
@@ -10,7 +11,11 @@
 //
 // Run with `cargo fuzz run against_roaring` from src/crates/treight/fuzz
 // (nightly pinned by src/crates/treight/fuzz/rust-toolchain.toml
-// `channel`). The fuzz workspace pins the same netdata/roaring-rs fork as
+// `channel`); a time-boxed run appends `-- -max_total_time=600`. One-time
+// setup: `rustup toolchain install nightly` and `cargo install cargo-fuzz`.
+// Corpus, crash artifacts and Cargo.lock stay local (fuzz/.gitignore).
+// Ops that leave large sets behind slow every later op in a sequence, so
+// keep op payloads small (see `FromRange`). The fuzz workspace pins the same netdata/roaring-rs fork as
 // the main workspace so both sides test one roaring implementation
 // (src/crates/treight/fuzz/Cargo.toml, the `roaring` dependency); the
 // in-crate proptest twin of this file is
@@ -67,6 +72,7 @@ enum Operation {
     CheckIter,
     RangeCardinality(Num, Num),
     RemoveRange(Num, Num),
+    FromRange(Num, Num),
     And,
     Or,
     Sub,
@@ -198,6 +204,22 @@ fuzz_target!(|input: FuzzInput| {
                 let hi = (a.max(b) % universe).saturating_add(1);
                 lhs_t.remove_range(&mut lhs_d, lo..hi);
                 lhs_r.remove_range(lo..hi);
+            }
+            Operation::FromRange(Num(a), Num(b)) => {
+                // Replace LHS with a freshly built lo..hi range; later ops
+                // and the closing size check then run on a range-built
+                // blob. The length is capped at 4,096 values so every
+                // iteration stays fast; ranges of millions of values are
+                // pinned by the unit tests (src/crates/treight/src/
+                // tests_raw.rs `test_from_range_bytes_large_universes`).
+                let lo = a % universe;
+                let hi = lo.saturating_add(b % 4_096 + 1).min(universe);
+                let mut data = Vec::new();
+                lhs_t = treight::RawBitmap::from_range(lo..hi, universe, &mut data);
+                lhs_d = data;
+                lhs_r = roaring::RoaringBitmap::new();
+                lhs_r.insert_range(lo..hi);
+                check_equal(&lhs_t, &lhs_d, &lhs_r);
             }
             Operation::And => {
                 let mut out = Vec::new();

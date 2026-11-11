@@ -62,7 +62,15 @@ By default, it detects instances running on the local host by trying to connect 
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+Input exceeding `max_input_series` rejects the whole collection. Output exceeding
+`max_output_series_per_context` omits that entire context while other contexts remain available.
+Limits apply with and without profiles. Admission and output omission/recovery are reported in ordinary logs.
+These limits do not bound download, parser memory, or total retained storage.
+
+HTTP responses have a separate fixed 64 MiB limit, including after gzip decompression.
+A response exceeding this limit fails the scrape. Reduce the metrics exposed by the endpoint if it
+exceeds this limit; collector-side selectors and relabeling do not reduce the downloaded body.
+
 
 #### Performance Impact
 
@@ -96,8 +104,8 @@ exports. Service views remain complete when optional dimension labels are omitte
 appear only when their identity labels are available. Gauge identity follows every non-redundant label required
 to distinguish the emitted state, including configured custom metadata, custom tags, and the opt-in user
 email/alias budget labels. Arbitrary configured label names are not turned into dimensions because they are
-deployment-defined, unbounded classifications rather than one stable bounded aspect. Size `max_time_series` and
-`max_time_series_per_metric` for the exported surface.
+deployment-defined, unbounded classifications rather than one stable bounded aspect. Size `max_input_series` and
+`max_output_series_per_context` for the exported surface.
 
 
 
@@ -121,8 +129,8 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | expected_prefix | If set, the job's check passes only when at least one post-job, pre-profile metric name starts with this prefix. Guards against scraping an unexpected endpoint; profile-owned relabeling cannot satisfy it. |  | no |
 | **Customization** | app | Application name used as the app segment of chart contexts (`prometheus.<app>.<metric>`). When unset, it is taken from a matched profile, otherwise it falls back to the job name. |  | no |
 | **Filters** | [selector](#option-filters-selector) | Time series selector (filter). |  | no |
-| **Limits** | max_time_series | Global time series limit applied after job and profile relabeling. If the final output exceeds it, the data is not processed. | 2000 | no |
-|  | max_time_series_per_metric | Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped. | 200 | no |
+| **Limits** | max_input_series | Maximum input series after selector and job/profile relabeling, checked at startup and every collection. Each scalar counts once; each histogram counts its buckets plus two count/sum slots, and each summary counts its quantiles plus two count/sum slots, including incomplete distributions. Exceeding the limit rejects the whole collection before storage. Zero disables the limit; negative values are invalid. This does not bound download or parser memory. | 10000 | no |
+|  | max_output_series_per_context | Maximum distinct current chart/dimension pairs per resolved context in one job and host scope, counted after routing and aggregation across all charts. Exceeding the limit omits the whole context; other contexts keep their complete inputs. Applies to profiles, automatic charts and raw counter companion charts. Zero disables the limit; negative values are invalid. | 1000 | no |
 | **Customization** | [fallback_type](#option-customization-fallback-type) | Job-level fallback type overrides for untyped metrics. |  | no |
 |  | [relabeling](#option-customization-relabeling) | Job-owned Prometheus-compatible metric relabeling, applied before profile selection. |  | no |
 |  | [profiles](#option-customization-profiles) | Curated, exporter-specific chart profiles with optional untyped classification, profile-owned normalization, and scoped fallback-chart policy. User profiles may constrain unmatched fallback charts; stock profiles preserve unknown future families. Disable profiles with mode `none`. | auto | no |

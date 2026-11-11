@@ -5,6 +5,10 @@
 #include <string.h>
 #include <strings.h>
 
+static inline bool http_header_is_ows(char c) {
+    return c == ' ' || c == '\t';
+}
+
 static void web_client_enable_deflate(struct web_client *w, bool gzip) {
     if(gzip)
         web_client_flag_set(w, WEB_CLIENT_ENCODING_GZIP);
@@ -126,6 +130,31 @@ static void http_header_x_auth_token(struct web_client *w, const char *v, size_t
     w->auth_bearer_token = strdupz(v);
 }
 
+static void http_header_cookie(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    // the browser may send multiple cookies with our name - the first one wins
+    if(w->auth.registry_person_guid[0])
+        return;
+
+    const size_t name_len = sizeof(NETDATA_REGISTRY_COOKIE_NAME) - 1;
+
+    while(*v) {
+        while(*v == ';' || http_header_is_ows(*v)) v++;
+
+        const char *pair = v;
+        while(*v && *v != ';') v++;
+
+        if((size_t)(v - pair) > name_len && pair[name_len] == '=' &&
+            strncmp(pair, NETDATA_REGISTRY_COOKIE_NAME, name_len) == 0) {
+            const char *value = &pair[name_len + 1];
+            size_t value_len = v - value;
+            while(value_len && http_header_is_ows(value[value_len - 1])) value_len--;
+            strncpyz(w->auth.registry_person_guid, value,
+                     MIN(value_len, sizeof(w->auth.registry_person_guid) - 1));
+            return;
+        }
+    }
+}
+
 static void http_header_host(struct web_client *w, const char *v, size_t len) {
     char buffer[NI_MAXHOST];
     strncpyz(buffer, v, (len < sizeof(buffer) - 1 ? len : sizeof(buffer) - 1));
@@ -151,10 +180,89 @@ static void http_header_x_forwarded_host(struct web_client *w, const char *v, si
     w->forwarded_host = strdupz(buffer);
 }
 
+// a port number written after an address: 1 to 65535, digits only
+static bool http_header_port_is_valid(const char *s, const char *end) {
+    if(s >= end || end - s > 5)
+        return false;
+
+    unsigned port = 0;
+    for(; s < end; s++) {
+        if(*s < '0' || *s > '9')
+            return false;
+        port = port * 10 + (unsigned)(*s - '0');
+    }
+
+    return port >= 1 && port <= 65535;
+}
+
 static void http_header_x_forwarded_for(struct web_client *w, const char *v, size_t len) {
-    if(len)
-        strncpyz(w->user_auth.forwarded_for, v,
-                 (len < sizeof(w->user_auth.forwarded_for) - 1 ? len : sizeof(w->user_auth.forwarded_for) - 1));
+    // X-Forwarded-For is a comma separated list of addresses, the first one being the client.
+    // The stored value is serialized into the comma separated key=value source string of
+    // function calls and quoted into the FUNCTION lines sent to plugins and children,
+    // so keep only the first entry, and only when it is an IPv4 or IPv6 address.
+    // Some proxies add the client port (IPv4:port, [IPv6]:port); keep only the address.
+    const char *end = v + len;
+    while(v < end && isspace((uint8_t)*v))
+        v++;
+
+    const char *e = v;
+    while(e < end && *e != ',')
+        e++;
+
+    while(e > v && isspace((uint8_t)e[-1]))
+        e--;
+
+    // an empty first entry carries no address
+    if(e == v)
+        return;
+
+    // the address part of the entry, and the family it must parse as (AF_UNSPEC: either)
+    const char *address_end = e;
+    int family = AF_UNSPEC;
+
+    if(v < e && *v == '[') {
+        // [IPv6] or [IPv6]:port
+        const char *close = memchr(v, ']', (size_t)(e - v));
+        if(!close)
+            return;
+
+        if(close + 1 < e && (close[1] != ':' || !http_header_port_is_valid(close + 2, e)))
+            return;
+
+        v++;
+        address_end = close;
+        family = AF_INET6;
+    }
+    else {
+        // exactly one colon is IPv4:port; two or more is a bare IPv6 address,
+        // which is never split, since 2001:db8::7:8080 is itself an address
+        const char *colon = memchr(v, ':', (size_t)(e - v));
+        if(colon && !memchr(colon + 1, ':', (size_t)(e - colon - 1))) {
+            if(!http_header_port_is_valid(colon + 1, e))
+                return;
+
+            address_end = colon;
+            family = AF_INET;
+        }
+    }
+
+    size_t address_len = (size_t)(address_end - v);
+    if(!address_len || address_len >= sizeof(w->user_auth.forwarded_for))
+        return;
+
+    char buffer[sizeof(w->user_auth.forwarded_for)];
+    memcpy(buffer, v, address_len);
+    buffer[address_len] = '\0';
+
+    unsigned char address[sizeof(struct in6_addr)];
+    if(family != AF_UNSPEC) {
+        if(inet_pton(family, buffer, address) != 1)
+            return;
+    }
+    else if(inet_pton(AF_INET, buffer, address) != 1 && inet_pton(AF_INET6, buffer, address) != 1)
+        return;
+
+    memcpy(w->user_auth.forwarded_for, buffer, address_len + 1);
 }
 
 static void http_header_x_transaction_id(struct web_client *w, const char *v, size_t len) {
@@ -369,6 +477,7 @@ struct {
     { .hash = 0, .key = "User-Agent",            .cb = http_header_user_agent},
     { .hash = 0, .key = "Accept",                .cb = http_header_accept },
     { .hash = 0, .key = "X-Auth-Token",          .cb = http_header_x_auth_token },
+    { .hash = 0, .key = "Cookie",                .cb = http_header_cookie },
     { .hash = 0, .key = "Host",                  .cb = http_header_host },
     { .hash = 0, .key = "Accept-Encoding",       .cb = http_header_accept_encoding },
     { .hash = 0, .key = "X-Forwarded-Host",      .cb = http_header_x_forwarded_host },
@@ -417,34 +526,70 @@ static inline void supported_headers_init(void) {
     spinlock_unlock(&supported_headers_init_spinlock);
 }
 
+// Checks the syntax of the header line at s. Returns its terminating '\r' and sets *colon, returns the end of the
+// string when the line has not been received completely, or returns NULL when the line is malformed:
+// - it starts with whitespace, an obsolete folded continuation line (RFC 9112 5.2)
+// - it has no colon, an empty name, or whitespace before the colon (RFC 9112 5.1)
+// - it has a CR or LF that is not part of its terminating CRLF (RFC 9110 5.5)
+static const char *http_header_line_check(const char *s, const char **colon) {
+    if(http_header_is_ows(*s))
+        return NULL;
+
+    const char *e = s;
+    while(*e && *e != ':' && *e != '\r' && *e != '\n') e++;
+    if(!*e) return e;
+    if(*e != ':' || e == s || http_header_is_ows(e[-1]))
+        return NULL;
+
+    const char *ve = e + 1;
+    while(*ve && *ve != '\r' && *ve != '\n') ve++;
+    if(!*ve) return ve;
+    if(*ve == '\r' && !ve[1]) return &ve[1];
+    if(*ve != '\r' || ve[1] != '\n')
+        return NULL;
+
+    *colon = e;
+    return ve;
+}
+
+bool http_header_section_is_valid(const char *request) {
+    const char *headers_end = strstr(request, "\r\n\r\n");
+    if(!headers_end)
+        return true;
+
+    // from the end of the request line, one header line at a time
+    const char *s = strstr(request, "\r\n");
+    while(s < headers_end) {
+        const char *colon = NULL;
+        s = http_header_line_check(s + 2, &colon);
+        if(!s)
+            return false;
+    }
+
+    return true;
+}
+
 char *http_header_parse_line(struct web_client *w, char *s) {
     supported_headers_init();
 
-    char *e = s;
-
-    // find the colon
-    while(*e && *e != ':') e++;
-    if(!*e) return e;
+    const char *colon = NULL;
+    char *ve = (char *)http_header_line_check(s, &colon);
+    if(!ve || !*ve)
+        return ve;
 
     // get the name
+    char *e = (char *)colon;
     *e = '\0';
 
-    // find the value
-    char *v = e + 1, *ve;
+    // find the value, without the optional whitespace before it
+    char *v = e + 1;
+    while(http_header_is_ows(*v)) v++;
 
-    // skip leading spaces from value
-    while(*v == ' ') v++;
-    ve = v;
-
-    // find the \r
-    while(*ve && *ve != '\r') ve++;
-    if(!*ve || ve[1] != '\n') {
-        *e = ':';
-        return ve;
-    }
-
-    // terminate the value
-    *ve = '\0';
+    // terminate the value, without the optional whitespace after it
+    char *vt = ve;
+    while(vt > v && http_header_is_ows(vt[-1])) vt--;
+    char saved = *vt;
+    *vt = '\0';
 
     uint32_t hash = simple_uhash(s);
 
@@ -452,11 +597,12 @@ char *http_header_parse_line(struct web_client *w, char *s) {
         if(likely(hash != supported_headers[i].hash || strcasecmp(s, supported_headers[i].key) != 0))
             continue;
 
-        supported_headers[i].cb(w, v, ve - v);
+        supported_headers[i].cb(w, v, vt - v);
         break;
     }
 
+    // restore the request, it may be parsed again
+    *vt = saved;
     *e = ':';
-    *ve = '\r';
     return ve;
 }

@@ -43,9 +43,21 @@ func (w *functionWire) Write(p []byte) (int, error) {
 func (w *functionWire) String() string { w.mu.Lock(); defer w.mu.Unlock(); return w.buffer.String() }
 func (w *functionWire) call(t *testing.T, input io.Writer, id, command string) map[string]any {
 	t.Helper()
+	return w.request(t, input, id, command, "", 200)
+}
+func (w *functionWire) request(t *testing.T, input io.Writer, id, command, payload string, status int) map[string]any {
+	t.Helper()
+	permissions := "0x1b"
+	if strings.HasPrefix(command, "config ") {
+		permissions = "0xFFFF"
+	}
+	line := fmt.Sprintf("FUNCTION %s 10 %q %s \"user=fixture\"\n", id, command, permissions)
+	if payload != "" {
+		line = fmt.Sprintf("FUNCTION_PAYLOAD %s 10 %q %s \"user=fixture\" application/json\n%s\nFUNCTION_PAYLOAD_END\n", id, command, permissions, payload)
+	}
 	written := make(chan error, 1)
 	go func() {
-		_, err := fmt.Fprintf(input, "FUNCTION %s 10 %q 0x1b \"user=fixture\"\n", id, command)
+		_, err := io.WriteString(input, line)
 		written <- err
 	}()
 	select {
@@ -54,24 +66,44 @@ func (w *functionWire) call(t *testing.T, input io.Writer, id, command string) m
 	case <-time.After(3 * time.Second):
 		t.Fatal("Function ingress blocked")
 	}
-	begin := "FUNCTION_RESULT_BEGIN " + id + " 200 application/json"
-	var body string
+	begin := "FUNCTION_RESULT_BEGIN " + id + " "
+	var body, header string
 	require.Eventually(t, func() bool {
 		_, response, ok := strings.Cut(w.String(), begin)
 		if !ok {
 			return false
 		}
-		_, response, ok = strings.Cut(response, "\n")
+		header, response, ok = strings.Cut(response, "\n")
 		if !ok {
 			return false
 		}
 		body, _, ok = strings.Cut(response, "FUNCTION_RESULT_END")
 		return ok
 	}, 3*time.Second, time.Millisecond, "wire: %s", w.String())
+	require.True(t, strings.HasPrefix(header, fmt.Sprintf("%d application/json", status)), "unexpected result for %s: %s %s", command, header, body)
 	var response map[string]any
 	require.NoError(t, json.Unmarshal([]byte(body), &response))
 	return response
 }
+
+// selectionData returns a table response's rows without its age columns. An
+// age counts whole seconds back from the clock of its own call, so two calls
+// that select the same rows can differ by one across a second boundary.
+func selectionData(response map[string]any) any {
+	columns, _ := response["columns"].(map[string]any)
+	rows, _ := response["data"].([]any)
+	for key, column := range columns {
+		if !strings.HasSuffix(key, "_age_s") {
+			continue
+		}
+		index := int(column.(map[string]any)["index"].(float64))
+		for _, row := range rows {
+			row.([]any)[index] = nil
+		}
+	}
+	return response["data"]
+}
+
 func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 	raw, err := os.ReadFile("../../../plugins.d/FUNCTION_UI_SCHEMA.json")
 	require.NoError(t, err)
@@ -95,9 +127,11 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			t.Cleanup(func() { require.NoError(t, history.Close()) })
 			cfg := dem.DefaultConfig()
 			require.NoError(t, history.EnforceHistoryRetention(ctx, cfg.History.Days, cfg.History.MaxBytes))
+			const siteGUID = "11111111-1111-4111-8111-111111111111"
 			now := time.Now().UnixMicro()
 			_, err = rumhistory.NewStore(history).AppendEvent(ctx, rumhistory.EventRecord{
 				Site:       "retired",
+				VnodeGUID:  siteGUID,
 				SessionID:  "session",
 				ObservedUS: now,
 				Type:       "pageview",
@@ -106,6 +140,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			require.NoError(t, err)
 			run := synthetic.Run{
 				ID:           "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+				VnodeGUID:    siteGUID,
 				JobID:        "journey:retired",
 				Name:         "retired",
 				Kind:         synthetic.Journey,
@@ -115,6 +150,11 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				CaptureState: "disabled",
 			}
 			_, err = synthetichistory.NewStore(history).AppendRun(ctx, "complete", run)
+			require.NoError(t, err)
+			other := run
+			other.ID = "cccccccccccccccccccccccccccccccc"
+			other.VnodeGUID = "33333333-3333-4333-8333-333333333333"
+			_, err = synthetichistory.NewStore(history).AppendRun(ctx, "complete", other)
 			require.NoError(t, err)
 			captures, err := artifacts.Open(t.TempDir())
 			require.NoError(t, err)
@@ -129,8 +169,15 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			for i := range components.Functions {
 				id := components.Functions[i].ID
 				factory := components.Functions[i].NewHandler
-				components.Functions[i].NewHandler = func() funcapi.MethodHandler {
-					h := factory()
+				contextFactory := components.Functions[i].NewHandlerWithContext
+				components.Functions[i].NewHandler = nil
+				components.Functions[i].NewHandlerWithContext = func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					var h funcapi.MethodHandler
+					if contextFactory != nil {
+						h = contextFactory(ctx)
+					} else {
+						h = factory()
+					}
 					handlersMu.Lock()
 					handlers[id] = append(handlers[id], h)
 					handlersMu.Unlock()
@@ -139,12 +186,15 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				}
 			}
 			dir := t.TempDir()
+			require.NoError(t, os.Mkdir(filepath.Join(dir, "vnodes"), 0700))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "vnodes", "sites.yaml"), []byte("- hostname: storefront\n  guid: "+siteGUID+"\n"), 0600))
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(test.config), 0600))
 			for _, module := range []string{"receiver", "rum", "journey", "lighthouse"} {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, module+".conf"), []byte("jobs: []\n"), 0600))
 			}
 			a := agent.New(agent.Config{
 				Name:                    "dem",
+				VarLibDir:               t.TempDir(),
 				PluginConfigDir:         []string{dir},
 				CollectorsConfigDir:     []string{dir},
 				ModuleRegistry:          components.Collectors,
@@ -206,6 +256,42 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				assert.Equal(t, string(synthetic.Failed), response["run"].(map[string]any)["outcome"])
 				info := output.call(t, writer, "info"+suffix, "synthetics-runs info")
 				assert.NotContains(t, fmt.Sprint(info), "__job")
+				for _, method := range []string{"rum-sites", "rum-pages", "rum-live", "rum-sessions", "rum-errors", "rum-session-events", "synthetics-checks", "synthetics-runs", "synthetics-artifacts"} {
+					id := method + suffix
+					args := ""
+					if method == "rum-session-events" {
+						args = " session_id:session"
+					}
+					byName := output.call(t, writer, "name-"+id, method+args+" vnode:storefront")
+					byGUID := output.call(t, writer, "guid-"+id, method+args+" vnode_guid:"+siteGUID)
+					assert.Equal(t, selectionData(byGUID), selectionData(byName))
+					assert.Contains(t, byName["accepted_params"], "vnode")
+					for n, selector := range []string{"vnode:unknown", "vnode:", "vnode:storefront vnode_guid:", "vnode:storefront vnode:storefront"} {
+						output.request(t, writer, fmt.Sprintf("invalid-%s-%d", id, n), method+args+" "+selector, "", 400)
+					}
+				}
+				if generation == 0 {
+					const replacement = "22222222-2222-4222-8222-222222222222"
+					output.request(t, writer, "vnode-add", "config dem:vnode add selection", `{"hostname":"display-name","guid":"33333333-3333-4333-8333-333333333333"}`, 202)
+					selected := output.call(t, writer, "dynamic-before", "synthetics-runs vnode:selection")
+					assert.Len(t, selected["data"], 1)
+					output.request(t, writer, "vnode-update", "config dem:vnode:selection update", `{"hostname":"new-display-name","guid":"`+replacement+`"}`, 202)
+					updated := output.call(t, writer, "dynamic-updated", "synthetics-runs vnode:selection")
+					assert.Empty(t, updated["data"])
+					output.request(t, writer, "hostname-is-not-name", "synthetics-runs vnode:new-display-name", "", 400)
+					output.request(t, writer, "vnode-remove", "config dem:vnode:selection remove", "", 200)
+					output.request(t, writer, "removed-name", "synthetics-runs vnode:selection", "", 400)
+					fallback := output.call(t, writer, "retained-guid", "synthetics-runs vnode_guid:"+other.VnodeGUID)
+					assert.Len(t, fallback["data"], 1)
+					output.request(t, writer, "vnode-reuse", "config dem:vnode add selection", `{"hostname":"reused-name","guid":"`+replacement+`"}`, 202)
+				}
+				if generation == 1 {
+					// The Agent owns DynCfg persistence and replays configuration after plugin restart.
+					output.request(t, writer, "before-replay", "synthetics-runs vnode:selection", "", 400)
+					output.request(t, writer, "vnode-replay", "config dem:vnode add selection", `{"hostname":"replayed-name","guid":"`+other.VnodeGUID+`"}`, 202)
+				}
+				selection := output.call(t, writer, "dynamic-current"+suffix, "synthetics-runs vnode:selection")
+				assert.Len(t, selection["data"], generation)
 				if generation == 0 {
 					restartCtx, stop := context.WithTimeout(ctx, 3*time.Second)
 					require.NoError(t, a.Restart(restartCtx))

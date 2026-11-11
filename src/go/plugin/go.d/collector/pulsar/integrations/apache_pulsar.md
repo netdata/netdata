@@ -44,9 +44,6 @@ Apache Pulsar can be monitored further using the following other integrations:
 By default, it detects Pulsar instances running on localhost.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

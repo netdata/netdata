@@ -26,6 +26,10 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
             // dimension name (or a label value under group_by=label)
             // must be escaped or the payload breaks
             buffer_json_strcat(wb, string2str(r->dn[c]));
+        else if(format == DATASOURCE_HTML)
+            // the html format is served as text/html: a dimension name
+            // must not be able to add markup to the page
+            buffer_strcat_htmlescape(wb, string2str(r->dn[c]));
         else
             buffer_strcat(wb, string2str(r->dn[c]));
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
@@ -113,4 +117,57 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         buffer_strcat(wb, endline);
     }
     //netdata_log_info("RRD2CSV(): %s: END", r->st->id);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+// unittest
+
+static int rrdr2csv_unittest_case(
+    const char *description,
+    uint32_t format,
+    const char *startline,
+    const char *separator,
+    const char *endline,
+    const char *dimension_name,
+    const char *expected) {
+    // a header-only result: one queried dimension, no rows
+    STRING *dn = string_strdupz(dimension_name);
+    RRDR_DIMENSION_FLAGS od = RRDR_DIMENSION_QUERIED;
+    RRDR r = {
+        .d = 1,
+        .rows = 0,
+        .od = &od,
+        .dn = &dn,
+    };
+
+    int errors = 0;
+    BUFFER *wb = buffer_create(0, NULL);
+    rrdr2csv(&r, wb, format, 0, startline, separator, endline, "");
+
+    if(strcmp(buffer_tostring(wb), expected) != 0) {
+        fprintf(stderr, "rrdr2csv %s header mismatch\nexpected: %s\nactual:   %s\n",
+                description, expected, buffer_tostring(wb));
+        errors++;
+    }
+
+    buffer_free(wb);
+    string_freez(dn);
+    return errors;
+}
+
+int rrdr2csv_unittest(void) {
+    int errors = 0;
+    const char *hostile = "<img src=x onerror=\"alert('&')\">";
+
+    // html is served as text/html: the name must not add markup
+    errors += rrdr2csv_unittest_case(
+        "html", DATASOURCE_HTML, "<tr><td>", "</td><td>", "</td></tr>\n", hostile,
+        "<tr><td>time</td><td>&lt;img src=x onerror=&quot;alert(&#x27;&amp;&#x27;)&quot;&gt;</td></tr>\n");
+
+    // plain csv is not markup: the name is written as it is
+    errors += rrdr2csv_unittest_case(
+        "csv", DATASOURCE_CSV, "", ",", "\r\n", hostile,
+        "time,<img src=x onerror=\"alert('&')\">\r\n");
+
+    return errors;
 }

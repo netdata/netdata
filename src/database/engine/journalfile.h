@@ -287,6 +287,7 @@ struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafi
 int journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, struct wal *wal);
 int journalfile_close(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_unlink(struct rrdengine_journalfile *journalfile);
+int journalfile_v2_unlink(struct rrdengine_journalfile *journalfile);
 #define JOURNALFILE_DELETED_V1  (1u << 0) // .njf was deleted
 #define JOURNALFILE_DELETED_V2  (1u << 1) // .njfv2 was deleted
 #define JOURNALFILE_DELETED_ALL (JOURNALFILE_DELETED_V1 | JOURNALFILE_DELETED_V2)
@@ -300,6 +301,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile);
 void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile);
+bool journalfile_v2_rebuild_from_v1(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile);
 bool journalfile_v2_samples_descriptor(const uint8_t *data_start, size_t file_size, struct journal_v2_samples_descriptor *out);
 const uint32_t *journalfile_v2_samples_section(const uint8_t *data_start, size_t file_size);
 uint64_t journalfile_v2_metric_estimated_samples(const struct journal_metric_list *metric);

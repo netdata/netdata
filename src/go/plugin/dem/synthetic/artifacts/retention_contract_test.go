@@ -50,7 +50,7 @@ func newRetentionFixture(t *testing.T) *retentionFixture {
 func (f *retentionFixture) begin(job string) (string, string) {
 	f.t.Helper()
 	id := fixtureRunID()
-	work, err := f.store.Begin(id, job)
+	work, err := f.store.Begin(id, job, "")
 	require.NoError(f.t, err)
 	f.ids = append(f.ids, id)
 	return id, work

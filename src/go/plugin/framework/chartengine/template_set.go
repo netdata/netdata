@@ -50,9 +50,10 @@ type TemplateSet struct {
 }
 
 type templateGlobalPolicy struct {
-	autogen   AutogenPolicy
-	selector  *metrixselector.Expr
-	namespace string
+	maxOutputSeriesPerContext int
+	autogen                   AutogenPolicy
+	selector                  *metrixselector.Expr
+	namespace                 string
 }
 
 // NewTemplateSet freezes, normalizes, validates and compiles native entries.
@@ -63,15 +64,17 @@ func NewTemplateSet(spec TemplateSetSpec) (*TemplateSet, error) {
 		return nil, err
 	}
 	global := templateGlobalPolicy{
-		autogen:   cloneAutogenPolicy(cfg.autogen),
-		selector:  normalizedSelectorExpr(spec.Policy.Selector),
-		namespace: strings.Join(normalizeOptional(spec.FallbackContextNamespace), "."),
+		maxOutputSeriesPerContext: cfg.maxOutputSeriesPerContext,
+		autogen:                   cloneAutogenPolicy(cfg.autogen),
+		selector:                  normalizedSelectorExpr(spec.Policy.Selector),
+		namespace:                 strings.Join(normalizeOptional(spec.FallbackContextNamespace), "."),
 	}
 	policy := effectiveEnginePolicy{
-		autogen:           cfg.autogen,
-		autogenRules:      cfg.autogenRules,
-		autogenCounterRaw: cfg.autogenCounterRaw,
-		selector:          cfg.selector,
+		maxOutputSeriesPerContext: cfg.maxOutputSeriesPerContext,
+		autogen:                   cfg.autogen,
+		autogenRules:              cfg.autogenRules,
+		autogenCounterRaw:         cfg.autogenCounterRaw,
+		selector:                  cfg.selector,
 	}
 	return compileTemplateSet(spec.Entries, global, policy, false, false)
 }
@@ -250,10 +253,14 @@ func PrepareTemplateSet(set *TemplateSet, opts ...Option) (*TemplateSet, error) 
 	if err != nil {
 		return nil, err
 	}
-	if !cfg.autogenOverride.set && !cfg.selectorOverride.set {
+	if !cfg.autogenOverride.set && !cfg.selectorOverride.set && !cfg.outputLimitOverride.set {
 		return set, nil
 	}
 	out := *set
+	if cfg.outputLimitOverride.set {
+		out.global.maxOutputSeriesPerContext = cfg.outputLimitOverride.value
+		out.policy.maxOutputSeriesPerContext = cfg.outputLimitOverride.value
+	}
 	if cfg.autogenOverride.set {
 		out.global.autogen = cloneAutogenPolicy(cfg.autogenOverride.value)
 		out.global.autogen.Rules = normalizedAutogenRules(out.global.autogen.Rules)
@@ -372,7 +379,8 @@ func (s *TemplateSet) GlobalPolicy() EnginePolicy {
 		return EnginePolicy{}
 	}
 	return cloneEnginePolicy(EnginePolicy{
-		Autogen:  &s.global.autogen,
-		Selector: s.global.selector,
+		MaxOutputSeriesPerContext: &s.global.maxOutputSeriesPerContext,
+		Autogen:                   &s.global.autogen,
+		Selector:                  s.global.selector,
 	})
 }

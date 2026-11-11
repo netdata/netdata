@@ -40,9 +40,6 @@ The plugin needs setuid because it loads data inside kernel. Netada sets necessa
 
 The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT, CONFIG_HAVE_SYSCALL_TRACEPOINTS), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

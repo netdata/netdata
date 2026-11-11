@@ -16,6 +16,7 @@ type Artifact struct {
 
 type Evidence struct {
 	JobID        string
+	VnodeGUID    string
 	RunID        string
 	CaptureState string
 	Artifacts    []Artifact
@@ -40,6 +41,7 @@ func (s *Service) Evidence(ctx context.Context, jobID, runID, artifactID string)
 	}
 	result := Evidence{
 		JobID:        manifest.JobID,
+		VnodeGUID:    manifest.VnodeGUID,
 		RunID:        manifest.RunID,
 		CaptureState: "available",
 	}
@@ -86,6 +88,7 @@ func (s *Service) absentEvidence(ctx context.Context, jobID, runID, artifactID s
 	}
 	result := Evidence{
 		JobID:        run.JobID,
+		VnodeGUID:    run.VnodeGUID,
 		RunID:        run.ID,
 		CaptureState: run.CaptureState,
 	}

@@ -221,17 +221,15 @@ test_untyped_metric{label1="value1"} 11
 	}
 }
 
-// Config defaults the V2 migration must preserve: update_every is the registered
-// Creator default (collectorapi.Defaults); max_time_series[_per_metric] are New()
-// defaults. A V2 re-registration can silently drop them.
+// Registration supplies update_every; New supplies independent input and output limits.
 func TestCollector_compatConfigDefaults(t *testing.T) {
 	creator, ok := collectorapi.DefaultRegistry.Lookup("prometheus")
 	require.True(t, ok, "prometheus collector must be registered")
 	assert.Equal(t, 10, creator.Defaults.UpdateEvery, "update_every default")
 
 	c := New()
-	assert.Equal(t, 2000, c.MaxTS, "max_time_series default")
-	assert.Equal(t, 200, c.MaxTSPerMetric, "max_time_series_per_metric default")
+	assert.Equal(t, 10000, c.MaxInputSeries, "max_input_series default")
+	assert.Equal(t, 1000, c.MaxOutputSeriesPerContext, "max_output_series_per_context default")
 }
 
 func goldenName(name string) string {

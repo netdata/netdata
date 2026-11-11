@@ -75,7 +75,7 @@ func (a *downloadActivity) close() {
 
 func (a *downloadActivity) failure(err error) error {
 	if errors.Is(context.Cause(a.ctx), errDownloadInactive) {
-		// Do not expose the internal cancellation as voluntary demand cancellation:
+		// Do not expose the internal cancellation as voluntary cancellation:
 		// the host must retain its normal acquisition-failure retry backoff.
 		return &downloadError{cause: errDownloadInactive, detail: "network inactivity timeout"}
 	}
@@ -135,9 +135,8 @@ func openDownload(ctx context.Context, address string, idle time.Duration) (io.R
 	return &downloadBody{ReadCloser: response.Body, activity: activity}, nil
 }
 
-// Download must only be called by the process owner for accepted demand and
-// administrator-allowed downloads. No collector check or status read calls it.
-func (s *Store) Download(ctx context.Context, m Manifest) error {
+// Downloads are explicit candidate operations, never monitor lifecycle work.
+func (s *Store) download(ctx context.Context, m Manifest) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}

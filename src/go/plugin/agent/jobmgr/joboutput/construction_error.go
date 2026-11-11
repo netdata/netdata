@@ -2,7 +2,10 @@
 
 package joboutput
 
-import "github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+)
 
 type invalidJobConfigurationError struct {
 	cause error
@@ -51,5 +54,6 @@ func transientActivationFailure(config confgroup.Config, err error) *autoDetecti
 		cause:      err,
 		retry:      true,
 		retryAfter: config.AutoDetectionRetry(),
+		notBefore:  collectorapi.RetryNotBefore(err),
 	}
 }

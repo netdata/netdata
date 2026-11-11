@@ -917,12 +917,13 @@ static bool perflib_get_counter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
             cd->id = pCounterDefinition->CounterNameTitleIndex;
         }
 
+        // Copy before stamping the type, so an empty or failed previous sample keeps CounterType 0.
+        cd->previous = cd->current;
         cd->current.CounterType = cd->OverwriteCounterType ? cd->OverwriteCounterType : pCounterDefinition->CounterType;
         PERF_COUNTER_BLOCK *pCounterBlock = object_scope ?
             getObjectTypeCounterBlock(pDataBlock, pObjectType) :
             getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
 
-        cd->previous = cd->current;
         if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
             if (cd->elapsed_time_uses_wall_clock && pCounterDefinition->CounterType == PERF_ELAPSED_TIME) {
                 // APP_POOL_WAS stores these start stamps in the 100-ns wall-clock domain.

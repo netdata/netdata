@@ -35,7 +35,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -131,7 +131,7 @@ jobs:
             - [ ] Verify any other platform support code that needs to be cleaned up.
       # Send a notification to Slack if a job failed.
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

@@ -27,7 +27,7 @@ func TestImportRejectsFIFOWithoutBlocking(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "archive")
 	require.NoError(t, unix.Mkfifo(path, 0600))
 	result := make(chan error, 1)
-	go func() { result <- s.Import(context.Background(), m, path) }()
+	go func() { result <- s.importUnselected(context.Background(), m, path) }()
 	select {
 	case err := <-result:
 		require.ErrorContains(t, err, "regular")
@@ -47,7 +47,7 @@ func TestImportFollowsRegularArchiveSymlink(t *testing.T) {
 	target, link := filepath.Join(dir, "archive"), filepath.Join(dir, "link")
 	require.NoError(t, os.WriteFile(target, archive, 0600))
 	require.NoError(t, os.Symlink(target, link))
-	require.NoError(t, s.Import(context.Background(), m, link))
+	require.NoError(t, s.importUnselected(context.Background(), m, link))
 	require.NoError(t, s.Available(m))
 }
 
@@ -88,7 +88,7 @@ func TestDownloadReportsCauseWithoutRequestCredentials(t *testing.T) {
 			previous := http.DefaultTransport
 			http.DefaultTransport = downloadTransport(func(*http.Request) (*http.Response, error) { return nil, tc.cause })
 			defer func() { http.DefaultTransport = previous }()
-			err := s.Download(context.Background(), m)
+			err := s.download(context.Background(), m)
 			require.ErrorIs(t, err, tc.cause)
 			require.ErrorContains(t, err, tc.want)
 			require.NotContains(t, err.Error(), "private-query")
@@ -109,7 +109,7 @@ func TestDownloadDoesNotExposeMalformedRedirectCredentials(t *testing.T) {
 	s, _ := testStore(t)
 	m, _ := bundleFixture(t, "redirect-diagnostic")
 	m.Archive.URL = server.URL
-	err := s.Download(context.Background(), m)
+	err := s.download(context.Background(), m)
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), "private-user")
 	require.NotContains(t, err.Error(), "private-query")
@@ -127,7 +127,7 @@ func TestDownloadReportsRedirectPolicyFailure(t *testing.T) {
 	s, _ := testStore(t)
 	m, _ := bundleFixture(t, "redirect-policy")
 	m.Archive.URL = server.URL
-	err := s.Download(context.Background(), m)
+	err := s.download(context.Background(), m)
 	require.ErrorIs(t, err, errDownloadRedirect)
 	require.ErrorContains(t, err, "unsafe runtime download redirect")
 	require.NotContains(t, err.Error(), "private-password")

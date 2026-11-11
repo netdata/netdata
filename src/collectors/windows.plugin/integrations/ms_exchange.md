@@ -22,10 +22,10 @@ Module: PerflibExchange
 
 ## Overview
 
-This collector monitors Microsoft Exchange.
+Monitor Exchange transport queues, Active Directory access, client activity, HTTP proxy traffic, and background workloads.
 
 
-It queries different Exchange objects from Perflib in order to gather the metrics.
+The collector reads registered Microsoft Exchange performance counters through Windows Perflib.
 
 
 This collector is only supported on the following platforms:
@@ -39,12 +39,9 @@ This collector only supports collecting metrics from a single instance of this i
 
 #### Auto-Detection
 
-The collector automatically detects all of the metrics, no further configuration is required.
+The collector is enabled by default. Charts appear when Exchange registers the corresponding performance objects and counters.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -115,9 +112,9 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 
 
-### Per Windows Exchange
+### Per Exchange host
 
-These metrics refer to Windows Exchange.
+Aggregate Exchange client and service counters on this host.
 
 This scope has no labels.
 
@@ -125,34 +122,119 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| exchange.transport_queues_active_mail_box_delivery | Active Mailbox Delivery Queue length. | active | messages |
-| exchange.transport_queues_external_active_remote_delivery | External Active Remote Delivery Queue length. | active | messages |
-| exchange.transport_queues_internal_active_remote_delivery | Internal Active Remote Delivery Queue length. | active | messages |
-| exchange.transport_queues_unreachable | Unreachable Queue length. | unreachable | messages |
-| exchange.transport_queues_poison | Poison Queue Length. | unreachable | messages |
 | exchange.activesync_ping_cmds_pending | Ping commands pending in queue. | pending | commands |
 | exchange.activesync_requests | HTTP requests received from ASP.NET. | received | requests/s |
 | exchange.activesync_sync_cmds | Sync commands processed. | processed | commands/s |
-| exchange.rpc_active_user_count | Active unique users in the last 2 minutes. | active | users |
 | exchange.rpc_avg_latency | Average latency. | latency | seconds |
-| exchange.rpc_connection_count | Client connections. | connections | connections |
 | exchange.rpc_requests | Clients requests currently being processed. | processed | requests |
-| exchange.rpc_active_user | Active unique users in the last 2 minutes. | users | users |
+| exchange.rpc_active_user | Active unique users in the last 2 minutes. | active | users |
 | exchange.rpc_connection | Client connections. | connections | connections |
 | exchange.rpc_operations | RPC operations. | operations | operations/s |
 | exchange.rpc_user_count | RPC users. | users | users |
-| exchange.owa_current_unique_users | Unique users currently logged on to Outlook Web App. | logged-in | users |
+| exchange.owa_current_unique_users | Unique users currently logged on to Outlook Web App | logged-in | users |
 | exchange.owa_requests_total | Requests handled by Outlook Web App. | handled | requests/s |
+| exchange.autodiscover_requests | Autodiscover service requests processed. | processed | requests/s |
+| exchange.avail_service_requests | Requests serviced. | serviced | requests/s |
+| exchange.mapihttp_emsmdb_active_user_count | Unique MAPI HTTP EMSMDB users active in the last 2 minutes. | active | users |
+
+
+### Per Transport queue priority
+
+Each Exchange transport priority or reported aggregate with registered queue counters. Aggregate instances such as `total excluding priority none` overlap with individual priorities and should not be summed with them.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| priority | The transport priority or aggregate instance reported by Exchange. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| exchange.transport_queues_active_mail_box_delivery | Active Mailbox Delivery Queue length. | active | messages |
+| exchange.transport_queues_external_active_remote_delivery | External Active Remote Delivery Queue length. | active | messages |
+| exchange.transport_queues_external_largest_delivery | External Largest Delivery Queue length. | largest | messages |
+| exchange.transport_queues_internal_active_remote_delivery | Internal Active Remote Delivery Queue length. | active | messages |
+| exchange.transport_queues_internal_largest_delivery | Internal Largest Delivery Queue length. | largest | messages |
+| exchange.transport_queues_retry_mailbox_delivery | Retry Mailbox Delivery Queue length. | retry | messages |
+| exchange.transport_queues_unreachable | Unreachable Queue length. | unreachable | messages |
+| exchange.transport_queues_poison | Poison Queue Length. | poison | messages |
+| exchange.transport_queues_messages_queued_for_delivery_total | Messages queued for delivery. | queued | messages/s |
+| exchange.transport_queues_messages_submitted_total | Messages submitted. | submitted | messages/s |
+| exchange.transport_queues_messages_delayed_total | Messages delayed. | delayed | messages/s |
+| exchange.transport_queues_messages_completed_delivery_total | Messages completed delivery. | delivered | messages/s |
+| exchange.transport_queues_aggregate_shadow_queue_length | Current number of messages in shadow queues. | queued | messages |
+| exchange.transport_queues_submission_queue_length | Submission Queue Length. | queued | messages |
+| exchange.transport_queues_delay_queue_length | Delay Queue Length. | queued | messages |
+| exchange.transport_queues_items_completed_delivery_total | Items completed delivery. | completed | items/s |
+| exchange.transport_queues_items_queued_for_delivery_expired_total | Items queued for delivery that expired. | expired | items/s |
+| exchange.transport_queues_items_queued_for_delivery_total | Items queued for delivery. | queued | items/s |
+| exchange.transport_queues_items_resubmitted_total | Items resubmitted. | resubmitted | items/s |
+
+
+### Per Workload
+
+Each background workload reported by Exchange Workload Management.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| workload | The Exchange workload name. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
 | exchange.workload_active_tasks | Workload active tasks. | active | tasks |
 | exchange.workload_completed_tasks | Workload completed tasks. | completed | tasks/s |
-| exchange.workload_queued_tasks | Workload queued tasks. | queued | tasks/s |
+| exchange.workload_queued_tasks | Workload queued tasks. | queued | tasks |
 | exchange.workload_yielded_tasks | Workload yielded tasks. | yielded | tasks/s |
-| exchange.workload_activity_status | Workload activity status | active, paused | status |
+| exchange.workload_activity_status | Workload activity status. | active, paused | status |
+
+
+### Per HTTP proxy
+
+Each Exchange HTTP proxy endpoint with registered counters.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| http_proxy | The HTTP proxy endpoint name reported by Exchange. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
 | exchange.http_proxy_avg_auth_latency | Average time spent authenticating CAS requests. | latency | seconds |
 | exchange.http_proxy_avg_cas_processing_latency_sec | Average latency (sec) of CAS processing time. | latency | seconds |
-| exchange.http_proxy_mailbox_proxy_failure_rate | Percentage of failures between this CAS and MBX servers. | failures | seconds |
+| exchange.http_proxy_mailbox_proxy_failure_rate | Percentage of failures between this CAS and MBX servers. | failures | percentage |
 | exchange.http_proxy_mailbox_server_locator_avg_latency_sec | Average latency of MailboxServerLocator web service calls. | latency | seconds |
-| exchange.http_proxy_outstanding_proxy_requests | Concurrent outstanding proxy requests. | requests | seconds |
-| exchange.http_proxy_requests | Number of proxy requests processed each second. | requests | seconds |
-| exchange.autodiscover_requests | Autodiscover service requests processed | processed | requests/s |
-| exchange.avail_service_requests | Requests serviced | serviced | requests/s |
+| exchange.http_proxy_outstanding_proxy_requests | Concurrent outstanding proxy requests. | requests | requests |
+| exchange.http_proxy_requests | Number of proxy requests processed each second. | requests | requests/s |
+
+
+### Per AD access process
+
+Each Exchange process reporting Active Directory access counters.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| process | The Exchange process name. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| exchange.ldap_read_time_sec | Time to send an LDAP read request and receive a response. | read | seconds |
+| exchange.ldap_search_time_sec | Time to send an LDAP search request and receive a response. | search | seconds |
+| exchange.ldap_write_time_sec | Time to send an LDAP add, modify, or delete request and receive a response. | write | seconds |
+| exchange.ldap_read_operations_total | LDAP read operations. | operations | operations/s |
+| exchange.ldap_search_operations_total | LDAP search operations. | operations | operations/s |
+| exchange.ldap_write_operations_total | LDAP write operations. | operations | operations/s |
+| exchange.ldap_timeout_errors_total | LDAP timeout errors. | timeouts | errors/s |
+| exchange.ldap_long_running_ops_per_sec | Long running LDAP operations. | operations | operations/s |

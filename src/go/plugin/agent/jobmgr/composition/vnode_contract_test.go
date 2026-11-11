@@ -134,20 +134,18 @@ func TestProcessVNodeNameRoundTrip(t *testing.T) {
 }
 
 func TestVNodeUpdatePreflightChecksLifetime(t *testing.T) {
-	for _, phase := range []string{"Check", "intent reservation"} {
+	for _, phase := range []string{"Check", "admission validation"} {
 		for _, mutation := range []string{"remove", "replace", "replace identical", "update"} {
 			t.Run(phase+"/"+mutation, func(t *testing.T) {
 				var inits, checks, created atomic.Int32
 				var incumbentStopped atomic.Bool
 				entered, release := make(chan struct{}), make(chan struct{})
-				var releaseOnce sync.Once
-				owner := &preflightIntentOwner{blockAt: 2, entered: entered, release: release}
-				if phase == "Check" {
-					owner.blockAt = 0
-				}
+				var releaseOnce, validationOnce sync.Once
 				modules := collectorapi.Registry{"module": {
-					JobConfigIntent: owner,
 					CreateV2: func() collectorapi.CollectorV2 {
+						if phase == "admission validation" && checks.Load() == 2 {
+							validationOnce.Do(func() { close(entered); <-release })
+						}
 						c := &handoffCollector{
 							readinessIntegrationCollector: readinessIntegrationCollector{store: metrix.NewCollectorStore()},
 							inits:                         &inits, checks: &checks,
@@ -164,7 +162,8 @@ func TestVNodeUpdatePreflightChecksLifetime(t *testing.T) {
 						}
 						return c
 					},
-					Config: func() any { return &collectorapi.MockConfiguration{} },
+					ActivationDependencies: func(map[string]any) ([]collectorapi.ActivationDependency, error) { return nil, nil },
+					Config:                 func() any { return &collectorapi.MockConfiguration{} },
 				}}
 				cfg := confgroup.Config{"module": "module", "name": "receiver", "update_every": 1}.
 					SetSourceType(confgroup.TypeUser).SetProvider(confgroup.TypeUser).SetSource("file=test")
@@ -236,10 +235,6 @@ func TestVNodeUpdatePreflightChecksLifetime(t *testing.T) {
 					after, _ := generation.vnodes.graph.Lookup(cfg.FullName())
 					require.Equal(t, before, after, "rejected preflight must preserve the incumbent")
 					require.False(t, incumbentStopped.Load(), "rejection must not stop the running monitor")
-					require.EqualValues(t, 1, owner.committed.Load(), "rejection must preserve original acquisition intent")
-					if phase == "intent reservation" {
-						require.EqualValues(t, 1, owner.aborted.Load())
-					}
 				}
 				require.EqualValues(t, 2, checks.Load(), "ordinary vnode updates must not cause another preflight")
 			})
@@ -248,19 +243,17 @@ func TestVNodeUpdatePreflightChecksLifetime(t *testing.T) {
 }
 
 func TestDiscoveredJobRebuildsAfterVNodeRemovalDuringPreflight(t *testing.T) {
-	for _, phase := range []string{"Check", "intent reservation"} {
+	for _, phase := range []string{"Check", "admission validation"} {
 		for _, readdBeforeAdoption := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/readd-before-adoption=%t", phase, readdBeforeAdoption), func(t *testing.T) {
 				var inits, checks atomic.Int32
 				entered, release := make(chan struct{}), make(chan struct{})
-				var releaseOnce sync.Once
-				owner := &preflightIntentOwner{blockAt: 1, entered: entered, release: release}
-				if phase == "Check" {
-					owner.blockAt = 0
-				}
+				var releaseOnce, validationOnce sync.Once
 				modules := collectorapi.Registry{"module": {
-					JobConfigIntent: owner,
 					CreateV2: func() collectorapi.CollectorV2 {
+						if phase == "admission validation" && checks.Load() == 1 {
+							validationOnce.Do(func() { close(entered); <-release })
+						}
 						return &handoffCollector{
 							readinessIntegrationCollector: readinessIntegrationCollector{store: metrix.NewCollectorStore()},
 							inits:                         &inits, checks: &checks,
@@ -273,7 +266,8 @@ func TestDiscoveredJobRebuildsAfterVNodeRemovalDuringPreflight(t *testing.T) {
 							},
 						}
 					},
-					Config: func() any { return &collectorapi.MockConfiguration{} },
+					ActivationDependencies: func(map[string]any) ([]collectorapi.ActivationDependency, error) { return nil, nil },
+					Config:                 func() any { return &collectorapi.MockConfiguration{} },
 				}}
 				cfg := confgroup.Config{"module": "module", "name": "receiver", "vnode": "x", "update_every": 1, "autodetection_retry": 0}.
 					SetSourceType(confgroup.TypeUser).SetProvider(confgroup.TypeUser).SetSource("file=test")
@@ -330,9 +324,6 @@ func TestDiscoveredJobRebuildsAfterVNodeRemovalDuringPreflight(t *testing.T) {
 					r, _ := generation.vnodes.graph.Lookup(cfg.FullName())
 					return r.Status == dyncfg.StatusRunning.String()
 				}, time.Second, time.Millisecond)
-				if phase == "intent reservation" {
-					require.EqualValues(t, 1, owner.aborted.Load())
-				}
 				require.EqualValues(t, 2, checks.Load(), "discovery must discard the removed vnode's candidate and probe the recreated record")
 			})
 		}
@@ -463,22 +454,3 @@ func TestVNodeUserConfigPreservesNamesAndFormattingFallback(t *testing.T) {
 		})
 	}
 }
-
-// Block only the selected enabled reservation, after the candidate's Check.
-type preflightIntentOwner struct {
-	blockAt                      int32
-	entered                      chan struct{}
-	release                      <-chan struct{}
-	prepared, committed, aborted atomic.Int32
-}
-type preflightIntentReservation struct{ owner *preflightIntentOwner }
-
-func (o *preflightIntentOwner) Prepare(_, next collectorapi.JobConfigIdentity, _ map[string]any) (collectorapi.PreparedJobConfigIntent, error) {
-	if next.Valid() && o.prepared.Add(1) == o.blockAt {
-		close(o.entered)
-		<-o.release
-	}
-	return &preflightIntentReservation{owner: o}, nil
-}
-func (r *preflightIntentReservation) Commit()      { r.owner.committed.Add(1) }
-func (r *preflightIntentReservation) Abort() error { r.owner.aborted.Add(1); return nil }

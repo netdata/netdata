@@ -44,15 +44,12 @@ static void get_and_sanitize_instance_value(
             rrddim_set_by_pointer(p->st, p->rd_##field, (collected_number)p->field.current.Data);                    \
     } while (0)
 
-static inline NETDATA_DOUBLE hyperv_average_timer_seconds(COUNTER_DATA *counter)
+// Reports 0 when the two samples cannot form an interval.
+static inline collected_number hyperv_average_timer_usec(const COUNTER_DATA *counter)
 {
-    if (!counter->updated || counter->current.CounterType != PERF_AVERAGE_TIMER ||
-        counter->current.Data < counter->previous.Data || !counter->previous.Time ||
-        counter->current.Time <= counter->previous.Time || !counter->current.Frequency)
-        return 0;
-
-    return (((double)(counter->current.Data - counter->previous.Data) / (double)counter->current.Frequency) /
-            (double)(counter->current.Time - counter->previous.Time));
+    double ms;
+    perflib_average_timer_ms(counter, &ms);
+    return (collected_number)(ms * USEC_PER_MS);
 }
 
 #define HYPERV_MISSING_CYCLES 12
@@ -747,7 +744,7 @@ static bool do_hyperv_root_partition(PERF_DATA_BLOCK *pDataBlock, int update_eve
                 RRDSET_TYPE_LINE);
 
             p->rd_GPASpaceModifications =
-                rrddim_add(p->st_gpa_space_modifications, "gpa", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+                rrddim_add(p->st_gpa_space_modifications, "gpa", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             p->st_attached_devices = rrdset_create_localhost(
                 "root_partition_attached_devices",
@@ -1353,12 +1350,12 @@ static bool do_hyperv_storage_device(PERF_DATA_BLOCK *pDataBlock, int update_eve
             rrddim_set_by_pointer(
                 p->st_latency,
                 p->rd_Latency,
-                (collected_number)(hyperv_average_timer_seconds(&p->Latency) * 1000000.0));
+                hyperv_average_timer_usec(&p->Latency));
         if (p->LowerLatency.updated)
             rrddim_set_by_pointer(
                 p->st_latency,
                 p->rd_LowerLatency,
-                (collected_number)(hyperv_average_timer_seconds(&p->LowerLatency) * 1000000.0));
+                hyperv_average_timer_usec(&p->LowerLatency));
         SETP_DIM_VALUE(st_throughput, Throughput);
         SETP_DIM_VALUE(st_normalized_throughput, NormalizedThroughput);
         SETP_DIM_VALUE(st_io_quota_replenishment_rate, IOQuotaReplenishmentRate);
@@ -2294,7 +2291,7 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
                 RRDSET_TYPE_AREA);
 
             p->rd_TotalRunTime =
-                rrddim_add(p->st_HypervisorProcessorTotal, "usage", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_HypervisorProcessorTotal, "usage", NULL, 1, 100000, RRD_ALGORITHM_INCREMENTAL);
             rrdlabels_add(
                 p->st_HypervisorProcessorTotal->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
 
@@ -2313,11 +2310,11 @@ static bool do_hyperv_processor(PERF_DATA_BLOCK *pDataBlock, int update_every, v
                 RRDSET_TYPE_STACKED);
 
             p->rd_GuestRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_HypervisorProcessor, "guest", NULL, 1, 100000, RRD_ALGORITHM_INCREMENTAL);
             p->rd_HypervisorRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_HypervisorProcessor, "hypervisor", NULL, 1, 100000, RRD_ALGORITHM_INCREMENTAL);
             p->rd_RemoteRunTime =
-                rrddim_add(p->st_HypervisorProcessor, "remote", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(p->st_HypervisorProcessor, "remote", NULL, 1, 100000, RRD_ALGORITHM_INCREMENTAL);
 
             rrdlabels_add(p->st_HypervisorProcessor->rrdlabels, "vm_name", windows_shared_buffer, RRDLABEL_SRC_AUTO);
         }

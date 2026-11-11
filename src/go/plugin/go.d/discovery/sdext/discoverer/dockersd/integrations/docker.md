@@ -21,7 +21,7 @@ Kind: `docker`
 
 ## Overview
 
-Netdata can automatically discover running Docker containers on the local Docker daemon and generate collector jobs for the services running inside them. The discoverer queries the Docker API on a fixed interval, builds one target per container port, and applies your `services:` rules to render collector job YAML — typically picking the right go.d module from the container image (nginx, postgres, redis, …).
+Netdata can automatically discover running Docker containers on the local Docker daemon and generate collector jobs for the services running inside them. The discoverer queries the Docker API on a fixed interval, builds one target per container port, and applies your `services:` rules to create collector jobs — typically picking the right go.d module from the container image (nginx, postgres, redis, …).
 
 This page covers Docker-specific setup. For the broader Service Discovery model and the shared template-helper reference, see [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md).
 
@@ -146,8 +146,7 @@ services:
   - id: nginx
     match: '{{ match "sp" .Image "nginx nginx:*" }}'
     config_template: |
-      name: docker_{{.Name}}
-      url: http://{{.Address}}/stub_status
+      {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/stub_status" .Address) }}
 
 ```
 ###### Remote daemon over TCP
@@ -166,8 +165,7 @@ services:
   - id: redis
     match: '{{ match "sp" .Image "redis redis:* */redis */redis:*" }}'
     config_template: |
-      name: docker_{{.Name}}
-      address: redis://@{{.Address}}
+      {{ job "name" (printf "docker_%s" .Name) "address" (printf "redis://@%s" .Address) }}
 
 ```
 
@@ -176,7 +174,7 @@ services:
 
 A `services:` rule turns each discovered container target into one or more collector jobs. Most rules match on `.Image` (using the `match "sp"` simple-pattern helper for the typical `image image:* */image */image:*` family), some also gate on `.PrivatePort`, and a few use `.Labels` to honor user intent.
 
-The shared rule model — function reference (`match`, `glob`, sprig, `toYaml`), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are Docker-specific.
+The shared rule model — function reference (`match`, `glob`, sprig, `job`), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are Docker-specific.
 
 
 ### How rules are evaluated
@@ -238,14 +236,10 @@ Match the four common image-name forms with `match "sp"`. `id: nginx` makes the 
 - id: nginx
   match: '{{ match "sp" .Image "nginx nginx:*" }}'
   config_template: |
-    - name: docker_{{.Name}}
-      url: http://{{.Address}}/stub_status
-    - name: docker_{{.Name}}
-      url: http://{{.Address}}/basic_status
-    - name: docker_{{.Name}}
-      url: http://{{.Address}}/nginx_status
-    - name: docker_{{.Name}}
-      url: http://{{.Address}}/status
+    {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/stub_status" .Address) }}
+    {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/basic_status" .Address) }}
+    {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/nginx_status" .Address) }}
+    {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/status" .Address) }}
 
 ```
 
@@ -258,9 +252,11 @@ When the rule `id` is something other than the target module name, set `module:`
 - id: postgres
   match: '{{ or (eq .PrivatePort "5432") (match "sp" .Image "postgres postgres:* */postgres */postgres:* */postgresql */postgresql:*") }}'
   config_template: |
-    module: postgres
-    name: docker_{{.Name}}
-    dsn: postgres://netdata:postgres@{{.Address}}/postgres
+    {{ job
+      "module" "postgres"
+      "name" (printf "docker_%s" .Name)
+      "dsn" (printf "postgres://netdata:postgres@%s/postgres" .Address)
+    }}
 
 ```
 
@@ -273,9 +269,11 @@ Use container labels to override behaviour without changing rules — e.g. opt a
 - id: label-routed
   match: '{{ and (hasKey .Labels "netdata.go.d/module") (eq (index .Labels "netdata.go.d/module") "mymodule") }}'
   config_template: |
-    module: mymodule
-    name: docker_{{.Name}}
-    url: http://{{.Address}}/metrics
+    {{ job
+      "module" "mymodule"
+      "name" (printf "docker_%s" .Name)
+      "url" (printf "http://%s/metrics" .Address)
+    }}
 
 ```
 

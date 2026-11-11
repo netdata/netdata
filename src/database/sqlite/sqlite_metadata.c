@@ -6,8 +6,6 @@
 
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 18
-
 #define COMPUTE_DURATION(var_name, unit, start, end)      \
     char var_name[64];                                    \
     duration_snprintf(var_name, sizeof(var_name),         \
@@ -58,7 +56,7 @@ const char *database_config[] = {
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
     "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, "
-    "summary text, time_group_condition INT, time_group_value DOUBLE, dims_group INT, data_source INT)",
+    "summary text, time_group_condition INT, time_group_value DOUBLE, time_group_options text, dims_group INT, data_source INT)",
 
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key))",
@@ -763,6 +761,23 @@ bool sql_metadata_wal_size_acceptable()
 }
 
 // Init
+
+// Why the last sql_init_meta_database() failed; written and read on the thread that initializes the database.
+static __thread SQLITE_INIT_FAILURE meta_init_failure;
+
+void sql_init_meta_failure_reason(char *dst, size_t dst_size, int *os_errno)
+{
+    sqlite_init_failure_format(&meta_init_failure, dst, dst_size);
+    if (os_errno) {
+#if defined(OS_WINDOWS)
+        // a GetLastError() code is not an errno; the reason above carries it
+        *os_errno = 0;
+#else
+        *os_errno = meta_init_failure.os_errno;
+#endif
+    }
+}
+
 /*
  * Initialize the SQLite database
  * Return 0 on success
@@ -772,6 +787,9 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     char *err_msg = NULL;
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
+
+    memset(&meta_init_failure, 0, sizeof(meta_init_failure));
+    sqlite_init_failure_clear();
 
     if (likely(!memory)) {
         snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
@@ -803,11 +821,8 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
 
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
+        sqlite_init_failure_record(db_meta, "meta_open", NULL, rc);
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
-        char *error_str = get_database_extented_error(db_meta, 0, "meta_open");
-        if (error_str)
-            analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
-        freez(error_str);
         goto close_database;
     }
 
@@ -876,6 +891,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     return 0;
 
 close_database:
+    sqlite_init_failure_get(&meta_init_failure);
     sqlite3_close_v2(db_meta);
     db_meta = NULL;
     return 1;
@@ -2122,7 +2138,7 @@ static void ctx_load_one_host(
     if (thread_found) {
         __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
         hclt[thread_index].host = host;
-        hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
+        hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_MANUAL_JOIN, restore_host_context, &hclt[thread_index]);
         rc = (hclt[thread_index].thread == NULL);
         *async_exec += (rc == 0);
         // if it failed, mark the thread slot as free
@@ -3273,7 +3289,12 @@ void metadata_execute_store_statement(sqlite3_stmt *stmt)
     if (unlikely(!stmt))
         return;
 
-    (void) queue_metadata_cmd(METADATA_EXECUTE_STORE_STATEMENT, stmt, NULL);
+    // the queue owns the statement once it is accepted; if metasync is not
+    // running - shutdown, or before init - nobody will ever execute or
+    // finalize it, so it goes back here (metaqueue_delete_dimension_uuid
+    // does the same with its allocation)
+    if (!queue_metadata_cmd(METADATA_EXECUTE_STORE_STATEMENT, stmt, NULL))
+        SQLITE_FINALIZE(stmt);
 }
 
 void commit_alert_transitions(RRDHOST *host __maybe_unused)

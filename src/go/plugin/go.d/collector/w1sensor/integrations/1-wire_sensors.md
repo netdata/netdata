@@ -40,9 +40,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 The collector will try to auto detect available 1-Wire devices.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

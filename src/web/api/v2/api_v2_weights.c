@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "api_v2_calls.h"
+#include "../queries/tg-expression.h"
 
 static bool weights_parse_limit(const char *value, size_t *result) {
     size_t n = 0;
@@ -143,6 +144,14 @@ int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *ur
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
     wb->content_type = CT_APPLICATION_JSON;
+
+    if(!time_grouping_expression_options_valid(time_group_method, time_group_options)) {
+        buffer_no_cacheable(wb);
+        buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+        buffer_json_member_add_string(wb, "error", "Invalid time-group condition.");
+        buffer_json_finalize(wb);
+        return HTTP_RESP_BAD_REQUEST;
+    }
 
     QUERY_WEIGHTS_REQUEST qwr = {
         .version = api_version,

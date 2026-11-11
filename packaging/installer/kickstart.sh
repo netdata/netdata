@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0524
+# Next unused error code: F0530
 
 # ======================================================================
 # Constants
@@ -57,6 +57,7 @@ STABLE_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/stable"
 NIGHTLY_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/edge"
 REPOCONFIG_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
+RELEASE_ARTIFACT_URL_PREFIX="https://artifacts.netdata.cloud"
 
 # ======================================================================
 # Defaults for environment variables
@@ -66,6 +67,7 @@ SELECTED_INSTALL_METHOD="none"
 INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
+NETDATA_INSTALL_DEM_RUNTIME=0
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_INSTALLER_OPTIONS=""
@@ -106,6 +108,7 @@ BADNET_MSG="This is usually a result of a networking issue"
 ERROR_F0003="Could not find a usable HTTP client. Either curl or wget is required to proceed with installation."
 BADOPT_MSG="If you are following a third-party guide online, please see ${INSTALL_DOC_URL} for current instructions for using this script. If you are using a local copy of this script instead of fetching it from our servers, consider updating it. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
 GITHUB_BADNET_MSG="This usually means there is some networking issue preventing access to https://github.com/ from this system."
+RELEASE_BADNET_MSG="This usually means there is some networking issue preventing access to ${RELEASE_ARTIFACT_URL_PREFIX} from this system."
 
 # ======================================================================
 # Core program logic
@@ -168,6 +171,7 @@ main() {
   fi
 
   set_auto_updates
+  install_dem_runtime
 
   printf >&2 "%s\n\n" "Successfully installed the Netdata Agent."
   deferred_warnings
@@ -188,6 +192,10 @@ USAGE: kickstart.sh [options]
   --non-interactive                Do not prompt for user input. (default: prompt if there is a controlling terminal)
   --interactive                    Prompt for user input even if there is no controlling terminal.
   --dont-start-it                  Do not start the agent by default (only for static installs or local builds)
+  --docker-container NAME         Target a running local Docker deployment (with --install-dem-runtime).
+  --dem-docker-policy-status TOKEN Inspect a Docker host policy registration without a container.
+  --dem-docker-policy-remove TOKEN Retire that registration; requires --deployments-stopped.
+  --install-dem-runtime            Explicitly install the optional browser runtime for DEM synthetic monitoring.
   --dry-run                        Report what we would do with the given options on this system, but don’t actually do anything.
   --release-channel                Specify the release channel to use for the install (default: ${DEFAULT_RELEASE_CHANNEL})
   --stable-channel                 Equivalent to "--release-channel stable"
@@ -211,6 +219,12 @@ USAGE: kickstart.sh [options]
   --static-install-options         Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
   --offline-architecture           Limit an offline install source being prepared with --prepare-offline-install-source to only include the specified static build architecture.
   --offline-install-source         Specify a folder to use as installation source when working offline. Use --prepare-offline-install-source first to set up this folder.
+
+--install-dem-runtime uses the installed Agent's normal configuration. Custom service
+-c/-u arguments or environment overrides require direct runtime CLI setup after
+administrator preparation of any required host policy. Native
+runtime packages require the named netdata service account. Managed setup downloads
+the browser archive and enables daily preparation; restart the Agent to activate it.
 
 The following options are mutually exclusive and specifiy special operations other than trying to install Netdata normally or update an existing install:
 
@@ -541,7 +555,7 @@ progress() {
 }
 
 run_logfile="/dev/null"
-run() {
+_get_run_info() {
   user="${USER--}"
   dir="${PWD}"
 
@@ -552,11 +566,9 @@ run() {
     info="[${user} ${dir}]$ "
     info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
   fi
+}
 
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    printf >&2 "%s" "Would run command:\n"
-  fi
-
+_log_run_cmd() {
   {
     printf "%s" "${info}"
     escaped_print "${@}"
@@ -566,15 +578,12 @@ run() {
   printf >&2 "%s" "${info_console}${TPUT_BOLD}"
   escaped_print >&2 "${@}"
   printf >&2 "%s\n" "${TPUT_RESET}"
+}
 
-  if [ "${DRY_RUN}" -ne 1 ]; then
-    "${@}"
-    ret=$?
-  else
-    ret=0
-  fi
-
-  if [ ${ret} -ne 0 ]; then
+_log_run_result() {
+  ret="${1}"
+  shift 1
+  if [ "${ret}" -ne 0 ]; then
     printf >&2 "%s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD} FAILED ${TPUT_RESET}"
     printf "%s\n" "FAILED with exit code ${ret}" >> "${run_logfile}"
     # shellcheck disable=SC2089
@@ -583,8 +592,36 @@ run() {
     printf >&2 "%s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD} OK ${TPUT_RESET}"
     printf "OK\n" >> "${run_logfile}"
   fi
+}
 
-  return ${ret}
+run() {
+  _get_run_info
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    printf >&2 "%s\n" "Would run command:"
+  fi
+
+  _log_run_cmd "${@}"
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    "${@}"
+    ret=$?
+  else
+    ret=0
+  fi
+
+  _log_run_result "${ret}" "${@}"
+
+  return "${ret}"
+}
+
+always_run() {
+  _get_run_info
+  _log_run_cmd "${@}"
+  "${@}"
+  ret="$?"
+  _log_run_result "${ret}" "${@}"
+  return "${ret}"
 }
 
 run_as_root() {
@@ -726,6 +763,20 @@ handle_curl_result() {
       handle_http_status "${status}" "${url}" "${action}"
       return "$?"
       ;;
+    56)
+      status="$(tail -n 1 "${dl_log}")"
+      [ -n "${dest}" ] && rm -f "${dest}"
+      case "${status}" in
+        2*)
+          warning "Protocol error when ${action} ${url}"
+          return 4
+          ;;
+        *)
+          handle_http_status "${status}" "${url}" "${action}"
+          return "$?"
+          ;;
+      esac
+      ;;
     5|6|7)
       [ -n "${dest}" ] && rm -f "${dest}"
       warning "Failed to connect to remote host when ${action} ${url}"
@@ -796,14 +847,14 @@ check_for_remote_file() {
   fi
 
   if [ -n "${CURL}" ]; then
-    "${CURL}" --write-out "%{http_code}" --output /dev/null --silent --head --fail "${url}" > "${dl_log}"
+    always_run "${CURL}" --write-out "%{http_code}" --output /dev/null --silent --head --fail "${url}" > "${dl_log}"
 
     handle_curl_result "$?" "${url}" "${dl_log}" "checking for remote file at"
     return "$?"
   fi
 
   if [ -n "${WGET}" ]; then
-    "${WGET}" -S -o "${dl_log}" --spider "${url}"
+    always_run "${WGET}" -S -o "${dl_log}" --spider "${url}"
 
     handle_wget_result "$?" "${url}" "${dl_log}" "checking for remote file at"
     return "$?"
@@ -815,6 +866,7 @@ check_for_remote_file() {
 download() {
   url="${1}"
   dest="${2}"
+  force="${3}"
 
   old_pwd="${PWD}"
   set_tmpdir
@@ -822,20 +874,26 @@ download() {
   dl_log="${tmpdir}/download.log"
   rm -f "${dl_log}"
 
+  if [ "${force}" = "force" ]; then
+    runcmd="always_run"
+  else
+    runcmd="run"
+  fi
+
   if echo "${url}" | grep -Eq "^file:///"; then
-    run cp "${url#file://}" "${dest}" || return 1
+    "${runcmd}" cp "${url#file://}" "${dest}" || return 1
     return 0
   fi
 
   if [ -n "${CURL}" ]; then
-    run sh -c '"${1}" --fail -q -sSL --connect-timeout 10 --retry 3 --write-out "%{http_code}" --output "${2}" "${3}" > "${4}"' _ "${CURL}" "${dest}" "${url}" "${dl_log}"
+    "${runcmd}" sh -c '"${1}" --fail -q -sSL --connect-timeout 10 --retry 3 --write-out "%{http_code}" --output "${2}" "${3}" > "${4}"' _ "${CURL}" "${dest}" "${url}" "${dl_log}"
 
     handle_curl_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
     return "$?"
   fi
 
   if [ -n "${WGET}" ]; then
-    run "${WGET}" -S -T 15 -o "${dl_log}" -O "${dest}" "${url}"
+    "${runcmd}" "${WGET}" -S -T 15 -o "${dl_log}" -O "${dest}" "${url}"
 
     handle_wget_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
     return "$?"
@@ -874,7 +932,7 @@ get_redirect() {
   rm -f "${output}"
 
   if [ -n "${CURL}" ]; then
-    run sh -c '"${1}" "${2}" -s -L -I -o /dev/null -w "%{url_effective}" > "${3}"' _ "${CURL}" "${url}" "${output}"
+    always_run sh -c '"${1}" "${2}" -s -L -I -o /dev/null -w "%{url_effective}" > "${3}"' _ "${CURL}" "${url}" "${output}"
 
     ret="$?"
 
@@ -892,7 +950,7 @@ get_redirect() {
   fi
 
   if [ -n "${WGET}" ]; then
-    run "${WGET}" -S -o "${output}" -O /dev/null "${url}"
+    always_run "${WGET}" -S -o "${output}" -O /dev/null "${url}"
 
     ret="$?"
 
@@ -910,6 +968,84 @@ get_redirect() {
   fi
 
   fatal "${ERROR_F0003}" F0003
+}
+
+verify_manifest() {
+  dir="${1}"
+  required_file="${2}"
+  old_pwd="${PWD}"
+  failed=0
+  cd "${dir}" || fatal "Failed to change current working directory to ${dir}." F000A
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would verify integrity of downloaded files."
+  else
+    progress "Verifying integrity of downloaded files."
+
+    if [ -r "./Manifest" ]; then
+      files="$(awk '{ print $1 }' ./Manifest)"
+      if [ -n "${required_file}" ]; then
+        progress "Verifying that ${required_file} exists in Manifest"
+
+        if ! echo "${files}" | grep -qxF "${required_file}" ; then
+          fatal "${required_file} is not present in Manifest" F052C
+        fi
+
+        if [ ! -r "${required_file}" ]; then
+          fatal "${required_file} cannot be read" F052D
+        fi
+      fi
+      for f in ${files} ; do
+        if [ -r "${f}" ]; then
+          file_info="$(grep -E "^${f} " ./Manifest)"
+          file_size="$(echo "${file_info}" | awk '{ print $2 }')"
+          file_hash="$(echo "${file_info}" | awk '{ print $3 }')"
+
+          actual_size="$(wc -c "${f}" | awk '{ print $1 }')"
+          if [ "${actual_size}" -ne "${file_size}" ]; then
+            failed="$((failed + 1))"
+            warning "Invalid file size for ${dir}/${f}, expected ${file_size}, actual ${actual_size}"
+            continue
+          fi
+
+          if ! echo "${file_hash} *${f}" | safe_sha256sum -c -; then
+            failed="$((failed + 1))"
+            warning "Invalid checksum for ${dir}/${f}, expected: ${file_hash}, actual $(safe_sha256sum "${f}" | awk '{print $1}')"
+          fi
+        fi
+      done
+    elif [ -r "./sha256sums.txt" ]; then
+      files="$(awk '{ print $2 }' ./sha256sums.txt | tr -d '*' | sed -e 's|^\./||' -)"
+      if [ -n "${required_file}" ]; then
+        progress "Verifying that ${required_file} exists in sha256sums.txt"
+
+        if ! echo "${files}" | grep -qxF "${required_file}" ; then
+          fatal "${required_file} is not present in sha256sums.txt" F052C
+        fi
+
+        if [ ! -r "${required_file}" ]; then
+          fatal "${required_file} cannot be read" F052D
+        fi
+      fi
+      for f in ${files} ; do
+        if [ -r "${f}" ]; then
+          csum="$(grep -E "${f}\$" ./sha256sums.txt | awk '{print $1}')"
+          if ! echo "${csum} *${f}" | safe_sha256sum -c -; then
+            failed="$((failed + 1))"
+            warning "Invalid checksum for ${dir}/${f}, expected: ${csum}, actual $(safe_sha256sum "${f}" | awk '{print $1}')"
+          fi
+        fi
+      done
+    else
+      fatal "No Manifest or sha256sums.txt file found, unable to verify files in ${dir}" F0524
+    fi
+  fi
+
+  if [ "${failed}" -gt 0 ]; then
+    fatal "${failed} files failed verification, see warnings for details on the failed files.\n${BADCACHE_MSG}" F0525
+  fi
+
+  cd "${old_pwd}" || fatal "Failed to change current working directory to ${old_pwd}." F000A
 }
 
 safe_sha256sum() {
@@ -1310,6 +1446,9 @@ handle_existing_install() {
         progress "Not attempting to claim existing install at ${ndprefix} (no claiming token provided)."
       fi
 
+      dem_claim_status=$ret
+      install_dem_runtime
+      ret=$dem_claim_status
       deferred_warnings
       success_banner
       cleanup
@@ -1338,6 +1477,9 @@ handle_existing_install() {
           INSTALL_PREFIX="${ndprefix}"
           claim
           ret=$?
+          dem_claim_status=$ret
+          install_dem_runtime
+          ret=$dem_claim_status
 
           cleanup
           trap - EXIT
@@ -1577,6 +1719,375 @@ claim() {
 }
 
 # ======================================================================
+# Explicit DEM browser runtime setup.
+dem_fail() { printf 'kickstart Docker setup: %s\n' "$*" >&2; exit 1; }
+
+dem_docker_id() {
+  [ "${#1}" = 64 ] || return 1
+  case "$1" in *[!0-9a-f]*) return 1 ;; esac
+}
+
+dem_image_docker() {
+  run_as_root env -i PATH="$PATH" "$dem_cli" --host unix:///var/run/docker.sock --config "$dem_private" "$@"
+}
+
+dem_remove_scratch() {
+  # Docker also records the ID on disk if creation succeeds as the caller is interrupted.
+  if [ -z "$dem_scratch" ]; then
+    dem_file_meta=$(dem_path_stat "$dem_private/cid") || return $?
+    [ "$dem_file_meta" != absent ] || return 0
+    dem_scratch=$(run_as_root cat "$dem_private/cid") || return $?
+  fi
+  dem_docker_id "$dem_scratch" || { printf '%s\n' 'Cannot verify temporary container ID for cleanup' >&2; return 1; }
+  dem_image_docker rm -v "$dem_scratch" >/dev/null || return $?
+  dem_scratch=
+  run_as_root rm -f -- "$dem_private/cid"
+}
+
+dem_docker_cleanup() {
+  dem_exit=$?
+  trap - EXIT
+  dem_remove_scratch || dem_exit=$?
+  if [ -n "$dem_control_dir" ]; then rm -rf -- "$dem_control_dir" || dem_exit=$?; fi
+  run_as_root rm -rf -- "$dem_private" || dem_exit=$?
+  exit "$dem_exit"
+}
+
+dem_trusted_dir() {
+  dem_dir_meta=$(LC_ALL=C stat -c '%F:%u:%a' -- "$1") || return $?
+  case "$dem_dir_meta" in directory:0:*) ;; *) dem_fail "unsafe directory: $1" ;; esac
+  dem_mode=${dem_dir_meta##*:}
+  [ $((0$dem_mode & 022)) -eq 0 ] || dem_fail "writable directory: $1"
+}
+
+dem_path_stat() {
+  # An absent path is ordinary. Preserve privilege or stat failures separately.
+  run_as_root env -i PATH="$PATH" LC_ALL=C /bin/sh -c '
+    if [ -L "$1" ] || [ -e "$1" ]; then exec stat -c "%F:%u:%a" -- "$1"; fi
+    echo absent
+  ' sh "$1"
+}
+
+dem_docker_policy() {
+  # The last registration must be removable after both container and image deletion.
+  dem_state=/var/lib/netdata-dem-runtime-host-policy
+  dem_recovery=$dem_state/docker-helpers
+  dem_helper=$dem_recovery/deployment-$dem_token
+  for dem_dir in / /var /var/lib; do dem_trusted_dir "$dem_dir" || return $?; done
+  for dem_dir in "$dem_state" "$dem_recovery"; do
+    dem_meta=$(dem_path_stat "$dem_dir") || return $?
+    case "$dem_meta" in directory:0:700|absent) ;; *) dem_fail "unsafe Docker policy directory: $dem_dir" ;; esac
+  done
+  dem_meta=$(dem_path_stat "$dem_helper") || return $?
+  case "$dem_meta" in
+    'regular file:0:600')
+      set -- "$dem_action" --deployment "$dem_token"
+      [ "$dem_stopped" != yes ] || set -- "$@" --deployments-stopped
+      run_as_root env -i PATH="$PATH" /bin/sh "$dem_helper" "$@" ;;
+    absent)
+      dem_record=$(dem_path_stat "$dem_state/registrations/deployment-$dem_token") || return $?
+      [ "$dem_record" = absent ] || dem_fail 'registration exists without its recovery helper; use a trusted netdata-dem-runtime.sh to inspect or retire it'
+      printf '%s\n' 'registration=absent' ;;
+    *) dem_fail 'unsafe Docker policy recovery helper' ;;
+  esac
+}
+
+dem_docker_enroll() {
+  case "$dem_container" in [a-zA-Z0-9]*) ;; *) dem_fail 'container name must start with a letter or digit' ;; esac
+  [ ! -e /.dockerenv ] && [ ! -e /run/.containerenv ] || dem_fail 'run kickstart on the Docker daemon host'
+  dem_trusted_dir /run || return $?
+  # Invoke the verified canonical CLI even when the packaged path is a symlink.
+  dem_cli=$(readlink -f -- /usr/bin/docker) || dem_fail 'the system Docker CLI is required'
+  dem_dir=${dem_cli%/*}
+  while [ -n "$dem_dir" ]; do
+    dem_trusted_dir "$dem_dir" || return $?
+    dem_dir=${dem_dir%/*}
+  done
+  dem_meta=$(LC_ALL=C stat -c '%F:%u:%a' -- "$dem_cli") || return $?
+  case "$dem_meta" in 'regular file:0:'*) ;; *) dem_fail 'unsafe system Docker CLI' ;; esac
+  dem_mode=${dem_meta##*:}
+  [ $((0$dem_mode & 022)) -eq 0 ] && [ -x "$dem_cli" ] || dem_fail 'unsafe system Docker CLI'
+  [ "$(readlink -f -- /var/run)" = /run ] && [ -S /var/run/docker.sock ] && [ ! -L /var/run/docker.sock ] &&
+    [ "$(stat -c %u /var/run/docker.sock)" = 0 ] || dem_fail 'a local root-owned system Docker socket is required'
+  dem_private=$(run_as_root mktemp -d /run/netdata-dem-kickstart.XXXXXXXX) || return $?
+  dem_scratch=; dem_control_dir=
+  trap dem_docker_cleanup EXIT
+  trap 'exit 1' 1 2 3 15
+
+  dem_security=$(dem_image_docker info --format '{{json .SecurityOptions}}|{{.OperatingSystem}}') || return $?
+  case "$dem_security" in *rootless*|*userns*|*Desktop*|*desktop*) dem_fail 'requires the local rootful system daemon' ;; esac
+  dem_snapshot=$(dem_image_docker inspect --type container --format '{{.Id}}|{{.Image}}|{{.Name}}|{{.State.Running}}|{{.State.Pid}}' "$dem_container") || return $?
+  dem_id=${dem_snapshot%%|*}
+  dem_image=${dem_snapshot#*|}; dem_image=${dem_image%%|*}
+  dem_pid=${dem_snapshot##*|}
+  case "$dem_pid" in ''|*[!0-9]*|0) dem_fail 'invalid container task PID' ;; esac
+  dem_docker_id "$dem_id" && dem_docker_id "${dem_image#sha256:}" &&
+    [ "$dem_snapshot" = "$dem_id|sha256:${dem_image#sha256:}|/$dem_container|true|$dem_pid" ] || dem_fail 'expected the exact running container and its local image ID'
+
+  run_as_root grep -Eq "(^|[/:.-])$dem_id([/.:-]|$)" "/proc/$dem_pid/cgroup" || dem_fail 'the target must be running on this daemon host'
+
+  # Only the operator-trusted image may supply host code. Never start this container or inherit deployment mounts.
+  dem_image_docker create --pull=never --network=none --cidfile "$dem_private/cid" "$dem_image" >/dev/null || return $?
+  dem_scratch=$(run_as_root cat "$dem_private/cid") || return $?
+  dem_docker_id "$dem_scratch" || { dem_scratch=; dem_fail 'invalid scratch container ID'; }
+  for dem_file in netdata-dem-runtime.sh netdata-dem-docker-host.sh; do
+    dem_image_docker cp "$dem_scratch:/usr/libexec/netdata/$dem_file" "$dem_private/$dem_file" || {
+      dem_copy_rc=$?
+      printf 'kickstart Docker setup: image %s must ship %s; update the Netdata image and retry\n' "$dem_image" "$dem_file" >&2
+      return "$dem_copy_rc"
+    }
+    dem_meta=$(run_as_root env LC_ALL=C stat -c '%F:%u' -- "$dem_private/$dem_file") || return $?
+    [ "$dem_meta" = 'regular file:0' ] || dem_fail 'image helper must be a plain root-owned file'
+  done
+  dem_remove_scratch || return $?
+
+  # Open both ends before elevation, then unlink the FIFO. Closing our writer
+  # cancels even when the privilege command execs a process we cannot signal.
+  dem_control_dir=$(mktemp -d /tmp/netdata-dem-control.XXXXXXXX) || return $?
+  mkfifo -m 600 "$dem_control_dir/control" || return $?
+  exec 8<> "$dem_control_dir/control"
+  exec 7< "$dem_control_dir/control"
+  rm -rf -- "$dem_control_dir" || return $?
+  dem_control_dir=
+
+  set -- docker-install --container "$dem_container" --container-id "$dem_id" --cancel-on-stdin-close
+  [ "$dem_dry" != yes ] || set -- "$@" --dry-run
+  dem_interrupted=no
+  trap 'dem_interrupted=yes; exec 8>&-' 1 2 3 15
+  # Wait on the actual privilege command, without an intermediate shell function.
+  progress "Running the Docker setup helper from local image $dem_image for $dem_container"
+  ${ROOTCMD} env -i PATH="$PATH" /bin/sh "$dem_private/netdata-dem-runtime.sh" "$@" <&7 7<&- 8>&- &
+  dem_child=$!
+  exec 7<&-
+  while :; do
+    dem_interrupted=no
+    if wait "$dem_child"; then return 0; else dem_status=$?; fi
+    # An interrupted wait does not establish that the privileged helper exited.
+    [ "$dem_interrupted" = yes ] && [ "$dem_status" -gt 128 ] || return "$dem_status"
+  done
+}
+
+dem_docker_dispatch() {
+  PATH=/usr/sbin:/usr/bin:/sbin:/bin
+  export PATH
+  LC_ALL=C
+  export LC_ALL
+  umask 077
+  dem_action=; dem_container=; dem_token=; dem_install=no; dem_dry=no; dem_stopped=no
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --install-dem-runtime) [ "$dem_install" = no ] || dem_fail 'duplicate install action'; dem_install=yes; shift ;;
+      --docker-container|--dem-docker-policy-status|--dem-docker-policy-remove)
+        [ "$#" -ge 2 ] && [ -n "$2" ] && [ -z "$dem_action" ] || dem_fail 'provide exactly one Docker action with its value'
+        case "$1" in
+          --docker-container) dem_action=docker-install; dem_container=$2 ;;
+          --dem-docker-policy-status) dem_action=policy-status; dem_token=$2 ;;
+          --dem-docker-policy-remove) dem_action=policy-remove; dem_token=$2 ;;
+        esac
+        shift 2 ;;
+      --dry-run) dem_dry=yes; shift ;;
+      --deployments-stopped) dem_stopped=yes; shift ;;
+      --non-interactive) INTERACTIVE=0; shift ;;
+      *) dem_fail 'Docker actions cannot be combined with host installation, claiming, update or other options' ;;
+    esac
+  done
+  case "$dem_action:$dem_install:$dem_stopped" in
+    docker-install:yes:no|policy-status:no:no|policy-remove:no:yes) ;;
+    *) dem_fail 'container enrollment requires --install-dem-runtime; policy removal requires --deployments-stopped; these are separate terminal actions' ;;
+  esac
+  for dem_redirect in "${DOCKER_HOST-}" "${DOCKER_CONTEXT-}" "${DOCKER_TLS_VERIFY-}" "${DOCKER_CERT_PATH-}" "${DOCKER_CONFIG-}" "${DOCKER_API_VERSION-}"; do
+    [ -z "$dem_redirect" ] || dem_fail 'Docker client overrides are unsupported; use a clean environment on the daemon host'
+  done
+  [ "$(uname -s)" = Linux ] || dem_fail 'Docker host actions require Linux'
+  case "$dem_container$dem_token" in ''|*[!a-zA-Z0-9_.-]*) dem_fail 'invalid container name or registration token' ;; esac
+  [ "${#dem_container}" -le 128 ] && [ "${#dem_token}" -le 128 ] || dem_fail 'container name or token is too long'
+  if [ "$dem_dry:$dem_action" = yes:policy-status ] || [ "$dem_dry:$dem_action" = yes:policy-remove ]; then
+    printf 'kickstart Docker setup: dry-run: would run %s for registration %s; no policy was changed\n' "$dem_action" "$dem_token" >&2
+    exit 0
+  fi
+  confirm_root_support
+  if [ "$dem_action" = docker-install ]; then dem_docker_enroll; else dem_docker_policy; fi
+}
+
+install_dem_runtime() {
+  [ "${NETDATA_INSTALL_DEM_RUNTIME}" -eq 1 ] || return 0
+
+  if setup_dem_runtime; then
+    return 0
+  else
+    dem_setup_status=$?
+    warning "Explicit DEM runtime setup failed (status ${dem_setup_status}). The Agent may already be installed; browser runtime setup did not complete."
+    cleanup
+    trap - EXIT
+    exit "${dem_setup_status}"
+  fi
+}
+
+dem_runtime_config() {
+  # Use the Agent's config parser, including legacy-key migration and compiled
+  # directory defaults. No shell evaluation of configuration values is needed.
+  run_as_root "${ndpath}" -W get "$1" "$2" ""
+}
+
+dem_runtime_plugin() {
+  # The Agent exposes plugins as a quoted path list. Consume paths as data,
+  # never shell source, and follow the Agent's first executable match.
+  dem_plugin_list=$1
+  while [ -n "${dem_plugin_list}" ]; do
+    dem_plugin_list=${dem_plugin_list#"${dem_plugin_list%%[![:space:]]*}"}
+    [ -n "${dem_plugin_list}" ] || break
+    case "${dem_plugin_list}" in
+      \"*)
+        dem_plugin_list=${dem_plugin_list#\"}
+        case "${dem_plugin_list}" in *\"*) ;; *) return 1 ;; esac
+        dem_plugin_dir=${dem_plugin_list%%\"*}
+        dem_plugin_list=${dem_plugin_list#*\"}
+        ;;
+      \'*)
+        dem_plugin_list=${dem_plugin_list#\'}
+        case "${dem_plugin_list}" in *\'*) ;; *) return 1 ;; esac
+        dem_plugin_dir=${dem_plugin_list%%\'*}
+        dem_plugin_list=${dem_plugin_list#*\'}
+        ;;
+      *)
+        dem_plugin_dir=${dem_plugin_list%%[[:space:]]*}
+        dem_plugin_list=${dem_plugin_list#"${dem_plugin_dir}"}
+        ;;
+    esac
+    case "${dem_plugin_list}" in ''|[[:space:]]*) ;; *) return 1 ;; esac
+    case "${dem_plugin_dir}" in *\\*) return 1 ;; /*) ;; *) return 1 ;; esac
+    # Native plugins can be root:netdata 0750, inaccessible to the invoking user.
+    # Only discovery is privileged; dem_runtime_cli still uses the service UID.
+    if run_as_root test -x "${dem_plugin_dir}/dem.plugin"; then
+      dem_plugin="${dem_plugin_dir}/dem.plugin"
+      return 0
+    fi
+  done
+  return 1
+}
+
+dem_runtime_cli() {
+  # Run from a directory accessible to the service user, even if kickstart's
+  # temporary checkout is private to root. Never create a managed store as root.
+  (
+    cd / || exit 1
+    set -- env NETDATA_LIB_DIR="${dem_lib}" NETDATA_USER_CONFIG_DIR="${dem_config}" \
+      NETDATA_STOCK_CONFIG_DIR="${dem_stock_config}" \
+      "${dem_plugin}" runtime "$@" --config-dir "${dem_config}"
+    if [ "$(id -u)" = "${dem_uid}" ]; then
+      run "$@"
+    elif command -v runuser >/dev/null 2>&1; then
+      run_as_root runuser -u "${dem_user}" -- "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+      run_as_root sudo -H -u "${dem_user}" -- "$@"
+    else
+      warning "Runtime setup requires runuser or sudo to execute dem.plugin as the configured service user. Run the runtime CLI as that user; do not run managed installation as root."
+      return 1
+    fi
+  )
+}
+
+setup_dem_runtime() {
+  case "${SYSTYPE}:${SYSARCH}" in
+    Linux:x86_64|Linux:aarch64) ;;
+    *) warning "DEM browser runtimes require Linux x86_64 or aarch64; no runtime was acquired."; return 1 ;;
+  esac
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    # A fresh source install may add /netdata to the requested prefix. Re-detect
+    # the installed executable instead of guessing its configured paths.
+    ndpath=
+    ndprefix=
+    detect_existing_install
+    if [ -z "${ndpath}" ] || [ ! -x "${ndpath}" ]; then
+      warning "Cannot find the installed Agent to read its runtime paths. For static/source setup, use netdata-dem-runtime.sh with the correct --agent path; custom deployments require explicit host policy and runtime setup."
+      return 1
+    fi
+  fi
+  dem_install_type=${INSTALL_TYPE}
+  if [ "${DRY_RUN}" -ne 1 ] && [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
+    # Package ownership takes precedence over the generic packaged type marker.
+    dem_install_type=native
+  fi
+  case "${dem_install_type}" in
+    native|binpkg-deb|binpkg-rpm)
+      if [ "${DRY_RUN}" -ne 1 ]; then
+        dem_user=$(dem_runtime_config global 'run as user') || return $?
+        dem_uid=$(id -u "${dem_user}") || return $?
+        if [ "${dem_user}" != netdata ] || [ "${dem_uid}" = 0 ]; then
+          warning "Native runtime packages require the named netdata service account with a nonroot UID. A separately configured managed installation under another account requires administrator-prepared host policy and runtime CLI setup."
+          return 1
+        fi
+      fi
+      progress "Installing optional netdata-dem-runtime through the system package manager; package hooks may restart the Agent."
+      configure_native_package_manager || return $?
+      # These are the same fixed package-manager option lists used for the Agent.
+      # shellcheck disable=SC2086
+      run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} netdata-dem-runtime || return $?
+      dem_action=status
+      ;;
+    kickstart-static|manual-static|legacy-static|kickstart-build|legacy-build)
+      progress "Explicit DEM setup prepares host browser policy, downloads signed release metadata and the browser archive, then enables daily automatic preparation. Activation requires an operator Agent restart."
+      dem_action=install
+      ;;
+    *)
+      warning "Cannot determine a supported DEM runtime installation method. Use the optional native package for package-managed Agents, or the installed netdata-dem-runtime.sh helper for static/source setup."
+      return 1
+      ;;
+  esac
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would run explicit DEM ${dem_action}; managed setup uses the administrator host helper and executes the runtime CLI as the configured nonroot service user."
+    return 0
+  fi
+  if [ "${dem_action}" = install ]; then
+    # detect_existing_install has canonicalized the Agent and its actual prefix.
+    # The installed helper owns policy and service-identity discovery together.
+    dem_helper="${ndprefix%/}/usr/libexec/netdata/netdata-dem-runtime.sh"
+    if ! run_as_root test -x "${dem_helper}"; then
+      warning "The installed DEM host setup helper is unavailable. Install an Agent with DEM support; runtime setup was not attempted."
+      return 1
+    fi
+    if run_as_root "${dem_helper}" install --agent "${ndpath}" --allow-download; then
+      progress "DEM runtime prepared with daily automatic preparation enabled. Restart the Agent explicitly to activate it; kickstart does not restart it for managed runtime activation."
+      return 0
+    else
+      dem_cli_status=$?
+      warning "Managed runtime installation failed. Check the host setup error and the dem.conf runtime.release_url setting; kickstart does not bypass host policy or qualification. Use the installed host helper for offline inputs or --manual-updates."
+      return "${dem_cli_status}"
+    fi
+  fi
+  dem_config=$(dem_runtime_config directories config) || return $?
+  dem_stock_config=$(dem_runtime_config directories 'stock config') || return $?
+  dem_lib=$(dem_runtime_config directories lib) || return $?
+  for dem_path in "${dem_config}" "${dem_stock_config}" "${dem_lib}"; do
+    case "${dem_path}" in /*) ;; *) warning "The installed Agent did not report absolute runtime directories; use its runtime CLI with explicit configuration."; return 1 ;; esac
+  done
+  dem_plugins=$(dem_runtime_config directories plugins) || return $?
+  if ! dem_runtime_plugin "${dem_plugins}"; then
+    warning "Cannot locate dem.plugin in the configured plugin directories. Install an Agent with DEM support, or run the correct installed runtime CLI explicitly for custom plugin layouts."
+    return 1
+  fi
+  if [ "${dem_action}" = status ]; then
+    # RPM can report success despite a failed posttrans hook. Ready admission,
+    # observed by the actual service identity, is required before success.
+    if dem_native_status=$(dem_runtime_cli status); then
+      printf '%s\n' "${dem_native_status}"
+      # Match the CLI's top-level mode field, not a nested runtime setting.
+      if ! printf '%s\n' "${dem_native_status}" | grep -Eq '^  "mode": "native",?$'; then
+        warning "The installed DEM configuration does not report native mode. Check dem.conf and use the matching runtime installation method."
+        return 1
+      fi
+      progress "Native DEM runtime is installed and available."
+    else
+      dem_cli_status=$?
+      warning "Native runtime is not available after package installation. Inspect package hook errors and repair the package; no managed fallback was attempted."
+      return "${dem_cli_status}"
+    fi
+  fi
+}
+
+# ======================================================================
 # Auto-update handling code.
 set_auto_updates() {
   if run_as_root test -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"; then
@@ -1774,42 +2285,9 @@ common_dnf_opts() {
   uninstall_subcmd="remove"
 }
 
-try_package_install() {
-  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or incompatibilities with one or more third-party package repositories in the system package manager configuration."
-
-  if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
-    warning "Unable to determine Linux distribution for native packages."
-    return 3
-  elif [ -z "${SYSCODENAME}" ]; then
-    case "${DISTRO_COMPAT_NAME}" in
-      debian|ubuntu)
-        warning "Release codename not set. Unable to check availability of native packages for this system."
-        return 3
-        ;;
-    esac
-  fi
-
-  set_tmpdir
-
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would attempt to install using native packages..."
-  else
-    progress "Attempting to install using native packages..."
-  fi
-
-  if [ "${SELECTED_RELEASE_CHANNEL}" = "nightly" ]; then
-    release="-edge"
-  else
-    release=""
-  fi
-
+configure_native_package_manager() {
   interactive_opts=""
   env=""
-
-  if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
-    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open a feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
-  fi
-
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
       if [ "${INTERACTIVE}" = "0" ]; then
@@ -1869,6 +2347,42 @@ try_package_install() {
       return 3
       ;;
   esac
+}
+
+try_package_install() {
+  failed_refresh_msg="Failed to refresh repository metadata. ${BADNET_MSG} or incompatibilities with one or more third-party package repositories in the system package manager configuration."
+
+  if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
+    warning "Unable to determine Linux distribution for native packages."
+    return 3
+  elif [ -z "${SYSCODENAME}" ]; then
+    case "${DISTRO_COMPAT_NAME}" in
+      debian|ubuntu)
+        warning "Release codename not set. Unable to check availability of native packages for this system."
+        return 3
+        ;;
+    esac
+  fi
+
+  set_tmpdir
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would attempt to install using native packages..."
+  else
+    progress "Attempting to install using native packages..."
+  fi
+
+  if [ "${SELECTED_RELEASE_CHANNEL}" = "nightly" ]; then
+    release="-edge"
+  else
+    release=""
+  fi
+
+  if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
+    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open a feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
+  fi
+
+  configure_native_package_manager || return $?
 
   if [ -n "${INSTALL_VERSION}" ]; then
     if echo "${INSTALL_VERSION}" | grep -q "nightly"; then
@@ -2037,88 +2551,126 @@ set_static_archive_urls() {
     arch="${2}"
   fi
 
-  if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-    path="$(cd "${NETDATA_OFFLINE_INSTALL_SOURCE}" || exit 1; pwd)"
-    export NETDATA_STATIC_ARCHIVE_URL="file://${path}/netdata-${arch}-latest.gz.run"
-    export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
-    export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="file://${path}/sha256sums.txt"
-  elif [ "${1}" = "stable" ]; then
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_NAME="netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-      export NETDATA_STATIC_ARCHIVE_URL="https://github.com/netdata/netdata/releases/download/${latest}/netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
-    fi
+  prefix_set="0"
+
+  if [ -n "${NETDATA_ARTIFACT_URL_PREFIX}" ]; then
+    prefix_set="1"
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_ARTIFACT_URL_PREFIX}"
+  elif [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+    prefix_set="1"
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="file://${NETDATA_OFFLINE_INSTALL_SOURCE}"
+  elif [ -n "${INSTALL_VERSION}" ]; then
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/v${INSTALL_VERSION}"
   else
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_OLD_NAME="netdata-v${INSTALL_VERSION}.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
-      export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-latest.gz.run"
-      export NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
-    fi
+    NETDATA_STATIC_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest"
   fi
+
+  check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+
+  case $? in
+    0) NETDATA_MANIFEST_INSTALL=1 ;;
+    *)
+      if [ "${prefix_set}" -eq 0 ]; then
+        if [ "${1}" = "stable" ]; then
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+          fi
+          NETDATA_STATIC_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
+        else
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
+          fi
+          NETDATA_STATIC_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/download/${version}"
+        fi
+
+        check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+
+        case $? in
+          0) NETDATA_MANIFEST_INSTALL=1 ;;
+          1)
+            NETDATA_MANIFEST_INSTALL=0
+            NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-${version}.gz.run"
+            NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${NETDATA_STATIC_ARCHIVE_NAME}"
+            NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+            ;;
+          *) fatal "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}" F052A ;;
+        esac
+      else
+        if [ -n "${INSTALL_VERSION}" ]; then
+          version="v${INSTALL_VERSION}"
+        else
+          version="$(get_redirect "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/latest")"
+        fi
+        NETDATA_MANIFEST_INSTALL=0
+        NETDATA_STATIC_ARCHIVE_NAME="netdata-${arch}-${version}.gz.run"
+        NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${NETDATA_STATIC_ARCHIVE_NAME}"
+        NETDATA_STATIC_ARCHIVE_CHECKSUM_URL="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+      fi
+
+      check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}"
+
+      case "$?" in
+        0) ;;
+        1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+        *) fatal "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}" F052A ;;
+      esac
+      ;;
+  esac
 }
 
 try_static_install() {
-  set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}"
+  set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" || return 1
+
   if [ "${DRY_RUN}" -eq 1 ]; then
     progress "Would attempt to install using static build..."
   else
     progress "Attempting to install using static build..."
   fi
 
-  check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
+  if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
+      fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
+    fi
 
-  case "$?" in
-    0) ;;
-    1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
-    *)
-      warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
-      return 1
-      ;;
-  esac
+    archive_info="$(grep -E "^netdata-${SYSARCH}-.*\\.run " ./Manifest)"
 
-  # Check status code first, so that we can provide nicer fallback for dry runs.
-  if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-    netdata_agent="${NETDATA_STATIC_ARCHIVE_NAME}"
-  elif [ "${SYSARCH}" = "x86_64" ] && check_for_remote_file "${NETDATA_STATIC_ARCHIVE_OLD_URL}"; then
-    netdata_agent="${NETDATA_STATIC_ARCHIVE_OLD_NAME}"
-    export NETDATA_STATIC_ARCHIVE_URL="${NETDATA_STATIC_ARCHIVE_OLD_URL}"
+    if [ -z "${archive_info}" ]; then
+      warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs."
+      return 2
+    fi
+
+    if [ "$(echo "${archive_info}" | wc -l)" -gt 1 ]; then
+      archive_info="$(echo "${archive_info}" | grep -v ".*-latest.*" | tail -n 1)"
+    fi
+
+    archive_name="$(echo "${archive_info}" | awk '{ print $1 }')"
+
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${archive_name}" "./${archive_name}"; then
+      fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
+    fi
   else
-    warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs. ${GITHUB_BADNET_MSG}"
-    return 2
-  fi
+    # Check status code first, so that we can provide nicer fallback for dry runs.
+    if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+      archive_name="${NETDATA_STATIC_ARCHIVE_NAME}"
+    else
+      warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs. ${GITHUB_BADNET_MSG}"
+      return 2
+    fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "./${netdata_agent}"; then
-    fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
-  fi
+    if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "./${archive_name}"; then
+      fatal "Unable to download static build archive for ${SYSARCH}. ${BADNET_MSG}." F0208
+    fi
 
-  if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
-    fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
-  fi
-
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would validate SHA256 checksum of downloaded static build archive."
-  else
-    if [ -z "${INSTALL_VERSION}" ]; then
-      if ! grep "${netdata_agent}" ./sha256sum.txt | safe_sha256sum -c - > /dev/null 2>&1; then
-        bad_sums_report="$(report_bad_sha256sum "${netdata_agent}" "./sha256sum.txt")"
-        fatal "Static binary checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0207
-      fi
+    if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "./sha256sums.txt"; then
+      fatal "Unable to fetch checksums to verify static build archive. ${BADNET_MSG}." F0206
     fi
   fi
+
+  verify_manifest ./ "${archive_name}"
 
   if [ "${INTERACTIVE}" -eq 0 ]; then
     opts="${opts} --accept"
@@ -2132,7 +2684,7 @@ try_static_install() {
 
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run_as_root ${env_cmd} /bin/sh "./${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run_as_root ${env_cmd} /bin/sh "./${archive_name}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2
@@ -2159,29 +2711,72 @@ try_static_install() {
 # Local build install code
 
 set_source_archive_urls() {
-  if [ "$1" = "stable" ]; then
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-v${INSTALL_VERSION}.tar"
-      export NETDATA_SOURCE_ARCHIVE_BASEURL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      latest="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
-      export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${latest}.tar"
-      export NETDATA_SOURCE_ARCHIVE_BASEURL="https://github.com/netdata/netdata/releases/download/${latest}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/${latest}/sha256sums.txt"
-    fi
-  else
-    export NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-latest.tar"
+  prefix_set="0"
 
-    if [ -n "${INSTALL_VERSION}" ]; then
-      export NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/v${INSTALL_VERSION}/sha256sums.txt"
-    else
-      tag="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
-      export NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_TARBALL_BASEURL}/download/${tag}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
-      export NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_TARBALL_BASEURL}/download/${tag}/sha256sums.txt"
-    fi
+  if [ -n "${NETDATA_ARTIFACT_URL_PREFIX}" ]; then
+    prefix_set="1"
+    NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_ARTIFACT_URL_PREFIX}"
+  elif [ -n "${INSTALL_VERSION}" ]; then
+    NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/v${INSTALL_VERSION}"
+  else
+    NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest"
   fi
+
+  check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest"
+
+  case $? in
+    0) NETDATA_MANIFEST_INSTALL=1 ;;
+    *)
+      if [ "${prefix_set}" -eq 0 ]; then
+        if [ "${1}" = "stable" ]; then
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "https://github.com/netdata/netdata/releases/latest")"
+          fi
+          NETDATA_SOURCE_ARCHIVE_URL_PREFIX="https://github.com/netdata/netdata/releases/download/${version}"
+        else
+          if [ -n "${INSTALL_VERSION}" ]; then
+            version="v${INSTALL_VERSION}"
+          else
+            version="$(get_redirect "${NETDATA_TARBALL_BASEURL}/latest")"
+          fi
+          NETDATA_SOURCE_ARCHIVE_URL_PREFIX="${NETDATA_TARBALL_BASEURL}/download/${version}"
+        fi
+
+        check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest"
+
+        case $? in
+          0) NETDATA_MANIFEST_INSTALL=1 ;;
+          1)
+            NETDATA_MANIFEST_INSTALL=0
+            NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${version}.tar"
+            NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
+            NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+            ;;
+          *) fatal "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}" F0528 ;;
+        esac
+      else
+        if [ -n "${INSTALL_VERSION}" ]; then
+          version="v${INSTALL_VERSION}"
+        else
+          version="$(get_redirect "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/latest")"
+        fi
+        NETDATA_MANIFEST_INSTALL=0
+        NETDATA_SOURCE_ARCHIVE_BASE_NAME="netdata-${version}.tar"
+        NETDATA_SOURCE_ARCHIVE_BASEURL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${NETDATA_SOURCE_ARCHIVE_BASE_NAME}"
+        NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL="${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/sha256sums.txt"
+      fi
+
+      check_for_remote_file "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}"
+
+      case "$?" in
+        0) ;;
+        1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+        *) fatal "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}" F0528 ;;
+      esac
+      ;;
+  esac
 }
 
 install_local_build_dependencies() {
@@ -2272,38 +2867,75 @@ try_build_install() {
   zstd="$(command -v zstd 2>/dev/null || true)"
   archive_name=""
 
-  if [ -n "${zstd}" ]; then
-    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.zst" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"; then
-      archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"
-      decompress="${zstd} -dcf"
-    else
-      warning "Unable to fetch zstd compressed source tarball, trying gzip compressed tarball instead."
+  if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+    if ! download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/Manifest" "./Manifest" "force"; then
+      fatal "Unable to download release manifest file. ${BADNET_MSG}" F0526
     fi
-  fi
 
-  if [ -z "${archive_name}" ]; then
-    if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.gz" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"; then
-      archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"
-      decompress="$(command -v gzip 2>/dev/null) -dc"
+    zstd_info="$(grep -E "^netdata-.*\\.tar\\.zst " ./Manifest)"
+    gzip_info="$(grep -E "^netdata-.*\\.tar\\.gz " ./Manifest)"
+
+    if [ -n "${zstd}" ] && [ -n "${zstd_info}" ]; then
+      if [ "$(echo "${zstd_info}" | wc -l)" -gt 1 ]; then
+        zstd_info="$(echo "${zstd_info}" | grep -v ".*-latest.*" | tail -n 1)"
+      fi
+
+      zstd_name="$(echo "${zstd_info}" | awk '{ print $1 }')"
+
+      if download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${zstd_name}" "${zstd_name}"; then
+        archive_name="${zstd_name}"
+        decompress="${zstd} -dcf"
+      else
+        warning "Unable to fetch zstd compressed source tarball, trying gzip compressed tarball instead."
+      fi
     fi
-  fi
 
-  if [ -z "${archive_name}" ]; then
-    fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
-  fi
+    if [ -z "${archive_name}" ] && [ -n "${gzip_info}" ]; then
+      if [ "$(echo "${gzip_info}" | wc -l)" -gt 1 ]; then
+        gzip_info="$(echo "${gzip_info}" | grep -v ".*-latest.*" | tail -n 1)"
+      fi
 
-  if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sum.txt"; then
-    fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
-  fi
+      gzip_name="$(echo "${gzip_info}" | awk '{ print $1 }')"
 
-  if [ "${DRY_RUN}" -eq 1 ]; then
-    progress "Would validate SHA256 checksum of downloaded source archive."
+      if download "${NETDATA_SOURCE_ARCHIVE_URL_PREFIX}/${gzip_name}" "${gzip_name}"; then
+        archive_name="${gzip_name}"
+        decompress="$(command -v gzip 2>/dev/null) -dc"
+      else
+        fatal "Unable to find a usable ${SELECTED_RELEASE_CHANNEL} source archive in Manifest file.\n${BADNET_MSG}" F0527
+      fi
+    fi
+
+    if [ -z "${archive_name}" ]; then
+      fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
+    fi
   else
-    if ! grep "${archive_name}" ./sha256sum.txt | safe_sha256sum -c - > /dev/null 2>&1; then
-      bad_sums_report="$(report_bad_sha256sum "${archive_name}" ./sha256sum.txt)"
-      fatal "Tarball checksum validation failed.\n${bad_sums_report}\n${BADCACHE_MSG}." F0005
+    if [ -n "${zstd}" ]; then
+      if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.zst" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"; then
+        archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"
+        decompress="${zstd} -dcf"
+      else
+        rm -f "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.zst"
+        warning "Unable to fetch zstd compressed source tarball, trying gzip compressed tarball instead."
+      fi
+    fi
+
+    if [ -z "${archive_name}" ]; then
+      if download "${NETDATA_SOURCE_ARCHIVE_BASEURL}.gz" "${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"; then
+        archive_name="${NETDATA_SOURCE_ARCHIVE_BASE_NAME}.gz"
+        decompress="$(command -v gzip 2>/dev/null) -dc"
+      fi
+    fi
+
+    if [ -z "${archive_name}" ]; then
+      fatal "Failed to download source tarball for local build. ${BADNET_MSG}." F000B
+    fi
+
+    if ! download "${NETDATA_SOURCE_ARCHIVE_CHECKSUM_URL}" "./sha256sums.txt"; then
+      fatal "Failed to download checksums for source tarball verification. ${BADNET_MSG}." F000C
     fi
   fi
+
+  verify_manifest ./ "${archive_name}"
 
   run sh -c '${0} "${1}" | tar -xf - -C "${2}"' "${decompress}" "${archive_name}" "${tmpdir}"
   rm -rf "${archive_name}" > /dev/null 2>&1
@@ -2333,6 +2965,8 @@ prepare_offline_install_source() {
   if [ -e "${1}" ]; then
     if [ ! -d "${1}" ]; then
       fatal "${1} is not a directory, unable to prepare offline install source." F0503
+    elif [ -n "$(find "${1}/" -mindepth 1 -maxdepth 1 -print)" ]; then
+      fatal "${1} already contains files. Either specify a different directory, or remove the files." F052E
     fi
   else
     run mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
@@ -2344,77 +2978,82 @@ prepare_offline_install_source() {
     static|auto|any)
       set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
 
-      check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
+      if [ "${NETDATA_MANIFEST_INSTALL}" -eq 1 ]; then
+        manifest_url="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Manifest"
+        progress "Fetching ${manifest_url}"
+        if ! download "${manifest_url}" "./Manifest" "force"; then
+          fatal "Unable to download release Manifest file. ${BADNET_MSG}" F0526
+        fi
 
-      case "$?" in
-        0) ;;
-        1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
-        *)
-          warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
-          return 1
-          ;;
-      esac
+        if ! download "${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/Version" "./Version"; then
+          fatal "Unable to download release Version file. ${BADNET_MSG}" F0526
+        fi
 
-      if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
+        archive_info="$(grep -E "^netdata-.*-.*\\.run " ./Manifest)"
+
+        if [ -z "${archive_info}" ]; then
+          warning "Could not find a ${SELECTED_RELEASE_CHANNEL} static build for ${SYSARCH} CPUs."
+          return 2
+        fi
+
+        archive_names="$(echo "${archive_info}" | awk '{ print $1 }')"
+
+        failed=0
+
+        for f in ${archive_names}; do
+          archive_url="${NETDATA_STATIC_ARCHIVE_URL_PREFIX}/${f}"
+          progress "Fetching ${archive_url}"
+          if ! download "${archive_url}" "${f}"; then
+            failed="$((failed + 1))"
+            warning "Failed to download ${archive_url}. ${BADNET_MSG}."
+          elif echo "${f}" | grep -qvE ".*-latest.*" ; then
+            latest_name="$(echo "${f}" | sed -e 's/v.*\.\([a-z]\+\)\.run$/latest.\1.run/' -)"
+            ln -sf "${f}" "${latest_name}"
+          fi
+        done
+
+        if [ "${failed}" -ne 0 ]; then
+          fatal "Failed to download one or more static installer archives, cannot continue. ${BADNET_MSG}." F052B
+        fi
+      else
+        check_for_remote_file "${NETDATA_TARBALL_BASEURL}"
+
+        case "$?" in
+          0) ;;
+          1) NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1 ;;
+          *)
+            warning "Unable to communicate with GitHub. ${GITHUB_BADNET_MSG}"
+            return 1
+            ;;
+        esac
+
         for arch in $(echo "${NETDATA_OFFLINE_ARCHES:-${STATIC_INSTALL_ARCHES}}" | awk '{for (i=1;i<=NF;i++) if (!a[$i]++) printf("%s%s",$i,FS)}{printf("\n")}'); do
           set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "${arch}"
 
           if check_for_remote_file "${NETDATA_STATIC_ARCHIVE_URL}"; then
-            progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
-            if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "netdata-${arch}-latest.gz.run"; then
-                warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
-            fi
+              progress "Fetching ${NETDATA_STATIC_ARCHIVE_URL}"
+              if ! download "${NETDATA_STATIC_ARCHIVE_URL}" "${NETDATA_STATIC_ARCHIVE_NAME}"; then
+                  warning "Failed to download static installer archive for ${arch}. ${BADNET_MSG}."
+              fi
           else
-            progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
+              progress "Skipping ${NETDATA_STATIC_ARCHIVE_URL} as it does not exist on the server."
           fi
         done
-        legacy=0
-      else
-        warning "Selected version of Netdata only provides static builds for x86_64. You will only be able to install on x86_64 systems with this offline install source."
-        progress "Fetching ${NETDATA_STATIC_ARCHIVE_OLD_URL}"
-        legacy=1
 
-        if ! download "${NETDATA_STATIC_ARCHIVE_OLD_URL}" "netdata-x86_64-latest.gz.run"; then
-          warning "Failed to download static installer archive for x86_64. ${BADNET_MSG}."
+        if [ -z "$(find . -name '*.gz.run')" ]; then
+          fatal "Did not actually download any static installer archives, cannot continue. ${BADNET_MSG}." F0516
         fi
-      fi
 
-      if [ -z "$(find . -name '*.gz.run')" ]; then
-        fatal "Did not actually download any static installer archives, cannot continue. ${BADNET_MSG}." F0516
-      fi
-
-      progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
-      if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "sha256sums.txt"; then
-        fatal "Failed to download checksum file. ${BADNET_MSG}." F0506
+        progress "Fetching ${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}"
+        if ! download "${NETDATA_STATIC_ARCHIVE_CHECKSUM_URL}" "sha256sums.txt"; then
+          fatal "Failed to download checksum file. ${BADNET_MSG}." F0506
+        fi
       fi
       ;;
     *) fatal "Install type ${NETDATA_REQUESTED_INSTALL_TYPE} is not supported for offline installs." F051B
   esac
 
-  if [ "${legacy:-0}" -eq 1 ]; then
-    sed -e 's/netdata-latest.gz.run/netdata-x86_64-latest.gz.run' sha256sums.txt > sha256sums.tmp
-    mv sha256sums.tmp sha256sums.txt
-  fi
-
-  if [ "${DRY_RUN}" -ne 1 ]; then
-    progress "Verifying checksums."
-
-    failed_files=""
-    while IFS= read -r file; do
-      [ -n "${file}" ] || continue
-      if ! grep -e "${file}" sha256sums.txt | safe_sha256sum -c -; then
-        failed_files="${failed_files}\n${file}\n$(report_bad_sha256sum "${file}" sha256sums.txt)"
-      fi
-    done <<EOF
-$(find . -name '*.gz.run')
-EOF
-
-    if [ -n "${failed_files}" ]; then
-      fatal "Checksums for offline install files are incorrect.\n${failed_files}\n${BADCACHE_MSG}." F0507
-    fi
-  else
-    progress "Would verify SHA256 checksums of downloaded installation files."
-  fi
+  verify_manifest ./
 
   if [ "${DRY_RUN}" -ne 1 ]; then
     progress "Preparing install script."
@@ -2441,6 +3080,22 @@ EOF
     echo "${SELECTED_RELEASE_CHANNEL}" > "channel"
   else
     progress "Would save release channel information to offline install source directory"
+  fi
+
+  if [ "${DRY_RUN}" -ne 1 ]; then
+    progress "Generating updated Manifest for offline install source directory."
+    rm -f sha256sums.txt
+    rm -f Manifest
+
+    for f in *; do
+      [ -f "${f}" ] || continue
+      h="$(safe_sha256sum "${f}" | awk '{ print $1 }')"
+      s="$(wc -c "${f}" | awk '{ print $1 }')"
+      echo "${f} ${s} ${h}" >> ./Manifest
+      echo "${h} *${f}" >> ./sha256sums.txt
+    done
+  else
+    progress "Would generate updated Manifest for offline install source directory."
   fi
 
   progress "Finished preparing offline install source directory at ${1}. You can now copy this directory to a target system and then run the script ‘install.sh’ from it to install on that system."
@@ -2591,6 +3246,16 @@ handle_major_version() {
 validate_args() {
   check_claim_opts
 
+  if [ "${NETDATA_INSTALL_DEM_RUNTIME}" -eq 1 ]; then
+    case "${ACTION}" in
+      uninstall|claim|repositories-only|prepare-offline)
+        fatal "--install-dem-runtime cannot be combined with this action. Use an ordinary install/update. Offline runtime setup uses the installed host helper for static/source installations, or the package manager for native installations." F052F ;;
+    esac
+    if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+      fatal "--install-dem-runtime requires online acquisition. For offline static/source setup, run netdata-dem-runtime.sh install --agent /path/to/netdata --release /absolute/release.json --archive /absolute/runtime.tar.zst as root with the configured offline keyring. Native installations use offline package provisioning." F052F
+    fi
+  fi
+
   if [ -n "${NETDATA_REQUESTED_INSTALL_TYPE}" ]; then
     SELECTED_INSTALL_METHOD="${NETDATA_REQUESTED_INSTALL_TYPE}"
   fi
@@ -2691,6 +3356,7 @@ parse_args() {
       "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
       "--interactive") INTERACTIVE=1 ;;
       "--dry-run") DRY_RUN=1 ;;
+      "--install-dem-runtime") NETDATA_INSTALL_DEM_RUNTIME=1 ;;
       "--release-channel")
         RELEASE_CHANNEL="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         case "${RELEASE_CHANNEL}" in
@@ -2841,9 +3507,8 @@ parse_args() {
         ;;
       "--offline-install-source")
         if [ -d "${2}" ]; then
-          NETDATA_OFFLINE_INSTALL_SOURCE="${2}"
-          # shellcheck disable=SC2164
-          NETDATA_TARBALL_BASEURL="file://$(cd "${2}"; pwd)"
+          NETDATA_OFFLINE_INSTALL_SOURCE="$(canonical_path "${2}")"
+          NETDATA_TARBALL_BASEURL="file://${NETDATA_OFFLINE_INSTALL_SOURCE}"
           shift 1
         else
           fatal "A source directory must be specified with the --offline-install-source option." F0501
@@ -2860,6 +3525,17 @@ parse_args() {
 
 # ======================================================================
 # Main program
+
+# Docker enrollment is terminal and must never enter host Agent discovery or installation.
+for dem_option do
+  case "$dem_option" in
+    --docker-container|--dem-docker-policy-status|--dem-docker-policy-remove)
+      trap - EXIT HUP INT QUIT PIPE TERM
+      dem_docker_dispatch "$@"
+      exit $?
+      ;;
+  esac
+done
 
 setup_terminal || echo > /dev/null
 

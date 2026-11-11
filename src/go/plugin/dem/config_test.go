@@ -53,6 +53,40 @@ func TestLoadConfigUsesHighestPriorityFile(t *testing.T) {
 	assert.Equal(t, 2, cfg.History.Days)
 }
 
+func TestBrowserConcurrencyConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want int
+		fail bool
+	}{
+		{name: "default", want: 1},
+		{name: "empty section", body: "browser: {}", want: 1},
+		{name: "commented section", body: "browser:\n  # concurrency: 1\n", want: 1},
+		{name: "null section", body: "browser: null", want: 1},
+		{name: "tilde section", body: "browser: ~", want: 1},
+		{name: "null alias", body: "empty: &empty null\nbrowser: *empty", want: 1},
+		{name: "explicit budget", body: "browser: {concurrency: 4}", want: 4},
+		{name: "zero", body: "browser: {concurrency: 0}", fail: true},
+		{name: "negative", body: "browser: {concurrency: -1}", fail: true},
+		{name: "fractional", body: "browser: {concurrency: 1.5}", fail: true},
+		{name: "text", body: "browser: {concurrency: four}", fail: true},
+		{name: "null concurrency", body: "browser: {concurrency: null}", fail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(tc.body), 0600))
+			cfg, err := LoadConfig(multipath.New(dir))
+			if tc.fail {
+				require.ErrorContains(t, err, "browser.concurrency")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, cfg.Browser.Concurrency)
+		})
+	}
+}
+
 func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}"), 0600))
@@ -87,7 +121,7 @@ func TestRuntimeValidationLeavesOtherSectionsOpaque(t *testing.T) {
 	dir := t.TempDir()
 	body := "enabled: yes\njobs: {future_option: [{duplicate: one, duplicate: two}]}\n" +
 		"history: {days: 7, unrelated: value}\nartifacts: {days: 2, unrelated: value}\n" +
-		"runtime: {allow_download: false}\n"
+		"runtime: {max_bytes: 2048}\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
 	cfg, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
@@ -95,5 +129,5 @@ func TestRuntimeValidationLeavesOtherSectionsOpaque(t *testing.T) {
 	require.Equal(t, DefaultConfig().History.MaxBytes, cfg.History.MaxBytes)
 	require.Equal(t, 2, cfg.Artifacts.Days)
 	require.Equal(t, DefaultConfig().Artifacts.MaxBytes, cfg.Artifacts.MaxBytes)
-	require.False(t, cfg.Runtime.AllowDownload)
+	require.EqualValues(t, 2048, cfg.Runtime.MaxBytes)
 }

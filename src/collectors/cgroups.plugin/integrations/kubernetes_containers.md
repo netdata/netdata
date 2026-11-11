@@ -47,9 +47,6 @@ Kubernetes Containers can be monitored further using the following other integra
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

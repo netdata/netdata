@@ -86,6 +86,7 @@ static cmd_status_t cmd_ping_execute(char *args, char **message);
 static cmd_status_t cmd_aclk_state(char *args, char **message);
 static cmd_status_t cmd_version(char *args, char **message);
 static cmd_status_t cmd_dumpconfig(char *args, char **message);
+static cmd_status_t cmd_dyncfg_tree(char *args, char **message);
 static cmd_status_t cmd_remove_stale_node(char *args, char **message);
 static cmd_status_t cmd_mark_stale_nodes_ephemeral(char *args, char **message);
 static cmd_status_t cmd_update_node_info(char *args, char **message);
@@ -104,6 +105,7 @@ static command_info_t command_info_array[] = {
     {"aclk-state", "[json]",  "Returns current state of ACLK and Netdata Cloud connection. (optionally in json).", cmd_aclk_state, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"version", "", "Returns the netdata version.", cmd_version, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_INIT},
     {"dumpconfig", "", "Returns the current netdata.conf on stdout.", cmd_dumpconfig, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
+    {"dyncfg-tree", "", "Returns the dynamic configuration tree of this agent as JSON (all configurations and their status).", cmd_dyncfg_tree, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"mark-stale-nodes-ephemeral", "<node_id | machine_guid | hostname | ALL_NODES>",
         "Marks one or all disconnected nodes as ephemeral, while keeping their retention\n      available for queries on both this Netdata Agent dashboard and Netdata Cloud", cmd_mark_stale_nodes_ephemeral, CMD_TYPE_ORTHOGONAL, CMD_INIT_STATUS_FULL},
     {"remove-stale-node", "<node_id | machine_guid | hostname | ALL_NODES>",
@@ -384,6 +386,33 @@ static cmd_status_t cmd_dumpconfig(char *args, char **message)
     return CMD_STATUS_SUCCESS;
 }
 
+static cmd_status_t cmd_dyncfg_tree(char *args, char **message)
+{
+    (void)args;
+
+    // The same call GET /api/v3/config?action=tree makes. Only root, the netdata user and members of the
+    // netdata group can reach the command pipe, so the caller counts as a signed-in member of this agent's
+    // space. SENSITIVE_DATA is left out, so the tree is what any member without that permission sees: the
+    // user details of configurations changed through the UI or API are hidden.
+    //
+    // This runs on the libuv threadpool; the tree branch of the config handler answers inline, on this
+    // thread, and queues nothing on that pool, so waiting here cannot starve it.
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    int code = nrpc_call(&(struct nrpc_call_spec) {
+        .owner = rrdhost_nrpc_owner(localhost),
+        .result_wb = wb,
+        .cmd = PLUGINSD_FUNCTION_CONFIG " tree '/' ''",
+        .source = "netdatacli",
+        .user_access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_ANONYMOUS_DATA,
+        .timeout_s = 60,
+        .wait = true,
+        .allow_restricted = false,
+    });
+
+    *message = strdupz(buffer_tostring(wb));
+    return code == HTTP_RESP_OK ? CMD_STATUS_SUCCESS : CMD_STATUS_FAILURE;
+}
+
 static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool report_error, bool unregister)
 {
     rrd_rdlock();
@@ -415,14 +444,26 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
     bool locked = unregister ? rw_spinlock_trywrite_lock(&host->metadata_lifetime_lock)
                              : rw_spinlock_tryread_lock(&host->metadata_lifetime_lock);
     if (!locked) {
-        if (report_error)
-            buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
-                           rrdhost_hostname(host), host->machine_guid);
+        // a plugin holds the read side of a vnode for as long as it has it selected, so an online
+        // vnode fails here: report it as online, as it is reported when we get the lock
+        bool online = rrdhost_is_online(host);
+        if (report_error) {
+            if (online)
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
+                               rrdhost_hostname(host), host->machine_guid);
+            else
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                               rrdhost_hostname(host), host->machine_guid);
+        }
         rrd_rdunlock();
-        return -1;
+        return online ? 0 : -1;
     }
     rrd_rdunlock();
 
+    // Every path that makes a host live (a child attaching, a plugin defining or re-enabling a vnode)
+    // holds the read side until the host is online (see metadata_lifetime_lock). So with the write side,
+    // an offline host stays offline - a reconnecting child is refused until we are done - and with the
+    // read side it stays allocated.
     if (rrdhost_is_online(host)) {
         if (report_error)
             buffer_sprintf(wb, "Node '%s' (machine guid: %s) is online - not changing it",
@@ -432,6 +473,24 @@ static int remove_ephemeral_host(BUFFER *wb, const char *machine_guid, bool repo
         else
             rw_spinlock_read_unlock(&host->metadata_lifetime_lock);
         return 0;
+    }
+
+    // Offline is not enough to free it: a disconnecting child's receiver clears the online flag
+    // first and keeps using the host until rrdhost_clear_receiver() sets host->receiver to NULL,
+    // while the free path waits for it only briefly. With the write side no new receiver can
+    // attach, so once host->receiver is NULL it stays NULL until we are done.
+    if (unregister) {
+        rrdhost_receiver_lock(host);
+        bool receiver_attached = host->receiver != NULL;
+        rrdhost_receiver_unlock(host);
+
+        if (receiver_attached) {
+            if (report_error)
+                buffer_sprintf(wb, "Node '%s' (machine guid: %s) is busy - try again",
+                               rrdhost_hostname(host), host->machine_guid);
+            rw_spinlock_write_unlock(&host->metadata_lifetime_lock);
+            return -1;
+        }
     }
 
     bool marked = false;
@@ -718,7 +777,9 @@ cmd_status_t execute_command(cmd_t idx, char *args, char **message)
     else {
         if (message)
             *message = strdupz("Agent is initializing");
-        status = CMD_STATUS_SUCCESS;
+        // dyncfg-tree prints JSON that callers (the support bundle) consume, so a reply without it must
+        // fail and let them fall back; the other commands keep their historical exit code
+        status = (idx == CMD_DYNCFG_TREE) ? CMD_STATUS_FAILURE : CMD_STATUS_SUCCESS;
     }
     cmd_unlock_by_type[type](idx);
 

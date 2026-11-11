@@ -13,6 +13,44 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
+// The legacy direct path remains O(rows), including allocations. ns/op is a local
+// trend, not a CI gate.
+func BenchmarkCrossTableResolver_Direct(b *testing.B) {
+	for _, rows := range []int{32, 4096} {
+		b.Run(fmt.Sprintf("rows=%d", rows), func(b *testing.B) {
+			tag := ddprofiledefinition.MetricTagConfig{
+				Tag:   "label",
+				Table: "target",
+				Symbol: ddprofiledefinition.SymbolConfigCompat{
+					OID:  "1.2.1",
+					Name: "label",
+				},
+			}
+			pdus := make(map[string]gosnmp.SnmpPDU)
+			indexes := make([]string, rows)
+			for i := range rows {
+				indexes[i] = strconv.Itoa(i + 1)
+				pdus["1.2.1."+indexes[i]] = createStringPDU("1.2.1."+indexes[i], "label")
+			}
+			ctx := newCrossTableContext(
+				map[string]map[string]gosnmp.SnmpPDU{"1.2": pdus},
+				map[string]string{"target": "1.2"},
+			)
+			ctx.rowTags = make(map[string]string)
+			r := newCrossTableResolver(logger.New())
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				for _, index := range indexes {
+					if err := r.resolveCrossTableTag(tag, index, ctx, nil); err != nil {
+						b.Fatal(err)
+					}
+				}
+			}
+		})
+	}
+}
+
 func BenchmarkCrossTableResolver_JuniperPeerFamilyLookupScaling(b *testing.B) {
 	const (
 		refTableOID     = "1.3.6.1.4.1.2636.5.1.1.2.1.1"

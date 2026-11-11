@@ -41,9 +41,6 @@ This collector supports collecting metrics from multiple instances of this integ
 It automatically detects FreeRadius instances running on localhost.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

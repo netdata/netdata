@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
 	"github.com/netdata/netdata/go/plugins/cmd/internal/discoveryproviders"
@@ -29,6 +31,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -40,8 +43,15 @@ func init() {
 }
 func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
-	if handled, err := runRuntimeCommand(context.Background(), os.Args[1:], os.Stdout, os.Stderr); handled {
-		if err != nil {
+	runtimeContext := context.Background()
+	stopRuntimeSignals := func() {}
+	if len(os.Args) > 1 && os.Args[1] == "runtime" {
+		runtimeContext, stopRuntimeSignals = signal.NotifyContext(runtimeContext, os.Interrupt, syscall.SIGTERM)
+	}
+	handled, runtimeError := runRuntimeCommandWithInput(runtimeContext, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	stopRuntimeSignals()
+	if handled {
+		if err := runtimeError; err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -111,9 +121,16 @@ func main() {
 		// Process maintenance retries it, and the catalogue exposes its status.
 		fmt.Fprintf(os.Stderr, "initial DEM artifact cleanup failed: %v\n", err)
 	}
-	assetsPath := filepath.Join(executable.Directory, "dem")
-	runtimeHandle := dem.OpenRuntime(cfg.Runtime, assetsPath, pluginconfig.VarLibDir())
-	executor := runner.New(assetsPath, runtimeHandle.Source, synthetichistory.NewStore(history), captures)
+	runtimeHandle := dem.OpenRuntime(cfg.Runtime, pluginconfig.VarLibDir())
+	executor, err := runner.New(runtimeHandle.Source, synthetichistory.NewStore(history), captures, cfg.Browser.Concurrency)
+	if err != nil {
+		_ = history.Close()
+		fmt.Fprintf(os.Stderr, "initializing DEM browser execution: %v\n", err)
+		os.Exit(1)
+	}
+	if runtimeHandle.Store != nil && runtimeHandle.Host != nil {
+		runtimeHandle.Updater = runtimehost.NewUpdater(runtimeHandle.Host, executor, cfg.Runtime.ReleaseLoader("", true))
+	}
 	components := dem.New(
 		dem.Dependencies{
 			History:        history,
@@ -128,6 +145,9 @@ func main() {
 	services := []composition.ProcessService{components.Retention}
 	if runtimeHandle.Host != nil {
 		services = append(services, runtimeHandle.Host)
+	}
+	if runtimeHandle.Updater != nil {
+		services = append(services, runtimeHandle.Updater)
 	}
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,

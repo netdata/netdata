@@ -147,3 +147,96 @@ func bgpRowForTest(structuralID, neighbor, remoteAS string) ddsnmp.BGPRow {
 		},
 	}
 }
+
+func TestTopologyBGPPeerSemanticIdentifierSelection(t *testing.T) {
+	for name, tc := range map[string]struct {
+		identity     ddsnmp.BGPIdentity
+		tags         map[string]string
+		wantOK       bool
+		wantProcess  string
+		wantInstance string
+	}{
+		"typed identifiers win exactly": {
+			identity: ddsnmp.BGPIdentity{
+				ProcessID:       " edge ",
+				RoutingInstance: "\r\nvrf\t",
+				Neighbor:        "192.0.2.1",
+			},
+			tags:   map[string]string{"process_id": "edge", "routing_instance": "vrf"},
+			wantOK: true, wantProcess: " edge ", wantInstance: "\r\nvrf\t",
+		},
+		"blank typed identifiers fall back exactly": {
+			identity: ddsnmp.BGPIdentity{
+				ProcessID:       "\t",
+				RoutingInstance: "\r\n",
+				Neighbor:        "192.0.2.1",
+			},
+			tags:   map[string]string{"process_id": " edge ", "routing_instance": " vrf "},
+			wantOK: true, wantProcess: " edge ", wantInstance: " vrf ",
+		},
+		"blank process is absent": {
+			identity: ddsnmp.BGPIdentity{
+				ProcessID: "\t",
+				Neighbor:  "192.0.2.1",
+				RemoteAS:  "65002",
+			},
+			wantOK: true, wantInstance: "default",
+		},
+		"default is not explicit eligibility": {
+			identity: ddsnmp.BGPIdentity{
+				ProcessID:       "0",
+				RoutingInstance: "\t",
+				Neighbor:        "192.0.2.1",
+			},
+		},
+		"blank process does not replace remote AS": {
+			identity: ddsnmp.BGPIdentity{
+				ProcessID:       " \t",
+				RoutingInstance: "vrf",
+				Neighbor:        "192.0.2.1",
+			},
+		},
+		"explicit default permits process identity": {
+			identity: ddsnmp.BGPIdentity{
+				ProcessID:       "0",
+				RoutingInstance: "default",
+				Neighbor:        "192.0.2.1",
+			},
+			wantOK: true, wantProcess: "0", wantInstance: "default",
+		},
+		"protocol fields still normalize": {
+			identity: ddsnmp.BGPIdentity{
+				ProcessID:       " edge ",
+				RoutingInstance: " vrf ",
+				Neighbor:        " C0000201 ",
+				RemoteAS:        " 65002 ",
+			},
+			wantOK: true, wantProcess: " edge ", wantInstance: " vrf ",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			row := ddsnmp.BGPRow{
+				Kind:     ddprofiledefinition.BGPRowKindPeer,
+				Identity: tc.identity,
+				Tags:     tc.tags,
+				Descriptors: ddsnmp.BGPDescriptors{
+					LocalAddress: " :: ",
+					LocalAS:      " 65001 ",
+				},
+			}
+			peer, ok := topologyBGPPeerFromRow(row)
+			require.Equal(t, tc.wantOK, ok)
+			if !ok {
+				return
+			}
+			require.Equal(t, tc.wantProcess, peer.ProcessID)
+			require.Equal(t, tc.wantInstance, peer.RoutingInstance)
+			require.Equal(t, "192.0.2.1", peer.NeighborIP)
+			require.Empty(t, peer.LocalIP)
+			require.Equal(t, "65001", peer.LocalAS)
+			if tc.identity.RemoteAS != "" {
+				require.Equal(t, "65002", peer.RemoteAS)
+			}
+		})
+	}
+}

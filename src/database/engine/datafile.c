@@ -4,6 +4,9 @@
 #ifdef OS_WINDOWS
 void sync_uv_file_data(uv_file file)
 {
+    if (file < 0)
+        return;
+
     uv_fs_t req;
     (void) uv_fs_fsync(NULL, &req, file, NULL);
     uv_fs_req_cleanup(&req);
@@ -249,6 +252,20 @@ void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_
                     datafile_ctx(datafile)->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
+// true only for the exact name generate_datafilepath() writes; sscanf() alone also
+// accepts other extensions, trailing text and unpadded numbers
+bool datafile_name_parse(const char *name, unsigned *fileno)
+{
+    unsigned tier;
+    if (sscanf(name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, fileno) != 2 || tier != 1)
+        return false;
+
+    char expected[RRDENG_PATH_MAX];
+    (void) snprintfz(expected, sizeof(expected), DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+                     tier, *fileno);
+    return strcmp(name, expected) == 0;
+}
+
 int close_data_file(struct rrdengine_datafile *datafile)
 {
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
@@ -452,11 +469,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
     bool validate_files = true;
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
-        ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &fileno);
-
         // This is a datafile
-        if (2 == ret) {
-            datafile = datafile_alloc_and_init(ctx, tier, fileno);
+        if (datafile_name_parse(dent.name, &fileno)) {
+            datafile = datafile_alloc_and_init(ctx, 1, fileno);
             datafiles[matched_files++] = datafile;
             Pvoid_t *Pvalue = JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);
             if (!Pvalue || Pvalue == PJERR)
@@ -560,17 +575,29 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             must_delete_pair = 1;
 
         journalfile = journalfile_alloc_and_init(datafile);
-        ret = journalfile_load(ctx, journalfile, datafile);
-        if (0 != ret) {
-            if (!must_delete_pair) /* If datafile is still open close it */
+
+        // the journal of a datafile that cannot be loaded is not replayed: its pages would
+        // point the open cache at a datafile that is deleted and freed below
+        if (!must_delete_pair) {
+            ret = journalfile_load(ctx, journalfile, datafile);
+            if (0 != ret) {
                 close_data_file(datafile);
-            must_delete_pair = 1;
+                must_delete_pair = 1;
+            }
         }
 
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
             netdata_log_error("DBENGINE: deleting invalid data and journal file pair.");
+
+            // a journal v2 loaded before the pair failed is indexed and charged: it must
+            // leave ctx->njfv2idx before the datafile is freed, and go with the pair
+            size_t journal_v2_size = journalfile_v2_data_size_get(journalfile);
+            (void)journalfile_close(journalfile, datafile);
+            if (!journalfile_v2_unlink(journalfile) && journal_v2_size)
+                ctx_current_disk_space_decrease(ctx, journal_v2_size);
+
             ret = journalfile_unlink(journalfile);
             if (!ret) {
                 journalfile_v1_generate_path(datafile, path, sizeof(path));

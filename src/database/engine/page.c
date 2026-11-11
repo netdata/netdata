@@ -820,12 +820,37 @@ uint32_t pgd_buffer_memory_footprint(PGD *pg)
     return footprint;
 }
 
+// the bytes the page takes in an extent, without the side effects of pgd_disk_footprint()
+static uint32_t pgd_extent_size(PGD *pg)
+{
+    if (!pgd_slots_used(pg))
+        return 0;
+
+    switch (pg->type) {
+        case RRDENG_PAGE_TYPE_GORILLA_32BIT:
+            if (pg->states & (PGD_STATE_CREATED_FROM_COLLECTOR | PGD_STATE_SCHEDULED_FOR_FLUSHING | PGD_STATE_FLUSHED_TO_DISK))
+                return pg->gorilla.num_buffers * RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+
+            if (pg->states & PGD_STATE_CREATED_FROM_DISK)
+                return pg->raw.size;
+
+            return 0;
+
+        case RRDENG_PAGE_TYPE_ARRAY_32BIT:
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            return pg->used * page_type_size[pg->type];
+
+        default:
+            return 0;
+    }
+}
+
 uint32_t pgd_disk_footprint(PGD *pg)
 {
     if (!pgd_slots_used(pg))
         return 0;
 
-    size_t size = 0;
+    uint32_t size = pgd_extent_size(pg);
 
     // since the page is ready for flushing, let's unmark its pages to ARAL
     pgd_aral_unmark(pg);
@@ -842,17 +867,13 @@ uint32_t pgd_disk_footprint(PGD *pg)
                 internal_fatal(pg->gorilla.num_buffers == 0,
                                "Gorilla writer does not have any buffers");
 
-                size = pg->gorilla.num_buffers * RRDENG_GORILLA_32BIT_BUFFER_SIZE;
-
                 if (pg->states & PGD_STATE_CREATED_FROM_COLLECTOR)
                     pulse_gorilla_tier0_page_flush(
                         gorilla_writer_actual_nbytes(pg->gorilla.writer),
                         gorilla_writer_optimal_nbytes(pg->gorilla.writer),
                         tier_page_size[0]);
 
-            } else if (pg->states & PGD_STATE_CREATED_FROM_DISK) {
-                size = pg->raw.size;
-            } else {
+            } else if (!(pg->states & PGD_STATE_CREATED_FROM_DISK)) {
                 fatal("Asked disk footprint on unknown page state");
             }
 
@@ -860,13 +881,9 @@ uint32_t pgd_disk_footprint(PGD *pg)
         }
 
         case RRDENG_PAGE_TYPE_ARRAY_32BIT:
-        case RRDENG_PAGE_TYPE_ARRAY_TIER1: {
-            uint32_t used_size = pg->used * page_type_size[pg->type];
-            internal_fatal(used_size > pg->raw.size, "Wrong disk footprint page size");
-            size = used_size;
-
+        case RRDENG_PAGE_TYPE_ARRAY_TIER1:
+            internal_fatal(size > pg->raw.size, "Wrong disk footprint page size");
             break;
-        }
 
         default:
             netdata_log_error("%s() - Unknown page type: %uc", __FUNCTION__, pg->type);
@@ -882,8 +899,12 @@ uint32_t pgd_disk_footprint(PGD *pg)
 
 void pgd_copy_to_extent(PGD *pg, uint8_t *dst, uint32_t dst_size)
 {
-    internal_fatal(pgd_disk_footprint(pg) != dst_size, "Wrong disk footprint size requested (need %u, available %u)",
-                   pgd_disk_footprint(pg), dst_size);
+    // pgd_disk_footprint() scheduled the page and returned its size; it is not called again here,
+    // it counts and changes the page state
+    internal_fatal(!(pg->states & PGD_STATE_SCHEDULED_FOR_FLUSHING),
+                   "Copying to extent a page that is not scheduled for flushing");
+    internal_fatal(pgd_extent_size(pg) != dst_size, "Wrong disk footprint size requested (need %u, available %u)",
+                   pgd_extent_size(pg), dst_size);
 
     switch (pg->type) {
         case RRDENG_PAGE_TYPE_GORILLA_32BIT: {

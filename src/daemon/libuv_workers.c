@@ -6,8 +6,25 @@
 static void register_libuv_worker_jobs_internal(void) {
     signals_block_all_except_deadly();
 
-    worker_register("LIBUV");
+    // make sure we have the right thread id
+    gettid_uncached();
 
+    // name the thread first: worker_register() takes the thread name as the worker's tag
+    static int workers = 0;
+    int worker_id = __atomic_add_fetch(&workers, 1, __ATOMIC_RELAXED);
+
+    char buf[NETDATA_THREAD_TAG_MAX + 1];
+    snprintfz(buf, NETDATA_THREAD_TAG_MAX, "UV_WORKER[%d]", worker_id);
+    uv_thread_set_name_np(buf);
+
+    worker_register("LIBUV");
+    register_libuv_worker_job_names();
+}
+
+// The job names of the UV_EVENT_* ids. Also used by threads outside the libuv pool that run the same
+// work (data queries moved off the pool), so their job time is attributed the same way. Registering
+// the names does NOT make a thread a libuv pool thread (see libuv_worker_thread_is_current()).
+void register_libuv_worker_job_names(void) {
     // generic
     worker_register_job_name(UV_EVENT_WORKER_INIT, "worker init");
 
@@ -100,15 +117,6 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_FREE_CHART, "free chart");
     worker_register_job_name(UV_EVENT_FREE_DIMENSION, "free dimension");
 
-    // make sure we have the right thread id
-    gettid_uncached();
-
-    static int workers = 0;
-    int worker_id = __atomic_add_fetch(&workers, 1, __ATOMIC_RELAXED);
-
-    char buf[NETDATA_THREAD_TAG_MAX + 1];
-    snprintfz(buf, NETDATA_THREAD_TAG_MAX, "UV_WORKER[%d]", worker_id);
-    uv_thread_set_name_np(buf);
 }
 
 // every libuv pool work callback calls register_libuv_worker_jobs(),

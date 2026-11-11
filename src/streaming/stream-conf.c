@@ -48,7 +48,6 @@ struct _stream_send stream_send = {
     .parents = {
         .destination = NULL,
         .default_port = 19999,
-        .h2o = false,
         .timeout_s = 300,
         .reconnect_delay_s = 15,
         .ssl_ca_path = NULL,
@@ -366,10 +365,6 @@ void stream_conf_load() {
     stream_send.compression.enabled =
         inicfg_get_boolean(&stream_config, CONFIG_SECTION_STREAM, "enable compression",
                               stream_send.compression.enabled);
-
-    stream_send.parents.h2o = inicfg_get_boolean(
-        &stream_config, CONFIG_SECTION_STREAM, "parent using h2o",
-        stream_send.parents.h2o);
 
     stream_send.parents.timeout_s = (int)inicfg_get_duration_seconds(
         &stream_config, CONFIG_SECTION_STREAM, "timeout",

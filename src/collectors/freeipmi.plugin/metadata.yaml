@@ -33,7 +33,10 @@ modules:
         description: "The plugin needs setuid."
       default_behavior:
         auto_detection:
-          description: ""
+          description: The plugin detects local IPMI sensors when selected. Netdata prefers the Go IPMI plugin
+            when both are installed and enabled. Existing non-blank FreeIPMI command options keep this implementation
+            when FreeIPMI is enabled. An existing freeipmi=no keeps collection disabled. Set ipmi=yes explicitly in
+            the plugins section of netdata.conf to migrate either case to Go.
         limits:
           description: ""
         performance_impact:
@@ -48,6 +51,17 @@ modules:
               When using a static build of Netdata, the FreeIPMI plugin will be included and installed automatically, though you will still need to have FreeIPMI installed on your system to be able to use the plugin.
 
               When using a local build of Netdata, you need to ensure that the FreeIPMI development packages (typically called `libipmimonitoring-dev`, `libipmimonitoring-devel`, or `freeipmi-devel`) are installed when building Netdata.
+          - title: Select the C implementation
+            description: |
+              To switch from the Go plugin, set the following in `netdata.conf` and restart Netdata:
+
+              ```ini
+              [plugins]
+                  ipmi = no
+                  freeipmi = yes
+              ```
+
+              Netdata starts at most one IPMI implementation and keeps that choice until restart. A failure does not automatically switch implementations.
           - title: Preliminary actions
             description: |
               If you have not previously used IPMI on your system, you will probably need to run the `ipmimonitoring` command as root
@@ -260,10 +274,6 @@ modules:
               This instructs the kernel IPMI module to pause for a tick between checking IPMI. Querying IPMI will be a lot slower now (e.g. several seconds for IPMI to respond), but `kipmi` will not use any noticeable CPU.
 
               You can also use a higher number (this is the number of microseconds to poll IPMI for a response, before waiting for a tick).
-    # ipmi_events is an alarm on chart id ipmi.events, which this plugin creates under the ipmi.sel context,
-    # so no declared context derives it. The integrations generator derives every other alert row from `metrics`.
-    alerts:
-      - ipmi_events
     metrics:
       folding:
         title: Metrics

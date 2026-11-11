@@ -2,10 +2,7 @@
 
 package panos
 
-import (
-	"regexp"
-	"strings"
-)
+import "strings"
 
 func systemLabelValues(info systemInfo) []string {
 	return []string{
@@ -31,14 +28,28 @@ func licenseLabelValues(entry licenseEntry) []string {
 	}
 }
 
-func ipsecTunnelLabelValues(tunnel ipsecTunnel) []string {
-	return []string{
-		labelValue(firstNonEmpty(tunnel.Name, "unknown"), "unknown"),
+func ipsecTunnelLabelValues(tunnel ipsecTunnel) [6]string {
+	return [6]string{
+		labelValue(tunnel.Name, "unknown"),
 		labelValue(tunnel.Gateway, "unknown"),
 		labelValue(tunnel.Remote, "unknown"),
-		labelValue(firstNonEmpty(tunnel.TID, tunnel.ISPI, tunnel.OSPI), "unknown"),
+		labelValue(tunnel.TID, "unknown"),
 		labelValue(tunnel.Protocol, "unknown"),
 		labelValue(tunnel.Encryption, "unknown"),
+	}
+}
+
+func ipsecTunnelStateKey(tunnel vpnFlowTunnel) [2]string {
+	return [2]string{
+		tunnel.Name,
+		labelValue(tunnel.ID, "unknown"),
+	}
+}
+
+func ipsecGatewayStateKey(gateway vpnGateway) [2]string {
+	return [2]string{
+		gateway.Name,
+		ipsecIKEVersion(gateway),
 	}
 }
 
@@ -62,20 +73,6 @@ func labelValue(value, fallback string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return fallback
-	}
-	return value
-}
-
-var invalidIDChars = regexp.MustCompile(`[^a-zA-Z0-9_]+`)
-
-func cleanID(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
-	value = strings.ReplaceAll(value, ".", "_")
-	value = strings.ReplaceAll(value, ":", "_")
-	value = invalidIDChars.ReplaceAllString(value, "_")
-	value = strings.Trim(value, "_")
-	if value == "" {
-		return "unknown"
 	}
 	return value
 }

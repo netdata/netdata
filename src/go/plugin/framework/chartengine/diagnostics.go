@@ -22,6 +22,7 @@ const (
 	PlanRouteAccepted                  PlanRouteDecision = "route_accepted"
 	PlanRouteAutogenDisplaced          PlanRouteDecision = "autogen_displaced"
 	PlanRouteCollisionRejected         PlanRouteDecision = "chart_id_collision_rejected"
+	PlanRouteContextRejected           PlanRouteDecision = "context_rejected"
 	PlanRouteLifecycleRejected         PlanRouteDecision = "lifecycle_rejected"
 	PlanRouteUnmatched                 PlanRouteDecision = "series_unmatched"
 )
@@ -40,6 +41,7 @@ const (
 	PlanRouteReasonAutogenRuleRejected      PlanRouteReason = "autogen_rule_rejected"
 	PlanRouteReasonAutogenBuildRejected     PlanRouteReason = "autogen_build_rejected"
 	PlanRouteReasonChartInstanceCap         PlanRouteReason = "chart_instance_cap"
+	PlanRouteReasonContextSeriesLimit       PlanRouteReason = "context_series_limit"
 	PlanRouteReasonDimensionCap             PlanRouteReason = "dimension_cap"
 )
 
@@ -74,6 +76,8 @@ type PlanRouteDiagnostic struct {
 	InstanceLabels               []string
 	MissingInstanceLabels        []string
 	Context                      string
+	ContextSeriesCount           int
+	ContextSeriesLimit           int
 	Family                       string
 	Units                        string
 	Algorithm                    string

@@ -50,7 +50,15 @@ modules:
           description: |
             By default, it detects instances running on the local host by trying to connect to known ports that are [allocated to exporters](https://github.com/prometheus/prometheus/wiki/Default-port-allocations).
         limits:
-          description: ""
+          description: |
+            Input exceeding `max_input_series` rejects the whole collection. Output exceeding
+            `max_output_series_per_context` omits that entire context while other contexts remain available.
+            Limits apply with and without profiles. Admission and output omission/recovery are reported in ordinary logs.
+            These limits do not bound download, parser memory, or total retained storage.
+
+            HTTP responses have a separate fixed 64 MiB limit, including after gzip decompression.
+            A response exceeding this limit fails the scrape. Reduce the metrics exposed by the endpoint if it
+            exceeds this limit; collector-side selectors and relabeling do not reduce the downloaded body.
         performance_impact:
           description: ""
     setup: &setup
@@ -121,15 +129,15 @@ modules:
                     - pattern4
                 ```
 
-            - name: max_time_series
-              description: Global time series limit applied after job and profile relabeling. If the final output exceeds it, the data is not processed.
-              default_value: 2000
+            - name: max_input_series
+              description: Maximum input series after selector and job/profile relabeling, checked at startup and every collection. Each scalar counts once; each histogram counts its buckets plus two count/sum slots, and each summary counts its quantiles plus two count/sum slots, including incomplete distributions. Exceeding the limit rejects the whole collection before storage. Zero disables the limit; negative values are invalid. This does not bound download or parser memory.
+              default_value: 10000
               required: false
               group: Limits
 
-            - name: max_time_series_per_metric
-              description: Per-metric time series limit applied to final metric families. Metrics exceeding it are skipped.
-              default_value: 200
+            - name: max_output_series_per_context
+              description: Maximum distinct current chart/dimension pairs per resolved context in one job and host scope, counted after routing and aggregation across all charts. Exceeding the limit omits the whole context; other contexts keep their complete inputs. Applies to profiles, automatic charts and raw counter companion charts. Zero disables the limit; negative values are invalid.
+              default_value: 1000
               required: false
               group: Limits
 
@@ -4660,7 +4668,9 @@ modules:
               default priority threshold and the complete priority-0 surface; use `exporter_prio_limit=0` when those diagnostic
               counters are required and size the job limits for the resulting series count. When cephadm node-proxy hardware
               reporting is enabled, hardware series scale with the cluster-wide component inventory; size both
-              `max_time_series` and `max_time_series_per_metric` for that surface.
+              `max_input_series` and `max_output_series_per_context` for that surface. The example limits are starting
+              budgets for source components and rendered context dimensions respectively; tune each independently to
+              your deployment.
       configuration:
         <<: *prometheus_configuration
         examples:
@@ -4684,14 +4694,14 @@ modules:
                     url: http://127.0.0.1:9283/metrics
                     update_every: 15
                     expected_prefix: ceph_
-                    max_time_series: 20000
-                    max_time_series_per_metric: 4000
+                    max_input_series: 20000
+                    max_output_series_per_context: 4000
                   - name: ceph-exporter
                     url: http://127.0.0.1:9926/metrics
                     update_every: 5
                     expected_prefix: ceph_
-                    max_time_series: 20000
-                    max_time_series_per_metric: 4000
+                    max_input_series: 20000
+                    max_output_series_per_context: 4000
             - name: Ceph NVMe-oF gateway exporter
               description: |
                 Collect one local gateway endpoint per Ceph NVMe-oF gateway whose local state is required. The gateway
@@ -4703,8 +4713,8 @@ modules:
                     url: http://127.0.0.1:10008/metrics
                     update_every: 5
                     expected_prefix: ceph_
-                    max_time_series: 10000
-                    max_time_series_per_metric: 2000
+                    max_input_series: 10000
+                    max_output_series_per_context: 2000
             - name: Ceph MGR with virtual node
               description: |
                 Use a virtual node when the cluster identity should remain independent of the Agent currently scraping its
@@ -4724,8 +4734,8 @@ modules:
                     url: http://127.0.0.1:9283/metrics
                     update_every: 15
                     expected_prefix: ceph_
-                    max_time_series: 20000
-                    max_time_series_per_metric: 4000
+                    max_input_series: 20000
+                    max_output_series_per_context: 4000
 
   - <<: *module
     meta:
@@ -4783,8 +4793,8 @@ modules:
               appear only when their identity labels are available. Gauge identity follows every non-redundant label required
               to distinguish the emitted state, including configured custom metadata, custom tags, and the opt-in user
               email/alias budget labels. Arbitrary configured label names are not turned into dimensions because they are
-              deployment-defined, unbounded classifications rather than one stable bounded aspect. Size `max_time_series` and
-              `max_time_series_per_metric` for the exported surface.
+              deployment-defined, unbounded classifications rather than one stable bounded aspect. Size `max_input_series` and
+              `max_output_series_per_context` for the exported surface.
       configuration:
         <<: *prometheus_configuration
         examples:

@@ -40,7 +40,7 @@ For `CollectorV2` collectors, the runtime integration expects:
 | `TemplateSet.ChartTemplateIDAt(entryID, path, i)` / `FallbackContextNamespace()` | Resolve an entry chart position to the template ID plans and route facts report; read the fixed automatic-chart namespace |
 | `PreparePlan(reader)`                               | Build deterministic action plan from reader snapshot and return an explicit attempt                                                                                     |
 | `RuntimeStore()`                                    | Access chartengine internal runtime metrics store                                                                                                                       |
-| `WithEnginePolicy(...)`                             | Configure selector + autogen behavior                                                                                                                                   |
+| `WithEnginePolicy(...)`                             | Configure selector, autogen behavior and optional output limit per context                                                                                              |
 | `WithRuntimeStore(...)`                             | Override/disable self-metrics store                                                                                                                                     |
 | `WithSeriesSelectionAllVisible()`                   | Process all visible series instead of filtering to latest successful collect cycle. Intended for runtime/internal stores that commit immediately (no cycle boundaries). |
 | `WithEmitTypeIDBudgetPrefix(...)`                   | Set the effective type-id prefix used by autogen budget checks and collision-warning rate limiting                                                                      |
@@ -100,7 +100,7 @@ Dimension definitions explicitly emit `type=float` or `type=int`. Integer is the
 this option during redefinition preserves the existing numeric mode. Explicit `type=int` clears a prior float mode,
 including when the Agent retains a dimension across a collector restart.
 
-Global selector/autogen policy and fallback namespace are fixed for a running job. `CollectorV2EnginePolicy` is captured
+Global selector/autogen/output-limit policy and fallback namespace are fixed for a running job. `CollectorV2EnginePolicy` is captured
 once and overrides global fields. An explicit autogen override replaces the entire global autogen policy and its rules.
 Entry `AutogenRules` are independent restrictions: they combine with global rules and disappear when the entry is removed.
 Overrides cannot remove them. Later effective global changes require job recreation; entry content and restrictions can
@@ -188,6 +188,7 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 | Validate reader | Ensure flattened metadata is available when inferred dimensions are used                       |
 | Scan            | Iterate series, filter by success sequence and selector, route to chart/dimension accumulators |
 | Cache retain    | Prune route cache entries not seen in the latest successful sequence                           |
+| Context limit   | Omit whole contexts whose current output population exceeds the optional job policy           |
 | Lifecycle caps  | Enforce chart/dimension cap policy                                                             |
 | Materialize     | Emit create/update actions from accumulated state                                              |
 | Expiry          | Emit removals for stale charts/dimensions                                                      |
@@ -198,7 +199,11 @@ Terms like "materialized state" and "route cache" are defined in the Engine Stat
 
 `WithPlanRouteDiagnosticObserver` is an opt-in validation/test surface. When enabled, the planner synchronously streams
 attempt-local facts for filtering, candidate rejection, chart-identity rejection, resolved routes, accepted routes,
-autogen displacement, collisions, lifecycle rejection, and unmatched series.
+autogen displacement, collisions, whole-context omission, lifecycle rejection, and unmatched series.
+
+`PlanRouteContextRejected` facts are emitted once per rejected chart, with its resolved context and
+`ContextSeriesCount`/`ContextSeriesLimit`. They follow routing facts: an accepted route can still belong to an omitted
+context. Ordinary omission/recovery logging does not enable this diagnostic observer or bypass the route cache.
 
 - Diagnostic planning bypasses route-cache lookup and storage so every scanned series produces complete facts.
 - The default path is unchanged when no observer is configured; it continues to use the route cache.
@@ -321,6 +326,32 @@ retention as authored routes and trades additional retained route/guard memory f
 Algorithm resolution happens after cache lookup, so a cached route
 cannot retain the effective algorithm from an earlier series kind. Only concrete algorithms reach accumulated dimension
 state and dimension actions; chart-level metadata retains the configured policy.
+
+## Output Limit Per Context
+
+`EnginePolicy.MaxOutputSeriesPerContext` is a fixed job policy: nil preserves the supplied template-set policy,
+zero disables the limit, and negative values are rejected. Engines default to disabled; a collector may supply its
+own default through `CollectorV2EnginePolicy.EnginePolicy()`. Both native and static template providers bind this
+policy through `ChartTemplateSource` before their first publication.
+
+The limit counts distinct currently observed `(chart ID, dimension ID)` pairs across all charts in one published
+context, after routing, ownership and aggregation. Context keys use the same wire normalization as the emitter;
+different authored names that normalize to one published context share its budget and transition reporting.
+Raw metadata remains available for inspection and authoring diagnostics. Equality is admitted. Exceeding the limit
+omits that entire context;
+other contexts retain their complete inputs. Hidden and non-finite-valued dimensions count, while quiet historical
+dimensions do not. Automatic fallback and counter raw companions follow the same rule in their respective contexts.
+The check precedes authored lifecycle caps; those caps cannot make an oversized context appear to fit.
+
+Omission publishes no values or partial aggregates for that context. Existing expiry and missing-data behavior apply.
+Borrowed scratch caches are detached through the plan journal, preserving published definitions and last-seen stamps;
+Abort restores the previous state. Each engine owns its context population, so scopes remain independent.
+
+After a successful `PlanAttempt.Commit`, one bounded ordinary log summary reports new omissions and contexts no
+longer omitted, with counts, the limit and at most three context examples per transition type. Unchanged admission
+state is silent. Disappearance, failed collection, abort and host reset do not imply recovery. Recovery means removal
+of limit suppression, not healthy measurements: resumed values may still be gaps. One-shot transitions bypass lossy
+rate limiting. Input admission, fetching, source retention and total output across contexts are separate concerns.
 
 ## Lifecycle Defaults and Policy
 
@@ -459,3 +490,23 @@ Metric collection and fixture setup are outside those planner/expiry timers. Exp
 dimensions but sorts only actual removals. Steady expiry allocates no removal memory; staging and output still scale
 with retained/output cardinality. Unit allocation envelopes guard these properties; elapsed benchmark timings are
 development-machine trends, not CI limits.
+
+Output admission reuses each candidate chart's distinct observed count: O(candidate charts + contexts) work and
+O(contexts) additional state per attempt, with no second dimension set or source scan. Changed raw context aliases
+are normalized once in a temporary map; canonical-only contexts need no alias map. Disabled limits allocate no
+admission maps. `BenchmarkContextLimitFanIn` compares fixed-output populations at increasing fan-in;
+`BenchmarkContextLimitManyContexts` measures context growth and `BenchmarkContextLimitRejectedDetail` measures
+omission while preserving rollups. Rejected detail still incurs routing/aggregation cost; it is not early aggregation.
+
+Once a chart alone exceeds the budget, its existing dimension map keeps exact distinct keys while discarding further
+value/label work. A shared attempt-local marker avoids allocating a value for every rejected dimension. Ownership
+replacement creates fresh chart state; no early cutoff uses provisional totals across a context. Fresh candidate maps
+need no rollback records, while mutations of borrowed published caches remain journaled.
+
+With a limit enabled, new chart candidates defer label work until they pass admission and lifecycle caps. The existing
+label reconciliation pass then builds their current labels and membership before materialization. First publication,
+new-chart churn and host reset can therefore replay routes once. Published charts retain ordinary membership detection
+and cached labels through omission/recovery; admission itself does not add a pass.
+`BenchmarkContextLimitInstances` covers many small charts and `BenchmarkContextLimitRecoveryCycle`
+includes repeated growth and recovery. Candidate sizing follows the pre-admission population to avoid repeated cold
+chart-state allocations for omitted contexts.

@@ -43,11 +43,8 @@ eBPF DCstat can be monitored further using the following other integrations:
 
 #### Auto-Detection
 
-The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), presence of BTF files, and the configured object flavor to decide which eBPF program will be attached. Because `lookup_fast` is a static kernel function, the collector resolves its real symbol name from `/proc/kallsyms` before attaching.
+The plugin checks kernel compilation flags (CONFIG_BPF and CONFIG_BPF_SYSCALL, plus CONFIG_KPROBES for probe-based collectors) and BTF availability to select the eBPF loading mode and object flavor. Because `lookup_fast` is a static kernel function, the collector resolves its real symbol name from `/proc/kallsyms` before attaching.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -60,7 +57,7 @@ This thread will add overhead every time that an internal kernel function monito
 
 #### Compile kernel
 
-Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different according to the preferences of Linux distributions.
+Check that your kernel was compiled with CONFIG_BPF and CONFIG_BPF_SYSCALL, and CONFIG_KPROBES for probe-based collectors. Look in `/proc/config.gz` or a `/boot/config-*` file; CONFIG_BPF_JIT is optional.
 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well defined pattern, but distributions can deliver their configuration files
 with different names.
 
@@ -153,3 +150,4 @@ Metrics:
 |:------|:------------|:----------|:----|
 | filesystem.dc_hit_ratio | Percentage of directory lookups resolved by the cache — `(reference - miss) / reference`. It measures lookup resolution, not how many files are held in the cache. Computed from cumulative counters since the eBPF program attached, matching the legacy dcstat contract. | ratio | % |
 | filesystem.dc_reference | Variables used to calculate hit ratio. Published as per-interval totals with the `absolute` algorithm, preserving the legacy dcstat metric contract. | reference, slow, miss | files |
+| ebpf.dcstat_arena_drops | Per-PID events dropped by the DCStat arena queue. Published only when the arena object is active. | dropped | events/s |

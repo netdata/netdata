@@ -154,12 +154,11 @@ Netdata takes the impact on monitored infrastructure extremely seriously. Netdat
 
 ### Independent Validation
 
-According to the [University of Amsterdam study](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf), examining the energy efficiency and impact of monitoring tools on Docker-based systems, Netdata was found to be the most energy-efficient tool for monitoring Docker-based systems. The study demonstrates that Netdata excels in:
+According to the [University of Amsterdam study](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf), examining the energy efficiency and impact of monitoring tools on Docker-based systems, Netdata was found to be the most energy-efficient tool, with best-in-class resource consumption and no impact on the monitored workloads. The study reports:
 
-- **CPU usage** - Lowest overhead among compared solutions
-- **RAM usage** - Most memory-efficient monitoring approach  
-- **Execution time impact** - Minimal interference with application performance
-- **Energy consumption** - Best-in-class energy efficiency
+- **Energy consumption** - Lowest among the compared tools
+- **CPU load and RAM usage** - Among the lowest of the compared tools
+- **Execution time** - Unaffected when running Netdata
 
 ## Data Retention and Storage
 

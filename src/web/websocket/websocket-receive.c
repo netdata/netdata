@@ -587,6 +587,27 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
         websocket_protocol_exception(wsc, WS_CLOSE_MESSAGE_TOO_BIG, "Frame too large");
         return WS_FRAME_ERROR;
     }
+
+    // Reject a data frame that would grow its message beyond the client's limit from its
+    // header, before waiting for (and buffering) its payload.
+    if (header.opcode == WS_OPCODE_TEXT || header.opcode == WS_OPCODE_BINARY ||
+        header.opcode == WS_OPCODE_CONTINUATION) {
+        bool continuation = header.opcode == WS_OPCODE_CONTINUATION;
+        size_t message_length = continuation ? wsb_length(&wsc->payload) : 0;
+
+        // deflate can grow incompressible data slightly: allow some slack for compressed bytes,
+        // their decompressed size is checked against the limit itself after inflating
+        size_t limit = wsc->max_inbound_message_size;
+        if (continuation ? wsc->is_compressed : header.rsv1)
+            limit += limit / 16;
+
+        if (message_length + header.payload_length > limit) {
+            websocket_error(wsc, "Invalid frame: Message too large (%zu bytes so far, frame payload=%zu bytes, limit=%zu bytes)",
+                            message_length, header.payload_length, limit);
+            websocket_protocol_exception(wsc, WS_CLOSE_MESSAGE_TOO_BIG, "Message too large");
+            return WS_FRAME_ERROR;
+        }
+    }
     
     // Check if we have enough data for the complete frame (header + payload)
     // If not, don't consume any bytes and wait for more data

@@ -47,9 +47,6 @@ NGINX VTS can be monitored further using the following other integrations:
 By default, it detects NGINX instances running on localhost.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

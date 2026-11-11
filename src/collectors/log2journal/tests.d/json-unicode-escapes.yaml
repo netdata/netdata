@@ -1,0 +1,2 @@
+# \u escapes: newline/tab, surrogate pairs, unpaired surrogates kept literally
+pattern: json

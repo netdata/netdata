@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
@@ -32,7 +33,8 @@ import (
 // Executor is the browser capability injected into native collectors.
 type Executor interface {
 	Check(context.Context, synthetic.Kind) error
-	Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution
+	monitor.Executor
+	Rehearse(context.Context, synthetic.Request) error
 }
 
 type Dependencies struct {
@@ -89,7 +91,6 @@ func New(deps Dependencies, cfg Config) Components {
 		Executor: deps.Executor,
 	})
 	if deps.Runtime != nil {
-		workflow.JobConfigIntent, audit.JobConfigIntent = deps.Runtime, deps.Runtime
 		workflow.ActivationDependencies, audit.ActivationDependencies = deps.Runtime.Dependencies, deps.Runtime.Dependencies
 	}
 	collectors.Register("journey", workflow)
@@ -113,14 +114,18 @@ func New(deps Dependencies, cfg Config) Components {
 		Collectors: collectors,
 		Functions: []funcapi.ProcessFunctionProvider{
 			{
-				ID:         "rum",
-				Functions:  rumfunctions.Declarations,
-				NewHandler: func() funcapi.MethodHandler { return rumfunctions.New(rumQueries) },
+				ID:        "rum",
+				Functions: rumfunctions.Declarations,
+				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					return rumfunctions.New(rumQueries, ctx.LookupVnodeGUID)
+				},
 			},
 			{
-				ID:         "synthetics",
-				Functions:  syntheticfunctions.Declarations,
-				NewHandler: func() funcapi.MethodHandler { return syntheticfunctions.New(syntheticQueries) },
+				ID:        "synthetics",
+				Functions: syntheticfunctions.Declarations,
+				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					return syntheticfunctions.New(syntheticQueries, ctx.LookupVnodeGUID)
+				},
 			},
 			{
 				ID:         "dem-history",

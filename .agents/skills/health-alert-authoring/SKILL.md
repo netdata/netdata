@@ -240,6 +240,15 @@ Use `calc` when the source's current value is the full condition. Test start-up,
 obsoletion separately. `delay:` controls notification hysteresis, not the evaluated alert state; it is not a substitute
 for a Prometheus `for:` duration.
 
+### Event Counts
+
+A `sum` lookup adds the stored points of its window. Incremental dimensions are stored as per-second rates
+(`new_value /= st->update_every` in `src/database/rrdset-collection.c`), so a `sum` over a counter is the event count
+divided by the chart's update interval. When the alert value or its notification must be a count, read a gauge of the
+events since the previous sample, or multiply by `$update_every`. Either sum stays approximate: a missed update
+interpolates the stored points (`rrdset_done_interpolate`), which can add a fraction, so compare it with zero rather
+than with an exact count.
+
 ## Control Flapping With Three Combinable Layers
 
 Stability involves signal smoothing, threshold hysteresis and notification delay. Address them in that order.
@@ -369,7 +378,18 @@ from the look of an expression alone.
 Run the smallest relevant tests first, then the full affected suite. A complete alert change normally needs all applicable
 items below:
 
-1. Run `/usr/sbin/netdata -W healthconfigtest` for the built-in health parser and lookup suite.
+1. Run the rebuilt binary's built-in health parser and lookup suite with private state:
+
+   Set `AGENT_BIN` to the rebuilt executable and `CASE_DIR` to an owned scratch directory containing `netdata.conf`.
+
+   ```sh
+   NETDATA_RUN_DIR="$CASE_DIR/run" TMPDIR="$CASE_DIR/tmp" \
+       "$AGENT_BIN" -c "$CASE_DIR/netdata.conf" -W healthconfigtest
+   ```
+
+   Pre-create private run/temp directories and configure private cache, lib, log and registry paths, including DynCfg's
+   `lib/config`. `-c` MUST precede `-W`: `main` in `src/daemon/main.c` returns during option parsing for this selector.
+   The tests can create GUID/lock and DynCfg files, so MUST NOT use production state directories.
 2. Verify the shipped alert against an independent oracle: exercise the signal's behavior, or compare independently
    owned artifacts with the `collecttest` health checks named in
    `.agents/skills/collectors-go-framework-v2/chart-template.md#tests`. A test MUST NOT copy the definition's lookup,

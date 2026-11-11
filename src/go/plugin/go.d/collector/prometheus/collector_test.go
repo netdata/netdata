@@ -59,8 +59,8 @@ func TestDefaultConfigMatchesNewAndReturnsIndependentValues(t *testing.T) {
 
 	first.Profiles.Mode = "none"
 	assert.Equal(t, "auto", second.Profiles.Mode)
-	assert.Equal(t, 2000, second.MaxTS)
-	assert.Equal(t, 200, second.MaxTSPerMetric)
+	assert.Equal(t, 10000, second.MaxInputSeries)
+	assert.Equal(t, 1000, second.MaxOutputSeriesPerContext)
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -308,24 +308,7 @@ test_counter_no_meta_metric_1_total{label1="value2"} 11
 					}))
 				collr = New()
 				collr.URL = srv.URL
-				collr.MaxTS = 1
-
-				return collr, srv.Close
-			},
-		},
-		"fail if the num time series in the metric exceeds the limit": {
-			wantFail: true,
-			prepare: func() (collr *Collector, cleanup func()) {
-				srv := httptest.NewServer(http.HandlerFunc(
-					func(w http.ResponseWriter, r *http.Request) {
-						_, _ = w.Write([]byte(`
-test_counter_no_meta_metric_1_total{label1="value1"} 11
-test_counter_no_meta_metric_1_total{label1="value2"} 11
-`))
-					}))
-				collr = New()
-				collr.URL = srv.URL
-				collr.MaxTSPerMetric = 1
+				collr.MaxInputSeries = 1
 
 				return collr, srv.Close
 			},
@@ -548,26 +531,6 @@ test_pg_info 7
 				_, ok := fr.Value("test_metric_info", metrix.Labels{"version": "1.2.3"})
 				assert.False(t, ok, "a gauge _info family must be skipped")
 				assert.InDelta(t, 7, value(t, fr, "test_pg_info", nil), 1e-9)
-			},
-		},
-		"per-metric series limit skips the family": {
-			prepare: func() *Collector {
-				c := New()
-				c.MaxTSPerMetric = 1
-				return c
-			},
-			input: `
-# TYPE test_gauge_metric gauge
-test_gauge_metric{label1="value1"} 11
-test_gauge_metric{label1="value2"} 12
-`,
-			checkInput: `
-# TYPE test_gauge_metric gauge
-test_gauge_metric{label1="value1"} 11
-`,
-			want: func(t *testing.T, fr metrix.Reader) {
-				_, ok := fr.Value("test_gauge_metric", metrix.Labels{"label1": "value1"})
-				assert.False(t, ok, "a family over the per-metric series limit must be skipped entirely")
 			},
 		},
 		"relabel applies before assembly (drop + rename via __name__)": {
@@ -2377,8 +2340,10 @@ func collectCephPlan(t *testing.T, body []byte) cephCollectorPlan {
 
 	collr := New()
 	collr.URL = srv.URL
-	collr.Profiles = ProfilesConfig{Mode: "auto"}
-	collr.MaxTS = 20_000
+	collr.Profiles = ProfilesConfig{
+		Mode: "auto",
+	}
+	collr.MaxInputSeries = 20_000
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
 	t.Cleanup(func() { collr.Cleanup(context.Background()) })

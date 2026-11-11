@@ -36,9 +36,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -115,7 +112,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 ### Per vm.stats.vm.v_pgfaults instance
 
-The number of page faults happened on host.
+The number of page faults happened on host. Linux and Windows chart the same context with `minor` and `major` dimensions: FreeBSD `memory` counts every fault (as Linux `minor` does) and `io_requiring` counts major faults that needed I/O.
 
 This scope has no labels.
 

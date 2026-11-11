@@ -36,9 +36,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -69,7 +66,8 @@ No action required.
 | bandwidth for all disks | Enable or disable bandwidth for all disks metric. | auto | no |
 | operations for all disks | Enable or disable operations for all disks metric. | auto | no |
 | queued operations for all disks | Enable or disable queued operations for all disks  metric. | auto | no |
-| utilization percentage for all disks | Enable or disable utilization percentage for all disks metric. | auto | no |
+| utilization percentage for all disks | Enable or disable utilization percentage and busy time for all disks metrics. | auto | no |
+| backlog for all disks | Enable or disable backlog for all disks metric. | auto | no |
 | i/o time for all disks | Enable or disable I/O time for all disks metric. | auto | no |
 | average completed i/o time for all disks | Enable or disable average completed I/O time for all disks metric. | auto | no |
 | average completed i/o bandwidth for all disks | Enable or disable average completed I/O bandwidth for all disks metric. | auto | no |
@@ -117,6 +115,7 @@ The following alerts are available:
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
 | [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | Average percentage of time ${label:device} disk was busy over the last 10 minutes |
+| [ 10min_disk_backlog ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.backlog | Average backlog size of the ${label:device} disk over the last 10 minutes |
 
 
 
@@ -144,9 +143,13 @@ Metrics:
 
 ### Per disk
 
+A disk or storage array reported by devstat.
 
+Labels:
 
-This scope has no labels.
+| Label      | Description     |
+|:-----------|:----------------|
+| device | devstat device name and unit number (for example ada0, da1, or nvd0). |
 
 Metrics:
 
@@ -155,6 +158,8 @@ Metrics:
 | disk.io | Disk I/O Bandwidth | reads, writes, frees | KiB/s |
 | disk.ops | Disk Completed I/O Operations | reads, writes, other, frees | operations/s |
 | disk.qops | Disk Current I/O Operations | operations | operations |
+| disk.backlog | Disk Backlog | backlog | milliseconds |
+| disk.busy | Disk Busy Time | busy | milliseconds |
 | disk.util | Disk Utilization Time | utilization | % of time working |
 | disk.iotime | Disk Total I/O Time | reads, writes, other, frees | milliseconds/s |
 | disk.await | Average Completed I/O Operation Time | reads, writes, other, frees | milliseconds/operation |

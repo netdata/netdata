@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,6 +52,14 @@ func TestGenerationSnapshotsAndFreshness(t *testing.T) {
 	snap[0].Latest.Tests.Failed = 0
 	assert.Equal(t, 1, h.Snapshot(now)[0].Latest.Tests.Failed)
 	reg.SetState("running")
+	reg.SetSchedule(monitor.Status{
+		Scheduled: 3,
+		Admitted:  1,
+		Coalesced: 1,
+		Pending:   true,
+		QueuedUS:  now.UnixMicro(),
+	})
+	assert.Equal(t, time.Second, h.Snapshot(time.UnixMicro(now.UnixMicro()).Add(time.Second))[0].Schedule.QueueAge)
 	old := h.Snapshot(now.Add(1801 * time.Second))
 	assert.Equal(t, "running", old[0].State)
 	assert.False(t, old[0].Fresh)
@@ -59,7 +68,11 @@ func TestGenerationSnapshotsAndFreshness(t *testing.T) {
 	replacement, err := h.Register(job)
 	require.NoError(t, err)
 	reg.Complete(run)
+	reg.SetSchedule(monitor.Status{
+		Scheduled: 100,
+	})
 	reg.Retire()
+	assert.Zero(t, h.Snapshot(now)[0].Schedule.Scheduled)
 	assert.Nil(t, h.Snapshot(now)[0].Latest)
 	replacement.Retire()
 }

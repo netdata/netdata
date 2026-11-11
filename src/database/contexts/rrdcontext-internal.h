@@ -306,7 +306,10 @@ typedef struct rrdinstance {
     // belongs to, and whether the instance uses the chart's labels or its own. A chart re-created with the same
     // id takes the instance over (the conflict callbacks) while the old chart may still exist and be destroyed
     // later, on another thread, so its teardown must check under this lock that it still owns what it tears
-    // down. Nothing else is locked while holding it, except the labels lock in rrdlabels_flush().
+    // down. It also serializes the metadata the conflict callbacks swap (the instance's name, title, units, family,
+    // chart_type, priority, update_every, and the name of each of its metrics) against readers that take references
+    // to it: the context worker's merge and the *_dup() helpers used by queries and the APIs.
+    // Nothing else is locked while holding it, except the labels lock in rrdlabels_flush().
     SPINLOCK spinlock;
 } RRDINSTANCE;
 
@@ -317,6 +320,8 @@ static ALWAYS_INLINE RRDSET *rrdinstance_rrdset_atomic_load(RRDINSTANCE *ri) {
 static ALWAYS_INLINE void rrdinstance_rrdset_atomic_store(RRDINSTANCE *ri, RRDSET *st) {
     __atomic_store_n(&ri->rrdset, st, __ATOMIC_RELEASE);
 }
+
+RRDSET_ACQUIRED *rrdinstance_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria);
 
 typedef struct rrdcontext {
     uint64_t version;
@@ -335,6 +340,15 @@ typedef struct rrdcontext {
     time_t last_time_s;
 
     VERSIONED_CONTEXT_DATA hub;
+
+    // what hub.title/units/family point to: the last values sent to the hub. The context's own strings are
+    // replaced and freed by rrdcontext_merge_with() while hub still describes the last message, so the hub
+    // keeps its own references (rrdcontext_hub_strings_update_unsafe()). The id never changes.
+    struct {
+        STRING *title;
+        STRING *units;
+        STRING *family;
+    } hub_strings;
 
     DICTIONARY *rrdinstances;
     RRDHOST *rrdhost;
@@ -520,6 +534,10 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 #define rrdcontext_lock(rc) spinlock_lock(&((rc)->spinlock))
 #define rrdcontext_unlock(rc) spinlock_unlock(&((rc)->spinlock))
 
+// point rc->hub's strings to the context's current ones; the caller holds rrdcontext_lock(rc)
+// (or the context is not published yet)
+void rrdcontext_hub_strings_update_unsafe(RRDCONTEXT *rc);
+
 void rrdmetric_trigger_updates(RRDMETRIC *rm, const char *function);
 void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function);
 void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function);
@@ -552,7 +570,6 @@ void get_metric_retention_by_id(RRDHOST *host, UUIDMAP_ID id, time_t *min_first_
 void rrdcontext_delete_after_loading(RRDHOST *host, RRDCONTEXT *rc);
 void rrdcontext_initial_processing_after_loading(RRDCONTEXT *rc);
 
-RRDLABELS *rrdinstance_labels(RRDINSTANCE *ri);
 
 // Bump the dbengine-rotations counter that gates extreme-cardinality
 // protection. Called from rrdcontext_db_rotation(); the chart-cleanup

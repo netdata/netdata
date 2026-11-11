@@ -85,9 +85,10 @@ summary alone; distinguish intended contract from what the checked implementatio
   gates, so an actor-only payload passes; nothing in `pkg/topology` caps row counts.
 - Not checked by the Go validator although the contract states them: `actor_labels` key, value, source, and kind
   column types (only `actor_column` is type-checked), `search.label_keys[]` against any label registry (string shape
-  only), correlation `key_space` values (schema-required, never read), unknown optional column ids on `actor_table`
-  port sources, and the owner of a detail table named as an `actor_table` source by port bullets, modal sections, or
-  modal labels (a link- or evidence-owned table is accepted there).
+  only), correlation `key_space` values (schema-required, never read), unknown optional enrichment column ids on
+  `actor_table` port sources (`label_column` and `value_column` are checked on every source), and the owner of a
+  detail table named as an `actor_table` source by port bullets, modal sections, or modal labels (a link- or
+  evidence-owned table is accepted there).
 - The network-connections 64 MiB budget is a producer-side hard stop (a `413` Function error), not a validator check
   (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#network-connections-shape`).
 - The SNMP scenario golden suite skips, not fails, without the external fixture checkout
@@ -143,7 +144,8 @@ owners before design, while review checks the resulting contracts and evidence. 
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-modal-sections`,
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#snmpl2-shape` and
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#snmp-logical-l3-and-control-plane-links`,
-    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#vsphere-shape`.
+    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#vsphere-shape` and
+    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#cato-networks-shape`.
 11. Validate and measure: schema plus semantic validation in tests, the producer's own suites (table above), size
     on realistic data, and the checklist.
     Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#producer-checklist`.
@@ -157,6 +159,8 @@ owners before design, while review checks the resulting contracts and evidence. 
   logs, docs, SOWs, or review artifacts (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-shape`).
 - Sparse grouping columns: test that a consumer keeps actor identity for null or empty grouping keys instead of
   merging every null row into one bucket.
+- Parallel-link tests MUST hold endpoints and type/state constant while varying only the grouping identity.
+  Cover ID-bearing interfaces with equal names and name-only interfaces; removing a required `group_key` must fail.
 - Fail explicitly on any size or row limit; never truncate a topology and present it as complete.
 - Validators need negative tests: missing label-policy columns, non-display label columns, a missing port-bullet
   source table, bad highlight-path columns, an invalid token, and a modal projection over a missing source. A producer

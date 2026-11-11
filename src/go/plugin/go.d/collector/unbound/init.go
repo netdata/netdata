@@ -42,7 +42,7 @@ func (c *Collector) initConfig() (enabled bool) {
 }
 
 func (c *Collector) applyConfig(cfg *config.UnboundConfig) {
-	c.Infof("applying configuration: %s", cfg)
+	c.Info("applying configuration")
 	if cumulative, ok := cfg.Cumulative(); ok && cumulative != c.Cumulative {
 		c.Debugf("changing 'cumulative_stats': %v => %v", c.Cumulative, cumulative)
 		c.Cumulative = cumulative

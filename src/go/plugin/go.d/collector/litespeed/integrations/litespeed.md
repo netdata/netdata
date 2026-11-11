@@ -40,9 +40,6 @@ This collector only supports collecting metrics from a single instance of this i
 
 If no configuration is present, the collector will attempt to read files under /tmp/lshttpd/.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

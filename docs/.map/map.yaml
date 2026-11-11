@@ -457,6 +457,12 @@ sidebar:
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/ecr-mirror.md
           description: Mirror Netdata Cloud On-Prem container images from Amazon ECR into a private registry for restricted environments.
       - meta:
+          label: High Availability and Disaster Recovery
+          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/high-availability-and-disaster-recovery.md
+      - meta:
+          label: Netdata AI
+          edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/netdata-ai.md
+      - meta:
           label: Troubleshooting
           edit_url: https://github.com/netdata/netdata-cloud-onprem/edit/master/docs/learn.netdata.cloud/troubleshooting.md
       - meta:

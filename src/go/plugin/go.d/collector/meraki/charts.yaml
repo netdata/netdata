@@ -1,0 +1,129 @@
+version: v1
+context_namespace: meraki
+groups:
+  - family: Organization
+    metrics: [organization_assigned_devices]
+    charts:
+      - title: Meraki Assigned Devices
+        context: organization_assigned_devices
+        units: devices
+        instances:
+          by_labels: [organization_id]
+        dimensions:
+          - selector: organization_assigned_devices
+            name: assigned
+  - family: Device
+    metrics: [device_assigned, device_availability_status]
+    charts:
+      - title: Meraki Device Inventory Membership
+        context: device_assigned
+        units: devices
+        dimensions:
+          - selector: device_assigned
+            name: assigned
+      - title: Meraki Device Availability
+        context: device_availability
+        units: status
+        type: stacked
+        dimensions:
+          - selector: device_availability_status
+  - family: Switch Ports
+    metrics:
+      - switch_port_traffic_sent
+      - switch_port_traffic_received
+      - switch_port_traffic_interval_age
+      - switch_port_packets_sent
+      - switch_port_packets_received
+    chart_defaults:
+      instances:
+        by_labels: [port_id]
+    charts:
+      - title: Meraki Switch Port Traffic
+        context: switch_port_traffic
+        units: kilobits/s
+        type: area
+        dimensions:
+          - selector: switch_port_traffic_received
+            name: received
+          - selector: switch_port_traffic_sent
+            name: sent
+            options:
+              multiplier: -1
+      - title: Meraki Switch Port Traffic Interval Age
+        context: switch_port_traffic_interval_age
+        units: seconds
+        dimensions:
+          - selector: switch_port_traffic_interval_age
+            name: age
+      - title: Meraki Switch Port Packets
+        context: switch_port_packets
+        units: packets/s
+        dimensions:
+          - selector: switch_port_packets_received
+            name: received
+          - selector: switch_port_packets_sent
+            name: sent
+            options:
+              multiplier: -1
+  - family: Appliance Uplinks
+    metrics: [appliance_uplink_traffic_sent, appliance_uplink_traffic_received]
+    charts:
+      - title: Meraki Appliance Uplink Traffic
+        context: appliance_uplink_traffic
+        units: kilobits/s
+        type: area
+        instances:
+          by_labels: [organization_id, network_id, interface]
+        dimensions:
+          - selector: appliance_uplink_traffic_received
+            name: received
+          - selector: appliance_uplink_traffic_sent
+            name: sent
+            options:
+              multiplier: -1
+  - family: Appliance Health
+    groups:
+      - family: Device Reports
+        metrics: [appliance_report_age]
+        charts:
+          - title: Meraki Appliance Last Report Age
+            context: appliance_report_age
+            units: seconds
+            dimensions:
+              - selector: appliance_report_age
+                name: age
+      - family: Uplink Status
+        metrics: [appliance_uplink_status]
+        charts:
+          - title: Meraki Appliance Uplink Status
+            context: appliance_uplink_status
+            units: status
+            type: stacked
+            instances:
+              by_labels: [interface]
+            dimensions:
+              - selector: appliance_uplink_status
+      - family: ICMP Probes
+        metrics: [appliance_uplink_packet_loss, appliance_uplink_latency, appliance_uplink_sample_age]
+        chart_defaults:
+          instances:
+            by_labels: [interface, destination_ip]
+        charts:
+          - title: Meraki Appliance Uplink ICMP Packet Loss
+            context: appliance_uplink_packet_loss
+            units: percentage
+            dimensions:
+              - selector: appliance_uplink_packet_loss
+                name: loss
+          - title: Meraki Appliance Uplink ICMP Latency
+            context: appliance_uplink_latency
+            units: milliseconds
+            dimensions:
+              - selector: appliance_uplink_latency
+                name: latency
+          - title: Meraki Appliance Uplink ICMP Sample Age
+            context: appliance_uplink_sample_age
+            units: seconds
+            dimensions:
+              - selector: appliance_uplink_sample_age
+                name: age

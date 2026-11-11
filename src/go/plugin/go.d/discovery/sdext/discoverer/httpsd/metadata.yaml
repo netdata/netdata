@@ -26,8 +26,8 @@ overview:
     1. **Fetches** the configured `url` over HTTP/HTTPS, honouring all standard go.d collector HTTP options (auth, headers, TLS, proxy, timeout).
     2. **Decodes** the response as either JSON or YAML according to `format` (auto / json / yaml). With `format: auto`, the decoder uses `Content-Type` if it is unambiguous, otherwise tries JSON first then YAML.
     3. **Accepts two shapes** at the top level: a bare array (`[ item, item, … ]`) **or** an envelope (`{ "items": [ … ] }`). Anything else is rejected.
-    4. **Builds one target per array element**, exposing `.Item` (the decoded element — could be a string, a map, a number, …), `.TUID`, and `.Hash`.
-    5. **Runs the `services:` rules** against each target. The default stock rule passes the item through unchanged via the `toYaml` helper, so an endpoint that already serves go.d job configurations works with zero rule authoring.
+    4. **Validates each item as a map or string**, then builds one target per item, exposing `.Item`, `.TUID`, and `.Hash`. Any other item type rejects the entire response before service rules run. Maps may contain nested values.
+    5. **Runs the `services:` rules** against each target. The default stock rule passes the item through unchanged via the `job` helper, so an endpoint that already serves go.d job configurations works with zero rule authoring.
     6. **Reconciles** disappeared items — when a target is no longer in the response, the corresponding job stops on the next reconcile.
   limitations: |
     - Only **one URL per pipeline**. To pull from multiple sources, configure multiple HTTP discovery pipelines (each as its own UI entry, or split the file into one job per source).
@@ -36,16 +36,16 @@ overview:
     - **One-shot mode** (`interval: 0`) fetches a single time when the pipeline starts. It does **not** refetch on SD reload — recreate the pipeline to refresh.
     - A missing **`bearer_token_file`** under `/var/run/secrets/` is treated as optional when Netdata is **not** running in Kubernetes (so the same config can be used in a Helm deployment without erroring out on dev hosts).
     - Configured bearer-token and TLS files have [file-safety requirements](#option-headers-username-password-bearer-token-file-proxy-url-tls-skip-verify-etc).
-    - The discoverer does not introspect the items it received — anything beyond what the upstream endpoint provides must be inferred via service rules.
+    - The discoverer does not fetch additional metadata for items — anything beyond what the upstream endpoint provides must be inferred via service rules.
 setup:
   prerequisites:
     list:
       - title: 'Endpoint that returns JSON or YAML'
         description: |
-          Stand up an HTTP endpoint that returns either a top-level array (`[ "https://a/health", "https://b/health" ]`) or an envelope (`{ "items": [...] }`). Items can be primitives (strings, numbers), maps, or any nestable value the rule engine knows how to consume.
+          Stand up an HTTP endpoint that returns either a top-level array (`[ "https://a/health", "https://b/health" ]`) or an envelope (`{ "items": [...] }`). Each item must be a map or string; maps can contain nested structures.
       - title: 'Choose a pass-through vs. curated approach'
         description: |
-          - **Pass-through**: have your endpoint emit ready-made go.d job configurations and use the stock rule, which renders each item directly via `toYaml`. Zero rule authoring on the Netdata side.
+          - **Pass-through**: have your endpoint emit ready-made go.d job configurations and use the stock rule, which submits each item directly via `job`. Zero rule authoring on the Netdata side.
           - **Curated**: have your endpoint emit raw data (URLs, hostnames, tags) and write `services:` rules that map the data to the right collector module. More work, more flexibility.
   configuration:
     file:
@@ -113,7 +113,7 @@ setup:
       list:
         - name: 'Pass-through go.d jobs (stock rule)'
           description: |
-            The endpoint serves go.d job configurations directly. Each item must include a `module` field. The stock rule pipes the item through `toYaml` unchanged.
+            The endpoint serves go.d job configurations directly. Each item must include a `module` field. The stock rule submits a copy of the item with `job`.
           config: |
             disabled: no
             discoverer:
@@ -125,7 +125,7 @@ setup:
               - id: passthrough
                 match: '{{ true }}'
                 config_template: |
-                  {{ .Item | toYaml }}
+                  {{ job .Item }}
         - name: 'Array of bare URLs → httpcheck'
           description: |
             The endpoint returns `[ "https://a/health", "https://b/health" ]`. Map each URL to an `httpcheck` job.
@@ -139,8 +139,7 @@ setup:
               - id: httpcheck
                 match: '{{ kindIs "string" .Item }}'
                 config_template: |
-                  name: {{ .TUID }}
-                  url: {{ .Item }}
+                  {{ job "name" .TUID "url" .Item }}
         - name: 'Array of objects with custom shape'
           description: |
             The endpoint returns `[ { "name": "api", "url": "https://api.example.com/health" }, … ]`.
@@ -153,8 +152,7 @@ setup:
               - id: httpcheck
                 match: '{{ and (kindIs "map" .Item) (hasKey .Item "url") }}'
                 config_template: |
-                  name: {{ .Item.name }}
-                  url: {{ .Item.url }}
+                  {{ job "name" .Item.name "url" .Item.url }}
         - name: 'Bearer-token authentication'
           description: 'Authenticate against the source-of-truth endpoint using a bearer token from a file.'
           config: |
@@ -169,22 +167,22 @@ setup:
               - id: passthrough
                 match: '{{ true }}'
                 config_template: |
-                  {{ .Item | toYaml }}
+                  {{ job .Item }}
 services:
   description: |
-    A `services:` rule turns each fetched item into one or more collector jobs. The HTTP discoverer is unique among SD discoverers in that the target's data shape is **defined by the upstream endpoint**, not by this discoverer — `.Item` is whatever JSON/YAML element the endpoint returned.
+    A `services:` rule turns each fetched item into one or more collector jobs. The upstream endpoint supplies each `.Item` as a map or string. For maps, the endpoint defines the fields and their values.
 
-    The shared rule model — function reference (`match`, sprig including `kindIs`/`hasKey`/`toYaml`), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are HTTP-specific.
+    The shared rule model — function reference (`match`, sprig including `kindIs`/`hasKey`, and the `job` helper), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are HTTP-specific.
   evaluation:
     description: |
       Quick reference — see [Rule evaluation semantics](/src/collectors/SERVICE-DISCOVERY.md#rule-evaluation-semantics) on the hub page for the full model.
     list:
       - name: 'Type-check `.Item` first'
         description: |
-          Because `.Item` is whatever the endpoint serves, write defensive rules that check the type before reading sub-fields. `kindIs "string" .Item`, `kindIs "map" .Item`, and `hasKey .Item "<key>"` are the workhorses. A rule that does `{{ .Item.url }}` on a non-map item will fail at template-render time (`missingkey=error`) and the rule will be skipped.
+          Because the endpoint can supply maps or strings, check the type before reading sub-fields. `kindIs "string" .Item`, `kindIs "map" .Item`, and `hasKey .Item "<key>"` are the workhorses. A rule that does `{{ .Item.url }}` on a string item will fail at template-render time and the rule will be skipped.
       - name: 'Pass-through requires `module:` in the upstream payload'
         description: |
-          The pass-through rule (`{{ .Item | toYaml }}`) forwards the item unchanged to the collector subsystem. The collector subsystem requires every job to have `name:` and `module:`. If your endpoint omits `module:`, the resulting job has no module and the agent rejects it. Either include `module:` upstream or wrap with a curated rule that adds it.
+          The pass-through rule (`{{ job .Item }}`) forwards the item unchanged to the collector subsystem. The collector subsystem requires every job to have `name:` and `module:`. If your endpoint omits `module:`, the rule ID `passthrough` becomes the module name, which does not identify a collector, and the agent rejects it. Either include `module:` upstream or wrap with a curated rule that adds it.
       - name: 'Module inference from rule id'
         description: |
           When you write a curated rule and the rendered job omits `module:`, the rule `id` is used as the module name. So `id: httpcheck` is enough to produce httpcheck jobs without writing `module: httpcheck` in every template.
@@ -192,8 +190,8 @@ services:
     description: 'Available inside both `match` expressions and `config_template` bodies for HTTP targets.'
     list:
       - name: '.Item'
-        type: 'any'
-        description: 'The decoded array element. Type depends on the upstream endpoint — could be a string, a number, a bool, a map, or a nested structure. Always type-check before reading sub-fields.'
+        type: 'map or string'
+        description: 'The decoded map or string from the upstream endpoint. Map fields may contain nested values. Check the item type before reading sub-fields.'
       - name: '.TUID'
         type: 'string'
         description: |
@@ -206,12 +204,12 @@ services:
     list:
       - name: 'Pass-through (default stock rule)'
         description: |
-          The endpoint already returns valid go.d job configurations. Forward each item unchanged via `toYaml`. Each item **must** include a `module` field (and `name`).
+          The endpoint already returns valid go.d job configurations. Forward each item with `job`. Each item **must** include a `module` field (and `name`).
         config: |
           - id: passthrough
             match: '{{ true }}'
             config_template: |
-              {{ .Item | toYaml }}
+              {{ job .Item }}
       - name: 'Array of strings → httpcheck (curated)'
         description: |
           Endpoint serves `[ "https://a/health", "https://b/health" ]`. Use `kindIs "string"` to gate the rule, then map each string to an `httpcheck` job. `id: httpcheck` makes the module infer automatically.
@@ -219,8 +217,7 @@ services:
           - id: httpcheck
             match: '{{ kindIs "string" .Item }}'
             config_template: |
-              name: {{ .TUID }}
-              url: {{ .Item }}
+              {{ job "name" .TUID "url" .Item }}
       - name: 'Array of objects → httpcheck (curated)'
         description: |
           Endpoint serves `[ { "name": "api", "url": "https://api/health" }, … ]`. Type-check that the item is a map and has a `url` key, then map fields into the rendered job.
@@ -228,8 +225,7 @@ services:
           - id: httpcheck
             match: '{{ and (kindIs "map" .Item) (hasKey .Item "url") }}'
             config_template: |
-              name: {{ .Item.name }}
-              url: {{ .Item.url }}
+              {{ job "name" .Item.name "url" .Item.url }}
       - name: 'Multiple modules from one endpoint'
         description: |
           Your endpoint mixes shapes — some items target `httpcheck`, some target `prometheus`. Use `hasKey` to discriminate, with each rule producing its own module's jobs.
@@ -237,14 +233,12 @@ services:
           - id: prometheus
             match: '{{ and (kindIs "map" .Item) (hasKey .Item "metrics_url") }}'
             config_template: |
-              name: {{ .Item.name }}
-              url: {{ .Item.metrics_url }}
+              {{ job "name" .Item.name "url" .Item.metrics_url }}
 
           - id: httpcheck
             match: '{{ and (kindIs "map" .Item) (hasKey .Item "health_url") }}'
             config_template: |
-              name: {{ .Item.name }}
-              url: {{ .Item.health_url }}
+              {{ job "name" .Item.name "url" .Item.health_url }}
 verify:
   description: 'After enabling the discoverer, confirm the endpoint is reachable and items are being parsed.'
   checks:
@@ -283,7 +277,7 @@ troubleshooting:
           The response is neither valid JSON nor valid YAML. Common causes: the endpoint returned an HTML error page (check status code and `Content-Type`), the JSON has trailing garbage, or YAML indentation is wrong. Reproduce with `curl -i` to see the headers + body.
       - name: 'Items decoded but no jobs created'
         description: |
-          Your `services:` rules are not matching, or they match but the rendered template is empty. With pass-through (`{{ .Item | toYaml }}`), make sure each upstream item includes `module:` and `name:`. With curated rules, double-check the type checks (`kindIs`, `hasKey`).
+          Your `services:` rules are not matching, or they match but the template creates no jobs. With pass-through (`{{ job .Item }}`), make sure each upstream item includes `module:` and `name:`. With curated rules, double-check the type checks (`kindIs`, `hasKey`).
       - name: 'TLS/certificate errors against an internal endpoint'
         description: |
           Use `tls_skip_verify: yes` to bypass for testing, then mount the issuing CA and set `tls_ca: /path/to/ca.crt` for production.

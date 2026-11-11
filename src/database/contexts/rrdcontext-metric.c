@@ -9,24 +9,20 @@ inline const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma) {
     return string2str(rm->id);
 }
 
-inline const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma) {
-    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
-    return string2str(rm->name);
-}
-
-inline bool rrdmetric_acquired_has_name(RRDMETRIC_ACQUIRED *rma) {
-    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
-    return (rm->name && rm->name != rm->id);
-}
-
 inline STRING *rrdmetric_acquired_id_dup(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     return string_dup(rm->id);
 }
 
-inline STRING *rrdmetric_acquired_name_dup(RRDMETRIC_ACQUIRED *rma) {
+// The id never changes, but the name is replaced while the metric is in use (rrdmetric_conflict_callback())
+// and the replaced string is freed. Holding the metric does not keep its current name alive: readers take
+// their own reference under the instance spinlock, which the writer holds while it swaps it.
+STRING *rrdmetric_acquired_name_dup(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
-    return string_dup(rm->name);
+    spinlock_lock(&rm->ri->spinlock);
+    STRING *name = string_dup(rm->name);
+    spinlock_unlock(&rm->ri->spinlock);
+    return name;
 }
 
 inline NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *rma) {
@@ -39,6 +35,14 @@ inline NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *r
     }
 
     return NAN;
+}
+
+// The same classification the query makes (query_target.c): read from the
+// RRDMETRIC's published algorithm, so a caller deciding units outside the
+// query path cannot disagree with the query about what it just summed.
+inline bool rrdmetric_acquired_stored_as_rates(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    return rrdmetric_algorithm_atomic_load(rm) == RRD_ALGORITHM_INCREMENTAL;
 }
 
 inline bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE_ACQUIRED *ria) {
@@ -168,12 +172,14 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
             rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
 
-    spinlock_unlock(&rm->ri->spinlock);
-
+    // readers take their references to the name under the instance spinlock (rrdmetric_acquired_name_dup()),
+    // before the old one is released with rm_new
     if(rm->name != rm_new->name) {
         SWAP(rm->name, rm_new->name);
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
+
+    spinlock_unlock(&rm->ri->spinlock);
 
     if(rrdmetric_algorithm_atomic_load(rm) != rm_new->algorithm) {
         rrdmetric_algorithm_atomic_store(rm, rm_new->algorithm);

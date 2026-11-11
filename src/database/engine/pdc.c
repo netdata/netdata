@@ -1095,9 +1095,14 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
                 pd = *pd_pptr;
                 start_time_s = pd->first_time_s;
                 end_time_s = pd->last_time_s;
-                METRIC *metric = (METRIC *)pd->metric_id;
-                nd_uuid_t *u = mrg_metric_uuid(main_mrg, metric);
-                uuid_unparse_lower(*u, uuid);
+
+                // pd->metric_id is the metric's UUIDMAP_ID (mrg_metric_id()) and nothing here holds a
+                // reference to it: uuidmap_uuid() copies under the map lock and only misses on a dead id
+                nd_uuid_t u;
+                if(uuidmap_uuid((UUIDMAP_ID)pd->metric_id, u))
+                    uuid_unparse_lower(u, uuid);
+                else
+                    snprintfz(uuid, sizeof(uuid), "id:%u", (unsigned)pd->metric_id);
                 used_epdl = true;
             }
         }

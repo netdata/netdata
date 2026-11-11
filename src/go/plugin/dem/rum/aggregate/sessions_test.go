@@ -274,7 +274,7 @@ func TestElementsFrustrationAndUser(t *testing.T) {
 	if len(texts) != 2 || texts[0] != "poor LCP 5200 ms on #hero img" || texts[1] != "rage click on button#buy" {
 		t.Fatalf("timeline = %v", texts)
 	}
-	pages := a.Pages()
+	pages := a.Pages("")
 	if len(pages) != 1 || pages[0].LCPElement != "#hero img" || pages[0].FrustrationWindow != 1 {
 		t.Fatalf("pages = %+v", pages)
 	}

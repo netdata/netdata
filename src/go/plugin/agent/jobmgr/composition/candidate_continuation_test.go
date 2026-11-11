@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -121,24 +122,28 @@ func TestCandidateContinuationFailedTrialsKeepLogicalBinding(t *testing.T) {
 	for _, version := range []string{"v1", "v2"} {
 		for mode, auto := range map[string]bool{"daemon-enable": false, "automatic": true} {
 			t.Run(version+"/"+mode, func(t *testing.T) {
-				configs := continuationConfigs(true)
-				state := &continuationCollectorState{check: func(context.Context, string) error {
-					return errors.New("endpoint unavailable")
-				}}
-				fixture := newContinuationFixture(t, version, auto, state, configs)
-				fixture.enableIfPassive(auto)
-				require.Eventually(t, func() bool { return len(state.checked()) == 2 }, time.Second, time.Millisecond)
-				fixture.waitStatus(dyncfg.StatusFailed)
-				fixture.assertExposed("failed-binding", configs[0])
-				fixture.assertLastMetadata(configs[0])
-				require.Equal(t, []string{configs[0]["option_str"].(string), configs[1]["option_str"].(string)}, state.checked())
-				require.Zero(t, state.active.Load())
+				synctest.Test(t, func(t *testing.T) {
+					configs := continuationConfigs(true)
+					state := &continuationCollectorState{check: func(context.Context, string) error {
+						return errors.New("endpoint unavailable")
+					}}
+					fixture := newContinuationFixture(t, version, auto, state, configs)
+					fixture.enableIfPassive(auto)
+					// Check entry and the first trial's Failed status do not prove the
+					// sibling outcome committed. RESTART would interrupt and resume it.
+					synctest.Wait()
+					fixture.waitStatus(dyncfg.StatusFailed)
+					fixture.assertExposed("failed-binding", configs[0])
+					fixture.assertLastMetadata(configs[0])
+					require.Equal(t, []string{configs[0]["option_str"].(string), configs[1]["option_str"].(string)}, state.checked())
+					require.Zero(t, state.active.Load())
 
-				// Stored-config commands target the logical binding, not a failed trial.
-				fixture.command("restart-bound", "restart", 422)
-				require.Equal(t, []string{configs[0]["option_str"].(string), configs[1]["option_str"].(string), configs[0]["option_str"].(string)}, state.checked())
-				fixture.assertExposed("after-restart", configs[0])
-				require.NoError(t, fixture.generation.run.DirtyCause())
+					// Stored-config commands target the logical binding, not a failed trial.
+					fixture.command("restart-bound", "restart", 422)
+					require.Equal(t, []string{configs[0]["option_str"].(string), configs[1]["option_str"].(string), configs[0]["option_str"].(string)}, state.checked())
+					fixture.assertExposed("after-restart", configs[0])
+					require.NoError(t, fixture.generation.run.DirtyCause())
+				})
 			})
 		}
 	}

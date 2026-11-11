@@ -32,7 +32,9 @@ Even a temporary store is preserved on close when unverified work remains.
 Same-UID or root tampering with the private store is outside the ownership model.
 
 A nonempty publication writes a Go-authored manifest containing `job_id`, `run_id`,
-`published_us` and artifact membership. No-capture finalization cleans drained work
+`published_us`, optional `vnode_guid` and artifact membership. `Begin` snapshots the
+resolved canonical vnode GUID supplied by the job at attempt admission; moving a job later does not relabel retained
+captures. Older manifests without `vnode_guid` remain unassigned. No-capture finalization cleans drained work
 without creating a persistent empty manifest. `Manifest` and `Fetch` require the
 owning JobID; the manifest authorizes membership independently of journal history.
 History is only a fallback explanation for an absent capture set, never byte access.
@@ -56,7 +58,9 @@ blocks deletion. Unknown work is never deleted through age or PID inference.
 
 `Catalogue` reads metadata and file sizes, not payload contents. It returns sets
 newest first with `(published_us, run_id)` keyset pagination; retention may remove
-sets between pages. Its global storage snapshot is independent of filters and
+sets between pages. Optional job and vnode GUID filters select matching sets together;
+vnode selection does not change ownership, retention preference or byte access.
+Its global storage snapshot is independent of filters and
 pages: effective policy, observation time, retained/workspace/unclassified/deleting
 byte observations, known set/job counts, and cleanup attempt/success/error state.
 Unreadable categories return unknown bytes plus an error, not a misleading zero.

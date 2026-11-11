@@ -38,11 +38,8 @@ The plugin needs setuid because it loads data inside the kernel. Netdata sets th
 
 #### Auto-Detection
 
-The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and selects the best available BPF object flavor (arena, buffer, or base) for the running kernel.
+The plugin checks CONFIG_BPF and CONFIG_BPF_SYSCALL and selects the best available BPF object flavor (arena, buffer ring, or legacy) for the running kernel. DNS uses socket filters and does not require CONFIG_KPROBES.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -55,7 +52,7 @@ The BPF socket filter runs in the kernel for every received Ethernet frame. Over
 
 #### Compile kernel
 
-Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different according to the preferences of Linux distributions.
+Check that your kernel was compiled with CONFIG_BPF and CONFIG_BPF_SYSCALL. Look in `/proc/config.gz` or a `/boot/config-*` file; CONFIG_BPF_JIT is optional.
 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well defined pattern, but distributions can deliver their configuration files
 with different names.
 

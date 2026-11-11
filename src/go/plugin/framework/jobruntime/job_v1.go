@@ -157,6 +157,7 @@ type Job struct {
 	// vnodeMu covers current vnode state while collection refreshes it.
 	vnodeMu               sync.RWMutex
 	vnode                 vnodes.VirtualNode
+	generatedVnode        bool // adopted from the collector, rather than supplied configuration
 	vnodeName             string
 	vnodeRevision         uint64
 	vnodeMetadataRevision uint64
@@ -266,6 +267,42 @@ func (j *Job) autoDetection(ctx context.Context) (err error) {
 	}
 
 	return nil
+}
+
+func (j *Job) refreshGeneratedVnode() {
+	if j.vnodeName != "" || j.vnode.GUID != "" && !j.generatedVnode {
+		return
+	}
+	vnode := j.module.VirtualNode()
+	if vnode == nil || vnode.GUID == "" || vnode.Hostname == "" {
+		return
+	}
+	next := *vnode
+	if j.generatedVnode {
+		if next.GUID != j.vnode.GUID && hostoutput.GUIDKey(next.GUID) != hostoutput.GUIDKey(j.vnode.GUID) {
+			return
+		}
+		// Metadata refresh must not change the adopted routing identity or its spelling.
+		next.GUID = j.vnode.GUID
+	}
+	if j.vnode.Equal(&next) {
+		return
+	}
+	if j.generatedVnode {
+		// An unusable refresh must not interrupt collection on the adopted target.
+		if _, err := hostoutput.NewDefinition(netdataapi.HostInfo{
+			GUID:     next.GUID,
+			Hostname: next.Hostname,
+			Labels:   next.HostLabels(),
+		}); err != nil {
+			return
+		}
+	}
+	snapshot := next.Copy()
+	j.vnodeMu.Lock()
+	j.vnode = *snapshot
+	j.generatedVnode = true
+	j.vnodeMu.Unlock()
 }
 
 func (j *Job) refreshVnodeSnapshot() {
@@ -469,13 +506,7 @@ func (j *Job) runOnce() {
 	if j.panicked.Load() {
 		return
 	}
-	if j.vnodeName == "" && j.vnode.GUID == "" {
-		if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
-			j.vnodeMu.Lock()
-			j.vnode = *v.Copy()
-			j.vnodeMu.Unlock()
-		}
-	}
+	j.refreshGeneratedVnode()
 	tx, err := j.prepareEmission(curTime)
 	if err != nil {
 		j.retries.Add(1)
@@ -585,10 +616,3 @@ func cleanPluginName(name string) string {
 	r := strings.NewReplacer(" ", "_", ".", "_")
 	return r.Replace(name)
 }
-
-var lblValueReplacer = strings.NewReplacer(
-	"'", "",
-	"\n", " ",
-	"\r", " ",
-	"\x00", "",
-)

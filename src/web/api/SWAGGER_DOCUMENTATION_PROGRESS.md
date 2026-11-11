@@ -2664,7 +2664,7 @@ Per dimension:
 2. ✅ `timeout` - integer, optional - Execution timeout in seconds
 
 #### Request Body:
-3. ✅ `payload` - string/JSON, optional - Function-specific input data (Content-Type: text/plain or application/json)
+3. ✅ `payload` - JSON, optional - Function-specific input data; must be a strict JSON document (non-JSON payloads are rejected with HTTP 400)
 
 #### Derived/Internal Parameters (from function name parsing):
 4. ✅ `node_id` - UUID (derived from function name pattern)
@@ -2672,7 +2672,7 @@ Per dimension:
 6. ✅ `instance` - string (derived from function name pattern)
 7. ✅ `source` - string (local, global, or node-specific)
 8. ✅ `transaction` - UUID (internally generated for tracking)
-9. ✅ `content_type` - string (from request Content-Type header)
+9. ✅ `content_type` - string (always `application/json` when forwarded to plugins)
 10. ✅ `progress` - boolean (internally managed execution state)
 11. ✅ `cancellable` - boolean (function capability flag)
 
@@ -2919,18 +2919,18 @@ Per dimension:
 - ACCESS: `HTTP_ACCESS_ANONYMOUS_DATA`
 
 ### PARAMETERS (1 total)
-1. ✅ `file` - string, required - Settings filename (alphanumerics, dashes, underscores). Anonymous users restricted to 'default', authenticated users (bearer token) can use any valid filename.
+1. ✅ `file` - string, optional - Only `default` is supported (omitted or empty = `default`); any other value returns 400. There is one Agent-wide object shared by every admitted caller, anonymous or bearer.
 
 ### HTTP METHODS SUPPORTED (2 total)
-1. ✅ `GET` - Retrieve a settings file
-2. ✅ `PUT` - Create or update a settings file
+1. ✅ `GET` - Retrieve the settings object
+2. ✅ `PUT` - Create or update the settings object
 
 ### REQUEST BODY (PUT only)
 **Content-Type:** `application/json`
 **Max Size:** 20 MiB (20,971,520 bytes)
 
 **Required Fields:**
-1. ✅ `version` - integer, required - Version number of the existing file (for conflict detection)
+1. ✅ `version` - integer, required - Positive JSON integer equal to the stored version, 1 when nothing is stored (for conflict detection); other types return 400
 
 **Optional Fields:**
 - Any additional JSON fields (user-defined)
@@ -2939,23 +2939,25 @@ Per dimension:
 1. ✅ `version` - integer - Current version number of the settings file (minimum 1)
 2. ✅ `[user-defined fields]` - any - Additional fields stored in the settings file
 
-### RESPONSE FIELDS - PUT SUCCESS (1 total)
-1. ✅ `message` - string - "OK"
+### RESPONSE FIELDS - PUT SUCCESS (2 total)
+1. ✅ `status` - integer - 200
+2. ✅ `errorMessage` - string - "OK"
 
 ### ERROR RESPONSES
 **All error responses contain:**
-1. ✅ `message` - string - Error description
+1. ✅ `status` - integer - HTTP status code
+2. ✅ `errorMessage` - string - Error description
 
 **Possible Error Scenarios:**
-- `400 Bad Request` - Invalid file parameter, invalid host, missing version in payload, invalid JSON payload, missing payload on PUT, unauthorized file access for anonymous users, invalid HTTP method
+- `400 Bad Request` - `file` other than `default`, invalid host, missing, non-integer or non-incrementable version in payload, invalid JSON payload, missing payload on PUT, invalid HTTP method
 - `409 Conflict` - Version mismatch (caller must reload and reapply changes)
 - `413 Payload Too Large` - PUT payload exceeds 20 MiB (20,971,520 bytes)
 - `500 Internal Server Error` - Settings path creation failure, file I/O errors
 
 ### SPECIAL BEHAVIORS
 1. ✅ **Version Auto-Increment** - Netdata increments version on successful PUT
-2. ✅ **Default Settings** - Returns `{"version": 1}` if file doesn't exist or cannot be parsed
-3. ✅ **Anonymous User Restriction** - Non-bearer-token users limited to 'default' file only
+2. ✅ **Default Settings** - Returns `{"version": 1}` if the object doesn't exist, cannot be parsed, or its version is not an integer from 1 to 9223372036854775806
+3. ✅ **Single Shared Object** - Every caller (anonymous or bearer) reads and writes the same `default` object
 4. ✅ **Host Restriction** - API only works on localhost (agent node), not child nodes
 5. ✅ **Optimistic Locking** - PUT requires current version to prevent concurrent modification conflicts
 
@@ -2964,11 +2966,11 @@ Per dimension:
 **HTTP Methods Verified:** 2
 **Request Body Fields (PUT):** 1 required + unlimited optional
 **Response Fields (GET):** 1 guaranteed + user-defined
-**Response Fields (PUT):** 1
-**Error Response Fields:** 1
+**Response Fields (PUT):** 2
+**Error Response Fields:** 2
 **Security:** ACL=HTTP_ACL_DASHBOARD + ACCESS=HTTP_ACCESS_ANONYMOUS_DATA
 **Max Payload Size:** 20 MiB (20,971,520 bytes); larger PUT payloads return 413
-**File Storage:** `{varlib}/settings/{file}`
+**File Storage:** `{varlib}/settings/default`
 **Dual-Agent Agreement:** ✅ Agent confirmed optimistic locking settings storage structure
 
 ---
@@ -3181,20 +3183,20 @@ Per dimension:
 ## `/api/v3/bearer_protection` - COMPLETE ENUMERATED CHECKLIST ✅
 
 **Source Code Locations:**
-- Registration: `src/web/api/web_api_v3.c:225-230`
-- Implementation: `src/web/api/v2/api_v2_bearer.c:21-70`
+- Registration: `src/web/api/web_api_v3.c:227-234`
+- Implementation: `src/web/api/v2/api_v2_bearer.c:21-85`
 
 **Security Configuration:**
 - ACL: `HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS`
 - ACCESS: `HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG | HTTP_ACCESS_EDIT_AGENT_CONFIG`
 
 ### PARAMETERS (4 total)
-1. ✅ `bearer_protection` - string, optional - Enable/disable bearer protection. Accepts: "on", "true", "yes" (enables), any other value (disables). Defaults to current `netdata_is_protected_by_bearer` value if not provided.
+1. ✅ `bearer_protection` - string, optional - Enable/disable bearer protection. Accepts (case-insensitive): "on", "true", "yes" (enables), "off", "false", "no" (disables); any other value returns HTTP 400 and leaves the state unchanged. If omitted or empty, the state is not changed.
 2. ✅ `machine_guid` - string, required - The machine GUID of the agent. Must match the local agent's `machine_guid` exactly.
 3. ✅ `claim_id` - string, required - The claim ID of the agent. Must match the local agent's claim ID via `claim_id_matches()`.
 4. ✅ `node_id` - string, required - The node UUID of the agent. Must match the local agent's `node_id` in lowercase UUID format.
 
-### RESPONSE FIELDS (3 total)
+### RESPONSE FIELDS (4 total)
 
 **Success Response (HTTP 200):**
 1. ✅ `bearer_protection` - boolean - Current state of bearer protection after the operation
@@ -3205,9 +3207,12 @@ Per dimension:
 **Error Response - Invalid UUIDs (HTTP 400):**
 1. ✅ `(error message)` - string - Plain text: "The request is missing or not matching local UUIDs"
 
+**Error Response - Invalid bearer_protection value (HTTP 400, checked after the identity checks):**
+1. ✅ `(error message)` - string - Plain text: "Invalid bearer_protection value; use on/off, true/false or yes/no"
+
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 4 (1 optional + 3 required)
-**Response Fields Verified:** 3 (1 JSON + 2 error messages)
+**Response Fields Verified:** 4 (1 JSON + 3 error messages)
 **Security:** `HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS` + `SIGNED_ID + SAME_SPACE + VIEW_AGENT_CONFIG + EDIT_AGENT_CONFIG`
 **HTTP Method:** GET (query parameters via URL parsing)
 **Dual-Agent Agreement:** ✅ Agent confirmed bearer token protection management structure
@@ -3216,7 +3221,7 @@ Per dimension:
 - Uses `api_v2_bearer_protection` callback (shared between v2 and v3)
 - Validates claim ID via `claim_id_matches()`
 - Validates UUIDs via internal `verify_host_uuids()` function
-- Sets global `netdata_is_protected_by_bearer` variable
+- Sets global `netdata_is_protected_by_bearer` variable only when a valid value is given
 - Success response is JSON, error responses are plain text
 
 ---
@@ -3224,9 +3229,9 @@ Per dimension:
 ## `/api/v3/bearer_get_token` - COMPLETE ENUMERATED CHECKLIST ✅
 
 **Source Code Locations:**
-- Registration: `src/web/api/web_api_v3.c:233-238`
-- Implementation: `src/web/api/v2/api_v2_bearer.c:93-139`
-- Helper Function: `src/web/api/v2/api_v2_bearer.c:72-91`
+- Registration: `src/web/api/web_api_v3.c:235-242`
+- Implementation: `src/web/api/v2/api_v2_bearer.c:112-158`
+- Helper Function: `src/web/api/v2/api_v2_bearer.c:87-110`
 - Remote Host Handler: `src/web/api/functions/function-bearer_get_token.c:59-82`
 
 **Security Configuration:**
@@ -3758,13 +3763,12 @@ No query parameters
 54. ✅ `protobuf` - boolean - Protobuf support
 55. ✅ `webrtc` - boolean - WebRTC support
 56. ✅ `native_https` - boolean - Native HTTPS support
-57. ✅ `h2o` - boolean - H2O web server support
-58. ✅ `mqtt` - boolean - MQTT support
-59. ✅ `ml` - boolean - Machine learning support
+57. ✅ `mqtt` - boolean - MQTT support
+58. ✅ `ml` - boolean - Machine learning support
 
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 0
-**Response Fields Verified:** 59
+**Response Fields Verified:** 58
 **Security:** `HTTP_ACL_NODES` + `HTTP_ACCESS_ANONYMOUS_DATA`
 **Dual-Agent Agreement:** ✅ Agent confirmed comprehensive agent info structure
 

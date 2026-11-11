@@ -4,7 +4,9 @@ package functions_test
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math"
@@ -21,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -74,16 +77,27 @@ func (s *source) Fetch(ctx context.Context, jobID, runID, artifactID string) (mo
 }
 func newHandler(s *source) *syntheticfunctions.Handler {
 	if s == nil {
-		return syntheticfunctions.New(nil)
+		return syntheticfunctions.New(nil, nil)
 	}
 	var active query.Observations
 	if s.hub != nil {
 		active = s.hub
 	}
-	return syntheticfunctions.New(query.New(active, s, s, nil))
+	return syntheticfunctions.New(query.New(active, s, s, nil), nil)
 }
 
 func ptr(n float64) *float64 { return &n }
+
+// fixtureRunID returns a fresh run ID: artifacts.Store.Begin creates a /tmp/nd-dem-<id> alias that is shared by
+// every test process on the host, so fixed IDs collide across parallel packages and concurrent checkouts.
+func fixtureRunID() string {
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(id[:])
+}
+
 func call(h *syntheticfunctions.Handler, method string, args ...string) *funcapi.FunctionResponse {
 	return h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 		Method:      method,
@@ -242,6 +256,17 @@ func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
 		HistoryError: "history write failed",
 	}
 	registration.Complete(evidence)
+	registration.SetSchedule(
+		monitor.Status{
+			Scheduled:       12,
+			Admitted:        2,
+			Coalesced:       9,
+			Pending:         true,
+			Active:          true,
+			AdmittedUS:      completed,
+			SchedulingDelay: 3 * time.Second,
+		},
+	)
 	registration.SetState("running")
 	h := newHandler(&source{
 		hub: hub,
@@ -252,20 +277,28 @@ func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
 	assert.Equal(
 		t,
 		map[string]any{
-			"job_id":          "journey:checkout",
-			"kind":            model.Journey,
-			"name":            "checkout",
-			"target":          "",
-			"state":           "running",
-			"fresh":           false,
-			"run_id":          "r",
-			"outcome":         "failed",
-			"completed_us":    completed,
-			"duration_ms":     500.25,
-			"last_success_us": nil,
-			"last_failure_us": completed,
-			"error":           "afterAll failed",
-			"history_error":   "history write failed",
+			"job_id":           "journey:checkout",
+			"vnode_guid":       "",
+			"kind":             model.Journey,
+			"name":             "checkout",
+			"target":           "",
+			"state":            "running",
+			"fresh":            false,
+			"run_id":           "r",
+			"outcome":          "failed",
+			"completed_us":     completed,
+			"duration_ms":      500.25,
+			"last_success_us":  nil,
+			"last_failure_us":  completed,
+			"error":            "afterAll failed",
+			"history_error":    "history write failed",
+			"check_every":      1,
+			"scheduled":        uint64(12),
+			"admitted":         uint64(2),
+			"coalesced":        uint64(9),
+			"pending":          true,
+			"queue_age":        nil,
+			"scheduling_delay": 3.0,
 		},
 		rowValues(t, got, rows[0]),
 	)
@@ -369,6 +402,11 @@ func TestHistoryFiltersAndUnavailableValues(t *testing.T) {
 
 func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 	run := model.Run{
+		Runtime: &model.RuntimeIdentity{
+			Version:  "release-a",
+			SHA256:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Contract: 1,
+		},
 		ID:          "r",
 		JobID:       "journey:a",
 		Name:        "a",
@@ -426,6 +464,7 @@ func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 	)
 	detail := got.RawResponse["run"].(map[string]any)
 	assert.Equal(t, run.Tests, detail["tests"])
+	assert.Equal(t, run.Runtime, detail["runtime"])
 	assert.Equal(t, 2, detail["dropped_events"])
 	assert.Equal(
 		t,
@@ -457,8 +496,8 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	store, err := artifacts.Open(t.TempDir())
 	require.NoError(t, err)
 	defer store.Close()
-	const runID = "0123456789abcdef0123456789abcdef"
-	dir, err := store.Begin(runID, "lighthouse:home")
+	runID := fixtureRunID()
+	dir, err := store.Begin(runID, "lighthouse:home", "")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "output"), 0700))
 	html := []byte("<html><script>privateReport()</script></html>")
@@ -546,7 +585,7 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	run.CompletedUS = run.StartedUS + 1
 	_, err = synthetichistory.NewStore(journal).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, synthetichistory.NewStore(journal), nil, nil))
+	h := syntheticfunctions.New(query.New(nil, synthetichistory.NewStore(journal), nil, nil), nil)
 	require.Len(t, responseData(t, call(h, "synthetics-runs")), 1)
 	got := call(h, "synthetics-runs", "before:0")
 	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
@@ -572,7 +611,7 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	}
 	_, err = retained.AppendRun(ctx, "start", run)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, retained, nil, nil))
+	h := syntheticfunctions.New(query.New(nil, retained, nil, nil), nil)
 	beforeCompletion := call(h, "synthetics-runs", "after:100", "before:100", "outcome:unknown")
 	require.Len(t, responseData(t, beforeCompletion), 1)
 	validate(t, beforeCompletion)

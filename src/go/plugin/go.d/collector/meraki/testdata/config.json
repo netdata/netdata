@@ -1,0 +1,19 @@
+{
+  "vnode": "summary-node",
+  "update_every": 300,
+  "autodetection_retry": 0,
+  "url": "https://api.meraki.com/api/v1",
+  "organization_id": "123456",
+  "api_key": "test-key",
+  "bearer_token_file": "",
+  "timeout": 60,
+  "proxy_url": "http://127.0.0.1:3128",
+  "tls_ca": "testdata/ca.pem",
+  "tls_cert": "testdata/client.pem",
+  "tls_key": "testdata/client.key",
+  "tls_skip_verify": false,
+  "collect_switch_port_traffic": true,
+  "collect_switch_port_packets": true,
+  "collect_appliance_uplink_traffic": true,
+  "collect_appliance_uplink_health": true
+}

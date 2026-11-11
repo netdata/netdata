@@ -88,7 +88,7 @@ func (c *Collector) collectBGPRowsObserved(
 		return nil, errors.Join(errs...)
 	}
 	if len(errs) > 0 {
-		c.log.Limit(bgpRowsPartialErrorLogKey+prof.SourceFile, 1, bgpRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+bgpRowsPartialErrorLogKey+prof.SourceFile, 1, bgpRowsErrorLogEvery).
 			Warningf("collecting BGP rows for profile %q partially failed: %v", prof.SourceFile, errors.Join(errs...))
 	}
 
@@ -280,6 +280,7 @@ func (c *Collector) collectTableBGPRows(
 
 		var rowOrdinal uint32
 		var dependencyRejected uint64
+		var rowErrors tableProcessingErrors
 		for rowIndex, rowPDUs := range ctx.rows {
 			var rejected *uint64
 			if route != nil {
@@ -294,7 +295,7 @@ func (c *Collector) collectTableBGPRows(
 				}
 				stats.Errors.Processing.BGP++
 				recordCollectionFailure(&c.failures.BGP, err, "bgp", "processing")
-				errs = append(errs, fmt.Errorf("BGP table %q row %q: %w", bgpConfigDisplayName(cfg), rowIndex, err))
+				rowErrors.add(rowIndex, err)
 				continue
 			}
 			if ok {
@@ -310,6 +311,9 @@ func (c *Collector) collectTableBGPRows(
 				route.Rejected++
 			}
 			rowOrdinal++
+		}
+		if err := rowErrors.err(); err != nil {
+			errs = append(errs, fmt.Errorf("BGP table %q: %w", bgpConfigDisplayName(cfg), err))
 		}
 		if route != nil {
 			if dependencyRejected > 0 {
@@ -428,7 +432,9 @@ func (c *Collector) buildTableBGPRow(
 		rejected:           rejected,
 		dependencyRejected: dependencyRejected,
 	}
-	c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx)
+	if err := c.tableCollector.rowProcessor.processRowTags(rowData, rowCtx); err != nil {
+		return ddsnmp.BGPRow{}, false, err
+	}
 
 	row := ddsnmp.BGPRow{
 		OriginProfileID: cfg.OriginProfileID,
@@ -476,6 +482,12 @@ func (c *Collector) buildTableBGPRow(
 func (c *Collector) populateBGPRow(row *ddsnmp.BGPRow, cfg ddprofiledefinition.BGPConfig, ctx bgpValueContext) error {
 	var err error
 
+	if row.Identity.ProcessID, err = c.bgpTextValue(cfg.Identity.ProcessID, ctx.forField("identity.process_id")); err != nil {
+		return fmt.Errorf("identity.process_id: %w", err)
+	}
+	if cfg.Identity.ProcessID.IsSet() && row.Identity.ProcessID == "" {
+		return fmt.Errorf("identity.process_id: configured process identity is missing")
+	}
 	if row.Identity.RoutingInstance, err = c.bgpTextValue(cfg.Identity.RoutingInstance, ctx.forField("identity.routing_instance")); err != nil {
 		return fmt.Errorf("identity.routing_instance: %w", err)
 	}
@@ -1151,66 +1163,25 @@ func (c *Collector) lookupBGPValuePDU(
 		return pdu, sourceOID, ok, nil
 	}
 
-	refTableOID, err := c.tableCollector.rowProcessor.crossTableResolver.findReferencedTableOID(
-		cfg.Table,
-		ctx.crossTableCtx.tableNameToOID,
-	)
-	if err != nil {
-		ctx.record(sym, sourceOID, "dependency_processing")
-		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
-			err: err,
-		}
+	tag := ddprofiledefinition.MetricTagConfig{
+		Table:          cfg.Table,
+		Symbol:         ddprofiledefinition.SymbolConfigCompat(sym),
+		LookupSymbol:   cfg.LookupSymbol,
+		IndexTransform: cfg.IndexTransform,
 	}
-	refTablePDUs, err := c.tableCollector.rowProcessor.crossTableResolver.getReferencedTableData(
-		cfg.Table,
-		refTableOID,
-		ctx.crossTableCtx.walkedData,
-	)
-	if err != nil {
-		ctx.record(sym, sourceOID, "dependency_processing")
-		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
-			err: err,
-		}
-	}
-	lookupIndex, err := c.tableCollector.rowProcessor.crossTableResolver.transformIndex(
-		ctx.rowIndex,
-		cfg.IndexTransform,
-	)
-	if err != nil {
-		ctx.record(sym, sourceOID, "dependency_processing")
-		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
-			err: err,
-		}
-	}
-	tagCfg := ddprofiledefinition.MetricTagConfig{
-		Table:        cfg.Table,
-		Symbol:       ddprofiledefinition.SymbolConfigCompat(sym),
-		LookupSymbol: cfg.LookupSymbol,
-	}
-	if c.tableCollector.rowProcessor.crossTableResolver.requiresLookupByValue(tagCfg) {
-		lookupIndex, err = c.tableCollector.rowProcessor.crossTableResolver.resolveLookupIndexByValue(
-			tagCfg,
-			lookupIndex,
-			refTableOID,
-			refTablePDUs,
-			ctx.crossTableCtx,
-		)
-		if err != nil {
-			ctx.record(sym, sourceOID, "dependency_processing")
-			return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
-				err: err,
+	pdu, failure := c.tableCollector.rowProcessor.crossTableResolver.lookupTagPDU(tag, ctx.rowIndex, ctx.crossTableCtx)
+	if failure != nil {
+		if failure.reason == "missing_dependency" {
+			ctx.record(sym, failure.oid, failure.reason)
+			if ctx.requiredDependencyMissing != nil {
+				*ctx.requiredDependencyMissing = true
 			}
+			return gosnmp.SnmpPDU{}, sourceOID, false, nil
 		}
-	}
-
-	fullOID := sourceOID + "." + lookupIndex
-	pdu, ok := refTablePDUs[fullOID]
-	if !ok {
-		ctx.record(sym, fullOID, "missing_dependency")
-		if ctx.requiredDependencyMissing != nil {
-			*ctx.requiredDependencyMissing = true
+		ctx.record(sym, sourceOID, "dependency_processing")
+		return gosnmp.SnmpPDU{}, "", false, &bgpDependencyProcessingError{
+			err: failure,
 		}
-		return gosnmp.SnmpPDU{}, sourceOID, false, nil
 	}
 	return pdu, sourceOID, true, nil
 }
@@ -1251,11 +1222,7 @@ func bgpConfigAsMetricsConfig(cfg ddprofiledefinition.BGPConfig) ddprofiledefini
 	}
 
 	forEachBGPValue(cfg, addColumn)
-	for _, tagCfg := range cfg.MetricTags {
-		if tagCfg.Symbol.OID != "" {
-			columns[trimOID(tagCfg.Symbol.OID)] = ddprofiledefinition.SymbolConfig(tagCfg.Symbol)
-		}
-	}
+	addTypedRowTagColumns(columns, cfg.MetricTags)
 
 	symbols := make([]ddprofiledefinition.SymbolConfig, 0, len(columns))
 	for _, sym := range columns {
@@ -1294,37 +1261,19 @@ func bgpTableNameToOID(configs []ddprofiledefinition.BGPConfig) map[string]strin
 		}
 		metricsCfg := bgpConfigAsMetricsConfig(cfg)
 		for _, tagCfg := range metricsCfg.MetricTags {
-			if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
-				continue
-			}
-			if _, ok := tableNameToOID[tagCfg.Table]; ok {
-				continue
-			}
-			if tagCfg.Symbol.OID != "" {
-				crossTableOIDs[tagCfg.Table] = append(crossTableOIDs[tagCfg.Table], tagCfg.Symbol.OID)
-			}
-			if tagCfg.LookupSymbol.OID != "" {
-				crossTableOIDs[tagCfg.Table] = append(crossTableOIDs[tagCfg.Table], tagCfg.LookupSymbol.OID)
-			}
+			addReferencedTableOIDs(tagCfg, tableNameToOID, crossTableOIDs)
 		}
 		forEachBGPValue(cfg, func(valueCfg ddprofiledefinition.BGPValueConfig) {
-			if valueCfg.Table == "" || valueCfg.Table == cfg.Table.Name {
-				return
-			}
-			if _, ok := tableNameToOID[valueCfg.Table]; ok {
-				return
-			}
-			if oid := valueCfg.EffectiveSymbol().OID; oid != "" {
-				crossTableOIDs[valueCfg.Table] = append(crossTableOIDs[valueCfg.Table], oid)
-			}
-			if oid := ddprofiledefinition.SymbolConfig(valueCfg.LookupSymbol).OID; oid != "" {
-				crossTableOIDs[valueCfg.Table] = append(crossTableOIDs[valueCfg.Table], oid)
-			}
+			addReferencedTableOIDs(ddprofiledefinition.MetricTagConfig{
+				Table:        valueCfg.Table,
+				Symbol:       ddprofiledefinition.SymbolConfigCompat(valueCfg.EffectiveSymbol()),
+				LookupSymbol: valueCfg.LookupSymbol,
+			}, tableNameToOID, crossTableOIDs)
 		})
 	}
 
 	for tableName, oids := range crossTableOIDs {
-		if oid := longestCommonOIDPrefix(oids); oid != "" {
+		if oid := ddprofiledefinition.CommonOIDPrefix(oids); oid != "" {
 			tableNameToOID[tableName] = oid
 		}
 	}
@@ -1408,6 +1357,7 @@ func forEachBGPValuePath(
 			fn(path, value)
 		}
 	}
+	add("identity.process_id", cfg.Identity.ProcessID)
 	add("identity.routing_instance", cfg.Identity.RoutingInstance)
 	add("identity.neighbor", cfg.Identity.Neighbor)
 	add("identity.remote_as", cfg.Identity.RemoteAS)
@@ -1482,10 +1432,9 @@ func bgpRowHasSignals(row ddsnmp.BGPRow) bool {
 func bgpRowIdentityComplete(row ddsnmp.BGPRow) bool {
 	switch row.Kind {
 	case ddprofiledefinition.BGPRowKindPeer:
-		return row.Identity.Neighbor != "" && row.Identity.RemoteAS != ""
+		return row.Identity.HasPeerIdentity()
 	case ddprofiledefinition.BGPRowKindPeerFamily:
-		return row.Identity.Neighbor != "" &&
-			row.Identity.RemoteAS != "" &&
+		return row.Identity.HasPeerIdentity() &&
 			row.Identity.AddressFamily != "" &&
 			row.Identity.SubsequentAddressFamily != ""
 	default:

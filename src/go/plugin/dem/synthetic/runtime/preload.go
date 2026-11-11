@@ -10,56 +10,81 @@ import (
 )
 
 type preloadRecord struct {
-	Generation string `json:"generation"`
-	Path       string `json:"path"`
+	Manifest Manifest `json:"manifest"`
+	Path     string   `json:"path"`
 }
 
-// SealPreload finishes a freshly prepared administrator-owned root. It must
-// never be moved or replaced while consumers run. Further managed operations,
-// including those through already open stores, refuse this protected root.
-func (s *Store) SealPreload(m Manifest) error {
-	return s.withLock(func() error {
-		if _, err := s.prepared(m); err != nil {
+// SealPreload finishes a new administrator-owned root after qualification. The
+// administrator must keep it immutable and stop every consumer before removal.
+// Native package replacement coordination is a separate delivery contract.
+func (c *Candidate) SealPreload() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return errors.New("runtime candidate is closed")
+	}
+	return c.store.withLock(func() error {
+		inv, err := c.store.inventoryLocked(true)
+		if err != nil {
 			return err
 		}
-		return saveJSON(s.root, "preload.json", preloadRecord{Generation: m.Archive.SHA256, Path: s.path})
+		if len(inv.generations) != 1 || len(inv.processes) > 0 || len(inv.uses) > 0 || len(inv.reservations) > 0 ||
+			len(inv.candidates) != 1 ||
+			inv.candidates[c.manifest.Archive.SHA256] != 1 {
+			return ErrInUse
+		}
+		if _, err := c.store.prepared(c.manifest); err != nil {
+			return err
+		}
+		if err := c.store.removeOwned(c.claim.name); err != nil {
+			return err
+		}
+		// Publication can fail after rename. Close must not mutate a sealed root.
+		c.closed = true
+		c.sealed = true
+		return saveJSON(c.store.root, "preload.json", preloadRecord{
+			Manifest: c.manifest,
+			Path:     c.store.path,
+		})
 	})
 }
 
-// ReadPreload resolves only a prepared bundle matching installed trust. It
-// creates no locks, claims or cache state, so a read-only mount is supported.
-// The administrator owns immutability; this is not a hostile same-account boundary.
-func ReadPreload(path string, m Manifest) (Paths, error) {
+// ReadPreload reads administrator-controlled metadata from the immutable root.
+// It creates no state, so read-only mounts work. This service-account-owned
+// preload does not claim native package lifecycle or same-account isolation.
+func ReadPreload(path string) (Paths, Manifest, error) {
+	var empty Manifest
 	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
-		return Paths{}, errors.New("preloaded browser runtime requires Linux amd64 or arm64")
-	}
-	if err := m.Validate(); err != nil {
-		return Paths{}, err
-	}
-	if m.Platform != "linux/"+goruntime.GOARCH {
-		return Paths{}, errors.New("preload does not match this architecture")
+		return Paths{}, empty, errors.New("preloaded browser runtime requires Linux amd64 or arm64")
 	}
 	if !filepath.IsAbs(path) {
-		return Paths{}, errors.New("runtime.preload_path must be absolute")
+		return Paths{}, empty, errors.New("runtime.preload_path must be absolute")
 	}
 	path, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return Paths{}, err
+		return Paths{}, empty, err
 	}
 	if err := privatePreloadDirectory(path); err != nil {
-		return Paths{}, err
+		return Paths{}, empty, err
 	}
 	root, err := os.OpenRoot(path)
 	if err != nil {
-		return Paths{}, err
+		return Paths{}, empty, err
 	}
 	defer root.Close()
+	if err := validateReadyStore(root); err != nil {
+		return Paths{}, empty, err
+	}
 	var record preloadRecord
 	if err := readJSON(root, "preload.json", &record); err != nil {
-		return Paths{}, err
+		return Paths{}, empty, err
 	}
-	if record.Path != path || record.Generation != m.Archive.SHA256 {
-		return Paths{}, errors.New("preload identity or final path differs from installed requirement")
+	if err := record.Manifest.Validate(); err != nil {
+		return Paths{}, empty, err
 	}
-	return preparedPaths(root, path, m)
+	if record.Path != path || record.Manifest.Platform != "linux/"+goruntime.GOARCH {
+		return Paths{}, empty, errors.New("preload identity, platform or final path differs from its preparation")
+	}
+	paths, err := preparedPaths(root, path, record.Manifest)
+	return paths, record.Manifest, err
 }

@@ -18,13 +18,12 @@ const (
 	configOperationValidate configOperationKind = iota + 1
 	configOperationTest
 	configOperationGet
-	// Intent validation and reservation must not supersede a retained candidate.
-	configOperationValidateIntent
+	// Admission validation must not supersede a retained candidate.
+	configOperationAdmit
 )
 
 type configOperationResult struct {
 	payload []byte
-	intent  *preparedJobConfigIntent
 	err     error
 }
 
@@ -48,10 +47,6 @@ type preparedConfigOperation struct {
 	settled  bool
 	taken    bool
 	released bool
-
-	// The worker retains physical ownership until take or rejection.
-	ownershipDone chan struct{}
-	resultContext context.Context
 
 	startOnce sync.Once
 	readyOnce sync.Once
@@ -77,16 +72,15 @@ func newPreparedConfigOperation(
 	}
 	ctx, cancel := context.WithCancelCause(context.Background())
 	return &preparedConfigOperation{
-		attempts:      factory.config.Attempts,
-		identity:      identity,
-		target:        factory.config.Epoch,
-		config:        cloned,
-		operation:     operation,
-		supersede:     kind == configOperationValidate,
-		ctx:           ctx,
-		cancel:        cancel,
-		ready:         make(chan struct{}),
-		ownershipDone: make(chan struct{}),
+		attempts:  factory.config.Attempts,
+		identity:  identity,
+		target:    factory.config.Epoch,
+		config:    cloned,
+		operation: operation,
+		supersede: kind == configOperationValidate,
+		ctx:       ctx,
+		cancel:    cancel,
+		ready:     make(chan struct{}),
 	}, nil
 }
 
@@ -136,9 +130,6 @@ func (pco *preparedConfigOperation) Release() {
 	}
 	pco.released = true
 	taken := pco.taken
-	if !taken {
-		close(pco.ownershipDone)
-	}
 	started := pco.started
 	attempt := pco.attempt
 	pco.config = nil
@@ -186,11 +177,10 @@ func (pco *preparedConfigOperation) start() {
 		}
 	}
 	workerResult := make(chan configOperationResult, 1)
-	registered := make(chan struct{})
 	attempt, err := pco.attempts.StartProcessAttempt(pco.ctx, jobmgr.ProcessAttemptPlan{
 		Identity: pco.identity,
 		Target:   pco.target,
-		Work: func(ctx context.Context, admission jobmgr.ProcessAttemptAdmission) error {
+		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
 			pco.mu.Lock()
 			config := pco.config
 			operation := pco.operation
@@ -200,54 +190,13 @@ func (pco *preparedConfigOperation) start() {
 			}
 			result := operation(ctx, config)
 			if cause := context.Cause(ctx); cause != nil {
-				return errors.Join(cause, result.err, result.intent.abort())
+				return errors.Join(cause, result.err)
 			}
-			if result.intent == nil {
-				if lifecycle.OwnershipRetained(result.err) {
-					return result.err
-				}
-				workerResult <- result
-				return nil
+			if lifecycle.OwnershipRetained(result.err) {
+				return result.err
 			}
-			if result.err != nil {
-				cleanupErr := result.intent.abort()
-				if cleanupErr != nil {
-					return errors.Join(result.err, cleanupErr)
-				}
-				result.intent = nil
-				workerResult <- result
-				return nil
-			}
-			if err := admission.Admit(); err != nil {
-				return errors.Join(err, result.intent.abort())
-			}
-			<-registered
-			pco.mu.Lock()
-			pco.resultContext = ctx
-			pco.mu.Unlock()
-			if !pco.publish(result, nil) {
-				return result.intent.abort()
-			}
-			select {
-			case <-pco.ownershipDone:
-			case <-ctx.Done():
-			}
-			pco.mu.Lock()
-			taken := pco.taken
-			if !taken {
-				pco.result.intent = nil
-				pco.resultErr = context.Cause(ctx)
-				if pco.resultErr == nil {
-					pco.resultErr = context.Canceled
-				}
-			}
-			pco.mu.Unlock()
-			if taken {
-				return nil
-			}
-			// Cleanup remains inside Work so containment joins it and retains
-			// ownership failures. Clean rejection is not a quarantine.
-			return result.intent.abort()
+			workerResult <- result
+			return nil
 		},
 	})
 	if err != nil {
@@ -257,7 +206,6 @@ func (pco *preparedConfigOperation) start() {
 	pco.mu.Lock()
 	pco.attempt = attempt
 	pco.mu.Unlock()
-	close(registered)
 	if cause := context.Cause(pco.ctx); cause != nil {
 		attempt.Cut(cause)
 	}
@@ -273,21 +221,18 @@ func (pco *preparedConfigOperation) start() {
 	}
 }
 
-func (pco *preparedConfigOperation) publish(result configOperationResult, err error) bool {
-	accepted := false
+func (pco *preparedConfigOperation) publish(result configOperationResult, err error) {
 	pco.readyOnce.Do(func() {
 		pco.mu.Lock()
 		if !pco.released {
 			pco.result = result
 			pco.resultErr = err
-			accepted = true
 		}
 		pco.settled = true
 		pco.config = nil
 		pco.mu.Unlock()
 		close(pco.ready)
 	})
-	return accepted
 }
 
 func (pco *preparedConfigOperation) take() (configOperationResult, error) {
@@ -308,24 +253,11 @@ func (pco *preparedConfigOperation) take() (configOperationResult, error) {
 		pco.mu.Unlock()
 		return configOperationResult{}, cause
 	}
-	if pco.resultContext != nil {
-		if cause := context.Cause(pco.resultContext); cause != nil {
-			pco.mu.Unlock()
-			return configOperationResult{}, cause
-		}
-	}
 	pco.taken = true
 	result := pco.result
 	err := pco.resultErr
 	pco.result = configOperationResult{}
-	attempt := pco.attempt
-	close(pco.ownershipDone)
 	pco.mu.Unlock()
-	// Once taken, the worker has no cleanup left. Join its in-memory return
-	// before allowing another operation for this same containment identity.
-	if result.intent != nil && attempt != nil {
-		<-attempt.Released()
-	}
 	return result, err
 }
 
@@ -340,7 +272,7 @@ func (dcjc *DynCfgJobController) runConfigOperation(
 	}
 	var operation func(context.Context, confgroup.Config) configOperationResult
 	switch kind {
-	case configOperationValidate:
+	case configOperationValidate, configOperationAdmit:
 		operation = func(ctx context.Context, config confgroup.Config) configOperationResult {
 			return configOperationResult{err: dcjc.factory.ValidateConfig(ctx, config)}
 		}

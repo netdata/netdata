@@ -67,10 +67,17 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
     if(before && (!rm->first_time_s || before < rm->first_time_s))
         return 0;
 
+    // the name is replaced while we use it: take our own reference (rrdmetric_acquired_name_dup())
+    spinlock_lock(&rm->ri->spinlock);
+    STRING *name = string_dup(rm->name);
+    spinlock_unlock(&rm->ri->spinlock);
+
     if(t->chart_dimensions
        && !simple_pattern_matches_string(t->chart_dimensions, rm->id)
-       && (rm->name == rm->id || !simple_pattern_matches_string(t->chart_dimensions, rm->name)))
+       && (name == rm->id || !simple_pattern_matches_string(t->chart_dimensions, name))) {
+        string_freez(name);
         return 0;
+    }
 
     if(t->written) {
         t->combined_first_time_s = MIN(t->combined_first_time_s, rm->first_time_s);
@@ -91,7 +98,8 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
         buffer_json_member_add_string(wb, "uuid", uuid);
     }
 
-    buffer_json_member_add_string(wb, "name", string2str(rm->name));
+    buffer_json_member_add_string(wb, "name", string2str(name));
+    string_freez(name);
     buffer_json_member_add_time_t_formatted(wb, "first_time_t", rm->first_time_s, options & RRDCONTEXT_OPTION_RFC3339);
     buffer_json_member_add_time_t_formatted(wb, "last_time_t", rrd_flag_is_collected(rm) ? (long long)t->now : (long long)rm->last_time_s, options & RRDCONTEXT_OPTION_RFC3339);
     buffer_json_member_add_boolean(wb, "collected", rrd_flag_is_collected(rm));
@@ -131,21 +139,26 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
         return 0;
 
     // An archived instance loads its labels from SQLite on first access; read them only when used.
-    RRDLABELS *labels = NULL;
+    // Held to the end, so the labels written below are the ones filtered here: release it on every return.
+    RRDINSTANCE_LABELS_REF lref = { .rsa = NULL, .labels = NULL };
     if(t_parent->chart_label_key || t_parent->chart_labels_filter || (options & RRDCONTEXT_OPTION_SHOW_LABELS))
-        labels = rrdinstance_labels(ri);
+        lref = rrdinstance_acquired_labels_acquire((RRDINSTANCE_ACQUIRED *)item);
 
     if(t_parent->chart_label_key && rrdlabels_match_simple_pattern_parsed(
-                                         labels,
+                                         lref.labels,
                                          t_parent->chart_label_key,
-                                         '\0', NULL) != SP_MATCHED_POSITIVE)
+                                         '\0', NULL) != SP_MATCHED_POSITIVE) {
+        rrdinstance_labels_release(&lref);
         return 0;
+    }
 
     if(t_parent->chart_labels_filter && rrdlabels_match_simple_pattern_parsed(
-                                             labels,
+                                             lref.labels,
                                              t_parent->chart_labels_filter, ':',
-                                             NULL) != SP_MATCHED_POSITIVE)
+                                             NULL) != SP_MATCHED_POSITIVE) {
+        rrdinstance_labels_release(&lref);
         return 0;
+    }
 
     time_t first_time_s = ri->first_time_s;
     time_t last_time_s = ri->last_time_s;
@@ -172,6 +185,7 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
 
         if(has_filter && !t_metrics.written) {
             buffer_free(wb_metrics);
+            rrdinstance_labels_release(&lref);
             return 0;
         }
 
@@ -199,11 +213,24 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
         buffer_json_member_add_string(wb, "uuid", uuid);
     }
 
-    buffer_json_member_add_string(wb, "name", string2str(ri->name));
+    // these are replaced while we use them: take our own references (rrdinstance_acquired_name_dup())
+    spinlock_lock(&ri->spinlock);
+    STRING *name = string_dup(ri->name);
+    STRING *title = string_dup(ri->title);
+    STRING *units = string_dup(ri->units);
+    STRING *family = string_dup(ri->family);
+    spinlock_unlock(&ri->spinlock);
+
+    buffer_json_member_add_string(wb, "name", string2str(name));
     buffer_json_member_add_string(wb, "context", string2str(ri->rc->id));
-    buffer_json_member_add_string(wb, "title", string2str(ri->title));
-    buffer_json_member_add_string(wb, "units", string2str(ri->units));
-    buffer_json_member_add_string(wb, "family", string2str(ri->family));
+    buffer_json_member_add_string(wb, "title", string2str(title));
+    buffer_json_member_add_string(wb, "units", string2str(units));
+    buffer_json_member_add_string(wb, "family", string2str(family));
+
+    string_freez(name);
+    string_freez(title);
+    string_freez(units);
+    string_freez(family);
     buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(ri->chart_type));
     buffer_json_member_add_uint64(wb, "priority", ri->priority);
     buffer_json_member_add_time_t(wb, "update_every", ri->update_every_s);
@@ -220,11 +247,12 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
         buffer_json_array_close(wb);
     }
 
-    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && rrdlabels_entries(labels)) {
+    if(options & RRDCONTEXT_OPTION_SHOW_LABELS && rrdlabels_entries(lref.labels)) {
         buffer_json_member_add_object(wb, "labels");
-        rrdlabels_to_buffer_json_members(labels, wb);
+        rrdlabels_to_buffer_json_members(lref.labels, wb);
         buffer_json_object_close(wb);
     }
+    rrdinstance_labels_release(&lref);
 
     if(wb_metrics) {
         buffer_json_member_add_object(wb, "dimensions");

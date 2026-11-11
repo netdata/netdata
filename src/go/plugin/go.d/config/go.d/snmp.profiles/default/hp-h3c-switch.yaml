@@ -51,8 +51,8 @@ metrics:
       - tag: hh3c_entity_ext_physical_index
         MIB: HH3C-ENTITY-EXT-MIB
         symbol:
-          OID: 1.3.6.1.4.1.25506.2.6.1.1.1.1.1
           name: hh3cEntityExtPhysicalIndex
+        index: 1
       - tag: _ent_physical_name
         MIB: ENTITY-MIB
         table: entPhysicalTable
@@ -77,8 +77,8 @@ metrics:
       - tag: hh3c_entity_ext_physical_index
         MIB: HH3C-ENTITY-EXT-MIB
         symbol:
-          OID: 1.3.6.1.4.1.25506.2.6.1.1.1.1.1
           name: hh3cEntityExtPhysicalIndex
+        index: 1
       - tag: _ent_physical_name
         MIB: ENTITY-MIB
         table: entPhysicalTable

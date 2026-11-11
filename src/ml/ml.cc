@@ -1244,6 +1244,8 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
         models_consulted++;
 
         calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, feature);
+
+        // NaN: the model abstains (it is flat, or its score cannot be computed)
         if (std::isnan(anomaly_score))
             continue;
 

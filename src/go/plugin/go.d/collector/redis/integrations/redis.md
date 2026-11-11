@@ -60,9 +60,6 @@ The Netdata Agent [service discovery](https://github.com/netdata/netdata/blob/ma
 - The `docker` discoverer matches containers exposing port 6379 or using a `redis` image and creates a job with the discovered address. The rule lives in `go.d/sd/docker.conf`.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

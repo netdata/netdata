@@ -315,7 +315,7 @@ metrics:
       - tag: fm_device_ent_index
         symbol:
           name: fmDeviceEntIndex
-          OID: 1.3.6.1.4.1.12356.103.6.2.1.1
+        index: 1
       - tag: _fm_device_ent_name
         symbol:
           name: fmDeviceEntName
@@ -369,8 +369,8 @@ metrics:
     metric_tags:
       - tag: fm_raid_disk_ent_index
         symbol:
-          OID: 1.3.6.1.4.1.12356.103.7.2.1.1
           name: fmRaidDiskEntIndex
+        index: 1
 
   - MIB: FORTINET-FORTIMANAGER-FORTIANALYZER-MIB
     table:
@@ -436,7 +436,7 @@ metrics:
       - tag: fm_ha_peer_ent_index
         symbol:
           name: fmHaPeerEntIndex
-          OID: 1.3.6.1.4.1.12356.103.9.2.1.1
+        index: 1
       - tag: _fm_ha_peer_ent_ip
         symbol:
           name: fmHaPeerEntIp

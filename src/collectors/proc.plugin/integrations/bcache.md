@@ -41,9 +41,6 @@ This collector supports collecting metrics from multiple instances of this integ
 Automatically detects BCache devices by reading stats from `/sys/block/*/bcache/`.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

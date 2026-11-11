@@ -97,6 +97,30 @@ typedef struct {
     netdata_socket_bpf_value_t data; /* per-event delta counters */
 } netdata_socket_rb_event_t;
 
+#define SOCKET_ARENA_EVENT_SLOTS 1024u
+/* The Linux UAPI value is stable; older build headers omit its enum name. */
+#define SOCKET_BPF_MAP_TYPE_ARENA 33
+
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+struct netdata_socket_arena_slot {
+    uint32_t ready;
+    uint32_t _pad;
+    netdata_socket_rb_event_t event;
+};
+
+struct netdata_socket_arena_state {
+    uint32_t head;
+    uint32_t tail;
+    uint32_t version;
+    uint32_t reserved;
+    uint64_t dropped;
+    struct netdata_socket_arena_slot slots[SOCKET_ARENA_EVENT_SLOTS];
+};
+
+_Static_assert(sizeof(netdata_socket_rb_event_t) == 152, "socket event layout differs from BPF");
+_Static_assert(sizeof(struct netdata_socket_arena_state) == 163864, "socket arena layout differs from BPF");
+#endif
+
 /* Per-PID aggregated socket metrics — output type for per-PID snapshot.
  * Field order mirrors struct ebpf_socket_publish_apps in
  * apps_ebpf_shared_pid_row.h so the Go layer can copy directly into
@@ -194,6 +218,10 @@ struct netdata_ebpf_socket_runtime {
     /* Ring-buffer handle — non-NULL only when the loaded object is buffer flavor.
      * NULL on base/arena flavor objects or builds without modern libbpf. */
     struct ring_buffer *rb;
+#endif
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+    struct nd_ebpf_raw_arena *raw_arena;
+    struct netdata_socket_arena_state *arena_state;
 #endif
 };
 
@@ -551,24 +579,54 @@ static int socket_rb_callback(void *ctx, void *data, size_t data_sz)
     return 0;
 }
 
-static void socket_setup_ring_buffer(struct netdata_ebpf_socket_runtime *rt)
+static int socket_setup_ring_buffer(struct netdata_ebpf_socket_runtime *rt)
 {
     struct bpf_map *map = bpf_object__find_map_by_name(rt->obj, "socket_events");
-    if (!map) {
-        fprintf(stderr, "ebpf-go.plugin: socket: ring buffer map 'socket_events' not found\n");
-        return;
-    }
+    if (!map)
+        return -1;
 
     int fd = bpf_map__fd(map);
     if (fd < 0) {
         fprintf(stderr, "ebpf-go.plugin: socket: ring buffer map fd invalid (%d)\n", fd);
-        return;
+        return -1;
     }
 
     rt->rb = ring_buffer__new(fd, socket_rb_callback, rt, NULL);
-    if (!rt->rb)
+    if (!rt->rb) {
         fprintf(stderr, "ebpf-go.plugin: socket: ring_buffer__new failed (errno %d)\n", errno);
+        return -1;
+    }
+    return 0;
 }
+
+#if LIBBPF_MAJOR_VERSION >= 1
+static int socket_setup_arena(struct netdata_ebpf_socket_runtime *rt)
+{
+    if (!rt->raw_arena || !rt->raw_arena->state)
+        return -1;
+
+    rt->arena_state = rt->raw_arena->state;
+    return nd_ebpf_arena_state_valid(
+        rt->raw_arena->map, rt->arena_state, sizeof(struct netdata_socket_arena_state));
+}
+
+static void socket_drain_arena(struct netdata_ebpf_socket_runtime *rt)
+{
+    struct netdata_socket_arena_state *state = rt->arena_state;
+    uint32_t head = __atomic_load_n(&state->head, __ATOMIC_ACQUIRE);
+    uint32_t tail = __atomic_load_n(&state->tail, __ATOMIC_RELAXED);
+
+    while (tail != head) {
+        struct netdata_socket_arena_slot *slot = &state->slots[tail % SOCKET_ARENA_EVENT_SLOTS];
+        if (!__atomic_load_n(&slot->ready, __ATOMIC_ACQUIRE))
+            break;
+        socket_rb_callback(rt, &slot->event, sizeof(slot->event));
+        __atomic_store_n(&slot->ready, 0, __ATOMIC_RELEASE);
+        tail++;
+        __atomic_store_n(&state->tail, tail, __ATOMIC_RELEASE);
+    }
+}
+#endif
 
 static void socket_destroy_ring_buffer(struct netdata_ebpf_socket_runtime *rt)
 {
@@ -598,6 +656,17 @@ struct netdata_ebpf_socket_runtime *netdata_socket_runtime_open_mode(const char 
 
     rt->obj  = obj;
     rt->kind = use_core ? NETDATA_SOCKET_RUNTIME_CORE : NETDATA_SOCKET_RUNTIME_LEGACY;
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+    struct bpf_map *events = bpf_object__find_map_by_name(obj, "socket_events");
+    if (events && bpf_map__type(events) == SOCKET_BPF_MAP_TYPE_ARENA) {
+        rt->raw_arena = nd_ebpf_raw_arena_create(obj, "socket_events");
+        if (!rt->raw_arena) {
+            bpf_object__close(obj);
+            freez(rt);
+            return NULL;
+        }
+    }
+#endif
     return rt;
 }
 
@@ -693,15 +762,30 @@ int netdata_socket_runtime_load(struct netdata_ebpf_socket_runtime *rt)
 {
     if (!rt || !rt->obj)
         return -1;
-    int rc = bpf_object__load(rt->obj);
+    int rc;
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+    rc = rt->raw_arena ? nd_ebpf_raw_arena_load(rt->raw_arena) : bpf_object__load(rt->obj);
+#else
+    rc = bpf_object__load(rt->obj);
+#endif
     if (rc != 0)
         return rc;
 #if defined(LIBBPF_MAJOR_VERSION)
-    /* Detect buffer flavor by the presence of the socket_events ring buffer map. */
-    if (bpf_object__find_map_by_name(rt->obj, "socket_events"))
-        socket_setup_ring_buffer(rt);
+    struct bpf_map *events = bpf_object__find_map_by_name(rt->obj, "socket_events");
+    if (events) {
+        if (bpf_map__type(events) == BPF_MAP_TYPE_RINGBUF)
+            return socket_setup_ring_buffer(rt);
+#if LIBBPF_MAJOR_VERSION >= 1
+        if (bpf_map__type(events) == SOCKET_BPF_MAP_TYPE_ARENA)
+            return socket_setup_arena(rt);
 #endif
-    return 0;
+        return -1;
+    }
+#else
+    if (bpf_object__find_map_by_name(rt->obj, "socket_events"))
+        return -1;
+#endif
+    return bpf_object__find_map_by_name(rt->obj, "tbl_nd_socket") ? 0 : -1;
 }
 
 int netdata_socket_runtime_attach(struct netdata_ebpf_socket_runtime *rt)
@@ -849,6 +933,11 @@ void netdata_socket_runtime_close(struct netdata_ebpf_socket_runtime *rt)
     socket_destroy_ring_buffer(rt);
 #endif
 
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+    if (rt->raw_arena)
+        nd_ebpf_raw_arena_destroy(rt->raw_arena);
+    else
+#endif
     if (rt->obj)
         bpf_object__close(rt->obj);
 
@@ -881,8 +970,17 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
      * One ring_buffer__consume() drains all events queued since the last call.
      * The accumulator is NOT reset: it holds monotonically increasing per-PID
      * totals; Go's UpdateSocketApps computes per-cycle deltas by subtraction. */
-    if (rt->rb) {
-        ring_buffer__consume(rt->rb);
+    if (rt->rb
+#if LIBBPF_MAJOR_VERSION >= 1
+        || rt->arena_state
+#endif
+    ) {
+        if (rt->rb)
+            ring_buffer__consume(rt->rb);
+#if LIBBPF_MAJOR_VERSION >= 1
+        else
+            socket_drain_arena(rt);
+#endif
 
         /* Sort by PID to match the tbl_nd_socket base-flavor output contract. */
         if (rt->acc_count > 1u)
@@ -1125,4 +1223,13 @@ netdata_socket_per_pid_snapshot(struct netdata_ebpf_socket_runtime *rt, int *out
     /* Rebuild htable after qsort + eviction reordered rt->acc. */
     socket_acc_htable_rebuild(rt);
     return rt->per_pid_entries;
+}
+uint64_t netdata_socket_runtime_arena_drops(struct netdata_ebpf_socket_runtime *rt)
+{
+#if defined(LIBBPF_MAJOR_VERSION) && (LIBBPF_MAJOR_VERSION >= 1)
+    return rt && rt->arena_state ? __atomic_load_n(&rt->arena_state->dropped, __ATOMIC_ACQUIRE) : 0;
+#else
+    (void)rt;
+    return 0;
+#endif
 }

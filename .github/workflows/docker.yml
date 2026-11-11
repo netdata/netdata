@@ -78,6 +78,7 @@ jobs:
             .github/scripts/docker-test.sh
             .github/scripts/gen-matrix-docker.py
             .github/scripts/gen-docker-tags.py
+            .github/scripts/modules/release_versions.py
             .github/scripts/gen-docker-imagetool-args.py
             packaging/cmake/
             packaging/docker/
@@ -101,6 +102,7 @@ jobs:
             .github/scripts/docker-test.sh
             .github/scripts/gen-matrix-docker.py
             .github/scripts/gen-docker-tags.py
+            .github/scripts/modules/release_versions.py
             .github/scripts/gen-docker-imagetool-args.py
             packaging/docker/
             packaging/runtime-check.sh
@@ -173,7 +175,7 @@ jobs:
           echo "Generated matrix: ${matrix}"
           echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -263,7 +265,7 @@ jobs:
           path: /tmp/build-cache/*
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -356,7 +358,7 @@ jobs:
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
@@ -389,7 +391,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -439,7 +441,7 @@ jobs:
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
@@ -454,7 +456,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.docker_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -516,7 +518,7 @@ jobs:
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
@@ -550,7 +552,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -600,7 +602,7 @@ jobs:
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
@@ -616,7 +618,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.quay_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -678,7 +680,7 @@ jobs:
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -712,7 +714,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -762,7 +764,7 @@ jobs:
       - name: Registry Login
         id: login
         if: github.repository == 'netdata/netdata'
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
@@ -778,7 +780,7 @@ jobs:
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
         run: .github/scripts/rotate-docker-tags.sh "${{ needs.gen-tags.outputs.ghcr_repo }}" "${{ needs.gen-tags.outputs.nightly_tag }}" "${NIGHTLY_COUNT}"
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
@@ -834,7 +836,7 @@ jobs:
           ref: refs/heads/master
           inputs: '{"tag": "stable", "pwd": "${{ secrets.MSI_CODE_SIGNING_PASSWORD }}"}'
       - name: Failure Notification
-        uses: rtCamp/action-slack-notify@33ca3be66c6f378fe1610fd1d5258632dbed5e58 # v2.4.0
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''

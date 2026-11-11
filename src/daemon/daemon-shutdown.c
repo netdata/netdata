@@ -6,6 +6,7 @@
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
+#include "web/api/queries/weights.h"
 
 #include <curl/curl.h>
 
@@ -174,14 +175,36 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
+// set when shutdown stopped waiting for dbengine or parallel weights work that may still be running
+static bool work_abandoned = false;
+
+// The last thing shutdown does. When shutdown gave up on work that may still be running (a SQLite user on a libuv
+// threadpool worker, see sqlite_teardown_is_unsafe(), undrained dbengine work, or a parallel weights chunk),
+// exit() would run destructors under it: libuv's library destructor joins every threadpool thread - so the process
+// would wait for the job it already gave up on, until systemd kills it - and the other destructors free state that
+// work may still use. Shutdown is complete and its status saved by then: leave without running destructors. No
+// stdio flush either: a thread stuck mid-write may hold a stdio lock (the logger uses raw write()).
+NORETURN void netdata_exit_process(int status) {
+    if(sqlite_teardown_is_unsafe() || __atomic_load_n(&work_abandoned, __ATOMIC_RELAXED))
+        _exit(status);
+
+    exit(status);
+}
+
 static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exit_when_done) {
     exit_initiated_set(reason);
+
+    // false when dbengine work may still be running after its event loop stopped
+    bool dbengine_drained __maybe_unused = true;
+    bool weights_drained __maybe_unused = true;
 
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
     if(run) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "EXIT: Recursion detected. Exiting immediately.");
-        exit(1);
+        // the first shutdown may be in the middle of a bounded wait, before it latched anything it gave up on:
+        // never run destructors here (libuv's would join threadpool workers that may still be running)
+        _exit(1);
     }
     run = true;
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
@@ -190,7 +213,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     netdata_log_exit_reason();
 
     watcher_thread_start();
-    usec_t shutdown_start_time = now_monotonic_usec();
     watcher_shutdown_begin();
 
 #ifdef ENABLE_DBENGINE
@@ -267,6 +289,18 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD);
 
     service_wait_exit(~0, 20 * USEC_PER_SEC);
+
+    // after every service that can issue a weights request (web, websockets/MCP, ACLK) has stopped,
+    // and before dbengine stops: accepted chunks finish, later requests run their chunks inline.
+    // Not waited for on an abnormal exit, like the dbengine drain: the fatal may be on a WEIGHTS thread (which
+    // would wait for itself) or hold the weights lock. Chunks may then still be running: skip the ASAN teardown.
+    if(abnormal)
+        weights_drained = false;
+    else if(!weights_parallel_shutdown()) {
+        weights_drained = false;
+        __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
+        daemon_status_file_shutdown_gave_up("WEIGHTS ", "parallel weights work may still be running");
+    }
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
 
     cancel_main_threads();
@@ -329,7 +363,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
             freez(th);
 
-            dbengine_shutdown();
+            dbengine_drained = dbengine_shutdown();
+            if(!dbengine_drained) {
+                __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
+                daemon_status_file_shutdown_gave_up("DBENGINE ", "pool work may still be running");
+            }
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
@@ -348,9 +386,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
-    // Don't register a shutdown event if we crashed
-    if (!abnormal)
-        add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
+    // Do not record the shutdown duration in SQLite here. The steps above may have given up on threads (the
+    // metadata worker, health) that are still inside db_meta, and any statement on that shared connection would
+    // wait for them until the shutdown watchdog aborts the agent. The watcher records the duration in the status
+    // file instead, and the next start imports it into the agent event log.
 
     nd_thread_join_threads();
     watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
@@ -426,85 +465,90 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_thread_stop();
 
 #if defined(FSANITIZE_ADDRESS)
-    fprintf(stderr, "\n");
+    // a worker still running would use what the teardown frees
+    if(!dbengine_drained || !weights_drained)
+        fprintf(stderr, "\nWARNING: dbengine or weights work may still be running, skipping the teardown.\n");
+    else {
+        fprintf(stderr, "\n");
 
-    fprintf(stderr, "Stopping spawn server...\n");
-    netdata_main_spawn_server_cleanup();
+        fprintf(stderr, "Stopping spawn server...\n");
+        netdata_main_spawn_server_cleanup();
 
-    fprintf(stderr, "Freeing all RRDHOSTs...\n");
-    mcp_functions_registry_cleanup();
-    rrdhost_free_all();
-    dyncfg_shutdown();
-    nrpc_inflight_calls_destroy();
-    nrpc_registries_destroy();
-    health_plugin_destroy();
-    cgroup_netdev_link_destroy();
-    bearer_tokens_destroy();
+        fprintf(stderr, "Freeing all RRDHOSTs...\n");
+        mcp_functions_registry_cleanup();
+        rrdhost_free_all();
+        dyncfg_shutdown();
+        nrpc_inflight_calls_destroy();
+        nrpc_registries_destroy();
+        health_plugin_destroy();
+        cgroup_netdev_link_destroy();
+        bearer_tokens_destroy();
 
-    // Deferred from ml_stop_threads(): the ML training queue must outlive every
-    // collector that can reach ml_queue_push(), and the collector stop above is
-    // time-bounded. Safe here, after rrdhost_free_all() removed all producers.
-    ml_workers_free();
+        // Deferred from ml_stop_threads(): the ML training queue must outlive every
+        // collector that can reach ml_queue_push(), and the collector stop above is
+        // time-bounded. Safe here, after rrdhost_free_all() removed all producers.
+        ml_workers_free();
 
-    fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
-    size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
-    if(dictionaries_referenced)
-        fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
-                dictionaries_referenced);
+        fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
+        size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
+        if(dictionaries_referenced)
+            fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
+                    dictionaries_referenced);
                 
-    // Always report dictionary allocations during ASAN builds
-    dictionary_print_still_allocated_stacktraces();
+        // Always report dictionary allocations during ASAN builds
+        dictionary_print_still_allocated_stacktraces();
 
-#ifdef ENABLE_DBENGINE
-    // destroy the caches in reverse order (extent and open depend on main cache)
-    fprintf(stderr, "Destroying extent cache (PGC)...\n");
-    pgc_destroy(extent_cache, false);
-    fprintf(stderr, "Destroying open cache (PGC)...\n");
-    pgc_destroy(open_cache, false);
-    fprintf(stderr, "Destroying main cache (PGC)...\n");
-    pgc_destroy(main_cache, false);
+    #ifdef ENABLE_DBENGINE
+        // destroy the caches in reverse order (extent and open depend on main cache)
+        fprintf(stderr, "Destroying extent cache (PGC)...\n");
+        pgc_destroy(extent_cache, false);
+        fprintf(stderr, "Destroying open cache (PGC)...\n");
+        pgc_destroy(open_cache, false);
+        fprintf(stderr, "Destroying main cache (PGC)...\n");
+        pgc_destroy(main_cache, false);
 
-    fprintf(stderr, "Destroying metrics registry (MRG)...\n");
-    size_t metrics_referenced = mrg_destroy(main_mrg);
-    if(metrics_referenced)
-        fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
-            metrics_referenced);
+        fprintf(stderr, "Destroying metrics registry (MRG)...\n");
+        size_t metrics_referenced = mrg_destroy(main_mrg);
+        if(metrics_referenced)
+            fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
+                metrics_referenced);
 
-    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-        if(multidb_ctx[tier]) {
-            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
-            finalize_rrd_files(multidb_ctx[tier]);
-            memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
+        for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+            if(multidb_ctx[tier]) {
+                fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
+                finalize_rrd_files(multidb_ctx[tier]);
+                memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
+            }
         }
+    #endif
+
+        fprintf(stderr, "Destroying UUIDMap...\n");
+        size_t uuid_referenced = uuidmap_destroy();
+        if(uuid_referenced)
+            fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
+                uuid_referenced);
+
+        fprintf(stderr, "Freeing configuration resources...\n");
+        claim_config_free();
+        exporting_config_free();
+        stream_config_free();
+        inicfg_free(&cloud_config);
+        inicfg_free(&netdata_config);
+
+        fprintf(stderr, "Cleaning up worker utilization...\n");
+        worker_utilization_cleanup();
+
+        alerts_by_x_cleanup();
+        size_t strings_referenced = string_destroy();
+        if(strings_referenced)
+            fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
+                    strings_referenced);
+
+        rrdlabels_aral_destroy(true);
+        fprintf(stderr, "RRDLABELS remaining in registry: %d.\n", rrdlabels_registry_count());
+
+        fprintf(stderr, "All done, exiting...\n");
     }
-#endif
-
-    fprintf(stderr, "Destroying UUIDMap...\n");
-    size_t uuid_referenced = uuidmap_destroy();
-    if(uuid_referenced)
-        fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
-            uuid_referenced);
-
-    fprintf(stderr, "Freeing configuration resources...\n");
-    claim_config_free();
-    exporting_config_free();
-    stream_config_free();
-    inicfg_free(&cloud_config);
-    inicfg_free(&netdata_config);
-
-    fprintf(stderr, "Cleaning up worker utilization...\n");
-    worker_utilization_cleanup();
-
-    alerts_by_x_cleanup();
-    size_t strings_referenced = string_destroy();
-    if(strings_referenced)
-        fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
-                strings_referenced);
-
-    rrdlabels_aral_destroy(true);
-    fprintf(stderr, "RRDLABELS remaining in registry: %d.\n", rrdlabels_registry_count());
-
-    fprintf(stderr, "All done, exiting...\n");
 #endif
 
     if(!exit_when_done) {
@@ -518,13 +562,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     nd_sentry_fini();
     curl_global_cleanup();
-    exit(abnormal ? 1 : 0);
+    netdata_exit_process(abnormal ? 1 : 0);
 #else
     if(abnormal)
         _exit(1);
     else {
         curl_global_cleanup();
-        exit(0);
+        netdata_exit_process(0);
     }
 #endif
 }

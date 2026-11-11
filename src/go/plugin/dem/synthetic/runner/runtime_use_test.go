@@ -135,51 +135,33 @@ func TestRuntimeUseFinishesWithActualDrainage(t *testing.T) {
 	}
 }
 
-func TestCheckUsesDistinctRuntimeHandlesAndPaths(t *testing.T) {
+func TestCheckUsesOneAcquiredRelease(t *testing.T) {
 	if os.Geteuid() == 0 {
-		t.Skip("Check requires preserved nonroot identity")
+		t.Skip("requires unprivileged identity")
 	}
 	e, _, _ := testEngine(t)
 	paths := e.source.(fixtureRuntime).Paths
 	var uses []*observedUse
 	e.source = sourceFunc(func() (Use, error) {
-		if len(uses) > 0 {
-			assert.Equal(t, []bool{true}, uses[len(uses)-1].finished())
-		}
-		// A later source generation may have different concrete paths.
-		paths.Node = filepath.Join(t.TempDir(), "node")
-		paths.Browser = filepath.Join(t.TempDir(), "browser")
-		require.NoError(t, os.WriteFile(paths.Node, []byte("fixture"), 0700))
-		require.NoError(t, os.WriteFile(paths.Browser, []byte("fixture"), 0700))
+		paths.Identity.Version = fmt.Sprintf("release-%d", len(uses))
 		u := &observedUse{paths: paths}
 		uses = append(uses, u)
 		return u, nil
 	})
-	starts := 0
 	e.start = func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
-		u := uses[starts]
+		require.Len(t, uses, 1)
+		u := uses[0]
 		assert.Same(t, u.Completion(), opts.Completion)
 		assert.Equal(t, u.paths.Node, bin)
-		starts++
-		query := starts
-		if query == 2 {
-			assert.Equal(t, u.paths.Browser, args[len(args)-1])
-		}
+		assert.Equal(t, []string{u.paths.EntryPoint, "--check"}, args)
 		return starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
-			if query == 1 {
-				fmt.Fprintf(out, `{"version":"%d.0.0","uid":%d,"gid":%d}`, requiredRuntime.NodeMajorMin, os.Geteuid(), os.Getegid())
-			} else {
-				fmt.Fprintf(out, "Chromium %s", requiredRuntime.Chromium.Version)
-			}
+			fmt.Fprintf(out, `{"version":%q,"contract":1,"uid":%d,"gid":%d}`, u.paths.Identity.Version, os.Geteuid(), os.Getegid())
 			return ndexec.TreeResult{Drained: true}
 		})(ctx, opts, bin, args...)
 	}
 	require.NoError(t, e.Check(context.Background(), synthetic.Journey))
-	require.Len(t, uses, 2)
-	assert.NotSame(t, uses[0].Completion(), uses[1].Completion())
-	for _, u := range uses {
-		assert.Equal(t, []bool{true}, u.finished())
-	}
+	require.Len(t, uses, 1)
+	assert.Equal(t, []bool{true}, uses[0].finished())
 }
 
 func TestRuntimeUseWaitsForLocalReaderJoin(t *testing.T) {
@@ -288,11 +270,7 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 				assert.Empty(t, u.finished())
 				return resultPayload(success())(ctx, args, raw, out, errOut)
 			}
-			if len(args) == 2 {
-				fmt.Fprintf(out, `{"version":"%d.0.0","uid":%d,"gid":%d}`, requiredRuntime.NodeMajorMin, os.Geteuid(), os.Getegid())
-			} else {
-				fmt.Fprintf(out, "Chromium %s", requiredRuntime.Chromium.Version)
-			}
+			fmt.Fprintf(out, `{"version":%q,"contract":1,"uid":%d,"gid":%d}`, u.paths.Identity.Version, os.Geteuid(), os.Getegid())
 			return ndexec.TreeResult{Drained: true}
 		})(ctx, opts, bin, args...)
 	}
@@ -308,7 +286,7 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 	got := <-done
 	require.NoError(t, checkErr)
 	require.Equal(t, synthetic.Success, got.Run.Outcome)
-	require.Len(t, uses, 3)
+	require.Len(t, uses, 2)
 	for _, u := range uses {
 		assert.Equal(t, []bool{true}, u.finished())
 	}

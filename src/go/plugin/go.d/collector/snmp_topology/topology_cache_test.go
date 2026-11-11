@@ -2000,9 +2000,84 @@ func TestTopologyCache_UpdateIfNameByIndex_StoresExtendedInterfaceFields(t *test
 	require.Equal(t, "Uplink Port 9", status.ifDescr)
 	require.Equal(t, "uplink-core", status.ifAlias)
 	require.Equal(t, "aa:bb:cc:dd:ee:ff", status.mac)
-	require.EqualValues(t, 1000_000_000, status.speedBps)
+	require.EqualValues(t, 1000_000_000, status.speedBps())
 	require.EqualValues(t, 34567, status.lastChange)
 	require.Equal(t, "full", status.duplex)
+}
+
+func TestTopologyCache_UpdateIfNameByIndex_PortSpeed(t *testing.T) {
+	// The stock profile reads ifHighSpeed from the ifXTable row and ifSpeed from the separate ifTable row.
+	ifXTableRow := func(ifHighSpeed string) map[string]string {
+		return map[string]string{tagTopoIfIndex: "5", tagTopoIfName: "Te0/1/0", tagTopoIfHigh: ifHighSpeed}
+	}
+	ifTableRow := func(ifSpeed string) map[string]string {
+		return map[string]string{tagTopoIfIndex: "5", tagTopoIfOper: "up", tagTopoIfSpeed: ifSpeed}
+	}
+
+	tests := map[string]struct {
+		rows         []map[string]string
+		wantSpeedBps int64
+	}{
+		"ifHighSpeed set": {
+			rows:         []map[string]string{ifXTableRow("10000"), ifTableRow("")},
+			wantSpeedBps: 10_000_000_000,
+		},
+		"only ifSpeed below the cap": {
+			rows:         []map[string]string{ifXTableRow(""), ifTableRow("1000000000")},
+			wantSpeedBps: 1_000_000_000,
+		},
+		"saturated ifSpeed without ifHighSpeed": {
+			rows:         []map[string]string{ifXTableRow(""), ifTableRow("4294967295")},
+			wantSpeedBps: 0,
+		},
+		"saturated ifSpeed with zero ifHighSpeed": {
+			rows:         []map[string]string{ifXTableRow("0"), ifTableRow("4294967295")},
+			wantSpeedBps: 0,
+		},
+		"both missing": {
+			rows:         []map[string]string{ifXTableRow(""), ifTableRow("")},
+			wantSpeedBps: 0,
+		},
+		"saturated ifSpeed row after the ifHighSpeed row": {
+			rows:         []map[string]string{ifXTableRow("10000"), ifTableRow("4294967295")},
+			wantSpeedBps: 10_000_000_000,
+		},
+		"ifHighSpeed row after the saturated ifSpeed row": {
+			rows:         []map[string]string{ifTableRow("4294967295"), ifXTableRow("10000")},
+			wantSpeedBps: 10_000_000_000,
+		},
+		"ifHighSpeed wins over ifSpeed below the cap": {
+			rows:         []map[string]string{ifXTableRow("2"), ifTableRow("1544000")},
+			wantSpeedBps: 2_000_000,
+		},
+		"ifSpeed below the cap when ifHighSpeed is zero": {
+			rows:         []map[string]string{ifXTableRow("0"), ifTableRow("100000000")},
+			wantSpeedBps: 100_000_000,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTopologyBuilder()
+			for _, row := range tc.rows {
+				cache.updateIfNameByIndex(row)
+			}
+
+			var observation topologyengine.L2Observation
+			cache.appendObservedInterfaces(&observation)
+
+			want := []topologyengine.ObservedInterface{
+				{
+					IfIndex:    5,
+					IfName:     "Te0/1/0",
+					IfDescr:    "Te0/1/0",
+					SpeedBps:   tc.wantSpeedBps,
+					OperStatus: "up",
+				},
+			}
+			assert.Equal(t, want, observation.Interfaces)
+		})
+	}
 }
 
 func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T) {

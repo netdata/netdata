@@ -16,7 +16,7 @@ func TestFinishFailureAppearsInStorageHealthUntilSweep(t *testing.T) {
 	require.NoError(t, err)
 	defer s.Close()
 	manifest := importFixture(t, s, "finish-health")
-	use, err := s.BeginUse(manifest)
+	use, err := s.beginUse(manifest)
 	require.NoError(t, err)
 	trash := filepath.Join(path, "trash")
 	require.NoError(t, os.Rename(trash, trash+".saved"))
@@ -41,7 +41,7 @@ func TestOlderSweepDoesNotClearConcurrentFinishFailure(t *testing.T) {
 	require.NoError(t, err)
 	defer s.Close()
 	manifest := importFixture(t, s, "finish-during-sweep")
-	use, err := s.BeginUse(manifest)
+	use, err := s.beginUse(manifest)
 	require.NoError(t, err)
 	// Run the inventory phase, then interleave the real failed Finish before the
 	// older sweep publishes its result after deleting trash.
@@ -74,7 +74,7 @@ func TestOlderSweepDoesNotClearConcurrentFinishFailure(t *testing.T) {
 func TestFinishCoordinationFailureRetainsDrainedProof(t *testing.T) {
 	s, _ := testStore(t)
 	manifest := importFixture(t, s, "finish-coordination")
-	use, err := s.BeginUse(manifest)
+	use, err := s.beginUse(manifest)
 	require.NoError(t, err)
 	coordination := filepath.Join(s.path, "coordination.lock")
 	require.NoError(t, os.Rename(coordination, coordination+".saved"))
@@ -89,4 +89,20 @@ func TestFinishCoordinationFailureRetainsDrainedProof(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, status.ExecutionPins)
 	require.Empty(t, status.CleanupError)
+}
+
+func TestExecutionOwnerDamageAppearsInStorageHealthWithoutReleasingPin(t *testing.T) {
+	s, _ := testStore(t)
+	manifest := importFixture(t, s, "owner-health")
+	use, err := s.beginUse(manifest)
+	require.NoError(t, err)
+	owner := filepath.Join(s.path, use.name, "owner.lock")
+	require.NoError(t, os.Chmod(owner, 0644))
+	status, err := s.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, 1, status.ExecutionPins)
+	require.Equal(t, 1, status.UncertainPins)
+	require.Contains(t, status.CleanupError, "invalid runtime operation owner")
+	require.NoError(t, os.Chmod(owner, 0600))
+	require.NoError(t, use.Finish(true))
 }

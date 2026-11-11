@@ -288,16 +288,19 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
 
     int i;
     const char *saved_name = em->info.thread_name;
-    int errors = 0;
+    bool loaded_legacy = (em->load & EBPF_LOAD_LEGACY) != 0;
     for (i = 0; i < NETDATA_SYNC_IDX_END; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         w->sync_maps = local_syscalls[i].sync_maps;
         em->maps = local_syscalls[i].sync_maps;
         if (w->enabled) {
+            em->info.thread_name = w->syscall;
             if (em->load & EBPF_LOAD_LEGACY) {
                 if (ebpf_sync_load_legacy(w, em))
-                    errors++;
+                    w->enabled = false;
                 else
+                    loaded_legacy = true;
+                if (w->probe_links)
                     ebpf_mark_program_loaded();
 
                 em->info.thread_name = saved_name;
@@ -309,21 +312,40 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                 if (ebpf_is_function_inside_btf(default_btf, syscall)) {
                     w->sync_obj = sync_bpf__open();
                     if (!w->sync_obj) {
-                        w->enabled = false;
-                        errors++;
+                        w->probe_links = ebpf_load_program(
+                            ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
+                        if (!w->probe_links) {
+                            w->enabled = false;
+                        } else {
+                            loaded_legacy = true;
+                            ebpf_mark_program_loaded();
+                        }
                     } else {
                         if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
                             sync_bpf__destroy(w->sync_obj);
                             w->sync_obj = NULL;
-                            w->enabled = false;
-                            errors++;
+                            w->probe_links = ebpf_load_program(
+                                ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
+                            if (!w->probe_links) {
+                                w->enabled = false;
+                            } else {
+                                loaded_legacy = true;
+                                ebpf_mark_program_loaded();
+                            }
                         } else {
                             ebpf_mark_program_loaded();
                         }
                     }
                 } else {
-                    netdata_log_info("Cannot find syscall %s we are not going to monitor it.", syscall);
-                    w->enabled = false;
+                    w->probe_links = ebpf_load_program(
+                        ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
+                    if (!w->probe_links) {
+                        netdata_log_info("Cannot find syscall %s; no compatible legacy object is available.", syscall);
+                        w->enabled = false;
+                    } else {
+                        loaded_legacy = true;
+                        ebpf_mark_program_loaded();
+                    }
                 }
 
                 em->info.thread_name = saved_name;
@@ -333,11 +355,22 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
     }
     em->info.thread_name = saved_name;
 
+    // Keep CORE set for the per-syscall load decisions above. Mark the module
+    // as legacy too only after initialization so aggregate stats do not claim
+    // a mixed CORE/legacy module is entirely CORE.
+    if (loaded_legacy && (em->load & EBPF_LOAD_CORE))
+        em->load |= EBPF_LOAD_LEGACY;
+
     memset(sync_counter_aggregated_data, 0, NETDATA_SYNC_IDX_END * sizeof(netdata_syscall_stat_t));
     memset(sync_counter_publish_aggregated, 0, NETDATA_SYNC_IDX_END * sizeof(netdata_publish_syscall_t));
     memset(sync_hash_values, 0, NETDATA_SYNC_IDX_END * sizeof(netdata_idx_t));
 
-    return (errors) ? -1 : 0;
+    for (i = 0; i < NETDATA_SYNC_IDX_END; i++) {
+        if (local_syscalls[i].enabled)
+            return 0;
+    }
+
+    return -1;
 }
 
 /*****************************************************************

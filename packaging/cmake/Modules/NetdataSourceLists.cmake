@@ -258,6 +258,13 @@ set(API_PLUGIN_FILES
         src/web/api/queries/extremes/extremes.h
         src/web/api/queries/latest/latest.c
         src/web/api/queries/latest/latest.h
+        src/web/api/queries/tg-expression.h
+        src/web/api/queries/percentage_of_time/percentage_of_time.c
+        src/web/api/queries/percentage_of_time/percentage_of_time.h
+        src/web/api/queries/number_of_flaps/number_of_flaps.c
+        src/web/api/queries/number_of_flaps/number_of_flaps.h
+        src/web/api/queries/number_of_times/number_of_times.c
+        src/web/api/queries/number_of_times/number_of_times.h
         src/web/api/queries/weights.c
         src/web/api/queries/weights-ranking.h
         src/web/api/queries/weights.h
@@ -363,6 +370,7 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/power-supply.h
         src/collectors/common-contexts/hw-sensors.h
         src/collectors/common-contexts/hw-sensors-function.h
+        src/collectors/common-contexts/network-interfaces-function.h
 )
 
 set(PLUGINSD_PLUGIN_FILES
@@ -372,6 +380,7 @@ set(PLUGINSD_PLUGIN_FILES
         src/plugins.d/pluginsd_dyncfg.h
         src/plugins.d/pluginsd_functions.c
         src/plugins.d/pluginsd_functions-unittest.c
+        src/plugins.d/pluginsd_vnodes-unittest.c
         src/plugins.d/pluginsd_functions.h
         src/plugins.d/pluginsd_internals.c
         src/plugins.d/pluginsd_internals.h
@@ -744,6 +753,7 @@ set(FREEBSD_PLUGIN_FILES
         src/collectors/freebsd.plugin/freebsd_devstat.c
         src/collectors/freebsd.plugin/freebsd_kstat_zfs.c
         src/collectors/freebsd.plugin/freebsd_ipfw.c
+        src/collectors/freebsd.plugin/freebsd_acpi_battery.c
         src/collectors/proc.plugin/zfs_common.c
         src/collectors/proc.plugin/zfs_common.h
 )
@@ -758,6 +768,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetServicesStatus.c
         src/collectors/windows.plugin/GetSensors.c
         src/collectors/windows.plugin/GetHardwareInfo.c
+        src/collectors/windows.plugin/GetFSRMQuota.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
@@ -778,6 +789,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-iis-extra.c
         src/collectors/windows.plugin/perflib-hyperv.c
         src/collectors/windows.plugin/perflib-exchange.c
+        src/collectors/windows.plugin/perflib-msmq.c
         src/collectors/windows.plugin/perflib-numa.c
         src/collectors/windows.plugin/perflib-asp.c
 )

@@ -18,9 +18,14 @@ const (
 	ActorTypeBGPPeer            = "bgp_peer"
 	ActorTypeBGPPeerObservation = "bgp_peer_observation"
 
-	LinkTypeTunnel = "cato_tunnel"
-	LinkTypeBGP    = "bgp_session"
+	LinkTypeOwnership          = "ownership"
+	LinkTypeTunnel             = "cato_tunnel"
+	LinkTypeBGP                = "bgp_session"
+	LinkTypeTunnelDisconnected = "cato_tunnel_disconnected"
+	LinkTypeTunnelUnknown      = "cato_tunnel_unknown"
+	LinkTypePopAssociation     = "cato_pop_association"
 
+	ActorTableLabels     = "actor_labels"
 	ActorTableInterfaces = "interfaces"
 )
 

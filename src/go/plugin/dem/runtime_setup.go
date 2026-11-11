@@ -3,57 +3,17 @@
 package dem
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"path/filepath"
 	goruntime "runtime"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/pkg/safefile"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
-
-// LoadRuntimeManifest reads installed administrator-controlled trust. An archive,
-// monitor request, or download response can never replace this manifest.
-func LoadRuntimeManifest(path string) (*runtime.Manifest, error) {
-	if !filepath.IsAbs(path) {
-		return nil, errors.New("runtime manifest path must be absolute")
-	}
-	data, err := safefile.Read(path)
-	if err != nil {
-		return nil, fmt.Errorf("installed runtime manifest: %w", err)
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	var manifest runtime.Manifest
-	if err := decoder.Decode(&manifest); err != nil {
-		return nil, fmt.Errorf("installed runtime manifest: %w", err)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		return nil, errors.New("installed runtime manifest has trailing content")
-	}
-	if err := manifest.Validate(); err != nil {
-		return nil, fmt.Errorf("installed runtime manifest: %w", err)
-	}
-	if manifest.Platform != "linux/"+goruntime.GOARCH {
-		return nil, errors.New("installed runtime manifest does not match this architecture")
-	}
-	return &manifest, nil
-}
-
-func RuntimeManifestPath(cfg RuntimeConfig, assetsPath string) string {
-	if cfg.ManifestPath != "" {
-		return cfg.ManifestPath
-	}
-	return filepath.Join(assetsPath, "runtime-"+goruntime.GOARCH+".json")
-}
 
 // RuntimeHandle owns process resources. Close follows joined jobs and workers;
 // it must not run while a supervised browser invocation may still use the cache.
@@ -61,13 +21,15 @@ type RuntimeHandle struct {
 	Source     runner.Source
 	Host       *runtimehost.Host
 	Store      *runtime.Store
+	Native     *runtime.Native
+	Updater    *runtimehost.Updater
 	Manifest   *runtime.Manifest
 	SetupError error
 	closeOnce  sync.Once
 	closeErr   error
 }
 
-func OpenRuntime(cfg RuntimeConfig, assetsPath, varLibPath string) *RuntimeHandle {
+func OpenRuntime(cfg RuntimeConfig, varLibPath string) *RuntimeHandle {
 	result := &RuntimeHandle{}
 	if err := cfg.validate(); err != nil {
 		result.SetupError = err
@@ -78,20 +40,28 @@ func OpenRuntime(cfg RuntimeConfig, assetsPath, varLibPath string) *RuntimeHandl
 	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
 		result.SetupError = errors.Join(result.SetupError, errors.New("browser runtime requires Linux amd64 or arm64"))
 	}
-	if result.SetupError == nil {
-		result.Manifest, result.SetupError = LoadRuntimeManifest(RuntimeManifestPath(cfg, assetsPath))
-	}
 	if cfg.Mode == "preloaded" {
 		if result.SetupError == nil {
 			var paths runtime.Paths
-			paths, result.SetupError = runtime.ReadPreload(cfg.PreloadPath, *result.Manifest)
+			var manifest runtime.Manifest
+			paths, manifest, result.SetupError = runtime.ReadPreload(cfg.PreloadPath)
+			result.Manifest = &manifest
 			if result.SetupError == nil {
-				result.Source = preloadedRuntime{paths: runner.Paths{Node: paths.Node, Dependencies: paths.Dependencies, Browser: paths.Browser}}
+				result.Source = preloadedRuntime{paths: runner.Paths{Node: paths.Node, EntryPoint: paths.EntryPoint, Identity: synthetic.RuntimeIdentity{Version: manifest.Version, SHA256: manifest.Archive.SHA256, Contract: manifest.Contract}}}
 			}
 		}
 		if result.SetupError != nil {
 			result.Source = unavailableRuntime{result.SetupError}
 		}
+		return result
+	}
+	if cfg.Mode == "native" {
+		if result.SetupError == nil {
+			result.Native, result.SetupError = runtime.OpenNative(runtime.DefaultNativeConfig())
+		}
+		result.Host = runtimehost.New(runtimehost.Config{Native: result.Native, Mode: "native", Unavailable: result.SetupError})
+		result.SetupError = result.Host.Ready()
+		result.Source = result.Host
 		return result
 	}
 	if result.SetupError == nil {
@@ -101,18 +71,25 @@ func OpenRuntime(cfg RuntimeConfig, assetsPath, varLibPath string) *RuntimeHandl
 		}
 		result.SetupError = err
 	}
-	result.Host = runtimehost.New(runtimehost.Config{Store: result.Store, Manifest: result.Manifest, Unavailable: result.SetupError, AllowDownload: cfg.AllowDownload})
+	result.Host = runtimehost.New(runtimehost.Config{Store: result.Store, Unavailable: result.SetupError})
+	result.SetupError = result.Host.Ready()
 	result.Source = result.Host
 	return result
 }
 
 func (h *RuntimeHandle) Close() error {
 	h.closeOnce.Do(func() {
+		if h.Updater != nil {
+			h.closeErr = h.Updater.Close()
+		}
 		if h.Host != nil {
-			h.closeErr = h.Host.Close()
+			h.closeErr = errors.Join(h.closeErr, h.Host.Close())
 		}
 		if h.Store != nil {
 			h.closeErr = errors.Join(h.closeErr, h.Store.Close())
+		}
+		if h.Native != nil {
+			h.closeErr = errors.Join(h.closeErr, h.Native.Close())
 		}
 	})
 	return h.closeErr

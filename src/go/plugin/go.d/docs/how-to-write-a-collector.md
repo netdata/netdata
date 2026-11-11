@@ -136,6 +136,7 @@ Public lifecycle and framework-contract methods MUST stay in `collector.go`:
 - `Configuration() any`
 - `Init(context.Context) error`
 - `Check(context.Context) error`
+- `Test(context.Context) error`, when the optional `dyncfg.Testable` capability is needed
 - `Collect(context.Context) error`
 - `Cleanup(context.Context)`
 - `MetricStore() metrix.CollectorStore`
@@ -150,6 +151,23 @@ Collectors that need a receiver or long-running background loop MAY implement `c
 then call `ready()` once all fallible startup prerequisites succeed and state is safe for concurrent `Collect()`.
 Readiness MUST NOT wait for a first packet or remote observation. `Init()` and `Check()` still run during configuration
 validation while an incumbent may own the endpoint; DynCfg `test` never calls `Run()`.
+
+V1 and V2 collectors MAY implement `dyncfg.Testable.Test(ctx context.Context) error` when an explicit DynCfg test
+needs a different operation from activation `Check()`. The framework resolves the submitted configuration and
+secrets, checks named dependencies, calls `Init()`, then calls `Test()` if implemented or `Check()` otherwise.
+The throwaway collector is cleaned up when the operation returns, including after failure. Activation and automatic
+discovery continue using `Init()` and `Check()`; they never call `Test()`.
+
+`Test()` MUST honor its caller's context and release resources it acquires. It MUST NOT assume `Run()` or `Collect()`
+has run. Return an error when the operation fails or cannot be performed; a Test error does not fall back to Check.
+Collectors retain the existing lifecycle error policy. Without secret references, error text is returned as-is, so
+`Test()` MUST return response-safe errors and MUST NOT include credentials or sensitive endpoint/configuration values.
+`dyncfg.NewPublicError` can separate a static public explanation from a private cause. With secret references, the
+framework replaces error text with a generic redacted message, including `NewPublicError` explanations.
+`dyncfg.ErrTestUnsupported` still fails the test, but that redaction does not preserve its sentinel identity.
+
+Implementations MUST NOT log submitted or resolved credentials; reference-bearing configurations also receive
+framework log redaction. This capability does not extend the caller's request deadline or add a structured result.
 
 The framework waits for readiness before collecting. Startup errors follow the candidate recovery policy below; a
 `collectorapi.PermanentError`, unexpected nil return and recovered panic do not automatically retry the same config.
@@ -176,9 +194,23 @@ An `Init()` or `Check()` error fails that candidate. By default, a `Check()` err
 the error when that default is wrong:
 
 - `collectorapi.PermanentError(err)`: a failure that retrying the same configuration cannot fix, such as an invalid
-  option or an unknown named profile. That config is not automatically retried.
+  option or an unknown named profile. Ordinary recovery does not retry that config.
 - `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a dependency that is not ready
   yet. That config keeps its `autodetection_retry` schedule, even from `Init()`.
+
+If a provider requires a minimum wait before another startup attempt, return
+`collectorapi.WithRetryNotBefore(err, deadline)`, with the absolute deadline captured when the provider requests it
+(for a duration, `time.Now().Add(wait)`). This annotation only delays an already-eligible automatic retry; it does not
+classify the error, enable disabled retries or change DynCfg replies. It survives failed-collector disposal and
+secret-error redaction. When several wrapped or joined errors specify deadlines, the latest applies. The outstanding
+minimum follows the same retained configuration across automatic source promotion and search reopening, independently
+of ordinary retry permission. Other configurations keep their own eligibility. The minimum is consumed when a new
+automatic activation is admitted. Manual `test` and rejected `update` still return promptly; accepted exact
+`update`/`restart` resets the selected configuration, and a fresh `enable` resets its reopened scope. An already-enabled
+`enable` preserves deadlines.
+
+This startup annotation does not schedule retries or delay ordinary `Collect` calls. A running collector remains
+responsible for its own provider wait between collections.
 
 Several source configs can share a module/job name. Before any candidate reaches readiness, an enabled source-owned
 job tries eligible alternatives at the highest owning source tier, including alternatives in other files. Each gets

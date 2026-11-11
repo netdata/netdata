@@ -39,9 +39,6 @@ This collector only supports collecting metrics from a single instance of this i
 
 No instance discovery is required. The module runs by default, and its chart-family options default to `auto`, creating the applicable charts when their proc sources are available without waiting for a non-zero sample.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

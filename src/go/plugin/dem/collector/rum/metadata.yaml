@@ -1,15 +1,42 @@
 modules:
   - functions:
         description: Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live
-            activity and retained investigation history. Invoke their public rum-* names; filter by site where
-            supported.
+            activity and retained investigation history. Invoke their public rum-* names on the collecting Agent; use
+            vnode:storefront to select the exact configured vnode name, not its display hostname. Names use current
+            configuration even with disabled or no jobs; renamed or removed names stop resolving, and reused names select
+            their current GUID. Use vnode_guid for retained history by canonical GUID after removal. Omit both selectors
+            for all vnodes and unassigned data. Filters retain Agent-level access and do not provide per-site authorization.
         list:
           - id: rum-sites
             function_name: rum-sites
             name: RUM Sites
             description: Inspect site setup, sampling, receiver availability and recent activity to diagnose missing
                 browser data.
-            parameters: []
+            parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
+              - id: site
+                name: site
+                description: Filter by native site job name. Leave empty to include all sites.
+                type: string
+                required: false
+                default: ''
+                options: []
             returns:
                 description: One admitted site job. The response also includes collector public URL and ingress
                     availability.
@@ -112,15 +139,11 @@ modules:
                     type: integer
                     unit: ''
                     description: Explicit application-view occurrences in the window.
-                  - name: window_lost
-                    type: integer
+                  - name: vnode_guid
+                    type: string
                     unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: sessions_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-            performance: Reads bounded local activity snapshots without contacting the monitored website.
+                    description: Recorded canonical vnode GUID; empty means unassigned.
+            performance: Reads current local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
@@ -133,6 +156,23 @@ modules:
             description: Compare document-entry pages using recent observed traffic, Web Vital populations and
                 attributed elements.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -142,7 +182,8 @@ modules:
                 options: []
             returns:
                 description: All retained document-entry groups, independent of chart top groups. Null values indicate
-                    absent or incomplete measurements; loss fields identify retained capacity-loss evidence.
+                    absent measurements; zero counts mean no retained occurrences for that field. A page can have vital
+                    measurements with zero document views.
                 columns:
                   - name: site
                     type: string
@@ -210,27 +251,11 @@ modules:
                     type: integer
                     unit: ''
                     description: Retained observations for CLS.
-                  - name: lcp_lost
-                    type: integer
+                  - name: vnode_guid
+                    type: string
                     unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: inp_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: cls_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: window_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-                  - name: sessions_lost
-                    type: integer
-                    unit: ''
-                    description: Retained capacity-loss evidence; affected measurements are unavailable.
-            performance: Reads bounded local activity snapshots without contacting the monitored website.
+                    description: Recorded canonical vnode GUID; empty means unassigned.
+            performance: Reads current local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
@@ -243,6 +268,23 @@ modules:
             description: Read recent browser events for live activity views, optionally continuing from a previous
                 response.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -358,6 +400,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Increasing report revision within this metric or event identity.
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads bounded local activity snapshots without contacting the monitored website.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -371,6 +417,23 @@ modules:
             description: Investigate sampled sessions with retained observations received within a time range, including pages, errors and
                 optional interaction heuristics.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -478,6 +541,10 @@ modules:
                     type: timestamp
                     unit: ''
                     description: Last Selected Observation in Unix microseconds; default descending sort.
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -491,6 +558,23 @@ modules:
             description: Group errors originally received by the Agent in the selected range by fingerprint; select a
                 fingerprint to investigate affected sessions, pages and browsers.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -578,6 +662,10 @@ modules:
                     description: Stable row identity scoped to the site; the visible values remain available for
                         filtering.
                     visibility: hidden
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -591,6 +679,23 @@ modules:
             description: Read the retained event timeline for a session to follow navigation, errors and traced
                 requests.
             parameters:
+              - id: vnode
+                name: vnode
+                description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                  names are rejected. Omit this parameter when not selecting by name.
+                  Supply either vnode or vnode_guid, never both, even with empty values.
+                type: string
+                required: false
+                default: Not supplied
+                options: []
+              - id: vnode_guid
+                name: vnode_guid
+                description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                  vnode. Leave empty or omit both selectors to include every vnode and unassigned data.
+                type: string
+                required: false
+                default: ''
+                options: []
               - id: site
                 name: site
                 description: Filter by native site job name. Leave empty to include all sites.
@@ -656,6 +761,10 @@ modules:
                     type: integer
                     unit: ''
                     description: Increasing report revision within this metric or event identity.
+                  - name: vnode_guid
+                    type: string
+                    unit: ''
+                    description: Recorded canonical vnode GUID; empty means unassigned.
             performance: Reads local retained history; work grows with the selected range and retained records.
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
@@ -686,11 +795,11 @@ modules:
     metrics:
         availability: []
         description: |
-            All charts remain on this Agent. Native job identity scopes site charts; display_name is optional metadata.
+            Charts belong to the configured vnode, or to this Agent when vnode is omitted. Native job identity scopes site charts; display_name is optional metadata.
             The window uses receiver arrival time. Each Web Vital contributes its latest report per document experience;
             percentiles cannot be averaged across times or groups. Population charts show retained observations and ratings.
-            No observations means no percentile. Capacity loss makes affected percentiles and counts unavailable; lost_reports
-            is retained loss evidence, not a denominator or an exact count of missing observations in the window.
+            No observations means no percentile; measured zero remains a valid value. Canonical measurements are retained
+            exactly for the configured receipt window, with no independent aggregate count or byte cap.
 
             Document views count initial activations and back-forward cache restores. Application views count explicit route
             occurrences separately. Observed sessions are distinct browser session identities seen in the window, not concurrent
@@ -729,7 +838,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.fcp
                 description: First Contentful Paint among recent observed document experiences
                 unit: milliseconds
@@ -747,7 +855,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.ttfb
                 description: Time to First Byte among recent observed document experiences
                 unit: milliseconds
@@ -765,7 +872,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.inp
                 description: Interaction to Next Paint among recent observed document experiences
                 unit: milliseconds
@@ -783,7 +889,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.cls
                 description: Cumulative Layout Shift among recent observed document experiences
                 unit: score
@@ -801,7 +906,6 @@ modules:
                   - name: good
                   - name: needs_improvement
                   - name: poor
-                  - name: lost_reports
               - name: rum.load
                 description: Document load time
                 unit: milliseconds
@@ -832,21 +936,18 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: observed
-                  - name: lost_reports
               - name: rum.dom_content_loaded_handler_population
                 description: DOMContentLoaded handler duration observation population
                 unit: observations
                 chart_type: line
                 dimensions:
                   - name: observed
-                  - name: lost_reports
               - name: rum.same_site_fetch_population
                 description: Same-site fetch and XHR duration observation population
                 unit: observations
                 chart_type: line
                 dimensions:
                   - name: observed
-                  - name: lost_reports
               - name: rum.document_views
                 description: Document views
                 unit: views/s
@@ -887,13 +988,6 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: views
-              - name: rum.measurement_loss
-                description: Retained capacity-loss evidence for window summaries
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
-                  - name: sessions
               - name: rum.resources
                 description: Reported application resource entries
                 unit: entries/s
@@ -936,12 +1030,6 @@ modules:
                   - name: sent
                   - name: dropped
                   - name: errors
-              - name: rum.samples_dropped
-                description: Reports lost from bounded measurement state
-                unit: reports/s
-                chart_type: line
-                dimensions:
-                  - name: dropped
               - name: rum.ingress_state
                 description: RUM ingress availability
                 unit: state
@@ -984,13 +1072,6 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: observed
-                  - name: lost_reports
-              - name: rum.resource_host_loss
-                description: Retained capacity-loss evidence for resource counts by host
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: lost_reports
           - name: site fingerprint
             description: One configured site grouped by fingerprint.
             labels:
@@ -1008,12 +1089,6 @@ modules:
                 chart_type: line
                 dimensions:
                   - name: errors
-              - name: rum.error_group_loss
-                description: Retained capacity-loss evidence for error fingerprints
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: lost_reports
           - name: site browser
             description: One configured site grouped by browser.
             labels:
@@ -1072,17 +1147,6 @@ modules:
                 unit: observations
                 chart_type: line
                 dimensions:
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
-              - name: rum.browser_loss
-                description: Retained capacity-loss evidence by browser
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
                   - name: lcp
                   - name: fcp
                   - name: ttfb
@@ -1151,17 +1215,6 @@ modules:
                   - name: ttfb
                   - name: inp
                   - name: cls
-              - name: rum.device_loss
-                description: Retained capacity-loss evidence by device
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
           - name: site country
             description: One configured site grouped by country.
             labels:
@@ -1220,17 +1273,6 @@ modules:
                 unit: observations
                 chart_type: line
                 dimensions:
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
-              - name: rum.country_loss
-                description: Retained capacity-loss evidence by country
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
                   - name: lcp
                   - name: fcp
                   - name: ttfb
@@ -1299,17 +1341,6 @@ modules:
                   - name: ttfb
                   - name: inp
                   - name: cls
-              - name: rum.page_loss
-                description: Retained capacity-loss evidence by page
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
           - name: site version
             description: One configured site grouped by version.
             labels:
@@ -1373,17 +1404,6 @@ modules:
                   - name: ttfb
                   - name: inp
                   - name: cls
-              - name: rum.version_loss
-                description: Retained capacity-loss evidence by version
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: activity
-                  - name: lcp
-                  - name: fcp
-                  - name: ttfb
-                  - name: inp
-                  - name: cls
           - name: site view
             description: One configured site grouped by view.
             labels:
@@ -1402,12 +1422,6 @@ modules:
                 dimensions:
                   - name: views
                   - name: errors
-              - name: rum.view_loss
-                description: Retained capacity-loss evidence by application view
-                unit: reports
-                chart_type: line
-                dimensions:
-                  - name: lost_reports
     overview:
         additional_permissions:
             description: The Netdata service needs write access to its DEM state directory. Configured TLS and GeoIP
@@ -1430,10 +1444,11 @@ modules:
                 description: Sites are explicitly configured; websites are not discovered automatically.
             limits:
                 description: |
-                    Breakdown charts show current-window top groups. Missing browser observations cannot be reconstructed, and
-                    capacity loss suppresses affected percentiles and window counts. Duplicate detection is best effort across a bounded
-                    30-minute retention period; capacity pressure or restart can shorten it. Quality alerts require at least 30
-                    observations for that metric and complete local measurement state. Quiet traffic alone does not trigger an alert.
+                    Breakdown charts show current-window top groups; page Functions expose all retained document-entry groups.
+                    Missing browser observations cannot be reconstructed. Measurements use the configured window (five minutes by
+                    default); replay evidence is retained for 30 minutes unless the site job restarts, is replaced, or changes its
+                    vnode association. Later replays can count again.
+                    Quality alerts require at least 30 observations for that metric. Quiet traffic alone does not trigger an alert.
 
                     RUM and synthetic history share the 30-day and 1-GiB defaults in `dem.conf`, including disabled sites and retained
                     machine identities. The byte target counts full journal file sizes including preallocation, with an 8-MiB minimum.
@@ -1447,8 +1462,10 @@ modules:
                     current and future detail while the session remains tracked. Earlier logs and spans are not exported retrospectively;
                     complete sessions or traces are not guaranteed. Export acceptance does not guarantee durable storage.
             performance_impact:
-                description: Resource usage depends on accepted browser traffic and the configured measurement window.
-                    Optional OTLP export and investigation history add network and local disk work.
+                description: Measurement and replay memory grows with admitted distinct state and retained text over the configured
+                    measurement window (five minutes by default) and 30-minute identity horizon. There is no independent aggregate
+                    count or byte cap. Investigation detail has separate session and entry limits. Optional OTLP export and investigation
+                    history add network and local disk work. These retention rules do not establish a qualified full-scale workload.
         multi_instance: true
         supported_platforms:
             exclude: []
@@ -1465,13 +1482,15 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
-                    description: Native charts, session timelines and errors, with country-only location and frustration
+                    description: Define the `storefront` vnode first, or omit `vnode` to use the collecting Agent. Native charts, session timelines and errors use country-only location with frustration
                         heuristics disabled. No OTLP receiver is required.
                     name: Website
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
                             investigate:
                               sample_rate: 0
@@ -1481,6 +1500,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
                             investigate:
                               sample_rate: 0
@@ -1491,6 +1511,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
                             event_logs:
                               enabled: true
@@ -1501,6 +1522,7 @@ modules:
                   - config: |
                         jobs:
                           - name: shop
+                            vnode: storefront
                             allowed_origins: [https://shop.example.org]
                             tracing:
                               enabled: true
@@ -1734,10 +1756,16 @@ modules:
                     group: Normalization
                     name: redact_paths[].replace
                     required: false
+                  - default_value: ""
+                    description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+                    detailed_description: Define a static vnode through `dem:vnode` or a YAML file in the Netdata configuration directory’s `vnodes/` directory. Enter its reference name, not its GUID. Leave empty to keep charts on the collecting Agent.
+                      A different resolved GUID starts a fresh rolling measurement window and Pages view. Saved and buffered investigation records keep their original GUID; hostname or label edits do not reset measurements. Job-wide transport and history counters continue.
+                    group: Virtual Node
+                    name: vnode
+                    required: false
         prerequisites:
             list:
-              - description: DEM is experimental and opt-in. Build Netdata with `-DENABLE_PLUGIN_DEM=ON`, or use
-                    `--enable-plugin-dem` with the source installer. Install the resulting DEM plugin package.
+              - description: Linux builds include DEM by default. Native installations include the `netdata-plugin-dem` package. RUM does not require the optional browser runtime.
                 title: Install the DEM plugin
               - description: Configure the canonical receiver in `dem/receiver.conf`, then add one job per website in
                     `dem/rum.conf`. The native configuration UI exposes the receiver as a single object and sites as

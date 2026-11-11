@@ -10,6 +10,11 @@
         "type": "string",
         "minLength": 1
       },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
       "url": {
         "title": "URL",
         "description": "Absolute HTTP or HTTPS URL of the page to audit. Embedded credentials are not accepted.",
@@ -25,10 +30,10 @@
       },
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, in seconds.",
+        "description": "Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`.",
         "type": "integer",
         "minimum": 1,
-        "default": 1800
+        "default": 10
       },
       "timeout": {
         "title": "Timeout",
@@ -36,6 +41,14 @@
         "type": "number",
         "default": 180,
         "minimum": 0.001
+      },
+      "check_every": {
+        "title": "Check every",
+        "description": "Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9223372036,
+        "default": 1800
       }
     },
     "required": [
@@ -63,11 +76,22 @@
         {
           "title": "Collection",
           "fields": [
+            "check_every",
             "update_every",
             "timeout"
           ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
         }
       ]
+    },
+    "vnode": {
+      "ui:placeholder": "storefront",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define a static Virtual Node through `dem:vnode` or a YAML file in `vnodes/` under the Netdata configuration directory, then enter its reference name here. Leave empty to use the collecting Agent."
     }
   }
 }

@@ -14,14 +14,16 @@ import "slices"
 //
 // A nil journal mutates without recording (direct state setup in tests).
 type planJournal struct {
-	token     uint64
-	chartMaps []chartMapUndo
-	dimMaps   []dimMapUndo
-	entryMaps []entryMapUndo
-	charts    []chartUndo
-	dims      []dimUndo
-	entries   []entryUndo
-	seqs      []seqUndo
+	// Context counts are attempt-local facts, installed only at commit.
+	contextCounts map[string]int
+	token         uint64
+	chartMaps     []chartMapUndo
+	dimMaps       []dimMapUndo
+	entryMaps     []entryMapUndo
+	charts        []chartUndo
+	dims          []dimUndo
+	entries       []entryUndo
+	seqs          []seqUndo
 
 	// byChart indexes chart and dimension-map records by chart for committedChart. It
 	// is built on first use and extended with the records appended since.

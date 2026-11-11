@@ -820,9 +820,12 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Monitor network interface metrics about bandwidth, state, errors and more.
+          Monitor Windows network interface traffic, packets, speed, errors, drops, and offload activity in charts.
+          A live interface table also shows current operational state and the adapter's friendly name when Windows can match it to a discovered interface.
         method_description: |
-          It queries 'Network Interface' and 'Network Adapter' objects from Perflib in order to gather the metrics.
+          It queries the 'Network Interface' Perflib object and uses its 'Network Adapter' data when present, querying
+          'Network Adapter' separately when absent. The live interface table
+          queries the Windows adapter API when opened and combines that result with the latest collected chart values.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -834,9 +837,18 @@ modules:
           description: |
             The collector automatically detects all of the metrics, no further configuration is required.
         limits:
-          description: ""
+          description: |
+            Operational state and friendly name are unavailable in the live table when a Perflib instance cannot be
+            matched uniquely to a Windows adapter. A missing value is shown as unavailable, not as a down state.
+            Per-interface charts start after the first received or sent byte; the live table can show idle interfaces
+            before their charts start. Existing charts continue through later zero-byte counter values.
+            When Windows cannot read an interface instance name, the aggregate bandwidth chart and removal of vanished
+            interfaces pause for up to 60 collection cycles; after that they continue without the unnamed instance.
         performance_impact:
-          description: ""
+          description: |
+            A separate 'Network Adapter' Perflib query runs only when the 'Network Interface' result lacks that object.
+            The live interface table queries the Windows adapter API on demand. It does not add an adapter API call
+            to each chart collection cycle.
     setup:
       prerequisites:
         list: []
@@ -854,6 +866,13 @@ modules:
             - name: update every
               description: Data collection frequency.
               default_value: 1
+              required: false
+            - name: disable by default interfaces matching
+              description: |
+                Space-separated, case-sensitive patterns matched against Perflib interface instance names. Use `*`
+                to span spaces in a name (for example, `Teredo*`). Matching interfaces are excluded from per-interface
+                charts and the live interface table. The physical network aggregate still includes them.
+              default_value: ""
               required: false
         examples:
           folding:
@@ -1026,7 +1045,7 @@ modules:
             - name: interface_type
               description: "Classification of the network interface (real or virtual)."
             - name: device
-              description: "System-assigned network interface identifier."
+              description: "Perflib network interface instance name."
           metrics:
             - name: net.net
               description: Bandwidth
@@ -1062,6 +1081,12 @@ modules:
               dimensions:
                 - name: inbound
                 - name: outbound
+            - name: net.unknown_protocol_packets
+              description: Packets Received with Unknown Protocol
+              unit: "packets/s"
+              chart_type: line
+              dimensions:
+                - name: inbound
             - name: net.queue_length
               description: Interface Output Queue Length
               unit: "packets"
@@ -1098,6 +1123,96 @@ modules:
               chart_type: line
               dimensions:
                 - name: connections
+    functions:
+      description: |
+        View current Windows network interface performance and operational state.
+      list:
+        - id: network-interfaces
+          name: Network Interfaces
+          description: |
+            Shows discovered physical and virtual interfaces with current traffic, packet, drop, speed, and operational
+            state values. Friendly names and state are shown only when the Perflib instance name uniquely matches a
+            Windows adapter description or, if none matches, an adapter friendly name. Physical carrier state, duplex,
+            and multicast packets are unavailable.
+          parameters: []
+          returns:
+            description: "One row per discovered, non-excluded interface; unavailable values are empty."
+            columns:
+              - name: Interface
+                type: string
+                unit: ""
+                description: "Perflib network interface name."
+              - name: Type
+                type: string
+                unit: ""
+                description: "Physical or virtual interface."
+              - name: UsedBy
+                type: string
+                unit: ""
+                description: "Interface owner."
+              - name: PhState
+                type: string
+                unit: ""
+                description: "Physical carrier state, currently unavailable."
+                visibility: hidden
+              - name: OpState
+                type: string
+                unit: ""
+                description: "Current Windows adapter operational state, when matched."
+              - name: Duplex
+                type: string
+                unit: ""
+                description: "Duplex mode, currently unavailable."
+                visibility: hidden
+              - name: Speed
+                type: number
+                unit: Mbit/s
+                description: "Link speed."
+              - name: MTU
+                type: number
+                unit: Octets
+                description: "Maximum transmission unit."
+              - name: In
+                type: number
+                unit: Mbit/s
+                description: "Traffic received."
+              - name: Out
+                type: number
+                unit: Mbit/s
+                description: "Traffic sent."
+              - name: Total
+                type: number
+                unit: Mbit/s
+                description: "Traffic received and sent."
+                visibility: hidden
+              - name: PktsIn
+                type: number
+                unit: Kpps
+                description: "Received packets."
+              - name: PktsOut
+                type: number
+                unit: Kpps
+                description: "Sent packets."
+              - name: McastIn
+                type: number
+                unit: Kpps
+                description: "Multicast received packets, currently unavailable."
+                visibility: hidden
+              - name: DropsIn
+                type: number
+                unit: Drops
+                description: "Dropped inbound packets."
+              - name: DropsOut
+                type: number
+                unit: Drops
+                description: "Dropped outbound packets."
+              - name: FriendlyName
+                type: string
+                unit: ""
+                description: "Windows adapter friendly name, when matched."
+          performance: "Queries the Windows adapter API when the table is opened."
+          security: "Requires signed-in, same-space access because adapter friendly names can contain user-entered text. This is intentionally stricter than the Linux `network-interfaces` Function, which allows anonymous access; anonymous dashboard users receive HTTP 412 on Windows."
+          availability: "Available after the Windows network collector successfully reads Perflib data."
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibSMB
@@ -4738,9 +4853,9 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Microsoft Exchange.
+          Monitor Exchange transport queues, Active Directory access, client activity, HTTP proxy traffic, and background workloads.
         method_description: |
-          It queries different Exchange objects from Perflib in order to gather the metrics.
+          The collector reads registered Microsoft Exchange performance counters through Windows Perflib.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -4750,7 +4865,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            The collector automatically detects all of the metrics, no further configuration is required.
+            The collector is enabled by default. Charts appear when Exchange registers the corresponding performance objects and counters.
         limits:
           description: ""
         performance_impact:
@@ -4788,40 +4903,10 @@ modules:
       description: ""
       availability: []
       scopes:
-        - name: Windows Exchange
-          description: "These metrics refer to Windows Exchange."
+        - name: Exchange host
+          description: Aggregate Exchange client and service counters on this host.
           labels: []
           metrics:
-            - name: exchange.transport_queues_active_mail_box_delivery
-              description: Active Mailbox Delivery Queue length.
-              unit: messages
-              chart_type: line
-              dimensions:
-                - name: active
-            - name: exchange.transport_queues_external_active_remote_delivery
-              description: External Active Remote Delivery Queue length.
-              unit: messages
-              chart_type: line
-              dimensions:
-                - name: active
-            - name: exchange.transport_queues_internal_active_remote_delivery
-              description: Internal Active Remote Delivery Queue length.
-              unit: messages
-              chart_type: line
-              dimensions:
-                - name: active
-            - name: exchange.transport_queues_unreachable
-              description: Unreachable Queue length.
-              unit: messages
-              chart_type: line
-              dimensions:
-                - name: unreachable
-            - name: exchange.transport_queues_poison
-              description: Poison Queue Length.
-              unit: messages
-              chart_type: line
-              dimensions:
-                - name: unreachable
             - name: exchange.activesync_ping_cmds_pending
               description: Ping commands pending in queue.
               unit: commands
@@ -4840,24 +4925,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: processed
-            - name: exchange.rpc_active_user_count
-              description: Active unique users in the last 2 minutes.
-              unit: users
-              chart_type: line
-              dimensions:
-                - name: active
             - name: exchange.rpc_avg_latency
               description: Average latency.
               unit: seconds
               chart_type: line
               dimensions:
                 - name: latency
-            - name: exchange.rpc_connection_count
-              description: Client connections.
-              unit: connections
-              chart_type: line
-              dimensions:
-                - name: connections
             - name: exchange.rpc_requests
               description: Clients requests currently being processed.
               unit: requests
@@ -4869,7 +4942,7 @@ modules:
               unit: users
               chart_type: line
               dimensions:
-                - name: users
+                - name: active
             - name: exchange.rpc_connection
               description: Client connections.
               unit: connections
@@ -4889,7 +4962,7 @@ modules:
               dimensions:
                 - name: users
             - name: exchange.owa_current_unique_users
-              description: Unique users currently logged on to Outlook Web App.
+              description: Unique users currently logged on to Outlook Web App
               unit: users
               chart_type: line
               dimensions:
@@ -4900,6 +4973,150 @@ modules:
               chart_type: line
               dimensions:
                 - name: handled
+            - name: exchange.autodiscover_requests
+              description: Autodiscover service requests processed.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: processed
+            - name: exchange.avail_service_requests
+              description: Requests serviced.
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: serviced
+            - name: exchange.mapihttp_emsmdb_active_user_count
+              description: Unique MAPI HTTP EMSMDB users active in the last 2 minutes.
+              unit: users
+              chart_type: line
+              dimensions:
+                - name: active
+        - name: Transport queue priority
+          description: Each Exchange transport priority or reported aggregate with registered queue counters. Aggregate instances such as `total excluding priority none` overlap with individual priorities and should not be summed with them.
+          labels:
+            - name: priority
+              description: The transport priority or aggregate instance reported by Exchange.
+          metrics:
+            - name: exchange.transport_queues_active_mail_box_delivery
+              description: Active Mailbox Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.transport_queues_external_active_remote_delivery
+              description: External Active Remote Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.transport_queues_external_largest_delivery
+              description: External Largest Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: largest
+            - name: exchange.transport_queues_internal_active_remote_delivery
+              description: Internal Active Remote Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: exchange.transport_queues_internal_largest_delivery
+              description: Internal Largest Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: largest
+            - name: exchange.transport_queues_retry_mailbox_delivery
+              description: Retry Mailbox Delivery Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: retry
+            - name: exchange.transport_queues_unreachable
+              description: Unreachable Queue length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: unreachable
+            - name: exchange.transport_queues_poison
+              description: Poison Queue Length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: poison
+            - name: exchange.transport_queues_messages_queued_for_delivery_total
+              description: Messages queued for delivery.
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_messages_submitted_total
+              description: Messages submitted.
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: submitted
+            - name: exchange.transport_queues_messages_delayed_total
+              description: Messages delayed.
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: delayed
+            - name: exchange.transport_queues_messages_completed_delivery_total
+              description: Messages completed delivery.
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: delivered
+            - name: exchange.transport_queues_aggregate_shadow_queue_length
+              description: Current number of messages in shadow queues.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_submission_queue_length
+              description: Submission Queue Length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_delay_queue_length
+              description: Delay Queue Length.
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_items_completed_delivery_total
+              description: Items completed delivery.
+              unit: items/s
+              chart_type: line
+              dimensions:
+                - name: completed
+            - name: exchange.transport_queues_items_queued_for_delivery_expired_total
+              description: Items queued for delivery that expired.
+              unit: items/s
+              chart_type: line
+              dimensions:
+                - name: expired
+            - name: exchange.transport_queues_items_queued_for_delivery_total
+              description: Items queued for delivery.
+              unit: items/s
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: exchange.transport_queues_items_resubmitted_total
+              description: Items resubmitted.
+              unit: items/s
+              chart_type: line
+              dimensions:
+                - name: resubmitted
+        - name: Workload
+          description: Each background workload reported by Exchange Workload Management.
+          labels:
+            - name: workload
+              description: The Exchange workload name.
+          metrics:
             - name: exchange.workload_active_tasks
               description: Workload active tasks.
               unit: tasks
@@ -4914,7 +5131,7 @@ modules:
                 - name: completed
             - name: exchange.workload_queued_tasks
               description: Workload queued tasks.
-              unit: tasks/s
+              unit: tasks
               chart_type: line
               dimensions:
                 - name: queued
@@ -4925,12 +5142,18 @@ modules:
               dimensions:
                 - name: yielded
             - name: exchange.workload_activity_status
-              description: Workload activity status
+              description: Workload activity status.
               unit: status
               chart_type: line
               dimensions:
                 - name: active
                 - name: paused
+        - name: HTTP proxy
+          description: Each Exchange HTTP proxy endpoint with registered counters.
+          labels:
+            - name: http_proxy
+              description: The HTTP proxy endpoint name reported by Exchange.
+          metrics:
             - name: exchange.http_proxy_avg_auth_latency
               description: Average time spent authenticating CAS requests.
               unit: seconds
@@ -4945,7 +5168,7 @@ modules:
                 - name: latency
             - name: exchange.http_proxy_mailbox_proxy_failure_rate
               description: Percentage of failures between this CAS and MBX servers.
-              unit: seconds
+              unit: percentage
               chart_type: line
               dimensions:
                 - name: failures
@@ -4957,28 +5180,403 @@ modules:
                 - name: latency
             - name: exchange.http_proxy_outstanding_proxy_requests
               description: Concurrent outstanding proxy requests.
-              unit: seconds
+              unit: requests
               chart_type: line
               dimensions:
                 - name: requests
             - name: exchange.http_proxy_requests
               description: Number of proxy requests processed each second.
-              unit: seconds
+              unit: requests/s
               chart_type: line
               dimensions:
                 - name: requests
-            - name: exchange.autodiscover_requests
-              description: Autodiscover service requests processed
-              unit: requests/s
+        - name: AD access process
+          description: Each Exchange process reporting Active Directory access counters.
+          labels:
+            - name: process
+              description: The Exchange process name.
+          metrics:
+            - name: exchange.ldap_read_time_sec
+              description: Time to send an LDAP read request and receive a response.
+              unit: seconds
               chart_type: line
               dimensions:
-                - name: processed
-            - name: exchange.avail_service_requests
-              description: Requests serviced
-              unit: requests/s
+                - name: read
+            - name: exchange.ldap_search_time_sec
+              description: Time to send an LDAP search request and receive a response.
+              unit: seconds
               chart_type: line
               dimensions:
-                - name: serviced
+                - name: search
+            - name: exchange.ldap_write_time_sec
+              description: Time to send an LDAP add, modify, or delete request and receive a response.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: write
+            - name: exchange.ldap_read_operations_total
+              description: LDAP read operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: exchange.ldap_search_operations_total
+              description: LDAP search operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: exchange.ldap_write_operations_total
+              description: LDAP write operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+            - name: exchange.ldap_timeout_errors_total
+              description: LDAP timeout errors.
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: timeouts
+            - name: exchange.ldap_long_running_ops_per_sec
+              description: Long running LDAP operations.
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: operations
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibMSMQ
+      monitored_instance:
+        name: Microsoft Message Queuing
+        link: "https://learn.microsoft.com/en-us/previous-versions/windows/desktop/msmq/ms711472(v=vs.85)"
+        categories:
+          - data-collection.applications
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - msmq
+        - message queue
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Microsoft Message Queuing (MSMQ) queues on Windows.
+        method_description: |
+          It queries the MSMQ Queue object from Perflib to gather per-queue message and byte counts,
+          including journal queue statistics.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector detects queues automatically when Perflib reports them; newly created or idle queues may not
+            appear until they become active, such as after a message is sent. It charts up to 100 matching queues
+            individually by default and aggregates unmatched or over-limit queues into an `Other (aggregated)` series.
+            Configure the selector and cap in `[plugin:windows:PerflibMSMQ]`.
+        limits:
+          description: |
+            By default, at most 100 queues are charted individually. Remaining queues are aggregated; setting the
+            individual queue limit to 0 aggregates all queues.
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Microsoft Message Queuing (MSMQ) installed
+            description: |
+              MSMQ must be installed and running on the Windows host. The collector will return no data
+              if the MSMQ Queue performance object is not present in the registry.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibMSMQ]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: queues to chart individually
+              description: |
+                Case-insensitive simple patterns separated by commas or pipes. Windows queue paths can be pasted
+                verbatim; escape a comma or pipe with a backslash to match that character literally. Selectors match
+                raw Perflib instance names; the `queue` chart label is sanitized for display. Matching queues are
+                chosen in case-insensitive alphabetical order before applying the individual chart limit. An empty
+                selector or a negative-only selector, such as `!*temp*`, selects no queues for individual charts, so
+                all queues are aggregated. Add a positive pattern, for example `!*temp*,*`, to select every queue
+                except those matching `*temp*`.
+              default_value: "*"
+              required: false
+            - name: max individually charted queues
+              description: |
+                Maximum number of matching queues to chart individually. Other queues are summed into the `Other
+                (aggregated)` series; 0 aggregates all queues.
+              default_value: 100
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: queue
+          description: "These metrics refer to one MSMQ queue or the aggregate of queues selected for the Other series."
+          labels:
+            - name: queue
+              description: The queue name, or `Other (aggregated)` for the sum of queues not charted individually.
+          metrics:
+            - name: msmq.queue_messages
+              description: MSMQ messages in queue
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: msmq.queue_bytes
+              description: MSMQ bytes in queue
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: msmq.queue_journal_messages
+              description: MSMQ messages in journal queue
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: msmq.queue_journal_bytes
+              description: MSMQ bytes in journal queue
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: queued
+  - meta:
+      plugin_name: windows.plugin
+      module_name: GetFSRMQuota
+      monitored_instance:
+        name: FSRM Quotas
+        description: "Monitor Windows File Server Resource Manager quota usage, limits, and state."
+        link: "https://learn.microsoft.com/en-us/windows-server/storage/fsrm/quota-management"
+        categories:
+          - data-collection.storage
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - fsrm
+        - quota
+        - file server
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors File Server Resource Manager (FSRM) quotas on Windows: space used, the highest usage
+          recorded, the quota limit, and whether each quota is disabled, a soft limit, or still matches its template.
+        method_description: |
+          It queries the `MSFT_FSRMQuota` WMI class in the `root\Microsoft\Windows\FSRM` namespace on its own thread,
+          so a slow WMI service cannot delay other Windows collectors.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: |
+          The Netdata service account needs read access to the `root\Microsoft\Windows\FSRM` WMI namespace. The
+          default `LocalSystem` account has it; whether other accounts can read quotas has not been verified.
+      default_behavior:
+        auto_detection:
+          description: |
+            The module is disabled by default. Once enabled, it charts every quota the FSRM provider returns. Quotas
+            created later appear on the next collection; deleted quotas stop being charted.
+        limits:
+          description: |
+            Every quota is charted individually, with two charts per quota. Hosts with thousands of quotas create a
+            matching number of charts.
+        performance_impact:
+          description: |
+            Each collection runs one WMI query. If the query fails, the module retries with exponential backoff, up to
+            every 10 minutes, so a host without the FSRM role costs almost nothing.
+    setup:
+      prerequisites:
+        list:
+          - title: FSRM role installed
+            description: |
+              The File Server Resource Manager role service must be installed and the `SrmSvc` service running. Quotas
+              are optional: with none configured, the module reports zero quotas.
+          - title: Enable the module
+            description: |
+              Set `GetFSRMQuota = yes` in the `[plugin:windows]` section of `netdata.conf` and restart Netdata.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:GetFSRMQuota]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      errors:
+        list:
+          - error: "GetFSRMQuota: the FSRM service (SrmSvc) is not running (service state `state`; 0 means not installed or not accessible); skipping this cycle"
+            cause: |
+              The File Server Resource Manager service is stopped, still starting, not installed, or its state cannot
+              be read by the Netdata service account. While it is not running, the FSRM WMI provider answers with an
+              empty or incomplete list instead of an error, so the module leaves a gap in the charts rather than
+              reporting zero quotas.
+            fix: |
+              Run `Get-Service SrmSvc`. If the service is not found, install the FSRM role with
+              `Install-WindowsFeature FS-Resource-Manager` (Windows Server). If it exists but is not running, start it
+              with `Start-Service SrmSvc` and check its startup type. If it is running but the state is 0, the Netdata
+              service account lacks permission to query it; run Netdata as `LocalSystem`. Charts resume on the next
+              successful collection.
+      problems:
+        list:
+          - name: No FSRM charts after enabling the module
+            description: |
+              Check the Netdata collector log for `GetFSRMQuota` errors. `FSRM WMI provider not found` means the FSRM
+              role is not installed; `access denied` means the service account cannot read the FSRM WMI namespace;
+              `timed out` means the WMI service did not answer in time. A host with no quotas shows only the quota
+              count chart, at 0.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "A failed WMI query leaves a gap in every chart instead of reporting zeros."
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to all FSRM quotas on the host."
+          labels: []
+          metrics:
+            - name: fsrm.quotas
+              description: FSRM quotas
+              unit: quotas
+              chart_type: line
+              dimensions:
+                - name: quotas
+        - name: quota
+          description: "These metrics refer to one FSRM quota."
+          labels:
+            - name: path
+              description: The folder or volume path the quota applies to.
+            - name: template
+              description: The quota template the quota was created from; empty when none.
+          metrics:
+            - name: fsrm.quota_space
+              description: FSRM quota space
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+                - name: peak
+                - name: limit
+            - name: fsrm.quota_state
+              description: FSRM quota state
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: disabled
+                - name: soft_limit
+                - name: matches_template
+    functions:
+      description: |
+        View every FSRM quota, including its description, which is not kept as a chart label.
+      list:
+        - id: fsrm-quotas
+          name: FSRM Quotas
+          description: |
+            Shows the quotas from the latest successful collection with usage, limit, peak usage, percentage used, and
+            state. Returns an error when no collection has succeeded within three collection intervals.
+          parameters: []
+          returns:
+            description: "One row per quota; unavailable values are empty."
+            columns:
+              - name: Path
+                type: string
+                unit: ""
+                description: "Quota path."
+              - name: Template
+                type: string
+                unit: ""
+                description: "Quota template; empty when none."
+              - name: Description
+                type: string
+                unit: ""
+                description: "Quota description."
+              - name: Used
+                type: number
+                unit: bytes
+                description: "Disk space charged to the quota."
+              - name: Limit
+                type: number
+                unit: bytes
+                description: "Quota size."
+              - name: Peak
+                type: number
+                unit: bytes
+                description: "Highest usage charged to the quota."
+                visibility: hidden
+              - name: Used%
+                type: number
+                unit: "%"
+                description: "Usage as a percentage of the quota size."
+              - name: SoftLimit
+                type: string
+                unit: ""
+                description: "`yes` for a soft limit, `no` for a hard limit."
+              - name: Disabled
+                type: string
+                unit: ""
+                description: "`yes` when the quota is disabled."
+              - name: MatchesTemplate
+                type: string
+                unit: ""
+                description: "`yes` when the quota properties match its template."
+                visibility: hidden
+          performance: "Reads the in-memory result of the latest collection; it does not query WMI."
+          security: "Requires signed-in, same-space access because quota paths and descriptions can contain user-entered text."
+          availability: "Available after the first successful collection with the module enabled."
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNUMA

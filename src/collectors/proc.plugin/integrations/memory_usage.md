@@ -53,9 +53,6 @@ This collector only supports collecting metrics from a single instance of this i
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -126,7 +123,7 @@ Metrics:
 | mem.swap_cached | Swap Memory Cached in RAM | cached | MiB |
 | mem.zswap | Zswap Usage | in-ram, on-disk | MiB |
 | mem.hwcorrupt | Corrupted Memory detected by ECC | HardwareCorrupted | MiB |
-| mem.commited | Committed (Allocated) Memory | Commited_AS | MiB |
+| mem.committed | Committed (Allocated) Memory | Committed_AS | MiB |
 | mem.writeback | Writeback Memory | Dirty, Writeback, FuseWriteback, NfsWriteback, Bounce | MiB |
 | mem.kernel | Memory Used by Kernel | Slab, KernelStack, PageTables, VmallocUsed, Percpu | MiB |
 | mem.slab | Reclaimable Kernel Memory | reclaimable, unreclaimable | MiB |

@@ -66,6 +66,7 @@ func (c *Collector) applyDiscoveryDisposition(ctx context.Context, disposition d
 		c.discoverySig = disposition.discoverySig
 		c.invalidateTagFetchPlan()
 		c.markTagsStale()
+		c.markAttributesStale()
 		c.invalidateQueryPlan()
 		return nil
 	case discoveryDispositionRetry:

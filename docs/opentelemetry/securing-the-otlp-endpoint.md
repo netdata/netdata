@@ -52,7 +52,7 @@ receivers:
 ## What reaches Netdata Cloud
 
 Received telemetry is stored on the Agent, not in Netdata Cloud. Viewing logs or traces requires a signed-in Netdata
-Cloud user of the Agent's Space; when viewing through Netdata Cloud, content is transmitted encrypted to the browser
+Cloud user of the Agent's Space, and viewing traces also requires a paid plan or an active trial; when viewing through Netdata Cloud, content is transmitted encrypted to the browser
 and is not stored in Netdata Cloud.
 
 ## Checklist

@@ -73,7 +73,7 @@ void simple_connector_receive_response(int *sock, struct instance *instance)
     errno_clear();
 
     // loop through to collect all data
-    while (*sock != -1 && errno != EWOULDBLOCK) {
+    while (*sock >= 0 && errno != EWOULDBLOCK) {
         ssize_t r;
         buffer_need_bytes(response, 1);
 
@@ -281,13 +281,13 @@ void simple_connector_worker(void *instance_p)
         // ------------------------------------------------------------------------
         // if we are connected, receive a response, without blocking
 
-        if (likely(sock != -1))
+        if (likely(sock >= 0))
             simple_connector_receive_response(&sock, instance);
 
         // ------------------------------------------------------------------------
         // if we are not connected, connect to a data collecting server
 
-        if (unlikely(sock == -1)) {
+        if (unlikely(sock < 0)) {
             size_t reconnects = 0;
 
             sock = connect_to_one_of_urls(
@@ -298,7 +298,7 @@ void simple_connector_worker(void *instance_p)
                 connector_specific_data->connected_to,
                 CONNECTED_TO_MAX);
 
-            if (exporting_tls_is_enabled(instance->config.type, options) && sock != -1) {
+            if (exporting_tls_is_enabled(instance->config.type, options) && sock >= 0) {
                 if (netdata_ssl_exporting_ctx) {
                     if (sock_setnonblock(sock, false) != 0)
                         netdata_log_error("Exporting cannot remove the non-blocking flag from socket %d", sock);
@@ -332,7 +332,7 @@ void simple_connector_worker(void *instance_p)
 
         failures = 0;
 
-        if (likely(sock != -1)) {
+        if (likely(sock >= 0)) {
             simple_connector_send_buffer(
                 &sock,
                 &failures,

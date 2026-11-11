@@ -144,13 +144,13 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_lgpEnvHumidityMeasurementRel` | `%` | per lgp_env_temperature_descr_deg_f | The measured humidity value |
+| `snmp.device_prof_lgpEnvHumidityMeasurementRel` | `%` | per lgp_env_humidity_descr_rel | The measured humidity value |
 
 ### Environment / Temperature
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_lgpEnvTemperatureMeasurementDegC` | `Cel` | per lgp_env_temperature_descr_deg_f | The measured temperature value |
+| `snmp.device_prof_lgpEnvTemperatureMeasurementDegC` | `Cel` | per lgp_env_temperature_descr_deg_c | The measured temperature value |
 | `snmp.device_prof_lgpEnvTemperatureMeasurementDegF` | `degF` | per lgp_env_temperature_descr_deg_f | The measured temperature value |
 | `snmp.device_prof_lgpEnvTemperatureSettingDegF` | `degF` | device | The temperature setting used to control the well known temperature object lgpEnvControlTemperature |
 | `snmp.device_prof_lgpEnvTemperatureToleranceDegF` | `degF` | device | The acceptable variance from lgpEnvTemperatureSettingDegF without initiating a control action |

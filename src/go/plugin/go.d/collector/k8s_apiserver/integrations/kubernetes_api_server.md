@@ -62,9 +62,6 @@ When running inside a Kubernetes cluster, the collector attempts to connect to
 `https://kubernetes.default.svc:443/metrics` using the pod's ServiceAccount token.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

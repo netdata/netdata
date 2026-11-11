@@ -59,7 +59,7 @@ const char *weights_method_to_string(WEIGHTS_METHOD method) {
 
 typedef enum {
     RESULT_IS_BASE_HIGH_RATIO     = (1 << 0),
-    RESULT_IS_PERCENTAGE_OF_TIME  = (1 << 1),
+    RESULT_IS_PERCENTAGE_OF_SAMPLES  = (1 << 1),
 } RESULT_FLAGS;
 
 struct register_result {
@@ -135,13 +135,30 @@ static struct weights_host_snapshot *weights_host_snapshot_get(DICTIONARY *snaps
     return snapshot;
 }
 
+// Each result owns references to its context, instance and metric: the results are formatted after the
+// query target or the contexts walk that found them has released its own references.
+static void register_result_acquire(struct register_result *t) {
+    t->rca = rrdcontext_acquired_ref(t->rca);
+    t->ria = rrdinstance_acquired_ref(t->ria);
+    t->rma = rrdmetric_acquired_ref(t->rma);
+}
+
+static void register_result_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct register_result *t = value;
+    rrdmetric_acquired_unref(t->rma);
+    rrdinstance_acquired_unref(t->ria);
+    rrdcontext_acquired_unref(t->rca);
+}
+
 static DICTIONARY *register_result_init() {
     DICTIONARY *results = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct register_result));
+    dictionary_register_delete_callback(results, register_result_delete_cb, NULL);
     return results;
 }
 
 static DICTIONARY *register_result_init_single_threaded() {
     DICTIONARY *results = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct register_result));
+    dictionary_register_delete_callback(results, register_result_delete_cb, NULL);
     return results;
 }
 
@@ -157,7 +174,9 @@ static void merge_results_dictionaries(DICTIONARY *main_results, DICTIONARY *loc
     struct register_result *local_result;
     dfe_start_read(local_results, local_result) {
         // workers process disjoint hosts and results are keyed by rma pointer, so keys never collide
-        dictionary_set(main_results, local_result_dfe.name, local_result, sizeof(struct register_result));
+        struct register_result t = *local_result;
+        register_result_acquire(&t);
+        dictionary_set(main_results, local_result_dfe.name, &t, sizeof(struct register_result));
     }
     dfe_done(local_result);
 }
@@ -201,6 +220,8 @@ static void register_result(DICTIONARY *results, RRDHOST *host, STRING *hostname
 
     if(baseline)
         t.baseline = *baseline;
+
+    register_result_acquire(&t);
 
     // Use the original pointer address approach - revert the stable key change
     char buf[20 + 1];
@@ -365,7 +386,9 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
             buffer_json_member_add_object(wb, "dimensions");
             charts++;
         }
-        buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
+        STRING *dim_name = rrdmetric_acquired_name_dup(t->rma);
+        buffer_json_member_add_double(wb, string2str(dim_name), t->value);
+        string_freez(dim_name);
         total_dimensions++;
     }
     dfe_done(t);
@@ -458,7 +481,9 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
         charts_total_weight += t->value;
         chart_dims++;
         if(!limit || t->selected) {
-            buffer_json_member_add_double(wb, rrdmetric_acquired_name(t->rma), t->value);
+            STRING *dim_name = rrdmetric_acquired_name_dup(t->rma);
+            buffer_json_member_add_double(wb, string2str(dim_name), t->value);
+            string_freez(dim_name);
             total_dimensions++;
         }
     }
@@ -483,13 +508,6 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
 
     return total_dimensions;
 }
-
-// Workload statistics for progress tracking and thread optimization
-struct workload_stats {
-    size_t nodes;
-    size_t contexts;
-    size_t metrics;
-};
 
 struct query_weights_data {
     QUERY_WEIGHTS_REQUEST *qwr;
@@ -524,14 +542,12 @@ struct query_weights_data {
     struct weights_host_snapshot *host_snapshot;
     ONEWAYALLOC *query_owa;
     WEIGHTS_STATS stats;
-    RRDHOST **hosts_array;
-    size_t total_hosts;
-    size_t hosts_array_capacity;
+    RRDHOST **hosts;        // pinned by query_scope_hosts_pin() until the response is built
+    size_t hosts_count;
 
     uint32_t shifts;
 
     struct query_versions versions;
-    struct workload_stats total_workload; // Overall workload statistics for progress tracking
 };
 
 // Thread-local data for parallel processing
@@ -601,9 +617,11 @@ void query_weights_worker_thread(void *arg)
     for (size_t i = 0; i < thread_data->host_count; i++) {
         RRDHOST *host = thread_data->hosts[i];
 
-        // Check for timeout/interruption
+        // Check for timeout/interruption, and stop between hosts once the agent is exiting:
+        // a normal shutdown waits for the chunks (weights_parallel_shutdown()), an abnormal one does not
         if (__atomic_load_n(&main_qwd->timed_out, __ATOMIC_RELAXED) ||
-            __atomic_load_n(&main_qwd->interrupted, __ATOMIC_RELAXED)) {
+            __atomic_load_n(&main_qwd->interrupted, __ATOMIC_RELAXED) ||
+            exit_initiated_get()) {
             break;
         }
 
@@ -620,7 +638,7 @@ void query_weights_worker_thread(void *arg)
             break;
         }
 
-        // Hosts were already filtered by the counting pass; only queryable ones are in hosts_array
+        // only queryable hosts are pinned
         ssize_t ret = weights_do_node_callback(&local_qwd, host, true);
         if (ret < 0)
             break;
@@ -1020,11 +1038,13 @@ struct dict_unique_node {
     usec_t duration_ut;
 };
 
+// the dictionaries below own their units and names: the objects' own strings are replaced while we use them
+
 struct dict_unique_name_units {
     bool existing;
     bool exposed;
     uint32_t i;
-    const char *units;
+    STRING *units;
 };
 
 struct dict_unique_id_name {
@@ -1032,8 +1052,20 @@ struct dict_unique_id_name {
     bool exposed;
     uint32_t i;
     const char *id;
-    const char *name;
+    STRING *name;
 };
+
+static void dict_unique_name_units_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct dict_unique_name_units *dun = value;
+    string_freez(dun->units);
+    dun->units = NULL;
+}
+
+static void dict_unique_id_name_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct dict_unique_id_name *dun = value;
+    string_freez(dun->name);
+    dun->name = NULL;
+}
 
 static inline struct dict_unique_node *dict_unique_node_add(DICTIONARY *dict, RRDHOST *host, ssize_t *max_id) {
     struct dict_unique_node *dun = dictionary_set(dict, host->machine_guid, NULL, sizeof(struct dict_unique_node));
@@ -1047,9 +1079,12 @@ static inline struct dict_unique_node *dict_unique_node_add(DICTIONARY *dict, RR
     return dun;
 }
 
-static inline struct dict_unique_name_units *dict_unique_name_units_add(DICTIONARY *dict, const char *name, const char *units, ssize_t *max_id) {
+// takes ownership of units
+static inline struct dict_unique_name_units *dict_unique_name_units_add(DICTIONARY *dict, const char *name, STRING *units, ssize_t *max_id) {
     struct dict_unique_name_units *dun = dictionary_set(dict, name, NULL, sizeof(struct dict_unique_name_units));
-    if(!dun->existing) {
+    if(dun->existing)
+        string_freez(units);
+    else {
         dun->units = units;
         dun->existing = true;
         dun->i = *max_id;
@@ -1059,11 +1094,14 @@ static inline struct dict_unique_name_units *dict_unique_name_units_add(DICTIONA
     return dun;
 }
 
-static inline struct dict_unique_id_name *dict_unique_id_name_add(DICTIONARY *dict, const char *id, const char *name, ssize_t *max_id) {
+// takes ownership of name
+static inline struct dict_unique_id_name *dict_unique_id_name_add(DICTIONARY *dict, const char *id, STRING *name, ssize_t *max_id) {
     char key[1024 + 1];
-    snprintfz(key, sizeof(key) - 1, "%s:%s", id, name);
+    snprintfz(key, sizeof(key) - 1, "%s:%s", id, string2str(name));
     struct dict_unique_id_name *dun = dictionary_set(dict, key, NULL, sizeof(struct dict_unique_id_name));
-    if(!dun->existing) {
+    if(dun->existing)
+        string_freez(name);
+    else {
         dun->existing = true;
         dun->i = *max_id;
         (*max_id)++;
@@ -1100,6 +1138,9 @@ static size_t registered_results_to_json_multinode_no_group_by(
     DICTIONARY *dict_contexts = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_name_units));
     DICTIONARY *dict_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
     DICTIONARY *dict_dimensions = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct dict_unique_id_name));
+    dictionary_register_delete_callback(dict_contexts, dict_unique_name_units_delete_cb, NULL);
+    dictionary_register_delete_callback(dict_instances, dict_unique_id_name_delete_cb, NULL);
+    dictionary_register_delete_callback(dict_dimensions, dict_unique_id_name_delete_cb, NULL);
 
     buffer_json_member_add_array(wb, "result");
 
@@ -1161,7 +1202,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
             last_rca = t->rca;
             context_dun = (!limit || t->context_selected) ?
                 dict_unique_name_units_add(dict_contexts, rrdcontext_acquired_id(t->rca),
-                                           rrdcontext_acquired_units(t->rca), &ci_max) : NULL;
+                                           rrdcontext_acquired_units_dup(t->rca), &ci_max) : NULL;
             ci = context_dun ? (ssize_t)context_dun->i : -1;
         }
 
@@ -1169,12 +1210,12 @@ static size_t registered_results_to_json_multinode_no_group_by(
         if(t->ria != last_ria) {
             last_ria = t->ria;
             instance_dun = (!limit || t->instance_selected) ?
-                dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name(t->ria), &ii_max) : NULL;
+                dict_unique_id_name_add(dict_instances, rrdinstance_acquired_id(t->ria), rrdinstance_acquired_name_dup(t->ria), &ii_max) : NULL;
             ii = instance_dun ? (ssize_t)instance_dun->i : -1;
         }
 
         if(!limit || t->selected) {
-            dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name(t->rma), &di_max);
+            dimension_dun = dict_unique_id_name_add(dict_dimensions, rrdmetric_acquired_id(t->rma), rrdmetric_acquired_name_dup(t->rma), &di_max);
             di = dimension_dun->i;
             struct aggregated_weight aw = {
                 .min = t->value,
@@ -1247,7 +1288,7 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "id", dun_dfe.name);
-            buffer_json_member_add_string(wb, "units", dun->units);
+            buffer_json_member_add_string(wb, "units", string2str(dun->units));
             buffer_json_member_add_int64(wb, "ci", dun->i);
             buffer_json_object_close(wb);
         }
@@ -1264,8 +1305,8 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "id", dun->id);
-            if(dun->id != dun->name)
-                buffer_json_member_add_string(wb, "nm", dun->name);
+            if(dun->id != string2str(dun->name))
+                buffer_json_member_add_string(wb, "nm", string2str(dun->name));
             buffer_json_member_add_int64(wb, "ii", dun->i);
             buffer_json_object_close(wb);
         }
@@ -1282,8 +1323,8 @@ static size_t registered_results_to_json_multinode_no_group_by(
 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "id", dun->id);
-            if(dun->id != dun->name)
-                buffer_json_member_add_string(wb, "nm", dun->name);
+            if(dun->id != string2str(dun->name))
+                buffer_json_member_add_string(wb, "nm", string2str(dun->name));
             buffer_json_member_add_int64(wb, "di", dun->i);
             buffer_json_object_close(wb);
         }
@@ -1347,8 +1388,10 @@ static size_t registered_results_to_json_multinode_group_by(
         buffer_flush(name);
 
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_DIMENSION) {
-            buffer_strcat(key, rrdmetric_acquired_name(t->rma));
-            buffer_strcat(name, rrdmetric_acquired_name(t->rma));
+            STRING *dim_name = rrdmetric_acquired_name_dup(t->rma);
+            buffer_strcat(key, string2str(dim_name));
+            buffer_strcat(name, string2str(dim_name));
+            string_freez(dim_name);
         }
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_INSTANCE) {
             if(buffer_strlen(key)) {
@@ -1357,7 +1400,9 @@ static size_t registered_results_to_json_multinode_group_by(
             }
 
             buffer_strcat(key, rrdinstance_acquired_id(t->ria));
-            buffer_strcat(name, rrdinstance_acquired_name(t->ria));
+            STRING *instance_name = rrdinstance_acquired_name_dup(t->ria);
+            buffer_strcat(name, string2str(instance_name));
+            string_freez(instance_name);
 
             if(!(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_NODE)) {
                 buffer_fast_strcat(key, "@", 1);
@@ -1390,8 +1435,10 @@ static size_t registered_results_to_json_multinode_group_by(
                 buffer_fast_strcat(name, ",", 1);
             }
 
-            buffer_strcat(key, rrdcontext_acquired_units(t->rca));
-            buffer_strcat(name, rrdcontext_acquired_units(t->rca));
+            STRING *units = rrdcontext_acquired_units_dup(t->rca);
+            buffer_strcat(key, string2str(units));
+            buffer_strcat(name, string2str(units));
+            string_freez(units);
         }
 
         struct aggregated_weight *aw = dictionary_set(group_by, buffer_tostring(key), NULL, sizeof(struct aggregated_weight));
@@ -1855,9 +1902,10 @@ static void rrdset_metric_correlations_volume(
         return;
     }
 
-    // this represents the percentage of time
-    // the highlighted window was above/below the baseline window
-    // (above or below depending on their averages)
+    // this is the percentage of SAMPLES (not of time) that the
+    // highlighted window was above/below the baseline window - the
+    // grouping used here is percentage-of-samples; percentage-of-time
+    // exists separately and is NOT what weights ranks on
     highlight_countif.value = highlight_countif.value / 100.0; // countif returns 0 - 100.0
 
     RESULT_FLAGS flags;
@@ -1867,7 +1915,7 @@ static void rrdset_metric_correlations_volume(
         pcent = (highlight_average.value - baseline_average.value) / baseline_average.value * highlight_countif.value;
     }
     else {
-        flags = RESULT_IS_PERCENTAGE_OF_TIME;
+        flags = RESULT_IS_PERCENTAGE_OF_SAMPLES;
         pcent = highlight_countif.value;
     }
 
@@ -1957,6 +2005,8 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             .timeout_ms = qwd->qwr->timeout_ms,
             .query_source = QUERY_SOURCE_API_WEIGHTS,
             .priority = STORAGE_PRIORITY_SYNCHRONOUS_FIRST,
+            .interrupt_callback = qwd->qwr->interrupt_callback,
+            .interrupt_callback_data = qwd->qwr->interrupt_callback_data,
     };
 
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);
@@ -1964,6 +2014,15 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
     stream_control_user_weights_query_started();
     RRDR *r = rrd2rrdr(owa, qt);
     stream_control_user_weights_query_finished();
+
+    if(r && (r->view.flags & RRDR_RESULT_FLAG_CANCEL)) {
+        // never register a cancelled (possibly partial) result; report why instead
+        if(r->view.flags & RRDR_RESULT_FLAG_TIMEOUT)
+            query_weights_set_timed_out(qwd);
+        else
+            query_weights_set_interrupted(qwd);
+        goto cleanup;
+    }
 
     if(!r || rrdr_rows(r) != 1 || !r->d || r->d != r->internal.qt->query.used)
         goto cleanup;
@@ -2069,7 +2128,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
     NETDATA_DOUBLE *slots = mallocz(dimensions * sizeof(*slots));
     dimensions = 0;
     dfe_start_read(results, t) {
-        if(t->flags & RESULT_IS_PERCENTAGE_OF_TIME)
+        if(t->flags & RESULT_IS_PERCENTAGE_OF_SAMPLES)
             t->value = t->value * stats->max_base_high_ratio;
 
         slots[dimensions++] = t->value;
@@ -2190,18 +2249,21 @@ static int registered_results_to_json_mcp_callback(const DICTIONARY_ITEM *item _
     buffer_json_add_array_item_string(wb, rrdinstance_acquired_id(t->ria));
     
     // Add dimension
-    buffer_json_add_array_item_string(wb, rrdmetric_acquired_name(t->rma));
+    STRING *dim_name = rrdmetric_acquired_name_dup(t->rma);
+    buffer_json_add_array_item_string(wb, string2str(dim_name));
+    string_freez(dim_name);
     
     // Add labels (as object or null)
-    RRDLABELS *labels = rrdinstance_acquired_labels(t->ria);
-    if(labels && rrdlabels_entries(labels) > 0) {
+    RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire(t->ria);
+    if(lref.labels && rrdlabels_entries(lref.labels) > 0) {
         buffer_json_add_array_item_object(wb);
-        rrdlabels_to_buffer_json_members(labels, wb);
+        rrdlabels_to_buffer_json_members(lref.labels, wb);
         buffer_json_object_close(wb);
     }
     else {
         buffer_json_add_array_item_string(wb, NULL);
     }
+    rrdinstance_labels_release(&lref);
     
     buffer_json_array_close(wb); // End row array
     
@@ -2298,19 +2360,6 @@ static size_t registered_results_to_json_mcp(
     return state.count;
 }
 
-static ssize_t weights_count_for_rrdmetric(
-    void *data,
-    RRDHOST *host __maybe_unused,
-    RRDCONTEXT_ACQUIRED *rca __maybe_unused,
-    RRDINSTANCE_ACQUIRED *ria __maybe_unused,
-    RRDMETRIC_ACQUIRED *rma __maybe_unused)
-{
-    struct query_weights_data *qwd = data;
-
-    __atomic_fetch_add(&qwd->total_workload.metrics, 1, __ATOMIC_RELAXED);
-    return 1;
-}
-
 // ----------------------------------------------------------------------------
 // The main function
 
@@ -2392,74 +2441,6 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
     return 1;
 }
 
-static ssize_t weights_count_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
-    if(!queryable_context)
-        return false;
-
-    struct query_weights_data *qwd = data;
-
-    bool has_retention = false;
-    switch(qwd->qwr->method) {
-        case WEIGHTS_METHOD_VALUE:
-        case WEIGHTS_METHOD_ANOMALY_RATE:
-            has_retention = rrdcontext_retention_match(rca, qwd->qwr->after, qwd->qwr->before);
-            break;
-
-        case WEIGHTS_METHOD_MC_KS2:
-        case WEIGHTS_METHOD_MC_VOLUME:
-            has_retention = rrdcontext_retention_match(rca, qwd->qwr->after, qwd->qwr->before);
-            if(has_retention)
-                has_retention = rrdcontext_retention_match(rca, qwd->qwr->baseline_after, qwd->qwr->baseline_before);
-            break;
-    }
-
-    if(!has_retention)
-        return 0;
-
-    __atomic_fetch_add(&qwd->total_workload.contexts, 1, __ATOMIC_RELAXED);
-    ssize_t ret = weights_foreach_rrdmetric_in_context(rca,
-                                            qwd->scope_instances_sp,
-                                            qwd->scope_labels_pa,
-                                            qwd->scope_dimensions_sp,
-                                            qwd->instances_sp,
-                                            NULL,
-                                            qwd->labels_pa,
-                                            qwd->alerts_sp,
-                                            qwd->dimensions_sp,
-                                            true, true, qwd->qwr->version,
-                                            weights_count_for_rrdmetric, qwd);
-    if (ret >= 1)
-        return 1;
-    else
-        return 0;
-}
-
-static ssize_t weights_count_node_callback(void *data, RRDHOST *host, bool queryable) {
-    if(!queryable)
-        return 0;
-
-    struct query_weights_data *qwd = data;
-    if (qwd->total_hosts >= qwd->hosts_array_capacity) {
-        if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / 2))
-            fatal("QUERY WEIGHTS: too many hosts to allocate");
-
-        size_t new_capacity = qwd->hosts_array_capacity ? qwd->hosts_array_capacity * 2 : 1;
-        if(unlikely(new_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
-            fatal("QUERY WEIGHTS: too many hosts to allocate");
-
-        qwd->hosts_array = reallocz(qwd->hosts_array, new_capacity * sizeof(*qwd->hosts_array));
-        qwd->hosts_array_capacity = new_capacity;
-    }
-    qwd->hosts_array[qwd->total_hosts++] = host;
-
-    __atomic_fetch_add(&qwd->total_workload.nodes, 1, __ATOMIC_RELAXED);
-    ssize_t ret = query_scope_foreach_context(host, qwd->qwr->scope_contexts,
-                                qwd->scope_contexts_sp, qwd->contexts_sp,
-                                weights_count_context_callback, queryable, qwd);
-
-    return ret;
-}
-
 static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
     if(!queryable_context)
         return false;
@@ -2501,47 +2482,110 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
     return ret;
 }
 
-// Parallel version of query_scope_foreach_host
-static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
-                                                  struct query_weights_data *qwd)
+#ifdef ENABLE_DBENGINE
+// Parallel weights chunks run on these threads, NEVER on the libuv threadpool: a chunk runs data queries,
+// which wait on dbengine query preparation and extent reads that run on that pool. Enough chunks
+// occupying pool threads leave nothing to run what they wait for, and the agent freezes.
+static struct {
+    SPINLOCK spinlock;      // protects the fields below; never held across a submit (it may create a thread)
+    ND_WORK_QUEUE *queue;   // created on first use
+    size_t submitters;      // submits in progress, and chunks running inline after a refused submit:
+                            // shutdown waits for them before it frees the queue
+    bool stopped;
+} weights_parallel = {
+    .spinlock = SPINLOCK_INITIALIZER,
+    .queue = NULL,
+    .submitters = 0,
+    .stopped = false,
+};
+
+// as long as dbengine's shutdown drain waited for these chunks when they were dbengine jobs
+#define WEIGHTS_PARALLEL_SHUTDOWN_TIMEOUT_UT (10 * USEC_PER_SEC)
+
+static void weights_parallel_thread_init(void *data __maybe_unused)
 {
-#ifndef ENABLE_DBENGINE
-    return query_scope_foreach_host(scope_hosts_sp, hosts_sp,
-                                    weights_do_node_callback, qwd,
-                                    &qwd->versions, NULL);
+    worker_register("WEIGHTS");
+    register_libuv_worker_job_names();
+}
 
-#else
-    size_t host_count = dictionary_entries(rrdhost_root_index);
-    qwd->hosts_array_capacity = host_count ? host_count : 1;
-    if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
-        fatal("QUERY WEIGHTS: too many hosts to allocate");
+static void weights_parallel_job(void *data)
+{
+    struct query_weights_thread_data *thread_data = data;
 
-    qwd->hosts_array = mallocz(qwd->hosts_array_capacity * sizeof(*qwd->hosts_array));
-    qwd->total_hosts = 0;
+    worker_is_busy(UV_EVENT_WEIGHTS_CALCULATION);
+    query_weights_worker_thread(thread_data);
+    worker_is_idle();
 
-    (void) query_scope_foreach_host(scope_hosts_sp, hosts_sp, weights_count_node_callback, qwd, &qwd->versions, NULL);
+    // last: the waiting caller frees thread_data once this completes
+    completion_mark_complete(&thread_data->completion);
+}
 
-    size_t active_hosts = qwd->total_hosts;
-
-    size_t num_threads = netdata_conf_cpus();
-    if (num_threads < 1) num_threads = 1;
-
-    // If we have fewer hosts than threads, reduce thread count
-    if (active_hosts < num_threads) {
-        num_threads = active_hosts;
+// Returns false only once shutdown has stopped the queue: the caller then runs the chunk itself, and it
+// processes no host (the agent is exiting). A chunk the queue refuses for any other reason (no thread
+// could be created) runs here, still counted in submitters, so shutdown waits for it too.
+static bool weights_parallel_submit(struct query_weights_thread_data *thread_data)
+{
+    spinlock_lock(&weights_parallel.spinlock);
+    if (weights_parallel.stopped) {
+        spinlock_unlock(&weights_parallel.spinlock);
+        return false;
     }
 
-    if (num_threads <= 1 || active_hosts <= 1) {
-        // Fall back to single-threaded processing
-        freez(qwd->hosts_array);
-        return query_scope_foreach_host(scope_hosts_sp, hosts_sp,
-                                      weights_do_node_callback, qwd,
-                                      &qwd->versions, NULL);
+    if (!weights_parallel.queue)
+        weights_parallel.queue = nd_work_queue_create(
+            "WEIGHTS", netdata_conf_cpus(), 60 * USEC_PER_SEC, weights_parallel_thread_init, NULL);
+
+    ND_WORK_QUEUE *wq = weights_parallel.queue;
+    weights_parallel.submitters++;
+    spinlock_unlock(&weights_parallel.spinlock);
+
+    if (!nd_work_queue_submit(wq, weights_parallel_job, thread_data))
+        weights_parallel_job(thread_data); // no thread available: run it here
+
+    spinlock_lock(&weights_parallel.spinlock);
+    weights_parallel.submitters--;
+    spinlock_unlock(&weights_parallel.spinlock);
+
+    return true;
+}
+
+// Returns false when a chunk was still running at the deadline: it may still use hosts and dbengine.
+bool weights_parallel_shutdown(void)
+{
+    usec_t deadline_ut = now_monotonic_usec() + WEIGHTS_PARALLEL_SHUTDOWN_TIMEOUT_UT;
+
+    spinlock_lock(&weights_parallel.spinlock);
+    ND_WORK_QUEUE *wq = weights_parallel.queue;
+    weights_parallel.queue = NULL;
+    weights_parallel.stopped = true;
+    spinlock_unlock(&weights_parallel.spinlock);
+
+    // a submitter that took the queue before it was stopped may still be submitting, or running its chunk inline
+    while (true) {
+        spinlock_lock(&weights_parallel.spinlock);
+        size_t submitters = weights_parallel.submitters;
+        spinlock_unlock(&weights_parallel.spinlock);
+        if (!submitters)
+            break;
+
+        // the queue cannot be freed under a submitter: leave it, like a chunk still running at the deadline
+        if (now_monotonic_usec() >= deadline_ut) {
+            nd_log_daemon(NDLP_WARNING, "WEIGHTS: %zu submitter(s) still running at shutdown, not freeing the queue", submitters);
+            return false;
+        }
+        sleep_usec(USEC_PER_MS);
     }
 
+    // Accepted chunks still run (their callers wait for them); later requests run their chunks inline.
+    usec_t now_ut = now_monotonic_usec();
+    return nd_work_queue_stop_and_free(wq, deadline_ut > now_ut ? deadline_ut - now_ut : 0);
+}
+
+static void weights_foreach_host_parallel(struct query_weights_data *qwd, size_t num_threads)
+{
     // Calculate hosts per thread
-    size_t hosts_per_thread = active_hosts / num_threads;
-    size_t remaining_hosts = active_hosts % num_threads;
+    size_t hosts_per_thread = qwd->hosts_count / num_threads;
+    size_t remaining_hosts = qwd->hosts_count % num_threads;
 
     // Prepare thread data
     struct query_weights_thread_data *thread_data = mallocz(sizeof(struct query_weights_thread_data) * num_threads);
@@ -2550,18 +2594,18 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
     for (size_t i = 0; i < num_threads; i++) {
         thread_data[i].main_qwd = qwd;
         thread_data[i].local_results = register_result_init_single_threaded();
-        thread_data[i].hosts = &qwd->hosts_array[current_host_idx];
+        thread_data[i].hosts = &qwd->hosts[current_host_idx];
 
         // Distribute hosts evenly, giving extra hosts to first threads
         thread_data[i].host_count = hosts_per_thread + (i < remaining_hosts ? 1 : 0);
         current_host_idx += thread_data[i].host_count;
 
         completion_init(&thread_data[i].completion);
-        rrdeng_enq_cmd(NULL, RRDENG_OPCODE_PARALLEL_WEIGHT, &thread_data[i], &thread_data[i].completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        if (!weights_parallel_submit(&thread_data[i]))
+            weights_parallel_job(&thread_data[i]); // shutting down: it stops before its first host
     }
 
-    // Wait for all threads to complete
-    ssize_t total_added = 0;
+    // Wait for all threads to complete; the pinned hosts are released only after this
     for (size_t i = 0; i < num_threads; i++) {
         completion_wait_for(&thread_data[i].completion);
         completion_destroy(&thread_data[i].completion);
@@ -2577,14 +2621,33 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         register_result_destroy(thread_data[i].local_results);
     }
 
-    total_added = (ssize_t) dictionary_entries(qwd->results);
-
-    // Cleanup
     freez(thread_data);
-    freez(qwd->hosts_array);
-
-    return total_added;
+}
+#else
+bool weights_parallel_shutdown(void) { return true; }
 #endif
+
+// Runs the query on the hosts pinned in qwd->hosts, in parallel when there are several
+static void weights_foreach_host(struct query_weights_data *qwd)
+{
+#ifdef ENABLE_DBENGINE
+    size_t num_threads = netdata_conf_cpus();
+
+    // If we have fewer hosts than threads, reduce thread count
+    if (qwd->hosts_count < num_threads)
+        num_threads = qwd->hosts_count;
+
+    // parallel only when a dbengine tier is in use (unchanged from when the chunks ran as dbengine jobs)
+    if (num_threads > 1 && dbengine_enabled) {
+        weights_foreach_host_parallel(qwd, num_threads);
+        return;
+    }
+#endif
+
+    for (size_t i = 0; i < qwd->hosts_count; i++) {
+        if (weights_do_node_callback(qwd, qwd->hosts[i], true) < 0)
+            break;
+    }
 }
 
 static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryable) {
@@ -2598,7 +2661,7 @@ static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryabl
 
     ssize_t ret = query_scope_foreach_context(host, qwd->qwr->scope_contexts,
                                 qwd->scope_contexts_sp, qwd->contexts_sp,
-                                weights_do_context_callback, queryable, qwd);
+                                weights_do_context_callback, queryable, qwd, NULL);
 
     return ret;
 }
@@ -2642,7 +2705,6 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .host_snapshots = weights_host_snapshots_init(),
             .stats = {},
             .shifts = 0,
-            .total_workload = {0}, // Initialize workload statistics
             .timings = {
                     .received_ut = now_monotonic_usec(),
             }
@@ -2747,7 +2809,9 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             rrdset_weights_multi_dimensional_value(&qwd);
         }
         else {
-            query_scope_foreach_host_parallel(qwd.scope_nodes_sp, qwd.nodes_sp, &qwd);
+            // the hosts stay pinned until cleanup: the results point into them until the response is built
+            qwd.hosts_count = query_scope_hosts_pin(qwd.scope_nodes_sp, qwd.nodes_sp, &qwd.hosts, &qwd.versions);
+            weights_foreach_host(&qwd);
         }
     }
 
@@ -2875,6 +2939,9 @@ cleanup:
 
     register_result_destroy(qwd.results);
     dictionary_destroy(qwd.host_snapshots);
+
+    if(qwd.hosts)
+        query_scope_hosts_unpin(qwd.hosts, qwd.hosts_count);
 
     if(error) {
         buffer_flush(wb);

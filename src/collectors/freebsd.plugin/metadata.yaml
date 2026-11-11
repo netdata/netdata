@@ -422,6 +422,86 @@ modules:
                 - name: frequency
   - meta:
       plugin_name: freebsd.plugin
+      module_name: hw.acpi.battery
+      monitored_instance:
+        name: hw.acpi.battery
+        description: "Monitor the remaining capacity of FreeBSD ACPI batteries through sysctl."
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - battery
+        - power supply
+    overview:
+      data_collection:
+        metrics_description: "Read the remaining battery capacity that the ACPI battery driver reports for all batteries combined."
+        method_description: "The plugin reads the `hw.acpi.battery.units` and `hw.acpi.battery.life` sysctls. When the host has several batteries, the kernel combines them into one capacity percentage."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "The module stops on hosts without the ACPI battery driver, where the `hw.acpi.battery` sysctls do not exist. When the driver reports no batteries, the chart is removed; when it cannot read a valid capacity, the chart shows a gap."
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list:
+            - name: hw.acpi.battery
+              description: Enable or disable the battery capacity metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: power device
+          description: "All ACPI batteries combined into one device."
+          labels:
+            - name: device
+              description: "Always `acpi_battery`, because the kernel combines every battery into one reading."
+          metrics:
+            - name: powersupply.capacity
+              description: Battery Capacity
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: capacity
+  - meta:
+      plugin_name: freebsd.plugin
       module_name: hw.intrcnt
       monitored_instance:
         name: hw.intrcnt
@@ -815,6 +895,84 @@ modules:
                 - name: used
   - meta:
       plugin_name: freebsd.plugin
+      module_name: vm.swap_reserved
+      monitored_instance:
+        name: vm.swap_reserved
+        description: "Monitor FreeBSD committed (allocated) anonymous memory through sysctl."
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - committed memory
+        - overcommit
+    overview:
+      data_collection:
+        metrics_description: "Read how much anonymous memory the kernel has reserved for running processes. This is the amount of swap that would be needed to back all allocated anonymous memory, the same accounting Linux reports as Committed_AS."
+        method_description: "The plugin reads the `vm.swap_reserved` sysctl. The kernel tracks it whatever the `vm.overcommit` setting is."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list:
+            - name: vm.swap_reserved
+              description: Enable or disable the committed memory metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "Committed memory for the whole system."
+          labels: []
+          metrics:
+            - name: mem.committed
+              description: Committed (Allocated) Memory
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: Committed_AS
+  - meta:
+      plugin_name: freebsd.plugin
       module_name: system.ram
       monitored_instance:
         name: system.ram
@@ -1044,7 +1202,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "The number of page faults happened on host."
+          description: "The number of page faults happened on host. Linux and Windows chart the same context with `minor` and `major` dimensions: FreeBSD `memory` counts every fault (as Linux `minor` does) and `io_requiring` counts major faults that needed I/O."
           labels: []
           metrics:
             - name: mem.pgfaults
@@ -1553,7 +1711,11 @@ modules:
               default_value: auto
               required: false
             - name: utilization percentage for all disks
-              description: Enable or disable utilization percentage for all disks metric.
+              description: Enable or disable utilization percentage and busy time for all disks metrics.
+              default_value: auto
+              required: false
+            - name: backlog for all disks
+              description: Enable or disable backlog for all disks metric.
               default_value: auto
               required: false
             - name: i/o time for all disks
@@ -1603,8 +1765,10 @@ modules:
                 - name: io
                 - name: out
         - name: disk
-          description: ""
-          labels: []
+          description: "A disk or storage array reported by devstat."
+          labels:
+            - name: device
+              description: "devstat device name and unit number (for example ada0, da1, or nvd0)."
           metrics:
             - name: disk.io
               description: Disk I/O Bandwidth
@@ -1629,6 +1793,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: operations
+            - name: disk.backlog
+              description: Disk Backlog
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: backlog
+            - name: disk.busy
+              description: Disk Busy Time
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: busy
             - name: disk.util
               description: Disk Utilization Time
               unit: "% of time working"
@@ -2614,7 +2790,7 @@ modules:
       module_name: getifaddrs
       monitored_instance:
         name: getifaddrs
-        description: "Monitor FreeBSD network interface traffic, packets, errors, drops, and collision events."
+        description: "Monitor FreeBSD network interface traffic, packets, errors, drops, collision events, link state, speed, duplex, and MTU."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2627,8 +2803,8 @@ modules:
       keywords: []
     overview:
       data_collection:
-        metrics_description: "Collect traffic per network interface."
-        method_description: "The plugin calls `getifaddrs` function to collect necessary data."
+        metrics_description: "Collect traffic and link information per network interface and expose the `network-interfaces` Function table. Unavailable link readings appear as unknown or null."
+        method_description: "The plugin uses `getifaddrs` for interface and address counters and `SIOCGIFMEDIA` for validated media state. Media fields may be unavailable for some interfaces."
       supported_platforms:
         include: []
         exclude: []
@@ -2696,12 +2872,32 @@ modules:
               description: Enable or disable collisions for all interface metric.
               default_value: auto
               required: false
+            - name: speed for all interfaces
+              description: Enable speed charts where the active media and line rate are available.
+              default_value: auto
+              required: false
+            - name: duplex for all interfaces
+              description: Enable duplex state charts. Unknown is shown when the media does not report duplex.
+              default_value: auto
+              required: false
+            - name: operstate for all interfaces
+              description: Enable operational state charts derived from administrative and link state.
+              default_value: auto
+              required: false
+            - name: carrier for all interfaces
+              description: Enable physical link state charts where the kernel reports a known link state.
+              default_value: auto
+              required: false
+            - name: mtu for all interfaces
+              description: Enable interface MTU charts where the kernel reports an MTU.
+              default_value: auto
+              required: false
             - name: disable by default interfaces matching
               description: Do not display data for intterfaces listed.
               default_value: lo*
               required: false
             - name: set physical interfaces for system.net
-              description: Do not show network traffic for listed interfaces.
+              description: Include matching interfaces in the physical-interface aggregates and classify them as physical in the network-interfaces Function.
               default_value: igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc*
               required: false
         examples:
@@ -2755,7 +2951,11 @@ modules:
                 - name: sent
         - name: network device
           description: ""
-          labels: []
+          labels:
+            - name: interface_type
+              description: "`real` when the interface matches the configured physical-interface pattern; otherwise `unknown`."
+            - name: device
+              description: "The network interface name."
           metrics:
             - name: net.net
               description: Bandwidth
@@ -2793,6 +2993,41 @@ modules:
               chart_type: line
               dimensions:
                 - name: collisions
+            - name: net.speed
+              description: Interface Speed, available only with valid active media and a reported line rate
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: net.duplex
+              description: Interface Duplex State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: full
+                - name: half
+                - name: unknown
+            - name: net.operstate
+              description: Interface Operational State. FreeBSD reports only up, down, or unknown; the additional Linux states are not emitted
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: unknown
+            - name: net.carrier
+              description: Interface Physical Link State, available only for a known kernel link state
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: net.mtu
+              description: Interface MTU
+              unit: "octets"
+              chart_type: line
+              dimensions:
+                - name: mtu
   - meta:
       plugin_name: freebsd.plugin
       module_name: getmntinfo

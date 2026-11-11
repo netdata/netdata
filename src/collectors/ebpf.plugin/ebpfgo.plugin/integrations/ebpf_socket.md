@@ -22,7 +22,7 @@ Module: socket
 
 ## Overview
 
-Monitor TCP and UDP function calls, bandwidth, errors, and connection counts. Data is exposed through the on-demand `network-protocols` function consumed by the network-viewer.
+Monitor TCP and UDP function calls, bandwidth, errors, and connection counts. Data is exposed through the on-demand `network-protocols` function consumed by the network-viewer; an arena-only chart reports dropped per-PID events.
 
 Attach kprobe or fentry/fexit trampolines to the kernel functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, `tcp_connect` (IPv4 and IPv6), `tcp_close`, `udp_sendmsg`, and `udp_recvmsg`. Per-cycle deltas and byte counts are computed in userspace from the BPF map snapshots.
 
@@ -38,11 +38,8 @@ The plugin needs setuid because it loads data inside the kernel. Netdata sets th
 
 #### Auto-Detection
 
-The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), presence of BTF files, and the configured object flavor to decide which eBPF program will be attached.
+The plugin checks kernel compilation flags (CONFIG_BPF and CONFIG_BPF_SYSCALL, plus CONFIG_KPROBES for probe-based collectors) and BTF availability to select the eBPF loading mode and object flavor.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -55,7 +52,7 @@ This thread adds overhead every time a monitored kernel TCP or UDP function is c
 
 #### Compile kernel
 
-Check if your kernel was compiled with necessary options (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) in `/proc/config.gz` or inside /boot/config file. Some cited names can be different according to the preferences of Linux distributions.
+Check that your kernel was compiled with CONFIG_BPF and CONFIG_BPF_SYSCALL, and CONFIG_KPROBES for probe-based collectors. Look in `/proc/config.gz` or a `/boot/config-*` file; CONFIG_BPF_JIT is optional.
 When you do not have options set, it is necessary to get the kernel source code from https://kernel.org or a kernel package from your distribution, this last is preferred. The kernel compilation has a well defined pattern, but distributions can deliver their configuration files
 with different names.
 
@@ -181,11 +178,12 @@ following columns:
 
 ### Per eBPF Socket instance
 
-All data is delivered through the on-demand `network-protocols` function consumed by network-viewer; no traditional Netdata charts are published for this scope.
+TCP/UDP activity is delivered through the on-demand `network-protocols` function; a diagnostic chart appears only when the arena object is active.
 
 This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| ebpf.socket_arena_drops | Per-PID events dropped by the Socket arena queue. Published only when the arena object is active. | dropped | events/s |

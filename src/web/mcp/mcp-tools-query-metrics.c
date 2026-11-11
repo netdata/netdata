@@ -33,8 +33,85 @@
 #include "mcp-tools-query-metrics.h"
 #include "mcp-tools.h"
 #include "mcp-params.h"
+#include "../api/queries/tg-expression.h"
 #include "web/api/formatters/rrd2json.h"
 
+// The time groupings advertised in the schema. time_grouping_parse() also accepts
+// aliases and fixed variants (e.g. "avg", "ewma", "percentile95").
+static const char *mcp_query_metrics_time_groups[] = {
+    "average",                  // "avg" and "mean" are aliases
+    "min",
+    "max",
+    "sum",
+    "incremental-sum",          // "incremental_sum" is an alias
+    "median",
+    "trimmed-mean",
+    "trimmed-median",
+    "percentile",               // requires time_group_options parameter
+    "stddev",                   // standard deviation
+    "coefficient-of-variation", // relative standard deviation (cv)
+    "ema",                      // exponential moving average (alias "ses" or "ewma")
+    "des",                      // double exponential smoothing
+    "percentage-of-samples",    // takes a condition
+    "countif",                  // the historical name of percentage-of-samples, still accepted
+    "percentage-of-time",       // takes a condition
+    "number-of-flaps",          // takes a condition
+    "number-of-times",          // takes a condition
+    "extremes",                 // for each time frame, returns max for positive values and min for negative values
+    "latest",                   // for each time frame, returns the most recent collected value
+};
+
+// The aggregation functions advertised in the schema ("avg" is also accepted).
+static const char *mcp_query_metrics_aggregations[] = {
+    "sum",
+    "min",
+    "max",
+    "extremes",
+    "average",
+    "percentage",
+};
+
+static void mcp_query_metrics_add_enum(BUFFER *wb, const char **names, size_t count) {
+    buffer_json_member_add_array(wb, "enum");
+    for(size_t i = 0; i < count; i++)
+        buffer_json_add_array_item_string(wb, names[i]);
+    buffer_json_array_close(wb);
+}
+
+static void mcp_query_metrics_invalid_enum_error(BUFFER *error, const char *parameter, const char **names, size_t count) {
+    buffer_sprintf(error, "Invalid value for parameter '%s'. Use one of: ", parameter);
+    for(size_t i = 0; i < count; i++)
+        buffer_sprintf(error, "%s'%s'", i ? ", " : "", names[i]);
+    buffer_strcat(error, ".");
+}
+
+// A usable enum value is a non-empty JSON string without embedded NUL bytes,
+// so that the C string seen by the parsers is the complete value.
+static const char *mcp_query_metrics_enum_string(struct json_object *value) {
+    if(!value || !json_object_is_type(value, json_type_string) || jsonc_string_has_embedded_nul(value))
+        return NULL;
+
+    const char *s = json_object_get_string(value);
+    return (s && *s) ? s : NULL;
+}
+
+static bool mcp_query_metrics_numeric_option_valid(struct json_object *option) {
+    if(!option || !json_object_is_type(option, json_type_string) || jsonc_string_has_embedded_nul(option))
+        return false;
+
+    const char *value = json_object_get_string(option);
+    while(value && isspace((uint8_t)*value)) value++;
+
+    // The numeric group implementations consume a bare number with str2ndd(),
+    // not an expression operator followed by a number.
+    if(!value || !*value || *value == '=' || *value == ':')
+        return false;
+
+    TG_EXPRESSION parsed;
+    return tg_expression_parse(&parsed, value) &&
+           parsed.cmp == TG_EXPRESSION_EQUAL &&
+           parsed.operand == TG_EXPRESSION_OPERAND_NUMBER;
+}
 
 // JSON schema for the metrics query tool
 void mcp_tool_query_metrics_schema(BUFFER *buffer) {
@@ -140,25 +217,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_member_add_string(buffer, "description", "Method to group data points over time. The 'extremes' method returns the maximum value for positive numbers and the minimum value for negative numbers, which is particularly useful for showing the highest peaks in both directions on charts. The 'latest' method returns the most recent collected value of each time frame, which is useful for reading the current value of a metric.");
         buffer_json_member_add_string(buffer, "default", "average");
         
-        // Define enum of possible values
-        buffer_json_member_add_array(buffer, "enum");
-        buffer_json_add_array_item_string(buffer, "average");  // "avg" and "mean" are aliases
-        buffer_json_add_array_item_string(buffer, "min");
-        buffer_json_add_array_item_string(buffer, "max");
-        buffer_json_add_array_item_string(buffer, "sum");
-        buffer_json_add_array_item_string(buffer, "incremental-sum");  // "incremental_sum" is an alias
-        buffer_json_add_array_item_string(buffer, "median");
-        buffer_json_add_array_item_string(buffer, "trimmed-mean");
-        buffer_json_add_array_item_string(buffer, "trimmed-median");
-        buffer_json_add_array_item_string(buffer, "percentile");  // requires time_group_options parameter
-        buffer_json_add_array_item_string(buffer, "stddev");  // standard deviation
-        buffer_json_add_array_item_string(buffer, "coefficient-of-variation");    // relative standard deviation (cv)
-        buffer_json_add_array_item_string(buffer, "ema");  // exponential moving average (alias "ses" or "ewma")
-        buffer_json_add_array_item_string(buffer, "des");  // double exponential smoothing
-        buffer_json_add_array_item_string(buffer, "countif");  // requires time_group_options parameter
-        buffer_json_add_array_item_string(buffer, "extremes");  // for each time frame, returns max for positive values and min for negative values
-        buffer_json_add_array_item_string(buffer, "latest");  // for each time frame, returns the most recent collected value
-        buffer_json_array_close(buffer);
+        mcp_query_metrics_add_enum(buffer, mcp_query_metrics_time_groups, _countof(mcp_query_metrics_time_groups));
     }
     buffer_json_object_close(buffer); // time_group
 
@@ -169,8 +228,26 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
         buffer_json_member_add_string(
             buffer, "description",
             "Additional options for time grouping.\n"
-            "For 'percentile', specify a percentage (0-100).\n"
-            "For 'countif', specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
+            "For 'percentile', 'trimmed-mean' and 'trimmed-median', specify a number.\n"
+            "For 'percentage-of-samples' (alias 'countif'), 'percentage-of-time', "
+            "'number-of-flaps' and 'number-of-times', specify a CONDITION: an optional operator "
+            "('!', '!=', '!:', '<>', '=', '==', ':', '>', '>=', '>:', '<', '<=', '<:') "
+            "followed by a value. The value is a number "
+            "(e.g. '>0'), a gap token ('==gap', '!=gap' - 'nan', 'null' and 'empty' are "
+            "synonyms. Naming a gap token makes uncollected samples participate for "
+            "'percentage-of-samples', 'number-of-flaps' and 'number-of-times'. For "
+            "'percentage-of-time', uncollected time is always in the denominator and enters "
+            "the numerator only when the condition matches gaps), or the "
+            "previous collected sample ('<previous' - 'last' is a synonym, so '<last' is the "
+            "same condition. Gaps are skipped, so comparisons span them, and the first collected "
+            "sample never matches; '<previous' counts counter resets such as reboots). There are no "
+            "and/or compounds. A bare number means '=N'; if the condition is omitted or blank it means '=0'; an operator "
+            "without a value applies to zero, so '>' means '>0'.\n"
+            "Over a window long enough to read lower-resolution data 'percentage-of-time', "
+            "'number-of-flaps' and 'number-of-times' return an estimate, and the counting ones "
+            "report at most one event per stored interval; 'percentage-of-samples' does not "
+            "estimate - it evaluates each stored point as one sample. Request tier=0 for the "
+            "highest-resolution available data and verify db.per_tier when the raw sample sequence matters.");
     }
     buffer_json_object_close(buffer); // time_group_options
 
@@ -246,15 +323,7 @@ void mcp_tool_query_metrics_schema(BUFFER *buffer) {
             "- 'average': Average of all grouped metrics (CAUTION: When 'group_by' doesn't include 'dimension', this averages different metric types together - e.g., CPU user + system + idle - which is rarely meaningful)\n"
             "- 'percentage': Expresses each grouped metric as a percentage of its group's total (useful for seeing proportional contributions)\n");
 
-        // Define enum of possible values
-        buffer_json_member_add_array(buffer, "enum");
-        buffer_json_add_array_item_string(buffer, "sum");
-        buffer_json_add_array_item_string(buffer, "min");
-        buffer_json_add_array_item_string(buffer, "max");
-        buffer_json_add_array_item_string(buffer, "extremes");
-        buffer_json_add_array_item_string(buffer, "average");
-        buffer_json_add_array_item_string(buffer, "percentage");
-        buffer_json_array_close(buffer);
+        mcp_query_metrics_add_enum(buffer, mcp_query_metrics_aggregations, _countof(mcp_query_metrics_aggregations));
     }
     buffer_json_object_close(buffer); // aggregation
 
@@ -352,24 +421,72 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_BAD_REQUEST;
     }
     
-    // Get time_group value to check if it's a percentile or countif
-    const char *time_group_str = NULL;
-    if (json_object_is_type(time_group_obj, json_type_string)) {
-        time_group_str = json_object_get_string(time_group_obj);
+    // Reject values the parsers would silently replace with their default.
+    const char *time_group_str = mcp_query_metrics_enum_string(time_group_obj);
+    RRDR_TIME_GROUPING time_group = time_group_str ?
+        time_grouping_parse(time_group_str, RRDR_GROUPING_UNDEFINED) : RRDR_GROUPING_UNDEFINED;
+    if (time_group == RRDR_GROUPING_UNDEFINED) {
+        mcp_query_metrics_invalid_enum_error(
+            mcpc->error, "time_group", mcp_query_metrics_time_groups, _countof(mcp_query_metrics_time_groups));
+        return MCP_RC_INVALID_PARAMS;
+    }
+
+    const char *aggregation_str = mcp_query_metrics_enum_string(aggregation_obj);
+    RRDR_GROUP_BY_FUNCTION aggregation = RRDR_GROUP_BY_FUNCTION_AVERAGE;
+    if (!aggregation_str || !group_by_aggregate_function_lookup(aggregation_str, &aggregation)) {
+        mcp_query_metrics_invalid_enum_error(
+            mcpc->error, "aggregation", mcp_query_metrics_aggregations, _countof(mcp_query_metrics_aggregations));
+        return MCP_RC_INVALID_PARAMS;
+    }
+
+    bool numeric_time_group = (
+        strcmp(time_group_str, "percentile") == 0 ||
+        strcmp(time_group_str, "trimmed-mean") == 0 ||
+        strcmp(time_group_str, "trimmed-median") == 0);
+    bool expression_time_group = (
+        strcmp(time_group_str, "countif") == 0 ||
+        strcmp(time_group_str, "percentage-of-samples") == 0 ||
+        strcmp(time_group_str, "percentage-of-time") == 0 ||
+        strcmp(time_group_str, "number-of-flaps") == 0 ||
+        strcmp(time_group_str, "number-of-times") == 0);
+
+    // Validate time_group_options according to the selected grouping.
+    if(numeric_time_group || expression_time_group) {
         
-        // Check if time_group_options is required based on time_group
-        if (time_group_str && (
-            strcmp(time_group_str, "percentile") == 0 || 
-            strcmp(time_group_str, "countif") == 0)) {
-            
-            struct json_object *time_group_options_obj = NULL;
-            if (!json_object_object_get_ex(params, "time_group_options", &time_group_options_obj) || !time_group_options_obj) {
-                if (strcmp(time_group_str, "percentile") == 0) {
-                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='percentile'. You must specify a percentage value between 0-100 (e.g., '95' for 95th percentile).");
-                } else {
-                    buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='countif'. You must specify a comparison operator and value (e.g., '>0', '=0', '!=0', '<=10').");
-                }
+        struct json_object *time_group_options_obj = NULL;
+        bool has_time_group_options =
+            json_object_object_get_ex(params, "time_group_options", &time_group_options_obj);
+        if (!has_time_group_options || !time_group_options_obj) {
+            if (strcmp(time_group_str, "percentile") == 0) {
+                buffer_sprintf(mcpc->error, "Missing required parameter 'time_group_options' when using time_group='percentile'. You must specify a percentage value between 0-100 (e.g., '95' for 95th percentile).");
                 return MCP_RC_BAD_REQUEST;
+            }
+        }
+
+        if(numeric_time_group && has_time_group_options) {
+            if(!mcp_query_metrics_numeric_option_valid(time_group_options_obj)) {
+                buffer_sprintf(mcpc->error,
+                               "Parameter 'time_group_options' must be a string containing a finite number when using time_group='%s'.",
+                               time_group_str);
+                return MCP_RC_INVALID_PARAMS;
+            }
+        }
+        else if(expression_time_group && has_time_group_options) {
+            if(!time_group_options_obj || !json_object_is_type(time_group_options_obj, json_type_string)) {
+                buffer_sprintf(mcpc->error,
+                               "Parameter 'time_group_options' must be a valid condition string when using time_group='%s'.",
+                               time_group_str);
+                return MCP_RC_INVALID_PARAMS;
+            }
+
+            const char *expression = json_object_get_string(time_group_options_obj);
+            TG_EXPRESSION parsed;
+            if(!expression || jsonc_string_has_embedded_nul(time_group_options_obj) ||
+               !tg_expression_parse(&parsed, expression)) {
+                buffer_sprintf(mcpc->error,
+                               "Invalid condition in parameter 'time_group_options' when using time_group='%s'.",
+                               time_group_str);
+                return MCP_RC_INVALID_PARAMS;
             }
         }
     }
@@ -422,8 +539,6 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         return MCP_RC_BAD_REQUEST;
     }
     
-    // No need to check aggregation_obj here - we already have a default in group_by struct
-    
     // Other parameters
     size_t points = mcp_params_extract_size(params, "points", 0, 0, SIZE_MAX, mcpc->error);
     if (buffer_strlen(mcpc->error) > 0) {
@@ -462,11 +577,6 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     if (options_str && *options_str)
         options |= rrdr_options_parse(options_str);
     
-    // Time grouping
-    RRDR_TIME_GROUPING time_group = RRDR_GROUPING_AVERAGE;
-    if (time_group_str && *time_group_str)
-        time_group = time_grouping_parse(time_group_str, RRDR_GROUPING_AVERAGE);
-    
     const char *time_group_options = mcp_params_extract_string(params, "time_group_options", NULL);
     
     // Tier selection (give an invalid default to now the caller added a tier to the query)
@@ -484,7 +594,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         {
             .group_by = RRDR_GROUP_BY_NONE,
             .group_by_label = NULL,
-            .aggregation = RRDR_GROUP_BY_FUNCTION_AVERAGE,
+            .aggregation = aggregation,
         },
     };
     
@@ -510,10 +620,6 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
         group_by[0].group_by_label = (char *)group_by_label;
         group_by[0].group_by |= RRDR_GROUP_BY_LABEL;
     }
-    
-    const char *aggregation_str = mcp_params_extract_string(params, "aggregation", NULL);
-    if (aggregation_str && *aggregation_str)
-        group_by[0].aggregation = group_by_aggregate_function_parse(aggregation_str);
     
     // Create interrupt callback data
     mcp_query_interrupt_data interrupt_data = {

@@ -117,7 +117,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@a8ac3eea598697a830f7d8e701fc9fcbfde88974 # v1.80.0
+        uses: reviewdog/action-actionlint@619a81ec64ff8c0211cd6146eb2b21e8f1d7f440 # v1.81.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -169,7 +169,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.10"
       - name: Run flake8
@@ -252,7 +252,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Run yamllint
-        uses: reviewdog/action-yamllint@5dd4640db975e4cac6f4e775a401695bafc28068 # v1.25.1
+        uses: reviewdog/action-yamllint@072d1a6ca6f5a03de10f492f6119fcbc8d47302b # v1.25.4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check

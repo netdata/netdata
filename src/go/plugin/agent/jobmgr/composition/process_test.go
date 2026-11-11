@@ -293,7 +293,10 @@ func TestProcessCorePublishesKnownRestartFailureBeforeFinalization(t *testing.T)
 		default:
 		}
 		close(releaseFinalize)
-		require.ErrorContains(t, <-done, "provider factory panic")
+		finalErr := <-done
+		require.ErrorContains(t, finalErr, "provider factory panic")
+		require.NotErrorIs(t, finalErr, context.DeadlineExceeded)
+		require.NotErrorIs(t, finalErr, errRunDidNotQuiesce)
 	})
 }
 

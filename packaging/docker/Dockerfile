@@ -65,6 +65,8 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /usr/sbin/systemd-cat-native /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     mv packaging/docker/health.sh     /app/usr/sbin/ && \
+    install -m 0755 packaging/docker/netdata-dem-docker /app/usr/libexec/netdata/netdata-dem-docker && \
+    install -m 0755 packaging/docker/netdata-dem-docker-host.sh /app/usr/libexec/netdata/netdata-dem-docker-host.sh && \
     mkdir -p /deps/etc && \
     cp -rp /deps/etc /app/usr/local/etc && \
     chmod -R o+rX /app && \
@@ -86,6 +88,9 @@ RUN mkdir -p /app/usr/sbin/ \
                 systemd-journal.plugin; do \
         [ -f "/app/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/app/usr/libexec/netdata/plugins.d/$name"; \
     done && \
+    if [ -f /app/usr/libexec/netdata/plugins.d/ipmi.plugin ]; then \
+        chmod u=rwx,g=rx,o=,u+s /app/usr/libexec/netdata/plugins.d/ipmi.plugin; \
+    fi && \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /app/var/lib/netdata /app/var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /app/var/lib/netdata /app/var/cache/netdata -type f -exec chmod 0660 {} \; && \
@@ -170,6 +175,11 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 systemd-journal.plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && test $(stat -c %a "/usr/libexec/netdata/plugins.d/$name") = "4755"; \
     done && \
+    if [ -f /usr/libexec/netdata/plugins.d/ipmi.plugin ]; then \
+        chown "root:${NETDATA_GID}" /usr/libexec/netdata/plugins.d/ipmi.plugin && \
+        chmod u=rwx,g=rx,o=,u+s /usr/libexec/netdata/plugins.d/ipmi.plugin && \
+        test $(stat -c %a /usr/libexec/netdata/plugins.d/ipmi.plugin) = "4750"; \
+    fi && \
     cp -va /etc/netdata /etc/netdata.stock
 
 ENTRYPOINT ["/usr/sbin/run.sh"]

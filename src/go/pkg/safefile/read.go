@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package safefile opens configured regular files and provides bounded reads.
+// Package safefile provides regular-file reads and no-follow collector state operations.
 package safefile
 
 import (
@@ -19,7 +19,7 @@ var (
 	ErrFile = errors.New("safe file read failed")
 	// ErrNotRegular identifies a path whose opened object is not a regular file.
 	ErrNotRegular = errors.New("file is not regular")
-	// ErrTooLarge identifies a regular file larger than MaxSize.
+	// ErrTooLarge identifies a regular file larger than the applicable read limit.
 	ErrTooLarge = errors.New("file exceeds size limit")
 )
 
@@ -110,5 +110,9 @@ func readBounded(r io.Reader, size int64) ([]byte, error) {
 }
 
 func newFileError(op, path string, err error) error {
-	return &fileError{op: op, path: path, err: err}
+	return &fileError{
+		op:   op,
+		path: path,
+		err:  err,
+	}
 }

@@ -82,7 +82,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 				if err != nil {
 					return nil, err
 				}
-				delta, err := dcjc.candidates.prepareAdoptExact(config, true, dyncfg.StatusAccepted, true, 0, dcjc.scheduler.retries.now())
+				delta, err := dcjc.candidates.prepareAdoptExact(config, true, dyncfg.StatusAccepted, true, candidateRetryPolicy{}, dcjc.scheduler.retries.now())
 				if err != nil {
 					return nil, err
 				}
@@ -98,7 +98,7 @@ func (dcjc *DynCfgJobController) PlanSecretDependentStop(id string) (jobmgr.Work
 				reply.restart.pause = pause
 				return dcjc.prepareMutationAfterApply(
 					ctx, scope, current, nil, permit, resourceRemovalDisposition(current), &postimage,
-					reply, dcjc.configStatusCleanup(id, dyncfg.StatusAccepted), state.markStopped, jobConfigIntentPreserve,
+					reply, dcjc.configStatusCleanup(id, dyncfg.StatusAccepted), state.markStopped,
 				)
 			},
 		},

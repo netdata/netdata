@@ -412,6 +412,7 @@ func newDiagnosticBGPFact(row *AcquisitionBGPRowValue) *diagnosticBGPFact {
 		RowKey:          row.RowKey,
 		StructuralID:    row.StructuralID,
 		Kind:            string(row.Kind),
+		ProcessID:       row.ProcessID,
 		RoutingInstance: row.RoutingInstance,
 		Neighbor:        row.Neighbor,
 		RemoteAS:        row.RemoteAS,

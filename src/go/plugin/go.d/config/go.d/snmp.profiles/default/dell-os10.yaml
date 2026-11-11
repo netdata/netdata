@@ -34,13 +34,19 @@ metadata:
 
 metrics:
   - MIB: DELLEMC-OS10-CHASSIS-MIB
-    symbol:
-      name: dell.os10ChassisTemp
-      OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.11
-      chart_meta:
-        family: 'Hardware/Chassis/Temperature/Value'
-        description: "Temperature of the chassis"
-        unit: "Cel"
+    table:
+      OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3
+      name: dell.os10ChassisTable
+    symbols:
+      - OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.3.1.11
+        name: dell.os10ChassisTemp
+        chart_meta:
+          family: 'Hardware/Chassis/Temperature/Value'
+          description: "Temperature of the chassis"
+          unit: "Cel"
+    metric_tags:
+      - tag: dell_os10_chassis_index
+        index: 1 # os10ChassisIndex (not-accessible)
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
       OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.1.4
@@ -98,8 +104,8 @@ metrics:
     metric_tags:
       - tag: dell_os10_power_supply_index
         symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.1
           name: dell.os10PowerSupplyIndex
+        index: 1
 
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
@@ -124,8 +130,8 @@ metrics:
     metric_tags:
       - tag: dell_os10_fan_tray_index
         symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.1
           name: dell.os10FanTrayIndex
+        index: 1
 
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
@@ -150,5 +156,5 @@ metrics:
     metric_tags:
       - tag: dell_os10_fan_index
         symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.1
           name: dell.os10FanIndex
+        index: 1

@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -672,22 +673,29 @@ func TestCollector_OSDWholeListCompleteness(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			page := make([]apiOsdResponse, test.rows)
+			for i := range page {
+				page[i].ID = int64(i)
+				page[i].UUID = fmt.Sprintf("uuid-%05d", i)
+			}
+			payload, err := json.Marshal(page)
+			require.NoError(t, err)
+
 			srv := newFakeDashboard(t, func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path != urlPathApiOsd {
 					w.WriteHeader(http.StatusNotFound)
 					return
 				}
-				page := make([]apiOsdResponse, test.rows)
-				for i := range page {
-					page[i].ID = int64(i)
-					page[i].UUID = fmt.Sprintf("uuid-%05d", i)
-				}
+				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("X-Total-Count", strconv.Itoa(test.advertised))
-				writeJSON(w, http.StatusOK, page)
+				_, _ = w.Write(payload)
 			})
 			defer srv.Close()
 
-			c := newInitializedCollector(t, srv.URL, nil)
+			c := newInitializedCollector(t, srv.URL, func(c *Collector) {
+				// Test completeness, not decoding speed under the race detector on busy CI runners.
+				c.Timeout = confopt.Duration(time.Minute)
+			})
 			defer c.Cleanup(context.Background())
 			requireClusterIdentity(t, c)
 			osds, err := c.fetchAllOSDs(context.Background())

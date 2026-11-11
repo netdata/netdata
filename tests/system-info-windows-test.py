@@ -41,6 +41,7 @@ typedef unsigned long ULONG;
 typedef unsigned int UINT;
 typedef unsigned long long ULONGLONG;
 typedef int HANDLE;
+typedef wchar_t WCHAR;
 #define INVALID_HANDLE_VALUE -1
 #define GENERIC_READ 1
 #define FILE_SHARE_VALID_FLAGS 1
@@ -264,7 +265,9 @@ def main():
     for name in ("netdata_windows_runtime_set", "netdata_windows_cpu_from_system_info", "netdata_windows_get_cpu",
                  "netdata_windows_get_disk_size", "netdata_windows_get_total_disk_size"):
         parts.append(function(hardware, name))
-    parts.extend([function(network, "netdata_win_default_network"), TESTS])
+    parts.extend([function(network, name) for name in
+                  ("netdata_win_get_adapter_addresses", "netdata_win_utf16_to_utf8", "netdata_win_default_network")])
+    parts.append(TESTS)
     with tempfile.TemporaryDirectory(prefix="netdata-win-probe-test-") as directory:
         source = Path(directory) / "test.c"
         binary = Path(directory) / "test"

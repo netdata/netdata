@@ -37,9 +37,6 @@ The plugin needs setuid.
 
 This plugin requires the `xen-dom0-libs-devel` and `yajl-devel` libraries to be installed.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

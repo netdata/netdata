@@ -25,7 +25,7 @@ modules:
         metrics_description: Monitor desktop lab performance for a web page with Lighthouse. Inspect the performance
           category score, individual lab timings, layout shift and audit execution outcomes.
         method_description: Audits the configured HTTP or HTTPS page using the Lighthouse desktop preset and
-          sandboxed Chromium at the native job interval. Configuration Test validates preparation without running
+          sandboxed Chromium at the check_every interval. Configuration Test validates preparation without running
           an audit. Lab measurements describe this browser attempt and are not field Core Web Vitals.
       supported_platforms:
         include:
@@ -47,32 +47,47 @@ modules:
           description: Jobs require explicit configuration; no websites or scripts are discovered automatically.
         limits:
           description: Missing scores or timings produce measurement gaps; a measured zero remains zero. Running
-            and waiting attempts do not refresh the prior observation, which becomes stale after two collection
+            and waiting attempts do not refresh the prior observation, which becomes stale after two check
             intervals. HTML reports are disabled unless requested. No stock performance-score threshold alert
             is configured.
         performance_impact:
           description: Each attempt starts a fresh browser and consumes CPU, memory and target website requests.
-            Increasing update_every reduces frequency. Jobs share one browser admission slot, so concurrent
+            Increasing check_every reduces browser frequency; update_every only refreshes charts. Jobs share the process browser.concurrency allowance (default 1), so concurrent
             due jobs can wait. Optional captures consume local disk space.
     setup:
       prerequisites:
         list:
+          - title: Prepare the browser sandbox policy
+            description: |
+              On Ubuntu hosts with restricted user namespaces, including Ubuntu 24.04, run kickstart with
+              `--install-dem-runtime` for a static or source installation. The native runtime package supplies its own policy.
+              For local, rootful Docker on Linux, use the documented Netdata container configuration, including
+              `apparmor=unconfined` on AppArmor hosts. Run kickstart with `--install-dem-runtime --docker-container NAME`
+              on the daemon host, then run `docker restart NAME` after the first installation succeeds.
+              Rootless, nested and remote Docker require separate administrator setup.
+              Follow the [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md)
+              for commands, offline setup and removal. Keep Chromium's sandbox enabled and qualify the actual service deployment.
           - title: Set up the browser runtime
             description: |
-              Browser runtime delivery is experimental; released bundles and automatic manifest installation are not
-              provided. Supply a trusted runtime manifest and its matching bundle before enabling browser monitors.
-              Run Chromium with its sandbox enabled as the unprivileged Netdata service account on Linux amd64 or arm64.
-              Managed mode prepares the exact runtime when a browser monitor is enabled, using an administrator-installed
-              runtime manifest. For offline setup, install the trusted manifest and import its matching archive, or select
-              `runtime.mode: preloaded` in `dem.conf` with the final `preload_path` produced by `dem.plugin runtime preload`.
-              Both modes require the trusted manifest and its matching bundle. Preloads stay outside automatic cleanup;
-              stop every consumer before replacing or removing them. Separately installed runtime components are unsupported.
+              Browser monitoring requires an explicitly installed runtime on Linux amd64 or arm64, running as the
+              unprivileged Netdata service account with Chromium sandboxing enabled. Native installations use the optional
+              `netdata-dem-runtime` package on live systemd hosts; package hooks may restart the Agent. Other installation
+              methods use managed bundles or protected preloads. Production publication still requires release and platform qualification.
 
-              Run `dem.plugin runtime status` to inspect preparation and `dem.plugin runtime qualify` as the service
-              account to check a local sandboxed browser run. Follow the
-              [DEM runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
-              for manifests, downloads, offline imports, retention and protected preloads. Restart the plugin after changing
-              runtime configuration.
+              For offline managed installation, set `runtime.offline_keyring` in `dem.conf` to the path of an
+              administrator-provisioned public OpenPGP keyring. Obtain a signed release descriptor and matching archive,
+              then run as the service account:
+
+              ```sh
+              dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
+              dem.plugin runtime status
+              ```
+
+              Restart DEM to activate the installation. Explicit install enables automatic update preparation; add
+              --manual-updates for manual control. Enabling a monitor never downloads a runtime.
+              Use `dem.plugin runtime qualify` under the service's execution policy to check both journeys and Lighthouse.
+              See the [runtime setup guide](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
+              for updates, explicit downloads, installation paths and protected preloads.
       configuration:
         file:
           name: dem/lighthouse.conf
@@ -99,9 +114,14 @@ modules:
               default_value: false
               required: false
               group: Diagnosis
-            - name: update_every
-              description: Data collection interval, in seconds.
+            - name: check_every
+              description: Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check.
               default_value: 1800
+              required: false
+              group: Collection
+            - name: update_every
+              description: Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`.
+              default_value: 10
               required: false
               group: Collection
             - name: timeout
@@ -109,14 +129,21 @@ modules:
               default_value: 180
               required: false
               group: Collection
+            - name: vnode
+              description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              detailed_description: Define a static vnode through `dem:vnode` or a YAML file in the Netdata configuration directory’s `vnodes/` directory. Enter its reference name, not its GUID. Leave empty to keep charts on the collecting Agent.
+                Retained runs and captures keep the GUID resolved when the attempt entered the execution queue, even if the vnode changes before execution starts. Changing the vnode clears the latest observation without relabeling retained evidence; records without a GUID remain unassigned.
+              default_value: ''
+              required: false
+              group: Virtual Node
         examples:
           folding:
             enabled: true
             title: Examples
           list:
             - name: Monitor a home page
-              description: Create one native browser monitor after preparing the runtime.
-              config: "jobs:\n  - name: home\n    url: https://example.org/\n"
+              description: Create one native browser monitor after preparing the runtime and defining the `example-site` vnode.
+              config: "jobs:\n  - name: home\n    vnode: example-site\n    url: https://example.org/\n"
     troubleshooting:
       problems:
         list:
@@ -126,8 +153,15 @@ modules:
               phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not
               recovery.
     metrics:
-      description: Each native job has its own chart identity. Attempt duration excludes waiting for admission.
-        Missing observations are omitted.
+      description: Charts repeat the latest completed observation until a new check finishes. Observation age and
+        stale state retain its actual freshness; measurements older than two check intervals are omitted.
+        Attempt and occurrence counters count each event once and reset when the native job restarts.
+        These job diagnostics continue across vnode changes; the latest observation, age and last success/failure
+        reset until a check for the new association completes.
+        Coalesced occurrences never ran and do not represent website failures. Queue age tracks the oldest
+        admission wait; scheduling delay describes the selected occurrence at the latest admission.
+        The first check is eligible immediately, followed by a spread first interval of one to two check_every periods
+        and then a fixed cadence. Each native job has its own chart identity. Attempt duration excludes admission waiting.
       availability: []
       folding:
         enabled: false
@@ -138,7 +172,7 @@ modules:
           labels: []
           metrics:
             - name: dem_synthetic.execution_state
-              description: Synthetic attempt outcome
+              description: Latest synthetic observation state
               unit: state
               chart_type: stacked
               dimensions:
@@ -149,20 +183,66 @@ modules:
                 - name: inconclusive
                 - name: error
                 - name: cancelled
+                - name: stale
             - name: dem_synthetic.duration
-              description: Synthetic attempt duration
+              description: Latest synthetic attempt duration
               unit: milliseconds
               chart_type: line
               dimensions:
                 - name: duration
+            - name: dem_synthetic.observation_age
+              description: Age of latest synthetic observation
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - name: dem_synthetic.attempts
+              description: Completed synthetic attempts
+              unit: attempts/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: failed
+                - name: timeout
+                - name: inconclusive
+                - name: error
+                - name: cancelled
+                - name: unknown
+            - name: dem_synthetic.occurrences
+              description: Synthetic scheduled occurrences
+              unit: occurrences/s
+              chart_type: line
+              dimensions:
+                - name: scheduled
+                - name: admitted
+                - name: coalesced
+            - name: dem_synthetic.scheduler_state
+              description: Synthetic active and pending attempts
+              unit: attempts
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: pending
+            - name: dem_synthetic.queue_age
+              description: Oldest synthetic admission wait
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - name: dem_synthetic.scheduling_delay
+              description: Latest synthetic admission delay from selected due time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: delay
             - name: dem_synthetic.lighthouse.performance
-              description: Lighthouse performance score
+              description: Latest Lighthouse performance score
               unit: points
               chart_type: line
               dimensions:
                 - name: performance
             - name: dem_synthetic.lighthouse.timings
-              description: Lighthouse lab timings
+              description: Latest Lighthouse lab timings
               unit: milliseconds
               chart_type: line
               dimensions:
@@ -171,15 +251,18 @@ modules:
                 - name: tbt
                 - name: speed_index
             - name: dem_synthetic.lighthouse.cls
-              description: Lighthouse cumulative layout shift
+              description: Latest Lighthouse cumulative layout shift
               unit: ratio
               chart_type: line
               dimensions:
                 - name: cls
     functions:
       description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse
-        jobs. Invoke their public synthetics-* names with the documented filters; no job selector or active
-        browser is required.
+        jobs. Invoke their public synthetics-* names on the collecting Agent and select the exact configured vnode name
+        with vnode:storefront, not its display hostname. Names use current configuration even with disabled or no jobs;
+        renamed or removed names stop resolving, and reused names select their current GUID. Use vnode_guid for retained
+        history by canonical GUID after removal. Omit both selectors for all vnodes and unassigned data. Filters retain
+        Agent-level access and do not provide per-site authorization; no active browser is required.
       list:
         - id: synthetics-checks
           function_name: synthetics-checks
@@ -188,6 +271,23 @@ modules:
             and failed-startup configuration remains in native job status. Freshness belongs to the last observation,
             independently of a waiting or running attempt.
           parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: Not supplied
+              options: []
+            - id: vnode_guid
+              name: Virtual node GUID (`vnode_guid`)
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: job_id
               name: Monitor (`job_id`)
               description: Native module and job name, such as journey:checkout. Leave empty to include all
@@ -213,7 +313,10 @@ modules:
               options: []
           returns:
             description: At most limit active jobs, with independent current-attempt state and last-observation
-              freshness. Disabled and failed-startup jobs are visible through native configuration status.
+              freshness, execution cadence, occurrence counts and queue/admission delays. Counters reset on native
+              activation and continue across vnode changes; latest observations and last success/failure reset on
+              reassignment. Coalesced occurrences never ran. Disabled and failed-startup jobs are visible through
+              native configuration status.
             columns:
               - name: job_id
                 type: string
@@ -258,11 +361,11 @@ modules:
               - name: last_success_us
                 type: timestamp
                 unit: ''
-                description: Last success in this activation. Unix microseconds; null when unavailable.
+                description: Last success in the current vnode association. Unix microseconds; null when unavailable.
               - name: last_failure_us
                 type: timestamp
                 unit: ''
-                description: Last failure in this activation. Unix microseconds; null when unavailable.
+                description: Last failure in the current vnode association. Unix microseconds; null when unavailable.
               - name: error
                 type: string
                 unit: ''
@@ -271,6 +374,38 @@ modules:
                 type: string
                 unit: ''
                 description: History error.
+              - name: vnode_guid
+                type: string
+                unit: ''
+                description: Recorded canonical vnode GUID. Empty means unassigned.
+              - name: check_every
+                type: integer
+                unit: 's'
+                description: Check interval.
+              - name: scheduled
+                type: integer
+                unit: ''
+                description: Scheduled occurrences.
+              - name: admitted
+                type: integer
+                unit: ''
+                description: Admitted attempts.
+              - name: coalesced
+                type: integer
+                unit: ''
+                description: Coalesced occurrences.
+              - name: pending
+                type: boolean
+                unit: ''
+                description: Pending occurrence.
+              - name: queue_age
+                type: float
+                unit: 's'
+                description: Oldest admission wait.
+              - name: scheduling_delay
+                type: float
+                unit: 's'
+                description: Latest admission delay.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -289,6 +424,23 @@ modules:
             second or accept negative offsets from now; omitted bounds cover retained history through now.
             Results are capped at 2000 and disclose truncation.
           parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: Not supplied
+              options: []
+            - id: vnode_guid
+              name: Virtual node GUID (`vnode_guid`)
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: job_id
               name: Monitor (`job_id`)
               description: Native module and job name, such as journey:checkout. Leave empty to include all
@@ -389,6 +541,18 @@ modules:
                 type: string
                 unit: ''
                 description: History error.
+              - name: vnode_guid
+                type: string
+                unit: ''
+                description: Recorded canonical vnode GUID. Empty means unassigned.
+              - name: scheduled_us
+                type: timestamp
+                unit: ''
+                description: Selected due time.
+              - name: queued_us
+                type: timestamp
+                unit: ''
+                description: Original admission queue time.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -423,7 +587,8 @@ modules:
           returns:
             description: One row per retained reporter event, preserving actual and expected status and failure
               phase. The run object also contains test counts, nullable lab metrics, capture state, artifact
-              metadata and history errors; dropped_events discloses omitted event detail.
+              metadata and history errors; dropped_events discloses omitted event detail. The run.vnode_guid field
+              contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
             columns:
               - name: at_ms
                 type: timestamp
@@ -482,6 +647,23 @@ modules:
             Journey recovery without a screenshot leaves its previous failure capture eligible. Disabled or
             deleted monitors keep the same preference; renamed monitors form separate groups.
           parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: Not supplied
+              options: []
+            - id: vnode_guid
+              name: Virtual node GUID (`vnode_guid`)
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
             - id: job_id
               name: Monitor (`job_id`)
               description: Exact native module and job name to filter captures, such as journey:checkout. Leave
@@ -532,6 +714,10 @@ modules:
                 type: integer
                 unit: ''
                 description: Number of captures in the set.
+              - name: vnode_guid
+                type: string
+                unit: ''
+                description: Recorded canonical vnode GUID. Empty means unassigned.
           performance: Reads local capture metadata and file sizes without reading capture contents or starting a browser.
           security: Requires member-equivalent access. Exposes monitor identities and capture metadata, not capture contents.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse jobs
@@ -572,7 +758,8 @@ modules:
           returns:
             description: Retained capture metadata remains available after run history expires. Fetch verifies content
               and returns encoding=base64 and data_base64 without rendering HTML. A missing recorded capture
-              returns expired_or_unavailable, which does not prove why the file is absent.
+              returns expired_or_unavailable, which does not prove why the file is absent. The top-level vnode_guid field
+              contains the recorded canonical vnode GUID; an empty value means unassigned.
             columns:
               - name: artifact_id
                 type: string

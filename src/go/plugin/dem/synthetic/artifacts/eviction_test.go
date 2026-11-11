@@ -21,7 +21,7 @@ func transitionCapture(t *testing.T, s *Store) string {
 	_, err := rand.Read(raw[:])
 	require.NoError(t, err)
 	id := hex.EncodeToString(raw[:])
-	work, err := s.Begin(id, "lighthouse:test")
+	work, err := s.Begin(id, "lighthouse:test", "")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	require.NoError(t, os.WriteFile(filepath.Join(work, "output", "report"), []byte("<html>diagnosis</html>"), 0600))
@@ -169,9 +169,9 @@ func TestDeletionCollisionAndUnknownEntriesArePreserved(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "preserve", string(body))
 	}
-	_, err = s.Begin(id, "lighthouse:test")
+	_, err = s.Begin(id, "lighthouse:test", "")
 	require.ErrorIs(t, err, ErrExists)
-	require.NoError(t, s.Close())
+	require.ErrorContains(t, s.Close(), "temporary artifact store cleanup is incomplete")
 	_, err = os.Stat(root)
 	require.NoError(t, err, "Close must honor preservation promised by maintenance")
 }
@@ -238,7 +238,7 @@ func TestPendingDeletionAloneReservesRunID(t *testing.T) {
 	require.Error(t, err)
 	_, err = s.root.Lstat("runs/" + id)
 	require.ErrorIs(t, err, os.ErrNotExist)
-	_, err = s.Begin(id, "lighthouse:test")
+	_, err = s.Begin(id, "lighthouse:test", "")
 	assert.ErrorIs(t, err, ErrExists)
 	s.eviction = real
 	_, err = s.Enforce(context.Background(), 7, 1)
@@ -253,7 +253,7 @@ func TestEmptyCaptureCleanupFailureDoesNotChangeCompletion(t *testing.T) {
 	_, err = rand.Read(raw[:])
 	require.NoError(t, err)
 	id := hex.EncodeToString(raw[:])
-	work, err := s.Begin(id, "journey:test")
+	work, err := s.Begin(id, "journey:test", "")
 	require.NoError(t, err)
 	// Replace only this test-owned alias; no child was launched.
 	require.NoError(t, os.Remove(work))

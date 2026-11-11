@@ -56,10 +56,8 @@ func TestCandidatePrivateDependencyWait(t *testing.T) {
 					hook := &failureLifecycleHook{
 						recordingJobConfigLifecycle: &recordingJobConfigLifecycle{events: &events},
 					}
-					owner := &intentTestOwner{}
 					creator := controller.modules["module"]
 					creator.JobConfigLifecycle = hook
-					creator.JobConfigIntent = owner
 					controller.modules["module"] = creator
 					var available atomic.Bool
 					controller.factory.config.Vnode = func(name string) (jobruntime.VnodeSnapshot, bool) {
@@ -99,7 +97,6 @@ func TestCandidatePrivateDependencyWait(t *testing.T) {
 					before, listed := graph.Lookup(a.FullName())
 					require.Equal(t, sourceType != confgroup.TypeStock, listed)
 					failure, reconciliations := hook.observed, len(hook.reconciliations)
-					prepared, committed, aborted, enabled := owner.snapshot()
 
 					require.Nil(t, applyActivationTestSubmission(t, commands.next(t, "internal/jobs/accepted-activation"), nil, 2))
 					after, stillListed := graph.Lookup(a.FullName())
@@ -107,8 +104,6 @@ func TestCandidatePrivateDependencyWait(t *testing.T) {
 					require.Equal(t, before, after, "a private wait must not mutate the public binding")
 					require.Equal(t, failure, hook.observed, "a sibling's failure must not replace the binding's diagnostic")
 					require.Len(t, hook.reconciliations, reconciliations)
-					p, c, aCount, e := owner.snapshot()
-					require.Equal(t, []int{prepared, committed, aborted, enabled}, []int{p, c, aCount, e})
 					require.EqualValues(t, 1, checks.Load(), "the missing vnode prevents the sibling Check")
 					require.False(t, runtimeTestHasRetry(controller, a.FullName()), "dependency waits do not need operational retries")
 

@@ -63,6 +63,10 @@ writes nothing there.
   selected service with `cloudwatch:ListMetrics`, once per target, region, and CloudWatch namespace, and matches
   them against the profile's dimensions to find the resources. Resource tag filters and labels are resolved
   with `tag:GetResources` (Resource Groups Tagging API).
+- RDS details: CloudWatch does not say which engine an RDS instance runs, so when RDS instances are
+  discovered the collector reads them with `rds:DescribeDBInstances`, using `discovery.refresh_every`, per target
+  and region, and adds their engine, engine version, and instance class as chart labels. These lookups
+  run in the background: charts can appear before their labels, and slow lookups do not delay metric collection.
 - Collection: every `update_every` seconds (default 60) it reads the newest complete datapoint of every selected
   metric and statistic with `cloudwatch:GetMetricData`, batched, and only for series whose CloudWatch period has
   moved on since the last read. Between reads the last value is repeated at no AWS cost.
@@ -88,6 +92,7 @@ This collector supports collecting metrics from multiple instances of this integ
 | `cloudwatch:ListMetrics` | Any selected profile has an identifying dimension and therefore needs discovery. An all-constant profile such as `billing_total` is queried directly and does not need it. |
 | `sts:AssumeRole` | A target sets `assume_role`; grant it on the credential source's identity for that role ARN. |
 | `tag:GetResources` | Resource tag filters (`rule_defaults.filters.resource_tags`, `rules[].filters.resource_tags`) or resource tag labels (`labels.resource_tags`) are configured. |
+| `rds:DescribeDBInstances` | RDS instances are collected (the `rds` profile is a default). It adds the `engine`, `engine_version`, and `db_instance_class` labels to RDS charts. Without it those labels are missing; collection is not affected. |
 
 The collector also calls `sts:GetCallerIdentity` for account attribution, but [AWS does not require an explicit
 permission grant for that operation](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html).
@@ -170,7 +175,7 @@ Four collector-activity charts count the work as it happens: *CloudWatch SDK Inv
 (the billable unit, per account and region), *GetMetricData Profile Metric Request Estimates* (the same split
 per profile for ranking; estimates are computed per profile and do not add up to the total), and
 *GetMetricData Query Items* (submitted queries, for plan tuning). They count only `ListMetrics` and
-`GetMetricData`, not STS or tag lookups, and they are inputs for cost visibility, not an invoice.
+`GetMetricData`, not STS, tag, or RDS lookups, and they are inputs for cost visibility, not an invoice.
 
 **Reducing the cost**
 
@@ -230,6 +235,8 @@ The collector authenticates as an IAM user or role that can read CloudWatch. Att
   `"Resource": "*"` is already the least privilege for these read actions
   ([AWS reference](https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazoncloudwatch.html)).
 - Add `tag:GetResources` (also `"Resource": "*"`) when you use resource tag filters or labels.
+- Add `rds:DescribeDBInstances` (also `"Resource": "*"`) so RDS charts carry the `engine`,
+  `engine_version`, and `db_instance_class` labels.
 - Add `sts:AssumeRole` on each role ARN a target assumes, and let the role's trust policy allow this identity.
 - A job that selects only the `billing_total` profile can omit `cloudwatch:ListMetrics`.
 
@@ -1046,8 +1053,15 @@ dashboard.
 Every chart instance is one AWS resource, identified by `account_id`, `region`, and the profile's identifying
 dimensions (for example EC2 `instance_id`, or S3 `bucket_name` and `storage_type`). A dimension that is the same
 for every resource of a profile (CloudFront's `Region=Global`) is matched but not shown as a label. Tags selected
-with `labels.resource_tags` are added as labels that are not part of the chart identity, so a changed tag changes
-the label, not the chart. Charts land on the job's `vnode` when one is set, otherwise on the node running the
+with `labels.resource_tags` are presentation labels in stock profiles; user templates may intentionally use
+them for chart identity or selection. RDS charts carry `engine` (as AWS reports it, for example `mysql`,
+`postgres`, `aurora-mysql`, `aurora-postgresql`, `mariadb`, `sqlserver-se`, `oracle-ee`), `engine_version`, and
+`db_instance_class`, read with `rds:DescribeDBInstances`. These labels can arrive after the charts appear;
+updates keep the same charts. Failed lookups leave labels absent or retain their last-known values. Explicit
+`labels.resource_tags` mappings take precedence over these automatic labels, even when the tag is absent.
+Automatic keys used by a user template for chart identity, dimension names, or selector predicates are withheld
+so adding metadata does not change that template's behavior.
+Charts land on the job's `vnode` when one is set, otherwise on the node running the
 collector; AWS resources never become separate Netdata nodes. CloudWatch publishes with a delay, so allow a few
 minutes for the first datapoints.
 
@@ -1260,22 +1274,23 @@ docker logs netdata 2>&1 | grep cloudwatch
 **When**
 
 Logged as part of a `CloudWatch <operation> failed for N target/region operation(s)` warning, where the
-operation is `account resolution`, `discovery`, `GetMetricData`, `query client creation`, or
-`resource tag lookup`. The codes `AccessDenied`, `NotAuthorized`, and `Forbidden` mean the same.
+operation is `account resolution`, `discovery`, `GetMetricData`, `query client creation`,
+`resource tag lookup`, or `resource attribute lookup`. The codes `AccessDenied`, `NotAuthorized`, and `Forbidden` mean the same.
 
 
 **Cause**
 
 The IAM identity behind the named target is not allowed the AWS action that operation uses:
 `cloudwatch:ListMetrics` for discovery, `cloudwatch:GetMetricData` for reads, `tag:GetResources` for tag
-lookups, or `sts:AssumeRole` when the target assumes a role. The collector never prints the AWS message
+lookups, `rds:DescribeDBInstances` for RDS attribute lookups, or `sts:AssumeRole` when the target assumes
+a role. The collector never prints the AWS message
 itself, only the code, HTTP status, and request id.
 
 
 **Fix**
 
 Attach the policy from Prerequisites to that identity, adding `tag:GetResources` if the job uses tag
-filters or labels. For a target with `assume_role`, allow `sts:AssumeRole` on the role ARN for the source
+filters or labels and `rds:DescribeDBInstances` for RDS engine labels. For a target with `assume_role`, allow `sts:AssumeRole` on the role ARN for the source
 identity and let the role's trust policy accept it. The next discovery refresh or collection cycle retries
 automatically.
 
@@ -1688,12 +1703,44 @@ Nothing, or add a rule for `us-east-1` if you want that service.
 **Cause**
 
 A tag selected in `labels.resource_tags` would become a label that the profile already uses for a
-dimension (or one of the reserved `account_id` and `region` labels). The tag is not attached.
+dimension (or one of the reserved `account_id` and `region` labels).
+The tag is not attached.
 
 
 **Fix**
 
 Set `labels.resource_tags[].label` to another name for that key.
+
+
+#### `CloudWatch resource attributes (profile "<profile>"): skipped rds:DescribeDBInstances labels: label "<label>" collides with an identity label`
+
+**Cause**
+
+A user profile for `AWS/RDS` names one of its dimension labels `engine`, `engine_version`, or
+`db_instance_class`, the labels the collector adds from `rds:DescribeDBInstances`. To keep chart labels
+unique, that profile gets none of the three; its charts are collected as before.
+
+
+**Fix**
+
+Give that dimension a different `label` in the user profile; its charts then also get the RDS labels.
+
+
+#### `CloudWatch resource attributes (profile "<profile>"): skipped automatic labels used by chart identity or selection: ...`
+
+**Cause**
+
+A user template uses an automatic RDS label in chart instance identity, dimension naming, or a
+dimension selector. The collector withholds that automatic label to preserve the template's existing
+chart IDs, dimensions and metric routing. Explicit resource-tag mappings are unchanged.
+
+
+**Fix**
+
+Keep the template as it is to preserve its current behavior. To use the automatic values as metadata,
+remove those keys from identity, dimension names and selectors; for wildcard identity, exclude them
+with `!engine`, `!engine_version`, and `!db_instance_class`. Changing an existing identity policy can
+itself change chart IDs.
 
 
 #### `load CloudWatch profiles: validate profile "<name>": ...`
@@ -1837,6 +1884,21 @@ uncollected rather than being collected unfiltered.
 Follow the `AWS request ...` message inside the lookup failure (usually a missing `tag:GetResources`
 permission or a timeout on a large tagged estate; raise `timeout` for the latter). Collection resumes on
 the next successful lookup.
+
+
+#### `CloudWatch resource attribute lookup failed for N target/region operation(s): ... (retaining last-known attribute labels; collection is unaffected)`
+
+**Cause**
+
+`rds:DescribeDBInstances` failed for that target and region, usually because the identity lacks the
+permission. RDS charts are still collected; they lack the `engine`, `engine_version`, and
+`db_instance_class` labels, or keep the last values read.
+
+
+**Fix**
+
+Allow `rds:DescribeDBInstances` for that identity (see Prerequisites). The lookup retries at the next
+`discovery.refresh_every` cadence.
 
 
 #### No charts appear although the job runs without errors

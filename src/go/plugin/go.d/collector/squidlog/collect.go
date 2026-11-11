@@ -317,14 +317,14 @@ func (c *Collector) addDimToMimeTypeChart(mimeType string) {
 func (c *Collector) addDimToChart(chartID, dimID, dimName string) {
 	chart := c.Charts().Get(chartID)
 	if chart == nil {
-		c.Warningf("add '%s' dim: couldn't find '%s' chart in charts", dimID, chartID)
+		c.Warningf("add dimension: couldn't find '%s' chart in charts", chartID)
 		return
 	}
 
 	dim := &Dim{ID: dimID, Name: dimName, Algo: collectorapi.Incremental}
 
 	if err := chart.AddDim(dim); err != nil {
-		c.Warningf("add '%s' dim: %v", dimID, err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chartID)
 		return
 	}
 	chart.MarkNotCreated()
@@ -338,7 +338,7 @@ func (c *Collector) addDimToChartOrCreateIfNotExist(chartID, dimID, dimName stri
 
 	chart := newChartByID(chartID)
 	if chart == nil {
-		c.Warningf("add '%s' dim: couldn't create '%s' chart", dimID, chartID)
+		c.Warningf("add dimension: couldn't create '%s' chart", chartID)
 		return
 	}
 	if err := c.Charts().Add(chart); err != nil {

@@ -1,13 +1,93 @@
 # DEM plugin
 
-`dem.plugin` runs native Netdata jobs for browser real user monitoring, Playwright journeys and desktop Lighthouse audits. It is experimental and built explicitly with
-`ENABLE_PLUGIN_DEM=ON` (source installer: `--enable-plugin-dem`). The integration metadata beside each collector is the
-source of operator configuration documentation. The [ownership guide](ARCHITECTURE.md) maps packages and runtime lifetimes.
+`dem.plugin` runs native Netdata jobs for browser real user monitoring, Playwright journeys and desktop Lighthouse audits.
+Linux builds include the plugin by default; the browser runtime is an additional, explicit installation.
+Use `ENABLE_PLUGIN_DEM=OFF` (source installer: `--disable-plugin-dem`) to omit the plugin. The integration metadata beside each collector is the
+source of operator configuration documentation. The [architecture guide](ARCHITECTURE.md) explains how the plugin
+is built, from the overall data flow to package ownership and runtime lifetimes.
 
 The stock configuration starts one loopback receiver and no sites. Configuration follows the normal Go Agent layout:
 `dem.conf` for plugin policy and `dem/receiver.conf` / `dem/rum.conf` for collectors. The receiver is a canonical single
-object (`dem:collector:receiver`); each site is an independent job (`dem:collector:rum:<name>`). Native `name` is the
-stable beacon/history key; `display_name` is presentation metadata. Renaming a site starts a new history namespace.
+object (`dem:collector:receiver`); each RUM monitor is an independent job (`dem:collector:rum:<name>`). Native `name` is the
+stable beacon/history key; `display_name` is presentation metadata. Renaming a RUM job starts a new history namespace.
+
+## Organize monitors on a site vnode
+
+A DEM site is a configured Virtual Node (vnode). Set the optional `vnode` reference on independent RUM, journey and
+Lighthouse jobs to place their charts on that node. Omit it to keep charts on the collecting Agent and leave the job
+unassigned to a site. A site with only synthetic monitors needs no RUM job or receiver.
+
+Create a static vnode through the plugin's `dem:vnode` dynamic configuration entry, or define one in a YAML file under
+`vnodes/` in the Netdata configuration directory. For example, `/etc/netdata/vnodes/sites.yaml`:
+
+```yaml
+- hostname: storefront
+  guid: 12345678-1234-4234-8234-123456789abc
+  labels:
+    environment: production
+```
+
+Generate a unique GUID for each site, for example with `uuidgen`. For file-defined static vnodes, `hostname` is also
+the reference name used by jobs. A dynamically configured vnode uses its configuration entry's name as the reference.
+Use the reference name in `vnode`, not the GUID. See [node identities](../../../../docs/learn/node-identities.md#virtual-nodes-vnodes)
+for the standard configuration and identity rules.
+
+These entries place two independent jobs on Storefront:
+
+```yaml
+# dem/rum.conf
+jobs:
+  - name: storefront-rum
+    vnode: storefront
+    display_name: Storefront
+    allowed_origins: [https://shop.example.org]
+```
+
+```yaml
+# dem/journey.conf
+jobs:
+  - name: storefront-checkout
+    vnode: storefront
+    script_path: /etc/netdata/dem/checkout.spec.ts
+    check_every: 300
+    update_every: 10
+    timeout: 120
+```
+
+The RUM installation key remains `storefront-rum`, so its script URL ends in `/rum/storefront-rum.js`. Each job keeps
+its own configuration, DynCfg entry, schedule, secrets and enable/disable controls. Names must be distinct within each
+collector module. Guided site setup creates or selects a vnode and submits ordinary independent job operations;
+partial success must show which operations need attention. A vnode does not own child jobs, browser workers or shared
+retention budgets, and referencing it does not deploy jobs to other Agents.
+
+DEM Functions remain global on the collecting Agent. Invoke their existing names through that Agent or Cloud and
+select a site by its configured vnode name, for example `synthetics-runs vnode:storefront` or
+`rum-pages vnode:storefront`. The name is the exact resource name used by the job's `vnode` option, not its display
+hostname. Name lookup uses current vnode configuration, including when all jobs are disabled or no jobs reference it.
+Renamed or removed names stop resolving; reusing a name selects its current GUID, without aliases to earlier identities.
+
+Use `vnode_guid` with the recorded canonical GUID to query an earlier identity or retained history after its vnode is
+removed, for example `synthetics-runs vnode_guid:12345678-1234-4234-8234-123456789abc`. Supply only one selector;
+empty or unknown vnode names and requests containing both selectors are rejected, even if either value is empty.
+Omitting both selectors, or supplying only an empty `vnode_guid`, includes all vnodes and unassigned data.
+These selectors apply to all six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts`;
+`synthetics-run` and `synthetics-artifact` keep their existing detail parameters.
+
+The selectors filter data under the existing Agent-level access model; they are not a per-site authorization boundary.
+Functions are not registered on each vnode. Frontend consumers retain the collecting Agent relationship when selecting
+a site, including for archived vnodes and retained history.
+
+Functions and retained evidence expose `vnode_guid`; charts use normal vnode placement without an extra GUID label.
+Existing RUM `site` fields identify the physical RUM job. RUM observations capture the resolved GUID when admitted;
+synthetic attempts capture it when submitted to the execution queue, before waiting for browser admission. Saved and
+buffered investigation records, runs and captures retain that GUID after reassignment. A changed RUM GUID starts a fresh rolling measurement window and Pages view; hostname or label
+edits with the same GUID do not reset measurements. Transport and history counters remain job-wide. Old evidence without
+a captured GUID stays unassigned; legacy `site_id` text is not mapped to a vnode or rewritten.
+
+Vnode placement does not combine RUM populations, change artifact ownership or increase browser capacity. Execution,
+receiver service and retention remain shared by the collecting Agent.
+
+## Receive browser reports
 
 Expose the receiver through HTTPS, configure its public URL and actual trusted proxy addresses, then install
 `<script async src="https://rum.example.org/rum/shop.js"></script>` on the configured website. Public URLs may include a
@@ -34,6 +114,9 @@ string identity combining site, runtime generation and sequence. Cursors track i
 advance a quiet site's position. A replaced site's runtime starts a fresh stream. Missing Web Vitals are `null` in
 Functions and gaps in charts; an available but quiet receiver measures zero traffic. Receiver outages leave site jobs
 running with explicit ingress availability and gaps in browser product measurements.
+
+On Linux, DEM requires a valid machine ID in `/etc/machine-id` or `/var/lib/dbus/machine-id` to open its history store.
+Minimal or custom container environments must provide that OS identity before starting the plugin.
 
 Investigation history uses pure-Go journal files under `${NETDATA_LIB_DIR}/dem/journal`, through the existing
 `systemd-journal-sdk`. Events include their session and error metadata, so investigation does not depend on a separate
@@ -95,7 +178,7 @@ old or partial schemas, detected index damage and quarantined `.journal~` files 
 operator recovery; there is no automatic migration, repair or deletion. External file modification is outside this
 archive-provenance guarantee.
 
-The browser normalization, bounded aggregation, OTLP and query behavior originated in the experimental
+The browser normalization, rolling aggregation, OTLP and query behavior originated in the experimental
 [Netdata digital-experience POC](https://github.com/netdata-labs/dem), commit
 `b3de4662f567dc63d33fee6201f8c2313568301b`. Its private configuration controller, scheduler, protocol emitter and root
 state reconciliation are replaced by the native Agent framework. Embedded third-party asset notices remain beside their source.
@@ -171,19 +254,21 @@ visualization. Later reports retain their own user and application-view context 
 attributed to the original document.
 
 The configured `window` uses receiver arrival time, including for delayed reports. A genuinely newer revision extends
-that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for up to 30 minutes,
-subject to capacity and runtime restart. Identified SDK session lifecycle events follow the same rule, so replay does
-not renew observed-session windows. It is best effort, not exactly-once delivery. Reports arriving after retained
-evidence expires can be counted again. Late observations are not rejected merely to claim perfect deduplication.
+that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for 30 minutes,
+unless the site job restarts, is replaced, or changes its vnode association. Identified SDK session lifecycle events
+follow the same rule, so replay does not renew observed-session windows. It is best effort, not exactly-once delivery.
+Reports arriving after retained evidence expires can be counted again. Late observations are not rejected merely to
+claim perfect deduplication.
 Errors, console logs, spans and ordinary custom events are not covered by this identity-based replay suppression;
 repeated delivery of these records can count again and refresh observed-session activity.
 
-Population charts show retained observations, good/needs-improvement/poor counts and capacity-loss evidence. Percentiles
-are unavailable when there are no observations or the local population is incomplete. A zero CLS or zero timing is a
-valid observation. Lost-report fields conservatively remain nonzero until the latest relevant loss leaves the window;
-they can include older loss from a continuous overload episode. They are neither exact missing-window counts nor part
-of the percentile denominator. The cumulative drop diagnostic counts actual discarded reports. Restart starts fresh
-in-memory windows; retained investigation history is independent.
+Population charts show exact retained observations and good/needs-improvement/poor counts. Percentiles are unavailable
+when there are no observations. A zero CLS or zero timing is a valid observation. Canonical measurements remain in the
+configured receipt window (five minutes by default); replay identities remain for 30 minutes. There is no independent
+aggregate count or byte cap. Memory grows with admitted distinct state and retained text over these horizons, plus
+investigation detail and query state. This is time retention, not a fixed memory guarantee or a qualified full-scale
+workload claim. Restarting or replacing the site job, or changing its vnode association, starts fresh in-memory
+windows; retained investigation history is independent and preserves its original vnode attribution.
 
 `rum.observed_sessions` counts distinct browser session identities seen in the receipt window. It does not estimate
 people, concurrency or time on site. Page session counts use the same window. JavaScript errors are events: several can
@@ -192,9 +277,8 @@ corresponding measurement and increments an invalid-measurement diagnostic; no t
 
 Breakdown traffic counts and vital populations use the same current window. Top groups and the pooled complement are
 computed from current observations. `bucket=value` distinguishes a literal label named `other` from `bucket=other`.
-The Pages Function exposes all retained document-entry groups, including groups outside the chart top list; loss
-fields reveal bounded-state truncation. Percentiles cannot be averaged across time windows, groups or sites to obtain a
-combined percentile.
+The Pages Function exposes all retained document-entry groups, including groups outside the chart top list. Percentiles
+cannot be averaged across time windows, groups or sites to obtain a combined percentile.
 
 Navigation charts report document load time and **DOMContentLoaded handler duration**. Same-site fetch timing includes
 reported same-site fetch/XHR resource entries, not all backend API requests or server availability. Resource counts
@@ -441,82 +525,205 @@ receiver recovery.
 ## Synthetic monitoring
 
 Each `journey` job runs one configured Playwright Test entry and its imports. Each `lighthouse` job runs one desktop
-performance lab audit. Both use native job configuration and scheduling. Stock configuration enables no browser jobs.
-Journey defaults to 900 seconds between attempts and a 120-second admitted timeout; Lighthouse defaults to 1800/180 seconds.
-One plugin-wide admission slot serializes expensive runs. Waiting time is separate from execution time; cancellation
-while waiting starts no browser. A fresh browser is created for each run.
+performance lab audit. Both use native job configuration. Stock configuration enables no browser jobs.
+`check_every` controls browser execution: 900 seconds for journeys and 1800 seconds for Lighthouse by default.
+Admitted attempt timeouts default to 120 and 180 seconds respectively. `update_every` controls chart refreshes and defaults
+to 10 seconds for both. When updating an existing test configuration, move its old browser interval from `update_every`
+to `check_every`; otherwise it will only change chart refresh frequency.
+
+A job queues its first check immediately. The first recurring check is spread deterministically between one and two
+check intervals after activation; later due times follow a fixed cadence. A busy job keeps at most one active and one
+pending monitoring occurrence. A newer due occurrence replaces the older pending one without losing its admission
+position. Replaced occurrences count as coalesced; they never ran and do not establish website failure. There is no
+catch-up backlog or automatic attempt retry. Equal-job turns do not imply equal CPU time or per-site quotas.
+
+Charts show the latest completed observation, its age, and independent active/pending and delay measurements.
+Refreshing a chart does not start or count another check. Observations older than two check intervals become `stale`;
+missing or stale duration, test and Lighthouse measurements remain gaps. Outcome counters count each completed attempt
+once, including attempts between chart refreshes, and reset on native job restart/replacement. These job diagnostics
+continue across vnode changes. Reassignment clears latest measurements, age and last success/failure until a check
+submitted for the new association completes. Earlier queued or running attempts keep their captured GUID in history
+and cannot repopulate current observations, including after switching back to the original vnode. History retains per-run
+evidence under its normal retention and availability policy. Stopping or replacing a job cancels its queued/active work
+and joins execution before the replacement starts.
+
+`browser.concurrency` in `dem.conf` limits simultaneous browser attempts in one plugin process. It defaults to 1 and
+accepts a positive integer; restart the plugin to apply changes. Monitoring, journey rehearsals and in-process runtime
+qualification share this allowance. Ready jobs take turns, and monitoring and rehearsals for the same job cannot overlap.
+Waiting time is separate from execution time; cancellation while waiting starts no browser. A fresh browser is created
+for each run.
+
+Choose concurrency for the Agent's CPU and memory budget and the accuracy needed from Lighthouse measurements.
+The setting is not a hard memory limit or a count of every child process. Concurrent activation checks share one
+runtime contract probe per runtime consumer; probes run outside browser slots so a long audit cannot block activation.
+A later activation checks the runtime again. Standalone administration commands have their own process budget.
 
 Browser jobs require Linux amd64 or arm64 and an unprivileged plugin identity. Chromium sandboxing stays enabled;
 containers need compatible namespace/seccomp support. RUM does not require a browser runtime.
 
 ### Runtime setup and retirement
 
-Browser runtime delivery is experimental. DEM is disabled by default at build time. This tree provides preparation,
-execution and retirement, but no bundle builder, release artifacts or manifest installation. Development deployments
-must supply a trusted manifest and its matching bundle. Packaging and independent runtime releases are separate work;
-the current Agent-owned adapters and exact component pins are temporary. Browser jobs cannot run without those inputs.
+The independent runtime owns Node, Chromium, Playwright, Lighthouse and their JavaScript adapters. Native Linux
+installations use the optional `netdata-dem-runtime` package; static, Docker and source installations use signed
+managed bundles or protected preloads. This tree includes the builder, native recipes and an independent release
+workflow. Production publication remains gated on confirmed infrastructure, source/license review and platform qualification.
 
-Managed mode is the default. Accepting an enabled journey or Lighthouse configuration requests its exact runtime;
-validation and disabled configurations do not download it. Preparation runs separately from website monitoring.
-An unavailable runtime leaves the monitor waiting for its dependency; it does not produce website failure measurements.
-Downloads can be disabled by the administrator:
+For native installations, explicitly install `netdata-dem-runtime` with the package manager. Its hooks require a live
+systemd host and coordinate Agent stop, consumer drainage, qualification and restoration; image/chroot installation
+is not supported yet. DEM never invokes the package manager. See the [native package guide](../../../../packaging/dem-runtime/native/README.md).
+
+On hosts with AppArmor, the native package supplies a profile for its root-owned Chromium executable. This permits
+the user namespaces Chromium needs for its sandbox; it does not add browser confinement. Package setup loads the
+profile before qualification. Administrator policy remains authoritative, and a policy or qualification failure keeps
+browser admission closed while restoring eligible non-browser monitoring.
+
+For static/source installations, use the installed `netdata-dem-runtime.sh` helper or kickstart's explicit
+`--install-dem-runtime` option. The administrator-run helper prepares the necessary AppArmor launcher allowance,
+then runs signed runtime installation and qualification as the configured nonroot service account. For Docker, run
+`sudo sh ./kickstart.sh --install-dem-runtime --docker-container NAME` on the local daemon host while the Agent is
+running. After setup succeeds, activate the runtime with `docker restart NAME`. No host Agent is required. See
+[browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md) for online/offline commands, preloads,
+custom paths, status and removal.
+
+Ubuntu 24.04 restricts unprivileged user namespaces by default. The generated allowance covers the registered root's
+stable browser launchers, including future runtime generations. It enables Chromium's sandbox without adding AppArmor
+confinement or exclusive signed-byte eligibility: service-owned files can be replaced, and other unconfined processes
+may adopt profiles. Administrator edits and disable markers remain authoritative. Containers still need compatible
+namespace/seccomp settings. Do not disable Chromium's sandbox or global host restrictions to make qualification pass.
+
+If qualification reports a Chromium sandbox error, inspect the host's kernel audit messages, for example
+`sudo journalctl -k --since '10 minutes ago'`, for AppArmor namespace denials. Correct the administrator-owned policy,
+then retry the failed installation or qualification. Successful CLI qualification must still be followed by a check
+through the actual Agent service; a terminal and a service can have different security policies.
+
+The low-level managed commands below run as the consuming service account, after any required host policy is prepared
+through the helper described above. Enabling a browser monitor does not download the runtime.
+A missing installation leaves browser monitors waiting for their dependency; it does not create website failures.
+RUM does not need the browser runtime.
+
+```sh
+dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
+# Alternatively, use the administrator-configured signed latest release:
+dem.plugin runtime install --allow-download
+# Disable automatic update preparation for a controlled/offline deployment:
+dem.plugin runtime install --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst --manual-updates
+dem.plugin runtime status
+dem.plugin runtime qualify
+```
+
+Install, update and repair verify the archive, prepare its private paths, then run both a local sandboxed journey and
+Lighthouse audit before selecting the release. Online operations fetch the package public keyring from
+`https://repository.netdata.cloud/netdatabot.gpg.key`; offline operations require `runtime.offline_keyring` to name
+an administrator-provisioned OpenPGP public keyring. `qualify` repeats these checks for the selected release.
+It tests the calling account and environment, not a different service's AppArmor, SELinux or container policy.
+
+Ctrl-C or SIGTERM asks the runtime CLI to cancel at the next point where it can stop safely. If qualification
+launched a browser, the CLI waits for its supervisor to confirm that the browser and its descendants have exited.
+A process stuck in uninterruptible kernel I/O can keep this wait open. Further interrupts do not bypass it.
+Forcing the CLI to exit with SIGKILL leaves drainage unverified. Preserve the execution's files and investigate
+the stuck process before retrying removal or repair.
+
+**Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
+acquired at startup. A process started without a runtime stays unavailable until restarted. Runtime releases can
+update their components without an Agent upgrade while preserving execution contract 1. Runs record the actual
+release version, archive digest and execution contract for investigation.
+
+Explicit installation enables automatic preparation by default and prints this policy before proceeding. Use
+`--manual-updates` on install or repair to disable it. The running plugin checks roughly daily with jitter, downloads
+and qualifies a newer signed release beside the working release, and reports that restart is required. It never
+restarts the Agent. Security fixes remain inactive until the administrator or deployment system restarts DEM.
+Qualification shares the browser execution allowance, so monitors can wait while these local checks run. Failures preserve
+the selected release and appear as update maintenance errors, separately from website measurements.
+
+Signatures authenticate publication order and complete preparation instructions. They cannot detect withheld updates
+or guarantee freshness on a new installation. Online trust follows the canonical HTTPS key endpoint and system TLS
+trust. A key fetch/verification failure blocks that preparation attempt without stopping the installed runtime.
+No stale cached key is used as a fallback; offline keyring updates remain an administrator responsibility.
+Normal updates compare with the currently selected sequence; explicit older-release repair resets that baseline.
+
+```sh
+dem.plugin runtime update --release /absolute/path/new-release.json --archive /absolute/path/new-runtime.tar.zst
+# Stop every DEM/standalone consumer first:
+dem.plugin runtime uninstall
+```
+
+Uninstall refuses while any generation has a running consumer or unresolved execution. Refusal leaves the installation
+intact. If child completion cannot be proved, execution protection remains; neither a timeout nor a missing PID allows
+removal. A failed selection write after publication reports uncertainty; inspection/reconciliation establishes the
+selected state before cleanup proceeds. A successful update does not replace files used by running processes.
+The low-level command removes runtime state only. For a managed runtime with an Agent-linked policy registration, use the
+administrator-owned `netdata-dem-runtime.sh uninstall --agent /path/to/netdata` to complete policy cleanup after
+drainage. Protected preloads additionally require `--root /absolute/preload/path --deployments-stopped`;
+For Docker, use the host retirement command printed at setup. Other explicit policy-only
+registrations use `policy-remove --deployment TOKEN --deployments-stopped` on the host.
+See [runtime and host-policy removal](../../../../packaging/installer/DEM-RUNTIME.md#status-retry-and-removal) for the retirement steps.
+
+If selection or generation metadata is damaged, `status` still reports the available inventory and identifies the
+metadata errors, with a nonzero exit status. A healthy selected release remains identified even when an older release
+is damaged. Incomplete ownership or storage inspection is reported as unknown, not as an empty installation.
+
+Stop all DEM and standalone consumers and let their executions drain before repairing the managed store:
+
+```sh
+dem.plugin runtime repair --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
+# Alternatively, explicitly request configured latest with --allow-download.
+```
+
+Repair removes damaged generations and rebuilds the requested release, including a same-release reinstall. It uses
+the same signed descriptor, service account, store and browser qualification as install. Repair may deliberately
+select an older authenticated release; ordinary updates reject lower publication sequences. A healthy selection of a
+different release stays selected if repair fails; ordinary retention still applies to other unselected releases.
+If repair clears the selection being rebuilt, failed preparation or qualification leaves it unavailable. The old
+selection cannot be rolled back; correct the reported problem and retry repair, then restart DEM after success.
+The command reports candidate progress separately from the final selected installation.
+
+Repair and uninstall can handle damaged executable metadata only when independent ownership records prove removal
+is safe. They refuse active consumers, preparation, unresolved executions, missing safety structure and storage access
+errors. There is no force-delete option; dead PIDs and timeouts do not prove execution completion. Do not manually
+edit selection records or remove generation directories. Repair applies only to private managed stores; immutable,
+administrator-owned preloads must be replaced through their separate lifecycle. Arbitrary external deletion of
+individual ownership records or copying a live store is outside this recovery guarantee.
+
+The store defaults to `NETDATA_LIB_DIR/dem/runtime`; override `cache_path` in `dem.conf` or `--cache` for administration.
+Use the same installation directory and service account for the CLI and running plugin. `--config-dir` selects an
+administrator configuration directory; all explicit paths must be absolute. Normal plugin configuration lookup rules
+apply. Terminal sessions ignore configuration-root environment variables, so use `--config-dir` when needed.
 
 ```yaml
 runtime:
   mode: managed
-  allow_download: false
+  cache_path: ''
   max_bytes: 4294967296
   previous_retention_days: 7
-  idle_retention_days: 30
+  release_url: https://artifacts.example.invalid/dem-runtime/latest/arm64.json
+  offline_keyring: /absolute/path/netdatabot.gpg.key  # required only for offline operations
 ```
 
-Managed setup reads a trusted `plugins.d/dem/runtime-<architecture>.json` manifest identifying the archive, digest,
-size limits and executable layout. The administrator must supply this file, or select an absolute `manifest_path`
-in `dem.conf`. Monitor configuration cannot choose a download URL. A checkout or package without that manifest reports
-setup unavailability; it does not guess a source or fetch a different browser.
+The release URL above is an example; use the confirmed publication URL for the host architecture. Online preparation
+uses the canonical package-key HTTPS endpoint, including when `--release` is combined with `--allow-download`.
+`--release` plus `--archive` is fully offline and uses only `offline_keyring`; this local trust is never an online fallback.
+The descriptor and archive cannot supply their own verification key. Explicit offline installation still enables future
+automatic online preparation unless `--manual-updates` is selected; protected preloads remain manual. The release URL
+and publication infrastructure must be configured before online setup succeeds. Ordinary execution and status do not
+fetch a key, and an already installed runtime can continue operating offline.
 
-The cache defaults to `NETDATA_LIB_DIR/dem/runtime`. Its 4 GiB allowance includes preparation reservations. Known
-enabled monitors protect their runtime; every probe and browser invocation also has an independent execution pin.
-Unneeded previous generations get a 7-day grace and idle runtimes 30 days, with hourly cleanup. Storage pressure can
-shorten either grace. Protected demand and executions can exceed the allowance. If child completion cannot be proved,
-the plugin stops and retains the execution's protection; an arbitrary timeout is not permission to remove its files.
+The selected runtime stays installed until explicitly uninstalled, even with no browser monitors. The 4 GiB logical
+allowance includes preparation workspace and reservations. Processes and executions protect older releases. Unprotected
+old releases are cleaned hourly, with a seven-day grace for the most recently used obsolete release; storage pressure
+can shorten that grace. Protected files can prevent a new installation. This is not a physical disk quota.
+`status` reports the selected installation and storage inventory without launching a browser; it does not report the
+runtime held by another running process.
 
-This is an ordinary cache: startup cleanup or another consumer can remove an expired generation before saved monitor
-enables arrive. Online setup can download it again; offline setup reports unavailability. For guaranteed offline
-availability across that gap, use an administrator-owned preload as described below. Restart the plugin after changing
-runtime configuration; an Agent upgrade requiring a new runtime needs that exact archive available online or imported.
+The portable archive supplies both the native package payload and managed installations on Linux amd64/arm64.
+Native packages own their installation lifecycle; Docker, static and source installations use the managed store or a
+preload. Persist the store in Docker to retain installation across container replacement. No host Node/npm/browser
+installation is required or discovered. Host sandbox prerequisites still apply to each deployment.
 
-Run administration commands as the consuming service account, with the same configuration and library directory:
+For an immutable image or read-only deployment, create a protected preload at its final path:
 
 ```sh
-dem.plugin runtime status
-dem.plugin runtime prepare
-dem.plugin runtime import --archive /absolute/path/runtime.tar.gz
-dem.plugin runtime qualify
+dem.plugin runtime preload --root /opt/netdata-dem-runtime --release /absolute/path/release.json --archive /absolute/path/runtime.tar.zst
 ```
-
-`status` reports cache inventory and whether the selected archive is prepared, without downloading or launching a
-browser. `prepare` uses only the installed manifest's URL; `import` verifies an offline archive against that same trust.
-`qualify` runs a local sandboxed Playwright journey through the actual supervisor and reports qualification separately
-from preparation. It does not download missing files. `--config-dir`, `--manifest`, `--cache` and `--assets` support
-explicit installation paths; paths must be absolute. Configuration lookup follows normal plugin startup:
-`--config-dir` takes priority while retaining the selected user and stock roots; environment roots replace build
-roots, with the same installation fallbacks when neither is set. As at normal startup, terminal sessions ignore
-configuration-root environment variables; use `--config-dir` for an explicit administrator directory in that case.
-Explicit `--manifest`, `--cache` and `--allow-download` values override the loaded configuration. Cache inventory and
-maintenance errors remain separate from monitor outcomes. CLI inventory is a storage observation, not the running plugin's live preparation status.
-
-With an explicitly supplied manifest and matching bundle, the same managed store can be used in native, Docker,
-static and source-build layouts. This does not establish production delivery or qualification for those methods.
-The bundle supplies private Node, Chromium libraries, fonts and JavaScript dependencies; preparation does not install
-host packages or modify installed adapters. Persist the cache in Docker if it should survive container replacement.
-A development image can instead include a preload at its final path:
-
-```sh
-dem.plugin runtime preload --root /opt/netdata-dem-runtime --archive /absolute/path/runtime.tar.gz
-```
-
-The root must be new or empty. Use the returned `runtime.mode: preloaded` configuration:
 
 ```yaml
 runtime:
@@ -524,19 +731,11 @@ runtime:
   preload_path: /opt/netdata-dem-runtime
 ```
 
-Both modes require the installed trusted runtime manifest. If the preload command uses an explicit `--manifest`,
-its returned configuration includes that `manifest_path`. A preload must match the required bundle and remain at its
-final path; moving it or upgrading to an Agent requiring a different bundle makes it unavailable. Prepare the new
-bundle at a new final path and switch configuration after stopping all consumers of the old preload.
-
-Preloads are outside automatic retirement, and managed-cache operations refuse their roots. Keep the directory
-privately owned by the consuming service account. It may be mounted read-only for execution. Stop every consumer
-before replacing or removing its files. This supports controlled offline images and read-only deployments while
-using the same qualified bundle as managed mode. Separately installed Node, npm packages or browsers cannot be selected.
-
-`runtime status` checks prepared identity without starting a browser; `runtime qualify` tests a local sandboxed
-browser under its calling account. Qualification still needs to run under the target service's sandbox and security
-policy; a successful image build does not establish host compatibility.
+The root must be new or empty. The command verifies and qualifies the complete release, then seals its identity and
+final location into the root. Keep it private and owned by the consuming service account; it may be mounted read-only.
+Preloads are outside managed retirement. Stop **every** consumer before replacement or removal, prepare replacements
+at a new final path, and restart DEM to switch. Moving a prepared root is unsupported. Preloads use this explicit
+consumer lifecycle; package-owned native runtimes use the coordinated package hooks described above.
 
 Configure exactly one of inline `script` or absolute `script_path` in `dem/journey.conf`. Standard named imports from
 `@playwright/test` and destructured CommonJS `require` use the real pinned package. JS/TS, mjs/mts and cjs/cts entries,
@@ -567,10 +766,24 @@ incomplete coverage. Skipped, expected-failure, empty or incomplete suites are i
 unexpected failure/timeout. Errors loading/running the monitor are execution inability. Cancellation and an interrupted
 start are distinct from a failed target. A workflow failure means a declared check failed, not proof of a service-wide outage.
 
+Use the journey configuration's **Test** action to execute an unsaved draft on the selected Agent with its resolved
+secrets and installed browser runtime. Test returns pass/fail; failed, skipped/incomplete, interrupted or unavailable
+execution is not success. It does not save the draft, change monitoring observations, publish metrics or alerts, or
+retain captures. `screenshot_on_failure` applies to monitoring only. Test actions against the website are real and
+are not rolled back. Activation still checks runtime preparation without executing the workflow.
+
+Test shares the browser allowance with monitoring and may wait for another attempt or delay a later one. The caller's
+request deadline covers waiting and execution, so it may expire before the configured workflow timeout. Cancellation
+requests process-tree shutdown. If drainage cannot be verified, DEM exits and preserves uncertain work instead of
+claiming cleanup. A timed-out caller may not receive the final diagnosis, and there is no retained result to retrieve
+later. Existing secret-reference redaction can replace detailed errors with a generic failure.
+
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
-observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
+observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two check
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
-and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable dependencies; plugin logs explain runtime preparation errors.
+and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable
+dependencies; plugin logs explain runtime setup/execution errors. The installation CLI reports preparation and
+qualification failures.
 Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,
@@ -585,9 +798,12 @@ Process Functions use the regular Netdata transport: `synthetics-checks` for act
 for retained history, `synthetics-run` for one run's full diagnosis, `synthetics-artifacts` for retained capture sets and
 storage status, and `synthetics-artifact` for one set's metadata or bytes.
 Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
-status. Current-generation last success/failure and freshness do not reconstruct a historical incident. A running or
-waiting attempt does not refresh its previous result. Run summaries are capped at 2000 rows with an explicit truncation
-flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
+status. Last success/failure and freshness describe the current activation and vnode association; reassignment resets
+these observations. They do not reconstruct a historical incident. A running or
+waiting attempt does not refresh its previous result. Active rows also expose check cadence, scheduled/admitted/coalesced
+counts and queue/admission delays for the current activation; these diagnostics continue across vnode changes.
+Run records preserve selected due and original queue timestamps when produced by the monitor scheduler; older and
+immediate diagnostic records may omit them. Run summaries are capped at 2000 rows with an explicit truncation flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
 including the entire endpoint seconds. Explicit zero means epoch, negative values are offsets from one captured now, and
 omitted bounds cover epoch through now. Run timestamps use Unix microseconds, while reporter event `at_ms` uses Unix
 milliseconds.

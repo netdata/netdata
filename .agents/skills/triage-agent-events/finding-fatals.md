@@ -102,6 +102,35 @@ Generic `fatal()` calls. Look at `AE_FATAL_MESSAGE` to find
 the panic message and `AE_FATAL_FUNCTION` to localize. Group
 by message to find the most common patterns.
 
+`DEADLOCK DETECTED: ... could not be acquired for N seconds`
+(3600 s spin) names the WAITER (`function '...'`), not the
+holder. A `[holder: ...]` suffix carries what the lock knows:
+
+- `SPINLOCK_TRACKED`: `tid=`, acquiring `func=`, `held_for=`;
+  or `NONE - lock shows unlocked, possible corruption/stuck
+  byte` when no holder is recorded.
+- `rw-spinlock read/write lock` (agents with the rw holder
+  change): `writer tid=` (or `no writer`), `same at the first
+  check`, `was tid=X at the first check` or `no writer at the
+  first check`, `(this thread)` on a self-deadlock, and
+  `reader count=` with min/max over the checks. These are samples about a minute apart: the reader
+  count includes readers caught mid-attempt, and `no writer`
+  can be a waiting writer's flicked bit. Treat them as leads.
+- No suffix: plain spinlock, waitq, or an older agent.
+
+`Failed to initialize SQLite` (`rrd_init`, metadata database) is
+mostly environmental. Agents with PR #24642 append
+`metadata database: <stage> [PRAGMA <name> | #<index>] failed:
+SQLite rc <n>, extended <n> (<text>), OS errno <n>` and whether
+the next start was asked to recover (rc 11) or reset (rc 26).
+`OS errno` is always printed; it is captured only for
+CANTOPEN/IOERR and is 0 otherwise. Windows agents print
+`Windows error <n>` (a `GetLastError()` code) instead and leave
+`AE_FATAL_ERRNO` empty. A requested reset means the
+next start attempts to move the database to `netdata-meta.bad`.
+Match the message by prefix. Older agents carry no reason, and
+their `AE_FATAL_ERRNO` is not SQLite's error.
+
 ### `no last status`
 
 First-ever start, or the prior status file was corrupted /

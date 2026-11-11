@@ -116,20 +116,106 @@ static bool parse_config_value_database_lookup(json_object *jobj, const char *pa
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error, flags);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error, flags);
 
+    TG_EXPRESSION time_group_expression;
+    bool has_time_group_expression = false;
+    unsigned time_group_value_flags = flags;
+
     switch(config->time_group) {
         default:
             break;
 
-        case RRDR_GROUPING_COUNTIF:
-            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group_condition", alerts_group_condition2id, config->time_group_condition, error, flags);
-            // fall through
+        case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+        case RRDR_GROUPING_NUMBER_OF_FLAPS:
+        case RRDR_GROUPING_NUMBER_OF_TIMES:
+        case RRDR_GROUPING_COUNTIF: {
+            json_object *jtime_group_options = NULL;
+            bool has_time_group_options =
+                json_object_object_get_ex(jobj, "time_group_options", &jtime_group_options);
+
+            // New payloads may provide the authoritative expression alone;
+            // old payloads still have to provide the legacy pair.
+            unsigned legacy_flags = has_time_group_options ? JSONC_STRICT : flags;
+            JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(
+                jobj, path, "time_group_condition", alerts_group_condition2id,
+                config->time_group_condition, error, legacy_flags);
+
+            if(has_time_group_options) {
+                if(!jtime_group_options || !json_object_is_type(jtime_group_options, json_type_string)) {
+                    buffer_sprintf(error, "invalid type for '%s.time_group_options' string", path);
+                    return false;
+                }
+                if(jsonc_string_has_embedded_nul(jtime_group_options)) {
+                    buffer_sprintf(error, "invalid condition in '%s.time_group_options'", path);
+                    return false;
+                }
+
+                string_freez(config->time_group_options);
+                config->time_group_options = string_strdupz(json_object_get_string(jtime_group_options));
+            }
+
+            // and it has to parse, exactly as it does when the same alert
+            // arrives in a .conf file and when the query API validates it.
+            // An alert that runs a condition its author did not write fires,
+            // or stays silent, for the wrong reason.
+            if(config->time_group_options) {
+                // trimmed to the same canonical form the .conf reader
+                // produces (health_parse_db_lookup): the condition is
+                // hashed into the alert's identity, so the same rule
+                // spaced differently must not become a different alert.
+                // The copy is as long as the condition written - a fixed
+                // buffer would silently truncate a long one and store a
+                // condition its author did not write.
+                const char *_written = string2str(config->time_group_options);
+                char *_copy = strdupz(_written);
+                char *_c = trim(_copy);
+                if(!_c || !*_c) {
+                    string_freez(config->time_group_options);
+                    config->time_group_options = NULL;
+                }
+                else if(strcmp(_c, _written) != 0) {
+                    string_freez(config->time_group_options);
+                    config->time_group_options = string_strdupz(_c);
+                }
+                freez(_copy);
+            }
+
+            if(has_time_group_options) {
+                const char *expression =
+                    config->time_group_options ? string2str(config->time_group_options) : "";
+                if(!tg_expression_parse(&time_group_expression, expression)) {
+                    buffer_sprintf(error, "invalid condition '%s' in '%s.time_group_options'",
+                                   expression, path);
+                    return false;
+                }
+
+                has_time_group_expression = true;
+                time_group_value_flags = JSONC_STRICT;
+            }
+            __attribute__((fallthrough));
+        }
 
         case RRDR_GROUPING_TRIMMED_MEAN:
         case RRDR_GROUPING_TRIMMED_MEDIAN:
         case RRDR_GROUPING_PERCENTILE:
-            JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "time_group_value", config->time_group_value, error, flags);
+            JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(
+                jobj, path, "time_group_value", config->time_group_value, error, time_group_value_flags);
             break;
     }
+
+    // the written expression wins: the pair it implies replaces whatever the
+    // payload carried, so an alert cannot be stored claiming one condition
+    // and running another
+    if(has_time_group_expression) {
+        config->time_group_condition = alert_lookup_condition_from_expression(time_group_expression.cmp);
+        config->time_group_value =
+            (time_group_expression.operand == TG_EXPRESSION_OPERAND_NUMBER) ? time_group_expression.target : NAN;
+    }
+    else if(time_grouping_is_expression(config->time_group) &&
+            !config->time_group_options && !netdata_double_isnumber(config->time_group_value))
+        // A legacy condition with no operand compares against zero. Without
+        // this normalization, exporting a null value writes `nan`, which the
+        // shared grammar reads back as an explicit gap operand.
+        config->time_group_value = 0;
 
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "options", rrdr_options_parse_one, config->options, error, flags);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "dimensions", config->dimensions, error, flags);
@@ -345,6 +431,38 @@ cleanup:
     return NULL;
 }
 
+// The notification program runs through /bin/sh with the alert's recipient as its first argument,
+// so dyncfg, which remote users can reach, must not choose it. Only the agent's configured default
+// is accepted, or nothing (which means the default). health.d files can still set any program.
+// STRINGs are interned, so comparing the pointers compares the text.
+bool health_prototype_exec_is_allowed(RRD_ALERT_PROTOTYPE *base, bool replay, BUFFER *error) {
+    size_t replaced = 0, rule = 0;
+    for(RRD_ALERT_PROTOTYPE *ap = base; ap; ap = ap->_internal.next, rule++) {
+        if(!ap->config.exec || ap->config.exec == health_globals.config.default_exec)
+            continue;
+
+        if(!replay) {
+            buffer_sprintf(error,
+                           "rule %zu: the notification program cannot be set through dynamic configuration; "
+                           "leave 'execute' empty, the agent uses its own", rule);
+            return false;
+        }
+
+        // a configuration saved before this check existed: keep the alert, drop the program
+        string_freez(ap->config.exec);
+        ap->config.exec = NULL;
+        replaced++;
+    }
+
+    if(replaced)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "HEALTH DYNCFG: saved alert prototype '%s' sets a custom notification program in %zu rule(s); "
+               "using the agent's default instead. Save the alert again to remove this message.",
+               string2str(base->config.name), replaced);
+
+    return true;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // generate the json object of an alert definition
 
@@ -390,6 +508,11 @@ static inline void health_prototype_rule_to_json_array_member(BUFFER *wb, RRD_AL
                     buffer_json_member_add_string(wb, "time_group", time_grouping_id2txt(ap->config.time_group));
                     buffer_json_member_add_string(wb, "time_group_condition", alerts_group_conditions_id2txt(ap->config.time_group_condition));
                     buffer_json_member_add_double(wb, "time_group_value", ap->config.time_group_value);
+                    // only when set: this JSON is what the alert config
+                    // hash is computed over, so emitting an empty member
+                    // for every alert would change every alert's identity
+                    if(ap->config.time_group_options)
+                        buffer_json_member_add_string(wb, "time_group_options", string2str(ap->config.time_group_options));
                     buffer_json_member_add_string(wb, "dims_group", alerts_dims_grouping_id2group(ap->config.dims_group));
                     buffer_json_member_add_string(wb, "data_source", alerts_data_source_id2source(ap->config.data_source));
                     rrdr_options_to_buffer_json_array(wb, "options", RRDR_OPTIONS_REMOVE_OVERLAPPING(ap->config.options));
@@ -510,7 +633,18 @@ int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const c
                 break;
 
                 case RRDR_GROUPING_COUNTIF:
-                    buffer_sprintf(wb, "(%s%0.2f)", alerts_group_conditions_id2txt(nap->config.time_group_condition), nap->config.time_group_value);
+                case RRDR_GROUPING_PERCENTAGE_OF_TIME:
+                case RRDR_GROUPING_NUMBER_OF_FLAPS:
+                case RRDR_GROUPING_NUMBER_OF_TIMES:
+                    // Match the file reader's whitespace normalization on one physical line.
+                    if(nap->config.time_group_options) {
+                        char *condition = strdupz(string2str(nap->config.time_group_options));
+                        const char *normalized = trim_all(condition);
+                        buffer_sprintf(wb, "(%s)", normalized ? normalized : "");
+                        freez(condition);
+                    }
+                    else
+                        buffer_sprintf(wb, "(%s%0.2f)", alerts_group_conditions_id2txt(nap->config.time_group_condition), nap->config.time_group_value);
                 break;
 
                 default:
@@ -644,12 +778,21 @@ static int health_dyncfg_reject(BUFFER *result, const char *cmd, const char *ale
     return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, reason);
 }
 
-static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS cmd, const char *add_name, BUFFER *payload, const char *source __maybe_unused) {
+static RRD_ALERT_PROTOTYPE *health_dyncfg_prototype_parse(BUFFER *payload, BUFFER *error, const char *name, unsigned flags, bool replay) {
+    RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, name, flags);
+    if(nap && !health_prototype_exec_is_allowed(nap, replay, error)) {
+        health_prototype_free(nap);
+        nap = NULL;
+    }
+    return nap;
+}
+
+static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS cmd, const char *add_name, BUFFER *payload, const char *source __maybe_unused, bool replay) {
     int code = HTTP_RESP_INTERNAL_SERVER_ERROR;
     switch(cmd) {
         case DYNCFG_CMD_ADD: {
             CLEAN_BUFFER *error = buffer_create(0, NULL);
-            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name, JSONC_REQUIRED);
+            RRD_ALERT_PROTOTYPE *nap = health_dyncfg_prototype_parse(payload, error, add_name, JSONC_REQUIRED, replay);
             if(!nap)
                 code = health_dyncfg_reject(result, "add", add_name, buffer_tostring(error));
             else {
@@ -684,7 +827,7 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
 
         case DYNCFG_CMD_USERCONFIG: {
             CLEAN_BUFFER *error = buffer_create(0, NULL);
-            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, add_name, JSONC_OPTIONAL);
+            RRD_ALERT_PROTOTYPE *nap = health_dyncfg_prototype_parse(payload, error, add_name, JSONC_OPTIONAL, false);
             if(!nap)
                 code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
             else {
@@ -719,7 +862,7 @@ static int dyncfg_health_prototype_template_action(BUFFER *result, DYNCFG_CMDS c
     return code;
 }
 
-static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source __maybe_unused, const char *alert_name) {
+static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, BUFFER *payload, const char *source __maybe_unused, const char *alert_name, bool replay) {
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(health_globals.prototypes.dict, alert_name);
     if(!item)
         return dyncfg_default_response(result, HTTP_RESP_NOT_FOUND, "no alert prototype is available by the name given");
@@ -775,7 +918,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 
         case DYNCFG_CMD_UPDATE: {
                 CLEAN_BUFFER *error = buffer_create(0, NULL);
-                RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name, JSONC_REQUIRED);
+                RRD_ALERT_PROTOTYPE *nap = health_dyncfg_prototype_parse(payload, error, alert_name, JSONC_REQUIRED, replay);
                 if(!nap)
                     code = health_dyncfg_reject(result, "update", alert_name, buffer_tostring(error));
                 else {
@@ -801,7 +944,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
 
         case DYNCFG_CMD_USERCONFIG: {
             CLEAN_BUFFER *error = buffer_create(0, NULL);
-            RRD_ALERT_PROTOTYPE *nap = health_prototype_payload_parse(buffer_tostring(payload), buffer_strlen(payload), error, alert_name, JSONC_OPTIONAL);
+            RRD_ALERT_PROTOTYPE *nap = health_dyncfg_prototype_parse(payload, error, alert_name, JSONC_OPTIONAL, false);
             if(!nap)
                 code = dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, buffer_tostring(error));
             else {
@@ -833,7 +976,7 @@ static int dyncfg_health_prototype_job_action(BUFFER *result, DYNCFG_CMDS cmd, B
     return code;
 }
 
-int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYNCFG_CMDS cmd, const char *add_name,
+int dyncfg_health_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd, const char *add_name,
                      BUFFER *payload, usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                      BUFFER *result, HTTP_ACCESS access __maybe_unused, const char *source, void *data __maybe_unused) {
     CLEAN_CHAR_P *buf = strdupz(id);
@@ -855,16 +998,19 @@ int dyncfg_health_cb(const char *transaction __maybe_unused, const char *id, DYN
     if(!type_prefix || !*type_prefix || strcmp(type_prefix, "prototype") != 0)
         return dyncfg_default_response(result, HTTP_RESP_BAD_REQUEST, "third component of id is not 'prototype'");
 
+    // a saved configuration replayed by dyncfg is coerced instead of rejected (see health_prototype_exec_is_allowed())
+    bool replay = (cmd & (DYNCFG_CMD_ADD | DYNCFG_CMD_UPDATE)) && dyncfg_transaction_is_echo(transaction);
+
     char *alert_name = get_word(words, num_words, i++);
     if(!alert_name || !*alert_name) {
         // action on the prototype template
 
-        code = dyncfg_health_prototype_template_action(result, cmd, add_name, payload, source);
+        code = dyncfg_health_prototype_template_action(result, cmd, add_name, payload, source, replay);
     }
     else {
         // action on a specific alert prototype
 
-        code = dyncfg_health_prototype_job_action(result, cmd, payload, source, alert_name);
+        code = dyncfg_health_prototype_job_action(result, cmd, payload, source, alert_name, replay);
     }
     return code;
 }

@@ -27,7 +27,7 @@ Use `agent.Config.ProcessFunctions` (or `composition.Config.ProcessFunctions`) f
 Functions whose data belongs to the plugin process and must remain queryable when
 collection modules are disabled. Each `funcapi.ProcessFunctionProvider` has a stable
 `ID`, a `Functions func() []FunctionConfig` callback and a `NewHandler func() MethodHandler`
-factory. Providers require no collector, config schema, discovery provider or scheduled job.
+factory, or a `NewHandlerWithContext func(ProcessFunctionContext) MethodHandler` factory. Exactly one factory is required. Providers require no collector, config schema, discovery provider or scheduled job.
 The default public name is `ID:method`; `FunctionName` and `Aliases` retain their normal meaning.
 
 For example, the command composition root can inject an existing history reader.
@@ -45,6 +45,14 @@ agent.Config{
     }},
 }
 ```
+
+Use the context-aware factory when a process Function needs framework-owned configured vnode identity.
+`ProcessFunctionContext.LookupVnodeGUID(name)` resolves the exact configuration name to its canonical GUID,
+including vnodes without running jobs or acquired metadata. It reads current committed configuration on every
+call; it does not retain removed names or interpret display hostnames as names. The lookup is concurrency-safe,
+read-only and owned by that run generation. Handlers MUST NOT close it or retain it beyond Cleanup.
+Production composition supplies the lookup; direct controller construction without composition supplies an empty
+context. These are selection capabilities, not trusted request host context or per-vnode authorization.
 
 The command MUST provide a fresh handler and declarations for each run generation.
 Callbacks run under the existing Function containment authority. Handler `Cleanup`
@@ -101,6 +109,23 @@ it defaults to false. `AcceptedParams` advertises additional input names, such a
 only resolved selector values and cannot access these extra inputs. The framework
 combines those names with required selector IDs without duplicates. These declarations do not implement filtering,
 storage, parsing or validation of extra inputs; the handler owns those semantics.
+
+## Reading raw inputs
+
+`ParseRawParams` reads the named inputs of a `RawMethodRequest`. A name takes its value from the first source that
+has it: `key:value` or `key=value` arguments, then the payload `selections` object, then top-level payload fields.
+A non-empty payload must be a JSON object. The returned `RawParams` provides:
+
+- `String(name)`: one string, or a one-element string array (a single selection); `""` when absent.
+- `TimeRange(now)`: `after` and `before` as Unix seconds, nil when absent. Values are integer seconds in years 1-9999.
+  As in the [query API](../../../web/api/queries/README.md), `before <= 0` is relative to now and a negative `after`
+  is relative to `before` (or to now without `before`).
+  `after` greater than `before` is an error.
+- `QueryMatcher()`: `query` compiled as a [simple pattern](../matcher/README.md), nil when absent or blank.
+
+Errors are client input errors with messages suitable for a 400 response. Handlers keep their own selector
+validation and choose the order of checks. Declare the inputs with `AcceptedParams` using `ParamAfter`,
+`ParamBefore` and `ParamQuery`.
 
 ## Info for structured methods
 

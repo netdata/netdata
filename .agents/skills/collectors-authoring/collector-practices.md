@@ -28,7 +28,9 @@ Labels — is the model. Every dashboard-shaping mechanism (§3) feeds into it.
 
 Chart `context`, chart IDs, dimension IDs, instance labels — once shipped, they bind health alerts, dashboards, exports,
 anomaly detection, ML jobs, streaming consumers, and Netdata Cloud. Renaming silently breaks all of them. Treat them as
-permanent.
+permanent outside an approved change. The explicit V1-to-V2 migration exception is owned by
+`src/go/plugin/go.d/docs/migrate-v1-to-v2.md#chart-and-dimension-ids`: normal V2 IDs are allowed while contexts and
+dimension names remain stable.
 
 ### 1.4 Gaps are data
 
@@ -97,6 +99,9 @@ resource) is a product decision, not an automatic consequence of having N target
 Cloud cost, and it needs stable identity per node. For Go V2 collectors the mechanism is `metrix.HostScope`; the
 decision and its bounds are owned by `.agents/skills/collectors-go-framework-v2/go-v2-host-scope.md`, and
 `.agents/skills/collectors-go-design/SKILL.md` records it in the design note.
+
+Generated vnode metadata adoption for existing Go V1 collectors follows
+`src/go/plugin/framework/jobruntime/README.md#v1-generated-vnode-metadata`.
 
 ### 1.10 Cardinality discipline
 
@@ -174,9 +179,9 @@ persistent result maps. V2 instrument reuse and expensive parser/client reuse re
 
 ### 2.3 Error handling
 
-Every error log answers three questions: **what operation, what target, what was expected vs observed**. Wrap errors
-with context (Go: `fmt.Errorf("...: %w", err)`); preserve the cause; check return codes from system calls and library
-functions.
+Every error log identifies the operation, target and failure reason using safe context. Wrap errors and preserve
+causes only when their messages are safe to expose; configured-file errors follow
+`./collector-practices.md#file-content-diagnostics`. Check return codes from system calls and library functions.
 
 Don't return a bare `err` with no context. Don't log `"failed"`. Don't ignore syscall returns or library NULLs.
 
@@ -193,6 +198,32 @@ milestones, reserve error logs for actionable failures, and preserve contextual 
 runtime. A transient partial condition may warrant a limited warning. Do not suppress the failure signal merely to
 avoid logs, and never log raw credentials. The repeated per-PID logging failure class matters; a blanket ban on every
 per-cycle diagnostic does not express it correctly.
+
+#### File-content diagnostics
+
+Contents of files selected through collector configuration, including DynCfg, MUST be treated as potentially
+sensitive. Trust in the configuration author or permission to read the file does not authorize disclosing its contents.
+
+- Collectors and parsers MUST NOT echo raw file contents, sampled lines, rejected source values or whole parsed-config
+  dumps through diagnostics. This includes debug logs, returned errors and their cause chains, rejected chart/dimension
+  identifiers, and errors serialized into Function or DynCfg responses. Derived values such as a file-built DSN need
+  the same treatment.
+- Replace input-bearing library errors at the parser or collector that owns the read. Use a safe reason, known field
+  name, line/sample number and configured path where useful. Do not retain unsafe text through wrapping (Go: `%w`),
+  cause chaining or a later debug statement. Preserve safe sentinels and error classifications needed by callers.
+  Secret-reference redaction MUST NOT be the only protection: ordinary file-path jobs may have no secret references.
+- Preserve output explicitly required by the collector's documented contract, such as parsed metrics, labels or
+  intentional log forwarding, and its existing file-access and privilege model. Reading a file for monitoring does
+  not make its unrelated contents or rejected values suitable diagnostic context.
+- When adding or changing these reads or diagnostics, regression tests MUST cover reachable disclosures using
+  synthetic markers: malformed input, and unused fields of valid samples where the format permits. Check captured
+  logs at debug level, returned error chains and reachable serialized Init/Check or Function failures without relying
+  on secret-reference substitution. Also verify successful parsing and caller-visible error classification. A fix's
+  tests SHOULD fail against the original disclosure path.
+
+For Go examples, see `src/go/plugin/go.d/pkg/logs/collector_diagnostics_test.go` for sampled/parsed logs and rejected
+identifiers, `src/go/plugin/agent/jobmgr/joboutput/content_errors_test.go` for real DynCfg serialization, and
+`src/go/plugin/go.d/pkg/collecttest/diagnostics.go` for reusable error-chain and parser assertions.
 
 ### 2.5 Cardinality bounding
 
@@ -211,7 +242,9 @@ concern; see §1.5.) The bound is a per-domain decision, recorded in the design 
   so totals stay truthful; for percentiles, temperatures, timestamps, or states, do not invent an aggregate: disclose
   the excluded coverage explicitly (for example a charted-versus-reported count). A cap alone silently truncates
   whatever lands in the first N entries, so pair it with a selector that lets the operator choose which entities
-  survive.
+  survive. Worked example: apps.plugin (`src/collectors/apps.plugin/apps_targets.c`) - per-family `max-targets` cap,
+  an `other` target aggregated from per-process values, idle retirement (§1.5); `apps_groups.conf` selects permanent
+  application groups only, so the user, group, SID and service families have no selector.
 
 A public `max_*` option or selector is a config option like any other: it MUST name the operator decision it enables
 (`.agents/skills/collectors-go-design/operator-surface.md`). A bounded, low-cardinality entity set needs no knob.
@@ -296,8 +329,11 @@ mechanism that matches your collector and *learn how it shapes the result*.
 
 **N**odes, **I**nstances, **D**imensions, **L**abels. This is the conceptual model every other mechanism feeds into.
 Read `docs/NIDL-Framework.md` before designing metrics. Group dimensions into charts that answer *one operational
-question*. Use labels for instance and context annotations. Pick the right chart type (`line`, `area`, `stacked`,
-`heatmap` — see `src/database/rrdset-type.h`) and dimension algorithm (`absolute`, `incremental`,
+question*. Use labels for instance and context annotations. Free-text label values (descriptions, aliases) need no
+collector-side content sanitization: the Agent normalizes every chart label value on ingest (`rrdlabels_sanitize_value`
+in `src/libnetdata/sanitizers/sanitizers-labels.c`), replacing control characters, quotes and several symbols, mapping
+`\` to `/`, capping the length, and storing an empty value as `[none]`. Pick the right chart type (`line`, `area`,
+`stacked`, `heatmap` — see `src/database/rrdset-type.h`) and dimension algorithm (`absolute`, `incremental`,
 `percentage-of-incremental-row`, `percentage-of-absolute-row` — see `src/database/rrd-algorithm.h`, documented in
 `src/plugins.d/README.md`).
 
@@ -350,7 +386,8 @@ A collector is *production-quality* when it satisfies all of:
 4. Are gaps preserved (no zero defaults for missing values)?
 5. Does the cycle rebuild expensive stable state, incur material avoidable cost, flood logs, or reconnect needlessly?
    Are legitimate snapshots preserved, and values authorizing dangerous operations re-checked at that operation?
-6. Do error logs answer *what operation, what target, what was expected vs observed*?
+6. Do errors retain useful safe context, and do configured-file reads satisfy
+   `./collector-practices.md#file-content-diagnostics`?
 7. Did I run the collector consistency checklist in `.agents/skills/integrations-lifecycle/consistency.md`, including
    the rule that generated integration pages are not hand-authored sources?
 8. For remote targets: is the vnode decision recorded (job-level `vnode` option, or a product decision for generated

@@ -22,10 +22,13 @@ Module: PerflibNetwork
 
 ## Overview
 
-Monitor network interface metrics about bandwidth, state, errors and more.
+Monitor Windows network interface traffic, packets, speed, errors, drops, and offload activity in charts.
+A live interface table also shows current operational state and the adapter's friendly name when Windows can match it to a discovered interface.
 
 
-It queries 'Network Interface' and 'Network Adapter' objects from Perflib in order to gather the metrics.
+It queries the 'Network Interface' Perflib object and uses its 'Network Adapter' data when present, querying
+'Network Adapter' separately when absent. The live interface table
+queries the Windows adapter API when opened and combines that result with the latest collected chart values.
 
 
 This collector is only supported on the following platforms:
@@ -44,11 +47,20 @@ The collector automatically detects all of the metrics, no further configuration
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+Operational state and friendly name are unavailable in the live table when a Perflib instance cannot be
+matched uniquely to a Windows adapter. A missing value is shown as unavailable, not as a down state.
+Per-interface charts start after the first received or sent byte; the live table can show idle interfaces
+before their charts start. Existing charts continue through later zero-byte counter values.
+When Windows cannot read an interface instance name, the aggregate bandwidth chart and removal of vanished
+interfaces pause for up to 60 collection cycles; after that they continue without the unnamed instance.
+
 
 #### Performance Impact
 
-The default configuration for this integration is not expected to impose a significant performance impact on the system.
+A separate 'Network Adapter' Perflib query runs only when the 'Network Interface' result lacks that object.
+The live interface table queries the Windows adapter API on demand. It does not add an adapter API call
+to each chart collection cycle.
+
 
 ## Setup
 
@@ -68,6 +80,7 @@ No action required.
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | update every | Data collection frequency. | 1 | no |
+| disable by default interfaces matching | Space-separated, case-sensitive patterns matched against Perflib interface instance names. Use `*` to span spaces in a name (for example, `Teredo*`). Matching interfaces are excluded from per-interface charts and the live interface table. The physical network aggregate still includes them. |  | no |
 
 
 
@@ -164,7 +177,7 @@ Labels:
 | Label      | Description     |
 |:-----------|:----------------|
 | interface_type | Classification of the network interface (real or virtual). |
-| device | System-assigned network interface identifier. |
+| device | Perflib network interface instance name. |
 
 Metrics:
 
@@ -175,9 +188,65 @@ Metrics:
 | net.speed | Interface Speed | speed | kilobits/s |
 | net.errors | Interface Errors | inbound, outbound | errors/s |
 | net.drops | Interface Drops | inbound, outbound | drops/s |
+| net.unknown_protocol_packets | Packets Received with Unknown Protocol | inbound | packets/s |
 | net.queue_length | Interface Output Queue Length | length | packets |
 | net.rsc_connections | Active TCP Connections Offloaded by RSC | connections | connections |
 | net.rsc_packets | TCP RSC Coalesced Packets | packets | packets/s |
 | net.rsc_exceptions | TCP RSC Exceptions | exceptions | exceptions/s |
 | net.rsc_average_packet_size | TCP RSC Average Packet Size | average | bytes |
 | net.chimney_connections | Active TCP Connections Offloaded with Chimney | connections | connections |
+
+
+
+## Live Data
+
+View current Windows network interface performance and operational state.
+
+
+### Network Interfaces
+
+Shows discovered physical and virtual interfaces with current traffic, packet, drop, speed, and operational
+state values. Friendly names and state are shown only when the Perflib instance name uniquely matches a
+Windows adapter description or, if none matches, an adapter friendly name. Physical carrier state, duplex,
+and multicast packets are unavailable.
+
+
+| Aspect | Description |
+|:-------|:------------|
+| Name | `Perflibnetwork:network-interfaces` |
+| Require Cloud | no |
+| Performance | Queries the Windows adapter API when the table is opened. |
+| Security | Requires signed-in, same-space access because adapter friendly names can contain user-entered text. This is intentionally stricter than the Linux `network-interfaces` Function, which allows anonymous access; anonymous dashboard users receive HTTP 412 on Windows. |
+| Availability | Available after the Windows network collector successfully reads Perflib data. |
+
+#### Prerequisites
+
+No additional configuration is required.
+
+#### Parameters
+
+This function has no parameters.
+
+#### Returns
+
+One row per discovered, non-excluded interface; unavailable values are empty.
+
+| Column | Type | Unit | Visibility | Description |
+|:-------|:-----|:-----|:-----------|:------------|
+| Interface | string |  |  | Perflib network interface name. |
+| Type | string |  |  | Physical or virtual interface. |
+| UsedBy | string |  |  | Interface owner. |
+| PhState | string |  | hidden | Physical carrier state, currently unavailable. |
+| OpState | string |  |  | Current Windows adapter operational state, when matched. |
+| Duplex | string |  | hidden | Duplex mode, currently unavailable. |
+| Speed | number | Mbit/s |  | Link speed. |
+| MTU | number | Octets |  | Maximum transmission unit. |
+| In | number | Mbit/s |  | Traffic received. |
+| Out | number | Mbit/s |  | Traffic sent. |
+| Total | number | Mbit/s | hidden | Traffic received and sent. |
+| PktsIn | number | Kpps |  | Received packets. |
+| PktsOut | number | Kpps |  | Sent packets. |
+| McastIn | number | Kpps | hidden | Multicast received packets, currently unavailable. |
+| DropsIn | number | Drops |  | Dropped inbound packets. |
+| DropsOut | number | Drops |  | Dropped outbound packets. |
+| FriendlyName | string |  |  | Windows adapter friendly name, when matched. |

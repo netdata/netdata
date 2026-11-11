@@ -68,7 +68,19 @@ The topology view brings in the rest of your infrastructure in the same form, so
 
 - **Netdata streaming** — how your Agents connect to each other (`topology:streaming`).
 - **VMware vSphere** — datacenters, clusters, resource pools, hosts, VMs, datastores, and networks (`topology:vsphere`).
-- **Cato Networks** — Cato SASE sites, devices, POPs, and BGP peers (`topology:cato_networks`).
+- **Cato Networks** — Cato SASE sites, devices, PoPs, and BGP peers (`topology:cato_networks`).
+  Site membership is structural, not a network connection. Observed WAN tunnels
+  distinguish connected, disconnected and unknown states. Reported PoP associations
+  are shown separately when interface observations are unavailable; they do not
+  establish an active tunnel. Open a site for its devices, HA roles and all WANs;
+  open a PoP for attached WANs and site context. Devices without a distinctive
+  name show their site, HA role and labeled serial/ID; full identifiers and the
+  original source name remain in details. Expand WAN rows for configured
+  limits and diagnostics. Upstream means site to Cato; downstream means Cato to site.
+  Topology information explains coverage gaps, and site identification shows inventory, metrics
+  and BGP collection status. Missing data does not mean zero or no configuration.
+  This is an access topology: the Cato backbone and end-to-end reachability are not
+  represented, so separate PoP groups do not imply network isolation.
 
 The device fabric (`topology:snmp`) and application dependencies come up on their own once the devices and hosts are monitored. The streaming map appears once Agents are streaming to a Parent (configured in `stream.conf`); vSphere and Cato come from their own collectors, configured separately.
 

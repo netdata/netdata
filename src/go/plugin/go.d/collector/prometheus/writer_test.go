@@ -284,18 +284,6 @@ app_pg_info 42
 				assert.InDelta(t, 42, value(t, fr, "app_pg_info", nil), 1e-9)
 			},
 		},
-		"skips family exceeding maxTSPerMetric": {
-			exposition: `
-# TYPE app_temp gauge
-app_temp{id="1"} 1
-app_temp{id="2"} 2
-app_temp{id="3"} 3
-`,
-			policy: metricFamilyWriterPolicy{maxTSPerMetric: 2},
-			assert: func(t *testing.T, fr metrix.Reader, written int) {
-				assert.Equal(t, 0, written, "family over the per-metric series limit must be skipped")
-			},
-		},
 		"untyped falls back to gauge and counter": {
 			exposition: `
 app_fallback_gauge 7

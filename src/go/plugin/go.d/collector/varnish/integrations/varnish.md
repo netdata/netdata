@@ -45,9 +45,6 @@ This collector supports collecting metrics from multiple instances of this integ
 Automatically detects and monitors Varnish instances running on the host or inside Docker containers.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

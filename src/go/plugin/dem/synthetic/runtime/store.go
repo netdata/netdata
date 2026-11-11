@@ -13,16 +13,12 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
-	"sync"
 	"time"
-
-	"github.com/gofrs/flock"
 )
 
 const (
 	DefaultMaxBytes          = int64(4 << 30)
 	DefaultPreviousRetention = 7 * 24 * time.Hour
-	DefaultIdleRetention     = 30 * 24 * time.Hour
 )
 
 var (
@@ -48,28 +44,24 @@ type Config struct {
 	Path              string
 	MaxBytes          int64
 	PreviousRetention time.Duration
-	IdleRetention     time.Duration
 }
 
 func DefaultConfig(path string) Config {
-	return Config{Path: path, MaxBytes: DefaultMaxBytes, PreviousRetention: DefaultPreviousRetention, IdleRetention: DefaultIdleRetention}
+	return Config{
+		Path:              path,
+		MaxBytes:          DefaultMaxBytes,
+		PreviousRetention: DefaultPreviousRetention,
+	}
 }
 
-// Store coordinates local processes. Reserved/accepted demand and execution pins
-// protect cached generations; owners must execute through BeginUse.
+// Store coordinates durable installation, process consumers and execution pins.
+// Executable access requires an acquired Consumer or Candidate.
 // The directory must remain on one host and may not be copied or network-shared.
 type Store struct {
-	completedUses       map[string]bool
-	releasingOwners     map[io.Closer]struct{} // Failed local lock closes only; dead records belong to inventory.
-	config              Config
-	path                string
-	root                *os.Root
-	mu                  sync.Mutex
-	lock                *flock.Flock
-	now                 func() time.Time
-	boot                bootIdentity
-	cleanupError        error
-	cleanupErrorVersion uint64
+	*ownershipLedger
+	config        Config
+	now           func() time.Time
+	syncSelection func() error // Directory durability barrier before selection-dependent operations.
 }
 
 type generation struct {
@@ -79,6 +71,7 @@ type generation struct {
 }
 
 type Paths struct {
+	EntryPoint   string
 	Node         string
 	Dependencies string
 	Browser      string
@@ -88,48 +81,27 @@ func Open(config Config) (*Store, error) {
 	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
 		return nil, errors.New("managed browser runtimes require Linux amd64 or arm64")
 	}
-	if config.MaxBytes <= 0 || config.PreviousRetention < 0 || config.IdleRetention < 0 {
+	if config.MaxBytes <= 0 || config.PreviousRetention < 0 {
 		return nil, errors.New("invalid runtime storage policy")
 	}
 	if !filepath.IsAbs(config.Path) {
 		return nil, errors.New("runtime store requires an absolute path")
 	}
-	if err := os.MkdirAll(config.Path, 0700); err != nil {
-		return nil, err
-	}
-	path, err := filepath.EvalSymlinks(config.Path)
+	path, root, err := openStoreRoot(config.Path)
 	if err != nil {
 		return nil, err
 	}
-	if err := privateDirectory(path); err != nil {
-		return nil, err
+	s := &Store{
+		ownershipLedger: newOwnershipLedger(path, root),
+		config:          config,
+		now:             time.Now,
 	}
-	root, err := os.OpenRoot(path)
-	if err != nil {
-		return nil, err
-	}
-	s := &Store{completedUses: make(map[string]bool), releasingOwners: make(map[io.Closer]struct{}), config: config, path: path, root: root, now: time.Now, boot: hostBoot()}
 	if err := requireManaged(root); err != nil {
 		root.Close()
 		return nil, err
 	}
-	if err := ensureLock(root, "coordination.lock"); err != nil {
-		root.Close()
-		return nil, err
-	}
-	s.lock = flock.New(filepath.Join(path, "coordination.lock"))
-	err = s.withLock(func() error {
-		for _, dir := range []string{"generations", "claims", "uses", "staging", "trash", "initializing"} {
-			if err := root.Mkdir(dir, 0700); err != nil && !errors.Is(err, os.ErrExist) {
-				return err
-			}
-			info, err := root.Lstat(dir)
-			if err != nil || !info.IsDir() {
-				return fmt.Errorf("invalid runtime store directory: %s", dir)
-			}
-		}
-		return syncDirectory(root, ".")
-	})
+	s.syncSelection = func() error { return syncDirectory(root, ".") }
+	err = s.withLock(func() error { return validateStoreLayout(root) })
 	if err != nil {
 		s.Close()
 		return nil, err
@@ -139,26 +111,15 @@ func Open(config Config) (*Store, error) {
 
 // Close requires the caller to have joined preparation and released its claims
 // and use handles. It does not manufacture completion for retained pins.
-func (s *Store) Close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := errors.Join(s.retryOwnerReleasesLocked(), s.lock.Close()); err != nil {
-		return err
-	}
-	return s.root.Close()
-}
+func (s *Store) Close() error { return s.ownershipLedger.Close() }
 
 func (s *Store) withLock(fn func() error) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if err := s.lock.Lock(); err != nil {
-		return err
-	}
-	err := requireManaged(s.root)
-	if err == nil {
-		err = fn()
-	}
-	return errors.Join(err, s.lock.Unlock())
+	return s.ownershipLedger.withLock(func() error {
+		if err := requireManaged(s.root); err != nil {
+			return err
+		}
+		return fn()
+	})
 }
 
 func randomID() (string, error) {
@@ -210,16 +171,26 @@ func readJSON(root *os.Root, name string, value any) error {
 	decoder := json.NewDecoder(f)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {
-		return err
+		return metadataDecodeError(name, err)
 	}
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
-		return errors.New("trailing runtime metadata")
+		if err != nil {
+			return metadataDecodeError(name, err)
+		}
+		return damagedMetadata(name, errors.New("trailing runtime metadata"))
 	}
 	return nil
 }
 
 func saveJSON(root *os.Root, name string, value any) error {
+	if err := publishJSON(root, name, value); err != nil {
+		return err
+	}
+	return syncDirectory(root, filepath.Dir(name))
+}
+
+func publishJSON(root *os.Root, name string, value any) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -235,7 +206,7 @@ func saveJSON(root *os.Root, name string, value any) error {
 	if err := root.Rename(temporary, name); err != nil {
 		return err
 	}
-	return syncDirectory(root, filepath.Dir(name))
+	return nil
 }
 
 func (s *Store) loadGeneration(id string) (generation, error) {
@@ -252,14 +223,21 @@ func loadGeneration(root *os.Root, id string) (generation, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return g, ErrUnavailable
 	}
-	if err != nil || !info.IsDir() {
+	if err != nil {
+		return g, err
+	}
+	if !info.IsDir() {
 		return g, errors.New("invalid generation directory")
 	}
-	if err := readJSON(root, filepath.Join(name, "prepared.json"), &g); err != nil {
+	metadata := filepath.Join(name, "prepared.json")
+	if err := readJSON(root, metadata, &g); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			err = damagedMetadata(metadata, err)
+		}
 		return g, err
 	}
 	if err := g.Manifest.Validate(); err != nil || g.Manifest.Archive.SHA256 != id || g.LastUsed.IsZero() {
-		return g, errors.New("invalid prepared generation metadata")
+		return g, damagedMetadata(metadata, errors.New("invalid prepared generation metadata"))
 	}
 	return g, nil
 }
@@ -282,10 +260,15 @@ func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
 		return Paths{}, err
 	}
 	if !sameManifest(g.Manifest, m) {
-		return Paths{}, errors.New("prepared runtime manifest differs from installed requirement")
+		return Paths{}, damagedMetadata("selection.json", errors.New("prepared runtime manifest differs from installed requirement"))
 	}
 	base := filepath.Join(path, "generations", m.Archive.SHA256)
-	return Paths{Node: filepath.Join(base, m.Layout.Node), Dependencies: filepath.Join(base, m.Layout.Dependencies), Browser: filepath.Join(base, "chrome")}, nil
+	return Paths{
+		EntryPoint:   filepath.Join(base, m.Layout.EntryPoint),
+		Node:         filepath.Join(base, m.Layout.Node),
+		Dependencies: filepath.Join(base, m.Layout.Dependencies),
+		Browser:      filepath.Join(base, "chrome"),
+	}, nil
 }
 
 func checkContext(ctx context.Context) error {
@@ -296,7 +279,7 @@ func checkContext(ctx context.Context) error {
 }
 
 // Available verifies prepared identity without acquiring execution ownership or
-// changing idle timestamps. BeginUse must still precede every executable access.
+// changing retention timestamps. Consumer.BeginUse must precede executable access.
 func (s *Store) Available(m Manifest) error {
 	if err := m.Validate(); err != nil {
 		return err

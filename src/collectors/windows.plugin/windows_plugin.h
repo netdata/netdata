@@ -57,11 +57,16 @@ int do_PerflibADCS(int update_every, usec_t dt);
 int do_PerflibADFS(int update_every, usec_t dt);
 int do_PerflibHyperV(int update_every, usec_t dt);
 int do_PerflibExchange(int update_every, usec_t dt __maybe_unused);
+int do_PerflibMSMQ(int update_every, usec_t dt __maybe_unused);
+void do_PerflibMSMQ_cleanup(void);
 int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
 int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
 int do_PerflibDNS(int update_every, usec_t dt __maybe_unused);
+
+// WMI
+int do_GetFSRMQuota(int update_every, usec_t dt);
 
 // Cleanup
 void do_GetHardwareInfo_cleanup();
@@ -71,6 +76,8 @@ void do_GetSystemCPU_cleanup();
 void do_GetPowerSupply_cleanup();
 void do_PerflibSMB_cleanup();
 void do_PerflibStorage_cleanup();
+void do_GetFSRMQuota_cleanup(void);
+void do_GetFSRMQuota_interrupt(void);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
@@ -351,6 +358,31 @@ enum PERFLIB_PRIO {
     PRIO_EXCHANGE_PROXY_REQUESTS_TOTAL,
     PRIO_EXCHANGE_AUTO_DISCOVER_REQUESTS,
     PRIO_EXCHANGE_AUTO_AVAILABILITY_SERVICES,
+    PRIO_EXCHANGE_LDAP_READ_TIME,
+    PRIO_EXCHANGE_LDAP_SEARCH_TIME,
+    PRIO_EXCHANGE_LDAP_WRITE_TIME,
+    PRIO_EXCHANGE_LDAP_READ_OPERATIONS,
+    PRIO_EXCHANGE_LDAP_SEARCH_OPERATIONS,
+    PRIO_EXCHANGE_LDAP_WRITE_OPERATIONS,
+    PRIO_EXCHANGE_LDAP_TIMEOUT_ERRORS,
+    PRIO_EXCHANGE_LDAP_LONG_RUNNING_OPS,
+    PRIO_EXCHANGE_MAPIHTTP_ACTIVE_USER_COUNT,
+    PRIO_EXCHANGE_QUEUE_MESSAGES_QUEUED_FOR_DELIVERY_TOTAL,
+    PRIO_EXCHANGE_QUEUE_MESSAGES_SUBMITTED_TOTAL,
+    PRIO_EXCHANGE_QUEUE_MESSAGES_DELAYED_TOTAL,
+    PRIO_EXCHANGE_QUEUE_MESSAGES_COMPLETED_DELIVERY_TOTAL,
+    PRIO_EXCHANGE_QUEUE_AGGREGATE_SHADOW_QUEUE_LENGTH,
+    PRIO_EXCHANGE_QUEUE_SUBMISSION_QUEUE_LENGTH,
+    PRIO_EXCHANGE_QUEUE_DELAY_QUEUE_LENGTH,
+    PRIO_EXCHANGE_QUEUE_ITEMS_COMPLETED_DELIVERY_TOTAL,
+    PRIO_EXCHANGE_QUEUE_ITEMS_QUEUED_FOR_DELIVERY_EXPIRED_TOTAL,
+    PRIO_EXCHANGE_QUEUE_ITEMS_QUEUED_FOR_DELIVERY_TOTAL,
+    PRIO_EXCHANGE_QUEUE_ITEMS_RESUBMITTED_TOTAL,
+
+    PRIO_MSMQ_QUEUE_MESSAGES,
+    PRIO_MSMQ_QUEUE_BYTES,
+    PRIO_MSMQ_JOURNAL_MESSAGES,
+    PRIO_MSMQ_JOURNAL_BYTES,
 
     PRIO_ASPNET_APPLICATION_RESTART,
     PRIO_ASPNET_WORKER_PROCESS_RESTART,
@@ -412,6 +444,10 @@ enum PERFLIB_PRIO {
     PRIO_DNS_UNMATCHED_RESPONSES,
     PRIO_DNS_WINS_LOOKUPS,
     PRIO_DNS_WINS_RESPONSES,
+
+    PRIO_FSRM_QUOTAS,
+    PRIO_FSRM_QUOTA_SPACE,
+    PRIO_FSRM_QUOTA_STATE,
 
     PRIO_IIS_EXTRA_WEBSITE = 25000,
     PRIO_IIS_EXTRA_WORKER = 25100,

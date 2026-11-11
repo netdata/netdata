@@ -129,8 +129,7 @@ void query_target_release(QUERY_TARGET *qt) {
     // release the contexts
     for(size_t i = 0, used = qt->contexts.used; i < used ;i++) {
         QUERY_CONTEXT *qc = query_context(qt, i);
-        rrdcontext_release(qc->rca);
-        qc->rca = NULL;
+        query_context_release(qc);
     }
     qt->contexts.used = 0;
 
@@ -187,6 +186,7 @@ static QUERY_TARGET *query_target_get(void) {
     spinlock_unlock(&query_target_base.used.spinlock);
 
     qt->internal.used = true;
+    qt->internal.cancelled = QUERY_TARGET_CANCEL_NONE;
     qt->internal.queries++;
     thread_qt = qt;
 
@@ -229,11 +229,47 @@ typedef struct query_target_locals {
     size_t instances_version;
 
     size_t metrics_skipped_due_to_not_matching_timeframe;
+    size_t cancel_checks;
 
     char host_node_id_str[UUID_STR_LEN];
     const STRING *host_hostname; // borrowed while query_node_add() traverses one host
     QUERY_NODE *qn; // temp to pass on callbacks, ignore otherwise - no need to free
 } QUERY_TARGET_LOCALS;
+
+// how many walk steps between two timeout/interrupt checks
+#define QUERY_TARGET_CANCEL_CHECK_EVERY 64
+
+// True when building the target has to stop: its timeout expired or the requester went away.
+// Without force, the clock and the interrupt callback are consulted only every
+// QUERY_TARGET_CANCEL_CHECK_EVERY calls; the decision sticks once made.
+static bool query_target_build_cancelled(QUERY_TARGET_LOCALS *qtl, bool force) {
+    QUERY_TARGET *qt = qtl->qt;
+
+    if(unlikely(qt->internal.cancelled))
+        return true;
+
+    if(!force && (++qtl->cancel_checks % QUERY_TARGET_CANCEL_CHECK_EVERY))
+        return false;
+
+    if(qt->request.timeout_ms > 0) {
+        usec_t elapsed_ut = now_monotonic_usec() - qt->timings.received_ut;
+        if(elapsed_ut >= (usec_t)qt->request.timeout_ms * USEC_PER_MS) {
+            qt->internal.cancelled = QUERY_TARGET_CANCEL_TIMEOUT;
+            nd_log(NDLS_ACCESS, NDLP_WARNING,
+                   "QUERY CANCELED WHILE PREPARING: RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
+                   (NETDATA_DOUBLE)elapsed_ut / USEC_PER_MS, (long long)qt->request.timeout_ms);
+            return true;
+        }
+    }
+
+    if(qt->request.interrupt_callback && qt->request.interrupt_callback(qt->request.interrupt_callback_data)) {
+        qt->internal.cancelled = QUERY_TARGET_CANCEL_INTERRUPTED;
+        nd_log(NDLS_ACCESS, NDLP_NOTICE, "QUERY INTERRUPTED WHILE PREPARING");
+        return true;
+    }
+
+    return false;
+}
 
 struct storage *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier) {
     QUERY_NODE *qn = query_node(qt, qm->link.query_node_id);
@@ -331,9 +367,11 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
             ? true : false;
 
     if(timeframe_matches) {
-        RRDSET *st = rrdinstance_rrdset_atomic_load(ri);
-        if(st)
-            rrdset_set_last_accessed_time_s(st, qtl->start_s);
+        RRDSET_ACQUIRED *rsa = rrdinstance_rrdset_acquire(qi->ria);
+        if(rsa) {
+            rrdset_set_last_accessed_time_s(rrdset_acquired_to_rrdset(rsa), qtl->start_s);
+            rrdset_acquired_release(rsa);
+        }
 
         if (qt->query.used == qt->query.size) {
             size_t old_mem = qt->query.size * sizeof(*qt->query.array);
@@ -348,6 +386,12 @@ static bool query_metric_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CON
 
         qm->status = options;
         qm->values_stored_as_rates = values_stored_as_rates;
+
+        // carried on the dimension flags so it survives group-by: the units
+        // a result dimension deserves depend on whether EVERY metric behind
+        // it was integrated from a rate into a volume
+        if(!values_stored_as_rates)
+            qm->status |= RRDR_DIMENSION_NOT_RATE;
 
         qm->link.query_node_id = qn->slot;
         qm->link.query_context_id = qc->slot;
@@ -390,11 +434,13 @@ static inline bool rrdmetric_retention_matches_query(QUERY_TARGET *qt, RRDMETRIC
 }
 
 static inline void query_dimension_release(QUERY_DIMENSION *qd) {
+    string_freez(qd->name);
+    qd->name = NULL;
     rrdmetric_release(qd->rma);
     qd->rma = NULL;
 }
 
-static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma, QUERY_STATUS status, size_t priority) {
+static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQUIRED *rma, STRING *name, QUERY_STATUS status, size_t priority) {
     if(qt->dimensions.used == qt->dimensions.size) {
         size_t old_mem = qt->dimensions.size * sizeof(*qt->dimensions.array);
         qt->dimensions.size = query_target_realloc_size(qt->dimensions.size, 4);
@@ -408,20 +454,19 @@ static QUERY_DIMENSION *query_dimension_allocate(QUERY_TARGET *qt, RRDMETRIC_ACQ
 
     qd->slot = qt->dimensions.used++;
     qd->rma = rrdmetric_acquired_dup(rma);
+    qd->name = string_dup(name);
     qd->status = status;
     qd->priority = priority;
 
     return qd;
 }
 
-static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
-                                RRDMETRIC_ACQUIRED *rma, bool queryable_instance, size_t *metrics_added, size_t priority) {
+static bool query_dimension_add_named(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
+                                      RRDMETRIC_ACQUIRED *rma, STRING *name, bool queryable_instance,
+                                      size_t *metrics_added, size_t priority) {
     QUERY_TARGET *qt = qtl->qt;
-
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
-    if(rrd_flag_is_deleted(rm))
-        return false;
-    
+
     // Check scope_dimensions first - if it doesn't match, skip entirely
     if(qt->dimensions.scope_pattern) {
         SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
@@ -429,8 +474,8 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
         if(qtl->match_ids)
             ret = simple_pattern_matches_string_extract(qt->dimensions.scope_pattern, rm->id, NULL, 0);
             
-        if(ret == SP_NOT_MATCHED && qtl->match_names && (rm->name != rm->id || !qtl->match_ids))
-            ret = simple_pattern_matches_string_extract(qt->dimensions.scope_pattern, rm->name, NULL, 0);
+        if(ret == SP_NOT_MATCHED && qtl->match_names && (name != rm->id || !qtl->match_ids))
+            ret = simple_pattern_matches_string_extract(qt->dimensions.scope_pattern, name, NULL, 0);
             
         if(ret != SP_MATCHED_POSITIVE)
             return false;  // Skip this dimension entirely - not in scope
@@ -461,8 +506,8 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
             if(qtl->match_ids)
                 ret = simple_pattern_matches_string_extract(qt->query.pattern, rm->id, NULL, 0);
 
-            if(ret == SP_NOT_MATCHED && qtl->match_names && (rm->name != rm->id || !qtl->match_ids))
-                ret = simple_pattern_matches_string_extract(qt->query.pattern, rm->name, NULL, 0);
+            if(ret == SP_NOT_MATCHED && qtl->match_names && (name != rm->id || !qtl->match_ids))
+                ret = simple_pattern_matches_string_extract(qt->query.pattern, name, NULL, 0);
 
             if(ret == SP_MATCHED_POSITIVE) {
                 needed = true;
@@ -541,8 +586,20 @@ static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_
     if(undo)
         return false;
 
-    query_dimension_allocate(qt, rma, status, priority);
+    query_dimension_allocate(qt, rma, name, status, priority);
     return true;
+}
+
+static bool query_dimension_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi,
+                                RRDMETRIC_ACQUIRED *rma, bool queryable_instance, size_t *metrics_added, size_t priority) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    if(rrd_flag_is_deleted(rm))
+        return false;
+
+    STRING *name = rrdmetric_acquired_name_dup(rma);
+    bool added = query_dimension_add_named(qtl, qn, qc, qi, rma, name, queryable_instance, metrics_added, priority);
+    string_freez(name);
+    return added;
 }
 
 static inline STRING *rrdinstance_create_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
@@ -553,12 +610,11 @@ static inline STRING *rrdinstance_create_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
     return string_dup(ri->id);
 }
 
-static inline STRING *rrdinstance_create_name_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
-    if(unlikely(!ria))
+static inline STRING *rrdinstance_create_name_fqdn_v1(QUERY_INSTANCE *qi) {
+    if(unlikely(!qi->ria))
         return NULL;
 
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return string_dup(ri->name);
+    return string_dup(qi->name);
 }
 
 static inline STRING *rrdinstance_create_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
@@ -572,14 +628,13 @@ static inline STRING *rrdinstance_create_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
     return string_strdupz(buffer);
 }
 
-static inline STRING *rrdinstance_create_name_fqdn_v2(
-    RRDINSTANCE_ACQUIRED *ria, const STRING *host_hostname) {
-    if(unlikely(!ria))
+static inline STRING *rrdinstance_create_name_fqdn_v2(QUERY_INSTANCE *qi, const STRING *host_hostname) {
+    if(unlikely(!qi->ria))
         return NULL;
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_name(ria), string2str(host_hostname));
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", query_instance_name(qi), string2str(host_hostname));
     return string_strdupz(buffer);
 }
 
@@ -598,33 +653,22 @@ inline STRING *query_instance_name_fqdn(
     QUERY_INSTANCE *qi, size_t version, const STRING *host_hostname) {
     if(!qi->name_fqdn) {
         if (version <= 1)
-            qi->name_fqdn = rrdinstance_create_name_fqdn_v1(qi->ria);
+            qi->name_fqdn = rrdinstance_create_name_fqdn_v1(qi);
         else
-            qi->name_fqdn = rrdinstance_create_name_fqdn_v2(qi->ria, host_hostname);
+            qi->name_fqdn = rrdinstance_create_name_fqdn_v2(qi, host_hostname);
     }
 
     return qi->name_fqdn;
 }
 
-RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria) {
-    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(ri->rc->rrdhost, string2str(ri->id), true);
-    if(unlikely(!rsa))
-        return NULL;
-
-    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
-
-    if(unlikely(st->rrdcontexts.rrdinstance != ria)) {
-        rrdset_acquired_release(rsa);
-        return NULL;
-    }
-
-    return rsa;
-}
-
-const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca) {
+// the context's title, units and family are replaced and freed by rrdcontext_merge_with() under the context
+// lock while the context is in use: readers take their own reference under the same lock
+STRING *rrdcontext_acquired_units_dup(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-    return string2str(rc->units);
+    rrdcontext_lock(rc);
+    STRING *units = string_dup(rc->units);
+    rrdcontext_unlock(rc);
+    return units;
 }
 
 RRDSET_TYPE rrdcontext_acquired_chart_type(RRDCONTEXT_ACQUIRED *rca) {
@@ -632,10 +676,12 @@ RRDSET_TYPE rrdcontext_acquired_chart_type(RRDCONTEXT_ACQUIRED *rca) {
     return rc->chart_type;
 }
 
-const char *rrdcontext_acquired_title(RRDCONTEXT_ACQUIRED *rca) {
-    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
-    return string2str(rc->title);
-}
+RRDCONTEXT_ACQUIRED *rrdcontext_acquired_ref(RRDCONTEXT_ACQUIRED *rca) { return rrdcontext_acquired_dup(rca); }
+void rrdcontext_acquired_unref(RRDCONTEXT_ACQUIRED *rca) { rrdcontext_release(rca); }
+RRDINSTANCE_ACQUIRED *rrdinstance_acquired_ref(RRDINSTANCE_ACQUIRED *ria) { return rrdinstance_acquired_dup(ria); }
+void rrdinstance_acquired_unref(RRDINSTANCE_ACQUIRED *ria) { rrdinstance_release(ria); }
+RRDMETRIC_ACQUIRED *rrdmetric_acquired_ref(RRDMETRIC_ACQUIRED *rma) { return rrdmetric_acquired_dup(rma); }
+void rrdmetric_acquired_unref(RRDMETRIC_ACQUIRED *rma) { rrdmetric_release(rma); }
 
 static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_unused,
                                                QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi) {
@@ -734,6 +780,12 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
 }
 
 static inline void query_instance_strings_free(QUERY_INSTANCE *qi) {
+    string_freez(qi->name);
+    qi->name = NULL;
+
+    string_freez(qi->units);
+    qi->units = NULL;
+
     string_freez(qi->id_fqdn);
     qi->id_fqdn = NULL;
 
@@ -741,7 +793,22 @@ static inline void query_instance_strings_free(QUERY_INSTANCE *qi) {
     qi->name_fqdn = NULL;
 }
 
+RRDLABELS *query_instance_labels(QUERY_INSTANCE *qi) {
+    if(!qi->labels_acquired) {
+        qi->labels = rrdinstance_acquired_labels_acquire(qi->ria);
+        qi->labels_acquired = true;
+    }
+
+    return qi->labels.labels;
+}
+
 static inline void query_instance_release(QUERY_INSTANCE *qi) {
+    // before the instance: the labels may be the instance's own
+    if(qi->labels_acquired) {
+        rrdinstance_labels_release(&qi->labels);
+        qi->labels_acquired = false;
+    }
+
     if(qi->ria) {
         rrdinstance_release(qi->ria);
         qi->ria = NULL;
@@ -765,13 +832,23 @@ static inline QUERY_INSTANCE *query_instance_allocate(QUERY_TARGET *qt, RRDINSTA
     qi->slot = qt->instances.used;
     qt->instances.used++;
     qi->ria = rrdinstance_acquired_dup(ria);
+
+    // our own references: the instance's strings are replaced while the query runs
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    spinlock_lock(&ri->spinlock);
+    qi->name = string_dup(ri->name);
+    qi->units = string_dup(ri->units);
+    spinlock_unlock(&ri->spinlock);
     qi->query_host_id = qn_slot;
 
     return qi;
 }
 
+// name: the caller's reference to the instance name, so that matching and output use the same name;
+// NULL to match a reference taken here
 static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED *ria,
                                              RRDINSTANCE *ri,
+                                             STRING *name_ref,
                                              SIMPLE_PATTERN *instances_sp,
                                              bool match_ids,
                                              bool match_names,
@@ -783,10 +860,15 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED 
     if(instances_sp) {
         ret = SP_NOT_MATCHED;
 
+        // the name is replaced while we use it: match a reference
+        STRING *name = name_ref, *name_owned = NULL;
+        if(match_names && !name)
+            name = name_owned = rrdinstance_acquired_name_dup(ria);
+
         if(match_ids)
             ret = simple_pattern_matches_string_extract(instances_sp, ri->id, NULL, 0);
-        if (ret == SP_NOT_MATCHED && match_names && (ri->name != ri->id || !match_ids))
-            ret = simple_pattern_matches_string_extract(instances_sp, ri->name, NULL, 0);
+        if (ret == SP_NOT_MATCHED && match_names && (name != ri->id || !match_ids))
+            ret = simple_pattern_matches_string_extract(instances_sp, name, NULL, 0);
 
         // the fqdn forms are formatted on the stack, the same way query_instance_id_fqdn() and
         // query_instance_name_fqdn() build them, without interning; in v1 they are the id and the
@@ -799,10 +881,11 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED 
             ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
         }
         if (ret == SP_NOT_MATCHED && match_names && version >= 2) {
-            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s",
-                      rrdinstance_acquired_name(ria), string2str(host_hostname));
+            snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", string2str(name), string2str(host_hostname));
             ret = simple_pattern_matches_extract(instances_sp, buffer, NULL, 0);
         }
+
+        string_freez(name_owned);
 
         if (ret == SP_NOT_MATCHED && match_ids && host_node_id_str[0]) {
             snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(ria), host_node_id_str);
@@ -814,7 +897,7 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(RRDINSTANCE_ACQUIRED 
 }
 
 static inline bool query_instance_matches_labels(
-    RRDINSTANCE *ri,
+    RRDINSTANCE_ACQUIRED *ria,
     SIMPLE_PATTERN *chart_label_key_sp,
     struct pattern_array *labels_pa)
 {
@@ -823,15 +906,20 @@ static inline bool query_instance_matches_labels(
     if (!chart_label_key_sp && !labels_pa)
         return true;
 
-    RRDLABELS *labels = rrdinstance_labels(ri);
-    if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(labels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
-        return false;
+    RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire(ria);
 
-    if (labels_pa) {
-        return pattern_array_label_match(labels_pa, labels, ':', NULL);
-    }
+    // labels that cannot be read right now (the chart is going away or moving to another context) match nothing:
+    // pattern_array_label_match() would accept them unchecked
+    bool matched = true;
+    if (!lref.labels)
+        matched = false;
+    else if (chart_label_key_sp && rrdlabels_match_simple_pattern_parsed(lref.labels, chart_label_key_sp, '\0', NULL) != SP_MATCHED_POSITIVE)
+        matched = false;
+    else if (labels_pa)
+        matched = pattern_array_label_match(labels_pa, lref.labels, ':', NULL);
 
-    return true;
+    rrdinstance_labels_release(&lref);
+    return matched;
 }
 
 static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_CONTEXT *qc,
@@ -845,12 +933,12 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 
     if(queryable_instance && filter_instances)
         queryable_instance = (SP_MATCHED_POSITIVE == query_instance_matches(
-                ria, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qtl->instances_version,
+                ria, ri, qi->name, qt->instances.pattern, qtl->match_ids, qtl->match_names, qtl->instances_version,
                 qtl->host_hostname, qtl->host_node_id_str));
 
     // chart_label_key has no scope variant: the scope checks before this call already applied it
     if(queryable_instance)
-        queryable_instance = query_instance_matches_labels(ri, NULL, qt->instances.labels_pa);
+        queryable_instance = query_instance_matches_labels(ria, NULL, qt->instances.labels_pa);
 
     if(queryable_instance) {
         if(qt->instances.alerts_pattern && !query_target_match_alert_pattern(ria, qt->instances.alerts_pattern))
@@ -869,6 +957,9 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
     else {
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
+            if(query_target_build_cancelled(qtl, false))
+                break;
+
             if(query_dimension_add(qtl, qn, qc, qi, (RRDMETRIC_ACQUIRED *) rm_dfe.item,
                                    queryable_instance, &metrics_added, priority++))
                 dimensions_added++;
@@ -899,6 +990,10 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 }
 
 static inline void query_context_release(QUERY_CONTEXT *qc) {
+    string_freez(qc->title);
+    qc->title = NULL;
+    string_freez(qc->units);
+    qc->units = NULL;
     rrdcontext_release(qc->rca);
     qc->rca = NULL;
 }
@@ -917,6 +1012,13 @@ static inline QUERY_CONTEXT *query_context_allocate(QUERY_TARGET *qt, RRDCONTEXT
     qc->slot = qt->contexts.used++;
     qc->rca =  rrdcontext_acquired_dup(rca);
 
+    // our own references: the context's strings are replaced while the query runs
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    rrdcontext_lock(rc);
+    qc->title = string_dup(rc->title);
+    qc->units = string_dup(rc->units);
+    rrdcontext_unlock(rc);
+
     return qc;
 }
 
@@ -932,7 +1034,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            SIMPLE_PATTERN_RESULT ret = query_instance_matches(qt->request.ria, ri,
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(qt->request.ria, ri, NULL,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names,
                 qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
             if(ret != SP_MATCHED_POSITIVE)
@@ -941,7 +1043,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_labels
         if(qt->instances.scope_labels_pa || qt->instances.chart_label_key_pattern) {
-            if(!query_instance_matches_labels(ri,
+            if(!query_instance_matches_labels(qt->request.ria,
                 qt->instances.chart_label_key_pattern,
                 qt->instances.scope_labels_pa))
                 return 0;
@@ -961,7 +1063,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_instances
         if(qt->instances.scope_pattern) {
-            SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri,
+            SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri, NULL,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
                 qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
             if(ret != SP_MATCHED_POSITIVE) {
@@ -972,7 +1074,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         
         // Check scope_labels
         if(qt->instances.scope_labels_pa || qt->instances.chart_label_key_pattern) {
-            if(!query_instance_matches_labels(ri,
+            if(!query_instance_matches_labels(ria,
                 qt->instances.chart_label_key_pattern,
                 qt->instances.scope_labels_pa)) {
                 rrdinstance_release(ria);
@@ -989,6 +1091,9 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
         // Pattern query - iterate through all instances
         RRDINSTANCE *ri;
         dfe_start_read(rc->rrdinstances, ri) {
+            if(query_target_build_cancelled(qtl, false))
+                break;
+
             if(rrd_flag_is_deleted(ri))
                 continue;
 
@@ -996,7 +1101,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             
             // Check scope_instances
             if(qt->instances.scope_pattern) {
-                SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri,
+                SIMPLE_PATTERN_RESULT ret = query_instance_matches(ria, ri, NULL,
                     qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
                     qtl->instances_version, qtl->host_hostname, qtl->host_node_id_str);
                 if(ret != SP_MATCHED_POSITIVE)
@@ -1005,7 +1110,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             
             // Check scope_labels
             if(qt->instances.scope_labels_pa || qt->instances.chart_label_key_pattern) {
-                if(!query_instance_matches_labels(ri,
+                if(!query_instance_matches_labels(ria,
                     qt->instances.chart_label_key_pattern,
                     qt->instances.scope_labels_pa))
                     continue;
@@ -1018,6 +1123,10 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
     }
     
     return added;
+}
+
+static bool query_context_scan_should_stop(void *data) {
+    return query_target_build_cancelled(data, false);
 }
 
 static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context) {
@@ -1036,8 +1145,11 @@ static ssize_t query_context_add(void *data, RRDCONTEXT_ACQUIRED *rca, bool quer
     if(!added) {
         query_context_release(qc);
         qt->contexts.used--;
-        return 0;
     }
+
+    // a negative return stops query_scope_foreach_context()
+    if(query_target_build_cancelled(qtl, false))
+        return -1;
 
     return added;
 }
@@ -1067,6 +1179,11 @@ static inline QUERY_NODE *query_node_allocate(QUERY_TARGET *qt, RRDHOST *host) {
 static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     QUERY_TARGET_LOCALS *qtl = data;
     QUERY_TARGET *qt = qtl->qt;
+
+    // a negative return stops query_scope_foreach_host()
+    if(query_target_build_cancelled(qtl, true))
+        return -1;
+
     QUERY_NODE *qn = query_node_allocate(qt, host);
 
     if(!UUIDiszero(host->node_id)) {
@@ -1117,7 +1234,7 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
         added = query_scope_foreach_context(
                 host, qtl->scope_contexts,
                 qt->contexts.scope_pattern, qt->contexts.pattern,
-                query_context_add, queryable_host, qtl);
+                query_context_add, queryable_host, qtl, query_context_scan_should_stop);
 
         if(added < 0)
             added = 0;
@@ -1127,13 +1244,18 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
     rrdhost_identity_release(&host_identity);
     qtl->qn = NULL;
 
+    if(qt->internal.cancelled) {
+        // keep the node: contexts added before the stop may reference it (added is not reliable here)
+        return -1;
+    }
+
     if(!added) {
         query_node_release(qn);
         qt->nodes.used--;
-        return false;
+        return 0;
     }
 
-    return true;
+    return 1;
 }
 
 void query_target_generate_name(QUERY_TARGET *qt) {
@@ -1267,6 +1389,7 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     // copy the request into query_thread_target
     qt->request = *qtr;
+    qt->request.resampling_time = rrdr_resampling_time_normalize(qt->request.resampling_time);
 
     query_target_generate_name(qt);
     qt->window.after = qt->request.after;
@@ -1368,6 +1491,12 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
                                  &qt->versions,
                                  qtl.host_node_id_str);
 
+    // a cancelled target is incomplete: callers get it back marked, and rrd2rrdr() does not execute it
+    if(unlikely(qt->internal.cancelled)) {
+        qt->timings.preprocessed_ut = now_monotonic_usec();
+        return qt;
+    }
+
     // we need the available db retention for this call
     // so it has to be done last
     if(unlikely(!query_target_calculate_window(qt))) {
@@ -1378,6 +1507,24 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     qt->timings.preprocessed_ut = now_monotonic_usec();
 
     return qt;
+}
+
+// true when the dimension matches the pattern (or there is no pattern) by id or by name;
+// name is the caller's reference to the metric name (the name is replaced while we use it)
+static bool query_metric_name_matches(RRDMETRIC *rm, STRING *name, SIMPLE_PATTERN *sp,
+                                      bool match_ids, bool match_names) {
+    if(!sp)
+        return true;
+
+    SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
+
+    if (match_ids)
+        ret = simple_pattern_matches_string_extract(sp, rm->id, NULL, 0);
+
+    if (ret == SP_NOT_MATCHED && match_names && (name != rm->id || !match_ids))
+        ret = simple_pattern_matches_string_extract(sp, name, NULL, 0);
+
+    return ret == SP_MATCHED_POSITIVE;
 }
 
 ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
@@ -1416,32 +1563,29 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 
                 RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *) ri_dfe.item;
                 
-                // Check scope_instances first - if it doesn't match, skip entirely
-                if(scope_instances_sp) {
-                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(
-                        ria, ri, scope_instances_sp, match_ids, match_names, version,
-                        host_identity.hostname, host_node_id_str);
+                // scope_instances and instances match the same snapshot of the name
+                if(scope_instances_sp || instances_sp) {
+                    STRING *name = match_names ? rrdinstance_acquired_name_dup(ria) : NULL;
+                    bool matched =
+                        (!scope_instances_sp ||
+                         query_instance_matches(ria, ri, name, scope_instances_sp, match_ids, match_names, version,
+                                                host_identity.hostname, host_node_id_str) == SP_MATCHED_POSITIVE) &&
+                        (!instances_sp ||
+                         query_instance_matches(ria, ri, name, instances_sp, match_ids, match_names, version,
+                                                host_identity.hostname, host_node_id_str) == SP_MATCHED_POSITIVE);
+                    string_freez(name);
 
-                    if (ret != SP_MATCHED_POSITIVE)
+                    if(!matched)
                         continue;
                 }
-                
+
                 // Check scope_labels - if it doesn't match, skip entirely
                 if(scope_labels_pa) {
-                    if(!query_instance_matches_labels(ri, NULL, scope_labels_pa))
+                    if(!query_instance_matches_labels(ria, NULL, scope_labels_pa))
                         continue;
                 }
 
-                if(instances_sp) {
-                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(
-                        ria, ri, instances_sp, match_ids, match_names, version,
-                        host_identity.hostname, host_node_id_str);
-
-                    if (ret != SP_MATCHED_POSITIVE)
-                        continue;
-                }
-
-                if(!query_instance_matches_labels(ri, chart_label_key_sp, labels_pa))
+                if(!query_instance_matches_labels(ria, chart_label_key_sp, labels_pa))
                     continue;
 
                 if(alerts_sp && !query_target_match_alert_pattern(ria, alerts_sp))
@@ -1454,36 +1598,22 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                             if(rrd_flag_is_deleted(rm))
                                 continue;
 
-                            // Check scope_dimensions first - if it doesn't match, skip entirely
-                            if(scope_dimensions_sp) {
-                                SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
+                            RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item;
 
-                                if (match_ids)
-                                    ret = simple_pattern_matches_string_extract(scope_dimensions_sp, rm->id, NULL, 0);
+                            // scope_dimensions and dimensions match the same snapshot of the name
+                            if(scope_dimensions_sp || dimensions_sp) {
+                                STRING *name = match_names ? rrdmetric_acquired_name_dup(rma) : NULL;
+                                bool matched =
+                                    query_metric_name_matches(rm, name, scope_dimensions_sp, match_ids, match_names) &&
+                                    query_metric_name_matches(rm, name, dimensions_sp, match_ids, match_names);
+                                string_freez(name);
 
-                                if (ret == SP_NOT_MATCHED && match_names && (rm->name != rm->id || !match_ids))
-                                    ret = simple_pattern_matches_string_extract(scope_dimensions_sp, rm->name, NULL, 0);
-
-                                if(ret != SP_MATCHED_POSITIVE)
-                                    continue;
-                            }
-
-                            if(dimensions_sp) {
-                                SIMPLE_PATTERN_RESULT ret = SP_NOT_MATCHED;
-
-                                if (match_ids)
-                                    ret = simple_pattern_matches_string_extract(dimensions_sp, rm->id, NULL, 0);
-
-                                if (ret == SP_NOT_MATCHED && match_names && (rm->name != rm->id || !match_ids))
-                                    ret = simple_pattern_matches_string_extract(dimensions_sp, rm->name, NULL, 0);
-
-                                if(ret != SP_MATCHED_POSITIVE)
+                                if(!matched)
                                     continue;
                             }
 
                             dfe_unlock(rm);
 
-                            RRDMETRIC_ACQUIRED *rma = (RRDMETRIC_ACQUIRED *)rm_dfe.item;
                             ssize_t ret = cb(data, rc->rrdhost, rca, ria, rma);
 
                             if(ret < 0) {

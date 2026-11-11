@@ -41,9 +41,6 @@ Postfix has internal access controls for the mail queue. By default, all users c
 
 The collector executes  `postqueue -p` to get Postfix queue statistics.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

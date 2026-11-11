@@ -28,10 +28,10 @@ func (c *Collector) collectFcPorts(ctx context.Context) {
 				c.Warningf("error collecting FC port %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				c.mx.fcPort.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
-				c.mx.fcPort.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
-				c.mx.fcPort.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
-				c.mx.fcPort.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.fcPort.perf.readIops.WithLabelValues(name).Observe(last.AvgReadIops)
+				c.mx.fcPort.perf.writeIops.WithLabelValues(name).Observe(last.AvgWriteIops)
+				c.mx.fcPort.perf.readBandwidth.WithLabelValues(name).Observe(last.AvgReadBandwidth)
+				c.mx.fcPort.perf.writeBandwidth.WithLabelValues(name).Observe(last.AvgWriteBandwidth)
 				c.mx.fcPort.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
 				c.mx.fcPort.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
 				c.mx.fcPort.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)

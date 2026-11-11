@@ -13,14 +13,25 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
+	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -32,32 +43,32 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TestPreparedLinuxRuntime uses the public Engine, real nd-run tree supervisor,
-// prepared packages/browser, artifact owner and journal. It never downloads a
-// browser. An operator must explicitly provide all four runtime fixture paths.
+// TestPreparedLinuxRuntime uses the selected production installation, actual
+// acquired process/execution claims, nd-run, artifacts and journal. It never
+// injects private component paths or downloads a runtime.
 func TestPreparedLinuxRuntime(t *testing.T) {
-	names := []string{
-		"DEM_RUNNER_TEST_NODE",
-		"DEM_RUNNER_TEST_DEPENDENCIES",
-		"DEM_RUNNER_TEST_BROWSER",
-		"DEM_RUNNER_TEST_HELPER",
-	}
+	names := []string{"DEM_RUNNER_TEST_MANIFEST", "DEM_RUNNER_TEST_STORE", "DEM_RUNNER_TEST_HELPER"}
 	values := make([]string, len(names))
 	for i, name := range names {
 		values[i] = os.Getenv(name)
 		if values[i] == "" {
-			t.Skip("real prepared Linux validation requires " + name)
+			t.Skip("real Linux validation requires " + name)
 		}
 	}
 	require.NotZero(t, os.Geteuid(), "browser runtime must run unprivileged")
-	restore := ndexec.SetRunnerPathsForTests(values[3], "")
+	restore := ndexec.SetRunnerPathsForTests(values[2], "")
 	defer restore()
-	_, source, _, ok := runtime.Caller(0)
-	require.True(t, ok)
-	assets := os.Getenv("DEM_RUNNER_TEST_ASSETS")
-	if assets == "" {
-		assets = filepath.Join(filepath.Dir(source), "assets")
-	}
+	raw, err := os.ReadFile(values[0])
+	require.NoError(t, err)
+	var manifest runtime.Manifest
+	require.NoError(t, json.Unmarshal(raw, &manifest))
+	require.NoError(t, manifest.Validate())
+	store, err := runtime.Open(runtime.DefaultConfig(values[1]))
+	require.NoError(t, err)
+	consumer, err := store.AcquireSelected()
+	require.NoError(t, err)
+	require.Equal(t, manifest, consumer.Manifest(), "selected release must match the supplied trusted descriptor")
+	expectedIdentity := synthetic.RuntimeIdentity{Version: manifest.Version, SHA256: manifest.Archive.SHA256, Contract: manifest.Contract}
 	base, err := os.MkdirTemp("", "dem-real-runtime-")
 	require.NoError(t, err)
 	safe := true
@@ -67,17 +78,32 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	require.NoError(t, err)
 	defer func() {
 		if safe {
+			assert.NoError(t, consumer.Close())
+			assert.NoError(t, store.Close())
 			assert.NoError(t, history.Close())
 			assert.NoError(t, captures.Close())
 			assert.NoError(t, os.RemoveAll(base))
 		}
 	}()
-	paths := runner.Paths{
-		Node:         values[0],
-		Dependencies: values[1],
-		Browser:      values[2],
+	observedHistory := &identityHistory{Store: synthetichistory.NewStore(history)}
+	engine, err := runner.New(selectedRuntime{consumer}, observedHistory, captures, 1)
+	require.NoError(t, err)
+	verifyIdentity := func(t *testing.T, run synthetic.Run) {
+		t.Helper()
+		require.Equal(t, &expectedIdentity, run.Runtime)
+		records := observedHistory.records[run.ID]
+		require.Len(t, records, 2, "both start and completion must carry the actual acquired identity")
+		require.Zero(t, records[0].CompletedUS)
+		require.Equal(t, &expectedIdentity, records[0].Runtime)
+		require.Equal(t, &expectedIdentity, records[1].Runtime)
+		retained, err := observedHistory.GetRun(context.Background(), run.JobID, run.ID)
+		require.NoError(t, err)
+		require.Equal(t, &expectedIdentity, retained.Runtime)
+		handler := syntheticfunctions.New(query.New(nil, observedHistory, captures, nil), nil)
+		response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: "synthetics-run", Args: []string{"job_id:" + run.JobID, "run_id:" + run.ID}, Permissions: "0x7b"})
+		require.NotNil(t, response.RawResponse, response.Message)
+		require.Equal(t, &expectedIdentity, response.RawResponse["run"].(map[string]any)["runtime"])
 	}
-	engine := runner.New(assets, fixtureRuntime{Paths: paths}, synthetichistory.NewStore(history), captures)
 	require.NoError(t, engine.Check(context.Background(), synthetic.Journey))
 
 	var mu sync.Mutex
@@ -188,9 +214,154 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			t.Fatalf("tree not drained: %+v", execution.Run)
 		}
 		require.Empty(t, execution.Run.HistoryError)
+		verifyIdentity(t, execution.Run)
 		t.Logf("%s: %s (%s)", name, execution.Run.Outcome, execution.Run.Error)
 		return execution
 	}
+	t.Run("draft-configuration-test", func(t *testing.T) {
+		const secret = "synthetic-rehearsal-secret"
+		t.Setenv("DEM_REHEARSAL_TEST_SECRET", secret)
+		temporary := filepath.Join(base, "rehearsal-tmp")
+		require.NoError(t, os.Mkdir(temporary, 0700))
+		t.Setenv("TMPDIR", temporary)
+		resolver, err := secretresolver.NewDefaultAtomicResolver()
+		require.NoError(t, err)
+		configs, err := secretconfig.NewConfigResolver(resolver, func([]string) (secretresolver.AtomicScope, error) {
+			return nil, errors.New("fixture does not use SecretStore references")
+		})
+		require.NoError(t, err)
+		registry := syntheticregistry.New()
+		var collector *journey.Collector
+		makeFactory := func(executor journey.Executor) *joboutput.ConfigModuleFactory {
+			creator := journey.Creator(journey.Dependencies{Executor: executor, Registry: registry})
+			create := creator.CreateV2
+			creator.CreateV2 = func() collectorapi.CollectorV2 {
+				collector = create().(*journey.Collector)
+				return collector
+			}
+			factory, err := joboutput.NewConfigModuleFactory(joboutput.ConfigModuleFactoryConfig{
+				Modules: collectorapi.Registry{"journey": creator},
+				Configs: configs,
+			})
+			require.NoError(t, err)
+			return factory
+		}
+		factory := makeFactory(engine)
+		config := func(script string) confgroup.Config {
+			return confgroup.Config{
+				"name":                  "unsaved-draft",
+				"module":                "journey",
+				"script":                script,
+				"timeout":               "30s",
+				"screenshot_on_failure": true,
+				"secrets": []any{map[string]any{
+					"name":  "DEM_SECRET_REHEARSAL",
+					"value": "${env:DEM_REHEARSAL_TEST_SECRET}",
+				}},
+			}.SetSourceType(confgroup.TypeDyncfg)
+		}
+		assertIsolated := func(t *testing.T) {
+			t.Helper()
+			assert.Empty(t, registry.Snapshot(time.Now()), "draft must not register a monitor")
+			assert.Empty(t, observedHistory.records, "draft must not append monitoring events")
+			page, err := observedHistory.QueryRuns(context.Background(), synthetichistory.RunFilter{})
+			require.NoError(t, err)
+			assert.Empty(t, page.Runs, "draft must not enter retained history")
+			require.NotNil(t, collector)
+			collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()).ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
+				t.Errorf("draft published metric %s", name)
+			})
+			for _, directory := range []string{"work", "staging", "runs", "drained", "deleting"} {
+				entries, err := os.ReadDir(filepath.Join(base, "captures", directory))
+				require.NoError(t, err)
+				assert.Empty(t, entries, "draft must not retain captures or workspaces in %s", directory)
+			}
+			leftovers, err := filepath.Glob(filepath.Join(temporary, "netdata-dem-artifacts-*"))
+			require.NoError(t, err)
+			if len(leftovers) != 0 {
+				safe = false // Preserve uncertain workspaces for diagnosis.
+			}
+			assert.Empty(t, leftovers, "temporary rehearsal stores must be closed after drainage")
+		}
+		for _, scenario := range []struct {
+			name      string
+			body      string
+			wantError bool
+		}{
+			{"success-with-resolved-secret", "test('secret',async({page})=>{await page.goto(" + string(urlJSON) + ");await expect(page).toHaveTitle('DEM synthetic fixture');expect(process.env.DEM_SECRET_REHEARSAL).toBe('" + secret + "')});", false},
+			{"assertion-failure", "test('failed',async({page})=>{await page.goto(" + string(urlJSON) + ");expect(1).toBe(2)});", true},
+			{"incomplete-suite", "test('passed',async({page})=>{});test.skip('not-covered',async()=>{});", true},
+		} {
+			t.Run(scenario.name, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+				defer cancel()
+				err := factory.Test(ctx, config(browserPrefix+scenario.body))
+				if scenario.wantError {
+					require.Error(t, err)
+					assert.NotContains(t, err.Error(), secret)
+				} else {
+					require.NoError(t, err)
+				}
+				verifyGone(t)
+				assertIsolated(t)
+			})
+		}
+		t.Run("script-path-load-failure", func(t *testing.T) {
+			entry := filepath.Join(base, "invalid-draft.spec.ts")
+			require.NoError(t, os.WriteFile(entry, []byte("export const invalid = ;"), 0600))
+			draft := config("")
+			delete(draft, "script")
+			draft["script_path"] = entry
+			ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+			defer cancel()
+			require.Error(t, factory.Test(ctx, draft))
+			assertIsolated(t)
+		})
+		t.Run("runtime-unavailable", func(t *testing.T) {
+			unavailableEngine, err := runner.New(nil, observedHistory, captures, 1)
+			require.NoError(t, err)
+			unavailable := makeFactory(unavailableEngine)
+			require.Error(t, unavailable.Test(context.Background(), config(prefix+"test('unused',async()=>{});")))
+			assertIsolated(t)
+		})
+		t.Run("cancel-after-browser-start", func(t *testing.T) {
+			mu.Lock()
+			registered = make(chan struct{}, 1)
+			signal := registered
+			mu.Unlock()
+			defer func() {
+				mu.Lock()
+				registered = nil
+				mu.Unlock()
+			}()
+			ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+			defer cancel()
+			done := make(chan error, 1)
+			go func() {
+				done <- factory.Test(ctx, config(browserPrefix+"test('cancel',async({page})=>{await new Promise(()=>{})});"))
+			}()
+			select {
+			case <-signal:
+				assert.Empty(t, registry.Snapshot(time.Now()), "started draft must not become a monitor")
+				cancel()
+			case err := <-done:
+				t.Fatalf("draft returned before browser registration: %v", err)
+			case <-time.After(20 * time.Second):
+				cancel()
+				t.Error("draft browser registration did not arrive")
+			}
+			select {
+			case err := <-done:
+				require.Error(t, err)
+				assert.NotContains(t, err.Error(), secret)
+			case <-time.After(30 * time.Second):
+				safe = false
+				t.Fatal("cancelled draft did not finish cleanup")
+			}
+			verifyGone(t)
+			assertIsolated(t)
+		})
+	})
 	t.Run("browser-success-and-detached-leaf", func(t *testing.T) {
 		script := browserPrefix + "import {spawn} from 'node:child_process';test('checkout',async({page})=>{const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{detached:true,stdio:'ignore'});child.unref();const response=await fetch(" + string(
 			pidURLJSON,
@@ -220,10 +391,52 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			assert.Equal(t, synthetic.Inconclusive, got.Run.Outcome)
 		}
 	})
+	t.Run("single-entry-helpers-fixtures-and-worker-policy", func(t *testing.T) {
+		input := filepath.Join(base, "script-source")
+		require.NoError(t, os.MkdirAll(input, 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(input, "helper.ts"), []byte(`export const label='fixture ready';`), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(input, "fixtures.ts"), []byte(`import {test as base} from '@playwright/test';
+export const test=base.extend({message:async({},use)=>{await use('fixture ready')}});
+export {expect} from '@playwright/test';`), 0600))
+		entry := filepath.Join(input, "chosen.spec.ts")
+		require.NoError(t, os.WriteFile(entry, []byte(`import {test,expect} from './fixtures';
+import {label} from './helper';
+test('selected entry',async({message},info)=>{
+ expect(message).toBe(label);
+ expect(info.config.workers).toBe(1);
+ expect(info.config.fullyParallel).toBe(false);
+ expect(info.project.retries).toBe(0);
+ expect(info.retry).toBe(0);
+ expect(process.env.DEM_RUNTIME_INHERITED).toBeUndefined();
+ expect(process.env.DEM_SECRET_TEST).toBe('private-fixture-value');
+ console.log('private-fixture-value');
+});`), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(input, "unselected.spec.ts"), []byte(`throw new Error('unselected entry must never load');`), 0600))
+		t.Setenv("DEM_RUNTIME_INHERITED", "must-not-reach-worker")
+		got := engine.Execute(context.Background(), synthetic.Request{Kind: synthetic.Journey, Name: "file-contract", ScriptPath: entry, Timeout: 30 * time.Second, Secrets: map[string]string{"DEM_SECRET_TEST": "private-fixture-value"}}, nil)
+		if !got.Drained {
+			safe = false
+			t.Fatal("file-contract tree not drained")
+		}
+		require.Equal(t, synthetic.Success, got.Run.Outcome, got.Run.Error)
+		require.Equal(t, &synthetic.TestCounts{Declared: 1, Passed: 1}, got.Run.Tests)
+		require.Equal(t, "disabled", got.Run.CaptureState)
+		require.Empty(t, got.Run.Artifacts)
+		encoded, err := json.Marshal(got.Run)
+		require.NoError(t, err)
+		require.NotContains(t, string(encoded), "private-fixture-value")
+		verifyIdentity(t, got.Run)
+	})
+	t.Run("capture-disabled-browser-failure", func(t *testing.T) {
+		got := run(t, context.Background(), "no-capture", browserPrefix+"test('fails',async({page})=>{await page.goto("+string(urlJSON)+");expect(1).toBe(2)});", 30*time.Second, false)
+		require.Equal(t, synthetic.Failed, got.Run.Outcome)
+		require.Equal(t, "disabled", got.Run.CaptureState)
+		require.Empty(t, got.Run.Artifacts)
+		verifyGone(t)
+	})
 	t.Run("setup-inability", func(t *testing.T) {
-		missing := paths
-		missing.Browser = filepath.Join(base, "missing-browser")
-		unavailable := runner.New(assets, fixtureRuntime{Paths: missing}, synthetichistory.NewStore(history), captures)
+		unavailable, err := runner.New(nil, synthetichistory.NewStore(history), captures, 1)
+		require.NoError(t, err)
 		require.Error(t, unavailable.Check(context.Background(), synthetic.Journey))
 		got := unavailable.Execute(
 			context.Background(),
@@ -284,6 +497,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			t.Fatal("cancelled tree not drained")
 		}
 		assert.Equal(t, synthetic.Cancelled, got.Run.Outcome)
+		verifyIdentity(t, got.Run)
 		verifyGone(t)
 		mu.Lock()
 		registered = nil
@@ -316,6 +530,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			t.Fatal("Lighthouse tree not drained")
 		}
 		require.Equal(t, synthetic.Success, got.Run.Outcome, got.Run.Error)
+		verifyIdentity(t, got.Run)
 		require.NotNil(t, got.Run.Metrics)
 		require.NotNil(t, got.Run.Metrics.Performance)
 		assert.GreaterOrEqual(t, *got.Run.Metrics.Performance, 0.0)
@@ -326,6 +541,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		_, raw, err := captures.Fetch(context.Background(), got.Run.JobID, got.Run.ID, got.Run.Artifacts[0].ID)
 		require.NoError(t, err)
 		assert.Contains(t, string(raw), "<!doctype html>")
+		assert.Regexp(t, `"formFactor"\s*:\s*"desktop"`, string(raw))
 	})
 }
 
@@ -362,12 +578,42 @@ func readProcIdentity(pid int) (procIdentity, error) {
 	}, nil
 }
 
-type fixtureRuntime struct{ Paths runner.Paths }
+// This adapter exposes only the public execution contract of the acquired
+// consumer. It cannot select a different generation or inject private paths.
+type selectedRuntime struct{ consumer *runtime.Consumer }
 
-func (r fixtureRuntime) BeginUse() (runner.Use, error) { return fixtureUse{r.Paths}, nil }
+func (s selectedRuntime) BeginUse() (runner.Use, error) {
+	use, err := s.consumer.BeginUse()
+	if err != nil {
+		return nil, err
+	}
+	m := s.consumer.Manifest()
+	return selectedUse{use: use, identity: synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}}, nil
+}
 
-type fixtureUse struct{ paths runner.Paths }
+type selectedUse struct {
+	use      *runtime.Use
+	identity synthetic.RuntimeIdentity
+}
 
-func (u fixtureUse) Paths() runner.Paths                { return u.paths }
-func (u fixtureUse) Completion() *ndexec.TreeCompletion { return nil }
-func (u fixtureUse) Finish(bool) error                  { return nil }
+func (u selectedUse) Paths() runner.Paths {
+	return runner.Paths{Node: u.use.Paths.Node, EntryPoint: u.use.Paths.EntryPoint, Identity: u.identity}
+}
+func (u selectedUse) Completion() *ndexec.TreeCompletion { return u.use.Completion }
+func (u selectedUse) Finish(drained bool) error          { return u.use.Finish(drained) }
+
+type identityHistory struct {
+	*synthetichistory.Store
+	records map[string][]synthetic.Run
+}
+
+func (h *identityHistory) AppendRun(ctx context.Context, phase string, run synthetic.Run) (bool, error) {
+	attempted, err := h.Store.AppendRun(ctx, phase, run)
+	if err == nil {
+		if h.records == nil {
+			h.records = make(map[string][]synthetic.Run)
+		}
+		h.records[run.ID] = append(h.records[run.ID], synthetic.CloneRun(run))
+	}
+	return attempted, err
+}

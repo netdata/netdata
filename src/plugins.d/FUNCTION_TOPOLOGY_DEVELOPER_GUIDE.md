@@ -797,6 +797,15 @@ sockets on the same process port. `default_type` must reference
 evidence references, arrays, or JSON cells. For evidence sources, `evidence`
 names an evidence type id.
 
+`name_column` is the bullet key: the UI merges rows with the same value into
+one bullet and resolves link endpoint port names against it, so it must carry
+the same port identity the links use, and consumers always display it.
+Optional `label_column` names a scalar display column with an operator-facing
+label, such as an SNMP interface alias. Consumers show it together with the
+name (for example `Gi0/1/0 · Uplink to core`) and show the name alone when the
+label is null or empty. Never put such a label in `name_column`: ports sharing
+it would merge and links would stop resolving to their port.
+
 `hover.fields` is intentionally lightweight graph hover metadata. Full modal
 and table composition lives in `types.actor_types.<id>.presentation.modal`,
 `types.link_types.<id>.presentation.modal`, and optional
@@ -1761,10 +1770,15 @@ Managed SNMP device actor modals are port-centric:
   device name, management IP, vendor, model, port counts, and LLDP/CDP counts
   in the modal identification area;
 - use `actor_ports` as the primary `Ports` section;
+- port bullets key on `actor_ports.name` (the port identity link endpoints
+  use) and set `label_column: if_alias`, so bullets show the interface alias
+  next to the port name when the device reports one;
 - expose real port identity columns, including SNMP `if_index` as the visible
-  numeric port ID when known, source `port_id`, display `name`, `if_name`,
-  `if_descr`, `if_alias`, MAC, speed, status, mode, role, VLAN, FDB, link, and
-  neighbor counts;
+  numeric port ID when known, display `name` with a visible `if_alias` (Alias)
+  column next to it, source `port_id`, `if_name`, `if_descr`, MAC, speed,
+  status, mode, role, VLAN, FDB, link, and neighbor counts; the expanded row
+  repeats `if_alias` as `ifAlias` next to `ifName` and `ifDescr`, so the full
+  value is visible when the grid cell is truncated;
 - never invent numeric port IDs. Do not use row order or any generated sequence;
   `if_index` must come from the device/SNMP facts and must align with
   `actor_port_links.if_index`, so local port identity never contradicts the
@@ -1839,6 +1853,12 @@ actor:
   endpoint IPs stay evidence and display fields because vendor profiles expose
   them asymmetrically, and parallel sessions of one pair in one routing
   instance remain `actor_bgp_peers` detail rows under one graph relationship.
+  The optional device-local `process_id` is retained in those detail rows and does
+  not change graph identity. Process-scoped source rows with explicit process,
+  routing instance and neighbor may omit an unproved remote AS; a row without
+  established state contributes inventory only. Preserve nonblank process and routing-instance
+  identifiers byte-for-byte in inventory and relationship evidence. Absence/default handling
+  must not trim an otherwise nonblank identifier; IP/ASN normalization is a separate rule.
 
 Every logical-L3 and control-plane type (`l3_subnet`, `l3_subnet_membership`,
 `ospf_adjacency`, `bgp_adjacency`) is excluded from `actor_port_links`, which
@@ -1937,6 +1957,85 @@ The acceptance check is:
 3. compare against sanitized fixtures or expected compatibility behavior.
 
 Do not add fields to production payloads solely to make this projection easier.
+
+## Cato Networks Shape
+
+`topology:cato_networks` emits sites, devices, PoPs and BGP peers. A site has an
+explicit `ownership` link to each device, including disconnected devices.
+`parent_identity` metadata complements these edges; it does not replace them.
+Ownership links are structural and carry no traffic measurements.
+
+Each interface with a reported PoP contributes an observed link from its device,
+or from its site when the device cannot be resolved. `cato_tunnel` means connected,
+`cato_tunnel_disconnected` means disconnected, and `cato_tunnel_unknown` means
+unknown. Their legend and line styles distinguish these states. Physical `link_up`
+does not establish tunnel connectivity. Parallel interfaces retain their own
+`interface_id` and `interface_name`, both declared `role: group_key` so CTS keeps
+ID-bearing and name-only interfaces distinct.
+
+A device's last reported PoP, falling back to the site's PoP, supplies a
+`cato_pop_association` only when that device has no interface PoP observations.
+A device-free site uses its summary PoP only when it has no interface PoP
+observations. These are associations, not observed tunnels: state is unknown,
+interface identifiers are null, and `observation` explains the source. Device
+connectivity is not evidence that a particular fallback tunnel is connected.
+No PoP-to-PoP fabric or end-to-end reachability is inferred.
+
+The actor-owned `interfaces` table retains actual ownership in `actor`, and
+references its site, observed PoP and tunnel with `site_actor`, nullable
+`pop_actor` and nullable `link`. Site modals filter by `site_actor` to show WANs
+across all devices; device modals filter by `actor`. PoP modals show attached
+WANs and connections with clickable site context. Site device summaries reuse
+ownership links and device labels, including HA role. Miniature graphs retain
+the schema's one-hop depth; the site-wide table provides the full WAN overview.
+
+Interface details distinguish physical and tunnel states, configured capacity
+and observed performance. Configured limits use Cato's supported
+`upstreamBandwidthMbpsPrecision` / `downstreamBandwidthMbpsPrecision` fields
+as nullable floating-point Mbps; absent capacity is not zero. RTT, directional
+loss and jitter, and last-mile measurements honor their presence flags and
+show units. Less frequently used details appear in expandable rows. Site
+aggregate measurements are not copied onto interface tunnels. The existing
+`connected` availability column is retained for compatibility: it is true when
+either the tunnel or physical link is up. Explicit
+`tunnel_connected`, `link_up`, and human-readable state columns carry their
+separate meanings. Human-readable state columns use title case; machine link
+state tokens remain lowercase. Consumers should use references and explicit
+state fields, not compare display strings. BGP details show local IP/ASN, incoming/outgoing states and
+route counts alongside the peer identity.
+
+All actor types expose known metadata through `actor_labels`, modal
+identification and a one-hop miniature. Device captions preserve configured names
+unless they merely repeat a device identity. Missing or identity-only names use
+the site, HA role (or `device`) and labeled full serial/ID. Other numeric
+configured names remain valid. The source name is retained as `source_name`;
+full identifiers remain separate labels. This policy applies only to topology,
+not metric `device_name` labels. Repeated device identities select the first
+record in stable display-name/ID order consistently for actors, labels and
+fallback links. Label values are trimmed before publication. Canonical actor columns remain the
+identity and search source. Shared PoPs have account/name labels without
+invented geography. Empty labels are omitted; known false/zero values survive.
+Site identification includes inventory, metrics and BGP observation status. Missing
+selected sites in a snapshot are explicitly unavailable, and failed discovery
+refreshes are identified as cached inventory. Site-wide aggregate metric rows
+are excluded from WAN details; they are not interfaces. A successful
+empty BGP response, cached empty response, partial normalization and failed
+collection are distinct. Missing peers after a failed observation must not be
+read as configuration removal.
+
+`data.notifications` explains access-topology scope and incomplete inventory/metrics/BGP
+coverage without raw errors or tenant identifiers. CTS must accept and preserve
+notifications, and the frontend must display them; site coverage also remains
+available in actor identification. The companion frontend notice control and
+faithful dotted/dashed legend samples are required for the complete operator
+experience. Collection time is not a claim that every source query succeeded.
+
+Producer and consumer validation MUST exercise a site with multiple devices
+and WANs, disconnected and unknown tunnels, fallback associations, PoP site
+context, BGP failure/recovery/empty observations, fractional and absent capacity,
+and zero/absent measurements. Validate actual modal projections and collection
+notices through the consumers, not only schema conformance. The operator must
+be able to identify the affected WAN and understand the limits of the evidence.
 
 ## Producer Checklist
 

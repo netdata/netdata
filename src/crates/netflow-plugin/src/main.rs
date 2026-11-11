@@ -22,6 +22,7 @@ mod query;
 #[cfg(test)]
 mod rollup;
 mod routing;
+mod startup_keepalive;
 #[cfg(test)]
 mod startup_memory_tests;
 mod test_cli;
@@ -121,6 +122,32 @@ fn main() {
 }
 
 async fn async_main() -> i32 {
+    let shutdown = CancellationToken::new();
+    let mut keepalive = if std::io::stdout().is_terminal() {
+        None
+    } else {
+        match startup_keepalive::StartupKeepalive::start(shutdown.clone()) {
+            Ok(keepalive) => Some(keepalive),
+            Err(err) => {
+                tracing::error!("failed to start initialization keepalive worker: {err}");
+                return 1;
+            }
+        }
+    };
+    let exit_code = async_main_with_keepalive(&mut keepalive, shutdown).await;
+    if let Some(keepalive) = &mut keepalive
+        && let Err(err) = keepalive.stop()
+    {
+        tracing::error!("startup keepalive failed while initializing NetFlow: {err}");
+        return 1;
+    }
+    exit_code
+}
+
+async fn async_main_with_keepalive(
+    keepalive: &mut Option<startup_keepalive::StartupKeepalive>,
+    shutdown: CancellationToken,
+) -> i32 {
     let config = match plugin_config::PluginConfig::new() {
         Ok(cfg) => cfg,
         Err(err) => {
@@ -128,6 +155,10 @@ async fn async_main() -> i32 {
             return 1;
         }
     };
+
+    if shutdown.is_cancelled() {
+        return 1;
+    }
 
     if !config.enabled {
         tracing::info!("netflow plugin disabled by config (enabled=false)");
@@ -139,11 +170,13 @@ async fn async_main() -> i32 {
         return 0;
     }
 
-    let shutdown = CancellationToken::new();
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
     let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
     let facet_runtime = Arc::new(facet_runtime::FacetRuntime::new(&config.journal.base_dir()));
+    if shutdown.is_cancelled() {
+        return 1;
+    }
     let (query_service, notify_rx) =
         match query::FlowQueryService::new_with_facet_runtime(&config, Arc::clone(&facet_runtime))
             .await
@@ -154,6 +187,9 @@ async fn async_main() -> i32 {
                 return 1;
             }
         };
+    if shutdown.is_cancelled() {
+        return 1;
+    }
     let query_service = Arc::new(query_service);
     let ingest_service = match ingest::IngestService::new_with_facet_runtime(
         config.clone(),
@@ -168,8 +204,21 @@ async fn async_main() -> i32 {
             return 1;
         }
     };
-    if let Err(err) = query_service.initialize_facets_before_ingest().await {
-        tracing::error!("failed to initialize facet runtime: {err:#}");
+    if shutdown.is_cancelled() {
+        return 1;
+    }
+    match query_service
+        .initialize_facets_before_ingest_cancellable(shutdown.clone())
+        .await
+    {
+        Ok(true) => {}
+        Ok(false) => return 1,
+        Err(err) => {
+            tracing::error!("failed to initialize facet runtime: {err:#}");
+            return 1;
+        }
+    }
+    if shutdown.is_cancelled() {
         return 1;
     }
     let routing_runtime = ingest_service.routing_runtime();
@@ -361,10 +410,9 @@ async fn async_main() -> i32 {
     // failure that follows publication collects something on every run, so
     // the restarts never stop. So nothing is published until the ingest
     // service has finished its fallible startup (tier rebuild, every listener
-    // bound). Keepalives cover the wait, which the Agent otherwise times out
-    // after two minutes of silence.
-    let keepalive_writer = runtime.writer();
-    let ingest_started = tokio::select! {
+    // bound). The startup worker covers this wait and all earlier blocking
+    // initialization; stop and join it before handing publication to runtime.
+    let mut ingest_started = tokio::select! {
         biased;
         _ = publish_listener_ready.cancelled() => true,
         result = &mut ingest_task => {
@@ -372,25 +420,30 @@ async fn async_main() -> i32 {
             exit_code = ingest_task_exit_code(result, false);
             false
         }
-        err = async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(60));
-            loop {
-                interval.tick().await;
-                if let Err(err) = keepalive_writer.lock().await.write_raw(b"PLUGIN_KEEPALIVE\n").await {
-                    break err;
-                }
+        err = async {
+            match keepalive.as_mut() {
+                Some(keepalive) => keepalive.failure().await,
+                None => std::future::pending().await,
             }
-        }, if !std::io::stdout().is_terminal() => {
+        } => {
             tracing::error!(
-                "failed to send PLUGIN_KEEPALIVE to the Agent while waiting for the UDP listeners \
-                 (expected the write to stdout to succeed): {err}"
+                "startup keepalive worker failed during NetFlow initialization: {err}"
             );
             exit_code = 1;
             false
         }
     };
 
-    // Only a failed keepalive leaves the ingest task neither started nor
+    if ingest_started
+        && let Some(keepalive) = keepalive.as_mut()
+        && let Err(err) = keepalive.stop()
+    {
+        tracing::error!("startup keepalive failed before publishing NetFlow: {err}");
+        exit_code = 1;
+        ingest_started = false;
+    }
+
+    // A failed keepalive leaves the ingest task neither published nor
     // finished. Its tier rebuild does not observe `shutdown`, so abort it
     // rather than let an Agent that is already gone wait for the rebuild to
     // finish.

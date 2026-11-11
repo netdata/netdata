@@ -41,17 +41,23 @@ The captured selection/projection description is assembled by `ProjectedView.Con
 
 ## Metric Emission
 
-The normal SNMP collector skips a table metric when its resolved tag map is empty. To keep rows distinct, provide
-non-empty identifying tag values; the SNMP row index is not automatically part of the emitted series identity.
+The normal SNMP collector skips a table metric when its resolved tag map is empty. Every required identity
+component must be an explicit public tag; the SNMP row index is not automatically part of emitted series identity.
 
-The collector's `tableMetricKey` combines the metric name with non-empty public tag values, ordered by tag key.
-[Underscore-prefixed tags](/src/go/plugin/go.d/collector/snmp/profile-format.md#underscore-prefixed-tags) do not distinguish chart IDs. Rows that reach
-`collectProfileTableMetrics` with the same key accumulate their ordinary numeric values into one sample; multi-value
-mapped dimensions use assignment instead. A captured row can therefore be present without having a distinct chart
-series, and a final sample can combine several rows.
+`tableMetricKey` in `metric_ids.go` frames the complete metric name and sorted public tag names and values,
+including explicit empty values. A bounded readable prefix and full SHA-256 digest produce the final chart-safe ID.
+Dimension subkeys are framed separately for job-scoped sample-map lookup. They do not replace the chart-scoped
+Netdata dimension ID: V1 emits `Dim.Name` when set and falls back to `Dim.ID` only when the name is empty. [Underscore-prefixed tags](/src/go/plugin/go.d/collector/snmp/profile-format.md#underscore-prefixed-tags)
+are display metadata and do not partition identity. Acquisition preserves semantic tags and typed identity bytes;
+only temporary `rm:` tags are removed. The framework sanitizes chart-label values when serializing the wire protocol,
+after machine identity has been established.
 
-`collect_snmp.go` owns these emission decisions; `normal_diagnostics.go` records their relationship to captured samples.
-Profile authoring details remain in the [table metric guide](/src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows).
+Rows reaching `collectProfileTableMetrics` with the same exact tuple accumulate ordinary numeric values into one
+sample; multi-value dimensions use assignment. Distinct semantic tuples remain distinct even when presentation
+sanitation makes their display labels look the same. Historical table IDs are not backfilled after migration.
+
+`collect_snmp.go` owns emission and `normal_diagnostics.go` records the relation to captured samples. Profile authoring
+belongs to the [table metric guide](/src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows).
 
 ## BGP Collection And Retained Rows
 

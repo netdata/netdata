@@ -33,7 +33,8 @@ void analytics_set_data_str(char **name, const char *value);
         if ((res)) {                                                                                                   \
             int _rc = sqlite3_finalize((res));                                                                         \
             if (_rc != SQLITE_OK) {                                                                                    \
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to finalize statement rc=%d in %s", _rc, __FUNCTION__);          \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "SQLite statement finalize in %s returned rc=%d (%s)",                 \
+                       __FUNCTION__, _rc, sqlite3_errstr(_rc));                                                        \
             }                                                                                                          \
         }                                                                                                              \
     } while (0)
@@ -43,7 +44,8 @@ void analytics_set_data_str(char **name, const char *value);
         if ((res)) {                                                                                                   \
             int _rc = sqlite3_reset((res));                                                                            \
             if (_rc != SQLITE_OK) {                                                                                    \
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to reset statement rc=%d in %s", _rc, __FUNCTION__);             \
+                nd_log(NDLS_DAEMON, NDLP_ERR, "SQLite statement reset in %s returned rc=%d (%s)",                    \
+                       __FUNCTION__, _rc, sqlite3_errstr(_rc));                                                        \
             }                                                                                                          \
         }                                                                                                              \
     } while (0)
@@ -118,10 +120,33 @@ void finalize_all_prepared_sql_statements();
 // sqlite_functions.c.
 void sqlite_mark_teardown_unsafe(const char *reason);
 bool sqlite_teardown_is_unsafe(void);
+const char *sqlite_teardown_unsafe_reason(void);
 
 int execute_insert(sqlite3_stmt *res);
 int db_execute(sqlite3 *database, const char *cmd, int *sqlite_rc);
-char *get_database_extented_error(sqlite3 *database, int i, const char *description);
+
+// Why a database initialization step failed, captured where it failed, before anything else touches the connection.
+// Startup reports it in the fatal message and the status file. It holds no SQL text and no paths.
+typedef enum {
+    SQLITE_INIT_RECOVERY_NONE = 0,      // not a corruption error
+    SQLITE_INIT_RECOVERY_REQUESTED,     // the .recover (CORRUPT) or .delete (NOTADB) marker was created
+    SQLITE_INIT_RECOVERY_NOT_MARKED,    // corruption error, but no marker was created
+} SQLITE_INIT_RECOVERY;
+
+typedef struct sqlite_init_failure {
+    const char *stage;                  // static string, e.g. "meta_open", "meta_config"; NULL = nothing recorded
+    char statement[48];                 // the PRAGMA name, or the statement index in the batch
+    int rc;                             // the code the failing call returned
+    int extended_rc;                    // sqlite3_extended_errcode() of the connection
+    int os_errno;                       // sqlite3_system_errno() of the connection, 0 = none; a GetLastError() code on Windows
+    SQLITE_INIT_RECOVERY recovery;
+} SQLITE_INIT_FAILURE;
+
+// The last failure recorded by this thread (init_database_batch() records every failing statement).
+void sqlite_init_failure_clear(void);
+void sqlite_init_failure_record(sqlite3 *database, const char *stage, const char *statement, int rc);
+void sqlite_init_failure_get(SQLITE_INIT_FAILURE *dst);
+void sqlite_init_failure_format(const SQLITE_INIT_FAILURE *f, char *dst, size_t dst_size);
 
 void sql_drop_table(const char *table);
 void sqlite_now_usec(sqlite3_context *context, int argc, sqlite3_value **argv);

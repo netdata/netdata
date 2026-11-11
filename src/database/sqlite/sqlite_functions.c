@@ -117,10 +117,23 @@ static bool sqlite_zombie_connection_created = false;
 static usec_t sqlite_zombie_noted_ut = 0;
 static const char *sqlite_zombie_noted_db = NULL;
 
+// The first reason, kept for the status file (agent-events). Callers pass string literals.
+static const char *sqlite_teardown_unsafe_first_reason = NULL;
+
+static void sqlite_teardown_unsafe_note_reason(const char *reason)
+{
+    const char *expected = NULL;
+    __atomic_compare_exchange_n(&sqlite_teardown_unsafe_first_reason, &expected,
+                                reason ? reason : "a SQLite user may still be running",
+                                false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+}
+
 // Every distinct reason is logged, not just the first: when several conditions fire, the list
 // is what tells a triage pass which one actually drove the decision.
 void sqlite_mark_teardown_unsafe(const char *reason)
 {
+    sqlite_teardown_unsafe_note_reason(reason);
+
     bool was_set = __atomic_exchange_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
 
     nd_log_daemon(
@@ -134,6 +147,11 @@ void sqlite_mark_teardown_unsafe(const char *reason)
 bool sqlite_teardown_is_unsafe(void)
 {
     return __atomic_load_n(&sqlite_teardown_unsafe, __ATOMIC_ACQUIRE);
+}
+
+const char *sqlite_teardown_unsafe_reason(void)
+{
+    return __atomic_load_n(&sqlite_teardown_unsafe_first_reason, __ATOMIC_ACQUIRE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -213,10 +231,13 @@ static bool sqlite_lease_acquire_library(void)
     bool refused_live = sqlite_library_initialized && sqlite_library_gate;
     if (ok)
         sqlite_leases++;
-    else if (refused_live)
+    else if (refused_live) {
         // Latch under the mutex: sqlite_library_shutdown() re-checks the latch under it after its drain,
         // so it cannot miss a handle we are about to leave open.
+        sqlite_teardown_unsafe_note_reason(
+            "a thread-local SQLite handle could not be closed while the library was shutting down");
         __atomic_store_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
+    }
     netdata_mutex_unlock(&sqlite_lifetime_mutex);
 
     if (refused_live)
@@ -261,34 +282,6 @@ SQLITE_API int sqlite3_exec_monitored(
     return rc;
 }
 
-SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
-    internal_fatal(!nd_thread_runs_sql(), "THIS THREAD CANNOT RUN SQL");
-
-    int rc;
-    int cnt = 0;
-
-    while (cnt++ < SQL_MAX_RETRY) {
-        rc = sqlite3_step(stmt);
-        switch (rc) {
-            case SQLITE_DONE:
-                pulse_sqlite3_query_completed(1, 0, 0);
-                break;
-            case SQLITE_ROW:
-                pulse_sqlite3_row_completed();
-                break;
-            case SQLITE_BUSY:
-            case SQLITE_LOCKED:
-                pulse_sqlite3_query_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
-                sleep_usec(SQLITE_INSERT_DELAY * USEC_PER_MS);
-                continue;
-            default:
-                break;
-        }
-        break;
-    }
-    return rc;
-}
-
 static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database, int rc)
 {
 
@@ -310,14 +303,87 @@ static bool mark_database_to_recover(sqlite3_stmt *res, sqlite3 *database, int r
     return false;
 }
 
-int execute_insert(sqlite3_stmt *res) {
+// A corrupt metadata database is only found by whatever statement happens to read the damaged pages, and most of
+// them are SELECTs that never went through execute_insert() or db_execute(). Mark it from any step, as the init batch
+// does: SQLITE_CORRUPT schedules a recovery and SQLITE_NOTADB a reset (the file is renamed to netdata-meta.bad) on the
+// next start. One thread at a time writes the marker, outside the lock; once it is written no one tries again, and a
+// failed write is retried by the next corrupt step but logged only once.
+static void mark_database_to_recover_once(sqlite3_stmt *stmt, int rc)
+{
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
+    static bool marked = false;
+    static bool in_progress = false;
+    static bool failure_logged = false;
+
+    sqlite3 *database = sqlite3_db_handle(stmt);
+    if (database != db_meta)
+        return;
+
+    // an in-memory metadata database has no file to recover
+    const char *filename = sqlite3_db_filename(database, "main");
+    if (!filename || !*filename)
+        return;
+
+    spinlock_lock(&spinlock);
+    bool skip = marked || in_progress;
+    if (!skip)
+        in_progress = true;
+    spinlock_unlock(&spinlock);
+
+    if (skip)
+        return;
+
+    bool ok = mark_database_to_recover(stmt, database, rc);
+
+    spinlock_lock(&spinlock);
+    marked = ok;
+    in_progress = false;
+    bool log_failure = !ok && !failure_logged;
+    if (log_failure)
+        failure_logged = true;
+    spinlock_unlock(&spinlock);
+
+    if (ok)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "SQLite reported %s (rc=%d) on the metadata database; it will be %s on the next start",
+               sqlite3_errstr(rc), rc, rc == SQLITE_CORRUPT ? "recovered" : "reset");
+    else if (log_failure)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "SQLite reported %s (rc=%d) on the metadata database, but it could not be marked for %s",
+               sqlite3_errstr(rc), rc, rc == SQLITE_CORRUPT ? "recovery" : "reset");
+}
+
+SQLITE_API int sqlite3_step_monitored(sqlite3_stmt *stmt) {
+    internal_fatal(!nd_thread_runs_sql(), "THIS THREAD CANNOT RUN SQL");
+
     int rc;
-    rc =  sqlite3_step_monitored(res);
-    if (rc == SQLITE_CORRUPT) {
-        (void)mark_database_to_recover(res, NULL, rc);
-        error_report("SQLite error %d", rc);
+    int cnt = 0;
+
+    while (cnt++ < SQL_MAX_RETRY) {
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_BUSY && rc != SQLITE_LOCKED)
+            break;
+        sleep_usec(SQLITE_INSERT_DELAY * USEC_PER_MS);
     }
+
+    // one count per call, from the final result: a retry that later succeeds is not a failed query,
+    // and errors other than busy/locked are failures too
+    if (rc == SQLITE_ROW)
+        pulse_sqlite3_row_completed();
+    else if (rc == SQLITE_DONE)
+        pulse_sqlite3_query_completed(true, false, false);
+    else {
+        pulse_sqlite3_query_completed(false, rc == SQLITE_BUSY, rc == SQLITE_LOCKED);
+        if (rc == SQLITE_CORRUPT || rc == SQLITE_NOTADB)
+            mark_database_to_recover_once(stmt, rc);
+    }
+
     return rc;
+}
+
+int execute_insert(sqlite3_stmt *res) {
+    // sqlite3_step_monitored() marks a corrupt metadata database for recovery
+    return sqlite3_step_monitored(res);
 }
 
 int configure_sqlite_database(sqlite3 *database, int target_version, const char *description)
@@ -562,18 +628,77 @@ int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **state
     return rc;
 }
 
-char *get_database_extented_error(sqlite3 *database, int i, const char *description)
+static __thread SQLITE_INIT_FAILURE sqlite_init_failure_last;
+
+void sqlite_init_failure_clear(void)
 {
-    const char *err = sqlite3_errstr(sqlite3_extended_errcode(database));
+    memset(&sqlite_init_failure_last, 0, sizeof(sqlite_init_failure_last));
+}
 
-    if (!err)
-        return NULL;
+void sqlite_init_failure_record(sqlite3 *database, const char *stage, const char *statement, int rc)
+{
+    SQLITE_INIT_FAILURE *f = &sqlite_init_failure_last;
+    memset(f, 0, sizeof(*f));
+    f->stage = stage;
+    f->rc = rc;
+    // the connection's codes describe the call that just failed, as long as nothing else used it since
+    f->extended_rc = database ? sqlite3_extended_errcode(database) : rc;
 
-    size_t len = strlen(err)+ strlen(description) + 32;
-    char *full_err = mallocz(len);
+    // the returned code is authoritative; if the connection reports another error, it is not about this call
+    if ((f->extended_rc & 0xff) != (rc & 0xff))
+        f->extended_rc = rc;
 
-    snprintfz(full_err, len - 1, "%s: %d: %s", description, i,  err);
-    return full_err;
+    // SQLite updates the OS error only on CANTOPEN and IOERR; for any other code it belongs to an earlier failure
+    if (database && ((rc & 0xff) == SQLITE_CANTOPEN || (rc & 0xff) == SQLITE_IOERR))
+        f->os_errno = sqlite3_system_errno(database);
+    if (statement)
+        strncpyz(f->statement, statement, sizeof(f->statement) - 1);
+}
+
+void sqlite_init_failure_get(SQLITE_INIT_FAILURE *dst)
+{
+    *dst = sqlite_init_failure_last;
+}
+
+void sqlite_init_failure_format(const SQLITE_INIT_FAILURE *f, char *dst, size_t dst_size)
+{
+    if (!f->stage) {
+        strncpyz(dst, "no SQLite error recorded", dst_size - 1);
+        return;
+    }
+
+    // SQLITE_CORRUPT asks the next start to recover the database, SQLITE_NOTADB to move it aside and start empty
+    bool reset = (f->rc & 0xff) == SQLITE_NOTADB;
+    const char *recovery = "";
+    if (f->recovery == SQLITE_INIT_RECOVERY_REQUESTED)
+        recovery = reset ? "; reset requested for the next start" : "; recovery requested for the next start";
+    else if (f->recovery == SQLITE_INIT_RECOVERY_NOT_MARKED)
+        recovery = reset ? "; reset could not be requested" : "; recovery could not be requested";
+
+#if defined(OS_WINDOWS)
+    // SQLite uses its Win32 VFS here, so the OS error is a GetLastError() code
+    const char *os_error_label = "Windows error";
+#else
+    const char *os_error_label = "OS errno";
+#endif
+
+    snprintfz(dst, dst_size - 1, "%s%s%s failed: SQLite rc %d, extended %d (%s), %s %d%s",
+              f->stage, *f->statement ? " " : "", f->statement,
+              f->rc, f->extended_rc, sqlite3_errstr(f->extended_rc), os_error_label, f->os_errno, recovery);
+}
+
+// A statement id that is safe to report: the PRAGMA name, or the index in the batch.
+static void init_statement_id(char *dst, size_t dst_size, const char *sql, int index)
+{
+    if (strncasecmp(sql, "PRAGMA ", 7) == 0) {
+        const char *s = sql + 7;
+        size_t len = strspn(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.");
+        if (len && len + 8 < dst_size) {
+            snprintfz(dst, dst_size - 1, "PRAGMA %.*s", (int)len, s);
+            return;
+        }
+    }
+    snprintfz(dst, dst_size - 1, "#%d", index);
 }
 
 int init_database_batch(sqlite3 *database, const char *batch[], const char *description)
@@ -583,15 +708,19 @@ int init_database_batch(sqlite3 *database, const char *batch[], const char *desc
     for (int i = 0; batch[i]; i++) {
         rc = sqlite3_exec_monitored(database, batch[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
+            char statement[sizeof(sqlite_init_failure_last.statement)];
+            init_statement_id(statement, sizeof(statement), batch[i], i);
+            sqlite_init_failure_record(database, description, statement, rc);
+
             error_report("SQLite error during database initialization, rc = %d (%s)", rc, err_msg);
             error_report("SQLite failed statement %s", batch[i]);
-            char *error_str = get_database_extented_error(database, i, description);
-            if (error_str)
-                analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
             sqlite3_free(err_msg);
-            freez(error_str);
             if (SQLITE_CORRUPT == rc || SQLITE_NOTADB == rc) {
-                if (mark_database_to_recover(NULL, database, rc))
+                bool marked = mark_database_to_recover(NULL, database, rc);
+                if (database == db_meta)
+                    sqlite_init_failure_last.recovery =
+                        marked ? SQLITE_INIT_RECOVERY_REQUESTED : SQLITE_INIT_RECOVERY_NOT_MARKED;
+                if (marked)
                     error_report("Database is corrupted will attempt to fix");
                 return SQLITE_CORRUPT;
             }
@@ -914,11 +1043,11 @@ int sqlite_library_init(void)
         (void) sqlite3_soft_heap_limit64(SQLITE_HEAP_SOFT_LIMIT);
         int64_t soft_limit_bytes = sqlite3_soft_heap_limit64(-1);
 
-        const char sqlite_hard_limit_mb[32];
-        size_snprintf_bytes((char *)sqlite_hard_limit_mb, sizeof(sqlite_hard_limit_mb), hard_limit_bytes);
+        char sqlite_hard_limit_mb[32];
+        size_snprintf_bytes(sqlite_hard_limit_mb, sizeof(sqlite_hard_limit_mb), hard_limit_bytes);
 
-        const char sqlite_soft_limit_mb[32];
-        size_snprintf_bytes((char *)sqlite_soft_limit_mb, sizeof(sqlite_soft_limit_mb), soft_limit_bytes);
+        char sqlite_soft_limit_mb[32];
+        size_snprintf_bytes(sqlite_soft_limit_mb, sizeof(sqlite_soft_limit_mb), soft_limit_bytes);
 
         nd_log_daemon(
             NDLP_INFO, "SQLITE: heap memory hard limit %s, soft limit %s", sqlite_hard_limit_mb, sqlite_soft_limit_mb);
@@ -931,6 +1060,7 @@ int sqlite_library_init(void)
     // would silently turn every later sqlite_library_shutdown() into a no-op (only the -W
     // unittest drivers re-initialize the library in one process).
     __atomic_store_n(&sqlite_teardown_unsafe, false, __ATOMIC_RELEASE);
+    __atomic_store_n(&sqlite_teardown_unsafe_first_reason, NULL, __ATOMIC_RELEASE);
 
     // The ZOMBIE flag is deliberately NOT cleared. It records that a connection was closed with
     // statements still attached, so its real close is deferred - that is a property of the
@@ -1019,8 +1149,12 @@ void sqlite_library_shutdown(void)
     pools_registered = JudyL_thread_stmt_pool != NULL;
     spinlock_unlock(&JudyL_thread_stmt_lock);
 
-    if (!drained || pools_registered)
+    if (!drained || pools_registered) {
+        sqlite_teardown_unsafe_note_reason(!drained ?
+            "a SQLite operation was still running at library shutdown" :
+            "a thread still had prepared SQLite statements at library shutdown");
         __atomic_store_n(&sqlite_teardown_unsafe, true, __ATOMIC_RELEASE);
+    }
 
     // Re-check under the lock, after the drain, and immediately before sqlite3_shutdown(). A thread-local
     // close refused by the gate latches under this same mutex, so it cannot slip past this check.

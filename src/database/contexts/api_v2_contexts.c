@@ -197,20 +197,31 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
         results->matched_types |= SEARCH_MATCH_CONTEXT_ID;
     }
     
+    // the metadata strings are replaced while we use them: search our own references
+    rrdcontext_lock(rc);
+    STRING *family = string_dup(rc->family);
+    STRING *title = string_dup(rc->title);
+    STRING *units = string_dup(rc->units);
+    rrdcontext_unlock(rc);
+
     // Only search family if the option is enabled
-    if((ctl->options & CONTEXTS_OPTION_FAMILY) && unlikely(full_text_search_string(&ctl->q.fts, q, rc->family))) {
+    if((ctl->options & CONTEXTS_OPTION_FAMILY) && unlikely(full_text_search_string(&ctl->q.fts, q, family))) {
         results->matched_types |= SEARCH_MATCH_CONTEXT_FAMILY;
     }
     
     // Only search title if the option is enabled
-    if((ctl->options & CONTEXTS_OPTION_TITLES) && unlikely(full_text_search_string(&ctl->q.fts, q, rc->title))) {
+    if((ctl->options & CONTEXTS_OPTION_TITLES) && unlikely(full_text_search_string(&ctl->q.fts, q, title))) {
         results->matched_types |= SEARCH_MATCH_CONTEXT_TITLE;
     }
     
     // Only search units if the option is enabled
-    if((ctl->options & CONTEXTS_OPTION_UNITS) && unlikely(full_text_search_string(&ctl->q.fts, q, rc->units))) {
+    if((ctl->options & CONTEXTS_OPTION_UNITS) && unlikely(full_text_search_string(&ctl->q.fts, q, units))) {
         results->matched_types |= SEARCH_MATCH_CONTEXT_UNITS;
     }
+
+    string_freez(family);
+    string_freez(title);
+    string_freez(units);
 
     
     RRDINSTANCE *ri;
@@ -219,13 +230,16 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
             continue;
 
         // Check instance name match only if instances option is enabled
-        if((ctl->options & CONTEXTS_OPTION_INSTANCES) && 
-           (unlikely(full_text_search_string(&ctl->q.fts, q, ri->id)) ||
-            (ri->name != ri->id && full_text_search_string(&ctl->q.fts, q, ri->name)))) {
-            if(!results->matched_instances)
-                results->matched_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
-            dictionary_set(results->matched_instances, string2str(ri->name), NULL, 0);
-            results->matched_types |= SEARCH_MATCH_INSTANCE;
+        if(ctl->options & CONTEXTS_OPTION_INSTANCES) {
+            STRING *name = rrdinstance_acquired_name_dup((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+            if(unlikely(full_text_search_string(&ctl->q.fts, q, ri->id)) ||
+               (name != ri->id && full_text_search_string(&ctl->q.fts, q, name))) {
+                if(!results->matched_instances)
+                    results->matched_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
+                dictionary_set(results->matched_instances, string2str(name), NULL, 0);
+                results->matched_types |= SEARCH_MATCH_INSTANCE;
+            }
+            string_freez(name);
         }
 
         // Check dimensions only if dimensions option is enabled
@@ -235,13 +249,15 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
                 if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, rrd_flag_is_collected(rm) ? ctl->now : rm->last_time_s, 0))
                     continue;
 
+                STRING *name = rrdmetric_acquired_name_dup((RRDMETRIC_ACQUIRED *)rm_dfe.item);
                 if(unlikely(full_text_search_string(&ctl->q.fts, q, rm->id)) ||
-                   (rm->name != rm->id && full_text_search_string(&ctl->q.fts, q, rm->name))) {
+                   (name != rm->id && full_text_search_string(&ctl->q.fts, q, name))) {
                     if(!results->matched_dimensions)
                         results->matched_dimensions = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
-                    dictionary_set(results->matched_dimensions, string2str(rm->name), NULL, 0);
+                    dictionary_set(results->matched_dimensions, string2str(name), NULL, 0);
                     results->matched_types |= SEARCH_MATCH_DIMENSION;
                 }
+                string_freez(name);
             }
             dfe_done(rm);
         }
@@ -249,9 +265,9 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
         // Check labels only if labels option is enabled
         if(ctl->options & CONTEXTS_OPTION_LABELS) {
             size_t label_searches = 0;
-            RRDLABELS *labels = rrdinstance_labels(ri);
-            if(unlikely(rrdlabels_entries(labels))) {
-                results->matched_labels = rrdlabels_full_text_search(labels, q, results->matched_labels, &label_searches);
+            RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+            if(unlikely(rrdlabels_entries(lref.labels))) {
+                results->matched_labels = rrdlabels_full_text_search(lref.labels, q, results->matched_labels, &label_searches);
                 
                 if(results->matched_labels) {
                     results->matched_types |= SEARCH_MATCH_LABEL;
@@ -260,6 +276,7 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
                 ctl->q.fts.searches += label_searches;
                 ctl->q.fts.char_searches += label_searches;
             }
+            rrdinstance_labels_release(&lref);
         }
 
         // We don't check alerts anymore as they are less relevant for the search
@@ -290,12 +307,19 @@ static ssize_t rrdcontext_to_json_v2_add_context(void *data, RRDCONTEXT_ACQUIRED
     }
 
     if(ctl->contexts.dict) {
+        // the metadata strings are replaced while we use them: take our own references
+        rrdcontext_lock(rc);
+        STRING *title = string_dup(rc->title);
+        STRING *family = string_dup(rc->family);
+        STRING *units = string_dup(rc->units);
+        rrdcontext_unlock(rc);
+
         struct context_v2_entry t = {
             .count = 1,
             .id = rc->id,
-            .title = string_dup(rc->title),
-            .family = string_dup(rc->family),
-            .units = string_dup(rc->units),
+            .title = title,
+            .family = family,
+            .units = units,
             .priority = rc->priority,
             .first_time_s = rc->first_time_s,
             .last_time_s = rc->last_time_s,
@@ -664,7 +688,7 @@ static ssize_t rrdcontext_to_json_v2_add_host(void *data, RRDHOST *host, bool qu
         ssize_t added = query_scope_foreach_context(
                 host, ctl->request->scope_contexts,
                 ctl->contexts.scope_pattern, ctl->contexts.pattern,
-                rrdcontext_to_json_v2_add_context, queryable_host, ctl);
+                rrdcontext_to_json_v2_add_context, queryable_host, ctl, NULL);
 
         if(unlikely(added < 0))
             return -1; // stop the query
@@ -995,7 +1019,9 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
 
         // Add instance name to instances dictionary
         if(t->instances_dict) {
-            dictionary_set(t->instances_dict, string2str(ri->name), NULL, 0);
+            STRING *name = rrdinstance_acquired_name_dup((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+            dictionary_set(t->instances_dict, string2str(name), NULL, 0);
+            string_freez(name);
         }
 
         // Collect dimensions from this instance
@@ -1005,15 +1031,18 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
                 if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, rrd_flag_is_collected(rm) ? ctl->now : rm->last_time_s, (time_t)ri->update_every_s))
                     continue;
 
-                dictionary_set(t->dimensions_dict, string2str(rm->name), NULL, 0);
+                STRING *name = rrdmetric_acquired_name_dup((RRDMETRIC_ACQUIRED *)rm_dfe.item);
+                dictionary_set(t->dimensions_dict, string2str(name), NULL, 0);
+                string_freez(name);
             }
             dfe_done(rm);
         }
 
         // Collect labels from this instance
         if(t->labels_aggregated) {
-            RRDLABELS *labels = rrdinstance_labels(ri);
-            rrdlabels_aggregated_add_from_rrdlabels(t->labels_aggregated, labels);
+            RRDINSTANCE_LABELS_REF lref = rrdinstance_acquired_labels_acquire((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+            rrdlabels_aggregated_add_from_rrdlabels(t->labels_aggregated, lref.labels);
+            rrdinstance_labels_release(&lref);
         }
     }
     dfe_done(ri);

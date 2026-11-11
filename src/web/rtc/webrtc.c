@@ -335,12 +335,18 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     }
 
     web_client_timeout_checkpoint_set(w, 0);
-    if(unlikely(!web_client_decode_path_and_query_string(w, path))) {
+    HTTP_VALIDATION decoded = web_client_decode_path_and_query_string(w, path);
+    if(unlikely(decoded == HTTP_VALIDATION_URI_TOO_LONG)) {
         buffer_flush(w->url_as_received);
         buffer_strcat(w->url_as_received, "too long request URI");
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Request URI is too long.\r\n");
         w->response.code = HTTP_RESP_URI_TOO_LONG;
+    }
+    else if(unlikely(decoded != HTTP_VALIDATION_OK)) {
+        buffer_flush(w->response.data);
+        buffer_strcat(w->response.data, "Malformed URL...\r\n");
+        w->response.code = HTTP_RESP_BAD_REQUEST;
     }
     else {
         path = (char *)buffer_tostring(w->url_path_decoded);

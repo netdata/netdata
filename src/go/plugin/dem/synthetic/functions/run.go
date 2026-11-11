@@ -67,10 +67,13 @@ func runDetail(run model.Run) map[string]any {
 	detail := map[string]any{
 		"id":             run.ID,
 		"job_id":         run.JobID,
+		"vnode_guid":     run.VnodeGUID,
 		"kind":           run.Kind,
 		"name":           run.Name,
 		"target":         run.Target,
 		"started_us":     timestamp(run.StartedUS),
+		"scheduled_us":   timestamp(run.ScheduledUS),
+		"queued_us":      timestamp(run.QueuedUS),
 		"completed_us":   timestamp(run.CompletedUS),
 		"duration_ms":    number(run.DurationMS),
 		"outcome":        run.Outcome,
@@ -81,6 +84,7 @@ func runDetail(run model.Run) map[string]any {
 		"history_error":  run.HistoryError,
 		"dropped_events": run.DroppedEvents,
 		"metrics":        nil,
+		"runtime":        run.Runtime,
 	}
 	if m := run.Metrics; m != nil {
 		detail["metrics"] = map[string]any{

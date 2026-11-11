@@ -336,7 +336,8 @@ void nd_thread_join_threads()
         while(nti) {
             // Manual-join wrappers are owned by their creator. Do not claim JOINED before
             // checking this flag: a direct owner join would otherwise see a false success.
-            if (nd_thread_status_check(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN)) {
+            // The flag is set at creation and never changes, so this check is final.
+            if (nd_thread_status_check(nti, NETDATA_THREAD_OPTION_MANUAL_JOIN)) {
                 nti = nti->next;
                 continue;
             }
@@ -351,13 +352,6 @@ void nd_thread_join_threads()
             nti->list = ND_THREAD_LIST_NONE;
         }
         spinlock_unlock(&threads_globals.exited.spinlock);
-
-        if(nti && nd_thread_status_check(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN)) {
-            // The creator owns this wrapper and must join it directly. Keep it out of the generic
-            // drain until that owner releases it.
-            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(retained, nti, prev, next);
-            continue;
-        }
 
         // nd_thread_join_internal() handles NULL and will skip list removal since we already did it
         bool wrapper_released = true;
@@ -482,17 +476,19 @@ bool nd_thread_is_me(ND_THREAD *nti) {
 #define MAX_THREAD_CREATE_RETRIES (10)
 #define MAX_THREAD_CREATE_WAIT_MS (1000)
 
-static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries)
+// only EAGAIN (out of threads, may be transient) is retried, sleeping between the attempts
+static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int max_attempts, int *retries)
 {
     int err;
 
-    do {
+    while (true) {
         err = uv_thread_create(thread, thread_func, arg);
-        if (err == 0)
+        if (err != UV_EAGAIN || *retries + 1 >= max_attempts)
             break;
 
+        (*retries)++;
         sleep_usec(MAX_THREAD_CREATE_WAIT_MS * USEC_PER_MS);
-    } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
+    }
 
     return err;
 }
@@ -507,7 +503,8 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
     strncpyz(nti->tag, tag, ND_THREAD_TAG_MAX);
 
     int retries = 0;
-    int ret = create_uv_thread(&nti->thread, nd_thread_starting_point, nti, &retries);
+    int max_attempts = (options & NETDATA_THREAD_OPTION_NO_RETRY) ? 1 : MAX_THREAD_CREATE_RETRIES;
+    int ret = create_uv_thread(&nti->thread, nd_thread_starting_point, nti, max_attempts, &retries);
     if(ret != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "failed to create new thread for %s. uv_thread_create() failed with code %d",
@@ -643,7 +640,88 @@ int nd_thread_join(ND_THREAD *nti) {
     return ret;
 }
 
-void nd_thread_set_manual_join(ND_THREAD *nti) {
-    if (nti)
-        nd_thread_status_set(nti, NETDATA_THREAD_STATUS_MANUAL_JOIN);
+// ----------------------------------------------------------------------------
+// unittest
+
+static void threads_unittest_worker(void *arg __maybe_unused) {
+    ;
+}
+
+// takes the wrapper's address as an integer, so it can be asked about a wrapper that has been freed
+static bool threads_unittest_is_exited(uintptr_t nti) {
+    bool found = false;
+
+    spinlock_lock(&threads_globals.exited.spinlock);
+    for(ND_THREAD *t = threads_globals.exited.list; t; t = t->next) {
+        if((uintptr_t)t == nti) {
+            found = true;
+            break;
+        }
+    }
+    spinlock_unlock(&threads_globals.exited.spinlock);
+
+    return found;
+}
+
+static bool threads_unittest_wait_finished(ND_THREAD *nti) {
+    // FINISHED is set after the wrapper is appended to the exited list
+    for(size_t i = 0; i < 10000; i++) {
+        if(nd_thread_status_check(nti, NETDATA_THREAD_STATUS_FINISHED))
+            return true;
+        sleep_usec(1 * USEC_PER_MS);
+    }
+    return false;
+}
+
+int threads_unittest(void) {
+    int errors = 0;
+
+    fprintf(stderr, "\nTesting that nd_thread_join_threads() leaves manual-join threads to their owner...\n");
+
+    ND_THREAD *manual = nd_thread_create("UT_MANUAL", NETDATA_THREAD_OPTION_DONT_LOG | NETDATA_THREAD_OPTION_MANUAL_JOIN,
+                                         threads_unittest_worker, NULL);
+    ND_THREAD *generic = nd_thread_create("UT_GENERIC", NETDATA_THREAD_OPTION_DONT_LOG,
+                                          threads_unittest_worker, NULL);
+    if(!manual || !generic) {
+        fprintf(stderr, " > FAILED: cannot create the test threads\n");
+        nd_thread_join(manual);
+        nd_thread_join(generic);
+        return 1;
+    }
+
+    if(!threads_unittest_wait_finished(manual) || !threads_unittest_wait_finished(generic)) {
+        // do not join: a thread that did not finish would block the test forever
+        fprintf(stderr, " > FAILED: the test threads did not finish\n");
+        return 1;
+    }
+
+    uintptr_t manual_id = (uintptr_t)manual;
+    uintptr_t generic_id = (uintptr_t)generic;
+
+    nd_thread_join_threads();
+
+    if(!threads_unittest_is_exited(manual_id)) {
+        fprintf(stderr, " > FAILED: the drain took a manual-join thread from its owner\n");
+        // the drain freed it; joining it here would be a use-after-free
+        return 1;
+    }
+
+    if(threads_unittest_is_exited(generic_id)) {
+        fprintf(stderr, " > FAILED: the drain did not join a default thread\n");
+        errors++;
+    }
+
+    int rc = nd_thread_join(manual);
+    if(rc != 0) {
+        fprintf(stderr, " > FAILED: the owner's join returned %d\n", rc);
+        errors++;
+    }
+
+    if(threads_unittest_is_exited(manual_id)) {
+        fprintf(stderr, " > FAILED: the owner's join left the thread on the exited list\n");
+        errors++;
+    }
+
+    fprintf(stderr, "%s\n", errors ? " > FAILED" : " > OK");
+    return errors;
 }

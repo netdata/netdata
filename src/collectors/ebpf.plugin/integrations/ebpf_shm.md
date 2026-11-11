@@ -45,9 +45,6 @@ eBPF SHM can be monitored further using the following other integrations:
 
 The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

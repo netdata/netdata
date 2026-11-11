@@ -68,7 +68,7 @@ func (dcjc *DynCfgJobController) prepareCandidateDecision(ctx context.Context, s
 	reply := internalReply()
 	reply.candidate = delta
 	reply.restart = option.restart
-	return dcjc.prepareMutationAfterApplyAndFallback(ctx, scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup, resume, option.lifecycle, jobConfigIntentPreserve, nil, nil, nil)
+	return dcjc.prepareMutationAfterApplyAndFallback(ctx, scope, current, nil, permit, resourceRemovalDisposition(current), postimage, reply, cleanup, resume, option.lifecycle, nil, nil, nil)
 }
 
 func (dcjc *DynCfgJobController) candidateProjectionCleanup(id string, postimage *dyncfg.GraphConfig, delta *candidateDelta) lifecycle.TaskCleanup {
@@ -139,7 +139,7 @@ func (dcjc *DynCfgJobController) prepareCandidateCommit(delta *candidateDelta, h
 // executor's object identity and the controller token are independent fences.
 func (dcjc *DynCfgJobController) prepareControllerActivation(ctx context.Context, attempt acceptedActivationAttempt, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit) (transaction lifecycle.PreparedResourceTransaction, resultErr error) {
 	defer func() {
-		var admission *configIntentAdmissionError
+		var admission *configAdmissionError
 		if errors.As(resultErr, &admission) && ctx.Err() == nil && !lifecycle.OwnershipRetained(resultErr) {
 			transaction, resultErr = dcjc.prepareControllerAdmissionFailure(ctx, attempt, current, scope, permit, resultErr)
 		}
@@ -158,7 +158,7 @@ func (dcjc *DynCfgJobController) prepareControllerActivation(ctx context.Context
 	}
 	if work.Tentative || state.Binding == nil || state.Binding.Key != work.Token.Candidate {
 		// Every changed binding retains its checked stage across admission.
-		// Resource reservation may yield and invalidate its dependency proof.
+		// Admission validation may yield and invalidate its dependency proof.
 		result, err := attempt.stage.inspect()
 		if err != nil {
 			return dcjc.prepareControllerActivationError(ctx, attempt, current, scope, permit, classifyActivationError(err))
@@ -224,7 +224,7 @@ func (dcjc *DynCfgJobController) prepareControllerAdmissionFailure(ctx context.C
 	activation := classifyActivationError(cause)
 	switch activation.kind {
 	case activationFailureBusy, activationFailureDeadline:
-		identity := jobTestAttemptIdentity(configOperationValidateIntent, attempt.spec.config)
+		identity := jobTestAttemptIdentity(configOperationAdmit, attempt.spec.config)
 		release, ok := dcjc.factory.config.Attempts.ProcessAttemptReleased(identity)
 		if !ok {
 			released := make(chan struct{})
@@ -267,12 +267,9 @@ func (dcjc *DynCfgJobController) prepareControllerProbeFailure(ctx context.Conte
 	if dcjc.configModules.activationWaitsForDependency(config, failure) {
 		return dcjc.prepareControllerWait(ctx, attempt, current, scope, permit, failure, nil)
 	}
-	retry := 0
-	if failure.retry {
-		retry = failure.retryAfter
-	}
+	retry := failure.retryPolicy()
 	listed := config.SourceType() != confgroup.TypeStock || failure.keepsFailedStockListed()
-	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFailed, RetryAfter: retry, Listed: listed}, dcjc.scheduler.retries.now())
+	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFailed, Retry: retry, Listed: listed}, dcjc.scheduler.retries.now())
 	if err != nil {
 		return nil, err
 	}
@@ -390,11 +387,8 @@ func (dcjc *DynCfgJobController) prepareControllerWait(ctx context.Context, atte
 }
 
 func (dcjc *DynCfgJobController) prepareControllerBlocked(ctx context.Context, attempt acceptedActivationAttempt, current lifecycle.ReadyResource, scope lifecycle.ResourceTransactionScope, permit lifecycle.LongLivedPermit, cause error, block candidateBlockPolicy) (lifecycle.PreparedResourceTransaction, error) {
-	retryAfter := 0
-	if failure := transientActivationFailure(attempt.spec.config, cause); failure.retry {
-		retryAfter = failure.retryAfter
-	}
-	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFrameworkBlocked, Block: block, RetryAfter: retryAfter, Listed: true}, dcjc.scheduler.retries.now())
+	retryAfter := transientActivationFailure(attempt.spec.config, cause).retryPolicy()
+	delta, err := dcjc.candidates.prepareOutcome(scope.ID, attempt.spec.work.Token, candidateOutcome{Kind: candidateFrameworkBlocked, Block: block, Retry: retryAfter, Listed: true}, dcjc.scheduler.retries.now())
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +470,7 @@ func (dcjc *DynCfgJobController) prepareControlCandidate(id string, postimage *d
 		}
 		status := dyncfg.Status(postimage.Status)
 		enabled := status != dyncfg.StatusDisabled && reply.command != dyncfg.CommandAdd
-		return dcjc.candidates.prepareAdoptExact(config, enabled, status, true, 0, dcjc.scheduler.retries.now())
+		return dcjc.candidates.prepareAdoptExact(config, enabled, status, true, candidateRetryPolicy{}, dcjc.scheduler.retries.now())
 	default:
 		return nil, nil
 	}

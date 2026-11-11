@@ -83,7 +83,9 @@ func TestCatoPeerAccountIdentityAndIndependentSessionReports(t *testing.T) {
 	}
 	assert.EqualValues(t, 3, sessions[0]["routes"])
 	assert.EqualValues(t, 7, sessions[1]["routes"])
-	assert.Empty(t, data.Notifications)
+	for _, notification := range data.Notifications {
+		assert.NotEqual(t, "cato.bgp_peer_identity_unqualified", notification.Code)
+	}
 	for _, column := range data.Actors.Columns {
 		if column.ID == "id" || column.ID == "site_id" || column.ID == "pop_name" || column.ID == "connectivity_status" {
 			assert.Empty(t, column.Aggregation, "legacy fields need coherent CTS report selection, not blanket reducers")
@@ -116,10 +118,18 @@ func TestCatoUnqualifiedPeerIsSourceLocalWithoutChangingPresentation(t *testing.
 		}
 		require.Len(t, peers, 2)
 		assert.NotEqual(t, peers[0]["id"], peers[1]["id"], "preserve distinct local site observations")
-		require.Len(t, data.Notifications, 1, "one response warning, not one per peer")
-		assert.Equal(t, topologyv1.NotificationSeverityWarning, data.Notifications[0].Severity)
-		assert.Equal(t, "cato.bgp_peer_identity_unqualified", data.Notifications[0].Code)
-		assert.Contains(t, data.Notifications[0].Message, "may represent multiple peers")
+		var identityWarnings []topologyv1.Notification
+		var hasScopeNotification bool
+		for _, notification := range data.Notifications {
+			if notification.Code == "cato.bgp_peer_identity_unqualified" {
+				identityWarnings = append(identityWarnings, notification)
+			}
+			hasScopeNotification = hasScopeNotification || notification.Code == "cato_access_scope"
+		}
+		assert.True(t, hasScopeNotification, "preserve existing producer notifications")
+		require.Len(t, identityWarnings, 1, "one identity warning, not one per peer")
+		assert.Equal(t, topologyv1.NotificationSeverityWarning, identityWarnings[0].Severity)
+		assert.Contains(t, identityWarnings[0].Message, "may represent multiple peers")
 		assert.Equal(t, catofunc.TopologyPresentation().Legend, data.Presentation.Legend)
 		var peerLegends int
 		for _, legend := range data.Presentation.Legend.Actors {
