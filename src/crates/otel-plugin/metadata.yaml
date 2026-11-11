@@ -389,7 +389,7 @@ modules:
               A successful TCP connection proves only that something is listening. Check that the Collector's exporter uses the right port: `4317` for `otlp_grpc`, `4318` for `otlp_http`. The `otlp_http` exporter needs the OTLP/HTTP listener, which is off by default. With the default endpoints, use `127.0.0.1`, not `localhost`, which can resolve to IPv6. Then look for rejected exports in the Collector log, and verify the resulting chart, log entry, or trace.
           - name: A metric does not create the expected chart
             description: |
-              Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
+              Exponential histograms are not currently ingested. The chart `netdata.otel.metric_data_points` shows the data points that the plugin dropped on its `rejected` dimension. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
           - name: Large exports are rejected
             description: |
               The plugin rejects an export request larger than 4 MiB as a whole, and the Collector drops that batch. Make the batches smaller. On the exporter, cap them by size with `sending_queue: { batch: { sizer: bytes, max_size: 3000000 } }`. Alternatively, lower `send_batch_max_size` on the `batch` processor; it counts items (spans, data points, log records), not bytes.
@@ -418,9 +418,16 @@ modules:
             otel.<metric name>.
       scopes:
         - name: global
-          description: The plugin itself, with charts of the log records and spans that it receives, and of the indexing operations that make stored logs and traces searchable.
+          description: The plugin itself, with charts of the metric data points, log records and spans that it receives, and of the indexing operations that make stored logs and traces searchable.
           labels: []
           metrics:
+            - name: netdata.otel.metric_data_points
+              description: OpenTelemetry metric data points received
+              unit: data points/s
+              chart_type: stacked
+              dimensions:
+                - name: accepted
+                - name: rejected
             - name: netdata.otel.log_records
               description: OpenTelemetry log records received
               unit: records/s

@@ -19,8 +19,9 @@
 //! Chart creation is budgeted per request (`max_new_charts_per_request`,
 //! from otel.yaml's `metrics.max_new_charts_per_request`, default 100); once
 //! the budget is exhausted, points for not-yet-created charts are dropped
-//! with one warn. The export core always answers Ok — problems are silent,
-//! never a transport error.
+//! with one warn. The export core always answers Ok, never a transport
+//! error: what became of a request's data points shows on the chart
+//! `netdata.otel.metric_data_points` (see [`PointOutcome`]).
 
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -36,6 +37,8 @@ use tonic::{Request, Response, Status};
 use opentelemetry_proto::tonic::metrics::v1::{
     AggregationTemporality, HistogramDataPoint, SummaryDataPoint,
 };
+
+use otel_derived_metrics::DerivedMetrics;
 
 use crate::chart::{Chart, ChartAggregationType, ChartConfig};
 use crate::chart_config::ChartConfigManager;
@@ -131,6 +134,20 @@ impl ChartManager {
     }
 }
 
+/// What became of one data point of an export request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PointOutcome {
+    /// It reached at least one chart.
+    Charted,
+    /// The plugin could not chart it: a metric type or temporality it has no
+    /// chart for, a malformed histogram, or a new chart past the request's
+    /// budget.
+    Dropped,
+    /// It carries no value: the sender flagged it `NO_RECORDED_VALUE`, or
+    /// left a number point's value unset.
+    NoValue,
+}
+
 /// The OTLP metrics ingestion service: OTLP metric exports in, chart
 /// accumulations out. Transport-agnostic — the gRPC `MetricsService`
 /// wrapper and the OTLP/HTTP front end both funnel into the
@@ -146,6 +163,8 @@ pub struct NetdataMetricsService {
     /// How many new charts a single export may create (otel.yaml
     /// `metrics.max_new_charts_per_request`).
     pub max_new_charts_per_request: usize,
+    /// Counts each request's data points, charted and dropped.
+    derived_metrics: Arc<DerivedMetrics>,
 }
 
 impl NetdataMetricsService {
@@ -153,11 +172,13 @@ impl NetdataMetricsService {
         chart_config_manager: Arc<RwLock<ChartConfigManager>>,
         chart_manager: Arc<RwLock<ChartManager>>,
         max_new_charts_per_request: usize,
+        derived_metrics: Arc<DerivedMetrics>,
     ) -> Self {
         Self {
             chart_config_manager,
             chart_manager,
             max_new_charts_per_request,
+            derived_metrics,
         }
     }
 
@@ -197,19 +218,19 @@ impl NetdataMetricsService {
         chart_name_buf: &mut String,
         new_charts: &mut usize,
         budget: usize,
-    ) {
+    ) -> PointOutcome {
         // Skip NO_RECORDED_VALUE (flag bit 0).
         if hdp.flags & 1 != 0 {
-            return;
+            return PointOutcome::NoValue;
         }
 
         // N explicit bounds imply N+1 buckets (the last one is "+Inf");
         // anything else is malformed.
         if hdp.bucket_counts.is_empty() {
-            return;
+            return PointOutcome::Dropped;
         }
         if hdp.bucket_counts.len() != hdp.explicit_bounds.len() + 1 {
-            return;
+            return PointOutcome::Dropped;
         }
 
         let chart_hash = dp.chart_hash();
@@ -222,7 +243,7 @@ impl NetdataMetricsService {
             Some(AggregationTemporality::Delta) => ChartAggregationType::DeltaSum,
             Some(AggregationTemporality::Cumulative) => ChartAggregationType::CumulativeSum,
             // Unspecified/unknown temporality: drop the data point.
-            _ => return,
+            _ => return PointOutcome::Dropped,
         };
 
         // ---- Bucket chart (heatmap) ----
@@ -242,7 +263,7 @@ impl NetdataMetricsService {
             new_charts,
             budget,
         ) {
-            return;
+            return PointOutcome::Dropped;
         }
         let bucket_chart = chart_manager.get(chart_name_buf).unwrap();
         if !bucket_chart.has_definition() {
@@ -285,7 +306,7 @@ impl NetdataMetricsService {
             new_charts,
             budget,
         ) {
-            return;
+            return PointOutcome::Charted;
         }
         let count_chart = chart_manager.get(chart_name_buf).unwrap();
         if !count_chart.has_definition() {
@@ -318,7 +339,7 @@ impl NetdataMetricsService {
                 new_charts,
                 budget,
             ) {
-                return;
+                return PointOutcome::Charted;
             }
             let sum_chart = chart_manager.get(chart_name_buf).unwrap();
             if !sum_chart.has_definition() {
@@ -352,7 +373,7 @@ impl NetdataMetricsService {
                 new_charts,
                 budget,
             ) {
-                return;
+                return PointOutcome::Charted;
             }
             let minmax_chart = chart_manager.get(chart_name_buf).unwrap();
             if !minmax_chart.has_definition() {
@@ -372,6 +393,8 @@ impl NetdataMetricsService {
                 minmax_chart.ingest("max", max, timestamp_ns, start_time_ns);
             }
         }
+
+        PointOutcome::Charted
     }
 
     /// Decompose one summary data point into up to three charts: count and
@@ -385,10 +408,10 @@ impl NetdataMetricsService {
         chart_name_buf: &mut String,
         new_charts: &mut usize,
         budget: usize,
-    ) {
+    ) -> PointOutcome {
         // Skip NO_RECORDED_VALUE (flag bit 0).
         if sdp.flags & 1 != 0 {
-            return;
+            return PointOutcome::NoValue;
         }
 
         let chart_hash = dp.chart_hash();
@@ -416,7 +439,7 @@ impl NetdataMetricsService {
             new_charts,
             budget,
         ) {
-            return;
+            return PointOutcome::Dropped;
         }
         let count_chart = chart_manager.get(chart_name_buf).unwrap();
         if !count_chart.has_definition() {
@@ -448,7 +471,7 @@ impl NetdataMetricsService {
             new_charts,
             budget,
         ) {
-            return;
+            return PointOutcome::Charted;
         }
         let sum_chart = chart_manager.get(chart_name_buf).unwrap();
         if !sum_chart.has_definition() {
@@ -481,7 +504,7 @@ impl NetdataMetricsService {
                 new_charts,
                 budget,
             ) {
-                return;
+                return PointOutcome::Charted;
             }
             let quantiles_chart = chart_manager.get(chart_name_buf).unwrap();
             if !quantiles_chart.has_definition() {
@@ -503,12 +526,88 @@ impl NetdataMetricsService {
                 quantiles_chart.ingest(&dim_buf, qv.value, timestamp_ns, start_time_ns);
             }
         }
+
+        PointOutcome::Charted
+    }
+
+    /// Route one number data point (a gauge or a sum) to the chart
+    /// `<metric>.<identity hash>`, creating the chart if the request's budget
+    /// allows. A point without a value is skipped.
+    fn process_number(
+        chart_manager: &mut ChartManager,
+        dp: &DataPointContext<'_>,
+        ccm: &ChartConfigManager,
+        chart_name_buf: &mut String,
+        new_charts: &mut usize,
+        budget: usize,
+    ) -> PointOutcome {
+        let Some(value) = dp.datapoint_ref.value_as_f64() else {
+            return PointOutcome::NoValue;
+        };
+
+        let dimension_name = dp.dimension_name();
+        let chart_hash = dp.chart_hash();
+        let timestamp_ns = dp.datapoint_ref.time_unix_nano();
+        let start_time_ns = dp.datapoint_ref.start_time_unix_nano();
+
+        // Chart name: <metric>.<identity hash>. The hash covers resource,
+        // scope, metric and data-point attributes except the dimension
+        // attribute (iter.rs), so each combination gets its own chart.
+        chart_name_buf.clear();
+        let _ = write!(
+            chart_name_buf,
+            "{}.{}",
+            dp.metric_ref.metric.name, chart_hash
+        );
+
+        // Existing chart: initialize its definition if still unset, then ingest.
+        if let Some(chart) = chart_manager.get(chart_name_buf) {
+            if !chart.has_definition() {
+                chart.init_definition(
+                    &dp.metric_ref.metric.name,
+                    &dp.metric_ref.metric.description,
+                    &dp.metric_ref.metric.unit,
+                    dp.chart_labels(),
+                );
+            }
+            chart.ingest(dimension_name, value, timestamp_ns, start_time_ns);
+            return PointOutcome::Charted;
+        }
+
+        // Chart doesn't exist — check budget before creating
+        if *new_charts >= budget {
+            return PointOutcome::Dropped;
+        }
+
+        // Per-chart timing/config: the metric's matched config merged
+        // over the global defaults (chart_config.rs).
+        let chart_config = ccm.resolve_chart_config(dp.metric_ref.config.as_deref());
+        let Some(chart) = chart_manager.create_chart(chart_name_buf, dp, chart_config) else {
+            // Unsupported metric type: no aggregation mapping (create_chart).
+            return PointOutcome::Dropped;
+        };
+        *new_charts += 1;
+
+        // Define the chart from the first data point seen; the metric
+        // name argument feeds family/context only, the chart ID keeps
+        // the identity hash.
+        chart.init_definition(
+            &dp.metric_ref.metric.name,
+            &dp.metric_ref.metric.description,
+            &dp.metric_ref.metric.unit,
+            dp.chart_labels(),
+        );
+
+        // Ingest the data point (accumulate only; emission happens on tick).
+        chart.ingest(dimension_name, value, timestamp_ns, start_time_ns);
+        PointOutcome::Charted
     }
 
     /// One export request end to end: normalize, attach per-metric configs,
-    /// and route every data point to histogram/summary decomposition or the
-    /// number path, under a config read lock and a chart-registry write lock
-    /// held for the whole request.
+    /// and route every data point to its charts (histograms and summaries
+    /// are decomposed into several), under a config read lock and a
+    /// chart-registry write lock held for the whole request. Then count what
+    /// became of the data points.
     async fn process_request(&self, req: &mut ExportMetricsServiceRequest) {
         otel::normalize_request(req);
 
@@ -517,11 +616,13 @@ impl NetdataMetricsService {
         let mut chart_name_buf = String::with_capacity(128);
         let mut new_charts: usize = 0;
         let budget = self.max_new_charts_per_request;
+        let mut charted: u64 = 0;
+        let mut dropped: u64 = 0;
 
         for dp in req.datapoint_iter(&ccm) {
-            // Histogram decomposition: bucket heatmap + count/sum/minmax lines.
-            if let DataPointRef::Histogram(hdp) = &dp.datapoint_ref {
-                Self::process_histogram(
+            let outcome = match &dp.datapoint_ref {
+                // Bucket heatmap + count/sum/minmax lines.
+                DataPointRef::Histogram(hdp) => Self::process_histogram(
                     &mut chart_manager,
                     &dp,
                     hdp,
@@ -529,13 +630,9 @@ impl NetdataMetricsService {
                     &mut chart_name_buf,
                     &mut new_charts,
                     budget,
-                );
-                continue;
-            }
-
-            // Summary decomposition: count/sum/quantiles charts.
-            if let DataPointRef::Summary(sdp) = &dp.datapoint_ref {
-                Self::process_summary(
+                ),
+                // Count/sum/quantiles charts.
+                DataPointRef::Summary(sdp) => Self::process_summary(
                     &mut chart_manager,
                     &dp,
                     sdp,
@@ -543,71 +640,24 @@ impl NetdataMetricsService {
                     &mut chart_name_buf,
                     &mut new_charts,
                     budget,
-                );
-                continue;
-            }
-
-            // Skip non-number data points (exponential histograms, etc.)
-            let Some(value) = dp.datapoint_ref.value_as_f64() else {
-                continue;
+                ),
+                DataPointRef::Number(_) => Self::process_number(
+                    &mut chart_manager,
+                    &dp,
+                    &ccm,
+                    &mut chart_name_buf,
+                    &mut new_charts,
+                    budget,
+                ),
+                // There is no chart for exponential histograms.
+                DataPointRef::ExponentialHistogram(_) => PointOutcome::Dropped,
             };
 
-            let dimension_name = dp.dimension_name();
-            let chart_hash = dp.chart_hash();
-            let timestamp_ns = dp.datapoint_ref.time_unix_nano();
-            let start_time_ns = dp.datapoint_ref.start_time_unix_nano();
-
-            // Chart name: <metric>.<identity hash>. The hash covers resource,
-            // scope, metric and data-point attributes except the dimension
-            // attribute (iter.rs), so each combination gets its own chart.
-            chart_name_buf.clear();
-            let _ = write!(
-                &mut chart_name_buf,
-                "{}.{}",
-                dp.metric_ref.metric.name, chart_hash
-            );
-
-            // Per-chart timing/config: the metric's matched config merged
-            // over the global defaults (chart_config.rs).
-            let chart_config = ccm.resolve_chart_config(dp.metric_ref.config.as_deref());
-
-            // Existing chart: initialize its definition if still unset, then ingest.
-            if let Some(chart) = chart_manager.get(&chart_name_buf) {
-                if !chart.has_definition() {
-                    chart.init_definition(
-                        &dp.metric_ref.metric.name,
-                        &dp.metric_ref.metric.description,
-                        &dp.metric_ref.metric.unit,
-                        dp.chart_labels(),
-                    );
-                }
-                chart.ingest(dimension_name, value, timestamp_ns, start_time_ns);
-                continue;
+            match outcome {
+                PointOutcome::Charted => charted += 1,
+                PointOutcome::Dropped => dropped += 1,
+                PointOutcome::NoValue => {}
             }
-
-            // Chart doesn't exist — check budget before creating
-            if new_charts >= budget {
-                continue;
-            }
-
-            let Some(chart) = chart_manager.create_chart(&chart_name_buf, &dp, chart_config) else {
-                // Unsupported metric type: no aggregation mapping (create_chart).
-                continue;
-            };
-            new_charts += 1;
-
-            // Define the chart from the first data point seen; the metric
-            // name argument feeds family/context only, the chart ID keeps
-            // the identity hash.
-            chart.init_definition(
-                &dp.metric_ref.metric.name,
-                &dp.metric_ref.metric.description,
-                &dp.metric_ref.metric.unit,
-                dp.chart_labels(),
-            );
-
-            // Ingest the data point (accumulate only; emission happens on tick).
-            chart.ingest(dimension_name, value, timestamp_ns, start_time_ns);
         }
 
         // This request created the maximum allowed number of new charts.
@@ -617,6 +667,9 @@ impl NetdataMetricsService {
                 budget
             );
         }
+
+        self.derived_metrics
+            .record_metric_data_points(charted, dropped);
     }
 
     /// The transport-agnostic OTLP metrics export core: process the decoded
@@ -638,13 +691,18 @@ impl NetdataMetricsService {
 }
 
 /// Defaults for standalone use: stock per-metric configs, an empty chart
-/// registry, and a 100-charts-per-request budget.
+/// registry, a 100-charts-per-request budget, and data point counts of its
+/// own.
 impl Default for NetdataMetricsService {
     fn default() -> Self {
+        let derived_metrics = DerivedMetrics::new(&Default::default())
+            .expect("the stock derived-metrics declaration is valid");
+
         Self {
             chart_config_manager: Arc::new(RwLock::new(ChartConfigManager::with_default_configs())),
             chart_manager: Arc::new(RwLock::new(ChartManager::new())),
             max_new_charts_per_request: 100,
+            derived_metrics: Arc::new(derived_metrics),
         }
     }
 }
@@ -660,5 +718,120 @@ impl MetricsService for NetdataMetricsService {
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
         let response = self.export_metrics(request.into_inner()).await?;
         Ok(Response::new(response))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use opentelemetry_proto::tonic::metrics::v1::{
+        ExponentialHistogram, ExponentialHistogramDataPoint, Gauge, Metric, NumberDataPoint,
+        ResourceMetrics, ScopeMetrics, metric::Data, number_data_point::Value,
+    };
+
+    use super::*;
+
+    fn now_ns() -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64
+    }
+
+    fn request(metrics: Vec<Metric>) -> ExportMetricsServiceRequest {
+        ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                scope_metrics: vec![ScopeMetrics {
+                    metrics,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        }
+    }
+
+    fn gauge(name: &str, points: Vec<NumberDataPoint>) -> Metric {
+        Metric {
+            name: name.to_string(),
+            data: Some(Data::Gauge(Gauge {
+                data_points: points,
+            })),
+            ..Default::default()
+        }
+    }
+
+    fn point(value: Option<f64>, time_unix_nano: u64) -> NumberDataPoint {
+        NumberDataPoint {
+            time_unix_nano,
+            value: value.map(Value::AsDouble),
+            ..Default::default()
+        }
+    }
+
+    /// The `accepted` and `rejected` values of the chart
+    /// `netdata.otel.metric_data_points`, summed over what the service's
+    /// counters emit two seconds from now.
+    fn counted(service: &NetdataMetricsService) -> (i64, i64) {
+        let chunks = service.derived_metrics.emit(now_ns() / 1_000_000_000 + 2);
+        let text = netdata_plugin_protocol::readable_chart_stream(&chunks.concat());
+        let mut totals = (0, 0);
+        let mut in_chart = false;
+        for line in text.lines() {
+            if let Some(chart) = line.strip_prefix("BEGIN ") {
+                in_chart = chart.starts_with("netdata.otel.metric_data_points ");
+            } else if in_chart && let Some(value) = line.strip_prefix("SET accepted = ") {
+                totals.0 += value.parse::<i64>().unwrap();
+            } else if in_chart && let Some(value) = line.strip_prefix("SET rejected = ") {
+                totals.1 += value.parse::<i64>().unwrap();
+            }
+        }
+        totals
+    }
+
+    #[tokio::test]
+    async fn data_points_are_counted_as_charted_or_dropped() {
+        let service = NetdataMetricsService::default();
+        let now = now_ns();
+        let exponential_histogram = Metric {
+            name: "latency".to_string(),
+            data: Some(Data::ExponentialHistogram(ExponentialHistogram {
+                data_points: vec![ExponentialHistogramDataPoint {
+                    time_unix_nano: now,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            })),
+            ..Default::default()
+        };
+
+        service
+            .export_metrics(request(vec![
+                gauge("load", vec![point(Some(1.0), now), point(Some(2.0), now)]),
+                // A point without a value is neither.
+                gauge("idle", vec![point(None, now)]),
+                exponential_histogram,
+            ]))
+            .await
+            .unwrap();
+
+        assert_eq!(counted(&service), (2, 1));
+    }
+
+    #[tokio::test]
+    async fn a_new_chart_past_the_budget_is_counted_as_dropped() {
+        let service = NetdataMetricsService {
+            max_new_charts_per_request: 1,
+            ..NetdataMetricsService::default()
+        };
+        let now = now_ns();
+
+        service
+            .export_metrics(request(vec![
+                gauge("first", vec![point(Some(1.0), now)]),
+                gauge("second", vec![point(Some(1.0), now)]),
+            ]))
+            .await
+            .unwrap();
+
+        assert_eq!(counted(&service), (1, 1));
     }
 }

@@ -142,6 +142,13 @@ impl DerivedMetrics {
             .record(signal, accepted, rejected, unix_now());
     }
 
+    /// Count the outcome of one metrics export request: data points that
+    /// reached a chart and data points that were dropped.
+    pub fn record_metric_data_points(&self, accepted: u64, rejected: u64) {
+        self.ingest_outcomes
+            .record_metric_data_points(accepted, rejected, unix_now());
+    }
+
     /// Emit every window whose allowed lateness has passed by `now` (Unix
     /// seconds), in chunks of at most [`MAX_CHUNK_BYTES`].
     pub fn emit(&self, now: u64) -> Vec<Vec<u8>> {

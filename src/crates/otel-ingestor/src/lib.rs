@@ -163,13 +163,6 @@ async fn run_ingestor(
 
     let ccm = Arc::new(RwLock::new(ccm));
     let chart_manager = Arc::new(RwLock::new(ChartManager::new()));
-    // Arc-shared: the gRPC server and the OTLP/HTTP router both hold the
-    // metrics service (chart emission is transport-agnostic).
-    let metrics_service = Arc::new(NetdataMetricsService::new(
-        Arc::clone(&ccm),
-        Arc::clone(&chart_manager),
-        config.metrics.max_new_charts_per_request,
-    ));
 
     // Charts derived from ingested logs and traces, plus the plugin's own
     // ingest outcomes. The export services record into it; the tick loop
@@ -178,6 +171,15 @@ async fn run_ingestor(
     let derived_metrics = Arc::new(
         DerivedMetrics::new(&config.derived_metrics).context("declaring the derived metrics")?,
     );
+
+    // Arc-shared: the gRPC server and the OTLP/HTTP router both hold the
+    // metrics service (chart emission is transport-agnostic).
+    let metrics_service = Arc::new(NetdataMetricsService::new(
+        Arc::clone(&ccm),
+        Arc::clone(&chart_manager),
+        config.metrics.max_new_charts_per_request,
+        Arc::clone(&derived_metrics),
+    ));
 
     // Channel for tick loop → main loop chart data forwarding
     let (chart_tx, mut chart_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);

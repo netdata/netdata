@@ -42,6 +42,7 @@ columns! {
 pub(crate) struct IngestOutcomes {
     metric_set: MetricSet,
     aggregator: SharedAggregator,
+    metric_data_points: Counter<Acceptance>,
     log_records: Counter<Acceptance>,
     spans: Counter<Acceptance>,
 }
@@ -49,6 +50,14 @@ pub(crate) struct IngestOutcomes {
 impl IngestOutcomes {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
+        let metric_data_points = builder.counter::<Acceptance>(ChartDescriptor {
+            title: "OpenTelemetry metric data points received".into(),
+            units: "data points/s".into(),
+            family: "ingest".into(),
+            context: "netdata.otel.metric_data_points".into(),
+            chart_type: ChartType::Stacked,
+            priority: 149_999,
+        })?;
         let log_records = builder.counter::<Acceptance>(ChartDescriptor {
             title: "OpenTelemetry log records received".into(),
             units: "records/s".into(),
@@ -70,6 +79,7 @@ impl IngestOutcomes {
         Ok(Self {
             metric_set,
             aggregator,
+            metric_data_points,
             log_records,
             spans,
         })
@@ -82,6 +92,16 @@ impl IngestOutcomes {
             Signal::Logs => self.log_records,
             Signal::Traces => self.spans,
         };
+        self.count(counter, accepted, rejected, now);
+    }
+
+    /// Count the outcome of one metrics export request at `now` (Unix
+    /// seconds): data points charted and data points dropped.
+    pub(crate) fn record_metric_data_points(&self, accepted: u64, rejected: u64, now: u64) {
+        self.count(self.metric_data_points, accepted, rejected, now);
+    }
+
+    fn count(&self, counter: Counter<Acceptance>, accepted: u64, rejected: u64, now: u64) {
         let mut batch = Batch::new(&self.metric_set);
         batch
             .entity(Labels::new())
@@ -232,6 +252,23 @@ mod tests {
             "BEGIN netdata.otel.log_records 1000000\nSET accepted = 3\nSET rejected = 0\nEND 101 0 1\n"
         ));
         assert!(out.contains("'netdata.otel.spans'"));
+    }
+
+    #[test]
+    fn metric_data_points_have_their_own_chart() {
+        let outcomes = IngestOutcomes::new().unwrap();
+        outcomes.record_metric_data_points(40, 2, 100);
+        let mut chunks = Vec::new();
+        outcomes.emit(101, &mut chunks);
+        let out = readable(chunks);
+        netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
+        assert!(out.contains(
+            "BEGIN netdata.otel.metric_data_points 1000000\nSET accepted = 40\nSET rejected = 2\nEND 101 0 1\n"
+        ));
+        // Metrics first, then logs, then traces.
+        let position = |context: &str| out.find(&format!("CHART {context} ")).unwrap();
+        assert!(position("netdata.otel.metric_data_points") < position("netdata.otel.log_records"));
+        assert!(position("netdata.otel.log_records") < position("netdata.otel.spans"));
     }
 
     #[test]
