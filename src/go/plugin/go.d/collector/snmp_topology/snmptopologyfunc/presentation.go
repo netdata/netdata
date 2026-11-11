@@ -23,6 +23,7 @@ func functionConfig() funcapi.FunctionConfig {
 		Help:         "SNMP Layer-2 topology and neighbor discovery data",
 		RequireCloud: true,
 		ResponseType: topologyv1.ResponseType,
+		DynamicInfo:  true,
 		RequiredParams: []funcapi.ParamConfig{
 			nodesIdentityParamConfig(),
 			mapTypeParamConfig(),
