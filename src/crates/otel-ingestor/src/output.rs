@@ -6,8 +6,8 @@
 //! that keep a line parseable by the agent; this module only decides what goes
 //! into them. Everything here comes from a sender (metric names, descriptions,
 //! units, attribute keys and values), so nothing is written verbatim: text
-//! fields go through the protocol crate's quoting, and ids are made valid
-//! with its `sanitize_*` functions. A malformed command stops the agent's
+//! fields go through the protocol crate's quoting, and chart.rs makes the ids
+//! valid with its `sanitize_*` functions before they come here. A malformed command stops the agent's
 //! parser, and the agent then restarts or disables the whole plugin
 //! (`src/plugins.d/plugins_d.c`), logs and traces included.
 //!
@@ -21,8 +21,8 @@
 
 use netdata_plugin_protocol::{
     ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
-    sanitize_dimension_id, write_begin, write_chart, write_clabel, write_clabel_commit,
-    write_dimension, write_end, write_set_empty, write_set_int,
+    write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end,
+    write_set_empty, write_set_int,
 };
 
 /// The chart rendering type. This ingestor emits only `Line` and `Heatmap`:
@@ -59,9 +59,9 @@ pub struct ChartDefinition {
     pub chart_type: ChartType,
     pub update_every: u64,
     pub labels: Vec<(String, String)>,
-    /// The dimensions' names as the sender gave them. A dimension's id on the
-    /// wire is its name made valid ([`dimension_id`]), and its display name
-    /// is the name itself.
+    /// The dimensions' ids, valid ones
+    /// (`netdata_plugin_protocol::sanitize_dimension_id`); a dimension's
+    /// display name is its id.
     pub dimensions: Vec<String>,
 }
 
@@ -113,12 +113,12 @@ impl ChartDefinition {
 
         // `absolute` stores each SET value as it is, scaled by multiplier /
         // divisor.
-        for name in &self.dimensions {
+        for id in &self.dimensions {
             write_dimension(
                 buf,
                 &DimensionLine {
-                    id: &dimension_id(name),
-                    name,
+                    id,
+                    name: id,
                     algorithm: DimensionAlgorithm::Absolute,
                     multiplier: 1,
                     divisor: PRECISION_DIVISOR,
@@ -153,19 +153,12 @@ impl ChartDefinition {
     }
 }
 
-/// A dimension's id on the wire: its name, made valid. Both the `DIMENSION`
-/// line and every `SET` line of the dimension go through here, so they agree.
-/// Two names that differ only in bytes an id cannot hold share an id.
-fn dimension_id(name: &str) -> std::borrow::Cow<'_, str> {
-    sanitize_dimension_id(name)
-}
-
 /// One dimension value in a data slot. `None` renders as `SET <id> =`, which
 /// stores no value for that dimension in this update.
 #[derive(Debug)]
 pub struct DimensionValue {
-    /// The dimension's name, as in [`ChartDefinition::dimensions`].
-    pub name: String,
+    /// The dimension's id, as in [`ChartDefinition::dimensions`].
+    pub id: String,
     pub value: Option<f64>,
 }
 
@@ -189,10 +182,10 @@ pub fn write_data_slot(
     write_begin(buf, chart_id, update_every * 1_000_000);
 
     for dimension in dimensions {
-        let id = dimension_id(&dimension.name);
+        let id = &dimension.id;
         match dimension.value {
-            Some(value) => write_set_int(buf, &id, (value * PRECISION_DIVISOR as f64) as i64),
-            None => write_set_empty(buf, &id),
+            Some(value) => write_set_int(buf, id, (value * PRECISION_DIVISOR as f64) as i64),
+            None => write_set_empty(buf, id),
         }
     }
 

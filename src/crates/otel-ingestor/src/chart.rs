@@ -6,8 +6,9 @@
 //! on each tick emits ready slots in chronological order — finalizing slots
 //! with data, gap-filling slots without, and writing the `CHART` definition
 //! plus `BEGIN`/`SET`/`END` blocks via [`crate::output`]. A chart's id on the
-//! wire is its name made valid for the agent: the name holds a metric name,
-//! which a sender chose.
+//! wire is its name made valid for the agent, and so is a dimension's: the
+//! names hold a metric name or an attribute value, which a sender chose. Two
+//! dimension names that give one id are one dimension.
 //!
 //! Consumers: `metrics_service.rs`'s `ChartManager` owns one `Chart` per
 //! chart name and drives [`Chart::emit`] from lib.rs's per-second tick loop;
@@ -16,7 +17,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
 
-use netdata_plugin_protocol::{Chunker, sanitize_chart_id};
+use netdata_plugin_protocol::{Chunker, sanitize_chart_id, sanitize_dimension_id};
 use opentelemetry_proto::tonic::metrics::v1::AggregationTemporality;
 
 use crate::aggregation::{
@@ -31,8 +32,8 @@ use crate::output::{ChartDefinition, ChartType, DimensionValue, write_data_slot}
 /// been emitted yet (out-of-order or late arrivals), and one tick can drain
 /// several ready slots in chronological order.
 struct Dimension<Ctx: CrossSlotContext> {
-    /// The name of the dimension.
-    name: String,
+    /// The dimension's id in the protocol commands, also its display name.
+    id: String,
     /// Cross-slot context (persists across slot boundaries).
     context: Ctx,
     /// Per-slot accumulators, keyed by slot timestamp.
@@ -40,9 +41,9 @@ struct Dimension<Ctx: CrossSlotContext> {
 }
 
 impl<Ctx: CrossSlotContext> Dimension<Ctx> {
-    fn new(name: String) -> Self {
+    fn new(id: String) -> Self {
         Self {
-            name,
+            id,
             context: Ctx::default(),
             slots: BTreeMap::new(),
         }
@@ -288,7 +289,8 @@ impl Chart {
         (timestamp_secs / self.update_every) * self.update_every
     }
 
-    /// Ingest a data point into a dimension's per-slot accumulator.
+    /// Ingest a data point into a dimension's per-slot accumulator. The
+    /// dimension is the one whose id `dimension_name` gives.
     pub fn ingest(
         &mut self,
         dimension_name: &str,
@@ -299,17 +301,18 @@ impl Chart {
         self.last_ingest_instant = Some(Instant::now());
 
         let slot = self.slot_for_timestamp(timestamp_ns);
+        let dimension_id = sanitize_dimension_id(dimension_name);
 
         // Record into the correct slot's accumulator.
         let new_dimension =
             self.dimensions
-                .ingest(dimension_name, value, timestamp_ns, start_time_ns, slot);
+                .ingest(&dimension_id, value, timestamp_ns, start_time_ns, slot);
 
         // If a new dimension was added, update the definition and mark it
         // for re-emission.
         if new_dimension {
             if let Some(def) = self.definition.as_mut() {
-                def.dimensions.push(dimension_name.to_string());
+                def.dimensions.push(dimension_id.into_owned());
             }
             self.definition.mark_changed();
         }
@@ -515,13 +518,13 @@ impl DimensionStore {
         }
     }
 
-    /// Ingest a value into a dimension's per-slot accumulator, creating the
-    /// dimension and/or slot entry if needed.
+    /// Ingest a value into the per-slot accumulator of the dimension `id`,
+    /// creating the dimension and/or slot entry if needed.
     ///
     /// Returns `true` if a new dimension was created.
     fn ingest(
         &mut self,
-        name: &str,
+        id: &str,
         value: f64,
         timestamp_ns: u64,
         start_time_ns: u64,
@@ -529,29 +532,29 @@ impl DimensionStore {
     ) -> bool {
         match self {
             Self::Gauge(dims) => {
-                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns, slot)
+                Self::ingest_into(dims, id, value, timestamp_ns, start_time_ns, slot)
             }
             Self::DeltaSum(dims) => {
-                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns, slot)
+                Self::ingest_into(dims, id, value, timestamp_ns, start_time_ns, slot)
             }
             Self::CumulativeSum(dims) => {
-                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns, slot)
+                Self::ingest_into(dims, id, value, timestamp_ns, start_time_ns, slot)
             }
         }
     }
 
     fn ingest_into<Ctx: CrossSlotContext>(
         dims: &mut HashMap<String, Dimension<Ctx>>,
-        name: &str,
+        id: &str,
         value: f64,
         timestamp_ns: u64,
         start_time_ns: u64,
         slot: u64,
     ) -> bool {
-        let new_dimension = !dims.contains_key(name);
+        let new_dimension = !dims.contains_key(id);
         let dim = dims
-            .entry(name.to_string())
-            .or_insert_with(|| Dimension::new(name.to_string()));
+            .entry(id.to_string())
+            .or_insert_with(|| Dimension::new(id.to_string()));
 
         let acc = dim.slots.entry(slot).or_default();
         acc.record(value, timestamp_ns, start_time_ns);
@@ -629,7 +632,7 @@ impl DimensionStore {
                 };
 
                 DimensionValue {
-                    name: dim.name.clone(),
+                    id: dim.id.clone(),
                     value: normalize(value, interval_divisor),
                 }
             })
@@ -653,7 +656,7 @@ impl DimensionStore {
     ) -> Vec<DimensionValue> {
         dims.values()
             .map(|dim| DimensionValue {
-                name: dim.name.clone(),
+                id: dim.id.clone(),
                 value: normalize(Some(dim.context.gap_fill()), interval_divisor),
             })
             .collect()
@@ -754,6 +757,27 @@ mod tests {
     /// The whole text of a chart whose names need no change. The agent reads
     /// it as it read the text the ingestor wrote before it used the shared
     /// writer; the one difference in bytes is the quoted dimension name.
+    /// Two names that an id cannot tell apart are one dimension: an update
+    /// never sets one id twice.
+    #[test]
+    fn names_with_one_id_share_a_dimension() {
+        let mut chart = Chart::new(
+            "http.requests.42",
+            ChartAggregationType::Gauge,
+            ChartType::Line,
+            test_config(),
+        );
+        chart.init_definition("http.requests", "Requests", "requests", Vec::new());
+        chart.ingest("GET /x", 1.0, ns(100), 0);
+        chart.ingest("GET_/x", 2.0, ns(100), 0);
+
+        let mut buf = Vec::new();
+        emit(&mut chart, 102, &mut buf);
+
+        netdata_plugin_protocol::validate_chart_stream(&buf).unwrap();
+        assert_eq!(text(&buf).matches("DIMENSION GET_/x ").count(), 1);
+    }
+
     #[test]
     fn a_chart_shows_points_within_its_expiry_of_now() {
         let config = ChartConfig {
