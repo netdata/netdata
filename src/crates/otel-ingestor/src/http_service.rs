@@ -7,8 +7,8 @@
 //! Contract (follows open-telemetry/opentelemetry-collector
 //! `receiver/otlpreceiver/otlphttp.go`, except where marked "local"):
 //!
-//! - method mismatch → `405 text/plain` ("405 method not allowed, supported:
-//!   [POST]"); unmatched path → `404 text/plain`;
+//! - method mismatch → `405 text/plain` (`405 method not allowed, supported:
+//!   [POST]`); unmatched path → `404 text/plain`;
 //! - `Content-Type`: the media type before any `;` is matched
 //!   case-insensitively; exactly `application/x-protobuf` and
 //!   `application/json` are accepted, anything else → `415 text/plain`
