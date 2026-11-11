@@ -163,6 +163,10 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
 
 /// Run `future` to completion on the runtime of the supervisor and the
 /// workers: multi-threaded, one worker thread per CPU.
+///
+/// The runtime is dropped before this returns, and the drop waits for the
+/// blocking calls that still run. Whatever must not wait for them, such as
+/// logging an error or leaving the process, belongs inside `future`.
 fn block_on_runtime<F: Future>(future: F) -> F::Output {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -240,23 +244,29 @@ fn main() {
                 tracing::error!("failed to watch the supervisor's lifeline: {e}");
                 std::process::exit(1);
             }
-            if let Err(e) = block_on_runtime(run_worker(kind)) {
-                tracing::error!("{e:#}");
-                std::process::exit(1);
-            }
+            block_on_runtime(async {
+                // Logged here, at once: the supervisor kills its workers as
+                // soon as one of them closes its connection.
+                if let Err(e) = run_worker(kind).await {
+                    tracing::error!("{e:#}");
+                    std::process::exit(1);
+                }
+            });
         }
         None => {
             netdata_plugin_rt::init_tracing_with_identifier("otel-plugin");
-            if let Err(e) = block_on_runtime(supervisor::run()) {
-                tracing::error!("{e:#}");
-                std::process::exit(1);
-            }
+            block_on_runtime(async {
+                if let Err(e) = supervisor::run().await {
+                    tracing::error!("{e:#}");
+                    std::process::exit(1);
+                }
 
-            // Not a return: dropping the runtime would wait for the
-            // supervisor's read of stdin, which tokio cannot cancel. That
-            // read ends only when the agent closes the pipe, and after a
-            // SIGTERM the agent does so two minutes later.
-            std::process::exit(0);
+                // Not a return: dropping the runtime would wait for the
+                // supervisor's read of stdin, which tokio cannot cancel. That
+                // read ends only when the agent closes the pipe, and after a
+                // SIGTERM the agent does so two minutes later.
+                std::process::exit(0);
+            });
         }
     }
 }
