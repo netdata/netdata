@@ -673,7 +673,7 @@ static void health_prototype_rematch_on_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *
     RRD_ALERT_PROTOTYPE *winner = health_prototype_winner_for_rrdset_unsafe(st, ap);
 
     // most rules match nothing on most charts: take the host alert dictionary write lock only when the chart has an
-    // alert of this name to keep or delete; an alert another thread adds meanwhile is stamped for the sweep at insert
+    // alert of this name to keep or delete; an alert another thread adds meanwhile is stamped for the sweep when linked
     bool kept = false;
     if(rrdcalc_rrdset_has_alert(st, ap->config.name))
         kept = rrdcalc_rematch_keep(st, ap->config.name, winner, seq);

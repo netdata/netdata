@@ -432,9 +432,6 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item, void *r
 
     rrdcalc_name_index_add(host, rc, item);
 
-    // at least the sequence of any re-match that started before this insert, so its sweep keeps this alert
-    rc->rematch_seq = __atomic_load_n(&health_globals.prototypes.rematch_seq, __ATOMIC_SEQ_CST);
-
     ctr->react_action = RRDCALC_REACT_NEW;
 }
 
@@ -448,8 +445,14 @@ static void rrdcalc_rrdhost_react_callback(const DICTIONARY_ITEM *item __maybe_u
     RRDCALC *rc = rrdcalc;
     struct rrdcalc_constructor *ctr = constructor_data;
 
-    if(ctr->react_action == RRDCALC_REACT_NEW)
+    if(ctr->react_action == RRDCALC_REACT_NEW) {
         rrdcalc_link_to_rrdset(rc);
+
+        // stamped once linked (the caller holds the host alert dictionary write lock, so no sweep runs in between):
+        // a re-match that reserved its sequence before this keeps the alert; one that reserves it after finds the
+        // alert linked to the chart and stamps it itself
+        rc->rematch_seq = __atomic_load_n(&health_globals.prototypes.rematch_seq, __ATOMIC_SEQ_CST);
+    }
 }
 
 // ----------------------------------------------------------------------------
