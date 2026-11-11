@@ -48,7 +48,7 @@ enum Indexed {
 impl Ledger {
     #[tracing::instrument(skip_all)]
     pub(super) async fn handle_indexer_resp(&mut self, signal: Signal, resp: IndexerResponse) {
-        let (seq, summary, size) = match resp {
+        let (file_id, summary, size) = match resp {
             IndexerResponse::IndexFailed { file_id, error } => {
                 // Intentional divergence from `recover_unindexed`: at runtime
                 // the entry stays tracked (and queryable as a WAL) until the
@@ -61,8 +61,9 @@ impl Ledger {
                 file_id,
                 summary,
                 size,
-            } => (file_id.seq, summary, size),
+            } => (file_id, summary, size),
         };
+        let seq = file_id.seq;
 
         tracing::info!(seq, record_count = summary.record_count, "indexed");
 
@@ -84,11 +85,10 @@ impl Ledger {
                 tracing::error!(seq, "indexed unknown seq; no tenant mapping");
                 return;
             };
-            let Some(wal_file) = registry.wal.get(seq) else {
+            if registry.wal.get(seq).is_none() {
                 tracing::error!(seq, "indexed unknown WAL");
                 return;
-            };
-            let file_id = wal_file.id;
+            }
             let wal_path = registry.wal.file_path(file_id);
 
             if summary.record_count == 0 {
