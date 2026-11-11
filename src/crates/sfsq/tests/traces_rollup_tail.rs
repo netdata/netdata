@@ -101,7 +101,7 @@ fn tail_fold_matches_the_sealed_rollup_value_for_value() {
     // Sealed side: run production indexing over the SAME WAL, then
     // read its TRSU.
     let out = dir.path().join("parity.sfst");
-    ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
+    ng_index::index_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
     let bytes = std::fs::read(&out).unwrap();
     let reader = sfst::IndexReader::open(&bytes).unwrap();
     let sealed = sealed_trace_envelopes(&reader.trace_rollup().unwrap());
@@ -117,7 +117,7 @@ fn tail_parts_match_the_sealed_rollup_and_stats() {
     let wal = write_wal(dir.path(), vec![req(&corpus())], "parts");
     let tail = tail_trace_parts(&TraceWalScan::scan(&wal).unwrap());
     let out = dir.path().join("parts.sfst");
-    ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
+    ng_index::index_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
     let bytes = std::fs::read(&out).unwrap();
     let reader = sfst::IndexReader::open(&bytes).unwrap();
     let rollup = reader.trace_rollup().unwrap();
@@ -237,7 +237,7 @@ fn a_root_ref_in_another_fields_range_is_corruption() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&corpus())], "corrupt-ref");
     let out = dir.path().join("corrupt-ref.sfst");
-    ng_index::build_sfst_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
+    ng_index::index_traces_file(&wal, &out, &ng_index::Metrics::new()).unwrap();
     let bytes = std::fs::read(&out).unwrap();
     let reader = sfst::IndexReader::open(&bytes).unwrap();
     let rollup = reader.trace_rollup().unwrap();

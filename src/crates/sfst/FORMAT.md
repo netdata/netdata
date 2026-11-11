@@ -19,7 +19,7 @@ and chunk ids `src/crates/sfst/src/lib.rs`; the writer
 `src/crates/sfst/src/{reader.rs,index_reader.rs,index_reader/session.rs}`;
 payload types `src/crates/sfst/src/schema.rs`; the trace chunks
 `src/crates/sfst/src/{trace_index.rs,trace_bloom.rs,span_extras.rs,trace_rollup.rs}`;
-the in-tree producer `src/crates/ng-index/src/sfst_build.rs`.
+the in-tree producer `src/crates/ng-index/src/indexing.rs`.
 
 ---
 

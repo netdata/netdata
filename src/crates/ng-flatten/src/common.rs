@@ -124,7 +124,7 @@ pub struct Entry {
     /// `lookup_hash` without re-hashing the string; indexing still re-renders
     /// the pair and string-verifies each hit, so a collision falls through to
     /// the string-path `intern` (feed at
-    /// `src/crates/ng-index/src/sfst_build.rs`).
+    /// `src/crates/ng-index/src/indexing.rs`).
     pub hash: u64,
 }
 

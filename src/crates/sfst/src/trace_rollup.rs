@@ -24,7 +24,7 @@
 //!
 //! # Lifecycle
 //!
-//! ng-index's span walk (`src/crates/ng-index/src/sfst_build.rs`) folds
+//! ng-index's span walk (`src/crates/ng-index/src/indexing.rs`) folds
 //! every stored span into [`TraceRollupRows`] — the `EventRows`
 //! pattern: write-side interner [`KvSlot`]s, translated to file
 //! [`KvId`]s at write time (`build.rs`), rows emitted sorted by trace
@@ -404,7 +404,7 @@ struct Root {
 }
 
 /// Insertion-order accumulator for [`TraceRollup`]. ng-index's span
-/// walk (`ng-index/src/sfst_build.rs`) calls
+/// walk (`ng-index/src/indexing.rs`) calls
 /// [`record_span`](Self::record_span) once per stored span; the writer
 /// calls `sealed_with_stats`, translating interner [`KvSlot`]s to
 /// file [`KvId`]s and emitting rows sorted by trace id.

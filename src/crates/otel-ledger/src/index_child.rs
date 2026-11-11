@@ -114,8 +114,8 @@ pub fn run(
     answer: &mut impl Write,
 ) -> Result<()> {
     let build = match signal {
-        Signal::Logs => ng_index::build_sfst_file,
-        Signal::Traces => ng_index::build_sfst_traces_file,
+        Signal::Logs => ng_index::index_logs_file,
+        Signal::Traces => ng_index::index_traces_file,
     };
 
     let (summary, size) = build(wal_path, sfst_path, &ng_index::Metrics::new())
@@ -256,7 +256,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let wal_path = write_logs_wal(dir.path(), 7);
 
-        assert_same_as_direct_call(Signal::Logs, &wal_path, ng_index::build_sfst_file);
+        assert_same_as_direct_call(Signal::Logs, &wal_path, ng_index::index_logs_file);
     }
 
     #[test]
@@ -267,7 +267,7 @@ mod tests {
             vec![otlp_req(1, 3, 1_000), otlp_req(2, 2, 9_000)],
         );
 
-        assert_same_as_direct_call(Signal::Traces, &wal_path, ng_index::build_sfst_traces_file);
+        assert_same_as_direct_call(Signal::Traces, &wal_path, ng_index::index_traces_file);
     }
 
     #[test]

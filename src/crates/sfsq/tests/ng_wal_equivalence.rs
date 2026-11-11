@@ -1,7 +1,7 @@
 //! Whole-engine equivalence harness for the ng-flatten logs path: WAL bytes of
 //! ng-flatten frames, evaluated by BOTH engines — the row-scan evaluator
 //! (`WalScan`, the implementation that serves a WAL's un-indexed tail) and the
-//! indexed engine (a sealed `ng_index::build_sfst` file; chunk SFSTs folded by
+//! indexed engine (a sealed `ng_index::index_logs_dir` file; chunk SFSTs folded by
 //! `run`) — must agree over the same frames. The rows are shared by
 //! construction (both sides render through `ng_flatten::build_kv` and order by
 //! the same frozen `Record.ts`); what is under test is the scan side's
@@ -11,11 +11,11 @@
 //!
 //! - the payload-format gate: `scan_flattened` refuses a WAL stamped with a
 //!   different frame codec (the traces format here) before decoding any frame;
-//! - shard parity: a whole-file `scan_flattened` vs the `build_sfst` index of
+//! - shard parity: a whole-file `scan_flattened` vs the `index_logs_dir` index of
 //!   the same file — equal row counts, then per query equal `matched`, field
 //!   table, facets, and timeline;
 //! - run-level parity, the chunk/tail split the otel-ledger handler drives:
-//!   chunk SFSTs (`build_sfst_range`, `Source::Memory`) + a row-scanned tail,
+//!   chunk SFSTs (`index_logs_range`, `Source::Memory`) + a row-scanned tail,
 //!   folded by `run`, match the whole-file index on matched/facets/histogram
 //!   and on served rows (strictly-monotonic fixture);
 //! - one tail per WAL: a duplicate-`file_seq` tail is dropped at `run`'s
@@ -375,7 +375,7 @@ fn tail_scan_refuses_wrong_payload_format() {
 /// production `wal::Writer` and `ng-flatten` encoding. Unlike ingest
 /// (`prepare_log_frame`) there is no normalization pass: the fixture resolves
 /// timestamps itself. The single-file assert holds because
-/// `ng_index::build_sfst` expects a directory containing exactly one WAL.
+/// `ng_index::index_logs_dir` expects a directory containing exactly one WAL.
 fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
     let seq = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(
@@ -426,13 +426,14 @@ fn write_flattened_wal(dir: &Path, corpus: &Corpus) -> std::path::PathBuf {
     wals.pop().unwrap()
 }
 
-/// Index the flattened WAL into the sealed SFST via `ng_index::build_sfst` and
+/// Index the flattened WAL into the sealed SFST via `ng_index::index_logs_dir` and
 /// wrap it as an engine candidate — the sealed-file identity: the whole file
 /// as one index under `file_seq` 1 / `Indexed(0)`, summary read back from the
 /// written bytes.
 fn ng_index_candidate(wal_dir: &Path) -> SfstCandidate {
     let sfst_path = wal_dir.join("harness-ng.sfst");
-    ng_index::build_sfst(wal_dir, &sfst_path, &ng_index::Metrics::new()).expect("build_sfst");
+    ng_index::index_logs_dir(wal_dir, &sfst_path, &ng_index::Metrics::new())
+        .expect("index_logs_dir");
     let bytes = std::fs::read(&sfst_path).expect("read sfst");
     let summary = IndexReader::open(&bytes)
         .expect("open sfst")
@@ -736,11 +737,11 @@ fn ng_flattened_tail_matches_sealed_index() {
 
 // ---------------------------------------------------------------------------
 // Run-level equivalence over the live production split: chunk SFSTs indexed
-// by `ng_index::build_sfst_range` (fed as `Source::Memory`) plus the
+// by `ng_index::index_logs_range` (fed as `Source::Memory`) plus the
 // row-scanned tail (`run` scans it with `scan_flattened_range`), folded by
 // `run`, must match indexing the whole WAL — the partition the otel-ledger
 // handler drives (`resolve_wal`: scan_frame_boundaries → chunk_boundaries →
-// build_sfst_range + one tail).
+// index_logs_range + one tail).
 // ---------------------------------------------------------------------------
 
 /// `run` with a fresh cancellation token and progress counter — these tests
@@ -790,7 +791,7 @@ fn tails_clone(ts: &[WalTail]) -> Vec<WalTail> {
 #[test]
 fn ng_run_stats_equal_whole_file_index() {
     // Statistics equivalence over the live split: chunk SFSTs
-    // (build_sfst_range, `Source::Memory`) + a row-scanned tail, folded by
+    // (index_logs_range, `Source::Memory`) + a row-scanned tail, folded by
     // `run`, must yield the same matched/facets/histogram as indexing the
     // whole WAL. Stats only: the merge is an order-independent monoid, while
     // served-row ORDER at equal timestamps turns on the cursor's per-source
@@ -860,7 +861,7 @@ fn ng_run_stats_equal_whole_file_index() {
 
             let mut live_candidates: Vec<SfstCandidate> = Vec::new();
             for (i, chunk) in chunks.iter().enumerate() {
-                let (summary, bytes) = ng_index::build_sfst_range(&wal_path, chunk.range).unwrap();
+                let (summary, bytes) = ng_index::index_logs_range(&wal_path, chunk.range).unwrap();
                 live_candidates.push(SfstCandidate {
                     summary,
                     // Mirror production (handler.rs): chunks of one WAL share
@@ -960,7 +961,7 @@ fn ng_run_rows_match_whole_file_index() {
 
     let mut live: Vec<SfstCandidate> = Vec::new();
     for (i, chunk) in chunks.iter().enumerate() {
-        let (summary, bytes) = ng_index::build_sfst_range(&wal_path, chunk.range).unwrap();
+        let (summary, bytes) = ng_index::index_logs_range(&wal_path, chunk.range).unwrap();
         live.push(SfstCandidate {
             summary,
             file_seq: 1,

@@ -1,6 +1,6 @@
 //! Phase 1 of indexing: the in-memory [`RowIndex`] a producer fills
 //! while reading its source — for the in-tree producer, decoding WAL frames
-//! (`src/crates/ng-index/src/sfst_build.rs`) — before Phase 2 (`build.rs`,
+//! (`src/crates/ng-index/src/indexing.rs`) — before Phase 2 (`build.rs`,
 //! behind [`crate::IndexWriter`]) streams it out as on-disk chunks.
 //!
 //! Core structures, plus the optional per-row columns on [`RowIndex`]:

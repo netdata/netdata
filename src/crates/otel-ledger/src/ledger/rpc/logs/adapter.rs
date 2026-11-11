@@ -526,7 +526,7 @@ fn group_row_fields(row: &sfst::MaterializedRow) -> HashMap<&str, Vec<&str>> {
 /// cells). The dedicated severity cell takes the **last** `severity_text`
 /// value in row order. Row pairs are interned resource → scope → record,
 /// and a record's top-level scalars (incl. `severity_text`) come before
-/// its `attributes.*` (ng-flatten/src/common.rs, ng-index/src/sfst_build.rs),
+/// its `attributes.*` (ng-flatten/src/common.rs, ng-index/src/indexing.rs),
 /// so the last value is the projected LogRecord severity unless an
 /// attribute also carries the name — in that clash the attribute wins.
 fn build_row_cells(

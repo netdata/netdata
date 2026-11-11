@@ -1,7 +1,7 @@
 //! `ng-index`: index the flattened-frame WAL that `ng-ingest` writes into a
 //! standard SFST index file, then smoke-test the result. This is the standalone
 //! logs-side CLI; the traces analog is `ng-index-traces` (`src/bin/traces.rs`),
-//! while the production indexing path is the library's `build_sfst_file`, which
+//! while the production indexing path is the library's `index_logs_file`, which
 //! `otel-ledger`'s indexer calls directly.
 //!
 //! ```text
@@ -9,7 +9,7 @@
 //! ```
 //!
 //! Streams the single `.wal` file inside `--flat` into an SFST index at `--sfst`
-//! in one pass (`build_sfst` in `sfst_build.rs`), reporting to stdout: frame and
+//! in one pass (`index_logs_dir` in `indexing.rs`), reporting to stdout: frame and
 //! record counts, intern hit rate, on-disk size, per-phase timings and RSS. No
 //! environment variables or stdin are read. The file is then re-opened and its
 //! record count plus collapsed-array (`[]`) field names printed — the successful
@@ -20,13 +20,13 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::Parser;
-use ng_index::{Metrics, build_sfst, read_rss};
+use ng_index::{Metrics, index_logs_dir, read_rss};
 use sfst::IndexReader;
 
 #[derive(Parser)]
 #[command(
     name = "ng-index",
-    about = "Build an SFST index from a flattened-frame WAL"
+    about = "Index a flattened-frame WAL into an SFST file"
 )]
 struct Args {
     /// Directory holding the flattened WAL written by `ng-ingest`. Must contain
@@ -51,10 +51,10 @@ fn main() -> ExitCode {
 /// and collapsed-array (`[]`) field names. A successful re-open is the only
 /// automated check — the counts are printed for eyeballing, nothing is asserted.
 fn run_sfst(args: &Args, out_path: &Path, metrics: &Metrics) -> ExitCode {
-    let stats = match build_sfst(&args.flat, out_path, metrics) {
+    let stats = match index_logs_dir(&args.flat, out_path, metrics) {
         Ok(stats) => stats,
         Err(e) => {
-            eprintln!("error: build sfst from {} failed: {e}", args.flat.display());
+            eprintln!("error: indexing {} failed: {e}", args.flat.display());
             return ExitCode::FAILURE;
         }
     };

@@ -143,7 +143,7 @@ impl WalScan {
     ///
     /// Renders each typed entry to its canonical `key=value` via
     /// `ng_flatten::build_kv` and uses `Record.ts` as the row timestamp,
-    /// mirroring `ng-index`'s indexing (`build_sfst`) exactly — same
+    /// mirroring `ng-index`'s indexing (`index_logs_dir`) exactly — same
     /// resource→scope→record token assembly, same per-occurrence rendering —
     /// so a scan and an SFST indexed from the same frames agree by
     /// construction.
@@ -165,7 +165,7 @@ impl WalScan {
     }
 
     /// Drive the shared [`ScanSink`] from a flattened-frame WAL reader.
-    /// Mirrors `ng_index::build_sfst`'s row construction — per record, the
+    /// Mirrors `ng_index::index_logs_dir`'s row construction — per record, the
     /// resource ++ scope ++ record token assembly with `Record.ts` as the
     /// timestamp — so the rows fed here are the rows the sealed builder
     /// indexes.

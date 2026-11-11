@@ -25,8 +25,8 @@ use memmap2::{Mmap, UncheckedAdvice};
 ///
 /// `File` is the steady-state case — a sealed index on disk, memory-
 /// mapped lazily. `Memory` is an in-memory SFST indexed from a chunk of
-/// an active WAL (`ng_index::build_sfst_range` /
-/// `build_sfst_traces_range`); the bytes are shared (`Arc`) so a query
+/// an active WAL (`ng_index::index_logs_range` /
+/// `index_traces_range`); the bytes are shared (`Arc`) so a query
 /// holds them alive even if the producing cache evicts the entry
 /// mid-query.
 #[derive(Clone)]

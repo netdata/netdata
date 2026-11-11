@@ -19,7 +19,7 @@ use file_lifecycle::chunk::BuiltChunk;
 use wal::prefix::{ChunkBoundary, ChunkFold};
 
 /// Indexes one WAL byte range into an SFST image (the signal's range
-/// indexing function, e.g. `ng_index::build_sfst_traces_range`).
+/// indexing function, e.g. `ng_index::index_traces_range`).
 pub(crate) type ChunkSealFn =
     fn(&Path, wal::FrameRange) -> Result<(sfst::Summary, Vec<u8>), ng_index::Error>;
 

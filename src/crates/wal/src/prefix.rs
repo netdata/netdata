@@ -21,8 +21,8 @@
 //! Both parts are read back with
 //! [`Reader::open_range`](crate::Reader::open_range), the bounded mode
 //! of `reader.rs`. A chunk's range is one window: the ledger indexes
-//! it into an SFST with `ng_index::build_sfst_range` /
-//! `build_sfst_traces_range` (record count cross-checked against
+//! it into an SFST with `ng_index::index_logs_range` /
+//! `index_traces_range` (record count cross-checked against
 //! [`ChunkBoundary::entry_count`]) and memoizes the image
 //! (file-lifecycle's `ChunkCache`). The tail from [`tail_start`] to
 //! `valid_up_to` is row-scanned per query by sfsq's WAL scans; a frame
@@ -66,8 +66,8 @@ pub struct ChunkBoundary {
     /// recorded by the scan; the start is the fold's `start` or the prior
     /// chunk's end), i.e. a valid
     /// [`Reader::open_range`](crate::Reader::open_range) window the
-    /// ledger passes straight to `ng_index::build_sfst_range` /
-    /// `build_sfst_traces_range`.
+    /// ledger passes straight to `ng_index::index_logs_range` /
+    /// `index_traces_range`.
     pub range: crate::FrameRange,
     /// Log records in the chunk — the sum of the frames' entry counts,
     /// at least `min_entries`. The ledger passes this as the expected

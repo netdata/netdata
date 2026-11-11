@@ -3,7 +3,7 @@
 //! delegate to the Phase-2 writer in `build.rs` (this file is its only
 //! consumer; the format pipeline is documented there, down to the
 //! low-level container writer in `writer.rs`). Production callers:
-//! `ng-index/src/sfst_build.rs` — indexing of closed WAL files and chunk
+//! `ng-index/src/indexing.rs` — indexing of closed WAL files and chunk
 //! indexing over active ones — plus this crate's own tests.
 
 use std::io::{Seek, Write};

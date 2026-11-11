@@ -499,7 +499,7 @@ fn prepare(source: &TraceSource, window: &TimeWindow) -> Prepared {
             }
         }
         TraceSource::Tail(tail) => {
-            match ng_index::build_sfst_traces_range(&tail.path, tail.coverage.range) {
+            match ng_index::index_traces_range(&tail.path, tail.coverage.range) {
                 Ok((summary, _)) if !overlaps(&summary) => Prepared::Outside,
                 Ok((_, bytes)) => Prepared::Open(Mapped::Memory(Arc::new(bytes))),
                 Err(error) => Prepared::Failed(format!("building the tail image: {error}")),

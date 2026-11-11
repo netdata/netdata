@@ -151,7 +151,7 @@ impl TraceWalScan {
         }
         // Accumulates the frames' typed schema trees — the source of the
         // field-kind map, exactly as indexing accumulates its on-disk
-        // tree (`src/crates/ng-index/src/sfst_build.rs`).
+        // tree (`src/crates/ng-index/src/indexing.rs`).
         let mut flattener = ng_flatten::Flattener::new();
         while let Some(frame) = reader.next_frame()? {
             frame_no += 1;

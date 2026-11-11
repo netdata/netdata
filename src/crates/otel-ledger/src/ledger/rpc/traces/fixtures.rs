@@ -222,15 +222,14 @@ pub(crate) fn write_traces_wal(
 }
 
 /// Index `reqs` into real traces SFST bytes:
-/// `ng_index::build_sfst_traces_range` — the same call the engine's
+/// `ng_index::index_traces_range` — the same call the engine's
 /// on-query chunk indexing makes — over a fresh WAL holding one frame per
 /// request. Returns the indexing's own summary alongside the bytes.
 pub(crate) fn sealed_traces(reqs: Vec<ExportTraceServiceRequest>) -> (sfst::Summary, Vec<u8>) {
     let staging = tempfile::tempdir().unwrap();
     let wal = write_traces_wal(staging.path(), reqs);
     let len = std::fs::metadata(&wal).unwrap().len();
-    ng_index::build_sfst_traces_range(&wal, wal::FrameRange::new(wal::HEADER_SIZE as u64, len))
-        .unwrap()
+    ng_index::index_traces_range(&wal, wal::FrameRange::new(wal::HEADER_SIZE as u64, len)).unwrap()
 }
 
 /// Install `reqs` indexed as `tenant`'s local SFST of sequence `seq`: the

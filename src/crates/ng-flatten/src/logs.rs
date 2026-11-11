@@ -4,7 +4,7 @@
 //! bincode codec) lives in [`crate::common`]; the span analog is [`crate::traces`].
 //!
 //! One record → one SFST row. What becomes what at index time (the filler is
-//! `src/crates/ng-index/src/sfst_build.rs::populate_row_index`):
+//! `src/crates/ng-index/src/indexing.rs::populate_row_index`):
 //! - interned facets: `severity_number`, `severity_text`, `event_name`,
 //!   `body.*` (a JSON-object string body arrives pre-parsed into a kvlist, so
 //!   its keys explode into typed leaves), `attributes.*`, plus the per-group
@@ -25,7 +25,7 @@
 //! [`prepare_log_frame`] is the single normalize → flatten → encode recipe;
 //! producers: `ng-ingest::write_request` (no bounds) and the `otel-ingestor`
 //! logs service (with ingestion bounds). Readers decode via [`decode_log_frame`]:
-//! `ng-index::sfst_build` (the indexing of a closed WAL file) and `sfsq::logs`
+//! `ng-index::indexing` (the indexing of a closed WAL file) and `sfsq::logs`
 //! (unindexed WAL-tail scan).
 
 use serde::{Deserialize, Serialize};
@@ -75,7 +75,7 @@ pub struct LogScopeGroup {
 /// (resolves timestamps, clears malformed ids, replaces a JSON-object string
 /// body with its parsed structure), so the frame stores the post-normalization
 /// record, not the original wire bytes. What the SFST keeps of each field is
-/// decided later, at index time (`build_sfst`).
+/// decided later, at index time (`index_logs_dir`).
 ///
 /// Columns — identifiers/scalars retrieved per row, deliberately NOT FST facets:
 /// - `ts` / `observed_ts`: the resolved `time_unix_nano` and the raw

@@ -18,10 +18,10 @@
 //!   (`EVNB`/`LNKB`), the per-file trace rollup (`TRSU`), and the `TIDX`
 //!   index + `TBLM` bloom over the chronological trace ids.
 //!
-//! Entry points: file indexing — [`build_sfst`] (logs, from a WAL directory)
-//! and [`build_sfst_file`] / [`build_sfst_traces_file`] (from one WAL path;
+//! Entry points: file indexing — [`index_logs_dir`] (logs, from a WAL directory)
+//! and [`index_logs_file`] / [`index_traces_file`] (from one WAL path;
 //! the `otel-ledger` indexing operation) — and chunk indexing
-//! [`build_sfst_range`] / [`build_sfst_traces_range`] (the on-query chunk over
+//! [`index_logs_range`] / [`index_traces_range`] (the on-query chunk over
 //! an active WAL's durable prefix). Both paths of a signal share one populate
 //! fn, so chunk bytes match an indexed file over the same frames. Also
 //! [`to_sfst_tree`], the canonical ng-flatten→sfst schema-tree conversion (the
@@ -168,7 +168,7 @@ fn intern_entries(
 /// Populate `row_index` from every frame `reader` yields: intern each entry
 /// (resource ++ scope ++ record), feed the per-row columns and the row `ts`, and
 /// accumulate then attach the global typed schema tree. Shared by file indexing
-/// ([`build_sfst`]) and chunk indexing ([`build_sfst_range`]) so both
+/// ([`index_logs_dir`]) and chunk indexing ([`index_logs_range`]) so both
 /// produce byte-identical chunks from the same frames — only the output sink differs.
 fn populate_row_index(
     reader: &mut wal::Reader,
@@ -217,7 +217,7 @@ fn populate_row_index(
             })?
         };
 
-        let _t = metrics.scope("index");
+        let _t = metrics.scope("fill");
         let tree = &flattened.tree;
         // Intern this frame's tree into the global tree (indexing-only; the map
         // is unused — paths below render identically from the per-frame tree).
@@ -304,8 +304,12 @@ fn check_payload_format(reader: &wal::Reader, expected: u16) -> Result<(), Error
 
 /// Index the flattened **logs** WAL in `flat_dir` into an SFST file at
 /// `out_path` (the `ng-index` binary's entry point). Single pass; phases
-/// timed: `read` / `deserialize` / `index` / `build`.
-pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result<SfstStats, Error> {
+/// timed: `read` / `deserialize` / `fill` / `write`.
+pub fn index_logs_dir(
+    flat_dir: &Path,
+    out_path: &Path,
+    metrics: &Metrics,
+) -> Result<SfstStats, Error> {
     let path = sole_wal_file(flat_dir)?;
     let mut reader = wal::Reader::open(&path)?;
     // The WAL header carries the authoritative identity blob the ingestor wrote;
@@ -314,7 +318,7 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
     let arena = Bump::new();
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     let stats = populate_row_index(&mut reader, &mut row_index, metrics)?;
-    let _t = metrics.scope("build");
+    let _t = metrics.scope("write");
     IndexWriter::write_file(&row_index, out_path, content_meta)?;
     Ok(stats)
 }
@@ -323,9 +327,9 @@ pub fn build_sfst(flat_dir: &Path, out_path: &Path, metrics: &Metrics) -> Result
 /// returning the registry-facing `sfst::Summary` + the written file size. The
 /// production entry point of indexing a closed WAL file, which `otel-ledger` calls
 /// with a concrete WAL path.
-/// Same typed tree + per-row columns as [`build_sfst`]; it just skips the
+/// Same typed tree + per-row columns as [`index_logs_dir`]; it just skips the
 /// `sole_wal_file` directory probe.
-pub fn build_sfst_file(
+pub fn index_logs_file(
     wal_path: &Path,
     out_path: &Path,
     metrics: &Metrics,
@@ -335,7 +339,7 @@ pub fn build_sfst_file(
     let arena = Bump::new();
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     populate_row_index(&mut reader, &mut row_index, metrics)?;
-    let _t = metrics.scope("build");
+    let _t = metrics.scope("write");
     let (summary, _metadata) = IndexWriter::write_file(&row_index, out_path, content_meta)?;
     let size = std::fs::metadata(out_path)?.len();
     Ok((summary, size))
@@ -343,7 +347,7 @@ pub fn build_sfst_file(
 
 /// Index a chunk: an **in-memory** SFST over a frame-aligned `range` of an active
 /// flattened WAL, returning its `sfst::Summary` plus the serialized bytes (openable
-/// with `sfst::IndexReader::open`). The in-memory counterpart of [`build_sfst`] —
+/// with `sfst::IndexReader::open`). The in-memory counterpart of [`index_logs_dir`] —
 /// on-query chunk indexing over an active WAL's durable-unindexed prefix. Reads only
 /// the frames in `range` via `wal::Reader::open_range` (see `wal::FrameRange` for the
 /// frame-boundary / durable-prefix soundness checks); the typed tree + per-row
@@ -351,7 +355,7 @@ pub fn build_sfst_file(
 /// indexed file over the same frames. The caller cross-checks `summary.record_count`
 /// against the expected count to detect a truncated prefix (the check `open_range`
 /// defers).
-pub fn build_sfst_range(
+pub fn index_logs_range(
     wal_path: &Path,
     range: wal::FrameRange,
 ) -> Result<(sfst::Summary, Vec<u8>), Error> {
@@ -365,14 +369,14 @@ pub fn build_sfst_range(
     Ok((summary, cursor.into_inner()))
 }
 
-/// The **traces** counterpart of [`build_sfst_range`]: an in-memory SFST over a
+/// The **traces** counterpart of [`index_logs_range`]: an in-memory SFST over a
 /// frame-aligned `range` of an active flattened-traces WAL — on-query chunk
 /// indexing over the durable-unindexed prefix. Same typed tree + span per-row
-/// columns (+ TIDX/TBLM) as [`build_sfst_traces_file`], so the chunks are
+/// columns (+ TIDX/TBLM) as [`index_traces_file`], so the chunks are
 /// byte-identical to an indexed file over the same frames. The caller
 /// cross-checks `summary.record_count` against the expected count to detect a
 /// truncated prefix (the check `open_range` defers).
-pub fn build_sfst_traces_range(
+pub fn index_traces_range(
     wal_path: &Path,
     range: wal::FrameRange,
 ) -> Result<(sfst::Summary, Vec<u8>), Error> {
@@ -445,7 +449,7 @@ fn populate_trace_row_index(
             })?
         };
 
-        let _t = metrics.scope("index");
+        let _t = metrics.scope("fill");
         let tree = &flattened.tree;
         let _ = flattener.merge_tree(tree);
         let paths: Vec<String> = (0..tree.len() as NodeId).map(|id| tree.path(id)).collect();
@@ -650,9 +654,9 @@ fn populate_trace_row_index(
 }
 
 /// Index a single flattened **traces** WAL file into an SFST file — the traces
-/// analog of [`build_sfst_file`]. Populates the span per-row columns and writes the
+/// analog of [`index_logs_file`]. Populates the span per-row columns and writes the
 /// `trace_id` index; returns the `sfst::Summary` + written file size.
-pub fn build_sfst_traces_file(
+pub fn index_traces_file(
     wal_path: &Path,
     out_path: &Path,
     metrics: &Metrics,
@@ -662,7 +666,7 @@ pub fn build_sfst_traces_file(
     let arena = Bump::new();
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     populate_trace_row_index(&mut reader, &mut row_index, metrics)?;
-    let _t = metrics.scope("build");
+    let _t = metrics.scope("write");
     let (summary, _metadata) = IndexWriter::write_file(&row_index, out_path, content_meta)?;
     let size = std::fs::metadata(out_path)?.len();
     Ok((summary, size))

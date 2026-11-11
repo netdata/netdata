@@ -7,7 +7,7 @@
 //! sealed SFSTs; each active WAL's durable prefix as chunk images plus a
 //! row-scanned tail, indexed OFF the registry lock through the shared
 //! singleflight [`ChunkCache`] (traces chunk indexing:
-//! `ng_index::build_sfst_traces_range`); and — with remote storage —
+//! `ng_index::index_traces_range`); and — with remote storage —
 //! the range's remote-only files, planned from catalogs read off the
 //! same lock and downloaded once through the shared download cache. A
 //! remote file whose bytes could not be obtained, and each unreadable
@@ -469,7 +469,7 @@ impl TracesSourceSupplier {
             // joins its indexing or indexes it. (seq, index) keys never
             // collide with logs because seqs are process-global (one
             // shared highwater).
-            let init = build_chunk(ng_index::build_sfst_traces_range, wal.path.clone(), *chunk);
+            let init = build_chunk(ng_index::index_traces_range, wal.path.clone(), *chunk);
             match self.chunk_cache.get_or_build(seq, chunk.index, init).await {
                 Ok(built) => chunks.push(ResolvedChunk {
                     index: chunk.index,

@@ -98,7 +98,7 @@ pub struct TraceSfstCandidate {
     /// [`Source::Memory`] an in-memory chunk image).
     pub source: Source,
     /// Present exactly when the SFST is an in-memory chunk of an active
-    /// WAL (`ng_index::build_sfst_traces_range`); a sealed file has no
+    /// WAL (`ng_index::index_traces_range`); a sealed file has no
     /// WAL coverage. ENFORCED by [`validate_sources`]: a
     /// [`Source::Memory`]-backed candidate without coverage is rejected —
     /// omitting it would silently bypass the overlap protection.

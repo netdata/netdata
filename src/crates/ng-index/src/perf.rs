@@ -3,7 +3,7 @@
 //! end of run, plus a Linux-only RSS reader ([`read_rss`]) for the peak-memory line.
 //!
 //! Stages time themselves with [`Metrics::scope`] and feed the counters as work
-//! happens — the `scope` names and `add_*` calls live in `sfst_build.rs`, and the
+//! happens — the `scope` names and `add_*` calls live in `indexing.rs`, and the
 //! `ng-index` binary prints the report. Timing is per phase/frame, never per
 //! record, so it does not perturb the work it measures.
 

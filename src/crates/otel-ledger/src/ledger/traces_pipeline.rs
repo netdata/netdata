@@ -1,7 +1,7 @@
 //! The traces binding — the twin of the logs binding in
 //! [`super::pipeline`]. It pre-spawns the shared
 //! [`crate::indexer::Indexer`] for the **traces** signal, whose indexing
-//! operations run [`ng_index::build_sfst_traces_file`] (full span columns,
+//! operations run [`ng_index::index_traces_file`] (full span columns,
 //! `TIDX` trace-id index, `TBLM` trace-id bloom, `EVNB`/`LNKB` event/link
 //! chunks), and delegates the rest to [`super::pipeline::build_pipeline`].
 //! Only the signal, the handler, and the GET shim differ from logs.

@@ -8,7 +8,7 @@
 //! The producer (`ng-flatten`) pre-computes `xxhash64("key=value")` for
 //! every attribute and carries the hash alongside the data (`hash_kv` in
 //! `src/crates/ng-flatten/src/common.rs`). The filling code
-//! (`src/crates/ng-index/src/sfst_build.rs`) hands it to this interner:
+//! (`src/crates/ng-index/src/indexing.rs`) hands it to this interner:
 //!
 //! - [`lookup_hash`](KeyValueInterner::lookup_hash): resolve a hash to a
 //!   slot with no string at all — the fast path.

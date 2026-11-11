@@ -1,6 +1,6 @@
 //! Format-layer spike for ng-index's SFST indexing: feed plain
 //! `(timestamp_ns, [key=value])` rows — the stringified shape indexing hands
-//! `sfst` (ng-index/src/sfst_build.rs) — to `RowIndex` + `IndexWriter`, then
+//! `sfst` (ng-index/src/indexing.rs) — to `RowIndex` + `IndexWriter`, then
 //! query the file back through `IndexReader`. Two contracts:
 //!
 //! - log-shaped rows index from out-of-order timestamps and count correctly
@@ -10,9 +10,9 @@
 //!   resolves trace ids against that same column.
 //!
 //! Both tests use `RowIndex`'s inherent `intern` + `row` with hash `None`
-//! (string-keyed dedup — the producer-hash fast path `sfst_build.rs` uses is
+//! (string-keyed dedup — the producer-hash fast path `indexing.rs` uses is
 //! not exercised here). The full pipelines live one layer up: logs in
-//! `ng-index/src/sfst_build.rs`, traces in `ng-index/tests/traces_seal.rs`.
+//! `ng-index/src/indexing.rs`, traces in `ng-index/tests/traces_indexing.rs`.
 
 use bumpalo::Bump;
 use sfst::query::Filter;
@@ -23,7 +23,7 @@ use sfst::{
 use sfst::{IndexWriter, RowIndex};
 
 /// Write an SFST file from `(timestamp_ns, &[key=value])` rows; return its bytes.
-fn build_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {
+fn write_sfst(rows: &[(i64, &[&str])]) -> Vec<u8> {
     let arena = Bump::new();
     let mut ri = RowIndex::new(&arena, 100);
     for &(ts, kvs) in rows {
@@ -49,7 +49,7 @@ fn count(reader: &IndexReader, filter: Filter) -> u64 {
 }
 
 #[test]
-fn build_sfst_from_our_rows_and_query_back() {
+fn write_sfst_from_our_rows_and_query_back() {
     // Timestamps deliberately out of arrival order: the writer's time-sort
     // must make the counts independent of insertion order.
     let rows: &[(i64, &[&str])] = &[
@@ -67,7 +67,7 @@ fn build_sfst_from_our_rows_and_query_back() {
         ),
     ];
 
-    let bytes = build_sfst(rows);
+    let bytes = write_sfst(rows);
     let reader = IndexReader::open(&bytes).expect("open sfst");
 
     // Empty filter = every record.
@@ -109,9 +109,9 @@ fn build_sfst_from_our_rows_and_query_back() {
 /// dormant. Only what is asserted is pinned: span ids / flags / dropped
 /// counts are written but not read back, and the `TBLM` bloom
 /// (`build_trace_id_bloom`) stays off. The full traces pipeline has its own
-/// oracle in `ng-index/tests/traces_seal.rs`.
+/// oracle in `ng-index/tests/traces_indexing.rs`.
 #[test]
-fn build_into_writes_span_columns_and_trace_id_index() {
+fn writer_stores_span_columns_and_trace_id_index() {
     let a = TraceId::from([0xAA; 16]);
     let b = TraceId::from([0xBB; 16]);
     // Timestamps out of arrival order so the write-time time-sort reorders the

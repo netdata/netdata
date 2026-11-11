@@ -32,7 +32,7 @@
 //! the ledger's `handle_indexer_resp` (`ledger/indexer.rs` — a different
 //! indexer.rs: the response handler, not this component) or to the recovery
 //! drains, in the order the operations finish. Chunk indexing for live
-//! queries (`ng_index::build_sfst_range`) bypasses this component.
+//! queries (`ng_index::index_logs_range`) bypasses this component.
 //!
 //! Cancelling or closing the request channel exits the loop and kills the
 //! operations that still run. That loses nothing: an operation writes its index

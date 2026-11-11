@@ -5,7 +5,7 @@
 //!
 //! Fixtures go through the production path: OTLP `ResourceLogs` →
 //! `ng_flatten` flatten + `encode_log_frame` → `wal::Writer` →
-//! `ng_index::build_sfst_file` at index time. Files are FileId-named (the
+//! `ng_index::index_logs_file` at index time. Files are FileId-named (the
 //! writer names WAL files; a sealed SFST reuses its source WAL's FileId,
 //! sharing the sequence — exactly how the ledger names an indexed file,
 //! otel-ledger/src/ledger/ingestor.rs), so the CLI's directory-scan discovery
@@ -202,7 +202,7 @@ fn seal_to_sfst(wal_path: &Path, sfst_tenant_dir: &Path) -> PathBuf {
     std::fs::create_dir_all(sfst_tenant_dir).unwrap();
     let id = FileId::parse(wal_path).expect("wal fileid");
     let out = sfst_tenant_dir.join(id.to_filename("sfst"));
-    ng_index::build_sfst_file(wal_path, &out, &ng_index::Metrics::new()).expect("index");
+    ng_index::index_logs_file(wal_path, &out, &ng_index::Metrics::new()).expect("index");
     out
 }
 

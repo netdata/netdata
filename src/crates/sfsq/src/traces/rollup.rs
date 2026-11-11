@@ -4,7 +4,7 @@
 //!
 //! - **Sealed files / chunks** carry the `TRSU` rollup chunk
 //!   (`sfst::TraceRollup`, folded per file by the indexer's span
-//!   walk — `src/crates/ng-index/src/sfst_build.rs`), read through
+//!   walk — `src/crates/ng-index/src/indexing.rs`), read through
 //!   [`sealed_trace_envelopes`].
 //! - **WAL tails** have no rollup; [`tail_trace_aggregates`] folds the
 //!   scan's decoded spans directly, with the SAME pinned semantics the

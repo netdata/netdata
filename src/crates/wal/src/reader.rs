@@ -40,7 +40,7 @@
 //!
 //! # Consumers (grep-verified)
 //!
-//! `ng-index` (`sfst_build.rs`): indexing closed WAL files via `open`,
+//! `ng-index` (`indexing.rs`): indexing closed WAL files via `open`,
 //! chunk indexing for queries via `open_range` (counts cross-checked).
 //! `sfsq` (`logs/wal_scan.rs`, `traces/wal_scan.rs`): tail row-scans via
 //! `open_range`, whole files via `open` in tests/tooling. `otel-ledger`

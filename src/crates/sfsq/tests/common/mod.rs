@@ -264,11 +264,11 @@ pub fn whole_range(wal_path: &Path) -> wal::FrameRange {
 }
 
 /// Index `wal_path` into `<id>.sfst` under `dir` with the production
-/// indexing function (`ng_index::build_sfst_traces_file`) and return
+/// indexing function (`ng_index::index_traces_file`) and return
 /// the sealed source over it — the standard "a sealed file" fixture.
 pub fn sealed_source(dir: &Path, wal_path: &Path, id: &str) -> TraceSource {
     let out = dir.join(format!("{id}.sfst"));
-    ng_index::build_sfst_traces_file(wal_path, &out, &ng_index::Metrics::new()).unwrap();
+    ng_index::index_traces_file(wal_path, &out, &ng_index::Metrics::new()).unwrap();
     sealed_source_at(&out, id)
 }
 
@@ -330,7 +330,7 @@ pub fn sealed_source_at(path: &Path, id: &str) -> TraceSource {
 /// overlap protection instead of silently evading it via distinct ids.
 pub fn memory_source(wal_path: &Path, id: &str) -> TraceSource {
     let range = whole_range(wal_path);
-    let (summary, bytes) = ng_index::build_sfst_traces_range(wal_path, range).unwrap();
+    let (summary, bytes) = ng_index::index_traces_range(wal_path, range).unwrap();
     TraceSource::Sfst(TraceSfstCandidate {
         source_id: SourceId::new(id.to_string()),
         summary,

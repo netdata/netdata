@@ -74,7 +74,7 @@ async fn built_chunks_carry_their_records_and_summary() {
     let (path, frames) = five_frame_wal(3).await;
     let end = frames.last().unwrap().end_offset;
     let chunk = WalPrefixes::new(3).chunks(3, &path, end).await.unwrap()[0];
-    let built = build_chunk(ng_index::build_sfst_traces_range, path, chunk)
+    let built = build_chunk(ng_index::index_traces_range, path, chunk)
         .await
         .unwrap();
     assert_eq!(u64::from(built.summary.record_count), chunk.entry_count);
@@ -133,12 +133,7 @@ async fn the_prebuilder_builds_new_chunks_on_its_own() {
     let prefixes = Arc::new(WalPrefixes::new(3));
     let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
     let cancel = CancellationToken::new();
-    let prebuilder = spawn_prebuilder(
-        &prefixes,
-        ng_index::build_sfst_traces_range,
-        &cache,
-        &cancel,
-    );
+    let prebuilder = spawn_prebuilder(&prefixes, ng_index::index_traces_range, &cache, &cancel);
     prebuilder.synced(4, path, end);
     await_cached(&cache, 4, &folded_up_to(&frames, end), true).await;
     cancel.cancel();
@@ -152,7 +147,7 @@ fn counting_seal(
     range: wal::FrameRange,
 ) -> Result<(sfst::Summary, Vec<u8>), ng_index::Error> {
     SEALS.fetch_add(1, Ordering::SeqCst);
-    ng_index::build_sfst_traces_range(path, range)
+    ng_index::index_traces_range(path, range)
 }
 
 #[tokio::test]
@@ -199,12 +194,7 @@ async fn forgetting_a_wal_drops_its_boundaries_and_chunks() {
     let prefixes = Arc::new(WalPrefixes::new(3));
     let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
     let cancel = CancellationToken::new();
-    let prebuilder = spawn_prebuilder(
-        &prefixes,
-        ng_index::build_sfst_traces_range,
-        &cache,
-        &cancel,
-    );
+    let prebuilder = spawn_prebuilder(&prefixes, ng_index::index_traces_range, &cache, &cancel);
     prebuilder.synced(7, path, end);
     await_cached(&cache, 7, &chunks, true).await;
 
@@ -230,12 +220,7 @@ async fn a_forget_right_behind_a_sync_leaves_nothing() {
     let prefixes = Arc::new(WalPrefixes::new(3));
     let cache = Arc::new(ChunkCache::new(64 * 1024 * 1024));
     let cancel = CancellationToken::new();
-    let prebuilder = spawn_prebuilder(
-        &prefixes,
-        ng_index::build_sfst_traces_range,
-        &cache,
-        &cancel,
-    );
+    let prebuilder = spawn_prebuilder(&prefixes, ng_index::index_traces_range, &cache, &cancel);
     prebuilder.synced(8, path, end);
     prebuilder.forget(8);
     // Served in arrival order: once WAL 9 is indexed, WAL 8 was handled.

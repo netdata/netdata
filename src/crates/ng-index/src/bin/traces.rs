@@ -1,18 +1,18 @@
-//! `ng-index-traces`: standalone CLI for the traces index. `seal` turns one
+//! `ng-index-traces`: standalone CLI for the traces index. `index` turns one
 //! flattened **traces** WAL file into an SFST index; `trace` reads a sealed
 //! index back — reconstructing one trace by id, or sampling the ids it holds.
 //! The traces analog of the `ng-index` binary, which does the same for
 //! flattened *log* frames (a WAL directory instead of a single file).
 //!
 //! The binary is a developer/ops tool: nothing wires it into the live
-//! `otel-ledger` pipeline. Its `seal`, though, is the pipeline's indexing —
-//! the same `ng_index::build_sfst_traces_file` the `otel-ledger` traces
+//! `otel-ledger` pipeline. Its `index`, though, is the pipeline's indexing —
+//! the same `ng_index::index_traces_file` the `otel-ledger` traces
 //! indexer runs (`src/crates/otel-ledger/src/ledger/traces_pipeline.rs`) — so
 //! an index written here is exactly what the live query path serves. The input
 //! WAL is produced by `ng-ingest-traces`.
 //!
 //! ```text
-//! ng-index-traces seal  --in ~/repos/tmp/ng/<wal> --out /tmp/traces.sfst
+//! ng-index-traces index --in ~/repos/tmp/ng/<wal> --out /tmp/traces.sfst
 //! ng-index-traces trace --sfst /tmp/traces.sfst --trace-id <32-hex-chars>
 //! ng-index-traces trace --sfst /tmp/traces.sfst --sample 10
 //! ```
@@ -23,13 +23,13 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use ng_index::{Metrics, build_sfst_traces_file};
+use ng_index::{Metrics, index_traces_file};
 use sfst::{IndexReader, TraceId};
 
 #[derive(Parser)]
 #[command(
     name = "ng-index-traces",
-    about = "Seal a traces WAL into SFST; reconstruct traces by id"
+    about = "Index a traces WAL into an SFST file; reconstruct traces by id"
 )]
 struct Args {
     #[command(subcommand)]
@@ -38,9 +38,9 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Seal a flattened traces WAL file (from `ng-ingest-traces`) into an SFST index,
+    /// Index a flattened traces WAL file (from `ng-ingest-traces`) into an SFST file,
     /// writing the per-row span columns and the `trace_id` index.
-    Seal {
+    Index {
         /// The flattened traces WAL file.
         #[arg(long = "in")]
         input: PathBuf,
@@ -66,7 +66,7 @@ enum Cmd {
 
 fn main() -> ExitCode {
     match Args::parse().cmd {
-        Cmd::Seal { input, out } => seal(&input, &out),
+        Cmd::Index { input, out } => index_wal(&input, &out),
         Cmd::Trace {
             sfst,
             trace_id: Some(id),
@@ -134,14 +134,14 @@ fn sample_ids(sfst_path: &Path, limit: usize) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn seal(wal: &Path, out: &Path) -> ExitCode {
+fn index_wal(wal: &Path, out: &Path) -> ExitCode {
     // The library does all the work; its Metrics are gathered but never
     // reported here (unlike `ng-index`, which prints a report at the end).
     let metrics = Metrics::new();
-    match build_sfst_traces_file(wal, out, &metrics) {
+    match index_traces_file(wal, out, &metrics) {
         Ok((summary, size)) => {
             println!(
-                "sealed {} spans → {} ({} bytes)",
+                "indexed {} spans → {} ({} bytes)",
                 summary.record_count,
                 out.display(),
                 size,
@@ -149,7 +149,7 @@ fn seal(wal: &Path, out: &Path) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(e) => {
-            eprintln!("seal failed: {e}");
+            eprintln!("indexing failed: {e}");
             ExitCode::FAILURE
         }
     }

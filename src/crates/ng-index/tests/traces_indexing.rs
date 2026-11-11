@@ -1,6 +1,6 @@
 //! End-to-end traces oracle: synthetic OTLP requests ingested through the
-//! shared flatten recipe (the `seal()` helper below), indexed by the real
-//! `ng_index::build_sfst_traces_file`, and read back through the real
+//! shared flatten recipe (the `index_wal()` helper below), indexed by the real
+//! `ng_index::index_traces_file`, and read back through the real
 //! `sfst::IndexReader::trace_by_id`. Two layers:
 //!  1. hand-built fixtures pin the tree-build edge cases (missing parents,
 //!     multiple roots, parent cycles, duplicate/unset span ids, clock skew,
@@ -12,14 +12,14 @@
 //!     then assert a sampled slice of its traces reconstructs via
 //!     `trace_by_id` to exactly their decoded span-id set.
 //!
-//! Not pinned here: the format layer (`tests/sfst_build_spike.rs`) and the
+//! Not pinned here: the format layer (`tests/sfst_write_spike.rs`) and the
 //! logs pipeline (`tests/count.rs`).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use file_registry::{ByteSize, MonotonicClock, TimestampNs};
-use ng_index::{Metrics, build_sfst_traces_file};
+use ng_index::{Metrics, index_traces_file};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{
     AnyValue, ArrayValue, KeyValue, KeyValueList, any_value::Value as Av,
@@ -91,7 +91,7 @@ fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 /// real writer path is exercised by the `#[ignore]`d real-WAL oracle below. Rotation
 /// is disabled so every request lands in one `.wal` file — indexing consumes a
 /// single WAL file.
-fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
+fn index_wal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
     let dir = tempfile::tempdir().unwrap();
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let config = wal::Config {
@@ -152,12 +152,12 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
         .find(|p| p.extension().is_some_and(|x| x == "wal"))
         .expect("a wal file was written");
     let out = dir.path().join("traces.sfst");
-    build_sfst_traces_file(&wal_path, &out, &Metrics::new()).unwrap();
+    index_traces_file(&wal_path, &out, &Metrics::new()).unwrap();
     std::fs::read(&out).unwrap()
 }
 
 #[test]
-fn traces_build_refuses_logs_payload_format() {
+fn traces_indexing_refuses_logs_payload_format() {
     // TRACES indexing must refuse a WAL stamped with the logs frame codec —
     // the cross-signal mixup the per-file format tag exists to catch.
     let dir = tempfile::tempdir().unwrap();
@@ -192,7 +192,7 @@ fn traces_build_refuses_logs_payload_format() {
         .map(|e| e.path())
         .find(|p| p.extension().is_some_and(|x| x == "wal"))
         .unwrap();
-    match build_sfst_traces_file(&wal_path, &dir.path().join("t.sfst"), &Metrics::new()) {
+    match index_traces_file(&wal_path, &dir.path().join("t.sfst"), &Metrics::new()) {
         Err(ng_index::Error::PayloadFormat { found, expected }) => {
             assert_eq!(found, ng_flatten::LOG_FRAME_PAYLOAD_FORMAT);
             assert_eq!(expected, ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT);
@@ -210,7 +210,7 @@ const ROOT_PARENT: [u8; 8] = [0u8; 8]; // unset parent = root
 fn trace_by_id_builds_linear_tree() {
     let t = [0xA1u8; 16];
     let (root, child, grand) = ([1u8; 8], [2u8; 8], [3u8; 8]);
-    let bytes = seal(vec![req(vec![
+    let bytes = index_wal(vec![req(vec![
         span(t, root, ROOT_PARENT, 100, 200, "root"),
         span(t, child, root, 110, 180, "child"),
         span(t, grand, child, 120, 160, "grand"),
@@ -251,7 +251,7 @@ fn trace_by_id_collapses_duplicate_span_ids() {
     // A resent span (same trace_id + span_id) must collapse to one node.
     let t = [0xB2u8; 16];
     let (root, dup) = ([1u8; 8], [2u8; 8]);
-    let bytes = seal(vec![req(vec![
+    let bytes = index_wal(vec![req(vec![
         span(t, root, ROOT_PARENT, 100, 200, "root"),
         span(t, dup, root, 110, 150, "a"),
         span(t, dup, root, 110, 150, "a"),
@@ -274,7 +274,7 @@ fn trace_by_id_forms_a_forest_from_orphans_and_multiple_roots() {
     // Two explicit roots (unset parent) + one orphan (parent absent from the file).
     let t = [0xC3u8; 16];
     let (r1, r2, orphan, missing) = ([1u8; 8], [2u8; 8], [3u8; 8], [9u8; 8]);
-    let bytes = seal(vec![req(vec![
+    let bytes = index_wal(vec![req(vec![
         span(t, r1, ROOT_PARENT, 100, 200, "root1"),
         span(t, r2, ROOT_PARENT, 105, 150, "root2"),
         span(t, orphan, missing, 110, 140, "orphan"),
@@ -301,7 +301,7 @@ fn trace_by_id_handles_clock_skew() {
     // the parent/child edge must still be built from the ids.
     let t = [0xD4u8; 16];
     let (root, child) = ([1u8; 8], [2u8; 8]);
-    let bytes = seal(vec![req(vec![
+    let bytes = index_wal(vec![req(vec![
         span(t, root, ROOT_PARENT, 200, 300, "root"),
         span(t, child, root, 100, 150, "child"),
     ])]);
@@ -336,7 +336,7 @@ fn trace_by_id_handles_large_fan_out() {
         let sid = (i + 2).to_be_bytes(); // unique, never all-zero, never == root
         spans.push(span(t, sid, root, 100 + i, 200, "leaf"));
     }
-    let bytes = seal(vec![req(spans)]);
+    let bytes = index_wal(vec![req(spans)]);
     let tr = IndexReader::open(&bytes)
         .unwrap()
         .trace_by_id(TraceId::from(t))
@@ -358,7 +358,7 @@ fn trace_by_id_cycle_surfaces_all_spans_under_a_root() {
     // no span is lost / unreachable.
     let t = [0x7cu8; 16];
     let (a, b) = ([1u8; 8], [2u8; 8]);
-    let bytes = seal(vec![req(vec![
+    let bytes = index_wal(vec![req(vec![
         span(t, a, b, 100, 200, "a"), // a's parent is b
         span(t, b, a, 110, 190, "b"), // b's parent is a
     ])]);
@@ -393,7 +393,7 @@ fn trace_by_id_keeps_distinct_unset_span_ids() {
         name: name.into(),
         ..Default::default()
     };
-    let bytes = seal(vec![req(vec![mk("a", 100), mk("b", 110)])]);
+    let bytes = index_wal(vec![req(vec![mk("a", 100), mk("b", 110)])]);
     let tr = IndexReader::open(&bytes)
         .unwrap()
         .trace_by_id(TraceId::from(t))
@@ -414,7 +414,7 @@ fn trace_by_id_reaches_all_spans_despite_a_cyclic_component() {
     // would leave X,Y unreachable. The reachability guard must surface them.
     let t = [0x5bu8; 16];
     let (r, c, x, y) = ([1u8; 8], [2u8; 8], [3u8; 8], [4u8; 8]);
-    let bytes = seal(vec![req(vec![
+    let bytes = index_wal(vec![req(vec![
         span(t, r, ROOT_PARENT, 100, 200, "root"),
         span(t, c, r, 110, 150, "child"),
         span(t, x, y, 120, 160, "x"), // x's parent is y
@@ -443,7 +443,7 @@ fn trace_by_id_self_parent_is_a_root() {
     // self-edge in `children`.
     let t = [0x9eu8; 16];
     let s = [1u8; 8];
-    let bytes = seal(vec![req(vec![span(t, s, s, 100, 200, "self")])]);
+    let bytes = index_wal(vec![req(vec![span(t, s, s, 100, 200, "self")])]);
     let tr = IndexReader::open(&bytes)
         .unwrap()
         .trace_by_id(TraceId::from(t))
@@ -463,7 +463,7 @@ fn trace_by_id_surfaces_flags_and_dropped_count() {
     let mut s = span(t, [1u8; 8], ROOT_PARENT, 100, 200, "x");
     s.flags = 0x1;
     s.dropped_attributes_count = 3;
-    let bytes = seal(vec![req(vec![s])]);
+    let bytes = index_wal(vec![req(vec![s])]);
     let tr = IndexReader::open(&bytes)
         .unwrap()
         .trace_by_id(TraceId::from(t))
@@ -476,7 +476,7 @@ fn trace_by_id_surfaces_flags_and_dropped_count() {
 #[test]
 fn trace_by_id_absent_is_empty() {
     let t = [0xF6u8; 16];
-    let bytes = seal(vec![req(vec![span(
+    let bytes = index_wal(vec![req(vec![span(
         t,
         [1u8; 8],
         ROOT_PARENT,
@@ -496,7 +496,7 @@ fn trace_by_id_separates_interleaved_traces() {
     // Two traces interleaved across one batch, reusing the same span ids:
     // each lookup reconstructs only its own trace's spans.
     let (ta, tb) = ([0x1au8; 16], [0x2bu8; 16]);
-    let bytes = seal(vec![req(vec![
+    let bytes = index_wal(vec![req(vec![
         span(ta, [1u8; 8], ROOT_PARENT, 100, 200, "a-root"),
         span(tb, [1u8; 8], ROOT_PARENT, 105, 210, "b-root"),
         span(ta, [2u8; 8], [1u8; 8], 110, 180, "a-child"),
@@ -510,7 +510,7 @@ fn trace_by_id_separates_interleaved_traces() {
 
 /// Self-consistency oracle against the re-captured real traces WAL.
 /// Ignored by default (CI has no WAL); run with:
-///   `cargo test -p ng-index --test traces_seal -- --ignored`
+///   `cargo test -p ng-index --test traces_indexing -- --ignored`
 /// after re-capturing with `ng-ingest-traces`.
 #[test]
 #[ignore = "requires the re-captured traces WAL under $HOME/repos/tmp/ng"]
@@ -549,7 +549,7 @@ fn oracle_real_wal_self_consistency() {
     // Index + reopen.
     let out = tempfile::tempdir().unwrap();
     let sfst_path = out.path().join("traces.sfst");
-    let (summary, _size) = build_sfst_traces_file(&wal_path, &sfst_path, &Metrics::new()).unwrap();
+    let (summary, _size) = index_traces_file(&wal_path, &sfst_path, &Metrics::new()).unwrap();
     let bytes = std::fs::read(&sfst_path).unwrap();
     let index = IndexReader::open(&bytes).unwrap();
 
@@ -672,7 +672,7 @@ fn events_links_and_deferred_scalars_round_trip() {
         dropped_attributes_count: 0,
     }];
 
-    let bytes = seal(vec![req(vec![root, early])]);
+    let bytes = index_wal(vec![req(vec![root, early])]);
     let index = IndexReader::open(&bytes).unwrap();
     assert!(index.has_event_index(), "EVNB present");
     assert!(index.has_link_index(), "LNKB present");
@@ -787,7 +787,7 @@ fn events_links_and_deferred_scalars_round_trip() {
 #[test]
 fn no_events_no_links_no_chunks() {
     let trace = [0xE2u8; 16];
-    let bytes = seal(vec![req(vec![span(
+    let bytes = index_wal(vec![req(vec![span(
         trace, [1; 8], [0; 8], 1_000, 2_000, "plain",
     )])]);
     let index = IndexReader::open(&bytes).unwrap();
@@ -807,7 +807,7 @@ fn dropped_count_alone_preserves_the_chunk() {
     let trace = [0xE3u8; 16];
     let mut s = span(trace, [1; 8], [0; 8], 1_000, 2_000, "lossy");
     s.dropped_events_count = 9;
-    let bytes = seal(vec![req(vec![s])]);
+    let bytes = index_wal(vec![req(vec![s])]);
     let index = IndexReader::open(&bytes).unwrap();
     assert!(index.has_event_index(), "EVNB carries the dropped count");
     assert!(!index.has_link_index());
@@ -821,7 +821,7 @@ fn dropped_count_alone_preserves_the_chunk() {
 /// an empty trace through the bloom pre-check (same observable result as an
 /// exact lookup, cheaper path).
 #[test]
-fn seal_writes_trace_id_bloom() {
+fn indexing_writes_trace_id_bloom() {
     let traces: Vec<[u8; 16]> = (1..=40u8).map(|i| [i; 16]).collect();
     let spans: Vec<Span> = traces
         .iter()
@@ -834,9 +834,9 @@ fn seal_writes_trace_id_bloom() {
             ]
         })
         .collect();
-    let bytes = seal(vec![req(spans)]);
+    let bytes = index_wal(vec![req(spans)]);
     let index = IndexReader::open(&bytes).unwrap();
-    assert!(index.has_trace_id_bloom(), "TBLM present after the seal");
+    assert!(index.has_trace_id_bloom(), "TBLM present after indexing");
 
     let bloom = index.trace_id_bloom().unwrap();
     assert_eq!(bloom.distinct_ids(), 40);
@@ -855,7 +855,7 @@ fn seal_writes_trace_id_bloom() {
 // ── The trace rollup (TRSU) ─────────────────────────────────────────
 
 #[test]
-fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
+fn indexing_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
     // Two traces: A has a true root (unset parent) + a child; B has NO
     // unset-parent span (a broken/partial trace) — its root columns must
     // be sentinels, never a synthesized guess. A's child span is stored
@@ -863,7 +863,7 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
     let a_root = span([0xA; 16], [1; 8], [0; 8], 1_000, 2_000, "root-op");
     let a_child = span([0xA; 16], [2; 8], [1; 8], 1_200, 1_500, "child-op");
     let b_orphan = span([0xB; 16], [3; 8], [9; 8], 5_000, 6_000, "orphan-op");
-    let bytes = seal(vec![req(vec![a_root, a_child.clone(), a_child, b_orphan])]);
+    let bytes = index_wal(vec![req(vec![a_root, a_child.clone(), a_child, b_orphan])]);
 
     let reader = IndexReader::open(&bytes).unwrap();
     assert!(reader.has_trace_rollup());
@@ -905,7 +905,7 @@ fn seal_writes_the_trace_rollup_with_honest_roots_and_stored_counts() {
 /// `service.name` is the sentinel entry), and the max and root starts
 /// as offsets from the row's first start.
 #[test]
-fn seal_writes_rollup_stats_per_service() {
+fn indexing_writes_rollup_stats_per_service() {
     use opentelemetry_proto::tonic::trace::v1 as otlp;
     let mut root = span([0xE; 16], [1; 8], [0; 8], 1_500, 2_000, "root-op");
     root.status = Some(otlp::Status {
@@ -916,7 +916,7 @@ fn seal_writes_rollup_stats_per_service() {
     let late = span([0xE; 16], [3; 8], [1; 8], 1_900, 1_950, "late");
     let mut svcless = req(vec![span([0xE; 16], [4; 8], [1; 8], 1_200, 1_300, "anon")]);
     svcless.resource_spans[0].resource = Some(Resource::default());
-    let bytes = seal(vec![req(vec![root, early, late.clone(), late]), svcless]);
+    let bytes = index_wal(vec![req(vec![root, early, late.clone(), late]), svcless]);
 
     let reader = IndexReader::open(&bytes).unwrap();
     assert!(reader.has_trace_rollup_stats());
@@ -960,7 +960,7 @@ fn rollup_captures_error_status_kind_and_service_absence() {
     )]);
     svcless.resource_spans[0].resource = Some(Resource::default());
 
-    let bytes = seal(vec![req(vec![root, child]), svcless]);
+    let bytes = index_wal(vec![req(vec![root, child]), svcless]);
     let reader = IndexReader::open(&bytes).unwrap();
     let rollup = reader.trace_rollup().unwrap();
     assert_eq!(rollup.len(), 2);
@@ -985,11 +985,11 @@ fn rollup_captures_error_status_kind_and_service_absence() {
 }
 
 #[test]
-fn all_unset_trace_ids_seal_without_a_rollup_chunk() {
+fn all_unset_trace_ids_index_without_a_rollup_chunk() {
     // The is-meaningful rule: a file whose spans all carry the unset
     // trace id (not a trace) writes no TRSU chunk at all.
     let s = span([0; 16], [1; 8], [0; 8], 1_000, 2_000, "no-trace");
-    let bytes = seal(vec![req(vec![s])]);
+    let bytes = index_wal(vec![req(vec![s])]);
     let reader = IndexReader::open(&bytes).unwrap();
     assert!(!reader.has_trace_rollup());
     assert!(reader.trace_rollup().is_err(), "no chunk to read");

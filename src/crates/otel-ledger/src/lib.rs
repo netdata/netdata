@@ -5,7 +5,7 @@
 //! engines (`ledger::rpc`), and the shared indexer component (`indexer`,
 //! spawned per signal; its indexing operations run in child processes,
 //! `index_child`, with that signal's `ng-index` indexing function —
-//! `build_sfst_file` for logs, `build_sfst_traces_file` for traces). The
+//! `index_logs_file` for logs, `index_traces_file` for traces). The
 //! reusable machinery (registry, catalog, upload/download, cache, recovery,
 //! the per-signal `Pipeline` shell) lives in `file-lifecycle`.
 //!

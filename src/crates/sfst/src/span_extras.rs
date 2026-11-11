@@ -15,7 +15,7 @@
 //! must survive — detected via the TOC, no format version bump.
 //!
 //! Flow: traces indexing fills the accumulators
-//! (`src/crates/ng-index/src/sfst_build.rs`), `build.rs` reorders and writes
+//! (`src/crates/ng-index/src/indexing.rs`), `build.rs` reorders and writes
 //! the chunks after `TIDX`, and `ChunkReader::event_index` / `link_index`
 //! validate and decode them; the trace session materializes per-span
 //! events/links from them. Row positions are **chronological**, like every

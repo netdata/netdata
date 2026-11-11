@@ -6,7 +6,7 @@
 //! [`Flattener::flatten_scope`].
 //!
 //! One span → one SFST row. What becomes what at index time (the filler is
-//! `src/crates/ng-index/src/sfst_build.rs::populate_trace_row_index`):
+//! `src/crates/ng-index/src/indexing.rs::populate_trace_row_index`):
 //! - interned facets: `name`, `kind`/`_kind`, `role`, `status.code`/`_status_code`,
 //!   `status.message`, `trace_state`, `attributes.*` (emitted by
 //!   [`Flattener::flatten_span`]), plus the event/link `events.*` / `links.*`
@@ -21,7 +21,7 @@
 //! [`prepare_trace_frame`] is the single normalize → flatten → encode recipe;
 //! producers: `ng-ingest::write_trace_request` (no bounds — dev/bench) and the
 //! `otel-ingestor` trace service (with bounds). Readers decode via
-//! [`decode_trace_frame`]: `ng-index::sfst_build` (the indexing of a closed WAL
+//! [`decode_trace_frame`]: `ng-index::indexing` (the indexing of a closed WAL
 //! file) and `sfsq::traces` (unindexed WAL-tail scan). Same frame rule as logs:
 //! positional bincode with no inner version — the WAL header's
 //! `payload_format` id ([`TRACE_FRAME_PAYLOAD_FORMAT`]) carries the version

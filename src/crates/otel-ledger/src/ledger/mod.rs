@@ -294,7 +294,7 @@ impl Ledger {
         ));
         let traces_prebuilder = prebuild::ChunkPrebuilder::spawn(
             Arc::clone(&traces_prefixes),
-            ng_index::build_sfst_traces_range,
+            ng_index::index_traces_range,
             Arc::clone(&chunk_cache),
             cancel.child_token(),
         );
@@ -330,7 +330,7 @@ impl Ledger {
         // download cache and the chunk cache (seqs are process-global, so
         // cache keys never collide across signals) but has its own
         // `{base}/traces/...` dirs, traces indexing
-        // (`ng_index::build_sfst_traces_file`), and the `otel-traces`
+        // (`ng_index::index_traces_file`), and the `otel-traces`
         // Function handler.
         let traces = traces_pipeline::build_traces_pipeline(
             Signal::Traces,

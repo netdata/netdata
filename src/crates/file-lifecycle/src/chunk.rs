@@ -9,7 +9,7 @@
 //! frame-boundary scan over `[HEADER_SIZE, valid_up_to)` (the durable
 //! read bound, whose soundness rules live in `wal::reader`) into chunk
 //! windows, and each window is indexed into an SFST with
-//! `ng_index::build_sfst_range` / `build_sfst_traces_range`, the indexed
+//! `ng_index::index_logs_range` / `index_traces_range`, the indexed
 //! record count cross-checked against the scan's `entry_count`. This
 //! module owns the memoization:
 //!

@@ -2,13 +2,13 @@
 //! in-process, flattened through the shared `ng-flatten` path, and written as
 //! flattened-frame WAL frames with the raw `wal::Writer` — the same flatten +
 //! emit-time hashes + bincode frame encoding `ng-ingest` writes at ingest,
-//! minus its normalization step. `build_sfst` / `build_sfst_range` index the
+//! minus its normalization step. `index_logs_dir` / `index_logs_range` index the
 //! WAL and `sfst::IndexReader` reads the sealed file back.
 //!
 //! Pins:
 //!
 //! - the payload-format gate (`check_payload_format` in ng-index's
-//!   `sfst_build.rs`): a WAL stamped with the traces codec is refused by the
+//!   `indexing.rs`): a WAL stamped with the traces codec is refused by the
 //!   logs indexing before any frame decode (`Error::PayloadFormat`);
 //! - rows in = rows indexed: frame/record counts survive indexing and re-open;
 //! - the five per-row log columns (observed_ts, trace_id, span_id, flags,
@@ -16,19 +16,19 @@
 //!   order, row-aligned with the timestamps;
 //! - the typed schema tree + coalesced scalar kinds (an Int+Str path coalesces
 //!   to Str) and the derived field table;
-//! - `build_sfst_range` parity: the indexed chunk is byte-identical to the
+//! - `index_logs_range` parity: the indexed chunk is byte-identical to the
 //!   indexed file, and frame-aligned splits partition record counts;
 //! - '=' in an attribute key is sanitized at flatten and stays queryable.
 //!
-//! Not pinned here: the traces pipeline (`tests/traces_seal.rs`), SFST query
+//! Not pinned here: the traces pipeline (`tests/traces_indexing.rs`), SFST query
 //! semantics (the `sfst` crate's own tests), and the standalone spike
-//! (`tests/sfst_build_spike.rs`).
+//! (`tests/sfst_write_spike.rs`).
 
 use std::sync::Arc;
 
 use file_registry::TimestampNs;
 use ng_flatten::{encode_log_frame, flatten_log_request};
-use ng_index::{Metrics, build_sfst, build_sfst_range};
+use ng_index::{Metrics, index_logs_dir, index_logs_range};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
 use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
@@ -97,7 +97,7 @@ fn write_flattened_wal(dir: &std::path::Path, counts: &[usize]) {
 }
 
 #[test]
-fn wrong_payload_format_refuses_to_build() {
+fn wrong_payload_format_refuses_to_index() {
     // A WAL stamped with the traces codec must be refused by logs indexing
     // before any frame decode: `Error::PayloadFormat` carrying the two format
     // ids — the header check, not a decode error.
@@ -132,7 +132,7 @@ fn wrong_payload_format_refuses_to_build() {
 
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("mismatch.sfst");
-    match build_sfst(flat.path(), &out, &Metrics::new()) {
+    match index_logs_dir(flat.path(), &out, &Metrics::new()) {
         Err(ng_index::Error::PayloadFormat { found, expected }) => {
             assert_eq!(found, ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT);
             assert_eq!(expected, ng_flatten::LOG_FRAME_PAYLOAD_FORMAT);
@@ -142,7 +142,7 @@ fn wrong_payload_format_refuses_to_build() {
 }
 
 #[test]
-fn flattened_wal_builds_and_roundtrips_an_sfst() {
+fn flattened_wal_indexes_and_roundtrips_an_sfst() {
     // Three batches — 3 + 5 + 2 records — into a fresh WAL.
     let flat = tempfile::tempdir().unwrap();
     write_flattened_wal(flat.path(), &[3, 5, 2]);
@@ -150,7 +150,7 @@ fn flattened_wal_builds_and_roundtrips_an_sfst() {
     // The summary counts what went in: 3 frames, 10 records.
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("count.sfst");
-    let sfst = build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
+    let sfst = index_logs_dir(flat.path(), &out, &Metrics::new()).unwrap();
     assert_eq!(sfst.frames, 3);
     assert_eq!(sfst.records, 10);
 
@@ -229,7 +229,7 @@ fn per_row_columns_roundtrip_in_chronological_order() {
     // Index the WAL and re-open the sealed file through the format reader.
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("cols.sfst");
-    build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
+    index_logs_dir(flat.path(), &out, &Metrics::new()).unwrap();
     let data = std::fs::read(&out).unwrap();
     let reader = IndexReader::open(&data).unwrap();
 
@@ -363,7 +363,7 @@ fn typed_tree_and_coalesced_kinds_roundtrip() {
 
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("typed.sfst");
-    build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
+    index_logs_dir(flat.path(), &out, &Metrics::new()).unwrap();
     let data = std::fs::read(&out).unwrap();
     let reader = IndexReader::open(&data).unwrap();
 
@@ -404,7 +404,7 @@ fn missing_flattened_wal_is_an_error() {
     // (`sole_wal_file` → `Error::NoWal`), never produce an empty index.
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("missing.sfst");
-    assert!(build_sfst(dir.path(), &out, &Metrics::new()).is_err());
+    assert!(index_logs_dir(dir.path(), &out, &Metrics::new()).is_err());
 }
 
 /// Write `num_frames` flattened frames (each `request_typed`, 4 records) to a
@@ -449,30 +449,30 @@ fn write_multiframe_flat_wal(num_frames: usize) -> (tempfile::TempDir, std::path
     (flat, wal_path)
 }
 
-/// Indexing the whole file as one chunk (`build_sfst_range`) must be
-/// byte-identical to indexing it to disk (`build_sfst`) over the same
+/// Indexing the whole file as one chunk (`index_logs_range`) must be
+/// byte-identical to indexing it to disk (`index_logs_dir`) over the same
 /// frames — same typed tree + columns, deterministic, only the sink differs.
 /// This is the parity that lets on-query chunk indexing over an active WAL
 /// and indexing a closed WAL file share one format.
 #[test]
-fn build_sfst_range_whole_file_matches_file_build() {
+fn range_indexing_of_whole_file_matches_file_indexing() {
     let (dir, wal_path) = write_multiframe_flat_wal(3);
     let file_len = std::fs::metadata(&wal_path).unwrap().len();
 
-    let (mem_summary, mem_bytes) = build_sfst_range(
+    let (mem_summary, mem_bytes) = index_logs_range(
         &wal_path,
         wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len),
     )
     .unwrap();
 
     let out = dir.path().join("file.sfst");
-    build_sfst(dir.path(), &out, &Metrics::new()).unwrap();
+    index_logs_dir(dir.path(), &out, &Metrics::new()).unwrap();
     let file_bytes = std::fs::read(&out).unwrap();
 
     assert_eq!(mem_summary.record_count, 12, "3 frames x 4 records");
     assert_eq!(
         mem_bytes, file_bytes,
-        "in-memory range build differs from the file build"
+        "in-memory range indexing differs from the file indexing"
     );
     let reader = IndexReader::open(&mem_bytes).unwrap();
     assert_eq!(reader.total_logs(), 12);
@@ -480,10 +480,10 @@ fn build_sfst_range_whole_file_matches_file_build() {
 
 /// A frame-aligned split — the cut is a scanned frame boundary — partitions the
 /// records exactly: the two indexed chunks' record counts sum to the whole.
-/// Exercises `build_sfst_range` over interior frame ranges (the on-query
+/// Exercises `index_logs_range` over interior frame ranges (the on-query
 /// active-WAL chunk case).
 #[test]
-fn build_sfst_range_split_partitions_records() {
+fn index_logs_range_split_partitions_records() {
     let (_dir, wal_path) = write_multiframe_flat_wal(4);
     let file_len = std::fs::metadata(&wal_path).unwrap().len();
 
@@ -495,13 +495,13 @@ fn build_sfst_range_split_partitions_records() {
     assert!(frames.len() >= 2, "need multiple frames to split");
     let split = frames[frames.len() / 2 - 1].end_offset;
 
-    let (a, _) = build_sfst_range(
+    let (a, _) = index_logs_range(
         &wal_path,
         wal::FrameRange::new(wal::HEADER_SIZE as u64, split),
     )
     .unwrap();
-    let (b, _) = build_sfst_range(&wal_path, wal::FrameRange::new(split, file_len)).unwrap();
-    let (whole, _) = build_sfst_range(
+    let (b, _) = index_logs_range(&wal_path, wal::FrameRange::new(split, file_len)).unwrap();
+    let (whole, _) = index_logs_range(
         &wal_path,
         wal::FrameRange::new(wal::HEADER_SIZE as u64, file_len),
     )
@@ -577,7 +577,7 @@ fn attribute_key_containing_eq_is_sanitized_and_queryable() {
 
     let out_dir = tempfile::tempdir().unwrap();
     let out = out_dir.path().join("eq.sfst");
-    let sfst = build_sfst(flat.path(), &out, &Metrics::new()).unwrap();
+    let sfst = index_logs_dir(flat.path(), &out, &Metrics::new()).unwrap();
     assert_eq!(sfst.records, 1);
 
     let bytes = std::fs::read(&out).unwrap();
@@ -589,7 +589,7 @@ fn attribute_key_containing_eq_is_sanitized_and_queryable() {
         .collect();
     assert!(
         names.contains(&"attributes.a_b"),
-        "sanitized field must survive sealing: {names:?}"
+        "sanitized field must survive indexing: {names:?}"
     );
     assert!(
         !names.iter().any(|n| n.contains('=')),
