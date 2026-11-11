@@ -135,7 +135,11 @@ void info_fields_notification_methods_main(void *ptr) {
         int code = -1;
         SPAWN_TIMEDWAIT_RESULT w = spawn_popen_timedwait(pi, probe_ms_left(deadline_ut), &code);
         if(w == SPAWN_TIMEDWAIT_EXITED) {
-            notification_methods_publish(out);
+            // dump_methods exits 0 after printing the full list; anything else is not a list
+            if(code == 0)
+                notification_methods_publish(out);
+            else
+                nd_log(NDLS_DAEMON, NDLP_WARNING, "%s dump_methods exited with code %d.", script, code);
             return;
         }
         r = (w == SPAWN_TIMEDWAIT_RUNNING) ? PROBE_READ_TIMEOUT : PROBE_READ_ERROR;
