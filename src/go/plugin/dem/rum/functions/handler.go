@@ -57,7 +57,7 @@ func Declarations() []funcapi.FunctionConfig {
 				Name:           spec.title,
 				UpdateEvery:    spec.every,
 				Help:           spec.help,
-				Tags:           "rum hidden",
+				Tags:           "rum",
 				RawRequest:     true,
 				ManagedInfo:    true,
 				HasHistory:     spec.history,

@@ -189,6 +189,7 @@ func (s *Store) Finalize(
 		return nil, err
 	}
 	delete(s.uncertain, runID)
+	s.observedPublished.Store(true)
 	// Work includes scripts, browser profiles and any unselected attachments.
 	if err = s.cleanupDrained(runID); err != nil {
 		s.recordCleanupError(err)

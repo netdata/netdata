@@ -562,3 +562,34 @@ func observedStatus(t *testing.T, s *artifacts.Store) artifacts.Status {
 	require.NotNil(t, page.Status.Inventory.Workspace.Bytes)
 	return page.Status
 }
+
+func TestDiscoveryIgnoresUnpublishedWorkspaceAfterRestart(t *testing.T) {
+	s, root := store(t)
+	_, err := s.Begin(run1, "journey:test", "")
+	require.NoError(t, err)
+	assert.False(t, s.HasObservedPublished())
+	require.NoError(t, s.Close())
+	reopened, err := artifacts.Open(root)
+	require.NoError(t, err)
+	defer reopened.Close()
+	assert.False(t, reopened.HasObservedPublished())
+	// The earlier workspace remains protected. A separate capture-free completion
+	// publishes no set either. These fixtures launch no browser.
+	_, err = reopened.Begin(run2, "journey:test", "")
+	require.NoError(t, err)
+	_, err = reopened.Finalize(t.Context(), run2, nil)
+	require.NoError(t, err)
+	assert.False(t, reopened.HasObservedPublished())
+}
+
+func TestDiscoveryKeepsUnclassifiedPublishedDataVisible(t *testing.T) {
+	s, root := store(t)
+	require.NoError(t, s.Close())
+	require.NoError(t, os.Mkdir(filepath.Join(root, "runs", run1), 0700))
+	reopened, err := artifacts.Open(root)
+	require.NoError(t, err)
+	defer reopened.Close()
+	assert.True(t, reopened.HasObservedPublished())
+	_, err = reopened.Manifest(t.Context(), "lighthouse:test", run1)
+	require.Error(t, err, "discovery must not bypass manifest validation")
+}
