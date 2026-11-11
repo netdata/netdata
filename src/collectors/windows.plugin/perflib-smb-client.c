@@ -5,16 +5,14 @@
 
 #define SMB_CLIENT_OBJECT_NAME "SMB Client Shares"
 #define SMB_CLIENT_NAME_PART_MAX 512
-#define SMB_CLIENT_MAX_DIMENSIONS 4
+#define SMB_CLIENT_MAX_DIMENSIONS 3
 
 enum smb_client_counter {
     SMBC_READ_BYTES,
     SMBC_WRITE_BYTES,
-    SMBC_DATA_BYTES,
     SMBC_READ_REQUESTS,
     SMBC_WRITE_REQUESTS,
     SMBC_METADATA_REQUESTS,
-    SMBC_DATA_REQUESTS,
     SMBC_SMBDIRECT_READ_BYTES,
     SMBC_SMBDIRECT_WRITE_BYTES,
     SMBC_SMBDIRECT_READ_REQUESTS,
@@ -25,7 +23,6 @@ enum smb_client_counter {
     SMBC_CURRENT_DATA_QUEUE_LENGTH,
     SMBC_AVG_READ_QUEUE_LENGTH,
     SMBC_AVG_WRITE_QUEUE_LENGTH,
-    SMBC_AVG_DATA_QUEUE_LENGTH,
     SMBC_AVG_SEC_PER_READ,
     SMBC_AVG_SEC_PER_WRITE,
     SMBC_AVG_SEC_PER_DATA_REQUEST,
@@ -36,11 +33,9 @@ enum smb_client_counter {
 static const char *smb_client_counter_keys[SMBC_COUNTERS] = {
     [SMBC_READ_BYTES] = "Read Bytes/sec",
     [SMBC_WRITE_BYTES] = "Write Bytes/sec",
-    [SMBC_DATA_BYTES] = "Data Bytes/sec",
     [SMBC_READ_REQUESTS] = "Read Requests/sec",
     [SMBC_WRITE_REQUESTS] = "Write Requests/sec",
     [SMBC_METADATA_REQUESTS] = "Metadata Requests/sec",
-    [SMBC_DATA_REQUESTS] = "Data Requests/sec",
     [SMBC_SMBDIRECT_READ_BYTES] = "Read Bytes transmitted via SMB Direct/sec",
     [SMBC_SMBDIRECT_WRITE_BYTES] = "Write Bytes transmitted via SMB Direct/sec",
     [SMBC_SMBDIRECT_READ_REQUESTS] = "Read Requests transmitted via SMB Direct/sec",
@@ -51,7 +46,6 @@ static const char *smb_client_counter_keys[SMBC_COUNTERS] = {
     [SMBC_CURRENT_DATA_QUEUE_LENGTH] = "Current Data Queue Length",
     [SMBC_AVG_READ_QUEUE_LENGTH] = "Avg. Read Queue Length",
     [SMBC_AVG_WRITE_QUEUE_LENGTH] = "Avg. Write Queue Length",
-    [SMBC_AVG_DATA_QUEUE_LENGTH] = "Avg. Data Queue Length",
     [SMBC_AVG_SEC_PER_READ] = "Avg. sec/Read",
     [SMBC_AVG_SEC_PER_WRITE] = "Avg. sec/Write",
     [SMBC_AVG_SEC_PER_DATA_REQUEST] = "Avg. sec/Data Request",
@@ -88,7 +82,6 @@ struct smb_client_chart_definition {
 
 enum smb_client_chart {
     SMBC_CHART_TRAFFIC,
-    SMBC_CHART_DATA_TRAFFIC,
     SMBC_CHART_REQUESTS,
     SMBC_CHART_SMBDIRECT_TRAFFIC,
     SMBC_CHART_SMBDIRECT_REQUESTS,
@@ -116,19 +109,6 @@ static const struct smb_client_chart_definition smb_client_charts[SMBC_CHARTS] =
             {SMBC_WRITE_BYTES, "write", -1},
         },
     },
-    [SMBC_CHART_DATA_TRAFFIC] = {
-        .suffix = "data_traffic",
-        .context = "smb.client_share_data_traffic",
-        .title = "SMB client share data traffic",
-        .units = "bytes/s",
-        .priority = PRIO_SMB_CLIENT_SHARE_DATA_TRAFFIC,
-        .type = RRDSET_TYPE_AREA,
-        .kind = SMBC_KIND_RATE,
-        .dimensions_count = 1,
-        .dimensions = {
-            {SMBC_DATA_BYTES, "data", 1},
-        },
-    },
     [SMBC_CHART_REQUESTS] = {
         .suffix = "requests",
         .context = "smb.client_share_requests",
@@ -137,12 +117,11 @@ static const struct smb_client_chart_definition smb_client_charts[SMBC_CHARTS] =
         .priority = PRIO_SMB_CLIENT_SHARE_REQUESTS,
         .type = RRDSET_TYPE_LINE,
         .kind = SMBC_KIND_RATE,
-        .dimensions_count = 4,
+        .dimensions_count = 3,
         .dimensions = {
             {SMBC_READ_REQUESTS, "read", 1},
             {SMBC_WRITE_REQUESTS, "write", 1},
             {SMBC_METADATA_REQUESTS, "metadata", 1},
-            {SMBC_DATA_REQUESTS, "data", 1},
         },
     },
     [SMBC_CHART_SMBDIRECT_TRAFFIC] = {
@@ -221,11 +200,10 @@ static const struct smb_client_chart_definition smb_client_charts[SMBC_CHARTS] =
         .priority = PRIO_SMB_CLIENT_SHARE_AVG_QUEUE_LENGTH,
         .type = RRDSET_TYPE_LINE,
         .kind = SMBC_KIND_QUEUE,
-        .dimensions_count = 3,
+        .dimensions_count = 2,
         .dimensions = {
             {SMBC_AVG_READ_QUEUE_LENGTH, "read", 1},
             {SMBC_AVG_WRITE_QUEUE_LENGTH, "write", 1},
-            {SMBC_AVG_DATA_QUEUE_LENGTH, "data", 1},
         },
     },
     [SMBC_CHART_LATENCY] = {
@@ -240,6 +218,7 @@ static const struct smb_client_chart_definition smb_client_charts[SMBC_CHARTS] =
         .dimensions = {
             {SMBC_AVG_SEC_PER_READ, "read", 1},
             {SMBC_AVG_SEC_PER_WRITE, "write", 1},
+            // Count-weighted mean over reads and writes; not derivable from the read and write lines.
             {SMBC_AVG_SEC_PER_DATA_REQUEST, "data", 1},
         },
     },
