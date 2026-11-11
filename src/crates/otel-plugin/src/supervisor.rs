@@ -507,8 +507,18 @@ impl Supervisor {
         }
     }
 
-    /// Forward a running function's progress update to the agent.
+    /// Forward a running function's progress update to the agent, unless the
+    /// transaction was already retired by a Cancel: for the agent the call
+    /// is over, as it is for a late result ([`Self::forward_result`]).
     async fn forward_progress(&mut self, transaction: String, done: usize, total: usize) {
+        if !self.transactions.contains_key(&transaction) {
+            tracing::debug!(
+                transaction = %transaction,
+                "dropping progress for a cancelled or unknown transaction"
+            );
+            return;
+        }
+
         let msg = Message::FunctionProgressResponse(Box::new(FunctionProgressResponse {
             transaction,
             done,
@@ -706,9 +716,12 @@ where
         .context("keepalive write failed")
 }
 
-/// Guard for one IPC socket file: `new` removes any stale file at the path
-/// (e.g. left by a crashed previous run) and `drop` removes the file again
-/// when the supervisor exits.
+/// Guard for one IPC socket file, whose name holds this process's id: `new`
+/// removes a file at the path (one that an earlier process with the same id
+/// left) and `drop` removes the file again when the supervisor exits. A
+/// listener removes its own file when it is dropped, so a file lives from
+/// its bind to its accept; this guard covers a socket that a worker binds
+/// (the ledger's writer socket) and a worker that is killed in between.
 struct SocketGuard(std::path::PathBuf);
 
 impl SocketGuard {
