@@ -100,7 +100,7 @@ def test_stream_cmd_certstream_url_flag():
         "certstream", "h:1", url="ws://x/", collections=None, start=None, rate=None,
         tenant_id=None, batch_size=100, flush_interval_ms=1000,
     )
-    assert cmd[:7] == ["cargo", "run", "--quiet", "-p", "otel-streams", "--bin", "certstream"]
+    assert cmd[:8] == ["cargo", "run", "--quiet", "--release", "-p", "otel-streams", "--bin", "certstream"]
     assert "--certstream-url" in cmd and "ws://x/" in cmd
     assert "--jetstream-url" not in cmd
 
@@ -129,7 +129,7 @@ def test_stream_cmd_ris_url_host_and_type():
         "ris", "h:1", url="wss://z/", collections=None, start=None, rate=None,
         tenant_id=None, batch_size=100, flush_interval_ms=1000, host="rrc00", msg_type="UPDATE",
     )
-    assert cmd[:7] == ["cargo", "run", "--quiet", "-p", "otel-streams", "--bin", "ris"]
+    assert cmd[:8] == ["cargo", "run", "--quiet", "--release", "-p", "otel-streams", "--bin", "ris"]
     assert cmd[cmd.index("--ris-url") + 1] == "wss://z/"
     assert cmd[cmd.index("--host") + 1] == "rrc00"
     assert cmd[cmd.index("--type") + 1] == "UPDATE"

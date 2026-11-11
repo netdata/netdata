@@ -140,8 +140,10 @@ def stream_cmd(
 ) -> list[str]:
     """Argv for a long-running source. Only the source-appropriate optional flags
     should be passed (the tool layer rejects mismatched ones)."""
+    # A source runs for hours at thousands of records a second: a release build
+    # keeps its CPU use down. The one-shot generators stay on the dev profile.
     cmd = [
-        "cargo", "run", "--quiet", "-p", "otel-streams", "--bin", source, "--",
+        "cargo", "run", "--quiet", "--release", "-p", "otel-streams", "--bin", source, "--",
         "--otel-endpoint", f"http://{otel_endpoint}",
         "--batch-size", str(batch_size),
         "--flush-interval-ms", str(flush_interval_ms),

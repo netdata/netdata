@@ -137,7 +137,8 @@ A dedicated surface for iterating on the OTel-logs path against a ready agent:
 | `netdata_agent_mint_bearer(agent_id, …)` | Mint and **return** a per-agent Cloud bearer for the **Playwright (browser) MCP**, so an LLM can view SIGNED_ID-gated functions (otel-logs, otel-files, systemd-journal) in the dashboard UI. The description embeds the `browser_run_code_unsafe` + `setExtraHTTPHeaders` injection recipe. Localhost-dev only (returns the bearer by design). |
 
 - **push/stream** shell out to `cargo run -p otel-streams --bin <name>` (built on
-  demand from `<worktree>/src/crates`); they target the agent's local OTLP
+  demand from `<worktree>/src/crates`; the stream sources as a release build,
+  whose first build takes minutes); they target the agent's local OTLP
   receiver, so no Cloud token is needed.
 - **otel_logs** is access-gated (`SIGNED_ID`): on a claimed agent with a Cloud
   token it auto-mints a bearer; otherwise it returns 412 with a hint.
