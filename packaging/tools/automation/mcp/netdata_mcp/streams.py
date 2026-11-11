@@ -7,7 +7,7 @@ the worktree source.
 
 - **synth** is one-shot: :func:`run_synth` runs it to completion and returns the
   outcome.
-- **certstream / jetstream / github** are long-running daemons:
+- **certstream / jetstream / github / ris** are long-running daemons:
   :class:`StreamRegistry` start/status/stops them like ``RunRegistry`` does for
   agents, reusing ``runner.py``'s process-group spawn + SIGTERM→SIGKILL teardown.
 
@@ -34,7 +34,10 @@ from .runner import (
     run_command,
 )
 
-StreamSource = Literal["certstream", "jetstream", "github"]
+StreamSource = Literal["certstream", "jetstream", "github", "ris"]
+
+# The flag that carries a source's URL override; a source absent here takes none.
+_URL_FLAGS = {"certstream": "--certstream-url", "jetstream": "--jetstream-url", "ris": "--ris-url"}
 StreamState = Literal["running", "stopped", "failed"]
 _TERMINAL = frozenset({"stopped", "failed"})
 
@@ -133,6 +136,7 @@ def stream_cmd(
     source: str, otel_endpoint: str, *, url: str | None, collections: str | None,
     start: str | None, rate: int | None, tenant_id: str | None,
     batch_size: int, flush_interval_ms: int,
+    host: str | None = None, msg_type: str | None = None,
 ) -> list[str]:
     """Argv for a long-running source. Only the source-appropriate optional flags
     should be passed (the tool layer rejects mismatched ones)."""
@@ -144,22 +148,26 @@ def stream_cmd(
     ]
     if tenant_id:
         cmd += ["--tenant-id", tenant_id]
-    # `url` is guarded but collections/start/rate are not — by design, not
-    # oversight: url's FLAG NAME is source-dependent (--certstream-url vs
-    # --jetstream-url), so a wrong source would silently emit a plausible-but-
-    # wrong flag; the explicit check prevents that. The others have fixed flag
-    # names, so a mismatch is just an unknown flag the bin rejects loudly.
+    # `url` is guarded but the other optional params are not — by design, not
+    # oversight: url's FLAG NAME is source-dependent (_URL_FLAGS), so a wrong
+    # source would silently emit a plausible-but-wrong flag; the explicit check
+    # prevents that. The others have fixed flag names, so a mismatch is just an
+    # unknown flag the bin rejects loudly.
     # (validate_source_params rejects all mismatches upstream regardless.)
     if url:
-        if source not in ("certstream", "jetstream"):
-            raise ValueError(f"url is only valid for certstream/jetstream, not {source!r}")
-        cmd += ["--certstream-url" if source == "certstream" else "--jetstream-url", url]
+        if source not in _URL_FLAGS:
+            raise ValueError(f"url is only valid for {'/'.join(_URL_FLAGS)}, not {source!r}")
+        cmd += [_URL_FLAGS[source], url]
     if collections:  # jetstream only
         cmd += ["--collections", collections]
     if start:  # github only
         cmd += ["--start", start]
     if rate is not None:  # github only
         cmd += ["--rate", str(rate)]
+    if host:  # ris only
+        cmd += ["--host", host]
+    if msg_type:  # ris only
+        cmd += ["--type", msg_type]
     return cmd
 
 

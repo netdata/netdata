@@ -124,6 +124,17 @@ def test_stream_cmd_github_start_and_rate():
     assert cmd[cmd.index("--rate") + 1] == "0"  # rate=0 (unlimited) must be emitted
 
 
+def test_stream_cmd_ris_url_host_and_type():
+    cmd = streams.stream_cmd(
+        "ris", "h:1", url="wss://z/", collections=None, start=None, rate=None,
+        tenant_id=None, batch_size=100, flush_interval_ms=1000, host="rrc00", msg_type="UPDATE",
+    )
+    assert cmd[:7] == ["cargo", "run", "--quiet", "-p", "otel-streams", "--bin", "ris"]
+    assert cmd[cmd.index("--ris-url") + 1] == "wss://z/"
+    assert cmd[cmd.index("--host") + 1] == "rrc00"
+    assert cmd[cmd.index("--type") + 1] == "UPDATE"
+
+
 # ── StreamRegistry lifecycle (real subprocess, harmless commands) ────────────────
 def _crates(tmp_path):
     d = tmp_path / "src" / "crates"
