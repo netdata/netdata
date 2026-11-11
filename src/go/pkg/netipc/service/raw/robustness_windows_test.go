@@ -569,9 +569,12 @@ const (
 )
 
 // startWinStalledReader completes the handshake and never reads. It closes
-// started once the request's first bytes arrived, then holds the session
-// until release is closed.
-func startWinStalledReader(t *testing.T, svc string, started, release chan struct{}) chan struct{} {
+// started once the request's first bytes arrived or its wait ended, sets
+// requestSeen before that when bytes did arrive, then holds the session until
+// release is closed. The caller asserts requestSeen only when the request must
+// have started: a call deadline can expire while the request is still being
+// encoded, before any byte is written.
+func startWinStalledReader(t *testing.T, svc string, started, release chan struct{}, requestSeen *bool) chan struct{} {
 	t.Helper()
 	cfg := testWinServerConfig()
 	cfg.MaxRequestPayloadBytes = winStalledReaderRequestBytes
@@ -589,9 +592,8 @@ func startWinStalledReader(t *testing.T, svc string, started, release chan struc
 			return
 		}
 		defer session.Close()
-		if readable, err := session.WaitReadable(10_000); err != nil || !readable {
-			t.Errorf("no request bytes arrived: readable=%v err=%v", readable, err)
-		}
+		readable, err := session.WaitReadable(10_000)
+		*requestSeen = err == nil && readable
 		close(started)
 		select {
 		case <-release:
@@ -617,7 +619,8 @@ func TestWinRobustSendBoundedByDeadlineAndAbort(t *testing.T) {
 			svc := uniqueWinService("go_winrob_" + name)
 			started := make(chan struct{})
 			release := make(chan struct{})
-			done := startWinStalledReader(t, svc, started, release)
+			requestSeen := false
+			done := startWinStalledReader(t, svc, started, release, &requestSeen)
 
 			ccfg := testWinClientConfig()
 			ccfg.MaxRequestPayloadBytes = winStalledReaderRequestBytes
@@ -637,13 +640,17 @@ func TestWinRobustSendBoundedByDeadlineAndAbort(t *testing.T) {
 			}()
 			if useAbort {
 				<-started
+				if !requestSeen {
+					t.Error("no request bytes arrived before the abort")
+				}
 				client.Abort()
 			}
 			err := <-result
 			elapsed := time.Since(start)
+			// Closing the client first wakes a reader still waiting for bytes.
+			client.Close()
 			close(release)
 			<-done
-			client.Close()
 
 			want := protocol.ErrTimeout
 			if useAbort {

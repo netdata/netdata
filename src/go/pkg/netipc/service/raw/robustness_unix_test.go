@@ -695,9 +695,12 @@ const (
 )
 
 // startStalledReader completes the handshake and never reads. It closes
-// started once the request's first bytes arrived, then holds the session
-// until release is closed.
-func startStalledReader(t *testing.T, svc string, started, release chan struct{}) chan struct{} {
+// started once the request's first bytes arrived or its wait ended, sets
+// requestSeen before that when bytes did arrive, then holds the session until
+// release is closed. The caller asserts requestSeen only when the request must
+// have started: a call deadline can expire while the request is still being
+// encoded, before any byte is written.
+func startStalledReader(t *testing.T, svc string, started, release chan struct{}, requestSeen *bool) chan struct{} {
 	t.Helper()
 	ensureRunDir()
 	cleanupAll(svc)
@@ -723,9 +726,7 @@ func startStalledReader(t *testing.T, svc string, started, release chan struct{}
 		for errno == syscall.EINTR {
 			n, errno = syspoll.Poll(&pfd, 10_000)
 		}
-		if errno != 0 || n == 0 || pfd.Revents&syspoll.In == 0 {
-			t.Errorf("no request bytes arrived: n=%d revents=%#x errno=%v", n, pfd.Revents, errno)
-		}
+		*requestSeen = errno == 0 && n > 0 && pfd.Revents&syspoll.In != 0
 		close(started)
 		select {
 		case <-release:
@@ -752,7 +753,8 @@ func TestRobustSendBoundedByDeadlineAndAbort(t *testing.T) {
 			defer cleanupAll(svc)
 			started := make(chan struct{})
 			release := make(chan struct{})
-			done := startStalledReader(t, svc, started, release)
+			requestSeen := false
+			done := startStalledReader(t, svc, started, release, &requestSeen)
 
 			ccfg := testClientConfig()
 			ccfg.MaxRequestPayloadBytes = stalledReaderRequestBytes
@@ -772,13 +774,17 @@ func TestRobustSendBoundedByDeadlineAndAbort(t *testing.T) {
 			}()
 			if useAbort {
 				<-started
+				if !requestSeen {
+					t.Error("no request bytes arrived before the abort")
+				}
 				client.Abort()
 			}
 			err := <-result
 			elapsed := time.Since(start)
+			// Closing the client first wakes a reader still waiting for bytes.
+			client.Close()
 			close(release)
 			<-done
-			client.Close()
 
 			want := protocol.ErrTimeout
 			if useAbort {
