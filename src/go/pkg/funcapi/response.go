@@ -33,6 +33,10 @@ type FunctionConfig struct {
 	// scoped info calls HandleRaw, which supplies domain RequiredParams.
 	// Requires RawRequest. RawResponse still bypasses managed serialization.
 	ManagedInfo bool
+	// DynamicInfo calls MethodParams for structured info on a bound method.
+	// Without a running available job, job-backed methods retain static info.
+	// Unselected shared-job info remains static. Not valid with RawRequest.
+	DynamicInfo bool
 	// HasHistory advertises time-range support in managed info and data responses.
 	HasHistory bool
 	// AcceptedParams advertises inputs in addition to required selector IDs.

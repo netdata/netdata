@@ -44,7 +44,7 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	wantReplay, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(scenario.opts)
 	require.NoError(t, err)
 	require.True(t, ok)
-	require.Equal(t, topologyv1test.NormalizeData(t, wantReplay), topologyv1test.NormalizeData(t, gotReplay))
+	require.Equal(t, topologyv1test.NormalizeData(t, wantReplay.Data), topologyv1test.NormalizeData(t, gotReplay))
 
 	device, err := archive.InspectDevice(query, 1)
 	require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	require.NotEmpty(t, device.GraphIdentity.Candidates)
 	require.Equal(t, "present", device.TypedIdentity.Membership.State)
 	require.Equal(t, 1, device.TypedIdentity.Membership.Candidates)
-	require.Equal(t, wantReplay.Stats, device.GraphStats)
+	require.Equal(t, wantReplay.Data.Stats, device.GraphStats)
 
 	linkAt, err := archive.InspectLinkAt(query, 0)
 	require.NoError(t, err)
@@ -66,7 +66,7 @@ func TestDiagnosticArchiveAPIReusesArchiveReplayAndInspection(t *testing.T) {
 	require.Equal(t, "present", link.TypedLink.Membership.State)
 	require.Equal(t, 1, link.TypedLink.Membership.Candidates)
 	require.NotEmpty(t, link.Source.Contexts)
-	require.Equal(t, wantReplay.Stats, link.Stats)
+	require.Equal(t, wantReplay.Data.Stats, link.Stats)
 
 	require.Equal(t, 0, linkAt.GraphLink.SelectedIndex)
 	require.Equal(t, 0, linkAt.TypedLink.Row)

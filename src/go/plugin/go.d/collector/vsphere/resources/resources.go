@@ -46,15 +46,16 @@ Virtual Datacenter Architecture Representation (partial).
 */
 
 type Resources struct {
-	DataCenters   DataCenters
-	Folders       Folders
-	Clusters      Clusters
-	Hosts         Hosts
-	VMs           VMs
-	Datastores    Datastores
-	Networks      Networks
-	StoragePods   StoragePods
-	ResourcePools ResourcePools
+	VCenterInstanceUUID string
+	DataCenters         DataCenters
+	Folders             Folders
+	Clusters            Clusters
+	Hosts               Hosts
+	VMs                 VMs
+	Datastores          Datastores
+	Networks            Networks
+	StoragePods         StoragePods
+	ResourcePools       ResourcePools
 }
 
 type (

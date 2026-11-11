@@ -117,7 +117,7 @@ func TestBuildTopology(t *testing.T) {
 			},
 			check: func(t *testing.T, data *topologyv1.Data) {
 				actors := topologyTableRows(t, data.Actors, data.Dictionaries)
-				peerActor := requireTopologyRow(t, actors, "type", catofunc.ActorTypeBGPPeer)
+				peerActor := requireTopologyRow(t, actors, "type", catofunc.ActorTypeBGPPeerObservation)
 				require.Empty(t, peerActor["remote_ip"])
 				require.Contains(t, data.Types.ActorTypes[catofunc.ActorTypeBGPPeer].Search.Columns, "site_id")
 				require.Contains(t, data.Types.ActorTypes[catofunc.ActorTypeBGPPeer].Search.Columns, "pop_name")

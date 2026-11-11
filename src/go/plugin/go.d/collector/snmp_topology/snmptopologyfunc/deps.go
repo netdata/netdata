@@ -9,6 +9,12 @@ import (
 
 // Deps defines the dependency surface required by SNMP topology function handlers.
 type Deps interface {
-	Snapshot(topologyoptions.QueryOptions) (topologyv1.Data, bool, error)
+	Snapshot(topologyoptions.QueryOptions) (SnapshotResult, bool, error)
 	ManagedDeviceFocusTargets() []topologyoptions.ManagedFocusTarget
+}
+
+// SnapshotResult keeps graph data and selector choices from the same acquired generation.
+type SnapshotResult struct {
+	Data         topologyv1.Data
+	FocusTargets []topologyoptions.ManagedFocusTarget
 }

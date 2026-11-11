@@ -24,6 +24,7 @@ func functionConfig() funcapi.FunctionConfig {
 		RequireCloud:      true,
 		RequireCommercial: true,
 		ResponseType:      topologyv1.ResponseType,
+		DynamicInfo:       true,
 		RequiredParams: []funcapi.ParamConfig{
 			nodesIdentityParamConfig(),
 			mapTypeParamConfig(),

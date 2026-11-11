@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +31,7 @@ func TestFuncDepsAdapterSnapshotUnavailable(t *testing.T) {
 
 			require.NoError(t, err)
 			require.False(t, ok)
-			require.Equal(t, topologyv1.Data{}, data)
+			require.Equal(t, snmptopologyfunc.SnapshotResult{}, data)
 		})
 	}
 }
@@ -60,10 +60,10 @@ func TestFuncDepsAdapterSnapshotUsesCachedReverseDNSWithoutLiveLookup(t *testing
 	seedPublishedEndpointSnapshot(cache)
 	publishTestTopologyBuilder(registry, cache)
 
-	data, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(topologyoptions.QueryOptions{})
+	snapshot, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(topologyoptions.QueryOptions{})
 	require.NoError(t, err)
 	require.True(t, ok)
-	require.Contains(t, topologyV1StringColumnValues(t, data, data.Actors, "display_name"), "switch-a.example.test")
+	require.Contains(t, topologyV1StringColumnValues(t, snapshot.Data, snapshot.Data.Actors, "display_name"), "switch-a.example.test")
 	require.Zero(t, liveCalls.Load())
 }
 
