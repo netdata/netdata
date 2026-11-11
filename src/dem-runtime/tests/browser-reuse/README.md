@@ -35,10 +35,33 @@ profile/artifact/registry paths. `-script-arg=--inspect` pauses with a private
 it is a provider retention probe, not full journey throughput. `unit-suite.mjs` runs
 all source Node tests with the installed dependencies.
 
-These cohort receipts do not prove
-per-owner Agent admission, epoch checking, runtime upgrade or independent-slot
-progress. Those require integration tests through the actual Agent pool. Timings
-here are diagnostics, not a capacity benchmark.
+These cohort receipts do not prove per-owner Agent admission, epoch checking,
+runtime upgrade or independent-slot progress. `engine-proof.go` covers the actual
+Agent pool through a selected contract-2 runtime, real `nd-run`, history and
+artifact stores. Build it from `src/go` and run as the service identity against an
+**idle, isolated** runtime store:
+
+```sh
+go build -o /tmp/dem-engine-proof ../dem-runtime/tests/browser-reuse/engine-proof.go
+/tmp/dem-engine-proof -store /absolute/test/store -helper /absolute/nd-run \
+  -work /absolute/new/proof-output -mode proof
+```
+
+The proof checks warm reuse, same-digest candidate isolation, repeated retirement,
+fresh and Lighthouse handoff, outcome/history identity, a real screenshot,
+cancellation, timeout, independent-slot progress and shutdown with zero execution
+pins. An unverified process tree fails the proof and keeps ownership evidence.
+It does not modify the selected runtime or restart an installed Agent.
+
+For a controlled comparison, use `-mode fresh` and `-mode reuse` in separate runs
+with the same `-journeys`, `-lighthouse` and `-slots` values and resource limits.
+Every workload job uses deterministic loopback content; all jobs become ready at
+one barrier. Report the complete batch and shutdown times, CPU and memory, rather
+than just browser launch or reporter completion. Slot time includes execution,
+cleanup and required browser replacement. Admission order can vary between runs.
+Use more than 100 journeys on one slot to exercise busy-owner rollover. These
+synthetic timings are comparative evidence, not a capacity guarantee for real
+websites or a long-running mixed RUM workload.
 
 Managed mode preserves real Test behavior within its browser-control contract.
 Explicit `browser_mode: fresh` provides the unrestricted SDK throughout. Automatic

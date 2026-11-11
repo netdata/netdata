@@ -685,7 +685,7 @@ Netdata monitors applications from the user's side as well as the infrastructure
 
 - **Collected by Netdata Agents.** RUM beacons are received, and synthetic browser checks run, by the `dem.plugin` on Netdata Agents and Parents; the customer chooses where data is received and where checks run from.
 - **Privacy at ingestion.** URLs are stripped of query strings and fragments, identifiers (emails, UUIDs, IDs, tokens) are redacted from paths, and client IP addresses are used only for rate limiting and geolocation, never stored.
-- **Real browsers, real scripts.** Synthetic journeys are Playwright Test scripts executed in sandboxed Chromium, with a fresh browser per run; Lighthouse audits run in the same managed browser environment.
+- **Real browsers, real scripts.** Synthetic journeys are Playwright Test scripts executed in sandboxed Chromium. They reuse warm browsers with fresh test processes and isolated contexts for each attempt; fresh browser mode is available for scripts needing direct browser control. Lighthouse audits use fresh browsers from the same managed runtime.
 - **Connected to the backend.** RUM can propagate W3C trace context and export browser logs and spans to Netdata's OpenTelemetry pipeline, linking user interactions to backend traces.
 
 **Capabilities**
