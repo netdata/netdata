@@ -94,6 +94,12 @@ Expose the receiver through HTTPS, configure its public URL and actual trusted p
 reverse-proxy path prefix. The receiver serves the pinned Faro 2.11.0 SDK and optional tracing bundle; visitors need no
 SDK CDN connection. Client IP addresses are used for rate limiting/geolocation and are not stored.
 
+`dem-history-status` is always announced. The six RUM Functions appear once a RUM site is active or RUM history is
+retained; the five synthetics Functions appear once a journey or Lighthouse job is active, or synthetic history or
+published captures are retained. Retained data makes the corresponding group available after restart even without
+jobs. A receiver alone does not enable RUM Functions. Once announced, a group stays available for that framework run,
+even after the last job stops or its data expires. A process restart rechecks retained data.
+
 RUM and synthetic Function providers are independent of collector selection. Disabling `rum` or `journey`, selecting
 only `lighthouse`, or disabling all collectors preserves investigation of retained history while the plugin is enabled.
 Setting `enabled: no` disables the whole plugin. Handler instances belong to each framework run generation; the command

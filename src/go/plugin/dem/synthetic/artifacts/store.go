@@ -6,12 +6,14 @@ package artifacts
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/gofrs/flock"
 )
@@ -59,7 +61,8 @@ type Store struct {
 	cleanup   Cleanup
 	eviction  evictionIO
 	// Inventory uses the same rooted filesystem; tests can fail enumeration alone.
-	inventoryFS fs.FS
+	inventoryFS       fs.FS
+	observedPublished atomic.Bool
 }
 
 // Open takes one lifetime filesystem lock. Empty path creates a private store.
@@ -150,6 +153,7 @@ func Open(name string) (_ *Store, retErr error) {
 	if err != nil {
 		return nil, err
 	}
+	s.observedPublished.Store(s.publishedAtStartup())
 	s.eviction = evictionIO{
 		rename:    root.Rename,
 		removeAll: root.RemoveAll,
@@ -202,4 +206,23 @@ func (s *Store) Close() error {
 	}
 	s.closed = true
 	return errors.Join(err, s.root.Close(), s.lock.Close())
+}
+
+// HasObservedPublished is a prompt Function-discovery hint, not proof that a
+// capture is readable. Once true it stays true for this store's lifetime.
+func (s *Store) HasObservedPublished() bool {
+	return s != nil && s.observedPublished.Load()
+}
+
+func (s *Store) publishedAtStartup() bool {
+	// Only the published namespace counts. Do not scan payloads or workspaces.
+	// Unknown entries or enumeration errors keep catalogue diagnostics reachable;
+	// normal manifest/ownership validation still governs every read and deletion.
+	dir, err := s.root.Open("runs")
+	if err != nil {
+		return true
+	}
+	defer dir.Close()
+	names, err := dir.Readdirnames(1)
+	return len(names) != 0 || (err != nil && !errors.Is(err, io.EOF))
 }

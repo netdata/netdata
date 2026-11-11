@@ -32,7 +32,9 @@ func (s *Store) OpenReader(ctx context.Context) (*Snapshot, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	reader := &Snapshot{ctx: ctx}
+	reader := &Snapshot{
+		ctx: ctx,
+	}
 	for _, path := range paths {
 		file, err := openSnapshot(ctx, path)
 		if err != nil {
@@ -46,10 +48,10 @@ func (s *Store) OpenReader(ctx context.Context) (*Snapshot, func(), error) {
 	return reader, func() { once.Do(func() { _ = reader.close(); s.readers.Done() }) }, nil
 }
 
-func openSnapshot(ctx context.Context, path string) (*journal.IndexedSnapshot, error) {
+func openSnapshot(ctx context.Context, path string, values ...journal.Field) (*journal.IndexedSnapshot, error) {
 	file, err := journal.OpenIndexedSnapshot(ctx, path, journal.IndexedSnapshotOptions{
 		CaptureFields: [][]byte{[]byte(rumBucket), []byte(syntheticBucket)},
-		CaptureValues: []journal.Field{journal.StringField(schemaField, schemaVersion)},
+		CaptureValues: append([]journal.Field{journal.StringField(schemaField, schemaVersion)}, values...),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("open history snapshot %q: %w", path, err)

@@ -25,11 +25,21 @@ func (s *Store) verifyStartup(ctx context.Context) error {
 				return fmt.Errorf("verify active history %q: %w", path, err)
 			}
 		}
-		file, err := openSnapshot(ctx, path)
+		file, err := openSnapshot(ctx, path, journal.StringField("DEM_KIND", "rum"), journal.StringField("DEM_KIND", "synthetic"))
 		if err != nil {
 			return err
 		}
 		empty := file.EntryCount() == 0
+		for _, kind := range []string{"rum", "synthetic"} {
+			value, err := file.CapturedValue([]byte("DEM_KIND"), []byte(kind))
+			if err != nil {
+				_ = file.Close()
+				return err
+			}
+			if value.EntryCount != 0 {
+				s.observeKind(kind)
+			}
+		}
 		if err := file.Close(); err != nil {
 			return err
 		}

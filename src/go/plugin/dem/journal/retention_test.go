@@ -47,7 +47,7 @@ func TestRetentionCoversRetiredActiveAndArchivedMachines(t *testing.T) {
 			path := filepath.Join(dir, "dem.journal")
 			writer, err := sdk.Create(path, sdk.Options{MachineID: machine, BootID: host.BootID(), Compact: true})
 			require.NoError(t, err)
-			fields, err := appendEnvelope(testFields())
+			fields, _, err := appendEnvelope(testFields())
 			require.NoError(t, err)
 			opts := host.EntryOptions()
 			opts.RealtimeUsec = uint64(time.Now().Add(-40 * 24 * time.Hour).UnixMicro())
