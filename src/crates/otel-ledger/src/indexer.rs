@@ -2,27 +2,27 @@
 //!
 //! One component type serves both signals — each pipeline spawns its own
 //! [`Indexer`] for its signal (`ledger/pipeline.rs`,
-//! `ledger/traces_pipeline.rs`). Every index build runs in a child process:
-//! this executable as `otel-plugin index` ([`crate::index_child`]), which
-//! picks the signal's `ng-index` builder. So the memory a build needs goes
-//! back to the system when the build ends, and a build that the kernel kills
-//! takes only itself down.
+//! `ledger/traces_pipeline.rs`). Every indexing operation runs in a child
+//! process: this executable as `otel-plugin index` ([`crate::index_child`]),
+//! which picks the signal's `ng-index` builder. So the memory an operation
+//! needs goes back to the system when the operation ends, and an operation that
+//! the kernel kills takes only itself down.
 //!
-//! The indexers of both signals start their builds through one
-//! [`IndexBuilds`], whose scheduler decides how many run at once across the
-//! process: at most all CPUs but one ([`max_index_builds`]), and only while
-//! the memory the running builds are expected to need stays within three
-//! quarters of what is free ([`MEMORY_PERCENT`]). The builds beyond that wait
-//! in its queue, in the order they were requested. A host that ingests
-//! enough to queue index builds is taken to be there for that work, so the
-//! builds may use most of it; what is left is the room for queries and for
-//! everything else, which this side does not look at.
+//! The indexers of both signals start their operations through one
+//! [`IndexingOperations`], whose scheduler decides how many run at once across
+//! the process: at most all CPUs but one ([`max_indexing_operations`]), and
+//! only while the memory the running operations are expected to need stays
+//! within three quarters of what is free ([`MEMORY_PERCENT`]). The operations
+//! beyond that wait in its queue, in the order they were requested. A host that
+//! ingests enough to queue indexing operations is taken to be there for that
+//! work, so the operations may use most of it; what is left is the room for
+//! queries and for everything else, which this side does not look at.
 //!
 //! Neither limit is a setting. For support, an environment variable replaces
-//! each of them when the ledger starts: [`MAX_BUILDS_VARIABLE`] and
+//! each of them when the ledger starts: [`MAX_OPERATIONS_VARIABLE`] and
 //! [`MEMORY_PERCENT_VARIABLE`]. They are not documented for users.
 //!
-//! What a build is expected to need is its WAL file's decoded size times a
+//! What an operation is expected to need is its WAL file's decoded size times a
 //! ratio that each indexer learns from the peaks its children report
 //! ([`ExpectedMemory`]).
 //!
@@ -31,11 +31,11 @@
 //! (`file_lifecycle::recovery::recover_unindexed`); responses go back to
 //! the ledger's `handle_indexer_resp` (`ledger/indexer.rs` — a different
 //! indexer.rs: the response handler, not this component) or to the recovery
-//! drains, in the order the builds finish. Live-tail chunk range builds
+//! drains, in the order the operations finish. Live-tail chunk range builds
 //! (`ng_index::build_sfst_range`) bypass this component.
 //!
 //! Cancelling or closing the request channel exits the loop and kills the
-//! builds that still run. That loses nothing: a build writes its index
+//! operations that still run. That loses nothing: an operation writes its index
 //! through a temporary file and leaves its WAL file alone, and the next start
 //! indexes the file again.
 
@@ -58,51 +58,51 @@ use file_lifecycle::ipc::{IndexerRequest, IndexerResponse};
 
 use crate::index_child::{self, IndexedFile};
 
-/// The share of the free memory, in percent, that the index builds of both
-/// signals may be expected to need together.
+/// The share of the free memory, in percent, that the indexing operations of
+/// both signals may be expected to need together.
 pub const MEMORY_PERCENT: u8 = 75;
 
-/// How many index builds may run at once, over both signals: all the CPUs
-/// this process may use but one, and at least one. A build keeps one CPU
-/// busy.
-pub fn max_index_builds() -> usize {
+/// How many indexing operations may run at once, over both signals: all the
+/// CPUs this process may use but one, and at least one. An operation keeps one
+/// CPU busy.
+pub fn max_indexing_operations() -> usize {
     let cpus = std::thread::available_parallelism().map_or(1, |cpus| cpus.get());
 
     cpus.saturating_sub(1).max(1)
 }
 
-/// The environment variable that replaces [`max_index_builds`]: a whole
-/// number of at least 1. With 1, the builds run one at a time.
-pub const MAX_BUILDS_VARIABLE: &str = "NETDATA_OTEL_INDEX_MAX_BUILDS";
+/// The environment variable that replaces [`max_indexing_operations`]: a whole
+/// number of at least 1. With 1, the operations run one at a time.
+pub const MAX_OPERATIONS_VARIABLE: &str = "NETDATA_OTEL_INDEXING_MAX_OPERATIONS";
 
 /// The environment variable that replaces [`MEMORY_PERCENT`]: a whole number
 /// from 1 to 100.
-pub const MEMORY_PERCENT_VARIABLE: &str = "NETDATA_OTEL_INDEX_MEMORY_PERCENT";
+pub const MEMORY_PERCENT_VARIABLE: &str = "NETDATA_OTEL_INDEXING_MEMORY_PERCENT";
 
-/// The limits of the index builds: [`max_index_builds`] and
+/// The limits of the indexing operations: [`max_indexing_operations`] and
 /// [`MEMORY_PERCENT`], each replaced by the value of its environment variable
 /// when that is set.
 ///
 /// A value that is not valid is an error, so that a mistyped value cannot
 /// leave a limit at its usual number unnoticed.
 fn limits_from(
-    max_builds: Option<&OsStr>,
+    max_operations: Option<&OsStr>,
     memory_percent: Option<&OsStr>,
 ) -> anyhow::Result<Limits> {
-    let jobs = match max_builds {
+    let jobs = match max_operations {
         Some(value) => {
-            let jobs: usize = whole_number(MAX_BUILDS_VARIABLE, value)?;
+            let jobs: usize = whole_number(MAX_OPERATIONS_VARIABLE, value)?;
             anyhow::ensure!(
                 jobs >= 1,
-                "invalid value for {MAX_BUILDS_VARIABLE}: '{jobs}': expected at least 1"
+                "invalid value for {MAX_OPERATIONS_VARIABLE}: '{jobs}': expected at least 1"
             );
             tracing::info!(
-                "{MAX_BUILDS_VARIABLE} is set: at most {jobs} index builds run at once, not {}",
-                max_index_builds()
+                "{MAX_OPERATIONS_VARIABLE} is set: at most {jobs} indexing operations run at once, not {}",
+                max_indexing_operations()
             );
             jobs
         }
-        None => max_index_builds(),
+        None => max_indexing_operations(),
     };
 
     let memory_percent = match memory_percent {
@@ -113,7 +113,7 @@ fn limits_from(
                 "invalid value for {MEMORY_PERCENT_VARIABLE}: '{percent}': expected 1 to 100"
             );
             tracing::info!(
-                "{MEMORY_PERCENT_VARIABLE} is set: index builds may use {percent}% of the free \
+                "{MEMORY_PERCENT_VARIABLE} is set: indexing operations may use {percent}% of the free \
                  memory, not {MEMORY_PERCENT}%"
             );
             percent
@@ -141,37 +141,37 @@ where
         .map_err(|e| anyhow::anyhow!("invalid value for {name}: '{text}': {e}"))
 }
 
-/// The memory an index build is expected to need, learned from the builds of
-/// one signal.
+/// The memory an indexing operation is expected to need, learned from the
+/// operations of one signal.
 ///
-/// A build needs memory in proportion to what its WAL file decodes to, by a
-/// ratio that depends on the data: about 4 for the data sets measured so
-/// far. The expectation uses the highest ratio among the last
-/// [`RECENT_BUILDS`](Self::RECENT_BUILDS) builds that reported their peak,
-/// so it follows the data and leans to the high side, and adds a margin.
-/// Until a build has reported, the ratio is
+/// An operation needs memory in proportion to what its WAL file decodes to, by
+/// a ratio that depends on the data: about 4 for the data sets measured so far.
+/// The expectation uses the highest ratio among the last
+/// [`RECENT_OPERATIONS`](Self::RECENT_OPERATIONS) operations that reported
+/// their peak, so it follows the data and leans to the high side, and adds a
+/// margin. Until an operation has reported, the ratio is
 /// [`FIRST_RATIO`](Self::FIRST_RATIO).
 #[derive(Debug, Default)]
 struct ExpectedMemory {
-    /// Peak memory over decoded size, of the most recent builds that taught
+    /// Peak memory over decoded size, of the most recent operations that taught
     /// it, oldest first.
     recent_ratios: VecDeque<f64>,
 }
 
 impl ExpectedMemory {
-    /// The ratio before any build has reported: above what was measured.
+    /// The ratio before any operation has reported: above what was measured.
     const FIRST_RATIO: f64 = 5.0;
-    /// How many builds the ratio looks back on.
-    const RECENT_BUILDS: usize = 32;
+    /// How many operations the ratio looks back on.
+    const RECENT_OPERATIONS: usize = 32;
     /// What the expectation adds on top of the highest recent ratio.
     const MARGIN: f64 = 1.15;
-    /// Only a build of a file that decodes to at least this much teaches the
-    /// ratio. A child holds about 15 MiB whatever it indexes; for a small
+    /// Only an operation of a file that decodes to at least this much teaches
+    /// the ratio. A child holds about 15 MiB whatever it indexes; for a small
     /// file that is most of its peak and would make the ratio many times too
     /// high.
     const SMALLEST_TEACHING_SIZE: u64 = 16 << 20;
 
-    /// What a build of a file that decodes to `decoded_size` bytes is
+    /// What an operation of a file that decodes to `decoded_size` bytes is
     /// expected to need at its peak, in bytes.
     fn of(&self, decoded_size: u64) -> u64 {
         let ratio = self
@@ -184,14 +184,14 @@ impl ExpectedMemory {
         (decoded_size as f64 * ratio * Self::MARGIN) as u64
     }
 
-    /// Take in what a build reported: the peak memory of the build of a file
-    /// that decodes to `decoded_size` bytes.
+    /// Take in what an operation reported: the peak memory of the operation of
+    /// a file that decodes to `decoded_size` bytes.
     fn learn(&mut self, decoded_size: u64, peak_memory: u64) {
         if decoded_size < Self::SMALLEST_TEACHING_SIZE {
             return;
         }
 
-        if self.recent_ratios.len() == Self::RECENT_BUILDS {
+        if self.recent_ratios.len() == Self::RECENT_OPERATIONS {
             self.recent_ratios.pop_front();
         }
         self.recent_ratios
@@ -199,45 +199,46 @@ impl ExpectedMemory {
     }
 }
 
-/// What the build of one file needed, for [`ExpectedMemory::learn`].
+/// What the operation of one file needed, for [`ExpectedMemory::learn`].
 struct Measured {
     decoded_size: u64,
     peak_memory: u64,
 }
 
-/// How many index builds have ended since the ledger started, by outcome.
+/// How many indexing operations have ended since the ledger started, by
+/// outcome.
 #[derive(Debug, Default)]
 struct Finished {
     succeeded: AtomicU64,
     failed: AtomicU64,
 }
 
-/// The index builds of the ledger at one moment, for its charts
-/// (`index_build_charts`).
+/// The indexing operations of the ledger at one moment, for its charts
+/// (`indexing_charts`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Statistics {
-    /// The builds that run and the builds that wait.
+    /// The operations that run and the operations that wait.
     pub(crate) queue: Queue,
-    /// How many builds have ended with an index file since the ledger
+    /// How many operations have ended with an index file since the ledger
     /// started.
     pub(crate) succeeded: u64,
-    /// How many builds have ended without one since the ledger started.
+    /// How many operations have ended without one since the ledger started.
     pub(crate) failed: u64,
 }
 
-/// Starts index builds as child processes. One for the whole ledger, shared
-/// by the indexers of both signals, so that one limit covers them all.
+/// Starts indexing operations as child processes. One for the whole ledger,
+/// shared by the indexers of both signals, so that one limit covers them all.
 #[derive(Clone)]
-pub struct IndexBuilds {
+pub struct IndexingOperations {
     scheduler: Scheduler,
     /// The executable to run as `otel-plugin index`.
     executable: PathBuf,
     finished: Arc<Finished>,
 }
 
-impl IndexBuilds {
-    /// Index builds that run this process's own executable, within the
-    /// limits that the environment leaves or sets ([`MAX_BUILDS_VARIABLE`],
+impl IndexingOperations {
+    /// Indexing operations that run this process's own executable, within the
+    /// limits that the environment leaves or sets ([`MAX_OPERATIONS_VARIABLE`],
     /// [`MEMORY_PERCENT_VARIABLE`]).
     ///
     /// Must be called within a tokio runtime (see [`Scheduler::new`]).
@@ -245,7 +246,7 @@ impl IndexBuilds {
         let executable =
             std::env::current_exe().context("failed to resolve the current executable")?;
         let limits = limits_from(
-            std::env::var_os(MAX_BUILDS_VARIABLE).as_deref(),
+            std::env::var_os(MAX_OPERATIONS_VARIABLE).as_deref(),
             std::env::var_os(MEMORY_PERCENT_VARIABLE).as_deref(),
         )?;
 
@@ -260,7 +261,7 @@ impl IndexBuilds {
         }
     }
 
-    /// The builds of both signals as they are now.
+    /// The operations of both signals as they are now.
     pub(crate) fn statistics(&self) -> Statistics {
         Statistics {
             queue: self.scheduler.queue(),
@@ -269,14 +270,14 @@ impl IndexBuilds {
         }
     }
 
-    /// Build the index file of the WAL file at `wal_path` at `sfst_path` and
+    /// Index the WAL file at `wal_path` into the index file at `sfst_path` and
     /// wait for the result. `decoded_size` is what the WAL file decodes to,
-    /// when that could be read, and `expected_memory` what the build is
+    /// when that could be read, and `expected_memory` what the operation is
     /// expected to need.
     ///
-    /// Returns the response for the ledger and, when the build reported its
+    /// Returns the response for the ledger and, when the operation reported its
     /// peak, what it needed.
-    async fn build(
+    async fn run(
         &self,
         signal: Signal,
         wal_path: PathBuf,
@@ -372,7 +373,7 @@ fn remove_partial_index(sfst_path: &Path) {
 }
 
 /// What the WAL file at `path` decodes to, in bytes, from its frame headers.
-/// `None` when the file cannot be read: its build then expects no memory,
+/// `None` when the file cannot be read: its operation then expects no memory,
 /// and reports what is wrong with the file.
 async fn decoded_size(path: &Path) -> Option<u64> {
     let wal_path = path.to_owned();
@@ -388,7 +389,7 @@ async fn decoded_size(path: &Path) -> Option<u64> {
     }
 }
 
-/// What a build cost in time, as the fields that follow the subject of its
+/// What an operation cost in time, as the fields that follow the subject of its
 /// log line: the time it waited for a slot and the time its child ran.
 fn usage_text(usage: Usage) -> String {
     format!(
@@ -405,42 +406,43 @@ pub struct Indexer;
 impl Component for Indexer {
     type Request = IndexerRequest;
     type Response = IndexerResponse;
-    type Args = (Signal, IndexBuilds);
+    type Args = (Signal, IndexingOperations);
 
     async fn run(
-        (signal, index_builds): Self::Args,
+        (signal, indexing_operations): Self::Args,
         mut rx: mpsc::UnboundedReceiver<IndexerRequest>,
         tx: mpsc::UnboundedSender<IndexerResponse>,
         cancel: CancellationToken,
     ) {
         let mut expected_memory = ExpectedMemory::default();
-        // Dropped when the loop exits, which abandons the builds still in it.
-        let mut builds = JoinSet::new();
+        // Dropped when the loop exits, which abandons the operations still in
+        // it.
+        let mut operations = JoinSet::new();
 
         loop {
             tokio::select! {
                 _ = cancel.cancelled() => break,
                 request = rx.recv() => match request {
                     Some(IndexerRequest::Index { wal_path, sfst_path }) => {
-                        // Sized here, not in the build's task: the builds
-                        // must reach the scheduler in the order of their
-                        // requests.
+                        // Sized here, not in the operation's task: the
+                        // operations must reach the scheduler in the order of
+                        // their requests.
                         let decoded_size = decoded_size(&wal_path).await;
                         let expected = decoded_size.map_or(0, |size| expected_memory.of(size));
 
-                        let index_builds = index_builds.clone();
-                        builds.spawn(async move {
-                            index_builds
-                                .build(signal, wal_path, sfst_path, decoded_size, expected)
+                        let indexing_operations = indexing_operations.clone();
+                        operations.spawn(async move {
+                            indexing_operations
+                                .run(signal, wal_path, sfst_path, decoded_size, expected)
                                 .await
                         });
                     }
                     None => break,
                 },
-                Some(built) = builds.join_next() => {
-                    // A build task ends without a response only if it
+                Some(ended) = operations.join_next() => {
+                    // An operation task ends without a response only if it
                     // panicked: there is nothing to forward then.
-                    if let Ok((response, measured)) = built {
+                    if let Ok((response, measured)) = ended {
                         if let Some(measured) = measured {
                             expected_memory.learn(measured.decoded_size, measured.peak_memory);
                         }
@@ -482,14 +484,14 @@ mod tests {
         path
     }
 
-    /// An indexer for logs whose builds run `executable`.
+    /// An indexer for logs whose operations run `executable`.
     fn spawn_indexer(
         executable: PathBuf,
         cancel: &CancellationToken,
     ) -> ComponentHandle<IndexerRequest, IndexerResponse> {
-        let index_builds =
-            IndexBuilds::with_executable(executable, limits_from(None, None).unwrap());
-        ComponentHandle::spawn::<Indexer>((Signal::Logs, index_builds), cancel.child_token())
+        let indexing_operations =
+            IndexingOperations::with_executable(executable, limits_from(None, None).unwrap());
+        ComponentHandle::spawn::<Indexer>((Signal::Logs, indexing_operations), cancel.child_token())
     }
 
     fn summary() -> sfst::Summary {
@@ -532,11 +534,11 @@ mod tests {
     }
 
     #[test]
-    fn expected_memory_forgets_the_builds_before_the_recent_ones() {
+    fn expected_memory_forgets_the_operations_before_the_recent_ones() {
         let mut expected_memory = ExpectedMemory::default();
 
         expected_memory.learn(100 * MIB, 900 * MIB);
-        for _ in 0..ExpectedMemory::RECENT_BUILDS - 1 {
+        for _ in 0..ExpectedMemory::RECENT_OPERATIONS - 1 {
             expected_memory.learn(100 * MIB, 300 * MIB);
         }
         assert_eq!(expected_memory.of(10 * MIB), at_ratio(10 * MIB, 9.0));
@@ -546,7 +548,7 @@ mod tests {
     }
 
     #[test]
-    fn a_build_of_a_small_file_does_not_teach_the_ratio() {
+    fn an_operation_on_a_small_file_does_not_teach_the_ratio() {
         let mut expected_memory = ExpectedMemory::default();
 
         // A child's own 15 MiB over a 1 MiB file: a ratio of 15.
@@ -562,16 +564,19 @@ mod tests {
     }
 
     #[test]
-    fn index_builds_leave_one_cpu_and_never_drop_to_none() {
+    fn indexing_operations_leave_one_cpu_and_never_drop_to_none() {
         let cpus = std::thread::available_parallelism().unwrap().get();
 
-        assert_eq!(max_index_builds(), if cpus > 1 { cpus - 1 } else { 1 });
+        assert_eq!(
+            max_indexing_operations(),
+            if cpus > 1 { cpus - 1 } else { 1 }
+        );
     }
 
     #[test]
     fn each_environment_variable_replaces_its_own_limit() {
         let usual = Limits {
-            jobs: max_index_builds(),
+            jobs: max_indexing_operations(),
             memory_percent: MEMORY_PERCENT,
         };
 
@@ -602,7 +607,7 @@ mod tests {
         for value in invalid {
             let error = limits_from(Some(OsStr::new(value)), None).unwrap_err();
             assert!(
-                error.to_string().contains(MAX_BUILDS_VARIABLE),
+                error.to_string().contains(MAX_OPERATIONS_VARIABLE),
                 "{value:?}: {error}"
             );
         }
@@ -655,7 +660,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_build_reports_the_decoded_size_and_the_peak_its_child_answered() {
+    async fn an_operation_reports_the_decoded_size_and_the_peak_its_child_answered() {
         let dir = tempfile::tempdir().unwrap();
         let wal = write_wal(dir.path(), 3);
         let answer = dir.path().join("answer");
@@ -666,12 +671,12 @@ mod tests {
         };
         std::fs::write(&answer, indexed.encode().unwrap()).unwrap();
         let executable = fake_executable(dir.path(), &format!("cat {}", answer.display()));
-        let index_builds =
-            IndexBuilds::with_executable(executable, limits_from(None, None).unwrap());
+        let indexing_operations =
+            IndexingOperations::with_executable(executable, limits_from(None, None).unwrap());
 
         let size = decoded_size(&wal).await;
-        let (response, measured) = index_builds
-            .build(Signal::Logs, wal, dir.path().join("out.sfst"), size, 0)
+        let (response, measured) = indexing_operations
+            .run(Signal::Logs, wal, dir.path().join("out.sfst"), size, 0)
             .await;
 
         assert_eq!(size, Some(3 * 1024));
@@ -679,7 +684,7 @@ mod tests {
             matches!(response, IndexerResponse::Indexed { .. }),
             "{response:?}"
         );
-        let measured = measured.expect("the build reported what it needed");
+        let measured = measured.expect("the operation reported what it needed");
         assert_eq!(
             (measured.decoded_size, measured.peak_memory),
             (3 * 1024, 77 * MIB)
@@ -687,7 +692,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn finished_builds_are_counted_by_their_outcome() {
+    async fn finished_operations_are_counted_by_their_outcome() {
         let dir = tempfile::tempdir().unwrap();
         let answer = dir.path().join("answer");
         let indexed = IndexedFile {
@@ -702,16 +707,18 @@ mod tests {
             answer.display()
         );
         let executable = fake_executable(dir.path(), &script);
-        let index_builds =
-            IndexBuilds::with_executable(executable, limits_from(None, None).unwrap());
+        let indexing_operations =
+            IndexingOperations::with_executable(executable, limits_from(None, None).unwrap());
 
         for name in ["good.wal", "garbage.wal", "failed.wal"] {
             let wal = dir.path().join(name);
             let sfst = dir.path().join("out.sfst");
-            index_builds.build(Signal::Logs, wal, sfst, None, 0).await;
+            indexing_operations
+                .run(Signal::Logs, wal, sfst, None, 0)
+                .await;
         }
 
-        let statistics = index_builds.statistics();
+        let statistics = indexing_operations.statistics();
         assert_eq!((statistics.succeeded, statistics.failed), (1, 2));
     }
 
@@ -725,11 +732,13 @@ mod tests {
         // before it can rename it.
         let executable =
             fake_executable(dir.path(), r#": > "$7.started"; : > "$7.tmp"; kill -9 $$"#);
-        let index_builds =
-            IndexBuilds::with_executable(executable, limits_from(None, None).unwrap());
+        let indexing_operations =
+            IndexingOperations::with_executable(executable, limits_from(None, None).unwrap());
 
         let wal = dir.path().join("in.wal");
-        let (response, _) = index_builds.build(Signal::Logs, wal, sfst, None, 0).await;
+        let (response, _) = indexing_operations
+            .run(Signal::Logs, wal, sfst, None, 0)
+            .await;
 
         assert!(
             matches!(response, IndexerResponse::IndexFailed { .. }),
@@ -740,14 +749,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_file_that_cannot_be_sized_is_built_without_an_expectation() {
+    async fn a_file_that_cannot_be_sized_is_indexed_without_an_expectation() {
         let dir = tempfile::tempdir().unwrap();
 
         assert_eq!(decoded_size(&dir.path().join("missing.wal")).await, None);
     }
 
     #[tokio::test]
-    async fn a_build_runs_the_index_command_and_answers_with_the_childs_answer() {
+    async fn an_operation_runs_the_index_command_and_answers_with_the_childs_answer() {
         let dir = tempfile::tempdir().unwrap();
         let (wal, sfst) = (wal_path(dir.path(), 7), dir.path().join("7.sfst"));
         let (answer, seen) = (dir.path().join("answer"), dir.path().join("seen"));
@@ -798,7 +807,7 @@ mod tests {
         );
     }
 
-    /// The `IndexFailed` error an indexer answers with when its builds run
+    /// The `IndexFailed` error an indexer answers with when its operations run
     /// `script`.
     async fn failure_of(script: &str) -> (PathBuf, PathBuf, String) {
         let dir = tempfile::tempdir().unwrap();
@@ -847,9 +856,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn responses_arrive_as_builds_finish() {
+    async fn responses_arrive_as_operations_finish() {
         let dir = tempfile::tempdir().unwrap();
-        // The build of the file with seq 1 takes longer than that of seq 2.
+        // The operation of the file with seq 1 takes longer than that of seq 2.
         let executable = fake_executable(
             dir.path(),
             "case \"$5\" in *0000000001-*) sleep 0.3;; esac; echo failed >&2; exit 1",
@@ -876,7 +885,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn cancelling_the_indexer_kills_its_running_builds() {
+    async fn cancelling_the_indexer_kills_its_running_operations() {
         let dir = tempfile::tempdir().unwrap();
         let pid_file = dir.path().join("pid");
         let executable = fake_executable(
@@ -902,12 +911,12 @@ mod tests {
         };
         let pid = tokio::time::timeout(std::time::Duration::from_secs(5), written)
             .await
-            .expect("the build never started");
+            .expect("the operation never started");
 
         cancel.cancel();
 
-        // The component ends without a response for the build, and the child
-        // is gone: its /proc entry disappears or shows a zombie.
+        // The component ends without a response for the operation, and the
+        // child is gone: its /proc entry disappears or shows a zombie.
         let ended = tokio::time::timeout(std::time::Duration::from_secs(5), indexer.recv());
         assert!(ended.await.expect("the indexer still runs").is_none());
         let gone = async {

@@ -302,9 +302,9 @@ impl Ledger {
         let (pipeline_tx, pipeline_rx) = mpsc::unbounded_channel();
         let (outbound_tx, outbound_rx) = mpsc::unbounded_channel();
 
-        // One for both signals: its limit covers every index build of the
-        // ledger.
-        let index_builds = crate::indexer::IndexBuilds::new()?;
+        // One for both signals: its limit covers every indexing operation of
+        // the ledger.
+        let indexing_operations = crate::indexer::IndexingOperations::new()?;
 
         // Build the logs pipeline: per-signal disk/registries/workers + recovery
         // (using the shared cleaner/uploader/storage). Adding a further signal
@@ -321,7 +321,7 @@ impl Ledger {
             storage.as_ref(),
             read_cache.as_ref(),
             chunk_cache.clone(),
-            &index_builds,
+            &indexing_operations,
             &pipeline_tx,
         )
         .await?;
@@ -345,7 +345,7 @@ impl Ledger {
             read_cache.as_ref(),
             chunk_cache.clone(),
             Arc::clone(&traces_prefixes),
-            &index_builds,
+            &indexing_operations,
             &pipeline_tx,
         )
         .await?;
@@ -378,12 +378,13 @@ impl Ledger {
         tracing::info!("signaled ready to supervisor");
 
         // Not before `Ready`: the supervisor accepts no other message until
-        // then, so the builds of the startup backlog are not charted.
-        let index_build_charts = crate::index_build_charts::IndexBuildCharts::new()
-            .context("failed to declare the charts of the index builds")?;
-        tokio::spawn(crate::index_build_charts::run(
-            index_build_charts,
-            index_builds.clone(),
+        // then, so the indexing operations of the startup backlog are not
+        // charted.
+        let indexing_charts = crate::indexing_charts::IndexingCharts::new()
+            .context("failed to declare the indexing charts")?;
+        tokio::spawn(crate::indexing_charts::run(
+            indexing_charts,
+            indexing_operations.clone(),
             outbound_tx.clone(),
             cancel.child_token(),
         ));

@@ -1,7 +1,7 @@
 //! The traces binding — the twin of the logs binding in
 //! [`super::pipeline`]. It pre-spawns the shared
-//! [`crate::indexer::Indexer`] for the **traces** signal, whose index
-//! builds run [`ng_index::build_sfst_traces_file`] (full span columns,
+//! [`crate::indexer::Indexer`] for the **traces** signal, whose indexing
+//! operations run [`ng_index::build_sfst_traces_file`] (full span columns,
 //! `TIDX` trace-id index, `TBLM` trace-id bloom, `EVNB`/`LNKB` event/link
 //! chunks), and delegates the rest to [`super::pipeline::build_pipeline`].
 //! Only the signal, the handler, and the GET shim differ from logs.
@@ -30,7 +30,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use crate::event::PipelineResp;
-use crate::indexer::{IndexBuilds, Indexer};
+use crate::indexer::{Indexer, IndexingOperations};
 use file_lifecycle::ArgShim;
 use file_lifecycle::Pipeline;
 use file_lifecycle::chunk::ChunkCache;
@@ -67,14 +67,16 @@ pub(crate) async fn build_traces_pipeline(
     read_cache: Option<&file_cache::FileCache>,
     chunk_cache: Arc<ChunkCache>,
     prefixes: Arc<super::wal_prefix::WalPrefixes>,
-    index_builds: &IndexBuilds,
+    indexing_operations: &IndexingOperations,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
-    // The traces indexer: its builds decode ng-flatten trace frames (payload
-    // format 3) into a trace SFST (full span columns + TIDX + TBLM +
-    // EVNB/LNKB).
-    let indexer =
-        ComponentHandle::spawn::<Indexer>((signal, index_builds.clone()), cancel.child_token());
+    // The traces indexer: its indexing operations decode ng-flatten trace
+    // frames (payload format 3) into a trace SFST (full span columns + TIDX +
+    // TBLM + EVNB/LNKB).
+    let indexer = ComponentHandle::spawn::<Indexer>(
+        (signal, indexing_operations.clone()),
+        cancel.child_token(),
+    );
 
     // Owned clones for the handler closure (the builder only borrows
     // `storage` for recovery): reading evicted files back needs the

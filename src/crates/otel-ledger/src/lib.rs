@@ -3,7 +3,7 @@
 //! supervisor/writer IPC, shared workers), the Function-call dispatch and the
 //! `otel-logs`/`otel-traces` query handlers over the wire-neutral `sfsq`
 //! engines (`ledger::rpc`), and the shared indexer component (`indexer`,
-//! spawned per signal; its index builds run in child processes,
+//! spawned per signal; its indexing operations run in child processes,
 //! `index_child`, with that signal's `ng-index` builder — `build_sfst_file`
 //! for logs, `build_sfst_traces_file` for traces). The reusable machinery
 //! (registry, catalog, upload/download, cache, recovery, the per-signal
@@ -21,9 +21,9 @@
 //! `otel-plugin index`.
 
 pub mod event;
-mod index_build_charts;
 pub mod index_child;
 pub mod indexer;
+mod indexing_charts;
 mod ledger;
 #[cfg(test)]
 pub(crate) mod test_helpers;

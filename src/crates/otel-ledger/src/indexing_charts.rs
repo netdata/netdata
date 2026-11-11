@@ -1,11 +1,11 @@
-//! The charts of the index builds, for whoever operates the host: how many
-//! builds run and how many wait, for how long the first of the waiting ones
-//! has waited, and how many builds succeeded and failed.
+//! The charts of the indexing operations, for whoever operates the host: how
+//! many operations run and how many wait, for how long the first of the waiting
+//! ones has waited, and how many operations succeeded and failed.
 //!
 //! One set of charts for the ledger, both signals together: the limits that
-//! hold a build back are shared ([`IndexBuilds`]). The queue of waiting
-//! builds has no bound, so these charts are where a host that closes files
-//! faster than it can index them shows.
+//! hold an operation back are shared ([`IndexingOperations`]). The queue of
+//! waiting operations has no bound, so these charts are where a host that
+//! closes files faster than it can index them shows.
 //!
 //! [`run`] samples the numbers every second and hands the chart text to the
 //! ledger's event loop, which sends it to the supervisor as
@@ -21,10 +21,10 @@ use otel_bridge::LedgerResponse;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::indexer::{IndexBuilds, Statistics};
+use crate::indexer::{IndexingOperations, Statistics};
 
 columns! {
-    /// Where an index build is.
+    /// Where an indexing operation is.
     enum State {
         Running = "running",
         Waiting = "waiting",
@@ -38,7 +38,7 @@ columns! {
 }
 
 columns! {
-    /// How an index build ended.
+    /// How an indexing operation ended.
     enum Outcome {
         Succeeded = "succeeded",
         Failed = "failed",
@@ -49,39 +49,39 @@ columns! {
 /// limit.
 const MAX_CHUNK_BYTES: usize = 1 << 20;
 
-/// The charts of the index builds: one label-less entity.
-pub(crate) struct IndexBuildCharts {
+/// The charts of the indexing operations: one label-less entity.
+pub(crate) struct IndexingCharts {
     metric_set: MetricSet,
     aggregator: Aggregator,
-    builds: Gauge<State>,
+    operations: Gauge<State>,
     oldest_wait: Gauge<OldestWait>,
     finished: CumulativeCounter<Outcome>,
 }
 
-impl IndexBuildCharts {
+impl IndexingCharts {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
-        let builds = builder.gauge::<State>(ChartDescriptor {
-            title: "Index builds running and waiting".into(),
-            units: "builds".into(),
-            family: "index builds".into(),
-            context: "netdata.otel.index_builds".into(),
+        let operations = builder.gauge::<State>(ChartDescriptor {
+            title: "Indexing operations running and waiting".into(),
+            units: "operations".into(),
+            family: "indexing".into(),
+            context: "netdata.otel.indexing_operations".into(),
             chart_type: ChartType::Stacked,
             priority: 150_020,
         })?;
         let oldest_wait = builder.gauge::<OldestWait>(ChartDescriptor {
-            title: "Longest wait of an index build that has not started".into(),
+            title: "Longest wait of an indexing operation that has not started".into(),
             units: "seconds".into(),
-            family: "index builds".into(),
-            context: "netdata.otel.index_builds_oldest_wait".into(),
+            family: "indexing".into(),
+            context: "netdata.otel.indexing_operations_oldest_wait".into(),
             chart_type: ChartType::Line,
             priority: 150_021,
         })?;
         let finished = builder.cumulative_counter::<Outcome>(ChartDescriptor {
-            title: "Index builds finished".into(),
-            units: "builds/s".into(),
-            family: "index builds".into(),
-            context: "netdata.otel.index_builds_finished".into(),
+            title: "Indexing operations finished".into(),
+            units: "operations/s".into(),
+            family: "indexing".into(),
+            context: "netdata.otel.indexing_operations_finished".into(),
             chart_type: ChartType::Stacked,
             priority: 150_022,
         })?;
@@ -91,17 +91,17 @@ impl IndexBuildCharts {
         Ok(Self {
             metric_set,
             aggregator,
-            builds,
+            operations,
             oldest_wait,
             finished,
         })
     }
 
-    /// Record `statistics` at `now` (Unix seconds), then return the chart
-    /// text of every window that ended by `now`: a tick charts the statistics
-    /// the tick before it recorded. The two totals are charted as their
-    /// increase from one window to the next, so the builds that ended before
-    /// the first tick are on no chart.
+    /// Record `statistics` at `now` (Unix seconds), then return the chart text
+    /// of every window that ended by `now`: a tick charts the statistics the
+    /// tick before it recorded. The two totals are charted as their increase
+    /// from one window to the next, so the operations that ended before the
+    /// first tick are on no chart.
     pub(crate) fn emit(&mut self, now: u64, statistics: &Statistics) -> Vec<Vec<u8>> {
         let oldest_wait = statistics.queue.oldest_wait.unwrap_or_default();
 
@@ -109,8 +109,16 @@ impl IndexBuildCharts {
         batch
             .entity(Labels::new())
             .record(now)
-            .set_value(self.builds, State::Running, statistics.queue.running as f64)
-            .set_value(self.builds, State::Waiting, statistics.queue.waiting as f64)
+            .set_value(
+                self.operations,
+                State::Running,
+                statistics.queue.running as f64,
+            )
+            .set_value(
+                self.operations,
+                State::Waiting,
+                statistics.queue.waiting as f64,
+            )
             .set_value(
                 self.oldest_wait,
                 OldestWait::Wait,
@@ -128,11 +136,11 @@ impl IndexBuildCharts {
     }
 }
 
-/// Chart the builds of `index_builds` on every second boundary, through
-/// `outbound`, until `cancel` fires or the ledger's event loop is gone.
+/// Chart the operations of `indexing_operations` on every second boundary,
+/// through `outbound`, until `cancel` fires or the ledger's event loop is gone.
 pub(crate) async fn run(
-    mut charts: IndexBuildCharts,
-    index_builds: IndexBuilds,
+    mut charts: IndexingCharts,
+    indexing_operations: IndexingOperations,
     outbound: mpsc::UnboundedSender<LedgerResponse>,
     cancel: CancellationToken,
 ) {
@@ -146,7 +154,7 @@ pub(crate) async fn run(
             _ = tokio::time::sleep(next_second.saturating_sub(now)) => {}
         }
 
-        for payload in charts.emit(next_second.as_secs(), &index_builds.statistics()) {
+        for payload in charts.emit(next_second.as_secs(), &indexing_operations.statistics()) {
             if outbound
                 .send(LedgerResponse::ChartData { payload })
                 .is_err()
@@ -169,7 +177,7 @@ mod tests {
 
     #[test]
     fn a_tick_charts_what_the_tick_before_it_recorded() {
-        let mut charts = IndexBuildCharts::new().unwrap();
+        let mut charts = IndexingCharts::new().unwrap();
         let earlier = Statistics {
             queue: Queue {
                 running: 7,
@@ -198,24 +206,24 @@ mod tests {
         // The window that `earlier` was recorded in. The totals have nothing
         // to be compared with yet.
         assert!(out.contains(
-            "BEGIN netdata.otel.index_builds 1000000\nSET running = 7\nSET waiting = 13\nEND 101 0 1\n"
+            "BEGIN netdata.otel.indexing_operations 1000000\nSET running = 7\nSET waiting = 13\nEND 101 0 1\n"
         ));
         assert!(out.contains(
-            "BEGIN netdata.otel.index_builds_oldest_wait 1000000\nSET wait = 12.5\nEND 101 0 1\n"
+            "BEGIN netdata.otel.indexing_operations_oldest_wait 1000000\nSET wait = 12.5\nEND 101 0 1\n"
         ));
         assert!(out.contains(
-            "BEGIN netdata.otel.index_builds_finished 1000000\nSET succeeded =\nSET failed =\nEND 101 0 1\n"
+            "BEGIN netdata.otel.indexing_operations_finished 1000000\nSET succeeded =\nSET failed =\nEND 101 0 1\n"
         ));
         // The window that `later` was recorded in: nothing waits, and the
         // totals grew by 7 and by 1.
         assert!(out.contains(
-            "BEGIN netdata.otel.index_builds 1000000\nSET running = 0\nSET waiting = 0\nEND 102 0 1\n"
+            "BEGIN netdata.otel.indexing_operations 1000000\nSET running = 0\nSET waiting = 0\nEND 102 0 1\n"
         ));
         assert!(out.contains(
-            "BEGIN netdata.otel.index_builds_oldest_wait 1000000\nSET wait = 0\nEND 102 0 1\n"
+            "BEGIN netdata.otel.indexing_operations_oldest_wait 1000000\nSET wait = 0\nEND 102 0 1\n"
         ));
         assert!(out.contains(
-            "BEGIN netdata.otel.index_builds_finished 1000000\nSET succeeded = 7\nSET failed = 1\nEND 102 0 1\n"
+            "BEGIN netdata.otel.indexing_operations_finished 1000000\nSET succeeded = 7\nSET failed = 1\nEND 102 0 1\n"
         ));
     }
 }

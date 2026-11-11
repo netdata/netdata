@@ -406,8 +406,9 @@ mod tests {
         assert!(!lifeline);
     }
 
-    // The ledger starts its index builds with `index_child::arguments`; they
-    // must parse to the subcommand they are meant for, with the lifeline on.
+    // The ledger starts its indexing operations with `index_child::arguments`;
+    // they must parse to the subcommand they are meant for, with the lifeline
+    // on.
     #[test]
     fn the_ledgers_index_arguments_route_to_index() {
         for signal in [Signal::Logs, Signal::Traces] {

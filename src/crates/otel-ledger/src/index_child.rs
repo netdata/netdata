@@ -32,7 +32,7 @@ pub struct IndexedFile {
     /// Size of the written index file in bytes.
     pub size: u64,
     /// The most memory the child held at once, in bytes, as the child read
-    /// it from its own system when the build was done. `None` on a system
+    /// it from its own system when the indexing was done. `None` on a system
     /// where `ng_index::read_rss` has no way to read it.
     pub peak_memory: Option<u64>,
 }
@@ -65,15 +65,15 @@ const NICE: libc::c_int = 10;
 
 /// Lower the CPU priority of this process to that of background work.
 ///
-/// `otel-plugin index` calls it before anything else, on its first thread,
-/// so that an index build gives way to the ledger, the ingestor and
-/// everything else on the host when CPUs are short. It costs a build nothing
-/// while CPUs are idle. If the system refuses, the build runs at the priority
-/// it was started with.
+/// `otel-plugin index` calls it before anything else, on its first thread, so
+/// that an indexing operation gives way to the ledger, the ingestor and
+/// everything else on the host when CPUs are short. It costs the operation
+/// nothing while CPUs are idle. If the system refuses, the operation runs at
+/// the priority it was started with.
 ///
 /// One implementation per system. On Linux the level belongs to the calling
-/// thread and to the threads it starts later, which is why this comes first.
-/// A system without an implementation here runs its builds at normal
+/// thread and to the threads it starts later, which is why this comes first. A
+/// system without an implementation here runs its indexing operations at normal
 /// priority.
 pub fn lower_priority() {
     #[cfg(unix)]
@@ -100,11 +100,11 @@ pub fn arguments(signal: Signal, wal_path: &Path, sfst_path: &Path) -> Vec<OsStr
     ]
 }
 
-/// Build the index file of the WAL file at `wal_path` at `sfst_path` and
+/// Index the WAL file at `wal_path` into the index file at `sfst_path` and
 /// write the answer to `answer`.
 ///
 /// The body of `otel-plugin index`. Nothing is written to `answer` when the
-/// build fails.
+/// indexing fails.
 pub fn run(
     signal: Signal,
     wal_path: &Path,
@@ -292,7 +292,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_build_names_the_file_and_writes_no_answer() {
+    fn failed_indexing_names_the_file_and_writes_no_answer() {
         let dir = tempfile::tempdir().unwrap();
         let wal_path = dir.path().join("missing.wal");
         let mut answer = Vec::new();
