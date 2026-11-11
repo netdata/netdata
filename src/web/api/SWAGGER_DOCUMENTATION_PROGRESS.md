@@ -3183,20 +3183,20 @@ Per dimension:
 ## `/api/v3/bearer_protection` - COMPLETE ENUMERATED CHECKLIST ✅
 
 **Source Code Locations:**
-- Registration: `src/web/api/web_api_v3.c:225-230`
-- Implementation: `src/web/api/v2/api_v2_bearer.c:21-70`
+- Registration: `src/web/api/web_api_v3.c:227-234`
+- Implementation: `src/web/api/v2/api_v2_bearer.c:21-85`
 
 **Security Configuration:**
 - ACL: `HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS`
 - ACCESS: `HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_VIEW_AGENT_CONFIG | HTTP_ACCESS_EDIT_AGENT_CONFIG`
 
 ### PARAMETERS (4 total)
-1. ✅ `bearer_protection` - string, optional - Enable/disable bearer protection. Accepts: "on", "true", "yes" (enables), any other value (disables). Defaults to current `netdata_is_protected_by_bearer` value if not provided.
+1. ✅ `bearer_protection` - string, optional - Enable/disable bearer protection. Accepts (case-insensitive): "on", "true", "yes" (enables), "off", "false", "no" (disables); any other value returns HTTP 400 and leaves the state unchanged. If omitted or empty, the state is not changed.
 2. ✅ `machine_guid` - string, required - The machine GUID of the agent. Must match the local agent's `machine_guid` exactly.
 3. ✅ `claim_id` - string, required - The claim ID of the agent. Must match the local agent's claim ID via `claim_id_matches()`.
 4. ✅ `node_id` - string, required - The node UUID of the agent. Must match the local agent's `node_id` in lowercase UUID format.
 
-### RESPONSE FIELDS (3 total)
+### RESPONSE FIELDS (4 total)
 
 **Success Response (HTTP 200):**
 1. ✅ `bearer_protection` - boolean - Current state of bearer protection after the operation
@@ -3207,9 +3207,12 @@ Per dimension:
 **Error Response - Invalid UUIDs (HTTP 400):**
 1. ✅ `(error message)` - string - Plain text: "The request is missing or not matching local UUIDs"
 
+**Error Response - Invalid bearer_protection value (HTTP 400, checked after the identity checks):**
+1. ✅ `(error message)` - string - Plain text: "Invalid bearer_protection value; use on/off, true/false or yes/no"
+
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 4 (1 optional + 3 required)
-**Response Fields Verified:** 3 (1 JSON + 2 error messages)
+**Response Fields Verified:** 4 (1 JSON + 3 error messages)
 **Security:** `HTTP_ACL_ACLK | ACL_DEV_OPEN_ACCESS` + `SIGNED_ID + SAME_SPACE + VIEW_AGENT_CONFIG + EDIT_AGENT_CONFIG`
 **HTTP Method:** GET (query parameters via URL parsing)
 **Dual-Agent Agreement:** ✅ Agent confirmed bearer token protection management structure
@@ -3218,7 +3221,7 @@ Per dimension:
 - Uses `api_v2_bearer_protection` callback (shared between v2 and v3)
 - Validates claim ID via `claim_id_matches()`
 - Validates UUIDs via internal `verify_host_uuids()` function
-- Sets global `netdata_is_protected_by_bearer` variable
+- Sets global `netdata_is_protected_by_bearer` variable only when a valid value is given
 - Success response is JSON, error responses are plain text
 
 ---
@@ -3226,9 +3229,9 @@ Per dimension:
 ## `/api/v3/bearer_get_token` - COMPLETE ENUMERATED CHECKLIST ✅
 
 **Source Code Locations:**
-- Registration: `src/web/api/web_api_v3.c:233-238`
-- Implementation: `src/web/api/v2/api_v2_bearer.c:93-139`
-- Helper Function: `src/web/api/v2/api_v2_bearer.c:72-91`
+- Registration: `src/web/api/web_api_v3.c:235-242`
+- Implementation: `src/web/api/v2/api_v2_bearer.c:112-158`
+- Helper Function: `src/web/api/v2/api_v2_bearer.c:87-110`
 - Remote Host Handler: `src/web/api/functions/function-bearer_get_token.c:59-82`
 
 **Security Configuration:**

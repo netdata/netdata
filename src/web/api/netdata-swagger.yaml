@@ -6657,7 +6657,7 @@ paths:
       description: |
         **Bearer Token Authentication Control**
 
-        This endpoint controls whether the Netdata agent requires bearer token authentication for API access. Bearer protection adds an additional security layer by downgrading unauthenticated requests to `HTTP_ACCESS_NONE` when enabled. To reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`, an unauthenticated direct HTTP request must present a valid bearer token in the `Authorization` header. API messages sent over an established WebRTC data channel are not parsed for an `Authorization` header (unlike the initial HTTP `rtc_offer` signaling request, which is), so an unauthenticated call made over the data channel cannot supply a bearer token and is rejected for such routes. Already-authenticated sessions (for example Netdata Cloud/ACLK) keep their permissions and are unaffected. Routes declared with `HTTP_ACCESS_NONE` do not acquire a generic bearer-token requirement; their own ACL, transport, and callback authorization still apply.
+        This endpoint controls whether the Netdata Agent requires bearer token authentication for API access. Bearer protection adds an additional security layer by downgrading unauthenticated requests to `HTTP_ACCESS_NONE` when enabled. To reach routes whose required access includes `HTTP_ACCESS_ANONYMOUS_DATA`, an unauthenticated direct HTTP request must present a valid bearer token in the `Authorization` header. API messages sent over an established WebRTC data channel are not parsed for an `Authorization` header (unlike the initial HTTP `rtc_offer` signaling request, which is), so an unauthenticated call made over the data channel cannot supply a bearer token and is rejected for such routes. Already-authenticated sessions (for example Netdata Cloud/ACLK) keep their permissions and are unaffected. Routes declared with `HTTP_ACCESS_NONE` do not acquire a generic bearer-token requirement; their own ACL, transport, and callback authorization still apply.
 
         **Use Cases:**
         - **Cloud Integration:** Enable bearer protection when agent is claimed to Netdata Cloud
@@ -6711,18 +6711,19 @@ paths:
         - name: bearer_protection
           in: query
           required: false
+          allowEmptyValue: true
           schema:
-            type: string
-            enum: [on, off, true, false, yes, no]
+            $ref: "#/components/schemas/bearerProtectionValue"
           description: |
             **Whether to enable or disable bearer token authentication requirement.**
 
-            **Valid Values:**
+            **Valid Values** (matched case-insensitively, so `ON` and `True` also work):
             - Enable: `on`, `true`, `yes`
             - Disable: `off`, `false`, `no`
+            - Any other value is rejected with HTTP 400 and the protection state is not changed
 
             **Default Behavior:**
-            - If omitted, maintains current bearer protection state
+            - If omitted or empty, the protection state is not changed and the current state is returned
             - When agent is unclaimed, defaults to disabled
             - When agent is claimed, typically enabled by Netdata Cloud
 
@@ -6810,7 +6811,7 @@ paths:
             Example: `node_id=23456789-2345-2345-2345-234567890abc`
       responses:
         "200":
-          description: Bearer protection state successfully changed.
+          description: Current bearer protection state, after applying the requested change if one was given.
           content:
             application/json:
               schema:
@@ -6827,7 +6828,8 @@ paths:
             - claim_id doesn't match the agent's claim ID
             - machine_guid doesn't match the agent's machine GUID
             - node_id doesn't match or is missing
-            - Invalid parameter values
+            - bearer_protection has a value other than on/off, true/false or yes/no (case-insensitive); the
+              protection state is not changed
   /api/v3/bearer_get_token:
     get:
       operationId: bearerGetToken3
@@ -7766,10 +7768,10 @@ paths:
         - name: bearer_protection
           in: query
           required: false
+          allowEmptyValue: true
           schema:
-            type: string
-            enum: [on, off, true, false, yes, no]
-          description: Enable or disable bearer protection
+            $ref: "#/components/schemas/bearerProtectionValue"
+          description: Enable (`on`, `true`, `yes`) or disable (`off`, `false`, `no`) bearer protection, matched case-insensitively. Any other value returns HTTP 400 without changing the state; if omitted or empty, the state is not changed.
         - name: claim_id
           in: query
           required: true
@@ -7791,9 +7793,19 @@ paths:
           description: Agent's node UUID
       responses:
         "200":
-          description: Bearer protection state successfully changed
+          description: Current bearer protection state, after applying the requested change if one was given
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bearer_protection:
+                    type: boolean
+                    description: Current bearer protection state after the operation (true = enabled, false = disabled)
+              example:
+                bearer_protection: true
         "400":
-          description: Invalid parameters or verification failed
+          description: Identity verification failed, or bearer_protection has a value other than on/off, true/false or yes/no (case-insensitive); the protection state is not changed
   /api/v2/bearer_get_token:
     get:
       deprecated: true
@@ -9564,6 +9576,10 @@ components:
           - anomaly-rate
           - value
   schemas:
+    bearerProtectionValue:
+      type: string
+      description: "`on`, `true` or `yes` enable; `off`, `false` or `no` disable; matched case-insensitively. Empty means no change."
+      pattern: '^(?:[oO][nN]|[oO][fF][fF]|[tT][rR][uU][eE]|[fF][aA][lL][sS][eE]|[yY][eE][sS]|[nN][oO])?$'
     info:
       type: object
       properties:

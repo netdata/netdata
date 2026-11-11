@@ -98,6 +98,12 @@ if(OS_LINUX)
         target_link_options(http-auth-bearer-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
         target_link_libraries(http-auth-bearer-test libnetdata)
 
+        add_executable(api-v2-bearer-protection-test EXCLUDE_FROM_ALL
+                src/web/api/tests/api-v2-bearer-protection-test.c)
+        target_compile_options(api-v2-bearer-protection-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(api-v2-bearer-protection-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(api-v2-bearer-protection-test libnetdata)
+
         add_executable(api-v3-settings-test EXCLUDE_FROM_ALL
                 src/web/api/tests/api-v3-settings-test.c)
         target_compile_options(api-v3-settings-test PRIVATE -ffunction-sections -fdata-sections)
