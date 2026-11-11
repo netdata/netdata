@@ -314,7 +314,7 @@
         "value_separator": {
           "type": "string",
           "minLength": 1,
-          "description": "Separator accepted by the producer for multiple values encoded in one string. Exact option IDs remain literal, even when they contain the separator."
+          "description": "Separator accepted by the producer for multiple values encoded in one string. Consumers normalizing values against this metadata must match exact option IDs before splitting. This declaration does not change transport parsing."
         }
       },
       "allOf": [

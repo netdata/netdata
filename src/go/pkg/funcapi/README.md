@@ -8,8 +8,11 @@ Job Manager owns publication, job routing, execution and response framing. The
 
 `ParamOption.Aliases` and `ParamConfig.ValueSeparator` serialize optional discovery metadata for alternate input
 forms already accepted by a producer. They do not change `ResolveParam` or enable new parsing automatically.
-Advertise only forms the request path actually accepts. Canonical option IDs remain opaque and take precedence over
-aliases or joined-value splitting; see the [Function contract](../../../plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md#accepted-option-forms).
+Advertise only forms the request path actually accepts. Consumers normalizing values against this metadata must match
+opaque canonical option IDs before considering aliases or joined-value splitting. Structured JSON `selections` preserve
+literal IDs; legacy Go structured Function command arguments split commas before resolution, independently of this metadata.
+Use JSON selections for IDs containing commas; see the
+[Function contract](../../../plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md#accepted-option-forms).
 
 ## Topology focus metadata
 

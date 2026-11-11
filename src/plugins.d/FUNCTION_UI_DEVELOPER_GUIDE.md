@@ -889,11 +889,12 @@ Functions may describe existing alternate input forms in `required_params`:
   network-connections `container` option accepts `container_name`.
 - A selector's optional `value_separator` describes an accepted encoding of several values in one string. The
   network-connections `sockets` and `protocols` selectors declare `","`.
-- Option IDs are opaque. An exact canonical ID takes precedence over alias matching and joined-value splitting.
+- When consumers normalize values against this metadata, option IDs are opaque. An exact canonical ID takes
+  precedence over alias matching and joined-value splitting.
   A job named `beta rack,1` is still one job; `prod-a` and `prod_a` remain distinct IDs.
 - An alias advertised by several options does not uniquely identify any option. Consumers must not select one
   arbitrarily or invent aliases by replacing punctuation.
-- Split a joined value only when the selector declares its separator and the whole string is not an exact ID.
+- Consumers split a joined value only when the selector declares its separator and the whole string is not an exact ID.
   Omitting `value_separator` does not implicitly permit comma splitting. Array entries remain literal unless that
   producer declares an accepted alternate encoding.
 
@@ -901,6 +902,11 @@ These are discovery declarations, not changes to the Function parser or permissi
 requests. A producer must advertise only forms its request path actually accepts. The Go `ParamConfig.RequiredParam`
 serializer exposes `ValueSeparator` and `ParamOption.Aliases` without changing `ResolveParam` behavior. Existing
 clients can continue selecting and sending canonical option IDs without using this optional metadata.
+
+Transport matters when sending the normalized values. Go structured Functions preserve each ID literally in
+JSON `selections`. Their legacy command arguments split commas before job or option resolution, even when the selector
+does not declare `value_separator`. Use JSON selections for IDs containing commas: `{"selections":{"__job":["beta,1"]}}`
+selects that one job, whereas the command argument `__job:beta,1` is split and rejected as multiple job values.
 
 ### Topology Focus Controls
 
