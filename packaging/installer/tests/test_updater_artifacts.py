@@ -51,7 +51,7 @@ RELEASE_CHANNEL=stable
 {body}
 '''
         env = {k: v for k, v in os.environ.items() if not k.startswith('NETDATA_')}
-        result = subprocess.run(['/bin/sh', '-c', setup], cwd=self.work, env=env,
+        result = subprocess.run(['bash', '-c', setup], cwd=self.work, env=env,
                                 text=True, capture_output=True)
         if success:
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
@@ -304,6 +304,13 @@ get_netdata_latest_tag() { echo github-must-not-be-used >&2; exit 9; }
 get_latest_tag preview
 ''', success=False)
         self.assertNotIn('github-must-not-be-used', result.stderr)
+
+    def test_preview_explicit_source_requires_manifest(self):
+        result = self.run_shell("""
+check_for_remote_file() { return 1; }
+set_tarball_urls preview yes
+""", success=False)
+        self.assertIn('preview release manifest', result.stderr)
 
     def test_current_version_without_binary(self):
         result = self.run_shell('''

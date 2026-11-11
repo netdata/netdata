@@ -1120,8 +1120,9 @@ set_tarball_urls() {
   if [ -n "${NETDATA_TARBALL_URL_PREFIX}" ] &&
      check_for_remote_file "${NETDATA_TARBALL_URL_PREFIX}/Manifest"; then
     NETDATA_MANIFEST_INSTALL=1
+  elif [ "${1}" = preview ]; then
+    fatal "Unable to fetch the preview release manifest from artifact hosting" U0029
   elif [ "${prefix_set}" -eq 0 ]; then
-    [ "${1}" != preview ] || fatal "Unable to fetch the preview release manifest from artifact hosting" U0029
     case "${1}" in
       stable) release_base="${NETDATA_STABLE_BASE_URL}" ;;
       nightly) release_base="${NETDATA_NIGHTLY_BASE_URL}" ;;

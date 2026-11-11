@@ -29,7 +29,7 @@ foreach(VARIANT IN LISTS REPO_VARIANTS)
   set(REPO_PACKAGE_${VARIANT} "netdata-repo${REPO_SUFFIX}")
   set(REPO_CONFIG_${VARIANT} "netdata${REPO_SUFFIX}")
   string(TOUPPER "${REPO_PACKAGE_${VARIANT}}" COMPONENT_NAME)
-  set(CPACK_COMPONENT_${COMPONENT_NAME}_PACKAGE_DESCRIPTION
+  set(CPACK_COMPONENT_${COMPONENT_NAME}_DESCRIPTION
       "Configuration for the official Netdata ${VARIANT} package repository.")
 endforeach()
 

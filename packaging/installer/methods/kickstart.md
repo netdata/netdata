@@ -78,7 +78,7 @@ Use these flags to customize your installation.
 |                         | `--old-install-prefix` | Clean previous install directory    |
 | **Interactivity**       | `--non-interactive`    | No prompts (good for scripts)       |
 |                         | `--interactive`        | Force interactive prompts           |
-| **Release Channel**     | `--release-channel`    | `nightly`, `stable`, or `preview`               |
+| **Release Channel**     | `--release-channel`    | `nightly`, `stable`, `preview`, or `default` (automatic selection)               |
 |                         | `--install-version`    | Install specific version            |
 | **Auto-Updates**        | `--auto-update`        | Enable updates                      |
 |                         | `--no-updates`         | Disable updates                     |
