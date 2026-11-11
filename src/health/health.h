@@ -51,7 +51,6 @@ void health_plugin_reload(void);
 
 void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
-void health_alert2json_conf(RRDHOST *host, BUFFER *wb, CONTEXTS_OPTIONS all);
 void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *wb);
@@ -92,7 +91,6 @@ void *health_cmdapi_thread(void *ptr);
 
 char *health_edit_command_from_source(const char *source);
 
-void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
 
 void health_log_alert_transition_with_trace(RRDHOST *host, ALARM_ENTRY *ae, int line, const char *file, const char *function);
 #define health_log_alert(host, ae) health_log_alert_transition_with_trace(host, ae, __LINE__, __FILE__, __FUNCTION__)

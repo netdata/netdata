@@ -223,27 +223,6 @@ void free_silencers(SILENCER *t) {
 }
 
 /**
- * Silencers to JSON Entry
- *
- * Fill the buffer with the other values given.
- *
- * @param wb a pointer to the output buffer
- * @param var the json variable
- * @param val the json value
- * @param hasprev has it a previous value?
- *
- * @return
- */
-int health_silencers2json_entry(BUFFER *wb, char* var, char* val, int hasprev) {
-    if (val) {
-        buffer_sprintf(wb, "%s\n\t\t\t\"%s\": \"%s\"", (hasprev)?",":"", var, val);
-        return 1;
-    } else {
-        return hasprev;
-    }
-}
-
-/**
  * Silencer to JSON
  *
  * Write the silencer values using JSON format inside a buffer.
@@ -251,27 +230,28 @@ int health_silencers2json_entry(BUFFER *wb, char* var, char* val, int hasprev) {
  * @param wb is the buffer to write the silencers.
  */
 static void health_silencers2json_unsafe(BUFFER *wb) {
-    buffer_sprintf(wb, "{\n\t\"all\": %s,"
-                       "\n\t\"type\": \"%s\","
-                       "\n\t\"silencers\": [",
-                   (silencers->all_alarms)?"true":"false",
-                   (silencers->stype == STYPE_NONE)?"None":((silencers->stype == STYPE_DISABLE_ALARMS)?"DISABLE":"SILENCE"));
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_member_add_boolean(wb, "all", silencers->all_alarms);
+    buffer_json_member_add_string(wb, "type",
+        (silencers->stype == STYPE_NONE) ? "None" : ((silencers->stype == STYPE_DISABLE_ALARMS) ? "DISABLE" : "SILENCE"));
 
-    SILENCER *silencer;
-    int i = 0, j = 0;
-    for(silencer = silencers->silencers; silencer ; silencer = silencer->next) {
-        if(likely(i)) buffer_strcat(wb, ",");
-        buffer_strcat(wb, "\n\t\t{");
-        j=health_silencers2json_entry(wb, HEALTH_ALARM_KEY, silencer->alarms, j);
-        j=health_silencers2json_entry(wb, HEALTH_CHART_KEY, silencer->charts, j);
-        j=health_silencers2json_entry(wb, HEALTH_CONTEXT_KEY, silencer->contexts, j);
-        j=health_silencers2json_entry(wb, HEALTH_HOST_KEY, silencer->hosts, j);
-        j=0;
-        buffer_strcat(wb, "\n\t\t}");
-        i++;
+    buffer_json_member_add_array(wb, "silencers");
+    for(SILENCER *silencer = silencers->silencers; silencer ; silencer = silencer->next) {
+        // a selector that is set is written even when empty: on reload, a missing one matches everything
+        buffer_json_add_array_item_object(wb);
+        if(silencer->alarms)
+            buffer_json_member_add_string(wb, HEALTH_ALARM_KEY, silencer->alarms);
+        if(silencer->charts)
+            buffer_json_member_add_string(wb, HEALTH_CHART_KEY, silencer->charts);
+        if(silencer->contexts)
+            buffer_json_member_add_string(wb, HEALTH_CONTEXT_KEY, silencer->contexts);
+        if(silencer->hosts)
+            buffer_json_member_add_string(wb, HEALTH_HOST_KEY, silencer->hosts);
+        buffer_json_object_close(wb);
     }
-    if(likely(i)) buffer_strcat(wb, "\n\t");
-    buffer_strcat(wb, "]\n}\n");
+    buffer_json_array_close(wb);
+
+    buffer_json_finalize(wb);
 }
 
 void health_silencers2json(BUFFER *wb) {
