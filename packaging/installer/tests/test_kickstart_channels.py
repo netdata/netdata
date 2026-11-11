@@ -72,7 +72,8 @@ parse_args {arg} --dry-run
         cases = [('2.13.0', 'stable'), ('2.13.0+build.1', 'stable'),
                  ('2.13.0-rc1', 'preview'), ('2.13.0-rc.2+build.1', 'preview'),
                  ('2.13.0-beta.1', 'preview'), ('2.13.0~rc1', 'preview'),
-                 ('2.13.0-123-nightly', 'nightly'), ('2.13.0-123-gabcdef', 'nightly'), ('2.13.0.123.gabcdef', 'nightly')]
+                 ('2.13.0-123-nightly', 'nightly'), ('2.13.0-123-gabcdef', 'nightly'),
+                 ('2.13.0.123.gabcdef', 'nightly')]
         for version, expected in cases:
             for requested in ('stable', 'nightly', 'preview'):
                 with self.subTest(version=version, requested=requested):
@@ -91,11 +92,15 @@ main
 ''')
 
     def test_native_repository_and_version_selection(self):
-        for distro, version_id, codename, suffix in [('debian', '12', 'bookworm', '_all.deb'),
-                                                    ('fedora', '43', '', '.noarch.rpm'),
-                                                    ('opensuse', '15.6', '', '.noarch.rpm')]:
-            for channel, repo_suffix, repo_path in [('preview', '-preview', 'preview'),
-                                                    ('stable', '', 'stable'), ('nightly', '-edge', 'edge')]:
+        for distro, version_id, codename, suffix in [
+            ('debian', '12', 'bookworm', '_all.deb'),
+            ('fedora', '43', '', '.noarch.rpm'),
+            ('opensuse', '15.6', '', '.noarch.rpm'),
+        ]:
+            for channel, repo_suffix, repo_path in [
+                ('preview', '-preview', 'preview'),
+                ('stable', '', 'stable'), ('nightly', '-edge', 'edge'),
+            ]:
                 with self.subTest(distro=distro, channel=channel):
                     result = self.shell(f'''
 DISTRO_COMPAT_NAME={distro}
@@ -117,7 +122,8 @@ printf '%s\\n' "$repoconfig_name" "$REPO_URL_PREFIX" "$NATIVE_VERSION" "$repocon
                     self.assertEqual(lines[0], f'netdata-repo{repo_suffix}')
                     self.assertEqual(lines[1], f'https://repository.netdata.cloud/repos/{repo_path}')
                     native_version = '2.13.0~rc1' if channel == 'preview' else '2.13.0-rc1'
-                    self.assertEqual(lines[2], f'={native_version}' if distro == 'debian' else f'-{native_version}.x86_64')
+                    expected_version = f'={native_version}' if distro == 'debian' else f'-{native_version}.x86_64'
+                    self.assertEqual(lines[2], expected_version)
                     self.assertIn(f'netdata-repo{repo_suffix}', lines[3])
                     self.assertTrue(lines[3].endswith(suffix))
                     self.assertIn('5-6', lines[3])
@@ -171,19 +177,21 @@ check_for_remote_file() {{ echo "$1"; return 0; }}
 set_{kind}_archive_urls {channel}
 [ "$NETDATA_MANIFEST_INSTALL" = 1 ] || exit 9
 ''')
-                        self.assertEqual(result.stdout.strip(), f'https://artifacts.netdata.cloud/{channel}/{release}/Manifest')
+                        self.assertEqual(result.stdout.strip(),
+                                         f'https://artifacts.netdata.cloud/{channel}/{release}/Manifest')
 
     def test_archive_fallback_stays_in_selected_channel(self):
         for kind in ('static', 'source'):
             for channel, repository, tag in [('stable', 'netdata', 'v2.12.0'),
-                                              ('nightly', 'netdata-nightlies', 'v2.13.0-123-nightly')]:
+                                             ('nightly', 'netdata-nightlies', 'v2.13.0-123-nightly')]:
                 with self.subTest(kind=kind, channel=channel):
                     self.shell(f'''
 check_for_remote_file() {{ case "$1" in */Manifest) return 1 ;; *) return 0 ;; esac; }}
 get_redirect() {{ echo {tag}; }}
 set_{kind}_archive_urls {channel}
 [ "$NETDATA_MANIFEST_INSTALL" = 0 ] || exit 9
-[ "$NETDATA_{kind.upper()}_ARCHIVE_URL_PREFIX" = https://github.com/netdata/{repository}/releases/download/{tag} ] || exit 9
+expected=https://github.com/netdata/{repository}/releases/download/{tag}
+[ "$NETDATA_{kind.upper()}_ARCHIVE_URL_PREFIX" = "$expected" ] || exit 9
 ''')
         self.shell('''
 check_for_remote_file() { return 1; }

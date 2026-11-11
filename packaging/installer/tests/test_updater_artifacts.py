@@ -223,7 +223,8 @@ update_static
 
     def test_unknown_channel_and_invalid_offline_source(self):
         self.run_shell('set_tarball_urls invalid no', success=False)
-        self.run_shell('NETDATA_OFFLINE_INSTALL_SOURCE=/nonexistent-updater-fixture\nset_tarball_urls stable no', success=False)
+        self.run_shell('NETDATA_OFFLINE_INSTALL_SOURCE=/nonexistent-updater-fixture\n'
+                       'set_tarball_urls stable no', success=False)
 
     def test_missing_architecture_fails_before_execution(self):
         self.artifact('netdata-x86_64-v2.8.0.gz.run')
@@ -312,6 +313,34 @@ set_tarball_urls preview yes
 """, success=False)
         self.assertIn('preview release manifest', result.stderr)
 
+    def test_preview_environment_replacement(self):
+        envfile = self.root / '.environment'
+        original = 'RELEASE_CHANNEL="nightly"\nOTHER="preserved"\n'
+        for failure in ('', 'cp', 'sed', 'mv'):
+            with self.subTest(failure=failure):
+                envfile.write_text(original)
+                envfile.chmod(0o640)
+                before = envfile.stat()
+                stub = ''
+                if failure == 'sed':
+                    stub = 'sed() { printf partial; return 1; }'
+                elif failure:
+                    stub = f'{failure}() {{ return 1; }}'
+                self.run_shell(f'''
+RELEASE_CHANNEL=preview
+ENVIRONMENT_FILE='{envfile}'
+{stub}
+restore_preview_channel
+''', success=not failure)
+                expected = original if failure else original.replace('nightly', 'preview')
+                self.assertEqual(envfile.read_text(), expected)
+                after = envfile.stat()
+                self.assertEqual((after.st_mode, after.st_uid, after.st_gid),
+                                 (before.st_mode, before.st_uid, before.st_gid))
+                if failure:
+                    self.assertEqual(after.st_ino, before.st_ino)
+                self.assertEqual(list(self.root.glob('.environment.*')), [])
+
     def test_current_version_without_binary(self):
         result = self.run_shell('''
 command() { return 1; }
@@ -330,8 +359,9 @@ _safe_download() {
 }
 self_update
 ''')
-        self.assertIn('hosted-updater --not-running-from-cron --no-updater-self-update --force-update --non-interactive',
-                      result.stdout)
+        self.assertIn(
+            'hosted-updater --not-running-from-cron --no-updater-self-update --force-update --non-interactive',
+            result.stdout)
 
     def test_preview_follows_publication_identity(self):
         # Preview follows the channel's publication, without imposing an ordering

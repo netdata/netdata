@@ -12,7 +12,8 @@ import unittest
 
 KICKSTART = Path(__file__).resolve().parents[1] / 'kickstart.sh'
 FUNCTIONS = (
-    'main', 'release_channel_for_version', 'save_release_channel', 'handle_existing_install', 'install_dem_runtime', 'setup_dem_runtime',
+    'main', 'release_channel_for_version', 'save_release_channel', 'handle_existing_install',
+    'install_dem_runtime', 'setup_dem_runtime',
     'dem_runtime_config', 'dem_runtime_plugin', 'dem_runtime_cli',
     'configure_native_package_manager', 'common_rpm_opts', 'common_dnf_opts',
     'run', 'run_as_root', '_get_run_info', '_log_run_cmd', '_log_run_result',

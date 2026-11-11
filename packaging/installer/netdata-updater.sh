@@ -1182,9 +1182,15 @@ verify_manifest() {
 # Bundled installers may reset the channel because they only accept stable/nightly flags.
 restore_preview_channel() {
   [ "${RELEASE_CHANNEL}" = preview ] || return 0
-  sed 's/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL="preview"/' "${ENVIRONMENT_FILE}" > "${ndtmpdir}/preview-environment" &&
-    cat "${ndtmpdir}/preview-environment" > "${ENVIRONMENT_FILE}" ||
+  # Keep the replacement on the destination filesystem so rename is atomic.
+  preview_environment="$(mktemp "${ENVIRONMENT_FILE}.XXXXXX")" ||
+    fatal "Unable to stage preview release channel" U002B
+  if ! cp -p "${ENVIRONMENT_FILE}" "${preview_environment}" ||
+    ! sed 's/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL="preview"/' "${ENVIRONMENT_FILE}" > "${preview_environment}" ||
+    ! mv -f "${preview_environment}" "${ENVIRONMENT_FILE}"; then
+    rm -f "${preview_environment}"
     fatal "Unable to preserve preview release channel" U002B
+  fi
 }
 
 update_build() {
