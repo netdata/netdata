@@ -4,15 +4,15 @@ DEM capacity depends on browser service time, RUM identity and payload volume, r
 Job count or beacon rate alone is not a sizing rule. Browser attempts share one process allowance; RUM processing
 does not consume browser slots.
 
-The mixed qualification below uses fresh browsers and met the tested target. Later RUM optimizations and a browser
-reuse experiment are reported separately because they measured different components and fixtures. Browser reuse is
-deferred; fresh execution and the default allowance of one shared browser slot remain the production approach.
+The original mixed qualification met the tested target. A current-master repeat completed the offered-load interval
+but shed 43 requests in the generator and coalesced five occurrences during activation. It did not meet the same
+lossless-load and zero-coalescing targets. Both runs use fresh browsers. Browser reuse remains deferred, and the production default remains one shared browser slot.
 
 ## Qualification workload
 
-The qualification uses a development build with shared browser admission, independent check and chart cadences,
-and exact time-based RUM retention. It runs the native Agent, DEM plugin, real Chromium executions, HTTP receiver,
-and retained-history queries together. The browser and RUM implementation was subsequently merged in
+The mixed runs use shared browser admission, independent check and chart cadences, and exact time-based RUM
+retention. They run the native Agent, DEM plugin, real Chromium executions, HTTP receiver and retained-history
+queries together. The browser admission and RUM retention changes merged in
 [PR #24674](https://github.com/netdata/netdata/pull/24674) and
 [PR #24675](https://github.com/netdata/netdata/pull/24675). The target below applies to one Agent and its DEM plugin process.
 
@@ -45,7 +45,7 @@ are disabled. Receiver admission settings explicitly allow the single-address lo
 test inputs, not recommended public ingress limits. The history age setting is subject to the shared byte budget;
 this test does not establish 30 days of retention at this rate.
 
-## Measured outcome
+## Original mixed result — 2026-11-10
 
 On 2026-11-10, this workload completed with the following results. The result covers the specific fixture and
 resource envelope above; it is not a capacity guarantee for arbitrary websites or beacon contents.
@@ -98,6 +98,88 @@ control audits of the same page. Maximum total blocking time was 85 ms for recur
 activation, versus 51–71 ms in the serial control. These observed tails matter when interpreting lab measurements;
 the test does not establish equivalence to an unloaded runner.
 
+## Current-master repeat — 2026-11-11
+
+The same fixture was repeated on master `d2c037a448`, including the merged history-query, snapshot,
+bot-classification and retained-state changes. **This repeat did not qualify the complete target.** The generator's
+1,024-entry hot-site queue shed 43 requests before sending them, and five initial journey occurrences were replaced
+by newer due occurrences while waiting for a browser slot. All requests actually sent received HTTP 202, with no
+transport errors. The failed generator and browser qualification verdicts are retained.
+
+| Observation | Original run | Current-master repeat |
+|---|---:|---:|
+| Planned RUM requests | 2,100,000 | 2,100,000 |
+| Requests attempted / HTTP 202 | 2,100,000 / 2,100,000 | 2,099,957 / 2,099,957 |
+| Generator-shed requests | 0 | 43 |
+| Original initial occurrences completed | 400 / 400 | 395 / 400 |
+| Time until all 400 jobs had a first result | 281.1 s | 353.1 s |
+| Coalesced occurrences | 0 | 5 |
+| Successful recurring journeys / audits through load end | 1,800 / 136 | 1,800 / 136 |
+| Average whole-test CPU during offered load | 7.21 cores | 7.45 cores |
+| Peak charged cgroup memory, including final audits | 15.28 GiB | 14.51 GiB |
+| Peak plus conservative external immutable-file bound | 16.39 GiB | 15.59 GiB |
+| OOM or memory-limit events | 0 | 0 |
+
+The repeat retained every expected sampled RUM record: 209,369 expected, zero missing or invalid. All 166 rolling
+observation polls passed, final counters matched the accepted population, cooldown reached exact zero, and all 328
+history queries succeeded without skipped ticks. The accepted population contained 1,049,982 distinct document and
+resource experiences. This verifies accepted-data correctness; it does not erase the generator's offered-load gap.
+
+The 43 missing request ordinals fall at load offsets 1,442.302–1,442.386 seconds, after CPU profiling ended.
+HTTP starts ranged from 275 to 1,678 per one-second bin and 984.4–1,014.9/second over rolling 60-second windows.
+Dispatch-to-HTTP-start delay had a p99 upper bound of 476 ms and a 2.13-second maximum; response latency had a p99
+upper bound of 17.8 ms and a 1.23-second maximum. One HTTP start occurred 0.268 ms beyond the nominal window.
+These observations do not satisfy the original lossless, within-window delivery criterion.
+
+Closed synthetic history contains 2,331 successful attempts due through load end: 395 original initial occurrences
+and all 1,936 recurring occurrences. The five replacement first attempts belong to that recurring count. A separate
+cadence reconciliation accounts for the five missing initial anchors; it does not change the failed qualification
+verdict. Cooldown adds 416 successes and nine controlled-shutdown cancellations. Every persisted run has one terminal
+record; four shutdown cancellations occurred before start-history append and satisfy the existing explicit drain
+exception.
+
+| Recurring browser work in repeat | Median execution | p95 execution | p95 admission delay | Maximum admission delay |
+|---|---:|---:|---:|---:|
+| Short journey | 3.96 s | 5.92 s | 9.36 s | 43.01 s |
+| Lighthouse audit | 12.86 s | 13.72 s | 6.42 s | 9.51 s |
+
+These recurring timings include the five replacement first attempts and activation spillover. Recurring Lighthouse
+scores were 84–86, with maximum total blocking time 113 ms. No new serial-control trial was run, and these values do
+not establish equivalence to an unloaded runner.
+
+The runtime, fixture, normalized workload configuration and browser execution source matched the original run.
+First-attempt time increased both inside child execution and around it. I/O pressure was observed after activation,
+but there is no matched old pressure trace or per-stage timing proof that establishes its cause. These are separate
+dated runs, not a randomized before/after comparison. The repeat shows lower observed memory and higher whole-test
+CPU; it does not establish a causal aggregate CPU improvement or a code regression.
+
+The test-only build exposed the three existing Function families for observation and added the bounded CPU capture
+below. Profiling ran for three of the 35 load minutes; aggregate counters include its overhead. The Linux plugin
+SHA-256 is `92ad1006cd112847631f7dff16000d90b723dd573703ba06e76bfbf5a6d068b5`. No production configuration,
+runtime or default changed. The private Agent drained successfully, all 43,477 tracked process identities exited,
+and the installed Agent/runtime remained unchanged.
+
+## Current DEM CPU attribution — 2026-11-11
+
+A 180-second CPU profile at minutes 20–23 of the current-master repeat recorded 118.22 sampled CPU-seconds in the
+DEM Go process, about **0.66 core**. The profile PID matched the native Agent's DEM child; it completed without
+interruption. These are cumulative stack costs, so nested rows overlap.
+
+| Profile path | Sampled CPU time | Share of DEM profile |
+|---|---:|---:|
+| RUM request handler | 40.86 s | 34.56% |
+| Rolling-window reads | 17.74 s | 15.01% |
+| Background GC marking | 13.65 s | 11.55% |
+| Faro decoding, within request handling | 17.12 s | 14.48% |
+| Bot classification, within request handling | 9.71 s | 8.21% |
+| Aggregation ingestion, within request handling | 8.12 s | 6.87% |
+
+Window reads include chart snapshots and Pages queries from the qualification observer. Background marking is not
+all GC work. This profile excludes the native Agent, Node, Chromium and load generator, and does not measure blocked
+I/O time. It precedes the 30-minute replay-retention turnover; the full workload covers that turnover, but this
+profile does not attribute its mature expiry costs. No original-run CPU profile exists, so these figures establish
+current attribution, not a causal CPU reduction.
+
 ## Choosing browser concurrency
 
 Set the process allowance in `dem.conf`, and restart the plugin to apply it:
@@ -107,7 +189,8 @@ browser:
   concurrency: 12
 ```
 
-This is the tested setting for the workload above, not a new default. The default remains 1. Choose it together
+This is the setting used in both mixed runs, not a new default or a guarantee of lossless activation. The repeat
+coalesced five initial occurrences at this allowance. The default remains 1. Choose it together
 with CPU, memory and Lighthouse measurement quality. A browser slot can own several child processes and is not
 a hard memory limit. Rehearsals and in-process runtime qualification share the allowance with monitoring.
 
@@ -139,7 +222,7 @@ readers, richer payloads, always-kept errors, exports and captures require their
 
 ## Subsequent RUM component measurements
 
-After the mixed qualification, [PR #24677](https://github.com/netdata/netdata/pull/24677) reduced history-query
+After the original mixed qualification, [PR #24677](https://github.com/netdata/netdata/pull/24677) reduced history-query
 string allocations and [PR #24680](https://github.com/netdata/netdata/pull/24680) reduced snapshot and Pages read
 costs. Both are merged. The following Linux VM results compare six balanced baseline/candidate pairs for each
 component; they are not a rerun of the full mixed workload.
@@ -162,8 +245,19 @@ Exact-output, revision, expiry and vnode-reset checks passed. Ingestion controls
 allocation counts, with no significant timing change. A separate concurrent ingestion/read fixture retained about
 794 MB of heap in both versions. Lower allocation volume per read is not an equivalent reduction in resident memory.
 
-These component improvements do not establish a new whole-Agent CPU or memory figure. The 7.21-core and 15.28-GiB
-mixed measurements above remain attributed to their original build and workload.
+Further merged changes reduced receiver bot-classification CPU in [PR #24691](https://github.com/netdata/netdata/pull/24691)
+and retained RUM state in [PR #24692](https://github.com/netdata/netdata/pull/24692). On the VM, the mixed-fixture
+User-Agent benchmark fell from 109.1 to 21.5 microseconds, and the desktop-browser collect-handler benchmark fell
+from 322.1 to 75.8 microseconds. These are six balanced baseline/candidate pairs; the handler benchmark excludes the
+HTTP socket path. The short mixed-fixture User-Agent saving corresponds to about 0.09 core at 1,000 calls/second.
+
+The retained-state probe used one site with 450,000 documents over 29 simulated minutes and forced GC. Retained heap
+fell from 916 to 630 MB, about 31%, with identical outputs and unchanged allocation counts on the measured operations.
+This is retained Go heap, not whole-Agent resident memory. The tested candidates were `993d743dcc` for classification
+and `12cf967cd1` for retained state, both compared with `5993198826`.
+
+Component percentages do not translate directly into whole-Agent savings. Keep their controlled comparisons
+separate from the dated mixed-workload observations, which include browser processes and the test harness.
 
 ## Browser reuse experiment — deferred
 
@@ -212,9 +306,9 @@ memory-limit events. All 5,480 checks across 12 matched trials, two short smokes
 Task processes and runtime ownership drained; the installed Agent and runtime were unchanged. Two runs per mode
 demonstrate repeatability, not statistical confidence or arbitrary-website capacity.
 
-Reuse is deferred because fresh execution already meets the tested target. The measured CPU and response gains do
-not currently justify maintaining long-lived browser owners, cleanup acknowledgments, separate runtime leases,
-retirement/replacement logic and browser-API restrictions. Making reuse opt-in would retain that maintenance cost.
+Reuse remains deferred based on that browser-only experiment, where fresh execution met the paced target. The
+measured CPU and response gains do not currently justify maintaining long-lived browser owners, cleanup
+acknowledgments, separate runtime leases, retirement/replacement logic and browser-API restrictions. Making reuse opt-in would retain that maintenance cost.
 The experiment also retains browsers for up to one idle minute, so a sparse five-minute check can start cold every
 time and gain no reuse benefit. A demonstrated CPU-budget or cadence shortfall with fresh execution would provide
 a stronger reason to reconsider this trade-off. The 12-slot test setting does not change the production default of 1.
@@ -227,8 +321,9 @@ an allocation of exclusive physical cores.
 The Linux test places the native Agent, plugin, browsers, fixture server, HTTP generator, observers and offline
 audits in one cgroup. Its memory includes charged file cache and kernel memory; it is not the Go heap or a sum of
 process RSS. An additional conservative catalog accounts for immutable files that could have been warmed outside
-the cgroup. CPU and memory measurements therefore include test overhead. Peak charged memory was 16,410,107,904 bytes;
-the additional immutable-file bound was 1,184,989,141 bytes, not a measurement of externally charged pages.
+the cgroup. CPU and memory measurements therefore include test overhead. In the original run, peak charged memory
+was 16,410,107,904 bytes; the additional immutable-file bound was 1,184,989,141 bytes, not a measurement of externally
+charged pages.
 The sum remained within 32 GiB. Ordinary Go GC policy was unchanged; no `GOGC` or `GOMEMLIMIT` override was used.
 
 Runtime 2026.10.29.1 supplies the browser tools. Chromium sandboxing stays enabled. The installed Agent service and
@@ -251,6 +346,6 @@ browser/runtime ownership is drained, then stops the private Agent. It does not 
 shutdown. A 35-minute load plus cooldown is a bounded capacity result, not a long-duration soak or a guarantee for
 arbitrary site behavior.
 
-The tested development source snapshot is `dd7e27768d`; the Linux plugin SHA-256 is
+The original tested development source snapshot is `dd7e27768d`; its Linux plugin SHA-256 is
 `a6bcdee58e2575d474d1b075c72809085b0749a4f56f17a2722dcf958fcccd08`. The managed runtime generation is
 `79bb9a948aa20f006d000edbe92081e910c1a8cd3538cc7d1a3be66a2aa1d0c2`. Revalidate after material source or runtime changes.
