@@ -65,6 +65,7 @@ Functions provide on-demand, detailed information beyond standard metrics.
 | **Topology Maps**       | SNMP, app dependencies, vSphere, Cato       |     ✗     |     ✗     |  ✓   |
 | **RUM**                 | Real User Monitoring: sessions and errors   |     ✗     |     ✗     |  ✓   |
 | **Browser Tests**       | Synthetic Playwright journeys, Lighthouse   |     ✗     |     ✗     |  ✓   |
+| **DEM History Status**  | Retained RUM and browser-test history status |     ✗     |     ✗     |  ✓   |
 
 ### Configuration and Management
 
@@ -116,7 +117,9 @@ For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mc
 2. **Connect your nodes** to your Netdata Cloud Space
 3. **Access the dashboard** through Netdata Cloud
 
-Once signed in, you'll have access to the sensitive functions (processes, logs, network connections, etc.) on nodes within your Space. Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, topology maps (SNMP, application dependencies, vSphere and Cato Networks), Real User Monitoring and Synthetic Browser Tests require a signed-in member of the node's Space with permission to view sensitive data, on a paid plan or an active trial. The Agent collects and stores this data on every plan; only viewing it is plan-gated. System logs, BMC event logs and the streaming topology need a signed-in member of the node's Space with sensitive-data permission, on every plan; SNMP device metrics and API, uptime and other checks are metrics, available on every plan.
+Once signed in, you'll have access to the sensitive functions (processes, logs, network connections, etc.) on nodes within your Space. Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, topology maps (SNMP, application dependencies, vSphere and Cato Networks), Real User Monitoring, Synthetic Browser Tests and DEM History Status require a signed-in member of the node's Space with permission to view sensitive data, on a paid plan or an active trial.
+
+Collection and storage remain available on every plan, according to the configured outputs; only viewing through these Functions is plan-gated. SNMP traps need journal output for local storage and the `snmp:traps` view. System logs, BMC event logs and the streaming topology need a signed-in member of the node's Space with sensitive-data permission, on every plan; SNMP device metrics and API, uptime and other checks are metrics, available on every plan.
 
 ### Enable Dynamic Configuration
 
@@ -170,11 +173,11 @@ Netdata Cloud and each Agent keep separate preferred-node lists. Netdata Cloud s
 | **Alert Notifications**   | Full access | Full access   | Full access |
 | **Public Functions**      | Full access | Full access   | Full access |
 | **Sensitive Functions**   | Blocked     | Full access   | Full access |
-| **Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, Topology Maps, RUM, Browser Tests** | Blocked     | Blocked       | Full access |
+| **Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, Topology Maps, RUM, Browser Tests, DEM History Status** | Blocked     | Blocked       | Full access |
 | **AI Features**           | Blocked     | Not available | Full access |
 | **Dynamic Configuration** | Blocked     | Blocked       | Full access |
 | **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
 | **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
 | **RBAC & SSO**            | N/A         | Not available | Full access |
 
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for Network Flows, Traces, OpenTelemetry Logs, SNMP traps, topology maps, Real User Monitoring, synthetic browser tests, full configuration control and unlimited scale.
+Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or use a paid plan or an active trial for Network Flows, Traces, OpenTelemetry Logs, SNMP traps, topology maps, Real User Monitoring, synthetic browser tests and DEM history status. A paid plan also provides full configuration control and unlimited scale.
