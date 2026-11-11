@@ -1017,6 +1017,29 @@ mod tests {
             .unwrap();
     }
 
+    /// A chart whose first point was refused took nothing: it must not stay
+    /// in the registry, where nothing would ever remove it.
+    #[test]
+    fn a_chart_that_took_no_point_is_dropped_at_the_next_tick() {
+        let mut manager = ChartManager::new();
+        let chart = manager.create_typed_chart(
+            "load.42",
+            ChartAggregationType::Gauge,
+            ChartType::Line,
+            ChartConfig::default(),
+        );
+        chart.init_definition("load", "Load", "load", Vec::new());
+        let name_too_long = "d".repeat(crate::chart::MAX_NAME_BYTES + 1);
+        assert!(!chart.ingest(&name_too_long, 1.0, 100 * 1_000_000_000, 0));
+
+        let mut out = Chunker::new(usize::MAX);
+        manager.emit(102, &mut out);
+
+        assert!(manager.is_empty());
+        // The agent never got the chart, so there is nothing to tell it.
+        assert!(out.finish().is_empty());
+    }
+
     /// One tick's chart text goes to the supervisor as messages of limited
     /// size: however many charts emit, no chunk passes the budget, and the
     /// chunks in order are valid chart text.

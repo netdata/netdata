@@ -537,11 +537,14 @@ impl Chart {
         }
     }
 
-    /// Whether the chart has expired (no data for longer than the expiry duration).
+    /// Whether the chart has expired: no data for longer than the expiry
+    /// duration, or no data ever. A chart is created for a data point, and it
+    /// can refuse that point ([`Self::ingest`]); such a chart took nothing,
+    /// and nothing would ever make it expire by time.
     pub fn is_expired(&self) -> bool {
         match self.last_ingest_instant {
             Some(instant) => instant.elapsed() >= self.expiry_duration,
-            None => false,
+            None => true,
         }
     }
 
