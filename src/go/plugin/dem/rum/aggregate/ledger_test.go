@@ -16,6 +16,7 @@ import (
 // a newer revision, a replay, or a different measurement reusing the name.
 func TestVitalIdentityAdmission(t *testing.T) {
 	tests := map[string]struct {
+		renewedAfter  time.Duration // when set, revision 2 is admitted first, this long after the first report
 		metricID      string
 		revision      uint64
 		clockAdvance  time.Duration
@@ -38,6 +39,12 @@ func TestVitalIdentityAdmission(t *testing.T) {
 		"newer revision is admitted after the window": {
 			metricID: "lcp-1", revision: 2, clockAdvance: 6 * time.Minute, admitted: true,
 		},
+		"a newer revision extends the evidence": {
+			renewedAfter: 20 * time.Minute, metricID: "lcp-2", revision: 3, clockAdvance: 20 * time.Minute, invalid: 1,
+		},
+		"a replay after an extension is still ignored": {
+			renewedAfter: 20 * time.Minute, metricID: "lcp-1", revision: 1, clockAdvance: 20 * time.Minute,
+		},
 		"evidence older than its retention at receipt no longer applies": {
 			metricID: "lcp-2", revision: 1, receivedAhead: identityRetention + time.Nanosecond, admitted: true,
 		},
@@ -50,6 +57,13 @@ func TestVitalIdentityAdmission(t *testing.T) {
 			a, now := newAgg(5 * time.Minute)
 			first := mk(*now, "session", "/page", beacon.Vital{ID: "lcp-1", Revision: 1, Name: beacon.LCP, Value: 100})
 			require.Len(t, a.Ingest(first).Observation.Vitals, 1)
+			if tc.renewedAfter > 0 {
+				*now = now.Add(tc.renewedAfter)
+				renewal := *first
+				renewal.Received = *now
+				renewal.Vitals = []beacon.Vital{{ID: "lcp-1", Revision: 2, Name: beacon.LCP, Value: 150}}
+				require.Len(t, a.Ingest(&renewal).Observation.Vitals, 1)
+			}
 
 			*now = now.Add(tc.clockAdvance)
 			next := *first
@@ -61,6 +75,24 @@ func TestVitalIdentityAdmission(t *testing.T) {
 			assert.Equal(t, tc.invalid, a.Snapshot().Counters[CounterInvalidMeasurements])
 		})
 	}
+}
+
+// A replaced value belongs to the window of its latest receipt.
+func TestNewerRevisionRenewsWindowMembership(t *testing.T) {
+	a, now := newAgg(5 * time.Minute)
+	first := mk(*now, "session", "/page", beacon.Vital{ID: "lcp-1", Revision: 1, Name: beacon.LCP, Value: 100})
+	a.Ingest(first)
+
+	*now = now.Add(4 * time.Minute)
+	update := *first
+	update.Received = *now
+	update.Vitals = []beacon.Vital{{ID: "lcp-1", Revision: 2, Name: beacon.LCP, Value: 200}}
+	a.Ingest(&update)
+
+	*now = now.Add(2 * time.Minute)
+	assert.Equal(t, VitalStats{N: 1, P50: 200, P75: 200, P95: 200, Good: 1}, a.Snapshot().Vitals[beacon.LCP])
+	*now = now.Add(3*time.Minute + time.Nanosecond)
+	assert.Equal(t, VitalStats{}, a.Snapshot().Vitals[beacon.LCP])
 }
 
 // Everything one report retains refers to one attribute set; a later report
