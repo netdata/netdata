@@ -274,10 +274,6 @@ jobs:
         id: artifact-name
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
-      - name: Mark image as official
-        id: env
-        if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
-        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu && needs.file-check.outputs.run == 'true'
@@ -300,7 +296,6 @@ jobs:
           load: true
           cache-to: type=local,dest=/tmp/build-cache,mode=max
           build-args: |
-            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=${{ needs.file-check.outputs.skip-go }}
             BUILD_ARCH=${{ matrix.arch }}
             RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
@@ -331,7 +326,6 @@ jobs:
               ${{ github.repository }}: Building or testing Docker image for ${{ matrix.platform }} failed.
               Checkout: ${{ steps.checkout.outcome }}
               Determine artifact name: ${{ steps.artifact-name.outcome }}
-              Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Build image: ${{ steps.build.outcome }}
@@ -419,10 +413,6 @@ jobs:
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
-      - name: Mark image as official
-        id: env
-        if: github.repository == 'netdata/netdata'
-        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
@@ -446,7 +436,6 @@ jobs:
           cache-from: type=local,src=/tmp/build-cache
           outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
           build-args: |
-            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
             RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
@@ -481,7 +470,6 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Determine artifact name: ${{ steps.artifact-name.outcome }}
               Fetch build cache: ${{ steps.fetch-cache.outcome }}
-              Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
@@ -606,10 +594,6 @@ jobs:
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
-      - name: Mark image as official
-        id: env
-        if: github.repository == 'netdata/netdata'
-        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
@@ -633,7 +617,6 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: |
-            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
             RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
@@ -669,7 +652,6 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Determine artifact name: ${{ steps.artifact-name.outcome }}
               Fetch build cache: ${{ steps.fetch-cache.outcome }}
-              Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
@@ -795,10 +777,6 @@ jobs:
         with:
           name: cache-${{ steps.artifact-name.outputs.platform }}
           path: /tmp/build-cache
-      - name: Mark image as official
-        id: env
-        if: github.repository == 'netdata/netdata'
-        run: echo "OFFICIAL_IMAGE=true" >> "${GITHUB_ENV}"
       - name: Setup QEMU
         id: qemu
         if: matrix.qemu
@@ -822,7 +800,6 @@ jobs:
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: |
-            OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
             RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
@@ -858,7 +835,6 @@ jobs:
               Checkout: ${{ steps.checkout.outcome }}
               Determine artifact name: ${{ steps.artifact-name.outcome }}
               Fetch build cache: ${{ steps.fetch-cache.outcome }}
-              Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}

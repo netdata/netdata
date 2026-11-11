@@ -4,21 +4,21 @@
 
 static struct engine *engine = NULL;
 
-void analytics_exporting_connectors_ssl(BUFFER *b)
+// published once by the exporting thread, never freed: /api/v1/info reads them from web threads
+static bool exporting_enabled = false;
+static const char *exporting_connectors = NULL;
+
+bool exporting_info_enabled(void)
 {
-    if (netdata_ssl_exporting_ctx && engine) {
-        for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
-            struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
-            if (SSL_connection(&connector_specific_data->ssl)) {
-                buffer_strcat(b, "exporting");
-                break;
-            }
-        }
-    }
-    buffer_strcat(b, "|");
+    return __atomic_load_n(&exporting_enabled, __ATOMIC_ACQUIRE);
 }
 
-void analytics_exporting_connectors(BUFFER *b)
+const char *exporting_info_connectors(void)
+{
+    return __atomic_load_n(&exporting_connectors, __ATOMIC_ACQUIRE);
+}
+
+static void exporting_connectors_to_buffer(BUFFER *b)
 {
     if (!engine)
         return;
@@ -74,6 +74,16 @@ void analytics_exporting_connectors(BUFFER *b)
 
         count++;
     }
+}
+
+static void exporting_info_publish(void)
+{
+    bool enabled = inicfg_get_boolean(&exporting_config, CONFIG_SECTION_EXPORTING, "enabled", CONFIG_BOOLEAN_NO);
+    __atomic_store_n(&exporting_enabled, enabled, __ATOMIC_RELEASE);
+
+    CLEAN_BUFFER *b = buffer_create(100, NULL);
+    exporting_connectors_to_buffer(b);
+    __atomic_store_n(&exporting_connectors, strdupz(buffer_tostring(b)), __ATOMIC_RELEASE);
 }
 
 /**
@@ -189,6 +199,7 @@ void exporting_main(void *ptr)
     CLEANUP_FUNCTION_REGISTER(exporting_main_cleanup) cleanup_ptr = ptr;
 
     engine = read_exporting_config();
+    exporting_info_publish();
     if (!engine) {
         netdata_log_info("EXPORTING: no exporting connectors configured");
         return;
