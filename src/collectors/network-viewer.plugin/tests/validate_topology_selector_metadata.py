@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Check a built plugin's info metadata without collecting host sockets.
+"""
+Check a built plugin's info metadata without collecting host sockets.
 
 Usage: python3 validate_topology_selector_metadata.py /path/to/network-viewer.plugin
        --run-dir /path/to/an/empty/private/runtime-directory
@@ -11,7 +12,8 @@ import argparse
 import json
 import os
 from pathlib import Path
-import subprocess
+# This harness executes the explicitly supplied test binary.
+import subprocess  # nosec B404
 
 import jsonschema
 
@@ -27,7 +29,8 @@ def validate(plugin, run_dir):
         raise ValueError("--run-dir must not be accessible to other users")
 
     env = dict(os.environ, NETDATA_RUN_DIR=str(run_dir))
-    result = subprocess.run(
+    # Execute the caller-selected build directly; no shell or topology input forms the command.
+    result = subprocess.run(  # nosec B603
         [str(plugin), "--test", "topology:network-connections"],
         input=json.dumps({"info": True}),
         text=True,

@@ -101,3 +101,29 @@ func TestFocusMetadataRoleRelationshipsAndDefaults(t *testing.T) {
 	depth.Options[1].ID = "-1"
 	require.ErrorContains(t, depth.ValidateFocus(), "non-negative integer")
 }
+
+func TestFocusValidationUsesEffectiveDefaults(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		selection ParamSelection
+		options   []ParamOption
+		valid     bool
+	}{
+		{"select first default focused", ParamSelect, []ParamOption{{ID: "device", Default: true}, {ID: "everything", Default: true}}, false},
+		{"select first default unfocused", ParamSelect, []ParamOption{{ID: "everything", Default: true}, {ID: "device", Default: true}}, true},
+		{"select later explicit default", ParamSelect, []ParamOption{{ID: "device"}, {ID: "everything", Default: true}}, true},
+		{"select implicit focused", ParamSelect, []ParamOption{{ID: "device"}, {ID: "everything"}}, false},
+		{"select implicit unfocused", ParamSelect, []ParamOption{{ID: "everything"}, {ID: "device"}}, true},
+		{"multiselect includes unfocused", ParamMultiSelect, []ParamOption{{ID: "device", Default: true}, {ID: "everything", Default: true}}, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			param := focusTestParam()
+			param.Selection, param.Options = test.selection, test.options
+			if test.valid {
+				require.NoError(t, param.ValidateFocus())
+			} else {
+				require.ErrorContains(t, param.ValidateFocus(), "default to its unfocused")
+			}
+		})
+	}
+}

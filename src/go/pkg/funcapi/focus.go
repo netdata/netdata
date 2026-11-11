@@ -88,12 +88,10 @@ func (p ParamConfig) ValidateFocus() error {
 		if _, ok := optionIDs[f.UnfocusedOption]; !ok {
 			return fmt.Errorf("unfocused option %q is not declared", f.UnfocusedOption)
 		}
-		var hasDefault, unfocusedDefault bool
-		for _, option := range p.Options {
-			hasDefault = hasDefault || option.Default
-			unfocusedDefault = unfocusedDefault || (option.ID == f.UnfocusedOption && option.Default)
-		}
-		if (hasDefault && !unfocusedDefault) || (!hasDefault && p.Options[0].ID != f.UnfocusedOption) {
+		// Match request resolution, including first-default precedence for select.
+		if !slices.ContainsFunc(defaultOptions(p), func(option ParamOption) bool {
+			return option.ID == f.UnfocusedOption
+		}) {
 			return fmt.Errorf("roots focus must default to its unfocused option")
 		}
 		if f.UnlimitedOption != "" || f.Bindings == nil || f.Traversal == nil {
