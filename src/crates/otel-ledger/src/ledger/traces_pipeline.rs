@@ -1,10 +1,10 @@
 //! The traces binding — the twin of the logs binding in
 //! [`super::pipeline`]. It pre-spawns the shared
-//! [`crate::indexer::Indexer`] seal worker with the **traces** seal
-//! ([`ng_index::build_sfst_traces_file`]: full span columns, `TIDX`
-//! trace-id index, `TBLM` trace-id bloom, `EVNB`/`LNKB` event/link
-//! chunks) and delegates the rest to [`super::pipeline::build_pipeline`].
-//! Only the seal function, the handler, and the GET shim differ from logs.
+//! [`crate::indexer::Indexer`] for the **traces** signal, whose index
+//! builds run [`ng_index::build_sfst_traces_file`] (full span columns,
+//! `TIDX` trace-id index, `TBLM` trace-id bloom, `EVNB`/`LNKB` event/link
+//! chunks), and delegates the rest to [`super::pipeline::build_pipeline`].
+//! Only the signal, the handler, and the GET shim differ from logs.
 //!
 //! The handler is [`OtelTracesHandler`] (`rpc/traces/`), the `otel-traces`
 //! Function. It shares the logs pipeline's chunk cache (seqs are
@@ -30,7 +30,7 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use crate::event::PipelineResp;
-use crate::indexer::Indexer;
+use crate::indexer::{IndexBuilds, Indexer};
 use file_lifecycle::ArgShim;
 use file_lifecycle::Pipeline;
 use file_lifecycle::chunk::ChunkCache;
@@ -49,8 +49,8 @@ use super::rpc::OtelTracesHandler;
 /// chunks, each built once and cached.
 pub(crate) const TRACES_CHUNK_MIN_ENTRIES: u64 = 4_096;
 
-/// Build the traces pipeline: spawn the shared [`Indexer`] with the traces
-/// seal, then delegate to [`super::pipeline::build_pipeline`] with a closure
+/// Build the traces pipeline: spawn the shared [`Indexer`] for the traces
+/// signal, then delegate to [`super::pipeline::build_pipeline`] with a closure
 /// that wires the [`OtelTracesHandler`] (the `otel-traces` Function) and the
 /// traces GET shim, with the remote-read cache when storage is enabled.
 #[allow(clippy::too_many_arguments)]
@@ -67,14 +67,14 @@ pub(crate) async fn build_traces_pipeline(
     read_cache: Option<&file_cache::FileCache>,
     chunk_cache: Arc<ChunkCache>,
     prefixes: Arc<super::wal_prefix::WalPrefixes>,
+    index_builds: &IndexBuilds,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
-    // The traces seal: decode ng-flatten trace frames (payload format 3)
-    // into a trace SFST (full span columns + TIDX + TBLM + EVNB/LNKB).
-    let indexer = ComponentHandle::spawn::<Indexer>(
-        ng_index::build_sfst_traces_file as crate::indexer::SealFn,
-        cancel.child_token(),
-    );
+    // The traces indexer: its builds decode ng-flatten trace frames (payload
+    // format 3) into a trace SFST (full span columns + TIDX + TBLM +
+    // EVNB/LNKB).
+    let indexer =
+        ComponentHandle::spawn::<Indexer>((signal, index_builds.clone()), cancel.child_token());
 
     // Owned clones for the handler closure (the builder only borrows
     // `storage` for recovery): reading evicted files back needs the

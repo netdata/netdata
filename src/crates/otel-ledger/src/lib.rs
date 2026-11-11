@@ -2,9 +2,10 @@
 //! `file-lifecycle` substrate. It owns the `Ledger` coordinator (run-loop,
 //! supervisor/writer IPC, shared workers), the Function-call dispatch and the
 //! `otel-logs`/`otel-traces` query handlers over the wire-neutral `sfsq`
-//! engines (`ledger::rpc`), and the shared seal component (`indexer`, spawned
-//! per signal with that signal's `ng-index` builder — `build_sfst_file` for
-//! logs, `build_sfst_traces_file` for traces). The reusable machinery
+//! engines (`ledger::rpc`), and the shared indexer component (`indexer`,
+//! spawned per signal; its index builds run in child processes,
+//! `index_child`, with that signal's `ng-index` builder — `build_sfst_file`
+//! for logs, `build_sfst_traces_file` for traces). The reusable machinery
 //! (registry, catalog, upload/download, cache, recovery, the per-signal
 //! `Pipeline` shell) lives in `file-lifecycle`.
 //!

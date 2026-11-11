@@ -1,11 +1,11 @@
 //! Indexing one WAL file in a process of its own.
 //!
 //! `otel-plugin index` runs [`run`]: it builds the index file of one closed
-//! WAL file with the signal's `ng-index` builder, the same one the in-process
-//! [`Indexer`](crate::indexer::Indexer) calls, and writes its answer, an
-//! [`IndexedFile`], to stdout. The process that started it reads the answer
-//! back with [`IndexedFile::decode`]. Both halves of the answer live here so
-//! that they cannot drift apart.
+//! WAL file with the signal's `ng-index` builder and writes its answer, an
+//! [`IndexedFile`], to stdout. The ledger's
+//! [`Indexer`](crate::indexer::Indexer) starts it with [`arguments`] and
+//! reads the answer back with [`IndexedFile::decode`]. Both halves of the
+//! exchange live here so that they cannot drift apart.
 //!
 //! The answer is the only thing a successful child writes to stdout. A child
 //! that fails writes nothing there: it reports the error on stderr and exits
@@ -16,6 +16,7 @@
 //! temporary file beside the index path, which startup recovery removes: the
 //! builders write through `file_registry`'s atomic file.
 
+use std::ffi::OsString;
 use std::io::Write;
 use std::path::Path;
 
@@ -34,7 +35,7 @@ pub struct IndexedFile {
 
 impl IndexedFile {
     /// The bytes an index child writes to stdout.
-    fn encode(&self) -> Result<Vec<u8>> {
+    pub(crate) fn encode(&self) -> Result<Vec<u8>> {
         bincode::serde::encode_to_vec(self, bincode::config::standard())
             .context("encoding the index child's answer")
     }
@@ -52,6 +53,22 @@ impl IndexedFile {
         );
         Ok(indexed)
     }
+}
+
+/// The arguments that make `otel-plugin` index the WAL file at `wal_path`
+/// into `sfst_path`: the `index` subcommand of its `main`. The child also
+/// exits when its stdin closes (`--lifeline`).
+pub fn arguments(signal: Signal, wal_path: &Path, sfst_path: &Path) -> Vec<OsString> {
+    vec![
+        "index".into(),
+        "--signal".into(),
+        signal.segment().into(),
+        "--wal".into(),
+        wal_path.into(),
+        "--sfst".into(),
+        sfst_path.into(),
+        "--lifeline".into(),
+    ]
 }
 
 /// Build the index file of the WAL file at `wal_path` at `sfst_path` and
@@ -147,9 +164,13 @@ mod tests {
             .expect("a wal file was written")
     }
 
+    /// An `ng-index` builder, as `run` calls it.
+    type Build =
+        fn(&Path, &Path, &ng_index::Metrics) -> Result<(sfst::Summary, u64), ng_index::Error>;
+
     /// The child's answer and index file are those of a direct call of
     /// `build`.
-    fn assert_same_as_direct_call(signal: Signal, wal_path: &Path, build: crate::indexer::SealFn) {
+    fn assert_same_as_direct_call(signal: Signal, wal_path: &Path, build: Build) {
         let dir = tempfile::tempdir().unwrap();
         let (direct_path, child_path) = (
             dir.path().join("direct.sfst"),

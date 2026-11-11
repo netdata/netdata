@@ -394,6 +394,32 @@ mod tests {
         assert!(!lifeline);
     }
 
+    // The ledger starts its index builds with `index_child::arguments`; they
+    // must parse to the subcommand they are meant for, with the lifeline on.
+    #[test]
+    fn the_ledgers_index_arguments_route_to_index() {
+        for signal in [Signal::Logs, Signal::Traces] {
+            let (wal, sfst) = (PathBuf::from("/x/1.wal"), PathBuf::from("/y/1.sfst"));
+            let mut argv = vec!["otel-plugin".into()];
+            argv.extend(otel_ledger::index_child::arguments(signal, &wal, &sfst));
+
+            let cli = Cli::try_parse_from(argv).unwrap();
+
+            let Some(CliCommand::Index {
+                signal: parsed_signal,
+                wal: parsed_wal,
+                sfst: parsed_sfst,
+                lifeline,
+            }) = cli.command
+            else {
+                panic!("expected index subcommand");
+            };
+            assert_eq!(Signal::from(parsed_signal), signal);
+            assert_eq!((parsed_wal, parsed_sfst), (wal, sfst));
+            assert!(lifeline);
+        }
+    }
+
     #[test]
     fn index_requires_a_known_signal() {
         let without = parse(&["otel-plugin", "index", "--wal", "/x", "--sfst", "/y"]);

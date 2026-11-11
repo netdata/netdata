@@ -3748,6 +3748,7 @@ dependencies = [
  "opentelemetry-proto",
  "otel-bridge",
  "otel-catalog",
+ "otel-job-scheduler",
  "otel-logs-identity",
  "serde",
  "serde_json",

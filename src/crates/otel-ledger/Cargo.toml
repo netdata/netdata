@@ -27,6 +27,7 @@ netdata-plugin-error = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
 netdata-plugin-types = { workspace = true }
 otel-catalog = { workspace = true }
+otel-job-scheduler = { workspace = true }
 sfst = { workspace = true }
 ng-index = { workspace = true }
 sfsq = { workspace = true }

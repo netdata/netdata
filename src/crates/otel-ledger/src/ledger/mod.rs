@@ -302,6 +302,10 @@ impl Ledger {
         let (pipeline_tx, pipeline_rx) = mpsc::unbounded_channel();
         let (outbound_tx, outbound_rx) = mpsc::unbounded_channel();
 
+        // One for both signals: its limit covers every index build of the
+        // ledger.
+        let index_builds = crate::indexer::IndexBuilds::new()?;
+
         // Build the logs pipeline: per-signal disk/registries/workers + recovery
         // (using the shared cleaner/uploader/storage). Adding a further signal
         // is another `build_*_pipeline` call here.
@@ -317,6 +321,7 @@ impl Ledger {
             storage.as_ref(),
             read_cache.as_ref(),
             chunk_cache.clone(),
+            &index_builds,
             &pipeline_tx,
         )
         .await?;
@@ -340,6 +345,7 @@ impl Ledger {
             read_cache.as_ref(),
             chunk_cache.clone(),
             Arc::clone(&traces_prefixes),
+            &index_builds,
             &pipeline_tx,
         )
         .await?;

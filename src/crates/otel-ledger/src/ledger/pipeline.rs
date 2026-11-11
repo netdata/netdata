@@ -28,7 +28,7 @@ use tokio::sync::{RwLock, mpsc};
 use tokio_util::sync::CancellationToken;
 
 use crate::event::PipelineResp;
-use crate::indexer::Indexer;
+use crate::indexer::{IndexBuilds, Indexer};
 use file_lifecycle::ArgShim;
 use file_lifecycle::Pipeline;
 use file_lifecycle::catalog_builder::{CatalogBuilder, CatalogBuilderArgs};
@@ -362,13 +362,13 @@ pub(crate) async fn build_logs_pipeline(
     storage: Option<&OpendalStorage>,
     read_cache: Option<&file_cache::FileCache>,
     chunk_cache: Arc<ChunkCache>,
+    index_builds: &IndexBuilds,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
-    // The logs seal: decode ng-flatten log frames into a full split-FST index.
-    let indexer = ComponentHandle::spawn::<Indexer>(
-        ng_index::build_sfst_file as crate::indexer::SealFn,
-        cancel.child_token(),
-    );
+    // The logs indexer: its builds decode ng-flatten log frames into a full
+    // split-FST index.
+    let indexer =
+        ComponentHandle::spawn::<Indexer>((signal, index_builds.clone()), cancel.child_token());
 
     // Owned clones for the handler closure: the builder body borrows `storage`
     // for recovery, while the handler needs its own `RemoteRead` (storage +
