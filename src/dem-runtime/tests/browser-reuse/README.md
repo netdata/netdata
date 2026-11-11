@@ -47,7 +47,7 @@ go build -o /tmp/dem-engine-proof ../dem-runtime/tests/browser-reuse/engine-proo
   -work /absolute/new/proof-output -mode proof
 ```
 
-The proof checks warm reuse, same-digest candidate isolation, repeated retirement,
+The proof checks warm reuse, same-digest qualification source isolation, repeated retirement,
 fresh and Lighthouse handoff, outcome/history identity, a real screenshot,
 cancellation, timeout, independent-slot progress and shutdown with zero execution
 pins. An unverified process tree fails the proof and keeps ownership evidence.
@@ -62,6 +62,8 @@ cleanup and required browser replacement. Admission order can vary between runs.
 Use more than 100 journeys on one slot to exercise busy-owner rollover. These
 synthetic timings are comparative evidence, not a capacity guarantee for real
 websites or a long-running mixed RUM workload.
+See [the validation results](RESULTS.md) for the measured implementation, runtime,
+resource limits, cleanup evidence and fresh/reuse trade-offs.
 
 Managed mode preserves real Test behavior within its browser-control contract.
 Explicit `browser_mode: fresh` provides the unrestricted SDK throughout. Automatic
