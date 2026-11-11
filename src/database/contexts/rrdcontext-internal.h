@@ -534,6 +534,31 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 #define rrdcontext_lock(rc) spinlock_lock(&((rc)->spinlock))
 #define rrdcontext_unlock(rc) spinlock_unlock(&((rc)->spinlock))
 
+// The name of an instance or metric the caller holds, for use after the instance lock is released: the id itself
+// when the object has no name of its own (no reference is taken: the id never changes and lives as long as the
+// object), otherwise the caller's own reference. Release it with rrd_name_release(name, id).
+// Walks over many objects use these instead of *_name_dup(): ids and names are interned and shared by every host
+// that has them, so a reference per object makes concurrent walkers contend on the same refcounts.
+// Code that only matches a name does not need a reference: it matches under the instance lock.
+static inline STRING *rrdinstance_name_get(RRDINSTANCE *ri) {
+    spinlock_lock(&ri->spinlock);
+    STRING *name = (ri->name == ri->id) ? ri->id : string_dup(ri->name);
+    spinlock_unlock(&ri->spinlock);
+    return name;
+}
+
+static inline STRING *rrdmetric_name_get(RRDMETRIC *rm) {
+    spinlock_lock(&rm->ri->spinlock);
+    STRING *name = (rm->name == rm->id) ? rm->id : string_dup(rm->name);
+    spinlock_unlock(&rm->ri->spinlock);
+    return name;
+}
+
+static inline void rrd_name_release(STRING *name, STRING *id) {
+    if(name != id)
+        string_freez(name);
+}
+
 // point rc->hub's strings to the context's current ones; the caller holds rrdcontext_lock(rc)
 // (or the context is not published yet)
 void rrdcontext_hub_strings_update_unsafe(RRDCONTEXT *rc);

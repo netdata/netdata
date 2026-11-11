@@ -67,15 +67,13 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
     if(before && (!rm->first_time_s || before < rm->first_time_s))
         return 0;
 
-    // the name is replaced while we use it: take our own reference (rrdmetric_acquired_name_dup())
-    spinlock_lock(&rm->ri->spinlock);
-    STRING *name = string_dup(rm->name);
-    spinlock_unlock(&rm->ri->spinlock);
+    // the name is replaced while we use it: match and report the same name, which we hold (rrdmetric_name_get())
+    STRING *name = rrdmetric_name_get(rm);
 
     if(t->chart_dimensions
        && !simple_pattern_matches_string(t->chart_dimensions, rm->id)
        && (name == rm->id || !simple_pattern_matches_string(t->chart_dimensions, name))) {
-        string_freez(name);
+        rrd_name_release(name, rm->id);
         return 0;
     }
 
@@ -99,7 +97,7 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
     }
 
     buffer_json_member_add_string(wb, "name", string2str(name));
-    string_freez(name);
+    rrd_name_release(name, rm->id);
     buffer_json_member_add_time_t_formatted(wb, "first_time_t", rm->first_time_s, options & RRDCONTEXT_OPTION_RFC3339);
     buffer_json_member_add_time_t_formatted(wb, "last_time_t", rrd_flag_is_collected(rm) ? (long long)t->now : (long long)rm->last_time_s, options & RRDCONTEXT_OPTION_RFC3339);
     buffer_json_member_add_boolean(wb, "collected", rrd_flag_is_collected(rm));
