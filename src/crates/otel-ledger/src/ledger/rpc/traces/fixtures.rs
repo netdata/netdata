@@ -161,7 +161,7 @@ pub(crate) fn otlp_req_at(
 /// `b"test-meta"` content meta — and return the produced file's path.
 /// Mirrors the sfsq integration suites' `write_wal` fixture recipe
 /// (`sfsq/tests/common/mod.rs`).
-fn write_traces_wal(
+pub(crate) fn write_traces_wal(
     dir: &std::path::Path,
     reqs: Vec<ExportTraceServiceRequest>,
 ) -> std::path::PathBuf {

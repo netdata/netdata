@@ -15,10 +15,12 @@
 //! alongside the `otel-ingestor` producer that writes the per-tenant WALs and
 //! forwards their events over the writer socket this crate accepts.
 //! `event`/`indexer` are reached only via `crate::` from `ledger/`, and
-//! `Ledger` has no external importer either (grep-verified): [`run_worker`]
-//! is the crate's whole external surface.
+//! `Ledger` has no external importer either (grep-verified): the crate's
+//! external surface is [`run_worker`] and [`index_child`], the body of
+//! `otel-plugin index`.
 
 pub mod event;
+pub mod index_child;
 pub mod indexer;
 mod ledger;
 #[cfg(test)]

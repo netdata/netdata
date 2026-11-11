@@ -37,6 +37,9 @@ mod wal_prefix;
 
 use file_lifecycle::Pipeline;
 pub(crate) use rpc::OtelLogsHandler;
+/// The traces fixtures, for the crate's tests that need real WAL files.
+#[cfg(test)]
+pub(crate) use rpc::traces_fixtures;
 
 use std::collections::HashMap;
 use std::sync::Arc;

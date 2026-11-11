@@ -2,7 +2,7 @@
 //! Netdata agent spawns, the worker subprocesses it re-execs, and an offline
 //! log query front end.
 //!
-//! One executable, three clap-dispatched modes:
+//! One executable, four clap-dispatched modes:
 //!
 //! - No subcommand (the agent also passes `<update_every>`): run the supervisor
 //!   (`supervisor::run`), which speaks the pluginsd protocol on stdin/stdout,
@@ -13,6 +13,11 @@
 //!   (`lifeline`).
 //! - `logs`: the embedded `sfsq-cli` query over stored WAL/SFST files, for
 //!   operators inspecting logs without a running agent.
+//! - `index`: build the index file of one WAL file and exit
+//!   (`otel_ledger::index_child`); started by the plugin, not by operators.
+//!
+//! The supervisor and the workers run on a tokio runtime; `logs` and `index`
+//! are synchronous and never build one.
 //!
 //! The worker implementations live in their own crates (`otel_ingestor`,
 //! `otel_ledger`, `otel_legacy_logs`); this crate owns only the entry point,
@@ -21,8 +26,11 @@ mod config;
 mod lifeline;
 mod supervisor;
 
+use std::path::PathBuf;
+
 use anyhow::Context;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use otel_bridge::signals::Signal;
 
 /// The worker subprocess modes, selected by the supervisor's internal re-exec
 /// of this binary (see `supervisor::spawn_worker`).
@@ -52,6 +60,23 @@ enum WorkerKind {
     },
 }
 
+/// The signal a WAL file of `index` belongs to. It selects the builder: a
+/// logs file and a traces file hold different frames.
+#[derive(Clone, Copy, ValueEnum)]
+enum IndexSignal {
+    Logs,
+    Traces,
+}
+
+impl From<IndexSignal> for Signal {
+    fn from(signal: IndexSignal) -> Self {
+        match signal {
+            IndexSignal::Logs => Signal::Logs,
+            IndexSignal::Traces => Signal::Traces,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 enum CliCommand {
     /// Run as a worker subprocess of this same executable; spawned by the
@@ -76,6 +101,26 @@ enum CliCommand {
     /// the small worker variants; clap flattens `Box<Args>` since
     /// `Box<T: Args>: Args`.
     Logs(Box<sfsq_cli::Args>),
+    /// Build the index file of one closed WAL file and exit; started by the
+    /// plugin, not an operator command. On success the answer goes to stdout
+    /// (`otel_ledger::index_child`); on failure the error goes to stderr and
+    /// the exit status is 1.
+    Index {
+        /// The signal the WAL file belongs to.
+        #[arg(long, value_enum)]
+        signal: IndexSignal,
+        /// The closed WAL file to index.
+        #[arg(long)]
+        wal: PathBuf,
+        /// Where to write the index file.
+        #[arg(long)]
+        sfst: PathBuf,
+        /// Exit when stdin closes: the starting process passes a pipe it
+        /// never writes, so end-of-file means that process is gone
+        /// (`lifeline`).
+        #[arg(long)]
+        lifeline: bool,
+    },
 }
 
 #[derive(Parser)]
@@ -116,8 +161,17 @@ async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
     }
 }
 
-#[tokio::main]
-async fn main() {
+/// Run `future` to completion on the runtime of the supervisor and the
+/// workers: multi-threaded, one worker thread per CPU.
+fn block_on_runtime<F: Future>(future: F) -> F::Output {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .expect("failed to build the tokio runtime")
+        .block_on(future)
+}
+
+fn main() {
     // rustls cannot pick a crypto provider on its own here: tonic brings
     // `ring` and opendal's reqwest brings `aws-lc-rs`, and with both compiled
     // in, every default `ServerConfig::builder()` (tonic's gRPC TLS and the
@@ -130,12 +184,14 @@ async fn main() {
 
     let cli = Cli::parse();
 
-    // Each arm installs the global tracing subscriber exactly once, then
-    // dispatches. Stdout is reserved for protocol output — pluginsd for the
-    // daemon, NDJSON for `logs` — so no subscriber ever writes there. The `logs`
-    // arm is an offline query, not the daemon, so it uses a quiet stderr `warn`
-    // subscriber instead of the daemon's journald-formatted `info` one, which
-    // would otherwise clutter an operator's terminal (and try to reach journald).
+    // The supervisor and worker arms install the global tracing subscriber
+    // exactly once, then dispatch. Stdout is reserved for protocol output —
+    // pluginsd for the daemon, NDJSON for `logs`, the answer for `index` — so
+    // no subscriber ever writes there. The `logs` arm is an offline query, not
+    // the daemon, so it uses a quiet stderr `warn` subscriber instead of the
+    // daemon's journald-formatted `info` one, which would otherwise clutter an
+    // operator's terminal (and try to reach journald). The `index` arm
+    // installs none: its one message is its error, on stderr.
     match cli.command {
         Some(CliCommand::Logs(args)) => {
             sfsq_cli::init_tracing();
@@ -152,6 +208,22 @@ async fn main() {
             };
             std::process::exit(code);
         }
+        Some(CliCommand::Index {
+            signal,
+            wal,
+            sfst,
+            lifeline: has_lifeline,
+        }) => {
+            if has_lifeline && let Err(e) = lifeline::exit_when_stdin_closes() {
+                eprintln!("error: failed to watch the lifeline: {e}");
+                std::process::exit(1);
+            }
+            let mut answer = std::io::stdout().lock();
+            if let Err(e) = otel_ledger::index_child::run(signal.into(), &wal, &sfst, &mut answer) {
+                eprintln!("error: {e:#}");
+                std::process::exit(1);
+            }
+        }
         Some(CliCommand::Worker {
             lifeline: has_lifeline,
             kind,
@@ -166,19 +238,19 @@ async fn main() {
                 tracing::error!("failed to watch the supervisor's lifeline: {e}");
                 std::process::exit(1);
             }
-            if let Err(e) = run_worker(kind).await {
+            if let Err(e) = block_on_runtime(run_worker(kind)) {
                 tracing::error!("{e:#}");
                 std::process::exit(1);
             }
         }
         None => {
             netdata_plugin_rt::init_tracing_with_identifier("otel-plugin");
-            if let Err(e) = supervisor::run().await {
+            if let Err(e) = block_on_runtime(supervisor::run()) {
                 tracing::error!("{e:#}");
                 std::process::exit(1);
             }
 
-            // Not a return: the runtime's shutdown would wait for the
+            // Not a return: dropping the runtime would wait for the
             // supervisor's read of stdin, which tokio cannot cancel. That
             // read ends only when the agent closes the pipe, and after a
             // SIGTERM the agent does so two minutes later.
@@ -291,6 +363,53 @@ mod tests {
         ])
         .is_ok();
         assert!(parsed, "expected `--since -1h --until +30m` to parse");
+    }
+
+    #[test]
+    fn index_subcommand_routes_to_index() {
+        let cli = parse(&[
+            "otel-plugin",
+            "index",
+            "--signal",
+            "traces",
+            "--wal",
+            "/x/1.wal",
+            "--sfst",
+            "/y/1.sfst",
+        ])
+        .unwrap();
+        let Some(CliCommand::Index {
+            signal,
+            wal,
+            sfst,
+            lifeline,
+        }) = cli.command
+        else {
+            panic!("expected index subcommand");
+        };
+
+        assert_eq!(Signal::from(signal), Signal::Traces);
+        assert_eq!(wal, PathBuf::from("/x/1.wal"));
+        assert_eq!(sfst, PathBuf::from("/y/1.sfst"));
+        assert!(!lifeline);
+    }
+
+    #[test]
+    fn index_requires_a_known_signal() {
+        let without = parse(&["otel-plugin", "index", "--wal", "/x", "--sfst", "/y"]);
+        let unknown = parse(&[
+            "otel-plugin",
+            "index",
+            "--signal",
+            "metrics",
+            "--wal",
+            "/x",
+            "--sfst",
+            "/y",
+        ]);
+
+        assert!(without.is_err());
+        assert!(unknown.is_err());
     }
 
     // The lib's tenant validation must still fire when `Args` arrives via the
