@@ -270,21 +270,22 @@ impl IndexingOperations {
         }
     }
 
-    /// Index the WAL file at `wal_path` into the index file at `sfst_path` and
-    /// wait for the result. `decoded_size` is what the WAL file decodes to,
-    /// when that could be read, and `expected_memory` what the operation is
-    /// expected to need.
+    /// Index the WAL file at `wal_path` into the index file at `sfst_path`.
+    /// `decoded_size` is what the WAL file decodes to, when that could be
+    /// read, and `expected_memory` what the operation is expected to need.
     ///
-    /// Returns the response for the ledger and, when the operation reported its
-    /// peak, what it needed.
-    async fn run(
+    /// The operation takes its place in the queue when this is called, not
+    /// when the returned future is first polled, so operations start in the
+    /// order of the calls. The future waits for the result: the response for
+    /// the ledger and, when the operation reported its peak, what it needed.
+    fn run(
         &self,
         signal: Signal,
         wal_path: PathBuf,
         sfst_path: PathBuf,
         decoded_size: Option<u64>,
         expected_memory: u64,
-    ) -> (IndexerResponse, Option<Measured>) {
+    ) -> impl Future<Output = (IndexerResponse, Option<Measured>)> + use<> {
         // Parsed from the WAL file name; 0 when it doesn't parse. The ledger
         // routes the response to a tenant by it.
         let seq = file_registry::FileId::parse(&wal_path)
@@ -310,55 +311,61 @@ impl IndexingOperations {
             command,
             expected_memory,
         };
-        let finished = match self.scheduler.run(job).await {
-            Ok(finished) => finished,
-            Err(e) => {
-                self.finished.failed.fetch_add(1, Ordering::Relaxed);
-                remove_partial_index(&sfst_path);
-                let usage = e.usage().map(usage_text).unwrap_or_default();
-                tracing::error!("indexing failed wal={}{usage}: {e}", wal_path.display());
-                let failed = IndexerResponse::IndexFailed {
-                    path: wal_path,
-                    error: e.to_string(),
-                };
-                return (failed, None);
-            }
-        };
+        let result = self.scheduler.run(job);
+        let counters = Arc::clone(&self.finished);
 
-        let usage = usage_text(finished.usage);
-        match IndexedFile::decode(&finished.stdout) {
-            Ok(IndexedFile {
-                summary,
-                size,
-                peak_memory,
-            }) => {
-                let peak = peak_memory
-                    .map(|bytes| format!(" peak_rss_kb={}", bytes / 1024))
-                    .unwrap_or_default();
-                self.finished.succeeded.fetch_add(1, Ordering::Relaxed);
-                tracing::info!("indexing done seq={seq}{usage}{peak}");
-                let indexed = IndexerResponse::Indexed {
-                    seq,
-                    path: sfst_path,
+        async move {
+            let finished = match result.await {
+                Ok(finished) => finished,
+                Err(e) => {
+                    counters.failed.fetch_add(1, Ordering::Relaxed);
+                    remove_partial_index(&sfst_path);
+                    let usage = e.usage().map(usage_text).unwrap_or_default();
+                    tracing::error!("indexing failed wal={}{usage}: {e}", wal_path.display());
+                    let failed = IndexerResponse::IndexFailed {
+                        path: wal_path,
+                        error: e.to_string(),
+                    };
+                    return (failed, None);
+                }
+            };
+
+            let usage = usage_text(finished.usage);
+            match IndexedFile::decode(&finished.stdout) {
+                Ok(IndexedFile {
                     summary,
-                    size: file_registry::ByteSize(size),
-                };
-                let measured = decoded_size
-                    .zip(peak_memory)
-                    .map(|(decoded_size, peak_memory)| Measured {
-                        decoded_size,
-                        peak_memory,
-                    });
-                (indexed, measured)
-            }
-            Err(e) => {
-                self.finished.failed.fetch_add(1, Ordering::Relaxed);
-                tracing::error!("indexing failed wal={}{usage}: {e:#}", wal_path.display());
-                let failed = IndexerResponse::IndexFailed {
-                    path: wal_path,
-                    error: format!("{e:#}"),
-                };
-                (failed, None)
+                    size,
+                    peak_memory,
+                }) => {
+                    let peak = peak_memory
+                        .map(|bytes| format!(" peak_rss_kb={}", bytes / 1024))
+                        .unwrap_or_default();
+                    counters.succeeded.fetch_add(1, Ordering::Relaxed);
+                    tracing::info!("indexing done seq={seq}{usage}{peak}");
+                    let indexed = IndexerResponse::Indexed {
+                        seq,
+                        path: sfst_path,
+                        summary,
+                        size: file_registry::ByteSize(size),
+                    };
+                    let measured =
+                        decoded_size
+                            .zip(peak_memory)
+                            .map(|(decoded_size, peak_memory)| Measured {
+                                decoded_size,
+                                peak_memory,
+                            });
+                    (indexed, measured)
+                }
+                Err(e) => {
+                    counters.failed.fetch_add(1, Ordering::Relaxed);
+                    tracing::error!("indexing failed wal={}{usage}: {e:#}", wal_path.display());
+                    let failed = IndexerResponse::IndexFailed {
+                        path: wal_path,
+                        error: format!("{e:#}"),
+                    };
+                    (failed, None)
+                }
             }
         }
     }
@@ -424,18 +431,20 @@ impl Component for Indexer {
                 _ = cancel.cancelled() => break,
                 request = rx.recv() => match request {
                     Some(IndexerRequest::Index { wal_path, sfst_path }) => {
-                        // Sized here, not in the operation's task: the
-                        // operations must reach the scheduler in the order of
-                        // their requests.
+                        // Sized and queued here, not in the operation's task:
+                        // the operations must reach the scheduler in the order
+                        // of their requests.
                         let decoded_size = decoded_size(&wal_path).await;
                         let expected = decoded_size.map_or(0, |size| expected_memory.of(size));
 
-                        let indexing_operations = indexing_operations.clone();
-                        operations.spawn(async move {
-                            indexing_operations
-                                .run(signal, wal_path, sfst_path, decoded_size, expected)
-                                .await
-                        });
+                        let operation = indexing_operations.run(
+                            signal,
+                            wal_path,
+                            sfst_path,
+                            decoded_size,
+                            expected,
+                        );
+                        operations.spawn(operation);
                     }
                     None => break,
                 },
@@ -853,6 +862,48 @@ mod tests {
             error.starts_with("decoding the index child's answer"),
             "{error}"
         );
+    }
+
+    #[tokio::test]
+    async fn operations_start_in_the_order_of_their_requests() {
+        let dir = tempfile::tempdir().unwrap();
+        let started = dir.path().join("started");
+        // A child that notes which WAL file it was started for, and fails.
+        let executable = fake_executable(
+            dir.path(),
+            &format!(r#"echo "$5" >> {}; exit 1"#, started.display()),
+        );
+        // One at a time, so the order of the notes is the scheduler's order.
+        let one_at_a_time = Limits {
+            jobs: 1,
+            memory_percent: 100,
+        };
+        let indexing_operations = IndexingOperations::with_executable(executable, one_at_a_time);
+        let cancel = CancellationToken::new();
+        let mut indexer = ComponentHandle::spawn::<Indexer>(
+            (Signal::Logs, indexing_operations),
+            cancel.child_token(),
+        );
+
+        let requested: Vec<PathBuf> = (1..=8).map(|seq| wal_path(dir.path(), seq)).collect();
+        for wal_path in &requested {
+            indexer
+                .send(IndexerRequest::Index {
+                    wal_path: wal_path.clone(),
+                    sfst_path: dir.path().join("out.sfst"),
+                })
+                .unwrap();
+        }
+        for _ in &requested {
+            indexer.recv().await.unwrap();
+        }
+
+        let started: Vec<PathBuf> = std::fs::read_to_string(&started)
+            .unwrap()
+            .lines()
+            .map(PathBuf::from)
+            .collect();
+        assert_eq!(started, requested);
     }
 
     #[tokio::test]
