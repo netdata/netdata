@@ -165,7 +165,7 @@ futures = "0.3"
 phf = { version = "0.12", default-features = false }
 phf_codegen = "0.12"
 tokio-util = { version = "0.7", features = ["codec"] }
-lru = "0.16"
+lru = "0.19"
 parking_lot = "0.12"
 allocative = "0.3.4"
 bumpalo = { version = "3", features = ["std"] }

@@ -2447,7 +2447,7 @@ dependencies = [
  "journal-core",
  "journal-index",
  "journal-registry",
- "lru 0.16.4",
+ "lru 0.19.0",
  "parking_lot",
  "rayon",
  "serde",
@@ -2625,18 +2625,18 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "lru"
-version = "0.16.4"
+version = "0.18.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f66e8d5d03f609abc3a39e6f08e4164ebf1447a732906d39eb9b99b7919ef39"
+checksum = "ff9840bcc50b71349309900da0ce7279aa336ae71d73250b07998932c7d97c25"
 dependencies = [
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
 ]
 
 [[package]]
 name = "lru"
-version = "0.18.4"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff9840bcc50b71349309900da0ce7279aa336ae71d73250b07998932c7d97c25"
+checksum = "4a9f71e3591c7ec44d3e563e87bf14ddc2bada8519dca046e5b0e560cd004e2d"
 dependencies = [
  "hashbrown 0.17.1",
 ]
@@ -2995,7 +2995,7 @@ dependencies = [
  "jaq-json",
  "jaq-std",
  "libc",
- "lru 0.16.4",
+ "lru 0.19.0",
  "maxminddb",
  "memchr",
  "memmap2",
