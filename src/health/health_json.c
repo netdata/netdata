@@ -54,7 +54,9 @@ static inline void health_rrdcalc2json_nolock(
     buffer_json_member_add_int64(wb, "delay_up_duration", rc->config.delay_up_duration);
     buffer_json_member_add_int64(wb, "delay_down_duration", rc->config.delay_down_duration);
     buffer_json_member_add_int64(wb, "delay_max_duration", rc->config.delay_max_duration);
-    buffer_json_member_add_double(wb, "delay_multiplier", rc->config.delay_multiplier);
+    // "%f" keeps it a JSON double (1.000000), as it has always been
+    buffer_json_member_add_key_only(wb, "delay_multiplier");
+    buffer_sprintf(wb, "%f", rc->config.delay_multiplier);
     buffer_json_member_add_int64(wb, "delay", snapshot->delay_last);
     buffer_json_member_add_uint64(wb, "delay_up_to_timestamp", (uint64_t)snapshot->delay_up_to_timestamp);
 

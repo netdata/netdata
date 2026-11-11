@@ -2195,6 +2195,7 @@ static int test_alarms_json_escapes_alert_text(int *passed) {
             errors += unittest_json_check_type(alert, where, "id", json_type_int);
             errors += unittest_json_check_type(alert, where, "active", json_type_boolean);
             errors += unittest_json_check_type(alert, where, "update_every", json_type_int);
+            errors += unittest_json_check_type(alert, where, "delay_multiplier", json_type_double);
             errors += unittest_json_check_type(alert, where, "warn_repeat_every", json_type_string);
             errors += unittest_json_check_type(alert, where, "crit_repeat_every", json_type_string);
             errors += unittest_json_check_type(alert, where, "last_repeat", json_type_string);
@@ -2250,8 +2251,17 @@ static int test_silencers_json_round_trip(int *passed) {
     SILENCERS *saved_silencers = silencers;
     STRING *saved_filename = health_globals.config.silencers_filename;
 
+    const char *tmpdir = getenv("TMPDIR");
+    if(!tmpdir || !*tmpdir)
+        tmpdir = P_tmpdir;
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "/tmp/netdata-unittest-silencers-%d.json", getpid());
+    snprintfz(filename, sizeof(filename), "%s/netdata-silencers-XXXXXX", tmpdir);
+    int fd = mkstemp(filename);
+    if(fd == -1) {
+        fprintf(stderr, "FAILED [silencers json]: cannot create a file in '%s'\n", tmpdir);
+        return 1;
+    }
+    close(fd);
     health_globals.config.silencers_filename = string_strdupz(filename);
 
     CLEAN_BUFFER *saved = buffer_create(0, NULL);
@@ -2291,6 +2301,11 @@ static int test_silencers_json_round_trip(int *passed) {
 
     // save, start over, load
     health_silencers2file(saved);
+    struct stat st;
+    if(stat(filename, &st) != 0 || (size_t)st.st_size != buffer_strlen(saved)) {
+        fprintf(stderr, "FAILED [silencers file round trip]: '%s' was not written\n", filename);
+        failed++;
+    }
     free_silencers(silencers->silencers);
     freez(silencers);
     health_initialize_global_silencers();
