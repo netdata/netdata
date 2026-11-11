@@ -3,8 +3,9 @@
 //! A [`Scheduler`] takes jobs from any number of callers. A job is a command;
 //! the scheduler starts it as a child process when a slot is free, in the
 //! order the jobs were submitted, and gives the caller what the child wrote to
-//! stdout or the way it failed ([`Error`]). Jobs beyond the limit wait in a
-//! queue that has no bound: the limit is on what runs, not on what waits.
+//! stdout or the way it failed ([`Error`]), with what the job cost
+//! ([`Usage`]). Jobs beyond the limit wait in a queue that has no bound: the
+//! limit is on what runs, not on what waits.
 //!
 //! The work runs in processes, not threads, for three reasons. The memory a
 //! job needs goes back to the system when the job ends. A job that fails,
@@ -19,10 +20,42 @@
 
 use std::collections::VecDeque;
 use std::process::{ExitStatus, Stdio};
+use std::time::Duration;
 
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinSet;
+use tokio::time::{Instant, MissedTickBehavior};
+
+/// How often the memory of a running child is read.
+const MEMORY_READ_INTERVAL: Duration = Duration::from_millis(100);
+
+/// What a job cost.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Usage {
+    /// How long the job waited in the queue before its child was started.
+    pub waited: Duration,
+    /// How long its child ran.
+    pub ran: Duration,
+    /// The most memory the child held at once, in bytes: the high-water mark
+    /// of its resident set, as last read while it ran (every
+    /// [`MEMORY_READ_INTERVAL`]), so what it added after the last reading is
+    /// not in it. `None` when it was never read: the child ended before the
+    /// first reading, or the system has no `/proc`.
+    ///
+    /// Not the `ru_maxrss` that waiting for a child reports: on Linux that
+    /// number is at least the resident set of the process that started the
+    /// child.
+    pub peak_memory: Option<u64>,
+}
+
+/// A job whose child ended with success.
+#[derive(Debug)]
+pub struct Finished {
+    /// What the child wrote to stdout.
+    pub stdout: Vec<u8>,
+    pub usage: Usage,
+}
 
 /// How a job failed.
 ///
@@ -39,21 +72,37 @@ pub enum Error {
     /// The child exited with a non-zero status; `stderr` is what it wrote
     /// there.
     #[error("the job exited with status {code}: {}", .stderr.trim_end())]
-    Exited { code: i32, stderr: String },
+    Exited {
+        code: i32,
+        stderr: String,
+        usage: Usage,
+    },
     /// A signal ended the child.
     #[error("the job was ended by signal {signal}")]
-    Signaled { signal: i32 },
+    Signaled { signal: i32, usage: Usage },
     /// The scheduler stopped before the job finished.
     #[error("the scheduler stopped before the job finished")]
     Stopped,
 }
 
-/// A job's result: the child's stdout, or how the job failed.
-pub type Result = std::result::Result<Vec<u8>, Error>;
+impl Error {
+    /// What the job cost, when its child ran to an end.
+    pub fn usage(&self) -> Option<Usage> {
+        match self {
+            Error::Exited { usage, .. } | Error::Signaled { usage, .. } => Some(*usage),
+            Error::Spawn(_) | Error::Wait(_) | Error::Stopped => None,
+        }
+    }
+}
 
-/// A job in the queue: the command to run and where its result goes.
+/// A job's result: what its child produced, or how the job failed.
+pub type Result = std::result::Result<Finished, Error>;
+
+/// A job in the queue: the command to run, when it was submitted, and where
+/// its result goes.
 struct Job {
     command: std::process::Command,
+    queued_at: Instant,
     result: oneshot::Sender<Result>,
 }
 
@@ -97,7 +146,11 @@ impl Scheduler {
         let (result, finished) = oneshot::channel();
         // A send fails only when the dispatcher is gone; `finished` then
         // reports it, because the job's sender is dropped with the job.
-        let _ = self.queue.send(Job { command, result });
+        let _ = self.queue.send(Job {
+            command,
+            queued_at: Instant::now(),
+            result,
+        });
 
         async move { finished.await.unwrap_or(Err(Error::Stopped)) }
     }
@@ -134,6 +187,7 @@ async fn dispatch(limit: usize, mut jobs: mpsc::UnboundedReceiver<Job>) {
 async fn run_job(job: Job) {
     let Job {
         command,
+        queued_at,
         mut result,
     } = job;
 
@@ -142,14 +196,16 @@ async fn run_job(job: Job) {
         biased;
         // Leaving `run_child` drops the child, which kills it.
         () = result.closed() => {}
-        finished = run_child(command) => {
+        finished = run_child(command, queued_at) => {
             let _ = result.send(finished);
         }
     }
 }
 
-/// Start `command` as a child process and wait for it to end.
-async fn run_child(command: std::process::Command) -> Result {
+/// Start `command` as a child process and wait for it to end, reading its
+/// memory while it runs.
+async fn run_child(command: std::process::Command, queued_at: Instant) -> Result {
+    let started_at = Instant::now();
     let mut child = Command::from(command)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -157,29 +213,72 @@ async fn run_child(command: std::process::Command) -> Result {
         .kill_on_drop(true)
         .spawn()
         .map_err(Error::Spawn)?;
+    let pid = child.id();
 
     // Taken out of the child so that waiting does not close it: the write end
     // stays open, unwritten, until the child has ended.
     let _lifeline = child.stdin.take();
 
-    let output = child.wait_with_output().await.map_err(Error::Wait)?;
+    let mut peak_memory = None;
+    let mut memory_reads =
+        tokio::time::interval_at(started_at + MEMORY_READ_INTERVAL, MEMORY_READ_INTERVAL);
+    memory_reads.set_missed_tick_behavior(MissedTickBehavior::Delay);
+
+    let ended = child.wait_with_output();
+    tokio::pin!(ended);
+    let output = loop {
+        tokio::select! {
+            output = &mut ended => break output.map_err(Error::Wait)?,
+            // The mark only rises, so the last reading is the highest. The
+            // child is not reaped before `ended` completes: until then the
+            // pid is its own.
+            _ = memory_reads.tick() => {
+                peak_memory = pid.and_then(memory_high_water).or(peak_memory);
+            }
+        }
+    };
+
+    let usage = Usage {
+        waited: started_at.duration_since(queued_at),
+        ran: started_at.elapsed(),
+        peak_memory,
+    };
     if output.status.success() {
-        return Ok(output.stdout);
+        return Ok(Finished {
+            stdout: output.stdout,
+            usage,
+        });
     }
 
-    Err(failure(output.status, &output.stderr))
+    Err(failure(output.status, &output.stderr, usage))
+}
+
+/// The high-water mark of the resident set of process `pid`, in bytes:
+/// `VmHWM` of `/proc/<pid>/status`. `None` when it cannot be read; a process
+/// that has ended but is not reaped has no such line.
+fn memory_high_water(pid: u32) -> Option<u64> {
+    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+    let kib = status
+        .lines()
+        .find_map(|line| line.strip_prefix("VmHWM:"))?
+        .trim()
+        .strip_suffix("kB")?
+        .trim();
+
+    Some(kib.parse::<u64>().ok()? * 1024)
 }
 
 /// The error of a child that ended with `status`, which is not a success.
-fn failure(status: ExitStatus, stderr: &[u8]) -> Error {
+fn failure(status: ExitStatus, stderr: &[u8], usage: Usage) -> Error {
     use std::os::unix::process::ExitStatusExt;
 
     match (status.code(), status.signal()) {
         (Some(code), _) => Error::Exited {
             code,
             stderr: String::from_utf8_lossy(stderr).into_owned(),
+            usage,
         },
-        (None, Some(signal)) => Error::Signaled { signal },
+        (None, Some(signal)) => Error::Signaled { signal, usage },
         (None, None) => Error::Wait(std::io::Error::other(format!(
             "unexpected wait status {status:?}"
         ))),
@@ -189,7 +288,6 @@ fn failure(status: ExitStatus, stderr: &[u8]) -> Error {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use std::time::Duration;
 
     use super::*;
 
@@ -236,9 +334,9 @@ mod tests {
     async fn a_job_returns_what_its_child_wrote_to_stdout() {
         let scheduler = Scheduler::new(1);
 
-        let stdout = scheduler.run(sh("printf answer; echo noise >&2")).await;
+        let finished = scheduler.run(sh("printf answer; echo noise >&2")).await;
 
-        assert_eq!(stdout.unwrap(), b"answer");
+        assert_eq!(finished.unwrap().stdout, b"answer");
     }
 
     #[tokio::test]
@@ -251,7 +349,7 @@ mod tests {
             .unwrap_err();
 
         assert!(
-            matches!(&err, Error::Exited { code: 3, stderr } if stderr == "it broke\n"),
+            matches!(&err, Error::Exited { code: 3, stderr, .. } if stderr == "it broke\n"),
             "{err:?}"
         );
         assert_eq!(err.to_string(), "the job exited with status 3: it broke");
@@ -263,7 +361,7 @@ mod tests {
 
         let err = scheduler.run(sh("kill -KILL $$")).await.unwrap_err();
 
-        assert!(matches!(err, Error::Signaled { signal: 9 }), "{err:?}");
+        assert!(matches!(err, Error::Signaled { signal: 9, .. }), "{err:?}");
     }
 
     #[tokio::test]
@@ -346,7 +444,10 @@ mod tests {
 
         wait_until_gone(pid).await;
         // The slot is free again.
-        assert_eq!(scheduler.run(sh("printf next")).await.unwrap(), b"next");
+        assert_eq!(
+            scheduler.run(sh("printf next")).await.unwrap().stdout,
+            b"next"
+        );
     }
 
     #[tokio::test]
@@ -361,7 +462,7 @@ mod tests {
         drop(abandoned);
 
         first.await.unwrap();
-        assert_eq!(last.await.unwrap(), b"last");
+        assert_eq!(last.await.unwrap().stdout, b"last");
         assert!(!marker.exists());
     }
 
@@ -389,8 +490,68 @@ mod tests {
 
         // `cat` returns at once on end-of-file; on an open pipe that nobody
         // writes to it waits until `timeout` ends it, with status 124.
-        let stdout = scheduler.run(sh("timeout 0.2 cat; echo $?")).await.unwrap();
+        let finished = scheduler.run(sh("timeout 0.2 cat; echo $?")).await.unwrap();
 
-        assert_eq!(stdout, b"124\n");
+        assert_eq!(finished.stdout, b"124\n");
+    }
+
+    #[tokio::test]
+    async fn usage_tells_the_wait_from_the_run() {
+        let scheduler = Scheduler::new(1);
+
+        let first = scheduler.run(sh("sleep 0.3"));
+        let second = scheduler.run(sh("true"));
+        let (first, second) = (first.await.unwrap().usage, second.await.unwrap().usage);
+
+        let (short, long) = (Duration::from_millis(150), Duration::from_millis(300));
+        assert!(first.waited < short && first.ran >= long, "{first:?}");
+        assert!(second.waited >= long && second.ran < short, "{second:?}");
+    }
+
+    #[tokio::test]
+    async fn usage_holds_the_most_memory_the_child_held() {
+        let scheduler = Scheduler::new(1);
+
+        // The shell holds a string of 40 million characters for longer than
+        // the interval between two readings.
+        let held = scheduler.run(sh(
+            "held=$(head -c 40000000 /dev/zero | tr '\\0' x); sleep 0.3",
+        ));
+        let quick = scheduler.run(sh("true"));
+        let (held, quick) = (held.await.unwrap().usage, quick.await.unwrap().usage);
+
+        let megabyte = 1_000_000;
+        let peak = held.peak_memory.expect("the child's memory was read");
+        assert!((40 * megabyte..400 * megabyte).contains(&peak), "{peak}");
+        // It ended before the first reading.
+        assert_eq!(quick.peak_memory, None);
+    }
+
+    #[tokio::test]
+    async fn a_failed_job_reports_its_usage() {
+        let scheduler = Scheduler::new(1);
+
+        let exited = scheduler.run(sh("sleep 0.15; exit 3")).await.unwrap_err();
+        let signaled = scheduler
+            .run(sh("sleep 0.15; kill -KILL $$"))
+            .await
+            .unwrap_err();
+        let unstarted = scheduler
+            .run(std::process::Command::new(
+                "/nonexistent/otel-job-scheduler-test",
+            ))
+            .await
+            .unwrap_err();
+
+        let ran = Duration::from_millis(150);
+        assert!(
+            exited.usage().is_some_and(|usage| usage.ran >= ran),
+            "{exited:?}"
+        );
+        assert!(
+            signaled.usage().is_some_and(|usage| usage.ran >= ran),
+            "{signaled:?}"
+        );
+        assert_eq!(unstarted.usage(), None);
     }
 }

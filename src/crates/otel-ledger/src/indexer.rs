@@ -31,10 +31,9 @@ use std::process::Command;
 
 use anyhow::Context;
 use otel_bridge::signals::Signal;
-use otel_job_scheduler::Scheduler;
+use otel_job_scheduler::{Scheduler, Usage};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
-use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 use file_lifecycle::component::Component;
@@ -98,22 +97,23 @@ impl IndexBuilds {
             wal_path.display(),
             sfst_path.display(),
         );
-        let queued_at = Instant::now();
 
-        let indexed = self
-            .scheduler
-            .run(command)
-            .await
-            .map_err(anyhow::Error::from)
-            .and_then(|answer| IndexedFile::decode(&answer));
+        let finished = match self.scheduler.run(command).await {
+            Ok(finished) => finished,
+            Err(e) => {
+                let usage = e.usage().map(usage_text).unwrap_or_default();
+                tracing::error!("indexing failed wal={}{usage}: {e}", wal_path.display());
+                return IndexerResponse::IndexFailed {
+                    path: wal_path,
+                    error: e.to_string(),
+                };
+            }
+        };
 
-        match indexed {
+        let usage = usage_text(finished.usage);
+        match IndexedFile::decode(&finished.stdout) {
             Ok(IndexedFile { summary, size }) => {
-                // The time includes the wait for a free slot.
-                tracing::info!(
-                    "indexing done seq={seq} elapsed_ms={}",
-                    queued_at.elapsed().as_millis(),
-                );
+                tracing::info!("indexing done seq={seq}{usage}");
                 IndexerResponse::Indexed {
                     seq,
                     path: sfst_path,
@@ -122,7 +122,7 @@ impl IndexBuilds {
                 }
             }
             Err(e) => {
-                tracing::error!("indexing failed wal={}: {e:#}", wal_path.display());
+                tracing::error!("indexing failed wal={}{usage}: {e:#}", wal_path.display());
                 IndexerResponse::IndexFailed {
                     path: wal_path,
                     error: format!("{e:#}"),
@@ -130,6 +130,21 @@ impl IndexBuilds {
             }
         }
     }
+}
+
+/// What a build cost, as the fields that follow the subject of its log line:
+/// the time it waited for a slot, the time its child ran, and the most
+/// memory the child held (absent when the child ended before it was read).
+fn usage_text(usage: Usage) -> String {
+    let mut text = format!(
+        " waited_ms={} ran_ms={}",
+        usage.waited.as_millis(),
+        usage.ran.as_millis(),
+    );
+    if let Some(peak_memory) = usage.peak_memory {
+        text.push_str(&format!(" peak_rss_kb={}", peak_memory / 1024));
+    }
+    text
 }
 
 /// The indexer component: a unit struct — all state lives in
@@ -220,6 +235,22 @@ mod tests {
             record_count: 3,
             content_meta: b"meta".to_vec(),
         }
+    }
+
+    #[test]
+    fn usage_text_lists_the_wait_the_run_and_the_peak_when_it_was_read() {
+        let mut usage = Usage {
+            waited: std::time::Duration::from_millis(5),
+            ran: std::time::Duration::from_millis(1500),
+            peak_memory: Some(2048 * 1024),
+        };
+        assert_eq!(
+            usage_text(usage),
+            " waited_ms=5 ran_ms=1500 peak_rss_kb=2048"
+        );
+
+        usage.peak_memory = None;
+        assert_eq!(usage_text(usage), " waited_ms=5 ran_ms=1500");
     }
 
     #[tokio::test]
