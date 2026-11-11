@@ -62,6 +62,32 @@ cleanup and required browser replacement. Admission order can vary between runs.
 Use more than 100 journeys on one slot to exercise busy-owner rollover. These
 synthetic timings are comparative evidence, not a capacity guarantee for real
 websites or a long-running mixed RUM workload.
+
+For a paced comparison, add `-paced 15m -journey-every 5m -lighthouse-every 15m
+-idle-after 75s` with 300 journey jobs, 100 audit jobs and 12 slots. This produces
+900 journey occurrences and 100 audit occurrences over the same 15-minute arrival
+window in each mode. The pool starts cold, and each persistent job uses the
+production monitor's stable JobID hash phase. The harness drives the real Engine
+directly: native Agent startup, monitor bootstrap/coalescing, charts and RUM are
+excluded. If any response crosses its next same-job occurrence, the run fails
+because this arrival model no longer represents monitor behavior.
+
+`attempts.jsonl` records every admitted occurrence's due, queue, admission and
+completion times. The summary includes counts, longest scheduling delay/response,
+runtime leases and the wall-clock start for aligning resource samples. After the
+window and all completions, the extra idle interval observes natural owner expiry
+and requires zero execution pins before Engine shutdown. Use at least 75 seconds
+for this idle observation. Whole-unit accounting includes that idle interval;
+fixed window elapsed time is not a throughput result. Measure cgroup CPU, peak
+and sampled average memory, anonymous/file memory and OOM/throttling events, and
+reverse fresh/reuse order in repeated trials. Retain failures and all trials.
+
+The arrival-plan checks can run without a browser from the `src/go` module:
+
+```sh
+go test ../dem-runtime/tests/browser-reuse/engine-proof.go ../dem-runtime/tests/browser-reuse/engine-proof_test.go
+```
+
 See [the validation results](RESULTS.md) for the measured implementation, runtime,
 resource limits, cleanup evidence and fresh/reuse trade-offs.
 

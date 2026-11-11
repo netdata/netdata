@@ -12,11 +12,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -53,6 +55,7 @@ type fixture struct {
 	identity synthetic.RuntimeIdentity
 	origin   string
 	hits     chan string
+	work     string
 }
 
 func main() {
@@ -71,6 +74,10 @@ func run() (result error) {
 	lighthouse := flag.Int("lighthouse", 100, "Lighthouse workload count")
 	slots := flag.Int("slots", 12, "workload admission slots")
 	repeat := flag.Int("repeat", 3, "proof clean/retire cycles")
+	window := flag.Duration("paced", 0, "paced workload window; zero starts all checks at one barrier")
+	journeyEvery := flag.Duration("journey-every", 5*time.Minute, "paced journey interval")
+	auditEvery := flag.Duration("lighthouse-every", 15*time.Minute, "paced Lighthouse interval")
+	idle := flag.Duration("idle-after", 0, "observe idle owners after the workload window and all completions")
 	timeout := flag.Duration("timeout", 20*time.Minute, "whole proof or workload deadline")
 	flag.Parse()
 	for _, path := range []string{*storePath, *helper, *work} {
@@ -84,6 +91,10 @@ func run() (result error) {
 	if *timeout <= 0 || *slots <= 0 || *repeat <= 0 || *journeys < 0 || *lighthouse < 0 ||
 		(*mode != "proof" && *mode != "reuse" && *mode != "fresh") {
 		return errors.New("invalid proof or workload options")
+	}
+	options := workloadOptions{window: *window, journeyEvery: *journeyEvery, auditEvery: *auditEvery, idle: *idle}
+	if err := options.validate(); err != nil {
+		return err
 	}
 	if err := os.Mkdir(*work, 0700); err != nil {
 		return err
@@ -128,6 +139,7 @@ func run() (result error) {
 		captures: captures,
 		identity: synthetic.RuntimeIdentity{Version: manifest.Version, SHA256: manifest.Archive.SHA256, Contract: manifest.Contract},
 		hits:     make(chan string, 4),
+		work:     *work,
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if req.URL.Path == "/cancel" || req.URL.Path == "/timeout" {
@@ -151,7 +163,7 @@ func run() (result error) {
 	}()
 	f.origin = server.URL
 	if *mode != "proof" {
-		return f.workload(ctx, *mode, *slots, *journeys, *lighthouse)
+		return f.workload(ctx, *mode, *slots, *journeys, *lighthouse, options)
 	}
 	start := time.Now()
 	if err := f.serialProof(ctx, *repeat); err != nil {
@@ -405,7 +417,70 @@ func cpu() cpuTime {
 		children: float64(child.Utime.Nano()+child.Stime.Nano()) / 1e9}
 }
 
-func (f fixture) workload(ctx context.Context, mode string, slots, journeys, lighthouse int) (result error) {
+type workloadOptions struct {
+	window, journeyEvery, auditEvery, idle time.Duration
+}
+
+func (o workloadOptions) validate() error {
+	if o.window < 0 || o.idle < 0 || o.journeyEvery <= 0 || o.auditEvery <= 0 {
+		return errors.New("workload durations must be positive, except zero window or idle time")
+	}
+	return nil
+}
+
+type plannedAttempt struct {
+	kind     synthetic.Kind
+	name     string
+	due      time.Duration
+	interval time.Duration
+}
+
+func planWorkload(journeys, lighthouse int, options workloadOptions) []plannedAttempt {
+	var plan []plannedAttempt
+	total := journeys + lighthouse
+	for i := range total {
+		attempt := plannedAttempt{kind: synthetic.Journey, name: fmt.Sprintf("journey-%04d", i), interval: options.journeyEvery}
+		if (i+1)*lighthouse/total != i*lighthouse/total {
+			attempt.kind, attempt.name, attempt.interval = synthetic.Lighthouse, fmt.Sprintf("audit-%04d", i), options.auditEvery
+		}
+		if options.window == 0 {
+			plan = append(plan, attempt)
+			continue
+		}
+		// Match monitor/session.go's stable JobID phase. This models steady
+		// arrivals; it does not run monitor bootstrap or occurrence coalescing.
+		h := fnv.New64a()
+		_, _ = h.Write([]byte(string(attempt.kind) + ":" + attempt.name))
+		attempt.due = time.Duration(h.Sum64() % uint64(attempt.interval))
+		for attempt.due < options.window {
+			plan = append(plan, attempt)
+			attempt.due += attempt.interval
+		}
+	}
+	slices.SortStableFunc(plan, func(a, b plannedAttempt) int {
+		if a.due < b.due {
+			return -1
+		}
+		if a.due > b.due {
+			return 1
+		}
+		return 0
+	})
+	return plan
+}
+
+func waitUntil(ctx context.Context, due time.Time) error {
+	timer := time.NewTimer(time.Until(due))
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+func (f fixture) workload(ctx context.Context, mode string, slots, journeys, lighthouse int, options workloadOptions) (result error) {
 	engine, err := runner.New(f.source, f.history, f.captures, slots)
 	if err != nil {
 		return err
@@ -413,66 +488,123 @@ func (f fixture) workload(ctx context.Context, mode string, slots, journeys, lig
 	if err := engine.Check(ctx, synthetic.Journey); err != nil {
 		return f.finish(engine, err)
 	}
-	total := journeys + lighthouse
+	plan := planWorkload(journeys, lighthouse, options)
+	total := len(plan)
+	trace, err := os.Create(filepath.Join(f.work, "attempts.jsonl"))
+	if err != nil {
+		return f.finish(engine, err)
+	}
+	defer closeVerified(&result, trace.Close)
+	encode := json.NewEncoder(trace)
 	type completion struct {
 		execution synthetic.Execution
 		occupied  time.Duration
+		planned   plannedAttempt
+		queued    time.Time
+		admitted  time.Time
+		completed time.Time
+		err       error
 	}
 	results := make(chan completion, total)
 	startGate := make(chan struct{})
 	var workers sync.WaitGroup
-	for i := range total {
+	var start time.Time
+	for _, attempt := range plan {
 		var request synthetic.Request
-		if (i+1)*lighthouse/total != i*lighthouse/total {
-			request = synthetic.Request{Kind: synthetic.Lighthouse, Name: fmt.Sprintf("audit-%04d", i),
+		if attempt.kind == synthetic.Lighthouse {
+			request = synthetic.Request{Kind: synthetic.Lighthouse, Name: attempt.name,
 				URL: f.origin, Timeout: 90 * time.Second}
 		} else {
-			request = f.visit(fmt.Sprintf("journey-%04d", i), mode, "/")
+			request = f.visit(attempt.name, mode, "/")
 		}
 		workers.Go(func() {
 			<-startGate
+			due := start.Add(attempt.due)
+			if err := waitUntil(ctx, due); err != nil {
+				results <- completion{planned: attempt, err: err}
+				return
+			}
+			queued := time.Now()
 			var admitted time.Time
 			execution := engine.ExecuteScheduled(ctx, request, nil, func(when time.Time) synthetic.Schedule {
 				admitted = when
-				return synthetic.Schedule{}
+				return synthetic.Schedule{DueUS: due.UnixMicro(), QueuedUS: queued.UnixMicro()}
 			})
 			var occupied time.Duration
 			if !admitted.IsZero() {
 				occupied = time.Since(admitted)
 			}
-			results <- completion{execution: execution, occupied: occupied}
+			results <- completion{execution: execution, occupied: occupied, planned: attempt,
+				queued: queued, admitted: admitted, completed: time.Now()}
 		})
 	}
 	beforeCPU := cpu()
-	start := time.Now()
+	start = time.Now()
 	close(startGate)
 	var first, journeySlotSeconds, auditSlotSeconds float64
+	var maxDelay, maxResponse float64
+	var cadenceOverruns, completedJourneys, completedAudits int
 	for i := range total {
 		completed := <-results
+		if completed.err != nil {
+			result = errors.Join(result, completed.err)
+			continue
+		}
 		execution := completed.execution
 		if i == 0 {
 			first = time.Since(start).Seconds()
 		}
 		run := execution.Run
+		due := start.Add(completed.planned.due)
+		delay := completed.admitted.Sub(due).Seconds()
+		response := completed.completed.Sub(due).Seconds()
+		maxDelay, maxResponse = max(maxDelay, delay), max(maxResponse, response)
+		if options.window > 0 && completed.completed.Sub(due) >= completed.planned.interval {
+			cadenceOverruns++
+		}
+		result = errors.Join(result, encode.Encode(map[string]any{
+			"job": run.JobID, "kind": run.Kind, "due_seconds": completed.planned.due.Seconds(),
+			"queued_seconds": completed.queued.Sub(start).Seconds(), "admitted_seconds": completed.admitted.Sub(start).Seconds(),
+			"completed_seconds": completed.completed.Sub(start).Seconds(), "slot_seconds": completed.occupied.Seconds(),
+			"outcome": run.Outcome, "drained": execution.Drained, "runtime": run.Runtime,
+		}))
 		if !execution.Drained {
 			result = errors.Join(result, fmt.Errorf("%s: %w", run.Name, ndexec.ErrTreeNotDrained))
 		} else if run.Outcome != synthetic.Success || run.Runtime == nil || *run.Runtime != f.identity || run.HistoryError != "" {
 			result = errors.Join(result, fmt.Errorf("%s: %s (%s, history %s)", run.Name, run.Outcome, run.Error, run.HistoryError))
 		}
 		if run.Kind == synthetic.Journey {
+			completedJourneys++
 			journeySlotSeconds += completed.occupied.Seconds()
 		} else {
+			completedAudits++
 			auditSlotSeconds += completed.occupied.Seconds()
 		}
 	}
 	workers.Wait()
+	if cadenceOverruns != 0 {
+		result = errors.Join(result, fmt.Errorf("%d attempts crossed the next same-job occurrence; paced fixture does not model coalescing", cadenceOverruns))
+	}
 	batch := time.Since(start).Seconds()
+	if options.window > 0 {
+		result = errors.Join(result, waitUntil(ctx, start.Add(options.window)))
+	}
+	workloadEnd := time.Since(start).Seconds()
+	if options.idle > 0 {
+		result = errors.Join(result, waitUntil(ctx, time.Now().Add(options.idle)), f.pins(0))
+	}
 	beforeClose := time.Now()
 	result = f.finish(engine, result)
 	retirement := time.Since(beforeClose).Seconds()
 	afterCPU := cpu()
 	return errors.Join(result, json.NewEncoder(os.Stdout).Encode(map[string]any{
 		"mode": mode, "runtime": f.identity, "journeys": journeys, "lighthouse": lighthouse, "slots": slots,
+		"start_unix_us":        start.UnixMicro(),
+		"paced_window_seconds": options.window.Seconds(), "idle_after_seconds": options.idle.Seconds(),
+		"journey_interval_seconds": options.journeyEvery.Seconds(), "lighthouse_interval_seconds": options.auditEvery.Seconds(),
+		"planned_attempts": total, "completed_journeys": completedJourneys, "completed_audits": completedAudits,
+		"max_scheduling_delay_seconds": maxDelay, "max_response_seconds": maxResponse, "cadence_overruns": cadenceOverruns,
+		"workload_end_seconds": workloadEnd,
 		"first_result_seconds": first, "batch_seconds": batch, "shutdown_seconds": retirement,
 		"total_seconds": time.Since(start).Seconds(), "journey_slot_seconds": journeySlotSeconds, "lighthouse_slot_seconds": auditSlotSeconds,
 		"agent_cpu_seconds": afterCPU.agent - beforeCPU.agent, "child_cpu_seconds": afterCPU.children - beforeCPU.children,
