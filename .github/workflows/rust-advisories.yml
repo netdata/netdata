@@ -8,6 +8,7 @@ on:
     paths:
       - 'src/crates/Cargo.lock'
       - 'src/crates/**/Cargo.toml'
+      - '!src/crates/jf/**' # Separate workspace with its own lockfile; out of scope.
       - '.github/cargo/deny.toml'
       - '.github/workflows/rust-advisories.yml'
   workflow_dispatch: null
