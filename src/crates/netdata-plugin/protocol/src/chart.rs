@@ -14,11 +14,15 @@
 //! stops the agent's parser and restarts or disables the plugin.
 //!
 //! Ids and option words are written verbatim; callers own their validity:
-//! - a chart id is `type.id`, both parts non-empty, with no whitespace or
-//!   quotes (the agent rejects the line otherwise, `pluginsd_chart`);
+//! - a chart id is `type.id`, both parts non-empty (the agent rejects the line
+//!   otherwise, `pluginsd_chart`), with no whitespace or quotes (the splitter
+//!   would cut the word there), and at most [`MAX_CHART_ID_BYTES`] long;
 //! - a dimension id has no whitespace or quotes, and every `SET` names a
 //!   dimension the chart declared (an unknown id is a protocol error,
 //!   `pluginsd_acquire_dimension`).
+//!
+//! [`sanitize_chart_id`] and [`sanitize_dimension_id`] make an id valid when
+//! its text is not the plugin's own.
 //!
 //! Debug builds assert both. `validate_chart_stream` (feature
 //! `test-support`) checks whole streams in tests.
@@ -468,11 +472,23 @@ impl Chunker {
     }
 }
 
+/// The longest chart id the agent keeps whole. It builds the chart's key
+/// with a bounded print into `RRD_ID_LENGTH_MAX` (1200) bytes, the last one
+/// for the terminator (`rrdset_create_custom`,
+/// `src/database/rrdset-index-id.c`), so a longer id is stored cut short. A
+/// later `BEGIN` carries the whole id, finds no chart, and is a protocol
+/// error.
+pub const MAX_CHART_ID_BYTES: usize = 1199;
+
 /// True when `id` is a valid chart id: `type.id` with both parts non-empty,
-/// no byte the agent's splitter treats as a separator or quote, and not
+/// no byte the agent's splitter treats as a separator or quote, not
 /// starting with `SLOT:` (the agent would read the word as a slot number,
-/// `pluginsd_parse_rrd_slot`).
+/// `pluginsd_parse_rrd_slot`), and at most [`MAX_CHART_ID_BYTES`] long.
 pub fn is_valid_chart_id(id: &str) -> bool {
+    if id.len() > MAX_CHART_ID_BYTES {
+        return false;
+    }
+
     match id.split_once('.') {
         Some((kind, rest)) => !kind.is_empty() && !rest.is_empty() && is_plain_word(id),
         None => false,
@@ -498,9 +514,11 @@ fn splits_or_quotes(byte: u8) -> bool {
 
 /// A valid chart id made from `id`: `id` itself when it is valid
 /// ([`is_valid_chart_id`]). Otherwise every byte the agent's splitter would
-/// misread becomes `_`, a leading `SLOT:` becomes `SLOT_`, and an empty type
-/// or id part becomes `_` (`cpu` becomes `cpu._`). Ids that differ only in
-/// replaced bytes become one id.
+/// misread becomes `_`, a leading `SLOT:` becomes `SLOT_`, an empty type or
+/// id part becomes `_` (`cpu` becomes `cpu._`), and what is past
+/// [`MAX_CHART_ID_BYTES`] is cut. Ids that differ only in replaced or cut
+/// bytes become one id: a caller that needs them apart keeps its ids
+/// shorter than the limit.
 ///
 /// For ids built from text the plugin does not control, such as a metric name
 /// a sender chose.
@@ -509,7 +527,14 @@ pub fn sanitize_chart_id(id: &str) -> Cow<'_, str> {
         return Cow::Borrowed(id);
     }
 
-    let word = plain_word(id);
+    // Room for the `.` and the `_` that an empty part may add.
+    let mut word = plain_word(id);
+    let mut end = word.len().min(MAX_CHART_ID_BYTES - 2);
+    while !word.is_char_boundary(end) {
+        end -= 1;
+    }
+    word.truncate(end);
+
     let (kind, rest) = word.split_once('.').unwrap_or((&word, ""));
     let or_placeholder = |part| if str::is_empty(part) { "_" } else { part };
     Cow::Owned(format!("{}.{}", or_placeholder(kind), or_placeholder(rest)))
@@ -1122,6 +1147,18 @@ mod tests {
         assert_eq!(chart(""), "_._");
         assert_eq!(chart("SLOT:1.a"), "SLOT_1.a");
         assert_eq!(chart("μετρική.1"), "μετρική.1");
+        // An id of the longest length is kept; a longer one is cut, on a
+        // character boundary.
+        let longest = format!("a.{}", "b".repeat(MAX_CHART_ID_BYTES - 2));
+        assert_eq!(chart(&longest), longest);
+        assert!(!is_valid_chart_id(&format!("{longest}b")));
+        assert_eq!(
+            chart(&format!("{longest}b")),
+            format!("a.{}", "b".repeat(MAX_CHART_ID_BYTES - 4))
+        );
+        let greek = chart(&"μ".repeat(MAX_CHART_ID_BYTES));
+        assert!(is_valid_chart_id(&greek), "{} bytes", greek.len());
+        assert!(greek.ends_with("μ._"));
 
         let dimension = |id: &str| sanitize_dimension_id(id).into_owned();
         assert_eq!(dimension("0.005"), "0.005");
@@ -1146,6 +1183,14 @@ mod tests {
             texts.extend(longer);
         }
         texts.extend(["SLOT:1.a", "SLOT:", "SLOT:.", "S.LOT:"].map(String::from));
+        // Around the longest chart id, with a multi-byte character and a dot
+        // at every place the cut can land on.
+        for length in MAX_CHART_ID_BYTES - 4..=MAX_CHART_ID_BYTES + 4 {
+            texts.push(format!("a.{}", "b".repeat(length - 2)));
+            texts.push(format!("{}μ", "b".repeat(length - 2)));
+            texts.push(format!("{}.", "b".repeat(length - 1)));
+            texts.push(format!("{}.μμ", "b".repeat(length - 3)));
+        }
 
         for text in &texts {
             let chart_id = sanitize_chart_id(text);
