@@ -341,6 +341,57 @@ restore_preview_channel
                     self.assertEqual(after.st_ino, before.st_ino)
                 self.assertEqual(list(self.root.glob('.environment.*')), [])
 
+    def test_preview_environment_symlinks(self):
+        target = self.root / 'config' / 'environment'
+        target.parent.mkdir()
+        link = self.root / '.environment'
+        intermediate = self.root / 'config' / 'link'
+        intermediate.symlink_to('environment')
+        original = 'RELEASE_CHANNEL="nightly"\nOTHER="preserved"\n'
+        for destination in (str(target), 'config/environment', 'config/link'):
+            for failure in ('', 'cp', 'sed', 'mv', 'readlink'):
+                with self.subTest(destination=destination, failure=failure):
+                    target.write_text(original)
+                    target.chmod(0o640)
+                    before = target.stat()
+                    link.unlink(missing_ok=True)
+                    link.symlink_to(destination)
+                    stub = f'{failure}() {{ return 1; }}' if failure else ''
+                    self.run_shell(f'''
+RELEASE_CHANNEL=preview
+ENVIRONMENT_FILE='{link}'
+{stub}
+restore_preview_channel
+''', success=not failure)
+                    self.assertTrue(link.is_symlink())
+                    self.assertEqual(os.readlink(link), destination)
+                    self.assertTrue(intermediate.is_symlink())
+                    self.assertEqual(target.read_text(), original if failure else
+                                     original.replace('nightly', 'preview'))
+                    after = target.stat()
+                    self.assertEqual((after.st_mode, after.st_uid, after.st_gid),
+                                     (before.st_mode, before.st_uid, before.st_gid))
+                    if failure:
+                        self.assertEqual(after.st_ino, before.st_ino)
+                    self.assertEqual(list(target.parent.glob('environment.*')), [])
+                    link.unlink()
+
+    def test_preview_environment_invalid_symlinks(self):
+        link = self.root / '.environment'
+        for destination in ('missing', '.environment'):
+            with self.subTest(destination=destination):
+                link.symlink_to(destination)
+                self.run_shell(f'''
+RELEASE_CHANNEL=preview
+ENVIRONMENT_FILE='{link}'
+restore_preview_channel
+''', success=False)
+                self.assertTrue(link.is_symlink())
+                self.assertEqual(os.readlink(link), destination)
+                self.assertEqual(list(self.root.glob('*.??????')), [])
+                self.assertEqual(list(self.root.glob('.environment.*')), [])
+                link.unlink()
+
     def test_current_version_without_binary(self):
         result = self.run_shell('''
 command() { return 1; }

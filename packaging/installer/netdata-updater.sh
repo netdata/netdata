@@ -1182,12 +1182,26 @@ verify_manifest() {
 # Bundled installers may reset the channel because they only accept stable/nightly flags.
 restore_preview_channel() {
   [ "${RELEASE_CHANNEL}" = preview ] || return 0
-  # Keep the replacement on the destination filesystem so rename is atomic.
-  preview_environment="$(mktemp "${ENVIRONMENT_FILE}.XXXXXX")" ||
+  # Resolve links before staging so rename updates the target, preserving the links.
+  preview_destination="${ENVIRONMENT_FILE}"
+  preview_link_count=0
+  while [ -L "${preview_destination}" ]; do
+    preview_link_count=$((preview_link_count + 1))
+    [ "${preview_link_count}" -le 40 ] ||
+      fatal "Unable to resolve preview environment symlink" U002B
+    preview_link="$(readlink "${preview_destination}")" ||
+      fatal "Unable to resolve preview environment symlink" U002B
+    case "${preview_link}" in
+      /*) preview_destination="${preview_link}" ;;
+      *) preview_destination="$(dirname "${preview_destination}")/${preview_link}" ;;
+    esac
+  done
+  # Keep the replacement on the target filesystem so rename is atomic.
+  preview_environment="$(mktemp "${preview_destination}.XXXXXX")" ||
     fatal "Unable to stage preview release channel" U002B
-  if ! cp -p "${ENVIRONMENT_FILE}" "${preview_environment}" ||
-    ! sed 's/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL="preview"/' "${ENVIRONMENT_FILE}" > "${preview_environment}" ||
-    ! mv -f "${preview_environment}" "${ENVIRONMENT_FILE}"; then
+  if ! cp -p "${preview_destination}" "${preview_environment}" ||
+    ! sed 's/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL="preview"/' "${preview_destination}" > "${preview_environment}" ||
+    ! mv -f "${preview_environment}" "${preview_destination}"; then
     rm -f "${preview_environment}"
     fatal "Unable to preserve preview release channel" U002B
   fi
