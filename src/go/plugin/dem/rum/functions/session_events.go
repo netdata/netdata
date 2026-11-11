@@ -11,24 +11,25 @@ import (
 var sessionEventsMethod = method{
 	id:      "rum-session-events",
 	title:   "RUM Session Events",
-	help:    "Full retained and pending timeline for one session, ordered by Agent receipt time; includes observations outside the history picker range",
+	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Full retained and pending timeline for one session, ordered by Agent receipt time; includes observations outside the history picker range",
 	sort:    "ts",
 	every:   10,
 	history: true,
-	params:  []string{"site", "session_id"},
+	params:  []string{"site", "vnode", "vnode_guid", "session_id"},
 	columns: rumSessionEventsColumns,
 }
 
-func (h *Handler) sessionEventsRows(ctx context.Context, site, session string) (rows [][]any, err error) {
+func (h *Handler) sessionEventsRows(ctx context.Context, site, session, vnodeGUID string) (rows [][]any, err error) {
 	var events []query.SessionEvent
-	events, err = h.deps.SessionEvents(ctx, site, session)
+	events, err = h.deps.SessionEvents(ctx, site, session, vnodeGUID)
 	for _, e := range events {
-		rows = append(rows, []any{e.ObservedUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID, h.redact.Apply(e.UserID), e.ExperienceID, h.redact.Apply(e.View), e.ViewID, e.MetricID, e.Revision})
+		rows = append(rows, []any{e.ObservedUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID, h.redact.Apply(e.UserID), e.ExperienceID, h.redact.Apply(e.View), e.ViewID, e.MetricID, e.Revision, e.VnodeGUID})
 	}
 	return rows, err
 }
 
 var rumSessionEventsColumns = map[string]any{
+	"vnode_guid": (funcapi.Column{Index: 11, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
 	"user_id": (funcapi.Column{
 		Index:         5,
 		Name:          "User ID at Event",

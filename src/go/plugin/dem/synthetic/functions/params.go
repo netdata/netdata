@@ -63,10 +63,11 @@ func validKind(value string) error {
 func runFilter(args map[string]string, now int64) (query.RunFilter, error) {
 	before := now
 	f := query.RunFilter{
-		JobID:   args["job_id"],
-		Kind:    model.Kind(args["kind"]),
-		Outcome: model.Outcome(args["outcome"]),
-		Before:  &before,
+		JobID:     args["job_id"],
+		VnodeGUID: args["vnode_guid"],
+		Kind:      model.Kind(args["kind"]),
+		Outcome:   model.Outcome(args["outcome"]),
+		Before:    &before,
 	}
 	if err := validKind(args["kind"]); err != nil {
 		return f, err

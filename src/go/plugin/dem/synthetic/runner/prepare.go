@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -58,18 +59,105 @@ func (e *Engine) checkFiles(kind synthetic.Kind, paths Paths) error {
 	return nil
 }
 
+type checkOwner struct {
+	mu     sync.Mutex
+	flight *checkFlight
+}
+
+type checkFlight struct {
+	done     chan struct{}
+	cancel   context.CancelFunc
+	waiters  int
+	retiring bool
+	err      error
+}
+
 // Check verifies the release contract through its own bounded supervised check.
 // Component versions and private dependency checks belong to the runtime release.
 // It never loads the configured workflow or launches a browser session.
 func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
+	if kind != synthetic.Journey && kind != synthetic.Lighthouse {
+		return errors.New("unsupported synthetic kind")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if e.isPoisoned() {
 		return ndexec.ErrTreeNotDrained
 	}
 	if err := e.platform(); err != nil {
 		return err
 	}
-	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	waiterCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+	owner := e.checks
+	for {
+		owner.mu.Lock()
+		flight := owner.flight
+		if flight != nil && flight.retiring {
+			owner.mu.Unlock()
+			// The last waiter owns cancellation and physical join. A replacement
+			// cannot acquire another runtime use until that join is complete.
+			select {
+			case <-flight.done:
+				continue
+			case <-waiterCtx.Done():
+				return waiterCtx.Err()
+			case <-e.poisoned:
+				return ndexec.ErrTreeNotDrained
+			}
+		}
+		if err := waiterCtx.Err(); err != nil {
+			owner.mu.Unlock()
+			return err
+		}
+		if e.isPoisoned() {
+			owner.mu.Unlock()
+			return ndexec.ErrTreeNotDrained
+		}
+		if flight == nil {
+			probeCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+			flight = &checkFlight{done: make(chan struct{}), cancel: stop}
+			owner.flight = flight
+			go func(f *checkFlight) {
+				err := e.check(probeCtx, kind)
+				stop()
+				owner.mu.Lock()
+				f.err = err
+				owner.flight = nil
+				close(f.done)
+				owner.mu.Unlock()
+			}(flight)
+		}
+		flight.waiters++
+		owner.mu.Unlock()
+		var err error
+		select {
+		case <-flight.done:
+			return flight.err
+		case <-waiterCtx.Done():
+			err = waiterCtx.Err()
+		case <-e.poisoned:
+			err = ndexec.ErrTreeNotDrained
+		}
+		owner.mu.Lock()
+		// Completion may race cancellation. The caller still owns its deadline,
+		// while the joined physical result remains available to other waiters.
+		flight.waiters--
+		last := flight.waiters == 0
+		if last {
+			flight.retiring = true
+			flight.cancel()
+		}
+		owner.mu.Unlock()
+		if last {
+			<-flight.done
+		}
+		return err
+	}
+}
+
+func (e *Engine) check(checkCtx context.Context, kind synthetic.Kind) error {
 	var identity synthetic.RuntimeIdentity
 	output, err := e.probe(checkCtx, kind, func(paths Paths) []string {
 		identity = paths.Identity

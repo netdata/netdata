@@ -77,7 +77,7 @@ static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_b
                 char _ub[64];
                 buffer_strcat(key, query_target_result_units_for(
                     qt, qm->values_stored_as_rates,
-                    rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+                    string2str(qi->units), _ub, sizeof(_ub)));
             }
         }
     }
@@ -145,7 +145,7 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
                 char _ub[64];
                 buffer_strcat(key, query_target_result_units_for(
                     qt, qm->values_stored_as_rates,
-                    rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+                    string2str(qi->units), _ub, sizeof(_ub)));
             }
         }
     }
@@ -180,7 +180,7 @@ static void query_group_by_make_dimension_name(
                 buffer_fast_strcat(key, ",", 1);
 
             if (group_by & RRDR_GROUP_BY_NODE)
-                buffer_strcat(key, rrdinstance_acquired_name(qi->ria));
+                buffer_strcat(key, query_instance_name(qi));
             else
                 buffer_strcat(key, string2str(query_instance_name_fqdn(qi, qt->request.version, host_hostname)));
         }
@@ -216,7 +216,7 @@ static void query_group_by_make_dimension_name(
                 char _ub[64];
                 buffer_strcat(key, query_target_result_units_for(
                     qt, qm->values_stored_as_rates,
-                    rrdinstance_acquired_units(qi->ria), _ub, sizeof(_ub)));
+                    string2str(qi->units), _ub, sizeof(_ub)));
             }
         }
     }
@@ -251,7 +251,7 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             QUERY_METRIC *qm = query_metric(qt, d);
             QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
             r->di[d] = rrdmetric_acquired_id_dup(qd->rma);
-            r->dn[d] = rrdmetric_acquired_name_dup(qd->rma);
+            r->dn[d] = string_dup(qd->name);
         }
 
         rrd2rrdr_set_timestamps(r);
@@ -441,7 +441,7 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 entries[pos].name = string_strdupz(buffer_tostring(key));
 
                 // add the rest of the info
-                entries[pos].units = rrdinstance_acquired_units_dup(qi->ria);
+                entries[pos].units = string_dup(qi->units);
                 if(group_by & RRDR_GROUP_BY_UNITS) {
                     char units_buf[64];
                     entries[pos].result_units = string_strdupz(query_target_result_units_for(

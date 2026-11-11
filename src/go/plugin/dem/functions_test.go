@@ -33,7 +33,7 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	components := New(Dependencies{
 		History: journalStore,
 	}, DefaultConfig())
-	handler := components.Functions[0].NewHandler().(*rumfunctions.Handler)
+	handler := components.Functions[0].NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*rumfunctions.Handler)
 	response := handler.HandleRaw(
 		context.Background(),
 		funcapi.RawMethodRequest{
@@ -55,6 +55,6 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	require.Len(t, response.RawResponse["data"].([][]any), 1)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = (query.New(rumregistry.New(), st)).Sessions(ctx, "", "", 0, now)
+	_, err = (query.New(rumregistry.New(), st)).Sessions(ctx, "", "", 0, now, "")
 	assert.ErrorIs(t, err, context.Canceled)
 }

@@ -36,7 +36,8 @@ func BenchmarkSyntheticRuns(b *testing.B) {
 	const start = int64(1700000000000000)
 	for i := 0; i < runCount; i++ {
 		run := synthetic.Run{
-			ID: fmt.Sprintf("run-%08d", i), JobID: "journey:benchmark", Kind: synthetic.Journey,
+			VnodeGUID: "11111111-1111-4111-8111-111111111111",
+			ID:        fmt.Sprintf("run-%08d", i), JobID: "journey:benchmark", Kind: synthetic.Journey,
 			StartedUS: start + int64(i)*60000000, Outcome: synthetic.Unknown,
 		}
 		_, err := store.AppendRun(ctx, "start", run)

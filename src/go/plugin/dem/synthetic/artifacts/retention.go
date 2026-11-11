@@ -110,7 +110,7 @@ func (s *Store) retryCleanup(ctx context.Context) error {
 			result = errors.Join(result, fmt.Errorf("unrecognized drainage entry %q", id))
 			continue
 		}
-		if s.active[id] != "" || s.uncertain[id] {
+		if s.active[id].JobID != "" || s.uncertain[id] {
 			continue
 		}
 		result = errors.Join(result, s.cleanupDrained(id))
@@ -150,7 +150,7 @@ func (s *Store) finishDeletion(id string) error {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if s.active[id] != "" || s.uncertain[id] {
+	if s.active[id].JobID != "" || s.uncertain[id] {
 		return fmt.Errorf("deleting run has uncertain ownership")
 	}
 	info, err := s.root.Lstat("deleting/" + id)

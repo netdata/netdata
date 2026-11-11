@@ -49,7 +49,7 @@ func TestRuntimeWithoutInstallURLRetiresAndReplacesEvidence(t *testing.T) {
 			cancel()
 			t.Fatal("runtime did not become ready")
 		}
-		rows, err := query.New(hub, nil).Sites(context.Background())
+		rows, err := query.New(hub, nil).Sites(context.Background(), "")
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		require.NotEmpty(t, rows[0].Generation)

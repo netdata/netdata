@@ -17,7 +17,7 @@ type onboardingSource struct {
 	site query.Site
 }
 
-func (s onboardingSource) Sites(context.Context) ([]query.Site, error) {
+func (s onboardingSource) Sites(context.Context, string) ([]query.Site, error) {
 	return []query.Site{s.site}, nil
 }
 func TestSiteFunctionPublishesIndependentFacts(t *testing.T) {
@@ -37,7 +37,7 @@ func TestSiteFunctionPublishesIndependentFacts(t *testing.T) {
 		}
 		response := functions.New(onboardingSource{
 			site: site,
-		}).HandleRaw(context.Background(), funcapi.RawMethodRequest{
+		}, nil).HandleRaw(context.Background(), funcapi.RawMethodRequest{
 			Method: "rum-sites",
 		}).RawResponse
 		require.NotNil(t, response)

@@ -303,6 +303,22 @@ func (pv PreparedVNode) Abort() error {
 	s.consumed = true
 	return nil
 }
+
+// LookupGUID reads configured identity independently of metadata acquisition or jobs.
+func (vc *VNodeConfiguration) LookupGUID(name string) (string, bool) {
+	if vc == nil {
+		return "", false
+	}
+	vc.mu.Lock()
+	defer vc.mu.Unlock()
+	r, ok := vc.records[name]
+	if !ok {
+		return "", false
+	}
+	guid, err := vnodes.ConfiguredGUIDKey(r.config.IdentityGUID())
+	return guid, err == nil
+}
+
 func (vc *VNodeConfiguration) Lookup(id string) (jobruntime.VnodeSnapshot, bool) {
 	if vc == nil {
 		return jobruntime.VnodeSnapshot{}, false

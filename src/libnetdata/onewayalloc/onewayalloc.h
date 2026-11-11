@@ -30,11 +30,7 @@ size_t onewayalloc_mul3_or_fatal(size_t nmemb1, size_t nmemb2, size_t size, cons
 
 void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size);
 void *onewayalloc_callocz(ONEWAYALLOC *owa, size_t nmemb, size_t size);
-char *onewayalloc_strdupz(ONEWAYALLOC *owa, const char *s);
-void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size);
 void onewayalloc_freez(ONEWAYALLOC *owa, const void *ptr);
-
-void *onewayalloc_doublesize(ONEWAYALLOC *owa, const void *src, size_t oldsize);
 
 size_t onewayalloc_allocated_memory(void);
 

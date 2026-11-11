@@ -121,7 +121,7 @@ DEM splits responsibility between three kinds of owner. Most contracts at the en
 |---|---|---|---|
 | Framework (`plugin/agent`) | The process; jobs come and go | Desired configuration, preflight, scheduling, admission, retries, status and DynCfg | Enabling a site; calling `Collect` every `update_every` |
 | Collector jobs (`collector/*`) | One job run | The runtime objects of that job and the metrics it publishes | The receiver's listener; a site's aggregator |
-| Command (`cmd/demplugin`) | The whole process | Shared stores and services: journal, captures, browser runtime, execution admission slot, retention | The journal survives every job reload |
+| Command (`cmd/demplugin`) | The whole process | Shared stores and services: journal, captures, browser runtime, execution admission, retention | The journal survives every job reload |
 
 Two **registries** connect running jobs to each other and to Functions. `rum/registry` and `synthetic/registry` hold
 only what is actually running (admitted sites, receiver availability, active synthetic jobs). `rum/registry` also leases
@@ -134,8 +134,73 @@ The four collector modules (the journeys below show them in action):
 |---|---|---|---|
 | `receiver` | Single instance (`dem:collector:receiver`) | Listens on `127.0.0.1:19938`, `update_every: 10` | HTTP listener, GeoIP resolver, receiver availability |
 | `rum` | One job per website (`dem:collector:rum:<name>`) | 5-minute measurement `window`, `update_every: 10` | Aggregator, route, diagnostics, history writer, optional exporters |
-| `journey` | One job per journey script (`script` or `script_path`) | Every 900 s, 120 s timeout | Prepared request, registration, metric store |
-| `lighthouse` | One job per audited URL | Every 1800 s, 180 s timeout | Prepared request, registration, metric store |
+| `journey` | One job per journey script (`script` or `script_path`) | Checks every 900 s, 120 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
+| `lighthouse` | One job per audited URL | Checks every 1800 s, 180 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
+
+### Site vnode identity
+
+A DEM site is a configured vnode. RUM, journey and Lighthouse use the standard optional `vnode` reference and
+framework-owned resolved snapshot. The reference is a lookup name, not a public GUID option. Normal framework routing
+places charts on the vnode; charts MUST NOT duplicate that identity in a GUID label. With no reference, metrics stay
+on the collecting Agent and observations are unassigned to a site. A synthetic-only site requires no RUM job.
+
+Keep these identities distinct:
+
+| Identity | Purpose |
+|---|---|
+| Collecting Agent | Function registration, access policy, receiver, executor and retention owner |
+| Native module and job name | Configuration, lifecycle and chart-instance owner |
+| RUM `site` / job name | Beacon route and physical RUM history namespace |
+| Synthetic `kind:name`, run ID | Monitor identity and individual execution/artifact ownership |
+| `vnode` reference | Configured vnode lookup name, independent of physical job identity |
+| Recorded `vnode_guid` | Canonical resolved node identity captured for observations and attempts |
+
+The framework delivers configured vnode snapshots before initialization and on revision changes before collection.
+Long-lived RUM ingestion and synthetic attempt work MUST reconcile those updates with their admission boundaries.
+History queries MUST use captured GUIDs, not current configuration. Session/error reductions retain physical identity
+and recorded GUID so reassignment cannot merge evidence. Saved and buffered investigation records retain their old GUID.
+A changed RUM GUID starts a fresh rolling measurement window and Pages view; metadata-only hostname/label edits do not.
+Transport and history counters remain job-wide. Old evidence lacking a captured GUID remains unassigned, including
+records with legacy `site_id` text: no current-config backfill or speculative migration is performed.
+
+DEM Functions remain process-owned on the collecting Agent with existing public names and Agent-level permissions.
+All six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts` accept either `vnode` or
+`vnode_guid`. The detail Functions `synthetics-run` and `synthetics-artifact` retain their existing parameters.
+Neither selector is an authorization boundary. Omitting both, or supplying only an empty `vnode_guid`, preserves
+all-vnode and unassigned reads. Empty or unknown `vnode` names and requests containing both selectors MUST fail,
+even if either value is empty.
+
+The `vnode` selector is the exact configured resource name used by collector jobs, not the display hostname.
+Resolve it once per request through the framework's read-only current configured-vnode authority, independently of
+active job registries. Lookup MUST work with disabled jobs or no jobs, use an in-memory name-to-canonical-GUID lookup,
+and perform no I/O or job/history scan. Renamed or removed names have no aliases; name reuse resolves only the current
+GUID. Keep `vnode_guid` as the canonical UUID fallback for earlier identities, including after configuration removal.
+Name selection MUST NOT rewrite captured GUIDs or add stored name history.
+
+Apply the resolved GUID filter before row limits and cursor advancement, retaining physical job, session, run and
+capture ownership checks on every evidence read. No Function registration or host-context protocol extension per vnode
+is part of this contract. Retained history remains available with all collector jobs disabled or a vnode archived.
+
+Frontend consumers retain collecting-Agent identity, vnode GUID, module and job name. Desired native configuration
+includes disabled and failed-startup jobs that active registries omit. Guided site setup creates/selects a configured
+vnode through `dem:vnode` or file configuration, then submits independent native job operations with visible outcomes.
+There is no parent configuration, generated child ownership, atomic site save or shared deletion lifecycle. Equal vnode
+references on different Agents do not create deployment or failover authority. File definitions use the standard
+Netdata configuration directory's `vnodes/` YAML format; DEM supports static configured vnodes.
+
+### Capacity remains process-owned
+
+Journey and Lighthouse share the process Executor and configured browser concurrency. Vnode association MUST NOT
+allocate a separate executor or browser pool. Scheduling is fair between ready jobs; vnode placement does not define quotas.
+Native `Run` owns due times and a bounded pending occurrence, while `Collect` publishes scalar latest observations. This avoids
+losing due occurrences when framework publication ticks are skipped. Retirement cancels and joins the session before
+native predecessor release; a replacement cannot inherit its pending work or completed observation.
+
+Warm browser reuse additionally needs explicit worker lifetime, runtime leases, per-attempt cancellation and browser
+state cleanup. A live shared worker cannot be considered reaped after each attempt. Preserve verified completion at the
+appropriate boundary and qualify Playwright and Lighthouse separately. The current fail-stop on unverified process
+drainage also stops RUM; independent jobs do not provide process isolation. These are separate execution changes that
+need measurement and validation, not promises made by vnode placement.
 
 ## Journey 1: a browser report
 
@@ -224,8 +289,8 @@ Each site job builds its own objects; nothing is shared between sites:
 
 ## Journey 2: a synthetic run
 
-Journey and Lighthouse jobs do not listen for anything. The framework calls `Collect` on their schedule, and each call
-executes one complete browser run:
+Journey and Lighthouse jobs own background monitor sessions in `Run`. Each session schedules browser attempts using
+`check_every`; framework `Collect` publishes a small latest-observation snapshot every `update_every`:
 
 ```mermaid
 sequenceDiagram
@@ -238,9 +303,9 @@ sequenceDiagram
     participant Art as synthetic/artifacts
     participant J as journal
 
-    FW->>Job: Collect
-    Job->>Eng: Execute(request)
-    Note over Eng: state "waiting":<br/>one plugin-wide admission slot
+    Job->>Job: Run: occurrence becomes due
+    Job->>Eng: ExecuteScheduled(request)
+    Note over Eng: state "waiting":<br/>shared configured admission slots
     Eng->>RT: BeginUse (execution pin)
     Eng->>J: start record
     Eng->>Art: Begin (private work directory)
@@ -251,13 +316,17 @@ sequenceDiagram
     Eng->>Art: Finalize captures
     Eng->>J: completion record
     Eng-->>Job: Execution(run, drained)
-    Job->>Job: registry.Complete, write metrics
+    Job->>Job: count admitted outcome; publish only if association epoch matches
+    FW->>Job: Collect (independent publication cadence)
+    Job->>Job: write latest snapshot and cumulative counters
 ```
 
 Key points of this path:
 
-- **One run at a time.** A single plugin-wide admission slot serializes expensive browser runs. Waiting time is
-  separate from execution time, and cancellation while waiting starts no browser.
+- **Shared admission.** `browser.concurrency` bounds active attempts across monitoring, rehearsals and in-process
+  qualification, defaulting to one. Ready jobs take turns; one logical job cannot run overlapping attempts. Waiting
+  time is separate from execution time, and cancellation while waiting starts no browser. Qualification uses a
+  separate internal identity, so a user job name cannot collide with it.
 - **A fresh browser per run.** Runs share no browser state.
 - **Installation is explicit.** An administrator installs and qualifies a complete runtime, or supplies a sealed
   preload. The process acquires its release at startup; each run pins that already prepared release for its duration.
@@ -274,7 +343,7 @@ How a run can end:
 | Skipped, expected-failure, empty or incomplete suite | `inconclusive` | Start and completion | None |
 | The overall deadline passes | `timeout` | Start and completion | None |
 | The run is cancelled | `cancelled` | None when cancelled while waiting | None |
-| The monitor cannot load or run | `error`, still counted in metrics and the registry | None when it fails before the runtime is pinned and checked | None |
+| An admitted monitor cannot load or run | `error`, still counted in metrics and the registry | Start and completion, including preparation failures | None |
 | Process-tree completion cannot be verified | No outcome published | A saved start record stays `unknown` | Admission is poisoned and the plugin fail-stops |
 
 The README defines the full outcome semantics.
@@ -369,8 +438,8 @@ flowchart TD
 
 - The journal opens first, and the configured history budget applies before any producer can append.
 - The browser runtime is either a managed host holding the installed startup selection or an administrator preload.
-  The host maintains storage but never downloads or changes its selection. The runner holds the single plugin-wide
-  admission slot.
+  The host maintains storage but never downloads or changes its selection. The runner owns the shared configured
+  admission allowance.
 - Unusable retained history stops the plugin at startup, before any Function registers.
 - An initial capture cleanup failure does not stop startup; the retention worker retries it.
 - Browser runtime setup problems (missing installation, unsupported platform, bad preload) never stop startup. Synthetic
@@ -662,8 +731,8 @@ Report identity and replay suppression:
   for every measurement: Faro groups by metadata, so per-item metadata would destroy default batching.
 - Explicit document/view/session lifecycle events and performance entries receive identities before transport;
   retries preserve identical IDs/revisions.
-- Identity evidence lasts at most 30 minutes, subject to capacity and restart. The SDK has no finite maximum delivery
-  delay, so this is best-effort replay suppression.
+- Identity evidence lasts 30 minutes unless the site job restarts, is replaced, or changes its vnode association.
+  The SDK has no finite maximum delivery delay, so this is best-effort replay suppression.
 - Unidentified errors, logs, spans and ordinary custom events have no replay suppression.
 
 Vital attribution:
@@ -715,14 +784,21 @@ OTLP export:
 What `rum/aggregate` stores:
 
 - One canonical latest observation per `(experience, vital)`.
-- Separate bounded activation, view/resource identity, activity and observed-session records.
-- Resource observations and replay evidence have separate retention from document/vital activity, so resource
-  pressure cannot invalidate unrelated measurements.
+- Separate time-retained activation, view/resource identity, activity and observed-session records.
+- Resource observations and replay evidence have separate retention from document/vital activity.
+- Canonical measurements remain exact for the configured receipt window (five minutes by default); replay evidence
+  retains its 30-minute identity horizon. No independent aggregate count/byte cap or approximation applies.
+- Restarting or replacing the site job, or changing its vnode GUID, resets canonical measurements and replay evidence.
+  Retained investigation evidence keeps its original vnode GUID.
 - Measurement retention is independent of the investigation-session LRU and the live ring.
 
 How reads derive results:
 
 - Facet distributions and top-N complements derive from canonical populations at read time.
+- Each read captures owned values/counts and matching configuration under the site mutex, then releases it before
+  percentile sorting, ranking and result construction. Sorting consumes those private arrays without another copy.
+- Resource API eligibility is classified once on admission using the same first-party decision as resource counters;
+  reads reuse that immutable classification.
 - Host/error grouping is bounded by those retained observations and folded only after ranking.
 - Pages reads expose all retained page groups rather than chart top-N only.
 
@@ -731,18 +807,22 @@ Cost:
 | Operation | Cost |
 |---|---|
 | Receipt-ordered retention | O(log retained) per changed entry, without scanning retained measurements during ingestion |
-| Snapshots | Scan bounded state and sort populations for percentiles and ranking |
+| Snapshots | Scan window-retained state and sort populations for percentiles and ranking |
 | Sites summary | Scans only its required activity and session populations |
 
-Capacity loss:
+Retention and resources:
 
-- Capacity loss conservatively invalidates affected results and remains visible until the newest relevant loss
-  expires.
-- This constant-space loss episode may include older loss during continuous overload; it is not an exact window-loss
-  count.
-- The drop counter remains cumulative actual loss.
-- Identity loss is scoped to affected measurements. Resource identity loss still invalidates session completeness,
-  because resource-only reports can renew session activity.
+- Canonical receipt heaps expire elapsed entries during accepted ingestion using Agent time, with work proportional
+  to entries actually expiring. Original receipt timestamps and inclusive window boundaries remain unchanged.
+- Read-side cleanup also expires idle state and retains transport/detail housekeeping. Receiver activity timestamp
+  slices are additionally compacted at most once per minute during ingestion, amortizing diagnostic cleanup when
+  publication is delayed. Ingestion MUST NOT scan retained measurements or the detail-session LRU for each beacon.
+  No background expiry worker is required.
+- Memory is O(admitted distinct state and retained bytes over each horizon), plus detail and query state. Heap/map
+  backing allocations may retain high-water capacity after entries expire. This is not a hard process-memory limit
+  or evidence of a qualified full-scale workload.
+- Investigation-session LRU, event/live rings and history/export queues retain their separate limits and actual loss
+  diagnostics. Invalid measurements and receiver rejections remain independently counted.
 
 ### Metrics and alerts
 
@@ -755,8 +835,8 @@ Instruments:
 
 Publication:
 
-- Collector gauges expose current retained population counts and loss evidence on every eligible collection cycle.
-- Percentile gauges are omitted for empty or incomplete populations.
+- Collector gauges expose exact current retained population counts on every eligible collection cycle.
+- Percentile gauges are omitted for empty populations; measured zero remains valid.
 - Measurement gauges are omitted when collection is zero or ingress is unavailable.
 
 Alerts:
@@ -910,7 +990,23 @@ Job ownership:
 - Journey and Lighthouse each own their prepared request, metric store, product instruments and explicit execution
   flow.
 - They share an executor, pure request validation and the common outcome/duration instrument helper.
-- Framework scheduling owns cadence. The command owns the execution admission slot, artifact store and journal.
+- `synthetic/monitor` owns due times in native `Run`; framework scheduling only refreshes metric snapshots.
+  The command owns shared execution admission, artifact store and journal.
+- A session has one executor call in flight and one latest pending occurrence. A new due replaces the pending
+  occurrence without requeuing a waiting call. Elapsed occurrences are counted arithmetically in constant time.
+  The admission callback consumes the latest due time and preserves the original queue timestamp in the run.
+- Bootstrap is immediately eligible. Recurring cadence starts one interval plus a deterministic JobID phase after
+  activation, then advances at a fixed rate. Delayed bootstrap cannot hide scheduled occurrences.
+- Every admitted, verified completion updates job-activation outcome counters, including obsolete-association results.
+  Only current-association completions update the value-only metric projection. `Collect` copies no reporter events
+  or captures, and repeated snapshots never increment attempt counters. Missing/stale measurements remain gaps;
+  known chart identities disable cycle expiry. The latest outcome becomes `stale` after two check intervals.
+
+Activation checks coalesce only while a contract probe is in flight for the exact runtime source view. Their caller
+deadlines remain independent; the last departing caller cancels and joins physical completion before a replacement
+probe can start. A later check probes again. Running and candidate runtime consumers have separate probe ownership,
+but share the fatal execution owner. Probes stay outside browser-attempt slots to preserve short startup deadlines;
+deployment resource sizing must include them. The concurrency setting does not impose a host-wide or CPU/RAM limit.
 
 Draft rehearsal:
 
@@ -927,8 +1023,19 @@ Draft rehearsal:
 Registration:
 
 - `Run` registers one observation generation before readiness.
-- `Collect` executes through that exact registration and records terminal outcomes.
-- Retirement fences late callbacks without replacing the collector's registration pointer.
+- The monitor session publishes current-association outcomes through that exact registration; `Collect` reads its scalar snapshot.
+- Session owns a monotonic association epoch under its mutex. At execution-queue submission it captures both the
+  prepared request (including vnode GUID) and epoch by value. Later admission may choose a newer pending due time,
+  but MUST NOT replace the captured identity. History and artifacts retain this GUID regardless of reassignment.
+- A GUID change increments the epoch, updates the next request and clears current latest observations, state and
+  success/failure timestamps. Same-GUID hostname/label updates preserve them. Old-epoch state/completion callbacks
+  MUST NOT refill current observations, including A-to-B-to-A transitions. Changes count when delivered by the
+  framework's configured-vnode snapshot; unobserved intermediate config edits are not association transitions.
+- Placement, state and completion callbacks are serialized under Session's mutex, with lock order Session then
+  Registry and no callback reentry. Physical-job scheduled/admitted/coalesced/outcome counters, pending/active state
+  and queue diagnostics continue across reassignment. Obsolete completions still undergo drainage and completion-time
+  checks; fencing current publication MUST NOT hide unsafe execution or delete historical evidence.
+- Retirement cancels and joins the session and executor call before retiring its registration; late callbacks remain fenced.
 
 Failure handling:
 
@@ -1033,7 +1140,7 @@ Protected preloads and shutdown:
 - Summary reduction is O(selected runs) memory and stores no full timelines. SDK snapshots use bounded buffers per
   retained file.
 - Current synthetic registry registrations own copied generation observations and reset to unknown on replacement.
-- Freshness is two native intervals and remains independent of an in-flight attempt. History does not drive current
+- Freshness is two browser check intervals and remains independent of an in-flight attempt. History does not drive current
   incidents.
 
 ### Captures

@@ -5,7 +5,7 @@ import (
 	"math"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 )
 
 type metrics struct {
@@ -27,8 +27,8 @@ func newMetrics(m metrix.SnapshotMeter) metrics {
 		cls:         m.Gauge("cls", metrix.WithFloat(true)),
 	}
 }
-func (m metrics) write(run model.Run) {
-	if v := run.Metrics; v != nil {
+func (m metrics) write(run monitor.Observation) {
+	if v := run.Metrics; run.HasMetrics {
 		observe(m.performance, v.Performance)
 		observe(m.fcp, v.FCPMS)
 		observe(m.lcp, v.LCPMS)
@@ -37,8 +37,8 @@ func (m metrics) write(run model.Run) {
 		observe(m.cls, v.CLS)
 	}
 }
-func observe(gauge metrix.SnapshotGauge, value *float64) {
-	if value != nil && !math.IsNaN(*value) && !math.IsInf(*value, 0) {
-		gauge.Observe(*value)
+func observe(gauge metrix.SnapshotGauge, value monitor.Scalar) {
+	if value.Present && !math.IsNaN(value.Value) && !math.IsInf(value.Value, 0) {
+		gauge.Observe(value.Value)
 	}
 }

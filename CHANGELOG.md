@@ -430,6 +430,23 @@
 - Regenerate integrations docs ([#24640](https://github.com/netdata/netdata/issues/24640))
 - Libnetdata, local-listeners: fix unchecked test wait and zero-total report division ([#24639](https://github.com/netdata/netdata/issues/24639))
 - Netdatacli: add dyncfg-tree; support bundle reads the tree through it ([#24586](https://github.com/netdata/netdata/issues/24586))
+- Contexts: merge collected instance metadata under the context lock ([#24645](https://github.com/netdata/netdata/issues/24645))
+- Sqlite: report why the metadata database failed to initialize ([#24642](https://github.com/netdata/netdata/issues/24642))
+- Missing BSD metrics ([#24617](https://github.com/netdata/netdata/issues/24617))
+- Regenerate integrations docs ([#24657](https://github.com/netdata/netdata/issues/24657))
+- Docs: Add node-to-Room move steps to Spaces and Rooms doc ([#23417](https://github.com/netdata/netdata/issues/23417))
+- Mcp: reject unknown time_group and aggregation in query_metrics ([#24641](https://github.com/netdata/netdata/issues/24641))
+- Fix apps.plugin stat parsing and stale process identity ([#24643](https://github.com/netdata/netdata/issues/24643))
+- Docs: add Netdata AI page to On-Prem docs map and reorder sidebar ([#24667](https://github.com/netdata/netdata/issues/24667))
+- Feat(dem): use configured vnodes for site identity ([#24668](https://github.com/netdata/netdata/issues/24668))
+- Also publish stable releases to preview channel. ([#24583](https://github.com/netdata/netdata/issues/24583))
+- Api: serve only the agent-wide default object from /api/v3/settings ([#24610](https://github.com/netdata/netdata/issues/24610))
+- Feat(dem): add shared browser capacity and independent check scheduling ([#24674](https://github.com/netdata/netdata/issues/24674))
+- Fix(dem): preserve exact RUM populations and reduce snapshot cost ([#24675](https://github.com/netdata/netdata/issues/24675))
+- Libnetdata: remove unused onewayalloc helpers ([#24663](https://github.com/netdata/netdata/issues/24663))
+- Perf(dem): reduce RUM history query allocations ([#24677](https://github.com/netdata/netdata/issues/24677))
+- Contexts: guard metadata reads and retain weights results ([#24654](https://github.com/netdata/netdata/issues/24654))
+- Perf(dem): reduce RUM snapshot CPU and allocations ([#24680](https://github.com/netdata/netdata/issues/24680))
 
 ## [2.12.0] - 2026-09-30
 
