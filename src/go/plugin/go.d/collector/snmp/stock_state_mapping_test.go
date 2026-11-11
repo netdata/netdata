@@ -82,9 +82,8 @@ func TestStockF5PoolMemberSessionStatus_WireTokens(t *testing.T) {
 					assert.Equal(t, "absolute", words[3], "dimension algorithm: %q", line)
 					dims = append(dims, words[1])
 				case "SET":
-					require.Len(t, words, 4, "SET fields must not shift: %q", line)
-					require.Equal(t, "=", words[2], "SET separator: %q", line)
-					sets[words[1]] = words[3]
+					require.Len(t, words, 3, "SET fields must not shift: %q", line)
+					sets[words[1]] = words[2]
 				}
 			}
 
@@ -101,11 +100,14 @@ func TestStockF5PoolMemberSessionStatus_WireTokens(t *testing.T) {
 	}
 }
 
-// splitAgentQuotedWords mirrors quoted_strings_splitter() in
+// splitAgentQuotedWords mirrors quoted_strings_splitter_pluginsd() in
 // src/libnetdata/line_splitter/line_splitter.h, which the Agent uses to parse
-// plugins.d commands, so the test sees the same tokens the Agent does.
+// plugins.d commands, so the test sees the same tokens the Agent does. Like
+// isspace_pluginsd(), it treats '=' as a separator.
 func splitAgentQuotedWords(line string) []string {
-	isSpace := func(c byte) bool { return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f' }
+	isSpace := func(c byte) bool {
+		return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f' || c == '='
+	}
 	s := []byte(line)
 	var words []string
 	var quote byte
