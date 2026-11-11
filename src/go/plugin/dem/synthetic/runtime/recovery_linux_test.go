@@ -119,6 +119,45 @@ func TestRecoveryStatusRetainsDamagedInventory(t *testing.T) {
 	}
 }
 
+func TestStoredMetadataRequiresCurrentExecutionContract(t *testing.T) {
+	for _, contract := range []int{0, 1, ExecutionContract + 1} {
+		for _, record := range []string{"selection", "generation"} {
+			t.Run(fmt.Sprintf("%s/%d", record, contract), func(t *testing.T) {
+				s, _ := testStore(t)
+				manifest := installFixture(t, s, "selected")
+				generationPath := filepath.Join("generations", manifest.Archive.SHA256)
+				metadataPath := "selection.json"
+				var metadata any
+				if record == "selection" {
+					manifest.Contract = contract
+					metadata = selection{Manifest: &manifest}
+				} else {
+					prepared, err := s.loadGeneration(manifest.Archive.SHA256)
+					require.NoError(t, err)
+					prepared.Manifest.Contract = contract
+					metadata = prepared
+					metadataPath = filepath.Join(generationPath, "prepared.json")
+				}
+				require.NoError(t, saveJSON(s.root, metadataPath, metadata))
+				before, err := s.root.ReadFile(metadataPath)
+				require.NoError(t, err)
+				_, err = s.AcquireSelected()
+				require.ErrorIs(t, err, ErrDamaged)
+				_, _, err = s.BeginPublishedEnsure(t.Context(), func(context.Context) (Release, error) {
+					t.Fatal("unsupported stored metadata must block enrollment discovery")
+					return Release{}, nil
+				})
+				require.ErrorIs(t, err, ErrDamaged)
+				require.ErrorIs(t, s.Sweep(), ErrDamaged)
+				after, err := s.root.ReadFile(metadataPath)
+				require.NoError(t, err)
+				require.Equal(t, before, after)
+				require.DirExists(t, filepath.Join(s.path, generationPath))
+			})
+		}
+	}
+}
+
 func TestOpenDoesNotRecreateLostSafetyStructure(t *testing.T) {
 	for _, name := range []string{layoutName, "coordination.lock", "installation.lock", "claims", "uses", "staging", "initializing", "generations", "trash"} {
 		t.Run(name, func(t *testing.T) {

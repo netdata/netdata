@@ -42,17 +42,10 @@ type releaseEnvelope struct {
 
 // Validate checks a published descriptor for use by this Agent.
 func (r Release) Validate() error {
-	if err := r.validateStored(); err != nil {
-		return err
-	}
-	return r.Manifest.requireExecutionContract()
-}
-
-func (r Release) validateStored() error {
 	if r.Format != 1 || r.Sequence == 0 {
 		return errors.New("invalid runtime release format or publication sequence")
 	}
-	if err := r.Manifest.validateStored(); err != nil {
+	if err := r.Manifest.Validate(); err != nil {
 		return err
 	}
 	if r.Manifest.Archive.URL == "" {
@@ -97,19 +90,6 @@ func EncodeRelease(signedPayload, signature []byte) ([]byte, error) {
 
 // VerifyRelease authenticates a descriptor for the current execution contract.
 func VerifyRelease(data []byte, trusted *ReleaseTrust) (Release, error) {
-	result, err := VerifyRetainedRelease(data, trusted)
-	if err != nil {
-		return Release{}, err
-	}
-	if err := result.Manifest.requireExecutionContract(); err != nil {
-		return Release{}, err
-	}
-	return result, nil
-}
-
-// VerifyRetainedRelease authenticates existing publication metadata, including
-// the prior contract needed to guard sequence during a contract upgrade.
-func VerifyRetainedRelease(data []byte, trusted *ReleaseTrust) (Release, error) {
 	var result Release
 	if len(data) > ReleaseEnvelopeLimit {
 		return result, errors.New("runtime release descriptor exceeds protocol size limit")
@@ -127,7 +107,7 @@ func VerifyRetainedRelease(data []byte, trusted *ReleaseTrust) (Release, error) 
 	if err := decodeReleaseJSON(envelope.Payload, &result); err != nil {
 		return Release{}, fmt.Errorf("signed runtime release: %w", err)
 	}
-	if err := result.validateStored(); err != nil {
+	if err := result.Validate(); err != nil {
 		return Release{}, err
 	}
 	return result, nil
@@ -150,7 +130,7 @@ func decodeReleaseJSON(data []byte, target any) error {
 // separate administrator recovery operation. Compare with selected state only;
 // this is not a historical high-water mark or proof of newest availability.
 func ReleaseUpdate(current, next Release) (bool, error) {
-	if err := current.validateStored(); err != nil {
+	if err := current.Validate(); err != nil {
 		return false, fmt.Errorf("installed runtime release: %w", err)
 	}
 	if err := next.Validate(); err != nil {

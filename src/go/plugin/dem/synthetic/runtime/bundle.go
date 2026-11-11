@@ -16,10 +16,6 @@ import (
 // ExecutionContract is the exact contract admitted by this Agent.
 const ExecutionContract = 2
 
-const retainedExecutionContract = 1
-
-var errIncompatibleContract = errors.New("incompatible runtime execution contract")
-
 // Manifest is administrator-trusted release metadata. Archive-supplied metadata
 // is never a trust anchor. Component versions belong to the release, not the Agent.
 type Manifest struct {
@@ -74,31 +70,11 @@ func localName(name string) bool {
 
 // Validate verifies the manifest for preparation or execution by this Agent.
 func (m Manifest) Validate() error {
-	if err := m.validateStored(); err != nil {
-		return err
-	}
-	return m.requireExecutionContract()
-}
-
-func (m Manifest) requireExecutionContract() error {
-	switch m.Contract {
-	case ExecutionContract:
-		return nil
-	case retainedExecutionContract:
-		return fmt.Errorf("%w %d (Agent requires %d)", errIncompatibleContract, m.Contract, ExecutionContract)
-	default:
-		return fmt.Errorf("unsupported runtime execution contract %d (Agent requires %d); upgrade the Agent or select a compatible runtime release", m.Contract, ExecutionContract)
-	}
-}
-
-// validateStored recognizes the prior execution contract for inventory and
-// ownership reconciliation during upgrades.
-func (m Manifest) validateStored() error {
 	if m.Format != 1 || m.Version == "" || (m.Platform != "linux/amd64" && m.Platform != "linux/arm64") || !validID(m.Archive.SHA256) {
 		return errors.New("invalid runtime identity or platform")
 	}
-	if m.Contract != retainedExecutionContract && m.Contract != ExecutionContract {
-		return m.requireExecutionContract()
+	if m.Contract != ExecutionContract {
+		return fmt.Errorf("unsupported runtime execution contract %d (Agent requires %d)", m.Contract, ExecutionContract)
 	}
 	a := m.Archive
 	if a.Bytes <= 0 || a.TarBytes <= 0 || a.ExpandedBytes <= 0 || a.ExpandedBytes > a.TarBytes || a.Entries <= 0 || a.Bytes == math.MaxInt64 || a.TarBytes == math.MaxInt64 {

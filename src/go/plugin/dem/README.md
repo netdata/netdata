@@ -631,10 +631,9 @@ acquired at startup. A process started without a runtime stays unavailable until
 update their components without an Agent upgrade while preserving execution contract 2. Runs record the actual
 release version, archive digest and execution contract for investigation.
 
-This Agent requires runtime execution contract 2. A previous contract-1 installation remains inspectable and retains
-its ownership records, but cannot execute checks with this Agent. Prepare a compatible signed release using the
-explicit install/update path, upgrade the native runtime package, or prepare a new protected preload as appropriate,
-then restart the Agent. Ordinary enrollment does not silently upgrade an existing incompatible selection.
+This Agent requires runtime execution contract 2. Migration from older experimental runtime state is unsupported;
+prepare fresh compatible runtime state for testing. Existing consumers must drain before their installation is
+explicitly retired. Incompatible metadata is rejected, not automatically discarded or migrated.
 
 Explicit installation enables automatic preparation by default and prints this policy before proceeding. Use
 `--manual-updates` on install or repair to disable it. The running plugin checks roughly daily with jitter, downloads

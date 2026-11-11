@@ -287,7 +287,7 @@ func TestUnsupportedContractKeepsInstalledSelection(t *testing.T) {
 	candidate, err := s.BeginInstall(context.Background(), unsupported)
 	require.Nil(t, candidate)
 	require.ErrorContains(t, err, "unsupported runtime execution contract 3")
-	require.ErrorContains(t, err, "upgrade the Agent")
+	require.ErrorContains(t, err, "Agent requires 2")
 	status, err := s.Inspect()
 	require.NoError(t, err)
 	require.Equal(t, selected, *status.Selected)

@@ -4,7 +4,6 @@ package runtime
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -81,9 +80,6 @@ func ReadPreload(path string) (Paths, Manifest, error) {
 		return Paths{}, empty, err
 	}
 	if err := record.Manifest.Validate(); err != nil {
-		if errors.Is(err, errIncompatibleContract) {
-			err = fmt.Errorf("%w; prepare and configure a compatible runtime preload, then restart dem.plugin", err)
-		}
 		return Paths{}, empty, err
 	}
 	if record.Path != path || record.Manifest.Platform != "linux/"+goruntime.GOARCH {

@@ -102,13 +102,10 @@ prepared to activate it. Until that restart, the running plugin keeps its curren
 again reuses a valid selection offline and preserves its update policy. An already-selected result by itself
 requires no additional restart.
 
-An Agent that requires a newer execution contract cannot use an older selected
-runtime. Kickstart's repeated enrollment does not replace that selection or
-change its update consent. Use the [explicit runtime update command](/src/go/plugin/dem/README.md#runtime-setup-and-retirement)
-inside the container as its service user to prepare a compatible signed release,
-then restart the container. Native installations instead upgrade the optional
-runtime package; protected preloads need a newly qualified preload. Old ownership
-records remain intact until their consumers and executions have drained.
+The Agent and browser runtime must implement the same execution contract,
+currently 2. Migration from older experimental runtime state is unsupported;
+prepare fresh compatible state for testing. Existing consumers and executions
+must drain before their installation is explicitly retired.
 
 The host command and sandboxed browser jobs were tested on Ubuntu 24.04 amd64 and Debian 13 amd64. Automatic
 AppArmor setup on hosts that restrict unprivileged user namespaces is qualified for Ubuntu 24.04. On hosts

@@ -236,7 +236,7 @@ func loadGeneration(root *os.Root, id string) (generation, error) {
 		}
 		return g, err
 	}
-	if err := g.Manifest.validateStored(); err != nil {
+	if err := g.Manifest.Validate(); err != nil {
 		return g, damagedMetadata(metadata, err)
 	}
 	if g.Manifest.Archive.SHA256 != id || g.LastUsed.IsZero() {

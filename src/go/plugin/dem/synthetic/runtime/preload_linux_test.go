@@ -39,21 +39,6 @@ func TestPreloadedIdentityReadOnlyAndManagedExclusion(t *testing.T) {
 	require.Equal(t, before, after)
 }
 
-func TestReadPreloadRejectsLegacyExecutionContract(t *testing.T) {
-	s, _ := testStore(t)
-	m := importFixture(t, s, "legacy-preload")
-	candidate, err := s.BeginInstall(t.Context(), m)
-	require.NoError(t, err)
-	require.NoError(t, candidate.SealPreload())
-	require.NoError(t, candidate.Close())
-	m.Contract = retainedExecutionContract
-	require.NoError(t, saveJSON(s.root, "preload.json", preloadRecord{Manifest: m, Path: s.path}))
-	paths, _, err := ReadPreload(s.path)
-	require.Empty(t, paths)
-	require.ErrorIs(t, err, errIncompatibleContract)
-	require.ErrorContains(t, err, "prepare and configure a compatible runtime preload")
-}
-
 func TestPreloadCannotMoveOrSealWithUnresolvedExecution(t *testing.T) {
 	s, _ := testStore(t)
 	m := importFixture(t, s, "preloaded")

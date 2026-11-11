@@ -286,7 +286,7 @@ func readNativeControl(config NativeConfig) (nativeControlRecord, error) {
 		if state.Target == nil {
 			return state, errors.New("native gate is missing its target")
 		}
-		if err := state.Target.validateStored(); err != nil {
+		if err := state.Target.Validate(); err != nil {
 			return state, err
 		}
 	default:

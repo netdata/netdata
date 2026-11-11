@@ -170,7 +170,7 @@ func (h *Host) Status() Snapshot {
 		if result.Storage.Selected != nil && result.Storage.SelectionError == "" && result.Storage.InventoryError == "" {
 			m := result.Storage.Selected
 			selected := synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}
-			result.RestartRequired = m.Contract == runtime.ExecutionContract && (result.Running == nil || *result.Running != selected)
+			result.RestartRequired = result.Running == nil || *result.Running != selected
 		}
 	}
 	if h.native != nil {

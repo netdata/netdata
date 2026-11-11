@@ -274,7 +274,7 @@ class SignedPublicationTests(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             release.publication(args)
 
-    def test_contract_upgrade_verifies_existing_latest_before_promotion(self):
+    def test_existing_latest_requires_current_contract_and_sequence(self):
         args, _, _ = self.fixture()
         release.stage(args)
         proposed, _ = release.publication(args)
@@ -292,14 +292,15 @@ class SignedPublicationTests(unittest.TestCase):
                                'signature': base64.b64encode(signature).decode()}).encode()
 
         pointer = args.remote + '/dem-runtime/latest/amd64.json'
-        for contract, sequence, error in [(3, 16, subprocess.CalledProcessError), (1, 18, ValueError)]:
+        for contract, sequence, error in [(1, 16, subprocess.CalledProcessError),
+                                          (3, 16, subprocess.CalledProcessError), (2, 18, ValueError)]:
             with self.subTest(contract=contract, sequence=sequence), \
                     patch.object(release, 'read_latest', side_effect={pointer: stored_descriptor('amd64', contract, sequence)}.get), \
                     patch.object(release, 'upload') as upload, self.assertRaises(error):
                 release.publish(args)
             upload.assert_not_called()
 
-        storage = {args.remote + '/dem-runtime/latest/' + arch + '.json': stored_descriptor(arch, 1, 16)
+        storage = {args.remote + '/dem-runtime/latest/' + arch + '.json': stored_descriptor(arch, 2, 16)
                    for arch in release.ARCHITECTURES}
 
         def upload(arguments, path, relative, *, mutable=False):
@@ -308,7 +309,7 @@ class SignedPublicationTests(unittest.TestCase):
         with patch.object(release, 'read_latest', side_effect=storage.get), \
                 patch.object(release, 'upload', side_effect=upload), patch.object(release, 'public_identity'):
             release.publish(args)
-            self.assertTrue(all(item['manifest']['contract'] == 1 for item in release.current_releases(args).values()))
+            self.assertTrue(all(item['manifest']['contract'] == 2 for item in release.current_releases(args).values()))
             release.promote(args)
             self.assertEqual(release.current_releases(args), proposed)
 

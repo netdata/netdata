@@ -188,34 +188,6 @@ func TestVerifyRequiresAuthenticationAndArtifactIntegrity(t *testing.T) {
 	}
 }
 
-func TestVerifyRetainedContractIsOnlyForExistingPublication(t *testing.T) {
-	f := newFixture(t, "arm64")
-	key := pgptest.Key(t, 1)
-	require.NoError(t, os.WriteFile(filepath.Join(f.dir, "public.gpg"), pgptest.Public(t, key), 0600))
-	hash, size, err := hashFile(filepath.Join(f.dir, "sources"))
-	require.NoError(t, err)
-	release := runtime.Release{
-		Format:   1,
-		Sequence: 16,
-		Manifest: f.manifest,
-		Sources:  runtime.ReleaseSource{URL: "https://example.invalid/sources.tar.zst", SHA256: hash, Bytes: size},
-	}
-	release.Manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
-	for _, contract := range []int{1, runtime.ExecutionContract + 1} {
-		release.Manifest.Contract = contract
-		descriptor, err := pgptest.Release(release, key)
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(filepath.Join(f.dir, "release.json"), descriptor, 0600))
-		require.ErrorContains(t, run(f.verifyArgs(), io.Discard), "runtime execution contract")
-		err = run(append(f.verifyArgs(), "--retained"), io.Discard)
-		if contract == 1 {
-			require.NoError(t, err)
-		} else {
-			require.ErrorContains(t, err, "unsupported runtime execution contract")
-		}
-	}
-}
-
 func TestCommandErrors(t *testing.T) {
 	for _, args := range [][]string{nil, {"unknown"}, {"sign"}, {"verify"}, {"sign", "--sequence", "-1"}, {"verify", "extra"}, {"sign", "--unknown"}} {
 		assert.Error(t, run(args, io.Discard))

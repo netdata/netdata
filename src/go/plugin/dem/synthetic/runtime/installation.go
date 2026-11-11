@@ -77,7 +77,7 @@ func (s *Store) readSelectionRecord() (selection, error) {
 		return record, err
 	}
 	if record.Manifest != nil {
-		if err := record.Manifest.validateStored(); err != nil {
+		if err := record.Manifest.Validate(); err != nil {
 			return record, damagedMetadata("selection.json", err)
 		}
 	}
@@ -131,13 +131,6 @@ func (c *Consumer) Close() error {
 	return c.store.closeClaim(c.claim)
 }
 
-func validateManagedSelectionContract(m Manifest) error {
-	if err := m.requireExecutionContract(); err != nil {
-		return fmt.Errorf("%w; run dem.plugin runtime update or dem.plugin runtime install with a compatible signed release, then restart dem.plugin", err)
-	}
-	return nil
-}
-
 func (s *Store) AcquireSelected() (*Consumer, error) {
 	var consumer *Consumer
 	err := s.withLock(func() error {
@@ -147,9 +140,6 @@ func (s *Store) AcquireSelected() (*Consumer, error) {
 		}
 		if m == nil {
 			return ErrUnavailable
-		}
-		if err := validateManagedSelectionContract(*m); err != nil {
-			return err
 		}
 		owner, err := s.claimLocked(m.Archive.SHA256, "process")
 		if err == nil {

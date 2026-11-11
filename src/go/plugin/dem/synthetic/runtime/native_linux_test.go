@@ -286,36 +286,6 @@ func TestNativeAdmissionLifecycle(t *testing.T) {
 	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
 }
 
-func TestNativeLegacyContractAllowsProofInspectionAndReplacement(t *testing.T) {
-	f := newNativeFixture(t)
-	ctx := t.Context()
-	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
-	stop := f.hold(t, "hold", nil)
-	state, err := readNativeControl(f.config)
-	require.NoError(t, err)
-	state.Target.Contract = retainedExecutionContract
-	require.NoError(t, writeNativeControl(f.config, state))
-	legacy, err := json.Marshal(NativePackage{Format: 1, Path: f.config.PayloadPath, Manifest: *state.Target})
-	require.NoError(t, err)
-	metadata := filepath.Join(f.config.PayloadPath, "native.json")
-	require.NoError(t, os.WriteFile(metadata, legacy, 0644))
-
-	status, err := f.inspect(t)(ctx)
-	require.NoError(t, err)
-	require.Equal(t, 1, status.ProcessClaims)
-	data, err := f.command(t, "consume", nil).CombinedOutput()
-	require.Error(t, err, "%s", data)
-	require.Contains(t, string(data), "upgrade the netdata-dem-runtime package")
-	require.ErrorIs(t, f.control.CloseAdmission(ctx, f.inspect(t)), ErrInUse)
-	stop()
-	require.NoError(t, f.control.CloseAdmission(ctx, f.inspect(t)))
-	require.ErrorIs(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")), errIncompatibleContract)
-	current, err := json.Marshal(NativePackage{Format: 1, Path: f.config.PayloadPath, Manifest: f.manifest})
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(metadata, current, 0644))
-	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
-}
-
 func TestNativeFailedQualificationCannotOpenAdmission(t *testing.T) {
 	f := newNativeFixture(t)
 	ctx := context.Background()
