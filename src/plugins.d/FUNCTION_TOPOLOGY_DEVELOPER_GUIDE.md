@@ -1943,8 +1943,9 @@ The existing source-local `id` remains site-qualified and is not a cross-source
 key. Consumers must use the actor type's declared merge tuple, not every column
 marked as identity or merge identity in the shared actor table.
 
-A peer without a remote address, or defensively without an account, is emitted
-as `bgp_peer_observation` with the same label policy, modal and visual appearance,
+Peers with both an empty remote address and an empty remote ASN are skipped.
+Of the remaining peers, one without a remote address or account is emitted as
+`bgp_peer_observation` with the same label policy, modal and visual appearance,
 but no merge identity. It remains source-local under the ordinary identity
 contract. An ASN alone does not identify a router. One warning,
 `cato.bgp_peer_identity_unqualified`, reports incomplete identity without

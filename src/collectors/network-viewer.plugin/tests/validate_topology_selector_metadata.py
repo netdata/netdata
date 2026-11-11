@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""
-Check a built plugin's info metadata without collecting host sockets.
+"""Check a built plugin's info metadata without collecting host sockets."""
 
-Usage: python3 validate_topology_selector_metadata.py /path/to/network-viewer.plugin
-       --run-dir /path/to/an/empty/private/runtime-directory
-Requires the same jsonschema package as validate_topology_payload.py.
-"""
+# Usage: python3 validate_topology_selector_metadata.py /path/to/network-viewer.plugin
+#        --run-dir /path/to/an/empty/private/runtime-directory
+# Requires the same jsonschema package as validate_topology_payload.py.
 
 import argparse
 import json
