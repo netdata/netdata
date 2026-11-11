@@ -12,6 +12,9 @@
 
 #define ND_PDH_PATH_MAX 1024
 
+// Buffer resizes per counter read before the read is reported as failed.
+#define ND_PDH_READ_ATTEMPTS 4
+
 struct nd_pdh_counter {
     PDH_HCOUNTER handle; // NULL when the counter could not be added
     DWORD type;
@@ -179,7 +182,7 @@ ND_PDH_READ_STATUS nd_pdh_query_read(ND_PDH_QUERY *q, size_t counter, nd_pdh_ins
     DWORD items = 0;
     DWORD status;
 
-    for (;;) {
+    for (int attempt = 0;; attempt++) {
         DWORD size = q->buffer_size;
 
         // Until a size is known, pass no buffer: PDH writes 8 bytes into any non-NULL buffer, whatever its size.
@@ -189,11 +192,32 @@ ND_PDH_READ_STATUS nd_pdh_query_read(ND_PDH_QUERY *q, size_t counter, nd_pdh_ins
         if (status == ERROR_SUCCESS)
             break;
 
-        if (status == PDH_MORE_DATA && size > q->buffer_size) {
-            freez(q->buffer);
-            q->buffer = mallocz((size_t)size + ND_PDH_BUFFER_SLACK);
-            q->buffer_size = size;
-            continue;
+        // Instances can appear between calls, so the buffer may need to grow more than once; the bound stops a
+        // provider that never settles.
+        if ((status == PDH_MORE_DATA || status == PDH_INSUFFICIENT_BUFFER) && attempt < ND_PDH_READ_ATTEMPTS) {
+            // The size PDH returns alongside a too-small buffer is not reliable; ask again without a buffer.
+            if (q->buffer_size) {
+                size = 0;
+                DWORD probe_items = 0;
+                status = (DWORD)PdhGetRawCounterArrayW(pc->handle, &size, &probe_items, NULL);
+
+                // Success without a buffer means no instance is left.
+                if (status == ERROR_SUCCESS)
+                    return ND_PDH_READ_NO_DATA;
+            }
+
+            if (status == PDH_MORE_DATA || status == PDH_INSUFFICIENT_BUFFER) {
+                // A size that did not grow would only repeat the failure.
+                if (size <= q->buffer_size)
+                    size = q->buffer_size * 2;
+
+                if (size) {
+                    freez(q->buffer);
+                    q->buffer = mallocz((size_t)size + ND_PDH_BUFFER_SLACK);
+                    q->buffer_size = size;
+                    continue;
+                }
+            }
         }
 
         if (pdh_status_is_no_data(status))

@@ -27,7 +27,9 @@ typedef enum {
 // instance is NULL when the instance name could not be decoded.
 // raw is NULL when PDH has no valid value for this instance in this sample.
 // raw follows the RAW_DATA conventions of Perflib, so the perflib chart helpers can use it.
-typedef void (*nd_pdh_instance_cb)(const char *instance, const RAW_DATA *raw, void *data);
+// The struct tag of RAW_DATA is used because perflib.h may not be parsed yet when libnetdata.h includes this file.
+struct _rawdata;
+typedef void (*nd_pdh_instance_cb)(const char *instance, const struct _rawdata *raw, void *data);
 
 // Adds "\object(*)\counter" by English name for every counter, so instances that appear later are read too.
 // The counters array is referenced, not copied: it must outlive the query.

@@ -816,11 +816,18 @@ static void perflib_check_counter_layout(PERF_DATA_BLOCK *pDataBlock, PERF_OBJEC
        !perflib_key_mark_once(&perflib_layout_spinlock, &perflib_layout_checked, object))
         return;
 
-    struct perflib_counter_span *spans = mallocz(pObjectType->NumCounters * sizeof(*spans));
+    // NumCounters comes from the provider; bound it by the definitions that fit in the definition area.
+    size_t max_counters = pObjectType->DefinitionLength > pObjectType->HeaderLength ?
+        (pObjectType->DefinitionLength - pObjectType->HeaderLength) / sizeof(PERF_COUNTER_DEFINITION) : 0;
+    size_t counters = MIN((size_t)pObjectType->NumCounters, max_counters);
+    if(counters < 2)
+        return;
+
+    struct perflib_counter_span *spans = mallocz(counters * sizeof(*spans));
     size_t used = 0;
 
     PERF_COUNTER_DEFINITION *pCounter = NULL;
-    for(DWORD c = 0; c < pObjectType->NumCounters; c++) {
+    for(size_t c = 0; c < counters; c++) {
         pCounter = getCounterDefinition(pDataBlock, pObjectType, pCounter);
         if(!pCounter)
             break;
