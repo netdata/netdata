@@ -447,6 +447,12 @@
 - Perf(dem): reduce RUM history query allocations ([#24677](https://github.com/netdata/netdata/issues/24677))
 - Contexts: guard metadata reads and retain weights results ([#24654](https://github.com/netdata/netdata/issues/24654))
 - Perf(dem): reduce RUM snapshot CPU and allocations ([#24680](https://github.com/netdata/netdata/issues/24680))
+- Packaging/windows: ship OpenSSL 4 and check bundled MSYS DLL imports ([#24671](https://github.com/netdata/netdata/issues/24671))
+- Api: reject unknown bearer_protection values instead of disabling protection ([#24664](https://github.com/netdata/netdata/issues/24664))
+- Web/network-viewer: fix GCC warnings and topology actor ID sizing ([#24670](https://github.com/netdata/netdata/issues/24670))
+- Rust: clear RustSec advisories in src/crates and scan for new ones ([#24686](https://github.com/netdata/netdata/issues/24686))
+- Fix(packaging): fail the static OpenSSL build when threads are disabled ([#24687](https://github.com/netdata/netdata/issues/24687))
+- Build(deps): bump bundled OpenSSL, curl and libucontext in static builds ([#24685](https://github.com/netdata/netdata/issues/24685))
 
 ## [2.12.0] - 2026-09-30
 

@@ -1,0 +1,51 @@
+---
+# RustSec advisory scan of src/crates/Cargo.lock: daily, and on PRs that change Cargo manifests or this check.
+name: Rust Advisories
+on:
+  schedule:
+    - cron: '30 5 * * *'
+  pull_request:
+    paths:
+      - 'src/crates/Cargo.lock'
+      - 'src/crates/**/Cargo.toml'
+      - '!src/crates/jf/**' # Separate workspace with its own lockfile; out of scope.
+      - '.github/cargo/deny.toml'
+      - '.github/workflows/rust-advisories.yml'
+  workflow_dispatch: null
+concurrency:
+  group: rust-advisories-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  cargo-deny:
+    name: RustSec advisories
+    runs-on: ubuntu-latest
+    if: github.repository == 'netdata/netdata'
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install cargo-deny
+        id: install
+        run: cargo install --locked cargo-deny --version 0.20.2
+      - name: Check advisories # Policy and vetted exceptions live in .github/cargo/deny.toml.
+        id: check
+        run: cargo deny --locked --manifest-path src/crates/Cargo.toml --config .github/cargo/deny.toml check advisories
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Rust advisory scan failed:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: cargo-deny found RustSec advisories in src/crates (or could not run).
+              Checkout: ${{ steps.checkout.outcome }}
+              Install cargo-deny: ${{ steps.install.outcome }}
+              Check advisories: ${{ steps.check.outcome }}
+              Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: failure() && github.event_name != 'pull_request' # PR authors see the failed check instead.

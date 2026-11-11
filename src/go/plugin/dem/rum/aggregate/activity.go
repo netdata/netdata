@@ -21,7 +21,7 @@ func (a *Aggregator) Activity() SiteActivity {
 	st.expire(now)
 	var documents, views, errors uint64
 	for _, el := range st.activity.entries {
-		v := el.Value.(*activityObservation)
+		v := &el.Value
 		documents += v.documents
 		views += v.views
 		errors += v.errors

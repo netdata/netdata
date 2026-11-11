@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Test executables. None is installed or registered with CTest - the project
 # defines no add_test() - but they are NOT all orphans: the topology container
-# tests workflow (.github/workflows/topology-container-tests.yml) builds nine of
+# tests workflow (.github/workflows/topology-container-tests.yml) builds twelve of
 # these targets by name (plus four more that live beside their plugins, in
 # NetdataPluginLocalListeners.cmake and NetdataPluginNetworkViewer.cmake).
 #
@@ -78,6 +78,10 @@ if(OS_LINUX)
             src/collectors/apps.plugin/tests/test_apps_lookup_netipc_lock.c)
     target_link_libraries(apps-lookup-netipc-lock-test libnetdata)
 
+    add_executable(apps-target-lifecycle-test EXCLUDE_FROM_ALL
+            src/collectors/apps.plugin/tests/test_apps_target_lifecycle.c)
+    target_link_libraries(apps-target-lifecycle-test libnetdata)
+
     add_executable(apps-cgroups-lookup-client-abort-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_cgroups_lookup_client_abort.c)
     target_link_libraries(apps-cgroups-lookup-client-abort-test libnetdata)
@@ -97,6 +101,12 @@ if(OS_LINUX)
         target_compile_options(http-auth-bearer-test PRIVATE -ffunction-sections -fdata-sections)
         target_link_options(http-auth-bearer-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
         target_link_libraries(http-auth-bearer-test libnetdata)
+
+        add_executable(api-v2-bearer-protection-test EXCLUDE_FROM_ALL
+                src/web/api/tests/api-v2-bearer-protection-test.c)
+        target_compile_options(api-v2-bearer-protection-test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(api-v2-bearer-protection-test PRIVATE -Wl,--no-export-dynamic -Wl,--gc-sections)
+        target_link_libraries(api-v2-bearer-protection-test libnetdata)
 
         add_executable(api-v3-settings-test EXCLUDE_FROM_ALL
                 src/web/api/tests/api-v3-settings-test.c)

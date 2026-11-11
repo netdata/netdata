@@ -33,7 +33,6 @@ int enable_file_charts = CONFIG_BOOLEAN_AUTO;
 #elif defined(OS_WINDOWS)
 int enable_file_charts = CONFIG_BOOLEAN_YES;
 #endif
-bool obsolete_file_charts = false;
 
 // ----------------------------------------------------------------------------
 // internal counters
@@ -376,6 +375,18 @@ static bool print_tree_and_exit = false;
 int pss_refresh_period = 0; // disabled by default
 #endif
 
+// A whole decimal number in [min, max]: no trailing characters, no overflow.
+static bool parse_option_number(const char *s, long long min, long long max, long long *result) {
+    char *end = NULL;
+    errno = 0;
+    long long v = strtoll(s, &end, 10);
+    if(end == s || *end || errno || v < min || v > max)
+        return false;
+
+    *result = v;
+    return true;
+}
+
 static void parse_args(int argc, char **argv)
 {
     int i, freq = 0;
@@ -420,6 +431,36 @@ static void parse_args(int argc, char **argv)
 
         if(strcmp("profile-speed", argv[i]) == 0) {
             profile_speed = true;
+            continue;
+        }
+
+        if(strcmp("retire-targets-after", argv[i]) == 0) {
+            if(argc <= i + 1) {
+                fprintf(stderr, "Parameter 'retire-targets-after' requires a number of seconds as argument.\n");
+                exit(1);
+            }
+            i++;
+            long long seconds;
+            if(!parse_option_number(argv[i], 0, INT_MAX, &seconds)) {
+                fprintf(stderr, "Cannot parse 'retire-targets-after' value '%s': expected a number of seconds.\n", argv[i]);
+                exit(1);
+            }
+            retire_targets_after_s = (time_t)seconds;
+            continue;
+        }
+
+        if(strcmp("max-targets", argv[i]) == 0) {
+            if(argc <= i + 1) {
+                fprintf(stderr, "Parameter 'max-targets' requires a number as argument.\n");
+                exit(1);
+            }
+            i++;
+            long long n;
+            if(!parse_option_number(argv[i], 1, INT_MAX, &n)) {
+                fprintf(stderr, "Cannot parse 'max-targets' value '%s': expected a number of at least 1.\n", argv[i]);
+                exit(1);
+            }
+            max_targets_per_family = (size_t)n;
             continue;
         }
 
@@ -578,6 +619,18 @@ static void parse_args(int argc, char **argv)
 #endif
                     " with-detailed-uptime   enable reporting min/avg/max uptime charts\n"
                     "\n"
+                    " retire-targets-after N remove the charts of a process group, user,\n"
+                    "                        user group or service after N seconds\n"
+                    "                        without processes (apps_groups.conf groups\n"
+                    "                        are never removed)\n"
+                    "                        (default is %d seconds, minimum 2 iterations)\n"
+                    "\n"
+                    " max-targets N          the maximum number of process groups, users,\n"
+                    "                        user groups and services, each, that get their\n"
+                    "                        own charts; the rest are aggregated into 'other'\n"
+                    "                        (apps_groups.conf groups are not counted)\n"
+                    "                        (default is %d, minimum 1)\n"
+                    "\n"
 #if defined(OS_LINUX)
                     " fds-cache-secs N       cache the files of processed for N seconds\n"
                     "                        caching is adaptive per file (when a file\n"
@@ -596,6 +649,8 @@ static void parse_args(int argc, char **argv)
                     " version or -v or -V print program version and exit\n"
                     "\n"
                     , NETDATA_VERSION
+                    , RETIRE_TARGETS_AFTER_DEFAULT_S
+                    , MAX_TARGETS_PER_FAMILY_DEFAULT
 #if defined(OS_LINUX)
                     , max_fds_cache_seconds
 #endif
@@ -610,6 +665,10 @@ static void parse_args(int argc, char **argv)
     }
 
     if(freq > 0) update_every = freq;
+
+    // a target is retired only after at least 2 iterations without processes
+    if(retire_targets_after_s < 2 * update_every)
+        retire_targets_after_s = 2 * update_every;
 
     if(read_apps_groups_conf(user_config_dir, "groups")) {
         netdata_log_info("Cannot read process groups configuration file '%s/apps_groups.conf'. Will try '%s/apps_groups.conf'", user_config_dir, stock_config_dir);
@@ -893,6 +952,10 @@ int main(int argc, char **argv) {
             apps_ebpf_accumulate_fd();
 #endif
 
+        // after the processes were aggregated and nothing reads targets until the
+        // next iteration: Functions hold apps_and_stdout_mutex for their whole run
+        apps_targets_retire();
+
         __atomic_add_fetch(&apps_collection_generation, 1, __ATOMIC_RELEASE);
 
         apps_cgroups_lookup_scan_pids();
@@ -923,36 +986,14 @@ int main(int argc, char **argv) {
         send_proc_states_count(dt);
 #endif
 
-        send_charts_updates_to_netdata(apps_groups_root_target, "app", "app_group", "Applications Groups");
-        send_collected_data_to_netdata(apps_groups_root_target, "app", dt);
+        for(size_t fi = 0; fi < TARGET_FAMILY_MAX ; fi++) {
+            struct target_family *f = &target_families[fi];
+            if(!target_family_enabled(f))
+                continue;
 
-#if (PROCESSES_HAVE_UID == 1)
-        if (enable_users_charts) {
-            send_charts_updates_to_netdata(users_root_target, "user", "user", "User");
-            send_collected_data_to_netdata(users_root_target, "user", dt);
+            send_charts_updates_to_netdata(f);
+            send_collected_data_to_netdata(f, dt);
         }
-#endif
-
-#if (PROCESSES_HAVE_GID == 1)
-        if (enable_groups_charts) {
-            send_charts_updates_to_netdata(groups_root_target, "usergroup", "user_group", "User Group");
-            send_collected_data_to_netdata(groups_root_target, "usergroup", dt);
-        }
-#endif
-
-#if (PROCESSES_HAVE_SID == 1)
-        if (enable_users_charts) {
-            send_charts_updates_to_netdata(sids_root_target, "user", "user", "User Processes");
-            send_collected_data_to_netdata(sids_root_target, "user", dt);
-        }
-#endif
-
-#if (PROCESSES_HAVE_SERVICE == 1)
-        if (enable_services_charts) {
-            send_charts_updates_to_netdata(services_root_target, "service", "service", "Windows Service");
-            send_collected_data_to_netdata(services_root_target, "service", dt);
-        }
-#endif
 
         fflush(stdout);
 

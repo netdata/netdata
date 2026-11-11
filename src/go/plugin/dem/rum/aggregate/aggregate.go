@@ -113,32 +113,35 @@ type Aggregator struct {
 
 // Measurement retention is independent of investigation sampling and detail LRU.
 // Canonical populations expire by receipt time, without count-driven eviction.
+// Receipt times live in the retaining receiptEntry. An attributes value is
+// immutable once retained: the items one report creates share it.
 type attributes struct{ browser, device, country, page, version, view string }
 type observationKey struct{ experience, name string }
 type vitalObservation struct {
 	key      observationKey
 	metricID string
 	revision uint64
-	received time.Time
 	value    float64
 	element  string
-	attrs    attributes
+	attrs    *attributes
 }
 type identityKey struct{ kind, experience, item string }
 type identity struct {
 	key      identityKey
+	revision uint64
+}
+
+// vitalIdentity is the replay evidence of one vital: its SDK metric identity
+// and the dimensions frozen when it was first admitted.
+type vitalIdentity struct {
+	key      observationKey
 	metricID string
 	revision uint64
-	received time.Time
-	attrs    attributes
+	attrs    *attributes
 }
-type sessionObservation struct {
-	key, page string
-	received  time.Time
-}
+type sessionObservation struct{ key, page string }
 type activityObservation struct {
-	received                               time.Time
-	attrs                                  attributes
+	attrs                                  *attributes
 	documents, views, errors, frustrations uint64
 	fingerprint, message                   string
 	resource                               *beacon.Resource
@@ -149,17 +152,19 @@ type siteState struct {
 	cfg                                                        SiteCfg
 	window                                                     time.Duration
 	counters                                                   map[string]uint64
-	observations                                               map[observationKey]*receiptEntry
-	observationOrder                                           receiptHeap
-	identities                                                 map[identityKey]*receiptEntry
-	identityOrder                                              receiptHeap
-	activity, resources                                        receiptHeap
-	sessions                                                   map[string]*receiptEntry
-	sessionOrder                                               receiptHeap
-	pageSessions                                               map[string]*receiptEntry
-	pageSessionOrder                                           receiptHeap
-	resourceIdentities                                         map[identityKey]*receiptEntry
-	resourceIdentityOrder                                      receiptHeap
+	observations                                               map[observationKey]*receiptEntry[vitalObservation]
+	observationOrder                                           receiptHeap[vitalObservation]
+	identities                                                 map[identityKey]*receiptEntry[identity]
+	identityOrder                                              receiptHeap[identity]
+	vitalIdentities                                            map[observationKey]*receiptEntry[vitalIdentity]
+	vitalIdentityOrder                                         receiptHeap[vitalIdentity]
+	activity, resources                                        receiptHeap[activityObservation]
+	sessions                                                   map[string]*receiptEntry[sessionObservation]
+	sessionOrder                                               receiptHeap[sessionObservation]
+	pageSessions                                               map[string]*receiptEntry[sessionObservation]
+	pageSessionOrder                                           receiptHeap[sessionObservation]
+	resourceIdentities                                         map[identityKey]*receiptEntry[identity]
+	resourceIdentityOrder                                      receiptHeap[identity]
 	sess                                                       *list.List
 	sessIdx                                                    map[string]*list.Element
 	accepted, rejected, bots                                   []time.Time
@@ -183,11 +188,12 @@ func newSiteState(window time.Duration, cfg SiteCfg) siteState {
 		cfg:                cfg,
 		window:             window,
 		counters:           map[string]uint64{},
-		observations:       map[observationKey]*receiptEntry{},
-		identities:         map[identityKey]*receiptEntry{},
-		sessions:           map[string]*receiptEntry{},
-		pageSessions:       map[string]*receiptEntry{},
-		resourceIdentities: map[identityKey]*receiptEntry{},
+		observations:       map[observationKey]*receiptEntry[vitalObservation]{},
+		identities:         map[identityKey]*receiptEntry[identity]{},
+		vitalIdentities:    map[observationKey]*receiptEntry[vitalIdentity]{},
+		sessions:           map[string]*receiptEntry[sessionObservation]{},
+		pageSessions:       map[string]*receiptEntry[sessionObservation]{},
+		resourceIdentities: map[identityKey]*receiptEntry[identity]{},
 		sess:               list.New(),
 		sessIdx:            map[string]*list.Element{},
 	}

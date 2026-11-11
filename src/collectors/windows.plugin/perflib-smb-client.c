@@ -7,6 +7,10 @@
 #define SMB_CLIENT_NAME_PART_MAX 512
 #define SMB_CLIENT_MAX_DIMENSIONS 3
 
+// A successful query may omit the object for a cycle; remove shares only after this many consecutive misses,
+// matching perflib-iis-extra.c, so a transient omission does not obsolete and recreate every chart.
+#define SMB_CLIENT_OBJECT_MISSING_CYCLES 12
+
 enum smb_client_counter {
     SMBC_READ_BYTES,
     SMBC_WRITE_BYTES,
@@ -406,12 +410,18 @@ static void smb_client_shares_remove(bool all, usec_t now_ut)
 
 static void do_smb_client_shares(PERF_DATA_BLOCK *pDataBlock, int update_every)
 {
+    static size_t missing_object_cycles = 0;
+
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, SMB_CLIENT_OBJECT_NAME);
     if (!pObjectType) {
-        // The query succeeded without the object, so no client shares remain.
-        smb_client_shares_remove(true, 0);
+        // Charts gap while the object is missing; a persistent absence means no client shares remain.
+        if (++missing_object_cycles >= SMB_CLIENT_OBJECT_MISSING_CYCLES) {
+            smb_client_shares_remove(true, 0);
+            missing_object_cycles = 0;
+        }
         return;
     }
+    missing_object_cycles = 0;
 
     usec_t now_ut = now_monotonic_usec();
     bool complete = true;
