@@ -31,7 +31,7 @@ use std::process::Command;
 
 use anyhow::Context;
 use otel_bridge::signals::Signal;
-use otel_job_scheduler::{Scheduler, Usage};
+use otel_job_scheduler::{Job, Limits, Scheduler, Usage};
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -67,7 +67,10 @@ impl IndexBuilds {
 
     fn with_executable(executable: PathBuf) -> Self {
         Self {
-            scheduler: Scheduler::new(MAX_INDEX_BUILDS),
+            scheduler: Scheduler::new(Limits {
+                jobs: MAX_INDEX_BUILDS,
+                memory_percent: 100,
+            }),
             executable,
         }
     }
@@ -98,7 +101,13 @@ impl IndexBuilds {
             sfst_path.display(),
         );
 
-        let finished = match self.scheduler.run(command).await {
+        let job = Job {
+            command,
+            // Not known yet: the limit on the number of builds is the only
+            // one in force.
+            expected_memory: 0,
+        };
+        let finished = match self.scheduler.run(job).await {
             Ok(finished) => finished,
             Err(e) => {
                 let usage = e.usage().map(usage_text).unwrap_or_default();

@@ -1,11 +1,18 @@
-//! Run commands as child processes, a bounded number at once.
+//! Run commands as child processes, as many at once as the limits allow.
 //!
-//! A [`Scheduler`] takes jobs from any number of callers. A job is a command;
-//! the scheduler starts it as a child process when a slot is free, in the
-//! order the jobs were submitted, and gives the caller what the child wrote to
-//! stdout or the way it failed ([`Error`]), with the time the job took
-//! ([`Usage`]). Jobs beyond the limit wait in a queue that has no bound: the
-//! limit is on what runs, not on what waits.
+//! A [`Scheduler`] takes jobs from any number of callers. A [`Job`] is a
+//! command and the memory its child is expected to need. The scheduler starts
+//! the jobs as child processes in the order they were submitted, and gives
+//! each caller what the child wrote to stdout or the way it failed
+//! ([`Error`]), with the time the job took ([`Usage`]).
+//!
+//! Two [`Limits`] decide when the job at the head of the queue starts: a
+//! number of jobs, and a share of the system's free memory that the expected
+//! memory of the running jobs may add up to. The head waits until both allow
+//! it and nothing passes it, so a large job cannot be starved by smaller ones
+//! behind it. One job may always run, whatever its size, so the queue always
+//! moves. The queue itself has no bound: the limits are on what runs, not on
+//! what waits.
 //!
 //! The work runs in processes, not threads, for three reasons. The memory a
 //! job needs goes back to the system when the job ends. A job that fails,
@@ -16,16 +23,49 @@
 //! holds until the child ends. A child that reads end-of-file there knows the
 //! scheduler's process is gone, however it ended, and can exit.
 //!
-//! The crate knows nothing about what the jobs do.
+//! The crate knows nothing about what the jobs do. What it must ask the
+//! system it runs on is in `system`, one implementation per system.
 
-use std::collections::VecDeque;
+mod system;
+
+use std::collections::{HashMap, VecDeque};
 use std::process::{ExitStatus, Stdio};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinSet;
 use tokio::time::Instant;
+
+use system::System;
+
+/// What the jobs of a scheduler may use together.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// How many jobs may run at once.
+    pub jobs: usize,
+    /// The share of the system's free memory, in percent, that the expected
+    /// memory of the running jobs may add up to. Free memory here is what
+    /// would be free if none of the scheduler's jobs ran: what the system
+    /// reports as free when a job is about to start, plus what the running
+    /// children hold at that moment.
+    ///
+    /// On a system where the scheduler cannot read these numbers, only `jobs`
+    /// limits it.
+    pub memory_percent: u8,
+}
+
+/// A job: a command to run as a child process.
+#[derive(Debug)]
+pub struct Job {
+    /// The scheduler sets the child's stdin, stdout and stderr; whatever the
+    /// command says about them is replaced.
+    pub command: std::process::Command,
+    /// The memory the child is expected to need at its peak, in bytes.
+    pub expected_memory: u64,
+}
 
 /// What a job cost in time.
 ///
@@ -88,56 +128,70 @@ impl Error {
 /// A job's result: what its child produced, or how the job failed.
 pub type Result = std::result::Result<Finished, Error>;
 
-/// A job in the queue: the command to run, when it was submitted, and where
-/// its result goes.
-struct Job {
-    command: std::process::Command,
+/// A job in the queue: the job, when it was submitted, and where its
+/// result goes.
+struct Queued {
+    job: Job,
     queued_at: Instant,
     result: oneshot::Sender<Result>,
 }
 
-/// Runs jobs as child processes, at most a fixed number at once.
+/// What the dispatcher knows of a job that runs.
+struct Running {
+    expected_memory: u64,
+    /// The child's process id; 0 until the child is started.
+    pid: Arc<AtomicU32>,
+}
+
+/// Runs jobs as child processes, as many at once as its [`Limits`] allow.
 ///
 /// Cheap to clone; every clone submits to the same queue. When the last
 /// clone is dropped the scheduler stops: jobs still waiting never start and
 /// the running children are killed.
 #[derive(Clone)]
 pub struct Scheduler {
-    queue: mpsc::UnboundedSender<Job>,
+    queue: mpsc::UnboundedSender<Queued>,
 }
 
 impl Scheduler {
-    /// A scheduler that runs at most `limit` jobs at once.
+    /// A scheduler whose jobs stay within `limits`.
     ///
     /// Must be called within a tokio runtime: the scheduler's dispatcher is a
     /// task on it.
     ///
     /// # Panics
     ///
-    /// If `limit` is zero: no job could ever start.
-    pub fn new(limit: usize) -> Self {
-        assert!(limit > 0, "a scheduler needs room for at least one job");
+    /// If `limits.jobs` is zero: no job could ever start.
+    pub fn new(limits: Limits) -> Self {
+        Self::on(limits, system::Host)
+    }
+
+    /// A scheduler that asks `system` for the memory numbers.
+    fn on(limits: Limits, system: impl System) -> Self {
+        assert!(
+            limits.jobs > 0,
+            "a scheduler needs room for at least one job"
+        );
 
         let (queue, jobs) = mpsc::unbounded_channel();
-        tokio::spawn(dispatch(limit, jobs));
+        tokio::spawn(dispatch(limits, system, jobs));
 
         Self { queue }
     }
 
-    /// Run `command` as a job and wait for its result.
+    /// Run `job` and wait for its result.
     ///
     /// The job takes its place in the queue when this is called, not when the
-    /// returned future is first polled. The scheduler sets the child's stdin,
-    /// stdout and stderr; whatever `command` says about them is replaced.
+    /// returned future is first polled.
     ///
     /// Dropping the returned future abandons the job: it never starts if it
     /// is still waiting, and its child is killed if it runs.
-    pub fn run(&self, command: std::process::Command) -> impl Future<Output = Result> + use<> {
+    pub fn run(&self, job: Job) -> impl Future<Output = Result> + use<> {
         let (result, finished) = oneshot::channel();
         // A send fails only when the dispatcher is gone; `finished` then
         // reports it, because the job's sender is dropped with the job.
-        let _ = self.queue.send(Job {
-            command,
+        let _ = self.queue.send(Queued {
+            job,
             queued_at: Instant::now(),
             result,
         });
@@ -146,54 +200,114 @@ impl Scheduler {
     }
 }
 
-/// The scheduler's dispatcher: queue the submitted jobs and start them in
-/// order while fewer than `limit` run. Ends when every [`Scheduler`] is gone;
+/// The scheduler's dispatcher: queue the submitted jobs and start the one at
+/// the head while the limits allow it. Ends when every [`Scheduler`] is gone;
 /// dropping `waiting` and `running` then fails the jobs that have not
 /// finished, and aborting the running ones kills their children.
-async fn dispatch(limit: usize, mut jobs: mpsc::UnboundedReceiver<Job>) {
+async fn dispatch(limits: Limits, system: impl System, mut jobs: mpsc::UnboundedReceiver<Queued>) {
     let mut waiting = VecDeque::new();
     let mut running = JoinSet::new();
+    let mut running_jobs = HashMap::new();
 
     loop {
-        while running.len() < limit
-            && let Some(job) = waiting.pop_front()
+        while let Some(next) = waiting.front()
+            && admits(limits, &system, &running_jobs, next)
+            && let Some(queued) = waiting.pop_front()
         {
-            running.spawn(run_job(job));
+            let job = Running {
+                expected_memory: queued.job.expected_memory,
+                pid: Arc::default(),
+            };
+            let task = running.spawn(run_job(queued, Arc::clone(&job.pid)));
+            running_jobs.insert(task.id(), job);
         }
 
         tokio::select! {
-            job = jobs.recv() => match job {
-                Some(job) => waiting.push_back(job),
+            queued = jobs.recv() => match queued {
+                Some(queued) => waiting.push_back(queued),
                 None => break,
             },
-            Some(_) = running.join_next() => {}
+            Some(ended) = running.join_next_with_id() => {
+                let task = match ended {
+                    Ok((task, ())) => task,
+                    Err(e) => e.id(),
+                };
+                running_jobs.remove(&task);
+            }
         }
     }
+}
+
+/// Whether the job at the head of the queue may start now.
+fn admits(
+    limits: Limits,
+    system: &impl System,
+    running: &HashMap<tokio::task::Id, Running>,
+    next: &Queued,
+) -> bool {
+    // One job may always run: the queue must move, even past a job that
+    // expects more than the whole budget.
+    if running.is_empty() {
+        return true;
+    }
+    if running.len() >= limits.jobs {
+        return false;
+    }
+
+    // What is free now does not hold what the running children took: give
+    // it back to see what would be free without them.
+    let Some(free_now) = system.free_memory() else {
+        return true;
+    };
+    let held: u64 = running
+        .values()
+        .filter_map(|job| match job.pid.load(Ordering::Relaxed) {
+            0 => None,
+            pid => system.resident_memory(pid),
+        })
+        .sum();
+    let expected: u64 = running.values().map(|job| job.expected_memory).sum();
+
+    fits(
+        limits.memory_percent,
+        free_now.saturating_add(held),
+        expected,
+        next.job.expected_memory,
+    )
+}
+
+/// Whether a job that expects `next` bytes fits beside running jobs that
+/// expect `running` bytes, when they may use `percent` of `free` bytes.
+fn fits(percent: u8, free: u64, running: u64, next: u64) -> bool {
+    let budget = u128::from(free) * u128::from(percent) / 100;
+
+    u128::from(running) + u128::from(next) <= budget
 }
 
 /// Run one job to its end and send its result, unless the caller stopped
 /// waiting: then the job is abandoned. One that has not started never does,
 /// and one that runs has its child killed.
-async fn run_job(job: Job) {
-    let Job {
-        command,
+async fn run_job(queued: Queued, pid: Arc<AtomicU32>) {
+    let Queued {
+        job,
         queued_at,
         mut result,
-    } = job;
+    } = queued;
 
     tokio::select! {
         // First, so that an abandoned job's child is never started.
         biased;
         // Leaving `run_child` drops the child, which kills it.
         () = result.closed() => {}
-        finished = run_child(command, queued_at) => {
+        finished = run_child(job.command, queued_at, &pid) => {
             let _ = result.send(finished);
         }
     }
 }
 
-/// Start `command` as a child process and wait for it to end.
-async fn run_child(command: std::process::Command, queued_at: Instant) -> Result {
+/// Start `command` as a child process and wait for it to end. The child's
+/// process id goes to `pid` once it is started.
+async fn run_child(command: std::process::Command, queued_at: Instant, pid: &AtomicU32) -> Result {
     let started_at = Instant::now();
     let mut child = Command::from(command)
         .stdin(Stdio::piped())
@@ -202,6 +316,7 @@ async fn run_child(command: std::process::Command, queued_at: Instant) -> Result
         .kill_on_drop(true)
         .spawn()
         .map_err(Error::Spawn)?;
+    pid.store(child.id().unwrap_or(0), Ordering::Relaxed);
 
     // Taken out of the child so that waiting does not close it: the write end
     // stays open, unwritten, until the child has ended.
@@ -245,11 +360,87 @@ mod tests {
 
     use super::*;
 
-    /// The command `sh -c <script>`.
-    fn sh(script: &str) -> std::process::Command {
+    /// The job `sh -c <script>`, expected to need no memory.
+    fn sh(script: &str) -> Job {
+        sh_expecting(0, script)
+    }
+
+    /// The job `sh -c <script>`, expected to need `expected_memory` bytes.
+    fn sh_expecting(expected_memory: u64, script: &str) -> Job {
         let mut command = std::process::Command::new("/bin/sh");
         command.args(["-c", script]);
-        command
+        Job {
+            command,
+            expected_memory,
+        }
+    }
+
+    /// A job whose command cannot be started.
+    fn unstartable() -> Job {
+        Job {
+            command: std::process::Command::new("/nonexistent/otel-job-scheduler-test"),
+            expected_memory: 0,
+        }
+    }
+
+    /// A scheduler on this host that runs at most `jobs` jobs at once.
+    fn scheduler(jobs: usize) -> Scheduler {
+        Scheduler::new(Limits {
+            jobs,
+            memory_percent: 100,
+        })
+    }
+
+    /// A system with fixed answers: `free` bytes are free, and every running
+    /// child holds `held_by_a_child` bytes.
+    struct FixedSystem {
+        free: Option<u64>,
+        held_by_a_child: u64,
+    }
+
+    impl System for FixedSystem {
+        fn free_memory(&self) -> Option<u64> {
+            self.free
+        }
+
+        fn resident_memory(&self, _pid: u32) -> Option<u64> {
+            Some(self.held_by_a_child)
+        }
+    }
+
+    /// A scheduler of up to 10 jobs that may use three quarters of the free
+    /// memory of `system`.
+    fn scheduler_on(system: FixedSystem) -> Scheduler {
+        let limits = Limits {
+            jobs: 10,
+            memory_percent: 75,
+        };
+        Scheduler::on(limits, system)
+    }
+
+    /// The most jobs that ran at once, from a log of `start` and `end` lines.
+    fn most_at_once(log: &Path) -> i32 {
+        let mut running = 0;
+        let mut most = 0;
+        for line in std::fs::read_to_string(log).unwrap().lines() {
+            match line {
+                "start" => running += 1,
+                "end" => running -= 1,
+                other => panic!("unexpected log line {other:?}"),
+            }
+            most = most.max(running);
+        }
+        most
+    }
+
+    /// A script that logs its start, runs for `seconds`, and logs its end.
+    /// `echo` appends one short line with one write, so the lines of
+    /// different jobs do not mix.
+    fn logged(log: &Path, seconds: &str) -> String {
+        format!(
+            "echo start >> {log}; sleep {seconds}; echo end >> {log}",
+            log = log.display()
+        )
     }
 
     /// Whether process `pid` still runs: it exists and is not a zombie.
@@ -286,7 +477,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_job_returns_what_its_child_wrote_to_stdout() {
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         let finished = scheduler.run(sh("printf answer; echo noise >&2")).await;
 
@@ -295,7 +486,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_failed_child_reports_its_status_and_stderr() {
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         let err = scheduler
             .run(sh("echo partial; echo 'it broke' >&2; exit 3"))
@@ -311,7 +502,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_child_ended_by_a_signal_reports_the_signal() {
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         let err = scheduler.run(sh("kill -KILL $$")).await.unwrap_err();
 
@@ -320,10 +511,8 @@ mod tests {
 
     #[tokio::test]
     async fn a_command_that_cannot_start_reports_the_spawn_error() {
-        let scheduler = Scheduler::new(1);
-        let command = std::process::Command::new("/nonexistent/otel-job-scheduler-test");
-
-        let err = scheduler.run(command).await.unwrap_err();
+        let scheduler = scheduler(1);
+        let err = scheduler.run(unstartable()).await.unwrap_err();
 
         assert!(matches!(err, Error::Spawn(_)), "{err:?}");
         assert!(
@@ -334,40 +523,150 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn at_most_the_limit_runs_at_once() {
+    async fn at_most_the_job_limit_runs_at_once() {
         let dir = tempfile::tempdir().unwrap();
         let log = dir.path().join("log");
-        let scheduler = Scheduler::new(2);
+        let scheduler = scheduler(2);
 
-        // Each job logs its start and its end. `echo` appends one short line
-        // with one write, so the lines of different jobs do not mix.
-        let script = format!(
-            "echo start >> {log}; sleep 0.1; echo end >> {log}",
-            log = log.display()
-        );
-        let jobs: Vec<_> = (0..6).map(|_| scheduler.run(sh(&script))).collect();
+        let jobs: Vec<_> = (0..6)
+            .map(|_| scheduler.run(sh(&logged(&log, "0.1"))))
+            .collect();
         for job in jobs {
             job.await.unwrap();
         }
 
-        let mut running = 0;
-        let mut most = 0;
-        for line in std::fs::read_to_string(&log).unwrap().lines() {
-            match line {
-                "start" => running += 1,
-                "end" => running -= 1,
-                other => panic!("unexpected log line {other:?}"),
-            }
-            most = most.max(running);
+        assert_eq!(most_at_once(&log), 2);
+    }
+
+    #[test]
+    fn a_job_fits_while_the_expected_memory_stays_within_the_share() {
+        // Three quarters of 1,000 bytes: 750.
+        assert!(fits(75, 1_000, 300, 450));
+        assert!(!fits(75, 1_000, 300, 451));
+        assert!(fits(75, 1_000, 0, 750));
+        assert!(!fits(75, 1_000, 750, 1));
+        assert!(fits(100, 1_000, 400, 600));
+        assert!(!fits(0, 1_000, 0, 1));
+        // No overflow at the ends of the range.
+        assert!(!fits(100, u64::MAX, u64::MAX, 1));
+        assert!(fits(100, u64::MAX, u64::MAX, 0));
+    }
+
+    #[tokio::test]
+    async fn the_expected_memory_of_the_running_jobs_stays_within_the_budget() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("log");
+        // The budget is 750: two jobs that expect 300 fit, a third does not.
+        let scheduler = scheduler_on(FixedSystem {
+            free: Some(1_000),
+            held_by_a_child: 0,
+        });
+
+        let jobs: Vec<_> = (0..6)
+            .map(|_| scheduler.run(sh_expecting(300, &logged(&log, "0.1"))))
+            .collect();
+        for job in jobs {
+            job.await.unwrap();
         }
-        assert_eq!(most, 2);
+
+        assert_eq!(most_at_once(&log), 2);
+    }
+
+    #[tokio::test]
+    async fn what_the_running_children_hold_counts_as_free() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("log");
+        // Every running child gives 100 back to "free": the budget is 825
+        // beside one child, 900 beside two, 975 beside three. So a third job
+        // that expects 300 fits (900), and a fourth (1,200) does not.
+        let scheduler = scheduler_on(FixedSystem {
+            free: Some(1_000),
+            held_by_a_child: 100,
+        });
+
+        let mut jobs = Vec::new();
+        for _ in 0..4 {
+            jobs.push(scheduler.run(sh_expecting(300, &logged(&log, "0.5"))));
+            // Each job arrives when the ones before it have started.
+            tokio::time::sleep(Duration::from_millis(60)).await;
+        }
+        for job in jobs {
+            job.await.unwrap();
+        }
+
+        assert_eq!(most_at_once(&log), 3);
+    }
+
+    #[tokio::test]
+    async fn a_job_that_expects_more_than_the_budget_runs_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("log");
+        let scheduler = scheduler_on(FixedSystem {
+            free: Some(1_000),
+            held_by_a_child: 0,
+        });
+
+        let large = scheduler.run(sh_expecting(5_000, &logged(&log, "0.1")));
+        let small = scheduler.run(sh_expecting(1, &logged(&log, "0.1")));
+        large.await.unwrap();
+        small.await.unwrap();
+
+        assert_eq!(most_at_once(&log), 1);
+    }
+
+    #[tokio::test]
+    async fn nothing_passes_the_job_at_the_head_of_the_queue() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("log");
+        let scheduler = scheduler_on(FixedSystem {
+            free: Some(1_000),
+            held_by_a_child: 0,
+        });
+        let named = |name: &str, seconds: &str| {
+            format!("echo {name} >> {}; sleep {seconds}", log.display())
+        };
+
+        // Beside the first job (300 of 750), the second (700) does not fit
+        // and the third (100) would.
+        let jobs = [
+            scheduler.run(sh_expecting(300, &named("first", "0.2"))),
+            scheduler.run(sh_expecting(700, &named("second", "0"))),
+            scheduler.run(sh_expecting(100, &named("third", "0"))),
+        ];
+        for job in jobs {
+            job.await.unwrap();
+        }
+
+        assert_eq!(
+            std::fs::read_to_string(&log).unwrap(),
+            "first\nsecond\nthird\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn without_memory_numbers_only_the_job_limit_counts() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("log");
+        let scheduler = scheduler_on(FixedSystem {
+            free: None,
+            held_by_a_child: 0,
+        });
+
+        let jobs: Vec<_> = (0..3)
+            .map(|_| scheduler.run(sh_expecting(u64::MAX / 4, &logged(&log, "0.1"))))
+            .collect();
+        for job in jobs {
+            job.await.unwrap();
+        }
+
+        assert_eq!(most_at_once(&log), 3);
     }
 
     #[tokio::test]
     async fn jobs_start_in_the_order_they_were_submitted() {
         let dir = tempfile::tempdir().unwrap();
         let log = dir.path().join("log");
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         // Submitted in order, awaited in reverse: the order of the calls
         // decides, not the order in which the futures are polled.
@@ -385,7 +684,7 @@ mod tests {
     async fn a_running_job_is_killed_when_its_caller_stops_waiting() {
         let dir = tempfile::tempdir().unwrap();
         let pid_file = dir.path().join("pid");
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         let job = scheduler.run(sh(&format!(
             "echo $$ > {}; exec sleep 60",
@@ -408,7 +707,7 @@ mod tests {
     async fn a_waiting_job_never_starts_when_its_caller_stops_waiting() {
         let dir = tempfile::tempdir().unwrap();
         let marker = dir.path().join("started");
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         let first = scheduler.run(sh("sleep 0.1"));
         let abandoned = scheduler.run(sh(&format!("echo yes > {}", marker.display())));
@@ -424,7 +723,7 @@ mod tests {
     async fn running_jobs_are_killed_when_the_scheduler_is_dropped() {
         let dir = tempfile::tempdir().unwrap();
         let pid_file = dir.path().join("pid");
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         let job = scheduler.run(sh(&format!(
             "echo $$ > {}; exec sleep 60",
@@ -440,7 +739,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_child_reads_no_end_of_file_from_stdin_while_it_runs() {
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         // `cat` returns at once on end-of-file; on an open pipe that nobody
         // writes to it waits until `timeout` ends it, with status 124.
@@ -451,7 +750,7 @@ mod tests {
 
     #[tokio::test]
     async fn usage_tells_the_wait_from_the_run() {
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         let first = scheduler.run(sh("sleep 0.3"));
         let second = scheduler.run(sh("true"));
@@ -464,19 +763,14 @@ mod tests {
 
     #[tokio::test]
     async fn a_failed_job_reports_its_usage() {
-        let scheduler = Scheduler::new(1);
+        let scheduler = scheduler(1);
 
         let exited = scheduler.run(sh("sleep 0.15; exit 3")).await.unwrap_err();
         let signaled = scheduler
             .run(sh("sleep 0.15; kill -KILL $$"))
             .await
             .unwrap_err();
-        let unstarted = scheduler
-            .run(std::process::Command::new(
-                "/nonexistent/otel-job-scheduler-test",
-            ))
-            .await
-            .unwrap_err();
+        let unstarted = scheduler.run(unstartable()).await.unwrap_err();
 
         let ran = Duration::from_millis(150);
         assert!(
