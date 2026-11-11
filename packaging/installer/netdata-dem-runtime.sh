@@ -48,11 +48,18 @@ host_hash() {
     case "$host_hash_value" in *[!0-9a-f]*) host_error 'sha256sum returned an invalid digest'; return 1 ;; esac
     printf '%s\n' "$host_hash_value"
 }
+host_untrusted_path() {
+    host_error "untrusted path: $1 (owner UID=${2%%:*}, mode=0${2#*:})"
+    host_error "$3"
+    host_error 'Inspect this path and its parents with namei -l before changing ownership or permissions, then retry.'
+    return 1
+}
 host_root_owned() {
     host_meta=$(stat -c '%u:%a' "$1") || return $?
-    case "$host_meta" in 0:*) ;; *) return 1 ;; esac
     host_mode=${host_meta#*:}
-    [ $((0$host_mode & 022)) -eq 0 ]
+    case "$host_meta" in 0:*) [ $((0$host_mode & 022)) -eq 0 ] && return 0 ;; esac
+    host_untrusted_path "$1" "$host_meta" \
+        'Requires owner UID=0 and no group/other write permission. For a path intended to be root-managed, correct ownership and use chmod go-w on that path only.'
 }
 host_ancestors() {
     host_parent=$1
@@ -91,7 +98,13 @@ host_resolve_executable() {
         host_candidate=${host_resolved%/}/$host_component
         if [ -L "$host_candidate" ]; then
             host_links=$((host_links + 1))
-            [ "$host_links" -le 40 ] && [ "$(stat -c '%u' "$host_candidate")" = 0 ] || return 1
+            [ "$host_links" -le 40 ] || return 1
+            host_link_meta=$(stat -c '%u:%a' "$host_candidate") || return $?
+            case "$host_link_meta" in 0:*) ;; *)
+                host_untrusted_path "$host_candidate" "$host_link_meta" \
+                    'Requires a root-owned symbolic link (UID=0). Have an administrator correct the link ownership or use a root-owned installation.'
+                return 1 ;;
+            esac
             # Preserve trailing controls instead of letting command substitution trim them.
             host_target=$(readlink -n -- "$host_candidate" && printf '.') || return $?
             host_target=${host_target%.}
