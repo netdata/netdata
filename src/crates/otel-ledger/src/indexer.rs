@@ -18,6 +18,10 @@
 //! builds may use most of it; what is left is the room for queries and for
 //! everything else, which this side does not look at.
 //!
+//! Neither limit is a setting. For support, an environment variable replaces
+//! each of them when the ledger starts: [`MAX_BUILDS_VARIABLE`] and
+//! [`MEMORY_PERCENT_VARIABLE`]. They are not documented for users.
+//!
 //! What a build is expected to need is its WAL file's decoded size times a
 //! ratio that each indexer learns from the peaks its children report
 //! ([`ExpectedMemory`]).
@@ -36,6 +40,7 @@
 //! indexes the file again.
 
 use std::collections::VecDeque;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -62,6 +67,76 @@ pub fn max_index_builds() -> usize {
     let cpus = std::thread::available_parallelism().map_or(1, |cpus| cpus.get());
 
     cpus.saturating_sub(1).max(1)
+}
+
+/// The environment variable that replaces [`max_index_builds`]: a whole
+/// number of at least 1. With 1, the builds run one at a time.
+pub const MAX_BUILDS_VARIABLE: &str = "NETDATA_OTEL_INDEX_MAX_BUILDS";
+
+/// The environment variable that replaces [`MEMORY_PERCENT`]: a whole number
+/// from 1 to 100.
+pub const MEMORY_PERCENT_VARIABLE: &str = "NETDATA_OTEL_INDEX_MEMORY_PERCENT";
+
+/// The limits of the index builds: [`max_index_builds`] and
+/// [`MEMORY_PERCENT`], each replaced by the value of its environment variable
+/// when that is set.
+///
+/// A value that is not valid is an error, so that a mistyped value cannot
+/// leave a limit at its usual number unnoticed.
+fn limits_from(
+    max_builds: Option<&OsStr>,
+    memory_percent: Option<&OsStr>,
+) -> anyhow::Result<Limits> {
+    let jobs = match max_builds {
+        Some(value) => {
+            let jobs: usize = whole_number(MAX_BUILDS_VARIABLE, value)?;
+            anyhow::ensure!(
+                jobs >= 1,
+                "invalid value for {MAX_BUILDS_VARIABLE}: '{jobs}': expected at least 1"
+            );
+            tracing::info!(
+                "{MAX_BUILDS_VARIABLE} is set: at most {jobs} index builds run at once, not {}",
+                max_index_builds()
+            );
+            jobs
+        }
+        None => max_index_builds(),
+    };
+
+    let memory_percent = match memory_percent {
+        Some(value) => {
+            let percent: u8 = whole_number(MEMORY_PERCENT_VARIABLE, value)?;
+            anyhow::ensure!(
+                (1..=100).contains(&percent),
+                "invalid value for {MEMORY_PERCENT_VARIABLE}: '{percent}': expected 1 to 100"
+            );
+            tracing::info!(
+                "{MEMORY_PERCENT_VARIABLE} is set: index builds may use {percent}% of the free \
+                 memory, not {MEMORY_PERCENT}%"
+            );
+            percent
+        }
+        None => MEMORY_PERCENT,
+    };
+
+    Ok(Limits {
+        jobs,
+        memory_percent,
+    })
+}
+
+/// The whole number that the environment variable `name` holds as `value`.
+fn whole_number<T>(name: &str, value: &OsStr) -> anyhow::Result<T>
+where
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    let text = value
+        .to_str()
+        .with_context(|| format!("{name} contains invalid UTF-8"))?;
+
+    text.parse()
+        .map_err(|e| anyhow::anyhow!("invalid value for {name}: '{text}': {e}"))
 }
 
 /// The memory an index build is expected to need, learned from the builds of
@@ -138,22 +213,25 @@ pub struct IndexBuilds {
 }
 
 impl IndexBuilds {
-    /// Index builds that run this process's own executable.
+    /// Index builds that run this process's own executable, within the
+    /// limits that the environment leaves or sets ([`MAX_BUILDS_VARIABLE`],
+    /// [`MEMORY_PERCENT_VARIABLE`]).
     ///
     /// Must be called within a tokio runtime (see [`Scheduler::new`]).
     pub fn new() -> anyhow::Result<Self> {
         let executable =
             std::env::current_exe().context("failed to resolve the current executable")?;
+        let limits = limits_from(
+            std::env::var_os(MAX_BUILDS_VARIABLE).as_deref(),
+            std::env::var_os(MEMORY_PERCENT_VARIABLE).as_deref(),
+        )?;
 
-        Ok(Self::with_executable(executable))
+        Ok(Self::with_executable(executable, limits))
     }
 
-    fn with_executable(executable: PathBuf) -> Self {
+    fn with_executable(executable: PathBuf, limits: Limits) -> Self {
         Self {
-            scheduler: Scheduler::new(Limits {
-                jobs: max_index_builds(),
-                memory_percent: MEMORY_PERCENT,
-            }),
+            scheduler: Scheduler::new(limits),
             executable,
         }
     }
@@ -364,7 +442,8 @@ mod tests {
         executable: PathBuf,
         cancel: &CancellationToken,
     ) -> ComponentHandle<IndexerRequest, IndexerResponse> {
-        let index_builds = IndexBuilds::with_executable(executable);
+        let index_builds =
+            IndexBuilds::with_executable(executable, limits_from(None, None).unwrap());
         ComponentHandle::spawn::<Indexer>((Signal::Logs, index_builds), cancel.child_token())
     }
 
@@ -444,6 +523,55 @@ mod tests {
         assert_eq!(max_index_builds(), if cpus > 1 { cpus - 1 } else { 1 });
     }
 
+    #[test]
+    fn each_environment_variable_replaces_its_own_limit() {
+        let usual = Limits {
+            jobs: max_index_builds(),
+            memory_percent: MEMORY_PERCENT,
+        };
+
+        assert_eq!(limits_from(None, None).unwrap(), usual);
+        assert_eq!(
+            limits_from(Some(OsStr::new("1")), None).unwrap(),
+            Limits { jobs: 1, ..usual }
+        );
+        assert_eq!(
+            limits_from(None, Some(OsStr::new("40"))).unwrap(),
+            Limits {
+                memory_percent: 40,
+                ..usual
+            }
+        );
+        assert_eq!(
+            limits_from(Some(OsStr::new("500")), Some(OsStr::new("100"))).unwrap(),
+            Limits {
+                jobs: 500,
+                memory_percent: 100
+            }
+        );
+    }
+
+    #[test]
+    fn an_environment_variable_with_an_invalid_value_is_an_error() {
+        let invalid = ["0", "", "-1", "four", " 4", "4.5"];
+        for value in invalid {
+            let error = limits_from(Some(OsStr::new(value)), None).unwrap_err();
+            assert!(
+                error.to_string().contains(MAX_BUILDS_VARIABLE),
+                "{value:?}: {error}"
+            );
+        }
+
+        let invalid = ["0", "101", "", "-1", "half", "75%"];
+        for value in invalid {
+            let error = limits_from(None, Some(OsStr::new(value))).unwrap_err();
+            assert!(
+                error.to_string().contains(MEMORY_PERCENT_VARIABLE),
+                "{value:?}: {error}"
+            );
+        }
+    }
+
     /// A WAL file under `dir` whose frames decode to `frames` times 1 KiB.
     /// The bytes are not log records: only its headers are ever read.
     fn write_wal(dir: &Path, frames: usize) -> PathBuf {
@@ -493,7 +621,8 @@ mod tests {
         };
         std::fs::write(&answer, indexed.encode().unwrap()).unwrap();
         let executable = fake_executable(dir.path(), &format!("cat {}", answer.display()));
-        let index_builds = IndexBuilds::with_executable(executable);
+        let index_builds =
+            IndexBuilds::with_executable(executable, limits_from(None, None).unwrap());
 
         let size = decoded_size(&wal).await;
         let (response, measured) = index_builds
