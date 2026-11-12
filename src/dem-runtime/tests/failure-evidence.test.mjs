@@ -198,3 +198,17 @@ test('a later error with a matching step never replaces the actual first error',
   const failure = records.find(record => record.record === 'failure').failure;
   assert.equal(failure.message, first.message); assert.deepEqual(failure.path, []);
 });
+
+test('same-source errors in separate branches leave ambiguous ancestry incomplete', () => {
+  const {evidence, records} = fixture(), t = specimen();
+  const actual = {message: 'same assertion', stack: 'same source location'};
+  const first = step('first branch', undefined, 'test.step');
+  step('assertion', first, 'expect', {...actual});
+  const second = step('second branch', undefined, 'test.step', {...actual});
+  step('assertion', second, 'expect', {...actual});
+  evidence.firstFailure(t, result('failed', [actual], [first, second]));
+  const failure = records.find(r => r.record === 'failure').failure;
+  assert.equal(failure.message, actual.message);
+  assert.equal(failure.path_incomplete, true);
+  assert.deepEqual(failure.path, []);
+});

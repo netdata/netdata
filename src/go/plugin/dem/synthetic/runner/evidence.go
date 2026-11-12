@@ -139,21 +139,34 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 	case "test":
 		if data.Test != nil && data.Step == nil && data.Failure == nil && data.Scope == "" && validEvidenceTest(*data.Test) {
 			redactEvidenceTest(data.Test, redact)
+			if data.Test.TextTruncated {
+				e.truncate("text")
+			}
 			valid = e.test(*data.Test)
 		}
 	case "step":
 		if data.Step != nil && data.Test == nil && data.Failure == nil && data.Scope == "" && validEvidenceStep(*data.Step) {
 			redactEvidenceStep(data.Step, redact)
+			if data.Step.TextTruncated {
+				e.truncate("text")
+			}
 			valid = e.step(*data.Step)
 		}
 	case "failure":
 		if data.Failure != nil && data.Test == nil && data.Step == nil && data.Scope == "" && validFailure(*data.Failure) && e.value.FirstFailure == nil {
 			redactEvidenceTest(&data.Failure.Test, redact)
+			data.Failure.TextTruncated = data.Failure.TextTruncated || data.Failure.Test.TextTruncated
 			for i := range data.Failure.Path {
 				redactEvidenceStep(&data.Failure.Path[i], redact)
+				data.Failure.TextTruncated = data.Failure.TextTruncated || data.Failure.Path[i].TextTruncated
 			}
-			data.Failure.Message = redact.text(data.Failure.Message)
-			redactLocation(data.Failure.Location, redact)
+			var clipped bool
+			data.Failure.Message, clipped = evidenceText(data.Failure.Message, 12002, redact)
+			locationClipped := redactLocation(data.Failure.Location, redact)
+			data.Failure.TextTruncated = data.Failure.TextTruncated || clipped || locationClipped
+			if data.Failure.TextTruncated {
+				e.truncate("text")
+			}
 			e.value.FirstFailure = data.Failure
 			valid = true
 		}
@@ -324,9 +337,11 @@ func validFailure(f synthetic.FailureDetail) bool {
 
 // Redaction can expand text; trim after redaction to preserve the feature budget.
 func evidenceText(value string, limit int, redact *textRedactor) (string, bool) {
-	value = redact.text(value)
+	value = redact.redacted(value)
+	clipped := utf8.RuneCountInString(value) > TextLimit
+	value = clip(value)
 	if boundedJSON(value, limit) {
-		return value, false
+		return value, clipped
 	}
 	runes := []rune(value)
 	lo, hi := 0, len(runes)
@@ -347,6 +362,9 @@ func redactLocation(l *synthetic.EvidenceLocation, redact *textRedactor) bool {
 	}
 	var clipped bool
 	l.File, clipped = evidenceText(l.File, 256, redact)
+	if clipped {
+		l.File = "[external]"
+	}
 	return clipped
 }
 

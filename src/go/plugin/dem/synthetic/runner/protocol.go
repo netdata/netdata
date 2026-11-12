@@ -49,13 +49,18 @@ func newRedactor(values map[string]string) *textRedactor {
 	}
 }
 func (r *textRedactor) text(value string) string {
+	return clip(r.redacted(value))
+}
+
+// redacted leaves clipping to typed consumers that must disclose it.
+func (r *textRedactor) redacted(value string) string {
 	value = r.patterns.Apply(r.exact.Replace(value))
 	// An upstream text cap or cancellation may remove a PEM closing marker.
 	// Retain no suffix of an unfinished block just because it no longer matches.
 	if start := strings.Index(strings.ToLower(value), "-----begin "); start >= 0 {
 		value = value[:start] + "[REDACTED]"
 	}
-	return clip(value)
+	return value
 }
 func clip(s string) string {
 	if utf8.RuneCountInString(s) <= TextLimit {

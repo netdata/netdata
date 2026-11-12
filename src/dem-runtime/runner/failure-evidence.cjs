@@ -129,7 +129,7 @@ module.exports = class FailureEvidence {
     if (this.failure || !(result.status === 'timedOut' || result.status === 'failed' && test.expectedStatus !== 'failed' || result.status === 'passed' && test.expectedStatus === 'failed')) return;
     this.failure = true;
     const error = result.errors?.[0];
-    let matched, pathIncomplete = false;
+    let matchedPath = [], ambiguous = false, pathIncomplete = false;
     // Bound temporary ancestry even for arbitrarily deep user-authored steps.
     // Skipping a deeper subtree is explicit; the actual first error survives.
     const cursors = [{steps: result.steps || [], index: 0}];
@@ -137,7 +137,19 @@ module.exports = class FailureEvidence {
       const cursor = cursors.at(-1);
       if (cursor.index === cursor.steps.length) { cursors.pop(); continue; }
       const step = cursor.steps[cursor.index++];
-      if (step.error && error && sameError(step.error, error)) matched = step;
+      if (step.error && error && sameError(step.error, error)) {
+        const candidate = cursors.map(cursor => cursor.steps[cursor.index - 1]);
+        let shared = 0;
+        while (shared < matchedPath.length && shared < candidate.length && matchedPath[shared] === candidate[shared]) shared++;
+        if (!ambiguous && shared === matchedPath.length) matchedPath = candidate;
+        else {
+          // Repeated assertions can share message and stack. Preserve only
+          // common ancestry instead of attributing the error to a caught sibling.
+          matchedPath.length = shared;
+          ambiguous = true;
+          pathIncomplete = true;
+        }
+      }
       if (step.steps?.length) {
         if (cursors.length === 64) pathIncomplete = true;
         else cursors.push({steps: step.steps, index: 0});
@@ -145,6 +157,7 @@ module.exports = class FailureEvidence {
     }
     const first = [], last = [];
     let ancestors = 0;
+    const matched = matchedPath.at(-1);
     for (let step = matched; step; step = step.parent) {
       if (last.length < 8) last.push(step);
       else { first.push(step); if (first.length > 8) first.shift(); }

@@ -285,8 +285,9 @@ expected statuses are `passed`, `failed`, `skipped`. Step states are `running`, 
 `failed`. Location is `{file,line,column}`, with positive source positions, script-relative
 file labels or `[external]`. IDs are opaque generated identity, not titles. Parent links
 and retention order support concurrent sibling steps; they are not a single active stack.
-The first-failure path matches the actual first test error, rather than an earlier caught
-error. Unexpected passes do not invent an error or failed step. Error messages may contain
+The first-failure path matches the actual first test error. When repeated errors share
+message and stack, only their common ancestry is retained and `path_incomplete` is set;
+the runtime does not guess which sibling assertion was caught. Unexpected passes do not invent an error or failed step. Error messages may contain
 the public Playwright call-log excerpt; no private call-log API or raw stack is retained.
 
 ### Feature budgets
@@ -304,6 +305,7 @@ should retain. These are diagnostic quotas, not execution/test limits or journal
   retains up to 16 ancestry nodes (first eight and last eight), exact omitted-ancestor count,
   and a 2000-character error excerpt. First-error search uses at most 64 ancestor cursors;
   deeper unexplored subtrees mark `path_incomplete`, without discarding the error.
+  Ambiguous error matches also mark the retained path incomplete.
 - Optional payloads are at most 32 KiB, far below the unchanged 4 MiB shared frame ceiling.
   At most two records per retained test/step, one first failure and fixed loss/completion
   markers bound ordinary feature emission below 1 MiB and retained typed data below 512 KiB.

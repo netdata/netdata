@@ -505,3 +505,19 @@ test('gated evidence resolves the owned work alias before labelling source locat
   assert.equal(failure.location.file, 'journey.spec.ts');
   assert.ok(failure.path.every(step => !step.location || step.location.file === 'journey.spec.ts'));
 });
+
+test('repeated same-source soft and caught errors do not invent first-failure attribution', async () => {
+  for (const softFirst of [true, false]) {
+    const actual = await run(prefix + `test('ambiguous assertion',async()=>{
+      for(let i=0;i<2;i++) await test.step(i ? 'second branch' : 'first branch',async()=>{
+        const check=(i===0)===${softFirst}?expect.soft:expect;
+        try {check(1).toBe(2)} catch {}
+      });
+    });`, {extensions:['failure_evidence.v1']});
+    assert.equal(actual.result.status, 'failed');
+    const failure = actual.optional.find(r => r.type === 'extension' && r.extension.data.record === 'failure').extension.data.failure;
+    assert.equal(failure.path_incomplete, true);
+    assert.deepEqual(failure.path, []);
+    assert.match(failure.message, /expect/);
+  }
+});

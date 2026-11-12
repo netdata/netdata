@@ -253,3 +253,16 @@ func BenchmarkFailureEvidenceStream(b *testing.B) {
 		})
 	}
 }
+
+func TestEvidenceRedactionExpansionDisclosesAllClipping(t *testing.T) {
+	test := evidenceStart("t1")
+	test.Status, test.ReportingComplete = "failed", true
+	failure := synthetic.FailureDetail{Test: test, Message: strings.Repeat("token=a ", 200) + strings.Repeat("z", 400)}
+	s := newSink(synthetic.Journey, false, newRedactor(nil))
+	require.NoError(t, s.consume(strings.NewReader(evidenceInit+"\n"+evidenceRecord("failure", "failure", failure))))
+	got := s.snapshot().evidence.FirstFailure
+	require.NotNil(t, got)
+	assert.True(t, got.TextTruncated, "pattern redaction expanded the message past its2000-character budget")
+	assert.Contains(t, s.snapshot().evidence.Truncated, "text")
+	assert.NotContains(t, got.Message, "token=a")
+}
