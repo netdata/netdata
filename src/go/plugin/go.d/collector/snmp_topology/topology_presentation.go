@@ -63,10 +63,10 @@ func (g *topologyDeviceGeneration) withRegisteredPresentation(
 			Vendor:          local.Vendor,
 			Model:           local.Model,
 			Labels:          local.Labels,
-			SerialNumber:    &local.SerialNumber,
-			SoftwareVersion: &local.SoftwareVersion,
-			FirmwareVersion: &local.FirmwareVersion,
-			HardwareVersion: &local.HardwareVersion,
+			SerialNumber:    local.SerialNumber,
+			SoftwareVersion: local.SoftwareVersion,
+			FirmwareVersion: local.FirmwareVersion,
+			HardwareVersion: local.HardwareVersion,
 		}
 		observation := topologymodel.WithDevicePresentation(g.observation, next.presentation)
 		next.presentedObservation = &observation
@@ -105,11 +105,7 @@ func projectPresentationLabels(acquired, old, current map[string]string) map[str
 
 func topologyPresentationLogicalBytes(p *topologymodel.DevicePresentation) uint64 {
 	n := uint64(len(p.SysName) + len(p.SysDescr) + len(p.SysContact) + len(p.SysLocation) + len(p.Vendor) + len(p.Model))
-	for _, value := range []*string{p.SerialNumber, p.SoftwareVersion, p.FirmwareVersion, p.HardwareVersion} {
-		if value != nil {
-			n += uint64(len(*value))
-		}
-	}
+	n += uint64(len(p.SerialNumber) + len(p.SoftwareVersion) + len(p.FirmwareVersion) + len(p.HardwareVersion))
 	return n + topologySemanticStringMapBytes(p.Labels)
 }
 

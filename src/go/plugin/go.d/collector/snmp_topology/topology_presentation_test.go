@@ -103,19 +103,6 @@ func TestCollectorRefreshPresentationKeepsDerivedMetadataCoherent(t *testing.T) 
 				replayed, err := archive.Replay(testDiagnosticQuery(options))
 				require.NoError(t, err)
 				require.Equal(t, live.Data, replayed)
-				if want == "1.0" {
-					// Earlier archives carry the six original presentation fields only.
-					// Omission must keep captured derived metadata, rather than clear it.
-					document, err := newTopologyDiagnosticArchiveDocumentV1(captureTopologyCut(coll.topologyRegistry, nil), "v-test")
-					require.NoError(t, err)
-					p := document.Snapshot.Topology.Devices[0].Presentation
-					p.SerialNumber, p.SoftwareVersion, p.FirmwareVersion, p.HardwareVersion = nil, nil, nil, nil
-					oldArchive, err := InspectDiagnosticDocument(document)
-					require.NoError(t, err)
-					oldReplay, err := oldArchive.Replay(testDiagnosticQuery(options))
-					require.NoError(t, err)
-					require.Equal(t, live.Data, oldReplay)
-				}
 			}
 			dev.SysDescr = "release 2"
 			dev.VnodeLabels[tc.alias] = "2.0"

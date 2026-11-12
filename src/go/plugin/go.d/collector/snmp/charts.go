@@ -266,10 +266,8 @@ func (c *Collector) installChart(chart *collectorapi.Chart) *collectorapi.Chart 
 			if chart.HasDim(dim.ID) {
 				continue
 			}
-			if existing.IsRemoved() || dim.IsRemoved() {
-				_ = existing.MarkDimRemove(dim.ID, false)
-			}
-			// A metadata redraw cannot infer schema removal from current samples.
+			// Retain obsolete dimensions until the framework publishes their removal.
+			_ = existing.MarkDimRemove(dim.ID, false)
 			chart.Dims = append(chart.Dims, dim)
 		}
 		*existing = *chart

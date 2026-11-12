@@ -88,10 +88,10 @@ type DevicePresentation struct {
 	SysLocation     string            `json:"sys_location"`
 	Vendor          string            `json:"vendor"`
 	Model           string            `json:"model"`
-	SerialNumber    *string           `json:"serial_number,omitempty"`
-	SoftwareVersion *string           `json:"software_version,omitempty"`
-	FirmwareVersion *string           `json:"firmware_version,omitempty"`
-	HardwareVersion *string           `json:"hardware_version,omitempty"`
+	SerialNumber    string            `json:"serial_number"`
+	SoftwareVersion string            `json:"software_version"`
+	FirmwareVersion string            `json:"firmware_version"`
+	HardwareVersion string            `json:"hardware_version"`
 	Labels          map[string]string `json:"labels,omitempty"`
 }
 

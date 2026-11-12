@@ -52,12 +52,17 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 		}
 
 		state := c.seenScalarMetrics[m.Name]
-		if state == nil || state.metadataVersion != c.chartMetadataVersion {
+		if state == nil || state.chart == nil {
 			state = &metricChartState{
 				metadataVersion: c.chartMetadataVersion,
 				chart:           c.addProfileScalarMetricChart(m),
 			}
 			c.seenScalarMetrics[m.Name] = state
+		} else if state.metadataVersion != c.chartMetadataVersion {
+			labels := make(map[string]string)
+			c.profileMetricLabels(labels, m)
+			updateProfileChartLabels(state.chart, labels)
+			state.metadataVersion = c.chartMetadataVersion
 		}
 
 		if len(m.MultiValue) == 0 {

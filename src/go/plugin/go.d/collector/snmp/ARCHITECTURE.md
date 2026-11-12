@@ -93,10 +93,10 @@ sanitation makes their display labels look the same. Historical table IDs are no
 
 Table charts absent from the current results are retired, preserving the existing ordinary-poll behavior.
 Classified replacement marks all old device charts for removal and clears their seen state; fresh DD results recreate
-active charts. Metadata-only label redraw preserves live dimensions missing from partial observations. Newly observed
-composite dimensions are added, and current-profile dimensions can revive
-pending incumbent removals after replacement. The chart owner indexes live dimensions so steady collection remains
-O(observed values), without scanning all retained charts.
+active charts. Metadata-only refresh updates labels on existing charts and marks them for framework redefinition,
+preserving their dimensions and dimension indexes. Newly observed composite dimensions are added, and current-profile
+dimensions can revive pending incumbent removals after replacement. The chart owner indexes live dimensions so steady
+collection remains O(observed values), without scanning all retained charts.
 
 `collect_snmp.go` owns emission and `normal_diagnostics.go` records the relation to captured samples. Profile authoring
 belongs to the [table metric guide](/src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows).

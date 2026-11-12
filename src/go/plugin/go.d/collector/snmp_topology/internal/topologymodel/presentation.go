@@ -16,10 +16,10 @@ type DevicePresentation struct {
 	SysLocation     string
 	Vendor          string
 	Model           string
-	SerialNumber    *string
-	SoftwareVersion *string
-	FirmwareVersion *string
-	HardwareVersion *string
+	SerialNumber    string
+	SoftwareVersion string
+	FirmwareVersion string
+	HardwareVersion string
 	Labels          map[string]string
 }
 
@@ -37,19 +37,10 @@ func WithDevicePresentation(snapshot ObservationSnapshot, presentation *DevicePr
 	local.Vendor = presentation.Vendor
 	local.Model = presentation.Model
 	local.Labels = presentation.Labels
-	// Older presentation records omit derived fields; keep acquired values then.
-	if presentation.SerialNumber != nil {
-		local.SerialNumber = *presentation.SerialNumber
-	}
-	if presentation.SoftwareVersion != nil {
-		local.SoftwareVersion = *presentation.SoftwareVersion
-	}
-	if presentation.FirmwareVersion != nil {
-		local.FirmwareVersion = *presentation.FirmwareVersion
-	}
-	if presentation.HardwareVersion != nil {
-		local.HardwareVersion = *presentation.HardwareVersion
-	}
+	local.SerialNumber = presentation.SerialNumber
+	local.SoftwareVersion = presentation.SoftwareVersion
+	local.FirmwareVersion = presentation.FirmwareVersion
+	local.HardwareVersion = presentation.HardwareVersion
 	snapshot.L2Observations = slices.Clone(snapshot.L2Observations)
 	for i := range snapshot.L2Observations {
 		observation := &snapshot.L2Observations[i]
