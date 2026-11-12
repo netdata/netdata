@@ -196,9 +196,9 @@ remote_storage:
   Apply with `systemctl daemon-reload && systemctl restart netdata`.
 - Uploads that fail are retried with backoff; while the remote is unreachable, sealed files accumulate locally without
   a ceiling. Monitor free disk on the receiving node.
-- The plugin needs the remote when it starts. It waits and tries again for some minutes. If the remote still does
-  not answer, or gives an error that cannot go away, the plugin stops, and when this happens at the start of the
-  Agent, the Agent does not start the plugin again until the Agent restarts. See
+- The plugin needs the remote when it starts. While the remote does not answer, or answers with an error, the
+  plugin waits and tries again, and it receives no data. When the remote answers again, the plugin completes its
+  start; you do not have to restart the Agent. See
   [Monitor the OpenTelemetry plugin](/docs/opentelemetry/otlp-ingestion.md#monitor-the-opentelemetry-plugin).
 - The Agent never deletes offloaded files, for logs or traces: expire them with the object storage's own lifecycle
   rules, such as an S3 lifecycle expiration rule.

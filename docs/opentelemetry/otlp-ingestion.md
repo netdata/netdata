@@ -216,14 +216,19 @@ The plugin relies on these rules and does not check them:
 - When the plugin starts, it lists all the catalog objects of the location, also those of other Agents that use the
   same location. While it starts, the list uses memory: some hundred MB for one million catalog objects. Expiry
   rules on old catalogs keep this small.
-- With object storage enabled, the plugin needs object storage when it starts. It tries a request again for about 3
-  minutes when the connection fails, and it waits at most 5 minutes for a request that gets no answer. Until then it
-  receives no data and its ports are not open. If object storage still does not answer, the plugin stops. An error
-  that cannot go away (for example, access denied) stops it at once. If this happens when the Agent starts, the Agent
-  does not start the plugin again until the Agent restarts: no metrics, logs or traces are received, and you cannot
-  query logs or traces. The Agent journal has an error from `otel-plugin/ledger` (`journalctl
-  SYSLOG_IDENTIFIER=otel-plugin/ledger`) with `startup catalog LIST` or `startup sync`, and then the Agent's message
-  `haven't collected any data. Disabling it.` Restart the Agent when object storage is reachable.
+- With object storage enabled, the plugin needs object storage when it starts: it lists the catalogs there before
+  it receives data. While object storage does not answer, or answers with an error, the plugin waits and tries
+  again. One attempt can take some minutes, and the next attempt starts 30 seconds after a failed one. During this
+  time the plugin's ports are not open: senders get a refused connection, no metrics, logs or traces are received,
+  and you cannot query logs or traces. When object storage answers again, the plugin completes its start. You do
+  not have to restart the Agent.
+- For each failed attempt, the Agent journal has a warning from `otel-plugin/ledger` (`journalctl
+  SYSLOG_IDENTIFIER=otel-plugin/ledger`) with `startup catalog sync` and the error from object storage. The plugin
+  also tries again after an error that your configuration causes, for example wrong credentials
+  (`PermissionDenied`) or a bucket that does not exist. If the warning shows such an error, correct
+  `remote_storage.uri` or the credentials and restart the Agent. If the warning says `timed out`, one request took
+  longer than `remote_storage.startup_op_timeout` (5 minutes by default): a location with very many catalog objects
+  needs a larger value.
 
 ## Troubleshoot the pipeline
 
