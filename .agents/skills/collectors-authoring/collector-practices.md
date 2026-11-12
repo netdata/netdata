@@ -62,8 +62,8 @@ Mechanisms:
 Rotating V1 selections (a TOP-N set that changes between refreshes):
 
 - Identity: tie chart identity to the source object. Key per-entity state by its identity fields (a struct), not a
-  joined string: `name + "_" + table` keys collide where chart IDs with `_db_`/`_schema_` tokens do not, and evicting
-  on a key mismatch turns that collision into chart loss or churn.
+  joined string: `name + "_" + table` keys collide even where the chart IDs differ (`pk` + `order_items` versus
+  `pk_order` + `items`), and evicting on a key mismatch turns that collision into chart loss or churn.
 - Retirement: keep chart references per selected entity, so retirement is identity-exact and linear in its charts.
 - Re-entry: verify runtime emission and stored Agent rates. `src/go/plugin/framework/jobruntime/job_v1_render.go`
   emits a zero/omitted BEGIN interval for new or previously unmeasured charts, so the Agent measures elapsed time.
