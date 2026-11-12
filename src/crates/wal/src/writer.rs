@@ -261,6 +261,9 @@ impl Stream {
             data.to_vec()
         };
 
+        // `Writer::write_frame` took at most `MAX_FRAME_DATA` bytes of data,
+        // so both lengths are in what the reader accepts and in a `u32`.
+        debug_assert!(compressed.len() <= crate::format::MAX_FRAME_PAYLOAD);
         let payload_len = compressed.len() as u32;
         let uncompressed_len = data.len() as u32;
         // The on-disk `entry_count` field is u32 (frame-header layout) and
@@ -828,6 +831,8 @@ impl Writer {
     /// recorded in each file's header. A `content_meta` larger than
     /// [`MAX_CONTENT_META_BYTES`](crate::format::MAX_CONTENT_META_BYTES) is
     /// rejected — the caller drops the records — rather than truncated.
+    /// So is `data` over [`MAX_FRAME_DATA`](crate::MAX_FRAME_DATA): the
+    /// reader would refuse the frame.
     ///
     /// `meta` carries the frame's record count, the caller's monotonic
     /// ingestion timestamp (stamped into the frame header), and the optional
@@ -848,6 +853,12 @@ impl Writer {
                 content_meta.len(),
                 crate::format::MAX_CONTENT_META_BYTES
             )));
+        }
+        if data.len() > crate::format::MAX_FRAME_DATA {
+            return Err(crate::Error::FrameTooLarge {
+                bytes: data.len(),
+                limit: crate::format::MAX_FRAME_DATA,
+            });
         }
         let written = self
             .get_or_create(partition_key, content_meta)
@@ -1140,6 +1151,37 @@ mod tests {
             identity,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn a_frame_that_the_reader_would_refuse_is_not_written() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        let meta = FrameMeta {
+            entry_count: 1,
+            ingestion_ns: TimestampNs(1),
+            log_ts_range: None,
+        };
+
+        let too_large = vec![0u8; crate::MAX_FRAME_DATA + 1];
+        let refused = writer.write_frame(pk(1), &[], &too_large, meta);
+
+        assert!(matches!(
+            refused,
+            Err(crate::Error::FrameTooLarge { bytes, limit })
+                if bytes == crate::MAX_FRAME_DATA + 1 && limit == crate::MAX_FRAME_DATA
+        ));
+        assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), 0);
+        // Nothing is in doubt: the writer takes the next frame.
+        writer.write_frame(pk(1), &[], b"frame", meta).unwrap();
+    }
+
+    #[test]
+    fn the_largest_frame_that_the_writer_takes_fits_the_reader_when_it_does_not_compress() {
+        assert!(
+            lz4_flex::block::get_maximum_output_size(crate::MAX_FRAME_DATA)
+                <= crate::format::MAX_FRAME_PAYLOAD
+        );
     }
 
     /// A distinct opaque `partition_key` per label — distinct labels give

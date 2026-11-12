@@ -117,6 +117,12 @@ pub use format::HEADER_SIZE;
 /// an attacker-reachable oversized identity drops that one frame instead
 /// of failing the batch.
 pub use format::MAX_CONTENT_META_BYTES;
+/// The largest frame data that [`Writer::write_frame`] takes: it refuses
+/// more, because the reader would refuse the frame and the whole file with
+/// it. A frame keeps some bytes for each record, whatever the record holds,
+/// so a producer of frames from network input MUST check its frame against
+/// this before it writes any frame of the same request.
+pub use format::MAX_FRAME_DATA;
 pub use format::{FileEvent, Message};
 pub use reader::{Frame, FrameBoundary, FrameRange, Reader, decoded_size, scan_frame_boundaries};
 pub use registry::{File, Registry};

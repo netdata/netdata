@@ -54,6 +54,18 @@ pub const HEADER_SIZE: usize = 4096;
 /// corrupt the identity).
 pub const MAX_CONTENT_META_BYTES: usize = 1024;
 
+/// The largest frame payload that the reader accepts, as stored (compressed
+/// or not) and after decompression. The reader refuses a larger one before
+/// it allocates anything, and with it the rest of the file.
+pub(crate) const MAX_FRAME_PAYLOAD: usize = 64 * 1024 * 1024;
+
+/// The largest frame data that the writer takes, before compression. The
+/// writer refuses more, so it never stores a frame that the reader refuses.
+/// It is half of what the reader accepts (`MAX_FRAME_PAYLOAD`): LZ4 makes
+/// data that does not compress a little larger (`lz4_flex` bounds it at 1.1
+/// times), and half leaves that room with a round number.
+pub const MAX_FRAME_DATA: usize = MAX_FRAME_PAYLOAD / 2;
+
 /// Byte offset where the header's `content_meta` blob begins:
 /// `MAGIC(4) + version(2) + flags(2) + created_at(8) + payload_format(2) +
 /// content_meta_len(2)`.

@@ -20,7 +20,8 @@
 //!   `Deserialization` sanity checks.
 //! - Writer-side admission: `Writer::new` and `Writer::write_frame`
 //!   (`writer.rs`) raise `InvalidHeader` for the reserved `payload_format`
-//!   0 and an oversized `content_meta`.
+//!   0 and an oversized `content_meta`, and `FrameTooLarge` for frame data
+//!   that the reader would refuse.
 //! - Registry event bookkeeping: `Registry::apply_event` (`registry.rs`)
 //!   raises `DuplicateSequence`, `UnknownSequence` and `AlreadyClosed`.
 //!
@@ -90,6 +91,18 @@ pub enum Error {
     /// disk but untracked.
     #[error("invalid WAL header: {0}")]
     InvalidHeader(String),
+
+    /// `Writer::write_frame` was given frame data over
+    /// [`MAX_FRAME_DATA`](crate::MAX_FRAME_DATA). The reader would refuse
+    /// such a frame, so nothing is written and no frame is in doubt; the
+    /// caller drops the frame.
+    #[error("frame data of {bytes} bytes is over the limit of {limit} bytes")]
+    FrameTooLarge {
+        /// The size of the refused frame data.
+        bytes: usize,
+        /// [`MAX_FRAME_DATA`](crate::MAX_FRAME_DATA).
+        limit: usize,
+    },
 
     /// A CRC32 failed. `FileHeader::from_bytes` checks the header page's
     /// CRC before the flag/compression/identity fields, so a

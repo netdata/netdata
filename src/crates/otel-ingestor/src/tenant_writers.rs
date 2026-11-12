@@ -50,6 +50,38 @@ pub(crate) fn storage_unavailable(message: &'static str) -> tonic::Status {
     tonic::Status::unavailable(message)
 }
 
+/// Refuse the frame of one stream of an export request when it is over
+/// [`wal::MAX_FRAME_DATA`]: the indexer could never read it, nor the rest of
+/// its WAL file. `what` names the records ("records", "spans").
+///
+/// A frame keeps some bytes for each record, whatever the record holds, so
+/// a request under [`MAX_REQUEST_BYTES`](crate::MAX_REQUEST_BYTES) of very
+/// many records that are almost empty makes such a frame. The answer is
+/// gRPC `INVALID_ARGUMENT` (HTTP 400), which is not retryable: the same
+/// request would be refused again. The services check every frame of a
+/// request before they write any, so the request is refused whole.
+pub(crate) fn check_frame_size(
+    records: usize,
+    what: &'static str,
+    frame_bytes: usize,
+) -> Result<(), tonic::Status> {
+    if frame_bytes <= wal::MAX_FRAME_DATA {
+        return Ok(());
+    }
+
+    tracing::warn!(
+        records,
+        frame_bytes,
+        limit = wal::MAX_FRAME_DATA,
+        "refused an export request: the {what} of one stream are too many for one WAL frame",
+    );
+    Err(tonic::Status::invalid_argument(format!(
+        "{records} {what} of one stream need a frame of {frame_bytes} bytes, and the limit is {} \
+         bytes: send fewer {what} in one request",
+        wal::MAX_FRAME_DATA,
+    )))
+}
+
 impl TenantWriter {
     /// Lock the writer, to write frames. Never held across an `.await`.
     pub(crate) fn lock(&self) -> MutexGuard<'_, wal::Writer> {

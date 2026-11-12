@@ -62,11 +62,10 @@ use std::path::Path;
 
 use file_registry::TimestampNs;
 
-use crate::format::{COMPRESSION_LZ4, FRAME_ALIGNMENT, FRAME_HEADER_SIZE, FileHeader, HEADER_SIZE};
+use crate::format::{
+    COMPRESSION_LZ4, FRAME_ALIGNMENT, FRAME_HEADER_SIZE, FileHeader, HEADER_SIZE, MAX_FRAME_PAYLOAD,
+};
 use crate::{Error, Result};
-
-/// Reject frames claiming to be larger than 64 MiB.
-const MAX_FRAME_PAYLOAD: usize = 64 * 1024 * 1024;
 
 /// A single frame read from the WAL file. `data` borrows the reader's reused
 /// decompressed buffer: valid until the reader is used again.

@@ -51,7 +51,7 @@ use tonic::{Request, Response, Status};
 
 use crate::ledger_sender::LedgerSender;
 use crate::tenant::extract_tenant_id;
-use crate::tenant_writers::{TenantWriters, storage_unavailable};
+use crate::tenant_writers::{TenantWriters, check_frame_size, storage_unavailable};
 
 /// What the logs export asks of an OTLP `ResourceLogs`.
 trait ResourceLogsExt {
@@ -211,7 +211,8 @@ impl StorableStream {
 
     /// Phase 1 for this stream, lock-free: flatten its records into one WAL
     /// frame, or leave it [`Payload::OutOfWindow`] when `bounds` rejects
-    /// every record. `visit` sees the kept records after normalization (see
+    /// every record. A frame that the WAL would not take is an error
+    /// ([`check_frame_size`]). `visit` sees the kept records after normalization (see
     /// `ng_flatten::prepare_log_frame_with`).
     fn flatten(
         &mut self,
@@ -232,6 +233,7 @@ impl StorableStream {
                     tracing::error!(%e, "failed to encode flattened frame");
                     Status::internal("flatten encode error")
                 })?;
+        check_frame_size(frame.records, "records", frame.data.len())?;
         let flattened = Flattened {
             kept: frame.records,
             out_of_window: frame.rejected,
@@ -1297,6 +1299,35 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(&socket);
+    }
+
+    #[tokio::test]
+    async fn a_request_whose_frame_the_indexer_could_not_read_is_refused_before_any_write() {
+        let tenant = TenantId::default_tenant();
+        let tmp = tempfile::tempdir().unwrap();
+        let service = test_service(tmp.path().to_path_buf());
+
+        // A frame keeps some bytes for each record, whatever the record
+        // holds: a million empty records are 2 MB on the wire and a frame
+        // over `wal::MAX_FRAME_DATA`. A small stream comes first: it must
+        // not be written either.
+        let status = service
+            .export_logs(
+                &tenant,
+                ExportLogsServiceRequest {
+                    resource_logs: vec![
+                        rl(Some("prod"), Some("small"), 2),
+                        rl(Some("prod"), Some("huge"), 1_000_000),
+                    ],
+                },
+            )
+            .await
+            .unwrap_err();
+
+        assert_eq!(status.code(), tonic::Code::InvalidArgument);
+        assert!(status.message().contains("1000000 records"));
+        let tenant_dir = tmp.path().join(tenant.as_str());
+        assert!(!tenant_dir.exists() || std::fs::read_dir(&tenant_dir).unwrap().count() == 0);
     }
 
     #[tokio::test]

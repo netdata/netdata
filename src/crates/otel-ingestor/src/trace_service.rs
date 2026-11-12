@@ -52,7 +52,7 @@ use tonic::{Request, Response, Status};
 use crate::ledger_sender::LedgerSender;
 use crate::observer::TraceObserver;
 use crate::tenant::extract_tenant_id;
-use crate::tenant_writers::{TenantWriters, storage_unavailable};
+use crate::tenant_writers::{TenantWriters, check_frame_size, storage_unavailable};
 use otel_bridge::config::AuthConfig;
 use otel_bridge::signals::Signal;
 use otel_derived_metrics::DerivedMetrics;
@@ -114,6 +114,7 @@ impl StorableSpans {
             tracing::error!(%e, "failed to encode flattened trace frame");
             Status::internal("flatten encode error")
         })?;
+        check_frame_size(frame.records, "spans", frame.data.len())?;
         let flattened = Flattened {
             kept: frame.records,
             out_of_window: frame.rejected,
@@ -807,6 +808,35 @@ mod tests {
         );
         assert_eq!(recorder.prepared.lock().unwrap().len(), 1);
         assert!(recorder.committed.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_request_whose_frame_the_indexer_could_not_read_is_refused_before_any_write() {
+        let tenant = TenantId::default_tenant();
+        let recorder = Arc::new(Recorder::default());
+        let tmp = tempfile::tempdir().unwrap();
+        let mut service = test_service(tmp.path().to_path_buf());
+        service.add_observer(recorder.clone());
+
+        // A frame keeps some bytes for each span, whatever the span holds:
+        // 300,000 empty spans are 600 kB on the wire and a frame over
+        // `wal::MAX_FRAME_DATA`.
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    spans: vec![Span::default(); 300_000],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let status = service.export_traces(&tenant, request).await.unwrap_err();
+
+        assert_eq!(status.code(), tonic::Code::InvalidArgument);
+        assert!(status.message().contains("300000 spans"));
+        assert!(recorder.committed.lock().unwrap().is_empty());
+        let tenant_dir = tmp.path().join(tenant.as_str());
+        assert!(!tenant_dir.exists() || std::fs::read_dir(&tenant_dir).unwrap().count() == 0);
     }
 
     #[tokio::test]
