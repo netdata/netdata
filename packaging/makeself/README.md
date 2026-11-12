@@ -7,6 +7,14 @@ Netdata provides pre-built static binaries for Linux systems where native packag
 - Self-contained installation (no system dependencies required, no interference with system libraries)
 - Installed under `/opt/netdata`
 
+Pass `--preview-channel` after the archive's `--` separator to select preview releases for future updates:
+
+```sh
+sh netdata-x86_64-latest.gz.run -- --preview-channel
+```
+
+The installer also accepts `--stable-channel` and `--nightly-channel`; the default is nightly.
+
 ## State permissions during updates
 
 Installation makes package directories traversable and initializes the service's library, cache and log roots.
