@@ -6132,7 +6132,7 @@ modules:
           connection whose print server is offline reports `other`, a status the server reports as unknown
           reports `unknown`, a job with no status flags counts as `queued` (and leaves an otherwise flagless
           printer `idle`), and a blocked job or one waiting for user intervention counts as `degraded`. The
-          job owner, submitting machine, and document title returned with each job are never stored, logged,
+          job owner, submitting machine, and document title returned with each job are never logged, charted,
           or exported.
       supported_platforms:
         include: ["windows"]

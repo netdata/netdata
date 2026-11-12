@@ -125,16 +125,17 @@ Status values match the `Win32_Printer` and `Win32_PrintJob` mappings used by Wi
 - A printer with no status flags whose first queued job is just waiting reports `idle`; a growing backlog shows in the
   queued jobs chart.
 
-An offline printer reports `other`. These states come from the printer's status, so they appear only when it can be
-read:
+An offline printer reports `other`. The printer state comes from the printer's status flags or, when none of them is
+mapped, from its first queued job, so the charts update only when that data can be read:
 
 - If a printer cannot be opened or its status cannot be read (for example, its print server is unreachable), all four
   of its charts have a gap for that cycle.
 - If only its job list cannot be read, the queued jobs and problems charts still update, and the status and jobs by
   status charts have a gap.
 
-The spooler returns the job owner, submitting machine, and document title with each job; the module reads only the job
-status, and never stores, logs, or exports those fields.
+The spooler returns the job owner, submitting machine, and document title with each job. The module reads only the job
+status; those fields stay only in the in-memory reply buffer, which is overwritten by the next read, and are never
+logged, charted, or exported.
 
 The module always runs on its own thread, so a slow spooler call never delays other modules; if that thread cannot be
 created, the module stays disabled. Opening a selected printer connection whose print server is unreachable can block;
