@@ -198,7 +198,7 @@ remote_storage:
   a ceiling. Monitor free disk on the receiving node.
 - The plugin needs the remote when it starts. While the remote does not answer, or answers with an error, the
   plugin waits and tries again, and it receives no data. When the remote answers again, the plugin completes its
-  start; you do not have to restart the Agent. See
+  start; you do not have to restart the Agent, unless your configuration caused the error. See
   [Monitor the OpenTelemetry plugin](/docs/opentelemetry/otlp-ingestion.md#monitor-the-opentelemetry-plugin).
 - The Agent never deletes offloaded files, for logs or traces: expire them with the object storage's own lifecycle
   rules, such as an S3 lifecycle expiration rule.

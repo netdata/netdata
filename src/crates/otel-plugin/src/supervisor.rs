@@ -26,7 +26,9 @@
 //! and the ledger indexes its whole backlog of WAL files before it is ready.
 //!
 //! Failure model: ingestor and ledger failures are fatal to the plugin (the
-//! agent restarts the whole process); the legacy-logs viewer is best-effort
+//! agent starts the whole process again, unless the plugin had sent it no
+//! data yet: then it leaves the plugin off until the agent itself restarts);
+//! the legacy-logs viewer is best-effort
 //! and is disabled at runtime without affecting the pipeline.
 
 use std::collections::HashMap;
@@ -742,21 +744,24 @@ impl Supervisor {
         }
     }
 
-    /// Stop while the plugin starts, before the ingestor serves. Nothing is
-    /// acknowledged yet and no worker holds work that a stop must finish, and
-    /// a worker in its start-up cannot be asked to leave: the ledger does not
-    /// read its connection before its `Ready`, and a worker that waits for
-    /// `Configure` takes anything else as an error. So the workers are ended,
-    /// and before their connections close: a worker that sees its connection
-    /// close logs an error, and a stop is none.
+    /// Stop while the plugin starts, before the ingestor's `Ready` was taken:
+    /// the ingestor serves only after it sent that (`recv_during_startup`
+    /// takes a waiting answer before a stop), so nothing is acknowledged yet
+    /// and no worker holds work that a stop must finish. And a worker in its
+    /// start-up cannot be asked to leave: the ledger does not read its
+    /// connection before its `Ready`, and a worker that waits for `Configure`
+    /// takes anything else as an error. So the workers are ended, and before
+    /// their connections close: a worker that sees its connection close logs
+    /// an error, and a stop is none. The ingestor goes first: it can already
+    /// hold a link to the ledger, and would warn that the link ended.
     ///
     /// Ending the ledger inside its start-up is what a lost supervisor
     /// already does to it (`crate::lifeline`): every step there can be cut
     /// (`file_lifecycle::recovery`).
     async fn stop_before_serving(mut self, reason: &'static str) {
         tracing::info!("{reason} during start-up, stopping");
-        self.ledger_child.kill().await;
         self.ingestor_child.kill().await;
+        self.ledger_child.kill().await;
         self.legacy_child.kill().await;
     }
 
@@ -826,6 +831,11 @@ where
 {
     loop {
         tokio::select! {
+            // The worker's answer first: a worker that answered may serve
+            // already, and a stop that came with the answer is then taken by
+            // the next wait, which knows that.
+            biased;
+
             response = worker.recv() => return Ok(Startup::Answer(response?)),
             event = agent.next_event() => match event {
                 AgentEvent::Stop(reason) => return Ok(Startup::Stop(reason)),
@@ -1281,8 +1291,25 @@ mod tests {
         assert!(matches!(end, Startup::Stop("stdin closed")));
     }
 
-    /// Only a stop ends the wait: a line that the agent's parser refuses, or
-    /// a message that is not a stop, leaves it waiting for the worker.
+    /// A worker that answered may serve already: its answer is taken even
+    /// when a stop request waits too, so that the caller stops a serving
+    /// worker as one (`Supervisor::stop_before_serving`).
+    #[tokio::test(start_paused = true)]
+    async fn an_answer_that_waits_is_taken_before_a_stop() {
+        let (mut supervisor, mut worker) = connected("answer-and-stop").await;
+        worker.send(7).await.unwrap();
+        let (mut agent, mut agent_writes, _agent_reads) = agent_link();
+        agent_writes.write_all(b"QUIT\n").await.unwrap();
+
+        let end = recv_during_startup(&mut supervisor, &mut agent)
+            .await
+            .unwrap();
+
+        assert!(matches!(end, Startup::Answer(7)));
+    }
+
+    /// Only a stop ends the wait: a line that the plugin does not know, or a
+    /// message that is not a stop, leaves it waiting for the worker.
     #[tokio::test(start_paused = true)]
     async fn what_is_not_a_stop_does_not_end_the_wait_for_a_worker() {
         let (mut supervisor, mut worker) = connected("other-input-during-a-handshake").await;

@@ -69,7 +69,8 @@ pub(crate) const DOWNLOAD_CONCURRENCY: usize = 8;
 /// The pause between two attempts of the phase. An attempt that the remote
 /// refuses fails in milliseconds, so this is what spaces the warnings; an
 /// attempt against a remote that is down already took the storage client's
-/// own retries (`OpendalStorage::new`), whose longest pause is the same.
+/// own retries (`OpendalStorage::new`), whose longest pause is about the
+/// same.
 pub(crate) const RETRY_PAUSE: Duration = Duration::from_secs(30);
 
 /// Why one attempt of the phase failed.

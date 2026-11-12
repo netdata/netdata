@@ -22,9 +22,9 @@
 //! handle shareable across tasks.
 //!
 //! [`OpendalStorage::new`] wraps the backend in opendal's retry layer — the
-//! parameters and the ~3-minute per-operation backoff ceiling live on its
-//! docs (the bound `otel_bridge::config`'s `startup_op_timeout` should stay
-//! above). The layer is transparent to callers; where a call must be bounded
+//! parameters, and how long one operation that keeps failing takes (3 to 6
+//! minutes), live on its docs. The layer is transparent to callers; where a
+//! call must be bounded
 //! tighter, the caller wraps it (`recovery::startup`'s per-op timeout,
 //! `remote_read`'s per-download deadline).
 //!
