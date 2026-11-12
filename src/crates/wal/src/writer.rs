@@ -477,15 +477,20 @@ impl Stream {
             payload_format: self.stamp.payload_format,
             content_meta: self.content_meta.clone(),
         };
-        writer.write_all(&header.to_bytes())?;
-        writer.flush()?;
-
         // Durability at creation stops at the directory entry: `create_new`
         // plus the `fsync_dir` below make the name survive power loss, but
         // the header bytes stay page-cache until the file's first fsync. A
         // crash in between can leave an empty or headerless file; a header
         // read then fails on it, so recovery skips it rather than misread.
-        file_registry::durable::fsync_dir(self.dir.path())?;
+        let created = write_file_header(&mut writer, &header.to_bytes())
+            .and_then(|()| file_registry::durable::fsync_dir(self.dir.path()));
+        if let Err(e) = created {
+            // Nothing was told of this file and nothing will write to it:
+            // on a full disk every request would leave one behind.
+            let (_file, _unwritten) = writer.into_parts();
+            let _ = std::fs::remove_file(&path);
+            return Err(e.into());
+        }
 
         self.pending_events.push(FileEvent::Created {
             file_id,
@@ -588,6 +593,17 @@ impl Stream {
         self.close_active_file();
         Ok(true)
     }
+}
+
+/// Write a new file's header page. A test can make the next one fail.
+fn write_file_header(writer: &mut BufWriter<File>, header: &[u8]) -> io::Result<()> {
+    #[cfg(test)]
+    if tests::FAIL_NEXT_WRITE.with(|fail| fail.replace(false)) {
+        return Err(io::Error::other("injected"));
+    }
+
+    writer.write_all(header)?;
+    writer.flush()
 }
 
 /// Write one frame whole: its header, its payload, its padding. The one
@@ -1099,8 +1115,9 @@ mod tests {
         /// Makes the next [`fsync`] of this test's thread fail.
         pub(super) static FAIL_NEXT_FSYNC: std::cell::Cell<bool> =
             const { std::cell::Cell::new(false) };
-        /// Makes the next [`write_whole_frame`] of this test's thread fail
-        /// after a part of the frame is in the file.
+        /// Makes the next write of this test's thread to a WAL file fail: a
+        /// [`write_whole_frame`], after a part of the frame is in the file,
+        /// or a [`write_file_header`].
         pub(super) static FAIL_NEXT_WRITE: std::cell::Cell<bool> =
             const { std::cell::Cell::new(false) };
     }
@@ -1772,6 +1789,32 @@ mod tests {
             .collect();
         files.sort();
         files
+    }
+
+    /// On a full disk every request would leave a file behind otherwise.
+    #[test]
+    fn a_file_whose_header_could_not_be_written_is_removed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+
+        FAIL_NEXT_WRITE.set(true);
+        let failed = writer.write_frame(
+            pk(1),
+            &[],
+            b"frame",
+            crate::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: TimestampNs(1),
+                log_ts_range: None,
+            },
+        );
+
+        assert!(failed.is_err());
+        assert!(wal_files(tmp.path()).is_empty());
+        assert!(writer.take_all_events().is_empty());
+        // The next frame gets its file as usual.
+        write_one(&mut writer, 1, b"frame", 2);
+        assert_eq!(wal_files(tmp.path()).len(), 1);
     }
 
     #[test]
