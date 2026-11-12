@@ -5,11 +5,11 @@ package ddsnmpcollector
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -101,13 +101,15 @@ func TestCollector_Collect_TiMOSBGP_FromLibreNMSFixtures(t *testing.T) {
 			profile := matchedBGPProjectionByFile(t, tc.sysObjectID, "nokia-service-router-os.yaml")
 			pdus := loadSnmprecPDUs(t, tc.fixture)
 
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectTiMOSMetadataGets(mockHandler, tc.sysObjectID)
 			expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
@@ -172,13 +174,15 @@ func TestCollector_Collect_TiMOSBGP_StateAdminAndRoutingInstance(t *testing.T) {
 				createGauge32PDU(oidWithIndex("1.3.6.1.4.1.6527.3.1.2.14.4.7.1.66", tc.rowIndex), 65001),
 			}
 
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectTiMOSMetadataGets(mockHandler, "1.3.6.1.4.1.6527.1.3.17")
 			expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
@@ -204,7 +208,7 @@ func TestCollector_Collect_TiMOSBGP_StateAdminAndRoutingInstance(t *testing.T) {
 	}
 }
 
-func expectTiMOSMetadataGets(mockHandler *snmpmock.MockHandler, sysObjectID string) {
+func expectTiMOSMetadataGets(mockHandler *snmpmock.MockSession, sysObjectID string) {
 	mockHandler.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		createStringPDU("1.3.6.1.2.1.1.1.0", "Nokia SR OS"),
 		createPDU("1.3.6.1.2.1.1.2.0", gosnmp.ObjectIdentifier, sysObjectID),

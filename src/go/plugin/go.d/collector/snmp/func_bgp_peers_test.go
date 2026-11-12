@@ -10,15 +10,16 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func newTestFuncBGPPeers(cache *bgpPeerCache) *funcBGPPeers {
@@ -451,7 +452,7 @@ func TestCollectSNMP_HidesBGPDiagnosticsButKeepsFunctionCache(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockSNMP := snmpmock.NewMockHandler(ctrl)
+	mockSNMP := snmpmock.NewMockSession(ctrl)
 	setMockClientInitExpect(mockSNMP)
 	setMockClientSysInfoExpect(mockSNMP)
 
@@ -460,7 +461,7 @@ func TestCollectSNMP_HidesBGPDiagnosticsButKeepsFunctionCache(t *testing.T) {
 	collr.CreateVnode = false
 	collr.Ping.Enabled = false
 	collr.snmpProfiles = []*ddsnmp.Profile{{}}
-	collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+	collr.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return mockSNMP }
 	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		row := typedBGPPeerRow()
 		row.LastError = ddsnmp.BGPLastError{

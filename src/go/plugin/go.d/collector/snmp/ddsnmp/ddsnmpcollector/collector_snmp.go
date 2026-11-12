@@ -13,15 +13,23 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
+// requestConfig holds the configuration values a request needs: the SNMP
+// version and the maximum OIDs per Get the client was configured with.
+type requestConfig struct {
+	version gosnmp.SnmpVersion
+	maxOIDs int
+}
+
 // Count attempted batches here so callers cannot lose or duplicate failed work.
 func getSNMPValues(
 	client snmputils.ScalarClient,
+	req requestConfig,
 	oids []string,
 	missingOIDs map[string]bool,
 	stats *ddsnmp.CollectionStats,
 ) (map[string]gosnmp.SnmpPDU, error) {
 	pdus := make(map[string]gosnmp.SnmpPDU)
-	for chunk := range slices.Chunk(oids, client.MaxOids()) {
+	for chunk := range slices.Chunk(oids, req.maxOIDs) {
 		for len(chunk) > 0 {
 			stats.SNMP.GetRequests++
 			stats.SNMP.GetOIDs += int64(len(chunk))
@@ -29,7 +37,7 @@ func getSNMPValues(
 			if err == nil && result == nil {
 				err = fmt.Errorf("SNMP GET returned nil response")
 			}
-			if err == nil && result.Error == gosnmp.NoSuchName && client.Version() == gosnmp.Version1 && result.ErrorIndex > 0 && int(result.ErrorIndex) <= len(chunk) {
+			if err == nil && result.Error == gosnmp.NoSuchName && req.version == gosnmp.Version1 && result.ErrorIndex > 0 && int(result.ErrorIndex) <= len(chunk) {
 				// V1 fails the whole request for one absent OID. Record that operation's
 				// missing value before retrying the remaining OIDs on an owned slice.
 				// Request diagnostics retain NoSuchName evidence even if this recovery succeeds.

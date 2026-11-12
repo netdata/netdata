@@ -78,12 +78,14 @@ func TestCollector_Collect_HuaweiTypedBGPRows(t *testing.T) {
 			profile := matchedBGPProjectionByFile(t, "1.3.6.1.4.1.2011.2.224.279", "huawei-routers.yaml")
 			filterProfileForTypedBGPByID(t, profile, tc.rowID)
 
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectBGPTableWalksFromFixture(mockHandler, profile, tc.pdus)
 
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),

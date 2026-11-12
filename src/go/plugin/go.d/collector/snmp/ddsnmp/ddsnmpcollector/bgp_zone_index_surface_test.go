@@ -24,7 +24,7 @@ func TestCollector_Collect_AristaBGP_IPv6ZoneIndexTags(t *testing.T) {
 		0, 0, 14, 133,
 	}
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSystemMetadataGets(mockHandler, "1.3.6.1.4.1.30065.1.3011.7010.427.48", "arista")
@@ -45,6 +45,8 @@ func TestCollector_Collect_AristaBGP_IPv6ZoneIndexTags(t *testing.T) {
 	expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
@@ -99,7 +101,7 @@ func TestCollector_Collect_CiscoBgpPeer3_IPv6ZoneIndexTags(t *testing.T) {
 		0, 0, 14, 133,
 	}
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.9", []gosnmp.SnmpPDU{
@@ -121,6 +123,8 @@ func TestCollector_Collect_CiscoBgpPeer3_IPv6ZoneIndexTags(t *testing.T) {
 	})
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),

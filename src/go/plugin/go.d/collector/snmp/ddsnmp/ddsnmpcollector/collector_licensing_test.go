@@ -16,7 +16,7 @@ import (
 )
 
 func TestCollector_Collect_LicenseRowsFromScalarLicensingConfig(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPGet(mockHandler,
@@ -93,6 +93,8 @@ func TestCollector_Collect_LicenseRowsFromScalarLicensingConfig(t *testing.T) {
 	}
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -137,7 +139,7 @@ func TestCollector_Collect_LicenseRowsBestEffortForRegularMetrics(t *testing.T) 
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
@@ -150,6 +152,8 @@ func TestCollector_Collect_LicenseRowsBestEffortForRegularMetrics(t *testing.T) 
 			)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{
@@ -210,7 +214,7 @@ func TestCollector_Collect_LicenseRowsSkipsKnownMissingScalarOIDs(t *testing.T) 
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
@@ -227,6 +231,8 @@ func TestCollector_Collect_LicenseRowsSkipsKnownMissingScalarOIDs(t *testing.T) 
 			)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{
@@ -283,7 +289,7 @@ func TestCollector_Collect_LicenseRowsSkipsKnownMissingScalarOIDs(t *testing.T) 
 }
 
 func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler,
@@ -383,6 +389,8 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -447,7 +455,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 }
 
 func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTableTags(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler,
@@ -507,6 +515,8 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTabl
 	}
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -527,7 +537,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTabl
 }
 
 func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_WalksEveryCollection(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler,
@@ -588,6 +598,8 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_WalksEveryCollect
 	}
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -705,7 +717,7 @@ func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
@@ -743,6 +755,8 @@ func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {
 			}
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),

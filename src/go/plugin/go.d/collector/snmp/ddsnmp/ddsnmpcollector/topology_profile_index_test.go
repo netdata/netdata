@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func TestTopologyProfile_QBridgeFDBUsesMACFromIndex(t *testing.T) {
@@ -23,7 +24,7 @@ func TestTopologyProfile_QBridgeFDBUsesMACFromIndex(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.17.1.4", nil)
@@ -41,7 +42,7 @@ func TestTopologyProfile_QBridgeFDBUsesMACFromIndex(t *testing.T) {
 }
 
 func TestTopologyProfile_BridgeFDBUsesMACFromIndex(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.17.1.4", nil)
@@ -64,7 +65,7 @@ func TestTopologyProfile_BridgeFDBUsesMACFromIndex(t *testing.T) {
 }
 
 func TestTopologyProfile_InterfaceStateMappings(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1", nil)
@@ -102,7 +103,7 @@ func TestTopologyProfile_InterfaceStateMappings(t *testing.T) {
 }
 
 func TestTopologyProfile_IPAddressUsesTableIndex(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.4.20", []gosnmp.SnmpPDU{
@@ -126,7 +127,7 @@ func TestTopologyProfile_IPAddressUsesTableIndex(t *testing.T) {
 }
 
 func TestTopologyProfile_CiscoVTPUsesVLANIndexComponent(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.46.1.3.1.1", []gosnmp.SnmpPDU{
@@ -149,7 +150,7 @@ func TestTopologyProfile_CiscoVTPUsesVLANIndexComponent(t *testing.T) {
 }
 
 func TestTopologyProfile_IPNetToPhysicalUsesIndexFields(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", nil)
@@ -188,7 +189,7 @@ func TestTopologyProfile_IPNetToPhysicalUsesIndexFields(t *testing.T) {
 }
 
 func TestTopologyProfile_LegacyARPUsesPhysicalAddressPresence(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.31.1.1.1.1", nil)
@@ -212,7 +213,7 @@ func TestTopologyProfile_LegacyARPUsesPhysicalAddressPresence(t *testing.T) {
 }
 
 func TestTopologyProfile_LLDPManagementAddressUsesIndexFields(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.3.7", nil)
@@ -254,7 +255,7 @@ func TestTopologyProfile_LLDPManagementAddressUsesIndexFields(t *testing.T) {
 }
 
 func TestTopologyProfile_LLDPRemoteManagementAddressUsesIndexFields(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.3.7", nil)
@@ -306,7 +307,7 @@ func TestTopologyProfile_LLDPRemoteManagementAddressOmitsMalformedIndexTag(t *te
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.0.8802.1.1.2.1.3.7", nil)
@@ -324,7 +325,7 @@ func TestTopologyProfile_LLDPRemoteManagementAddressOmitsMalformedIndexTag(t *te
 }
 
 func TestTopologyProfile_LLDPV2UsesAccessibleColumnsAndStableIndexes(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.111.2.802.1.1.13.1.3.7", []gosnmp.SnmpPDU{
@@ -454,7 +455,7 @@ func TestTopologyProfile_MikroTikRB750Gr3OverridesLLDPRemoteManagementAddressRow
 }
 
 func TestTopologyProfile_OSPFNeighborUsesNeighborTags(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	index := "198.51.100.2.0"
@@ -489,7 +490,7 @@ func TestTopologyProfile_OSPFTopologyExcludesVirtualNeighborTable(t *testing.T) 
 	require.Equal(t, "ospfNbrTable", profile.Definition.Topology[0].Table.Name)
 }
 
-func collectTopologyProfileTables(t *testing.T, mockHandler gosnmp.Handler, profileName string) []ddsnmp.Metric {
+func collectTopologyProfileTables(t *testing.T, mockHandler snmputils.Client, profileName string) []ddsnmp.Metric {
 	t.Helper()
 
 	profile, err := ddsnmp.LoadProfileByName(profileName)
@@ -498,8 +499,8 @@ func collectTopologyProfileTables(t *testing.T, mockHandler gosnmp.Handler, prof
 	missingOIDs := make(map[string]bool)
 	tcache := newTableCache(0, 0)
 	collector := &Collector{
-		scalarCollector: newScalarCollector(mockHandler, missingOIDs, logger.New()),
-		tableCollector:  newTableCollector(mockHandler, missingOIDs, tcache, logger.New(), false),
+		scalarCollector: newScalarCollector(mockHandler, testRequests, missingOIDs, logger.New()),
+		tableCollector:  newTableCollector(mockHandler, testRequests, 0, missingOIDs, tcache, logger.New(), false),
 	}
 
 	var stats ddsnmp.CollectionStats

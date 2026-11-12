@@ -32,16 +32,12 @@ func (SNMP) Acquire(ctx context.Context, config vnodes.SNMPConfig) (*vnodes.Meta
 	conn := client.Conn
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer func() { stop(); _ = conn.Close() }()
-	return acquire(scalarClient{client}, config.Address)
+	return acquire(client, client.Version, client.MaxOids, config.Address)
 }
 
-type scalarClient struct{ *gosnmp.GoSNMP }
-
-func (c scalarClient) MaxOids() int                { return c.GoSNMP.MaxOids }
-func (c scalarClient) Version() gosnmp.SnmpVersion { return c.GoSNMP.Version }
-
-func acquire(client snmputils.ScalarClient, address string) (*vnodes.Metadata, error) {
-	si, err := snmputils.GetSysInfo(client)
+// acquire reads the identity through a client configured with version and maxOIDs.
+func acquire(client snmputils.ScalarClient, version gosnmp.SnmpVersion, maxOIDs int, address string) (*vnodes.Metadata, error) {
+	si, err := snmputils.GetSysInfo(client, version, maxOIDs)
 	if err != nil {
 		return nil, errors.New("SNMP system identity acquisition failed")
 	}
@@ -59,7 +55,7 @@ func acquire(client snmputils.ScalarClient, address string) (*vnodes.Metadata, e
 	}
 	profiles := ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{SysObjectID: si.SysObjectID, SysDescr: si.Descr}).Profiles()
 	// Acquisition reports safe phase errors; raw returned values stay out of logs.
-	meta, err := ddsnmpcollector.CollectDeviceMetadata(client, profiles, si.SysObjectID, logger.NewWithWriter(io.Discard))
+	meta, err := ddsnmpcollector.CollectDeviceMetadata(client, version, maxOIDs, profiles, si.SysObjectID, logger.NewWithWriter(io.Discard))
 	if err != nil {
 		return result, errors.New("SNMP profile metadata acquisition failed")
 	}

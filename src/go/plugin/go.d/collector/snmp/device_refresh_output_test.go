@@ -119,7 +119,7 @@ func TestCollectorRuntimeSystemChangeNativeOutputRetries(t *testing.T) {
 
 	client, _ := newReplacementTestClient(t, device, nil)
 	t.Cleanup(cleanup) // Close the installed client before its mock controller settles.
-	c.newSnmpClient = func() gosnmp.Handler { return client }
+	c.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return client }
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector { return newReplacementTestDD(t, cfg) }
 	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
 		Name:  snmputils.OidSysObject,
@@ -202,7 +202,7 @@ func TestCollectorRuntimeReplacementDimensionsOutputRetries(t *testing.T) {
 	require.True(t, collect(1).committed)
 	client, _ := newReplacementTestClient(t, device, nil)
 	t.Cleanup(cleanup)
-	c.newSnmpClient = func() gosnmp.Handler { return client }
+	c.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return client }
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 		cfg.Profiles = []*ddsnmp.Profile{profile}
 		return ddsnmpcollector.New(cfg)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -15,10 +16,12 @@ import (
 )
 
 func TestCollector_UnreachableWithNoopProfile(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	const oid = "1.3.6.1.2.1.1.3.0"
 	c := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: handler,
 		Log:        logger.New(),
 		Profiles: []*ddsnmp.Profile{
@@ -71,12 +74,13 @@ func TestCollector_FailedSiblingWithGETResponse(t *testing.T) {
 		"no response":       {wantError: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
-			handler.EXPECT().Version().Return(gosnmp.Version1).AnyTimes()
 			expectSNMPGetError(handler, []string{failedOID}, context.DeadlineExceeded)
 			handler.EXPECT().Get([]string{oid}).Return(tc.packet, tc.err)
 			c := New(Config{
+				Version:    gosnmp.Version1,
+				MaxOIDs:    10,
 				SnmpClient: handler,
 				Log:        logger.New(),
 				Profiles: []*ddsnmp.Profile{
@@ -112,16 +116,17 @@ func TestCollector_FailedSiblingWithWalkResponse(t *testing.T) {
 	} {
 		for _, version := range []gosnmp.SnmpVersion{gosnmp.Version1, gosnmp.Version2c} {
 			t.Run(name+"/"+version.String(), func(t *testing.T) {
-				ctrl, handler := setupMockHandler(t)
+				ctrl, handler := setupMockSession(t)
 				defer ctrl.Finish()
-				handler.EXPECT().Version().Return(version).AnyTimes()
 				expectSNMPGetError(handler, []string{failedOID}, context.DeadlineExceeded)
 				if version == gosnmp.Version1 {
 					handler.EXPECT().WalkAll(tableOID).Return(tc.values, tc.err)
 				} else {
-					handler.EXPECT().BulkWalkAll(tableOID).Return(tc.values, tc.err)
+					handler.EXPECT().BulkWalkAll(tableOID, gomock.Any()).Return(tc.values, tc.err)
 				}
 				c := New(Config{
+					Version:    version,
+					MaxOIDs:    10,
 					SnmpClient: handler,
 					Log:        logger.New(),
 					Profiles: []*ddsnmp.Profile{
@@ -150,9 +155,11 @@ func TestCollector_FailedSiblingWithWalkResponse(t *testing.T) {
 }
 
 func TestCollector_NoRequests(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	c := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: handler,
 		Log:        logger.New(),
 		Profiles:   []*ddsnmp.Profile{createTestProfile("vendor.yaml", nil)},
@@ -165,11 +172,13 @@ func TestCollector_NoRequests(t *testing.T) {
 }
 
 func TestCollector_UnreachableCachedTableAfterClientReplacement(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	const tableOID = "1.3.6.1.2.1.2.2"
 	const valueOID = tableOID + ".1.10"
 	c := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: handler,
 		Log:        logger.New(),
 		Profiles: []*ddsnmp.Profile{
@@ -188,12 +197,11 @@ func TestCollector_UnreachableCachedTableAfterClientReplacement(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, metrics[0].Metrics, 1)
 
-	replacementCtrl, replacement := setupMockHandler(t)
+	replacementCtrl, replacement := setupMockSession(t)
 	defer replacementCtrl.Finish()
 	c.SetSNMPClient(replacement)
 	expectSNMPGetError(replacement, []string{valueOID + ".1"}, context.DeadlineExceeded)
-	replacement.EXPECT().Version().Return(gosnmp.Version2c)
-	replacement.EXPECT().BulkWalkAll(tableOID).Return(nil, context.DeadlineExceeded)
+	replacement.EXPECT().BulkWalkAll(tableOID, gomock.Any()).Return(nil, context.DeadlineExceeded)
 	metrics, err = c.Collect()
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Empty(t, metrics)
@@ -203,7 +211,7 @@ func TestCollector_UnreachableTypedRows(t *testing.T) {
 	const licenseOID = "1.3.6.1.4.1.99999.7.1.0"
 	for _, kind := range []string{"licensing", "bgp"} {
 		t.Run(kind, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			profile := createTestProfile("typed.yaml", nil)
 			if kind == "licensing" {
@@ -229,6 +237,8 @@ func TestCollector_UnreachableTypedRows(t *testing.T) {
 				expectSNMPGetError(handler, []string{"1.3.6.1.4.1.99999.20.1.0", "1.3.6.1.4.1.99999.20.2.0"}, context.DeadlineExceeded)
 			}
 			c := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: handler,
 				Log:        logger.New(),
 				Profiles:   []*ddsnmp.Profile{profile, createTestProfile("vendor.yaml", nil)},

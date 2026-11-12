@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 )
 
 type snmpFixture struct {
@@ -221,7 +221,7 @@ func stripTimeticksValue(s string) string {
 	return stripEnumSuffix(s)
 }
 
-func expectSNMPWalkFromFixture(mockHandler *snmpmock.MockHandler, version gosnmp.SnmpVersion, fixture *snmpFixture, oid string) {
+func expectSNMPWalkFromFixture(mockHandler *snmpmock.MockSession, version gosnmp.SnmpVersion, fixture *snmpFixture, oid string) {
 	root := trimOID(oid)
 	prefix := root + "."
 	pdus := make([]gosnmp.SnmpPDU, 0)
@@ -234,7 +234,7 @@ func expectSNMPWalkFromFixture(mockHandler *snmpmock.MockHandler, version gosnmp
 	expectSNMPWalk(mockHandler, version, root, pdus)
 }
 
-func mustExpectSNMPGetFromFixture(t *testing.T, mockHandler *snmpmock.MockHandler, fixture *snmpFixture, oids []string) {
+func mustExpectSNMPGetFromFixture(t *testing.T, mockHandler *snmpmock.MockSession, fixture *snmpFixture, oids []string) {
 	t.Helper()
 
 	pdus := make([]gosnmp.SnmpPDU, 0, len(oids))

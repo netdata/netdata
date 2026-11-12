@@ -62,10 +62,10 @@ func TestIndexDecodeRejectedRowsDoNotEnterCache(t *testing.T) {
 			const goodIndex = "1.4.192.0.2.1.7"
 			def := decodeContractProfile(t, "metrics:\n- table: {OID: "+root+", name: rows}\n  symbols: [{OID: "+root+".1, name: value}]\n  metric_tags:\n  - tag: address\n    index_decode: {components: [{type: integer}, {type: octet_string}, {type: integer}], component: 2}\n    symbol: {format: ip_address}\n")
 			prof := &ddsnmp.Profile{SourceFile: "decode-test.yaml", Definition: def}
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			cache := newTableCache(time.Hour, 0)
-			collector := newTableCollector(handler, make(map[string]bool), cache, logger.New(), false)
+			collector := newTableCollector(handler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 			expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.SnmpPDU{
 				createGauge32PDU(root+".1."+goodIndex, 10), createGauge32PDU(root+".1."+badIndex, 20),
 			})
@@ -92,9 +92,9 @@ func TestIndexDecodeRejectedRowsDoNotEnterCache(t *testing.T) {
 func TestIndexDecodeConfigChangeDoesNotReuseIdentity(t *testing.T) {
 	const root = "1.3.6.1.4.1.99999.880"
 	def := decodeContractProfile(t, "metrics:\n- table: {OID: "+root+", name: rows}\n  symbols: [{OID: "+root+".1, name: value}]\n  metric_tags:\n  - tag: identity\n    index_decode: {components: [{type: integer}, {type: integer}], component: 1}\n")
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
-	collector := newTableCollector(handler, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
+	collector := newTableCollector(handler, testRequests, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
 	for _, component := range []uint{1, 2} {
 		changed := def.Clone()
 		changed.Metrics[0].MetricTags[0].IndexDecode.Component = component
@@ -132,9 +132,9 @@ func TestExtendedIndexTagConfigChangeDoesNotReuseIdentity(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
-			collector := newTableCollector(handler, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
+			collector := newTableCollector(handler, testRequests, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
 			pdu := createGauge32PDU(root+".1.65.66", 10)
 			for i, tags := range []string{tc.before, tc.after, tc.after} {
 				def := decodeContractProfile(t, "metrics:\n- table: {OID: "+root+", name: rows}\n  symbols: [{OID: "+root+".1, name: value}]\n  metric_tags:\n    "+strings.ReplaceAll(tags, "\n", "\n    "))

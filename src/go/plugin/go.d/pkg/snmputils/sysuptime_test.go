@@ -6,11 +6,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestGetSysUptime(t *testing.T) {
@@ -71,7 +71,7 @@ func TestGetSysUptime(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			client := snmpmock.NewMockHandler(ctrl)
+			client := snmpmock.NewMockSession(ctrl)
 			client.EXPECT().Get(gomock.InAnyOrder(sysUptimeOIDs())).Return(&gosnmp.SnmpPacket{Variables: tc.pdus}, tc.getErr)
 
 			actual, err := GetSysUptime(client)

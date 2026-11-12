@@ -301,6 +301,8 @@ func collectMainProfileMetrics(
 	}).Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing, ddsnmp.ConsumerBGP).Profiles()
 	require.NotEmpty(t, profiles)
 	metrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  newTopologySNMPHandler(pdus),
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,
@@ -320,6 +322,8 @@ func collectTopologyProfileMetrics(
 	profiles := (&Collector{}).findTopologyProfiles(device)
 	require.NotEmpty(t, profiles)
 	metrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  newTopologySNMPHandler(pdus),
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,

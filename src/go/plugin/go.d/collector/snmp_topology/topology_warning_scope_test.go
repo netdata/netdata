@@ -9,10 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -43,11 +44,10 @@ func TestTopologyRowWarningsAreScopedAcrossRefreshes(t *testing.T) {
 	for refresh := 0; refresh < 2; refresh++ {
 		for i, host := range []string{"192.0.2.10", "192.0.2.11"} {
 			dev := ddsnmp.DeviceConnectionInfo{Hostname: host, Port: 161, SNMPVersion: "2c"}
-			handler := snmpmock.NewMockHandler(gomock.NewController(t))
+			handler := snmpmock.NewMockSession(gomock.NewController(t))
 			expectTopologyRefreshSNMPClient(handler, dev)
-			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-			handler.EXPECT().BulkWalkAll(root).Return([]gosnmp.SnmpPDU{{Name: fmt.Sprintf("%s.1.7.8", root), Type: gosnmp.OctetString, Value: []byte("Gi0/1")}}, nil)
-			coll.newSnmpClient = func() gosnmp.Handler { return handler }
+			handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return([]gosnmp.SnmpPDU{{Name: fmt.Sprintf("%s.1.7.8", root), Type: gosnmp.OctetString, Value: []byte("Gi0/1")}}, nil)
+			coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return handler }
 			attempt := testTopologyAttemptID(ddsnmp.DeviceRegistrationID(i + 1))
 			attempt.Ordinal += uint64(refresh)
 			snapshot, outcome, capture := coll.refreshDeviceTopology(context.Background(), attempt, dev, testTopologyTarget())
@@ -60,12 +60,11 @@ func TestTopologyRowWarningsAreScopedAcrossRefreshes(t *testing.T) {
 				vlans = []string{"200", "100"}
 			}
 			for _, vlan := range vlans {
-				handler := snmpmock.NewMockHandler(gomock.NewController(t))
+				handler := snmpmock.NewMockSession(gomock.NewController(t))
 				expectTopologyVLANClient(handler, dev, vlan, nil)
-				handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-				handler.EXPECT().BulkWalkAll(root).Return([]gosnmp.SnmpPDU{{Name: fmt.Sprintf("%s.1.7.8", root), Type: gosnmp.OctetString, Value: []byte("Gi0/1")}}, nil)
+				handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return([]gosnmp.SnmpPDU{{Name: fmt.Sprintf("%s.1.7.8", root), Type: gosnmp.OctetString, Value: []byte("Gi0/1")}}, nil)
 				handler.EXPECT().Close().Return(nil)
-				coll.newSnmpClient = func() gosnmp.Handler { return handler }
+				coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return handler }
 				_, progress, err := collectTopologyVLANContext(context.Background(), coll, attempt.RegistrationID, dev, vlan, []*ddsnmp.Profile{profile}, nil)
 				require.NoError(t, err)
 				require.Equal(t, topologydiag.AcquisitionPhaseSuccess, progress.collection.Outcome)

@@ -80,9 +80,15 @@ func collectTopologyVLANContext(
 		return nil, progress, err
 	}
 	sourceRecorder := &ddsnmpcollector.SourceRecorder{}
-	client = sourceRecorder.Wrap(client)
 	collector := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient: client, Profiles: profiles, SysObjectID: dev.SysObjectID, DisableBulkWalk: dev.DisableBulkWalk, AcquisitionObserver: observer,
+		SnmpClient:          sourceRecorder.Wrap(client),
+		Version:             snmputils.ParseSNMPVersion(dev.SNMPVersion),
+		MaxOIDs:             dev.MaxOIDs,
+		MaxRepetitions:      dev.MaxRepetitions,
+		Profiles:            profiles,
+		SysObjectID:         dev.SysObjectID,
+		DisableBulkWalk:     dev.DisableBulkWalk,
+		AcquisitionObserver: observer,
 		Log: c.Logger.With(
 			slog.String("device", dev.Hostname),
 			slog.String("registration", registrationID.String()),
@@ -116,31 +122,25 @@ func initTopologyVLANClient(
 	c *Collector,
 	dev ddsnmp.DeviceConnectionInfo,
 	vlanID string,
-) (gosnmp.Handler, func(), topologyVLANProgress, error) {
+) (snmputils.Session, func(), topologyVLANProgress, error) {
 	progress := newTopologyVLANProgress()
 	if err := ctx.Err(); err != nil {
 		progress.interruption = snmputils.ClassifyFailure(err)
 		return nil, func() {}, progress, err
 	}
-	client, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
+	handler, err := newSNMPHandlerFromDeviceInfo(dev)
 	if err != nil {
 		progress.client = failedAcquisitionPhase(topologydiag.AcquisitionFailureClientConfiguration, err)
 		return nil, func() {}, progress, err
 	}
 	progress.client = successfulAcquisitionPhase()
-	switch client.Version() {
+	switch snmputils.ParseSNMPVersion(dev.SNMPVersion) {
 	case gosnmp.Version3:
-		client.SetContextName("vlan-" + vlanID)
+		handler.SetContextName("vlan-" + vlanID)
 	default:
-		baseCommunity := client.Community()
-		if baseCommunity == "" {
-			baseCommunity = dev.Community
-		}
-		client.SetCommunity(baseCommunity + "@" + vlanID)
+		handler.SetCommunity(dev.Community + "@" + vlanID)
 	}
-	if dev.MaxRepetitions != 0 {
-		client.SetMaxRepetitions(dev.MaxRepetitions)
-	}
+	client := c.newSnmpClient(handler)
 	if err := client.Connect(); err != nil {
 		progress.connect = failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect, err)
 		progress.interruption = snmputils.ClassifyFailure(ctx.Err())

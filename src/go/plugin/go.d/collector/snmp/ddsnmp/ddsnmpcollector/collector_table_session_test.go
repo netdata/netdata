@@ -58,7 +58,7 @@ func TestTableCollectionSession_CanonicalTableRoutes(t *testing.T) {
 			if test.missingOwner {
 				missingOIDs[test.ownerOIDs[0]] = true
 			}
-			collector := newTableCollector(nil, missingOIDs, newTableCache(time.Hour, 0), logger.New(), false)
+			collector := newTableCollector(nil, testRequests, 0, missingOIDs, newTableCache(time.Hour, 0), logger.New(), false)
 
 			var profiles []*ddsnmp.Profile
 			for i, oid := range test.ownerOIDs {
@@ -106,7 +106,7 @@ func BenchmarkTableCollectorCachedAuxiliaryRoutingScaling(b *testing.B) {
 			}
 
 			profile := createTestProfile("cached-auxiliary-scaling.yaml", configs)
-			collector := newTableCollector(nil, make(map[string]bool), cache, logger.New(), false)
+			collector := newTableCollector(nil, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 			identity := buildTableIdentity([]*ddsnmp.Profile{profile})
 
 			b.ReportAllocs()
@@ -137,7 +137,7 @@ func BenchmarkTableCollectionSessionDisabledCacheRollback(b *testing.B) {
 			state: tableRouteFresh,
 		}
 	}
-	collector := newTableCollector(nil, make(map[string]bool), newTableCache(0, 0), logger.New(), false)
+	collector := newTableCollector(nil, testRequests, 0, make(map[string]bool), newTableCache(0, 0), logger.New(), false)
 	session := newTableCollectionSession(collector, nil)
 
 	b.ReportAllocs()

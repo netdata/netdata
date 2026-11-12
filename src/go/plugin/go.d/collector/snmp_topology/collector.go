@@ -85,7 +85,7 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		topologyRegistry: newTopologyRegistryWithResolver(reverseDNS),
 		deviceSource:     deviceStore,
 		trapEnrichment:   trapEnrichment,
-		newSnmpClient:    gosnmp.NewHandler,
+		newSnmpClient:    snmputils.NewSession,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
@@ -126,7 +126,7 @@ type (
 		metrics *collectorMetrics
 
 		topologyProfiles func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
-		newSnmpClient    func() gosnmp.Handler
+		newSnmpClient    func(gosnmp.Handler) snmputils.Session
 		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
 		resolveTargetIPs func(context.Context, string) ([]netip.Addr, error)
 		now              func() time.Time
@@ -486,7 +486,7 @@ func (c *Collector) refreshDeviceTopology(
 		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 
-	snmpClient, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
+	handler, err := newSNMPHandlerFromDeviceInfo(dev)
 	if err != nil {
 		if recorder.evidence != nil {
 			recorder.evidence.Client = failedAcquisitionPhase(topologydiag.AcquisitionFailureClientConfiguration, err)
@@ -505,11 +505,9 @@ func (c *Collector) refreshDeviceTopology(
 			ctx.Client = successfulAcquisitionPhase()
 		}
 	}
-	snmpClient = recorder.sourceClient(snmpClient)
-	if dev.MaxRepetitions != 0 {
-		snmpClient.SetMaxRepetitions(dev.MaxRepetitions)
-	}
-	if err := snmpClient.Connect(); err != nil {
+	session := c.newSnmpClient(handler)
+	snmpClient := recorder.sourceClient(session)
+	if err := session.Connect(); err != nil {
 		if recorder.evidence != nil {
 			recorder.evidence.Connect = failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect, err)
 			if ctx := recorder.contextByOrdinal(0); ctx != nil {
@@ -531,9 +529,9 @@ func (c *Collector) refreshDeviceTopology(
 			ctx.Connect = successfulAcquisitionPhase()
 		}
 	}
-	stopContextClose := closeSNMPClientOnContextCancel(ctx, snmpClient)
+	stopContextClose := closeSNMPClientOnContextCancel(ctx, session)
 	defer stopContextClose()
-	defer func() { _ = snmpClient.Close() }()
+	defer func() { _ = session.Close() }()
 
 	if ctx.Err() != nil {
 		recorder.recordInterruption(ctx.Err())
@@ -561,8 +559,11 @@ func (c *Collector) refreshDeviceTopology(
 	}
 
 	coll := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient: snmpClient,
-		Profiles:   profiles,
+		SnmpClient:     snmpClient,
+		Version:        snmputils.ParseSNMPVersion(dev.SNMPVersion),
+		MaxOIDs:        dev.MaxOIDs,
+		MaxRepetitions: dev.MaxRepetitions,
+		Profiles:       profiles,
 		Log: c.Logger.With(
 			slog.String("device", dev.Hostname),
 			slog.String("registration", attemptID.RegistrationID.String()),
@@ -732,7 +733,7 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 	}
 }
 
-func closeSNMPClientOnContextCancel(ctx context.Context, client gosnmp.Handler) func() {
+func closeSNMPClientOnContextCancel(ctx context.Context, client snmputils.Session) func() {
 	done := make(chan struct{})
 	go func() {
 		select {
@@ -852,15 +853,16 @@ func (c *Collector) getTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) ([]*dds
 	return view.Profiles(), view.Context()
 }
 
-func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.DeviceConnectionInfo) (gosnmp.Handler, error) {
-	client := newClient()
+// newSNMPHandlerFromDeviceInfo builds the SNMP client the device's connection
+// settings describe; bulk walks pass the device's max-repetitions themselves.
+func newSNMPHandlerFromDeviceInfo(dev ddsnmp.DeviceConnectionInfo) (gosnmp.Handler, error) {
+	client := gosnmp.NewHandler()
 
 	client.SetTarget(dev.Hostname)
 	client.SetPort(uint16(dev.Port))
 	client.SetRetries(dev.Retries)
 	client.SetTimeout(time.Duration(dev.Timeout) * time.Second)
 	client.SetMaxOids(dev.MaxOIDs)
-	client.SetMaxRepetitions(dev.MaxRepetitions)
 
 	ver := snmputils.ParseSNMPVersion(dev.SNMPVersion)
 

@@ -58,15 +58,10 @@ type SysInfoProbe struct {
 	SeenSysLocation bool
 }
 
-// ScalarClient is sufficient for system and device metadata acquisition.
-type ScalarClient interface {
-	Get([]string) (*gosnmp.SnmpPacket, error)
-	MaxOids() int
-	Version() gosnmp.SnmpVersion
-}
-
-func GetSysInfo(client ScalarClient) (*SysInfo, error) {
-	pdus, err := getSysInfoPDUs(client)
+// GetSysInfo reads the system group with requests of at most maxOIDs OIDs, as a
+// client of the given SNMP version.
+func GetSysInfo(client ScalarClient, version gosnmp.SnmpVersion, maxOIDs int) (*SysInfo, error) {
+	pdus, err := getSysInfoPDUs(client, version, maxOIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +164,7 @@ func sysInfoOIDs() []string {
 	}
 }
 
-func getSysInfoPDUs(client ScalarClient) ([]gosnmp.SnmpPDU, error) {
-	maxOids := client.MaxOids()
+func getSysInfoPDUs(client ScalarClient, version gosnmp.SnmpVersion, maxOids int) ([]gosnmp.SnmpPDU, error) {
 	if maxOids < 1 {
 		return nil, WithFailure(
 			fmt.Errorf("get SNMP system scalars: invalid maximum OIDs per request %d", maxOids),
@@ -178,8 +172,6 @@ func getSysInfoPDUs(client ScalarClient) ([]gosnmp.SnmpPDU, error) {
 			"invalid_configuration",
 		)
 	}
-	version := client.Version()
-
 	oids := sysInfoOIDs()
 	pdus := make([]gosnmp.SnmpPDU, 0, len(oids))
 	for chunk := range slices.Chunk(oids, maxOids) {

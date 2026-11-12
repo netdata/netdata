@@ -140,6 +140,8 @@ func TestTypedTableRejectedRowsBoundedDiagnostics(t *testing.T) {
 							var output bytes.Buffer
 							var report AcquisitionProfileReport
 							collector := New(Config{
+								Version:    gosnmp.Version2c,
+								MaxOIDs:    1,
 								SnmpClient: handler,
 								Profiles:   []*ddsnmp.Profile{typedRejectionTestProfile(t, kind, tc)},
 								Log:        logger.NewWithWriter(&output),

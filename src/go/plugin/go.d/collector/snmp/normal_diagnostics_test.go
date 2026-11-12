@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -82,10 +82,8 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			bgpMissing := strings.HasPrefix(tc.failure, "missing_bgp")
 			handler, cleanup := mockInit(t)
 			defer cleanup()
-			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-			setMockClientInitExpect(handler)
-			handler.EXPECT().BulkWalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: "switch"}}, nil).Times(2)
-			handler.EXPECT().MaxOids().Return(20).AnyTimes()
+			setMockClientConnectExpect(handler)
+			handler.EXPECT().BulkWalkAll(snmputils.RootOidMibSystem, gomock.Any()).Return([]gosnmp.SnmpPDU{{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: "switch"}}, nil).Times(2)
 			poll := 0
 			handler.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
 				packet := &gosnmp.SnmpPacket{}
@@ -144,7 +142,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			creator := Creator(store, publisher)
 			c := creator.Create().(*Collector)
 			c.Config = prepareV2Config()
-			c.newSnmpClient = func() gosnmp.Handler { return handler }
+			c.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return handler }
 			// Inject profile input only; Init, Check, all acquisition, normalization
 			// and consumer commits run through their production implementations.
 			c.snmpProfiles = []*ddsnmp.Profile{normalTestProfile()}
@@ -160,7 +158,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 				cfg.Table = ddprofiledefinition.SymbolConfig{OID: root, Name: "peers"}
 				cfg.State.Symbol.OID = root + ".1"
 				cfg.MetricTags = []ddprofiledefinition.MetricTagConfig{{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: root + ".2", Name: "site"}}}
-				handler.EXPECT().BulkWalkAll(root).Return([]gosnmp.SnmpPDU{{Name: root + ".2.1", Type: gosnmp.OctetString, Value: "site"}}, nil).AnyTimes()
+				handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return([]gosnmp.SnmpPDU{{Name: root + ".2.1", Type: gosnmp.OctetString, Value: "site"}}, nil).AnyTimes()
 			}
 			if tc.failure == "missing_bgp_tags" {
 				c.snmpProfiles[0].Definition.BGP[0].MetricTags = []ddprofiledefinition.MetricTagConfig{{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: normalTestRoot + ".6.0", Name: "site"}}}

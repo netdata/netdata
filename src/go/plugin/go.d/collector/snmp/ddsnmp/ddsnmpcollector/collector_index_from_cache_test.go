@@ -116,11 +116,11 @@ func TestTableCollector_IndexFromHopRefresh(t *testing.T) {
 		"second hop failed":  {hop: indexFromSecondRoot, outcome: "failed"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			profile := indexFromCacheProfile()
 			cache := newTableCache(time.Hour, 0)
-			collector := newTableCollector(handler, make(map[string]bool), cache, logger.New(), false)
+			collector := newTableCollector(handler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 
 			for root, pdus := range indexFromCachePDUs(1, "old") {
 				expectSNMPWalk(handler, gosnmp.Version2c, root, pdus)
@@ -198,11 +198,11 @@ func TestTableCollector_IndexFromHopRefresh(t *testing.T) {
 }
 
 func TestTableCollector_IndexFromCachedRoutesReuseTags(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	profile := indexFromCacheProfile()
 	cache := newTableCache(time.Hour, 0)
-	collector := newTableCollector(handler, make(map[string]bool), cache, logger.New(), false)
+	collector := newTableCollector(handler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 	for root, pdus := range indexFromCachePDUs(1, "port-20") {
 		expectSNMPWalk(handler, gosnmp.Version2c, root, pdus)
 	}
@@ -229,11 +229,11 @@ func TestTableCollector_IndexFromCachedRoutesReuseTags(t *testing.T) {
 func TestTableCollector_IndexFromHopRefreshInvalidatesOmittedConsumer(t *testing.T) {
 	for name, root := range map[string]string{"first hop": indexFromFirstRoot, "second hop": indexFromSecondRoot, "final table": indexFromFinalRoot} {
 		t.Run(name, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			profile := indexFromCacheProfile()
 			cache := newTableCache(time.Hour, 0)
-			collector := newTableCollector(handler, make(map[string]bool), cache, logger.New(), false)
+			collector := newTableCollector(handler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 			for oid, pdus := range indexFromCachePDUs(1, "old") {
 				expectSNMPWalk(handler, gosnmp.Version2c, oid, pdus)
 			}
@@ -278,7 +278,7 @@ func TestTableCollector_IndexFromHopRefreshInvalidatesOmittedConsumer(t *testing
 func TestCollector_IndexFromTypedTableTags(t *testing.T) {
 	for _, consumer := range []string{"topology", "licensing", "bgp"} {
 		t.Run(consumer, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			profile := &ddsnmp.Profile{
 				SourceFile: consumer + "-index-from.yaml",
@@ -345,6 +345,8 @@ func TestCollector_IndexFromTypedTableTags(t *testing.T) {
 			require.NoError(t, ddprofiledefinition.ValidateEnrichProfile(profile.Definition))
 			ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: handler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),
@@ -511,6 +513,8 @@ func TestCollector_IndexFromTypedLookupTargetsDoNotCreateRows(t *testing.T) {
 						},
 					}
 					collector := New(Config{
+						Version:    gosnmp.Version2c,
+						MaxOIDs:    1,
 						SnmpClient: handler,
 						Profiles:   []*ddsnmp.Profile{profile},
 						Log:        logger.New(),

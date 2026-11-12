@@ -13,10 +13,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 type benchmarkTopologySNMPHandler struct {
-	gosnmp.Handler
+	snmputils.Client
 	pdus []gosnmp.SnmpPDU
 }
 
@@ -64,21 +65,11 @@ func benchmarkAcquisitionObserverModes() []struct {
 	}
 }
 
-func (h *benchmarkTopologySNMPHandler) Version() gosnmp.SnmpVersion {
-	return gosnmp.Version2c
-}
-
-func (h *benchmarkTopologySNMPHandler) BulkWalkAll(string) ([]gosnmp.SnmpPDU, error) {
+func (h *benchmarkTopologySNMPHandler) BulkWalkAll(string, uint32) ([]gosnmp.SnmpPDU, error) {
 	return h.pdus, nil
 }
 
-func (h *benchmarkTopologySNMPHandler) MaxOids() int {
-	return 4096
-}
-
 type benchmarkAcquisitionSNMPHandler struct{ benchmarkTopologySNMPHandler }
-
-func (*benchmarkAcquisitionSNMPHandler) MaxOids() int { return 10 }
 
 func (*benchmarkAcquisitionSNMPHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	packet := &gosnmp.SnmpPacket{Variables: make([]gosnmp.SnmpPDU, len(oids))}
@@ -115,7 +106,7 @@ func BenchmarkCollector_AcquisitionAccounting(b *testing.B) {
 		}
 		for _, mode := range benchmarkAcquisitionObserverModes()[:2] {
 			b.Run(name+"/observer="+mode.name, func(b *testing.B) {
-				cfg := Config{SnmpClient: &benchmarkAcquisitionSNMPHandler{}, Profiles: profiles, Log: logger.New()}
+				cfg := Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: &benchmarkAcquisitionSNMPHandler{}, Profiles: profiles, Log: logger.New()}
 				b.ReportAllocs()
 				for b.Loop() {
 					cfg.AcquisitionObserver = mode.new()
@@ -164,6 +155,8 @@ func BenchmarkCollector_NewTopologyProfiles(b *testing.B) {
 		for _, mode := range benchmarkAcquisitionObserverModes()[:2] {
 			b.Run(fmt.Sprintf("profiles=%d/observer=%s", profileCount, mode.name), func(b *testing.B) {
 				cfg := Config{
+					Version:             gosnmp.Version2c,
+					MaxOIDs:             4096,
 					SnmpClient:          &benchmarkTopologySNMPHandler{},
 					Profiles:            profiles,
 					Log:                 logger.New(),
@@ -197,6 +190,8 @@ func BenchmarkCollector_InitialCollectTopologyRows(b *testing.B) {
 				for b.Loop() {
 					observer := mode.new()
 					collector := New(Config{
+						Version:             gosnmp.Version2c,
+						MaxOIDs:             4096,
 						SnmpClient:          &benchmarkTopologySNMPHandler{pdus: pdus},
 						Profiles:            []*ddsnmp.Profile{profile},
 						Log:                 log,
@@ -227,7 +222,7 @@ func BenchmarkTableCollector_OrganizeRowsByCacheEligibility(b *testing.B) {
 		Table:   ddprofiledefinition.SymbolConfig{OID: tableOID, Name: "allocationTable"},
 		Symbols: []ddprofiledefinition.SymbolConfig{{OID: columnOID, Name: "value"}},
 	}
-	collector := newTableCollector(nil, make(map[string]bool), nil, logger.New(), false)
+	collector := newTableCollector(nil, testRequests, 0, make(map[string]bool), nil, logger.New(), false)
 
 	for _, rowCount := range []int{256, 4096} {
 		pdus := make(map[string]gosnmp.SnmpPDU, rowCount)
@@ -345,7 +340,7 @@ func BenchmarkCollector_WarmDiagnostics(b *testing.B) {
 			for n := range tc.tables {
 				profile.Definition.Topology = append(profile.Definition.Topology, benchmarkTopologyProfile(n).Definition.Topology...)
 			}
-			c := New(Config{SnmpClient: &benchmarkAcquisitionSNMPHandler{}, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+			c := New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: &benchmarkAcquisitionSNMPHandler{}, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 			if _, err := c.Collect(); err != nil {
 				b.Fatal(err)
 			}

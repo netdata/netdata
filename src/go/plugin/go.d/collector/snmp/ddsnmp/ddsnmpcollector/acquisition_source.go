@@ -27,12 +27,12 @@ type SourceRecorder struct {
 }
 
 type sourceClient struct {
-	gosnmp.Handler
+	snmputils.Client
 	recorder *SourceRecorder
 }
 
-func (r *SourceRecorder) Wrap(client gosnmp.Handler) gosnmp.Handler {
-	return &sourceClient{Handler: client, recorder: r}
+func (r *SourceRecorder) Wrap(client snmputils.Client) snmputils.Client {
+	return &sourceClient{Client: client, recorder: r}
 }
 
 func (c *sourceClient) SourceRecorder() *SourceRecorder { return c.recorder }
@@ -93,7 +93,7 @@ func (r *SourceRecorder) requestsSince(cursor uint64) map[string][]uint64 {
 
 func (c *sourceClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	start := time.Now()
-	packet, err := c.Handler.Get(oids)
+	packet, err := c.Client.Get(oids)
 	elapsed := time.Since(start)
 	var pdus []gosnmp.SnmpPDU
 	if packet != nil {
@@ -105,14 +105,14 @@ func (c *sourceClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 
 func (c *sourceClient) WalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
 	start := time.Now()
-	values, err := c.Handler.WalkAll(oid)
+	values, err := c.Client.WalkAll(oid)
 	c.recorder.recordWalk("walk", oid, start, time.Since(start), values, err)
 	return values, err
 }
 
-func (c *sourceClient) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
+func (c *sourceClient) BulkWalkAll(oid string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
 	start := time.Now()
-	values, err := c.Handler.BulkWalkAll(oid)
+	values, err := c.Client.BulkWalkAll(oid, maxRepetitions)
 	c.recorder.recordWalk("bulk_walk", oid, start, time.Since(start), values, err)
 	return values, err
 }

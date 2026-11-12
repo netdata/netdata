@@ -15,7 +15,7 @@ import (
 )
 
 func TestCollector_Collect_CiscoBgpPeer2PrefixProfile(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	prefixIndex := "1.4.192.0.2.1.1.128"
@@ -285,6 +285,8 @@ func TestCollector_Collect_CiscoBgpPeer2PrefixProfile(t *testing.T) {
 	require.NoError(t, ddsnmp.CompileTransforms(profile))
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),

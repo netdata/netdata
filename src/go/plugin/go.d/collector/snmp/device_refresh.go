@@ -25,7 +25,7 @@ func (c *Collector) refreshDeviceState() error {
 	}
 	defer func() { c.nextSysInfoCheck = c.now().Add(sysInfoCheckEvery) }()
 
-	observed, err := snmputils.GetSysInfo(c.snmpClient)
+	observed, err := c.getSysInfo()
 	if err != nil {
 		c.Limit("snmp:sysinfo", 1, 5*time.Minute).Warningf("failed to refresh SNMP system information: %v", err)
 		return c.pendingRebuildError()
@@ -171,17 +171,17 @@ func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	if len(profiles) == 0 {
 		return snmputils.WithFailure(noMetricProfilesError(si), "profile_resolution", "no_profiles")
 	}
-	client, disableBulk, repetitions, err := c.connectSNMPClient()
+	session, disableBulk, repetitions, err := c.connectSNMPClient()
 	if err != nil {
 		return err
 	}
 	// The diagnostic wrapper is owned by this attempt; transfer its underlying
 	// connection so finishing the attempt cannot restore the retired client.
-	previous := c.snmpClient
-	c.snmpClient = client
+	previous := c.snmpSession
+	c.snmpSession, c.snmpClient = session, session
 	if c.normal.client != nil {
-		previous, c.normal.client = c.normal.client, client
-		c.snmpClient = c.normal.recorder.Wrap(client)
+		c.normal.client = session
+		c.snmpClient = c.normal.recorder.Wrap(session)
 	}
 	c.sysInfo, c.snmpProfiles = si, profiles
 	c.disableBulkWalk, c.adjMaxRepetitions = disableBulk, repetitions

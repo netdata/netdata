@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -39,9 +39,8 @@ func newStatefulSNMPDevice() *statefulSNMPDevice {
 	}
 }
 
-func (d *statefulSNMPDevice) install(mockHandler *snmpmock.MockHandler) {
-	mockHandler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	mockHandler.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) {
+func (d *statefulSNMPDevice) install(mockHandler *snmpmock.MockSession) {
+	mockHandler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) {
 		root := trimOID(oid)
 		d.walkCount[root]++
 		if err := d.walkErrs[root]; err != nil {
@@ -84,7 +83,7 @@ func (d *statefulSNMPDevice) set(pdu gosnmp.SnmpPDU) {
 }
 
 func TestCollector_Collect_AlternatingOmissionDiscardsStaleDependent(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -133,6 +132,8 @@ func TestCollector_Collect_AlternatingOmissionDiscardsStaleDependent(t *testing.
 	device := newStatefulSNMPDevice()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{ownerProfile, sourceProfile},
 		Log:        logger.New(),
@@ -194,13 +195,15 @@ func TestCollector_Collect_AlternatingOmissionDiscardsStaleDependent(t *testing.
 }
 
 func TestCollector_Collect_BGPIneligibleWalkIsNotCached(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	cfg := tableBGPTestConfig()
 	device := newStatefulSNMPDevice()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles: []*ddsnmp.Profile{{
 			SourceFile: "vendor-device.yaml",
@@ -230,7 +233,7 @@ func TestCollector_Collect_BGPIneligibleWalkIsNotCached(t *testing.T) {
 }
 
 func TestCollector_Collect_LicensingIneligibleWalkIsNotCached(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	cfg := ddprofiledefinition.LicensingConfig{
@@ -260,6 +263,8 @@ func TestCollector_Collect_LicensingIneligibleWalkIsNotCached(t *testing.T) {
 	device := newStatefulSNMPDevice()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles: []*ddsnmp.Profile{{
 			SourceFile: "vendor-device.yaml",
@@ -289,7 +294,7 @@ func TestCollector_Collect_LicensingIneligibleWalkIsNotCached(t *testing.T) {
 
 func TestCollector_Collect_SharesEmptyDirectTableWalkPerPass(t *testing.T) {
 	t.Run("BGP", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
+		ctrl, mockHandler := setupMockSession(t)
 		defer ctrl.Finish()
 
 		first := tableBGPTestConfig()
@@ -298,6 +303,8 @@ func TestCollector_Collect_SharesEmptyDirectTableWalkPerPass(t *testing.T) {
 		device := newStatefulSNMPDevice()
 		device.install(mockHandler)
 		collector := New(Config{
+			Version:    gosnmp.Version2c,
+			MaxOIDs:    10,
 			SnmpClient: mockHandler,
 			Profiles: []*ddsnmp.Profile{{
 				SourceFile: "vendor-device.yaml",
@@ -317,7 +324,7 @@ func TestCollector_Collect_SharesEmptyDirectTableWalkPerPass(t *testing.T) {
 	})
 
 	t.Run("licensing", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
+		ctrl, mockHandler := setupMockSession(t)
 		defer ctrl.Finish()
 
 		first := ddprofiledefinition.LicensingConfig{
@@ -340,6 +347,8 @@ func TestCollector_Collect_SharesEmptyDirectTableWalkPerPass(t *testing.T) {
 		device := newStatefulSNMPDevice()
 		device.install(mockHandler)
 		collector := New(Config{
+			Version:    gosnmp.Version2c,
+			MaxOIDs:    10,
 			SnmpClient: mockHandler,
 			Profiles: []*ddsnmp.Profile{{
 				SourceFile: "vendor-device.yaml",
@@ -361,7 +370,7 @@ func TestCollector_Collect_SharesEmptyDirectTableWalkPerPass(t *testing.T) {
 
 func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 	t.Run("BGP primary", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
+		ctrl, mockHandler := setupMockSession(t)
 		defer ctrl.Finish()
 
 		first := tableBGPTestConfig()
@@ -372,6 +381,8 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 		device.install(mockHandler)
 		var stats ddsnmp.CollectionStats
 		collector := New(Config{
+			Version:    gosnmp.Version2c,
+			MaxOIDs:    10,
 			SnmpClient: mockHandler,
 			Profiles: []*ddsnmp.Profile{{
 				SourceFile: "vendor-device.yaml",
@@ -395,7 +406,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 	})
 
 	t.Run("BGP dependency", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
+		ctrl, mockHandler := setupMockSession(t)
 		defer ctrl.Finish()
 
 		first := crossTableBGPTestConfig()
@@ -410,6 +421,8 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 		device.walkErrs[dependencyOID] = errors.New("BGP dependency timeout")
 		device.install(mockHandler)
 		collector := New(Config{
+			Version:    gosnmp.Version2c,
+			MaxOIDs:    10,
 			SnmpClient: mockHandler,
 			Profiles: []*ddsnmp.Profile{{
 				SourceFile: "vendor-device.yaml",
@@ -433,7 +446,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 	})
 
 	t.Run("licensing primary", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
+		ctrl, mockHandler := setupMockSession(t)
 		defer ctrl.Finish()
 
 		first := ddprofiledefinition.LicensingConfig{
@@ -458,6 +471,8 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 		device.install(mockHandler)
 		var stats ddsnmp.CollectionStats
 		collector := New(Config{
+			Version:    gosnmp.Version2c,
+			MaxOIDs:    10,
 			SnmpClient: mockHandler,
 			Profiles: []*ddsnmp.Profile{{
 				SourceFile: "vendor-device.yaml",
@@ -481,7 +496,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 	})
 
 	t.Run("licensing dependency", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
+		ctrl, mockHandler := setupMockSession(t)
 		defer ctrl.Finish()
 
 		const (
@@ -524,6 +539,8 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 		device.walkErrs[dependencyOID] = errors.New("licensing dependency timeout")
 		device.install(mockHandler)
 		collector := New(Config{
+			Version:    gosnmp.Version2c,
+			MaxOIDs:    10,
 			SnmpClient: mockHandler,
 			Profiles: []*ddsnmp.Profile{{
 				SourceFile: "vendor-device.yaml",
@@ -547,7 +564,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 }
 
 func TestCollector_Collect_BGPCrossTableTagIsCurrentOnEveryCollection(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	cfg := ddprofiledefinition.BGPConfig{
@@ -587,6 +604,8 @@ func TestCollector_Collect_BGPCrossTableTagIsCurrentOnEveryCollection(t *testing
 	device := newStatefulSNMPDevice()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles: []*ddsnmp.Profile{{
 			SourceFile: "vendor-device.yaml",
@@ -619,7 +638,7 @@ func TestTableCollector_OrganizePDUsByRow_AllocatesCacheMapsOnlyWhenEligible(t *
 		columnOID = tableOID + ".1"
 		rowOID    = columnOID + ".7"
 	)
-	collector := newTableCollector(nil, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
+	collector := newTableCollector(nil, testRequests, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.New(), false)
 	config := ddprofiledefinition.MetricsConfig{
 		Table: ddprofiledefinition.SymbolConfig{
 			OID:  tableOID,

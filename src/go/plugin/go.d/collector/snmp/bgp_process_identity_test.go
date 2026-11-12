@@ -8,11 +8,11 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -42,12 +42,12 @@ func TestHuaweiProcessesRetainAllCountersThroughChartsAndFunctions(t *testing.T)
 			)
 		}
 	}
-	handler := snmpmock.NewMockHandler(gomock.NewController(t))
-	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	handler.EXPECT().BulkWalkAll(root).Return(pdus, nil).AnyTimes()
+	handler := snmpmock.NewMockSession(gomock.NewController(t))
+	handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return(pdus, nil).AnyTimes()
 
 	acquisition := ddsnmpcollector.New(
 		ddsnmpcollector.Config{
+			Version:    gosnmp.Version2c,
 			SnmpClient: handler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
@@ -60,6 +60,7 @@ func TestHuaweiProcessesRetainAllCountersThroughChartsAndFunctions(t *testing.T)
 				cloned.Definition = profile.Definition.Clone()
 				acquisition = ddsnmpcollector.New(
 					ddsnmpcollector.Config{
+						Version:    gosnmp.Version2c,
 						SnmpClient: handler,
 						Profiles:   []*ddsnmp.Profile{&cloned},
 						Log:        logger.New(),

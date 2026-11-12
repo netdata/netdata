@@ -8,26 +8,23 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/require"
 )
 
 type responseClient struct {
-	gosnmp.Handler
+	snmputils.Client
 	packet  *gosnmp.SnmpPacket
 	version gosnmp.SnmpVersion
 }
 
 func (c responseClient) Get([]string) (*gosnmp.SnmpPacket, error) { return c.packet, nil }
-func (c responseClient) MaxOids() int                             { return 10 }
-func (c responseClient) Version() gosnmp.SnmpVersion              { return c.version }
 
 type indexedMissingClient struct {
-	gosnmp.Handler
+	snmputils.Client
 	requests [][]string
 }
 
-func (c *indexedMissingClient) MaxOids() int                { return 10 }
-func (c *indexedMissingClient) Version() gosnmp.SnmpVersion { return gosnmp.Version1 }
 func (c *indexedMissingClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	c.requests = append(c.requests, slices.Clone(oids))
 	packet := &gosnmp.SnmpPacket{}
@@ -50,11 +47,11 @@ func TestMetadataGETRecoversIndexedV1MissingOIDs(t *testing.T) {
 	stats := &ddsnmp.CollectionStats{}
 	recorder := &SourceRecorder{ContextID: 7}
 	evidence := &negativeEvidence{}
-	observed := &diagnosticClient{Handler: recorder.Wrap(client), negative: evidence, failures: &ddsnmp.CollectionFailures{}}
+	observed := &diagnosticClient{Client: recorder.Wrap(client), negative: evidence, failures: &ddsnmp.CollectionFailures{}}
 	for _, oid := range oids {
 		require.False(t, isMissingOID(observed, missing, oid))
 	}
-	pdus, err := getSNMPValues(observed, oids, missing, stats)
+	pdus, err := getSNMPValues(observed, requestConfig{version: gosnmp.Version1, maxOIDs: 10}, oids, missing, stats)
 	require.NoError(t, err)
 	require.Equal(t, []string{"1.2.3", "1.2.4", "1.2.5"}, oids, "do not mutate callers' OID lists")
 	require.Equal(t, [][]string{{"1.2.3", "1.2.4", "1.2.5"}, {"1.2.4", "1.2.5"}, {"1.2.4"}}, client.requests)
@@ -69,7 +66,7 @@ func TestMetadataGETRecoversIndexedV1MissingOIDs(t *testing.T) {
 	require.EqualValues(t, 7, evidence.causes["1.2.5"].ContextID)
 }
 func TestMetadataGETRejectsPacketError(t *testing.T) {
-	_, err := getSNMPValues(responseClient{packet: &gosnmp.SnmpPacket{Error: gosnmp.GenErr}}, []string{"1.2.3"}, map[string]bool{}, &ddsnmp.CollectionStats{})
+	_, err := getSNMPValues(responseClient{packet: &gosnmp.SnmpPacket{Error: gosnmp.GenErr}}, requestConfig{version: gosnmp.Version1, maxOIDs: 10}, []string{"1.2.3"}, map[string]bool{}, &ddsnmp.CollectionStats{})
 	require.Error(t, err)
 }
 
@@ -77,7 +74,7 @@ func TestMetadataGETV1AllMissing(t *testing.T) {
 	client := &indexedMissingClient{}
 	missing := map[string]bool{}
 	stats := &ddsnmp.CollectionStats{}
-	pdus, err := getSNMPValues(client, []string{"1.2.3", "1.2.5"}, missing, stats)
+	pdus, err := getSNMPValues(client, requestConfig{version: gosnmp.Version1, maxOIDs: 10}, []string{"1.2.3", "1.2.5"}, missing, stats)
 	require.NoError(t, err)
 	require.Empty(t, pdus)
 	require.Len(t, missing, 2)
@@ -95,7 +92,7 @@ func TestMetadataGETRejectsUnrecoverableMissingResponse(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			missing := map[string]bool{}
 			stats := &ddsnmp.CollectionStats{}
-			_, err := getSNMPValues(client, []string{"1.2.3"}, missing, stats)
+			_, err := getSNMPValues(client, requestConfig{version: client.version, maxOIDs: 10}, []string{"1.2.3"}, missing, stats)
 			require.Error(t, err)
 			require.Empty(t, missing)
 			require.EqualValues(t, 1, stats.SNMP.GetRequests)

@@ -12,19 +12,22 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 // globalTagsCollector handles collection of profile-wide tags
 type globalTagsCollector struct {
-	snmpClient  gosnmp.Handler
+	snmpClient  snmputils.Client
+	req         requestConfig
 	missingOIDs map[string]bool
 	log         *logger.Logger
 	tagProc     *globalTagProcessor
 }
 
-func newGlobalTagsCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *globalTagsCollector {
+func newGlobalTagsCollector(snmpClient snmputils.Client, req requestConfig, missingOIDs map[string]bool, log *logger.Logger) *globalTagsCollector {
 	return &globalTagsCollector{
 		snmpClient:  snmpClient,
+		req:         req,
 		missingOIDs: missingOIDs,
 		log:         log,
 		tagProc:     newGlobalTagProcessor(),
@@ -164,5 +167,5 @@ func (gc *globalTagsCollector) identifyTagOIDs(metricTags []ddprofiledefinition.
 }
 
 func (gc *globalTagsCollector) fetchTagValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	return getSNMPValues(gc.snmpClient, oids, gc.missingOIDs, stats)
+	return getSNMPValues(gc.snmpClient, gc.req, oids, gc.missingOIDs, stats)
 }

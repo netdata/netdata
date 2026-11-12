@@ -48,7 +48,7 @@ func TestLookupFormatChangeInvalidatesCachedIdentity(t *testing.T) {
 			return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{createGauge32PDU(base+".1.1.65", 11)}}, nil
 		},
 	}
-	cached := newTableCollector(handler, make(map[string]bool), newTableCache(time.Hour, 0), logger.NewWithWriter(io.Discard), false)
+	cached := newTableCollector(handler, requestConfig{version: gosnmp.Version2c, maxOIDs: 1}, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.NewWithWriter(io.Discard), false)
 	first, err := cached.collect(profile(""), &ddsnmp.CollectionStats{})
 	require.NoError(t, err)
 	require.Len(t, first, 1)
@@ -57,7 +57,7 @@ func TestLookupFormatChangeInvalidatesCachedIdentity(t *testing.T) {
 	changed, err := cached.collect(profile("octet_string"), stats)
 	require.NoError(t, err)
 	require.Len(t, changed, 1)
-	fresh := newTableCollector(handler, make(map[string]bool), newTableCache(0, 0), logger.NewWithWriter(io.Discard), false)
+	fresh := newTableCollector(handler, requestConfig{version: gosnmp.Version2c, maxOIDs: 1}, 0, make(map[string]bool), newTableCache(0, 0), logger.NewWithWriter(io.Discard), false)
 	reference, err := fresh.collect(profile("octet_string"), &ddsnmp.CollectionStats{})
 	require.NoError(t, err)
 	require.Len(t, reference, 1)
@@ -113,7 +113,7 @@ func TestConcurrentLookupFormatsRetainCachedIdentity(t *testing.T) {
 			return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{createGauge32PDU(base+".1.1.65", 11)}}, nil
 		},
 	}
-	collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{prof}, Log: logger.NewWithWriter(io.Discard)})
+	collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: handler, Profiles: []*ddsnmp.Profile{prof}, Log: logger.NewWithWriter(io.Discard)})
 	for cycle := 0; cycle < 2; cycle++ {
 		results, err := collector.Collect()
 		require.NoError(t, err)

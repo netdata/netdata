@@ -99,7 +99,7 @@ func (c *Collector) collectDeviceMetrics(ctx context.Context) (map[string]int64,
 }
 
 func (c *Collector) ensureInitialized() error {
-	if c.snmpClient == nil {
+	if c.snmpSession == nil {
 		return errors.New("snmp client not initialized")
 	}
 
@@ -151,6 +151,9 @@ func (c *Collector) newProfileCollector() ddCollector {
 	}
 	return c.newDdSnmpColl(ddsnmpcollector.Config{
 		SnmpClient:          c.snmpClient,
+		Version:             c.snmpVersion(),
+		MaxOIDs:             c.Options.MaxOIDs,
+		MaxRepetitions:      c.adjMaxRepetitions,
 		Profiles:            c.snmpProfiles,
 		Log:                 c.Logger,
 		SysObjectID:         c.sysInfo.SysObjectID,
@@ -159,7 +162,7 @@ func (c *Collector) newProfileCollector() ddCollector {
 	})
 }
 
-func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
+func (c *Collector) initAndConnectSNMPClient() (snmputils.Session, error) {
 	client, disableBulk, repetitions, err := c.connectSNMPClient()
 	if err == nil {
 		c.disableBulkWalk, c.adjMaxRepetitions = disableBulk, repetitions
@@ -169,11 +172,12 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 
 // connectSNMPClient derives learned transport settings from authored options.
 // A replacement candidate must not alter the incumbent's client or settings.
-func (c *Collector) connectSNMPClient() (client gosnmp.Handler, disableBulk bool, repetitions uint32, err error) {
-	snmpClient, err := c.initSNMPClient()
+func (c *Collector) connectSNMPClient() (session snmputils.Session, disableBulk bool, repetitions uint32, err error) {
+	handler, err := c.configuredSNMPHandler()
 	if err != nil {
 		return nil, false, 0, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
 	}
+	snmpClient := c.newSnmpClient(handler)
 
 	if err := snmpClient.Connect(); err != nil {
 		return nil, false, 0, snmputils.WithFailure(fmt.Errorf("connect: %w", err), "connect", "")
@@ -184,7 +188,7 @@ func (c *Collector) connectSNMPClient() (client gosnmp.Handler, disableBulk bool
 		}
 	}()
 
-	if snmpClient.Version() == gosnmp.Version1 {
+	if c.snmpVersion() == gosnmp.Version1 {
 		return snmpClient, false, 0, nil
 	}
 
@@ -192,11 +196,11 @@ func (c *Collector) connectSNMPClient() (client gosnmp.Handler, disableBulk bool
 		return snmpClient, true, 0, nil
 	}
 
-	probeClient := snmpClient
+	var probeClient snmputils.Client = snmpClient
 	if c.normal != nil && c.normal.recorder != nil {
 		probeClient = c.normal.recorder.Wrap(snmpClient)
 	}
-	ok, err := c.adjustMaxRepetitions(probeClient)
+	repetitions, ok, err := c.adjustMaxRepetitions(probeClient)
 	if err != nil {
 		return nil, false, 0, snmputils.WithFailure(
 			fmt.Errorf("re-adjust max repetitions SNMP client: %w", err),
@@ -209,20 +213,22 @@ func (c *Collector) connectSNMPClient() (client gosnmp.Handler, disableBulk bool
 		disableBulk = true
 	}
 
-	return snmpClient, disableBulk, snmpClient.MaxRepetitions(), nil
+	return snmpClient, disableBulk, repetitions, nil
 }
 
-func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error) {
+// adjustMaxRepetitions returns the max-repetitions the device answered the
+// system group with, or the configured value when none did (ok false).
+func (c *Collector) adjustMaxRepetitions(snmpClient snmputils.Client) (uint32, bool, error) {
+	orig := c.Options.MaxRepetitions
 	ok, err := c.detectBulkWalkSupport(snmpClient)
 	if err != nil {
 		c.Warningf("bulk support probe error: %v", err)
-		return false, nil
+		return uint32(orig), false, nil
 	}
 	if !ok {
-		return false, nil
+		return uint32(orig), false, nil
 	}
 
-	orig := c.Options.MaxRepetitions
 	maxReps := c.Options.MaxRepetitions
 	attempts := 0
 	const maxAttempts = 20 // Prevent infinite loops
@@ -230,17 +236,16 @@ func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error
 	for maxReps > 0 && attempts < maxAttempts {
 		attempts++
 
-		v, err := snmpClient.BulkWalkAll(snmputils.RootOidMibSystem)
+		v, err := snmpClient.BulkWalkAll(snmputils.RootOidMibSystem, uint32(maxReps))
 		if err != nil {
-			return false, err
+			return 0, false, err
 		}
 
 		if len(v) > 0 {
-			//c.Config.OptionsConfig.MaxRepetitions = maxReps
 			if orig != maxReps {
 				c.Infof("adjusted max_repetitions: %d → %d (took %d attempts)", orig, maxReps, attempts)
 			}
-			return true, nil
+			return uint32(maxReps), true, nil
 		}
 
 		// Adaptive decrease strategy
@@ -258,13 +263,10 @@ func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error
 		maxReps = max(0, maxReps) // Ensure non-negative
 
 		c.Debugf("max_repetitions=%d returned no data, trying %d", prevMaxReps, maxReps)
-		snmpClient.SetMaxRepetitions(uint32(maxReps))
 	}
 
-	// Restore original value since nothing worked
-	snmpClient.SetMaxRepetitions(uint32(orig))
 	c.Debugf("unable to find working max_repetitions value after %d attempts", attempts)
-	return false, nil
+	return uint32(orig), false, nil
 }
 
 func isPingUnrecoverableError(err error) bool {
@@ -272,19 +274,25 @@ func isPingUnrecoverableError(err error) bool {
 	return errors.As(err, &errno) && (errors.Is(errno, syscall.EPERM) || errors.Is(errno, syscall.EACCES))
 }
 
-func (c *Collector) detectBulkWalkSupport(snmpClient gosnmp.Handler) (bool, error) {
-	if snmpClient.Version() == gosnmp.Version1 {
+func (c *Collector) detectBulkWalkSupport(snmpClient snmputils.Client) (bool, error) {
+	if c.snmpVersion() == gosnmp.Version1 {
 		return false, nil
 	}
 
 	// Use a very small max-reps for the probe to be gentle
-	orig := snmpClient.MaxRepetitions()
-	defer snmpClient.SetMaxRepetitions(orig)
-	snmpClient.SetMaxRepetitions(5)
-
-	oids, err := snmpClient.BulkWalkAll(snmputils.RootOidMibSystem)
+	oids, err := snmpClient.BulkWalkAll(snmputils.RootOidMibSystem, 5)
 	if err != nil {
 		return false, err
 	}
 	return len(oids) > 0, nil
+}
+
+// snmpVersion is the SNMP version the configuration selects.
+func (c *Collector) snmpVersion() gosnmp.SnmpVersion {
+	return snmputils.ParseSNMPVersion(c.Options.Version)
+}
+
+// getSysInfo reads the system group as the configured client.
+func (c *Collector) getSysInfo() (*snmputils.SysInfo, error) {
+	return snmputils.GetSysInfo(c.snmpClient, c.snmpVersion(), snmputils.MaxOIDsOrDefault(c.Options.MaxOIDs))
 }

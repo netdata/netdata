@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -85,9 +85,8 @@ licensing:
 		"backslash":   {"edge\\", "edge/"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			handler := snmpmock.NewMockHandler(gomock.NewController(t))
-			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-			handler.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) {
+			handler := snmpmock.NewMockSession(gomock.NewController(t))
+			handler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) {
 				require.Contains(t, []string{root + ".1", root + ".2", root + ".3"}, oid)
 				var pdus []gosnmp.SnmpPDU
 				for i, value := range values {
@@ -109,6 +108,7 @@ licensing:
 			}).AnyTimes()
 			acquisition := ddsnmpcollector.New(
 				ddsnmpcollector.Config{
+					Version:    gosnmp.Version2c,
 					SnmpClient: handler,
 					Profiles:   []*ddsnmp.Profile{profile},
 					Log:        logger.New(),

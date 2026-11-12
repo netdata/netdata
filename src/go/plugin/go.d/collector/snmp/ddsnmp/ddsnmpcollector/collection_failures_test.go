@@ -14,10 +14,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestCollectionFailuresObserveWarmPollAndRecovery(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	const scalarOID = "1.3.6.1.2.1.1.3.0"
 	const licenseOID = "1.3.6.1.4.1.99999.7.1.0"
@@ -137,11 +138,11 @@ func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			var failures ddsnmp.CollectionFailures
 			client := &diagnosticClient{
-				Handler:  handler,
+				Client:   handler,
 				failures: &failures,
 			}
 			var err error
@@ -151,9 +152,9 @@ func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
 				packet, err = client.Get([]string{"1.3.6"})
 				require.Same(t, tc.packet, packet)
 			} else {
-				handler.EXPECT().BulkWalkAll("1.3.6").Return(tc.values, tc.err)
+				handler.EXPECT().BulkWalkAll("1.3.6", gomock.Any()).Return(tc.values, tc.err)
 				var values []gosnmp.SnmpPDU
-				values, err = client.BulkWalkAll("1.3.6")
+				values, err = client.BulkWalkAll("1.3.6", 0)
 				require.Equal(t, tc.values, values)
 			}
 			if tc.err != nil {
@@ -168,7 +169,7 @@ func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
 }
 
 func TestReplacementClientKeepsFailureObservation(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	profile := createTestProfile(
 		"scalar.yaml",
@@ -180,6 +181,8 @@ func TestReplacementClientKeepsFailureObservation(t *testing.T) {
 		},
 	)
 	c := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: handler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -192,7 +195,7 @@ func TestReplacementClientKeepsFailureObservation(t *testing.T) {
 }
 
 func TestMetadataProcessingDoesNotRelabelLaterTransportFailure(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	const oid = "1.3.6.1.4.1.99999"
 	const first = oid + ".1.0"
@@ -225,6 +228,8 @@ func TestMetadataProcessingDoesNotRelabelLaterTransportFailure(t *testing.T) {
 		},
 	}
 	c := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  handler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		SysObjectID: oid,
@@ -287,14 +292,15 @@ func TestCollectionFailuresPreserveDependencyReasons(t *testing.T) {
 				"unknown":  {errors.New("synthetic transport error"), "unknown", "dependency"},
 			} {
 				t.Run(name, func(t *testing.T) {
-					ctrl, handler := setupMockHandler(t)
+					ctrl, handler := setupMockSession(t)
 					defer ctrl.Finish()
 					expectSNMPWalk(handler, gosnmp.Version2c, spec.mainOID, []gosnmp.SnmpPDU{
 						createGauge32PDU(spec.valueOID, 42),
 					})
-					handler.EXPECT().Version().Return(gosnmp.Version2c)
-					handler.EXPECT().BulkWalkAll(spec.dependencyOID).Return(nil, tc.cause)
+					handler.EXPECT().BulkWalkAll(spec.dependencyOID, gomock.Any()).Return(nil, tc.cause)
 					c := New(Config{
+						Version:    gosnmp.Version2c,
+						MaxOIDs:    10,
 						SnmpClient: handler,
 						Log:        logger.New(),
 						Profiles: []*ddsnmp.Profile{{
@@ -347,6 +353,8 @@ func TestAllRequestsFailedPreservesCacheProbeAndWalkErrors(t *testing.T) {
 		},
 	)
 	c := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    1,
 		SnmpClient: handler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),

@@ -32,11 +32,11 @@ func TestTableRejectedRowsBoundedLoggingAndRecovery(t *testing.T) {
 		"healthy neighbor fresh table": {goodNeighbor: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			var output bytes.Buffer
 			cache := newTableCache(tc.ttl, 0)
-			collector := newTableCollector(handler, make(map[string]bool), cache, logger.NewWithWriter(&output), false)
+			collector := newTableCollector(handler, testRequests, 0, make(map[string]bool), cache, logger.NewWithWriter(&output), false)
 			profile := &ddsnmp.Profile{
 				SourceFile: "custom.yaml",
 				Definition: def,
@@ -124,7 +124,7 @@ func TestTableRejectionDiagnosticsIdentifyEachProfile(t *testing.T) {
 		return []gosnmp.SnmpPDU{createGauge32PDU(base+".1.7.8", 10), createGauge32PDU(base+".2.7.8", 20)}, nil
 	}}
 	var output bytes.Buffer
-	collector := New(Config{SnmpClient: handler, Profiles: profiles, Log: logger.NewWithWriter(&output)})
+	collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: handler, Profiles: profiles, Log: logger.NewWithWriter(&output)})
 	firstLogBytes := 0
 	for cycle := 0; cycle < 2; cycle++ {
 		result, err := collector.Collect()
@@ -170,6 +170,8 @@ func BenchmarkTableRejectedRowSummary(b *testing.B) {
 			}
 			collector := newTableCollector(
 				nil,
+				testRequests,
+				0,
 				nil,
 				newTableCache(time.Hour, 0),
 				logger.NewWithWriter(io.Discard),
@@ -215,6 +217,8 @@ func BenchmarkCachedTableProcessingErrors(b *testing.B) {
 			}
 			collector := newTableCollector(
 				nil,
+				testRequests,
+				0,
 				nil,
 				newTableCache(time.Hour, 0),
 				logger.NewWithWriter(io.Discard),

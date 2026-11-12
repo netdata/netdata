@@ -74,10 +74,10 @@ func TestStockIndexTags_CollectWithoutIndexColumns(t *testing.T) {
 					require.False(t, strings.HasPrefix(pdu.Name, oid+"."), "fixture returned INDEX column %s", oid)
 				}
 			}
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			expectFixtureAgent(handler, pdus)
-			collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 			results, err := collector.Collect()
 			require.NoError(t, err)
 			require.Len(t, results, 1)

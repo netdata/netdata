@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func TestTopologyProductionPath_CatalogFixtureReconcilesLegacyAndModernIPRows(t *testing.T) {
@@ -240,6 +241,8 @@ func collectCatalogFixtureTopology(
 	require.NotEmpty(t, profiles, "stock catalog should resolve topology profiles")
 
 	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  fixture,
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,
@@ -269,6 +272,8 @@ func TestTopologyProductionPath_StockIOSXEFixture(t *testing.T) {
 	require.NotEmpty(t, profiles, "stock catalog should resolve Cisco topology profiles")
 
 	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  fixture,
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,
@@ -348,7 +353,7 @@ func TestTopologyProductionPath_LegacyARPPhysicalOnly(t *testing.T) {
 		},
 	}
 	handler := &topologySNMPRecHandler{
-		Handler: gosnmp.NewHandler(),
+		Session: snmputils.NewSession(gosnmp.NewHandler()),
 		entries: pdus,
 		byOID:   make(map[string]gosnmp.SnmpPDU, len(pdus)),
 	}
@@ -369,6 +374,8 @@ func TestTopologyProductionPath_LegacyARPPhysicalOnly(t *testing.T) {
 	require.NotEmpty(t, profiles)
 
 	profileMetrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  handler,
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,

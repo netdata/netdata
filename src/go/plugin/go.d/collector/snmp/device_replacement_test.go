@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 const replacementTestObjectID = "1.3.6.1.4.1.9.1.1166"
@@ -50,7 +50,7 @@ func TestCollectorRuntimeDeviceReplacement(t *testing.T) {
 
 	client, clientCloses := newReplacementTestClient(t, device, nil)
 	clientCreations := 0
-	c.newSnmpClient = func() gosnmp.Handler { clientCreations++; return client }
+	c.newSnmpClient = func(gosnmp.Handler) snmputils.Session { clientCreations++; return client }
 	var replacement *mockDdSnmpCollector
 	ddCreations := 0
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
@@ -125,7 +125,7 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	clientCreations := 0
 	failedClient, failedCloses := newReplacementTestClient(t, device, errors.New("synthetic connect failure"))
 	recoveredClient, recoveredCloses := newReplacementTestClient(t, device, nil)
-	c.newSnmpClient = func() gosnmp.Handler {
+	c.newSnmpClient = func(gosnmp.Handler) snmputils.Session {
 		clientCreations++
 		if clientCreations == 1 {
 			return failedClient
@@ -219,12 +219,10 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	assert.Equal(t, 1, *recoveredCloses)
 }
 
-func newReplacementTestClient(t *testing.T, device *refreshTestDevice, connectErr error) (*snmpmock.MockHandler, *int) {
+func newReplacementTestClient(t *testing.T, device *refreshTestDevice, connectErr error) (*snmpmock.MockSession, *int) {
 	t.Helper()
-	client := snmpmock.NewMockHandler(gomock.NewController(t))
+	client := snmpmock.NewMockSession(gomock.NewController(t))
 	// Register the concrete protocol before the shared helper's permissive getter.
-	client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	setMockClientSetterExpect(client)
 	client.EXPECT().Connect().Return(connectErr).Times(1)
 	closes := new(int)
 	closeCalls := 0
@@ -233,9 +231,8 @@ func newReplacementTestClient(t *testing.T, device *refreshTestDevice, connectEr
 	}
 	client.EXPECT().Close().DoAndReturn(func() error { *closes++; return nil }).Times(closeCalls)
 	if connectErr == nil {
-		client.EXPECT().MaxOids().Return(20).AnyTimes()
 		client.EXPECT().Get(gomock.Any()).DoAndReturn(device.Get).AnyTimes()
-		client.EXPECT().BulkWalkAll(snmputils.RootOidMibSystem).DoAndReturn(device.BulkWalkAll).Times(2)
+		client.EXPECT().BulkWalkAll(snmputils.RootOidMibSystem, gomock.Any()).DoAndReturn(device.BulkWalkAll).Times(2)
 	}
 	return client, closes
 }
@@ -287,7 +284,7 @@ func TestCollectorRuntimeReplacementDisablesUnselectedBGP(t *testing.T) {
 	require.Equal(t, 200, c.funcRouter.Handle(context.Background(), bgpPeersMethodID, nil).Status)
 	client, _ := newReplacementTestClient(t, device, nil)
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
-	c.newSnmpClient = func() gosnmp.Handler { return client }
+	c.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return client }
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 		require.False(t, profilesHaveBGP(cfg.Profiles), "the current catalog selection must not declare BGP")
 		return &mockDdSnmpCollector{
@@ -317,7 +314,7 @@ func TestCollectorRuntimeReplacementWithBlankAcquiredName(t *testing.T) {
 	guid := c.VirtualNode().GUID
 	client, _ := newReplacementTestClient(t, device, nil)
 	creations := 0
-	c.newSnmpClient = func() gosnmp.Handler { creations++; return client }
+	c.newSnmpClient = func(gosnmp.Handler) snmputils.Session { creations++; return client }
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector { return newReplacementTestDD(t, cfg) }
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
 	device.setText(snmputils.OidSysName, " \t\n ")

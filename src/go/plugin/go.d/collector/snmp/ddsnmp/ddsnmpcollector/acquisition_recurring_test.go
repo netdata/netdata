@@ -40,7 +40,9 @@ func TestRecurringTableEvidence(t *testing.T) {
 			}})
 			var reports []AcquisitionProfileReport
 			first := &SourceRecorder{ContextID: 1}
-			collector := New(Config{SnmpClient: first.Wrap(handler), Profiles: []*ddsnmp.Profile{profile}, Log: logger.New(),
+			collector := New(Config{
+				Version: gosnmp.Version2c,
+				MaxOIDs: 1, SnmpClient: first.Wrap(handler), Profiles: []*ddsnmp.Profile{profile}, Log: logger.New(),
 				AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, report) }),
 			})
 			_, err := collector.Collect()
@@ -102,7 +104,9 @@ func TestRecurringNegativeEvidence(t *testing.T) {
 			profile := createTestProfile("scalar.yaml", []ddprofiledefinition.MetricsConfig{{Symbol: ddprofiledefinition.SymbolConfig{OID: oid, Name: "missing"}}})
 			var report AcquisitionProfileReport
 			first := &SourceRecorder{ContextID: 11}
-			collector := New(Config{SnmpClient: first.Wrap(handler), Profiles: []*ddsnmp.Profile{profile}, Log: logger.New(),
+			collector := New(Config{
+				Version: gosnmp.Version2c,
+				MaxOIDs: 1, SnmpClient: first.Wrap(handler), Profiles: []*ddsnmp.Profile{profile}, Log: logger.New(),
 				AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = value }),
 			})
 			_, err := collector.Collect()
@@ -150,7 +154,9 @@ func TestRecurringDependencySettlementEvidence(t *testing.T) {
 			profile := createTestProfile("dependencies.yaml", []ddprofiledefinition.MetricsConfig{source, dependency})
 			var report AcquisitionProfileReport
 			first := &SourceRecorder{ContextID: 1}
-			collector := New(Config{SnmpClient: first.Wrap(handler), Profiles: []*ddsnmp.Profile{profile}, Log: logger.New(),
+			collector := New(Config{
+				Version: gosnmp.Version2c,
+				MaxOIDs: 1, SnmpClient: first.Wrap(handler), Profiles: []*ddsnmp.Profile{profile}, Log: logger.New(),
 				AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = value }),
 			})
 			_, err := collector.Collect()
@@ -210,7 +216,7 @@ func TestRecurringNegativeEvidenceIgnoresDynamicInstances(t *testing.T) {
 				{Symbol: ddprofiledefinition.SymbolConfig{OID: scalar, Name: "unsupported"}},
 				{Table: ddprofiledefinition.SymbolConfig{OID: root, Name: "table"}, Symbols: []ddprofiledefinition.SymbolConfig{{OID: root + ".1", Name: "value"}}},
 			})
-			collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 			for poll = 1; poll <= tc.polls; poll++ {
 				recorder := &SourceRecorder{ContextID: uint64(poll)}
 				collector.SetSNMPClient(recorder.Wrap(handler))

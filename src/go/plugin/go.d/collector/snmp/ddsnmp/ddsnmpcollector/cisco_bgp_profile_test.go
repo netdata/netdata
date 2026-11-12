@@ -15,7 +15,7 @@ import (
 )
 
 func TestCollector_Collect_CiscoBgpPeer3Profile(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.9", []gosnmp.SnmpPDU{
@@ -235,6 +235,8 @@ func TestCollector_Collect_CiscoBgpPeer3Profile(t *testing.T) {
 	require.NoError(t, ddsnmp.CompileTransforms(profile))
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
