@@ -538,7 +538,7 @@ modules:
           security: |
             Exposes discovered inventory object names and status attributes already visible through vSphere chart labels and metrics:<br/>• Does not expose the configured vCenter URL, username, or password
           availability: |
-            Available when:<br/>• The vSphere collector job is running<br/>• Initial discovery has completed successfully<br/>• Returns HTTP 503 while topology data is not cached yet
+            Available when:<br/>• The vSphere collector job is running<br/>• Initial discovery has completed successfully<br/>• Returns HTTP 503 while topology data is not cached yet<br/>• Viewing requires a signed-in member of a Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial
           require_cloud: true
     metrics:
       folding:

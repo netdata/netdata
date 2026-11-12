@@ -938,7 +938,7 @@ Browse events currently retained by one BMC log service in the Logs view. Select
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Redfish:logs` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Each query discovers linked services and reads every page and entry of the selected log before filtering. There is no event cap; cost grows with BMC retention and pagination. Reads share the job's `max_concurrent_requests` budget with metrics. The default UI refresh is 60 seconds. Slow full scans can fail at the Function deadline; narrow time or text filters do not reduce BMC reads. |
 | Security | Uses the job's existing credentials, TLS and proxy settings. Reading logs requires BMC permissions for the linked services and entries. Queries are read-only apart from creating and deleting their authentication sessions. Event messages may contain sensitive operational information; credentials and session tokens are not returned. |
 | Availability | Available for running jobs without waiting for a successful metric poll. An empty service selector means no supported linked services were advertised. Missing Entries support and inaccessible services return an error; an empty readable log returns an empty table. The view has no histogram, live tail or historical archive, and a multi-page read is not an atomic snapshot. |

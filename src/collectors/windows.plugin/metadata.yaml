@@ -1238,7 +1238,9 @@ modules:
         metrics_description: |
           Monitor SMB server share activity and throughput counters on Windows systems.
         method_description: |
-          It queries the 'SMB Server Shares' object from Perflib in order to gather the metrics.
+          It reads the 'SMB Server Shares' performance counters through the Performance Data Helper (PDH), the same
+          source as Performance Monitor and `Get-Counter`. The registry view of this object reports some counters
+          under the wrong names on some Windows builds, so it is not used.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -1248,7 +1250,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            This collector is enabled by default and automatically detects all available SMB share instances and metrics. On systems where the 'SMB Server Shares' object is not available, no SMB metrics are collected.
+            This collector is enabled by default and automatically detects all SMB shares served by this host. The aggregate `_Total` instance is not collected. On systems without the SMB server role, no SMB metrics are collected; the collector keeps checking and starts collecting once the role is installed, without restarting the Agent.
         limits:
           description: ""
         performance_impact:
@@ -1322,6 +1324,172 @@ modules:
               chart_type: line
               dimensions:
                 - name: opened
+            - name: smb.server_shares_tree_connects
+              description: Current number of tree connects (client connections) to the SMB share.
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: connects
+            - name: smb.server_shares_traffic
+              description: Bytes received and sent on the SMB share, including SMB protocol data such as packet headers.
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibSMBClient
+      monitored_instance:
+        name: SMB Client Shares
+        link: "https://learn.microsoft.com/en-us/windows-server/storage/file-server/file-server-smb-overview"
+        categories:
+          - data-collection.storage
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - smb
+        - smb client
+        - share
+        - network drive
+        - file sharing
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor the remote SMB shares this Windows host uses as a client: traffic, requests, queues, and latency.
+        method_description: |
+          It queries the 'SMB Client Shares' object from Perflib. Each remote share the host has open is one instance,
+          named `\server\share`; the aggregate `_Total` instance and names that do not split into a server and a
+          share are skipped.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector is enabled by default. It charts every remote share the host is connected to, including
+            shares connected after the Agent starts, and removes a share's charts when the connection closes. A host
+            with no SMB client connections produces no charts.
+        limits:
+          description: |
+            One set of nine charts is created per connected remote share; the number of charts follows the number of
+            shares the host has open.
+        performance_impact:
+          description: |
+            One Perflib query per collection interval.
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibSMBClient]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: SMB client share
+          description: "These metrics refer to a remote SMB share this host is connected to."
+          labels:
+            - name: server
+              description: Server part of the share path, as reported by the SMB Client Shares performance object.
+            - name: share
+              description: Share name on that server.
+          metrics:
+            - name: smb.client_share_traffic
+              description: SMB client share traffic
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_requests
+              description: SMB client share requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: metadata
+            - name: smb.client_share_smbdirect_traffic
+              description: SMB client share traffic via SMB Direct
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_smbdirect_requests
+              description: SMB client share requests via SMB Direct
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_turbo_io
+              description: SMB client share Turbo I/O requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_credit_stalls
+              description: SMB client share requests delayed by insufficient credits
+              unit: "stalls/s"
+              chart_type: line
+              dimensions:
+                - name: stalls
+            - name: smb.client_share_outstanding_requests
+              description: SMB client share outstanding requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: outstanding
+            - name: smb.client_share_avg_queue_length
+              description: SMB client share average queue length
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_latency
+              description: SMB client share average request latency
+              unit: "milliseconds"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: data
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibTerminalServices

@@ -74,8 +74,12 @@ func TestDeviceStoreLifecyclePrecedesTopologyRegistration(t *testing.T) {
 
 func TestDeviceStoreReplaceJobCommitsOneIncarnationTransition(t *testing.T) {
 	store := NewDeviceStore()
-	store.RegisterJob("old-config", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
-	store.Register("old-config", DeviceConnectionInfo{Hostname: "192.0.2.10"})
+	store.RegisterJob("old-config", DeviceLifecycleInfo{
+		Hostname: "192.0.2.10",
+	})
+	store.Register("old-config", DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+	})
 	oldCut := store.LifecycleCut()
 	status := DeviceLifecycleStatus{
 		Phase:       DeviceLifecyclePhaseInit,
@@ -101,7 +105,9 @@ func TestDeviceStoreReplaceJobCommitsOneIncarnationTransition(t *testing.T) {
 
 func TestDeviceStoreLifecycleCleanupAndReincarnation(t *testing.T) {
 	store := NewDeviceStore()
-	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{
+		Hostname: "192.0.2.10",
+	})
 	first := store.LifecycleCut()
 	require.Len(t, first.Entries, 1)
 
@@ -109,7 +115,9 @@ func TestDeviceStoreLifecycleCleanupAndReincarnation(t *testing.T) {
 	require.Empty(t, store.LifecycleCut().Entries)
 	require.Empty(t, store.Entries())
 
-	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{
+		Hostname: "192.0.2.10",
+	})
 	second := store.LifecycleCut()
 	require.Len(t, second.Entries, 1)
 	require.Greater(t, second.Entries[0].RegistrationID, first.Entries[0].RegistrationID)
@@ -117,8 +125,12 @@ func TestDeviceStoreLifecycleCleanupAndReincarnation(t *testing.T) {
 
 func TestDeviceStoreLifecycleCutIsSortedAndIndependent(t *testing.T) {
 	store := NewDeviceStore()
-	store.RegisterJob("switch-b", DeviceLifecycleInfo{Hostname: "switch-b"})
-	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "switch-a"})
+	store.RegisterJob("switch-b", DeviceLifecycleInfo{
+		Hostname: "switch-b",
+	})
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{
+		Hostname: "switch-a",
+	})
 
 	cut := store.LifecycleCut()
 	require.Len(t, cut.Entries, 2)
@@ -131,7 +143,9 @@ func TestDeviceStoreLifecycleCutIsSortedAndIndependent(t *testing.T) {
 
 func BenchmarkDeviceStoreRecordJobLifecycle(b *testing.B) {
 	store := NewDeviceStore()
-	store.RegisterJob("switch-a", DeviceLifecycleInfo{Hostname: "192.0.2.10"})
+	store.RegisterJob("switch-a", DeviceLifecycleInfo{
+		Hostname: "192.0.2.10",
+	})
 	status := DeviceLifecycleStatus{
 		Phase:       DeviceLifecyclePhaseCollect,
 		Outcome:     DeviceLifecycleOutcomeSuccess,
@@ -170,28 +184,38 @@ func TestDeviceStoreDevicesByHostname(t *testing.T) {
 
 func TestDeviceStoreDevicesByHostnameNoMatch(t *testing.T) {
 	store := NewDeviceStore()
-	store.Register("switch-a", DeviceConnectionInfo{Hostname: "switch-a.example.com"})
+	store.Register("switch-a", DeviceConnectionInfo{
+		Hostname: "switch-a.example.com",
+	})
 
 	require.Empty(t, store.DevicesByHostname("switch-b.example.com"))
 }
 
 func TestDeviceStoreDevicesByHostnameMatchesDNSCaseInsensitive(t *testing.T) {
 	store := NewDeviceStore()
-	store.Register("switch-a", DeviceConnectionInfo{Hostname: "Switch-A.Example.COM"})
+	store.Register("switch-a", DeviceConnectionInfo{
+		Hostname: "Switch-A.Example.COM",
+	})
 
 	require.Len(t, store.DevicesByHostname("switch-a.example.com"), 1)
 }
 
 func TestDeviceStoreDevicesByHostnameIndexUpdatesOnRegisterAndUnregister(t *testing.T) {
 	store := NewDeviceStore()
-	store.Register("switch-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "switch-a"})
+	store.Register("switch-a", DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		SysName:  "switch-a",
+	})
 
 	devices := store.DevicesByHostname("192.0.2.10")
 	require.Len(t, devices, 1)
 	dev := devices[0]
 	require.Equal(t, "switch-a", dev.SysName)
 
-	store.Register("switch-a", DeviceConnectionInfo{Hostname: "192.0.2.11", SysName: "switch-a-renumbered"})
+	store.Register("switch-a", DeviceConnectionInfo{
+		Hostname: "192.0.2.11",
+		SysName:  "switch-a-renumbered",
+	})
 
 	require.Empty(t, store.DevicesByHostname("192.0.2.10"))
 	devices = store.DevicesByHostname("192.0.2.11")
@@ -205,8 +229,14 @@ func TestDeviceStoreDevicesByHostnameIndexUpdatesOnRegisterAndUnregister(t *test
 
 func TestDeviceStoreDevicesByHostnameReturnsAllMatches(t *testing.T) {
 	store := NewDeviceStore()
-	store.Register("switch-b", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "switch-b"})
-	store.Register("switch-a", DeviceConnectionInfo{Hostname: "::ffff:192.0.2.10", SysName: "switch-a"})
+	store.Register("switch-b", DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		SysName:  "switch-b",
+	})
+	store.Register("switch-a", DeviceConnectionInfo{
+		Hostname: "::ffff:192.0.2.10",
+		SysName:  "switch-a",
+	})
 
 	devices := store.DevicesByHostname("192.0.2.10")
 	require.Len(t, devices, 2)
@@ -239,8 +269,14 @@ func TestDeviceStoreRegisterClonesReferenceFields(t *testing.T) {
 
 func TestDeviceStoreEntriesAreSortedByRegistrationID(t *testing.T) {
 	store := NewDeviceStore()
-	store.Register("job-b", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "switch-b"})
-	store.Register("job-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "switch-a"})
+	store.Register("job-b", DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		SysName:  "switch-b",
+	})
+	store.Register("job-a", DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		SysName:  "switch-a",
+	})
 
 	entries := store.Entries()
 	require.Len(t, entries, 2)
@@ -251,40 +287,84 @@ func TestDeviceStoreEntriesAreSortedByRegistrationID(t *testing.T) {
 
 func TestDeviceStoreRegistrationIdentityChangesOnlyAfterUnregister(t *testing.T) {
 	store := NewDeviceStore()
-	store.Register("owner-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "initial"})
+	store.Register("owner-a", DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		SysName:  "initial",
+	})
 
 	entries := store.Entries()
 	require.Len(t, entries, 1)
 	initialIdentity := entries[0].RegistrationID
 
-	store.Register("owner-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "updated"})
+	store.Register("owner-a", DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		SysName:  "updated",
+	})
 	entries = store.Entries()
 	require.Len(t, entries, 1)
-	require.Equal(t, initialIdentity, entries[0].RegistrationID, "live metadata updates must retain the registration identity")
+	require.Equal(
+		t,
+		initialIdentity,
+		entries[0].RegistrationID,
+		"live metadata updates must retain the registration identity",
+	)
 
 	store.Unregister("owner-a")
-	store.Register("owner-a", DeviceConnectionInfo{Hostname: "192.0.2.10", SysName: "replacement"})
+	store.Register("owner-a", DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+		SysName:  "replacement",
+	})
 	entries = store.Entries()
 	require.Len(t, entries, 1)
-	require.Greater(t, entries[0].RegistrationID, initialIdentity, "replacement registrations must receive a new identity")
+	require.Greater(
+		t,
+		entries[0].RegistrationID,
+		initialIdentity,
+		"replacement registrations must receive a new identity",
+	)
 }
 
 func TestDeviceWriterCannotReviveRemovedOrReplaceSuccessor(t *testing.T) {
 	store := NewDeviceStore()
-	first := store.ReplaceJob("", "same-config", DeviceLifecycleInfo{Hostname: "first"}, DeviceLifecycleStatus{}, nil)
-	first.UpdateDevice(DeviceConnectionInfo{Hostname: "first"})
+	first := store.ReplaceJob("", "same-config", DeviceLifecycleInfo{
+		Hostname: "first",
+	}, DeviceLifecycleStatus{}, nil)
+	first.UpdateDevice(DeviceConnectionInfo{
+		Hostname: "first",
+	})
 	require.Len(t, store.Entries(), 1)
-	successor := store.ReplaceJob("same-config", "same-config", DeviceLifecycleInfo{Hostname: "successor"}, DeviceLifecycleStatus{}, nil)
-	first.UpdateDevice(DeviceConnectionInfo{Hostname: "retired"})
-	first.RecordLifecycle(DeviceLifecycleStatus{Phase: DeviceLifecyclePhaseCollect, Outcome: DeviceLifecycleOutcomeFailed})
+	successor := store.ReplaceJob(
+		"same-config",
+		"same-config",
+		DeviceLifecycleInfo{
+			Hostname: "successor",
+		},
+		DeviceLifecycleStatus{},
+		nil,
+	)
+	first.UpdateDevice(DeviceConnectionInfo{
+		Hostname: "retired",
+	})
+	first.RecordLifecycle(
+		DeviceLifecycleStatus{
+			Phase:   DeviceLifecyclePhaseCollect,
+			Outcome: DeviceLifecycleOutcomeFailed,
+		},
+	)
 	require.Empty(t, store.Entries())
 	require.Equal(t, "successor", store.LifecycleCut().Entries[0].Info.Hostname)
 	require.Equal(t, DeviceLifecyclePhaseUnknown, store.LifecycleCut().Entries[0].LastCompleted.Phase)
-	successor.UpdateDevice(DeviceConnectionInfo{Hostname: "successor"})
+	successor.UpdateDevice(DeviceConnectionInfo{
+		Hostname: "successor",
+	})
 	require.Equal(t, "successor", store.Entries()[0].Info.Hostname)
 	store.Unregister("same-config")
-	successor.UpdateDevice(DeviceConnectionInfo{Hostname: "retired"})
-	successor.RecordLifecycle(DeviceLifecycleStatus{Phase: DeviceLifecyclePhaseCollect})
+	successor.UpdateDevice(DeviceConnectionInfo{
+		Hostname: "retired",
+	})
+	successor.RecordLifecycle(DeviceLifecycleStatus{
+		Phase: DeviceLifecyclePhaseCollect,
+	})
 	require.Empty(t, store.Entries())
 	require.Empty(t, store.LifecycleCut().Entries)
 }
@@ -295,9 +375,20 @@ func BenchmarkDeviceWriterLifecycle(b *testing.B) {
 			store := NewDeviceStore()
 			var writer *DeviceWriter
 			for i := range count {
-				writer = store.ReplaceJob("", strconv.Itoa(i), DeviceLifecycleInfo{Hostname: "switch.example"}, DeviceLifecycleStatus{}, nil)
+				writer = store.ReplaceJob(
+					"",
+					strconv.Itoa(i),
+					DeviceLifecycleInfo{
+						Hostname: "switch.example",
+					},
+					DeviceLifecycleStatus{},
+					nil,
+				)
 			}
-			status := DeviceLifecycleStatus{Phase: DeviceLifecyclePhaseCollect, Outcome: DeviceLifecycleOutcomeSuccess}
+			status := DeviceLifecycleStatus{
+				Phase:   DeviceLifecyclePhaseCollect,
+				Outcome: DeviceLifecycleOutcomeSuccess,
+			}
 			b.ReportAllocs()
 			for b.Loop() {
 				writer.RecordLifecycle(status)
@@ -324,21 +415,33 @@ func TestDeviceStoreLifecycleChangeNotifications(t *testing.T) {
 			s.RecordJobLifecycle("job", status)
 		}, false},
 		"readiness": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
-			s.Register("job", DeviceConnectionInfo{Hostname: "switch.example"})
+			s.Register("job", DeviceConnectionInfo{
+				Hostname: "switch.example",
+			})
 		}, true},
 		"same identity": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
-			s.RegisterJob("job", DeviceLifecycleInfo{Hostname: "switch.example"})
+			s.RegisterJob("job", DeviceLifecycleInfo{
+				Hostname: "switch.example",
+			})
 		}, false},
 		"changed identity": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) {
-			s.RegisterJob("job", DeviceLifecycleInfo{Hostname: "other.example"})
+			s.RegisterJob("job", DeviceLifecycleInfo{
+				Hostname: "other.example",
+			})
 		}, true},
 		"remove":        {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { s.Unregister("job") }, true},
 		"remove absent": {func(s *DeviceStore, w *DeviceWriter, status DeviceLifecycleStatus) { s.Unregister("absent") }, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			store := NewDeviceStore()
-			status := DeviceLifecycleStatus{Phase: DeviceLifecyclePhaseCollect, Outcome: DeviceLifecycleOutcomeSuccess, CompletedAt: time.Now()}
-			writer := store.ReplaceJob("", "job", DeviceLifecycleInfo{Hostname: "switch.example"}, status, nil)
+			status := DeviceLifecycleStatus{
+				Phase:       DeviceLifecyclePhaseCollect,
+				Outcome:     DeviceLifecycleOutcomeSuccess,
+				CompletedAt: time.Now(),
+			}
+			writer := store.ReplaceJob("", "job", DeviceLifecycleInfo{
+				Hostname: "switch.example",
+			}, status, nil)
 			<-store.LifecycleChanges()
 			revision := store.LifecycleRevision()
 			tc.change(store, writer, status)
@@ -361,13 +464,21 @@ func TestDeviceStoreReplaceJobChangeNotifications(t *testing.T) {
 		status   DeviceLifecycleStatus
 		device   *DeviceConnectionInfo
 	}
-	info := DeviceLifecycleInfo{Hostname: "192.0.2.10", Port: 161, SNMPVersion: "2c"}
-	device := &DeviceConnectionInfo{Hostname: "192.0.2.10"}
-	failed := DeviceLifecycleStatus{PreparationFailure: collectorapi.JobConfigFailure{
-		Stage:       "vnode",
-		Reason:      "missing_vnode",
-		CompletedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC),
-	}}
+	info := DeviceLifecycleInfo{
+		Hostname:    "192.0.2.10",
+		Port:        161,
+		SNMPVersion: "2c",
+	}
+	device := &DeviceConnectionInfo{
+		Hostname: "192.0.2.10",
+	}
+	failed := DeviceLifecycleStatus{
+		PreparationFailure: collectorapi.JobConfigFailure{
+			Stage:       "vnode",
+			Reason:      "missing_vnode",
+			CompletedAt: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC),
+		},
+	}
 	retried := failed
 	retried.PreparationFailure.CompletedAt = retried.PreparationFailure.CompletedAt.Add(time.Second)
 	pending := failed
@@ -386,42 +497,117 @@ func TestDeviceStoreReplaceJobChangeNotifications(t *testing.T) {
 		wantChange bool
 	}{
 		"repeated preparation failure": {
-			initial: replacement{owner: "job", info: info, status: failed},
-			next:    replacement{previous: "job", owner: "job", info: info, status: retried},
+			initial: replacement{
+				owner:  "job",
+				info:   info,
+				status: failed,
+			},
+			next: replacement{
+				previous: "job",
+				owner:    "job",
+				info:     info,
+				status:   retried,
+			},
 		},
 		"repeated ready projection": {
-			initial: replacement{owner: "job", info: info, status: collected, device: device},
-			next:    replacement{previous: "job", owner: "job", info: info, status: recollected, device: device},
+			initial: replacement{
+				owner:  "job",
+				info:   info,
+				status: collected,
+				device: device,
+			},
+			next: replacement{
+				previous: "job",
+				owner:    "job",
+				info:     info,
+				status:   recollected,
+				device:   device,
+			},
 		},
 		"preparation failure reason": {
-			initial:    replacement{owner: "job", info: info, status: failed},
-			next:       replacement{previous: "job", owner: "job", info: info, status: pending},
+			initial: replacement{
+				owner:  "job",
+				info:   info,
+				status: failed,
+			},
+			next: replacement{
+				previous: "job",
+				owner:    "job",
+				info:     info,
+				status:   pending,
+			},
 			wantChange: true,
 		},
 		"identity": {
-			initial:    replacement{owner: "job", info: info, status: failed},
-			next:       replacement{previous: "job", owner: "job", info: DeviceLifecycleInfo{Hostname: "192.0.2.20"}, status: failed},
+			initial: replacement{
+				owner:  "job",
+				info:   info,
+				status: failed,
+			},
+			next: replacement{
+				previous: "job",
+				owner:    "job",
+				info: DeviceLifecycleInfo{
+					Hostname: "192.0.2.20",
+				},
+				status: failed,
+			},
 			wantChange: true,
 		},
 		"readiness gained": {
-			initial:    replacement{owner: "job", info: info, status: collected},
-			next:       replacement{previous: "job", owner: "job", info: info, status: collected, device: device},
+			initial: replacement{
+				owner:  "job",
+				info:   info,
+				status: collected,
+			},
+			next: replacement{
+				previous: "job",
+				owner:    "job",
+				info:     info,
+				status:   collected,
+				device:   device,
+			},
 			wantChange: true,
 		},
 		"readiness lost": {
-			initial:    replacement{owner: "job", info: info, status: collected, device: device},
-			next:       replacement{previous: "job", owner: "job", info: info, status: collected},
+			initial: replacement{
+				owner:  "job",
+				info:   info,
+				status: collected,
+				device: device,
+			},
+			next: replacement{
+				previous: "job",
+				owner:    "job",
+				info:     info,
+				status:   collected,
+			},
 			wantChange: true,
 		},
 		"new incarnation": {
-			initial:    replacement{owner: "job", info: info, status: failed},
-			next:       replacement{previous: "job", owner: "successor", info: info, status: failed},
+			initial: replacement{
+				owner:  "job",
+				info:   info,
+				status: failed,
+			},
+			next: replacement{
+				previous: "job",
+				owner:    "successor",
+				info:     info,
+				status:   failed,
+			},
 			wantChange: true,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			store := NewDeviceStore()
-			store.ReplaceJob(tc.initial.previous, tc.initial.owner, tc.initial.info, tc.initial.status, tc.initial.device)
+			store.ReplaceJob(
+				tc.initial.previous,
+				tc.initial.owner,
+				tc.initial.info,
+				tc.initial.status,
+				tc.initial.device,
+			)
 			<-store.LifecycleChanges()
 			revision := store.LifecycleRevision()
 			store.ReplaceJob(tc.next.previous, tc.next.owner, tc.next.info, tc.next.status, tc.next.device)
@@ -465,4 +651,49 @@ func TestDeviceWriterProfileContextChangeNotifications(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDeviceStoreWithdrawPreservesRegistrationAndWriterAuthority(t *testing.T) {
+	store := NewDeviceStore()
+	info := DeviceConnectionInfo{
+		Hostname:      "192.0.2.10",
+		VnodeHostname: "before",
+	}
+	previous := store.ReplaceJob(
+		"",
+		"job",
+		DeviceLifecycleInfo{
+			Hostname: info.Hostname,
+		},
+		DeviceLifecycleStatus{},
+		&info,
+	)
+	id := previous.RegistrationID()
+	info.VnodeHostname = "current"
+	current := store.ReplaceJob(
+		"job",
+		"job",
+		DeviceLifecycleInfo{
+			Hostname: info.Hostname,
+		},
+		DeviceLifecycleStatus{},
+		&info,
+	)
+	previous.WithdrawDevice()
+	require.Len(t, store.Entries(), 1, "retired runtimes cannot withdraw the accepted connection")
+	current.WithdrawDevice()
+	require.Empty(t, store.Entries())
+	require.Empty(t, store.DevicesByHostname(info.Hostname))
+	cut := store.LifecycleCut()
+	require.Len(t, cut.Entries, 1)
+	require.Equal(t, id, cut.Entries[0].RegistrationID)
+	require.False(t, cut.Entries[0].TopologyReady)
+	current.UpdateDevice(info)
+	entries := store.Entries()
+	require.Len(t, entries, 1)
+	require.Equal(t, id, entries[0].RegistrationID)
+	require.Equal(t, "current", entries[0].Info.VnodeHostname)
+	store.WithdrawDevice("job")
+	require.Empty(t, store.Entries())
+	require.Equal(t, id, current.RegistrationID())
 }

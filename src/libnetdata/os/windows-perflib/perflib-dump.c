@@ -412,6 +412,30 @@ bool dumpObjectCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, vo
     buffer_json_member_add_int64(wb, "DefaultCounter", pObjectType->DefaultCounter);
     buffer_json_member_add_string(wb, "DetailLevel", GetDetailLevel(pObjectType->DetailLevel));
 
+    // Every definition in walk order, base counters included, so offsets can be checked against the values below.
+    buffer_json_member_add_array(wb, "CounterDefinitions");
+    PERF_COUNTER_DEFINITION *pCounter = NULL;
+    for(DWORD c = 0; c < pObjectType->NumCounters; c++) {
+        pCounter = perflibForEachCounterDefinition(pDataBlock, pObjectType, pCounter);
+        if(!pCounter)
+            break;
+
+        buffer_json_add_array_item_object(wb);
+        buffer_json_member_add_uint64(wb, "Index", c);
+        buffer_json_member_add_uint64(wb, "NameId", pCounter->CounterNameTitleIndex);
+        buffer_json_member_add_string(wb, "Name", RegistryFindNameByID(pCounter->CounterNameTitleIndex));
+        buffer_json_member_add_uint64(wb, "HelpId", pCounter->CounterHelpTitleIndex);
+        buffer_json_member_add_string(wb, "Type", getCounterType(pCounter->CounterType));
+        buffer_json_member_add_uint64(wb, "TypeId", pCounter->CounterType);
+        buffer_json_member_add_uint64(wb, "CounterSize", pCounter->CounterSize);
+        buffer_json_member_add_uint64(wb, "CounterOffset", pCounter->CounterOffset);
+        buffer_json_member_add_int64(wb, "DefaultScale", pCounter->DefaultScale);
+        buffer_json_member_add_string(wb, "DetailLevel", GetDetailLevel(pCounter->DetailLevel));
+        buffer_json_member_add_uint64(wb, "ByteLength", pCounter->ByteLength);
+        buffer_json_object_close(wb);
+    }
+    buffer_json_array_close(wb); // CounterDefinitions
+
     if(ObjectTypeHasInstances(pDataBlock, pObjectType))
         buffer_json_member_add_array(wb, "Instances");
     else
@@ -436,6 +460,9 @@ bool dumpInstanceCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, 
     buffer_json_add_array_item_object(wb);
     buffer_json_member_add_string(wb, "Instance", name);
     buffer_json_member_add_int64(wb, "UniqueID", pInstance->UniqueID);
+    // The traversal validated this counter block before calling us; offsets are relative to its start.
+    PERF_COUNTER_BLOCK *pCounterBlock = (PERF_COUNTER_BLOCK *)((PBYTE)pInstance + pInstance->ByteLength);
+    buffer_json_member_add_uint64(wb, "CounterBlockLength", pCounterBlock->ByteLength);
     buffer_json_member_add_array(wb, "Labels");
     {
         buffer_json_add_array_item_object(wb);

@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartemit"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -236,4 +238,47 @@ func TestAcquireDeviceIdentityWithoutMetricsJob(t *testing.T) {
 		},
 	}
 	assert.Equal(t, want, identity)
+}
+
+func TestAcquiredDeviceNameUsesTrimmedFallback(t *testing.T) {
+	for _, tc := range []struct{ name, wireName, authored, want string }{
+		{"blank acquired", " \t\n ", "", "snmp-device"},
+		{"trim acquired", " router ", "", "router"},
+		{"authored hostname", " ", " authored ", " authored "},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := snmpmock.NewMockHandler(gomock.NewController(t))
+			client.EXPECT().MaxOids().Return(20).AnyTimes()
+			client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			client.EXPECT().
+				Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject, snmputils.OidSysContact, snmputils.OidSysName, snmputils.OidSysLocation}).
+				Return(&gosnmp.SnmpPacket{
+					Variables: []gosnmp.SnmpPDU{
+						{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte(tc.wireName)},
+					},
+				}, nil)
+			si, err := snmputils.GetSysInfo(client)
+			require.NoError(t, err)
+			original := *si
+			identity, err := ddsnmp.ComposeDeviceIdentity(
+				si,
+				nil,
+				ddsnmp.DeviceIdentityOptions{
+					Address:  "192.0.2.1",
+					Hostname: tc.authored,
+				},
+			)
+			require.NoError(t, err)
+			_, err = chartemit.PrepareHostInfo(
+				netdataapi.HostInfo{
+					GUID:     identity.GUID,
+					Hostname: identity.Hostname,
+					Labels:   identity.Labels,
+				},
+			)
+			require.NoError(t, err, "acquired names must remain publishable")
+			assert.Equal(t, tc.want, identity.Hostname)
+			assert.Equal(t, original, *si, "borrowed system metadata is unchanged")
+		})
+	}
 }

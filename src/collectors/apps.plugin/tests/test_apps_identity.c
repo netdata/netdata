@@ -66,12 +66,17 @@ static bool test_refresh_schedule(void) {
     CHECK(strcmp(string2str(p.comm), "clickhouse-serv") == 0);
     CHECK(!p.matched_by_config);
 
-    // A failed refresh clears stale matching and retries on the next scheduled iteration.
+    // A failed refresh keeps the cached cmdline and matching; the next scheduled iteration retries.
     os_cmdline = NULL;
     p.target = &assigned;
+    p.identity_changed = false;
+    p.matched_by_config = true;
     global_iterations_counter = 120;
     update_pid_comm(&p, "clickhouse-serv");
-    CHECK(!p.cmdline && !p.target);
+    CHECK(cmdline_reads == 6);
+    CHECK(strcmp(string2str(p.cmdline), "/bin/other --new") == 0);
+    CHECK(strcmp(string2str(p.comm), "clickhouse-serv") == 0);
+    CHECK(p.target == &assigned && !p.identity_changed && p.matched_by_config);
     os_cmdline = "/bin/clickhouse-server --recovered";
     for(global_iterations_counter = 121; global_iterations_counter <= 150; global_iterations_counter++)
         update_pid_comm(&p, "clickhouse-serv");
@@ -85,10 +90,13 @@ static bool test_staggering_and_initial_failure(void) {
     struct pid_stat processes[30] = {0};
     global_iterations_counter = 1;
     os_cmdline = NULL;
+    cmdline_reads = 0;
     for(size_t i = 0; i < 30; i++) {
         processes[i].pid = 300 + i;
         update_pid_comm(&processes[i], "worker");
+        CHECK(!processes[i].cmdline);
     }
+    CHECK(cmdline_reads == 30);
     os_cmdline = "/bin/worker";
     for(global_iterations_counter = 2; global_iterations_counter <= 31; global_iterations_counter++) {
         cmdline_reads = 0;
@@ -100,6 +108,49 @@ static bool test_staggering_and_initial_failure(void) {
         CHECK(strcmp(string2str(processes[i].cmdline), os_cmdline) == 0);
         clear_identity(&processes[i]);
     }
+    return true;
+}
+
+static bool test_failed_read_after_name_change(void) {
+    struct pid_stat p = {.pid = 61};
+    struct target assigned = {0};
+    global_iterations_counter = 1;
+    cmdline_reads = 0;
+    os_cmdline = "/bin/clickhouse-server --old";
+    update_pid_comm(&p, "clickhouse-serv");
+    CHECK(strcmp(string2str(p.comm), "clickhouse-server") == 0);
+    p.target = &assigned;
+    p.identity_changed = false;
+
+    // The process name changed (exec) and the new cmdline cannot be read: the cached one belonged to the old program.
+    os_cmdline = NULL;
+    global_iterations_counter = 2;
+    update_pid_comm(&p, "worker");
+    CHECK(cmdline_reads == 2);
+    CHECK(!p.cmdline && !p.target && p.identity_changed && !p.matched_by_config);
+    CHECK(strcmp(string2str(p.comm), "worker") == 0);
+    clear_identity(&p);
+    return true;
+}
+
+static bool test_empty_read_clears_cmdline(void) {
+    struct pid_stat p = {.pid = 62};
+    struct target assigned = {0};
+    global_iterations_counter = 1;
+    os_cmdline = "/bin/clickhouse-server --old";
+    update_pid_comm(&p, "clickhouse-serv");
+    p.target = &assigned;
+    p.identity_changed = false;
+
+    // A successful empty read (zombie) clears the cmdline even though the process name did not change.
+    os_cmdline = "";
+    cmdline_reads = 0;
+    global_iterations_counter = 32;
+    update_pid_comm(&p, "clickhouse-serv");
+    CHECK(cmdline_reads == 1);
+    CHECK(!p.cmdline && !p.target && p.identity_changed);
+    CHECK(strcmp(string2str(p.comm), "clickhouse-serv") == 0);
+    clear_identity(&p);
     return true;
 }
 
@@ -216,6 +267,17 @@ static bool test_inherited_assignments(void) {
     update_pid_cmdline(&parent, "/bin/worker --new");
     assign_a_target_to_all_processes();
     CHECK(targets_assignment_counter == matches);
+
+    // A failed scheduled refresh of the parent keeps the group its descendants inherited.
+    os_cmdline = NULL;
+    cmdline_reads = 0;
+    global_iterations_counter = 40;
+    update_pid_comm(&parent, "worker");
+    CHECK(cmdline_reads == 1);
+    assign_a_target_to_all_processes();
+    CHECK(strcmp(string2str(parent.cmdline), "/bin/worker --new") == 0);
+    CHECK(parent.target == new && child.target == new && grandchild.target == new);
+    CHECK(targets_assignment_counter == matches);
     for(size_t i = 0; i < 5; i++) {
         CHECK(!all[i]->identity_changed);
         clear_identity(all[i]);
@@ -227,6 +289,7 @@ static bool test_inherited_assignments(void) {
 int main(void) {
     apps_managers_and_aggregators_init();
     if(!test_refresh_schedule() || !test_staggering_and_initial_failure() ||
+       !test_failed_read_after_name_change() || !test_empty_read_clears_cmdline() ||
        !test_empty_identity() || !test_literal_parentheses() || !test_derived_metadata() || !test_inherited_assignments())
         return 1;
 

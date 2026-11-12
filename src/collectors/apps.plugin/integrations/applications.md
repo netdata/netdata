@@ -37,6 +37,12 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
+#### Limits
+
+- **Idle process groups disappear after 1 hour:** the charts of a process group with no processes for `retire-targets-after` seconds (default 3600) are removed. Groups defined in `apps_groups.conf` are never removed and do not count against the limit.
+- **At most 500 process groups:** up to `max-targets` (default 500) process groups get their own charts. Beyond that, new ones are aggregated into `app.other_*`, and an info message is logged once.
+- Both are set in `netdata.conf`, for example `[plugin:apps]` `command options = retire-targets-after 7200 max-targets 1000` (seconds, and targets per family).
+
 
 #### Performance Impact
 

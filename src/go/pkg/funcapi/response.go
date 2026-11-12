@@ -17,6 +17,9 @@ type FunctionConfig struct {
 	RequireCloud bool     // Indicates whether the method requires cloud connection
 	Tags         string   // Function tags for registration; empty defaults to "top"
 	ResponseType string   // Response schema type; empty defaults to "table" when dispatched
+	// RequireCommercial restricts viewing to members of a paid Netdata Cloud Space.
+	// It implies RequireCloud.
+	RequireCommercial bool
 	// Available gates publication of agent/process-backed Functions. Nil means available.
 	// Process providers are rechecked on the process tick even without jobs;
 	// collector AgentFunctions are rechecked while their module has scheduled jobs.

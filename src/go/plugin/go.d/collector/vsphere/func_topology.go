@@ -43,13 +43,14 @@ var _ funcapi.MethodHandler = (*funcTopology)(nil)
 
 func vsphereTopologyFunctionConfig() funcapi.FunctionConfig {
 	return funcapi.FunctionConfig{
-		ID:           topologyMethodID,
-		Aliases:      []string{topologyMethodID},
-		Name:         "vSphere Topology",
-		UpdateEvery:  30,
-		Help:         topologyMethodHelp,
-		RequireCloud: true,
-		ResponseType: "topology",
+		ID:                topologyMethodID,
+		Aliases:           []string{topologyMethodID},
+		Name:              "vSphere Topology",
+		UpdateEvery:       30,
+		Help:              topologyMethodHelp,
+		RequireCloud:      true,
+		RequireCommercial: true,
+		ResponseType:      "topology",
 	}
 }
 

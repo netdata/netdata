@@ -52,16 +52,18 @@ func Declarations() []funcapi.FunctionConfig {
 		out = append(
 			out,
 			funcapi.FunctionConfig{
-				ID:             spec.id,
-				FunctionName:   spec.id,
-				Name:           spec.title,
-				UpdateEvery:    spec.every,
-				Help:           spec.help,
-				Tags:           "rum",
-				RawRequest:     true,
-				ManagedInfo:    true,
-				HasHistory:     spec.history,
-				AcceptedParams: spec.params,
+				ID:                spec.id,
+				FunctionName:      spec.id,
+				Name:              spec.title,
+				UpdateEvery:       spec.every,
+				Help:              spec.help,
+				Tags:              "rum",
+				RequireCloud:      true,
+				RequireCommercial: true,
+				RawRequest:        true,
+				ManagedInfo:       true,
+				HasHistory:        spec.history,
+				AcceptedParams:    spec.params,
 			},
 		)
 	}

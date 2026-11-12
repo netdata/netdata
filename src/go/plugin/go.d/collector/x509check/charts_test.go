@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"testing"
 	"time"
 
@@ -33,8 +34,8 @@ func TestCollector_ChartContract(t *testing.T) {
 			}, NotAfter: time.Now().Add(24 * time.Hour)},
 		},
 	}
-	c.revocationStatus = func(context.Context, *x509.Certificate, time.Time) (bool, bool, error) {
-		return true, true, nil
+	c.revocationStatus = func(context.Context, *x509.Certificate, []*x509.Certificate, time.Time) (bool, error) {
+		return true, nil
 	}
 	require.NoError(t, collectCycle(t, c))
 	plan := preparePlan(t, newEngine(t, c), c)
@@ -116,9 +117,12 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 		},
 	}
 	c.provider = provider
-	verified := true
-	c.revocationStatus = func(context.Context, *x509.Certificate, time.Time) (bool, bool, error) {
-		return false, verified, nil
+	determined := true
+	c.revocationStatus = func(context.Context, *x509.Certificate, []*x509.Certificate, time.Time) (bool, error) {
+		if !determined {
+			return false, errors.New("undetermined")
+		}
+		return false, nil
 	}
 	engine := newEngine(t, c)
 	require.NoError(t, collectCycle(t, c))
@@ -136,7 +140,7 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 	renewed := *chain[0]
 	renewed.Subject.CommonName = "renewed"
 	provider.certs = []*x509.Certificate{&renewed}
-	verified = false
+	determined = false
 	for cycle := 0; cycle < 20; cycle++ {
 		require.NoError(t, collectCycle(t, c))
 		plan := preparePlan(t, engine, c)
@@ -159,7 +163,7 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 			assert.Equal(t, 1, labels, "renewal updates metadata without changing identity")
 		}
 	}
-	provider.certs, verified = chain, true
+	provider.certs, determined = chain, true
 	require.NoError(t, collectCycle(t, c))
 	var updates, labels int
 	for _, action := range preparePlan(t, engine, c).Actions {

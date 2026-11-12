@@ -387,6 +387,10 @@ flowchart TD
 
 What makes this layer predictable:
 
+- **Plan-gated viewing.** Every DEM Function (`rum`, `synthetics` and `dem-history-status`) publishes access `0x0017`
+  (signed in, same Space, paid Space, sensitive data): viewing Real User Monitoring, browser tests and DEM history
+  status requires a paid plan or an active trial. Collection, journeys, audits and history storage run on every plan.
+  `dem-history-status` also checks member permissions in its handler.
 - **Independent of collector selection.** Disabling `rum` or `journey`, or every collector, keeps retained history
   queryable while the plugin itself is enabled.
 - **Fresh handlers.** Each framework run generation gets new handler instances; the stores they read stay open.
