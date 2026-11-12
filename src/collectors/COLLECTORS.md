@@ -250,6 +250,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [vm.swap_info](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.swap_info.md) | Collect information about SWAP memory. |
 | [vm.swap_reserved](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.swap_reserved.md) | Read how much anonymous memory the kernel has reserved for running processes. |
 | [vm.vmtotal](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.vmtotal.md) | Collect Virtual Memory information from host. |
+| [Windows printers](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/windows_printers.md) | This collector monitors Windows print queues: queued jobs, printer status, and jobs by status. |
 | [Windows Services](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/integrations/windows_services.md) | This integration monitors resource utilization grouped by Windows Service. |
 | [Windows Services](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/windows_services.md) | This collector monitors Windows Services Status and States. |
 | [ZRAM](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/zram.md) | Monitor zRAM device capacity, compression, memory use, and I/O activity on Linux systems. |
@@ -320,7 +321,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Ubiquiti UFiber OLT](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/ubiquiti_ufiber_olt.md) | Track Ubiquiti UFiber GPON (Gigabit Passive Optical Network) device metrics for efficient fiber-optic network management and performance. |
 | [Unbound](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/unbound/integrations/unbound.md) | This collector monitors Unbound servers. |
 | [Windows Network Protocols](https://github.com/netdata/netdata/blob/master/src/collectors/network-viewer.plugin/integrations/windows_network_protocols.md) | This collector exposes TCP and UDP stack statistics on Windows systems via a real-time table function. |
-| [WireGuard](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | This collector monitors WireGuard VPN devices and peers traffic. |
+| [WireGuard](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | Monitor WireGuard VPN interfaces and their peers: traffic, peer counts, and the time since each peer's latest handshake. |
 | [Wireless network interfaces](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/wireless_network_interfaces.md) | Monitor wireless devices with metrics about status, link quality, signal level, noise level and more. |
 
 ### Cloud and DevOps
