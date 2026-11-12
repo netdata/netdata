@@ -772,6 +772,7 @@ void apps_managers_and_aggregators_init(void);
 void apps_pids_init(void);
 
 #if (PROCESSES_HAVE_CMDLINE == 1)
+// Returns 0 on a failed read and leaves p->cmdline unchanged; update_pid_comm() decides whether to clear it.
 int read_proc_pid_cmdline(struct pid_stat *p);
 #endif
 

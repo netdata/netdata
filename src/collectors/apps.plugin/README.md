@@ -177,12 +177,14 @@ airdrop-sharing: sharingd
 > `apps.plugin` attempts to obtain the full process name by searching for it in the **cmdline**.
 > If successful, the entire process name is used; otherwise, the shortened version is used.
 
-Command lines are read when a process is first observed, when its operating-system process name
-changes, and every 30 collection iterations. Periodic reads are staggered across processes and
-also retry failed reads. Changes that leave the process name unchanged can take up to 30
-iterations to appear (30 seconds at the default one-second collection interval). Changed command
-lines refresh process matching and any groups inherited by descendants. If a read fails or returns
-an empty command line, matching falls back to the process name until a later non-empty read succeeds.
+On Linux, FreeBSD and macOS, command lines are read when a process is first observed, when its
+operating-system process name changes, and every 30 collection iterations. Periodic reads are staggered across processes and also retry failed reads. Changes that
+leave the process name unchanged can take up to 30 iterations to appear (30 seconds at the default
+one-second collection interval). Changed command lines refresh process matching and any groups
+inherited by descendants. A failed read keeps the command line already known for the process, unless
+its process name has just changed. Matching falls back to the process name when no command line is
+known, when a read after a process name change fails, or when a read returns an empty command line
+(for example, a zombie process on Linux). Windows reads the command line once, when it first sees the process.
 
 #### Windows process fields
 
@@ -221,6 +223,7 @@ You can use asterisks (`*`) to create patterns:
 - On Unix-like systems: Searches within the full command line including arguments
 - On Windows: Searches within the full command line including arguments (e.g., `"C:\Program Files\Mozilla Firefox\firefox.exe" -ProfileManager`)
 
+- Process names are matched exactly as the operating system reports them, including parentheses. For example, systemd names its PAM helper `(sd-pam)`, and its service processes show names like `(nginx)` for a moment before they start the service binary. The patterns `sd-pam` and `*pam` do not match `(sd-pam)`; `(sd-pam)` and `(sd-pam*` do. Substring patterns such as `*pam*` search the command line instead.
 - Asterisks can be placed anywhere within pattern (e.g., `fi*fox`) without affecting the matching criteria (**comm** or **cmdline**).
 - To include process names with spaces, enclose them in quotes (single or double), like this: `'Plex Media Serv'` or `"my other process"`.
 - **Substring patterns that contain spaces** — such as a pattern matching part of a command line including arguments — must be enclosed in quotes too; otherwise the spaces split the pattern into separate entries. For example, `'*my_app.exe --mode production*'` is one substring pattern, while the unquoted `*my_app.exe --mode production*` is read as three separate patterns (`*my_app.exe`, `--mode`, `production*`).
