@@ -1,8 +1,10 @@
 //! The catalog builder component: accumulates `otel_catalog::CatalogEntry`
 //! rows in memory per `(tenant, date, machine, instance)` scope — each catalog
 //! file is single-identity by construction because the scope key carries the
-//! machine and instance — and rotates a scope to an immutable catalog file on
-//! the first of three triggers: `rotation_count` entries accumulated,
+//! machine and instance — and rotates a scope to a catalog file on the first
+//! of three triggers (a file is never changed after that, except that a
+//! rotation which gives the name of an existing file writes it again with
+//! the entries of both): `rotation_count` entries accumulated,
 //! `rotation_period` elapsed since the accumulator was created, or an explicit
 //! `Flush` (clean shutdown).
 //!
@@ -249,7 +251,6 @@ async fn rotate_scope(
     // downloaded catalog against its remote key's filename fields — one
     // source, no drift.
     let (max_seq, min_timestamp_s, max_timestamp_s) = catalog.fold();
-    let seqs: Vec<u64> = catalog.entries.values().map(|e| e.id.seq).collect();
     let path = scope_path(
         &args.catalog_base_dir,
         &tenant_id,
@@ -266,18 +267,21 @@ async fn rotate_scope(
     // of the index files that the new bucket lacks, they are uploaded again,
     // and their entries can fold to the name of the file that still lists
     // them, next to entries of index files that are gone locally. Those
-    // older entries are written again; the answer names only what this
-    // rotation added.
-    let serialized = match older_entries(&path, catalog).await {
-        older if older.is_empty() => catalog.to_container_bytes(),
-        older => {
-            let mut whole = catalog.clone();
-            for entry in older {
-                whole.add(entry);
-            }
-            whole.to_container_bytes()
+    // older entries are written again, and the answer names them too: the
+    // upload of this file confirms them on the remote like the others.
+    let older = older_entries(&path, catalog).await;
+    let whole = if older.is_empty() {
+        None
+    } else {
+        let mut whole = catalog.clone();
+        for entry in older {
+            whole.add(entry);
         }
+        Some(whole)
     };
+    let written = whole.as_ref().unwrap_or(catalog);
+    let seqs: Vec<u64> = written.entries.values().map(|e| e.id.seq).collect();
+    let serialized = written.to_container_bytes();
     let bytes = match serialized {
         Ok(b) => b,
         Err(e) => {

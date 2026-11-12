@@ -271,8 +271,9 @@ pub enum CatalogBuilderResponse {
     /// The entry joined the accumulator; no rotation was triggered (the
     /// ledger only logs it).
     EntryAccepted { seq: u64 },
-    /// A scope's accumulator rotated and a new catalog file was written to
-    /// `path` (count, time, or `Flush` trigger). The accumulator for this
+    /// A scope's accumulator rotated and a catalog file was written to
+    /// `path` (count, time, or `Flush` trigger): a new file, or, when a file
+    /// with that name was there, the same file with the entries of both. The accumulator for this
     /// scope is now empty. The ledger is responsible for registering the file
     /// and sending it to the uploader.
     Rotated {

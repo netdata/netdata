@@ -207,18 +207,41 @@ async fn a_rotation_keeps_the_entries_of_a_local_file_with_the_same_name() {
         panic!("expected the second rotation");
     };
 
-    // The file still names entry 1; the rotation answers for what it added.
+    // The file still names entry 1, and the rotation answers for the file.
     assert_eq!(path, first);
     let catalog = Catalog::from_container_bytes(&std::fs::read(&path).unwrap()).unwrap();
     let mut in_file: Vec<u64> = catalog.entries.keys().map(|id| id.seq).collect();
     in_file.sort();
     assert_eq!(in_file, [1, 2, 3]);
     seqs.sort();
-    assert_eq!(seqs, [2, 3]);
+    assert_eq!(seqs, [1, 2, 3]);
     assert!(matches!(
         h.recv().await,
         CatalogBuilderResponse::FlushComplete
     ));
+}
+
+#[tokio::test]
+async fn a_rotation_replaces_a_local_catalog_whose_entries_do_not_fit_its_name() {
+    let mut h = Harness::new(3);
+    h.send_recv(add_request(1)).await;
+    h.send_recv(add_request(2)).await;
+    let CatalogBuilderResponse::Rotated { path, .. } = h.send_recv(add_request(3)).await else {
+        panic!("expected the first rotation");
+    };
+    // A catalog that decodes, but whose largest seq is not the 3 of its name.
+    let mut other = Catalog::new(TenantId::from("tenant1"), date(), ident());
+    other.add(entry_for(9));
+    std::fs::write(&path, other.to_container_bytes().unwrap()).unwrap();
+
+    h.send_recv(add_request(1)).await;
+    h.send_recv(add_request(2)).await;
+    h.send_recv(add_request(3)).await;
+
+    let catalog = Catalog::from_container_bytes(&std::fs::read(&path).unwrap()).unwrap();
+    let mut in_file: Vec<u64> = catalog.entries.keys().map(|id| id.seq).collect();
+    in_file.sort();
+    assert_eq!(in_file, [1, 2, 3]);
 }
 
 #[tokio::test]
