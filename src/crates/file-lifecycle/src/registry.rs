@@ -36,7 +36,7 @@
 //! | index file local, not uploaded | no `SeqState`, or `NotUploaded` ([`SeqKey`]); the request is with the uploader | `helpers::sfst_upload_request` | `recovery::recover_unuploaded`, the same request |
 //! | upload failed, waiting | [`crate::upload_retry::UploadRetry`] (`SeqKey` or remote key) | `UploadFailed`; a timer sends it again | not kept: "not uploaded" again |
 //! | uploaded, in no catalog file yet | `SeqState::upload`; the entry is with the catalog builder | `Uploaded`: [`Registry::mark_uploaded`] and `AddEntry` | `recovery::reconcile_remote_uploads` (a LIST of the remote) |
-//! | in a local catalog file | `CatalogStage::RotatedLocal`; the file in [`otel_catalog::Registry`] (path) | the builder's `Rotated`: [`Registry::mark_rotated_many`], then the catalog's upload | `recovery::seed_from_catalog_files`; [`Registry::forget_catalog_claims`] takes it back for index files that the remote lacks |
+//! | in a local catalog file | `CatalogStage::RotatedLocal`; the file in [`otel_catalog::Registry`] (path) | the builder's `Rotated`: [`Registry::mark_rotated_many`], then the catalog's upload | `recovery::seed_from_catalog_files` |
 //! | catalog entry on the remote | `CatalogStage::Remote` | `CatalogUploaded`: [`Registry::mark_remote_cataloged`] | `recovery::reconcile_local_catalog_uploads` |
 //! | deletion on its way | the `pending_deletion` flag of the [`sfst::Registry`] entry; the request is with the cleaner | retention, through [`Registry::index_evictions`] | `recovery::recover_retention`, the same function, with no flag (it waits for the cleaner) |
 //! | gone locally | nothing: [`Registry::evict_seq`] and [`TenantRegistries::forget_seq`]; with remote storage the seq lives on as a catalog entry | `IndexFileDeleted` | [`Registry::evict_seq`] |
@@ -391,18 +391,6 @@ impl Registry {
     pub fn mark_remote_cataloged(&mut self, keys: impl IntoIterator<Item = SeqKey>) {
         for key in keys {
             self.seq_mut(key).catalog = CatalogStage::Remote;
-        }
-    }
-
-    /// Take back what a local catalog file said of these SFSTs: that their
-    /// bytes are on the remote, and that they are in a closed catalog.
-    /// Recovery calls it for a catalog that is not on the remote and that
-    /// names an index file the remote does not have either: the remote is
-    /// not the one the catalog was written for. The SFSTs that are still
-    /// local are then [`unuploaded_ids`](Self::unuploaded_ids) again.
-    pub fn forget_catalog_claims(&mut self, keys: impl IntoIterator<Item = SeqKey>) {
-        for key in keys {
-            self.seqs.remove(&key);
         }
     }
 

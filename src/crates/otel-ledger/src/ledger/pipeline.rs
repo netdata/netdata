@@ -223,6 +223,9 @@ where
                 }
             };
 
+            // Fire-and-forget; runs even when the remote is unreachable.
+            recover_unuploaded(registry, segment, uploader, tenant_id);
+
             // Catalog re-upload probes the remote per file (`stat`), so it
             // only makes sense when the remote is reachable.
             if remote_ok {
@@ -256,11 +259,6 @@ where
                     }
                 }
             }
-
-            // Fire-and-forget; runs even when the remote is unreachable. After
-            // the catalog pass: that pass can find that a local catalog does
-            // not vouch for its SFSTs, and they are uploaded again here.
-            recover_unuploaded(registry, segment, uploader, tenant_id);
         }
 
         let retention = config.index.retention.resolve(tenant_id.as_str());
