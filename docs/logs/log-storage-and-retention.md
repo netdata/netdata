@@ -164,16 +164,12 @@ answers from it; repeated queries over the same files are served from the cache.
 - If the cache directory becomes unwritable, downloads fail as above and the plugin logs the write errors; a query that
   needs room the cache cannot free fails with a message about the cache directory.
 
-Do not change `remote_storage.uri` to a location that does not hold the Agent's files, and do not empty the location.
-The Agent does not check that the location holds the files that it uploaded before. At its start it uploads to the
-new location the local catalogs that list an indexed file on its disk. From then on it takes each indexed file in
-those catalogs as stored there, and local retention can delete files that the new location did not receive. Those files are then only in the old
-location, which the Agent does not read.
-
-Before you change the URI, copy the `v2/` tree of the old location (the `catalog` and `tenants` directories of each
-signal) to the new location. The object keys are the same in both locations. When you enable remote storage on an
-Agent that has data and never used remote storage, no copy is necessary: the Agent uploads the indexed files that
-are on its local disk.
+The Agent can start with a remote location that does not hold its files: you enable remote storage on an Agent that
+already has data, you change `remote_storage.uri`, or you empty the bucket. The Agent then uploads to the configured
+location the indexed files that are still on the local disk, before local retention can delete them. It cannot upload
+a file that local retention already deleted. To keep such files reachable after a change of location, copy the `v2/`
+tree of the old location (the `catalog` and `tenants` directories of each signal) to the new location before you
+change the URI. The object keys are the same in both locations.
 
 ```yaml
 remote_storage:

@@ -280,8 +280,6 @@ modules:
               description: Remote storage URI. Supported schemes are `fs` and `s3`.
               detailed_description: |
                 Put non-secret backend options in the query string. Never put credentials in this file or URI. For S3, use the standard AWS environment, credentials file, or instance-role mechanisms available to the Netdata service account.
-
-                Before you change this value on an Agent that already uploaded files, copy the stored objects (the `v2/` tree) from the old location to the new location. The plugin does not check that the new location holds its files, and its local retention can then delete files that are in no other place.
               default_value: "fs:///var/log/netdata/otel/v2/remote"
               required: false
             - name: remote_storage.read_cache_max_size

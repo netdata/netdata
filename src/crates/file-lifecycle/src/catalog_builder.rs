@@ -282,14 +282,13 @@ async fn rotate_scope(
         max_timestamp_s,
     );
     // The file holds exactly the entries of this rotation, also when a file
-    // with this name is there already and is replaced. Every entry of a
-    // local catalog file must come from an upload that the remote
-    // confirmed: start-up recovery and the upload of the catalog take each
-    // entry as such, and a confirmed entry lets retention delete the local
-    // index file. (They take it so for the remote of now. An operator who
-    // changes the remote, or empties it, carries its objects over first:
-    // the storage page says so, and nothing here checks it.) The entries of
-    // the older file are not carried over: nothing confirms them.
+    // with this name is there already and is replaced (possible after a move
+    // to another bucket, when re-uploaded index files give the name of the
+    // catalog that listed them). Every entry of a local catalog file must
+    // come from an upload that the current remote confirmed: start-up
+    // recovery and the upload of the catalog take each entry as such, and a
+    // confirmed entry lets retention delete the local index file. The
+    // entries of the older file are not carried over: nothing confirms them.
     // One of them whose index file is local and on the remote is held back
     // from retention until the next start, which catalogs it again.
     if let Err(e) = write_local_atomic(&path, bytes).await {

@@ -191,8 +191,9 @@ async fn rotation_fires_at_threshold_and_writes_file() {
 #[tokio::test]
 async fn a_rotation_onto_a_file_with_the_same_name_writes_only_its_own_entries() {
     // A first rotation writes the entries 1, 2 and 3. Then 2 and 3 come
-    // again and are flushed: the same largest seq and the same times make
-    // the same file name.
+    // again (their uploads were taken back at a start, after a move to
+    // another bucket) and are flushed: the same largest seq and the same
+    // times make the same file name.
     let mut h = Harness::new(3);
     h.send_recv(add_request(1)).await;
     h.send_recv(add_request(2)).await;
