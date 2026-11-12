@@ -697,6 +697,26 @@ mod tests {
     }
 
     #[test]
+    fn a_frame_that_misses_its_last_byte_is_not_whole() {
+        // The last byte of a frame is padding, or the end of its payload:
+        // either way the frame was not written whole.
+        let dir = tempfile::tempdir().unwrap();
+        let (path, bounds) = write_frames(dir.path(), &[b"alpha", b"bravo"]);
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_len(bounds[1] - 1)
+            .unwrap();
+
+        let mut reader = Reader::open(&path).unwrap();
+        let frames = collect(&mut reader);
+
+        assert_eq!(frames, vec![(1, b"alpha".to_vec())]);
+        assert_eq!(reader.incomplete_tail(), bounds[1] - 1 - bounds[0]);
+    }
+
+    #[test]
     fn a_whole_file_read_of_whole_frames_leaves_no_tail() {
         let dir = tempfile::tempdir().unwrap();
         let (path, _) = write_frames(dir.path(), &[b"alpha", b"bravo"]);

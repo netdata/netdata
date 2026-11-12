@@ -112,8 +112,9 @@ pub struct File {
     /// page size, so `ZERO` never stands for a known-empty file. `Closed`
     /// reports the durable prefix alongside `size`; the two are equal
     /// whenever the seal follows a sync (the writer's rotation, idle-sweep,
-    /// and shutdown paths), but its unsynced-`Drop` close path syncs
-    /// nothing, so a sealed file can carry `valid_up_to < size`.
+    /// and shutdown paths); a file sealed with no sync before it (the
+    /// writer's `Drop`, or a file it closed after a failed write or fsync)
+    /// can carry `valid_up_to < size`.
     pub valid_up_to: ByteSize,
     /// Number of log records in the durable prefix, as reported by the
     /// latest `Synced` or `Closed` event; `0` when unknown (recovered from

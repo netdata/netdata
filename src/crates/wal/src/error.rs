@@ -10,9 +10,9 @@
 //!   reader (opens, reads, seeks), the registry (scans, header reads), and
 //!   the seq allocator (high-water envelope writes).
 //! - Writer-side durability: the writer's one fsync site (`fsync` in
-//!   `writer.rs`) raises `Fsync`; `Writer::is_durable` and
-//!   `Writer::finish_sync` raise `FramesLost` for frames a failed fsync left
-//!   in doubt.
+//!   `writer.rs`) raises `Fsync`, and a failed frame write or flush raises
+//!   `Write`; `Writer::is_durable` and `Writer::finish_sync` raise
+//!   `FramesLost` for frames that either left in doubt.
 //! - Reader-side format rejection: `FileHeader::from_bytes` (`format.rs`)
 //!   raises `InvalidHeader`, `UnsupportedVersion`, `CrcMismatch`, and
 //!   `UnsupportedCompression`; `Reader` and `scan_frame_boundaries`
@@ -197,7 +197,7 @@ pub enum Error {
     /// `Writer::finish_sync` for a sync whose frames another fsync's failure
     /// put in doubt while it was out. The ingestor fails the request, so
     /// the client sends the records again. Message-only.
-    #[error("an fsync failed before the frames were durable: they may be lost")]
+    #[error("a write or an fsync failed before the frames were durable: they may be lost")]
     FramesLost,
 }
 
