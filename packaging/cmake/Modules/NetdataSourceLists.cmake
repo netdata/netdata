@@ -780,6 +780,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-smb.c
+        src/collectors/windows.plugin/perflib-smb-client.c
         src/collectors/windows.plugin/perflib-terminal-services.c
         src/collectors/windows.plugin/perflib-dns.c
         src/collectors/windows.plugin/perflib-netframework.c

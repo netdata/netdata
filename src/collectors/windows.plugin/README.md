@@ -8,7 +8,7 @@ The Windows plugin primarily collects metrics from Microsoft Windows [Performanc
 
 ## Default Configuration
 
-By default, all collector threads are enabled except for `PerflibThermalZone`. `PerflibSMB` is also enabled by default; on systems where the "SMB Server Shares" object is not available, no SMB metrics are collected. You can enable disabled collectors or disable any of the currently active ones by modifying the `[plugin:windows]` section in your configuration file.
+By default, all collector threads are enabled except for `PerflibThermalZone`. `PerflibSMB` is also enabled by default; on systems where the "SMB Server Shares" object is not available, no SMB server metrics are collected. `PerflibSMBClient` is enabled by default and charts the remote SMB shares the host is connected to. You can enable disabled collectors or disable any of the currently active ones by modifying the `[plugin:windows]` section in your configuration file.
 
 To change a setting, remove the comment symbol (`#`) from the beginning of the line and set the value to either `yes` or `no`.
 
@@ -26,6 +26,7 @@ To change a setting, remove the comment symbol (`#`) from the beginning of the l
         # PerflibStorage = yes
         # PerflibNetwork = yes
         # PerflibSMB = yes
+        # PerflibSMBClient = yes
         # PerflibTerminalServices = yes
         # PerflibDNS = yes
         # PerflibObjects = yes
