@@ -170,6 +170,22 @@ static inline bool full_text_search_string(FTS_INDEX *fts, SIMPLE_PATTERN *q, ST
     return simple_pattern_matches_string(q, ptr);
 }
 
+// Search an instance's or metric's id and, when it has one of its own, its name. The name is replaced and freed
+// while we use it (its writers swap it under the instance lock), so it is matched under that lock, without a
+// reference: most objects do not match. On a hit, *found is the name to report, released with rrd_name_release().
+static bool full_text_search_id_and_name(FTS_INDEX *fts, SIMPLE_PATTERN *q, SPINLOCK *lock, STRING *id, STRING **name_ptr, STRING **found) {
+    bool hit = full_text_search_string(fts, q, id);
+
+    spinlock_lock(lock);
+    STRING *name = *name_ptr;
+    if(!hit && name != id)
+        hit = full_text_search_string(fts, q, name);
+    *found = !hit ? NULL : (name == id) ? id : string_dup(name);
+    spinlock_unlock(lock);
+
+    return hit;
+}
+
 static inline bool full_text_search_char(FTS_INDEX *fts, SIMPLE_PATTERN *q, char *ptr) {
     fts->searches++;
     fts->char_searches++;
@@ -197,33 +213,28 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
         results->matched_types |= SEARCH_MATCH_CONTEXT_ID;
     }
     
-    // the metadata strings are replaced while we use them: search our own references
-    rrdcontext_lock(rc);
-    STRING *family = string_dup(rc->family);
-    STRING *title = string_dup(rc->title);
-    STRING *units = string_dup(rc->units);
-    rrdcontext_unlock(rc);
+    // the metadata strings are replaced and freed while we use them: search them under the context lock
+    if(ctl->options & (CONTEXTS_OPTION_FAMILY | CONTEXTS_OPTION_TITLES | CONTEXTS_OPTION_UNITS)) {
+        rrdcontext_lock(rc);
 
-    // Only search family if the option is enabled
-    if((ctl->options & CONTEXTS_OPTION_FAMILY) && unlikely(full_text_search_string(&ctl->q.fts, q, family))) {
-        results->matched_types |= SEARCH_MATCH_CONTEXT_FAMILY;
-    }
-    
-    // Only search title if the option is enabled
-    if((ctl->options & CONTEXTS_OPTION_TITLES) && unlikely(full_text_search_string(&ctl->q.fts, q, title))) {
-        results->matched_types |= SEARCH_MATCH_CONTEXT_TITLE;
-    }
-    
-    // Only search units if the option is enabled
-    if((ctl->options & CONTEXTS_OPTION_UNITS) && unlikely(full_text_search_string(&ctl->q.fts, q, units))) {
-        results->matched_types |= SEARCH_MATCH_CONTEXT_UNITS;
+        // Only search family if the option is enabled
+        if((ctl->options & CONTEXTS_OPTION_FAMILY) && unlikely(full_text_search_string(&ctl->q.fts, q, rc->family))) {
+            results->matched_types |= SEARCH_MATCH_CONTEXT_FAMILY;
+        }
+
+        // Only search title if the option is enabled
+        if((ctl->options & CONTEXTS_OPTION_TITLES) && unlikely(full_text_search_string(&ctl->q.fts, q, rc->title))) {
+            results->matched_types |= SEARCH_MATCH_CONTEXT_TITLE;
+        }
+
+        // Only search units if the option is enabled
+        if((ctl->options & CONTEXTS_OPTION_UNITS) && unlikely(full_text_search_string(&ctl->q.fts, q, rc->units))) {
+            results->matched_types |= SEARCH_MATCH_CONTEXT_UNITS;
+        }
+
+        rrdcontext_unlock(rc);
     }
 
-    string_freez(family);
-    string_freez(title);
-    string_freez(units);
-
-    
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
         if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, ri->first_time_s, rrd_flag_is_collected(ri) ? ctl->now : ri->last_time_s, 0))
@@ -231,15 +242,14 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
 
         // Check instance name match only if instances option is enabled
         if(ctl->options & CONTEXTS_OPTION_INSTANCES) {
-            STRING *name = rrdinstance_acquired_name_dup((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
-            if(unlikely(full_text_search_string(&ctl->q.fts, q, ri->id)) ||
-               (name != ri->id && full_text_search_string(&ctl->q.fts, q, name))) {
+            STRING *name;
+            if(unlikely(full_text_search_id_and_name(&ctl->q.fts, q, &ri->spinlock, ri->id, &ri->name, &name))) {
                 if(!results->matched_instances)
                     results->matched_instances = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
                 dictionary_set(results->matched_instances, string2str(name), NULL, 0);
                 results->matched_types |= SEARCH_MATCH_INSTANCE;
+                rrd_name_release(name, ri->id);
             }
-            string_freez(name);
         }
 
         // Check dimensions only if dimensions option is enabled
@@ -249,15 +259,14 @@ static void rrdcontext_to_json_v2_full_text_search(struct rrdcontext_to_json_v2_
                 if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, rrd_flag_is_collected(rm) ? ctl->now : rm->last_time_s, 0))
                     continue;
 
-                STRING *name = rrdmetric_acquired_name_dup((RRDMETRIC_ACQUIRED *)rm_dfe.item);
-                if(unlikely(full_text_search_string(&ctl->q.fts, q, rm->id)) ||
-                   (name != rm->id && full_text_search_string(&ctl->q.fts, q, name))) {
+                STRING *name;
+                if(unlikely(full_text_search_id_and_name(&ctl->q.fts, q, &rm->ri->spinlock, rm->id, &rm->name, &name))) {
                     if(!results->matched_dimensions)
                         results->matched_dimensions = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
                     dictionary_set(results->matched_dimensions, string2str(name), NULL, 0);
                     results->matched_types |= SEARCH_MATCH_DIMENSION;
+                    rrd_name_release(name, rm->id);
                 }
-                string_freez(name);
             }
             dfe_done(rm);
         }
@@ -1019,9 +1028,9 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
 
         // Add instance name to instances dictionary
         if(t->instances_dict) {
-            STRING *name = rrdinstance_acquired_name_dup((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+            STRING *name = rrdinstance_name_get(ri);
             dictionary_set(t->instances_dict, string2str(name), NULL, 0);
-            string_freez(name);
+            rrd_name_release(name, ri->id);
         }
 
         // Collect dimensions from this instance
@@ -1031,9 +1040,9 @@ static void contexts_react_callback(const DICTIONARY_ITEM *item __maybe_unused, 
                 if(ctl->window.enabled && !query_matches_retention(ctl->window.after, ctl->window.before, rm->first_time_s, rrd_flag_is_collected(rm) ? ctl->now : rm->last_time_s, (time_t)ri->update_every_s))
                     continue;
 
-                STRING *name = rrdmetric_acquired_name_dup((RRDMETRIC_ACQUIRED *)rm_dfe.item);
+                STRING *name = rrdmetric_name_get(rm);
                 dictionary_set(t->dimensions_dict, string2str(name), NULL, 0);
-                string_freez(name);
+                rrd_name_release(name, rm->id);
             }
             dfe_done(rm);
         }

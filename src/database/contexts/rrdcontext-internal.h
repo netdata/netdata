@@ -307,8 +307,9 @@ typedef struct rrdinstance {
     // id takes the instance over (the conflict callbacks) while the old chart may still exist and be destroyed
     // later, on another thread, so its teardown must check under this lock that it still owns what it tears
     // down. It also serializes the metadata the conflict callbacks swap (the instance's name, title, units, family,
-    // chart_type, priority, update_every, and the name of each of its metrics) against readers that take references
-    // to it: the context worker's merge and the *_dup() helpers used by queries and the APIs.
+    // chart_type, priority, update_every, and the name of each of its metrics) against their readers: the context
+    // worker's merge, the *_dup() and *_name_get() helpers that take references, and the walks that only match a
+    // name while holding this lock.
     // Nothing else is locked while holding it, except the labels lock in rrdlabels_flush().
     SPINLOCK spinlock;
 } RRDINSTANCE;
@@ -533,6 +534,31 @@ void rrdcontext_recalculate_host_retention(RRDHOST *host, RRD_FLAGS reason, bool
 
 #define rrdcontext_lock(rc) spinlock_lock(&((rc)->spinlock))
 #define rrdcontext_unlock(rc) spinlock_unlock(&((rc)->spinlock))
+
+// The name of an instance or metric the caller holds, for use after the instance lock is released: the id itself
+// when the object has no name of its own (no reference is taken: the id never changes and lives as long as the
+// object), otherwise the caller's own reference. Release it with rrd_name_release(name, id).
+// Walks over many objects use these instead of *_name_dup(): ids and names are interned and shared by every host
+// that has them, so a reference per object makes concurrent walkers contend on the same refcounts.
+// Code that only matches a name does not need a reference: it matches under the instance lock.
+static inline STRING *rrdinstance_name_get(RRDINSTANCE *ri) {
+    spinlock_lock(&ri->spinlock);
+    STRING *name = (ri->name == ri->id) ? ri->id : string_dup(ri->name);
+    spinlock_unlock(&ri->spinlock);
+    return name;
+}
+
+static inline STRING *rrdmetric_name_get(RRDMETRIC *rm) {
+    spinlock_lock(&rm->ri->spinlock);
+    STRING *name = (rm->name == rm->id) ? rm->id : string_dup(rm->name);
+    spinlock_unlock(&rm->ri->spinlock);
+    return name;
+}
+
+static inline void rrd_name_release(STRING *name, STRING *id) {
+    if(name != id)
+        string_freez(name);
+}
 
 // point rc->hub's strings to the context's current ones; the caller holds rrdcontext_lock(rc)
 // (or the context is not published yet)
