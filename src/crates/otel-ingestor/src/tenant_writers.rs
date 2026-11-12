@@ -41,9 +41,11 @@ pub(crate) struct TenantWriter {
 /// OpenTelemetry Collector keeps the batch and sends it again. `INTERNAL`
 /// (HTTP 500) is not retryable, and the sender would drop the batch.
 ///
-/// A request that failed can have stored a part of its records (the frames
-/// of its other streams), so a resend can store those twice: OTLP delivery
-/// is at-least-once.
+/// A request that failed can have its records in the files, in part (the
+/// frames of its other streams) or in full (frames that were whole but in
+/// doubt when another write or fsync of the tenant's writer failed), and
+/// the indexer indexes whole frames. So a resend can store records twice:
+/// OTLP delivery is at-least-once.
 pub(crate) fn storage_unavailable(message: &'static str) -> tonic::Status {
     tonic::Status::unavailable(message)
 }

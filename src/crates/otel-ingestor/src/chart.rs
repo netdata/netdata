@@ -55,9 +55,9 @@ pub const MAX_DIMENSIONS: usize = 4096;
 /// [`MAX_LABEL_VALUE_BYTES`]), a definition's labels stay near 1 MiB.
 ///
 /// The agent cuts a label too, after it sanitized the text, so the two cuts
-/// can differ for a key or a value over the limit: one with runs of spaces,
-/// or with multi-byte characters near the limit, is stored a little shorter
-/// than the agent alone would store it.
+/// can differ for a key or a value over the limit: one with runs of spaces
+/// or with multi-byte characters (the agent turns each of a key's into one
+/// `_`) is stored shorter than the agent alone would store it.
 pub const MAX_LABELS: usize = 1024;
 
 /// Cut `text` to at most `max_bytes`, at a character boundary, and give back
