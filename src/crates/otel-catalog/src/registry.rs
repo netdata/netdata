@@ -1,8 +1,9 @@
 //! The registry of locally-present catalog files.
 //!
-//! A catalog file is an immutable snapshot the catalog builder rotates once
-//! per `(tenant, date, machine, instance)` scope (file-lifecycle
-//! `catalog_builder.rs`). One [`Registry`] per tenant tracks the files of
+//! A catalog file is a snapshot that the catalog builder rotates once per
+//! `(tenant, date, machine, instance)` scope (file-lifecycle
+//! `catalog_builder.rs`). It is written whole and never changed in place; a
+//! rotation that gives the name of an existing file replaces it. One [`Registry`] per tenant tracks the files of
 //! one signal's catalog dir; it is the third registry of file-lifecycle's
 //! per-tenant composition, beside `wal::Registry` and `sfst::Registry`.
 //!
