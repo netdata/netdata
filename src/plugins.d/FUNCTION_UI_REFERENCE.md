@@ -123,9 +123,20 @@ GET /api/v3/function?function=systemd-journal info after:1234567890 before:12345
 **Parameter shapes (wire format):**
 - `accepted_params`: array of **strings** (parameter IDs). Example: `["sockets"]`, `["group"]`.
 - `required_params`: array of **objects** that define UI selectors.
-  - Required fields: `id`, `name`, `type`, `options`
-  - Common fields: `help`, `unique_view`
-  - `options[]`: `id`, `name`, optional `defaultSelected`, `disabled`, `sort`
+  - Required fields: `id`, `name`, `type`; `select` and `multiselect` also require `options`
+  - A free-form `text` selector does not require `options`
+  - Common fields: `help`, `unique_view`, optional `value_separator` for an accepted joined-value encoding
+  - `options[]`: `id`, `name`, optional `defaultSelected`, `disabled`, `sort`, `aliases`
+  - Optional `focus` declares topology roots/depth controls; see
+    [Topology focus controls](FUNCTION_UI_DEVELOPER_GUIDE.md#topology-focus-controls).
+
+When normalizing values against selector metadata, option IDs are opaque. Match an exact ID before considering
+declared aliases or splitting a joined value; `beta rack,1` can be one ID, and `prod-a` differs from `prod_a`.
+An alias advertised by several options is ambiguous and does not identify an option. These declarations describe
+accepted producer input; they do not change parsing.
+Go structured Function command arguments split commas before resolution regardless of this metadata. Use structured
+JSON `selections` to preserve IDs containing commas.
+See [Accepted option forms](FUNCTION_UI_DEVELOPER_GUIDE.md#accepted-option-forms).
 
 **Cloud-frontend UI notes (verified):**
 - `type: "select"` renders as a **single-select**.

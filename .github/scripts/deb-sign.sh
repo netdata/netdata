@@ -7,7 +7,6 @@ keyid="${2}"
 
 echo "::group::Installing Dependencies"
 sudo apt-get update
-sudo apt-get upgrade -y
 sudo apt-get install -y debsigs
 echo "::endgroup::"
 

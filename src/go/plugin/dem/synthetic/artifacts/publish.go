@@ -38,8 +38,8 @@ func (s *Store) Finalize(
 	if !runIDPattern.MatchString(runID) {
 		return nil, ErrInvalidID
 	}
-	jobID := s.active[runID]
-	if jobID == "" {
+	owner := s.active[runID]
+	if owner.JobID == "" {
 		return nil, ErrNotFound
 	}
 	delete(s.active, runID)
@@ -83,7 +83,8 @@ func (s *Store) Finalize(
 	m := manifest{
 		Version: 2,
 		Manifest: Manifest{
-			JobID:       jobID,
+			JobID:       owner.JobID,
+			VnodeGUID:   owner.VnodeGUID,
 			RunID:       runID,
 			PublishedUS: time.Now().UnixMicro(),
 			Artifacts:   []synthetic.Artifact{},
@@ -188,6 +189,7 @@ func (s *Store) Finalize(
 		return nil, err
 	}
 	delete(s.uncertain, runID)
+	s.observedPublished.Store(true)
 	// Work includes scripts, browser profiles and any unselected attachments.
 	if err = s.cleanupDrained(runID); err != nil {
 		s.recordCleanupError(err)

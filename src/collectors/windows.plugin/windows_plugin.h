@@ -77,6 +77,9 @@ int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
 int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
 int do_PerflibDNS(int update_every, usec_t dt __maybe_unused);
 
+// WMI
+int do_GetFSRMQuota(int update_every, usec_t dt);
+
 // Cleanup
 void do_GetHardwareInfo_cleanup();
 void do_Sensors_cleanup();
@@ -86,6 +89,8 @@ void do_GetPowerSupply_cleanup();
 void do_PerflibSMB_cleanup();
 void do_PerflibStorage_cleanup();
 void do_GetPrinters_cleanup(void);
+void do_GetFSRMQuota_cleanup(void);
+void do_GetFSRMQuota_interrupt(void);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
@@ -452,6 +457,10 @@ enum PERFLIB_PRIO {
     PRIO_DNS_UNMATCHED_RESPONSES,
     PRIO_DNS_WINS_LOOKUPS,
     PRIO_DNS_WINS_RESPONSES,
+
+    PRIO_FSRM_QUOTAS,
+    PRIO_FSRM_QUOTA_SPACE,
+    PRIO_FSRM_QUOTA_STATE,
 
     PRIO_IIS_EXTRA_WEBSITE = 25000,
     PRIO_IIS_EXTRA_WORKER = 25100,

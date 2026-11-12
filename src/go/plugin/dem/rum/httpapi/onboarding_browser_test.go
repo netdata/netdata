@@ -70,7 +70,7 @@ func TestOnboardingBrowser(t *testing.T) {
 		},
 	}
 	handler := httpapi.New(&receiverConfig, hub, nil).Handler()
-	fn := functions.New(query.New(hub, history.NewStore(db)))
+	fn := functions.New(query.New(hub, history.NewStore(db)), nil)
 	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/function":

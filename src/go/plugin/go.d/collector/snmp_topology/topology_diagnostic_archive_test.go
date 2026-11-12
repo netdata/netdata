@@ -51,7 +51,7 @@ func TestTopologyDiagnosticArchiveRoundTripPreservesReplayAndInspection(t *testi
 	require.True(t, ok)
 	replayed, err := archive.Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
-	require.Equal(t, topologyv1test.NormalizeData(t, live), topologyv1test.NormalizeData(t, replayed))
+	require.Equal(t, topologyv1test.NormalizeData(t, live.Data), topologyv1test.NormalizeData(t, replayed))
 
 	beforeDevice, err := openTestDiagnosticCut(t, diagnostics).InspectDevice(testDiagnosticQuery(scenario.opts), 1)
 	require.NoError(t, err)

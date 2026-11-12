@@ -36,17 +36,17 @@ func TestSessionIdentityMembershipPrecedesLimitAndPreservesWholeSummary(t *testi
 		UserID:     "other",
 	})
 	for _, id := range []string{ids[0], ids[2], ids[3]} {
-		rows, err := s.QuerySessions(ctx, "shop", id, 0, now.Unix()+10, 1)
+		rows, err := s.QuerySessions(ctx, "shop", id, 0, now.Unix()+10, 1, "")
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		assert.Equal(t, "shared", rows[0].SessionID)
 		assert.EqualValues(t, 5, rows[0].Pageviews, "all session events count, including anonymous and other IDs")
 		assert.Equal(t, []string{ids[0], ids[3], ids[2]}, rows[0].UserIDs)
 	}
-	rows, err := s.QuerySessions(ctx, "shop", "123", 0, now.Unix()+10, 1)
+	rows, err := s.QuerySessions(ctx, "shop", "123", 0, now.Unix()+10, 1, "")
 	require.NoError(t, err)
 	assert.Empty(t, rows, "lookup is exact, not substring")
-	events, err := s.QuerySessionEvents(ctx, "shop", "shared")
+	events, err := s.QuerySessionEvents(ctx, "shop", "shared", "")
 	require.NoError(t, err)
 	require.Len(t, events, len(ids))
 	for i, id := range ids {
@@ -79,15 +79,15 @@ func TestSessionUserIDsOnlyIncludeReceiptTimeRange(t *testing.T) {
 		Type:       "pageview",
 		Page:       "/anonymous",
 	})
-	rows, err := s.QuerySessions(ctx, "shop", "prior-user", now.Unix()-5, now.Unix()+5, 0)
+	rows, err := s.QuerySessions(ctx, "shop", "prior-user", now.Unix()-5, now.Unix()+5, 0, "")
 	require.NoError(t, err)
 	assert.Empty(t, rows, "an ID outside the selected receipt-time range must not match")
-	rows, err = s.QuerySessions(ctx, "shop", "", now.Unix()-5, now.Unix()+5, 0)
+	rows, err = s.QuerySessions(ctx, "shop", "", now.Unix()-5, now.Unix()+5, 0, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, []string{}, rows[0].UserIDs)
 	assert.EqualValues(t, 1, rows[0].Pageviews)
-	rows, err = s.QuerySessions(ctx, "shop", "prior-user", old.Unix()-5, now.Unix()+5, 0)
+	rows, err = s.QuerySessions(ctx, "shop", "prior-user", old.Unix()-5, now.Unix()+5, 0, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, []string{"prior-user"}, rows[0].UserIDs)

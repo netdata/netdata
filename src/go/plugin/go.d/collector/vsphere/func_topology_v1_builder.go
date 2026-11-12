@@ -57,29 +57,31 @@ type vsphereActorDetail struct {
 }
 
 type vsphereTopologyBuilder struct {
-	strings          *topologyv1.StringDictionary
-	collectJob       string
-	actorIndexes     map[string]int
-	actorObjectTypes map[string]string
-	searchLabelKeys  map[string]map[string]struct{}
-	actors           *topologyv1.TableBuilder
-	links            *topologyv1.TableBuilder
-	evidence         map[string]*topologyv1.TableBuilder
-	details          *topologyv1.TableBuilder
-	labels           *topologyv1.TableBuilder
-	overlays         *topologyv1.OverlayRefsBuilder
+	vCenterInstanceUUID string
+	strings             *topologyv1.StringDictionary
+	collectJob          string
+	actorIndexes        map[string]int
+	actorObjectTypes    map[string]string
+	searchLabelKeys     map[string]map[string]struct{}
+	actors              *topologyv1.TableBuilder
+	links               *topologyv1.TableBuilder
+	evidence            map[string]*topologyv1.TableBuilder
+	details             *topologyv1.TableBuilder
+	labels              *topologyv1.TableBuilder
+	overlays            *topologyv1.OverlayRefsBuilder
 }
 
-func newVSphereTopologyBuilder(jobName string) *vsphereTopologyBuilder {
+func newVSphereTopologyBuilder(jobName, vCenterInstanceUUID string) *vsphereTopologyBuilder {
 	strings := topologyv1.NewStringDictionary()
 	return &vsphereTopologyBuilder{
-		strings:          strings,
-		collectJob:       sanitizeTopologyLabelValue(cleanTopologyString(jobName)),
-		actorIndexes:     make(map[string]int),
-		actorObjectTypes: make(map[string]string),
-		searchLabelKeys:  make(map[string]map[string]struct{}),
-		actors:           topologyv1.NewTableBuilder(vsphereTopologyActorColumns()...),
-		links:            topologyv1.NewTableBuilder(vsphereTopologyLinkColumns()...),
+		vCenterInstanceUUID: cleanTopologyString(vCenterInstanceUUID),
+		strings:             strings,
+		collectJob:          sanitizeTopologyLabelValue(cleanTopologyString(jobName)),
+		actorIndexes:        make(map[string]int),
+		actorObjectTypes:    make(map[string]string),
+		searchLabelKeys:     make(map[string]map[string]struct{}),
+		actors:              topologyv1.NewTableBuilder(vsphereTopologyActorColumns()...),
+		links:               topologyv1.NewTableBuilder(vsphereTopologyLinkColumns()...),
 		evidence: map[string]*topologyv1.TableBuilder{
 			vsphereOwnershipEvidenceType:     topologyv1.NewTableBuilder(vsphereTopologyEvidenceColumns()...),
 			vsphereRunsOnEvidenceType:        topologyv1.NewTableBuilder(vsphereTopologyEvidenceColumns()...),
@@ -127,6 +129,7 @@ func (b *vsphereTopologyBuilder) addActor(actorType, moid, name, parentID string
 		b.nullableStringRef(parentID),
 		b.nullableStringRef(detail.overallStatus),
 		b.nullableStringRef(detail.powerState),
+		b.nullableStringRef(b.vCenterInstanceUUID),
 	)
 	b.actorIndexes[moid] = row
 	b.actorObjectTypes[moid] = objectType
@@ -229,7 +232,7 @@ func (b *vsphereTopologyBuilder) data(agentID string, collectedAt time.Time, res
 		stats["overlay_refs"] = overlays.Refs.Rows
 	}
 
-	return topologyv1.Data{
+	data := topologyv1.Data{
 		SchemaVersion: topologyv1.SchemaVersion,
 		Producer: topologyv1.Producer{
 			Source:       vsphereTopologySource,
@@ -248,7 +251,7 @@ func (b *vsphereTopologyBuilder) data(agentID string, collectedAt time.Time, res
 		Dictionaries: topologyv1.Dictionaries{
 			"strings": b.strings.Values(),
 		},
-		Types:        vsphereTopologyTypes(b.searchLabelKeys),
+		Types:        vsphereTopologyTypes(b.searchLabelKeys, b.vCenterInstanceUUID != ""),
 		Presentation: vsphereTopologyPresentation(),
 		Actors:       actorTable,
 		Links:        linkTable,
@@ -267,7 +270,15 @@ func (b *vsphereTopologyBuilder) data(agentID string, collectedAt time.Time, res
 		},
 		Stats:    stats,
 		Overlays: overlays,
-	}, nil
+	}
+	if b.vCenterInstanceUUID == "" {
+		data.Notifications = []topologyv1.Notification{{
+			Severity: "warning",
+			Code:     "vsphere.identity_unqualified",
+			Message:  "The vCenter instance UUID is unavailable. Objects in this map cannot be safely matched across sources and must be kept separate.",
+		}}
+	}
+	return data, nil
 }
 
 func (b *vsphereTopologyBuilder) evidenceMap() (topologyv1.EvidenceMap, int, error) {
@@ -420,6 +431,7 @@ func vsphereTopologyActorColumns() []topologyv1.Column {
 		topologyv1.NewColumn("parent_moid", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable(), topologyv1.WithRole("parent_identity")),
 		topologyv1.NewColumn("overall_status", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable(), topologyv1.WithRole("attribute")),
 		topologyv1.NewColumn("power_state", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable(), topologyv1.WithRole("attribute")),
+		topologyv1.NewColumn("vsphere_instance_uuid", "string_ref", topologyv1.WithDictionary("strings"), topologyv1.WithNullable(), topologyv1.WithRole("identity")),
 	}
 }
 
@@ -502,8 +514,8 @@ func vsphereTopologyLabelColumns() []topologyv1.Column {
 	}
 }
 
-func vsphereTopologyTypes(searchLabelKeys map[string]map[string]struct{}) topologyv1.TypeRegistry {
-	return topologyv1.TypeRegistry{
+func vsphereTopologyTypes(searchLabelKeys map[string]map[string]struct{}, qualified bool) topologyv1.TypeRegistry {
+	registry := topologyv1.TypeRegistry{
 		ActorTypes: map[string]topologyv1.ActorType{
 			"vsphere_datacenter":        vsphereActorType("Datacenter", "datacenter", "blue", searchLabelKeys["vsphere_datacenter"]),
 			"vsphere_cluster":           vsphereActorType("Cluster", "cluster", "green", searchLabelKeys["vsphere_cluster"]),
@@ -559,13 +571,21 @@ func vsphereTopologyTypes(searchLabelKeys map[string]map[string]struct{}) topolo
 			),
 		},
 	}
+	if qualified {
+		for id, actorType := range registry.ActorTypes {
+			actorType.Identity = []string{"vsphere_instance_uuid", "object_type", "vsphere_moid"}
+			actorType.MergeIdentity = []string{"vsphere_instance_uuid", "object_type", "vsphere_moid"}
+			actorType.ParentIdentity = []string{"vsphere_instance_uuid", "parent_object_type", "parent_moid"}
+			registry.ActorTypes[id] = actorType
+		}
+	}
+	return registry
 }
 
 func vsphereActorType(label, icon, colorSlot string, dynamicLabelKeys map[string]struct{}) topologyv1.ActorType {
 	return topologyv1.ActorType{
 		Layer:          vsphereTopologyLayer,
 		Identity:       []string{"object_type", "vsphere_moid"},
-		MergeIdentity:  []string{"object_type", "vsphere_moid"},
 		ParentIdentity: []string{"parent_object_type", "parent_moid"},
 		Search: &topologyv1.ActorSearchPolicy{
 			Columns:   []string{"name", "vsphere_moid", "object_type"},

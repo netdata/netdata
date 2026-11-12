@@ -6,12 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"golang.org/x/net/publicsuffix"
 )
 
 const resourceHostTopN = 10
-const apiName = "__api"
 
 type hostKey struct {
 	host    string
@@ -27,13 +25,6 @@ type ResourceHostGroup struct {
 	Unknown  bool // Missing host metadata; distinct from a literal host named "unknown".
 	Count    uint64
 	Duration VitalStats
-	Lost     uint64
-}
-
-func isAPICall(pageHost string, r beacon.Resource) bool {
-	return !r.Self && r.HasDuration && validMeasurement(r.DurationMS) &&
-		(r.Initiator == "fetch" || r.Initiator == "xmlhttprequest") &&
-		isFirstParty(pageHost, r.Host)
 }
 
 // isFirstParty reports whether resHost is the same registrable domain as
@@ -88,8 +79,8 @@ func (r *windowRead) addResource(v *activityObservation) {
 	if resource.HasDuration {
 		g.values = append(g.values, resource.DurationMS)
 	}
-	if isAPICall(v.pageHost, *resource) {
-		r.global.values[apiName] = append(r.global.values[apiName], resource.DurationMS)
+	if v.api {
+		r.api = append(r.api, resource.DurationMS)
 	}
 }
 func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
@@ -115,8 +106,7 @@ func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 			Host:     key.host,
 			Unknown:  key.unknown,
 			Count:    g.count,
-			Duration: measurementStats(apiName, g.values, r.resourcesLost),
-			Lost:     r.resourcesLost,
+			Duration: pctStats(g.values),
 		})
 	}
 	other := resourcePopulation{}
@@ -132,8 +122,7 @@ func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 			Host:     Other,
 			Other:    true,
 			Count:    other.count,
-			Duration: measurementStats(apiName, other.values, r.resourcesLost),
-			Lost:     r.resourcesLost,
+			Duration: pctStats(other.values),
 		})
 	}
 	return out

@@ -161,3 +161,10 @@ func (h *Registry) Availability() Availability {
 	}
 	return h.lastReceiver
 }
+
+// HasSites reports whether any runtime is currently admitted.
+func (h *Registry) HasSites() bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.sites) != 0
+}

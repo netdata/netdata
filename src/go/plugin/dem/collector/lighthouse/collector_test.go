@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
@@ -19,7 +20,13 @@ import (
 type prepared struct{}
 
 func (prepared) Check(context.Context, model.Kind) error { return nil }
-func (prepared) Execute(context.Context, model.Request, func(string)) model.Execution {
+
+func (prepared) ExecuteScheduled(
+	context.Context,
+	model.Request,
+	func(string),
+	func(time.Time) model.Schedule,
+) model.Execution {
 	panic("unexpected audit during validation")
 }
 func configured() *Collector {
@@ -34,9 +41,11 @@ func configured() *Collector {
 
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
-		`{"name":"home","update_every":1800,"timeout":180,"url":"https://example.org/","save_report":false}`,
+		`{"vnode":"storefront","name":"home","update_every":10,"check_every":1800,"timeout":180,"url":"https://example.org/","save_report":false}`,
 	)
-	cfgYAML := []byte("name: home\nupdate_every: 1800\ntimeout: 180\nurl: https://example.org/\nsave_report: false\n")
+	cfgYAML := []byte(
+		"vnode: storefront\nname: home\nupdate_every: 10\ncheck_every: 1800\ntimeout: 180\nurl: https://example.org/\nsave_report: false\n",
+	)
 	collecttest.TestConfigurationSerialize(t, New(Dependencies{}), cfgJSON, cfgYAML)
 	for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
 		t.Run(format, func(t *testing.T) {
@@ -46,7 +55,8 @@ func TestConfiguration(t *testing.T) {
 				t,
 				Config{
 					Name:        "home",
-					UpdateEvery: 1800,
+					UpdateEvery: 10,
+					CheckEvery:  1800,
 					Timeout:     180000000000,
 					URL:         "https://example.org/",
 				},
@@ -60,7 +70,7 @@ func TestConfiguration(t *testing.T) {
 		})
 	}
 	creator := Creator(Dependencies{})
-	assert.Equal(t, 1800, creator.Defaults.UpdateEvery)
+	assert.Equal(t, 10, creator.Defaults.UpdateEvery)
 	assert.True(t, creator.StoreFirst)
 	assert.Equal(t, New(Dependencies{}).Configuration(), creator.CreateV2().Configuration())
 }
@@ -70,20 +80,23 @@ func TestInitValidation(t *testing.T) {
 		change func(*Collector)
 		valid  bool
 	}{
-		"https":                  {func(*Collector) {}, true},
-		"http":                   {func(c *Collector) { c.URL = "http://127.0.0.1:8000/" }, true},
-		"empty":                  {func(c *Collector) { c.URL = "" }, false},
-		"relative":               {func(c *Collector) { c.URL = "/home" }, false},
-		"protocol relative":      {func(c *Collector) { c.URL = "//example.org" }, false},
-		"credentials":            {func(c *Collector) { c.URL = "https://user:pass@example.org" }, false},
-		"username only":          {func(c *Collector) { c.URL = "https://user@example.org" }, false},
-		"file scheme":            {func(c *Collector) { c.URL = "file:///tmp/index.html" }, false},
-		"empty host":             {func(c *Collector) { c.URL = "http://:80" }, false},
-		"invalid":                {func(c *Collector) { c.URL = "https://bad host/" }, false},
-		"missing name":           {func(c *Collector) { c.Name = "" }, false},
-		"zero interval":          {func(c *Collector) { c.UpdateEvery = 0 }, false},
-		"submillisecond timeout": {func(c *Collector) { c.Timeout = 999999 }, false},
-		"zero timeout":           {func(c *Collector) { c.Timeout = 0 }, false},
+		"https":                   {func(*Collector) {}, true},
+		"http":                    {func(c *Collector) { c.URL = "http://127.0.0.1:8000/" }, true},
+		"empty":                   {func(c *Collector) { c.URL = "" }, false},
+		"relative":                {func(c *Collector) { c.URL = "/home" }, false},
+		"protocol relative":       {func(c *Collector) { c.URL = "//example.org" }, false},
+		"credentials":             {func(c *Collector) { c.URL = "https://user:pass@example.org" }, false},
+		"username only":           {func(c *Collector) { c.URL = "https://user@example.org" }, false},
+		"file scheme":             {func(c *Collector) { c.URL = "file:///tmp/index.html" }, false},
+		"empty host":              {func(c *Collector) { c.URL = "http://:80" }, false},
+		"invalid":                 {func(c *Collector) { c.URL = "https://bad host/" }, false},
+		"missing name":            {func(c *Collector) { c.Name = "" }, false},
+		"zero check interval":     {func(c *Collector) { c.CheckEvery = 0 }, false},
+		"negative check interval": {func(c *Collector) { c.CheckEvery = -1 }, false},
+		"duration capacity":       {func(c *Collector) { c.CheckEvery = int(^uint(0) >> 1) }, time.Duration(int(^uint(0)>>1)) <= time.Duration(1<<63-1)/time.Second},
+		"zero interval":           {func(c *Collector) { c.UpdateEvery = 0 }, false},
+		"submillisecond timeout":  {func(c *Collector) { c.Timeout = 999999 }, false},
+		"zero timeout":            {func(c *Collector) { c.Timeout = 0 }, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := configured()
@@ -118,7 +131,16 @@ func TestPreparedCheckAndArtifacts(t *testing.T) {
 		metadata,
 		charts,
 		map[string][]string{
-			"execution_state": {"unknown", "success", "failed", "timeout", "inconclusive", "error", "cancelled"},
+			"execution_state": {
+				"unknown",
+				"success",
+				"failed",
+				"timeout",
+				"inconclusive",
+				"error",
+				"cancelled",
+				"stale",
+			},
 		},
 	)
 	collecttest.AssertConfigSchemaMatchesMetadataWith(
@@ -129,4 +151,11 @@ func TestPreparedCheckAndArtifacts(t *testing.T) {
 			Defaults: true,
 		},
 	)
+}
+
+func TestYAMLNullVnodeRemainsUnassigned(t *testing.T) {
+	c := configured()
+	require.NoError(t, yaml.Unmarshal([]byte("vnode: null\n"), c))
+	require.NoError(t, c.Init(context.Background()))
+	assert.Empty(t, c.Vnode)
 }

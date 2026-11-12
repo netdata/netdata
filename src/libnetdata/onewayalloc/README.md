@@ -28,8 +28,6 @@ these data can be freed immediately after the query finishes.
 2. The caller can then perform any number of the following calls to acquire memory:
    - `onewayalloc_mallocz(owa, size)`, similar to `mallocz()`
    - `onewayalloc_callocz(owa, nmemb, size)`, similar to `callocz()`
-   - `onewayalloc_strdupz(owa, string)`, similar to `strdupz()`
-   - `onewayalloc_memdupz(owa, ptr, size)`, similar to `mallocz()` and then `memcpy()`
    
 3. Once all allocated buffers are no longer needed, `onewayalloc_reset(owa)` invalidates
    them and makes every page available for reuse. Reset takes constant time; overflow

@@ -33,7 +33,9 @@ func (e *Engine) Qualify(ctx context.Context, source Source) (*Qualification, er
 	if err != nil {
 		return nil, err
 	}
-	result, err := qualify(ctx, e.unrecordedView(source, captures))
+	candidate := e.unrecordedView(source, captures)
+	candidate.qualification = true
+	result, err := qualify(ctx, candidate)
 	if !errors.Is(err, ndexec.ErrTreeNotDrained) {
 		err = errors.Join(err, captures.Close())
 	}

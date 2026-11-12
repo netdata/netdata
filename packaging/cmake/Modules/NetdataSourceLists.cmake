@@ -769,6 +769,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetSensors.c
         src/collectors/windows.plugin/GetHardwareInfo.c
         src/collectors/windows.plugin/GetPrinters.c
+        src/collectors/windows.plugin/GetFSRMQuota.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c

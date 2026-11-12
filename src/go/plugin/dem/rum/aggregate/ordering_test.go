@@ -18,7 +18,7 @@ func TestOutOfOrderReceiptsDoNotHideExpiredState(t *testing.T) {
 	assert.Equal(t, 1, snap.Vitals[beacon.LCP].N)
 	assert.EqualValues(t, 1, snap.PageviewsWindow)
 	assert.Equal(t, 1, snap.ObservedSessions)
-	rows, _ := a.Live(0, 100)
+	rows, _ := a.Live(0, 100, "")
 	require.NotEmpty(t, rows)
 	for _, row := range rows {
 		assert.Equal(t, "/new", row.Page)

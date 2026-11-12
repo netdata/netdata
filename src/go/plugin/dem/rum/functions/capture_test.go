@@ -19,7 +19,7 @@ type captureFunctionSource struct {
 	count int
 }
 
-func (s captureFunctionSource) Pages(context.Context, string) ([]query.Page, error) {
+func (s captureFunctionSource) Pages(context.Context, string, string) ([]query.Page, error) {
 	return []query.Page{{Site: "shop", Page: "/", FrustrationsKnown: s.known, FrustrationWindow: s.count}}, nil
 }
 
@@ -38,7 +38,7 @@ func TestPageFrustrationDistinguishesDisabledFromMeasuredZero(t *testing.T) {
 			handler := rumfunctions.New(captureFunctionSource{
 				known: tc.known,
 				count: tc.count,
-			})
+			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 				Method: "rum-pages",
 			})

@@ -90,7 +90,7 @@ func (c *Collector) topologyData(agentID, jobName string) (topologyv1.Data, bool
 		return topologyv1.Data{}, false
 	}
 
-	builder := newVSphereTopologyBuilder(jobName)
+	builder := newVSphereTopologyBuilder(jobName, c.resources.VCenterInstanceUUID)
 
 	for _, dc := range sortedDatacenters(c.resources.DataCenters) {
 		builder.addActor("vsphere_datacenter", dc.ID, dc.Name, "", vsphereActorDetail{

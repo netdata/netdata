@@ -25,11 +25,12 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 
 #include "../rrd.h"
 
-bool rrdinstance_acquired_id_and_name_are_same(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
-const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
-bool rrdmetric_acquired_has_name(RRDMETRIC_ACQUIRED *rma);
 
+// Names, titles, units and families of metrics, instances and contexts are replaced (and the old strings
+// freed) while the objects are in use, so holding the object does not keep them alive. Readers MUST take
+// their own reference with the *_dup() helpers (taken under the owner's lock) and release it with
+// string_freez(). Ids never change.
 STRING *rrdmetric_acquired_id_dup(RRDMETRIC_ACQUIRED *rma);
 STRING *rrdmetric_acquired_name_dup(RRDMETRIC_ACQUIRED *rma);
 
@@ -40,9 +41,7 @@ bool rrdmetric_acquired_stored_as_rates(RRDMETRIC_ACQUIRED *rma);
 bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE_ACQUIRED *ria);
 
 const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
-const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
-bool rrdinstance_acquired_has_name(RRDINSTANCE_ACQUIRED *ria);
-const char *rrdinstance_acquired_units(RRDINSTANCE_ACQUIRED *ria);
+STRING *rrdinstance_acquired_name_dup(RRDINSTANCE_ACQUIRED *ria);
 STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
 
 // An instance's labels belong to its chart while it is linked to one, and to the instance once archived.
@@ -62,9 +61,17 @@ RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria);
 bool rrdinstance_acquired_belongs_to_context(RRDINSTANCE_ACQUIRED *ria, RRDCONTEXT_ACQUIRED *rca);
 time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria);
 
-const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca);
-const char *rrdcontext_acquired_title(RRDCONTEXT_ACQUIRED *rca);
+STRING *rrdcontext_acquired_units_dup(RRDCONTEXT_ACQUIRED *rca);
 RRDSET_TYPE rrdcontext_acquired_chart_type(RRDCONTEXT_ACQUIRED *rca);
+
+// Extra references for callers that keep objects after the query or walk that acquired them releases its own.
+// Release a metric before its instance and an instance before its context.
+RRDCONTEXT_ACQUIRED *rrdcontext_acquired_ref(RRDCONTEXT_ACQUIRED *rca);
+void rrdcontext_acquired_unref(RRDCONTEXT_ACQUIRED *rca);
+RRDINSTANCE_ACQUIRED *rrdinstance_acquired_ref(RRDINSTANCE_ACQUIRED *ria);
+void rrdinstance_acquired_unref(RRDINSTANCE_ACQUIRED *ria);
+RRDMETRIC_ACQUIRED *rrdmetric_acquired_ref(RRDMETRIC_ACQUIRED *rma);
+void rrdmetric_acquired_unref(RRDMETRIC_ACQUIRED *rma);
 
 // ----------------------------------------------------------------------------
 // public API for rrdhost
@@ -194,9 +201,14 @@ typedef struct _query_node {
     QUERY_ALERTS_COUNTS alerts;
 } QUERY_NODE;
 
+// The query keeps its own references to the metadata strings it reports (taken when the context, instance or
+// dimension is added, released with it): the objects' own strings are replaced while the query runs.
+
 typedef struct _query_context {
     uint32_t slot;
     RRDCONTEXT_ACQUIRED *rca;
+    STRING *title;
+    STRING *units;
 
     STORAGE_POINT query_points;
     QUERY_INSTANCES_COUNTS instances;
@@ -208,6 +220,8 @@ typedef struct _query_instance {
     uint32_t slot;
     uint32_t query_host_id;
     RRDINSTANCE_ACQUIRED *ria;
+    STRING *name;
+    STRING *units;
     STRING *id_fqdn;        // never access this directly - it is created on demand via query_instance_id_fqdn()
     STRING *name_fqdn;      // never access this directly - it is created on demand via query_instance_name_fqdn()
     RRDINSTANCE_LABELS_REF labels; // never access this directly - it is acquired on demand via query_instance_labels()
@@ -222,6 +236,7 @@ typedef struct _query_dimension {
     uint32_t slot;
     uint32_t priority;
     RRDMETRIC_ACQUIRED *rma;
+    STRING *name;
     QUERY_STATUS status;
 } QUERY_DIMENSION;
 
@@ -619,10 +634,20 @@ static inline const char *query_metric_id(QUERY_TARGET *qt, QUERY_METRIC *qm) {
 
 static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) {
     QUERY_DIMENSION *qd = query_dimension(qt, qm->link.query_dimension_id);
-    return rrdmetric_acquired_name(qd->rma);
+    return string2str(qd->name);
 }
 
 struct storage *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
+
+// the instance name as it was when the instance was added to the query
+static inline const char *query_instance_name(QUERY_INSTANCE *qi) {
+    return string2str(qi->name);
+}
+
+// the instance has no name of its own (ids and names are interned, so the same string is the same pointer)
+static inline bool query_instance_name_is_id(QUERY_INSTANCE *qi) {
+    return string2str(qi->name) == rrdinstance_acquired_id(qi->ria);
+}
 
 STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version);
 STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version, const STRING *host_hostname);

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
 func managedFocusParamOptions(deps Deps) []funcapi.ParamOption {
@@ -13,8 +14,12 @@ func managedFocusParamOptions(deps Deps) []funcapi.ParamOption {
 		return nil
 	}
 
-	options := make([]funcapi.ParamOption, 0)
-	for _, target := range deps.ManagedDeviceFocusTargets() {
+	return managedFocusTargetOptions(deps.ManagedDeviceFocusTargets())
+}
+
+func managedFocusTargetOptions(targets []topologyoptions.ManagedFocusTarget) []funcapi.ParamOption {
+	options := make([]funcapi.ParamOption, 0, len(targets))
+	for _, target := range targets {
 		if strings.TrimSpace(target.Value) == "" {
 			continue
 		}

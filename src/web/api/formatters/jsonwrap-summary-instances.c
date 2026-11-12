@@ -13,14 +13,14 @@ void query_target_summary_instances_v1(BUFFER *wb, QUERY_TARGET *qt, const char 
 
         snprintfz(name, RRD_ID_LENGTH_MAX * 2 + 1, "%s:%s",
                   rrdinstance_acquired_id(qi->ria),
-                  rrdinstance_acquired_name(qi->ria));
+                  query_instance_name(qi));
 
         bool *set = dictionary_set(dict, name, NULL, sizeof(*set));
         if (!*set) {
             *set = true;
             buffer_json_add_array_item_array(wb);
             buffer_json_add_array_item_string(wb, rrdinstance_acquired_id(qi->ria));
-            buffer_json_add_array_item_string(wb, rrdinstance_acquired_name(qi->ria));
+            buffer_json_add_array_item_string(wb, query_instance_name(qi));
             buffer_json_array_close(wb);
         }
     }
@@ -67,7 +67,7 @@ void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char 
             QUERY_INSTANCE *qi = query_instance(qt, c);
             items[c].index = c;
             items[c].id = rrdinstance_acquired_id(qi->ria);
-            items[c].name = rrdinstance_acquired_name(qi->ria);
+            items[c].name = query_instance_name(qi);
             
             // Use query points as the metric for contribution
             if (qt->query_points.sum > 0)
@@ -96,7 +96,7 @@ void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char 
                 buffer_json_add_array_item_object(wb);
                 buffer_json_member_add_string(wb, "id", items[i].id);
                 
-                if(!rrdinstance_acquired_id_and_name_are_same(qi->ria))
+                if(!query_instance_name_is_id(qi))
                     buffer_json_member_add_string(wb, JSKEY(name), items[i].name);
                 
                 buffer_json_member_add_uint64(wb, JSKEY(node_index), qi->query_host_id);
@@ -163,8 +163,8 @@ void query_target_summary_instances_v2(BUFFER *wb, QUERY_TARGET *qt, const char 
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "id", rrdinstance_acquired_id(qi->ria));
             
-            if(!rrdinstance_acquired_id_and_name_are_same(qi->ria))
-                buffer_json_member_add_string(wb, JSKEY(name), rrdinstance_acquired_name(qi->ria));
+            if(!query_instance_name_is_id(qi))
+                buffer_json_member_add_string(wb, JSKEY(name), query_instance_name(qi));
             
             buffer_json_member_add_uint64(wb, JSKEY(node_index), qi->query_host_id);
             

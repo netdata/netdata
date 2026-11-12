@@ -116,8 +116,7 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 		ActorTypeBGPPeer: {
 			Layer:             "network",
 			Identity:          []string{"id"},
-			MergeIdentity:     []string{"remote_ip", "remote_asn"},
-			ParentIdentity:    []string{"site_id"},
+			MergeIdentity:     []string{"account_id", "remote_ip", "remote_asn"},
 			AggregationScopes: []string{"network"},
 			Search: &topologyv1.ActorSearchPolicy{
 				Columns: []string{
@@ -169,6 +168,10 @@ func TopologyActorTypes() map[string]topologyv1.ActorType {
 		}
 		types[id] = actorType
 	}
+	// An ASN without an address identifies an observation, not a unique router.
+	observation := types[ActorTypeBGPPeer]
+	observation.MergeIdentity = nil
+	types[ActorTypeBGPPeerObservation] = observation
 	return types
 }
 

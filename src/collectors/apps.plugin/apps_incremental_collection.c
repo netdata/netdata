@@ -207,9 +207,7 @@ int read_proc_pid_cmdline(struct pid_stat *p) {
     return 1;
 
 cleanup:
-    // copy the command to the command line
-    string_freez(p->cmdline);
-    p->cmdline = NULL;
+    update_pid_cmdline(p, NULL);
     return 0;
 }
 #endif

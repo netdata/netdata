@@ -18,6 +18,136 @@
     { "$ref": "#/definitions/not_modified_response" }
   ],
   "definitions": {
+    "focus_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "option_column",
+        "actor_column"
+      ],
+      "properties": {
+        "table": {
+          "type": "string",
+          "minLength": 1
+        },
+        "option_column": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_column": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focus_membership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_type",
+        "link_type"
+      ],
+      "properties": {
+        "actor_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "link_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focus_traversal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connect_roots"
+      ],
+      "properties": {
+        "connector_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "boundary_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "connect_roots": {
+          "type": "boolean"
+        },
+        "prune_leaf_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "protected_memberships": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/focus_membership"
+          }
+        }
+      }
+    },
+    "focus": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "unfocused_option",
+            "bindings",
+            "traversal"
+          ],
+          "properties": {
+            "role": {
+              "const": "roots"
+            },
+            "unfocused_option": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bindings": {
+              "$ref": "#/definitions/focus_bindings"
+            },
+            "traversal": {
+              "$ref": "#/definitions/focus_traversal"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "unlimited_option"
+          ],
+          "properties": {
+            "role": {
+              "const": "depth"
+            },
+            "unlimited_option": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
     "field_type": {
       "type": "string",
       "enum": [
@@ -158,24 +288,41 @@
         "name": { "type": "string" },
         "defaultSelected": { "type": "boolean" },
         "disabled": { "type": "boolean" },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Alternate option IDs accepted by the producer. Canonical IDs take precedence; aliases are not global normalization rules."
+        },
         "sort": { "$ref": "#/definitions/field_sort" }
       },
       "additionalProperties": true
     },
     "required_param": {
       "type": "object",
-      "required": ["id", "name", "type", "options"],
+      "required": ["id", "name", "type"],
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "type": { "enum": ["select", "multiselect"] },
+        "type": { "enum": ["select", "multiselect", "text"] },
         "options": {
           "type": "array",
           "items": { "$ref": "#/definitions/required_param_option" }
         },
         "help": { "type": "string" },
-        "unique_view": { "type": "boolean" }
+        "unique_view": { "type": "boolean" },
+        "focus": { "$ref": "#/definitions/focus" },
+        "value_separator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Separator accepted by the producer for multiple values encoded in one string. Consumers normalizing values against this metadata must match exact option IDs before splitting. This declaration does not change transport parsing."
+        }
       },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["select", "multiselect"] } } },
+          "then": { "required": ["options"] }
+        }
+      ],
       "additionalProperties": true
     },
     "accepted_params": {
