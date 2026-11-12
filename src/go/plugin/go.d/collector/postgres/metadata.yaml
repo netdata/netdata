@@ -45,19 +45,20 @@ modules:
         limits:
           description: |
             By default, each database, including the database in the DSN, is monitored for up to 50 tables and 250 indexes.
-            Above either limit, the collector selects TOP objects by recent activity: tables by rows read, fetched, inserted,
-            updated and deleted; indexes by index scans. These are PostgreSQL statistics counters, not SQL query counts.
-            Table and index selection is independent and refreshes approximately every five minutes. Detailed metrics
-            for the selected objects are collected at each update interval. Oversized databases need two successful
-            observations before the first selection; the second is attempted at the next update interval.
+            Above either limit, the collector selects TOP objects: tables by recent rows read, fetched, inserted, updated
+            and deleted (PostgreSQL statistics counters, not SQL query counts), indexes by size. Table and index selection
+            is independent and refreshes approximately every five minutes. A selected object is replaced only by one with
+            more than twice its row activity or size. Detailed metrics for the selected objects are collected at each
+            update interval. Databases above the table limit need two successful observations before the first table
+            selection; the second is attempted at the next update interval.
             Objects outside TOP have no individual metrics, and there is no aggregate for them. Rotation can cause gaps
             in individual charts and their alerts. While a limit is set, tables or indexes created after the last
             selection, including ones recreated under the same name, have no metrics until the next refresh, even in a
             database below the limit. Set either limit to 0 for unlimited collection.
         performance_impact:
           description: |
-            Activity selection scans lightweight statistics for all accessible candidate tables and indexes at startup
-            and approximately every five minutes; a failed scan is retried after one minute.
+            Selection scans lightweight statistics for all accessible candidate tables, and the size of every accessible
+            index, at startup and approximately every five minutes; a failed scan is retried after one minute.
             In-memory selection state grows with the number of candidates.
             Detailed statistics and size queries cover the selected objects; bloat and column checks run every five minutes.
             Unlimited collection increases detailed query cost and the number of charts.
@@ -158,7 +159,7 @@ modules:
               required: false
               group: Limits
             - name: max_db_indexes
-              description: Maximum indexes monitored per database, including the DSN database. Above the limit, select TOP indexes by recent index scans, independently of tables (0 = no limit).
+              description: Maximum indexes monitored per database, including the DSN database. Above the limit, select the largest indexes, independently of tables (0 = no limit).
               default_value: 250
               required: false
               group: Limits

@@ -63,6 +63,9 @@ func TestRelationSelection(t *testing.T) {
 		"rename starts new baseline":          {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "renamed", 100000), activity(2, "b", 1)), want: 2},
 		"database reset starts new baseline":  {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 1), activity(2, "b", 100000)), reset: "new", want: 1},
 		"equal activity keeps membership":     {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 0), activity(2, "b", 0)), retained: []uint32{2}, want: 2},
+		"selected keeps place below twice":    {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 100), activity(2, "b", 150)), retained: []uint32{1}, want: 1},
+		"more than twice replaces selected":   {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 100), activity(2, "b", 250)), retained: []uint32{1}, want: 2},
+		"idle selected yields to activity":    {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 0), activity(2, "b", 1)), retained: []uint32{1}, want: 2},
 		"large integer delta stays precise":   {before: activityRows(activity(1, "a", 1<<60), activity(2, "b", 1<<60)), after: activityRows(activity(1, "a", (1<<60)+1), activity(2, "b", (1<<60)+2)), want: 2},
 	}
 	for name, test := range tests {
@@ -72,7 +75,7 @@ func TestRelationSelection(t *testing.T) {
 			for _, oid := range test.retained {
 				s.selected[oid] = test.before[oid]
 			}
-			s.choose(test.after, test.reset, now.Add(17*time.Second), 1)
+			s.choose(test.after, test.reset, now.Add(17*time.Second), 1, false)
 			assert.Equal(t, []uint32{test.want}, s.oids())
 		})
 	}
@@ -82,20 +85,43 @@ func TestRelationSelectionWarmup(t *testing.T) {
 	now := time.Unix(1000, 0)
 	rows := activityRows(activity(1, "a", 1000), activity(2, "b", 0))
 	var oversized relationSelection
-	oversized.choose(rows, "", now, 1)
+	oversized.choose(rows, "", now, 1, false)
 	assert.Empty(t, oversized.selected)
 	assert.False(t, oversized.warmed)
-	oversized.choose(activityRows(activity(1, "a", 1000), activity(2, "b", 5)), "", now.Add(time.Second), 1)
+	oversized.choose(activityRows(activity(1, "a", 1000), activity(2, "b", 5)), "", now.Add(time.Second), 1, false)
 	assert.Equal(t, []uint32{2}, oversized.oids())
 	assert.True(t, oversized.warmed)
 	var small relationSelection
-	small.choose(rows, "", now, 2)
+	small.choose(rows, "", now, 2, false)
 	assert.Len(t, small.selected, 2)
 	assert.True(t, small.warmed)
 	var largeLimit relationSelection
-	largeLimit.choose(rows, "", now, 1<<40)
+	largeLimit.choose(rows, "", now, 1<<40, false)
 	assert.Len(t, largeLimit.selected, 2)
 	assert.True(t, largeLimit.warmed)
+}
+
+func TestIndexSelectionBySize(t *testing.T) {
+	sized := func(sizes ...int64) map[uint32]relationActivity {
+		rows := make(map[uint32]relationActivity, len(sizes))
+		for i, size := range sizes {
+			oid := uint32(i + 1)
+			rows[oid] = relationActivity{oid: oid, tableOID: 100, database: "db", schema: "public", table: "t", name: fmt.Sprint("i", oid), size: size}
+		}
+		return rows
+	}
+	now := time.Unix(1000, 0)
+	var s relationSelection
+	// Size needs no second observation, even in an oversized database.
+	s.choose(sized(100, 300, 200), "", now, 2, true)
+	assert.Equal(t, []uint32{2, 3}, s.oids())
+	assert.True(t, s.warmed)
+	assert.Nil(t, s.previous)
+	// Index 1 grows past selected index 3 (200) but not past twice its size.
+	s.choose(sized(350, 300, 200), "", now.Add(relationRefreshEvery), 2, true)
+	assert.Equal(t, []uint32{2, 3}, s.oids())
+	s.choose(sized(450, 300, 200), "", now.Add(2*relationRefreshEvery), 2, true)
+	assert.Equal(t, []uint32{1, 2}, s.oids())
 }
 
 // pgx accepts oid arrays; sqlmock's default database/sql converter does not.
@@ -124,7 +150,7 @@ func tableInventory(counters ...int64) *sqlmock.Rows {
 }
 
 func indexInventory() *sqlmock.Rows {
-	return sqlmock.NewRows([]string{"datname", "stats_reset", "relid", "indexrelid", "schemaname", "relname", "indexrelname", "idx_scan"}).AddRow("db", "", 3, 11, "public", "t3", "i1", 0)
+	return sqlmock.NewRows([]string{"datname", "relid", "indexrelid", "schemaname", "relname", "indexrelname", "size"}).AddRow("db", 3, 11, "public", "t3", "i1", 8192)
 }
 
 func TestRefreshRelationsPrimaryAndSecondary(t *testing.T) {
@@ -592,12 +618,12 @@ func BenchmarkRelationSelection(b *testing.B) {
 			}
 			s := relationSelection{}
 			now := time.Unix(1000, 0)
-			s.choose(rows, "", now, 50)
+			s.choose(rows, "", now, 50, false)
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				now = now.Add(time.Minute)
-				s.choose(rows, "", now, 50)
+				s.choose(rows, "", now, 50, false)
 			}
 		})
 	}

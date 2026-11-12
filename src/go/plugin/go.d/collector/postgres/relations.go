@@ -12,15 +12,19 @@ const (
 	relationRefreshEvery = 5 * time.Minute
 	// A failed activity scan is not repeated every update interval.
 	relationRetryEvery = time.Minute
+	// A selected object yields only to one scoring more than this many times higher, limiting rotation churn.
+	relationRetainFactor = 2
 	// Repeated per-database query failures are logged at most once per window.
 	queryWarningEvery = 5 * time.Minute
 )
 
 // OIDs belong to a connection's database. Public chart identities still use names.
+// Tables rank by counters, indexes by size.
 type relationActivity struct {
 	oid, tableOID                 uint32
 	database, schema, name, table string
 	counters                      [5]int64
+	size                          int64
 }
 
 type relationSelection struct {
@@ -83,7 +87,7 @@ func (c *Collector) refreshRelations(now time.Time) {
 			indexes   bool
 			operation string
 		}{
-			{&r.tables, c.MaxDBTables, false, "table activity"}, {&r.indexes, c.MaxDBIndexes, true, "index activity"},
+			{&r.tables, c.MaxDBTables, false, "table activity"}, {&r.indexes, c.MaxDBIndexes, true, "index sizes"},
 		} {
 			if surface.limit == 0 {
 				continue
@@ -105,13 +109,15 @@ func (c *Collector) refreshRelations(now time.Time) {
 					}
 				}
 			}
-			s.choose(rows, reset, now, surface.limit)
+			s.choose(rows, reset, now, surface.limit, surface.indexes)
 			c.retireUnselected(db, surface.indexes)
 		}
 	})
 }
 
-func (s *relationSelection) choose(rows map[uint32]relationActivity, reset string, now time.Time, limit int64) {
+// choose ranks tables by recent row activity, a rate that needs two observations, and indexes by size.
+// A selected object keeps its place unless another scores more than relationRetainFactor times higher.
+func (s *relationSelection) choose(rows map[uint32]relationActivity, reset string, now time.Time, limit int64, bySize bool) {
 	type scored struct {
 		relationActivity
 		score    float64
@@ -121,23 +127,14 @@ func (s *relationSelection) choose(rows map[uint32]relationActivity, reset strin
 	seconds := now.Sub(s.observed).Seconds()
 	for oid, row := range rows {
 		item := scored{relationActivity: row}
-		old, exists := s.previous[oid]
-		valid := exists && sameRelation(old, row) && reset == s.reset && seconds > 0
-		for i, value := range row.counters {
-			if value < old.counters[i] {
-				valid = false
-			}
-			if value >= old.counters[i] {
-				item.score += float64(value - old.counters[i])
-			}
-		}
-		if valid {
-			item.score /= seconds
+		if bySize {
+			item.score = float64(row.size)
 		} else {
-			item.score = 0
+			item.score = s.activityRate(oid, row, reset, seconds)
 		}
-		if selected, ok := s.selected[oid]; ok {
-			item.retained = sameRelation(selected, row)
+		if selected, ok := s.selected[oid]; ok && sameRelation(selected, row) {
+			item.retained = true
+			item.score *= relationRetainFactor
 		}
 		ranked = append(ranked, item)
 	}
@@ -159,7 +156,8 @@ func (s *relationSelection) choose(rows map[uint32]relationActivity, reset strin
 	})
 	selected := make(map[uint32]relationActivity)
 	// A first observation cannot establish recent activity in an oversized database.
-	if int64(len(rows)) <= limit || !s.observed.IsZero() {
+	s.warmed = bySize || !s.observed.IsZero() || int64(len(rows)) <= limit
+	if s.warmed {
 		for i, row := range ranked {
 			if int64(i) >= limit {
 				break
@@ -167,8 +165,27 @@ func (s *relationSelection) choose(rows map[uint32]relationActivity, reset strin
 			selected[row.oid] = row.relationActivity
 		}
 	}
-	s.warmed = !s.observed.IsZero() || int64(len(rows)) <= limit
-	s.previous, s.selected, s.reset, s.observed = rows, selected, reset, now
+	s.previous = nil
+	if !bySize {
+		s.previous = rows
+	}
+	s.selected, s.reset, s.observed = selected, reset, now
+}
+
+// activityRate is the summed row-counter rate since the previous observation, or 0 without a valid baseline.
+func (s *relationSelection) activityRate(oid uint32, row relationActivity, reset string, seconds float64) float64 {
+	old, ok := s.previous[oid]
+	if !ok || !sameRelation(old, row) || reset != s.reset || seconds <= 0 {
+		return 0
+	}
+	var delta float64
+	for i, value := range row.counters {
+		if value < old.counters[i] {
+			return 0
+		}
+		delta += float64(value - old.counters[i])
+	}
+	return delta / seconds
 }
 
 func sameRelation(a, b relationActivity) bool {
@@ -211,7 +228,9 @@ func (c *Collector) queryRelationActivity(db *sql.DB, indexes bool) (map[uint32]
 			}
 		case "indexrelname":
 			row.name = value
-		case "seq_tup_read", "idx_scan":
+		case "size":
+			row.size = parseInt(value)
+		case "seq_tup_read":
 			row.counters[0] = parseInt(value)
 		case "idx_tup_fetch":
 			row.counters[1] = parseInt(value)
@@ -230,11 +249,12 @@ func (c *Collector) queryRelationActivity(db *sql.DB, indexes bool) (map[uint32]
 	return rows, reset, err
 }
 
+// queryRelationActivity returns the ranking inputs: row-activity counters for tables, sizes for indexes.
 func queryRelationActivity(indexes bool) string {
 	if indexes {
-		return `SELECT current_database() AS datname, d.stats_reset, s.relid, s.indexrelid,
- s.schemaname, s.relname, s.indexrelname, s.idx_scan
- FROM pg_stat_user_indexes s JOIN pg_stat_database d ON d.datname = current_database()
+		return `SELECT current_database() AS datname, s.relid, s.indexrelid,
+ s.schemaname, s.relname, s.indexrelname, pg_relation_size(s.indexrelid) AS size
+ FROM pg_stat_user_indexes s
  WHERE has_schema_privilege(s.schemaname, 'USAGE');`
 	}
 	return `SELECT current_database() AS datname, d.stats_reset, s.relid,

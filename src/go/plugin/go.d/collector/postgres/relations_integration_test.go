@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -53,12 +54,14 @@ func TestRelationSelectionPostgreSQL(t *testing.T) {
 	_, err = c.collect()
 	require.NoError(t, err)
 	assert.Empty(t, c.relationsFor(c.db).tables.selected)
-	assert.Empty(t, c.relationsFor(c.db).indexes.selected)
+	// Indexes rank by size from the first observation: a_pkey is the largest.
+	assert.Equal(t, []string{"a_pkey"}, selectedNames(c.relationsFor(c.db).indexes))
 	secondary := c.dbConns["netdata_top_secondary"]
 	require.NotNil(t, secondary)
 	require.NotNil(t, secondary.db)
 	assert.Empty(t, c.relationsFor(secondary.db).tables.selected)
-	assert.Empty(t, c.relationsFor(secondary.db).indexes.selected)
+	// Equal sizes break ties by schema and name.
+	assert.Equal(t, []string{"a_pkey"}, selectedNames(c.relationsFor(secondary.db).indexes))
 	secondaryWork, secondaryConnStr, err := c.openSecondaryConnection("netdata_top_secondary")
 	require.NoError(t, err)
 	_, err = secondaryWork.Exec(`INSERT INTO c SELECT n FROM generate_series(1,3000) n`)
@@ -189,4 +192,13 @@ ANALYZE netdata_columns.parent; ANALYZE netdata_columns.child`)
 		require.NotNil(t, m.nullColumns, table)
 		assert.Equal(t, int64(1), *m.nullColumns, table)
 	}
+}
+
+func selectedNames(s relationSelection) []string {
+	var names []string
+	for _, row := range s.selected {
+		names = append(names, row.name)
+	}
+	slices.Sort(names)
+	return names
 }
