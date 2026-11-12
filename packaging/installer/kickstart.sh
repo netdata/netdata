@@ -1029,8 +1029,9 @@ verify_release_signature() (
   download "${signature_url}" "${signature_file}" || fatal "Unable to download release Manifest signature. ${BADNET_MSG}" F0531
 
   # Export only the expected repository key, never an arbitrary signature issuer.
-  # Avoid creating a default GnuPG home on machines that do not have one yet.
-  if [ -d "${GNUPGHOME:-${HOME}/.gnupg}" ] && command -v gpg >/dev/null 2>&1; then
+  # Exporting from an empty home creates pubring.kbx, so require an existing keyring.
+  signature_user_home="${GNUPGHOME:-${HOME}/.gnupg}"
+  if { [ -s "${signature_user_home}/pubring.kbx" ] || [ -s "${signature_user_home}/pubring.gpg" ]; } && command -v gpg >/dev/null 2>&1; then
     gpg --no-options --batch --lock-never --no-auto-check-trustdb --export "${signature_fingerprint}" > "${signature_key}" 2>/dev/null || true
   fi
   if [ ! -s "${signature_key}" ]; then
@@ -1061,7 +1062,7 @@ check_release_key_fingerprint() (
       mkdir "${4}/keycheck" && chmod 700 "${4}/keycheck" || return 1
       gpg --no-options --homedir "${4}/keycheck" --batch --with-colons --import-options show-only --import "${2}" 2>/dev/null |
         awk -F: -v want="${3}" '
-          $1 == "pub" { certs++; primary = 1; next }
+          $1 == "pub" || $1 == "sec" { certs++; primary = 1; next }
           $1 == "fpr" && primary { fpr = toupper($10); primary = 0 }
           END { exit !(certs == 1 && fpr == want) }
         '

@@ -130,12 +130,12 @@ download() {
         self.pin_fixture_key()
         other_home = self.root / 'other-home'
         other_home.mkdir(mode=0o700)
-        before = {p.relative_to(self.home): p.read_bytes() for p in self.home.rglob('*') if p.is_file()}
+        before = {p.relative_to(other_home): p.read_bytes() for p in other_home.rglob('*') if p.is_file()}
         result = self.run_shell('verify_release_signature', 'https://example.invalid',
                                 NETDATA_VERIFY_RELEASE_SIGNATURES='1', DRY_RUN='0',
                                 NETDATA_MANIFEST_INSTALL='1', GNUPGHOME=str(other_home))
         self.assertEqual(result.returncode, 0, result.stderr)
-        after = {p.relative_to(self.home): p.read_bytes() for p in self.home.rglob('*') if p.is_file()}
+        after = {p.relative_to(other_home): p.read_bytes() for p in other_home.rglob('*') if p.is_file()}
         self.assertEqual(before, after)
         self.assertEqual((self.root / 'fetches').read_text(), 'fetched\n')
 
@@ -184,9 +184,19 @@ download() {
         both = self.root / 'both.key'
         both.write_bytes((self.root / 'public.key').read_bytes() + other_key)
         (self.root / 'other.key').write_bytes(other_key)
+        other_secret = subprocess.run(
+            ['gpg', '--batch', '--armor', '--export-secret-keys'],
+            env=dict(self.env, GNUPGHOME=str(other)),
+            check=True, capture_output=True).stdout
+        mixed = self.root / 'mixed.key'
+        mixed.write_bytes((self.root / 'public.key').read_bytes() + other_secret)
+        reversed_mixed = self.root / 'reversed-mixed.key'
+        reversed_mixed.write_bytes(other_secret + (self.root / 'public.key').read_bytes())
         cases = {'pinned': (self.root / 'public.key', 0),
                  'different key': (self.root / 'other.key', 1),
-                 'extra certificate': (both, 1)}
+                 'extra certificate': (both, 1),
+                 'extra secret certificate': (mixed, 1),
+                 'leading secret certificate': (reversed_mixed, 1)}
         for tool in ('gpg', 'sq'):
             if not shutil.which(tool):
                 continue
