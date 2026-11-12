@@ -195,7 +195,7 @@ func TestCollectorRefreshMetadataDoesNotAcquireTopology(t *testing.T) {
 	require.NoError(t, err)
 	replayed, err := archive.Replay(testDiagnosticQuery(options))
 	require.NoError(t, err)
-	require.Equal(t, live, replayed, "current presentation must survive archive replay separately from acquisition input")
+	require.Equal(t, live.Data, replayed, "current presentation must survive archive replay separately from acquisition input")
 
 	dev.SysContact, dev.SysLocation = "", ""
 	delete(dev.VnodeLabels, "location")

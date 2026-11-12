@@ -43,7 +43,7 @@ func TestCollectorRuntimeDeviceReplacement(t *testing.T) {
 	require.Len(t, entries, 1)
 	registrationID, guid := entries[0].RegistrationID, c.VirtualNode().GUID
 	oldDD, router, interfaces := c.ddSnmpColl, c.funcRouter, c.ifaceCache
-	oldTableChart := c.Charts().Get(chartIDFromName("ifTraffic_2"))
+	oldTableChart := c.Charts().Get(refreshTestTableKey("ifTraffic", "2"))
 	require.NotNil(t, oldTableChart)
 	oldStatsChart := c.Charts().Get("snmp_device_prof_refresh_stats_timings")
 	require.NotNil(t, oldStatsChart)
@@ -69,7 +69,7 @@ func TestCollectorRuntimeDeviceReplacement(t *testing.T) {
 	require.NotEmpty(t, mx)
 	require.NotNil(t, replacement)
 	assert.Equal(t, int64(7), mx[metricIDFromName("replacementLoad")])
-	assert.NotContains(t, mx, metricIDFromName("ifTraffic_2"))
+	assert.NotContains(t, mx, refreshTestTableKey("ifTraffic", "2"))
 	assert.NotSame(t, oldDD, c.ddSnmpColl)
 	assert.Same(t, replacement, c.ddSnmpColl)
 	assert.Equal(t, 1, replacement.collectCalls, "replacement's first frame must be collected only once")

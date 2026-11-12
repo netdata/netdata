@@ -102,7 +102,7 @@ func TestCollectorRefreshPresentationKeepsDerivedMetadataCoherent(t *testing.T) 
 				require.NoError(t, err)
 				replayed, err := archive.Replay(testDiagnosticQuery(options))
 				require.NoError(t, err)
-				require.Equal(t, live, replayed)
+				require.Equal(t, live.Data, replayed)
 				if want == "1.0" {
 					// Earlier archives carry the six original presentation fields only.
 					// Omission must keep captured derived metadata, rather than clear it.
@@ -114,7 +114,7 @@ func TestCollectorRefreshPresentationKeepsDerivedMetadataCoherent(t *testing.T) 
 					require.NoError(t, err)
 					oldReplay, err := oldArchive.Replay(testDiagnosticQuery(options))
 					require.NoError(t, err)
-					require.Equal(t, live, oldReplay)
+					require.Equal(t, live.Data, oldReplay)
 				}
 			}
 			dev.SysDescr = "release 2"

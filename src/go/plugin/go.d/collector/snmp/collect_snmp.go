@@ -101,15 +101,17 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			continue
 		}
 
-		seen[key] = true
-
-		state := c.seenTableMetrics[key]
-		if state == nil || state.metadataVersion != c.chartMetadataVersion {
-			state = &metricChartState{
-				metadataVersion: c.chartMetadataVersion,
-				chart:           c.addProfileTableMetricChart(m),
+		state := c.tableMetricCharts[key]
+		if !seen[key] {
+			seen[key] = true
+			// Samples sharing a key keep the first sample's metadata.
+			c.profileMetricLabels(labels, m)
+			if state != nil {
+				updateProfileChartLabels(state.chart, labels)
+			} else if chart := c.addProfileTableMetricChart(m, key, labels); chart != nil {
+				state = &metricChartState{chart: chart}
+				c.tableMetricCharts[key] = state
 			}
-			c.seenTableMetrics[key] = state
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -132,10 +134,11 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 		}
 	}
 
-	for key := range c.seenTableMetrics {
+	for key, state := range c.tableMetricCharts {
 		if !seen[key] {
-			delete(c.seenTableMetrics, key)
-			c.removeProfileTableMetricChart(key)
+			delete(c.tableMetricCharts, key)
+			state.chart.MarkRemove()
+			state.chart.MarkNotCreated()
 		}
 	}
 }

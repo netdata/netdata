@@ -127,6 +127,10 @@ func (d *refreshTestDevice) setText(oid, text string) {
 	}
 }
 
+func refreshTestTableKey(name, index string) string {
+	return tableMetricKey(ddsnmp.Metric{Name: name, Tags: map[string]string{"interface": index}})
+}
+
 func newRefreshTestCollector(t *testing.T) (*Collector, *refreshTestDevice, *time.Time) {
 	t.Helper()
 	d := &refreshTestDevice{
@@ -411,7 +415,7 @@ func TestCollectorRuntimePartialMetadataRefresh(t *testing.T) {
 	*now = now.Add(time.Minute)
 	require.NotEmpty(t, c.Collect(context.Background()))
 	assert.Equal(t, "after", c.VirtualNode().Hostname, "failed unrelated inputs cannot block healthy identity updates")
-	assert.Equal(t, "after", labels("snmp_device_prof_ifTraffic_1")["snmp_host"])
+	assert.Equal(t, "after", labels(refreshTestTableKey("ifTraffic", "1"))["snmp_host"])
 	assert.Equal(t, "before accessory", labels(chartIDFromName("accessoryMetric"))["accessory"])
 	require.NotNil(t, c.pendingSysInfo, "failed profile input refresh must remain retryable")
 	entries := c.deviceStore.Entries()
@@ -462,7 +466,7 @@ func TestCollectorRuntimeUnchangedObservationReconcilesNegativeInput(t *testing.
 		c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value,
 		"a successful system observation contradicts prior unsupported evidence even when its value is unchanged",
 	)
-	chart := c.Charts().Get("snmp_device_prof_ifTraffic_1")
+	chart := c.Charts().Get(refreshTestTableKey("ifTraffic", "1"))
 	require.NotNil(t, chart)
 	assert.Contains(t, chart.Labels, collectorapi.Label{
 		Key:   "snmp_host",

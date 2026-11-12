@@ -42,7 +42,7 @@ func compositeRefreshTestProfile(device *refreshTestDevice, table bool) (*ddsnmp
 			},
 			MetricTags: []ddprofiledefinition.MetricTagConfig{{Tag: "interface", Index: 1}},
 		}}
-		key = "traffic_1"
+		key = refreshTestTableKey("traffic", "1")
 	}
 	device.values[inOID] = gosnmp.SnmpPDU{
 		Name:  inOID,
@@ -81,30 +81,40 @@ func TestCollectorRuntimeMetadataRedrawRetainsDimensions(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c, device, now := newRefreshTestCollector(t)
 			profile, key, outOID := compositeRefreshTestProfile(device, table)
+			metricID := func(subkey string) string {
+				if table {
+					return metricIDFromKey(key, subkey)
+				}
+				return metricIDFromName(key, subkey)
+			}
+			chartID := key
+			if !table {
+				chartID = chartIDFromName(key)
+			}
 			c.snmpProfiles = []*ddsnmp.Profile{profile}
-			require.Contains(t, c.Collect(context.Background()), metricIDFromKey(key, "out"))
-			chart := c.Charts().Get(chartIDFromKey(key))
+			require.Contains(t, c.Collect(context.Background()), metricID("out"))
+			chart := c.Charts().Get(chartID)
 			require.NotNil(t, chart)
 			require.Len(t, chart.Dims, 2)
 			device.omittedOID = outOID
 			device.setText(snmputils.OidSysName, "changed")
 			*now = now.Add(time.Minute)
 			partial := c.Collect(context.Background())
-			require.Contains(t, partial, metricIDFromKey(key, "in"))
+			require.Contains(t, partial, metricID("in"))
 			require.NotContains(
 				t,
 				partial,
-				metricIDFromKey(key, "out"),
+				metricID("out"),
 				"the source must actually omit this dimension during redraw",
 			)
 			assert.True(
 				t,
-				chart.HasDim(metricIDFromKey(key, "out")),
+				chart.HasDim(metricID("out")),
 				"metadata redraw cannot infer dimension removal from a partial observation",
 			)
 			device.omittedOID = ""
-			require.Contains(t, c.Collect(context.Background()), metricIDFromKey(key, "out"))
-			assert.True(t, chart.HasDim(metricIDFromKey(key, "out")))
+			require.Contains(t, c.Collect(context.Background()), metricID("out"))
+			assert.True(t, chart.HasDim(metricID("out")))
 		})
 	}
 }
@@ -133,13 +143,13 @@ func TestCollectorRuntimeReplacementPartialDimensionsRecover(t *testing.T) {
 			}
 			*now = now.Add(time.Minute)
 			first := c.Collect(context.Background())
-			require.Contains(t, first, metricIDFromKey(key, "in"))
-			require.NotContains(t, first, metricIDFromKey(key, "out"))
+			require.Contains(t, first, metricIDFromName(key, "in"))
+			require.NotContains(t, first, metricIDFromName(key, "out"))
 			device.omittedOID = ""
-			require.Contains(t, c.Collect(context.Background()), metricIDFromKey(key, "out"))
-			chart := c.Charts().Get(chartIDFromKey(key))
+			require.Contains(t, c.Collect(context.Background()), metricIDFromName(key, "out"))
+			chart := c.Charts().Get(chartIDFromName(key))
 			require.NotNil(t, chart)
-			dim := chart.GetDim(metricIDFromKey(key, "out"))
+			dim := chart.GetDim(metricIDFromName(key, "out"))
 			require.NotNil(
 				t,
 				dim,

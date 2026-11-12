@@ -56,7 +56,7 @@ func TestCollectorRuntimeMetadataNativeOutputRetries(t *testing.T) {
 	require.True(t, first.committed)
 	guid := c.VirtualNode().GUID
 	assert.Contains(t, first.payload, "HOST_DEFINE '"+guid+"' 'before'")
-	assert.Contains(t, first.payload, "BEGIN 'snmp_refresh.snmp_device_prof_ifTraffic_1'")
+	assert.Contains(t, first.payload, "BEGIN 'snmp_refresh."+refreshTestTableKey("ifTraffic", "1")+"'")
 	assert.Contains(t, first.payload, "SET 'ifTraffic' = 42")
 
 	device.setText(snmputils.OidSysName, "after")
@@ -98,7 +98,7 @@ func TestCollectorRuntimeMetadataNativeOutputRetries(t *testing.T) {
 	assert.Nil(t, c.Charts().Get("snmp_device_prof_refresh_stats_timings"), "accepted output prunes retired charts")
 	require.Len(
 		t,
-		c.Charts().Get("snmp_device_prof_ifTraffic_1").Dims,
+		c.Charts().Get(refreshTestTableKey("ifTraffic", "1")).Dims,
 		2,
 		"accepted output prunes the retired dimension",
 	)
@@ -177,11 +177,11 @@ func TestCollectorRuntimeReplacementDimensionsOutputRetries(t *testing.T) {
 	replaced := collect(3)
 	require.True(t, replaced.committed)
 	assert.Contains(t, replaced.payload, "DIMENSION 'out' 'out' 'incremental' '1' '1' 'obsolete'")
-	chart := c.Charts().Get(chartIDFromKey(key))
+	chart := c.Charts().Get(chartIDFromName(key))
 	require.NotNil(t, chart)
 	assert.Nil(
 		t,
-		chart.GetDim(metricIDFromKey(key, "out")),
+		chart.GetDim(metricIDFromName(key, "out")),
 		"accepted replacement output prunes the incumbent dimension",
 	)
 	device.omittedOID = ""

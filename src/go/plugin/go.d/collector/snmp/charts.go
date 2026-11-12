@@ -189,18 +189,20 @@ func (c *Collector) addProfileStatsCharts(name string) {
 }
 
 func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) *collectorapi.Chart {
-	return c.addProfileMetricChart(m, m.Name, chartIDFromName(m.Name), collectorapi.ChartType(m.ChartType))
+	labels := make(map[string]string)
+	c.profileMetricLabels(labels, m)
+	return c.addProfileMetricChart(m, m.Name, chartIDFromName(m.Name), collectorapi.ChartType(m.ChartType), labels)
 }
 
-func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) *collectorapi.Chart {
-	key := tableMetricKey(m)
-	return c.addProfileMetricChart(m, key, chartIDFromKey(key), "")
+func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric, key string, labels map[string]string) *collectorapi.Chart {
+	return c.addProfileMetricChart(m, key, key, "", labels)
 }
 
 func (c *Collector) addProfileMetricChart(
 	m ddsnmp.Metric,
 	key, id string,
 	chartType collectorapi.ChartType,
+	labels map[string]string,
 ) *collectorapi.Chart {
 	if m.Name == "" {
 		return nil
@@ -227,19 +229,27 @@ func (c *Collector) addProfileMetricChart(
 		chart.Type = collectorapi.Area
 	}
 
-	labels := make(map[string]string)
-	c.profileMetricLabels(labels, m)
 	updateProfileChartLabels(chart, labels)
 	if len(m.MultiValue) > 0 {
 		for name := range m.MultiValue {
+			var id string
+			if m.IsTable {
+				id = metricIDFromKey(key, name)
+			} else {
+				id = metricIDFromName(m.Name, name)
+			}
 			chart.Dims = append(chart.Dims, &collectorapi.Dim{
-				ID:   metricIDFromKey(key, name),
+				ID:   id,
 				Name: name,
 				Algo: dimAlgoFromDdSnmpType(m),
 			})
 		}
 	} else {
-		chart.Dims = collectorapi.Dims{{ID: metricIDFromKey(key), Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)}}
+		id := metricIDFromName(m.Name)
+		if m.IsTable {
+			id = metricIDFromKey(key)
+		}
+		chart.Dims = collectorapi.Dims{{ID: id, Name: m.Name, Algo: dimAlgoFromDdSnmpType(m)}}
 	}
 	return c.installChart(chart)
 }
@@ -275,7 +285,7 @@ func (c *Collector) installChart(chart *collectorapi.Chart) *collectorapi.Chart 
 // Composite inputs may be partial, including the first replacement sample.
 // Keep an index of live declared dimensions so steady collection stays O(values).
 func (s *metricChartState) observeDimension(id, name string, algo collectorapi.DimAlgo) {
-	if s.chart == nil {
+	if s == nil || s.chart == nil {
 		return
 	}
 	if s.dimensions == nil {
@@ -303,8 +313,8 @@ func (s *metricChartState) observeDimension(id, name string, algo collectorapi.D
 	s.chart.MarkNotCreated()
 }
 
-// Profile charts redraw through chartMetadataVersion. Ping and licensing charts
-// are not rebuilt from samples, so their device labels are replaced here.
+// Scalar profile charts use chartMetadataVersion; table labels follow current samples.
+// Ping and licensing charts need their device labels replaced here.
 func (c *Collector) refreshAuxiliaryChartLabels() {
 	for _, chart := range *c.charts {
 		switch {
@@ -328,14 +338,6 @@ func toChartLabels(labels map[string]string) []collectorapi.Label {
 		})
 	}
 	return out
-}
-
-func (c *Collector) removeProfileTableMetricChart(key string) {
-	id := chartIDFromKey(key)
-	if chart := c.Charts().Get(id); chart != nil {
-		chart.MarkRemove()
-		chart.MarkNotCreated()
-	}
 }
 
 func updateProfileChartLabels(chart *collectorapi.Chart, labels map[string]string) {

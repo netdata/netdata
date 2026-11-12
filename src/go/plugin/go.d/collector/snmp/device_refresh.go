@@ -239,7 +239,7 @@ func (c *Collector) resetDevicePresentation() {
 		}
 	}
 	clear(c.seenScalarMetrics)
-	clear(c.seenTableMetrics)
+	clear(c.tableMetricCharts)
 	clear(c.seenProfiles)
 	c.chartMetadataVersion++
 	c.normal.initialization = nil
