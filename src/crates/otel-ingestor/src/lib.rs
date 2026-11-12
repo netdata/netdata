@@ -18,9 +18,12 @@
 //! # Modules
 //!
 //! - Services: `logs_service` and `trace_service` (WAL writers),
-//!   `metrics_service` (chart emission); `tenant` (tenant extraction from
-//!   the `X-Scope-OrgID` header). Each service exposes a transport-agnostic
-//!   core that the gRPC wrappers and the OTLP/HTTP front end both call.
+//!   `metrics_service` (chart emission); `tenant_writers` (the WAL writers
+//!   of one signal, one per tenant: the wait for durable frames and the
+//!   lifecycle events to the ledger, shared by logs and traces); `tenant`
+//!   (tenant extraction from the `X-Scope-OrgID` header). Each service
+//!   exposes a transport-agnostic core that the gRPC wrappers and the
+//!   OTLP/HTTP front end both call.
 //! - Transports: `http_service` (OTLP/HTTP, `POST /v1/{logs,traces,metrics}`
 //!   with protobuf + JSON codecs on `receivers.otlp.protocols.http`) and
 //!   `otlp_json` (its OTLP/JSON decoding over the `opentelemetry-proto`
