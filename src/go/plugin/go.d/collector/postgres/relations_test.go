@@ -163,6 +163,22 @@ func TestRefreshRelationsPrimaryAndSecondary(t *testing.T) {
 	assert.NoError(t, sm.ExpectationsWereMet())
 }
 
+func TestRefreshRelationsRetryAfterFailure(t *testing.T) {
+	c := New()
+	db, mock := newRelationsMock(t)
+	c.db = db
+	c.MaxDBTables, c.MaxDBIndexes = 1, 0
+	now := time.Unix(1000, 0)
+	mock.ExpectQuery(queryRelationActivity(false)).WillReturnError(errors.New("timeout"))
+	c.refreshRelations(now)
+	mock.ExpectQuery(queryRelationActivity(false)).WillReturnRows(tableInventory(1, 2))
+	c.refreshRelations(now.Add(time.Second))
+	c.refreshRelations(now.Add(relationRetryEvery - time.Second))
+	assert.Error(t, mock.ExpectationsWereMet(), "a failed scan is not retried before the retry interval")
+	c.refreshRelations(now.Add(relationRetryEvery))
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func tableDetails(oid uint32, name string, updates, hot int64) *sqlmock.Rows {
 	return sqlmock.NewRows([]string{"datname", "relid", "schemaname", "relname", "parent_relname", "n_tup_upd", "n_tup_hot_upd", "total_relation_size"}).AddRow("db", oid, "public", name, "", updates, hot, 10000)
 }

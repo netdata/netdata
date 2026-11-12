@@ -8,7 +8,13 @@ import (
 	"time"
 )
 
-const relationRefreshEvery = 5 * time.Minute
+const (
+	relationRefreshEvery = 5 * time.Minute
+	// A failed activity scan is not repeated every update interval.
+	relationRetryEvery = time.Minute
+	// Repeated per-database query failures are logged at most once per window.
+	queryWarningEvery = 5 * time.Minute
+)
 
 // OIDs belong to a connection's database. Public chart identities still use names.
 type relationActivity struct {
@@ -19,6 +25,7 @@ type relationActivity struct {
 
 type relationSelection struct {
 	observed time.Time
+	retryAt  time.Time
 	reset    string
 	previous map[uint32]relationActivity
 	selected map[uint32]relationActivity
@@ -39,44 +46,56 @@ func (c *Collector) relationsFor(db *sql.DB) *databaseRelations {
 	return c.relations[db]
 }
 
-func (c *Collector) forEachDatabase(fn func(*sql.DB)) {
-	fn(c.db)
-	for _, conn := range c.dbConns {
+// forEachDatabase passes an empty name for the DSN database.
+func (c *Collector) forEachDatabase(fn func(name string, db *sql.DB)) {
+	fn("", c.db)
+	for name, conn := range c.dbConns {
 		if conn.db != nil {
-			fn(conn.db)
+			fn(name, conn.db)
 		}
 	}
 }
 
+func (c *Collector) warnDatabaseQuery(operation, dbname string, err error) {
+	target := "the DSN database"
+	if dbname != "" {
+		target = "database '" + dbname + "'"
+	}
+	c.Limit("postgres:"+operation+":"+dbname, 1, queryWarningEvery).
+		Warningf("querying PostgreSQL %s in %s: %v", operation, target, err)
+}
+
 func (c *Collector) queryEachDatabase(operation string, query func(*sql.DB) error) error {
-	c.forEachDatabase(func(db *sql.DB) {
+	c.forEachDatabase(func(name string, db *sql.DB) {
 		if err := query(db); err != nil {
-			c.Warningf("querying PostgreSQL %s: %v", operation, err)
+			c.warnDatabaseQuery(operation, name, err)
 		}
 	})
 	return nil
 }
 
 func (c *Collector) refreshRelations(now time.Time) {
-	c.forEachDatabase(func(db *sql.DB) {
+	c.forEachDatabase(func(name string, db *sql.DB) {
 		r := c.relationsFor(db)
 		for _, surface := range []struct {
 			selection *relationSelection
 			limit     int64
 			indexes   bool
+			operation string
 		}{
-			{&r.tables, c.MaxDBTables, false}, {&r.indexes, c.MaxDBIndexes, true},
+			{&r.tables, c.MaxDBTables, false, "table activity"}, {&r.indexes, c.MaxDBIndexes, true, "index activity"},
 		} {
 			if surface.limit == 0 {
 				continue
 			}
 			s := surface.selection
-			if s.warmed && now.Sub(s.observed) < relationRefreshEvery {
+			if now.Before(s.retryAt) || s.warmed && now.Sub(s.observed) < relationRefreshEvery {
 				continue
 			}
 			rows, reset, err := c.queryRelationActivity(db, surface.indexes)
 			if err != nil {
-				c.Warningf("querying PostgreSQL activity (indexes=%t): %v", surface.indexes, err)
+				s.retryAt = now.Add(relationRetryEvery)
+				c.warnDatabaseQuery(surface.operation, name, err)
 				continue
 			}
 			if !s.observed.IsZero() && s.reset != reset {
