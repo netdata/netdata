@@ -120,7 +120,9 @@ func (c *Collector) ensureInitialized() error {
 		c.addPingCharts()
 	}
 
-	// Normal collection supplies prepared profile metadata without acquiring it twice.
+	// ping_only never polls profiles, so it publishes its identity here. Normal
+	// collection publishes after its first profile poll, in the same cycle and
+	// before any sample leaves the collector (syncDeviceMetadata).
 	if c.PingOnly || c.ddSnmpColl == nil {
 		var metadata map[string]ddsnmp.MetaTag
 		if c.ddSnmpColl != nil {
@@ -132,12 +134,6 @@ func (c *Collector) ensureInitialized() error {
 			}
 		}
 		if err := c.applyDeviceMetadata(si, metadata); err != nil {
-			return err
-		}
-	} else {
-		// Establish routing from system identity before polling. Optional profile
-		// input failures must not send healthy samples to the local Agent.
-		if err := c.applyDeviceMetadata(si, nil); err != nil {
 			return err
 		}
 	}

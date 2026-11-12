@@ -116,7 +116,7 @@ func (c *Collector) addLicenseCharts(agg licenseAggregate) {
 }
 
 func (c *Collector) addLicenseChart(chart collectorapi.Chart) {
-	if existing := c.Charts().Get(chart.ID); existing != nil && !existing.IsRemoved() {
+	if c.chartInstalled(chart.ID) {
 		return
 	}
 

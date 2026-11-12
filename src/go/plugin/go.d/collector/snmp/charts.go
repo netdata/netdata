@@ -253,6 +253,7 @@ func (c *Collector) installChart(chart *collectorapi.Chart) *collectorapi.Chart 
 		c.Warning(err)
 		return nil
 	}
+	delete(c.staleCharts, chart.ID)
 	if existing := c.charts.Get(chart.ID); existing != nil {
 		for _, dim := range existing.Dims {
 			if chart.HasDim(dim.ID) {
@@ -270,6 +271,25 @@ func (c *Collector) installChart(chart *collectorapi.Chart) *collectorapi.Chart 
 		return nil
 	}
 	return chart
+}
+
+// chartInstalled reports whether the current device state already owns the chart.
+func (c *Collector) chartInstalled(id string) bool {
+	chart := c.charts.Get(id)
+	_, stale := c.staleCharts[id]
+	return chart != nil && !chart.IsRemoved() && !stale
+}
+
+// retireStaleCharts removes the charts a rebuild left behind that the new state
+// did not report in its first successful poll.
+func (c *Collector) retireStaleCharts() {
+	for id := range c.staleCharts {
+		if chart := c.charts.Get(id); chart != nil {
+			chart.MarkRemove()
+			chart.MarkNotCreated()
+		}
+	}
+	c.staleCharts = nil
 }
 
 // Composite inputs may be partial, including the first replacement sample.

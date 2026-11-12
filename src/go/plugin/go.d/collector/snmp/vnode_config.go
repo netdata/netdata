@@ -66,7 +66,7 @@ func (c *Collector) SetConfiguredVnode(v vnodes.VirtualNode) {
 	}
 	// Runtime transfers ownership and calls this only at lifecycle boundaries.
 	c.configuredVnode = &v
-	if c.initialized && c.sysInfo != nil && !c.rebuildPending {
+	if c.devicePublished {
 		c.registerDeviceState(c.sysInfo, c.preparedProfileMetadata())
 	}
 }

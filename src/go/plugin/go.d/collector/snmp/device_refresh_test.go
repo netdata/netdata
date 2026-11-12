@@ -36,6 +36,7 @@ type refreshTestDevice struct {
 	probeErr   error
 	probePDUs  []gosnmp.SnmpPDU
 	tableErr   error
+	failOID    string
 	omittedOID string
 }
 
@@ -53,6 +54,9 @@ func (d *refreshTestDevice) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 				Variables: slices.Clone(d.probePDUs),
 			}, nil
 		}
+	}
+	if d.failOID != "" && slices.Contains(oids, d.failOID) {
+		return nil, errors.New("synthetic request failure")
 	}
 	if d.tableErr != nil {
 		for _, oid := range oids {
@@ -295,8 +299,15 @@ func TestCollectorRuntimeSystemChangeRebuilds(t *testing.T) {
 
 	require.NotEmpty(t, st.collectAfter(24*time.Hour))
 	assert.Equal(t, 1, st.clients, "elapsed time is never a rebuild trigger")
+
+	device.setText(snmputils.OidSysLocation, "second location")
+	require.NotEmpty(t, st.collectAfter(time.Minute))
+	assert.Equal(t, 2, st.clients)
+	assert.Equal(t, 1, st.closes, "each rebuild retires the connection it replaces")
+	assert.Equal(t, "second location", c.VirtualNode().Labels["location"])
+	assert.Equal(t, "after", c.VirtualNode().Hostname)
 	c.Cleanup(context.Background())
-	assert.Equal(t, 1, st.closes)
+	assert.Equal(t, 2, st.closes)
 }
 
 func TestCollectorRuntimeSystemChangeRebuildFailureKeepsCollecting(t *testing.T) {
@@ -326,12 +337,94 @@ func TestCollectorRuntimeSystemChangeRebuildFailureKeepsCollecting(t *testing.T)
 	require.NotEmpty(t, st.collectAfter(time.Second))
 	assert.Equal(t, 1, st.clients, "the rebuild retries on the next system check")
 
+	// A classification change during the retries makes the incumbent incompatible.
+	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+		Name:  snmputils.OidSysObject,
+		Type:  gosnmp.ObjectIdentifier,
+		Value: replacementTestObjectID,
+	}
+	assert.Empty(t, st.collectAfter(time.Minute))
+	assert.True(t, c.rebuildPending)
+	assert.Equal(t, 2, st.clients)
+	assert.Same(t, dd, c.ddSnmpColl)
+	assert.Empty(t, c.deviceStore.Entries())
+	assert.Empty(t, interfaceRows())
+
 	st.connectErr = nil
 	require.NotEmpty(t, st.collectAfter(time.Minute))
-	assert.Equal(t, 2, st.clients)
+	assert.Equal(t, 3, st.clients)
+	assert.False(t, c.rebuildPending)
 	assert.NotSame(t, dd, c.ddSnmpColl)
 	assert.Equal(t, "after", c.VirtualNode().Hostname)
-	assert.Equal(t, "after", c.deviceStore.Entries()[0].Info.SysName)
+	entries = c.deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "after", entries[0].Info.SysName)
+	assert.Equal(t, replacementTestObjectID, entries[0].Info.SysObjectID)
+	c.Cleanup(context.Background())
+}
+
+func TestCollectorRuntimeSystemChangeWithoutProfilesKeepsCollecting(t *testing.T) {
+	// The stock catalog has no profile for this sysObjectID.
+	c, device, now := newRefreshTestCollectorWithObjectID(t, "1.3.6.1.2.1.999")
+	c.newSnmpClient = func() gosnmp.Handler {
+		t.Fatal("no candidate connection is needed without profiles")
+		return nil
+	}
+	require.NotEmpty(t, c.Collect(context.Background()))
+	dd := c.ddSnmpColl
+	device.setText(snmputils.OidSysName, "after")
+	*now = now.Add(time.Minute)
+	require.NotEmpty(t, c.Collect(context.Background()))
+	assert.False(t, c.rebuildPending)
+	assert.Same(t, dd, c.ddSnmpColl)
+	assert.Zero(t, device.closes)
+	assert.Equal(t, "before", c.VirtualNode().Hostname)
+	assert.Equal(t, "before", c.sysInfo.Name, "the change stays pending for the next check")
+}
+
+func TestCollectorRuntimeSystemChangeFailedFirstPollKeepsPublication(t *testing.T) {
+	st := newSystemChangeTest(t)
+	c, device := st.c, st.device
+	const modelOID = "1.3.6.1.4.1.99999.95.0"
+	device.setText(modelOID, "observed-model")
+	c.snmpProfiles[0].Definition.Metadata["device"].Fields["model"] = ddprofiledefinition.MetadataField{
+		Symbol: ddprofiledefinition.SymbolConfig{OID: modelOID},
+	}
+	require.NotEmpty(t, c.Collect(context.Background()))
+	require.Equal(t, "observed-model", c.VirtualNode().Labels["model"])
+	charts := len(*c.Charts())
+	require.NotZero(t, charts)
+
+	// The rebuilt state cannot prepare its profile inputs on its first poll.
+	device.setText(snmputils.OidSysName, "after")
+	device.failOID = modelOID
+	require.Empty(t, st.collectAfter(time.Minute))
+	require.Equal(t, 1, st.clients)
+	assert.Equal(t, "before", c.VirtualNode().Hostname, "the previous publication stays until inputs are prepared")
+	assert.Equal(t, "observed-model", c.VirtualNode().Labels["model"])
+	entries := c.deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "before", entries[0].Info.SysName)
+	assert.Equal(t, "observed-model", entries[0].Info.Model)
+	require.Len(t, *c.Charts(), charts)
+	for _, chart := range *c.Charts() {
+		assert.False(t, chart.IsRemoved(), "%s: a failed poll leaves gaps, not retired charts", chart.ID)
+	}
+
+	device.failOID = ""
+	require.NotEmpty(t, c.Collect(context.Background()))
+	assert.Equal(t, 1, st.clients)
+	assert.Equal(t, "after", c.VirtualNode().Hostname)
+	assert.Equal(t, "observed-model", c.VirtualNode().Labels["model"])
+	entries = c.deviceStore.Entries()
+	require.Len(t, entries, 1)
+	assert.Equal(t, "after", entries[0].Info.SysName)
+	assert.Equal(t, "observed-model", entries[0].Info.Model)
+	require.Len(t, *c.Charts(), charts)
+	for _, chart := range *c.Charts() {
+		assert.False(t, chart.IsRemoved(), chart.ID)
+		assert.Equal(t, "after", chartLabelsForTest(chart)["sysName"], chart.ID)
+	}
 	c.Cleanup(context.Background())
 }
 

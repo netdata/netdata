@@ -64,10 +64,19 @@ A rebuild:
   candidate leaves the incumbent intact;
 - installs a new DD collector, which discards table caches, missing-OID decisions and prepared profile inputs;
 - clears Function contents and counter baselines under their existing owner locks;
-- marks every chart for removal through `resetDevicePresentation`. Charts the new state reports in the same cycle are
-  redefined in place with their new labels; the job runtime prunes the rest after accepted output;
-- publishes the vnode and DeviceStore registration from the new system identity, then from profile metadata once the
-  DD collector has prepared it.
+- records the existing charts as stale (`resetDevicePresentation`).
+
+Nothing is published at the swap. Publication follows the new state's first profile poll, which runs in the same
+collection cycle:
+
+| What | When | After a failed first poll |
+|---|---|---|
+| Charts the new state reports | Redefined in place with their new labels (`installChart`) | Not reported, so unchanged |
+| Stale charts it does not report | Removed after the first poll that succeeds (`retireStaleCharts`); the job runtime prunes them after accepted output | Stay, showing gaps like any failed poll |
+| Vnode and DeviceStore registration | `syncDeviceMetadata`, once the new DD collector has prepared profile inputs | The previous publication stays, so consumers never see an identity without its profile metadata |
+
+A partially successful first poll counts as success: charts of a profile that failed in that cycle are removed and
+come back when the profile reports, the same way absent table charts behave in ordinary polling.
 
 The vnode GUID, the DeviceStore registration ID and compatible chart identities/history stay stable. Authored
 `Config`, including local vnode overrides, never receives acquired identity values.
@@ -77,12 +86,14 @@ the DeviceStore connection from SNMP-family consumers (the accepted registration
 kept) and clears Function state, even if the rebuild cannot finish yet. An unanswered or invalid object ID on a later
 check cannot resume the incompatible profiles.
 
-Normal initialization and rebuilding share one identity flow: system identity establishes vnode routing before
-polling, so optional profile input failures cannot send healthy samples to the local Agent, and
-`syncDeviceMetadata` publishes profile metadata whenever the DD collector's prepared-input revision changes. Profile
-metadata is therefore acquired once, by normal profile preparation, and metadata recovered after a failed preparation
-publishes without a system-field change. Diagnostic input evidence follows the installed snapshots; a rebuild starts
-a new current diagnostic view, preserving sources for its own system and transport preparation.
+Normal initialization uses the same publication point. A device without a current publication (a new job, or one
+suspended by a changed `sysObjectID`) is published by the first `syncDeviceMetadata` after a profile poll, whatever
+that poll prepared, so routing to the vnode exists before any sample leaves the collector and optional profile input
+failures cannot send healthy samples to the local Agent. Later changes of the DD collector's prepared-input revision
+publish again. Profile metadata is therefore acquired once, by normal profile preparation, each publication is a
+single DeviceStore update, and metadata recovered after a failed preparation publishes without a system-field change.
+Diagnostic input evidence follows the installed snapshots; a rebuild starts a new current diagnostic view, preserving
+sources for its own system and transport preparation.
 
 A replacement that changes none of the five scalars is not detected.
 
@@ -104,10 +115,10 @@ sample; multi-value dimensions use assignment. Distinct semantic tuples remain d
 sanitation makes their display labels look the same. Historical table IDs are not backfilled after migration.
 
 Table charts absent from the current results are retired, preserving the existing ordinary-poll behavior. A
-[device rebuild](#runtime-system-metadata) marks all charts for removal and clears their seen state; fresh DD results
-recreate active charts. Newly observed composite dimensions are added, and current-profile dimensions can revive
-pending incumbent removals after a rebuild. The chart owner indexes live dimensions so steady collection remains
-O(observed values), without scanning all retained charts.
+[device rebuild](#runtime-system-metadata) clears the seen state and records existing charts as stale; fresh DD results
+redefine active charts and the rest are removed after the first successful poll. Newly observed composite dimensions
+are added, and current-profile dimensions can revive pending incumbent removals after a rebuild. The chart owner
+indexes live dimensions so steady collection remains O(observed values), without scanning all retained charts.
 
 `collect_snmp.go` owns emission and `normal_diagnostics.go` records the relation to captured samples. Profile authoring
 belongs to the [table metric guide](/src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows).

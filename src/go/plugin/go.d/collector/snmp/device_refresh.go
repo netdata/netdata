@@ -34,6 +34,7 @@ func (c *Collector) refreshDeviceState() error {
 		(c.rebuildPending || observed.SysObjectID != c.sysInfo.SysObjectID) {
 		if !c.rebuildPending {
 			c.withdrawDeviceState()
+			c.devicePublished = false
 			c.resetDeviceFunctionState()
 		}
 		c.rebuildPending = true
@@ -131,6 +132,7 @@ func (c *Collector) applyDeviceMetadata(si *snmputils.SysInfo, metadata map[stri
 		c.vnode = vnode
 	}
 	c.registerDeviceState(si, metadata)
+	c.devicePublished = true
 	c.publishedProfileInputRevision = 0
 	if c.ddSnmpColl != nil {
 		c.publishedProfileInputRevision = c.ddSnmpColl.ProfileInputRevision()
@@ -138,10 +140,14 @@ func (c *Collector) applyDeviceMetadata(si *snmputils.SysInfo, metadata map[stri
 	return nil
 }
 
-// syncDeviceMetadata publishes profile inputs that normal collection prepared
-// or recovered since the last publication.
+// syncDeviceMetadata publishes device identity after a profile poll: once for
+// a device without a current publication, then whenever profile inputs become
+// prepared. A rebuilt device that kept its classification keeps the previous
+// publication until then, so a failed first poll never publishes a partial
+// identity.
 func (c *Collector) syncDeviceMetadata() {
-	if c.sysInfo == nil || c.publishedProfileInputRevision == c.ddSnmpColl.ProfileInputRevision() {
+	revision := c.ddSnmpColl.ProfileInputRevision()
+	if c.sysInfo == nil || c.devicePublished && revision == c.publishedProfileInputRevision {
 		return
 	}
 	if err := c.applyDeviceMetadata(c.sysInfo, c.ddSnmpColl.PreparedDeviceMetadata()); err != nil {
@@ -158,6 +164,8 @@ func (c *Collector) preparedProfileMetadata() map[string]ddsnmp.MetaTag {
 
 // rebuildDevice replaces every piece of device-derived state with a fresh one for
 // si. The candidate is prepared first, so a failure leaves the incumbent intact.
+// Identity and chart changes are published when the new state reports
+// (syncDeviceMetadata, retireStaleCharts), not here.
 // It runs only for normal polling jobs; ping_only keeps setup-only SNMP.
 func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	profiles, profileContext := c.resolveProfiles(si)
@@ -181,18 +189,20 @@ func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	c.ddSnmpColl = c.newProfileCollector()
 	c.activateProfiles(profiles, profileContext)
 	c.rebuildPending = false
+	c.publishedProfileInputRevision = 0
 	c.resetDeviceFunctionState()
 	c.resetDevicePresentation()
 	_ = previous.Close()
-	return c.applyDeviceMetadata(si, nil)
+	return nil
 }
 
 func (c *Collector) resetDevicePresentation() {
-	// Charts the new state reports again are redefined in place by installChart;
-	// the job runtime prunes the rest after publishing their removal.
+	// Existing charts stay until the new state reports. installChart redefines
+	// the ones it reports again; retireStaleCharts removes the rest after the
+	// first successful poll, so a failed first poll only leaves gaps.
+	c.staleCharts = make(map[string]struct{}, len(*c.charts))
 	for _, chart := range *c.charts {
-		chart.MarkRemove()
-		chart.MarkNotCreated()
+		c.staleCharts[chart.ID] = struct{}{}
 	}
 	clear(c.seenScalarMetrics)
 	clear(c.tableMetricCharts)

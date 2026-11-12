@@ -200,6 +200,23 @@ func TestCollectorRefreshChangedDeviceInformationReacquires(t *testing.T) {
 	require.Zero(t, coll.refreshTopology(context.Background()).errors)
 	require.Equal(t, 4, calls)
 	require.Equal(t, "renamed-again", coll.topologyRegistry.acquireGeneration().devices[0].trap.deviceHostname)
+
+	// A change that arrives during a failure backoff is acquired without waiting for it.
+	fail = true
+	dev.SysLocation = "moved"
+	store.Register("job-a", dev)
+	now = now.Add(time.Minute)
+	require.Equal(t, 1, coll.refreshTopology(context.Background()).errors)
+	require.Equal(t, 5, calls)
+	require.True(t, now.Before(coll.deviceStates[id].nextRetry))
+	fail = false
+	dev.SysLocation = "moved-again"
+	store.Register("job-a", dev)
+	now = now.Add(time.Second)
+	require.Zero(t, coll.refreshTopology(context.Background()).errors)
+	require.Equal(t, 6, calls)
+	local = coll.topologyRegistry.acquireGeneration().observationSnapshots()[0].LocalDevice
+	require.Equal(t, "moved-again", local.SysLocation)
 }
 
 func TestCollectorRefreshReclassificationCancellationKeepsCommittedCut(t *testing.T) {

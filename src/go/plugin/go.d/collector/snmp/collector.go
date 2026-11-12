@@ -120,6 +120,7 @@ type (
 		seenScalarMetrics        map[string]*metricChartState
 		tableMetricCharts        map[string]*metricChartState
 		seenProfiles             map[string]bool
+		staleCharts              map[string]struct{} // charts of the state replaced by the last rebuild
 		deviceStore              *ddsnmp.DeviceStore
 		deviceLifecycleStore     deviceLifecycleStore
 		deviceWriter             *ddsnmp.DeviceWriter
@@ -149,6 +150,7 @@ type (
 		sysInfo                       *snmputils.SysInfo
 		snmpProfiles                  []*ddsnmp.Profile
 		initialized                   bool
+		devicePublished               bool
 		publishedProfileInputRevision uint64
 		now                           func() time.Time
 		nextSysInfoCheck              time.Time

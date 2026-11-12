@@ -37,6 +37,9 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	c.finalizeIfaceCache()
 	c.finalizeProfileMetrics()
 	c.commitNormalConsumers(pms)
+	if c.staleCharts != nil {
+		c.retireStaleCharts()
+	}
 
 	return nil
 }
