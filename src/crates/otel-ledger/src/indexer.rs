@@ -430,13 +430,23 @@ fn usage_text(usage: Usage) -> String {
 /// response, also when its task ends without one (it panicked). Start-up
 /// recovery waits for exactly one response per request, with no time limit
 /// (`file_lifecycle::component::batch_recover`).
-#[derive(Default)]
 struct RunningOperations {
     tasks: JoinSet<(IndexerResponse, Option<Measured>)>,
     files: HashMap<tokio::task::Id, FileId>,
+    /// The ledger's count of ended operations: an operation counts itself,
+    /// and one whose task ended without a response is counted here.
+    finished: Arc<Finished>,
 }
 
 impl RunningOperations {
+    fn new(finished: Arc<Finished>) -> Self {
+        Self {
+            tasks: JoinSet::new(),
+            files: HashMap::new(),
+            finished,
+        }
+    }
+
     /// Run `operation`, which indexes the file `file_id`, in a new task.
     fn spawn(
         &mut self,
@@ -461,6 +471,7 @@ impl RunningOperations {
                     let Some(file_id) = self.files.remove(&e.id()) else {
                         continue;
                     };
+                    self.finished.failed.fetch_add(1, Ordering::Relaxed);
                     tracing::error!(
                         file = %file_id.to_filename("wal"),
                         "the task of an indexing operation ended without a response: {e}",
@@ -494,7 +505,7 @@ impl Component for Indexer {
         let mut expected_memory = ExpectedMemory::default();
         // Dropped when the loop exits, which abandons the operations still in
         // it.
-        let mut operations = RunningOperations::default();
+        let mut operations = RunningOperations::new(Arc::clone(&indexing_operations.finished));
 
         loop {
             tokio::select! {
@@ -543,7 +554,8 @@ mod tests {
 
     #[tokio::test]
     async fn an_operation_whose_task_panics_still_gives_its_one_response() {
-        let mut operations = RunningOperations::default();
+        let finished = Arc::<Finished>::default();
+        let mut operations = RunningOperations::new(Arc::clone(&finished));
         operations.spawn(file_id(7), async {
             panic!("a defect in an indexing operation")
         });
@@ -555,6 +567,8 @@ mod tests {
             IndexerResponse::IndexFailed { file_id: failed, .. } if failed == file_id(7)
         ));
         assert!(measured.is_none());
+        assert_eq!(finished.failed.load(Ordering::Relaxed), 1);
+        assert!(operations.files.is_empty());
         assert!(operations.next().await.is_none());
     }
 
