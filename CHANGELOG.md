@@ -453,6 +453,17 @@
 - Rust: clear RustSec advisories in src/crates and scan for new ones ([#24686](https://github.com/netdata/netdata/issues/24686))
 - Fix(packaging): fail the static OpenSSL build when threads are disabled ([#24687](https://github.com/netdata/netdata/issues/24687))
 - Build(deps): bump bundled OpenSSL, curl and libucontext in static builds ([#24685](https://github.com/netdata/netdata/issues/24685))
+- Apps.plugin: retire idle dynamic targets and cap them per family ([#24538](https://github.com/netdata/netdata/issues/24538))
+- Perf(dem): reduce memory retained by RUM replay and window state ([#24692](https://github.com/netdata/netdata/issues/24692))
+- Perf(dem): speed up RUM bot User-Agent classification ([#24691](https://github.com/netdata/netdata/issues/24691))
+- Test(dem): ignore call-time ages when comparing Function selections ([#24693](https://github.com/netdata/netdata/issues/24693))
+- Bring FSRM Quota monitoring (Windows.plugin) ([#24504](https://github.com/netdata/netdata/issues/24504))
+- Limit DEB signing to only installing required tools. ([#24695](https://github.com/netdata/netdata/issues/24695))
+- Fix(dem): expose investigation functions when jobs or data exist ([#24699](https://github.com/netdata/netdata/issues/24699))
+- Fix(dem): explain runtime setup path permission failures ([#24698](https://github.com/netdata/netdata/issues/24698))
+- Fix(go): keep LongDuration intact through a JSON round trip ([#24661](https://github.com/netdata/netdata/issues/24661))
+- Fix(topology): expose aggregation metadata and qualify producer identities ([#24696](https://github.com/netdata/netdata/issues/24696))
+- Health: do not wait for repeat notifications under the alert lock ([#24665](https://github.com/netdata/netdata/issues/24665))
 
 ## [2.12.0] - 2026-09-30
 
