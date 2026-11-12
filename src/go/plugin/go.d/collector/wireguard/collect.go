@@ -15,10 +15,6 @@ func (c *Collector) collect() error {
 		return err
 	}
 
-	if len(devices) == 0 {
-		c.Info("no WireGuard devices found on the host system")
-	}
-
 	c.writeMetrics(devices, c.now())
 
 	return nil
@@ -33,8 +29,9 @@ func (c *Collector) devices() ([]*wgtypes.Device, error) {
 		c.client = client
 	}
 
-	// TODO: probably we need to get a list of interfaces and query interfaces using client.Device()
-	// https://github.com/WireGuard/wgctrl-go/blob/3d4a969bb56bb6931f6661af606bc9c4195b4249/internal/wglinux/client_linux.go#L79-L80
+	// Devices() fails as a whole when any single device cannot be read (for example an interface removed between
+	// listing and querying), so one bad device costs the whole cycle. Querying each interface with Device() would
+	// keep the others.
 	devices, err := c.client.Devices()
 	if err != nil {
 		return nil, fmt.Errorf("retrieving WireGuard devices: %v", err)

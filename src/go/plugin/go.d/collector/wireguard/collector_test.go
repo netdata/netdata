@@ -4,11 +4,9 @@ package wireguard
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -27,7 +25,6 @@ import (
 var (
 	dataConfigJSON, _ = os.ReadFile("testdata/config.json")
 	dataConfigYAML, _ = os.ReadFile("testdata/config.yaml")
-	dataV1Charts, _   = os.ReadFile("testdata/v1_charts.json")
 )
 
 var testNow = time.Date(2026, time.January, 1, 12, 0, 0, 0, time.UTC)
@@ -36,7 +33,6 @@ func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
 		"dataConfigJSON": dataConfigJSON,
 		"dataConfigYAML": dataConfigYAML,
-		"dataV1Charts":   dataV1Charts,
 	} {
 		assert.NotNil(t, data, name)
 	}
@@ -50,23 +46,21 @@ func TestCollector_Init(t *testing.T) {
 	assert.NoError(t, New().Init(context.Background()))
 }
 
-func TestCollector_ChartTemplateYAML(t *testing.T) {
+func TestArtifacts(t *testing.T) {
 	templateYAML := New().ChartTemplateYAML()
 	collecttest.AssertChartTemplateSchema(t, templateYAML)
 
 	spec, err := charttpl.DecodeYAML([]byte(templateYAML))
 	require.NoError(t, err)
 	require.NoError(t, spec.Validate())
-
 	_, err = chartengine.Compile(spec, 1)
 	require.NoError(t, err)
-}
 
-func TestArtifacts(t *testing.T) {
 	metadata, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
-
-	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, chartTemplateYAML, nil)
+	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, templateYAML, nil)
+	collecttest.AssertConfigSchemaMatchesMetadataWith(t, "config_schema.json", "metadata.yaml",
+		collecttest.ConfigSchemaCheck{Defaults: true})
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -405,7 +399,7 @@ func TestCollector_CollectFailsWhenClientCannotBeCreated(t *testing.T) {
 
 func TestCollector_ChartCoverage(t *testing.T) {
 	collr := newTestCollector(t)
-	collr.client.(*mockClient).devices = parityDevices(testNow)
+	collr.client.(*mockClient).devices = []*wgtypes.Device{prepareDevice("wg1", preparePeer("11", 1, 2))}
 
 	_, err := collecttest.CollectScalarSeries(collr)
 	require.NoError(t, err)
@@ -413,8 +407,7 @@ func TestCollector_ChartCoverage(t *testing.T) {
 	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
 }
 
-// The V1 collector removed every chart whose ID started with "device_<name>", so removing "wg1" also removed the
-// charts of "wg10". Only the charts of devices and peers that are gone may be retired.
+// Device "wg10" shares the "wg1" prefix: removing "wg1" and one peer of "wg10" must retire only their own charts.
 func TestCollector_RemovesOnlyChartsOfGoneDevicesAndPeers(t *testing.T) {
 	collr := newTestCollector(t)
 	m := collr.client.(*mockClient)
@@ -469,126 +462,11 @@ func TestCollector_RemovesOnlyChartsOfGoneDevicesAndPeers(t *testing.T) {
 	assert.Equal(t, wantRemoved, removed)
 }
 
-// testdata/v1_charts.json was rendered by the V1 collector (Charts() and the Collect() map) from parityDevices.
-func TestCollector_V1ChartParity(t *testing.T) {
-	var want []manifestChart
-	require.NoError(t, json.Unmarshal(dataV1Charts, &want))
-
-	collr := newTestCollector(t)
-	collr.client.(*mockClient).devices = parityDevices(testNow)
-
-	_, err := collecttest.CollectScalarSeries(collr)
-	require.NoError(t, err)
-
-	engine, err := chartengine.New()
-	require.NoError(t, err)
-	require.NoError(t, engine.LoadYAML([]byte(collr.ChartTemplateYAML()), 1))
-	attempt, err := engine.PreparePlan(collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
-	require.NoError(t, err)
-
-	charts := make(map[string]*manifestChart)
-	type dimKey struct{ chartID, name string }
-	values := make(map[dimKey]int64)
-	for _, action := range attempt.Plan().Actions {
-		switch action := action.(type) {
-		case chartengine.CreateChartAction:
-			charts[action.ChartID] = &manifestChart{
-				Context:  action.Meta.Context,
-				Labels:   action.Labels,
-				Title:    action.Meta.Title,
-				Family:   action.Meta.Family,
-				Units:    action.Meta.Units,
-				Type:     string(action.Meta.Type),
-				Priority: action.Meta.Priority,
-			}
-		case chartengine.CreateDimensionAction:
-			chart := charts[action.ChartID]
-			require.NotNil(t, chart, action.ChartID)
-			chart.Dimensions = append(chart.Dimensions, manifestDim{
-				Name:       action.Name,
-				Algorithm:  string(action.Algorithm),
-				Multiplier: wireValue(action.Multiplier),
-				Divisor:    wireValue(action.Divisor),
-			})
-		case chartengine.UpdateChartAction:
-			for _, v := range action.Values {
-				require.False(t, v.IsFloat, "%s/%s", action.ChartID, v.Name)
-				if !v.IsEmpty {
-					values[dimKey{action.ChartID, v.Name}] = v.Int64
-				}
-			}
-		}
-	}
-
-	got := make([]manifestChart, 0, len(charts))
-	for chartID, chart := range charts {
-		for i, dim := range chart.Dimensions {
-			if v, ok := values[dimKey{chartID, dim.Name}]; ok {
-				chart.Dimensions[i].Value = &v
-			}
-		}
-		got = append(got, *chart)
-	}
-	sortManifest(got)
-
-	assert.Equal(t, want, got)
-}
-
-type manifestDim struct {
-	Name       string `json:"name"`
-	Algorithm  string `json:"algorithm"`
-	Multiplier int    `json:"multiplier"`
-	Divisor    int    `json:"divisor"`
-	Value      *int64 `json:"value"`
-}
-
-type manifestChart struct {
-	Context    string            `json:"context"`
-	Labels     map[string]string `json:"labels"`
-	Title      string            `json:"title"`
-	Family     string            `json:"family"`
-	Units      string            `json:"units"`
-	Type       string            `json:"type"`
-	Priority   int               `json:"priority"`
-	Dimensions []manifestDim     `json:"dimensions"`
-}
-
-func sortManifest(charts []manifestChart) {
-	sort.Slice(charts, func(i, j int) bool {
-		return charts[i].Context+fmt.Sprint(charts[i].Labels) < charts[j].Context+fmt.Sprint(charts[j].Labels)
-	})
-}
-
-// wireValue mirrors the plugin protocol, where a zero multiplier or divisor is sent as 1.
-func wireValue(v int) int {
-	if v == 0 {
-		return 1
-	}
-	return v
-}
-
-func parityDevices(now time.Time) []*wgtypes.Device {
-	return []*wgtypes.Device{
-		{Name: "wg0", Peers: []wgtypes.Peer{
-			parityPeer("a", now.Add(-time.Minute), 1000, 2000),
-			parityPeer("b", now.Add(-2*time.Minute), 300, 400),
-			parityPeer("c", time.Time{}, 0, 148),
-		}},
-		{Name: "wg1"},
-		{Name: "wg10", Peers: []wgtypes.Peer{
-			parityPeer("d", now.Add(-5*time.Second), 5, 6),
-		}},
-	}
-}
-
-func parityPeer(name string, handshake time.Time, receive, transmit int64) wgtypes.Peer {
-	b := make([]byte, 32)
-	copy(b, "parity-peer-"+name)
-	key, err := wgtypes.NewKey(b)
-	if err != nil {
-		panic(err)
-	}
-	return wgtypes.Peer{PublicKey: key, LastHandshakeTime: handshake, ReceiveBytes: receive, TransmitBytes: transmit}
+// testKey builds a deterministic public key: seed bytes followed by zeros.
+func testKey(seed string) wgtypes.Key {
+	var key wgtypes.Key
+	copy(key[:], seed)
+	return key
 }
 
 func newTestCollector(t *testing.T) *Collector {
@@ -639,12 +517,8 @@ func prepareDevice(name string, peers ...wgtypes.Peer) *wgtypes.Device {
 }
 
 func preparePeer(s string, receive, transmit int64) wgtypes.Peer {
-	b := make([]byte, 32)
-	b = append(b[:0], fmt.Sprintf("peer%s", s)...)
-	k, _ := wgtypes.NewKey(b[:32])
-
 	return wgtypes.Peer{
-		PublicKey:         k,
+		PublicKey:         testKey("peer" + s),
 		LastHandshakeTime: testNow.Add(-time.Minute),
 		ReceiveBytes:      receive,
 		TransmitBytes:     transmit,
