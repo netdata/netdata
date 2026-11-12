@@ -334,7 +334,7 @@ impl Stream {
     }
 
     /// Flush and fsync the active file, recording the now-durable prefix on
-    /// it. Emits no event: [`Self::seal`] and [`Self::sync`] do.
+    /// it. Emits no event: [`Self::seal`] queues the `Closed`.
     fn sync_data(&mut self) -> Result<()> {
         if let Some(active) = &mut self.active {
             let synced = match active.writer.flush() {
@@ -352,25 +352,6 @@ impl Stream {
             // tail bytes.
             active.synced_up_to = active.bytes_written;
             active.synced_entry_count = active.log_entry_count;
-        }
-        Ok(())
-    }
-
-    /// fsync the active file and queue its `Synced` event. Every call with
-    /// an active file emits one, even with no new bytes since the last sync
-    /// — the event re-reports the accumulated state (not a delta).
-    fn sync(&mut self) -> Result<()> {
-        self.sync_data()?;
-        if let Some(active) = &self.active {
-            let event = FileEvent::Synced {
-                file_id: active.file_id,
-                valid_up_to: active.synced_up_to,
-                frame_count: active.frame_count,
-                entry_count: active.synced_entry_count,
-                min_timestamp_ns: active.min_timestamp_ns,
-                max_timestamp_ns: active.max_timestamp_ns,
-            };
-            self.pending_events.push(event);
         }
         Ok(())
     }

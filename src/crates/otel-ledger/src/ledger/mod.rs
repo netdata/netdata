@@ -439,7 +439,7 @@ impl Ledger {
                     // this arm.
                     Err(e) => {
                         tracing::error!("writer-socket recv failed: {e}");
-                        return Err(e.into());
+                        return Err(e);
                     }
                 },
                 // Merged per-pipeline worker responses (indexer + catalog
