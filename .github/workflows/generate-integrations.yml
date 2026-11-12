@@ -149,7 +149,7 @@ jobs:
         run: rm -rf go.d.plugin virtualenv integrations/integrations.js integrations/integrations.json src/go/plugin/go.d/collector/snmp/npm-catalog/metrics-metadata-gaps.txt
       - name: Create PR
         id: create-pr
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        uses: peter-evans/create-pull-request@15733dbdfeedb4f7fdb73d13c6f5ac83b710fab8 # v8.1.2
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           commit-message: Regenerate integrations docs
