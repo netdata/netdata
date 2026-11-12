@@ -428,7 +428,8 @@ impl Supervisor {
             }
         }
 
-        // The wait ends before the agent's SIGKILL (`otel_bridge::shutdown`).
+        // The wait ends inside the longest time that the agent gives a plugin
+        // to leave by itself (`otel_bridge::shutdown`).
         let _ = tokio::time::timeout(otel_bridge::shutdown::WORKERS_EXIT_WAIT, async {
             let (r1, r2, r3) = tokio::join!(
                 self.ingestor_child.child.wait(),

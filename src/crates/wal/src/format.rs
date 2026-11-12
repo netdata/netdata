@@ -300,10 +300,9 @@ pub enum FileEvent {
         max_timestamp_ns: TimestampNs,
         size: ByteSize,
         /// Durable prefix at seal time: the end of the last frame fsynced
-        /// before the seal. May postdate the last `Synced` (the
-        /// idle-rotation and `Drop` close paths seal without emitting a
-        /// final `Synced`); carried so a sealed file's prefix does not
-        /// depend on a `Synced` before it.
+        /// before the seal. Usually later than the last `Synced`: no seal
+        /// queues a `Synced` of its own (the writer's `Stream::seal`), so
+        /// a sealed file's prefix does not depend on a `Synced` before it.
         valid_up_to: ByteSize,
         /// Log records in that durable prefix at seal time.
         entry_count: u64,

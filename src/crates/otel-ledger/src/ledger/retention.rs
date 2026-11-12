@@ -8,7 +8,7 @@
 //! tenant's files can pass a count or a size limit. It also runs for every
 //! tenant on the ledger's periodic timer, because a file passes its age
 //! limit by time alone: a tenant with no new data has no rotation. Each
-//! pass takes the tenant registry's write lock once: it decides, marks each
+//! pass takes the write lock of the signal's registries once: it decides, marks each
 //! entry pending deletion and sends its `CleanerRequest` under that one
 //! hold. The cleaner's response handler completes the flow — success removes
 //! the entry from the registry, failure un-marks it

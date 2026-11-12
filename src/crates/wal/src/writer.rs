@@ -362,8 +362,9 @@ impl Stream {
     ///
     /// The second handle is an open of its own, not a duplicate of the
     /// writer's. The kernel reports a failed write-back once for each open
-    /// of a file (Linux: the `errseq_t` of the file's mapping, with one
-    /// position for each open). The round fsyncs without the lock, so a
+    /// of a file (Linux 4.13 and later: the `errseq_t` of the file's
+    /// mapping, with one position for each open; an older kernel reports it
+    /// once for the file, and there this open changes nothing). The round fsyncs without the lock, so a
     /// rotation or the idle sweep can fsync the same file through the
     /// writer's handle meanwhile. With two opens each of them learns of a
     /// failure; a duplicate would share the writer's position, and only the
@@ -1281,6 +1282,48 @@ mod tests {
                 FileEvent::Closed { size, valid_up_to, entry_count: 100_000, .. },
                 FileEvent::Created { .. },
             ] if size == valid_up_to
+        ));
+    }
+
+    #[test]
+    fn a_sync_round_has_an_open_of_its_own_of_each_file() {
+        use std::io::Seek;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        let meta = crate::FrameMeta {
+            entry_count: 1,
+            ingestion_ns: TimestampNs(1),
+            log_ts_range: None,
+        };
+        writer.write_frame(pk(1), &[], b"frame", meta).unwrap();
+
+        let ticket = writer.begin_sync();
+
+        // A duplicate of the writer's handle would share its position, at
+        // the end of what is written. A new open starts at 0.
+        let mut file = &ticket.files[0].file;
+        assert_eq!(file.stream_position().unwrap(), 0);
+        writer.finish_sync(ticket.fsync()).unwrap();
+    }
+
+    #[test]
+    fn a_shutdown_closes_each_file_with_a_closed_event_only() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        let meta = crate::FrameMeta {
+            entry_count: 1,
+            ingestion_ns: TimestampNs(1),
+            log_ts_range: None,
+        };
+        writer.write_frame(pk(1), &[], b"frame", meta).unwrap();
+        let _ = writer.take_all_events();
+
+        let events = writer.shutdown_all().unwrap();
+
+        assert!(matches!(
+            events.as_slice(),
+            [FileEvent::Closed { size, valid_up_to, .. }] if size == valid_up_to
         ));
     }
 

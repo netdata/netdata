@@ -242,8 +242,8 @@ impl Registry {
     ///   regress a sealed file's prefix.
     /// - `Closed`: seal — set `Archived` and write the final size, range,
     ///   and durable prefix. The event carries the durable prefix itself,
-    ///   so the sealed entry does not depend on a `Synced` before it (the
-    ///   writer's idle rotation sends none). `Error::AlreadyClosed` for a file that
+    ///   so the sealed entry does not depend on a `Synced` before it (no
+    ///   seal of the writer sends one). `Error::AlreadyClosed` for a file that
     ///   is `Archived` already: a file is closed once, and the caller starts
     ///   an indexing operation for every `Closed` that is applied.
     ///

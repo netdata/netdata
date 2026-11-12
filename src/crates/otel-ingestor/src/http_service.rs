@@ -651,7 +651,8 @@ fn rpc_error(codec: Codec, status: Status) -> Response<Body> {
 /// `tenant_writers::check_frame_size`), `Unauthenticated` (missing tenant
 /// header), `Internal` (frame encoding) and `Unavailable` (the records could
 /// not be stored: `tenant_writers::storage_unavailable`; or the plugin
-/// stopped before their sync: `tenant_writers::export_task_ended`). The other arms are kept so a future
+/// stopped before their sync: `tenant_writers::export_task_ended`). The other
+/// arms are kept so a future
 /// core error maps correctly without touching the transport — e.g.
 /// throttling's `ResourceExhausted` becomes the retryable 429. The 503 arm is
 /// the spec's retryable set; `Unimplemented` → 404 is the collector's choice.
