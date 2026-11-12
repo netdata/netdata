@@ -81,9 +81,7 @@ use crate::registry::WAL_EXT;
 /// accumulators the lifecycle events report.
 struct ActiveFile {
     file_id: FileId,
-    // Unused on the write path (hence the attribute); re-derivable as
-    // `dir.file_path(file_id)`.
-    #[allow(dead_code)]
+    /// A sync round opens the file by it ([`Stream::begin_sync`]).
     path: PathBuf,
     writer: BufWriter<File>,
     frame_count: u64,
@@ -378,8 +376,17 @@ impl Stream {
     }
 
     /// A split sync's first half for this stream: flush the active file's
-    /// buffer and take a second handle to the file, with what is written to
-    /// it now. `None` without an active file.
+    /// buffer and open the file a second time, with what is written to it
+    /// now. `None` without an active file.
+    ///
+    /// The second handle is an open of its own, not a duplicate of the
+    /// writer's. The kernel reports a failed write-back once for each open
+    /// of a file (Linux: the `errseq_t` of the file's mapping, with one
+    /// position for each open). The round fsyncs without the lock, so a
+    /// rotation or the idle sweep can fsync the same file through the
+    /// writer's handle meanwhile. With two opens each of them learns of a
+    /// failure; a duplicate would share the writer's position, and only the
+    /// first of the two to ask would learn of it.
     fn begin_sync(&mut self) -> Result<Option<FileSync>> {
         let Some(active) = &mut self.active else {
             return Ok(None);
@@ -389,7 +396,7 @@ impl Stream {
             self.abandon_active_file();
             return Err(crate::Error::Write(e));
         }
-        let file = active.writer.get_ref().try_clone()?;
+        let file = File::options().write(true).open(&active.path)?;
 
         Ok(Some(FileSync {
             partition_key: self.partition_key,
@@ -944,12 +951,12 @@ impl Writer {
     /// An fsync of one of this writer's files failed: every frame that is
     /// not durable yet is in doubt, and stays so.
     ///
-    /// The kernel reports a failed write-back once per open file, and all of
-    /// the writer's handles to a file are one open file (a sync's are
-    /// duplicates). So the next fsync of the file succeeds, whoever calls
-    /// it, and its success says nothing about the frames written before the
-    /// failure. Frames of another file are put in doubt too: the writer
-    /// counts frames, not files.
+    /// The kernel reports a failed write-back once for each open of a file.
+    /// So the next fsync through the same open succeeds, and its success
+    /// says nothing about the frames written before the failure. (A sync
+    /// round has an open of its own, so that it and the writer each learn
+    /// of a failure: [`Stream::begin_sync`].) Frames of another file are
+    /// put in doubt too: the writer counts frames, not files.
     ///
     /// A second failure widens the range up to the frames written by then.
     /// It can take in frames that became durable in between; their callers
