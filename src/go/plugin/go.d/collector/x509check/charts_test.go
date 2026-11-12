@@ -65,6 +65,9 @@ func TestCollector_ChartContract(t *testing.T) {
 			assert.False(t, a.Float)
 		}
 	}
+	// The revocation check status chart has no V1 counterpart; metadata and chart coverage tests cover it.
+	require.Contains(t, got, "x509check.revocation_check_status/0")
+	delete(got, "x509check.revocation_check_status/0")
 	// V1 charts.go contract: IDs may change, but contexts, display names and measurement metadata must survive.
 	assert.Equal(t, map[string]chartContract{
 		"x509check.time_until_expiration/0": {
@@ -120,20 +123,20 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 	determined := true
 	c.revocationStatus = func(context.Context, *x509.Certificate, []*x509.Certificate, time.Time) (bool, error) {
 		if !determined {
-			return false, errors.New("undetermined")
+			return false, failCheck(checkRequestFailed, errors.New("undetermined"))
 		}
 		return false, nil
 	}
 	engine := newEngine(t, c)
 	require.NoError(t, collectCycle(t, c))
 	initial := preparePlan(t, engine, c)
-	var charts int
+	contexts := make(map[string]string)
 	for _, a := range initial.Actions {
-		if _, ok := a.(chartengine.CreateChartAction); ok {
-			charts++
+		if create, ok := a.(chartengine.CreateChartAction); ok {
+			contexts[create.ChartID] = create.Meta.Context
 		}
 	}
-	assert.Equal(t, 3, charts, "identical common names must not merge distinct depths")
+	assert.Len(t, contexts, 4, "identical common names must not merge distinct depths")
 
 	// Successful observations with a shorter, renewed chain and unavailable revocation must retain charts with gaps.
 	chain := provider.certs
@@ -144,7 +147,8 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 	for cycle := 0; cycle < 20; cycle++ {
 		require.NoError(t, collectCycle(t, c))
 		plan := preparePlan(t, engine, c)
-		var updates, labels int
+		var updated []string
+		var labels int
 		for _, action := range plan.Actions {
 			switch a := action.(type) {
 			case chartengine.CreateChartAction, chartengine.RemoveChartAction, chartengine.RemoveDimensionAction:
@@ -153,14 +157,13 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 				labels++
 				assert.Equal(t, "renewed", a.Labels["common_name"])
 			case chartengine.UpdateChartAction:
-				updates++
-				require.Len(t, a.Values, 1)
-				assert.Equal(t, "expiry", a.Values[0].Name)
+				updated = append(updated, contexts[a.ChartID])
 			}
 		}
-		assert.Equal(t, 1, updates)
+		// The revocation status of the server certificate is a gap; the check status says why.
+		assert.ElementsMatch(t, []string{"x509check.time_until_expiration", "x509check.revocation_check_status"}, updated)
 		if cycle == 0 {
-			assert.Equal(t, 1, labels, "renewal updates metadata without changing identity")
+			assert.Equal(t, 2, labels, "renewal updates metadata without changing identity")
 		}
 	}
 	provider.certs, determined = chain, true
@@ -177,8 +180,8 @@ func TestCollector_ChartLifecycle(t *testing.T) {
 			updates++
 		}
 	}
-	assert.Equal(t, 3, updates)
-	assert.Equal(t, 1, labels, "the restored chain updates the renewed chart's metadata back")
+	assert.Equal(t, 4, updates)
+	assert.Equal(t, 2, labels, "the restored chain updates the renewed charts' metadata back")
 }
 
 func newEngine(t *testing.T, c *Collector) *chartengine.Engine {

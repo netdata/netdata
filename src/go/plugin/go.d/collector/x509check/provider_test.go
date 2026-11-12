@@ -53,12 +53,10 @@ func TestCollector_CollectFromSource(t *testing.T) {
 			require.NoError(t, c.Check(t.Context()))
 			require.NoError(t, collectCycle(t, c))
 
-			// The certificate lists no CRL or OCSP URL, so the revocation check reports it as not revoked.
-			assert.Equal(t, map[string]float64{
-				"expiry/0/":                       86400,
-				"revocation_status/0/not_revoked": 1,
-				"revocation_status/0/revoked":     0,
-			}, readMetrics(c))
+			// The certificate lists no CRL or OCSP URL, so its revocation status cannot be checked.
+			assert.Equal(t, withCheckStatus(checkNoRevocationInfo, map[string]float64{
+				"expiry/0/": 86400,
+			}), readMetrics(c))
 		})
 	}
 }

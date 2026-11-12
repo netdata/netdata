@@ -59,10 +59,12 @@ func TestCollector_ChartTemplate(t *testing.T) {
 	health, err := os.ReadFile("../../../../../health/health.d/x509check.conf")
 	require.NoError(t, err)
 	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, template, map[string][]string{
-		"revocation_status": {"not_revoked", "revoked"},
+		"revocation_status":       {"not_revoked", "revoked"},
+		"revocation_check_status": checkOutcomes,
 	})
 	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, template)
-	// The metadata-unit assertion does not apply: alerts convert seconds to days and boolean to status.
+	// The metadata-unit assertion does not apply: alerts convert seconds to days, boolean to status and check
+	// outcomes to a percentage of checks.
 }
 
 func TestCollector_Init(t *testing.T) {
@@ -217,26 +219,31 @@ func TestCollector_Collect(t *testing.T) {
 		},
 		"not revoked": {
 			checkRevocation: true,
-			want: map[string]float64{
+			want: withCheckStatus(checkSuccess, map[string]float64{
 				"expiry/0/":                       3600,
 				"revocation_status/0/not_revoked": 1,
 				"revocation_status/0/revoked":     0,
-			},
+			}),
 		},
 		"revoked leaf in chain": {
 			fullChain:       true,
 			checkRevocation: true,
 			revoked:         true,
-			want: map[string]float64{
+			want: withCheckStatus(checkSuccess, map[string]float64{
 				"expiry/0/":                       3600,
 				"expiry/1/":                       -60,
 				"revocation_status/0/not_revoked": 0,
 				"revocation_status/0/revoked":     1,
-			},
+			}),
 		},
 		"undetermined revocation": {
 			checkRevocation: true,
-			revocationErr:   errors.New("issuer certificate not found"),
+			revocationErr:   failCheck(checkIssuerNotFound, errors.New("issuer certificate not found")),
+			want:            withCheckStatus(checkIssuerNotFound, map[string]float64{"expiry/0/": 3600}),
+		},
+		"undetermined revocation without an outcome": {
+			checkRevocation: true,
+			revocationErr:   errors.New("undetermined"),
 			want:            map[string]float64{"expiry/0/": 3600},
 		},
 	} {
@@ -284,7 +291,10 @@ func TestCollector_Collect(t *testing.T) {
 			}
 			exp := collecttest.ChartCoverageExpectation{}
 			if !test.checkRevocation || test.revocationErr != nil {
-				exp.ExcludeContextPatterns = []string{"x509check.revocation_status"}
+				exp.ExcludeContextPatterns = append(exp.ExcludeContextPatterns, "x509check.revocation_status")
+			}
+			if !test.checkRevocation || checkOutcome(test.revocationErr) == "" {
+				exp.ExcludeContextPatterns = append(exp.ExcludeContextPatterns, "x509check.revocation_check_status")
 			}
 			collecttest.AssertChartCoverage(t, c, exp)
 		})
@@ -326,11 +336,11 @@ func TestCollector_CollectTakesRevocationIssuerFromVerifiedChain(t *testing.T) {
 			require.NoError(t, collectCycle(t, c))
 
 			// The root decides the revocation status but is not charted: the source did not send it.
-			assert.Equal(t, map[string]float64{
+			assert.Equal(t, withCheckStatus(checkSuccess, map[string]float64{
 				"expiry/0/":                       server.Leaf.NotAfter.Sub(pki.now).Seconds(),
 				"revocation_status/0/not_revoked": 0,
 				"revocation_status/0/revoked":     1,
-			}, readMetrics(c))
+			}), readMetrics(c))
 		})
 	}
 }
@@ -420,9 +430,20 @@ func readMetrics(c *Collector, opts ...metrix.ReadOption) map[string]float64 {
 		Read(append(opts, metrix.ReadFlatten())...).
 		ForEachSeries(func(name string, labels metrix.LabelView, value float64) {
 			depth, _ := labels.Get("depth")
-			state, _ := labels.Get("revocation_status")
+			// A stateset sample carries its state in a label named after the metric.
+			state, _ := labels.Get(name)
 			values[name+"/"+depth+"/"+state] = value
 		})
+	return values
+}
+
+// withCheckStatus adds to values the revocation check status of the server certificate, as readMetrics keys it, with
+// outcome as the active state.
+func withCheckStatus(outcome string, values map[string]float64) map[string]float64 {
+	for _, o := range checkOutcomes {
+		values["revocation_check_status/0/"+o] = 0
+	}
+	values["revocation_check_status/0/"+outcome] = 1
 	return values
 }
 

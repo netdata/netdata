@@ -18,6 +18,7 @@ groups:
   - family: revocation
     metrics:
       - revocation_status
+      - revocation_check_status
     charts:
       - title: Revocation Status
         context: revocation_status
@@ -28,3 +29,11 @@ groups:
           expire_after_cycles: 0
         dimensions:
           - selector: revocation_status
+      - title: Revocation Check Status
+        context: revocation_check_status
+        units: status
+        type: stacked
+        instances:
+          by_labels: [depth]
+        dimensions:
+          - selector: revocation_check_status
