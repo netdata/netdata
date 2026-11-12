@@ -303,6 +303,7 @@ At most limit retained attempts selected by start time, with explicit truncated 
 | vnode_guid | string |  |  | Recorded canonical vnode GUID. Empty means unassigned. |
 | scheduled_us | timestamp |  |  | Selected due time. |
 | queued_us | timestamp |  |  | Original admission queue time. |
+| termination_reason | string |  |  | Reason execution stopped, separate from the first reported error. |
 
 ### Synthetic run detail
 
@@ -329,7 +330,7 @@ No additional configuration is required.
 
 #### Returns
 
-One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, nullable lab metrics, capture state, artifact metadata and history errors; dropped_events discloses omitted event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
+One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact metadata and history errors; dropped_events discloses omitted event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
