@@ -355,6 +355,18 @@ impl Registry {
         }
     }
 
+    /// Take back what a local catalog file said of these SFSTs: that their
+    /// bytes are on the remote, and that they are in a closed catalog.
+    /// Recovery calls it for a catalog that is not on the remote and that
+    /// names an index file the remote does not have either: the remote is
+    /// not the one the catalog was written for. The SFSTs that are still
+    /// local are then [`unuploaded_ids`](Self::unuploaded_ids) again.
+    pub fn forget_catalog_claims(&mut self, keys: impl IntoIterator<Item = SeqKey>) {
+        for key in keys {
+            self.seqs.remove(&key);
+        }
+    }
+
     /// What retention does with the tenant's index files now: the retention
     /// policy over the local files (`sfst::Registry::evaluate_retention`),
     /// with the one rule about remote storage. When storage is enabled, a

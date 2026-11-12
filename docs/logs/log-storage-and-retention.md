@@ -153,6 +153,10 @@ needs an offloaded file that is no longer local, the Agent downloads it whole in
 `<base_dir>/remote-read`, bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then
 answers from it; repeated queries over the same files are served from the cache.
 
+When you change `remote_storage.uri` to another location, the Agent uploads to the new location the indexed files
+that are still on the local disk, before local retention can delete them. It does not copy the files that are only
+in the old location. Copy those yourself if queries must still reach them: their object keys do not change.
+
 - A query whose offloaded files exceed the cache fails with a message to narrow the time window or stream filter.
 - A download may take 30 seconds plus one second per MiB of the file, at most 5 minutes. A file that takes longer, or
   that the remote cannot serve, is left out of the answer, and the query still reads its other files; the Logs tab

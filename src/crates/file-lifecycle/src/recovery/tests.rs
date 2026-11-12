@@ -699,9 +699,64 @@ fn place_local_catalog(
     path
 }
 
+/// The remote is not the one the local catalog was written for (the
+/// operator moved `remote_storage.uri` to an empty bucket): the catalog is
+/// missing there, and so is the index file it names. The catalog must not be
+/// uploaded as it is: once it lands, its files count as being on the remote
+/// and retention may delete the only copy. The index file is to be uploaded
+/// again instead, through the normal path.
+#[tokio::test]
+async fn a_catalog_whose_index_file_is_not_on_the_remote_does_not_vouch_for_it() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+    place_local_catalog(&mut reg, date, 10, 100, 200);
+    let id = make_entry(10).id;
+    reg.sfst.track(id, ByteSize(1), empty_summary());
+    // What seeding from the local catalog files marked.
+    reg.mark_uploaded(sk(10));
+    reg.mark_rotated(sk(10));
+
+    let (op, _op_tmp) = fs_operator();
+    let storage = crate::storage::OpendalStorage::from_operator(op.clone());
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut uploader = crate::component::ComponentHandle::spawn::<
+        crate::uploader::Uploader<crate::storage::OpendalStorage>,
+    >(
+        crate::uploader::UploaderArgs {
+            storage: storage.clone(),
+            max_concurrent: 4,
+        },
+        cancel.child_token(),
+    );
+
+    reconcile_local_catalog_uploads(
+        &mut reg,
+        0,
+        "logs",
+        &mut uploader,
+        &storage,
+        &TenantId::from("tenant1"),
+        &evict_all_retention(),
+    )
+    .await
+    .unwrap();
+
+    // Nothing was queued for upload, and the index file is one that still
+    // has to be uploaded.
+    let queued = tokio::time::timeout(std::time::Duration::from_millis(200), uploader.recv()).await;
+    assert!(queued.is_err(), "{queued:?}");
+    assert_eq!(reg.unuploaded_ids(), vec![id]);
+    assert!(!reg.is_rotated(sk(10)));
+    assert!(!reg.is_remote_cataloged(sk(10)));
+
+    cancel.cancel();
+}
+
 /// The only test that drives a real `UploadCatalog` through the `Uploader`:
-/// a catalog missing from the remote is re-uploaded, its response is
-/// `CatalogUploaded`, and the remote bytes match the local file.
+/// a catalog missing from the remote, whose index file is there (its upload
+/// was cut by a stop), is re-uploaded, its response is `CatalogUploaded`,
+/// and the remote bytes match the local file.
 #[tokio::test]
 async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -709,9 +764,8 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
 
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let local_path = place_local_catalog(&mut reg, date, 10, 100, 200);
-    // The catalog's SFST is still local (a catalog missing from remote implies
-    // its SFSTs were never remote-cataloged, so they can't have been evicted) —
-    // the reconcile only considers catalogs that can gate a local SFST.
+    // The catalog's SFST is still local: the reconcile only considers
+    // catalogs that can gate a local SFST.
     reg.sfst.track(
         file_registry::FileId::new(ident(), 0, 10, 0),
         ByteSize(1),
@@ -719,6 +773,10 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
     );
 
     let (op, _op_tmp) = fs_operator();
+    // The index file that the catalog names is on the remote.
+    op.write(&make_entry(10).remote_key, b"index file".to_vec())
+        .await
+        .unwrap();
     let storage = crate::storage::OpendalStorage::from_operator(op.clone());
     let cancel = tokio_util::sync::CancellationToken::new();
     let mut uploader = crate::component::ComponentHandle::spawn::<

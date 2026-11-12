@@ -242,14 +242,27 @@ pub async fn reconcile_remote_uploads<S: Storage>(
 /// seed of the SFST eviction gate (`remote_cataloged` is not persisted;
 /// without this pass every SFST would sit deferred until its catalog were
 /// re-uploaded). `NotFound` → re-upload the file via
-/// [`UploaderRequest::UploadCatalog`], unless retention is about to evict it.
+/// [`UploaderRequest::UploadCatalog`], unless retention is about to evict it,
+/// and only when the remote has every SFST the catalog names (one `stat()`
+/// each).
 ///
 /// The re-upload arm covers the crash-between-write-and-upload window: the
 /// catalog builder writes the local file atomically, then sends
 /// `UploadCatalog` and may die before the uploader puts the object. The
 /// steady-state handler re-queues `CatalogUploadFailed` on the retry queue,
 /// so this pass is the startup-time backstop rather than the only retry
-/// path.
+/// path. In that window the SFSTs are on the remote already.
+///
+/// A catalog that is missing on the remote together with an SFST it names is
+/// a different case: the remote is not the one the catalog was written for
+/// (`remote_storage.uri` now names another bucket, or the bucket was
+/// emptied). Uploaded as it is, the catalog would make its SFSTs evictable
+/// here while the remote never got them. So it is not uploaded, and what
+/// seeding took from it is taken back
+/// ([`Registry::forget_catalog_claims`]): the SFSTs that are still local are
+/// uploaded again (`recover_unuploaded`, which the caller runs after this
+/// pass) and a new catalog names them. An SFST that is not local any more
+/// has its only copy on the old remote.
 ///
 /// Strategy: per-catalog `stat()` beats a LIST + symmetric-diff when the
 /// local catalog count is small (≤ retention_days × rotations_per_day) and
@@ -344,14 +357,16 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
 
     for (local_path, date, remote_key, identity) in catalogs {
         // The catalog's SFST seqs are needed both to mark them remote-cataloged
-        // (on confirmed presence) and to carry into a re-upload request.
-        let Some(seqs) = read_catalog_seqs(&local_path) else {
+        // (on confirmed presence) and to carry into a re-upload request; their
+        // remote keys, to ask the remote for them.
+        let Some(entries) = read_catalog_entries(&local_path) else {
             tracing::warn!(
                 path = %local_path.display(),
                 "skipping catalog reconcile: local file unreadable",
             );
             continue;
         };
+        let seqs: Vec<u64> = entries.iter().map(|(seq, _)| *seq).collect();
 
         match storage.stat(&remote_key).await {
             Ok(()) => {
@@ -369,6 +384,43 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
                 {
                     continue;
                 }
+
+                // Once the catalog is on the remote, its SFSTs may be evicted
+                // locally. So it goes there as it is only when the remote has
+                // every SFST it names: true when its upload was cut by a stop,
+                // false when the remote is not the one it was written for (a
+                // new or emptied bucket). Then the catalog vouches for
+                // nothing: the SFSTs that are still local are uploaded again,
+                // and a new catalog will name them.
+                match missing_on_remote(storage, &entries).await {
+                    Ok(0) => {}
+                    Ok(missing) => {
+                        let mut not_local = 0usize;
+                        for seq in &seqs {
+                            if registry.sfst.get(*seq).is_none() {
+                                not_local += 1;
+                            }
+                        }
+                        registry
+                            .forget_catalog_claims(seqs.iter().map(|s| SeqKey::new(identity, *s)));
+                        tracing::warn!(
+                            path = %local_path.display(),
+                            "the remote has neither this catalog nor {missing} of the {} index \
+                             file(s) it names: not uploading it; its index files that are \
+                             still local are uploaded again ({not_local} are not local any more)",
+                            seqs.len(),
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            remote_key = %remote_key,
+                            "stat of an index file failed; skipping this catalog: {e}",
+                        );
+                        continue;
+                    }
+                }
+
                 let req = UploaderRequest::UploadCatalog {
                     pipeline_id,
                     local_path: local_path.clone(),
@@ -408,15 +460,37 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
     Ok(())
 }
 
-/// Read the SFST sequence numbers recorded in a local catalog file. Returns
-/// `None` if the file can't be read or parsed (the caller warns and skips
-/// the catalog).
+/// How many of `entries` (a catalog's SFSTs: seq and remote key) the remote
+/// does not have. One `stat` each; the first error other than "not found"
+/// ends it.
+async fn missing_on_remote<S: Storage>(
+    storage: &S,
+    entries: &[(u64, String)],
+) -> Result<usize, StorageError> {
+    let mut missing = 0;
+    for (_, remote_key) in entries {
+        match storage.stat(remote_key).await {
+            Ok(()) => {}
+            Err(StorageError::NotFound) => missing += 1,
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(missing)
+}
+
+/// Read the SFSTs recorded in a local catalog file: the sequence number and
+/// the remote key of each. Returns `None` if the file can't be read or parsed
+/// (the caller warns and skips the catalog).
 ///
 /// Blocking `std::fs::read` is intentional: startup-only, before the run
 /// loop, over the retained catalog set — narrowed further by the caller to
 /// catalogs that can still gate a still-local SFST.
-fn read_catalog_seqs(path: &Path) -> Option<Vec<u64>> {
+fn read_catalog_entries(path: &Path) -> Option<Vec<(u64, String)>> {
     let bytes = std::fs::read(path).ok()?;
     let catalog = Catalog::from_container_bytes(&bytes).ok()?;
-    Some(catalog.entries.values().map(|e| e.id.seq).collect())
+    let mut entries = Vec::with_capacity(catalog.entries.len());
+    for entry in catalog.entries.values() {
+        entries.push((entry.id.seq, entry.remote_key.clone()));
+    }
+    Some(entries)
 }
