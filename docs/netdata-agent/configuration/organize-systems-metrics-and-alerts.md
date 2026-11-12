@@ -274,27 +274,45 @@ send automatic labels = yes
 
 ### Filter and group metrics within charts
 
-Netdata's aggregate charts let you filter and group metrics using label name-value pairs. All go.d plugin collectors support labels at the collection job level.
+Netdata's aggregate charts let you filter and group metrics using label name-value pairs.
 
-Configure metric labels when collected from multiple sources. For example, label two Apache servers by service and location:
+Go.d collection jobs do not accept a free-form `labels:` option: unrecognized keys in a job definition are
+ignored. There are two supported ways to put labels on metrics collected by a go.d job:
 
-```yaml
-jobs:
-  - name: my_webserver1
-    url: http://host1/server-status?auto
-    labels:
-      service: "Payments"
-      location: "Atlanta"
-  - name: my_webserver2
-    url: http://host2/server-status?auto
-    labels:
-      service: "Payments"
-      location: "New York"
-```
+1. **Virtual nodes (vnodes)** — the general mechanism for any go.d job. Define a vnode with your own labels and
+   point the job at it with `vnode:`. All charts from that job are reported under the vnode and carry its labels:
+
+   ```yaml
+   # vnodes/payments.example.com.yaml
+   - hostname: payments.example.com
+     guid: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
+     labels:
+       team: "Payments"
+       environment: "production"
+       contact: "sre-team@example.com"
+   ```
+
+   ```yaml
+   # go.d/x509check.conf
+   jobs:
+     - name: payments_cert
+       source: https://payments.example.com:443
+       vnode: payments.example.com
+   ```
+
+   Use vnodes for logical entities that don't run their own Agent: certificates, remote services, database
+   instances. See [Virtual Nodes (vnodes)](/docs/learn/node-identities.md#virtual-nodes-vnodes) for the full
+   reference, including creation from the GUI.
+
+2. **Collector-specific label options** — a few collectors provide their own label configuration. For example,
+   CloudWatch can copy selected AWS resource tags to chart labels, and SNMP profiles attach device labels.
+   Check the collector's configuration reference for the options it supports.
 
 :::tip
 
-Define as many label pairs as you need across all your data collection jobs to create meaningful groupings in your dashboards.
+Labels pass through the Netdata label sanitizer (for example, commas in values are exposed as dots, as noted
+under [host labels](#host-labels)). Prefer host labels to categorize whole systems, and vnodes when several
+monitored entities share a single Agent.
 
 :::
 
