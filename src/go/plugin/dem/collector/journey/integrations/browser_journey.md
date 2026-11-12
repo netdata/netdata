@@ -114,7 +114,7 @@ Options apply independently to each native job.
 | **Diagnosis** | screenshot_on_failure | Save a screenshot when a workflow check fails. Screenshots can contain sensitive page content; timeout capture is best effort. | no | no |
 | **Collection** | check_every | Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check. | 900 | no |
 |  | update_every | Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`. | 10 | no |
-|  | timeout | Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded. | 120 | no |
+|  | timeout | Browser attempt budget, in seconds, excluding time waiting for a browser slot. Journeys reserve up to 5 seconds (20% for budgets below 25 seconds) inside this budget for timeout reporting. Verified cleanup and persistence follow execution. | 120 | no |
 | **Virtual Node** | [vnode](#option-virtual-node-vnode) | Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 <a id="option-virtual-node-vnode"></a>
@@ -316,6 +316,7 @@ At most limit retained attempts selected by start time, with explicit truncated 
 | vnode_guid | string |  |  | Recorded canonical vnode GUID. Empty means unassigned. |
 | scheduled_us | timestamp |  |  | Selected due time. |
 | queued_us | timestamp |  |  | Original admission queue time. |
+| termination_reason | string |  |  | Reason execution stopped, separate from the first reported error. |
 
 ### Synthetic run detail
 
@@ -342,7 +343,7 @@ No additional configuration is required.
 
 #### Returns
 
-One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, nullable lab metrics, capture state, artifact metadata and history errors; dropped_events discloses omitted event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
+One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact metadata and history errors; dropped_events discloses omitted event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
