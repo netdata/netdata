@@ -873,6 +873,27 @@ mod tests {
         assert!(service.chart_manager.read().await.is_empty());
     }
 
+    /// A number point whose value is not a number (NaN) or is infinite is
+    /// treated like a point without a value. The agent's `SET` takes an
+    /// integer: such a value would be charted as 0, or as the largest one.
+    #[tokio::test]
+    async fn a_point_whose_value_is_not_a_finite_number_is_not_counted() {
+        let service = NetdataMetricsService::default();
+        let now = now_ns();
+
+        service
+            .export_metrics(request(vec![
+                gauge("nan", vec![point(Some(f64::NAN), now)]),
+                gauge("infinite", vec![point(Some(f64::INFINITY), now)]),
+                gauge("minus_infinite", vec![point(Some(f64::NEG_INFINITY), now)]),
+            ]))
+            .await
+            .unwrap();
+
+        assert_eq!(counted(&service), (0, 0));
+        assert!(service.chart_manager.read().await.is_empty());
+    }
+
     /// A metric's name becomes part of its charts' ids, and an id has a
     /// longest length at the agent: a longer name is not charted.
     #[tokio::test]

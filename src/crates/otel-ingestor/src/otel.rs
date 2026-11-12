@@ -506,10 +506,16 @@ const NO_RECORDED_VALUE: u32 = 1;
 
 impl<'a> DataPointRef<'a> {
     /// What the point holds, or `None` when it carries no value: the sender
-    /// flagged it `NO_RECORDED_VALUE`, or left a number point's value unset.
+    /// flagged it `NO_RECORDED_VALUE`, left a number point's value unset, or
+    /// sent a number that is not finite (NaN, an infinity). The agent's
+    /// `SET` takes an integer, so a value that is not finite would be
+    /// charted as 0 or as the largest integer, which nobody measured.
     pub fn value(&self) -> Option<PointValue<'a>> {
         let (flags, value) = match *self {
-            DataPointRef::Number(dp) => (dp.flags, self.value_as_f64().map(PointValue::Number)),
+            DataPointRef::Number(dp) => {
+                let number = self.value_as_f64().filter(|number| number.is_finite());
+                (dp.flags, number.map(PointValue::Number))
+            }
             DataPointRef::Histogram(dp) => (dp.flags, Some(PointValue::Histogram(dp))),
             DataPointRef::Summary(dp) => (dp.flags, Some(PointValue::Summary(dp))),
             DataPointRef::ExponentialHistogram(dp) => {

@@ -70,7 +70,7 @@ Both exporters work. `otlp_grpc` sends to port `4317`. `otlp_http` sends to port
 
 Keep the exporter's default encoding and compression:
 
-- **Encoding:** the default is protobuf. With `encoding: json`, a metric value of NaN or infinity makes the Agent reject the whole request.
+- **Encoding:** the default is protobuf. With `encoding: json`, a metric value of NaN or infinity makes the Agent reject the whole request. With protobuf, the Agent does not chart a data point that has such a value.
 - **Compression:** the default is gzip, the only compression the Agent accepts. Do not set `compression` to `zstd`, `snappy`, or another algorithm.
 
 ## Smoke-test Host Metrics
