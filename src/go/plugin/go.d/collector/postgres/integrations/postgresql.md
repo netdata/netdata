@@ -51,13 +51,30 @@ By default, it detects instances running on localhost by trying to connect as ro
 
 #### Limits
 
-Table and index metrics are not collected for databases with more than 50 tables or 250 indexes.
-These limits can be changed in the configuration file.
+By default, each database, including the database in the DSN, is monitored for up to 50 tables and 250 indexes.
+Above either limit, the collector selects TOP objects: tables by recent rows read, fetched, inserted, updated
+and deleted (PostgreSQL statistics counters, not SQL query counts), indexes by size. Table and index selection
+is independent and refreshes approximately every five minutes. A selected object stays until another has more
+than twice its row activity or size; a selected table also stays against tables below one row per second.
+Detailed metrics for the selected objects are collected at each update interval. Databases above the table
+limit need two successful observations before the first table selection; the second is attempted at the
+next update interval.
+Objects outside TOP have no individual metrics, and there is no aggregate for them. Rotation can cause gaps
+in individual charts and their alerts. While the corresponding limit is set, a table or index created after
+the last selection, including one recreated under the same name, has no metrics until the next refresh, even
+in a database below that limit. Set either limit to 0 for unlimited collection.
 
 
 #### Performance Impact
 
-The default configuration for this integration is not expected to impose a significant performance impact on the system.
+While the corresponding limit is set, selection scans lightweight statistics for all accessible candidate
+tables and the size of every accessible index, at startup and approximately every five minutes. A database
+above the table limit repeats the table scan at the next update interval to establish recent activity, and
+a failed scan is retried after one minute.
+In-memory selection state grows with the number of candidates.
+Detailed statistics and size queries cover the selected objects; bloat and column checks run every five minutes.
+Unlimited collection increases detailed query cost and the number of charts.
+
 
 ## Setup
 
@@ -119,9 +136,9 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | cloud_auth.azure_ad.mode_service_principal.client_secret | Azure client secret for `service_principal` mode. |  | no |
 |  | cloud_auth.azure_ad.mode_managed_identity.client_id | Optional client ID of a user-assigned managed identity (`managed_identity` mode). |  | no |
 | **Target** | timeout | Query timeout (seconds). | 2 | no |
-| **Filters** | collect_databases_matching | Database selector. Controls which databases are included. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher). |  | no |
-| **Limits** | max_db_tables | Maximum number of tables per database to collect metrics for (0 = no limit). | 50 | no |
-|  | max_db_indexes | Maximum number of indexes per database to collect metrics for (0 = no limit). | 250 | no |
+| **Filters** | collect_databases_matching | Select additional databases for table/index metrics. The DSN database is always included; an empty selector disables additional connections. Server and database-level metrics remain available. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher). |  | no |
+| **Limits** | max_db_tables | Maximum tables monitored per database, including the DSN database. Above the limit, select TOP tables by recent row activity (0 = no limit). | 50 | no |
+|  | max_db_indexes | Maximum indexes monitored per database, including the DSN database. Above the limit, select indexes by size, independently of tables; a selected index stays until another is more than twice as large (0 = no limit). | 250 | no |
 | **Functions** | functions.top_queries.disabled | Disable the [top-queries](#top-queries) function. | no | no |
 |  | functions.top_queries.timeout | Query timeout (seconds). Uses collector timeout if not set. |  | no |
 |  | functions.top_queries.limit | Maximum number of queries to return. | 500 | no |
