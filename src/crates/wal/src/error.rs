@@ -171,24 +171,42 @@ pub enum Error {
     #[error("sequence {0} is already closed")]
     AlreadyClosed(u64),
 
+    /// A write to a WAL file failed: a frame's bytes, or the flush of
+    /// buffered ones. A part of the bytes may be in the file. The writer
+    /// closes the file and writes no more to it, and it treats every frame
+    /// that was not durable yet as in doubt (see `FramesLost`): whole frames
+    /// of earlier requests can be among the bytes that never reached the
+    /// file. Message-only: the io::Error is rendered into the text.
+    #[error("write failed: {0}")]
+    Write(std::io::Error),
+
     /// An fsync of a WAL file failed. The kernel reports a failed
     /// write-back once per open file: the next fsync of the same file
     /// succeeds although the data may be gone. So the writer treats every
     /// frame that was not durable yet as in doubt for good (see
     /// `FramesLost`), whichever fsync got the error — a sync, a rotation's,
-    /// the idle sweep's. Message-only: the io::Error is rendered into the
+    /// the idle sweep's — and closes the file, so that no later fsync of it
+    /// can vouch for those frames. Message-only: the io::Error is rendered into the
     /// text.
     #[error("fsync failed: {0}")]
     Fsync(std::io::Error),
 
-    /// The frames asked about were not durable yet when an fsync of their
-    /// writer failed (`Fsync`): they may be lost, and no later sync can
+    /// The frames asked about were not durable yet when a write or an fsync
+    /// of their writer failed (`Write`, `Fsync`): they may be lost, and no later sync can
     /// vouch for them. `Writer::is_durable` returns it for such frames, and
     /// `Writer::finish_sync` for a sync whose frames another fsync's failure
     /// put in doubt while it was out. The ingestor fails the request, so
     /// the client sends the records again. Message-only.
     #[error("an fsync failed before the frames were durable: they may be lost")]
     FramesLost,
+}
+
+impl Error {
+    /// True for a failed write or fsync of a WAL file: after it, the frames
+    /// of the writer that were not durable yet may be lost (`FramesLost`).
+    pub(crate) fn leaves_frames_in_doubt(&self) -> bool {
+        matches!(self, Error::Write(_) | Error::Fsync(_))
+    }
 }
 
 /// Error side of every fallible WAL API — writer, reader, registry, seq

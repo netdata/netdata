@@ -24,12 +24,17 @@
 //! [`WriteMark`] tells a caller whether a completed sync already covered the
 //! frames it wrote ([`Writer::is_durable`]).
 //!
-//! A failed fsync: the kernel reports a failed write-back once, so the next
-//! fsync of the file succeeds whatever became of the data. The writer
-//! therefore treats the frames that were not durable at that moment as
-//! possibly lost for good (`Writer::frames_in_doubt`): `is_durable` answers
+//! A failed write or fsync: a file that saw one is closed at once and never
+//! written again (`Stream::abandon_active_file`); the stream's next frame
+//! starts a new file. A failed write can leave a part of a frame in the
+//! file, and nothing may follow it there: a reader ends a file at a frame
+//! that is not whole. A failed fsync is reported by the kernel once, so the
+//! next fsync of the same file would succeed whatever became of the data:
+//! there is no next one. In both cases the writer treats the frames that
+//! were not durable at that moment as possibly lost for good
+//! (`Writer::frames_in_doubt`): `is_durable` answers
 //! [`Error::FramesLost`](crate::Error::FramesLost) for them, and no later
-//! sync changes that. The file itself is kept and written to as before.
+//! sync changes that.
 //!
 //! Events: every lifecycle step (created, synced, closed) is queued per
 //! stream and handed to the caller via [`Writer::take_all_events`]; the
@@ -102,6 +107,22 @@ struct ActiveFile {
     /// path, which writes no sync first.
     synced_up_to: ByteSize,
     synced_entry_count: u64,
+}
+
+impl ActiveFile {
+    /// The file's `Closed` event: its final state, with the durable prefix
+    /// rather than the live counters.
+    fn closed_event(&self) -> FileEvent {
+        FileEvent::Closed {
+            file_id: self.file_id,
+            frame_count: self.frame_count,
+            min_timestamp_ns: self.min_timestamp_ns,
+            max_timestamp_ns: self.max_timestamp_ns,
+            size: self.bytes_written,
+            valid_up_to: self.synced_up_to,
+            entry_count: self.synced_entry_count,
+        }
+    }
 }
 
 /// The two opaque identifiers a writer stamps into every file it produces:
@@ -261,27 +282,20 @@ impl Stream {
             0
         };
 
-        let active = self.active.as_mut().unwrap();
-        let frame_offset = active.bytes_written.0;
-        // An I/O error below aborts the frame mid-write: the accumulators
-        // stay at the last complete frame (they are advanced only after
-        // every `write_all` succeeds), but bytes already flushed are not
-        // rewound. Bounded reads never see the torn bytes — the next
-        // `valid_up_to` stops at the accumulators — yet the next frame
-        // appends after them, so a whole-file read trips on the torn frame.
-        active.writer.write_all(&payload_len.to_le_bytes())?;
-        active.writer.write_all(&uncompressed_len.to_le_bytes())?;
-        active.writer.write_all(&entry_count.to_le_bytes())?;
-        active.writer.write_all(&ts.0.to_le_bytes())?;
-        active.writer.write_all(&crc.to_le_bytes())?;
-        active.writer.write_all(&compressed)?;
-
+        let mut frame_header = [0u8; FRAME_HEADER_SIZE];
+        frame_header[0..4].copy_from_slice(&payload_len.to_le_bytes());
+        frame_header[4..8].copy_from_slice(&uncompressed_len.to_le_bytes());
+        frame_header[8..12].copy_from_slice(&entry_count.to_le_bytes());
+        frame_header[12..20].copy_from_slice(&ts.0.to_le_bytes());
+        frame_header[20..24].copy_from_slice(&crc.to_le_bytes());
         let frame_bytes = FRAME_ALIGNMENT_HEADER + compressed.len();
         let padding = (FRAME_ALIGNMENT - (frame_bytes % FRAME_ALIGNMENT)) % FRAME_ALIGNMENT;
-        if padding > 0 {
-            active
-                .writer
-                .write_all(&[0u8; FRAME_ALIGNMENT][..padding])?;
+
+        let active = self.active.as_mut().unwrap();
+        let frame_offset = active.bytes_written.0;
+        if let Err(e) = write_whole_frame(&mut active.writer, &frame_header, &compressed, padding) {
+            self.abandon_active_file();
+            return Err(crate::Error::Write(e));
         }
 
         active.frame_count += 1;
@@ -313,8 +327,14 @@ impl Stream {
     /// prefix) instead of a redundant `Synced` on an already-synced file.
     fn sync_data(&mut self) -> Result<()> {
         if let Some(active) = &mut self.active {
-            active.writer.flush()?;
-            fsync(active.writer.get_ref())?;
+            let synced = match active.writer.flush() {
+                Ok(()) => fsync(active.writer.get_ref()),
+                Err(e) => Err(crate::Error::Write(e)),
+            };
+            if let Err(e) = synced {
+                self.abandon_active_file();
+                return Err(e);
+            }
 
             // The just-fsynced prefix is now durable; remember it so a later
             // `Closed` (which may not be preceded by a fresh sync on the `Drop`
@@ -352,7 +372,10 @@ impl Stream {
             return Ok(None);
         };
 
-        active.writer.flush()?;
+        if let Err(e) = active.writer.flush() {
+            self.abandon_active_file();
+            return Err(crate::Error::Write(e));
+        }
         let file = active.writer.get_ref().try_clone()?;
 
         Ok(Some(FileSync {
@@ -519,15 +542,31 @@ impl Stream {
     /// counters.
     fn close_active_file(&mut self) {
         if let Some(active) = self.active.take() {
-            self.pending_events.push(FileEvent::Closed {
-                file_id: active.file_id,
-                frame_count: active.frame_count,
-                min_timestamp_ns: active.min_timestamp_ns,
-                max_timestamp_ns: active.max_timestamp_ns,
-                size: active.bytes_written,
-                valid_up_to: active.synced_up_to,
-                entry_count: active.synced_entry_count,
-            });
+            self.pending_events.push(active.closed_event());
+        }
+    }
+
+    /// Close the active file after a write or an fsync of it failed, for
+    /// good: no frame may follow a frame that is not whole, and no later
+    /// fsync may vouch for bytes whose fsync failed. The bytes still in the
+    /// buffer are not written (dropping the `BufWriter` would flush them).
+    /// The `Closed` carries the prefix that was durable before the failure.
+    fn abandon_active_file(&mut self) {
+        if let Some(active) = self.active.take() {
+            self.pending_events.push(active.closed_event());
+            let (_file, _unwritten) = active.writer.into_parts();
+        }
+    }
+
+    /// [`abandon_active_file`](Self::abandon_active_file), if the active
+    /// file is still `file_id`.
+    fn abandon_file(&mut self, file_id: FileId) {
+        if self
+            .active
+            .as_ref()
+            .is_some_and(|active| active.file_id == file_id)
+        {
+            self.abandon_active_file();
         }
     }
 
@@ -549,6 +588,29 @@ impl Stream {
         self.close_active_file();
         Ok(true)
     }
+}
+
+/// Write one frame whole: its header, its payload, its padding. The one
+/// place the writer does it, and a test can make the next one fail half-way.
+fn write_whole_frame(
+    writer: &mut BufWriter<File>,
+    frame_header: &[u8; FRAME_HEADER_SIZE],
+    payload: &[u8],
+    padding: usize,
+) -> io::Result<()> {
+    #[cfg(test)]
+    if tests::FAIL_NEXT_WRITE.with(|fail| fail.replace(false)) {
+        // What a failed write can leave in the file: the frame's header and
+        // a part of its payload.
+        writer.write_all(frame_header)?;
+        writer.write_all(&payload[..payload.len() / 2])?;
+        writer.flush()?;
+        return Err(io::Error::other("injected"));
+    }
+
+    writer.write_all(frame_header)?;
+    writer.write_all(payload)?;
+    writer.write_all(&[0u8; FRAME_ALIGNMENT][..padding])
 }
 
 /// fsync a WAL file: the one place the writer does it. A failure is an
@@ -751,9 +813,8 @@ impl Writer {
     /// ingestion timestamp (stamped into the frame header), and the optional
     /// record time range feeding the per-file accumulator — see [`FrameMeta`].
     /// Returns the frame's starting byte offset in the file (header page
-    /// included). On I/O error the frame is aborted mid-write: the durable
-    /// prefix stays sound, the bytes beyond it are a torn frame (the write
-    /// path above records the details).
+    /// included). A failed write or fsync closes the stream's file and puts
+    /// the writer's frames that were not durable yet in doubt (module docs).
     pub fn write_frame(
         &mut self,
         partition_key: u64,
@@ -771,8 +832,7 @@ impl Writer {
         let written = self
             .get_or_create(partition_key, content_meta)
             .write_frame(data, meta);
-        // The fsync of a rotation, before the frame.
-        if let Err(crate::Error::Fsync(_)) = &written {
+        if written.as_ref().is_err_and(|e| e.leaves_frames_in_doubt()) {
             self.frames_in_doubt();
         }
         let frame_offset = written?;
@@ -883,15 +943,20 @@ impl Writer {
     pub fn begin_sync(&mut self) -> SyncTicket {
         let mut files = Vec::with_capacity(self.streams.len());
         let mut error = None;
+        let mut in_doubt = false;
 
         for stream in self.streams.values_mut() {
             match stream.begin_sync() {
                 Ok(Some(file)) => files.push(file),
                 Ok(None) => {}
                 Err(e) => {
+                    in_doubt |= e.leaves_frames_in_doubt();
                     error.get_or_insert(e);
                 }
             }
+        }
+        if in_doubt {
+            self.frames_in_doubt();
         }
 
         SyncTicket {
@@ -916,14 +981,17 @@ impl Writer {
     pub fn finish_sync(&mut self, ticket: SyncTicket) -> Result<()> {
         let mut first_error = ticket.error;
         // A file that never came back may have been fsynced, and failed.
-        let mut fsync_failed = ticket.files.len() != ticket.file_count;
+        let file_lost = ticket.files.len() != ticket.file_count;
+        let mut fsync_failed = file_lost;
 
-        if fsync_failed {
+        if file_lost {
             first_error
                 .get_or_insert_with(|| io::Error::other("a WAL file's fsync was lost").into());
         }
 
+        let mut came_back = Vec::with_capacity(ticket.files.len());
         for mut file in ticket.files {
+            came_back.push(file.partition_key);
             match file.result.take() {
                 Some(Ok(())) => {
                     if let Some(stream) = self.streams.get_mut(&file.partition_key) {
@@ -933,6 +1001,9 @@ impl Writer {
                 Some(Err(e)) => {
                     fsync_failed = true;
                     first_error.get_or_insert(e);
+                    if let Some(stream) = self.streams.get_mut(&file.partition_key) {
+                        stream.abandon_file(file.file_id);
+                    }
                 }
                 None => {
                     first_error.get_or_insert_with(|| {
@@ -942,6 +1013,15 @@ impl Writer {
             }
         }
 
+        if file_lost {
+            // Which file it was is not known: it is one that did not come
+            // back.
+            for (partition_key, stream) in &mut self.streams {
+                if !came_back.contains(partition_key) {
+                    stream.abandon_active_file();
+                }
+            }
+        }
         if fsync_failed {
             self.frames_in_doubt();
         }
@@ -979,7 +1059,7 @@ impl Writer {
                 Ok(true) => rotated += 1,
                 Ok(false) => {}
                 Err(e) => {
-                    if matches!(e, crate::Error::Fsync(_)) {
+                    if e.leaves_frames_in_doubt() {
                         fsync_failed = true;
                     }
                     if first_err.is_none() {
@@ -1018,6 +1098,10 @@ mod tests {
     thread_local! {
         /// Makes the next [`fsync`] of this test's thread fail.
         pub(super) static FAIL_NEXT_FSYNC: std::cell::Cell<bool> =
+            const { std::cell::Cell::new(false) };
+        /// Makes the next [`write_whole_frame`] of this test's thread fail
+        /// after a part of the frame is in the file.
+        pub(super) static FAIL_NEXT_WRITE: std::cell::Cell<bool> =
             const { std::cell::Cell::new(false) };
     }
 
@@ -1569,8 +1653,8 @@ mod tests {
         writer.take_all_events();
         let mark = writer.write_mark();
 
-        // The crate has no seam to make an fsync fail, so the failure of
-        // stream 1's file is written into the ticket.
+        // Only stream 1's file must fail, so its failure is written into
+        // the ticket.
         let mut ticket = writer.begin_sync();
         for mut file in ticket.take_files() {
             file = file.fsync();
@@ -1667,6 +1751,109 @@ mod tests {
         assert!(!writer.is_durable(after).unwrap());
         writer.sync_all().unwrap();
         assert!(writer.is_durable(after).unwrap());
+    }
+
+    /// The frames a whole-file read of `path` yields, and the bytes it left.
+    fn read_whole_file(path: &std::path::Path) -> (Vec<Vec<u8>>, u64) {
+        let mut reader = crate::Reader::open(path).unwrap();
+        let mut frames = Vec::new();
+        while let Some(frame) = reader.next_frame().unwrap() {
+            frames.push(frame.data.to_vec());
+        }
+        (frames, reader.incomplete_tail())
+    }
+
+    /// The WAL files under `dir`, oldest first.
+    fn wal_files(dir: &std::path::Path) -> Vec<PathBuf> {
+        let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.extension().is_some_and(|ext| ext == "wal"))
+            .collect();
+        files.sort();
+        files
+    }
+
+    #[test]
+    fn a_failed_frame_write_closes_the_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        write_one(&mut writer, 1, b"whole", 1);
+        let mark = writer.write_mark();
+        writer.take_all_events();
+
+        FAIL_NEXT_WRITE.set(true);
+        let failed = writer.write_frame(
+            pk(1),
+            &[],
+            b"cut short, cut short, cut short",
+            crate::FrameMeta {
+                entry_count: 1,
+                ingestion_ns: TimestampNs(2),
+                log_ts_range: None,
+            },
+        );
+
+        assert!(matches!(failed, Err(crate::Error::Write(_))), "{failed:?}");
+        // The file is closed at once, and the frame written before it, which
+        // no sync had covered, is in doubt: it can be among the bytes that
+        // never reached the file.
+        let events = writer.take_all_events();
+        assert!(
+            matches!(events.as_slice(), [FileEvent::Closed { .. }]),
+            "{events:?}"
+        );
+        assert!(matches!(
+            writer.is_durable(mark),
+            Err(crate::Error::FramesLost)
+        ));
+
+        // The next frame goes to a new file: nothing follows the cut-short
+        // frame, so the old file reads to its last whole frame.
+        write_one(&mut writer, 1, b"next", 3);
+        let events = writer.take_all_events();
+        assert!(
+            matches!(events.as_slice(), [FileEvent::Created { .. }]),
+            "{events:?}"
+        );
+        let files = wal_files(tmp.path());
+        assert_eq!(files.len(), 2);
+        let (frames, incomplete_tail) = read_whole_file(&files[0]);
+        assert_eq!(frames, vec![b"whole".to_vec()]);
+        assert!(incomplete_tail > 0);
+    }
+
+    #[test]
+    fn a_failed_fsync_closes_the_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        write_one(&mut writer, 1, b"synced", 1);
+        let mut ticket = writer.begin_sync();
+        for file in ticket.take_files() {
+            ticket.give_back(file.fsync());
+        }
+        writer.finish_sync(ticket).unwrap();
+        let synced = synced_of(&writer.take_all_events());
+        let (_, synced_up_to) = synced[0];
+
+        write_one(&mut writer, 1, b"in doubt", 2);
+        FAIL_NEXT_FSYNC.set(true);
+        let mut ticket = writer.begin_sync();
+        for file in ticket.take_files() {
+            ticket.give_back(file.fsync());
+        }
+        let error = writer.finish_sync(ticket).unwrap_err();
+
+        assert!(matches!(error, crate::Error::Fsync(_)), "{error}");
+        // The file is closed with the prefix that was durable before: no
+        // later fsync of it can vouch for the frame in doubt.
+        let events = writer.take_all_events();
+        match events.as_slice() {
+            [FileEvent::Closed { valid_up_to, .. }] => assert_eq!(*valid_up_to, synced_up_to),
+            other => panic!("expected one `Closed`: {other:?}"),
+        }
+        write_one(&mut writer, 1, b"next", 3);
+        assert_eq!(wal_files(tmp.path()).len(), 2);
     }
 
     #[test]
