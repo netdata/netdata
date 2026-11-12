@@ -157,6 +157,13 @@ impl DerivedMetrics {
             .record_metric_data_points(accepted, rejected, unix_now());
     }
 
+    /// The counter of the ingestor's queue of WAL file events to the ledger,
+    /// for the sender of those events to keep: `netdata.otel.wal_events_queued`
+    /// charts it.
+    pub fn wal_events_queued(&self) -> Arc<std::sync::atomic::AtomicU64> {
+        self.ingest_outcomes.wal_events_queued()
+    }
+
     /// Emit every window whose allowed lateness has passed by `now` (Unix
     /// seconds), in chunks of at most [`MAX_CHUNK_BYTES`].
     pub fn emit(&self, now: u64) -> Vec<Vec<u8>> {

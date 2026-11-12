@@ -25,6 +25,9 @@
 //! workers; the agent restarts the whole plugin (`Supervisor::run` in
 //! `otel-plugin/src/supervisor.rs`), and the ledger's startup recovery picks
 //! up the files whose events it did not get.
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use ferryboat::{Connection, Endpoint};
 use file_registry::TenantId;
 use tokio::sync::mpsc;
@@ -35,19 +38,29 @@ use tokio::sync::mpsc;
 /// writer connection, so there is no alternative
 /// (`create_shared_writer_state` in `otel-ingestor/src/lib.rs`) — and
 /// sending needs only `&self` and never blocks: an unbounded-channel push.
+///
+/// The queue has no bound: while the ledger is slow, the events wait in this
+/// process's memory. `queued` counts them, for the chart
+/// `netdata.otel.wal_events_queued`.
 pub struct LedgerSender {
     tx: mpsc::UnboundedSender<wal::Message>,
+    queued: Arc<AtomicU64>,
 }
 
 impl LedgerSender {
     /// Creates the sender and spawns its background task, returning before any
     /// connection exists; the task retries the socket indefinitely (1 s
     /// apart), so the ledger does not have to be up yet. Events queued before
-    /// it connects simply wait in the channel.
-    pub fn new(socket_path: &str) -> Self {
+    /// it connects simply wait in the channel. `queued` is the counter of
+    /// the events that wait, kept here and charted by its owner.
+    pub fn new(socket_path: &str, queued: Arc<AtomicU64>) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sender_task(rx, socket_path.to_string()));
-        Self { tx }
+        tokio::spawn(sender_task(
+            rx,
+            socket_path.to_string(),
+            Arc::clone(&queued),
+        ));
+        Self { tx, queued }
     }
 
     /// Queues every event of a `wal::FileEvent` vec for delivery to the
@@ -64,7 +77,9 @@ impl LedgerSender {
                 tenant_id: tenant_id.clone(),
                 event,
             };
-            let _ = self.tx.send(msg);
+            if self.tx.send(msg).is_ok() {
+                self.queued.fetch_add(1, Ordering::Relaxed);
+            }
         }
     }
 }
@@ -75,7 +90,11 @@ impl LedgerSender {
 /// supervisor connection, not here. A failed send ends the task for good —
 /// there is no reconnect — and the dropped receiver turns every later
 /// `tx.send` into a silently ignored error.
-async fn sender_task(mut rx: mpsc::UnboundedReceiver<wal::Message>, socket_path: String) {
+async fn sender_task(
+    mut rx: mpsc::UnboundedReceiver<wal::Message>,
+    socket_path: String,
+    queued: Arc<AtomicU64>,
+) {
     let endpoint = Endpoint::ipc(&socket_path);
 
     let mut conn = match Connection::<wal::Message, ()>::connect(endpoint)
@@ -98,6 +117,7 @@ async fn sender_task(mut rx: mpsc::UnboundedReceiver<wal::Message>, socket_path:
     };
 
     while let Some(msg) = rx.recv().await {
+        queued.fetch_sub(1, Ordering::Relaxed);
         if conn.send(msg).await.is_err() {
             tracing::error!("ledger IPC connection lost");
             break;

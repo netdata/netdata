@@ -1139,7 +1139,7 @@ mod tests {
         ingest: otel_bridge::config::IngestConfig,
     ) -> NetdataLogsService {
         let socket = format!("/tmp/netdata-ingestor-test-{}.sock", std::process::id());
-        let sender = Arc::new(LedgerSender::new(&socket));
+        let sender = Arc::new(LedgerSender::new(&socket, Arc::default()));
 
         let mut rotation = HashMap::new();
         rotation.insert(
@@ -1227,7 +1227,7 @@ mod tests {
 
         // A zero rotation duration makes any elapsed time expire an idle stream;
         // point the service's sender at our capturing listener.
-        let sender = Arc::new(LedgerSender::new(&socket));
+        let sender = Arc::new(LedgerSender::new(&socket, Arc::default()));
         let mut rotation = HashMap::new();
         rotation.insert(
             "default".to_string(),

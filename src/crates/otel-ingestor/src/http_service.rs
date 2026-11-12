@@ -827,7 +827,7 @@ mod tests {
     ) -> (HttpState, tempfile::TempDir) {
         let tmp = tempfile::tempdir().unwrap();
         let socket = format!("/tmp/netdata-http-service-test-{}.sock", std::process::id());
-        let sender = Arc::new(LedgerSender::new(&socket));
+        let sender = Arc::new(LedgerSender::new(&socket, Arc::default()));
         let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
         let clock = Arc::new(Mutex::new(MonotonicClock::new()));
         let identity = Identity::new(

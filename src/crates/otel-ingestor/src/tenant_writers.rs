@@ -356,8 +356,57 @@ mod tests {
                 MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
                 InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
             ),
-            Arc::new(LedgerSender::new(socket)),
+            Arc::new(LedgerSender::new(socket, Arc::default())),
         )
+    }
+
+    /// The queue to the ledger has no bound; its length is counted for the
+    /// chart `netdata.otel.wal_events_queued`.
+    #[tokio::test]
+    async fn the_events_that_wait_for_the_ledger_are_counted() {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        let tmp = tempfile::tempdir().unwrap();
+        let socket = format!(
+            "/tmp/netdata-tenant-writers-queue-test-{}.sock",
+            std::process::id()
+        );
+        let _ = std::fs::remove_file(&socket);
+        let queued = Arc::new(AtomicU64::new(0));
+        let sender = LedgerSender::new(&socket, Arc::clone(&queued));
+        let file_id = file_registry::FileId::new(
+            Identity::new(
+                MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+            ),
+            0,
+            1,
+            0,
+        );
+        let created = || wal::FileEvent::Created {
+            file_id,
+            created_at_ns: TimestampNs(1),
+            content_meta: Vec::new(),
+        };
+
+        // Nobody listens yet: the events wait.
+        sender.send_events(TenantId::from("a"), vec![created(), created(), created()]);
+        assert_eq!(queued.load(Ordering::Relaxed), 3);
+
+        // The ledger connects and takes them.
+        let mut listener =
+            ferryboat::Listener::<(), wal::Message>::bind(ferryboat::Endpoint::ipc(&socket))
+                .open()
+                .expect("bind ledger listener");
+        let mut conn = listener.accept().await.expect("accept writer connection");
+        for _ in 0..3 {
+            tokio::time::timeout(Duration::from_secs(5), conn.recv())
+                .await
+                .expect("the event must reach the ledger")
+                .expect("recv wal message");
+        }
+        assert_eq!(queued.load(Ordering::Relaxed), 0);
+        let _ = tmp;
     }
 
     #[tokio::test]

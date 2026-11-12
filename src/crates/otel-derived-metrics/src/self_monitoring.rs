@@ -8,6 +8,8 @@ use netdata_plugin_metrics::{
     MetricSetBuilder, Settings, Stats, columns,
 };
 use otel_bridge::signals::Signal;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 columns! {
     /// What became of the data points of a metrics export.
@@ -26,6 +28,12 @@ columns! {
         Accepted = "accepted",
         Rejected = "rejected",
         Failed = "failed",
+    }
+}
+
+columns! {
+    enum Queued {
+        Events = "events",
     }
 }
 
@@ -57,6 +65,10 @@ pub(crate) struct IngestOutcomes {
     metric_data_points: Counter<Acceptance>,
     log_records: Counter<Storing>,
     spans: Counter<Storing>,
+    wal_events_queued: Gauge<Queued>,
+    /// The length of the ingestor's queue of WAL file events to the ledger:
+    /// the sender of those events keeps it ([`Self::wal_events_queued`]).
+    wal_events_queued_now: Arc<AtomicU64>,
 }
 
 impl IngestOutcomes {
@@ -86,6 +98,14 @@ impl IngestOutcomes {
             chart_type: ChartType::Stacked,
             priority: 150_001,
         })?;
+        let wal_events_queued = builder.gauge::<Queued>(ChartDescriptor {
+            title: "WAL file events waiting to be sent to the ledger".into(),
+            units: "events".into(),
+            family: "ingest".into(),
+            context: "netdata.otel.wal_events_queued".into(),
+            chart_type: ChartType::Line,
+            priority: 150_002,
+        })?;
         let metric_set = builder.build()?;
         let aggregator = SharedAggregator::new(&metric_set);
         Ok(Self {
@@ -94,7 +114,16 @@ impl IngestOutcomes {
             metric_data_points,
             log_records,
             spans,
+            wal_events_queued,
+            wal_events_queued_now: Arc::default(),
         })
+    }
+
+    /// The counter that `netdata.otel.wal_events_queued` charts. The queue
+    /// has no bound: when the ledger is slow, the events wait in the
+    /// ingestor's memory, and this chart is where it shows.
+    pub(crate) fn wal_events_queued(&self) -> Arc<AtomicU64> {
+        Arc::clone(&self.wal_events_queued_now)
     }
 
     /// Count the outcome of one export request of `signal` at `now` (Unix
@@ -156,12 +185,18 @@ impl IngestOutcomes {
         self.aggregator.emit(now, chunks);
     }
 
-    /// An empty event at `now`: emitted as zeros, it keeps the ingest chart
+    /// An event at `now` with no count and the length of the queue to the
+    /// ledger: its counts are emitted as zeros, so it keeps the ingest chart
     /// instances defined from the first tick and never lets them expire while
     /// the plugin runs.
     fn heartbeat(&self, now: u64) -> Batch {
+        let queued = self.wal_events_queued_now.load(Ordering::Relaxed);
         let mut batch = Batch::new(&self.metric_set);
-        batch.entity(Labels::new()).record(now);
+        batch.entity(Labels::new()).record(now).set_value(
+            self.wal_events_queued,
+            Queued::Events,
+            queued as f64,
+        );
         batch
     }
 }
@@ -309,6 +344,24 @@ mod tests {
         let position = |context: &str| out.find(&format!("CHART {context} ")).unwrap();
         assert!(position("netdata.otel.metric_data_points") < position("netdata.otel.log_records"));
         assert!(position("netdata.otel.log_records") < position("netdata.otel.spans"));
+    }
+
+    #[test]
+    fn the_queue_to_the_ledger_is_charted_from_its_counter() {
+        let outcomes = IngestOutcomes::new().unwrap();
+        let queued = outcomes.wal_events_queued();
+        let mut chunks = Vec::new();
+        queued.store(7, Ordering::Relaxed);
+        outcomes.emit(100, &mut chunks);
+        outcomes.emit(101, &mut chunks);
+        let out = readable(chunks);
+        netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
+        assert!(
+            out.contains(
+                "BEGIN netdata.otel.wal_events_queued 1000000\nSET events = 7\nEND 101 0 1\n"
+            ),
+            "{out}"
+        );
     }
 
     #[test]

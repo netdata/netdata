@@ -242,8 +242,11 @@ async fn run_ingestor(
     // Set up the logs + traces pipelines. They SHARE one writer→ledger sender
     // and one global seq allocator: the ledger accepts a single writer
     // connection, and file `seq` must be globally unique across signals.
-    let (ledger_sender, seq_allocator) =
-        create_shared_writer_state(&config, &config.writer_socket_path)?;
+    let (ledger_sender, seq_allocator) = create_shared_writer_state(
+        &config,
+        &config.writer_socket_path,
+        derived_metrics.wal_events_queued(),
+    )?;
     // One process-wide monotonic clock, shared across signals — the WAL writer's
     // contract is that all per-frame `ingestion_ns` come from a single clock so
     // frame-level ordering is consistent across every stream/signal.
@@ -482,6 +485,7 @@ fn start_service_map(
 fn create_shared_writer_state(
     config: &PluginConfig,
     writer_socket_path: &str,
+    wal_events_queued: Arc<std::sync::atomic::AtomicU64>,
 ) -> Result<(Arc<ledger_sender::LedgerSender>, Arc<wal::SeqAllocator>)> {
     let logs_lc = config.lifecycle_for(Signal::Logs);
     let traces_lc = config.lifecycle_for(Signal::Traces);
@@ -504,7 +508,10 @@ fn create_shared_writer_state(
             .context("initializing seq high-water allocator")?,
     );
 
-    let ledger_sender = Arc::new(ledger_sender::LedgerSender::new(writer_socket_path));
+    let ledger_sender = Arc::new(ledger_sender::LedgerSender::new(
+        writer_socket_path,
+        wal_events_queued,
+    ));
 
     tracing::info!(
         logs_wal = logs_scan.wal_max,
