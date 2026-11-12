@@ -9,15 +9,21 @@
 //! charts are where a host whose index files grow, or whose remote storage
 //! holds evictions back, shows.
 //!
-//! The ledger's periodic retention pass takes the totals ([`IndexTotals`])
-//! and leaves them in [`StorageTotals`]; [`run`] charts them every second.
+//! With remote storage there are two more charts, of the uploads (index
+//! files and catalog files together): how many are on their way or wait for
+//! a retry, and how many succeeded and failed. They are where a remote that
+//! is unreachable, or too slow for the host, shows.
+//!
+//! The ledger's periodic retention pass takes the totals ([`IndexTotals`]),
+//! its event loop keeps the upload numbers ([`UploadTotals`]), and both leave
+//! them in [`StorageTotals`]; [`run`] charts them every second.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use netdata_plugin_metrics::{
-    Aggregator, Batch, ChartDescriptor, ChartType, Gauge, Labels, MetricSet, MetricSetBuilder,
-    Settings, columns,
+    Aggregator, Batch, ChartDescriptor, ChartType, CumulativeCounter, Gauge, Labels, MetricSet,
+    MetricSetBuilder, Settings, columns,
 };
 use otel_bridge::LedgerResponse;
 use otel_bridge::signals::Signal;
@@ -30,6 +36,23 @@ columns! {
     enum PerSignal {
         Logs = "logs",
         Traces = "traces",
+    }
+}
+
+columns! {
+    /// Where an upload is: sent to the uploader and not answered yet, or
+    /// failed and waiting for its next try.
+    enum UploadState {
+        Running = "running",
+        Waiting = "waiting",
+    }
+}
+
+columns! {
+    /// How an upload ended.
+    enum UploadOutcome {
+        Succeeded = "succeeded",
+        Failed = "failed",
     }
 }
 
@@ -49,12 +72,30 @@ pub(crate) struct IndexTotals {
     pub(crate) waiting_for_remote: u64,
 }
 
-/// The latest [`IndexTotals`] of each signal: written by the ledger's event
-/// loop, read by the chart task.
+/// The uploads to remote storage, index files and catalog files together.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct UploadTotals {
+    /// Sent to the uploader and not answered yet.
+    pub(crate) running: u64,
+    /// Failed, and waiting for the next try.
+    pub(crate) waiting: u64,
+    /// Uploads that succeeded since the ledger started.
+    pub(crate) succeeded: u64,
+    /// Upload attempts that failed since the ledger started.
+    pub(crate) failed: u64,
+}
+
+/// The latest [`IndexTotals`] of each signal and the latest
+/// [`UploadTotals`]: written by the ledger's event loop, read by the chart
+/// task.
 #[derive(Default)]
 pub(crate) struct StorageTotals {
     logs: SignalTotals,
     traces: SignalTotals,
+    uploads_running: AtomicU64,
+    uploads_waiting: AtomicU64,
+    uploads_succeeded: AtomicU64,
+    uploads_failed: AtomicU64,
 }
 
 #[derive(Default)]
@@ -83,6 +124,32 @@ impl StorageTotals {
         }
     }
 
+    /// The uploads that are on their way and those that wait for a retry,
+    /// as the event loop sees them now.
+    pub(crate) fn set_uploads_in_progress(&self, running: u64, waiting: u64) {
+        self.uploads_running.store(running, Ordering::Relaxed);
+        self.uploads_waiting.store(waiting, Ordering::Relaxed);
+    }
+
+    /// One upload ended.
+    pub(crate) fn upload_finished(&self, succeeded: bool) {
+        let counter = if succeeded {
+            &self.uploads_succeeded
+        } else {
+            &self.uploads_failed
+        };
+        counter.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub(crate) fn uploads(&self) -> UploadTotals {
+        UploadTotals {
+            running: self.uploads_running.load(Ordering::Relaxed),
+            waiting: self.uploads_waiting.load(Ordering::Relaxed),
+            succeeded: self.uploads_succeeded.load(Ordering::Relaxed),
+            failed: self.uploads_failed.load(Ordering::Relaxed),
+        }
+    }
+
     fn of(&self, signal: Signal) -> &SignalTotals {
         match signal {
             Signal::Logs => &self.logs,
@@ -91,17 +158,27 @@ impl StorageTotals {
     }
 }
 
-/// The charts of the local index files: one label-less entity.
+/// The charts of the local index files and, with remote storage, of the
+/// uploads: one label-less entity.
 pub(crate) struct StorageCharts {
     metric_set: MetricSet,
     aggregator: Aggregator,
     index_files: Gauge<PerSignal>,
     index_size: Gauge<PerSignal>,
     waiting_for_remote: Gauge<PerSignal>,
+    /// Present when remote storage is enabled.
+    uploads: Option<UploadCharts>,
+}
+
+struct UploadCharts {
+    in_progress: Gauge<UploadState>,
+    finished: CumulativeCounter<UploadOutcome>,
 }
 
 impl StorageCharts {
-    pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
+    /// `remote_storage`: whether the ledger uploads, so whether the upload
+    /// charts exist.
+    pub(crate) fn new(remote_storage: bool) -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
         let index_files = builder.gauge::<PerSignal>(ChartDescriptor {
             title: "Index files on the local disk".into(),
@@ -127,6 +204,28 @@ impl StorageCharts {
             chart_type: ChartType::Stacked,
             priority: 150_032,
         })?;
+        let uploads = if remote_storage {
+            Some(UploadCharts {
+                in_progress: builder.gauge::<UploadState>(ChartDescriptor {
+                    title: "Uploads to remote storage running and waiting for a retry".into(),
+                    units: "operations".into(),
+                    family: "remote storage".into(),
+                    context: "netdata.otel.uploads".into(),
+                    chart_type: ChartType::Stacked,
+                    priority: 150_040,
+                })?,
+                finished: builder.cumulative_counter::<UploadOutcome>(ChartDescriptor {
+                    title: "Uploads to remote storage finished".into(),
+                    units: "operations/s".into(),
+                    family: "remote storage".into(),
+                    context: "netdata.otel.uploads_finished".into(),
+                    chart_type: ChartType::Stacked,
+                    priority: 150_041,
+                })?,
+            })
+        } else {
+            None
+        };
         let metric_set = builder.build()?;
         let aggregator = Aggregator::new(&metric_set);
 
@@ -136,16 +235,20 @@ impl StorageCharts {
             index_files,
             index_size,
             waiting_for_remote,
+            uploads,
         })
     }
 
-    /// Record the totals of both signals at `now` (Unix seconds), then return
-    /// the chart text of every window that ended by `now`.
+    /// Record the totals of both signals and of the uploads at `now` (Unix
+    /// seconds), then return the chart text of every window that ended by
+    /// `now`. The two upload totals are charted as their increase from one
+    /// window to the next.
     pub(crate) fn emit(
         &mut self,
         now: u64,
         logs: IndexTotals,
         traces: IndexTotals,
+        upload_totals: UploadTotals,
     ) -> Vec<Vec<u8>> {
         let mut batch = Batch::new(&self.metric_set);
         let mut entity = batch.entity(Labels::new());
@@ -158,6 +261,29 @@ impl StorageCharts {
                     self.waiting_for_remote,
                     signal,
                     totals.waiting_for_remote as f64,
+                );
+        }
+        if let Some(uploads) = &self.uploads {
+            measurements
+                .set_value(
+                    uploads.in_progress,
+                    UploadState::Running,
+                    upload_totals.running as f64,
+                )
+                .set_value(
+                    uploads.in_progress,
+                    UploadState::Waiting,
+                    upload_totals.waiting as f64,
+                )
+                .set_total(
+                    uploads.finished,
+                    UploadOutcome::Succeeded,
+                    upload_totals.succeeded as f64,
+                )
+                .set_total(
+                    uploads.finished,
+                    UploadOutcome::Failed,
+                    upload_totals.failed as f64,
                 );
         }
         self.aggregator.merge(batch, now);
@@ -188,6 +314,7 @@ pub(crate) async fn run(
             next_second.as_secs(),
             totals.get(Signal::Logs),
             totals.get(Signal::Traces),
+            totals.uploads(),
         );
         for payload in chunks {
             if outbound
@@ -210,7 +337,7 @@ mod tests {
 
     #[test]
     fn the_totals_of_each_signal_are_charted_as_its_dimension() {
-        let mut charts = StorageCharts::new().unwrap();
+        let mut charts = StorageCharts::new(false).unwrap();
         let logs = IndexTotals {
             files: 12,
             bytes: 3_000,
@@ -222,8 +349,8 @@ mod tests {
             waiting_for_remote: 0,
         };
 
-        let mut chunks = charts.emit(100, logs, traces);
-        chunks.extend(charts.emit(101, logs, traces));
+        let mut chunks = charts.emit(100, logs, traces, UploadTotals::default());
+        chunks.extend(charts.emit(101, logs, traces, UploadTotals::default()));
         let out = readable(chunks);
 
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
@@ -236,6 +363,70 @@ mod tests {
         assert!(out.contains(
             "BEGIN netdata.otel.index_files_waiting_for_remote 1000000\nSET logs = 2\nSET traces = 0\nEND 101 0 1\n"
         ));
+    }
+
+    #[test]
+    fn without_remote_storage_there_are_no_upload_charts() {
+        let mut charts = StorageCharts::new(false).unwrap();
+        let none = IndexTotals::default();
+
+        let mut chunks = charts.emit(100, none, none, UploadTotals::default());
+        chunks.extend(charts.emit(101, none, none, UploadTotals::default()));
+
+        assert!(!readable(chunks).contains("netdata.otel.uploads"));
+    }
+
+    #[test]
+    fn with_remote_storage_the_uploads_are_charted() {
+        let mut charts = StorageCharts::new(true).unwrap();
+        let none = IndexTotals::default();
+        let earlier = UploadTotals {
+            running: 3,
+            waiting: 1,
+            succeeded: 10,
+            failed: 2,
+        };
+        let later = UploadTotals {
+            running: 0,
+            waiting: 2,
+            succeeded: 13,
+            failed: 3,
+        };
+
+        let mut chunks = charts.emit(100, none, none, earlier);
+        chunks.extend(charts.emit(101, none, none, later));
+        chunks.extend(charts.emit(102, none, none, later));
+        let out = readable(chunks);
+
+        netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
+        assert!(out.contains(
+            "BEGIN netdata.otel.uploads 1000000\nSET running = 3\nSET waiting = 1\nEND 101 0 1\n"
+        ));
+        // The increase from one second to the next: 3 more succeeded, 1 more
+        // failed.
+        assert!(out.contains(
+            "BEGIN netdata.otel.uploads_finished 1000000\nSET succeeded = 3\nSET failed = 1\nEND 102 0 1\n"
+        ));
+    }
+
+    #[test]
+    fn the_uploads_are_counted_and_read_back() {
+        let totals = StorageTotals::default();
+
+        totals.set_uploads_in_progress(4, 1);
+        totals.upload_finished(true);
+        totals.upload_finished(true);
+        totals.upload_finished(false);
+
+        assert_eq!(
+            totals.uploads(),
+            UploadTotals {
+                running: 4,
+                waiting: 1,
+                succeeded: 2,
+                failed: 1,
+            }
+        );
     }
 
     #[test]

@@ -48,6 +48,13 @@ impl Ledger {
         let registries = pipeline.registries().clone();
         let catalog_builder_tx = pipeline.catalog_builder_tx().clone();
 
+        // For the upload charts: index files and catalog files together.
+        let succeeded = matches!(
+            resp,
+            UploaderResponse::Uploaded { .. } | UploaderResponse::CatalogUploaded { .. }
+        );
+        self.storage_totals.upload_finished(succeeded);
+
         match resp {
             UploaderResponse::Uploaded {
                 seq,

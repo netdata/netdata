@@ -382,7 +382,7 @@ impl Ledger {
             cancel.child_token(),
         ));
         let storage_totals = Arc::new(crate::storage_charts::StorageTotals::default());
-        let storage_charts = crate::storage_charts::StorageCharts::new()
+        let storage_charts = crate::storage_charts::StorageCharts::new(uploader.is_some())
             .context("failed to declare the storage charts")?;
         tokio::spawn(crate::storage_charts::run(
             storage_charts,
@@ -510,6 +510,15 @@ impl Ledger {
                     self.handle_retry_tick().await;
                     self.evaluate_retention_of_all_tenants().await;
                 }
+            }
+
+            // For the upload charts: an event can have sent an upload, taken
+            // an answer, or queued a retry.
+            if let Some(uploader) = &self.uploader {
+                self.storage_totals.set_uploads_in_progress(
+                    uploader.pending() as u64,
+                    self.upload_retry.len() as u64,
+                );
             }
         }
     }
