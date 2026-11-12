@@ -8,6 +8,7 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {metricsFromLHR} from '../runner/lighthouse.mjs';
 import {monotonicMilliseconds} from '../runner/journey.mjs';
+import {baselineRecords} from './contract-2.mjs';
 const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const dependencies = process.env.DEM_TEST_DEPENDENCIES || sourceRoot;
 
@@ -37,7 +38,7 @@ async function run(source, options = {}, root = runtimeRoot) {
   child.stdin.end(JSON.stringify(request));
   const code = await new Promise((resolve, reject) => {child.on('error', reject); child.on('close', resolve);});
   assert.equal(err, '', 'bootstrap stderr is not an uncontrolled diagnostic path');
-  const records = out.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+  const records = baselineRecords(out);
   const results = records.filter(r => r.type === 'result');
   assert.equal(results.length, 1, out);
   assert.ok(records.every(r => ['event', 'result'].includes(r.type)));
@@ -45,6 +46,33 @@ async function run(source, options = {}, root = runtimeRoot) {
 }
 const counts = values => ({declared: 0, passed: 0, failed: 0, timed_out: 0, skipped: 0, expected_failure: 0, not_run: 0, ...values});
 const prefix = "import {test, expect} from '@playwright/test';\n";
+
+test('unknown advisory request members preserve ordinary journey execution', async () => {
+  const source = prefix + "test('pass',async()=>{console.log('workflow-executed');expect(2).toBe(2)});";
+  const plain = await run(source);
+  const extended = await run(source, {extensions: ['fixture.future.v1'], future_advisory: {value: 'ignored-fixture'}});
+  assert.equal(extended.code, plain.code);
+  assert.deepEqual(extended.result, plain.result);
+  const output = extended.events.filter(event => event.kind === 'stdout').map(event => event.message).join('');
+  assert.equal(output.split('workflow-executed').length - 1, 1);
+  assert.ok(!JSON.stringify(extended.events).includes('ignored-fixture'));
+});
+
+test('unsupported request versions refuse both kinds before workflow work', async () => {
+  for (const kind of ['journey', 'lighthouse']) {
+    for (const version of [1, 3]) {
+      const actual = await run("throw new Error('must not load workflow');", {
+        kind, version, url: 'http://fixture.invalid', capture: true,
+      });
+      assert.equal(actual.code, 1);
+      assert.deepEqual(actual.result, {status: 'error', error: 'unsupported runner request', capture_state: 'unavailable'});
+      assert.deepEqual(actual.events.map(({at_ms, ...event}) => event), [
+        {kind: 'error', phase: 'execution', status: 'error', message: 'unsupported runner request'},
+      ]);
+      assert.deepEqual(await fs.readdir(actual.dir), [], 'runtime must reject before generating execution files');
+    }
+  }
+});
 
 const outcomes = {
   success: ["test('pass', async()=>{expect(2).toBe(2)});", 'success', counts({declared:1,passed:1})],
@@ -114,7 +142,7 @@ test('real native suite timeout takes precedence over earlier assertion and glob
   let wire='',stderr='';child.stdio[3].on('data',data=>wire+=data);child.stderr.on('data',data=>stderr+=data);
   const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve)});
   assert.notEqual(code,0,stderr);
-  const records=wire.trim().split('\n').map(JSON.parse);
+  const records=baselineRecords(wire);
   const result=records.find(record=>record.type==='result')?.result;
   assert.equal(result?.status,'timeout',wire+stderr);
   assert.equal(result.termination_reason,'suite_timeout');
@@ -205,7 +233,7 @@ test('actual reporter protects fragmented buffers and unfinished secret prefixes
   const child=spawn(process.execPath,['-e',script],{stdio:['ignore','ignore','pipe','pipe']});
   let wire='';child.stdio[3].on('data',b=>wire+=b);
   assert.equal(await new Promise(r=>child.on('close',r)),0);
-  const records=wire.trim().split('\n').map(JSON.parse);
+  const records=baselineRecords(wire);
   const recovered=records.filter(r=>r.type==='event').map(r=>r.event.message||'').join('');
   assert.ok(!recovered.includes('fixture-only-secret-'),recovered);
   assert.ok(!recovered.includes('秘密'),recovered);
@@ -214,7 +242,7 @@ test('actual reporter protects fragmented buffers and unfinished secret prefixes
 });
 
 
-test('optional Lighthouse report write failure preserves completed measurements', async()=>{
+async function lighthouseFixture() {
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'dem-report-failure-'));
   const modules=path.join(dir,'node_modules');
   for(const packageName of ['lighthouse','chrome-launcher']) {
@@ -227,14 +255,33 @@ test('optional Lighthouse report write failure preserves completed measurements'
   await fs.writeFile(path.join(modules,'lighthouse/core/config/lr-desktop-config.js'),"export default {profile:'desktop'};");
   const closed=path.join(dir,'closed');
   await fs.writeFile(path.join(modules,'chrome-launcher/dist/index.js'),`import assert from 'node:assert/strict';import fs from 'node:fs/promises';export const launch=async options=>{assert.deepEqual(options.chromeFlags,['--headless=new','--disable-dev-shm-usage']);return {port:1,kill:async()=>fs.writeFile(${JSON.stringify(closed)},'closed')}};`);
-  await fs.mkdir(path.join(dir,'output/lighthouse.html'),{recursive:true});
   const fixture=await fixtureRuntime(dir,'chrome');
   await fs.symlink(process.execPath,path.join(fixture,'chrome'));
+  return {dir, fixture, closed};
+}
+
+test('unknown advisory request members preserve Lighthouse measurements and capture', async()=>{
+  const {fixture, closed}=await lighthouseFixture();
+  const options={kind:'lighthouse',url:'http://fixture.invalid',capture:true};
+  const plain=await run(undefined,options,fixture);
+  const extended=await run(undefined,{...options,extensions:['fixture.future.v1'],future_advisory:{value:'ignored-fixture'}},fixture);
+  assert.equal(extended.code,0);
+  assert.deepEqual(extended.result,plain.result);
+  assert.deepEqual(extended.result.metrics,{performance:88,lcp_ms:123});
+  assert.equal(extended.result.capture_state,'available');
+  assert.equal(await fs.readFile(path.join(extended.dir,'output/lighthouse.html'),'utf8'),'<html>fixture</html>');
+  assert.equal(await fs.readFile(closed,'utf8'),'closed');
+  assert.ok(!JSON.stringify(extended.events).includes('ignored-fixture'));
+});
+
+test('optional Lighthouse report write failure preserves completed measurements', async()=>{
+  const {dir, fixture, closed}=await lighthouseFixture();
+  await fs.mkdir(path.join(dir,'output/lighthouse.html'),{recursive:true});
   const child=spawn(process.execPath,[path.join(fixture,'runner/lighthouse.mjs')],{stdio:['pipe','ignore','pipe','pipe']});
   let wire='';child.stdio[3].on('data',b=>wire+=b);
   child.stdin.end(JSON.stringify({work_dir:dir,url:'http://fixture.invalid',timeout_ms:1000,capture:true}));
   await new Promise(r=>child.on('close',r));
-  const records=wire.trim().split('\n').map(JSON.parse);
+  const records=baselineRecords(wire);
   const result=records.find(r=>r.type==='result').result;
   assert.equal(result.status,'success');
   assert.deepEqual(result.metrics,{performance:88,lcp_ms:123});

@@ -46,9 +46,11 @@ application variables are not inherited.
 
 ## Contract 2 semantics
 
-There is one supported execution contract and no version adapters. Runtime-internal
-dependency and browser locations are not request fields. The outer descriptor's
-`contract` and request `version` are both 2; release versions are independent.
+The current implementation accepts execution contract 2 and request version 2.
+Runtime-internal dependency and browser locations are not request fields.
+Release versions are independent. See [Compatibility policy](#compatibility-policy)
+for the rules governing future additions; those rules do not enable new wire
+messages or request versions by themselves.
 
 The Agent retains the admission-based hard execution deadline, including an earlier
 caller deadline. Journeys reserve min(5 seconds, one fifth of that effective admitted
@@ -173,6 +175,76 @@ report, like screenshots, may contain sensitive page content and is not claimed
 to be sanitized. Capture paths are relative to work_dir and begin with output/;
 Go validates and publishes them after verified drainage.
 
+## Compatibility policy
+
+The execution contract defines shared request, result and safety semantics. A new
+runtime release MUST preserve those semantics for existing supported requests, or
+use a new execution contract. A core contract bump is required only when existing
+required semantics cannot remain correct through baseline behavior or an explicitly
+negotiated path. A break affecting even one supported request matters.
+
+Contract 2 has two baseline compatibility rules:
+
+- Unknown advisory request members MUST be ignored. Existing required fields and
+  explicitly forbidden component-path fields retain their validation. A sender
+  MUST NOT rely on an unknown field to enforce a required execution control.
+- Without explicit opt-in, runtime output MUST remain inside the baseline
+  contract-2 schema on every path, including failure, timeout, cancellation and
+  capture reporting. Older Agents reject unknown nested response fields, frame
+  types and event kinds. An optional new output field is therefore not automatically
+  compatible just because its value could be omitted.
+
+An unsupported request version MUST be rejected before script loading, generated
+execution files, browser launch or workflow actions. Reading runtime identity and
+starting the Node process are not workflow execution. Refusal still uses the
+baseline error event/result and does not authorize replay with weaker settings.
+
+### Additions and required capabilities
+
+Future output extensions MUST be explicitly requested by an Agent that understands
+them and selected by the runtime for that attempt. Use a general extension gate,
+with diagnostics as one consumer, rather than treating every addition as diagnostic.
+No extension gate or acknowledgement is implemented yet.
+
+| Change | Compatible evolution rule |
+|---|---|
+| Safe-to-ignore request hint | Add an advisory member; retain baseline validation and behavior when absent. |
+| New output field, event, metric or enum value | Emit only to a peer that opted in; retain truthful baseline output otherwise. Missing measurements are absent, not zero. |
+| Optional diagnostic format | Use an exact format ID; permit additive fields or records only when older readers can safely ignore them. |
+| Changed field meaning, unit, required record or completeness rule | Introduce a new field/format/capability; never silently change the existing meaning. |
+| Required execution control | Honor it or refuse that attempt before workflow work; absence of an optional acknowledgement is not enforcement. |
+| Incompatible execution, cancellation, capture trust or cleanup semantics | Change the core contract if baseline semantics cannot be preserved through a safe negotiated path. |
+| Component update with unchanged protocol semantics | Change the immutable runtime release identity, not the core contract. |
+
+Optional evidence cannot change authoritative outcomes/counts, authorize artifact
+publication, prove process drainage or complete persistence. Invalid content inside
+an identifiable best-effort extension MUST invalidate that evidence without
+cancelling an otherwise valid attempt. Shared framing, mixed core/extension
+envelopes and core result validation remain strict. Absence, unsupported formats,
+partial reports and retention truncation MUST stay distinguishable; none implies
+zero errors or complete evidence. Unknown record variants are safely ignorable only
+when the format explicitly preserves known lifecycle and completeness semantics.
+
+Required controls need a separate must-understand admission rule. A reserved design
+is a new request dialect (for example version 3 with required capability IDs): an
+old runtime rejects it before workflow work, while a newer runtime can still serve
+baseline version-2 requests under execution contract 2. This separates the request
+dialect from the runtime's shared baseline contract. It is not implemented, and
+version 3 is currently unsupported. Introduce and validate it with the first real
+required control, not as unused compatibility machinery. Never retry an unsupported
+control as an advisory field or infer enforcement from optional output selection.
+
+The extension mechanism will land with its first typed consumer, Failure-evidence.
+There is no generic registry, version-range solver, capability cache or extra probe
+process in this design. Producer emission, parsing and retention must be bounded:
+optional traffic shares the result stream and must be measured near execution
+deadlines, not merely clipped after it has already delayed core reporting.
+
+These rules do not make contract-1 runtimes executable by contract-2 Agents. Runtime
+selection, cross-contract upgrade order, rollback and native package compatibility
+remain separate work in [#24720](https://github.com/netdata/netdata/issues/24720).
+New runtime content still requires a new immutable release version/digest.
+
 ## Tests
 
 Run `npm ci --ignore-scripts` and `npm test` in this source directory, or set
@@ -183,3 +255,14 @@ execution request. Fixtures stamp the test Node version; production archives use
 the release pin. Real Linux browser/audit and process-tree cancellation validation
 belongs to the Go-to-Node integration checks. Candidate installation qualification
 must exercise both journeys and Lighthouse with deterministic local content.
+
+`tests/contract-2.mjs` freezes baseline wire fields, types and enum values from
+`7278241848caed20c5a5d59b82e343bac5dbb037`. It checks real runner output without
+importing evolving production models. Do not expand that baseline to accommodate
+new output: future opt-in tests must retain baseline-only checks for old requests.
+This shape/enum guard complements the Go semantic validators; it does not prove
+process drainage, capture provenance or extended-peer compatibility. The tests also
+pin advisory request tolerance and unsupported-version refusal before workflow work.
+The shared `dem-runtime-node-tests.yml` workflow runs this suite with the manifest's
+Node pin for both DEM PR checks and runtime release builds; a failing suite blocks
+release assembly. These non-browser tests do not replace target qualification.
