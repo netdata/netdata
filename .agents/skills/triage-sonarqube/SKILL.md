@@ -49,12 +49,12 @@ The token is used as **HTTP Basic auth username with empty password**:
 No browser tab is required for token-based auth. Tokens can expire or be revoked; verify access when executing.
 
 For a public project, read-only API calls may work anonymously when local credentials are absent; check availability
-each time. The helper scripts require `SONAR_TOKEN`, so call the API directly. Verify complete, PR-scoped results from
-`/api/issues/search?componentKeys=<project>&pullRequest=<pr>&sinceLeakPeriod=true&statuses=OPEN,CONFIRMED` and
-`/api/hotspots/search?projectKey=<project>&pullRequest=<pr>`: request pages with `p` and `ps` (at most 500) until
-`paging.total` is reached. Check `/api/qualitygates/project_status?projectKey=<project>&pullRequest=<pr>` separately.
-An HTTP error is a coverage gap, not an empty result; this fallback does not authorize remote changes or require
-credential setup.
+each time. The helper scripts require `SONAR_TOKEN`, so call the API directly with the queries the PR fetcher uses:
+`/api/issues/search?componentKeys=<project>&pullRequest=<pr>&resolved=false` and
+`/api/hotspots/search?projectKey=<project>&pullRequest=<pr>&status=TO_REVIEW`. Request pages with `p` and `ps` (at
+most 500) until `paging.total` is reached. Check
+`/api/qualitygates/project_status?projectKey=<project>&pullRequest=<pr>` separately. An HTTP error is a coverage gap,
+not an empty result; this fallback does not authorize remote changes or require credential setup.
 
 ## Triage decision matrix
 

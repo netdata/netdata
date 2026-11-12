@@ -86,15 +86,15 @@ the DeviceStore connection from SNMP-family consumers (the accepted registration
 kept) and clears Function state, even if the rebuild cannot finish yet. An unanswered or invalid object ID on a later
 check cannot resume the incompatible profiles.
 
-Normal initialization uses the same publication point: `syncDeviceMetadata` publishes after a profile poll whenever
-the DD collector's prepared-input revision changed. A poll that prepared nothing publishes nothing, so a new job, a
-device suspended by a changed `sysObjectID` (which stays withdrawn) and a rebuilt device all become visible together
-with their profile metadata. Samples only come from profiles whose inputs are prepared, so routing to the vnode exists
-before any sample leaves the collector and optional profile input failures cannot send healthy samples to the local
-Agent. Profile metadata is acquired once, by normal profile preparation, each publication is a single DeviceStore
-update, and metadata recovered after a failed preparation publishes without a system-field change. Diagnostic input
-evidence follows the installed snapshots; a rebuild starts a new current diagnostic view, preserving sources for its
-own system and transport preparation.
+Normal initialization uses the same publication point: `syncDeviceMetadata` publishes after a profile poll whenever the
+DD collector's prepared-input revision changed. A poll that prepared nothing publishes nothing, so a new job, a device
+suspended by a changed `sysObjectID` (which stays withdrawn until then) and a rebuilt device that kept its registration
+are each published together with their profile metadata. Samples only come from profiles whose inputs are prepared, so
+routing to the vnode exists before any sample leaves the collector and optional profile input failures cannot send
+healthy samples to the local Agent. Profile metadata is acquired once, by normal profile preparation, each publication
+is a single DeviceStore update, and metadata recovered after a failed preparation publishes without a system-field
+change. Diagnostic input evidence follows the installed snapshots; a rebuild starts a new current diagnostic view,
+preserving sources for its own system and transport preparation.
 
 A replacement that changes none of the five scalars is not detected.
 
