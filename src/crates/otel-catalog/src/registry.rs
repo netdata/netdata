@@ -1,6 +1,6 @@
 //! The registry of locally-present catalog files.
 //!
-//! A catalog file is a snapshot (it never loses an entry) the catalog builder rotates once
+//! A catalog file is an immutable snapshot the catalog builder rotates once
 //! per `(tenant, date, machine, instance)` scope (file-lifecycle
 //! `catalog_builder.rs`). One [`Registry`] per tenant tracks the files of
 //! one signal's catalog dir; it is the third registry of file-lifecycle's
@@ -145,8 +145,7 @@ pub struct Registry {
     tenant_id: TenantId,
     /// Keyed by on-disk path. The path encodes the file's full
     /// `(date, machine, instance, max_seq, min_ts, max_ts)` identity, and
-    /// a catalog file never loses an entry — a file's tracked key never
-    /// changes.
+    /// catalog files are immutable — a file's tracked key never changes.
     files: BTreeMap<PathBuf, File>,
 }
 
