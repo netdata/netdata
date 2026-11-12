@@ -18,14 +18,6 @@ use crate::event::PipelineResp;
 
 use super::Ledger;
 
-/// Budget for the clean-shutdown catalog flush: the LOCAL rotations must
-/// finish inside it; the follow-up uploads are best effort (next boot's
-/// `recovery::remote::reconcile_local_catalog_uploads` re-uploads whatever
-/// didn't land). Kept BELOW the supervisor's 2s worker-exit wait
-/// (`supervisor.rs` `shutdown_workers`) so the flush can finish and the
-/// process exit before the supervisor stops waiting.
-const SHUTDOWN_FLUSH_BUDGET: std::time::Duration = std::time::Duration::from_secs(1);
-
 impl Ledger {
     pub(super) async fn handle_catalog_builder_resp(
         &mut self,
@@ -140,9 +132,13 @@ impl Ledger {
     /// drains the merged worker channel until every builder reports
     /// `FlushComplete` or the budget expires.
     ///
-    /// Only the LOCAL writes are guaranteed: each `Rotated` handled here still
-    /// registers the file and queues an upload (best effort; next boot's
-    /// `reconcile_local_catalog_uploads` finishes the misses). The drain also
+    /// The budget is the worker's stop budget (`otel_bridge::shutdown`).
+    /// Only the LOCAL writes matter here: each `Rotated` handled here still
+    /// registers the file and queues an upload, but the ledger leaves right
+    /// after the flush and does not wait for uploads: against a real remote
+    /// they do not finish. The next start's
+    /// `recovery::remote::reconcile_local_catalog_uploads` uploads every
+    /// local catalog that the remote does not have. The drain also
     /// services `Indexer` responses (a late indexing operation still
     /// registers its SFST and queues its WAL delete) and counts a
     /// `WorkerGone` builder as done — unlike the run loop, where worker death
@@ -197,14 +193,12 @@ impl Ledger {
             }
         };
 
-        if tokio::time::timeout(SHUTDOWN_FLUSH_BUDGET, drain)
-            .await
-            .is_err()
-        {
+        let budget = otel_bridge::shutdown::WORKER_STOP_BUDGET;
+        if tokio::time::timeout(budget, drain).await.is_err() {
             tracing::warn!(
                 "shutdown catalog flush exceeded {}s budget; {pending} builder(s) unconfirmed \
                  (next-boot reconcile re-uploads any missing catalogs)",
-                SHUTDOWN_FLUSH_BUDGET.as_secs(),
+                budget.as_secs(),
             );
         }
     }

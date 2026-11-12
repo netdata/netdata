@@ -54,8 +54,8 @@ const WORKER_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Bound on reaping the legacy-logs child after it reports `Disabled`. The
 /// worker exits right after sending it, so this only fires if the worker
-/// wedges mid-exit; distinct from the shutdown budget in `shutdown_workers`,
-/// which is sized to the agent's 3s SIGTERM→SIGKILL grace.
+/// wedges mid-exit; distinct from the wait of `shutdown_workers`
+/// (`otel_bridge::shutdown`): this one is at start-up, not at a stop.
 const LEGACY_REAP_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// How often the supervisor writes `PLUGIN_KEEPALIVE` to the agent. The
@@ -428,11 +428,9 @@ impl Supervisor {
             }
         }
 
-        // The agent SIGTERMs the plugin right after QUIT and SIGKILLs it if it
-        // has not exited within 3 seconds (`spawn_popen_kill`'s grace). Budget
-        // 2s here so the supervisor finishes its own cleanup before the SIGKILL.
-        let timeout = std::time::Duration::from_secs(2);
-        let _ = tokio::time::timeout(timeout, async {
+        // The wait ends inside the time that the agent gives the plugin to
+        // leave by itself (`otel_bridge::shutdown`).
+        let _ = tokio::time::timeout(otel_bridge::shutdown::WORKERS_EXIT_WAIT, async {
             let (r1, r2, r3) = tokio::join!(
                 self.ingestor_child.child.wait(),
                 self.ledger_child.child.wait(),

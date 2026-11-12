@@ -95,7 +95,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     // Log the error while `ledger` is still in scope: returning drops its
     // supervisor connection. The supervisor treats a worker disconnect as
     // fatal (`Supervisor::run` in `otel-plugin/src/supervisor.rs`) and tears
-    // the whole plugin down — graceful `Shutdown` + ≤2s exit wait
+    // the whole plugin down — graceful `Shutdown` + a bounded exit wait
     // (`shutdown_workers`), ChildGuard SIGKILL only as last resort — so an
     // error logged after the drop (e.g. in `main`) races that teardown and
     // may never be recorded.
@@ -104,8 +104,9 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         tracing::error!("ledger event loop error: {e:#}");
     }
     // Signal shutdown to the cancellation-driven tasks on BOTH exit
-    // paths — an error exit would otherwise leave them to the runtime
-    // teardown, never the graceful drain.
+    // paths. They get no time after it: the caller drops the runtime, and
+    // work that a component still has in flight (an upload) is cut. The
+    // next start recovers it.
     ledger.cancel.cancel();
     result.context("ledger event loop error")?;
 

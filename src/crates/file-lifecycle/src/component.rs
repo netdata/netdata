@@ -30,8 +30,8 @@
 //!   site, cancelled after the run loop exits — `otel-ledger/src/lib.rs`).
 //!   Cancellation is cooperative: the loop exits on its next `select!` arm
 //!   and never preempts in-flight work; what happens to unfinished work at
-//!   cancel is the component's own policy (the uploader drains in-flight
-//!   uploads briefly — see its module docs).
+//!   cancel is the component's own policy (the uploader's uploads in flight
+//!   are cut — see its module docs).
 //! - Handle/request pairing: `send` never blocks (unbounded channels). Any
 //!   backpressure — the indexer queueing requests at its concurrency limit,
 //!   the uploader's semaphore bounding uploads in flight — is the

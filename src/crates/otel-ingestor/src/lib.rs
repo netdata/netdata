@@ -452,8 +452,7 @@ async fn run_ingestor(
     logs_sweep_handle.abort();
     traces_sweep_handle.abort();
     if let Some(map) = service_map {
-        // Within the supervisor's 2 s shutdown window, which the ledger shares.
-        if tokio::time::timeout(SERVICE_MAP_SHUTDOWN_BUDGET, map.shutdown())
+        if tokio::time::timeout(otel_bridge::shutdown::WORKER_STOP_BUDGET, map.shutdown())
             .await
             .is_err()
         {
@@ -462,8 +461,6 @@ async fn run_ingestor(
     }
     Ok(())
 }
-
-const SERVICE_MAP_SHUTDOWN_BUDGET: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// Starts the service map under `{base_dir}/service-map`, or logs why it
 /// cannot and returns `None`.

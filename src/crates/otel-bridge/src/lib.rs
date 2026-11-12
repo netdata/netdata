@@ -46,6 +46,7 @@
 pub mod config;
 pub mod driver;
 pub mod function;
+pub mod shutdown;
 pub mod signals;
 
 use netdata_plugin_types::{FunctionDeclaration, FunctionResult};
