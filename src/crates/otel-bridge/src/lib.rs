@@ -53,8 +53,9 @@
 //!    forwards those declarations to the agent, and a declared function
 //!    outlives the plugin as a restartable collector, so declaring before
 //!    startup is complete would restart-loop a plugin that cannot serve. The
-//!    supervisor additionally holds the ingestor's and ledger's declarations
-//!    until both handshakes have succeeded.
+//!    supervisor holds every worker's declarations until the last handshake
+//!    is over: the agent calls only what was declared, so until then the
+//!    one message it can send is `QUIT`.
 //!    The legacy-logs worker may instead send `Disabled` — nothing to serve
 //!    or init failed — and exits immediately after.
 //!    Before its `Ready` a worker sends nothing else: the supervisor takes
@@ -126,8 +127,9 @@ pub enum IngestorRequest {
 pub enum IngestorResponse {
     /// Startup fully succeeded; the declarations are what the supervisor may
     /// advertise to the agent. Sent once, as the reply to `Configure` — the
-    /// supervisor accepts no other message in between. The ingestor's `Ready`
-    /// also gates when the ledger's declarations are advertised.
+    /// supervisor accepts no other message in between. The supervisor
+    /// advertises them only once every handshake is over (see the module
+    /// docs).
     Ready {
         declarations: Vec<FunctionDeclaration>,
     },
@@ -185,8 +187,8 @@ pub enum LedgerResponse {
     /// Startup fully succeeded; the declarations are what the supervisor may
     /// advertise to the agent. Sent once, as the reply to `Configure` — the
     /// supervisor accepts no other message in between. The supervisor
-    /// registers them only once the ingestor's handshake has also succeeded
-    /// (see the module docs).
+    /// advertises them only once every handshake is over (see the module
+    /// docs).
     Ready {
         declarations: Vec<FunctionDeclaration>,
     },
@@ -242,7 +244,9 @@ pub enum LegacyLogsRequest {
 pub enum LegacyLogsResponse {
     /// Startup fully succeeded; the declarations are what the supervisor may
     /// advertise to the agent. Sent once, as the reply to `Configure` — the
-    /// supervisor accepts no other message in between.
+    /// supervisor accepts no other message in between. The supervisor
+    /// advertises them only once every handshake is over (see the module
+    /// docs).
     Ready {
         declarations: Vec<FunctionDeclaration>,
     },

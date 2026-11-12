@@ -211,14 +211,15 @@ struct Supervisor {
 
 impl Supervisor {
     /// Record a worker's function declarations in the routing table and forward
-    /// each one to the agent. The ledger's and ingestor's declarations are held
-    /// by the startup sequence in [`run`] until BOTH handshakes succeeded,
-    /// because the ingestor's Ready means "the gRPC endpoint is bound and
+    /// each one to the agent. The startup sequence in [`run`] holds every
+    /// worker's declarations until the last handshake is over, for two
+    /// reasons. The ingestor's Ready means "the gRPC endpoint is bound and
     /// startup completed": a Function the agent has seen outlives the plugin as
     /// a restartable collector, so a plugin that declared and then died on a
     /// bind error would leave the agent holding declarations for a collector
-    /// it keeps restarting. Legacy-logs registers as soon as it is ready; it
-    /// is configured after the ingestor and is best-effort anyway.
+    /// it keeps restarting. And the agent calls only what was declared: while
+    /// nothing is, the one message it can send is `QUIT`, so no call waits
+    /// unread in the pipe for the event loop to start.
     async fn register_declarations(
         &mut self,
         worker: Worker,
@@ -247,11 +248,11 @@ impl Supervisor {
     }
 
     /// Send Configure to the ingestor and return the functions it reports
-    /// (`topology:tracing` when its service map started; its Ready also gates
-    /// the ledger's declarations, see `register_declarations`). The ingestor sends Ready
-    /// only once its gRPC endpoint is bound and every startup step succeeded,
-    /// so a failure here (typically the port already in use) surfaces before
-    /// anything has been declared to the agent.
+    /// (`topology:tracing` when its service map started; the caller
+    /// registers them after the last handshake, see `register_declarations`).
+    /// The ingestor sends Ready only once its gRPC endpoint is bound and every
+    /// startup step succeeded, so a failure here (typically the port already
+    /// in use) surfaces before anything has been declared to the agent.
     async fn configure_ingestor(
         &mut self,
         config: PluginConfig,
@@ -273,8 +274,8 @@ impl Supervisor {
     }
 
     /// Send Configure to the ledger and return the functions it reports. The
-    /// caller registers them only after the ingestor handshake also succeeded
-    /// (see `register_declarations`).
+    /// caller registers them after the last handshake (see
+    /// `register_declarations`).
     async fn configure_ledger(
         &mut self,
         config: PluginConfig,
@@ -295,10 +296,14 @@ impl Supervisor {
         }
     }
 
-    /// Send Configure to the legacy-logs worker and register the functions it
+    /// Send Configure to the legacy-logs worker and return the functions it
     /// reports. A `Disabled` response is handled here (`disable_legacy` +
-    /// `reap_legacy`) and does not propagate as an error.
-    async fn configure_legacy(&mut self, config: LegacyLogsConfig) -> anyhow::Result<()> {
+    /// `reap_legacy`): it reports no functions and does not propagate as an
+    /// error.
+    async fn configure_legacy(
+        &mut self,
+        config: LegacyLogsConfig,
+    ) -> anyhow::Result<Vec<FunctionDeclaration>> {
         self.legacy
             .send(LegacyLogsRequest::Configure(config))
             .await
@@ -310,10 +315,7 @@ impl Supervisor {
                 .context("legacy-logs handshake")?;
 
         match response {
-            LegacyLogsResponse::Ready { declarations } => {
-                self.register_declarations(Worker::LegacyLogs, declarations)
-                    .await?;
-            }
+            LegacyLogsResponse::Ready { declarations } => Ok(declarations),
             LegacyLogsResponse::Disabled => {
                 // Nothing to serve (or handler init failed — the worker logged
                 // why). The worker exits right after sending this; reap it here
@@ -321,10 +323,10 @@ impl Supervisor {
                 tracing::info!("legacy-logs reported Disabled; reaping the worker");
                 self.disable_legacy();
                 self.reap_legacy().await;
+                Ok(Vec::new())
             }
             other => bail!("expected Ready or Disabled from legacy-logs, got: {other:?}"),
         }
-        Ok(())
     }
 
     /// Disable the legacy-logs worker: mark it dead and drop its routing +
@@ -948,9 +950,10 @@ pub async fn run() -> anyhow::Result<()> {
     // The ledger is configured first, and the ingestor only after the
     // ledger's `Ready`: the ledger's start-up recovery must find no live
     // writer of WAL files, and the seq high-water file has one writer at a
-    // time (`otel_bridge`, "Handshake protocol"). The ledger's declarations are
-    // forwarded only after the ingestor's handshake also succeeded — bind
-    // before declare (see `register_declarations`). A handshake failure here
+    // time (`otel_bridge`, "Handshake protocol"). No worker's declarations are
+    // forwarded before the last handshake is over — bind before declare, and
+    // nothing to call before the event loop reads (see
+    // `register_declarations`). A handshake failure here
     // returns straight out and ChildGuard SIGKILLs the remaining workers on
     // unwind: the ledger does not read its supervisor connection while it
     // waits in `accept_writer`, so a graceful Shutdown would not reach it
@@ -965,18 +968,27 @@ pub async fn run() -> anyhow::Result<()> {
         .await
         .context("ingestor configuration failed")?;
 
+    // The legacy-logs viewer is best-effort and decoupled from the new pipeline:
+    // a configure failure disables it but MUST NOT take down the new pipeline.
+    let legacy_declarations = match supervisor.configure_legacy(legacy_config).await {
+        Ok(declarations) => declarations,
+        Err(e) => {
+            tracing::error!("legacy-logs configuration failed, disabling it: {e:#}");
+            supervisor.disable_legacy();
+            Vec::new()
+        }
+    };
+
     supervisor
         .register_declarations(Worker::Ledger, ledger_declarations)
         .await?;
     supervisor
         .register_declarations(Worker::Ingestor, ingestor_declarations)
         .await?;
-
-    // The legacy-logs viewer is best-effort and decoupled from the new pipeline:
-    // a configure failure disables it but MUST NOT take down the new pipeline.
-    if let Err(e) = supervisor.configure_legacy(legacy_config).await {
-        tracing::error!("legacy-logs configuration failed, disabling it: {e:#}");
-        supervisor.disable_legacy();
+    if supervisor.legacy_alive {
+        supervisor
+            .register_declarations(Worker::LegacyLogs, legacy_declarations)
+            .await?;
     }
 
     tracing::info!("workers ready, entering main loop");
