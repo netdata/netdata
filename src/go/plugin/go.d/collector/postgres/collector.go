@@ -53,8 +53,8 @@ func New() *Collector {
 		dbConns: make(map[string]*dbConn),
 		mx: &pgMetrics{
 			dbs:       make(map[string]*dbMetrics),
-			indexes:   make(map[string]*indexMetrics),
-			tables:    make(map[string]*tableMetrics),
+			indexes:   make(map[indexKey]*indexMetrics),
+			tables:    make(map[tableKey]*tableMetrics),
 			replApps:  make(map[string]*replStandbyAppMetrics),
 			replSlots: make(map[string]*replSlotMetrics),
 		},

@@ -8,6 +8,8 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +17,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// getTableMetrics and getIndexMetrics place owner-less details directly in the maps.
+func (c *Collector) getTableMetrics(name, db, schema string) *tableMetrics {
+	key := tableKey{db: db, schema: schema, name: name}
+	if c.mx.tables[key] == nil {
+		c.mx.tables[key] = &tableMetrics{db: db, schema: schema, name: name}
+	}
+	return c.mx.tables[key]
+}
+
+func (c *Collector) getIndexMetrics(name, table, db, schema string) *indexMetrics {
+	key := indexKey{db: db, schema: schema, table: table, name: name}
+	if c.mx.indexes[key] == nil {
+		c.mx.indexes[key] = &indexMetrics{db: db, schema: schema, table: table, name: name}
+	}
+	return c.mx.indexes[key]
+}
 
 func activityRows(values ...relationActivity) map[uint32]relationActivity {
 	rows := make(map[uint32]relationActivity, len(values))
@@ -234,7 +253,7 @@ func TestRelationDetailsCommitOnlyCompleteQueries(t *testing.T) {
 	mock.ExpectQuery(queryStatUserTables(false)).WillReturnRows(tableDetails(1, "t1", 99999, 99999).AddRow("db", 2, "public", "t2", "", 1, 1, 100).RowError(1, errors.New("partial")))
 	require.Error(t, c.doDBQueryStatUserTables(db))
 	assert.Len(t, c.mx.tables, 1)
-	assert.Equal(t, int64(100), c.mx.tables["t1_db_public"].nTupUpd.last)
+	assert.Equal(t, int64(100), c.mx.tables[tableKey{db: "db", schema: "public", name: "t1"}].nTupUpd.last)
 	mock.ExpectQuery(queryStatUserTables(false)).WillReturnRows(tableDetails(1, "t1", 120, 30))
 	require.NoError(t, c.doDBQueryStatUserTables(db))
 	mx := make(map[string]int64)
@@ -244,8 +263,8 @@ func TestRelationDetailsCommitOnlyCompleteQueries(t *testing.T) {
 	c.resetMetrics()
 	mock.ExpectQuery(queryStatUserTables(false)).WillReturnRows(tableDetails(2, "t1", 200, 100))
 	require.NoError(t, c.doDBQueryStatUserTables(db))
-	assert.Equal(t, uint32(2), c.mx.tables["t1_db_public"].oid)
-	assert.False(t, c.mx.tables["t1_db_public"].sampled)
+	assert.Equal(t, uint32(2), c.mx.tables[tableKey{db: "db", schema: "public", name: "t1"}].oid)
+	assert.False(t, c.mx.tables[tableKey{db: "db", schema: "public", name: "t1"}].sampled)
 	// A successful empty index query retires indexes; failures leave charts available with a gap.
 	idxRows := func() *sqlmock.Rows {
 		return sqlmock.NewRows([]string{"datname", "indexrelid", "schemaname", "relname", "indexrelname", "idx_scan"}).AddRow("db", 11, "public", "t1", "i1", 10)
@@ -254,7 +273,7 @@ func TestRelationDetailsCommitOnlyCompleteQueries(t *testing.T) {
 	require.NoError(t, c.doDBQueryStatUserIndexes(db))
 	c.collectMetrics(make(map[string]int64))
 	c.resetMetrics()
-	idx := c.mx.indexes["i1_t1_db_public"]
+	idx := c.mx.indexes[indexKey{db: "db", schema: "public", table: "t1", name: "i1"}]
 	mock.ExpectQuery(queryStatUserIndexes(false)).WillReturnError(errors.New("timeout"))
 	require.Error(t, c.doDBQueryStatUserIndexes(db))
 	mx = make(map[string]int64)
@@ -266,6 +285,104 @@ func TestRelationDetailsCommitOnlyCompleteQueries(t *testing.T) {
 	assert.Empty(t, c.mx.indexes)
 	assert.True(t, idx.charts[0].IsRemoved())
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestIndexIdentityAmbiguousNames(t *testing.T) {
+	type index struct {
+		oid         uint32
+		table, name string
+	}
+	tests := map[string]struct {
+		indexes    []index
+		wantCharts []string
+	}{
+		"index and table names concatenate alike": {
+			indexes: []index{{11, "order_items", "pk"}, {12, "items", "pk_order"}},
+			wantCharts: []string{
+				"index_pk_order_table_items_db_db_schema_public_size",
+				"index_pk_table_order_items_db_db_schema_public_size",
+			},
+		},
+		"whitespace and underscore share one chart identity": {
+			indexes:    []index{{21, "t", "a b"}, {22, "t", "a_b"}},
+			wantCharts: []string{"index_a_b_table_t_db_db_schema_public_size"},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			require.NoError(t, c.Init(context.Background()))
+			db, mock := newRelationsMock(t)
+			c.db, c.MaxDBIndexes = db, 0
+			for cycle := range 3 {
+				rows := sqlmock.NewRows([]string{"datname", "indexrelid", "schemaname", "relname", "indexrelname", "size"})
+				// The query has no ORDER BY; alternate the row order between cycles.
+				for i := range test.indexes {
+					idx := test.indexes[i]
+					if cycle%2 == 1 {
+						idx = test.indexes[len(test.indexes)-1-i]
+					}
+					rows.AddRow("db", idx.oid, "public", idx.table, idx.name, 100)
+				}
+				c.resetMetrics()
+				mock.ExpectQuery(queryStatUserIndexes(false)).WillReturnRows(rows)
+				require.NoError(t, c.doDBQueryStatUserIndexes(db))
+				mx := make(map[string]int64)
+				c.collectMetrics(mx)
+				var live []string
+				for _, chart := range *c.Charts() {
+					assert.False(t, chart.IsRemoved(), "cycle %d: chart %s removed", cycle, chart.ID)
+					if strings.HasPrefix(chart.ID, "index_") && strings.HasSuffix(chart.ID, "_size") && !chart.IsRemoved() {
+						live = append(live, chart.ID)
+					}
+				}
+				slices.Sort(live)
+				assert.Equal(t, test.wantCharts, live, "cycle %d", cycle)
+				for _, id := range test.wantCharts {
+					assert.Contains(t, mx, id, "cycle %d", cycle)
+				}
+			}
+			assert.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestTableIdentityAcrossDatabases(t *testing.T) {
+	c := New()
+	require.NoError(t, c.Init(context.Background()))
+	primary, pm := newRelationsMock(t)
+	secondary, sm := newRelationsMock(t)
+	c.db = primary
+	c.dbConns["app_x"] = &dbConn{db: secondary}
+	c.MaxDBTables = 0
+	rows := func(db, schema string, updates, hot int64) *sqlmock.Rows {
+		return sqlmock.NewRows([]string{"datname", "relid", "schemaname", "relname", "parent_relname", "n_tup_upd", "n_tup_hot_upd", "total_relation_size"}).
+			AddRow(db, 1, schema, "t", "", updates, hot, 1)
+	}
+	// "t" in app/x_s and "t" in app_x/s have distinct chart IDs.
+	ids := []string{"table_t_db_app_schema_x_s_", "table_t_db_app_x_schema_s_"}
+	for cycle := range 3 {
+		c.resetMetrics()
+		n := int64(cycle)
+		pm.ExpectQuery(queryStatUserTables(false)).WillReturnRows(rows("app", "x_s", 100+10*n, 5*n))
+		pm.ExpectQuery(queryStatIOUserTables(false)).WillReturnRows(sqlmock.NewRows([]string{"datname"}))
+		sm.ExpectQuery(queryStatUserTables(false)).WillReturnRows(rows("app_x", "s", 100+10*n, 5*n))
+		sm.ExpectQuery(queryStatIOUserTables(false)).WillReturnRows(sqlmock.NewRows([]string{"datname"}))
+		require.NoError(t, c.doQueryTablesMetrics())
+		mx := make(map[string]int64)
+		c.collectMetrics(mx)
+		for _, chart := range *c.Charts() {
+			assert.False(t, chart.IsRemoved(), "cycle %d: chart %s removed", cycle, chart.ID)
+		}
+		for _, px := range ids {
+			assert.Contains(t, mx, px+"n_tup_upd", "cycle %d", cycle)
+			if cycle > 0 {
+				assert.Equal(t, int64(50), mx[px+"n_tup_hot_upd_perc"], "cycle %d", cycle)
+			}
+		}
+	}
+	assert.NoError(t, pm.ExpectationsWereMet())
+	assert.NoError(t, sm.ExpectationsWereMet())
 }
 
 func TestSlowRelationMetricsDatabaseOwnership(t *testing.T) {

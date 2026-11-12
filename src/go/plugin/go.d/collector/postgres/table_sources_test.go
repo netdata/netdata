@@ -51,7 +51,7 @@ func TestTableSourcesIndependent(t *testing.T) {
 			px := "table_t1_db_db_schema_public_"
 			mx := collect(tableDetails(1, "t1", 100, 20), tableIO(1, "t1", 100, 200))
 			assert.Equal(t, int64(100), mx[px+"heap_blks_read"])
-			m := c.mx.tables["t1_db_public"]
+			m := c.mx.tables[tableKey{db: "db", schema: "public", name: "t1"}]
 			chart := c.Charts().Get("table_t1_db_db_schema_public_io_rate")
 			require.NotNil(t, chart)
 			mx = collect(nil, tableIO(1, "t1", 110, 240))
@@ -60,8 +60,8 @@ func TestTableSourcesIndependent(t *testing.T) {
 			assert.NotContains(t, mx, px+"n_tup_upd")
 			assert.NotContains(t, mx, px+"total_size")
 			assert.False(t, chart.IsRemoved())
-			assert.True(t, c.mx.tables["t1_db_public"].hasCharts)
-			assert.Equal(t, len(m.charts), len(c.mx.tables["t1_db_public"].charts))
+			assert.True(t, c.mx.tables[tableKey{db: "db", schema: "public", name: "t1"}].hasCharts)
+			assert.Equal(t, len(m.charts), len(c.mx.tables[tableKey{db: "db", schema: "public", name: "t1"}].charts))
 			mx = collect(tableDetails(1, "t1", 120, 30), tableIO(1, "t1", 120, 280))
 			assert.Equal(t, int64(20), mx[px+"heap_blks_read_perc"])
 			assert.NotContains(t, mx, px+"n_tup_hot_upd_perc")
@@ -69,7 +69,7 @@ func TestTableSourcesIndependent(t *testing.T) {
 			mx = collect(tableDetails(1, "t1", 130, 35), partial)
 			assert.Equal(t, int64(130), mx[px+"n_tup_upd"])
 			assert.NotContains(t, mx, px+"heap_blks_read")
-			assert.Equal(t, int64(120), c.mx.tables["t1_db_public"].heapBlksRead.last)
+			assert.Equal(t, int64(120), c.mx.tables[tableKey{db: "db", schema: "public", name: "t1"}].heapBlksRead.last)
 			mx = collect(nil, tableIO(1, "t1", 140, 360))
 			assert.Equal(t, int64(140), mx[px+"heap_blks_read"])
 			assert.NotContains(t, mx, px+"heap_blks_read_perc")
@@ -115,7 +115,7 @@ func TestTableIOInitialObservationAndIdentity(t *testing.T) {
 	mx = collect(tableDetails(1, "t1", 110, 25), 2, "t1")
 	assert.Equal(t, int64(110), mx[px+"n_tup_upd"])
 	assert.NotContains(t, mx, px+"heap_blks_read")
-	assert.Equal(t, uint32(1), c.mx.tables["t1_db_public"].oid)
+	assert.Equal(t, uint32(1), c.mx.tables[tableKey{db: "db", schema: "public", name: "t1"}].oid)
 	// The same applies to rename between the queries, even though the OID stays the same.
 	mx = collect(tableDetails(1, "t1", 120, 30), 1, "renamed")
 	assert.NotContains(t, mx, "table_renamed_db_db_schema_public_heap_blks_read")
@@ -125,11 +125,11 @@ func TestTableIOInitialObservationAndIdentity(t *testing.T) {
 	assert.Equal(t, int64(100), mx["table_renamed_db_db_schema_public_heap_blks_read"])
 	assert.NotContains(t, c.mx.tables, "t1_db_public")
 	assert.True(t, ioChart.IsRemoved())
-	old := c.mx.tables["renamed_db_public"]
+	old := c.mx.tables[tableKey{db: "db", schema: "public", name: "renamed"}]
 	mx = collect(nil, 2, "renamed")
 	assert.Equal(t, int64(100), mx["table_renamed_db_db_schema_public_heap_blks_read"])
 	assert.NotContains(t, mx, "table_renamed_db_db_schema_public_heap_blks_read_perc")
-	assert.Equal(t, uint32(2), c.mx.tables["renamed_db_public"].oid)
+	assert.Equal(t, uint32(2), c.mx.tables[tableKey{db: "db", schema: "public", name: "renamed"}].oid)
 	assert.True(t, old.charts[0].IsRemoved())
 	assert.NoError(t, mock.ExpectationsWereMet())
 }

@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"database/sql"
+
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
@@ -11,8 +12,8 @@ import (
 type pgMetrics struct {
 	srvMetrics
 	dbs       map[string]*dbMetrics
-	tables    map[string]*tableMetrics
-	indexes   map[string]*indexMetrics
+	tables    map[tableKey]*tableMetrics
+	indexes   map[indexKey]*indexMetrics
 	replApps  map[string]*replStandbyAppMetrics
 	replSlots map[string]*replSlotMetrics
 }
@@ -240,6 +241,19 @@ type indexMetrics struct {
 	bloatSize     *int64 // need 'SELECT' access to the table
 	bloatSizePerc *int64 // need 'SELECT' access to the table
 }
+
+// Map keys hold the chart identity fields separately; joined strings are ambiguous
+// ("pk"+"order_items" vs "pk_order"+"items").
+type tableKey struct{ db, schema, name string }
+
+type indexKey struct{ db, schema, table, name string }
+
+func (m *tableMetrics) key() tableKey { return tableKey{db: m.db, schema: m.schema, name: m.name} }
+
+func (m *indexMetrics) key() indexKey {
+	return indexKey{db: m.db, schema: m.schema, table: m.table, name: m.name}
+}
+
 type incDelta struct{ prev, last int64 }
 
 func (pc *incDelta) delta() int64 { return pc.last - pc.prev }

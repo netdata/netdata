@@ -87,17 +87,16 @@ func (c *Collector) doDBQueryBloat(db *sql.DB) error {
 		}
 	}
 	for _, row := range results {
-		if c.hasTableMetrics(row.table, row.database, row.schema) {
-			v := c.getTableMetrics(row.table, row.database, row.schema)
-			if v.owner == db && v.updated {
-				v.bloatSize, v.bloatSizePerc = new(row.tableWasted), new(calcPercentage(row.tableWasted, v.totalSize))
-			}
+		if v := c.mx.tables[tableKey{db: row.database, schema: row.schema, name: row.table}]; v != nil && v.owner == db && v.updated {
+			v.bloatSize, v.bloatSizePerc = new(row.tableWasted), new(calcPercentage(row.tableWasted, v.totalSize))
 		}
-		if row.index != "?" && c.hasIndexMetrics(row.index, row.table, row.database, row.schema) {
-			v := c.getIndexMetrics(row.index, row.table, row.database, row.schema)
-			if v.owner == db && v.updated {
-				v.bloatSize, v.bloatSizePerc = new(row.indexWasted), new(calcPercentage(row.indexWasted, v.size))
-			}
+		if row.index == "?" {
+			continue
+		}
+		// Index metrics are keyed by the chart-safe name, as in the statistics query.
+		key := indexKey{db: row.database, schema: row.schema, table: row.table, name: removeSpaces(row.index)}
+		if v := c.mx.indexes[key]; v != nil && v.owner == db && v.updated {
+			v.bloatSize, v.bloatSizePerc = new(row.indexWasted), new(calcPercentage(row.indexWasted, v.size))
 		}
 	}
 	return nil

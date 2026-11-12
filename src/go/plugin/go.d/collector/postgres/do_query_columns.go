@@ -19,7 +19,7 @@ func (c *Collector) doDBQueryColumns(db *sql.DB) error {
 		args = []any{ids}
 	}
 	q := queryColumnsStats(filtered)
-	counts := make(map[string]int64)
+	counts := make(map[tableKey]int64)
 
 	var dbname, schema, table string
 	var nullPerc int64
@@ -38,7 +38,7 @@ func (c *Collector) doDBQueryColumns(db *sql.DB) error {
 			return
 		}
 		if nullPerc == 100 {
-			counts[table+"_"+dbname+"_"+schema]++
+			counts[tableKey{db: dbname, schema: schema, name: table}]++
 		}
 	}, args...)
 	if err != nil {

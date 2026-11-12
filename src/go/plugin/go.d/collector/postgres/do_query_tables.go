@@ -55,7 +55,7 @@ func (c *Collector) doDBQueryStatUserTables(db *sql.DB) error {
 		case "relname":
 			name = value
 			m = newTableMetrics(db, oid, name, dbname, schema)
-			if old, ok := c.mx.tables[name+"_"+dbname+"_"+schema]; ok && old.owner == db && old.oid == oid {
+			if old, ok := c.mx.tables[m.key()]; ok && old.owner == db && old.oid == oid {
 				*m = *old
 			}
 			m.updated = true
@@ -112,9 +112,9 @@ func (c *Collector) doDBQueryStatUserTables(db *sql.DB) error {
 		}
 		return err
 	}
-	seen := make(map[string]bool, len(staged))
+	seen := make(map[tableKey]bool, len(staged))
 	for _, m := range staged {
-		key := m.name + "_" + m.db + "_" + m.schema
+		key := m.key()
 		if old := c.mx.tables[key]; old != nil && (old.owner != db || old.oid != m.oid) {
 			c.removeTableCharts(old)
 		}
@@ -161,7 +161,7 @@ func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB, statsComplete bool) er
 		case "relname":
 			name = value
 			m = newTableMetrics(db, oid, name, dbname, schema)
-			old := c.mx.tables[name+"_"+dbname+"_"+schema]
+			old := c.mx.tables[m.key()]
 			matches := old != nil && old.owner == db && old.oid == oid
 			// A successful stats observation owns this cycle's identity. Otherwise
 			// this complete I/O observation can establish an identity independently.
@@ -202,7 +202,7 @@ func (c *Collector) doDBQueryStatIOUserTables(db *sql.DB, statsComplete bool) er
 		return err
 	}
 	for _, m := range staged {
-		key := m.name + "_" + m.db + "_" + m.schema
+		key := m.key()
 		if old := c.mx.tables[key]; old != nil && (old.owner != db || old.oid != m.oid) {
 			c.removeTableCharts(old)
 		}

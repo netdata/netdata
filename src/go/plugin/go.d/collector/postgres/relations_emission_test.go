@@ -100,7 +100,7 @@ func TestRelationSelectionJobEmission(t *testing.T) {
 			assert.False(t, chart.IsRemoved())
 		}
 	}
-	assert.Equal(t, len(c.mx.tables["t_db_public"].charts), active)
+	assert.Equal(t, len(c.mx.tables[tableKey{db: "db", schema: "public", name: "t"}].charts), active)
 	// Optionally replay these exact runtime frames through a real Agent in an isolated environment.
 	if dir := os.Getenv("NETDATA_POSTGRES_PROTOCOL_DIR"); dir != "" {
 		require.NoError(t, os.MkdirAll(dir, 0700))
@@ -112,9 +112,9 @@ func TestRelationSelectionJobEmission(t *testing.T) {
 
 func TestTableSourcesJobEmission(t *testing.T) {
 	c := &relationEmissionCollector{Collector: New()}
-	c.mx.tables["t_db_public"] = newTableMetrics(nil, 1, "t", "db", "public")
+	c.mx.tables[tableKey{db: "db", schema: "public", name: "t"}] = newTableMetrics(nil, 1, "t", "db", "public")
 	c.collect = func(step int) {
-		m := c.mx.tables["t_db_public"]
+		m := c.mx.tables[tableKey{db: "db", schema: "public", name: "t"}]
 		m.ioUpdated = true
 		m.heapBlksRead.last = int64(100 + 10*step)
 		m.heapBlksHit.last = int64(200 + 40*step)

@@ -47,7 +47,7 @@ func (c *Collector) doDBQueryStatUserIndexes(db *sql.DB) error {
 		case "indexrelname":
 			name = removeSpaces(value)
 			m = &indexMetrics{owner: db, oid: oid, db: dbname, schema: schema, name: name, table: table}
-			if old, ok := c.mx.indexes[name+"_"+table+"_"+dbname+"_"+schema]; ok && old.owner == db && old.oid == oid {
+			if old, ok := c.mx.indexes[m.key()]; ok && old.owner == db && old.oid == oid {
 				*m = *old
 			}
 			m.updated = true
@@ -67,20 +67,23 @@ func (c *Collector) doDBQueryStatUserIndexes(db *sql.DB) error {
 		}
 	}, args...)
 	if err != nil {
-
 		return err
 	}
-	seen := make(map[string]bool, len(staged))
+	// Index names that differ only in whitespace share one chart identity; the lowest OID keeps it.
+	batch := make(map[indexKey]*indexMetrics, len(staged))
 	for _, m := range staged {
-		key := m.name + "_" + m.table + "_" + m.db + "_" + m.schema
+		if prev := batch[m.key()]; prev == nil || m.oid < prev.oid {
+			batch[m.key()] = m
+		}
+	}
+	for key, m := range batch {
 		if old := c.mx.indexes[key]; old != nil && (old.owner != db || old.oid != m.oid) {
 			c.removeIndexCharts(old)
 		}
 		c.mx.indexes[key] = m
-		seen[key] = true
 	}
 	for key, m := range c.mx.indexes {
-		if m.owner == db && !seen[key] {
+		if m.owner == db && batch[key] == nil {
 			c.removeIndexCharts(m)
 			delete(c.mx.indexes, key)
 		}
