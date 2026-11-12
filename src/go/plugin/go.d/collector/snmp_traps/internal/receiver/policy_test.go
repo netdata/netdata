@@ -70,6 +70,7 @@ func TestPolicyValidation(t *testing.T) {
 		"invalid auth proto": {Username: "testuser", EngineID: testEngineIDHex, AuthProto: "whirlpool"},
 		"invalid priv proto": {Username: "testuser", EngineID: testEngineIDHex, AuthProto: "sha", AuthKey: "authsecret", PrivProto: "3des"},
 		"priv without auth":  {Username: "testuser", EngineID: testEngineIDHex, AuthProto: "none", PrivProto: "aes", PrivKey: "privsecret"},
+		"long username":      {Username: strings.Repeat("u", 33), EngineID: testEngineIDHex},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := ValidateUSMUsers([]USMUser{user}, false); err == nil {
@@ -77,6 +78,12 @@ func TestPolicyValidation(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("username of 32 octets", func(t *testing.T) {
+		if err := ValidateUSMUsers([]USMUser{{Username: strings.Repeat("u", 32), EngineID: testEngineIDHex}}, false); err != nil {
+			t.Fatalf("ValidateUSMUsers failed: %v", err)
+		}
+	})
 
 	t.Run("static user requires engine ID", func(t *testing.T) {
 		if err := ValidateUSMUsers([]USMUser{{Username: "testuser"}}, false); err == nil {

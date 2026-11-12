@@ -30,7 +30,9 @@ The job's client is a `gosnmp.Client` (`github.com/netdata/gosnmp`) built from `
 `newSNMPSession` (`snmp_session.go`); the profile acquisition sees it through the `snmputils.Client` interface. Request
 rules the collector relies on:
 
-- Every request takes the collection's context, so a job stop or cycle deadline ends a request in flight.
+- Every request takes its caller's context: `Check`, topology, VLAN contexts, vnode acquisition and snmpsd probes
+  end when theirs does. The V1 job runtime calls `Collect` with `context.TODO()`, so a poll in flight ends by its
+  timeout and retries.
 - An SNMPv3 client discovers the agent's engine ID once and keeps it. A request that fails with an unknown engine ID
   (a replaced device, or a forged discovery answer) makes the client forget that engine, and the next request
   discovers it again; the log line for it is rate-limited.
@@ -38,9 +40,10 @@ rules the collector relies on:
   2147483647 (RFC 3416); 0 or a negative value disables bulk walks.
 - An answer whose error-status is not noError fails the request (`gosnmp.StatusError`). An SNMPv1 GET answered with
   noSuchName drops the OID the error-index names and retries the others.
-- A table walk that an error-status ended keeps the rows before it: they are collected and feed the tables that
-  depend on them, the error is reported (a warning, the SNMP error counter, `packet_error` source evidence), and
-  nothing built from those rows is cached, so the next collection walks the table again.
+- A table walk that an error-status ended keeps the rows before it, none included: they are collected and feed the
+  tables that depend on them. The error is recorded (the SNMP error counter, `packet_error` source evidence and the
+  collection failures; a warning for metric tables) and does not fail a BGP or licensing collection. No structure built
+  from those rows, the table's own or a dependent table's, is cached, so the next collection walks the table again.
 
 ## Profile Selection
 

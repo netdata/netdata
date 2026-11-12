@@ -250,7 +250,8 @@ Two sharp edges:
    and its SNMPv3 engine ID goes into a decode-error entry. A header that does not parse gives neither: the packet
    skips this check and fails the decode. A dynamic-discovery job drops an engine ID of all `0x00` or all `0xff`
    octets here (`unknown_engine_id`): such an ID names no engine and is never learned.
-3. **Home-grown BER pre-validation** before gosnmp ever sees the bytes (`validateBERLimits`): max nesting depth 8,
+3. **Home-grown BER pre-validation** before the decode (`validateBERLimits`; only the header read of check 2 comes
+   first): max nesting depth 8,
    max encoded OID 128 bytes, max OctetString 1024 bytes (relaxed for v3, whose encrypted ScopedPDU is one large
    OctetString), no indefinite lengths, no trailing data. This is the DoS budget for malformed input.
 4. Decode by the job's `gosnmp.Receiver` (panic-guarded), with the SNMPv3 security processing of RFC 3414 section 3.2
@@ -293,23 +294,35 @@ catch-all `0.0.0.0/0` trusted-relay prefix draws a startup warning, because any 
 the job's users, its local engine ID and boots; it decodes, authenticates and decrypts each message, keeps the time
 records of RFC 3414 section 3.2 step 7, learns engines and makes the INFORM Responses and Reports.
 
-- USM users are validated at config time (priv requires auth; keys ≥ 8 chars; engine IDs 5–32 hex bytes).
+- USM users are validated at config time (user names 1–32 octets; priv requires auth; keys ≥ 8 chars; engine IDs
+  5–32 hex bytes).
 - Registration lists (`receiverUsers`): a message is decoded only by the users registered for its user name and
   engine ID, tried in order, and a user with an authentication protocol accepts only authenticated messages. Per user
-  name, an engine gets the users bound to it by `engine_id` first, then the name's other authenticated users; without
-  either, its no-auth users. So an unauthenticated message is decided by the users bound to its engine when there are
-  any, otherwise it is accepted only when every user of the name is no-auth. A configured `engine_id` does not restrict
-  which engines a user's traffic comes from; engine authorization stays with the whitelist or the learned engines. The
-  local engine ID gets its bound users first and every user of the name otherwise, so a user configured with both
-  levels accepts unauthenticated INFORMs; give each security level its own username. A rejected level, an unknown user
-  name and a non-USM message fail the decode (`usm_failures`). Privacy is not required.
-- Trap authorization: a static job registers its users for each engine in `engine_id_whitelist`, so a trap from
-  another engine fails the decode (`unknown_engine_id`). With `dynamic_engine_id_discovery` the receiver learns the
-  engine of an authentic, unreportable trap from a configured user name, at most `dynamic_engine_id_max_pairs` user
-  names over all engines; the authenticated users of the name are learned, and its no-auth users when one of them has
-  no `engine_id` or every user of the name is no-auth. Learning runs in the decode, before the rate limit; the
-  password-to-key derivation is cached per passphrase, so a learning attempt costs a key localization and a digest.
-  The two options are mutually exclusive by validation.
+  name, a registered engine gets the users bound to it by `engine_id` first, then the name's other authenticated users;
+  without either, its no-auth users. So at a registered engine an unauthenticated message is decided by the users
+  bound to it when there are any, otherwise it is accepted only when every user of the name is no-auth; at a learned
+  engine (below) the learned users decide. A configured `engine_id` does not restrict which engines a user's traffic
+  comes from; engine authorization stays with the whitelist or the learned engines. The local engine ID gets its bound
+  users first and every user of the name otherwise, so a user configured with both levels accepts unauthenticated
+  INFORMs; give each security level its own username. A rejected level, a non-USM message and an unknown user name at
+  an engine the job has users for fail the decode (`usm_failures`); a message naming an engine the job has no users
+  for is `unknown_engine_id`, whatever its user name. Privacy is not required.
+- Trap authorization: a static job registers every user name for each engine in `engine_id_whitelist`, so a trap from
+  another engine fails the decode (`unknown_engine_id`). A dynamic job (`dynamic_engine_id_discovery`) registers, for
+  each configured `engine_id`, the names with users bound to it, and learns the engine of an unreportable trap from
+  any other (engine, user name) pair that one of the name's learn users accepts, at most `dynamic_engine_id_max_pairs`
+  pairs over all engines. The learn users of a name are its authenticated users, which verify the message, and its
+  no-auth users when one of them has no `engine_id` or every user of the name is no-auth, which accept an
+  unauthenticated one. A learned engine is reported once (`unknown_engine_id` and a log line), also when the
+  collector's own checks then reject the message that taught it. Past the cap, a trap from an engine with no users is
+  `unknown_engine_id`, and one of a new name at an engine with users `usm_failures`. Learning runs in the decode,
+  before the rate limit; the password-to-key derivation is cached per passphrase, so a learning attempt costs a key
+  localization and a digest. The two options are mutually exclusive by validation.
+- Trap freshness (RFC 3414 section 3.2 step 7 b): the receiver keeps, per sender engine, the boots and time of its
+  latest authenticated message. An authenticated trap with fewer boots, or more than 150 seconds behind that record
+  (a replay included), fails `usm_failures`. The records last for the job's life, so devices that share an engine ID
+  and credentials (cloned hosts) or that do not raise their boots at a restart lose traps this way until the job
+  restarts; each device needs its own engine ID.
 - INFORM authorization is different by RFC 3414: the receiver is authoritative, so the message's engine ID must equal
   the job's **local engine ID** (another engine ID fails the decode, `unknown_engine_id`), and an authenticated INFORM
   must carry the local engine's boots and a time within 150 seconds of its own (RFC 3414 section 3.2 step 7 a): a stale
@@ -318,7 +331,9 @@ records of RFC 3414 section 3.2 step 7, learns engines and makes the INFORM Resp
 - Reports: the receiver answers a discovery probe (a reportable message naming no engine), a reportable message naming
   an engine it has no users for (usmStatsUnknownEngineIDs) and an authenticated message to the local engine outside
   its time window. No Report answers an unknown user name, a level, a wrong digest or a decryption error. A Report
-  can be about 2.4 times the size of the probe it answers, which is why it waits for a rate-limit token.
+  can be about 2.4 times the size of the probe it answers, which is why it waits for a rate-limit token. That bounds
+  Reports only with the rate limit enabled in `drop` mode: with `rate_limit.enabled: false` (the default) or in
+  `sample` mode, every reportable SNMPv3 message gets its Report, also from a forged source.
 - Engine state persists per job in `<lib-dir>/snmp-trap/<job>/`: `engine-boots` (incremented on every
   construction — constructing the counter speculatively burns a boot count) and `local-engine-id` (configured value
   wins; a corrupt persisted file is a **hard startup error**, never silently regenerated, because peers cache it).

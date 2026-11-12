@@ -212,13 +212,13 @@ modules:
 
             - name: dynamic_engine_id_discovery
               group: SNMPv3
-              description: When enabled, the listener discovers v3 Trap sender engine IDs at runtime and hot-registers new (engineID, username) pairs after the retry authenticates and decodes a v3 Trap. Static `engine_id_whitelist` must be empty.
+              description: When enabled, the listener learns v3 Trap sender engine IDs at runtime, one (engineID, username) pair at a time, from the first unreportable v3 Trap a configured user of that name accepts. Static `engine_id_whitelist` must be empty.
               default_value: false
               required: false
 
             - name: dynamic_engine_id_max_pairs
               group: SNMPv3
-              description: Maximum in-memory dynamic (engineID, username) pairs per job. 0 or unset uses the default of 4096.
+              description: Maximum in-memory dynamic (engineID, username) pairs per job. 0 or unset uses the default of 4096. Past it, a trap from an unlearned engine counts as `unknown_engine_id`, and one of a new user name at a learned engine as `usm_failures`.
               default_value: 4096
               required: false
 
@@ -386,8 +386,8 @@ modules:
             - name: Dynamic engine ID discovery
               description: |
                 For environments where v3 sender engine IDs are not known in advance.
-                The listener discovers them at runtime from raw SNMPv3 context and hot-registers
-                new (engineID, username) pairs after the first successful authentication and decode.
+                The listener learns them at runtime, one (engineID, username) pair at a time,
+                from the first v3 Trap that a configured user of that name accepts.
                 The USM user omits `engine_id`; the whitelist must be empty.
               config: |
                 jobs:
@@ -570,7 +570,7 @@ modules:
                 - name: auth_failures
                   description: SNMPv3 messages whose digest does not verify or that do not decrypt with the configured user keys
                 - name: usm_failures
-                  description: SNMPv3 messages no configured USM user accepts (unknown user name, a security level the user rejects, a non-USM security model), and authenticated INFORMs outside the local engine time window
+                  description: SNMPv3 messages no configured USM user accepts (an unknown user name at an engine the job has users for, a security level the user rejects, a non-USM security model), and authenticated messages outside their time window (INFORMs the local engine's, traps their sender engine's)
                 - name: unknown_engine_id
                   description: SNMPv3 messages naming an engine ID the job has no users for (engine ID discovery requests included), INFORMs naming another engine ID than the local one, and engine IDs learned by dynamic discovery
                 - name: inform_response_failed
@@ -643,6 +643,11 @@ modules:
               After a job restart, each sender's first authenticated INFORM counts once in `usm_failures`:
               the job's engine boots rise at every start, the INFORM falls outside the time window, and the
               sender resynchronizes from the Report it gets.
+
+              Authenticated traps are checked against their sender engine's latest message: a trap with fewer
+              engine boots, or more than 150 seconds behind it (a replay included), counts in `usm_failures`.
+              Devices that share an engine ID and credentials (cloned hosts), or that do not raise their engine
+              boots at a restart, lose traps this way until the job restarts; give each device its own engine ID.
           - name: journal retention eating disk space
             description: |
               The default direct journal retention uses size-based eviction (`max_size: 10GB`) with no time-based age limit.

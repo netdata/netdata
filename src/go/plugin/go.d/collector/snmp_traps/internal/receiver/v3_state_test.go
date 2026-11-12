@@ -5,6 +5,7 @@ package receiver
 import (
 	"encoding/hex"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -246,5 +247,42 @@ func TestCleanupCreatedEngineStateRemovesNewDir(t *testing.T) {
 
 	if _, err := os.Stat(paths.dir); !os.IsNotExist(err) {
 		t.Fatalf("new engine dir should be removed, err=%v", err)
+	}
+}
+
+// PrepareV3 checks the configuration before it raises the persisted engine
+// boots: a configuration the receiver refuses burns no boot.
+func TestPrepareV3ConfigErrorBurnsNoBoot(t *testing.T) {
+	root := t.TempDir()
+	paths := newEngineStatePaths(root, "boots-test")
+	policy := func(username string) Policy {
+		return NewPolicy(PolicyConfig{
+			Versions:          []string{"v3"},
+			USMUsers:          []USMUser{{Username: username, EngineID: testEngineIDHex, AuthProto: "none", PrivProto: "none"}},
+			EngineIDWhitelist: []string{testEngineIDHex},
+			LocalEngineID:     testLocalEngineIDHex,
+		})
+	}
+	first := New(policy("testuser"), nil)
+	if err := first.PrepareV3(root, "boots-test"); err != nil {
+		t.Fatalf("prepare v3 receiver: %v", err)
+	}
+	first.CommitPreparedState()
+	before, err := os.ReadFile(paths.engineBoots)
+	if err != nil {
+		t.Fatalf("read engine boots: %v", err)
+	}
+
+	// A name over 32 octets, which configuration validation refuses too.
+	err = New(policy(strings.Repeat("u", 33)), nil).PrepareV3(root, "boots-test")
+	if err == nil || !IsConfigPreparationError(err) {
+		t.Fatalf("PrepareV3 error = %v, want a configuration error", err)
+	}
+	after, err := os.ReadFile(paths.engineBoots)
+	if err != nil {
+		t.Fatalf("read engine boots: %v", err)
+	}
+	if string(after) != string(before) {
+		t.Fatalf("engine boots = %q after a configuration error, want %q", after, before)
 	}
 }
