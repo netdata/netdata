@@ -13,6 +13,12 @@
 #ifndef PRINTER_STATUS_POWER_SAVE
 #define PRINTER_STATUS_POWER_SAVE 0x01000000
 #endif
+#ifndef PRINTER_STATUS_SERVER_OFFLINE
+#define PRINTER_STATUS_SERVER_OFFLINE 0x02000000
+#endif
+#ifndef PRINTER_STATUS_DRIVER_UPDATE_NEEDED
+#define PRINTER_STATUS_DRIVER_UPDATE_NEEDED 0x04000000
+#endif
 
 #define CONFIG_SECTION_GET_PRINTERS "plugin:windows:GetPrinters"
 #define PRINTERS_DEFAULT_MAX 100
@@ -54,6 +60,32 @@ static const char *printer_job_state_names[PRINTER_JOB_STATE_MAX] = {
     [PRINTER_JOB_STATE_UNKNOWN] = "unknown",
 };
 
+// Problem flags charted individually, so each one can be alerted on even when several are set together.
+static const struct {
+    DWORD flag;
+    const char *name;
+} printer_problems[] = {
+    {PRINTER_STATUS_PAUSED, "paused"},
+    {PRINTER_STATUS_ERROR, "error"},
+    {PRINTER_STATUS_PENDING_DELETION, "pending_deletion"},
+    {PRINTER_STATUS_PAPER_JAM, "paper_jam"},
+    {PRINTER_STATUS_PAPER_OUT, "paper_out"},
+    {PRINTER_STATUS_MANUAL_FEED, "manual_feed"},
+    {PRINTER_STATUS_PAPER_PROBLEM, "paper_problem"},
+    {PRINTER_STATUS_OFFLINE, "offline"},
+    {PRINTER_STATUS_OUTPUT_BIN_FULL, "output_bin_full"},
+    {PRINTER_STATUS_TONER_LOW, "toner_low"},
+    {PRINTER_STATUS_NO_TONER, "no_toner"},
+    {PRINTER_STATUS_PAGE_PUNT, "page_punt"},
+    {PRINTER_STATUS_USER_INTERVENTION, "user_intervention"},
+    {PRINTER_STATUS_OUT_OF_MEMORY, "out_of_memory"},
+    {PRINTER_STATUS_DOOR_OPEN, "door_open"},
+    {PRINTER_STATUS_SERVER_OFFLINE, "server_offline"},
+    {PRINTER_STATUS_DRIVER_UPDATE_NEEDED, "driver_update_needed"},
+};
+
+#define PRINTER_PROBLEMS_COUNT (sizeof(printer_problems) / sizeof(printer_problems[0]))
+
 struct printer {
     usec_t last_seen;
     DWORD last_error;
@@ -63,6 +95,9 @@ struct printer {
 
     RRDSET *st_status;
     RRDDIM *rd_status[PRINTER_STATE_MAX];
+
+    RRDSET *st_problems;
+    RRDDIM *rd_problems[PRINTER_PROBLEMS_COUNT];
 
     RRDSET *st_job_status;
     RRDDIM *rd_job_status[PRINTER_JOB_STATE_MAX];
@@ -92,12 +127,15 @@ static void printer_obsolete_charts(struct printer *p)
         rrdset_is_obsolete___safe_from_collector_thread(p->st_jobs);
     if (p->st_status)
         rrdset_is_obsolete___safe_from_collector_thread(p->st_status);
+    if (p->st_problems)
+        rrdset_is_obsolete___safe_from_collector_thread(p->st_problems);
     if (p->st_job_status)
         rrdset_is_obsolete___safe_from_collector_thread(p->st_job_status);
 
-    p->st_jobs = p->st_status = p->st_job_status = NULL;
+    p->st_jobs = p->st_status = p->st_problems = p->st_job_status = NULL;
     p->rd_jobs = NULL;
     memset(p->rd_status, 0, sizeof(p->rd_status));
+    memset(p->rd_problems, 0, sizeof(p->rd_problems));
     memset(p->rd_job_status, 0, sizeof(p->rd_job_status));
 }
 
@@ -173,51 +211,39 @@ static BOOL spooler_enum_jobs_call(void *ctx, BYTE *data, DWORD size, DWORD *nee
     return EnumJobsW((HANDLE)ctx, 0, 0xFFFFFFFF, 1, data, size, needed, returned);
 }
 
+// Flag groups follow the Win32_Printer.PrinterStatus mapping used by windows_exporter.
+#define PRINTER_FLAGS_OTHER                                                                                            \
+    (PRINTER_STATUS_PAUSED | PRINTER_STATUS_ERROR | PRINTER_STATUS_PENDING_DELETION | PRINTER_STATUS_PAPER_JAM |       \
+     PRINTER_STATUS_PAPER_OUT | PRINTER_STATUS_MANUAL_FEED | PRINTER_STATUS_PAPER_PROBLEM | PRINTER_STATUS_OFFLINE |   \
+     PRINTER_STATUS_OUTPUT_BIN_FULL | PRINTER_STATUS_TONER_LOW | PRINTER_STATUS_NO_TONER | PRINTER_STATUS_PAGE_PUNT |  \
+     PRINTER_STATUS_USER_INTERVENTION | PRINTER_STATUS_OUT_OF_MEMORY | PRINTER_STATUS_DOOR_OPEN)
+#define PRINTER_FLAGS_UNKNOWN (PRINTER_STATUS_NOT_AVAILABLE)
+#define PRINTER_FLAGS_PRINTING                                                                                         \
+    (PRINTER_STATUS_IO_ACTIVE | PRINTER_STATUS_BUSY | PRINTER_STATUS_PRINTING | PRINTER_STATUS_PROCESSING)
+#define PRINTER_FLAGS_WARMUP (PRINTER_STATUS_INITIALIZING | PRINTER_STATUS_WARMING_UP)
+#define PRINTER_FLAGS_IDLE (PRINTER_STATUS_WAITING | PRINTER_STATUS_SERVER_UNKNOWN | PRINTER_STATUS_POWER_SAVE)
+
 static enum printer_state printer_state_from_flags(DWORD status, bool *decided)
 {
     *decided = true;
 
-    // CIMWin32 compares the whole value with single flags; zero and combinations fall back to the first job.
-    switch (status) {
-        case PRINTER_STATUS_PAUSED:
-        case PRINTER_STATUS_ERROR:
-        case PRINTER_STATUS_PENDING_DELETION:
-        case PRINTER_STATUS_PAPER_JAM:
-        case PRINTER_STATUS_PAPER_OUT:
-        case PRINTER_STATUS_MANUAL_FEED:
-        case PRINTER_STATUS_PAPER_PROBLEM:
-        case PRINTER_STATUS_OFFLINE:
-        case PRINTER_STATUS_OUTPUT_BIN_FULL:
-        case PRINTER_STATUS_TONER_LOW:
-        case PRINTER_STATUS_NO_TONER:
-        case PRINTER_STATUS_PAGE_PUNT:
-        case PRINTER_STATUS_USER_INTERVENTION:
-        case PRINTER_STATUS_OUT_OF_MEMORY:
-        case PRINTER_STATUS_DOOR_OPEN:
-            return PRINTER_STATE_OTHER;
+    // CIMWin32 only matches a status that is exactly one flag, so combined flags (offline and paper out together)
+    // would fall back to the jobs and read as idle. Test bits instead, problems first, so a single flag maps as in
+    // windows_exporter and a combination reports its most severe state.
+    if (status & PRINTER_FLAGS_OTHER)
+        return PRINTER_STATE_OTHER;
+    if (status & PRINTER_FLAGS_UNKNOWN)
+        return PRINTER_STATE_UNKNOWN;
+    if (status & PRINTER_FLAGS_PRINTING)
+        return PRINTER_STATE_PRINTING;
+    if (status & PRINTER_FLAGS_WARMUP)
+        return PRINTER_STATE_WARMUP;
+    if (status & PRINTER_FLAGS_IDLE)
+        return PRINTER_STATE_IDLE;
 
-        case PRINTER_STATUS_IO_ACTIVE:
-        case PRINTER_STATUS_BUSY:
-        case PRINTER_STATUS_PRINTING:
-        case PRINTER_STATUS_PROCESSING:
-            return PRINTER_STATE_PRINTING;
-
-        case PRINTER_STATUS_NOT_AVAILABLE:
-            return PRINTER_STATE_UNKNOWN;
-
-        case PRINTER_STATUS_WAITING:
-        case PRINTER_STATUS_SERVER_UNKNOWN:
-        case PRINTER_STATUS_POWER_SAVE:
-            return PRINTER_STATE_IDLE;
-
-        case PRINTER_STATUS_INITIALIZING:
-        case PRINTER_STATUS_WARMING_UP:
-            return PRINTER_STATE_WARMUP;
-
-        default:
-            *decided = false;
-            return PRINTER_STATE_UNKNOWN;
-    }
+    // No mapped flag (zero, or only SERVER_OFFLINE/DRIVER_UPDATE_NEEDED): the first queued job decides.
+    *decided = false;
+    return PRINTER_STATE_UNKNOWN;
 }
 
 static enum printer_state printer_state_from_first_job(const JOB_INFO_1W *jobs, DWORD jobs_count)
@@ -330,6 +356,30 @@ static void printer_chart_status(struct printer *p, const char *name, enum print
     rrdset_done(p->st_status);
 }
 
+static void printer_chart_problems(struct printer *p, const char *name, DWORD status, int update_every)
+{
+    if (unlikely(!p->st_problems)) {
+        p->st_problems = printer_chart_create(
+            name,
+            "problems",
+            sizeof("problems") - 1,
+            "windows.printer_problems",
+            "Printer problems",
+            "status",
+            PRIO_PRINTER_PROBLEMS,
+            update_every,
+            RRDSET_TYPE_LINE);
+        for (size_t i = 0; i < PRINTER_PROBLEMS_COUNT; i++)
+            p->rd_problems[i] = rrddim_add(p->st_problems, printer_problems[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrdset_isnot_obsolete___safe_from_collector_thread(p->st_problems);
+    for (size_t i = 0; i < PRINTER_PROBLEMS_COUNT; i++)
+        rrddim_set_by_pointer(
+            p->st_problems, p->rd_problems[i], (collected_number)((status & printer_problems[i].flag) != 0));
+    rrdset_done(p->st_problems);
+}
+
 static void printer_chart_job_status(
     struct printer *p,
     const char *name,
@@ -417,8 +467,9 @@ static void printer_collect(struct printer *p, const char *name, const PRINTER_I
 
     const PRINTER_INFO_2W *info = (const PRINTER_INFO_2W *)printer_info_buffer.data;
 
-    // The queue length is valid even if the job list below cannot be read.
+    // The queue length and problem flags are valid even if the job list below cannot be read.
     printer_chart_jobs(p, name, info->cJobs, update_every);
+    printer_chart_problems(p, name, info->Status, update_every);
 
     const JOB_INFO_1W *jobs;
     DWORD jobs_count;

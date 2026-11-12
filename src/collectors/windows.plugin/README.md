@@ -109,9 +109,13 @@ The selector uses the same syntax as the MSMQ selector above; printer connection
 pasted verbatim. Matching printers are selected in case-insensitive alphabetical order up to the cap; unselected
 printers get no charts and their queues are not opened.
 
-Each selected printer gets three charts: queued jobs, printer status, and jobs by status. Status values match the
-`Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter; an offline printer reports `other`. Job user
-names, machine names, and document titles are never collected.
+Each selected printer gets four charts: queued jobs, printer status, printer problems, and jobs by status. The problems
+chart has one dimension per Windows problem flag (for example `offline`, `paper_jam`, `toner_low`), each `1` while the
+flag is set, so several can be active together and each can be alerted on. Status values match the
+`Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter, except that a printer reporting several status
+flags at once gets its most severe state (problems such as offline or paper out first, then printing, warmup and idle)
+instead of falling back to its jobs; an offline printer reports `other`. Job user names, machine names, and document
+titles are never collected.
 
 The module runs on its own thread only while its `update every` differs from the global interval. Opening a selected
 printer connection whose print server is unreachable can block; while it is blocked, this module collects nothing and
