@@ -916,9 +916,8 @@ pub async fn run() -> anyhow::Result<()> {
         .join("otel-legacy-logs");
     let legacy_config = LegacyLogsConfig::new(legacy_journal_dir, legacy_cache_dir);
 
-    // Spawn the ledger first: it listens on the writer socket, and on startup
-    // the ingestor connects to that socket to stream records to it. Reversing
-    // the order would race the ingestor against a not-yet-listening ledger.
+    // Each worker connects and waits for its `Configure`: the order of the
+    // spawns means nothing (`otel_bridge`, "Handshake protocol").
     let (ledger_conn, ledger_child) = spawn_worker(&self_exe, &ledger_sock, "ledger").await?;
     let (ingestor_conn, ingestor_child) =
         spawn_worker(&self_exe, &ingestor_sock, "ingestor").await?;
@@ -946,8 +945,9 @@ pub async fn run() -> anyhow::Result<()> {
         .await
         .context("failed to write TRUST_DURATIONS to agent")?;
 
-    // The ledger is configured first: it must be listening on the writer
-    // socket before the ingestor connects to it. Its declarations are
+    // The ledger is configured first, and the ingestor only after the
+    // ledger's `Ready`: the seq high-water file has one writer at a time
+    // (`otel_bridge`, "Handshake protocol"). The ledger's declarations are
     // forwarded only after the ingestor's handshake also succeeded — bind
     // before declare (see `register_declarations`). A handshake failure here
     // returns straight out and ChildGuard SIGKILLs the remaining workers on

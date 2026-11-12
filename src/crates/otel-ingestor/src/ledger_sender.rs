@@ -20,7 +20,7 @@
 //! orders the events of different files. Connecting retries forever, but a
 //! connection lost once established is never re-established: the task exits
 //! and later events are dropped. Nothing recovers in-process — the ledger
-//! exits on the same failure (`Ledger::run` in
+//! ends its run when the connection ends (`Ledger::run` in
 //! `otel-ledger/src/ledger/mod.rs`) and the supervisor never restarts
 //! workers; the agent restarts the whole plugin (`Supervisor::run` in
 //! `otel-plugin/src/supervisor.rs`), and the ledger's startup recovery picks
@@ -122,7 +122,10 @@ async fn sender_task(
     while let Some(msg) = rx.recv().await {
         queued.fetch_sub(1, Ordering::Relaxed);
         if conn.send(msg).await.is_err() {
-            tracing::error!("ledger IPC connection lost");
+            // At a stop the ledger can leave first; when the ledger died,
+            // the supervisor says so and stops the plugin. Either way the
+            // next start recovers the files whose events were not sent.
+            tracing::warn!("the ledger closed the event link: no more file events are sent");
             break;
         }
     }

@@ -28,9 +28,20 @@
 //!
 //! ## Handshake protocol
 //!
+//! This is the one description of the start-up order; the code of each
+//! process points here.
+//!
 //! 1. The supervisor binds one IPC socket per worker and spawns the worker;
-//!    the worker connects.
-//! 2. The supervisor sends `Configure` with the worker's resolved config.
+//!    the worker connects and waits. The order of the spawns means nothing.
+//! 2. The supervisor sends `Configure` with the worker's resolved config,
+//!    to one worker at a time, and waits for that worker's answer: the
+//!    ledger first, then the ingestor, then legacy-logs. The ledger comes
+//!    before the ingestor because both write the seq high-water file
+//!    (`wal/src/seq.rs`), which has one writer at a time: the ledger's
+//!    start-up raises it to what the remote holds, and the ingestor reads it
+//!    and writes it from then on. No other rule orders the two: the ingestor
+//!    connects to the ledger's event socket by itself, with retries, and the
+//!    ledger binds that socket only after its own `Ready`.
 //! 3. The worker initializes, then sends `Ready` with zero or more function
 //!    declarations — only once startup fully succeeded. The supervisor
 //!    forwards those declarations to the agent, and a declared function
@@ -40,6 +51,8 @@
 //!    until both handshakes have succeeded.
 //!    The legacy-logs worker may instead send `Disabled` — nothing to serve
 //!    or init failed — and exits immediately after.
+//!    Before its `Ready` a worker sends nothing else: the supervisor takes
+//!    any other first message as a failed start.
 //! 4. The supervisor enters its main loop, routing function calls, results,
 //!    progress and chart data between the agent and the workers.
 

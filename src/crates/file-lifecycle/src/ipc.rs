@@ -322,13 +322,14 @@ pub enum CatalogBuilderResponse {
 /// (`max_retries(None)`, 1 s interval), so an `Err` here means the bind
 /// failed, not that no writer showed up yet. While this call waits, the
 /// ledger reads no supervisor traffic, so a graceful `Shutdown` sent in that
-/// window is not honored (deliberate ordering; see the supervisor's
-/// configure-before-bind comment and `Ledger::new`'s doc).
+/// window is not honored (deliberate ordering; see `Ledger::new`'s doc).
 ///
 /// On success the connection is stored on the `Ledger` and driven by the run
-/// loop's `select!`; a `recv` error there is fatal (exits `run`, dropping the
-/// supervisor connection so the supervisor reaps the workers). The ingestor
-/// side treats the same loss as fire-and-forget (`ledger_sender.rs`).
+/// loop's `select!`. When the ingestor closes the connection, the run ends
+/// as it does on a `Shutdown`; any other `recv` error there is fatal (exits
+/// `run`, dropping the supervisor connection so the supervisor reaps the
+/// workers). The ingestor side treats the loss of the connection as
+/// fire-and-forget (`ledger_sender.rs`).
 ///
 /// Exactly one writer connection is served: the function accepts once and
 /// returns, dropping the listener — which also unlinks the Unix socket path

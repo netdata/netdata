@@ -159,9 +159,10 @@ impl Ledger {
     /// per-pipeline workers → per-tenant recovery → handler) → `Ready` →
     /// accept the ingestor writer connection. `Ready` is pinned between pipeline
     /// construction (which sets up the handlers) and the ingestor accept: the
-    /// supervisor configures workers sequentially, so the ingestor (which the
-    /// ledger then waits for on `writer_socket_path`) can't start until the
-    /// supervisor has seen Ready — moving Ready any later deadlocks. Ready here
+    /// supervisor configures workers sequentially (`otel_bridge`, "Handshake
+    /// protocol"), so the ingestor (which the ledger then waits for on
+    /// `writer_socket_path`) can't start until the supervisor has seen Ready
+    /// — moving Ready any later deadlocks every start. Ready here
     /// is a report to the supervisor, not yet an advertisement: the supervisor
     /// forwards these declarations to the agent only after the ingestor has
     /// bound its gRPC endpoint (bind before declare), so a failure before Ready
@@ -370,9 +371,10 @@ impl Ledger {
             .context("failed to signal ready to supervisor")?;
         tracing::info!("signaled ready to supervisor");
 
-        // Not before `Ready`: the supervisor accepts no other message until
-        // then, so the indexing operations of the startup backlog are not
-        // charted.
+        // Started after the start-up work, so the indexing operations of
+        // the start-up backlog are not charted. The handshake does not
+        // depend on this: chart data reaches the supervisor only from
+        // `Ledger::run`.
         let indexing_charts = crate::indexing_charts::IndexingCharts::new()
             .context("failed to declare the indexing charts")?;
         tokio::spawn(crate::indexing_charts::run(
