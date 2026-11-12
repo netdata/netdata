@@ -559,6 +559,18 @@ modules:
                 type: string
                 unit: ''
                 description: Reason execution stopped, separate from the first reported error.
+              - name: failure_evidence_status
+                type: string
+                unit: ''
+                description: Journey evidence reporting status (not_recorded, unavailable, unsupported, partial, complete or invalid); detail truncation is reported separately.
+              - name: first_failure
+                type: string
+                unit: ''
+                description: First unexpected journey test failure, with retained step path, source location and error excerpt when available.
+              - name: last_observed_step
+                type: string
+                unit: ''
+                description: Last retained running step observation; this does not imply the browser is still executing it.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -593,7 +605,9 @@ modules:
           returns:
             description: One row per retained reporter event, preserving actual and expected status and failure
               phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact
-              metadata and history errors; dropped_events discloses omitted event detail. The run.vnode_guid field
+              metadata and history errors. Journey failure_evidence adds test and step observations, the first unexpected failure,
+              reporting completeness and separate truncation flags; absent evidence is not a report of zero failures.
+              dropped_events discloses omitted generic event detail. The run.vnode_guid field
               contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
             columns:
               - name: at_ms

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
 const {text, event, write, captureState, screenshotCandidate, secretStream} = require('./protocol.cjs');
+const FailureEvidence = require('./failure-evidence.cjs');
 
 module.exports = class DEMReporter {
   constructor(options) {
@@ -12,6 +13,8 @@ module.exports = class DEMReporter {
     this.executionError = false;
     this.confirmedFailure = false;
     this.finished = false;
+    this.evidence = options.extensions?.includes(FailureEvidence.FEATURE)
+      ? new FailureEvidence(options, record => write(3, record)) : undefined;
     this.stdio = Object.fromEntries(['stdout', 'stderr'].map(kind => [kind,
       secretStream(message => this.emit(kind, {phase: 'worker', message}))]));
   }
@@ -29,9 +32,12 @@ module.exports = class DEMReporter {
     this.emit('suite', {title: 'Discovered ' + this.tests.size + ' tests', phase: 'discovery', declared_tests: this.tests.size});
   }
   onTestBegin(test) {
+    this.evidence?.test(test);
     this.emit('test', {test_id: test.id, title: text(test.title), phase: 'start', status: 'running', expected_status: test.expectedStatus});
   }
+  onStepBegin(test, result, step) { this.evidence?.step(test, step); }
   onStepEnd(test, result, step) {
+    this.evidence?.step(test, step, true);
     this.emit('step', {test_id: test.id, title: text(step.title), phase: text(step.category), status: step.error ? 'failed' : 'passed', duration_ms: step.duration, ...(step.error ? {message: text(step.error.message || step.error.value)} : {})});
   }
   onStdOut(chunk) { this.stdio.stdout.write(chunk); }
@@ -43,6 +49,8 @@ module.exports = class DEMReporter {
     this.emit('error', {phase: 'execution', status: 'error', message});
   }
   onTestEnd(test, result) {
+    this.evidence?.test(test, result);
+    this.evidence?.firstFailure(test, result);
     this.tests.set(test.id, {test, result});
     const failureSteps = [];
     const visit = steps => { for (const step of steps) { if (step.error) failureSteps.push(step); visit(step.steps || []); } };
@@ -96,6 +104,7 @@ module.exports = class DEMReporter {
     else if (this.confirmedFailure) status = 'failed';
     else if (this.executionError) status = 'error';
     else if (counts.declared > 0 && counts.passed === counts.declared && fullResult?.status === 'passed') status = 'success';
+    this.evidence?.complete();
     write(3, {type: 'result', result: {status, tests: counts, ...(terminationReason ? {termination_reason: terminationReason} : {}), ...(this.errors.length ? {error: this.errors[0]} : {}), artifacts: this.artifacts, interrupted_artifacts: this.interruptedArtifacts, capture_state: captureState(this.options.capture, status, this.artifacts)}});
   }
 };

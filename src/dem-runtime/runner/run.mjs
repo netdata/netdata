@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import protocol from './protocol.cjs';
+import extensions from './extensions.cjs';
 import {runtimePaths, checkRuntime} from './runtime.mjs';
 import {monotonicMilliseconds, journeyStop, journeyResult} from './journey.mjs';
 const {text, event, write} = protocol;
@@ -48,6 +49,8 @@ async function main() {
   validate(request);
   protocol.configureSecrets(request.secrets);
   const r = request;
+  const selected = extensions.selection(r);
+  if (selected) emit({type: 'extension_init', extension_init: {selected}});
   for (const dir of ['output', 'tmp', 'home', 'cache']) await fs.mkdir(path.join(r.work_dir, dir), {recursive: true, mode: 0o700});
   const env = {
     PATH: path.dirname(process.execPath) + ':/usr/bin:/bin', HOME: path.join(r.work_dir, 'home'),
@@ -65,12 +68,14 @@ async function main() {
       entry = path.join(input, 'journey.spec.ts');
       await fs.writeFile(entry, r.script, {mode: 0o600});
     }
+    // Playwright reports canonical paths; the Agent supplies a short work alias.
+    const sourceDir = path.dirname(await fs.realpath(entry).catch(() => entry));
     const modules = runtime.modules;
     const config = {
       testDir: path.dirname(entry), workers: 1, retries: 0, repeatEach: 1, fullyParallel: false,
       forbidOnly: true, timeout: r.timeout_ms, globalTimeout: 0,
       respectGitIgnore: false, outputDir: path.join(r.work_dir, 'output'),
-      reporter: [[path.join(here, 'reporter.cjs'), {workDir: r.work_dir, capture: r.capture}]],
+      reporter: [[path.join(here, 'reporter.cjs'), {workDir: r.work_dir, sourceDir, capture: r.capture, ...(selected?.length ? {extensions: selected} : {})}]],
       projects: [{name: 'chromium', use: {browserName: 'chromium', headless: true,
         launchOptions: {executablePath: runtime.browser, chromiumSandbox: true},
         screenshot: r.capture ? 'only-on-failure' : 'off', trace: 'off', video: 'off'}}],
@@ -106,7 +111,10 @@ async function main() {
   const lines = createInterface({input: child.stdio[3], crlfDelay: Infinity});
   lines.on('line', line => {
     try {
+      if (Buffer.byteLength(line) > 4 * 1024 * 1024) throw new Error('reporter record exceeds framing limit');
       const record = JSON.parse(line);
+      const optional = extensions.optional(record, selected, terminal);
+      if (optional) { if (optional !== true) emit(optional); return; }
       if (record.type === 'event' && record.event) emit(record);
       else if (record.type === 'result' && record.result && !terminal) {
         terminal = record.result;

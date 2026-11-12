@@ -14,11 +14,13 @@ function configureSecrets(values = {}) {
   secretPattern = known.length ? new RegExp(known.map(value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g') : undefined;
 }
 configureSecrets(Object.fromEntries(Object.entries(process.env).filter(([name]) => /^DEM_SECRET_[A-Za-z0-9_]+$/.test(name))));
-function text(value) {
+function redact(value) {
   const raw = String(value ?? '');
   // Clipping first could expose a secret prefix that Go cannot match exactly.
-  const redacted = secretPattern ? raw.replace(secretPattern, '[REDACTED]') : raw;
-  return Array.from(redacted).slice(0, 2000).join('');
+  return secretPattern ? raw.replace(secretPattern, '[REDACTED]') : raw;
+}
+function text(value) {
+  return Array.from(redact(value)).slice(0, 2000).join('');
 }
 
 // Hold enough original input to decide a match before emitting any of its bytes.
@@ -107,4 +109,4 @@ function screenshotCandidate(file, workDir, index) {
   } finally { fs.closeSync(fd); }
   return {id: 'screenshot-' + index, kind: 'screenshot', path: path.relative(actualWork, resolved), mime: 'image/png'};
 }
-module.exports = {text, event, write, captureState, screenshotCandidate, configureSecrets, secretStream};
+module.exports = {text, redact, event, write, captureState, screenshotCandidate, configureSecrets, secretStream};

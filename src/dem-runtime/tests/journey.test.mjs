@@ -100,9 +100,11 @@ async function runFake(cli, stopAfter, options = {}) {
   const started = monotonicMilliseconds();
   const code = await new Promise((resolve,reject) => {child.on('error',reject); child.on('close',resolve);});
   assert.equal(stderr, '');
-  const records = baselineRecords(stdout);
+  const negotiated = Array.isArray(options.extensions) && options.extensions.every(value => typeof value === 'string' && value);
+  const records = negotiated ? stdout.trim().split('\n').map(line => JSON.parse(line)) : baselineRecords(stdout);
+  if (negotiated) baselineRecords(records.filter(record => !['extension', 'extension_init'].includes(record.type)).map(record => JSON.stringify(record)).join('\n'));
   const results = records.filter(record => record.type === 'result'); assert.equal(results.length, 1, stdout);
-  return {root, work, code, result:results[0].result, elapsed:monotonicMilliseconds() - started};
+  return {root, work, code, records, result:results[0].result, elapsed:monotonicMilliseconds() - started};
 }
 
 test('exhausted startup budget does not spawn selected user work', async () => {
@@ -209,4 +211,61 @@ test('reporter retains ordinary and interrupted PNG provenance with unique IDs',
   assert.equal(result.tests.failed, 1); assert.equal(result.tests.not_run, 1);
   assert.equal(result.artifacts[0].id, 'screenshot-1');
   assert.equal(result.interrupted_artifacts[0].id, 'screenshot-2');
+});
+
+const fakeResult = {type: 'result', result: {status: 'success', tests: {declared: 1, passed: 1}}};
+const fakeCLI = records => "const fs=require('node:fs');" + records.map(record => 'fs.writeSync(3,' + JSON.stringify(JSON.stringify(record) + '\n') + ');').join('');
+
+test('parent acknowledges selected extensions first and relays malformed optional bodies without outcome failure', async () => {
+  const malformed = {type: 'extension', extension: {feature: 'failure_evidence.v1', data: null}};
+  const actual = await runFake(fakeCLI([malformed, fakeResult]), 10000, {extensions: ['failure_evidence.v1', 'failure_evidence.v1']});
+  assert.equal(actual.result.status, 'success');
+  assert.deepEqual(actual.records[0], {type: 'extension_init', extension_init: {selected: ['failure_evidence.v1']}});
+  assert.deepEqual(actual.records[1], malformed);
+  assert.equal(actual.records.at(-1).type, 'result');
+});
+
+test('legacy parent relay discards recognized optional records and ignores unselected feature IDs', async () => {
+  const optional = {type: 'extension', extension: {feature: 'failure_evidence.v1', data: {record: 'complete'}}};
+  const legacy = await runFake(fakeCLI([optional, fakeResult]), 10000);
+  assert.equal(legacy.result.status, 'success');
+  assert.deepEqual(legacy.records, [legacy.records.at(-1)]);
+  const unknown = await runFake(fakeCLI([{type: 'extension', extension: {feature: 'future.v1', data: null}}, fakeResult]), 10000,
+    {extensions: ['failure_evidence.v1']});
+  assert.equal(unknown.result.status, 'success');
+  assert.equal(unknown.records.some(record => record.type === 'extension'), false);
+});
+
+test('parent refuses mixed families and duplicate results but never emits late optional completion', async () => {
+  for (const records of [
+    [{type: 'extension', extension: null, result: {}}, fakeResult],
+    [fakeResult, fakeResult],
+  ]) {
+    const actual = await runFake(fakeCLI(records), 10000, {extensions: ['failure_evidence.v1']});
+    assert.equal(actual.result.status, 'error');
+  }
+  const actual = await runFake(fakeCLI([fakeResult, {type: 'extension', extension: {feature: 'failure_evidence.v1', data: {record: 'complete'}}}]), 10000,
+    {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'success');
+  assert.equal(actual.records.some(record => record.type === 'extension'), false);
+});
+
+test('unexpected reporter initialization is relayed for optional invalidation only to opted-in peers', async () => {
+  const init = {type: 'extension_init', extension_init: {selected: ['failure_evidence.v1']}};
+  const gated = await runFake(fakeCLI([init, fakeResult]), 10000, {extensions: ['failure_evidence.v1']});
+  assert.equal(gated.result.status, 'success');
+  assert.equal(gated.records.filter(record => record.type === 'extension_init').length, 2);
+  const legacy = await runFake(fakeCLI([init, fakeResult]), 10000);
+  assert.equal(legacy.result.status, 'success');
+  assert.equal(legacy.records.some(record => record.type === 'extension_init'), false);
+});
+
+// The parent withholds its terminal until exit/EOF; late core observations still
+// precede the Agent terminal as in the baseline runtime. Optional completion does not.
+test('parent preserves late core observations while waiting for reporter exit', async () => {
+  const late = {type: 'event', event: {kind: 'stdout', at_ms: 1, message: 'late'}};
+  const actual = await runFake(fakeCLI([fakeResult, late]), 10000);
+  assert.equal(actual.result.status, 'success');
+  assert.deepEqual(actual.records[0], late);
+  assert.equal(actual.records.at(-1).type, 'result');
 });
