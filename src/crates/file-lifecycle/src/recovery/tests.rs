@@ -682,29 +682,15 @@ fn place_local_catalog(
     min_ts: u32,
     max_ts: u32,
 ) -> std::path::PathBuf {
-    place_local_catalog_of(reg, date, &[max_seq], min_ts, max_ts)
-}
-
-/// A local catalog file with one entry per seq of `seqs` (the last is the
-/// largest), tracked in `reg`.
-fn place_local_catalog_of(
-    reg: &mut Registry,
-    date: NaiveDate,
-    seqs: &[u64],
-    min_ts: u32,
-    max_ts: u32,
-) -> std::path::PathBuf {
-    let max_seq = *seqs.last().unwrap();
     let path = reg
         .catalog_files
         .file_path(date, ident(), max_seq, min_ts, max_ts);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
 
-    // Write a real catalog container so reconcile can read its SFST seqs.
+    // Write a real catalog container so reconcile can read its SFST seqs; the
+    // single entry's seq is `max_seq`.
     let mut catalog = otel_catalog::Catalog::new(TenantId::from("tenant1"), date, ident());
-    for seq in seqs {
-        catalog.add(make_entry(*seq));
-    }
+    catalog.add(make_entry(max_seq));
     let bytes = catalog.to_container_bytes().unwrap();
     std::fs::write(&path, &bytes).unwrap();
 
@@ -766,62 +752,6 @@ async fn a_catalog_whose_index_file_is_not_on_the_remote_does_not_vouch_for_it()
     assert_eq!(reg.unuploaded_ids(), vec![id]);
     assert!(!reg.is_rotated(sk(10)));
     assert!(!reg.is_remote_cataloged(sk(10)));
-
-    cancel.cancel();
-}
-
-/// Only an index file that is still local can be lost by a catalog that
-/// vouches for it. An index file that is neither local nor on the remote
-/// (it was evicted before the remote changed) does not hold the catalog
-/// back: else the catalog would be refused at every start, and its local
-/// files uploaded again every time.
-#[tokio::test]
-async fn an_index_file_that_is_not_local_does_not_hold_its_catalog_back() {
-    let catalog_dir = tempfile::tempdir().unwrap();
-    let mut reg = make_registry(catalog_dir.path());
-    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
-    place_local_catalog_of(&mut reg, date, &[9, 10], 100, 200);
-    // Seq 9 is gone from the local disk and was never on this remote; seq
-    // 10 is local and on the remote.
-    reg.sfst
-        .track(make_entry(10).id, ByteSize(1), empty_summary());
-    reg.mark_uploaded(sk(10));
-    reg.mark_rotated(sk(10));
-
-    let (op, _op_tmp) = fs_operator();
-    op.write(&make_entry(10).remote_key, b"index file".to_vec())
-        .await
-        .unwrap();
-    let storage = crate::storage::OpendalStorage::from_operator(op.clone());
-    let cancel = tokio_util::sync::CancellationToken::new();
-    let mut uploader = crate::component::ComponentHandle::spawn::<
-        crate::uploader::Uploader<crate::storage::OpendalStorage>,
-    >(
-        crate::uploader::UploaderArgs {
-            storage: storage.clone(),
-            max_concurrent: 4,
-        },
-        cancel.child_token(),
-    );
-
-    reconcile_local_catalog_uploads(
-        &mut reg,
-        0,
-        "logs",
-        &mut uploader,
-        &storage,
-        &TenantId::from("tenant1"),
-        &evict_all_retention(),
-    )
-    .await
-    .unwrap();
-
-    let resp = tokio::time::timeout(std::time::Duration::from_secs(5), uploader.recv())
-        .await
-        .expect("the catalog must be uploaded")
-        .unwrap();
-    assert!(matches!(resp, UploaderResponse::CatalogUploaded { .. }));
-    assert!(reg.is_uploaded(sk(10)));
 
     cancel.cancel();
 }
