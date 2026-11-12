@@ -52,7 +52,9 @@ use tonic::{Request, Response, Status};
 use crate::ledger_sender::LedgerSender;
 use crate::observer::TraceObserver;
 use crate::tenant::extract_tenant_id;
-use crate::tenant_writers::{TenantWriters, check_frame_size, storage_unavailable};
+use crate::tenant_writers::{
+    TenantWriters, check_frame_size, export_task_ended, storage_unavailable,
+};
 use otel_bridge::config::AuthConfig;
 use otel_bridge::signals::Signal;
 use otel_derived_metrics::DerivedMetrics;
@@ -463,10 +465,7 @@ impl NetdataTracesService {
             ))
         });
 
-        stored.await.map_err(|e| {
-            tracing::error!(%e, "the task that syncs and counts a traces export failed");
-            Status::internal("export task failed")
-        })?
+        stored.await.map_err(|e| export_task_ended(e, "traces"))?
     }
 }
 

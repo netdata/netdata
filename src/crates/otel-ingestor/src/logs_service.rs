@@ -51,7 +51,9 @@ use tonic::{Request, Response, Status};
 
 use crate::ledger_sender::LedgerSender;
 use crate::tenant::extract_tenant_id;
-use crate::tenant_writers::{TenantWriters, check_frame_size, storage_unavailable};
+use crate::tenant_writers::{
+    TenantWriters, check_frame_size, export_task_ended, storage_unavailable,
+};
 
 /// What the logs export asks of an OTLP `ResourceLogs`.
 trait ResourceLogsExt {
@@ -814,10 +816,7 @@ impl NetdataLogsService {
             ))
         });
 
-        stored.await.map_err(|e| {
-            tracing::error!(%e, "the task that syncs and counts a logs export failed");
-            Status::internal("export task failed")
-        })?
+        stored.await.map_err(|e| export_task_ended(e, "logs"))?
     }
 }
 

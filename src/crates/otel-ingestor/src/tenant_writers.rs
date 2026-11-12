@@ -50,6 +50,30 @@ pub(crate) fn storage_unavailable(message: &'static str) -> tonic::Status {
     tonic::Status::unavailable(message)
 }
 
+/// The answer of an export whose task (the one that syncs the request's
+/// frames and counts its records) ended without a result. `what` names the
+/// signal ("logs", "traces").
+///
+/// The task is cancelled when the plugin stops while the request waits for
+/// its sync: the runtime drops it. That is a normal end, not an error. The
+/// frames are in their WAL file, so the next start indexes them; the sender
+/// got no answer and sends the records again. A task that panicked is a
+/// defect of this plugin.
+pub(crate) fn export_task_ended(
+    error: tokio::task::JoinError,
+    what: &'static str,
+) -> tonic::Status {
+    if error.is_cancelled() {
+        tracing::info!(
+            "the plugin stopped before a {what} export was synced: it is not acknowledged"
+        );
+        return storage_unavailable("the plugin is stopping");
+    }
+
+    tracing::error!(%error, "the task that syncs and counts a {what} export failed");
+    tonic::Status::internal("export task failed")
+}
+
 /// Refuse the frame of one stream of an export request when it is over
 /// [`wal::MAX_FRAME_DATA`]: the indexer could never read it, nor the rest of
 /// its WAL file. `what` names the records ("records", "spans").
@@ -342,6 +366,18 @@ mod tests {
     use file_registry::{InstanceId, MachineId, MonotonicClock};
 
     use super::*;
+
+    #[tokio::test]
+    async fn an_export_task_that_a_stop_cancelled_is_retryable_and_one_that_panicked_is_not() {
+        let cancelled = tokio::spawn(std::future::pending::<()>());
+        cancelled.abort();
+        let status = export_task_ended(cancelled.await.unwrap_err(), "logs");
+        assert_eq!(status.code(), tonic::Code::Unavailable);
+
+        let panicked = tokio::spawn(async { panic!("a defect") });
+        let status = export_task_ended(panicked.await.unwrap_err(), "logs");
+        assert_eq!(status.code(), tonic::Code::Internal);
+    }
 
     /// A socket nobody listens on: events sent to it only queue.
     fn dead_socket() -> String {
