@@ -90,7 +90,7 @@ metrics:
   # the guard against cardinality explosion from high-cardinality label
   # combinations. Points for charts beyond this budget are dropped (with a
   # warning); later requests get a fresh budget, so the total chart count
-  # is not capped by this.
+  # is not capped by this. Do not set it to 0: no chart is made then.
   max_new_charts_per_request: 100
 
 # Charts that the plugin makes from the logs and traces it receives:
@@ -125,6 +125,8 @@ logs:
     # Incoming logs are appended to a current file; a new file starts when
     # any of these limits is reached. The "default" entry applies to every
     # tenant without its own entry below.
+    # Do not set a limit to 0: every export request then makes a file of
+    # its own.
     default:
       max_file_size: "25MB"
       max_entries: 50000
@@ -151,6 +153,8 @@ traces:
     # Incoming spans are appended to a current file; a new file starts when
     # any of these limits is reached. The "default" entry applies to every
     # tenant without its own entry below.
+    # Do not set a limit to 0: every export request then makes a file of
+    # its own.
     default:
       max_file_size: "25MB"
       max_entries: 50000

@@ -95,6 +95,32 @@ pub struct PluginConfig {
 }
 
 impl PluginConfig {
+    /// The values of this config that the plugin accepts and that do harm
+    /// with no other sign: one sentence for each, with its key. Empty for a
+    /// config with none, as the stock one.
+    ///
+    /// They are not errors: what `otel.yaml` accepts does not change, and a
+    /// plugin that ran with such a value still starts. The config load logs
+    /// each as a warning (`otel-plugin`, `ConfigResolver::resolve`). The
+    /// values that only the ingestor can judge (against its sweep interval)
+    /// are warned about there (`otel-ingestor`, `warn_signal_config`).
+    pub fn harmful_values(&self) -> Vec<String> {
+        let mut found = Vec::new();
+
+        if self.metrics.max_new_charts_per_request == 0 {
+            found.push(
+                "metrics.max_new_charts_per_request is 0: no chart is ever made for an OTLP \
+                 metric"
+                    .to_string(),
+            );
+        }
+        for (signal, config) in [("logs", &self.logs), ("traces", &self.traces)] {
+            config.harmful_values(signal, self.remote_storage.enabled, &mut found);
+        }
+
+        found
+    }
+
     /// The signal-neutral file-lifecycle view for one signal: the WAL, index, and
     /// catalog settings (with derived dirs) the content-agnostic ledger substrate
     /// consumes. The derived directory layout (`{base_dir}/{signal}/...`) is
@@ -307,6 +333,62 @@ fn default_derived_metrics_enabled() -> bool {
 
 fn default_derived_metrics_max_services() -> usize {
     500
+}
+
+impl SignalConfig {
+    /// This signal's part of [`PluginConfig::harmful_values`], for the
+    /// `default` entry and for every tenant that has an entry of its own.
+    fn harmful_values(&self, signal: &str, remote_storage: bool, found: &mut Vec<String>) {
+        let format = humantime_serde::re::humantime::format_duration;
+
+        let mut tenants: Vec<&str> = self.rotation.tenants.keys().map(String::as_str).collect();
+        tenants.sort_unstable();
+        tenants.insert(0, "default");
+        for tenant in tenants {
+            let rotation = self.rotation.resolve(tenant);
+            let mut zero = Vec::new();
+            if rotation.max_entries == 0 {
+                zero.push("max_entries");
+            }
+            if rotation.max_file_size.as_u64() == 0 {
+                zero.push("max_file_size");
+            }
+            if rotation.max_file_duration.is_zero() {
+                zero.push("max_file_duration");
+            }
+            for key in zero {
+                found.push(format!(
+                    "{signal}.rotation.{tenant}.{key} is 0: every export request makes a file of \
+                     its own and an indexing operation of its own"
+                ));
+            }
+        }
+
+        let mut tenants: Vec<&str> = self.retention.tenants.keys().map(String::as_str).collect();
+        tenants.sort_unstable();
+        tenants.insert(0, "default");
+        for tenant in tenants {
+            let retention = self.retention.resolve(tenant);
+            if self.ingest.max_age > retention.max_age {
+                found.push(format!(
+                    "{signal}.ingest.max_age ({}) is longer than {signal}.retention.{tenant}.max_age \
+                     ({}): a record older than the retention age is accepted, indexed, and then \
+                     deleted at once",
+                    format(self.ingest.max_age),
+                    format(retention.max_age),
+                ));
+            }
+            if remote_storage && self.ingest.max_age >= retention.horizon {
+                found.push(format!(
+                    "{signal}.ingest.max_age ({}) is not shorter than \
+                     {signal}.retention.{tenant}.horizon ({}): the catalog of records that old can \
+                     be deleted before it is uploaded",
+                    format(self.ingest.max_age),
+                    format(retention.horizon),
+                ));
+            }
+        }
+    }
 }
 
 /// Per-signal tuning, operator-facing. Carries no directories (they are derived
@@ -1042,6 +1124,64 @@ traces:
 
     fn full_config() -> PluginConfig {
         serde_yaml::from_str(FULL_YAML).unwrap()
+    }
+
+    #[test]
+    fn a_config_with_no_harmful_value_has_none_to_report() {
+        assert_eq!(full_config().harmful_values(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn harmful_values_are_reported_with_their_keys() {
+        let mut config = full_config();
+        config.metrics.max_new_charts_per_request = 0;
+        // Logs: a rotation limit of 0 for one tenant, and an ingest window
+        // longer than the retention age (7 days).
+        let mut rotation = HashMap::new();
+        rotation.insert(
+            "acme".to_string(),
+            RotationEntry {
+                max_file_size: None,
+                max_entries: Some(0),
+                max_file_duration: None,
+            },
+        );
+        config.logs.rotation.apply_overrides(&rotation);
+        config.logs.ingest.max_age = Duration::from_secs(8 * 86_400);
+        // Traces: an ingest window that reaches the catalog horizon.
+        config.traces.ingest.max_age = config.traces.retention.resolve("default").horizon;
+
+        let found = config.harmful_values();
+
+        let keys: Vec<&str> = found
+            .iter()
+            .map(|sentence| sentence.split([' ', ':']).next().unwrap())
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "metrics.max_new_charts_per_request",
+                "logs.rotation.acme.max_entries",
+                "logs.ingest.max_age",
+                "traces.ingest.max_age",
+                "traces.ingest.max_age",
+            ]
+        );
+        assert!(found[2].contains("logs.retention.default.max_age (7days)"));
+        assert!(found[3].contains("traces.retention.default.max_age"));
+        assert!(found[4].contains("traces.retention.default.horizon"));
+    }
+
+    #[test]
+    fn the_catalog_horizon_is_not_judged_without_remote_storage() {
+        let mut config = full_config();
+        config.remote_storage.enabled = false;
+        config.traces.ingest.max_age = config.traces.retention.resolve("default").horizon;
+
+        let found = config.harmful_values();
+
+        assert_eq!(found.len(), 1);
+        assert!(found[0].contains("traces.retention.default.max_age"));
     }
 
     #[test]

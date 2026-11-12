@@ -233,6 +233,9 @@ impl ConfigResolver {
         }
 
         validate(&config)?;
+        for sentence in config.harmful_values() {
+            tracing::warn!("configuration: {sentence}");
+        }
         log_config("effective", &config);
         Ok(config)
     }

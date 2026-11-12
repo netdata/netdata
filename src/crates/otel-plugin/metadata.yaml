@@ -190,7 +190,7 @@ modules:
             - name: metrics.max_new_charts_per_request
               description: Maximum number of new charts one OTLP export request can create.
               detailed_description: |
-                This limits a single request's cardinality burst. It does not cap the total number of charts that successive requests can create.
+                This limits a single request's cardinality burst. It does not cap the total number of charts that successive requests can create. Do not set it to 0: the plugin then makes no chart for OTLP metrics, and it logs a warning when it starts.
               default_value: 100
               required: false
             - name: derived_metrics.enabled
@@ -221,11 +221,11 @@ modules:
               default_value: "/var/log/netdata/otel/v2"
               required: false
             - name: logs.rotation.default.max_file_size
-              description: File size at which incoming logs start a new file.
+              description: File size at which incoming logs start a new file. Do not set it to 0, because every export request then makes a file of its own. The plugin logs a warning when it starts with a 0.
               default_value: "25MB"
               required: false
             - name: logs.rotation.default.max_entries
-              description: Entry count at which incoming logs start a new file.
+              description: Entry count at which incoming logs start a new file. Do not set it to 0, because every export request then makes a file of its own. The plugin logs a warning when it starts with a 0.
               default_value: 50000
               required: false
             - name: logs.retention.default.max_files
@@ -243,11 +243,11 @@ modules:
               default_value: "7 days"
               required: false
             - name: traces.rotation.default.max_file_size
-              description: File size at which incoming spans start a new file.
+              description: File size at which incoming spans start a new file. Do not set it to 0, because every export request then makes a file of its own. The plugin logs a warning when it starts with a 0.
               default_value: "25MB"
               required: false
             - name: traces.rotation.default.max_entries
-              description: Span count at which incoming spans start a new file.
+              description: Span count at which incoming spans start a new file. Do not set it to 0, because every export request then makes a file of its own. The plugin logs a warning when it starts with a 0.
               default_value: 50000
               required: false
             - name: traces.retention.default.max_files
