@@ -46,9 +46,8 @@
 //! (`ComponentHandle::spawn::<Cleaner>((), ...)`). Steady-state senders: the
 //! indexer-response handler and the retention pass
 //! (`otel-ledger/ledger/indexer.rs`, `ledger/retention.rs`). Recovery
-//! senders: `recovery/local.rs` (`recover_unindexed`, `recover_orphaned_wals`,
-//! `recover_retention` via `batch_recover`; `drain_wal_deletes` drains the
-//! WAL deletes `recover_unindexed` enqueues). Response handlers:
+//! senders: `recovery/local.rs` (`recover_orphaned_wals`, `recover_retention`
+//! via `batch_recover`). Response handlers:
 //! `handle_cleaner_resp` (`otel-ledger/ledger/cleaner.rs`) and the recovery
 //! handlers in `recovery/local.rs`. `cleaner/tests.rs` drives `process`
 //! directly.

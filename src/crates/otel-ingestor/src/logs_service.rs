@@ -344,6 +344,9 @@ pub struct NetdataLogsService {
     /// region, so tenants ingest in parallel and same-tenant requests overlap
     /// everything before that region.
     writers: Mutex<HashMap<TenantId, Arc<Mutex<wal::Writer>>>>,
+    /// One fsync round at a time per tenant; requests that arrive during a
+    /// round wait here, and one round after it covers them all.
+    sync_gates: crate::wal_sync::SyncGates,
     /// Canonical `ServiceStream` per `(tenant, ns_hash)`. First write
     /// wins; subsequent writes whose stream doesn't match are rejected via
     /// `partial_success`. In-memory only — on restart the table is empty and
@@ -388,6 +391,7 @@ impl NetdataLogsService {
     ) -> Self {
         Self {
             writers: Mutex::new(HashMap::new()),
+            sync_gates: crate::wal_sync::SyncGates::default(),
             canonical: Mutex::new(HashMap::new()),
             clock,
             sender,
@@ -714,7 +718,14 @@ impl NetdataLogsService {
                 )
             }
         };
-        {
+        // The writer lock covers the writes and the event sends, not the
+        // fsyncs: holding it across them serialized every request of the
+        // tenant behind the slowest fsync. Events still go out under the lock,
+        // so each file's Created/Synced/Closed reach the ledger in order.
+        // Fsync rounds take turns at the tenant's sync gate; a request whose
+        // bytes an earlier round already made durable skips its own
+        // (`wal_sync::make_durable`).
+        let target = {
             let mut writer = writer.lock().unwrap();
             for p in &prepared {
                 let ingestion_ns = self.clock.lock().unwrap().now_ns();
@@ -742,24 +753,20 @@ impl NetdataLogsService {
                         Status::internal("WAL write error")
                     })?;
             }
-            writer.sync_all().map_err(|e| {
-                tracing::error!(%e, "failed to sync WAL");
-                Status::internal("WAL sync error")
-            })?;
-            // Drain AND forward the lifecycle events while STILL holding the
-            // writer lock, so drain+send is atomic per tenant: a file's
-            // Created→Synced→Closed reach the single ledger channel in
-            // lock-acquisition (== logical) order. Sending after releasing the
-            // lock would let a concurrent op on the same tenant (another export,
-            // or the idle-rotation sweep) interleave its events. `send_events`
-            // is synchronous and non-blocking (unbounded channel), so no
-            // `.await` is held under the lock.
+            let target = writer.sync_target();
             let events = writer.take_all_events();
-            // `send_events` takes the tenant by value and the core only
-            // borrows it, so clone here — the last use of the id in this
-            // request either way.
             self.sender.send_events(tenant_id.clone(), events);
-        }
+            target
+        };
+        crate::wal_sync::make_durable(
+            writer,
+            self.sync_gates.gate(tenant_id),
+            Arc::clone(&self.sender),
+            tenant_id.clone(),
+            target,
+            "logs",
+        )
+        .await?;
 
         Ok(ExportLogsServiceResponse {
             partial_success: build_partial_success(&collisions, &oversized, out_of_window),

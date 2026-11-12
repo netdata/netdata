@@ -102,6 +102,13 @@ metrics:
 #   - the download cache for remote storage (see remote_storage below).
 base_dir: @logdir_POST@/otel/v2
 
+# glibc malloc arenas for the ingestor and ledger processes. "auto" gives one
+# per CPU, so their threads do not wait on each other's allocations; this
+# replaces netdata.conf's "glibc malloc arena max for plugins" for these two
+# processes. A number caps them, which can lower memory fragmentation at the
+# cost of ingestion throughput. Ignored where the C library is not glibc.
+malloc_arena_max: auto
+
 logs:
   rotation:
     # Incoming logs are appended to a current file; a new file starts when
@@ -128,6 +135,14 @@ logs:
     # my-tenant:
     #   max_age: "30 days"
 
+  indexers:
+    # Finished files are indexed in the background; a file is not queryable
+    # until it is indexed. The number of log files indexed in parallel
+    # starts at "min" and grows with the backlog up to "max" ("auto" = one per
+    # CPU). Each indexer uses one CPU core while it runs.
+    min: 1
+    max: auto
+
 traces:
   rotation:
     # Incoming spans are appended to a current file; a new file starts when
@@ -153,6 +168,14 @@ traces:
     # Per-tenant overrides (any subset of the fields above):
     # my-tenant:
     #   max_age: "30 days"
+
+  indexers:
+    # Finished files are indexed in the background; a file is not queryable
+    # until it is indexed. The number of trace files indexed in parallel
+    # starts at "min" and grows with the backlog up to "max" ("auto" = one per
+    # CPU). Each indexer uses one CPU core while it runs.
+    min: 1
+    max: auto
 
 remote_storage:
   # Upload data to remote object storage, in addition to keeping it on local

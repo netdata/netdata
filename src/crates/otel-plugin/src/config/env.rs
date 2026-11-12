@@ -30,7 +30,8 @@ use super::receivers::{
     DEPRECATED_ENDPOINT_KEYS, ProtocolOverride, ReceiversOverride, TlsOverride, resolve_deprecated,
 };
 use super::signal::{
-    AuthOverride, CatalogOverride, IngestOverride, RemoteStorageOverride, SignalOverride,
+    AuthOverride, CatalogOverride, IndexersOverride, IngestOverride, RemoteStorageOverride,
+    SignalOverride,
 };
 
 /// A snapshot of the `NETDATA_OTEL_CFG_*` environment (name → raw value).
@@ -208,6 +209,7 @@ impl ConfigOverride {
         let receivers = receivers_from_map(env)?;
         let metrics = MetricsOverride::from_map(env)?;
         let base_dir = get_env(env, "NETDATA_OTEL_CFG_BASE_DIR")?.map(PathBuf::from);
+        let malloc_arena_max = parse_env_var(env, "NETDATA_OTEL_CFG_MALLOC_ARENA_MAX")?;
         let remote_storage = RemoteStorageOverride::from_map(env)?;
         let auth = AuthOverride::from_map(env)?;
         let logs = SignalOverride::from_map(env, "LOGS")?;
@@ -224,6 +226,7 @@ impl ConfigOverride {
                 None
             },
             base_dir,
+            malloc_arena_max,
             remote_storage: if remote_storage.has_any() {
                 Some(remote_storage)
             } else {
@@ -334,6 +337,10 @@ impl SignalOverride {
             max_age: parse_env_duration(env, &var(prefix, "INGEST_MAX_AGE"))?,
             future_skew: parse_env_duration(env, &var(prefix, "INGEST_FUTURE_SKEW"))?,
         };
+        let indexers = IndexersOverride {
+            min: parse_env_var(env, &var(prefix, "INDEXERS_MIN"))?,
+            max: parse_env_var(env, &var(prefix, "INDEXERS_MAX"))?,
+        };
         Ok(Self {
             crc_enabled: parse_env_bool(env, &var(prefix, "CRC_ENABLED"))?,
             compression_enabled: parse_env_bool(env, &var(prefix, "COMPRESSION_ENABLED"))?,
@@ -357,6 +364,11 @@ impl SignalOverride {
                 None
             },
             ingest: if ingest.has_any() { Some(ingest) } else { None },
+            indexers: if indexers.has_any() {
+                Some(indexers)
+            } else {
+                None
+            },
             // The former plugin's journal dir stays YAML-only (`logs.journal_dir`,
             // consumed by `resolve_legacy_journal_dir`); no env var exists for it.
             journal_dir: None,

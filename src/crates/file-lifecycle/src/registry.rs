@@ -255,15 +255,16 @@ impl Registry {
 
     /// Whether any artifact for `seq` is still tracked (a WAL entry or an
     /// SFST entry). The post-recovery routing filter keys on this: a seq
-    /// recovery dropped entirely (an unsealable orphan, a drained empty-WAL
-    /// seal) must not be routed, or its `seq_to_tenant` entry dangles for
-    /// the process lifetime.
+    /// recovery dropped entirely (an SFST the retention pass evicted) must
+    /// not be routed, or its `seq_to_tenant` entry dangles for the process
+    /// lifetime.
     pub fn holds_seq(&self, seq: u64) -> bool {
         self.wal.get(seq).is_some() || self.sfst.get(seq).is_some()
     }
 
     /// Returns FileIds of archived WAL files that have no corresponding index —
-    /// the set startup recovery re-indexes (`recovery::local::recover_unindexed`).
+    /// the set the pipeline builder queues on the indexer at startup
+    /// (otel-ledger `build_pipeline`).
     pub fn unindexed_ids(&self) -> Vec<FileId> {
         self.wal
             .archived_files()
