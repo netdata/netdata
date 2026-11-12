@@ -90,6 +90,7 @@ func TestRelationSelectionJobEmission(t *testing.T) {
 	assert.Contains(t, output[0], "CHART '"+chartID+"'")
 	assert.Contains(t, output[2], "obsolete")
 	assert.NotContains(t, output[2], "BEGIN '"+chartID+"'")
+	assert.Contains(t, output[3], "CHART '"+chartID+"'")
 	assert.Contains(t, output[3], "BEGIN '"+chartID+"'\n")
 	assert.Contains(t, output[3], "SET 'inserted' = 10000")
 	assert.Contains(t, output[3], "BEGIN 'postgres_selection.table_t_db_db_schema_public_ops_rows_hot_ratio'\nSET 'hot' = \nEND")

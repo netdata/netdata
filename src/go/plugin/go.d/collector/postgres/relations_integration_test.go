@@ -60,7 +60,7 @@ func TestRelationSelectionPostgreSQL(t *testing.T) {
 	require.NotNil(t, secondary)
 	require.NotNil(t, secondary.db)
 	assert.Empty(t, c.relationsFor(secondary.db).tables.selected)
-	// Equal sizes break ties by schema and name.
+	// Equal sizes fall back to name order; all three indexes are in public.
 	assert.Equal(t, []string{"a_pkey"}, selectedNames(c.relationsFor(secondary.db).indexes))
 	secondaryWork, secondaryConnStr, err := c.openSecondaryConnection("netdata_top_secondary")
 	require.NoError(t, err)
