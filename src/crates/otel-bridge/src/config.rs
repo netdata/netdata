@@ -47,12 +47,6 @@ use crate::signals::Signal;
 pub struct PluginConfig {
     pub receivers: ReceiversConfig,
     pub metrics: MetricsConfig,
-    /// Metrics the plugin derives from the logs and traces it ingests
-    /// (per-service request rates, errors and durations; log records per
-    /// severity). Optional in YAML; an absent section enables them with the
-    /// default cap.
-    #[serde(default)]
-    pub derived_metrics: DerivedMetricsConfig,
     /// Single mandatory root for all signal storage. The plugin derives each
     /// signal's subtree as `{base_dir}/{signal}/{wal,index,catalog}`; the
     /// download cache shared by every signal is `{base_dir}/remote-read`, and
@@ -313,45 +307,6 @@ pub struct MetricsConfig {
 /// ([`PluginConfig::correct_harmful_values`]). The otel-plugin test of the
 /// shipped stock file pins it against the shipped value.
 pub const DEFAULT_MAX_NEW_CHARTS_PER_REQUEST: usize = 100;
-
-/// Metrics derived from ingested logs and traces.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct DerivedMetricsConfig {
-    /// Emit the derived charts.
-    #[serde(default = "default_derived_metrics_enabled")]
-    pub enabled: bool,
-    /// Services tracked at once, per signal; records of further services are
-    /// counted in one overflow chart set until tracked services go idle.
-    #[serde(default = "default_derived_metrics_max_services")]
-    pub max_services: usize,
-}
-
-impl Default for DerivedMetricsConfig {
-    fn default() -> Self {
-        Self {
-            enabled: default_derived_metrics_enabled(),
-            max_services: default_derived_metrics_max_services(),
-        }
-    }
-}
-
-impl DerivedMetricsConfig {
-    pub fn validate(&self) -> Result<(), String> {
-        if self.max_services == 0 {
-            return Err("max_services must be at least 1".to_string());
-        }
-        Ok(())
-    }
-}
-
-fn default_derived_metrics_enabled() -> bool {
-    true
-}
-
-fn default_derived_metrics_max_services() -> usize {
-    500
-}
 
 impl SignalConfig {
     /// This signal's part of [`PluginConfig::correct_harmful_values`], for the

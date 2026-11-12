@@ -15,7 +15,6 @@
 //! - `receivers`, `metrics`, `signal`: per-section override types
 //! - `legacy`: turns a former-schema user file into a migration guide
 
-mod derived_metrics;
 mod env;
 mod legacy;
 mod metrics;
@@ -29,7 +28,6 @@ use anyhow::{Context, Result};
 use otel_bridge::config::{PluginConfig, ProtocolConfig, TlsServerConfig};
 use serde::Deserialize;
 
-use derived_metrics::DerivedMetricsOverride;
 use metrics::MetricsOverride;
 use receivers::{DeprecatedEndpointOverride, ReceiversOverride};
 use signal::{AuthOverride, RemoteStorageOverride, SignalOverride};
@@ -432,11 +430,6 @@ fn validate(config: &PluginConfig) -> Result<()> {
         );
     }
 
-    config
-        .derived_metrics
-        .validate()
-        .map_err(|e| anyhow::anyhow!("derived_metrics.{e}"))?;
-
     // Catalog retention (horizon) must outlive SFST retention (max_age) in day
     // units, or a catalog could be evicted while the SFSTs it gates are still
     // local — wedging their eviction. Checked per signal, for the default and
@@ -478,8 +471,6 @@ pub(crate) struct ConfigOverride {
     endpoint: Option<DeprecatedEndpointOverride>,
     #[serde(default)]
     metrics: Option<MetricsOverride>,
-    #[serde(default)]
-    derived_metrics: Option<DerivedMetricsOverride>,
     #[serde(default)]
     base_dir: Option<PathBuf>,
     #[serde(default)]
@@ -526,7 +517,6 @@ impl ConfigOverride {
     fn has_any(&self) -> bool {
         self.receivers.is_some()
             || self.metrics.is_some()
-            || self.derived_metrics.is_some()
             || self.base_dir.is_some()
             || self.remote_storage.is_some()
             || self.auth.is_some()
@@ -544,9 +534,6 @@ fn apply_overrides(config: &mut PluginConfig, o: &ConfigOverride) {
     }
     if let Some(m) = &o.metrics {
         metrics::apply(&mut config.metrics, m);
-    }
-    if let Some(d) = &o.derived_metrics {
-        derived_metrics::apply(&mut config.derived_metrics, d);
     }
     if let Some(b) = &o.base_dir {
         config.base_dir = b.clone();
@@ -1134,23 +1121,6 @@ traces:
         assert_eq!(config.metrics.interval_secs, Some(30));
         assert_eq!(config.metrics.grace_period_secs, Some(60));
         assert_eq!(config.metrics.max_new_charts_per_request, 100);
-    }
-
-    #[test]
-    fn derived_metrics_default_and_override() {
-        let config = resolve_with_user("").unwrap();
-        assert!(config.derived_metrics.enabled);
-        assert_eq!(config.derived_metrics.max_services, 500);
-
-        let config = resolve_with_user("derived_metrics:\n  enabled: false\n").unwrap();
-        assert!(!config.derived_metrics.enabled);
-        assert_eq!(config.derived_metrics.max_services, 500);
-
-        let err = resolve_with_user("derived_metrics:\n  max_services: 0\n").unwrap_err();
-        assert!(
-            format!("{err:#}").contains("derived_metrics.max_services"),
-            "{err:#}"
-        );
     }
 
     #[test]
@@ -1953,18 +1923,6 @@ logs:
         )]))
         .unwrap();
         assert_eq!(o.metrics.as_ref().unwrap().interval_secs, Some(30));
-    }
-
-    #[test]
-    fn env_override_derived_metrics() {
-        let o = ConfigOverride::from_map(&env_map(&[
-            ("NETDATA_OTEL_CFG_DERIVED_METRICS_ENABLED", "false"),
-            ("NETDATA_OTEL_CFG_DERIVED_METRICS_MAX_SERVICES", "20"),
-        ]))
-        .unwrap();
-        let d = o.derived_metrics.as_ref().unwrap();
-        assert_eq!(d.enabled, Some(false));
-        assert_eq!(d.max_services, Some(20));
     }
 
     #[test]

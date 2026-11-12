@@ -655,9 +655,8 @@ mod tests {
             .unwrap()
             .as_nanos() as u64;
         let tenant = TenantId::default_tenant();
-        let derived = Arc::new(
-            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
-        );
+        let derived =
+            Arc::new(DerivedMetrics::new(otel_derived_metrics::Settings::default()).unwrap());
         let recorder = Arc::new(Recorder::default());
         let tmp = tempfile::tempdir().unwrap();
         let mut service = test_service(tmp.path().to_path_buf());
@@ -702,9 +701,8 @@ mod tests {
             .unwrap()
             .as_nanos() as u64;
         let tenant = TenantId::default_tenant();
-        let derived = Arc::new(
-            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
-        );
+        let derived =
+            Arc::new(DerivedMetrics::new(otel_derived_metrics::Settings::default()).unwrap());
         let tmp = tempfile::tempdir().unwrap();
 
         // Stored: three root spans count as three requests.
@@ -848,9 +846,8 @@ mod tests {
             .unwrap()
             .as_nanos() as u64;
         let tenant = TenantId::default_tenant();
-        let derived = Arc::new(
-            DerivedMetrics::new(&otel_bridge::config::DerivedMetricsConfig::default()).unwrap(),
-        );
+        let derived =
+            Arc::new(DerivedMetrics::new(otel_derived_metrics::Settings::default()).unwrap());
         let recorder = Arc::new(Recorder::default());
         let tmp = tempfile::tempdir().unwrap();
         let mut service = test_service(tmp.path().to_path_buf());

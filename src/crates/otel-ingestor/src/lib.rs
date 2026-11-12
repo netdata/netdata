@@ -179,9 +179,17 @@ async fn run_ingestor(
     // ingest outcomes. The export services record into it; the tick loop
     // renders it. Its stores have their own locks, apart from the
     // ChartManager's.
-    let derived_metrics = Arc::new(
-        DerivedMetrics::new(&config.derived_metrics).context("declaring the derived metrics")?,
-    );
+    let derived_settings = otel_derived_metrics::Settings::from_environment()?;
+    if derived_settings != otel_derived_metrics::Settings::default() {
+        tracing::info!(
+            "the environment replaces the settings of the derived metrics: enabled {}, at most {} services",
+            derived_settings.enabled,
+            derived_settings.max_services
+        );
+    }
+
+    let derived_metrics =
+        Arc::new(DerivedMetrics::new(derived_settings).context("declaring the derived metrics")?);
 
     // Arc-shared: the gRPC server and the OTLP/HTTP router both hold the
     // metrics service (chart emission is transport-agnostic).

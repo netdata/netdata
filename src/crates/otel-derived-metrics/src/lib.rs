@@ -16,16 +16,17 @@ mod self_monitoring;
 mod service;
 mod service_log_records;
 mod service_requests;
+mod settings;
 mod shared_aggregator;
 
 use netdata_plugin_metrics::Batch;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
-use otel_bridge::config::DerivedMetricsConfig;
 use otel_bridge::signals::Signal;
 use self_monitoring::{DerivationHealth, IngestOutcomes};
 use service_log_records::ServiceLogRecords;
 use service_requests::ServiceRequests;
+pub use settings::{ENABLED_VARIABLE, MAX_SERVICES, MAX_SERVICES_VARIABLE, Settings};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -99,11 +100,11 @@ impl DerivedMetrics {
     /// # Errors
     ///
     /// A metric set that the plugin declares wrongly.
-    pub fn new(config: &DerivedMetricsConfig) -> Result<Self, netdata_plugin_metrics::Error> {
-        let per_service = if config.enabled {
+    pub fn new(settings: Settings) -> Result<Self, netdata_plugin_metrics::Error> {
+        let per_service = if settings.enabled {
             Some(PerServiceMetrics {
-                requests: Arc::new(ServiceRequests::new(config.max_services)?),
-                log_records: Arc::new(ServiceLogRecords::new(config.max_services)?),
+                requests: Arc::new(ServiceRequests::new(settings.max_services)?),
+                log_records: Arc::new(ServiceLogRecords::new(settings.max_services)?),
                 health: DerivationHealth::new()?,
             })
         } else {
@@ -234,7 +235,7 @@ mod tests {
 
     #[test]
     fn counts_committed_batches_and_charts_the_derivation() {
-        let derived = DerivedMetrics::new(&DerivedMetricsConfig::default()).unwrap();
+        let derived = DerivedMetrics::new(Settings::default()).unwrap();
         let now = unix_now();
 
         let mut spans = derived.spans_batch().unwrap();
@@ -269,11 +270,11 @@ mod tests {
 
     #[test]
     fn disabled_keeps_only_the_ingest_outcomes() {
-        let config = DerivedMetricsConfig {
+        let settings = Settings {
             enabled: false,
-            ..DerivedMetricsConfig::default()
+            ..Settings::default()
         };
-        let derived = DerivedMetrics::new(&config).unwrap();
+        let derived = DerivedMetrics::new(settings).unwrap();
         assert!(derived.spans_batch().is_none());
         assert!(derived.logs_batch().is_none());
 

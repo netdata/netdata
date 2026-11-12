@@ -740,7 +740,7 @@ fn unix_now_ns() -> u64 {
 /// own.
 impl Default for NetdataMetricsService {
     fn default() -> Self {
-        let derived_metrics = DerivedMetrics::new(&Default::default())
+        let derived_metrics = DerivedMetrics::new(Default::default())
             .expect("the stock derived-metrics declaration is valid");
 
         Self {

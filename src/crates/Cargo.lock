@@ -3670,6 +3670,7 @@ dependencies = [
 name = "otel-derived-metrics"
 version = "0.1.3"
 dependencies = [
+ "anyhow",
  "netdata-plugin-metrics",
  "netdata-plugin-protocol",
  "opentelemetry-proto",
