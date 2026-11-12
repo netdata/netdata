@@ -366,7 +366,6 @@ mod tests {
     async fn the_events_that_wait_for_the_ledger_are_counted() {
         use std::sync::atomic::{AtomicU64, Ordering};
 
-        let tmp = tempfile::tempdir().unwrap();
         let socket = format!(
             "/tmp/netdata-tenant-writers-queue-test-{}.sock",
             std::process::id()
@@ -406,7 +405,6 @@ mod tests {
                 .expect("recv wal message");
         }
         assert_eq!(queued.load(Ordering::Relaxed), 0);
-        let _ = tmp;
     }
 
     #[tokio::test]

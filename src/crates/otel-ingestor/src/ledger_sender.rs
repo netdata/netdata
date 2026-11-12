@@ -77,8 +77,11 @@ impl LedgerSender {
                 tenant_id: tenant_id.clone(),
                 event,
             };
-            if self.tx.send(msg).is_ok() {
-                self.queued.fetch_add(1, Ordering::Relaxed);
+            // Counted before the push: the sending task, on another thread,
+            // can take the message at once and count it down.
+            self.queued.fetch_add(1, Ordering::Relaxed);
+            if self.tx.send(msg).is_err() {
+                self.queued.fetch_sub(1, Ordering::Relaxed);
             }
         }
     }
@@ -123,4 +126,6 @@ async fn sender_task(
             break;
         }
     }
+    // Nothing is sent any more, and what is left in the queue goes with it.
+    queued.store(0, Ordering::Relaxed);
 }
