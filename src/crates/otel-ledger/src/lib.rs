@@ -25,6 +25,7 @@ pub mod index_child;
 pub mod indexer;
 mod indexing_charts;
 mod ledger;
+mod storage_charts;
 #[cfg(test)]
 pub(crate) mod test_helpers;
 

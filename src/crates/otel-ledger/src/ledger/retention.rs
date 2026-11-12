@@ -22,19 +22,60 @@ use file_lifecycle::ipc::CleanerRequest;
 use file_lifecycle::recovery::now_ns;
 
 use super::Ledger;
+use crate::storage_charts::IndexTotals;
 use file_lifecycle::helpers::{catalog_retention_days, sfst_retention_policy};
 
 impl Ledger {
-    /// Run retention for every tenant of every signal.
+    /// Run retention for every tenant of every signal, then leave the
+    /// totals of each signal's index files for the storage charts.
     pub(super) async fn evaluate_retention_of_all_tenants(&mut self) {
         for signal in [Signal::Logs, Signal::Traces] {
             let registries = self.pipelines.get(signal).registries().clone();
             let tenant_ids = registries.read().await.tenant_ids();
 
-            for tenant_id in tenant_ids {
-                self.evaluate_retention(signal, &tenant_id).await;
+            for tenant_id in &tenant_ids {
+                self.evaluate_retention(signal, tenant_id).await;
             }
+
+            let totals = self.index_totals(signal, &tenant_ids).await;
+            self.storage_totals.set(signal, totals);
         }
+    }
+
+    /// The index files of `signal` on the local disk, over `tenant_ids`: how
+    /// many, how large, and how many are over a retention limit but stay
+    /// until remote storage confirms their catalog entry. Files whose
+    /// deletion is on its way are not counted.
+    async fn index_totals(&self, signal: Signal, tenant_ids: &[TenantId]) -> IndexTotals {
+        let pipeline = self.pipelines.get(signal);
+        let storage_enabled = self.uploader.is_some();
+        let registries = pipeline.registries().read().await;
+
+        let mut totals = IndexTotals::default();
+        for tenant_id in tenant_ids {
+            let Some(registry) = registries.get(tenant_id) else {
+                continue;
+            };
+            for file in registry.sfst.values() {
+                if !file.is_pending_deletion() {
+                    totals.files += 1;
+                    totals.bytes += file.size.0;
+                }
+            }
+
+            let retention = pipeline
+                .config()
+                .index
+                .retention
+                .resolve(tenant_id.as_str());
+            let evictions = registry.index_evictions(
+                &sfst_retention_policy(&retention),
+                now_ns(),
+                storage_enabled,
+            );
+            totals.waiting_for_remote += evictions.deferred.len() as u64;
+        }
+        totals
     }
 
     /// Cancel-safety invariant: the mark-then-send-then-clear-on-failure

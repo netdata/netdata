@@ -418,6 +418,8 @@ modules:
         Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
 
         The plugin also makes charts about the data it receives, listed below. These charts count the records of an export when the plugin accepts the export, even when it rejects some of its records. When the plugin cannot store the records of an export of logs or spans (a storage error), the records show as `failed`, and the sender sends them again. An export that fails for another reason does not show on these charts.
+
+        The charts of the index files (`netdata.otel.index_files`, `netdata.otel.index_size`, `netdata.otel.index_files_waiting_for_remote`) are totals of all tenants, and the plugin updates them every 30 seconds. The retention limits are per tenant: compare the totals with the limits that you configured. A file waits for remote storage when it is over a retention limit but remote storage did not confirm its catalog entry yet. Such files stay on the local disk, so the disk can hold more than the limits while remote storage is unreachable.
       availability: []
       dynamic_context_prefixes:
         - prefix: otel.
@@ -472,6 +474,27 @@ modules:
               dimensions:
                 - name: succeeded
                 - name: failed
+            - name: netdata.otel.index_files
+              description: Index files on the local disk
+              unit: files
+              chart_type: stacked
+              dimensions:
+                - name: logs
+                - name: traces
+            - name: netdata.otel.index_size
+              description: Size of the index files on the local disk
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: logs
+                - name: traces
+            - name: netdata.otel.index_files_waiting_for_remote
+              description: Index files over the retention limits that wait for remote storage
+              unit: files
+              chart_type: stacked
+              dimensions:
+                - name: logs
+                - name: traces
         - name: signal
           description: One signal, logs or traces, that the per-service charts are made from, when `derived_metrics.enabled` is `true`.
           labels:

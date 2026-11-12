@@ -120,6 +120,9 @@ pub struct Ledger {
     /// global byte budget), keyed by `(seq, chunk index)`. A WAL's chunks are
     /// dropped when its authoritative SFST registers (or the WAL proves empty).
     chunk_cache: Arc<ChunkCache>,
+    /// The totals of the local index files that the periodic retention pass
+    /// takes, for the storage charts.
+    storage_totals: Arc<crate::storage_charts::StorageTotals>,
     /// Indexes the traces WALs' chunks as the writer syncs, so traces
     /// queries rarely index one; fed each traces `Synced` event, told to
     /// forget a WAL when its chunks drop.
@@ -378,6 +381,15 @@ impl Ledger {
             outbound_tx.clone(),
             cancel.child_token(),
         ));
+        let storage_totals = Arc::new(crate::storage_charts::StorageTotals::default());
+        let storage_charts = crate::storage_charts::StorageCharts::new()
+            .context("failed to declare the storage charts")?;
+        tokio::spawn(crate::storage_charts::run(
+            storage_charts,
+            Arc::clone(&storage_totals),
+            outbound_tx.clone(),
+            cancel.child_token(),
+        ));
 
         let ingestor = file_lifecycle::ipc::accept_writer(writer_socket_path).await?;
         tracing::info!("ingestor connected");
@@ -397,6 +409,7 @@ impl Ledger {
             upload_retry: file_lifecycle::upload_retry::UploadRetry::default(),
             periodic_timer,
             chunk_cache,
+            storage_totals,
             traces_chunk_indexer,
             cancel,
             outbound_tx,
