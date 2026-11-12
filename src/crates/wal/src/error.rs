@@ -149,7 +149,7 @@ pub enum Error {
 
     /// `Registry::apply_event` got a `Created` whose seq is already
     /// tracked. The seq allocator issues one seq per file creation, so a
-    /// duplicate means a replayed or reordered `Created` event; the
+    /// duplicate means a `Created` applied twice; the
     /// explicit check is the dedup, because the underlying file-registry
     /// would silently replace the entry. otel-ledger logs and drops the
     /// event on it. Message-only.
@@ -157,8 +157,8 @@ pub enum Error {
     DuplicateSequence(u64),
 
     /// `Registry::apply_event` got a `Synced` or `Closed` naming a file the
-    /// registry does not track — its `Created` was lost, or the entry was
-    /// already removed. otel-ledger logs and drops the event, leaving the
+    /// registry does not track — no `Created` was applied for it, or the
+    /// entry was already removed. otel-ledger logs and drops the event, leaving the
     /// file untracked. Message-only.
     #[error("unknown sequence {0}: file not tracked")]
     UnknownSequence(u64),

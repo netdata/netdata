@@ -290,9 +290,8 @@ pub enum FileEvent {
         /// Durable prefix at seal time: the end of the last frame fsynced
         /// before the seal. May postdate the last `Synced` (the
         /// idle-rotation and `Drop` close paths seal without emitting a
-        /// final `Synced`); carried so a sealed file's prefix is
-        /// authoritative even if the final `Synced` was reordered or lost
-        /// in flight to the ledger.
+        /// final `Synced`); carried so a sealed file's prefix does not
+        /// depend on a `Synced` before it.
         valid_up_to: ByteSize,
         /// Log records in that durable prefix at seal time.
         entry_count: u64,

@@ -238,20 +238,22 @@ impl Registry {
     ///   the writer's current accumulator state — every event re-reports
     ///   the totals, not a delta, so a direct overwrite is correct. Ignored
     ///   (reported as success) for an `Archived` file: `Closed` is
-    ///   authoritative and final, and a late or reordered `Synced` must not
+    ///   authoritative and final, and a `Synced` applied after it must not
     ///   regress a sealed file's prefix.
     /// - `Closed`: seal — set `Archived` and write the final size, range,
     ///   and durable prefix. The event carries the durable prefix itself,
-    ///   so the sealed entry is correct even if the final `Synced` was
-    ///   reordered or lost in flight. `Error::AlreadyClosed` for a file that
+    ///   so the sealed entry does not depend on a `Synced` before it (the
+    ///   writer's idle rotation sends none). `Error::AlreadyClosed` for a file that
     ///   is `Archived` already: a file is closed once, and the caller starts
     ///   an indexing operation for every `Closed` that is applied.
     ///
     /// Errors: `Error::UnknownSequence` when `Synced`/`Closed` names a file
-    /// the registry does not track (its `Created` was lost, or the entry
-    /// was already removed). otel-ledger logs and drops the event on any
-    /// of the three errors. The `frame_count` field is informational; the registry
-    /// ignores it.
+    /// the registry does not track (no `Created` was applied for it, or the
+    /// entry was already removed). otel-ledger logs and drops the event on
+    /// any of the three errors. The event link delivers a file's events once
+    /// and in order ([`Message`](crate::Message)), so a ledger does not meet
+    /// them: they are the registry's own rules, whoever feeds it. The
+    /// `frame_count` field is informational; the registry ignores it.
     pub fn apply_event(&mut self, event: &FileEvent) -> Result<()> {
         match event {
             FileEvent::Created {

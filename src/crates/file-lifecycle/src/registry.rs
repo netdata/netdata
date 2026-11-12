@@ -460,7 +460,7 @@ impl TenantRegistries {
     /// Errors are `wal::Registry::apply_event`'s bookkeeping rejections
     /// (`Error::DuplicateSequence` for a replayed `Created`,
     /// `Error::UnknownSequence` for a `Synced`/`Closed` whose `Created` was
-    /// lost, `Error::AlreadyClosed` for a second `Closed`); the caller
+    /// never applied, `Error::AlreadyClosed` for a second `Closed`); the caller
     /// (otel-ledger's ingestor) logs and drops the event. A refused event
     /// leaves no route: a route says that the tenant's registry tracks the
     /// file.

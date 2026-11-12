@@ -565,13 +565,18 @@ mod tests {
             }
         }
 
+        // With the writers gone the sender ends and closes the link: read
+        // every event that was sent, to the end.
+        drop(writers);
         let mut events_of_file: HashMap<u64, Vec<wal::FileEvent>> = HashMap::new();
         let mut closed_files = 0;
-        while closed_files < files_on_disk {
-            let message = tokio::time::timeout(Duration::from_secs(10), conn.recv())
+        loop {
+            let received = tokio::time::timeout(Duration::from_secs(10), conn.recv())
                 .await
-                .expect("the `Closed` of every file must reach the ledger")
-                .expect("recv wal message");
+                .expect("the link must close when the writers are gone");
+            let Ok(message) = received else {
+                break;
+            };
             let seq = match &message.event {
                 Created { file_id, .. } | Synced { file_id, .. } | Closed { file_id, .. } => {
                     file_id.seq
@@ -583,6 +588,7 @@ mod tests {
             events_of_file.entry(seq).or_default().push(message.event);
         }
 
+        assert_eq!(closed_files, files_on_disk);
         assert_eq!(events_of_file.len(), files_on_disk);
         assert!(files_on_disk > TENANTS.len(), "the sweep sealed no file");
         for (seq, events) in &events_of_file {
