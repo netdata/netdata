@@ -47,11 +47,6 @@ func buildDynamicV3Trap(t *testing.T, user, engineIDHex, trapOID string) []byte 
 	return buildV3SecuredTrapWithFlags(t, dynamicV3Spec(user, engineIDHex, trapOID), gosnmp.AuthPriv)
 }
 
-func buildDynamicV3Inform(t *testing.T, user, engineIDHex, trapOID string) []byte {
-	t.Helper()
-	return buildV3SecuredInformWithFlags(t, dynamicV3Spec(user, engineIDHex, trapOID), gosnmp.AuthPriv)
-}
-
 func dynamicV3Spec(user, engineIDHex, trapOID string) v3SecuredTrapSpec {
 	return v3SecuredTrapSpec{
 		user:        user,
@@ -129,19 +124,30 @@ func TestDynamicEngineIDConcurrentDuplicateRegistration(t *testing.T) {
 	}
 }
 
-// An inform naming another engine is answered by that engine: it is not
-// learned, and a trap from that engine is learned after it.
+// An inform naming another engine is answered by that engine: one that reaches
+// learning (unreportable, from a name the job may learn) is not learned, and a
+// trap from that engine is learned after it.
 func TestDynamicEngineIDDoesNotRegisterInform(t *testing.T) {
-	inform := buildDynamicV3Inform(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
-	recv, events, peer := newDynamicTestReceiver(t, 0, RateLimitConfig{})
+	recorder := &receiverEventRecorder{}
+	recv := New(NewPolicy(PolicyConfig{
+		Versions:        []string{"v3"},
+		USMUsers:        []USMUser{securityLevelNoAuthUser("")},
+		DynamicEngineID: true,
+	}), recorder.report)
+	require.NoError(t, recv.PrepareV3(t.TempDir(), "dynamic-inform-test"))
+	t.Cleanup(recv.RollbackPreparedState)
+	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+
+	inform := setV3Flags(t, buildV3InformWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1"), byte(gosnmp.NoAuthNoPriv))
 	result := recv.Process(Datagram{Data: inform, PeerIP: peer.IP, Peer: peer})
 	require.NotNil(t, result.DecodeFailure)
 	assert.Equal(t, ErrorUnknownEngine, result.DecodeFailure.Kind)
-	assert.Zero(t, events.count(EventDynamicEngineIDRegistered, ""))
+	assert.ErrorContains(t, result.DecodeFailure.Err, "asks another engine ID", "the inform decoded and was refused, not left unanswered")
+	assert.Zero(t, recorder.count(EventDynamicEngineIDRegistered, ""))
 
-	trap := buildDynamicV3Trap(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
+	trap := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
 	assert.NotNil(t, recv.Process(Datagram{Data: trap, PeerIP: peer.IP, Peer: peer}).PDU)
-	assert.Equal(t, 1, events.count(EventDynamicEngineIDRegistered, ""))
+	assert.Equal(t, 1, recorder.count(EventDynamicEngineIDRegistered, ""))
 }
 
 func TestDynamicEngineIDNoStateForUnknownUsername(t *testing.T) {
@@ -255,4 +261,23 @@ func TestDynamicEngineIDDropsDegenerateEngineIDs(t *testing.T) {
 			assert.Zero(t, events.count(EventDynamicEngineIDRegistered, ""))
 		})
 	}
+}
+
+// The receiver learns an engine when the message authenticates, before the
+// collector's own checks: a learned engine is reported once also when those
+// checks then reject the message.
+func TestDynamicEngineIDRegistrationReportedWhenDecodeFails(t *testing.T) {
+	spec := dynamicV3Spec("testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
+	spec.extra = []gosnmp.VarBind{{Name: "1.3.6.1.4.1.99999.1", Value: gosnmp.OctetStringValue(make([]byte, maxOctetStringLen+1))}}
+	malformed := buildV3SecuredTrapWithFlags(t, spec, gosnmp.AuthPriv)
+	recv, events, peer := newDynamicTestReceiver(t, 0, RateLimitConfig{})
+
+	result := recv.Process(Datagram{Data: malformed, PeerIP: peer.IP, Peer: peer})
+	require.NotNil(t, result.DecodeFailure)
+	assert.Equal(t, ErrorMalformedPDU, result.DecodeFailure.Kind)
+	assert.Equal(t, 1, events.count(EventDynamicEngineIDRegistered, ""))
+
+	trap := buildDynamicV3Trap(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
+	assert.NotNil(t, recv.Process(Datagram{Data: trap, PeerIP: peer.IP, Peer: peer}).PDU)
+	assert.Equal(t, 1, events.count(EventDynamicEngineIDRegistered, ""), "the engine was learned by the first message")
 }

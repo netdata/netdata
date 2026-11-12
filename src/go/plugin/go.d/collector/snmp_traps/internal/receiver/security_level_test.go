@@ -368,3 +368,29 @@ func TestV3SecurityLevelDynamicMixedLevelUser(t *testing.T) {
 		})
 	}
 }
+
+// In dynamic mode a configured engine_id registers only its own user names
+// there: another name's message from that engine is decided by the name's
+// learned users, as from any other engine.
+func TestV3SecurityLevelDynamicOtherNameAtConfiguredEngine(t *testing.T) {
+	recorder := &receiverEventRecorder{}
+	recv := New(NewPolicy(PolicyConfig{
+		Versions: []string{"v3"},
+		USMUsers: []USMUser{
+			securityLevelNoAuthUser(""),
+			securityLevelAuthUser(testEngineIDHex),
+			{Username: "otheruser", EngineID: securityLevelOtherEngineIDHex, AuthProto: "none", PrivProto: "none"},
+		},
+		DynamicEngineID: true,
+	}), recorder.report)
+	require.NoError(t, recv.PrepareV3(t.TempDir(), "security-level-dynamic-other-name-test"))
+	t.Cleanup(recv.RollbackPreparedState)
+	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+
+	data := buildV3TrapWithEngineID(t, "testuser", securityLevelOtherEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
+	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer})
+
+	assert.NotNil(t, result.PDU, "decode failure: %+v", result.DecodeFailure)
+	assert.Zero(t, recorder.count(EventError, ErrorUSMFailure))
+	assert.Equal(t, 1, recorder.count(EventDynamicEngineIDRegistered, ""))
+}

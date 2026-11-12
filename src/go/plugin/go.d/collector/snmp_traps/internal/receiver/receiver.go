@@ -279,6 +279,10 @@ func (r *Receiver) Process(datagram Datagram) Result {
 
 	trustedRelay := r.trustedRelaySource(decodePeerIP)
 	packetContext, response, err := decodeTrapWithOptions(data, versionKnown && sniffedVersion == model.SnmpVersionV3, decodePeerIP, r.receiver, decodeOptions{trustedRelay: trustedRelay})
+	if packetContext != nil {
+		// An engine the receiver learned stays learned whatever Netdata decides.
+		r.reportLearned(packetContext.Notification)
+	}
 	if err != nil {
 		// A Report answers a rejected SNMPv3 message: send it after one
 		// rate-limit token, since its source can be forged and it can be larger
@@ -327,14 +331,6 @@ func (r *Receiver) Process(datagram Datagram) Result {
 		r.reportError(ErrorUnknownEngine)
 		return Result{}
 	}
-	if packetContext.Notification.Learned {
-		r.reportEvent(Event{
-			Type:     EventDynamicEngineIDRegistered,
-			EngineID: hex.EncodeToString(msg.SecurityParameters.AuthoritativeEngineID),
-			Username: msg.SecurityParameters.UserName,
-		})
-	}
-
 	// An accepted INFORM is acknowledged before the rate limit, so a rate-limited
 	// INFORM is still acked while its content is dropped.
 	if pdu.PduType == model.PduTypeInform && response != nil && datagram.Conn != nil && datagram.Peer != nil {
@@ -349,6 +345,18 @@ func (r *Receiver) Process(datagram Datagram) Result {
 		}
 	}
 	return Result{PDU: packetContext.PDU}
+}
+
+// reportLearned reports the engine the receiver learned from n, if it did.
+func (r *Receiver) reportLearned(n *gosnmp.Notification) {
+	if n == nil || !n.Learned {
+		return
+	}
+	r.reportEvent(Event{
+		Type:     EventDynamicEngineIDRegistered,
+		EngineID: hex.EncodeToString(n.Message.SecurityParameters.AuthoritativeEngineID),
+		Username: n.Message.SecurityParameters.UserName,
+	})
 }
 
 // trapNamesUnauthorizedLocalEngine reports a static job's trap that names the

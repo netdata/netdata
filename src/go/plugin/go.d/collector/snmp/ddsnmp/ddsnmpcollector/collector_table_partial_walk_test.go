@@ -20,8 +20,8 @@ import (
 
 // A walk an error-status ended keeps the rows before it: they are collected
 // and feed the tables that depend on them, the status counts as an SNMP error,
-// and nothing built from the partial rows is served from the cache: the next
-// collection walks both tables again (the mock allows no GET).
+// and nothing built from the partial rows is cached: the next collection walks
+// both tables again (the mock allows no GET).
 func TestCollector_PartialTableWalk(t *testing.T) {
 	const (
 		table      = "1.3.6.1.4.1.25461.1.1.7.1.2.1"
@@ -116,14 +116,16 @@ func TestCollector_PartialTableWalk(t *testing.T) {
 				assert.ElementsMatch(t, want, result[0].Metrics, "collection %d", i+1)
 				if i == 0 {
 					assert.EqualValues(t, 1, result[0].Stats.Errors.SNMP, "the status is an SNMP error")
+					assert.False(t, collector.tableCache.isConfigCached(profile.Definition.Metrics[0]), "no structure built from partial rows is cached")
 				}
 			}
 		})
 	}
 }
 
-// A licensing walk an error-status ended keeps the rows before it, and those
-// of a dependency feed the rows' tags; the status is a licensing failure.
+// A licensing walk an error-status ended keeps the rows before it, none
+// included, and those of a dependency feed the rows' tags; the status is a
+// licensing failure, not a failed collection.
 func TestCollector_PartialLicensingWalk(t *testing.T) {
 	const (
 		table   = "1.3.6.1.4.1.99999.6"
@@ -145,6 +147,11 @@ func TestCollector_PartialLicensingWalk(t *testing.T) {
 			names:     names,
 			want:      map[string]map[string]string{"1": {"if_name": "eth1"}},
 		},
+		"primary table without rows": {
+			statesErr: status,
+			names:     names,
+			want:      map[string]map[string]string{},
+		},
 		"dependency table": {
 			states:   states,
 			names:    names[:1],
@@ -157,7 +164,9 @@ func TestCollector_PartialLicensingWalk(t *testing.T) {
 			ctrl, session := setupMockSession(t)
 			defer ctrl.Finish()
 			session.EXPECT().BulkWalkAll(gomock.Any(), table, gomock.Any()).Return(tc.states, gosnmp.WalkEnd{}, tc.statesErr)
-			session.EXPECT().BulkWalkAll(gomock.Any(), ifNames, gomock.Any()).Return(tc.names, gosnmp.WalkEnd{}, tc.namesErr)
+			if len(tc.states) > 0 {
+				session.EXPECT().BulkWalkAll(gomock.Any(), ifNames, gomock.Any()).Return(tc.names, gosnmp.WalkEnd{}, tc.namesErr)
+			}
 			profile := &ddsnmp.Profile{
 				SourceFile: "vendor-device.yaml",
 				Definition: &ddprofiledefinition.ProfileDefinition{
@@ -198,6 +207,58 @@ func TestCollector_PartialLicensingWalk(t *testing.T) {
 			failures := collector.CollectionFailures()
 			assert.EqualValues(t, 1, failures.Licensing.Count)
 			assert.Equal(t, "packet_error", failures.Licensing.Last.Reason)
+		})
+	}
+}
+
+// A BGP walk an error-status ended keeps the rows before it, none included;
+// the status is a BGP failure, not a failed collection.
+func TestCollector_PartialBGPWalk(t *testing.T) {
+	const (
+		primary    = "1.3.6.1.4.1.99999.70.1"
+		dependency = "1.3.6.1.4.1.99999.70.2"
+	)
+	status := &gosnmp.StatusError{Status: gosnmp.GenErr, Index: 1}
+	tests := map[string]struct {
+		rows     []gosnmp.VarBind
+		wantRows int
+	}{
+		"primary table without rows": {},
+		"primary table with rows": {
+			rows:     []gosnmp.VarBind{createGauge32PDU(primary+".1.4.192.0.2.1.1.1", 42)},
+			wantRows: 1,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctrl, session := setupMockSession(t)
+			defer ctrl.Finish()
+			session.EXPECT().BulkWalkAll(gomock.Any(), primary, gomock.Any()).Return(tc.rows, gosnmp.WalkEnd{}, status)
+			if len(tc.rows) > 0 {
+				expectSNMPWalk(session, gosnmp.Version2c, dependency, []gosnmp.VarBind{
+					createGauge32PDU(dependency+".1.4.192.0.2.1", 65001),
+					createStringPDU(dependency+".2.4.192.0.2.1", "blue"),
+				})
+			}
+			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
+				SnmpClient: session,
+				Profiles: []*ddsnmp.Profile{{
+					SourceFile: "bgp-partial.yaml",
+					Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{crossTableBGPTestConfig()}},
+				}},
+				Log: logger.New(),
+			})
+
+			results, err := collector.Collect(context.Background())
+			require.NoError(t, err)
+			require.Len(t, results, 1)
+			assert.NoError(t, results[0].BGPCollectError)
+			assert.Len(t, results[0].BGPRows, tc.wantRows)
+			failures := collector.CollectionFailures()
+			assert.EqualValues(t, 1, failures.BGP.Count)
+			assert.Equal(t, "packet_error", failures.BGP.Last.Reason)
 		})
 	}
 }

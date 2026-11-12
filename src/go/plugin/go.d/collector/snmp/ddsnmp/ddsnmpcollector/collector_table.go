@@ -87,7 +87,10 @@ func (tc *tableCollector) collectWithSymbolMode(
 
 type (
 	tableCollectionContext struct {
-		walkedData     map[string]map[string]gosnmp.VarBind
+		walkedData map[string]map[string]gosnmp.VarBind
+		// partialData names the walked tables an error-status ended: their rows
+		// feed tags, and no structure that depends on them is cached.
+		partialData    map[string]bool
 		tableNameToOID map[string]string
 	}
 
@@ -285,7 +288,7 @@ func (tc *tableCollector) resolvedDependenciesAvailable(
 	collectionCtx *tableCollectionContext,
 ) bool {
 	for _, tableOID := range extractTableDependencies(cfg, collectionCtx.tableNameToOID) {
-		if _, ok := collectionCtx.walkedData[tableOID]; !ok {
+		if _, ok := collectionCtx.walkedData[tableOID]; !ok || collectionCtx.partialData[tableOID] {
 			return false
 		}
 	}

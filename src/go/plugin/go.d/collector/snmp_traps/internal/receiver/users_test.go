@@ -110,6 +110,16 @@ func TestReceiverUsers(t *testing.T) {
 			want:      concat(at(e1, plain, auth), at(e2, auth), at(local, plain, auth)),
 			wantLearn: []gosnmp.User{auth},
 		},
+		"dynamic: a configured engine registers only the names bound to it": {
+			users: []USMUser{
+				securityLevelNoAuthUser(""),
+				securityLevelAuthUser(testEngineIDHex),
+				{Username: "otheruser", EngineID: securityLevelOtherEngineIDHex, AuthProto: "none", PrivProto: "none"},
+			},
+			dynamic:   true,
+			want:      concat(at(e1, auth), at(e2, other), at(local, plain, auth, other)),
+			wantLearn: []gosnmp.User{plain, auth, other},
+		},
 		"dynamic: the whitelist is not used": {
 			users:     []USMUser{securityLevelAuthUser("")},
 			whitelist: [][]byte{e1},

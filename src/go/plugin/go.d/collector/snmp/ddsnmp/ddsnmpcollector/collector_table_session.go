@@ -37,7 +37,9 @@ type tableCollectionSession struct {
 	routes    map[string]*tableCollectionRoute
 	graph     tableRouteGraph
 	freshData map[string]map[string]gosnmp.VarBind
-	resolved  bool
+	// partialData names the fresh routes an error-status ended.
+	partialData map[string]bool
+	resolved    bool
 }
 
 type tableCollectionScope struct {
@@ -134,10 +136,11 @@ func newTableCollectionSession(collector *tableCollector, identity *tableIdentit
 		identity = emptyTableIdentity
 	}
 	return &tableCollectionSession{
-		collector: collector,
-		identity:  identity,
-		routes:    make(map[string]*tableCollectionRoute),
-		freshData: make(map[string]map[string]gosnmp.VarBind),
+		collector:   collector,
+		identity:    identity,
+		routes:      make(map[string]*tableCollectionRoute),
+		freshData:   make(map[string]map[string]gosnmp.VarBind),
+		partialData: make(map[string]bool),
 	}
 }
 
@@ -478,6 +481,9 @@ func (s *tableCollectionSession) resolveFreshRoute(ctx context.Context, route *t
 	route.state = tableRouteFresh
 	route.pdus = pdus
 	s.freshData[route.oid] = pdus
+	if route.partial() {
+		s.partialData[route.oid] = true
+	}
 }
 
 func tableHasEligibleRows(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.VarBind) bool {
@@ -536,6 +542,7 @@ func (s *tableCollectionSession) collectScope(ctx context.Context, scope *tableC
 
 	collectionCtx := &tableCollectionContext{
 		walkedData:     s.freshData,
+		partialData:    s.partialData,
 		tableNameToOID: scope.tableNameToOID,
 	}
 

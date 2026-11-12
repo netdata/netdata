@@ -59,32 +59,39 @@ func decodeTrap(data []byte, udpPeer net.IP, receiver *gosnmp.Receiver) (*packet
 
 // decodeTrapWithOptions decodes a datagram whose header says it is SNMPv3 when
 // v3 is set. It returns the response the receiver made for its sender, if any:
-// an inform's Response with the notification, or a Report with the error.
+// an inform's Response with the notification, or a Report with the error. When
+// the receiver accepted the message and the collector's own checks then reject
+// it, the context holds the notification (no PDU) with the error: the receiver
+// may have learned the message's engine.
 func decodeTrapWithOptions(data []byte, v3 bool, udpPeer net.IP, receiver *gosnmp.Receiver, opts decodeOptions) (*packetContext, []byte, error) {
 	n, response, err := decodePacket(data, v3, receiver)
-	if err != nil {
+	if n == nil {
 		return nil, response, err
+	}
+	accepted := &packetContext{Notification: n}
+	if err != nil {
+		return accepted, nil, err
 	}
 	pkt := &n.Message
 
 	varbinds, err := packetVarbinds(pkt)
 	if err != nil {
-		return nil, nil, err
+		return accepted, nil, err
 	}
 
 	version, err := snmpVersion(pkt.Version)
 	if err != nil {
-		return nil, nil, err
+		return accepted, nil, err
 	}
 
 	pduType, err := snmpPDUType(pkt.PDUType)
 	if err != nil {
-		return nil, nil, err
+		return accepted, nil, err
 	}
 
 	trapOID := trapOIDFromVarbinds(varbinds)
 	if trapOID == "" {
-		return nil, nil, errors.New("missing snmpTrapOID.0")
+		return accepted, nil, errors.New("missing snmpTrapOID.0")
 	}
 
 	peerIP := ""
@@ -94,7 +101,7 @@ func decodeTrapWithOptions(data []byte, v3 bool, udpPeer net.IP, receiver *gosnm
 
 	source := selectTrapSource(varbinds, udpPeer, opts.trustedRelay)
 
-	tpdu := &model.TrapPDU{
+	accepted.PDU = &model.TrapPDU{
 		OID:         trapOID,
 		SourceIP:    source.sourceIP,
 		PeerIP:      peerIP,
@@ -105,11 +112,7 @@ func decodeTrapWithOptions(data []byte, v3 bool, udpPeer net.IP, receiver *gosnm
 		RequestID:   pkt.RequestID,
 		SourceAudit: source.audit,
 	}
-
-	return &packetContext{
-		Notification: n,
-		PDU:          tpdu,
-	}, response, nil
+	return accepted, response, nil
 }
 
 // classifyDecodeError labels a decode failure: the library's errors by their
@@ -144,7 +147,8 @@ func classifyDecodeError(err error) ErrorKind {
 }
 
 // decodePacket applies Netdata's decode budget, then the receiver's decode and
-// security processing.
+// security processing. A notification the receiver accepted comes back also
+// with the error of the varbind budget.
 func decodePacket(data []byte, v3 bool, receiver *gosnmp.Receiver) (n *gosnmp.Notification, response []byte, err error) {
 	if len(data) > maxDatagramSize {
 		return nil, nil, fmt.Errorf("datagram too large: %d > %d", len(data), maxDatagramSize)
@@ -165,7 +169,7 @@ func decodePacket(data []byte, v3 bool, receiver *gosnmp.Receiver) (n *gosnmp.No
 		return nil, response, err
 	}
 	if len(n.Message.VarBinds) > maxVarbinds {
-		return nil, nil, fmt.Errorf("too many varbinds: %d > %d", len(n.Message.VarBinds), maxVarbinds)
+		return n, nil, fmt.Errorf("too many varbinds: %d > %d", len(n.Message.VarBinds), maxVarbinds)
 	}
 	return n, response, nil
 }

@@ -21,8 +21,10 @@ import (
 //     users first, then the name's other authenticated users; an
 //     unauthenticated message is then decided by the bound users. Without bound
 //     users, the name's authenticated users; and when the name has none, its
-//     unauthenticated users. Static jobs register this for each whitelisted
-//     engine, dynamic jobs for each configured engine_id.
+//     unauthenticated users. Static jobs register every name for each
+//     whitelisted engine; dynamic jobs register, for each configured
+//     engine_id, the names with users bound to it, so another name's message
+//     from that engine is learned as from any other engine.
 //   - the local engine ID (informs): the users bound to it as above, otherwise
 //     every user of the name.
 //   - dynamic jobs learn, for any other engine, the name's authenticated users,
@@ -129,9 +131,21 @@ func receiverUsers(users []USMUser, whitelist [][]byte, localEngineID []byte, dy
 		}
 	}
 
+	boundTo := func(name string, engineID []byte) bool {
+		for _, c := range byName[name] {
+			if string(c.engineID) == string(engineID) {
+				return true
+			}
+		}
+		return false
+	}
+
 	var registered []gosnmp.EngineUser
 	for _, engineID := range engines {
 		for _, name := range names {
+			if dynamic && !boundTo(name, engineID) {
+				continue
+			}
 			for _, user := range engineList(name, engineID) {
 				registered = append(registered, gosnmp.EngineUser{EngineID: engineID, User: user})
 			}

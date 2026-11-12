@@ -163,11 +163,14 @@ func (c *Collector) collectTableLicenseRows(
 
 		outcome := walkPass.walk(ctx, c.tableCollector, cfg.Table.OID, stats)
 		bindSourceWalk(route, outcome.sourceOperation, cfg.Table.OID, "primary")
+		// A walk an error-status ended is the table as far as the agent
+		// returned it: its failure is recorded, and its rows (none included)
+		// are collected.
 		partial := outcome.err != nil && isPartialWalk(outcome.err)
 		if outcome.err != nil {
 			recordCollectionFailure(&c.failures.Licensing, outcome.err, "licensing", "")
-			errs = append(errs, fmt.Errorf("licensing table %q: %w", licensingConfigDisplayName(cfg), outcome.err))
 			if !partial {
+				errs = append(errs, fmt.Errorf("licensing table %q: %w", licensingConfigDisplayName(cfg), outcome.err))
 				failAcquisitionRoute(route, AcquisitionFailureClassTransport)
 				continue
 			}
