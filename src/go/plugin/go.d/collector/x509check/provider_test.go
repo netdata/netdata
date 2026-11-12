@@ -53,7 +53,7 @@ func TestCollector_CollectFromSource(t *testing.T) {
 			require.NoError(t, c.Check(t.Context()))
 			require.NoError(t, collectCycle(t, c))
 
-			// The certificate has no CRL or OCSP endpoints, so the revocation library reports it as not revoked.
+			// The certificate lists no CRL or OCSP URL, so the revocation check reports it as not revoked.
 			assert.Equal(t, map[string]float64{
 				"expiry/0/":                       86400,
 				"revocation_status/0/not_revoked": 1,
@@ -177,7 +177,7 @@ func TestCollector_TLSServerNameSelectsCertificate(t *testing.T) {
 			c.InsecureSkipVerify = true
 			require.NoError(t, c.Init(t.Context()))
 
-			certs, err := c.provider.certificates(t.Context())
+			src, err := c.provider.certificates(t.Context())
 
 			select {
 			case sni := <-requested:
@@ -186,7 +186,7 @@ func TestCollector_TLSServerNameSelectsCertificate(t *testing.T) {
 				t.Fatal("the server saw no TLS handshake")
 			}
 			require.NoError(t, err)
-			assert.Equal(t, test.wantCommonName, certs[0].Subject.CommonName)
+			assert.Equal(t, test.wantCommonName, src.chain[0].Subject.CommonName)
 		})
 	}
 }

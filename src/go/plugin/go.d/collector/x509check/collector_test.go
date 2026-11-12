@@ -4,8 +4,10 @@ package x509check
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -181,9 +183,9 @@ func TestCollector_Check(t *testing.T) {
 			c := New()
 			c.provider = test.provider
 			c.CheckRevocation = true
-			c.revocationStatus = func(context.Context, *x509.Certificate, time.Time) (bool, bool, error) {
+			c.revocationStatus = func(context.Context, *x509.Certificate, []*x509.Certificate, time.Time) (bool, error) {
 				t.Fatal("Check must not perform optional revocation I/O")
-				return false, false, nil
+				return false, nil
 			}
 
 			err := c.Check(t.Context())
@@ -203,8 +205,7 @@ func TestCollector_Collect(t *testing.T) {
 		fullChain       bool
 		checkRevocation bool
 		revoked         bool
-		verified        bool
-		verifyErr       error
+		revocationErr   error
 		want            map[string]float64
 	}{
 		"leaf only": {
@@ -216,7 +217,6 @@ func TestCollector_Collect(t *testing.T) {
 		},
 		"not revoked": {
 			checkRevocation: true,
-			verified:        true,
 			want: map[string]float64{
 				"expiry/0/":                       3600,
 				"revocation_status/0/not_revoked": 1,
@@ -227,7 +227,6 @@ func TestCollector_Collect(t *testing.T) {
 			fullChain:       true,
 			checkRevocation: true,
 			revoked:         true,
-			verified:        true,
 			want: map[string]float64{
 				"expiry/0/":                       3600,
 				"expiry/1/":                       -60,
@@ -237,12 +236,7 @@ func TestCollector_Collect(t *testing.T) {
 		},
 		"undetermined revocation": {
 			checkRevocation: true,
-			want:            map[string]float64{"expiry/0/": 3600},
-		},
-		"revocation check error": {
-			checkRevocation: true,
-			verified:        true,
-			verifyErr:       errors.New("verification failed"),
+			revocationErr:   errors.New("issuer certificate not found"),
 			want:            map[string]float64{"expiry/0/": 3600},
 		},
 	} {
@@ -252,20 +246,32 @@ func TestCollector_Collect(t *testing.T) {
 				{NotAfter: now.Add(time.Hour + 900*time.Millisecond)},
 				{NotAfter: now.Add(-time.Minute - 900*time.Millisecond)},
 			}
+			// A root that TLS verification found and the source did not send.
+			root := &x509.Certificate{
+				NotAfter: now.Add(24 * time.Hour),
+			}
 			c := New()
 			c.Source = "https://example.org:443"
 			c.CheckFullChain = test.fullChain
 			c.CheckRevocation = test.checkRevocation
 			c.now = func() time.Time { return now }
 			c.provider = &mockProvider{
-				certs: certs,
+				certs:    certs,
+				verified: [][]*x509.Certificate{{certs[0], root}},
 			}
 			calls := 0
-			c.revocationStatus = func(_ context.Context, cert *x509.Certificate, at time.Time) (bool, bool, error) {
+			c.revocationStatus = func(
+				_ context.Context,
+				cert *x509.Certificate,
+				issuers []*x509.Certificate,
+				at time.Time,
+			) (bool, error) {
 				calls++
 				assert.Same(t, certs[0], cert)
+				// The rest of the chain, also when only the server certificate is charted, and the verified issuer.
+				assert.Equal(t, []*x509.Certificate{certs[1], root}, issuers)
 				assert.Equal(t, now, at)
-				return test.revoked, test.verified, test.verifyErr
+				return test.revoked, test.revocationErr
 			}
 
 			require.NoError(t, collectCycle(t, c))
@@ -277,10 +283,54 @@ func TestCollector_Collect(t *testing.T) {
 				assert.Zero(t, calls)
 			}
 			exp := collecttest.ChartCoverageExpectation{}
-			if !test.checkRevocation || !test.verified || test.verifyErr != nil {
+			if !test.checkRevocation || test.revocationErr != nil {
 				exp.ExcludeContextPatterns = []string{"x509check.revocation_status"}
 			}
 			collecttest.AssertChartCoverage(t, c, exp)
+		})
+	}
+}
+
+func TestCollector_CollectTakesRevocationIssuerFromVerifiedChain(t *testing.T) {
+	for scheme, serve := range map[string]func(*testing.T, *tls.Config) string{
+		"https": serveTLS,
+		"smtp":  serveSMTP,
+	} {
+		t.Run(scheme, func(t *testing.T) {
+			pki := newTestPKI(t, testPKIEndpoints{
+				issuers: []testPKIHandler{unexpected},
+				crls:    []testPKIHandler{serveCRL(true)},
+			})
+			// The server sends only its certificate, which a root the job trusts through tls_ca issued.
+			server := pki.issueServerCertificate(t, pki.leaf.SerialNumber, pki.ca, pki.caKey,
+				func(template *x509.Certificate) { template.DNSNames = []string{"localhost"} })
+			_, port, err := net.SplitHostPort(serve(t, serverConfig(server)))
+			require.NoError(t, err)
+			roots := x509.NewCertPool()
+			roots.AddCert(pki.ca)
+			c := New()
+			c.Source = scheme + "://localhost:" + port
+			c.CheckFullChain = true
+			c.CheckRevocation = true
+			c.now = func() time.Time { return pki.now }
+			require.NoError(t, c.Init(t.Context()))
+			// The CA option reads through the privileged file helper, which tests cannot run, so trust the root
+			// directly.
+			switch p := c.provider.(type) {
+			case *netProvider:
+				p.tlsConfig.RootCAs = roots
+			case *smtpProvider:
+				p.tlsConfig.RootCAs = roots
+			}
+
+			require.NoError(t, collectCycle(t, c))
+
+			// The root decides the revocation status but is not charted: the source did not send it.
+			assert.Equal(t, map[string]float64{
+				"expiry/0/":                       server.Leaf.NotAfter.Sub(pki.now).Seconds(),
+				"revocation_status/0/not_revoked": 0,
+				"revocation_status/0/revoked":     1,
+			}, readMetrics(c))
 		})
 	}
 }
@@ -294,8 +344,9 @@ func TestCollector_CollectHonorsCancellationDuringRevocationCheck(t *testing.T) 
 	c := New()
 	c.Source = "https://example.org:443"
 	c.CheckRevocation = true
+	// The presented CA signed the server certificate, so the CRL is requested.
 	c.provider = &mockProvider{
-		certs: []*x509.Certificate{pki.leaf},
+		certs: []*x509.Certificate{pki.leaf, pki.ca},
 	}
 	store, ok := metrix.AsCycleManagedStore(c.MetricStore())
 	require.True(t, ok)
@@ -376,13 +427,17 @@ func readMetrics(c *Collector, opts ...metrix.ReadOption) map[string]float64 {
 }
 
 type mockProvider struct {
-	certs []*x509.Certificate
-	err   bool
+	certs    []*x509.Certificate
+	verified [][]*x509.Certificate
+	err      bool
 }
 
-func (m *mockProvider) certificates(context.Context) ([]*x509.Certificate, error) {
+func (m *mockProvider) certificates(context.Context) (sourceCertificates, error) {
 	if m.err {
-		return nil, errors.New("mock certificates error")
+		return sourceCertificates{}, errors.New("mock certificates error")
 	}
-	return m.certs, nil
+	return sourceCertificates{
+		chain:    m.certs,
+		verified: m.verified,
+	}, nil
 }
