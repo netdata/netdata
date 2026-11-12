@@ -295,53 +295,10 @@ Notes:
 
 - `labels:` is read by the job framework itself, not by the collector's own config; all other unrecognized keys
   in a job definition are ignored.
-- Labels are sanitized when emitted, the same way as other labels (for example, commas in values are exposed as
-  dots).
+- Label keys and values are sanitized on emission.
 - A label that the collector sets on a chart itself takes precedence over a job label with the same key. The
   label `_collect_job` is reserved.
-- The dynamic configuration GUI does not currently offer `labels:` in job forms — set job labels in the
-  collector's YAML file on the Agent.
-
-### Labels on a node instead of on charts
-
-If what you monitor is an entity of its own (a remote server, a database instance, a logical service), report
-its jobs through a virtual node (vnode). A vnode carries **host labels** for the node it creates — node
-identity metadata, not per-chart labels — so filtering by them selects nodes, not charts:
-
-```yaml
-# vnodes/payments.example.com.yaml
-- hostname: payments.example.com
-  guid: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
-  labels:
-    team: "Payments"
-    environment: "production"
-```
-
-```yaml
-# go.d/x509check.conf
-jobs:
-  - name: payments_cert
-    source: https://payments.example.com:443
-    vnode: payments.example.com
-```
-
-Generate a unique `guid` with `uuidgen` (or `[guid]::NewGuid()` in PowerShell) for every vnode: two vnodes
-sharing a GUID collide in identity. See
-[Virtual Nodes (vnodes)](/docs/learn/node-identities.md#virtual-nodes-vnodes) for the full reference, including
-creation from the GUI.
-
-### Collector-specific label options
-
-A few collectors provide their own label configuration beyond the generic job `labels:`. For example, CloudWatch
-can copy selected AWS resource tags to chart labels. Check the collector's configuration reference for the
-options it supports.
-
-:::tip
-
-Prefer [host labels](#host-labels) to categorize whole systems, job `labels:` to group and filter charts from
-go.d jobs, and vnodes when several monitored entities share a single Agent.
-
-:::
+- The dynamic configuration GUI does not currently offer `labels:` in job forms.
 
 ## Next steps
 
