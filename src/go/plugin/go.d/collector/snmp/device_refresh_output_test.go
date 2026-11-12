@@ -27,26 +27,65 @@ type refreshOutputFrame struct {
 
 type refreshOutputSink struct {
 	frames chan refreshOutputFrame
+	done   chan struct{}
 	reject atomic.Bool
 }
 
 func (*refreshOutputSink) Write([]byte) (int, error) { panic("transactional output expected") }
 func (s *refreshOutputSink) CommitJobOutput(payload []byte, state jobruntime.OutputStateTransaction) error {
+	var outputErr error
 	if s.reject.Swap(false) {
 		_ = state.Abort()
-		s.frames <- refreshOutputFrame{
-			payload: string(payload),
-		}
-		return errors.New("synthetic frame rejection")
-	}
-	if err := state.Commit(); err != nil {
+		outputErr = errors.New("synthetic frame rejection")
+	} else if err := state.Commit(); err != nil {
 		return err
 	}
-	s.frames <- refreshOutputFrame{
+	select {
+	case s.frames <- refreshOutputFrame{
 		payload:   string(payload),
-		committed: true,
+		committed: outputErr == nil,
+	}:
+	case <-s.done:
 	}
-	return nil
+	return outputErr
+}
+
+type refreshOutputTransaction struct {
+	settled chan bool
+}
+
+func (s refreshOutputTransaction) Commit() error { s.settled <- true; return nil }
+func (s refreshOutputTransaction) Abort() error  { s.settled <- false; return nil }
+
+func TestRefreshOutputCleanupReleasesSenders(t *testing.T) {
+	for name, reject := range map[string]bool{"accepted": false, "rejected": true} {
+		t.Run(name, func(t *testing.T) {
+			c, _, _ := newRefreshTestCollector(t)
+			sink, _, cleanup := startRefreshOutputJob(t, c)
+			// Exercise a pending send, then another send after cleanup.
+			for range 2 {
+				sink.reject.Store(reject)
+				state := refreshOutputTransaction{settled: make(chan bool)}
+				done := make(chan error, 1)
+				go func() { done <- sink.CommitJobOutput(nil, state) }()
+				assert.Equal(t, !reject, <-state.settled)
+				cleanup()
+				select {
+				case err := <-done:
+					if reject {
+						assert.EqualError(t, err, "synthetic frame rejection")
+					} else {
+						assert.NoError(t, err)
+					}
+				case <-time.After(time.Second):
+					// Release the sender before reporting a regression.
+					<-sink.frames
+					<-done
+					t.Fatal("cleanup left the output sender blocked")
+				}
+			}
+		})
+	}
 }
 
 func TestCollectorRuntimeMetadataNativeOutputRetries(t *testing.T) {
@@ -108,6 +147,7 @@ func startRefreshOutputJob(t *testing.T, c *Collector) (*refreshOutputSink, func
 	t.Helper()
 	sink := &refreshOutputSink{
 		frames: make(chan refreshOutputFrame),
+		done:   make(chan struct{}),
 	}
 	job := jobruntime.NewJob(jobruntime.JobConfig{
 		PluginName:  "go.d",
@@ -128,6 +168,7 @@ func startRefreshOutputJob(t *testing.T, c *Collector) (*refreshOutputSink, func
 	var stopped sync.Once
 	cleanup := func() {
 		stopped.Do(func() {
+			close(sink.done) // Release output even when the test stopped receiving frames.
 			run.Stop(nil)
 			job.Stop()
 			<-done

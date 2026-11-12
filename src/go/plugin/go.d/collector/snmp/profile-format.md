@@ -587,9 +587,10 @@ renderer sanitizes labels for the plugin wire only after IDs have been built. Tw
 names that look the same after display sanitation still have separate chart IDs
 and samples. Temporary `rm:` tags are removed before export.
 
-The `metric_tags` section defines **global dynamic tags** — values collected once from the device and applied to **every metric** in the profile.
+The `metric_tags` section defines **global dynamic tags** — cached device-scoped values applied to **every metric** in
+the profile. Normal SNMP metric polling refreshes these values when system information changes.
 
-They are evaluated during collection, just like other SNMP symbols, and remain the same for all metrics within that device.
+Each cached tag value is shared by all metrics in the profile.
 
 **Typical uses**:
 
