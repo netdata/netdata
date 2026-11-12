@@ -276,43 +276,70 @@ send automatic labels = yes
 
 Netdata's aggregate charts let you filter and group metrics using label name-value pairs.
 
-Go.d collection jobs do not accept a free-form `labels:` option: unrecognized keys in a job definition are
-ignored. There are two supported ways to put labels on metrics collected by a go.d job:
+Every go.d job supports a generic `labels:` map at the collection job level. The job framework reads it and
+emits each pair as a chart label (source `conf`) on every chart the job produces, so you can tag jobs with
+ownership or context — for example owner, environment, or contact:
 
-1. **Virtual nodes (vnodes)** — the general mechanism for any go.d job. Define a vnode with your own labels and
-   point the job at it with `vnode:`. All charts from that job are reported under the vnode and carry its labels:
+```yaml
+# go.d/x509check.conf
+jobs:
+  - name: payments_cert
+    source: https://payments.example.com:443
+    labels:
+      team: "Payments"
+      environment: "production"
+      contact: "sre-team@example.com"
+```
 
-   ```yaml
-   # vnodes/payments.example.com.yaml
-   - hostname: payments.example.com
-     guid: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
-     labels:
-       team: "Payments"
-       environment: "production"
-       contact: "sre-team@example.com"
-   ```
+Notes:
 
-   ```yaml
-   # go.d/x509check.conf
-   jobs:
-     - name: payments_cert
-       source: https://payments.example.com:443
-       vnode: payments.example.com
-   ```
+- `labels:` is read by the job framework itself, not by the collector's own config; all other unrecognized keys
+  in a job definition are ignored.
+- Labels are sanitized when emitted, the same way as other labels (for example, commas in values are exposed as
+  dots).
+- A label that the collector sets on a chart itself takes precedence over a job label with the same key. The
+  label `_collect_job` is reserved.
+- Jobs created from the dynamic configuration GUI get their form from the collector's configuration schema,
+  which does not include `labels:` — set job labels by editing the job's YAML file on the Agent.
 
-   Use vnodes for logical entities that don't run their own Agent: certificates, remote services, database
-   instances. See [Virtual Nodes (vnodes)](/docs/learn/node-identities.md#virtual-nodes-vnodes) for the full
-   reference, including creation from the GUI.
+### Labels on a node instead of on charts
 
-2. **Collector-specific label options** — a few collectors provide their own label configuration. For example,
-   CloudWatch can copy selected AWS resource tags to chart labels, and SNMP profiles attach device labels.
-   Check the collector's configuration reference for the options it supports.
+If what you monitor is an entity of its own (a remote server, a database instance, a logical service), report
+its jobs through a virtual node (vnode). A vnode carries **host labels** for the node it creates — node
+identity metadata, not per-chart labels — so filtering by them selects nodes, not charts:
+
+```yaml
+# vnodes/payments.example.com.yaml
+- hostname: payments.example.com
+  guid: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
+  labels:
+    team: "Payments"
+    environment: "production"
+```
+
+```yaml
+# go.d/x509check.conf
+jobs:
+  - name: payments_cert
+    source: https://payments.example.com:443
+    vnode: payments.example.com
+```
+
+Generate a unique `guid` with `uuidgen` (or `[guid]::NewGuid()` in PowerShell) for every vnode: two vnodes
+sharing a GUID collide in identity. See
+[Virtual Nodes (vnodes)](/docs/learn/node-identities.md#virtual-nodes-vnodes) for the full reference, including
+creation from the GUI.
+
+### Collector-specific label options
+
+A few collectors provide their own label configuration beyond the generic job `labels:`. For example, CloudWatch
+can copy selected AWS resource tags to chart labels. Check the collector's configuration reference for the
+options it supports.
 
 :::tip
 
-Labels pass through the Netdata label sanitizer (for example, commas in values are exposed as dots, as noted
-under [host labels](#host-labels)). Prefer host labels to categorize whole systems, and vnodes when several
-monitored entities share a single Agent.
+Prefer [host labels](#host-labels) to categorize whole systems, job `labels:` to group and filter charts from
+go.d jobs, and vnodes when several monitored entities share a single Agent.
 
 :::
 
