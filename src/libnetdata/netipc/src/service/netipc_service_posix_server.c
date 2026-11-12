@@ -34,6 +34,9 @@ static bool server_accept_loop_enter(nipc_managed_server_t *server) {
   __atomic_store_n(&server->acceptor_started, true, __ATOMIC_SEQ_CST);
   if (!__atomic_load_n(&server->stop_requested, __ATOMIC_SEQ_CST))
     return true;
+  /* running is cleared here, not by the caller: once acceptor_started is
+   * false, destroy may free the server. */
+  __atomic_store_n(&server->running, false, __ATOMIC_SEQ_CST);
   __atomic_store_n(&server->acceptor_started, false, __ATOMIC_SEQ_CST);
   return false;
 }
@@ -133,7 +136,8 @@ static bool server_stop_requested(nipc_managed_server_t *server) {
  * waits up to two poll slices for one to finish (a worker whose client left
  * exits within one), so a client that
  * reconnects right after closing is not refused while its old worker exits.
- * The loop has nothing else to serve while full, so waiting costs nothing. */
+ * Clients queued behind this one wait as well, but while every worker
+ * stays busy they would be refused too. */
 static bool server_wait_for_slot_locked(nipc_managed_server_t *server) {
   uint64_t deadline =
       nipc_service_platform_monotonic_ms() + 2u * (uint64_t)server->poll_ms;
@@ -159,10 +163,8 @@ void nipc_server_run(nipc_managed_server_t *server) {
   /* running is set before the stop check: a stop the check misses clears
    * it afterwards. */
   __atomic_store_n(&server->running, true, __ATOMIC_SEQ_CST);
-  if (!server_accept_loop_enter(server)) {
-    __atomic_store_n(&server->running, false, __ATOMIC_SEQ_CST);
+  if (!server_accept_loop_enter(server))
     return;
-  }
 
   while (__atomic_load_n(&server->running, __ATOMIC_RELAXED)) {
     /* Poll the listener fd before blocking on accept */

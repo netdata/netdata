@@ -308,6 +308,12 @@ func (r Receiver) validateReceiveChunk(
 	if chk.ChunkCount != expectedChunkCount {
 		return r.ErrChunk("chunk_count mismatch")
 	}
+	// A sender that uses smaller chunks than the budget would need more
+	// chunks than the count it must declare.
+	if chunkIndex >= expectedChunkCount {
+		return r.ErrChunk(fmt.Sprintf(
+			"chunk_index %d beyond chunk_count %d", chunkIndex, expectedChunkCount))
+	}
 	// checkedU32 prevents a truncated comparison from falsely matching a
 	// crafted total_message_len when totalMsg exceeds the u32 wire range.
 	totalMsgU32, ok := checkedU32(totalMsg)

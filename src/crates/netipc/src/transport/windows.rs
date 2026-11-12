@@ -159,6 +159,12 @@ mod ffi {
 //  Constants
 // ---------------------------------------------------------------------------
 
+/// Profiles Windows can provide; unassigned bits are never offered or
+/// accepted, so a peer can never select a profile without an implementation
+/// (0x04 is WinSHM busy-wait here, not the POSIX futex profile).
+const PLATFORM_PROFILES: u32 =
+    PROFILE_BASELINE | super::win_shm::PROFILE_HYBRID | super::win_shm::PROFILE_BUSYWAIT;
+
 const DEFAULT_BATCH_ITEMS: u32 = 1;
 const DEFAULT_PACKET_SIZE: u32 = 65536;
 const DEFAULT_PIPE_BUF_SIZE: u32 = 65536;
@@ -1832,13 +1838,13 @@ fn client_handshake(
 ) -> Result<NpSession, NpError> {
     let pkt_size = apply_default(config.packet_size, DEFAULT_PACKET_SIZE);
 
-    let supported = apply_default(config.supported_profiles, PROFILE_BASELINE);
+    let supported = apply_default(config.supported_profiles, PROFILE_BASELINE) & PLATFORM_PROFILES;
 
     let hello = Hello {
         layout_version: 1,
         flags: 0,
         supported_profiles: supported,
-        preferred_profiles: config.preferred_profiles,
+        preferred_profiles: config.preferred_profiles & PLATFORM_PROFILES,
         max_request_payload_bytes: apply_default(
             config.max_request_payload_bytes,
             MAX_PAYLOAD_DEFAULT,
@@ -1933,8 +1939,9 @@ fn server_handshake(
 ) -> Result<NpSession, NpError> {
     let offer = ServerOffer {
         packet_size: apply_default(config.packet_size, DEFAULT_PACKET_SIZE),
-        supported_profiles: apply_default(config.supported_profiles, PROFILE_BASELINE),
-        preferred_profiles: config.preferred_profiles,
+        supported_profiles: apply_default(config.supported_profiles, PROFILE_BASELINE)
+            & PLATFORM_PROFILES,
+        preferred_profiles: config.preferred_profiles & PLATFORM_PROFILES,
         max_request_payload_bytes: apply_default(
             config.max_request_payload_bytes,
             MAX_PAYLOAD_DEFAULT,
@@ -3188,6 +3195,40 @@ mod tests {
         };
         let mut session = NpSession::connect(TEST_RUN_DIR, &svc, &ccfg).expect("connect");
         assert_eq!(session.selected_profile, preferred);
+        session.close();
+        server.join().expect("server join");
+    }
+
+    // A profile bit Windows does not implement, offered and preferred by
+    // both peers, is never selected: they would otherwise run the pipe under
+    // that label. 0x08 is assigned on POSIX only.
+    #[cfg(windows)]
+    #[test]
+    fn test_unassigned_profile_bit_not_selected() {
+        ensure_run_dir();
+        let svc = unique_service("rs_unassigned_prof");
+        let unassigned = crate::protocol::PROFILE_SHM_WAITADDR;
+
+        let scfg = ServerConfig {
+            supported_profiles: PROFILE_BASELINE | unassigned,
+            preferred_profiles: unassigned,
+            ..default_server_config()
+        };
+        let mut listener = NpListener::bind(TEST_RUN_DIR, &svc, scfg).expect("bind");
+
+        let server = thread::spawn(move || {
+            let mut session = listener.accept().expect("accept");
+            assert_eq!(session.selected_profile, PROFILE_BASELINE);
+            session.close();
+        });
+
+        let ccfg = ClientConfig {
+            supported_profiles: PROFILE_BASELINE | unassigned,
+            preferred_profiles: unassigned,
+            ..default_client_config()
+        };
+        let mut session = NpSession::connect(TEST_RUN_DIR, &svc, &ccfg).expect("connect");
+        assert_eq!(session.selected_profile, PROFILE_BASELINE);
         session.close();
         server.join().expect("server join");
     }

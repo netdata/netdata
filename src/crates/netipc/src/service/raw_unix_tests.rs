@@ -3229,6 +3229,121 @@ fn test_refresh_shm_attach_failure_falls_back_to_baseline() {
     cleanup_all(svc);
 }
 
+/// Accepts `n` sessions on `listener`, one after the other, serves each
+/// until the client closes it, and returns their selected profiles.
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+fn serve_sessions_until_closed(listener: UdsListener, n: usize) -> thread::JoinHandle<Vec<u32>> {
+    thread::spawn(move || {
+        let mut selected = Vec::new();
+        let mut recv_buf = vec![0u8; RESPONSE_BUF_SIZE];
+        for _ in 0..n {
+            let Ok(mut session) = listener.accept() else {
+                break;
+            };
+            selected.push(session.selected_profile);
+            let _ = session.receive(&mut recv_buf);
+        }
+        selected
+    })
+}
+
+/// A region that never becomes attachable, with a call timeout below the
+/// SHM attach timeout: every attach wait ends at the call deadline. The
+/// first one keeps SHM; the second in a row drops it, so the third connect
+/// runs on the baseline instead of every call ending at its deadline.
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+#[test]
+fn test_refresh_persistent_call_bound_attach_failure_falls_back() {
+    let svc = "rs_svc_shm_call_bound";
+    ensure_run_dir();
+    cleanup_all(svc);
+
+    let listener =
+        UdsListener::bind(TEST_RUN_DIR, svc, shm_server_config()).expect("bind shm listener");
+    let server = serve_sessions_until_closed(listener, 3);
+
+    let mut client = snapshot_client(svc, shm_client_config());
+    client.shm_attach_timeout = Duration::from_secs(5);
+    client.call_timeout_ms = 100;
+
+    assert!(
+        !client.refresh() && !client.ready(),
+        "first refresh ends at the call deadline"
+    );
+    assert_ne!(
+        client.transport_config.supported_profiles & PROFILE_SHM_FUTEX,
+        0,
+        "one call-bound attach failure keeps SHM"
+    );
+    assert!(
+        !client.refresh() && !client.ready(),
+        "second refresh ends at the call deadline"
+    );
+    assert_eq!(
+        client.transport_config.supported_profiles & PROFILE_SHM_FUTEX,
+        0,
+        "a second call-bound attach failure in a row drops SHM"
+    );
+    assert!(
+        client.refresh() && client.ready(),
+        "third refresh connects over the baseline"
+    );
+    assert!(client.shm.is_none());
+    assert_eq!(
+        client.session.as_ref().map(|s| s.selected_profile),
+        Some(PROFILE_BASELINE)
+    );
+
+    client.close();
+    assert_eq!(
+        server.join().expect("server join"),
+        vec![PROFILE_SHM_FUTEX, PROFILE_SHM_FUTEX, PROFILE_BASELINE]
+    );
+    cleanup_all(svc);
+}
+
+/// An attach error that waiting cannot fix (a region of another version)
+/// drops SHM at once, even when the call deadline would end the wait first.
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+#[test]
+fn test_refresh_permanent_attach_error_falls_back_at_once() {
+    let svc = "rs_svc_shm_bad_ver";
+    ensure_run_dir();
+    cleanup_all(svc);
+
+    let listener =
+        UdsListener::bind(TEST_RUN_DIR, svc, shm_server_config()).expect("bind shm listener");
+    // The first session gets id 1; its region carries a foreign version.
+    let region_path = format!("{TEST_RUN_DIR}/{svc}-{:016x}.ipcshm", 1u64);
+    let mut region = vec![0u8; 64];
+    region[0..4].copy_from_slice(&crate::transport::shm::REGION_MAGIC.to_ne_bytes());
+    region[4..6].copy_from_slice(&0xffffu16.to_ne_bytes());
+    std::fs::write(&region_path, &region).expect("write region");
+    let server = serve_sessions_until_closed(listener, 2);
+
+    let mut client = snapshot_client(svc, shm_client_config());
+    client.shm_attach_timeout = Duration::from_secs(5);
+    client.call_timeout_ms = 2000;
+
+    assert!(
+        client.refresh() && client.ready(),
+        "refresh falls back to the baseline in the same call"
+    );
+    assert!(client.shm.is_none());
+    assert_eq!(
+        client.session.as_ref().map(|s| s.selected_profile),
+        Some(PROFILE_BASELINE)
+    );
+
+    client.close();
+    assert_eq!(
+        server.join().expect("server join"),
+        vec![PROFILE_SHM_FUTEX, PROFILE_BASELINE]
+    );
+    let _ = std::fs::remove_file(&region_path);
+    cleanup_all(svc);
+}
+
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_server_falls_back_to_baseline_when_linux_shm_prepare_fails() {

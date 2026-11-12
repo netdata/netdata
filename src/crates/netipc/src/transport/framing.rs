@@ -324,6 +324,13 @@ pub(crate) fn receive_message<'a, E: FramingError>(
         if chk.chunk_count != expected_chunk_count {
             return Err(E::chunk("chunk_count mismatch".into()));
         }
+        // A sender that uses smaller chunks than the budget would need more
+        // chunks than the count it must declare.
+        if ci >= expected_chunk_count {
+            return Err(E::chunk(format!(
+                "chunk_index {ci} beyond chunk_count {expected_chunk_count}"
+            )));
+        }
         if chk.total_message_len != total_msg as u32 {
             return Err(E::chunk("total_message_len mismatch".into()));
         }

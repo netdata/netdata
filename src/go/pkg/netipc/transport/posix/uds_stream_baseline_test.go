@@ -97,6 +97,10 @@ func TestStreamFailedReceiveDropsPending(t *testing.T) {
 	if _, _, err := client.Receive(rbuf); !errors.Is(err, ErrLimitExceeded) {
 		t.Fatalf("expected ErrLimitExceeded, got %v", err)
 	}
+	// No response can arrive any more, so the request in flight has failed.
+	if n := len(client.inflightIDs); n != 0 {
+		t.Fatalf("%d requests still in flight after the receive side failed", n)
+	}
 	if _, _, err := client.Receive(rbuf); err == nil {
 		t.Fatal("later receive delivered a queued message")
 	}

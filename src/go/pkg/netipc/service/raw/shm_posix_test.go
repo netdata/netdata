@@ -5,10 +5,14 @@
 package raw
 
 import (
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
@@ -186,6 +190,116 @@ func TestUnixShmAttachFailureFallsBackToBaseline(t *testing.T) {
 	}
 	if result.secondSelected != protocol.ProfileBaseline {
 		t.Fatalf("second selected profile = %#x, want baseline", result.secondSelected)
+	}
+}
+
+// serveSessionsUntilClosed accepts n sessions on listener, one after the
+// other, and records each one's selected profile; each session is served
+// until the client closes it.
+func serveSessionsUntilClosed(listener *posix.Listener, n int) <-chan []uint32 {
+	done := make(chan []uint32, 1)
+	go func() {
+		var selected []uint32
+		recvBuf := make([]byte, protocol.HeaderSize+4096)
+		for range n {
+			session, err := listener.Accept()
+			if err != nil {
+				break
+			}
+			selected = append(selected, session.SelectedProfile)
+			_, _, _ = session.Receive(recvBuf)
+			session.Close()
+		}
+		done <- selected
+	}()
+	return done
+}
+
+// A region that never becomes attachable, with a call timeout below the SHM
+// attach timeout: every attach wait ends at the call deadline. The first one
+// keeps SHM; the second in a row drops it, so the third connect runs on the
+// baseline instead of every call ending at its deadline.
+func TestUnixShmPersistentCallBoundAttachFailureFallsBack(t *testing.T) {
+	svc := uniqueUnixService("go_unix_shm_call_bound")
+	ensureRunDir()
+	cleanupAll(svc)
+
+	listener, err := posix.Listen(testRunDir, svc, testUnixShmServerConfig())
+	if err != nil {
+		t.Fatalf("posix.Listen failed: %v", err)
+	}
+	defer listener.Close()
+	doneCh := serveSessionsUntilClosed(listener, 3)
+
+	client := NewIncrementClient(testRunDir, svc, testUnixShmClientConfig())
+	client.shmAttachTimeout = 5 * time.Second
+	client.SetCallTimeout(100)
+
+	if client.Refresh(); client.Ready() {
+		t.Fatal("first refresh should end at the call deadline")
+	}
+	if client.config.SupportedProfiles&protocol.ProfileSHMHybrid == 0 {
+		t.Fatal("one call-bound attach failure should keep SHM")
+	}
+	if client.Refresh(); client.Ready() {
+		t.Fatal("second refresh should end at the call deadline")
+	}
+	if client.config.SupportedProfiles&protocol.ProfileSHMHybrid != 0 {
+		t.Fatal("a second call-bound attach failure in a row should drop SHM")
+	}
+	if !client.Refresh() || !client.Ready() {
+		t.Fatal("third refresh should connect over the baseline")
+	}
+	if client.shm != nil || client.session.SelectedProfile != protocol.ProfileBaseline {
+		t.Fatalf("selected profile = %#x, want baseline without SHM", client.session.SelectedProfile)
+	}
+	client.Close()
+
+	want := []uint32{protocol.ProfileSHMHybrid, protocol.ProfileSHMHybrid, protocol.ProfileBaseline}
+	if got := <-doneCh; !slices.Equal(got, want) {
+		t.Fatalf("server selected profiles = %#x, want %#x", got, want)
+	}
+}
+
+// An attach error that waiting cannot fix (a region of another version) drops
+// SHM at once, even when the call deadline would end the wait first.
+func TestUnixShmPermanentAttachErrorFallsBackAtOnce(t *testing.T) {
+	svc := uniqueUnixService("go_unix_shm_bad_ver")
+	ensureRunDir()
+	cleanupAll(svc)
+
+	listener, err := posix.Listen(testRunDir, svc, testUnixShmServerConfig())
+	if err != nil {
+		t.Fatalf("posix.Listen failed: %v", err)
+	}
+	defer listener.Close()
+
+	// The first session gets id 1; its region carries a foreign version.
+	region := make([]byte, 64)
+	binary.NativeEndian.PutUint32(region[0:4], 0x4e53484d)
+	binary.NativeEndian.PutUint16(region[4:6], 0xffff)
+	regionPath := filepath.Join(testRunDir, fmt.Sprintf("%s-%016x.ipcshm", svc, 1))
+	if err := os.WriteFile(regionPath, region, 0o600); err != nil {
+		t.Fatalf("write region: %v", err)
+	}
+	defer os.Remove(regionPath)
+	doneCh := serveSessionsUntilClosed(listener, 2)
+
+	client := NewIncrementClient(testRunDir, svc, testUnixShmClientConfig())
+	client.shmAttachTimeout = 5 * time.Second
+	client.SetCallTimeout(2000)
+
+	if !client.Refresh() || !client.Ready() {
+		t.Fatal("refresh should fall back to the baseline in the same call")
+	}
+	if client.shm != nil || client.session.SelectedProfile != protocol.ProfileBaseline {
+		t.Fatalf("selected profile = %#x, want baseline without SHM", client.session.SelectedProfile)
+	}
+	client.Close()
+
+	want := []uint32{protocol.ProfileSHMHybrid, protocol.ProfileBaseline}
+	if got := <-doneCh; !slices.Equal(got, want) {
+		t.Fatalf("server selected profiles = %#x, want %#x", got, want)
 	}
 }
 

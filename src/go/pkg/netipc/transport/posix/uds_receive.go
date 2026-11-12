@@ -183,8 +183,10 @@ func (s *Session) receiveStream(buf []byte) (protocol.Header, []byte, error) {
 	hdr, payload, err := s.receiveFraming(buf, s.recvStreamFn, true)
 	if err != nil && s.streamConsumed {
 		s.recvFailed = true
-		// Queued bytes are part of the abandoned stream too.
+		// Queued bytes are part of the abandoned stream too, and no response
+		// for a request in flight can arrive any more.
 		s.pending = pendingQueue{}
+		s.failAllInflight()
 	}
 	return hdr, payload, err
 }

@@ -153,9 +153,10 @@ static int bind_owner_only_socket(int fd, const char *run_dir,
     if (fchmod(dfd, S_IRWXU) < 0 ||
         bind(fd, (const struct sockaddr *)&addr, sizeof(addr)) < 0)
         goto fail_dfd;
-    /* The bound file carries 0777 & ~umask; keep the umask narrowing. */
-    if (fstatat(dfd, "s", &st, AT_SYMLINK_NOFOLLOW) < 0 ||
-        fchmodat(dfd, "s", (st.st_mode & 0777) & (S_IRUSR | S_IWUSR), 0) < 0 ||
+    /* The bound file carries 0777 & ~umask. It is set to exactly 0600:
+     * a umask without owner write would leave a socket its own user cannot
+     * connect to, and only the owner can reach the private directory. */
+    if (fchmodat(dfd, "s", S_IRUSR | S_IWUSR, 0) < 0 ||
         renameat(dfd, "s", AT_FDCWD, path) < 0)
         goto fail_file;
     close(dfd);
@@ -181,7 +182,10 @@ fail_dir:
  * the socket file the mode of the unbound socket, so fchmod() before bind()
  * sets it without a post-bind window and without touching the
  * process-global umask, which other threads of the embedding process use.
- * Returns 0 or -1. */
+ * connect() needs write permission on the socket file, so a umask without
+ * owner write fails the listen instead of leaving an endpoint its own user
+ * cannot reach.
+ * Returns 0, -1 on a socket error, -2 if the bind path is too long. */
 static int bind_owner_only_socket(int fd, const char *run_dir,
                                   const char *service_name, const char *path)
 {
@@ -190,9 +194,19 @@ static int bind_owner_only_socket(int fd, const char *run_dir,
     struct sockaddr_un addr;
     if (fill_sockaddr_path(&addr, path) != 0)
         return -2;
-    if (fchmod(fd, S_IRUSR | S_IWUSR) < 0)
+    if (fchmod(fd, S_IRUSR | S_IWUSR) < 0 ||
+        bind(fd, (const struct sockaddr *)&addr, sizeof(addr)) < 0)
         return -1;
-    return bind(fd, (const struct sockaddr *)&addr, sizeof(addr));
+    struct stat st;
+    if (lstat(path, &st) == 0) {
+        if (st.st_mode & S_IWUSR)
+            return 0;
+        errno = EACCES;
+    }
+    int saved_errno = errno;
+    (void)unlink(path);
+    errno = saved_errno;
+    return -1;
 }
 #endif
 

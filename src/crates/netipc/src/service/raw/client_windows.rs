@@ -1,8 +1,8 @@
 use super::client::{ClientState, RawClient};
-use super::common::CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS;
+use super::common::{CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS, CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT};
 use crate::transport::win_shm::{
     PROFILE_BUSYWAIT as WIN_SHM_PROFILE_BUSYWAIT, PROFILE_HYBRID as WIN_SHM_PROFILE_HYBRID,
-    WinShmContext,
+    WinShmContext, WinShmError,
 };
 use crate::transport::windows::{NpError, NpSession};
 
@@ -29,7 +29,9 @@ impl RawClient {
                 {
                     let mut shm_ok = false;
                     // When the call deadline ends the wait first, WinSHM is
-                    // not at fault and stays enabled for the next connect.
+                    // not at fault and stays enabled for the next connect,
+                    // unless that keeps happening
+                    // (CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT).
                     let call_left = std::time::Duration::from_millis(self.op_remaining_ms() as u64);
                     // The remaining time is rounded up, so a tie means the
                     // call deadline comes first.
@@ -46,13 +48,30 @@ impl RawClient {
                         ) {
                             Ok(ctx) => {
                                 self.shm = Some(ctx);
+                                self.shm_call_bound_failures = 0;
                                 shm_ok = true;
                                 break;
                             }
-                            Err(_) => {
+                            // Only objects the server has not finished yet
+                            // are worth waiting for.
+                            Err(
+                                WinShmError::OpenMapping(_)
+                                | WinShmError::OpenEvent(_)
+                                | WinShmError::BadMagic,
+                            ) => {
                                 if std::time::Instant::now() >= deadline {
                                     if call_bound {
-                                        return ClientState::Disconnected;
+                                        if super::server_session_windows::peer_disconnected(
+                                            &session,
+                                        ) {
+                                            return ClientState::Disconnected;
+                                        }
+                                        self.shm_call_bound_failures += 1;
+                                        if self.shm_call_bound_failures
+                                            < CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT
+                                        {
+                                            return ClientState::Disconnected;
+                                        }
                                     }
                                     break;
                                 }
@@ -69,6 +88,7 @@ impl RawClient {
                                     CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS,
                                 ));
                             }
+                            Err(_) => break,
                         }
                     }
                     if !shm_ok {

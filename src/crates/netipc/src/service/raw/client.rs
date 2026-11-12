@@ -92,6 +92,10 @@ pub struct RawClient {
     /// How long to retry attaching a negotiated SHM region; tests shorten it.
     #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
     pub(super) shm_attach_timeout: std::time::Duration,
+    /// Consecutive SHM attaches the call deadline ended with the session
+    /// still connected.
+    #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
+    pub(super) shm_call_bound_failures: u32,
     /// Deadline of the call or refresh in progress.
     pub(super) op_deadline: Instant,
 }
@@ -190,6 +194,8 @@ impl RawClient {
             shm_attach_timeout: std::time::Duration::from_millis(
                 CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS,
             ),
+            #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
+            shm_call_bound_failures: 0,
             op_deadline: Instant::now(),
         }
     }

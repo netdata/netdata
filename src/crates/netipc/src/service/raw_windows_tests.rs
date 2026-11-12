@@ -3115,6 +3115,70 @@ fn test_client_auth_failure_windows() {
     server.stop();
 }
 
+/// A region that never becomes attachable, with a call timeout below the
+/// WinSHM attach timeout: every attach wait ends at the call deadline. The
+/// first one keeps WinSHM; the second in a row drops it, so the third
+/// connect runs on the baseline instead of every call ending at its deadline.
+#[test]
+fn test_refresh_persistent_call_bound_winshm_attach_failure_falls_back() {
+    let svc = unique_service("rs_win_svc_shm_call_bound");
+    ensure_run_dir();
+    cleanup_all(&svc);
+
+    let mut listener = NpListener::bind(TEST_RUN_DIR, &svc, shm_server_config()).expect("bind");
+    let server_thread = thread::spawn(move || {
+        let mut selected = Vec::new();
+        let mut recv_buf = vec![0u8; RESPONSE_BUF_SIZE];
+        for _ in 0..3 {
+            let Ok(mut session) = listener.accept() else {
+                break;
+            };
+            selected.push(session.selected_profile);
+            let _ = session.receive(&mut recv_buf);
+        }
+        selected
+    });
+
+    let mut client = increment_client(&svc, shm_client_config());
+    client.shm_attach_timeout = Duration::from_secs(5);
+    client.call_timeout_ms = 100;
+
+    assert!(
+        !client.refresh() && !client.ready(),
+        "first refresh ends at the call deadline"
+    );
+    assert_ne!(
+        client.transport_config.supported_profiles & PROFILE_SHM_HYBRID,
+        0,
+        "one call-bound attach failure keeps WinSHM"
+    );
+    assert!(
+        !client.refresh() && !client.ready(),
+        "second refresh ends at the call deadline"
+    );
+    assert_eq!(
+        client.transport_config.supported_profiles & PROFILE_SHM_HYBRID,
+        0,
+        "a second call-bound attach failure in a row drops WinSHM"
+    );
+    assert!(
+        client.refresh() && client.ready(),
+        "third refresh connects over the baseline"
+    );
+    assert!(client.shm.is_none());
+    assert_eq!(
+        client.session.as_ref().map(|s| s.selected_profile),
+        Some(PROFILE_BASELINE)
+    );
+
+    client.close();
+    assert_eq!(
+        server_thread.join().expect("server join"),
+        vec![PROFILE_SHM_HYBRID, PROFILE_SHM_HYBRID, PROFILE_BASELINE]
+    );
+    cleanup_all(&svc);
+}
+
 #[test]
 fn test_refresh_winshm_attach_failure_falls_back_to_baseline() {
     let svc = unique_service("rs_win_svc_shm_attach_fail");

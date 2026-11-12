@@ -76,11 +76,10 @@ func bindOwnerOnly(fd int, runDir, serviceName, path string) error {
 	if err := syscall.Bind(fd, &syscall.SockaddrUnix{Name: tmp}); err != nil {
 		return sockErr("bind", err)
 	}
-	// The bound file carries 0777 & ~umask; keep the umask narrowing.
-	err = unix.Fstatat(dfd, "s", &st, unix.AT_SYMLINK_NOFOLLOW)
-	if err == nil {
-		err = unix.Fchmodat(dfd, "s", uint32(st.Mode)&0o600, 0)
-	}
+	// The bound file carries 0777 & ~umask. It is set to exactly 0600: a
+	// umask without owner write would leave a socket its own user cannot
+	// connect to, and only the owner can reach the private directory.
+	err = unix.Fchmodat(dfd, "s", 0o600, 0)
 	if err == nil {
 		err = unix.Renameat(dfd, "s", unix.AT_FDCWD, path)
 	}

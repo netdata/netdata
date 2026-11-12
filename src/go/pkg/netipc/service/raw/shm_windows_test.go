@@ -124,6 +124,65 @@ func TestWinServerRunInvalidServiceName(t *testing.T) {
 	}
 }
 
+// A region that never becomes attachable, with a call timeout below the
+// WinSHM attach timeout: every attach wait ends at the call deadline. The
+// first one keeps WinSHM; the second in a row drops it, so the third connect
+// runs on the baseline instead of every call ending at its deadline.
+func TestWinShmPersistentCallBoundAttachFailureFallsBack(t *testing.T) {
+	svc := uniqueWinService("go_win_shm_call_bound")
+	listener, err := windows.Listen(winTestRunDir, svc, testWinShmServerConfig())
+	if err != nil {
+		t.Fatalf("windows.Listen failed: %v", err)
+	}
+	defer listener.Close()
+
+	doneCh := make(chan []uint32, 1)
+	go func() {
+		var selected []uint32
+		recvBuf := make([]byte, protocol.HeaderSize+4096)
+		for range 3 {
+			session, err := listener.Accept()
+			if err != nil {
+				break
+			}
+			selected = append(selected, session.SelectedProfile)
+			_, _, _ = session.Receive(recvBuf)
+			session.Close()
+		}
+		doneCh <- selected
+	}()
+
+	client := NewIncrementClient(winTestRunDir, svc, testWinShmClientConfig())
+	client.shmAttachTimeout = 5 * time.Second
+	client.SetCallTimeout(100)
+
+	if client.Refresh(); client.Ready() {
+		t.Fatal("first refresh should end at the call deadline")
+	}
+	if client.config.SupportedProfiles&protocol.ProfileSHMHybrid == 0 {
+		t.Fatal("one call-bound attach failure should keep WinSHM")
+	}
+	if client.Refresh(); client.Ready() {
+		t.Fatal("second refresh should end at the call deadline")
+	}
+	if client.config.SupportedProfiles&protocol.ProfileSHMHybrid != 0 {
+		t.Fatal("a second call-bound attach failure in a row should drop WinSHM")
+	}
+	if !client.Refresh() || !client.Ready() {
+		t.Fatal("third refresh should connect over the baseline")
+	}
+	if client.shm != nil || client.session.SelectedProfile != protocol.ProfileBaseline {
+		t.Fatalf("selected profile = %#x, want baseline without WinSHM", client.session.SelectedProfile)
+	}
+	client.Close()
+
+	want := []uint32{protocol.ProfileSHMHybrid, protocol.ProfileSHMHybrid, protocol.ProfileBaseline}
+	got := <-doneCh
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Fatalf("server selected profiles = %#x, want %#x", got, want)
+	}
+}
+
 func TestWinShmAttachFailureFallsBackToBaseline(t *testing.T) {
 	svc := uniqueWinService("go_win_shm_attach_fail")
 	cfg := testWinShmServerConfig()

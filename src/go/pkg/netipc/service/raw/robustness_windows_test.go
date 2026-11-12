@@ -5,7 +5,8 @@ package raw
 // Robustness reproduction tests (SOW-0040), Windows.
 //
 // Each test asserts the correct behavior and runs every blocking step in a
-// goroutine under a watchdog, so a regression fails instead of hanging.
+// goroutine under a watchdog, and every later wait on such a goroutine is
+// bounded too (recvWithin), so a regression fails instead of hanging.
 // Bounds are deliberately lenient so they do not dictate a fix design.
 
 import (
@@ -296,7 +297,7 @@ func TestWinRobustClientBoundedWhenServerNeverSendsHelloAck(t *testing.T) {
 	})
 
 	syscall.CloseHandle(h)
-	<-done
+	recvWithin(t, done, "done")
 	if !finished {
 		t.Error("Refresh + call with a 1s timeout must return within 6s when the server never sends HELLO_ACK")
 	}
@@ -330,7 +331,7 @@ func TestWinRobustCallReconnectBoundedByCallDeadline(t *testing.T) {
 	})
 
 	syscall.CloseHandle(h)
-	<-done
+	recvWithin(t, done, "done")
 	if !finished {
 		t.Fatal("a call with a 1s timeout must return within 6s")
 	}
@@ -367,7 +368,7 @@ func TestWinRobustAbortEndsRefreshWaitingForHelloAck(t *testing.T) {
 
 	syscall.CloseHandle(h)
 	if !returned {
-		<-ready
+		recvWithin(t, ready, "ready")
 		t.Fatal("refresh must return within 2s of the abort")
 	}
 	c.Close()
@@ -450,7 +451,7 @@ func TestWinRobustStopBeforeRunIsHonored(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Error("Run after Stop must return promptly instead of serving forever")
 		s.Stop()
-		<-doneCh
+		recvWithin(t, doneCh, "doneCh")
 	}
 }
 
@@ -478,7 +479,7 @@ func TestWinRobustShmClientNoticesCrashedServer(t *testing.T) {
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
 
-	r := <-result
+	r := recvWithin(t, result, "result")
 	if r.err == nil || r.elapsed > 3500*time.Millisecond {
 		t.Errorf("call must fail within 3s of the server crash (timeout is 10s): err=%v after %v", r.err, r.elapsed)
 	}
@@ -639,18 +640,18 @@ func TestWinRobustSendBoundedByDeadlineAndAbort(t *testing.T) {
 				result <- err
 			}()
 			if useAbort {
-				<-started
+				recvWithin(t, started, "started")
 				if !requestSeen {
 					t.Error("no request bytes arrived before the abort")
 				}
 				client.Abort()
 			}
-			err := <-result
+			err := recvWithin(t, result, "result")
 			elapsed := time.Since(start)
 			// Closing the client first wakes a reader still waiting for bytes.
 			client.Close()
 			close(release)
-			<-done
+			recvWithin(t, done, "done")
 
 			want := protocol.ErrTimeout
 			if useAbort {

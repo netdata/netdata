@@ -547,6 +547,9 @@ static bool run_overflow_status_test(void)
                    "overflow status response encode/decode failed"))
         return false;
 
+    // This test runs without nv_apps_lookup_init(), which owns the cache mutex.
+    if (!expect_ok(netdata_mutex_init(&apps_lookup_cache_mutex) == 0, "cache mutex init failed"))
+        return false;
     nv_apps_lookup_cache_create();
     uint64_t failed_before = counter_value(&apps_lookup_requests_failed);
     uint64_t unknown_before = counter_value(&apps_lookup_cache_misses_unknown);
@@ -565,6 +568,7 @@ static bool run_overflow_status_test(void)
     __atomic_store_n(&apps_lookup_requests_failed, failed_before, __ATOMIC_RELEASE);
     __atomic_store_n(&apps_lookup_cache_misses_unknown, unknown_before, __ATOMIC_RELEASE);
     nv_apps_lookup_cache_destroy();
+    netdata_mutex_destroy(&apps_lookup_cache_mutex);
     return ok;
 }
 

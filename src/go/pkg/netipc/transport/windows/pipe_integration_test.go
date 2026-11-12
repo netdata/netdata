@@ -139,6 +139,41 @@ func TestPipeSingleClientPingPong(t *testing.T) {
 	}
 }
 
+// A profile bit Windows does not implement, offered and preferred by both
+// peers, is never selected: they would otherwise run the pipe under that
+// label. 0x08 is assigned on POSIX only.
+func TestPipeUnassignedProfileBitNotSelected(t *testing.T) {
+	service := uniquePipeService(t)
+	const unassigned = protocol.ProfileSHMWaitAddr
+
+	sCfg := defaultServerConfig()
+	sCfg.SupportedProfiles = protocol.ProfileBaseline | unassigned
+	sCfg.PreferredProfiles = unassigned
+	listener := startListener(t, testPipeRunDir, service, sCfg)
+	defer listener.Close()
+
+	acceptCh := acceptAsync(listener)
+
+	cCfg := defaultClientConfig()
+	cCfg.SupportedProfiles = protocol.ProfileBaseline | unassigned
+	cCfg.PreferredProfiles = unassigned
+	client, err := Connect(testPipeRunDir, service, &cCfg)
+	if err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer client.Close()
+
+	sr := <-acceptCh
+	if sr.err != nil {
+		t.Fatalf("Accept failed: %v", sr.err)
+	}
+	defer sr.session.Close()
+
+	if client.SelectedProfile != protocol.ProfileBaseline || sr.session.SelectedProfile != protocol.ProfileBaseline {
+		t.Errorf("selected = 0x%x/0x%x, want baseline", client.SelectedProfile, sr.session.SelectedProfile)
+	}
+}
+
 func TestPipeConnectWaitsForBusyPipe(t *testing.T) {
 	service := uniquePipeService(t)
 	listener := startListener(t, testPipeRunDir, service, defaultServerConfig())

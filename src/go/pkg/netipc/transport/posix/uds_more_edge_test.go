@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -707,6 +708,45 @@ func TestUdsReceiveRejectsMalformedChunks(t *testing.T) {
 	}
 }
 
+func TestUdsReceiveRejectsMoreChunksThanDeclared(t *testing.T) {
+	client, server := udsSessionPair(t, defaultServerConfig(), defaultClientConfig())
+	// A full first packet carries 4 of the 8 payload bytes, so one
+	// continuation is declared; two half-budget ones follow.
+	client.PacketSize = protocol.HeaderSize + 4
+
+	client.inflightIDs[42] = struct{}{}
+	firstPkt := encodePartialPacket(protocol.Header{
+		Kind:      protocol.KindResponse,
+		Code:      protocol.MethodIncrement,
+		ItemCount: 1,
+		MessageID: 42,
+	}, 8, []byte("head"))
+	if err := rawSendPacket(server.fd, firstPkt); err != nil {
+		t.Fatalf("rawSendPacket(first) failed: %v", err)
+	}
+	for i, part := range []string{"ta", "il"} {
+		pkt := encodeChunkPacket(protocol.ChunkHeader{
+			Magic:           protocol.MagicChunk,
+			Version:         protocol.Version,
+			MessageID:       42,
+			TotalMessageLen: uint32(protocol.HeaderSize + 8),
+			ChunkIndex:      uint32(i + 1),
+			ChunkCount:      2,
+			ChunkPayloadLen: uint32(len(part)),
+		}, []byte(part))
+		if err := rawSendPacket(server.fd, pkt); err != nil {
+			t.Fatalf("rawSendPacket(continuation %d) failed: %v", i+1, err)
+		}
+	}
+	endStreamWrites(server.fd)
+
+	buf := make([]byte, 4096)
+	_, _, err := client.Receive(buf)
+	if !errors.Is(err, ErrChunk) {
+		t.Fatalf("Receive error = %v, want ErrChunk", err)
+	}
+}
+
 func TestUdsClientHandshakeRejectsMalformedAck(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -1204,28 +1244,35 @@ func TestLockUmaskHelperProcess(t *testing.T) {
 	}
 	lockPublishHook.Store(&hook)
 
-	func() {
-		// Restore the umask before exit so files the process writes then
-		// (coverage data) keep their normal mode.
-		defer syscall.Umask(syscall.Umask(mask))
-		first, err := Listen(runDir, service, defaultServerConfig())
-		lockPublishHook.Store(nil)
-		if err != nil {
-			t.Fatalf("listen under umask %o: %v", mask, err)
-		}
-		if second, err := Listen(runDir, service, defaultServerConfig()); !errors.Is(err, ErrAddrInUse) {
-			if second != nil {
-				second.Close()
+	// connect() needs write permission on the socket file. macOS sets the
+	// socket to exactly 0600; Linux and FreeBSD keep the umask narrowing and
+	// refuse to listen when it removes owner write.
+	sock := filepath.Join(runDir, service+".sock")
+	if runtime.GOOS != "darwin" && mask&0o200 != 0 {
+		var err error
+		func() {
+			defer syscall.Umask(syscall.Umask(mask))
+			var first *Listener
+			first, err = Listen(runDir, service, defaultServerConfig())
+			if first != nil {
+				first.Close()
 			}
-			t.Errorf("second server under umask %o: err = %v, want ErrAddrInUse", mask, err)
+		}()
+		lockPublishHook.Store(nil)
+		if !errors.Is(err, ErrSocket) || !strings.Contains(err.Error(), "permission denied") {
+			t.Fatalf("listen under umask %o: err = %v, want a permission-denied socket error", mask, err)
 		}
-		first.Close()
+		if _, err := os.Lstat(sock); err == nil {
+			t.Fatal("an unreachable socket was left behind")
+		}
 		again, err := Listen(runDir, service, defaultServerConfig())
 		if err != nil {
-			t.Fatalf("restart under umask %o: %v", mask, err)
+			t.Fatalf("listen under a usable umask: %v", err)
 		}
 		again.Close()
-	}()
+	} else {
+		lockUnderUmaskListens(t, runDir, service, sock, mask)
+	}
 
 	info, err := os.Stat(lock)
 	if err != nil {
@@ -1242,6 +1289,41 @@ func TestLockUmaskHelperProcess(t *testing.T) {
 		t.Errorf("temporary name %s was left behind", published[0])
 	}
 	_ = os.Remove(lock)
+}
+
+// lockUnderUmaskListens runs a listener under mask: it starts, a second one
+// gets ErrAddrInUse, and it restarts; its socket has owner write only among
+// the permission bits it keeps (exactly 0600 on macOS).
+func lockUnderUmaskListens(t *testing.T, runDir, service, sock string, mask int) {
+	t.Helper()
+	// Restore the umask before exit so files the process writes then
+	// (coverage data) keep their normal mode.
+	defer syscall.Umask(syscall.Umask(mask))
+	first, err := Listen(runDir, service, defaultServerConfig())
+	lockPublishHook.Store(nil)
+	if err != nil {
+		t.Fatalf("listen under umask %o: %v", mask, err)
+	}
+	info, err := os.Lstat(sock)
+	if err != nil {
+		t.Fatalf("socket stat: %v", err)
+	}
+	if mode := info.Mode().Perm(); mode&0o200 == 0 || mode&0o077 != 0 ||
+		(runtime.GOOS == "darwin" && mode != 0o600) {
+		t.Errorf("socket mode under umask %o = %o", mask, mode)
+	}
+	if second, err := Listen(runDir, service, defaultServerConfig()); !errors.Is(err, ErrAddrInUse) {
+		if second != nil {
+			second.Close()
+		}
+		t.Errorf("second server under umask %o: err = %v, want ErrAddrInUse", mask, err)
+	}
+	first.Close()
+	again, err := Listen(runDir, service, defaultServerConfig())
+	if err != nil {
+		t.Fatalf("restart under umask %o: %v", mask, err)
+	}
+	again.Close()
 }
 
 // A child that shares the lock's open file description (as a child forked

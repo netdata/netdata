@@ -50,6 +50,9 @@ type Client struct {
 	// shmAttachTimeout bounds the SHM attach retry after negotiation;
 	// tests shorten it per instance.
 	shmAttachTimeout time.Duration
+	// shmCallBoundFailures counts consecutive SHM attaches the call
+	// deadline ended with the session still connected.
+	shmCallBoundFailures int
 	// opDeadline bounds the call or refresh in progress, in monotime
 	// nanoseconds; zero outside one.
 	opDeadline int64
@@ -104,7 +107,8 @@ func (c *Client) tryConnect() ClientState {
 	if session.SelectedProfile == windows.WinShmProfileHybrid ||
 		session.SelectedProfile == windows.WinShmProfileBusywait {
 		// When the call deadline ends the wait first, WinSHM is not at
-		// fault and stays enabled for the next connect.
+		// fault and stays enabled for the next connect, unless that keeps
+		// happening (clientShmCallBoundFailureLimit).
 		callLeft := time.Duration(c.opRemainingMs()) * time.Millisecond
 		// The remaining time is rounded up, so a tie means the call deadline
 		// comes first.
@@ -119,12 +123,26 @@ func (c *Client) tryConnect() ClientState {
 			)
 			if serr == nil {
 				c.shm = shm
+				c.shmCallBoundFailures = 0
+				break
+			}
+			// Only objects the server has not finished yet are worth
+			// waiting for.
+			if !errors.Is(serr, windows.ErrWinShmOpenMapping) && !errors.Is(serr, windows.ErrWinShmOpenEvent) &&
+				!errors.Is(serr, windows.ErrWinShmBadMagic) {
 				break
 			}
 			if !time.Now().Before(deadline) {
 				if callBound {
-					session.Close()
-					return StateDisconnected
+					if pipePeerDisconnected(session) {
+						session.Close()
+						return StateDisconnected
+					}
+					c.shmCallBoundFailures++
+					if c.shmCallBoundFailures < clientShmCallBoundFailureLimit {
+						session.Close()
+						return StateDisconnected
+					}
 				}
 				break
 			}

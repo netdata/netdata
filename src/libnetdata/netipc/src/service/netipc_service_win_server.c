@@ -131,7 +131,8 @@ static bool server_stop_requested(nipc_managed_server_t *server) {
  * waits up to two poll slices for one to finish (a worker whose client left
  * exits within one), so a client that
  * reconnects right after closing is not refused while its old worker exits.
- * The loop has nothing else to serve while full, so waiting costs nothing. */
+ * Clients queued behind this one wait as well, but while every worker
+ * stays busy they would be refused too. */
 static bool server_wait_for_slot_locked(nipc_managed_server_t *server) {
   ULONGLONG deadline = GetTickCount64() + 2u * (ULONGLONG)server->poll_ms;
   EnterCriticalSection(&server->sessions_lock);

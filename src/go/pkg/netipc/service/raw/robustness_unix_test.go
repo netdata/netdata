@@ -5,7 +5,8 @@ package raw
 // Robustness reproduction tests (SOW-0040).
 //
 // Each test asserts the correct behavior and runs every blocking step in a
-// goroutine under a watchdog, so a regression fails instead of hanging.
+// goroutine under a watchdog, and every later wait on such a goroutine is
+// bounded too (recvWithin), so a regression fails instead of hanging.
 // Bounds are deliberately lenient so they do not dictate a fix design.
 
 import (
@@ -249,7 +250,7 @@ func TestRobustSilentClientDoesNotBlockShutdown(t *testing.T) {
 	stopped := rs.stopWithin(3 * time.Second)
 
 	syscall.Close(silent)
-	<-rs.doneCh
+	recvWithin(t, rs.doneCh, "doneCh")
 	if !stopped {
 		t.Error("server Run must return within 3s of Stop while a silent client is connected")
 	}
@@ -304,7 +305,7 @@ func TestRobustClientBoundedWhenServerNeverAccepts(t *testing.T) {
 	elapsed := time.Since(start)
 
 	syscall.Close(listener)
-	<-done
+	recvWithin(t, done, "done")
 	if !finished {
 		t.Errorf("Refresh + call with a 1s timeout must return within 6s against a server that never accepts (blocked %v)", elapsed)
 	}
@@ -336,7 +337,7 @@ func TestRobustClientBoundedWhenServerNeverSendsHelloAck(t *testing.T) {
 	})
 
 	close(release)
-	<-done
+	recvWithin(t, done, "done")
 	if !finished {
 		t.Error("Refresh + call with a 1s timeout must return within 6s when the server accepts but never sends HELLO_ACK")
 	}
@@ -391,8 +392,8 @@ func TestRobustCallReconnectBoundedByCallDeadline(t *testing.T) {
 	})
 
 	close(release)
-	<-held
-	<-done
+	recvWithin(t, held, "held")
+	recvWithin(t, done, "done")
 	if !finished {
 		t.Fatal("a call with a 1s timeout must return within 6s")
 	}
@@ -428,9 +429,9 @@ func TestRobustAbortEndsRefreshWaitingForHelloAck(t *testing.T) {
 	}
 
 	close(release)
-	<-held
+	recvWithin(t, held, "held")
 	if !returned {
-		<-ready
+		recvWithin(t, ready, "ready")
 		t.Fatal("refresh must return within 2s of the abort")
 	}
 	c.Close()
@@ -497,7 +498,7 @@ func TestRobustShutdownNotBlockedByNonReadingClient(t *testing.T) {
 
 	stopped := rs.stopWithin(3 * time.Second)
 	session.Close()
-	<-rs.doneCh
+	recvWithin(t, rs.doneCh, "doneCh")
 	if !stopped {
 		t.Error("server Run must return within 3s of Stop while a worker is blocked sending")
 	}
@@ -524,7 +525,7 @@ func TestRobustStopBeforeRunIsHonored(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Error("Run after Stop must return promptly instead of serving forever")
 		s.Stop()
-		<-doneCh
+		recvWithin(t, doneCh, "doneCh")
 	}
 }
 
@@ -614,7 +615,7 @@ func clientNoticesCrashedServer(t *testing.T, shm bool) {
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
 
-	r := <-result
+	r := recvWithin(t, result, "result")
 	if r.err == nil || r.elapsed > 3500*time.Millisecond {
 		t.Errorf("call must fail within 3s of the server crash (timeout is 10s): err=%v after %v", r.err, r.elapsed)
 	}
@@ -773,18 +774,18 @@ func TestRobustSendBoundedByDeadlineAndAbort(t *testing.T) {
 				result <- err
 			}()
 			if useAbort {
-				<-started
+				recvWithin(t, started, "started")
 				if !requestSeen {
 					t.Error("no request bytes arrived before the abort")
 				}
 				client.Abort()
 			}
-			err := <-result
+			err := recvWithin(t, result, "result")
 			elapsed := time.Since(start)
 			// Closing the client first wakes a reader still waiting for bytes.
 			client.Close()
 			close(release)
-			<-done
+			recvWithin(t, done, "done")
 
 			want := protocol.ErrTimeout
 			if useAbort {

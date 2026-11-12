@@ -130,9 +130,10 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
             bool keep_shm = false;
             uint32_t attach_ms = nipc_service_common_client_op_remaining_ms(ctx);
             /* When the call deadline ends the wait first, WinSHM is not at
-             * fault and stays enabled for the next connect. */
-            /* The remaining time is rounded up, so a tie means the call
-             * deadline comes first. */
+             * fault and stays enabled for the next connect, unless that
+             * keeps happening (CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT). */
+            /* Both deadlines are whole milliseconds on one clock, so a tie
+             * ends both waits together and counts as call-bound. */
             bool call_bound = attach_ms <= ctx->shm_attach_timeout_ms;
             if (!call_bound)
                 attach_ms = ctx->shm_attach_timeout_ms;
@@ -151,7 +152,10 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
                     serr != NIPC_WIN_SHM_ERR_BAD_MAGIC)
                     break;
                 if (GetTickCount64() >= deadline_ms) {
-                    keep_shm = call_bound;
+                    keep_shm = call_bound &&
+                               (nipc_service_win_peer_disconnected(&session) ||
+                                ++ctx->shm_call_bound_failures <
+                                    CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT);
                     break;
                 }
                 if (nipc_service_common_client_abort_requested(ctx)) {
@@ -169,6 +173,7 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
 
             if (serr == NIPC_WIN_SHM_OK) {
                 ctx->shm = shm;
+                ctx->shm_call_bound_failures = 0;
             } else if (keep_shm) {
                 /* Not a WinSHM problem: keep WinSHM enabled for the next connect. */
                 free(shm);

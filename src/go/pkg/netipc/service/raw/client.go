@@ -13,6 +13,12 @@ const clientShmAttachRetryInterval = 5 * time.Millisecond
 // clientShmAttachRetryTimeout is the default Client.shmAttachTimeout.
 const clientShmAttachRetryTimeout = 5 * time.Second
 
+// clientShmCallBoundFailureLimit: a call deadline that ends an SHM attach
+// wait is not the region's fault once; the second time in a row on a live
+// session, SHM is dropped like on any attach failure, so a region that never
+// becomes attachable cannot make every call end at its deadline.
+const clientShmCallBoundFailureLimit = 2
+
 func nextPowerOf2U32(n uint32) uint32 {
 	if n < 16 {
 		return 16

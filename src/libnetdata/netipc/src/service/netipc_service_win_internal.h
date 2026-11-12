@@ -12,6 +12,11 @@
 #include <windows.h>
 
 #define CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS 5u
+/* A call deadline that ends an SHM attach wait is not the region's fault
+ * once; the second time in a row on a live session, SHM is dropped like on
+ * any attach failure, so a region that never becomes attachable cannot make
+ * every call end at its deadline. */
+#define CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT 2u
 
 enum {
     NIPC_WIN_SERVICE_TEST_FAULT_CLIENT_RESPONSE_BUF_REALLOC_INTERNAL = 1,

@@ -533,8 +533,10 @@ impl UdsSession {
             );
             if result.is_err() && consumed {
                 self.recv_failed = true;
-                // Queued bytes are part of the abandoned stream too.
+                // Queued bytes are part of the abandoned stream too, and no
+                // response for a request in flight can arrive any more.
                 self.pending = Pending::default();
+                self.inflight_ids.clear();
             }
             result
         }
@@ -992,6 +994,9 @@ fn accept_cloexec(listen_fd: i32) -> i32 {
 /// the socket file the mode of the unbound socket, so fchmod() before bind()
 /// sets it without a post-bind window and without touching the
 /// process-global umask, which other threads of the embedding process use.
+/// connect() needs write permission on the socket file, so a umask without
+/// owner write fails the listen instead of leaving an endpoint its own user
+/// cannot reach.
 #[cfg(not(target_os = "macos"))]
 fn bind_owner_only(
     fd: RawFd,
@@ -999,10 +1004,19 @@ fn bind_owner_only(
     _service_name: &str,
     path: &str,
 ) -> Result<(), UdsError> {
+    use std::os::unix::fs::PermissionsExt;
+
     if unsafe { libc::fchmod(fd, libc::S_IRUSR | libc::S_IWUSR) } < 0 {
         return Err(UdsError::Socket(errno()));
     }
-    bind_unix(fd, path)
+    bind_unix(fd, path)?;
+    let err = match std::fs::symlink_metadata(path) {
+        Ok(meta) if meta.permissions().mode() & 0o200 != 0 => return Ok(()),
+        Ok(_) => libc::EACCES,
+        Err(e) => e.raw_os_error().unwrap_or(libc::EIO),
+    };
+    let _ = std::fs::remove_file(path);
+    Err(UdsError::Socket(err))
 }
 
 /// macOS rejects fchmod() on an unbound socket and creates the socket file
@@ -1081,13 +1095,11 @@ fn bind_owner_only(
         let dfd = dir_file.as_raw_fd();
         let name = c"s";
         let placed = (|| {
-            let mut st: libc::stat = unsafe { std::mem::zeroed() };
-            if unsafe { libc::fstatat(dfd, name.as_ptr(), &mut st, libc::AT_SYMLINK_NOFOLLOW) } < 0
-            {
-                return Err(UdsError::Socket(errno()));
-            }
-            // The bound file carries 0777 & ~umask; keep the umask narrowing.
-            let mode = st.st_mode & 0o777 & (libc::S_IRUSR | libc::S_IWUSR);
+            // The bound file carries 0777 & ~umask. It is set to exactly
+            // 0600: a umask without owner write would leave a socket its own
+            // user cannot connect to, and only the owner can reach the
+            // private directory.
+            let mode = libc::S_IRUSR | libc::S_IWUSR;
             if unsafe { libc::fchmodat(dfd, name.as_ptr(), mode, 0) } < 0 {
                 return Err(UdsError::Socket(errno()));
             }

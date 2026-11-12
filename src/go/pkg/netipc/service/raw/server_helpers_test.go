@@ -2,6 +2,7 @@ package raw
 
 import (
 	"fmt"
+	"testing"
 	"time"
 )
 
@@ -50,6 +51,21 @@ func waitClosed(ch <-chan struct{}, what string) {
 	case <-ch:
 	case <-time.After(testWaitLimit):
 		panic(what + ": not done after " + testWaitLimit.String())
+	}
+}
+
+// recvWithin receives from ch, failing the test if nothing arrives within
+// testWaitLimit, so a step that never returns fails the test instead of
+// hanging it.
+func recvWithin[T any](t *testing.T, ch <-chan T, what string) T {
+	t.Helper()
+	select {
+	case v := <-ch:
+		return v
+	case <-time.After(testWaitLimit):
+		t.Fatalf("%s: nothing received after %v", what, testWaitLimit)
+		var zero T
+		return zero
 	}
 }
 

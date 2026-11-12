@@ -11,11 +11,19 @@
 #include "netipc/netipc_named_pipe.h"
 #include "netipc/netipc_protocol.h"
 #include "netipc_win_security.h"
+#include "netipc/netipc_win_shm.h"
 
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Profiles Windows can provide; unassigned bits are never offered or
+ * accepted, so a peer can never select a profile without an implementation
+ * (0x04 is WinSHM busy-wait here, not the POSIX futex profile). */
+#define NIPC_NP_PLATFORM_PROFILES                                              \
+  (NIPC_PROFILE_BASELINE | NIPC_WIN_SHM_PROFILE_HYBRID |                       \
+   NIPC_WIN_SHM_PROFILE_BUSYWAIT)
 
 /* ------------------------------------------------------------------ */
 /*  Win32 error constants for disconnect detection                     */
@@ -876,9 +884,10 @@ static nipc_np_error_t client_handshake(HANDLE pipe,
   nipc_hello_t hello = {
       .layout_version = 1,
       .flags = 0,
-      .supported_profiles = cfg->supported_profiles ? cfg->supported_profiles
-                                                    : NIPC_PROFILE_BASELINE,
-      .preferred_profiles = cfg->preferred_profiles,
+      .supported_profiles = (cfg->supported_profiles ? cfg->supported_profiles
+                                                     : NIPC_PROFILE_BASELINE) &
+                            NIPC_NP_PLATFORM_PROFILES,
+      .preferred_profiles = cfg->preferred_profiles & NIPC_NP_PLATFORM_PROFILES,
       .max_request_payload_bytes = apply_default(cfg->max_request_payload_bytes,
                                                  NIPC_MAX_PAYLOAD_DEFAULT),
       .max_request_batch_items = apply_default(cfg->max_request_batch_items,
@@ -1021,8 +1030,9 @@ static nipc_np_error_t server_handshake(HANDLE pipe,
   uint32_t s_resp_pay =
       apply_default(cfg->max_response_payload_bytes, NIPC_MAX_PAYLOAD_DEFAULT);
   uint32_t s_profiles =
-      cfg->supported_profiles ? cfg->supported_profiles : NIPC_PROFILE_BASELINE;
-  uint32_t s_preferred = cfg->preferred_profiles;
+      (cfg->supported_profiles ? cfg->supported_profiles : NIPC_PROFILE_BASELINE) &
+      NIPC_NP_PLATFORM_PROFILES;
+  uint32_t s_preferred = cfg->preferred_profiles & NIPC_NP_PLATFORM_PROFILES;
 
   /* Receive HELLO */
   DWORD bytes_read = 0;
@@ -1899,8 +1909,10 @@ nipc_np_error_t nipc_np_receive_timeout(nipc_np_session_t *session, void *buf,
       return NIPC_NP_ERR_CHUNK;
     }
 
-    /* Validate chunk header */
+    /* Validate chunk header. A sender that uses smaller chunks than the
+     * budget would need more chunks than the count it must declare. */
     if (chk.message_id != hdr_out->message_id || chk.chunk_index != ci ||
+        ci >= expected_chunk_count ||
         chk.chunk_count != expected_chunk_count ||
         chk.total_message_len != (uint32_t)total_msg) {
       free(pkt_buf);

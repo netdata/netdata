@@ -31,6 +31,12 @@ impl ServerTimings {
 }
 #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
 pub(super) const CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS: u64 = 5;
+/// A call deadline that ends an SHM attach wait is not the region's fault
+/// once; the second time in a row on a live session, SHM is dropped like on
+/// any attach failure, so a region that never becomes attachable cannot make
+/// every call end at its deadline.
+#[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
+pub(super) const CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT: u32 = 2;
 #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
 pub(super) const CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS: u64 = 5_000;
 pub(super) const CACHE_RESPONSE_BUF_SIZE: usize = 65536;
@@ -80,8 +86,9 @@ impl LookupLogicalConfig {
 
 /// When all workers are busy, wait up to `slot_wait` for one to
 /// finish, so a client that reconnects right after closing is not refused
-/// while its old worker exits. The accept loop has nothing else to serve
-/// while full, so waiting costs nothing. Returns whether a slot is free.
+/// while its old worker exits. Clients queued behind this one wait as well,
+/// but while every worker stays busy they would be refused too. Returns
+/// whether a slot is free.
 pub(super) fn wait_for_worker_slot(
     running: &std::sync::atomic::AtomicBool,
     slot_wait: std::time::Duration,

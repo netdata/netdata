@@ -11,6 +11,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/internal/framing"
 )
 
+// platformProfiles are the profiles Windows can provide; unassigned bits are
+// never offered or accepted, so a peer can never select a profile without an
+// implementation (0x04 is WinSHM busy-wait here, not the POSIX futex profile).
+const platformProfiles = protocol.ProfileBaseline | WinShmProfileHybrid | WinShmProfileBusywait
+
 func headerVersionIncompatible(buf []byte, expectedCode uint16) bool {
 	return framing.HeaderVersionIncompatible(buf, expectedCode)
 }
@@ -41,6 +46,7 @@ func clientHandshake(handle syscall.Handle, io *pipeIO, config *ClientConfig, wa
 			MaxResponseBatchItems:   applyDefault(config.MaxResponseBatchItems, defaultBatchItems),
 			AuthToken:               config.AuthToken,
 			PacketSize:              pktSize,
+			PlatformProfiles:        platformProfiles,
 		},
 		Send: pending.writePacket,
 		Recv: func(dst []byte) (int, error) {
@@ -134,6 +140,7 @@ func serverHandshakeWait(handle syscall.Handle, config *ServerConfig, sessionID 
 			SupportedProfiles:       config.SupportedProfiles,
 			PreferredProfiles:       config.PreferredProfiles,
 			AuthToken:               config.AuthToken,
+			PlatformProfiles:        platformProfiles,
 		},
 		SessionID: sessionID,
 		Prepare:   prepare,

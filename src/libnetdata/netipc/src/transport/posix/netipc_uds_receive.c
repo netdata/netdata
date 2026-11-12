@@ -299,8 +299,10 @@ static nipc_uds_error_t validate_chunk_header(const nipc_chunk_header_t *chk,
                                               uint32_t chunk_count,
                                               size_t total_msg)
 {
+    /* A sender that uses smaller chunks than the budget would need more
+     * chunks than the count it must declare. */
     if (chk->message_id != hdr->message_id ||
-        chk->chunk_index != chunk_index ||
+        chk->chunk_index != chunk_index || chunk_index >= chunk_count ||
         chk->chunk_count != chunk_count ||
         chk->total_message_len != (uint32_t)total_msg)
         return NIPC_UDS_ERR_CHUNK;
@@ -501,8 +503,10 @@ nipc_uds_error_t nipc_uds_receive_timeout(nipc_uds_session_t *session,
                                            &wait, &consumed);
     if (err != NIPC_UDS_OK && consumed) {
         session->recv_failed = true;
-        /* Queued bytes are part of the abandoned stream too. */
+        /* Queued bytes are part of the abandoned stream too, and no
+         * response for a request in flight can arrive any more. */
         nipc_uds_pending_free(session);
+        nipc_uds_inflight_fail_all(session);
     }
     return err;
 #else

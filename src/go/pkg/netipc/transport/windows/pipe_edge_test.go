@@ -906,6 +906,50 @@ func TestSessionReceiveRejectsMalformedChunks(t *testing.T) {
 	}
 }
 
+func TestSessionReceiveRejectsMoreChunksThanDeclared(t *testing.T) {
+	client, server := sessionPair(t, defaultServerConfig(), defaultClientConfig())
+
+	first := encodePacket(protocol.Header{
+		Kind:      protocol.KindRequest,
+		Code:      protocol.MethodIncrement,
+		ItemCount: 1,
+		MessageID: 7,
+	}, []byte("0123456789"))
+	hdr, err := protocol.DecodeHeader(first[:protocol.HeaderSize])
+	if err != nil {
+		t.Fatalf("DecodeHeader failed: %v", err)
+	}
+	hdr.PayloadLen = 20
+	hdr.Encode(first[:protocol.HeaderSize])
+	if err := rawWrite(client.handle, first); err != nil {
+		t.Fatalf("rawWrite(first) failed: %v", err)
+	}
+	// The 10 remaining bytes fit one continuation; two half-size ones follow.
+	for i, part := range []string{"abcde", "fghij"} {
+		pkt := encodeChunkPacket(protocol.ChunkHeader{
+			Magic:           protocol.MagicChunk,
+			Version:         protocol.Version,
+			MessageID:       7,
+			TotalMessageLen: uint32(protocol.HeaderSize + 20),
+			ChunkIndex:      uint32(i + 1),
+			ChunkCount:      2,
+			ChunkPayloadLen: uint32(len(part)),
+		}, []byte(part))
+		if err := rawWrite(client.handle, pkt); err != nil {
+			t.Fatalf("rawWrite(continuation %d) failed: %v", i+1, err)
+		}
+	}
+
+	buf := make([]byte, 4096)
+	_, _, err = server.Receive(buf)
+	if !errors.Is(err, ErrChunk) {
+		t.Fatalf("Receive error = %v, want ErrChunk", err)
+	}
+	if !strings.Contains(err.Error(), "beyond chunk_count") {
+		t.Fatalf("Receive error = %v, want text %q", err, "beyond chunk_count")
+	}
+}
+
 func TestSessionReceiveRejectsMalformedChunkedBatchMessages(t *testing.T) {
 	type batchCase struct {
 		name         string

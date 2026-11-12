@@ -714,11 +714,47 @@ fn lock_umask_helper_process() {
             .unwrap()
             .push((tmp.to_string(), mode, visible));
     }));
-    {
+    // connect() needs write permission on the socket file. macOS sets the
+    // socket to exactly 0600; Linux and FreeBSD keep the umask narrowing and
+    // refuse to listen when it removes owner write.
+    let unreachable = cfg!(not(target_os = "macos")) && mask & 0o200 != 0;
+    let sock = format!("{TEST_RUN_DIR}/{svc}.sock");
+    if unreachable {
+        let first = {
+            let _umask = UmaskGuard(unsafe { libc::umask(mask) });
+            UdsListener::bind(TEST_RUN_DIR, &svc, default_server_config())
+        };
+        *LOCK_PUBLISH_HOOK.lock().unwrap() = None;
+        assert!(
+            matches!(first, Err(UdsError::Socket(libc::EACCES))),
+            "listen under umask {mask:o} must fail with EACCES, got {:?}",
+            first.as_ref().map(|_| ())
+        );
+        assert!(
+            std::fs::symlink_metadata(&sock).is_err(),
+            "no unreachable socket is left"
+        );
+        drop(
+            UdsListener::bind(TEST_RUN_DIR, &svc, default_server_config())
+                .expect("the endpoint starts under a usable umask"),
+        );
+    } else {
         let _umask = UmaskGuard(unsafe { libc::umask(mask) });
         let first = UdsListener::bind(TEST_RUN_DIR, &svc, default_server_config())
             .unwrap_or_else(|e| panic!("listen under umask {mask:o}: {e:?}"));
         *LOCK_PUBLISH_HOOK.lock().unwrap() = None;
+        let sock_mode = std::fs::symlink_metadata(&sock)
+            .expect("socket stat")
+            .permissions()
+            .mode()
+            & 0o777;
+        assert!(
+            sock_mode & 0o200 != 0 && sock_mode & 0o077 == 0,
+            "socket mode {sock_mode:o} under umask {mask:o}"
+        );
+        if cfg!(target_os = "macos") {
+            assert_eq!(sock_mode, 0o600, "macOS socket mode under umask {mask:o}");
+        }
         let second = UdsListener::bind(TEST_RUN_DIR, &svc, default_server_config());
         assert!(
             matches!(second, Err(UdsError::AddrInUse)),
@@ -1520,6 +1556,11 @@ fn test_stream_failed_receive_drops_pending() {
         session.receive(&mut rbuf),
         Err(UdsError::LimitExceeded)
     ));
+    // No response can arrive any more, so the request in flight has failed.
+    assert!(
+        session.inflight_ids.is_empty(),
+        "requests still in flight after the receive side failed"
+    );
     assert!(session.receive(&mut rbuf).is_err(), "later receive fails");
 
     drop(session);
@@ -2661,6 +2702,55 @@ fn test_receive_chunk_count_mismatch() {
     let mut buf = [0u8; 64];
     let err = session.receive(&mut buf).expect_err("chunk_count mismatch");
     assert!(matches!(err, UdsError::Chunk(_)));
+
+    unsafe { libc::close(fd1) };
+}
+
+#[test]
+fn test_receive_more_chunks_than_declared() {
+    let (fd0, fd1) = socketpair_seqpacket();
+    let mut session = test_session(fd0, Role::Server, (HEADER_SIZE + 10) as u32);
+
+    let hdr = Header {
+        magic: MAGIC_MSG,
+        version: VERSION,
+        header_len: protocol::HEADER_LEN,
+        kind: KIND_REQUEST,
+        code: 1,
+        flags: 0,
+        transport_status: protocol::STATUS_OK,
+        payload_len: 20,
+        item_count: 1,
+        message_id: 45,
+    };
+    let mut first_pkt = [0u8; HEADER_SIZE + 10];
+    hdr.encode(&mut first_pkt[..HEADER_SIZE]);
+    first_pkt[HEADER_SIZE..].copy_from_slice(&[1u8; 10]);
+    raw_send(fd1, &first_pkt).expect("send first chunk");
+
+    // Half-budget continuations need three chunks where two are declared.
+    for ci in 1..=2u32 {
+        let chk = ChunkHeader {
+            magic: MAGIC_CHUNK,
+            version: VERSION,
+            flags: 0,
+            message_id: 45,
+            total_message_len: (HEADER_SIZE + 20) as u32,
+            chunk_index: ci,
+            chunk_count: 2,
+            chunk_payload_len: 5,
+        };
+        let mut pkt = [0u8; HEADER_SIZE + 5];
+        chk.encode(&mut pkt[..HEADER_SIZE]);
+        pkt[HEADER_SIZE..].copy_from_slice(&[2u8; 5]);
+        raw_send(fd1, &pkt).expect("send continuation");
+    }
+
+    let mut buf = [0u8; 64];
+    let err = session
+        .receive(&mut buf)
+        .expect_err("chunk beyond chunk_count");
+    assert!(matches!(err, UdsError::Chunk(_)), "{err:?}");
 
     unsafe { libc::close(fd1) };
 }

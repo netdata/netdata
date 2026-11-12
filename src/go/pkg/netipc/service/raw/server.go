@@ -141,8 +141,8 @@ func (s *Server) retryAcceptAfter(cleanup func()) bool {
 
 // acquireWorkerSlot waits up to timings.slotWait() for a free worker, so a
 // client that reconnects right after closing is not refused while its old
-// worker exits. The accept loop has nothing else to serve while full, so
-// waiting costs nothing.
+// worker exits. Clients queued behind this one wait as well, but while every
+// worker stays busy they would be refused too.
 func (s *Server) acquireWorkerSlot(sem chan struct{}, cleanup func(), closeSession func()) bool {
 	select {
 	case sem <- struct{}{}:
