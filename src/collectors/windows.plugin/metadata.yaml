@@ -5960,8 +5960,9 @@ modules:
           contacting print servers. Each selected printer is then opened to read its status flags and queued job count
           (`GetPrinterW`) and, when jobs are queued, its jobs (`EnumJobsW`). Status values
           follow the `Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter, except that a printer
-          reporting several status flags at once gets its most severe state (problems first) and a connection whose
-          print server is offline reports `other`. Job user names, machine
+          reporting several status flags at once gets its most severe state (problems first), a connection whose
+          print server is offline reports `other`, a status the server reports as unknown reports `unknown`, a blocked
+          job counts as `error`, and a job waiting for user intervention counts as `degraded`. Job user names, machine
           names, and document titles are not collected.
       supported_platforms:
         include: ["windows"]
@@ -5983,8 +5984,8 @@ modules:
             One name enumeration per collection, plus one printer open and status read per selected printer, and a job
             read for selected printers with queued jobs. Unselected printers are never opened. For a selected printer
             connection, opening it can contact the print server and block when it is unreachable. The
-            module runs on its own thread while its `update every` differs from the global interval; a blocked call
-            stops only this module, but Netdata shutdown waits for it to return.
+            module always runs on its own thread; a blocked call stops only this module, but Netdata shutdown waits for
+            it to return.
     setup:
       prerequisites:
         list:
@@ -6004,7 +6005,7 @@ modules:
             enabled: false
           list:
             - name: update every
-              description: Data collection frequency. Setting it equal to the global interval runs the module on the shared collection thread.
+              description: Data collection frequency.
               default_value: 10
               required: false
             - name: printers to monitor

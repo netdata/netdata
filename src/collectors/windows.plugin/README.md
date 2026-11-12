@@ -111,14 +111,21 @@ printers get no charts and their queues are not opened.
 
 Each selected printer gets four charts: queued jobs, printer status, printer problems, and jobs by status. The problems
 chart has one dimension per Windows problem flag (for example `offline`, `paper_jam`, `toner_low`), each `1` while the
-flag is set, so several can be active together and each can be alerted on. Status values match the
-`Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter, except that a printer reporting several status
-flags at once gets its most severe state (problems such as offline or paper out first, then printing, warmup and idle)
-instead of falling back to its jobs, and a printer connection whose print server is offline reports `other`; an offline
-printer reports `other`. Job user names, machine names, and document titles are never collected.
+flag is set, so several can be active together and each can be alerted on.
 
-The module runs on its own thread only while its `update every` differs from the global interval. Opening a selected
-printer connection whose print server is unreachable can block; while it is blocked, this module collects nothing and
-Netdata shutdown waits for the call to return. Exclude such connections with `printers to monitor` (for example
-`!\\oldserver\*,*`); excluded printers are never opened. If the spooler cannot be enumerated (for example, the Spooler service is stopped), the
-charts show gaps and are kept until a successful enumeration shows the printer is gone.
+Status values match the `Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter, with these exceptions:
+
+- A printer reporting several status flags at once gets its most severe state (problems such as offline or paper out
+  first, then unknown, printing, warmup and idle) instead of falling back to its jobs.
+- A printer connection whose print server is offline reports `other`; a printer whose status the server reports as
+  unknown reports `unknown`.
+- A job the driver cannot print (blocked) counts as `error`; a job waiting for user intervention counts as `degraded`.
+
+An offline printer reports `other`. Job user names, machine names, and document titles are never collected.
+
+The module always runs on its own thread, so a slow spooler call never delays other modules; if that thread cannot be
+created, the module stays disabled. Opening a selected printer connection whose print server is unreachable can block;
+while it is blocked, this module collects nothing and Netdata shutdown waits for the call to return. Exclude such
+connections with `printers to monitor` (for example `!\\oldserver\*,*`); excluded printers are never opened. If the
+spooler cannot be enumerated (for example, the Spooler service is stopped), the charts show gaps and are kept until a
+successful enumeration shows the printer is gone.

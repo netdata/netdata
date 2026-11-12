@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "windows_plugin.h"
-#include "libnetdata/sanitizers/chart_id_and_name.h"
 
 #include <ctype.h>
 
@@ -170,6 +169,7 @@ static struct proc_module {
      .dim = "GetPrinters",
      .enabled = CONFIG_BOOLEAN_NO,
      .update_every = 10 * UPDATE_EVERY_MIN,
+     .dedicated_thread = true,
      .func = do_GetPrinters,
      .rd = NULL,
      .thread = NULL,

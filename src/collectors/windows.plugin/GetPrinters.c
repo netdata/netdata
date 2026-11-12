@@ -6,7 +6,7 @@
 #include <windows.h>
 #include <winspool.h>
 
-// Documented PRINTER_INFO_2 flags; defined here in case an older SDK header lacks them.
+// Documented PRINTER_INFO_2 and JOB_INFO_1 flags; defined here in case an older SDK header lacks them.
 #ifndef PRINTER_STATUS_SERVER_UNKNOWN
 #define PRINTER_STATUS_SERVER_UNKNOWN 0x00800000
 #endif
@@ -18,6 +18,12 @@
 #endif
 #ifndef PRINTER_STATUS_DRIVER_UPDATE_NEEDED
 #define PRINTER_STATUS_DRIVER_UPDATE_NEEDED 0x04000000
+#endif
+#ifndef JOB_STATUS_BLOCKED_DEVQ
+#define JOB_STATUS_BLOCKED_DEVQ 0x00000200
+#endif
+#ifndef JOB_STATUS_USER_INTERVENTION
+#define JOB_STATUS_USER_INTERVENTION 0x00000400
 #endif
 
 #define CONFIG_SECTION_GET_PRINTERS "plugin:windows:GetPrinters"
@@ -43,7 +49,9 @@ static const char *printer_state_names[PRINTER_STATE_MAX] = {
     [PRINTER_STATE_WARMUP] = "warmup",
 };
 
-// Job states follow the Win32_PrintJob.Status mapping used by windows_exporter.
+// Job states follow the Win32_PrintJob.Status mapping used by windows_exporter, except that a job the driver cannot
+// print (BLOCKED_DEVQ) is an error and one waiting for user action (USER_INTERVENTION) is degraded; CIMWin32 reports
+// both as unknown.
 enum printer_job_state {
     PRINTER_JOB_STATE_ERROR = 0,
     PRINTER_JOB_STATE_DEGRADED,
@@ -211,19 +219,20 @@ static BOOL spooler_enum_jobs_call(void *ctx, BYTE *data, DWORD size, DWORD *nee
     return EnumJobsW((HANDLE)ctx, 0, 0xFFFFFFFF, 1, data, size, needed, returned);
 }
 
-// Flag groups follow the Win32_Printer.PrinterStatus mapping used by windows_exporter, plus SERVER_OFFLINE: an
-// unreachable print server makes a connection unusable, so it must not read as idle.
+// Flag groups follow the Win32_Printer.PrinterStatus mapping used by windows_exporter, except: SERVER_OFFLINE is a
+// problem (an unreachable print server makes a connection unusable) and SERVER_UNKNOWN is unknown (Microsoft defines
+// it as "the printer status is unknown"); CIMWin32 reports both as idle.
 #define PRINTER_FLAGS_OTHER                                                                                            \
     (PRINTER_STATUS_PAUSED | PRINTER_STATUS_ERROR | PRINTER_STATUS_PENDING_DELETION | PRINTER_STATUS_PAPER_JAM |       \
      PRINTER_STATUS_PAPER_OUT | PRINTER_STATUS_MANUAL_FEED | PRINTER_STATUS_PAPER_PROBLEM | PRINTER_STATUS_OFFLINE |   \
      PRINTER_STATUS_OUTPUT_BIN_FULL | PRINTER_STATUS_TONER_LOW | PRINTER_STATUS_NO_TONER | PRINTER_STATUS_PAGE_PUNT |  \
      PRINTER_STATUS_USER_INTERVENTION | PRINTER_STATUS_OUT_OF_MEMORY | PRINTER_STATUS_DOOR_OPEN |                     \
      PRINTER_STATUS_SERVER_OFFLINE)
-#define PRINTER_FLAGS_UNKNOWN (PRINTER_STATUS_NOT_AVAILABLE)
+#define PRINTER_FLAGS_UNKNOWN (PRINTER_STATUS_NOT_AVAILABLE | PRINTER_STATUS_SERVER_UNKNOWN)
 #define PRINTER_FLAGS_PRINTING                                                                                         \
     (PRINTER_STATUS_IO_ACTIVE | PRINTER_STATUS_BUSY | PRINTER_STATUS_PRINTING | PRINTER_STATUS_PROCESSING)
 #define PRINTER_FLAGS_WARMUP (PRINTER_STATUS_INITIALIZING | PRINTER_STATUS_WARMING_UP)
-#define PRINTER_FLAGS_IDLE (PRINTER_STATUS_WAITING | PRINTER_STATUS_SERVER_UNKNOWN | PRINTER_STATUS_POWER_SAVE)
+#define PRINTER_FLAGS_IDLE (PRINTER_STATUS_WAITING | PRINTER_STATUS_POWER_SAVE)
 
 static enum printer_state printer_state_from_flags(DWORD status, bool *decided)
 {
@@ -270,10 +279,10 @@ static enum printer_state printer_state_from_first_job(const JOB_INFO_1W *jobs, 
 
 static enum printer_job_state printer_job_state(DWORD status)
 {
-    if (status & JOB_STATUS_ERROR)
+    if (status & (JOB_STATUS_ERROR | JOB_STATUS_BLOCKED_DEVQ))
         return PRINTER_JOB_STATE_ERROR;
 
-    if (status & (JOB_STATUS_PAUSED | JOB_STATUS_OFFLINE | JOB_STATUS_PAPEROUT))
+    if (status & (JOB_STATUS_PAUSED | JOB_STATUS_OFFLINE | JOB_STATUS_PAPEROUT | JOB_STATUS_USER_INTERVENTION))
         return PRINTER_JOB_STATE_DEGRADED;
 
     if (status & (JOB_STATUS_DELETING | JOB_STATUS_SPOOLING | JOB_STATUS_PRINTING | JOB_STATUS_PRINTED))
