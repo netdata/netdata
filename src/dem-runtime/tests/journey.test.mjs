@@ -10,6 +10,10 @@ import {fileURLToPath} from 'node:url';
 import {journeyStop, journeyResult, monotonicMilliseconds} from '../runner/journey.mjs';
 
 const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+// Include two Node startups and filesystem preparation on a loaded test host.
+// Exact deadline ordering is covered by the controlled-clock tests below.
+const subprocessBudget = 5000;
+const delayedExit = subprocessBudget + 1000;
 function controlledStop(stopAt = 100) {
   const child = new EventEmitter();
   const signals = [], pending = new Map();
@@ -113,16 +117,16 @@ test('exhausted startup budget does not spawn selected user work', async () => {
 test('short budget can stop a live CLI and preserves actual interrupted counts', async () => {
   const actual = await runFake(`const fs=require('node:fs');
     process.on('SIGINT',()=>{fs.writeSync(3,JSON.stringify({type:'result',result:{status:'cancelled',termination_reason:'cancelled',tests:{declared:1,not_run:1},interrupted_artifacts:[{id:'screenshot-1'}]}})+'\\n');process.exit(0)});
-    setInterval(()=>{},1000);`, 400);
+    setInterval(()=>{},1000);`, subprocessBudget);
   assert.equal(actual.result.status, 'timeout');
   assert.equal(actual.result.termination_reason, 'execution_budget');
   assert.deepEqual(actual.result.tests, {declared:1,not_run:1});
   assert.deepEqual(actual.result.interrupted_artifacts, [{id:'screenshot-1'}]);
-  assert.ok(actual.elapsed >= 300, actual.elapsed);
+  assert.ok(actual.elapsed >= subprocessBudget - 100, actual.elapsed);
 });
 
 test('budget stop before CLI reporting is ready still reports timeout without invented counts', async () => {
-  const actual = await runFake('setInterval(()=>{},1000);', 400);
+  const actual = await runFake('setInterval(()=>{},1000);', subprocessBudget);
   assert.equal(actual.result.status, 'timeout');
   assert.equal(actual.result.termination_reason, 'execution_budget');
   assert.equal(actual.result.tests, undefined);
@@ -132,14 +136,14 @@ test('budget stop before CLI reporting is ready still reports timeout without in
 test('accepted budget stop precedes a successful terminal with nonzero CLI exit', async () => {
   const actual = await runFake(`const fs=require('node:fs');process.on('SIGINT',()=>{
     fs.writeSync(3,JSON.stringify({type:'result',result:{status:'success',tests:{declared:1,passed:1}}})+'\\n');process.exit(130)});
-    setInterval(()=>{},1000);`, 400);
+    setInterval(()=>{},1000);`, subprocessBudget);
   assert.equal(actual.result.status, 'timeout');
   assert.equal(actual.result.termination_reason, 'execution_budget');
   assert.deepEqual(actual.result.tests, {declared:1,passed:1});
 });
 
 test('a budget stop does not excuse invalid reporter protocol', async () => {
-  const actual = await runFake("require('node:fs').writeSync(3,'invalid JSON\\n');setInterval(()=>{},1000);", 400);
+  const actual = await runFake("require('node:fs').writeSync(3,'invalid JSON\\n');setInterval(()=>{},1000);", subprocessBudget);
   assert.equal(actual.result.status, 'error');
   assert.equal(actual.result.termination_reason, undefined);
 });
@@ -148,20 +152,20 @@ test('terminal report before soft stop survives delayed CLI exit without signal'
   const actual = await runFake(`const fs=require('node:fs');
     process.on('SIGINT',()=>fs.writeFileSync('signalled','bad'));
     fs.writeSync(3,JSON.stringify({type:'result',result:{status:'success',tests:{declared:1,passed:1}}})+'\\n');
-    setTimeout(()=>process.exit(0),700);`, 400);
+    setTimeout(()=>process.exit(0),${delayedExit});`, subprocessBudget);
   assert.equal(actual.result.status, 'success');
   assert.equal(actual.result.termination_reason, undefined);
-  assert.ok(actual.elapsed >= 650, actual.elapsed);
+  assert.ok(actual.elapsed >= delayedExit, actual.elapsed);
   await assert.rejects(fs.access(path.join(actual.work, 'signalled')));
 });
 
 test('CLI exit before soft stop still joins inherited reporter pipe EOF', async () => {
   const actual = await runFake(`const fs=require('node:fs');
     fs.writeSync(3,JSON.stringify({type:'result',result:{status:'success'}})+'\\n');
-    require('node:child_process').spawn(process.execPath,['-e','setTimeout(()=>{},700)'],{stdio:['ignore','inherit','inherit',3]}).unref();
-    process.exit(0);`, 400);
+    require('node:child_process').spawn(process.execPath,['-e','setTimeout(()=>{},${delayedExit})'],{stdio:['ignore','inherit','inherit',3]}).unref();
+    process.exit(0);`, subprocessBudget);
   assert.equal(actual.result.status, 'success');
-  assert.ok(actual.elapsed >= 650, actual.elapsed);
+  assert.ok(actual.elapsed >= delayedExit, actual.elapsed);
 });
 
 test('journey request requires positive safe monotonic handoff', async () => {

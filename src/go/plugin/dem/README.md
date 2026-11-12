@@ -781,7 +781,7 @@ unexpected failure/timeout. Errors loading/running the monitor are execution ina
 start are distinct from a failed target. A workflow failure means a declared check failed, not proof of a service-wide outage.
 
 Journey timeouts start when a browser slot is admitted, including runtime startup. The runner reserves up to five
-seconds inside the effective budget for Playwright to report a timeout (one fifth of budgets below 25 seconds).
+seconds inside the effective budget for Playwright's final diagnostic report (one fifth of budgets below 25 seconds).
 An earlier caller deadline shortens that budget. When the work interval expires, the runner requests a graceful
 Playwright stop. A cooperative interrupted test can report its locator error and an opted-in screenshot; its actual
 status remains `interrupted`, not a fabricated test timeout. Script-specified test timeouts remain supported.
