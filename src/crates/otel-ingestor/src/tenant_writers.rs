@@ -55,9 +55,10 @@ pub(crate) fn storage_unavailable(message: &'static str) -> tonic::Status {
 /// signal ("logs", "traces").
 ///
 /// The task is cancelled when the runtime is dropped while the request
-/// waits for its sync. That happens only to an export that is still in
-/// progress when the worker's stop budget ends: at a stop the worker first
-/// lets the exports in progress finish (`run_ingestor`). It is a normal end,
+/// waits for its sync. At a stop that happens only to an export that is
+/// still in progress when its part of the worker's stop budget ends: the
+/// worker first lets the exports in progress finish (`run_ingestor`). It is
+/// a normal end,
 /// not an error. The frames are in their WAL file, so the next start indexes
 /// them, and a sender that sends the records again stores them twice. The
 /// sender's connection usually ends with no answer at that moment, so few

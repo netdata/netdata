@@ -754,11 +754,7 @@ traces:
         assert_eq!(config.metrics.interval_secs, Some(10));
         assert_eq!(config.metrics.grace_period_secs, Some(60));
         assert_eq!(config.metrics.expiry_duration_secs, Some(900));
-        // What a 0 in a user file is read as must be the shipped value.
-        assert_eq!(
-            config.metrics.max_new_charts_per_request,
-            otel_bridge::config::DEFAULT_MAX_NEW_CHARTS_PER_REQUEST
-        );
+        assert_eq!(config.metrics.max_new_charts_per_request, 100);
         assert_eq!(
             config.metrics.chart_configs_dir.as_deref(),
             Some("/etc/netdata/otel.d/v1/metrics")
@@ -2362,6 +2358,11 @@ logs:
         assert_eq!(config.metrics.grace_period_secs, Some(60));
         assert_eq!(config.metrics.expiry_duration_secs, Some(900));
         assert_eq!(config.metrics.max_new_charts_per_request, 100);
+        // The same for the chart limit: a 0 gets this constant.
+        assert_eq!(
+            config.metrics.max_new_charts_per_request,
+            otel_bridge::config::DEFAULT_MAX_NEW_CHARTS_PER_REQUEST
+        );
 
         assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v2"));
 
@@ -2405,6 +2406,13 @@ logs:
             assert_eq!(rotation.max_file_size, ByteSize::mb(25));
             assert_eq!(rotation.max_entries, 50000);
             assert_eq!(rotation.max_file_duration, Duration::from_secs(15 * 60));
+            // A limit of 0 is read as "not set" and gets the built-in value
+            // (`PluginConfig::correct_harmful_values`): that must be the
+            // shipped one.
+            let built_in = otel_bridge::config::RotationPolicy::default().resolve("default");
+            assert_eq!(rotation.max_file_size, built_in.max_file_size);
+            assert_eq!(rotation.max_entries, built_in.max_entries);
+            assert_eq!(rotation.max_file_duration, built_in.max_file_duration);
             let retention = signal.retention.resolve("default");
             assert_eq!(retention.max_files, 100_000);
             assert_eq!(retention.max_total_size, ByteSize::gb(1));

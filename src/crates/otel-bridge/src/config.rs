@@ -310,8 +310,8 @@ pub struct MetricsConfig {
 
 /// The new-chart budget of the stock file, which is what a
 /// `max_new_charts_per_request` of 0 is read as
-/// ([`PluginConfig::correct_harmful_values`]). The otel-plugin stock-file
-/// test pins it against the shipped value.
+/// ([`PluginConfig::correct_harmful_values`]). The otel-plugin test of the
+/// shipped stock file pins it against the shipped value.
 pub const DEFAULT_MAX_NEW_CHARTS_PER_REQUEST: usize = 100;
 
 /// Metrics derived from ingested logs and traces.

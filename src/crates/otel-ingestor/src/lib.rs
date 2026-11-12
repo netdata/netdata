@@ -471,16 +471,21 @@ async fn run_ingestor(
     traces_sweep_handle.abort();
 
     // The stop work, all of it inside one budget (`otel_bridge::shutdown`).
-    // The exports in progress get their answer: an export that is cut gets
-    // none, and its sender sends again records that are on the disk already.
-    // The service map writes its open minutes.
     //
-    // A server ends when its connections are closed: it tells each client
-    // that it stops, and a client closes its connection when its exports
-    // have their answers. A peer that never closes (a connection that sent
-    // nothing, a client that ignores the notice) costs the whole budget.
+    // First the exports in progress get their answer: an export that is cut
+    // gets none, and its sender sends again records that are on the disk
+    // already. A server ends when its connections are closed: it tells each
+    // client that it stops and closes a connection after its answers. A peer
+    // that sent nothing yet, or that ignores the notice, holds its
+    // connection open: the exports get half of the budget at most, so that
+    // such a peer leaves the service map its time.
+    //
+    // Then the service map writes its open minutes. It comes second because
+    // its stop closes its queue: the spans of an export that ends after that
+    // would be answered and stored, and missing from the map.
     stop.cancel();
     let budget = otel_bridge::shutdown::WORKER_STOP_BUDGET;
+    let deadline = tokio::time::Instant::now() + budget;
     let exports = async {
         let (grpc, http) = tokio::join!(&mut grpc_server, &mut http_server);
         for result in [grpc, http] {
@@ -489,24 +494,20 @@ async fn run_ingestor(
             }
         }
     };
-    let map = async {
-        if let Some(map) = &service_map {
-            map.shutdown().await;
-        }
-    };
-    let (exports, map) = tokio::join!(
-        tokio::time::timeout(budget, exports),
-        tokio::time::timeout(budget, map)
-    );
-    if exports.is_err() {
+    if tokio::time::timeout(budget / 2, exports).await.is_err() {
         tracing::info!(
             "connections were still open {} ms after the stop request: an export in progress \
              on one of them gets no answer",
-            budget.as_millis()
+            (budget / 2).as_millis()
         );
     }
-    if map.is_err() {
-        tracing::warn!("service map: shutdown took too long; its open minutes are lost");
+    if let Some(map) = service_map {
+        if tokio::time::timeout_at(deadline, map.shutdown())
+            .await
+            .is_err()
+        {
+            tracing::warn!("service map: shutdown took too long; its open minutes are lost");
+        }
     }
     Ok(())
 }

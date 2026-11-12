@@ -29,12 +29,12 @@
 //!   [`WORKERS_EXIT_WAIT`] for all of them together. A worker that is still
 //!   there after that is killed.
 //! - A worker's work after `Shutdown` (the ingestor takes no new export,
-//!   answers the exports in progress and writes the open minutes of the
-//!   service map; the ledger writes its catalog entries to local catalog
-//!   files) has [`WORKER_STOP_BUDGET`]. In by-hand runs under load the
-//!   ingestor's answers took a few milliseconds; a peer that keeps a
-//!   connection open and never closes it costs the ingestor the whole
-//!   budget.
+//!   answers the exports in progress and then writes the open minutes of
+//!   the service map; the ledger writes its catalog entries to local
+//!   catalog files) has [`WORKER_STOP_BUDGET`]. In by-hand runs under load
+//!   the ingestor's answers took a few milliseconds; a peer that holds a
+//!   connection open costs the ingestor half of the budget, the most that
+//!   the answers get.
 //!
 //! A stop while the plugin starts, before the ingestor's `Ready`, has no
 //! stop work and none of these budgets: the supervisor ends its workers at

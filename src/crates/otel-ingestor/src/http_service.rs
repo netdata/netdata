@@ -1436,9 +1436,8 @@ mod tests {
         assert_eq!(v["code"], serde_json::json!(3));
     }
 
-    /// A stop does not cut a request in progress: the server takes no new
-    /// request, the one in progress gets its answer, and then the server
-    /// ends by itself.
+    /// A stop does not cut a request in progress: it gets its answer, and
+    /// then the server ends by itself.
     #[tokio::test]
     async fn a_stop_ends_the_server_after_the_request_in_progress_is_answered() {
         use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
