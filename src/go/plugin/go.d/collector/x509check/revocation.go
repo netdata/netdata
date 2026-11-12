@@ -114,10 +114,11 @@ func newRevocationChecker() *revocationChecker {
 	}
 }
 
-// status reports whether cert is revoked; issuers are certificates that may have issued it. An error means that the
-// status could not be determined, and names why, with an outcome (checkOutcome): the certificate is outside its
-// validity period, lists no CRL or OCSP URL to use, no issuer that signed it is found, a CRL cannot be downloaded,
-// parsed or verified, or no OCSP responder gives a usable answer. Any OCSP status other than good counts as revoked.
+// status reports whether cert is revoked; issuers are certificates that may have issued it. Only the HTTP and HTTPS
+// URLs cert lists are used. An error means that the status could not be determined, and names why, with an outcome
+// (checkOutcome): the certificate is outside its validity period, lists no CRL or OCSP URL to use, no issuer that
+// signed it is found, a CRL cannot be downloaded, parsed or verified, or no OCSP responder gives a usable answer. Any
+// OCSP status other than good counts as revoked.
 func (rc *revocationChecker) status(
 	ctx context.Context,
 	cert *x509.Certificate,
@@ -138,7 +139,7 @@ func (rc *revocationChecker) status(
 	maps.DeleteFunc(rc.crls, func(_ crlKey, v crlVerdict) bool { return !now.Before(v.nextUpdate) })
 	var crlChecked bool
 	for _, crlURL := range cert.CRLDistributionPoints {
-		if isLDAPURL(crlURL) {
+		if !isHTTPURL(crlURL) {
 			continue
 		}
 		revoked, err := rc.crlStatus(ctx, cert, crlURL, issuer, now)
@@ -148,10 +149,10 @@ func (rc *revocationChecker) status(
 		crlChecked = true
 	}
 
-	if len(cert.OCSPServer) == 0 {
+	if !slices.ContainsFunc(cert.OCSPServer, isHTTPURL) {
 		if !crlChecked {
 			return false, failCheck(checkNoRevocationInfo,
-				errors.New("the certificate lists no OCSP URL and no CRL URL other than LDAP"))
+				errors.New("the certificate lists no HTTP or HTTPS CRL or OCSP URL"))
 		}
 		return false, nil
 	}
@@ -228,6 +229,9 @@ func (rc *revocationChecker) ocspStatus(
 	var reasons []string
 	outcome := checkRequestFailed
 	for _, server := range cert.OCSPServer {
+		if !isHTTPURL(server) {
+			continue
+		}
 		resp, err := rc.queryOCSP(ctx, server, req, cert)
 		if err == nil {
 			err = verifyOCSPResponse(resp, cert, iss, now)
@@ -296,12 +300,15 @@ func (rc *revocationChecker) findIssuer(
 
 	reasons := []string{"no certificate the source sent or TLS verification found signed it"}
 	outcome := checkIssuerNotFound
-	if len(cert.IssuingCertificateURL) == 0 {
-		reasons = append(reasons, "the certificate lists no issuer URL")
+	if !slices.ContainsFunc(cert.IssuingCertificateURL, isHTTPURL) {
+		reasons = append(reasons, "the certificate lists no HTTP or HTTPS issuer URL")
 	} else {
 		outcome = checkRequestFailed
 	}
 	for _, issuerURL := range cert.IssuingCertificateURL {
+		if !isHTTPURL(issuerURL) {
+			continue
+		}
 		issuer, err := rc.downloadIssuer(ctx, cert, issuerURL)
 		if err == nil {
 			return issuer, nil
@@ -601,23 +608,28 @@ func (rc *revocationChecker) get(ctx context.Context, rawURL string) ([]byte, er
 	return rc.do(req)
 }
 
-// do returns the body of a 200 OK response; its errors name the URL and are failed requests.
+// do returns the body of a 200 OK response. Its errors name the URL and are failed requests, except a body over the
+// client's size limit, which is an answer that cannot be used.
 func (rc *revocationChecker) do(req *http.Request) ([]byte, error) {
 	var body []byte
 	err := web.DoHTTP(rc.client).Request(req, func(r io.Reader) (err error) {
 		body, err = io.ReadAll(r)
 		return err
 	})
-	if err != nil {
+	switch {
+	case errors.Is(err, web.ErrResponseTooLarge):
+		return nil, failCheck(checkInvalidAnswer, err)
+	case err != nil:
 		return nil, failCheck(checkRequestFailed, err)
 	}
 	return body, nil
 }
 
-// isLDAPURL reports an LDAP CRL distribution point, which is not fetched.
-func isLDAPURL(rawURL string) bool {
+// isHTTPURL reports a URL the checker fetches. CRL, OCSP and issuer URLs of other schemes, such as the LDAP URLs some
+// CAs list, are not used.
+func isHTTPURL(rawURL string) bool {
 	u, err := url.Parse(rawURL)
-	return err == nil && u.Scheme == "ldap"
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
 }
 
 // parseCRL accepts a DER CRL and, as some servers send, a PEM one.

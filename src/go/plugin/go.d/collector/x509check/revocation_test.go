@@ -33,6 +33,9 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
 	"golang.org/x/crypto/ocsp"
+
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 func TestRevocationChecker_Status(t *testing.T) {
@@ -47,7 +50,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 		wantOutcome string
 	}{
 		"no CRL or OCSP URL": {
-			wantErr:     "lists no OCSP URL and no CRL URL other than LDAP",
+			wantErr:     "lists no HTTP or HTTPS CRL or OCSP URL",
 			wantOutcome: checkNoRevocationInfo,
 		},
 		"CRL lists the certificate": {
@@ -82,7 +85,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 			endpoints: testPKIEndpoints{
 				crls: []testPKIHandler{unexpected},
 			},
-			wantErr:     "the certificate lists no issuer URL",
+			wantErr:     "the certificate lists no HTTP or HTTPS issuer URL",
 			wantOutcome: checkIssuerNotFound,
 		},
 		"issuer that did not sign the certificate": {
@@ -108,6 +111,38 @@ func TestRevocationChecker_Status(t *testing.T) {
 			},
 			wantErr:     "did not sign it",
 			wantOutcome: checkIssuerNotFound,
+		},
+		"issuer URLs serving another certificate or unreachable": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveRogueIssuer, notFound},
+				crls:    []testPKIHandler{unexpected},
+			},
+			wantErr:     "did not sign it",
+			wantOutcome: checkIssuerNotFound,
+		},
+		"issuer URL that is not HTTP": {
+			endpoints: testPKIEndpoints{
+				crls: []testPKIHandler{unexpected},
+			},
+			chain: func(p *testPKI) []*x509.Certificate {
+				leaf := p.issueLeaf(p.t, p.leaf.SerialNumber, p.ca, p.caKey, func(template *x509.Certificate) {
+					template.IssuingCertificateURL = []string{"ldap:///CN=CA,CN=AIA,CN=Public%20Key%20Services?cACertificate"}
+				})
+				return []*x509.Certificate{leaf}
+			},
+			wantErr:     "lists no HTTP or HTTPS issuer URL",
+			wantOutcome: checkIssuerNotFound,
+		},
+		"CRL and OCSP URLs that are not HTTP": {
+			chain: func(p *testPKI) []*x509.Certificate {
+				leaf := p.issueLeaf(p.t, p.leaf.SerialNumber, p.ca, p.caKey, func(template *x509.Certificate) {
+					template.CRLDistributionPoints = []string{"ldaps://ldap.example.org/CN=CA?certificateRevocationList"}
+					template.OCSPServer = []string{"ftp://ocsp.example.org"}
+				})
+				return []*x509.Certificate{leaf}
+			},
+			wantErr:     "lists no HTTP or HTTPS CRL or OCSP URL",
+			wantOutcome: checkNoRevocationInfo,
 		},
 		"issuer URLs unreachable": {
 			endpoints: testPKIEndpoints{
@@ -299,7 +334,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 			endpoints: testPKIEndpoints{
 				ldapCRL: true,
 			},
-			wantErr:     "lists no OCSP URL and no CRL URL other than LDAP",
+			wantErr:     "lists no HTTP or HTTPS CRL or OCSP URL",
 			wantOutcome: checkNoRevocationInfo,
 		},
 		"LDAP CRL is skipped for OCSP": {
@@ -380,6 +415,14 @@ func TestRevocationChecker_Status(t *testing.T) {
 			endpoints: testPKIEndpoints{
 				issuers: []testPKIHandler{serveIssuer},
 				ocsps:   []testPKIHandler{notFound, serveRogueOCSP},
+			},
+			wantErr:     "bad OCSP signature",
+			wantOutcome: checkInvalidAnswer,
+		},
+		"OCSP responders with unusable answers or unreachable": {
+			endpoints: testPKIEndpoints{
+				issuers: []testPKIHandler{serveIssuer},
+				ocsps:   []testPKIHandler{serveRogueOCSP, notFound},
 			},
 			wantErr:     "bad OCSP signature",
 			wantOutcome: checkInvalidAnswer,
@@ -569,7 +612,7 @@ func TestRevocationChecker_Status(t *testing.T) {
 			endpoints: testPKIEndpoints{
 				ocsps: []testPKIHandler{unexpected},
 			},
-			wantErr:     "the certificate lists no issuer URL",
+			wantErr:     "the certificate lists no HTTP or HTTPS issuer URL",
 			wantOutcome: checkIssuerNotFound,
 		},
 		"OCSP with an unreachable issuer": {
@@ -600,12 +643,12 @@ func TestRevocationChecker_Status(t *testing.T) {
 		// The certificate lists no URL, so passing the validity check, which comes first, ends the check there.
 		"certificate at its last valid instant": {
 			at:          func(p *testPKI) time.Time { return p.leaf.NotAfter },
-			wantErr:     "lists no OCSP URL",
+			wantErr:     "lists no HTTP or HTTPS CRL or OCSP URL",
 			wantOutcome: checkNoRevocationInfo,
 		},
 		"certificate at its first valid instant": {
 			at:          func(p *testPKI) time.Time { return p.leaf.NotBefore },
-			wantErr:     "lists no OCSP URL",
+			wantErr:     "lists no HTTP or HTTPS CRL or OCSP URL",
 			wantOutcome: checkNoRevocationInfo,
 		},
 	}
@@ -635,6 +678,23 @@ func TestRevocationChecker_Status(t *testing.T) {
 				"a check requests each issuer URL at most once")
 		})
 	}
+}
+
+func TestRevocationChecker_AnswerOverTheSizeLimit(t *testing.T) {
+	pki := newTestPKI(t, testPKIEndpoints{
+		crls: []testPKIHandler{serveCRL(false)},
+	})
+	rc := newRevocationChecker()
+	// The CRL is larger than this limit. The issuer comes with the chain, so the CRL is the only download.
+	rc.client = web.NewHTTPClientWithTransport(web.ClientConfig{
+		Timeout:           confopt.Duration(revocationRequestTimeout),
+		ResponseBodyLimit: 64,
+	}, nil)
+
+	_, err := rc.status(t.Context(), pki.leaf, []*x509.Certificate{pki.ca}, pki.now)
+
+	assert.ErrorIs(t, err, web.ErrResponseTooLarge)
+	assert.Equal(t, checkInvalidAnswer, checkOutcome(err))
 }
 
 func TestRevocationChecker_CachesCRLVerdictUntilNextUpdate(t *testing.T) {

@@ -34,7 +34,8 @@ modules:
           use STARTTLS, or a certificate stored in a local file. It charts the time left until the certificate
           expires and, optionally, the expiration of every certificate in the chain and the revocation status of
           the server certificate, with the outcome of each revocation check. Stock alerts fire before a certificate
-          expires, when it is revoked, and when its revocation status keeps failing to be determined.
+          expires, when it is revoked, and when revocation checks keep failing for a reason that can be fixed: a
+          failed request, an unusable answer, or a missing issuer certificate.
         method_description: |
           Every collection interval, each job connects to its `source` and completes a TLS handshake, after a
           `STARTTLS` command for `smtp://` sources, to read the certificates the server presents. A `file://` source
@@ -59,17 +60,18 @@ modules:
             - A `file://` source provides only the first certificate in the file, so `check_full_chain` has no effect
               there.
             - Revocation status is checked for the server certificate only, and an OCSP `unknown` answer is reported
-              as revoked. LDAP CRL URLs are not used, so a certificate that lists no OCSP URL and no other CRL URL has
-              no revocation status to check: the revocation status chart shows a gap and the revocation check status
-              shows `no_revocation_info`.
+              as revoked. Only the HTTP and HTTPS URLs a certificate lists are used, not LDAP or other ones, so a
+              certificate that lists no HTTP or HTTPS CRL or OCSP URL has no revocation status to check: the
+              revocation status chart shows a gap and the revocation check status shows `no_revocation_info`.
             - For a certificate that lists CRL or OCSP URLs, revocation status comes only from CRLs and OCSP answers
               that verify against the issuer of the server certificate and are current by the Agent host's clock,
               within 5 minutes. The issuer certificate must be one the server sends, one that TLS verification reached
               through `tls_ca` or the system's trusted CAs, or the one at the issuer URL listed in the server
-              certificate. Without it the chart shows a gap, for example with `tls_skip_verify` for a private CA whose
-              certificates list no issuer URL, behind a server that does not send the CA certificate, or for a
-              `file://` source whose certificate lists none. The chart also shows a gap when the CA publishes outdated
-              CRLs or OCSP answers, and can show one when the Agent host's clock is more than 5 minutes off.
+              certificate. Without it the revocation status chart shows a gap, for example with `tls_skip_verify` for a
+              private CA whose certificates list no issuer URL, behind a server that does not send the CA certificate,
+              or for a `file://` source whose certificate lists none. The revocation status chart also shows a gap when
+              the CA publishes outdated CRLs or OCSP answers, and can show one when the Agent host's clock is more than
+              5 minutes off.
             - With an `smtp://` source, `timeout` covers the whole SMTP exchange. A mail server that delays its
               greeting, a common anti-spam measure on port 25, needs a `timeout` longer than that delay.
         performance_impact:
@@ -177,10 +179,13 @@ modules:
                 |:------|:--------|
                 | `success` | The revocation status was determined. |
                 | `request_failed` | A CRL, OCSP or issuer certificate request failed (DNS, connection, timeout or HTTP status); with several OCSP responders or issuer URLs, every request failed. |
-                | `invalid_answer` | A CRL or OCSP answer could not be parsed or failed verification (signature, issuer, scope or freshness). |
-                | `issuer_not_found` | The certificate of the CA that issued the server certificate is unavailable: the source did not send it, TLS verification did not reach it, and the server certificate lists no issuer URL or one that serves another certificate. |
-                | `no_revocation_info` | The certificate lists no OCSP URL and no CRL URL other than LDAP, so there is nothing to check. |
+                | `invalid_answer` | A CRL or OCSP answer could not be used: it is larger than 64 MiB, cannot be parsed, is an OCSP error status such as `unauthorized` or `tryLater`, or failed verification (signature, issuer, scope or freshness). |
+                | `issuer_not_found` | The certificate of the CA that issued the server certificate is unavailable: the source did not send it, TLS verification did not reach it, and the server certificate lists no HTTP or HTTPS issuer URL, or one that does not serve that certificate. |
+                | `no_revocation_info` | The certificate lists no HTTP or HTTPS CRL or OCSP URL, so there is nothing to check. |
                 | `outside_validity` | The certificate is expired or not yet valid. |
+
+                Only `request_failed`, `invalid_answer` and `issuer_not_found` count toward the stock alert on failing
+                revocation checks: the others have no fix in the check, and the expiration alerts cover validity.
 
             - name: update_every
               description: Data collection interval, in seconds.
@@ -388,14 +393,15 @@ modules:
             cause: >-
               The certificate of the CA that issued the server certificate is unavailable: the server does not send
               it, TLS verification did not reach it (for example, `tls_skip_verify` is set or the source is
-              `file://`), and the issuer URL listed in the server certificate is missing, unreachable, or does not
-              serve that certificate as a single DER or PEM certificate; `reason` says which. The revocation status
-              chart shows a gap, and the revocation check status shows `request_failed` when every issuer URL request
-              failed, otherwise `issuer_not_found`.
+              `file://`), and the server certificate lists no HTTP or HTTPS issuer URL, or the one it lists is
+              unreachable or does not serve that certificate as a single DER or PEM certificate; `reason` says which.
+              The revocation status chart shows a gap, and the revocation check status shows `request_failed` when
+              every issuer URL request failed, otherwise `issuer_not_found`.
             fix: >-
               Configure the server to send the CA certificate that issued its certificate, or set `tls_ca` to that CA
               certificate and remove `tls_skip_verify`. Otherwise check that the Agent host can reach the issuer URL
-              listed in the certificate.
+              listed in the certificate. A `file://` source does not use `tls_ca`: use a certificate that lists its
+              issuer URL, or set `check_revocation_status` to `no` for the job.
           - error: "revocation status of `source` could not be determined: no usable OCSP answer: `reason`"
             when: "`check_revocation_status` is enabled."
             cause: >-
@@ -406,12 +412,12 @@ modules:
             fix: >-
               Check that the Agent host can reach the OCSP URLs listed in the certificate and that its clock is
               correct. For an `outdated since` reason, the responder serves stale answers; report it to the CA.
-          - error: "revocation status of `source` could not be determined: the certificate lists no OCSP URL and no CRL URL other than LDAP"
+          - error: "revocation status of `source` could not be determined: the certificate lists no HTTP or HTTPS CRL or OCSP URL"
             when: "`check_revocation_status` is enabled."
             cause: >-
-              The server certificate lists no OCSP responder and no CRL that the collector uses, so its revocation
-              status cannot be checked. The revocation status chart shows a gap, and the revocation check status shows
-              `no_revocation_info`.
+              The server certificate lists no OCSP responder and no CRL that the collector uses (it uses only HTTP and
+              HTTPS URLs, not LDAP ones), so its revocation status cannot be checked. The revocation status chart shows
+              a gap, and the revocation check status shows `no_revocation_info`.
             fix: >-
               Set `check_revocation_status` to `no` for this job. For a certificate of your own CA, have the CA include
               an HTTP CRL distribution point or an OCSP URL in the certificates it issues.
@@ -421,7 +427,7 @@ modules:
               A CRL listed in the certificate could not be downloaded, parsed or verified, and `reason` names its URL
               and the problem; or the certificate is expired or not yet valid, and `reason` gives the time. The
               revocation status chart shows a gap. The revocation check status shows `request_failed` for a CRL that
-              could not be downloaded, `invalid_answer` for one that could not be parsed or verified, and
+              could not be downloaded, `invalid_answer` for one over 64 MiB or that could not be parsed or verified, and
               `outside_validity` for the certificate's validity. A CRL must be a complete version 2 CRL (not a delta or
               indirect CRL) up to 64 MiB, issued and signed by the certificate's issuer, covering the server
               certificate, and current within 5 minutes.
@@ -435,8 +441,8 @@ modules:
         title: Metrics
         enabled: false
       description: |
-        When a certificate cannot be read, or its revocation status cannot be determined, the affected charts show
-        gaps rather than zeros.
+        When a certificate cannot be read, its charts show gaps rather than zeros. When its revocation status cannot
+        be determined, the revocation status chart shows a gap and the revocation check status chart shows why.
       availability: []
       scopes:
         - name: certificate
