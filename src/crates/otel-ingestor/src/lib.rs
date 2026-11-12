@@ -123,8 +123,9 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     };
 
     // Best-effort: log immediately on return, before the supervisor (which
-    // SIGKILLs workers the moment the connection closes) can react to the
-    // dropped connection. `conn` is owned by `run_ingestor`, so unlike the
+    // stops every worker when one of them closes its connection, and kills
+    // one that is still there after its wait) can react to the dropped
+    // connection. `conn` is owned by `run_ingestor`, so unlike the
     // ledger we can't log strictly before the drop.
     run_ingestor(config, conn)
         .await

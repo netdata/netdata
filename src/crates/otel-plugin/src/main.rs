@@ -245,8 +245,9 @@ fn main() {
                 std::process::exit(1);
             }
             block_on_runtime(async {
-                // Logged here, at once: the supervisor kills its workers as
-                // soon as one of them closes its connection.
+                // Logged here, at once: the supervisor stops its workers when
+                // one of them closes its connection, and kills one that is
+                // still there after its wait (`otel_bridge::shutdown`).
                 if let Err(e) = run_worker(kind).await {
                     tracing::error!("{e:#}");
                     std::process::exit(1);
