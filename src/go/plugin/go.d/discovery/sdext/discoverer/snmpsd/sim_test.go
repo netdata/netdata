@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,14 +30,14 @@ func (sim *discoverySim) run(t *testing.T) {
 	d, err := NewDiscoverer(sim.cfg)
 	require.NoError(t, err)
 
-	d.newSnmpClient = func(handler gosnmp.Handler) (snmputils.Session, func()) {
-		h, cleanup := prepareMockSnmpHandler(t, handler)
+	d.newSnmpClient = func(cfg gosnmp.Config) (snmputils.Session, func(), error) {
+		h, cleanup := prepareMockSnmpHandler(t, cfg)
 		h.setExpectInit()
 		h.setExpectSysInfo()
 		if sim.updateSnmpHandler != nil {
 			sim.updateSnmpHandler(h)
 		}
-		return h, cleanup
+		return h, cleanup, nil
 	}
 
 	seen := make(map[string]model.TargetGroup)
@@ -135,32 +135,32 @@ func sortTargetGroups(tggs []model.TargetGroup) {
 	}
 }
 
-// mockSnmpHandler is the session of one probe; handler is the client the
-// discoverer configured for it.
+// mockSnmpHandler is the session of one probe; cfg is the client
+// configuration the discoverer made for it.
 type mockSnmpHandler struct {
 	*snmpmock.MockSession
-	handler       gosnmp.Handler
+	cfg           gosnmp.Config
 	skipOnConnect func(ip string) bool
 }
 
-func (m *mockSnmpHandler) Connect() error {
-	if m.skipOnConnect != nil && m.skipOnConnect(m.handler.Target()) {
+func (m *mockSnmpHandler) Connect(ctx context.Context) error {
+	if m.skipOnConnect != nil && m.skipOnConnect(m.cfg.Target) {
 		return errors.New("mock handler skip connect")
 	}
-	return m.MockSession.Connect()
+	return m.MockSession.Connect(ctx)
 }
 
-func prepareMockSnmpHandler(t *testing.T, handler gosnmp.Handler) (*mockSnmpHandler, func()) {
+func prepareMockSnmpHandler(t *testing.T, cfg gosnmp.Config) (*mockSnmpHandler, func()) {
 	mockCtl := gomock.NewController(t)
 	cleanup := func() { mockCtl.Finish() }
 	mockSNMP := snmpmock.NewMockSession(mockCtl)
-	m := &mockSnmpHandler{MockSession: mockSNMP, handler: handler}
+	m := &mockSnmpHandler{MockSession: mockSNMP, cfg: cfg}
 
 	return m, cleanup
 }
 
 func (m *mockSnmpHandler) setExpectInit() {
-	m.EXPECT().Connect().Return(nil).AnyTimes()
+	m.EXPECT().Connect(gomock.Any()).Return(nil).AnyTimes()
 	m.EXPECT().Close().Return(nil).AnyTimes()
 }
 
@@ -173,13 +173,13 @@ const (
 )
 
 func (m *mockSnmpHandler) setExpectSysInfo() {
-	m.EXPECT().Get(sysInfoOIDsForTest()).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Name: snmputils.OidSysDescr, Value: []uint8(mockSysDescr), Type: gosnmp.OctetString},
-			{Name: snmputils.OidSysObject, Value: mockSysObject, Type: gosnmp.ObjectIdentifier},
-			{Name: snmputils.OidSysContact, Value: []uint8(mockSysContact), Type: gosnmp.OctetString},
-			{Name: snmputils.OidSysName, Value: []uint8(mockSysName), Type: gosnmp.OctetString},
-			{Name: snmputils.OidSysLocation, Value: []uint8(mockSysLocation), Type: gosnmp.OctetString},
+	m.EXPECT().Get(gomock.Any(), sysInfoOIDsForTest()).Return(&gosnmp.Message{
+		VarBinds: []gosnmp.VarBind{
+			{Name: snmputils.OidSysDescr, Value: gosnmp.OctetStringValue([]uint8(mockSysDescr))},
+			{Name: snmputils.OidSysObject, Value: gosnmp.ObjectIdentifierValue(mockSysObject)},
+			{Name: snmputils.OidSysContact, Value: gosnmp.OctetStringValue([]uint8(mockSysContact))},
+			{Name: snmputils.OidSysName, Value: gosnmp.OctetStringValue([]uint8(mockSysName))},
+			{Name: snmputils.OidSysLocation, Value: gosnmp.OctetStringValue([]uint8(mockSysLocation))},
 		},
 	}, nil).AnyTimes()
 }

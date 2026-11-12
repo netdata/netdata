@@ -6,8 +6,8 @@ machinery around that pipeline (startup, shutdown, configuration, self-observabi
 for coming back later.
 
 It intentionally leaves two dependencies opaque: the journal file format (owned by `systemd-journal-sdk`) and SNMP
-wire parsing internals (owned by the gosnmp fork). This document covers how the collector drives them, not how they
-work inside.
+wire parsing and USM internals (owned by the `github.com/netdata/gosnmp` library). This document covers how the
+collector drives them, not how they work inside.
 
 **Place in the documentation set.** This is the one maintained record of the collector's design and internals: the
 design invariants that are not visible in the code (why a limit has its value, which ownership rules the packages
@@ -218,7 +218,8 @@ early-return that legitimately consumes a packet must set `packetFinished`, or t
 
 ### Stage 1 — Receive
 
-`internal/receiver/listener.go`. Raw `net.ListenUDP` — gosnmp is used only as an unmarshaller, not as a listener.
+`internal/receiver/listener.go`. Raw `net.ListenUDP` — gosnmp's `Receiver` decodes datagrams and makes their
+responses; it does not listen or send.
 
 | Property | Value |
 | --- | --- |
@@ -245,15 +246,21 @@ Two sharp edges:
 
 1. Source-IP allowlist (`allowlist.source_cidrs`; default allows both `0.0.0.0/0` **and** `::/0` — the check is
    address-family-strict, so both are needed).
-2. SNMP version sniff — a minimal, zero-allocation BER walk that rejects disallowed versions before real parsing.
+2. The unauthenticated header (`gosnmp.ReadEnvelope`): its version rejects disallowed versions before the decode,
+   and its SNMPv3 engine ID goes into a decode-error entry. A header that does not parse gives neither: the packet
+   skips this check and fails the decode. A dynamic-discovery job drops an engine ID of all `0x00` or all `0xff`
+   octets here (`unknown_engine_id`): such an ID names no engine and is never learned.
 3. **Home-grown BER pre-validation** before gosnmp ever sees the bytes (`validateBERLimits`): max nesting depth 8,
    max encoded OID 128 bytes, max OctetString 1024 bytes (relaxed for v3, whose encrypted ScopedPDU is one large
    OctetString), no indefinite lengths, no trailing data. This is the DoS budget for malformed input.
-4. gosnmp decode (panic-guarded; the dependency is a fork: see the `replace` directive in `src/go/go.mod`).
-5. Post-decode checks: version re-check, community allowlist (v1/v2c; empty list = accept any), v3 security level,
-   dynamic engine-ID registration, v3 engine-ID authorization.
-6. **INFORM acknowledgment** — sent *before* the rate-limit decision, so a rate-limited INFORM is still acked while
-   its content is dropped.
+4. Decode by the job's `gosnmp.Receiver` (panic-guarded), with the SNMPv3 security processing of RFC 3414 section 3.2
+   against the registered users (see SNMPv3 below). A rejected SNMPv3 message may come with a Report for its sender,
+   which is sent after one rate-limit token; that token also admits the packet's decode-error entry.
+5. Post-decode checks: version re-check, community allowlist (v1/v2c; empty list = accept any), and, for a static
+   job, a trap naming the job's local engine ID, which is rejected (`unknown_engine_id`) unless that engine is
+   whitelisted. A dynamic job reports an engine the decode learned.
+6. **INFORM acknowledgment** — the Response the receiver made, sent *before* the rate-limit decision, so a
+   rate-limited INFORM is still acked while its content is dropped.
 7. Rate limit (last).
 
 The decode budget is five fixed constants (`listener.go`, `decode.go`), enforced per job and deliberately not
@@ -282,24 +289,36 @@ prepended in fixed order, so downstream stages see one uniform shape:
 candidate and its reason, is recorded in a `TrapSourceAudit` that travels with the entry into the journal. A
 catch-all `0.0.0.0/0` trusted-relay prefix draws a startup warning, because any peer could then spoof its identity.
 
-**SNMPv3** (`v3_state.go`, `v3_dynamic.go`, `v3_envelope.go`, `inform.go`):
+**SNMPv3** (`users.go`, `v3_state.go`, `receiver.go`): one `gosnmp.Receiver` per job, built in `PrepareV3` with
+the job's users, its local engine ID and boots; it decodes, authenticates and decrypts each message, keeps the time
+records of RFC 3414 section 3.2 step 7, learns engines and makes the INFORM Responses and Reports.
 
 - USM users are validated at config time (priv requires auth; keys ≥ 8 chars; engine IDs 5–32 hex bytes).
-- Security level (`v3_security_level.go`): gosnmp's table decode authenticates only what a message's own flags
-  request, and only for the User-based Security Model, so an unauthenticated or non-USM message naming a user
-  configured with an authentication protocol would decode. A non-USM message is dropped as `usm_failures`; so is an
-  unauthenticated one unless the most specific entries of its user allow it: entries bound to its engine ID; else
-  entries without engine ID, or any entry for a message to the local engine; else only when every entry of the user is
-  no-auth. A configured `engine_id` does not restrict which engines a user's traffic comes from; engine authorization
-  stays with the whitelist or the dynamic registry. An INFORM carries the local engine ID, not the sender's, so a user
-  configured with both levels accepts unauthenticated INFORMs; give each security level its own username. Privacy is
-  not required. The check runs before dynamic engine-ID registration and the INFORM acknowledgment.
-- Trap authorization: the sender's engine ID must be in `engine_id_whitelist` — **or** `dynamic_engine_id_discovery`
-  hot-registers unseen `(engineID, username)` pairs, capped by `dynamic_engine_id_max_pairs`. The two options are
-  mutually exclusive by validation.
+- Registration lists (`receiverUsers`): a message is decoded only by the users registered for its user name and
+  engine ID, tried in order, and a user with an authentication protocol accepts only authenticated messages. Per user
+  name, an engine gets the users bound to it by `engine_id` first, then the name's other authenticated users; without
+  either, its no-auth users. So an unauthenticated message is decided by the users bound to its engine when there are
+  any, otherwise it is accepted only when every user of the name is no-auth. A configured `engine_id` does not restrict
+  which engines a user's traffic comes from; engine authorization stays with the whitelist or the learned engines. The
+  local engine ID gets its bound users first and every user of the name otherwise, so a user configured with both
+  levels accepts unauthenticated INFORMs; give each security level its own username. A rejected level, an unknown user
+  name and a non-USM message fail the decode (`usm_failures`). Privacy is not required.
+- Trap authorization: a static job registers its users for each engine in `engine_id_whitelist`, so a trap from
+  another engine fails the decode (`unknown_engine_id`). With `dynamic_engine_id_discovery` the receiver learns the
+  engine of an authentic, unreportable trap from a configured user name, at most `dynamic_engine_id_max_pairs` user
+  names over all engines; the authenticated users of the name are learned, and its no-auth users when one of them has
+  no `engine_id` or every user of the name is no-auth. Learning runs in the decode, before the rate limit; the
+  password-to-key derivation is cached per passphrase, so a learning attempt costs a key localization and a digest.
+  The two options are mutually exclusive by validation.
 - INFORM authorization is different by RFC 3414: the receiver is authoritative, so the message's engine ID must equal
-  the job's **local engine ID** — whitelist membership is not enough. Discovery probes are answered with an
-  unauthenticated Report carrying the local engine ID.
+  the job's **local engine ID** (another engine ID fails the decode, `unknown_engine_id`), and an authenticated INFORM
+  must carry the local engine's boots and a time within 150 seconds of its own (RFC 3414 section 3.2 step 7 a): a stale
+  one fails `usm_failures` and gets a notInTimeWindow Report, from which the sender resynchronizes. The boots rise at
+  every job start, so every sender resynchronizes once after a restart.
+- Reports: the receiver answers a discovery probe (a reportable message naming no engine), a reportable message naming
+  an engine it has no users for (usmStatsUnknownEngineIDs) and an authenticated message to the local engine outside
+  its time window. No Report answers an unknown user name, a level, a wrong digest or a decryption error. A Report
+  can be about 2.4 times the size of the probe it answers, which is why it waits for a rate-limit token.
 - Engine state persists per job in `<lib-dir>/snmp-trap/<job>/`: `engine-boots` (incremented on every
   construction — constructing the counter speculatively burns a boot count) and `local-engine-id` (configured value
   wins; a corrupt persisted file is a **hard startup error**, never silently regenerated, because peers cache it).
@@ -312,8 +331,8 @@ catch-all `0.0.0.0/0` trusted-relay prefix draws a startup warning, because any 
   writes; startup rollback removes newly created state.
   The job-directory leaf rejects symlinks; creation uses `0750` subject to umask and preserves existing permissions.
   Directory ancestry must remain trusted and stable during use.
-- The shared gosnmp security table needs an extra lock (`tableMu`) around decode because dynamic registration can
-  mutate the per-username credential list that `UnmarshalTrap` iterates.
+- The receiver counts the local engine time from `PrepareV3`, which builds it right after raising the boots; its
+  time records for other engines last for the job's life.
 
 **Protection** (`allowlist.go`, `ratelimit.go`): rate limiting is a per-source-IP token bucket
 (`rate = burst = per_source_pps`, default 1000), per job, capped at 10 000 tracked sources with idle sweep and
@@ -325,9 +344,10 @@ most once per 5 minutes; when the 10 000 cap is hit the sweep runs immediately a
 before a new source is refused.
 
 **Undecodable packets are not silent.** A decode failure is classified (`malformed_pdu`, `auth_failures`,
-`usm_failures`, `unknown_engine_id`, `decode_failed` — by substring match on gosnmp error text, a deliberate coupling
-until the fork exposes typed errors) and, if the rate limiter admits it, produces a `decode_error` journal entry with
-the sanitized error, packet size, and SHA-256 — **never the raw bytes**, which may contain communities.
+`usm_failures`, `unknown_engine_id`, `decode_failed` — the library's errors by their category (`errors.Is`), the
+collector's decode-budget and trap-shape errors by their text) and, if the rate limiter admits it, produces a
+`decode_error` journal entry with the sanitized error, packet size, and SHA-256 — **never the raw bytes**, which may
+contain communities.
 
 ### Stage 3 — Classify with Profiles
 
@@ -709,7 +729,7 @@ OTLP varbind list, and the dedup fingerprint — all routed through the single `
 | --- | --- |
 | root (`snmp_traps`) | V2 framework adapter: config surface + pure validation, DynCfg error classes, path resolution, process-shared services, Function wiring, base `charts.yaml` |
 | `internal/jobruntime` | One job's lifecycle: the ordered start transaction, the per-packet pipeline, output staging, event fan-in to telemetry, decode-error entries, ordered cleanup |
-| `internal/receiver` | Admission: UDP listener, BER pre-validation, gosnmp decode, v1 normalization, source selection, SNMPv3 (USM, engine state, dynamic discovery, INFORM/discovery responses), allowlist, rate limiting |
+| `internal/receiver` | Admission: UDP listener, BER pre-validation, gosnmp decode, v1 normalization, source selection, SNMPv3 (registration lists, engine state; the gosnmp receiver's USM, engine learning, INFORM Responses and Reports), allowlist, rate limiting |
 | `internal/model` | Shared vocabulary: `TrapPDU`, `TrapEntry`, wire-stable enums, OID normalization and the `.0.` alternate, varbind lookup and the sensitive-varbind redaction predicate |
 | `internal/catalog` | Trap profiles: loading (eager user / lazy sha256-pinned stock), the manifest route tables, closed taxonomy, restricted templates, metric-rule DSL parsing and validation, per-job overrides, ref-counted manager |
 | `internal/enrichment` | Registry → varbind-interface → topology → reverse-DNS enrichment with full audit; `netdataadapter` isolates the concrete Netdata dependencies |
@@ -735,7 +755,7 @@ implements the seams.
 | --- | --- |
 | Add/change a public config option | `config.go` + `init.go` (pure validation) + `config_schema.json` (defaults, tab) + the owning package's policy `Normalize`/`Validate` |
 | Change packet admission, rate limiting, allowlists | `internal/receiver/` (`receiver.go` order, `policy.go` rules) |
-| Change SNMPv3 behavior | `internal/receiver/` (`v3_state.go`, `v3_dynamic.go`, `v3_envelope.go`, `inform.go`) |
+| Change SNMPv3 behavior | `internal/receiver/` (`users.go`, `v3_state.go`, `receiver.go`) |
 | Change the profile format or taxonomy | `internal/catalog/` (`profile.go`, `template.go`) + the authoring docs at `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md` + the trap-profile authoring skill |
 | Change the pipeline stage order | `internal/jobruntime/pipeline.go` (mind the ordering contracts: enrich before render, metrics after commit, `packetFinished`) |
 | Add a journal field | `internal/output/journal/serialize.go` (order is pinned; `TRAP_JSON` stays last) + the Function defaults in `internal/snmptrapsfunc` + the `query-snmp-traps` skill |

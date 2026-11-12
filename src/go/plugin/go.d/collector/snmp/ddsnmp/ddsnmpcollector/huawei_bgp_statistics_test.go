@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,12 +18,12 @@ import (
 func TestCollector_Collect_HuaweiTypedBGPRows(t *testing.T) {
 	tests := map[string]struct {
 		rowID    string
-		pdus     []gosnmp.SnmpPDU
+		pdus     []gosnmp.VarBind
 		validate func(t *testing.T, rows []ddsnmp.BGPRow)
 	}{
 		"peer family maps state admin and routing instance": {
 			rowID: "huawei-bgp-peer-family",
-			pdus: []gosnmp.SnmpPDU{
+			pdus: []gosnmp.VarBind{
 				createStringPDU("1.3.6.1.4.1.2011.5.25.177.1.1.1.1.6.0.1.1.1.4.192.0.2.21", "blue"),
 				createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2.0.1.1.1.4.192.0.2.21", 65001),
 				createPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.1.1.1.4.192.0.2.21", gosnmp.OctetString, []byte{192, 0, 2, 21}),
@@ -48,7 +49,7 @@ func TestCollector_Collect_HuaweiTypedBGPRows(t *testing.T) {
 		},
 		"peer statistics retains process VPN and address without unproved AS": {
 			rowID: "huawei-bgp-peer-statistics",
-			pdus: []gosnmp.SnmpPDU{
+			pdus: []gosnmp.VarBind{
 				createPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.42.1.1.1.4.192.0.2.22", gosnmp.OctetString, []byte{192, 0, 2, 22}),
 				createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.2.42.1.1.1.4.192.0.2.22", 65002),
 				createCounter32PDU("1.3.6.1.4.1.2011.5.25.177.1.1.7.1.4.0.42.4.192.0.2.22", 5),
@@ -92,7 +93,7 @@ func TestCollector_Collect_HuaweiTypedBGPRows(t *testing.T) {
 				SysObjectID: "1.3.6.1.4.1.2011.2.224.279",
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Empty(t, results[0].Metrics)

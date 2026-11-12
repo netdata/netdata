@@ -3,11 +3,12 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -37,11 +38,12 @@ func newScalarCollector(snmpClient snmputils.Client, req requestConfig, missingO
 }
 
 // Collect gathers all scalar metrics from the profile
-func (sc *scalarCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
-	return sc.collectObserved(prof, stats, nil)
+func (sc *scalarCollector) collect(ctx context.Context, prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+	return sc.collectObserved(ctx, prof, stats, nil)
 }
 
 func (sc *scalarCollector) collectObserved(
+	ctx context.Context,
 	prof *ddsnmp.Profile,
 	stats *ddsnmp.CollectionStats,
 	observer *acquisitionScalarObserver,
@@ -62,7 +64,7 @@ func (sc *scalarCollector) collectObserved(
 
 	source := sourceRecorder(sc.snmpClient)
 	cursor := source.Cursor()
-	pdus, err := sc.getScalarValues(oids, stats)
+	pdus, err := sc.getScalarValues(ctx, oids, stats)
 	if source != nil {
 		requests := source.requestsSince(cursor)
 		observer.bindSource(requests, prof.Definition.Metrics)
@@ -120,18 +122,13 @@ func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 	return oids, missingOIDs
 }
 
-func (sc *scalarCollector) getScalarValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	return getSNMPValues(sc.snmpClient, sc.req, oids, sc.missingOIDs, stats)
-}
-
-// processScalarMetrics converts PDUs into metrics
-func (sc *scalarCollector) processScalarMetrics(configs []ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
-	return sc.processScalarMetricsObserved(configs, pdus, stats, nil)
+func (sc *scalarCollector) getScalarValues(ctx context.Context, oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.VarBind, error) {
+	return getSNMPValues(ctx, sc.snmpClient, sc.req, oids, sc.missingOIDs, stats)
 }
 
 func (sc *scalarCollector) processScalarMetricsObserved(
 	configs []ddprofiledefinition.MetricsConfig,
-	pdus map[string]gosnmp.SnmpPDU,
+	pdus map[string]gosnmp.VarBind,
 	stats *ddsnmp.CollectionStats,
 	observer *acquisitionScalarObserver,
 ) ([]ddsnmp.Metric, error) {
@@ -176,7 +173,7 @@ func (sc *scalarCollector) processScalarMetricsObserved(
 // processScalarMetric processes a single scalar metric configuration
 func (sc *scalarCollector) processScalarMetric(
 	cfg ddprofiledefinition.MetricsConfig,
-	pdus map[string]gosnmp.SnmpPDU,
+	pdus map[string]gosnmp.VarBind,
 	observer *acquisitionScalarObserver,
 	configIndex int,
 ) (*ddsnmp.Metric, error) {

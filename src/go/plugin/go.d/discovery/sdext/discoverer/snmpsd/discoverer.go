@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/gohugoio/hashstructure"
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/filepersister"
 	"github.com/sourcegraph/conc/pool"
 
@@ -43,8 +43,12 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		started:   make(chan struct{}),
 		cfgHash:   cfgHash,
 		subnets:   subnets,
-		newSnmpClient: func(handler gosnmp.Handler) (snmputils.Session, func()) {
-			return snmputils.NewSession(handler), func() {}
+		newSnmpClient: func(cfg gosnmp.Config) (snmputils.Session, func(), error) {
+			client, err := gosnmp.NewClient(cfg)
+			if err != nil {
+				return nil, func() {}, err
+			}
+			return client, func() {}, nil
 		},
 
 		rescanInterval:          defaultRescanInterval,
@@ -87,7 +91,7 @@ type (
 
 		subnets []subnet
 
-		newSnmpClient func(gosnmp.Handler) (snmputils.Session, func())
+		newSnmpClient func(gosnmp.Config) (snmputils.Session, func(), error)
 
 		parallelScansPerNetwork int
 		rescanInterval          time.Duration
@@ -175,7 +179,7 @@ func (d *Discoverer) discoverNetwork(ctx context.Context, in chan<- []model.Targ
 	}
 	p := pool.New().WithMaxGoroutines(d.parallelScansPerNetwork)
 
-	d.Debugf("SNMP client info for '%s': %s", sub.str, snmputils.SnmpClientConnInfo(d.newProbeHandler("", sub.credential)))
+	d.Debugf("SNMP client info for '%s': %s", sub.str, snmputils.SnmpClientConnInfo(d.probeConfig("", sub.credential)))
 
 	for ip := range sub.ips.Iterate() {
 		ipAddr := ip.String()
@@ -224,7 +228,7 @@ func (d *Discoverer) probeIPAddress(ctx context.Context, sub subnet, ip string, 
 		return
 	}
 
-	si, err := d.getSnmpSysInfo(sub, ip)
+	si, err := d.getSnmpSysInfo(ctx, sub, ip)
 	if err != nil {
 		if dev == nil {
 			// First-time discovery failure - log at debug level as this is expected for many IPs
@@ -246,28 +250,34 @@ func (d *Discoverer) probeIPAddress(ctx context.Context, sub subnet, ip string, 
 	tgg.addTarget(tg)
 }
 
-func (d *Discoverer) getSnmpSysInfo(sub subnet, ip string) (*snmputils.SysInfo, error) {
-	client, cleanup := d.newSnmpClient(d.newProbeHandler(ip, sub.credential))
+func (d *Discoverer) getSnmpSysInfo(ctx context.Context, sub subnet, ip string) (*snmputils.SysInfo, error) {
+	cfg := d.probeConfig(ip, sub.credential)
+	client, cleanup, err := d.newSnmpClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SNMP client: %v", err)
+	}
 	defer cleanup()
 
-	if err := client.Connect(); err != nil {
+	if err := client.Connect(ctx); err != nil {
 		return nil, fmt.Errorf("failed to connect: %v", err)
 	}
 
 	defer func() { _ = client.Close() }()
 
-	return snmputils.GetSysInfo(client, snmputils.ParseSNMPVersion(sub.credential.Version), gosnmp.MaxOids)
+	return snmputils.GetSysInfo(ctx, client, cfg.Version, gosnmp.MaxOids)
 }
 
-// newProbeHandler builds the client of one probe: no retries, the discovery
-// timeout, the subnet's credential and the library's default max OIDs.
-func (d *Discoverer) newProbeHandler(target string, cred CredentialConfig) gosnmp.Handler {
-	client := gosnmp.NewHandler()
-	client.SetTarget(target)
-	client.SetTimeout(d.timeout)
-	client.SetRetries(0)
-	setCredential(client, cred)
-	return client
+// probeConfig is the client configuration of one probe: the standard port,
+// no retries, the discovery timeout, the subnet's credential and the library's
+// default max OIDs.
+func (d *Discoverer) probeConfig(target string, cred CredentialConfig) gosnmp.Config {
+	cfg := gosnmp.Config{
+		Target:  target,
+		Port:    161,
+		Timeout: d.timeout,
+	}
+	setCredential(&cfg, cred)
+	return cfg
 }
 
 func send(ctx context.Context, in chan<- []model.TargetGroup, tgg model.TargetGroup) {

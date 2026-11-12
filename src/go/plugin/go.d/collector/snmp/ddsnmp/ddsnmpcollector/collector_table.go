@@ -3,13 +3,15 @@
 package ddsnmpcollector
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
 	"strings"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -59,31 +61,33 @@ func newTableCollector(
 }
 
 // Collect gathers all table metrics from the profile
-func (tc *tableCollector) collect(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
-	return tc.collectWithSymbolMode(prof, tableSymbolModeValue, stats)
+func (tc *tableCollector) collect(ctx context.Context, prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+	return tc.collectWithSymbolMode(ctx, prof, tableSymbolModeValue, stats)
 }
 
 func (tc *tableCollector) collectTopology(
+	ctx context.Context,
 	prof *ddsnmp.Profile,
 	stats *ddsnmp.CollectionStats,
 ) ([]ddsnmp.Metric, error) {
-	return tc.collectWithSymbolMode(prof, tableSymbolModePresence, stats)
+	return tc.collectWithSymbolMode(ctx, prof, tableSymbolModePresence, stats)
 }
 
 func (tc *tableCollector) collectWithSymbolMode(
+	ctx context.Context,
 	prof *ddsnmp.Profile,
 	mode tableSymbolMode,
 	stats *ddsnmp.CollectionStats,
 ) ([]ddsnmp.Metric, error) {
 	session := newTableCollectionSession(tc, buildTableIdentity([]*ddsnmp.Profile{prof}))
 	scope := session.addScope(prof, mode, stats)
-	session.resolve()
-	return session.collectScope(scope)
+	session.resolve(ctx)
+	return session.collectScope(ctx, scope)
 }
 
 type (
 	tableCollectionContext struct {
-		walkedData     map[string]map[string]gosnmp.SnmpPDU
+		walkedData     map[string]map[string]gosnmp.VarBind
 		tableNameToOID map[string]string
 	}
 
@@ -99,12 +103,12 @@ type (
 
 		// pdus contains all PDUs from walking this specific table
 		// Key: full OID (e.g., "1.3.6.1.2.1.2.2.1.10.1"), Value: SNMP PDU
-		pdus map[string]gosnmp.SnmpPDU
+		pdus map[string]gosnmp.VarBind
 
 		// walkedData contains PDUs from ALL walked tables in this collection
 		// Used for cross-table tag resolution
 		// Key: table OID → map[full OID]PDU
-		walkedData map[string]map[string]gosnmp.SnmpPDU
+		walkedData map[string]map[string]gosnmp.VarBind
 
 		// tableNameToOID maps table names to their OIDs
 		// Used to resolve cross-table references (e.g., "ifXTable" → "1.3.6.1.2.1.31.1.1")
@@ -130,7 +134,7 @@ type (
 		// rows contains PDUs organized by row index
 		// Created by organizePDUsByRow from flat PDU list
 		// Key: row index (e.g., "1", "2.3") → map[column OID]PDU
-		rows map[string]map[string]gosnmp.SnmpPDU
+		rows map[string]map[string]gosnmp.VarBind
 
 		// oidCache stores the mapping of column OID to full OID for each row
 		// Used for caching table structure
@@ -185,7 +189,7 @@ type cacheProcessingContext struct {
 	// pdus contains current metric values fetched via SNMP GET
 	// Only contains metric columns (not tag columns, which are cached)
 	// Key: full OID (trimmed), Value: current PDU value
-	pdus map[string]gosnmp.SnmpPDU
+	pdus map[string]gosnmp.VarBind
 
 	tableName     string
 	profileSource string
@@ -202,6 +206,7 @@ const (
 
 // tryCollectFromCache attempts to collect metrics using cached data
 func (tc *tableCollector) tryCollectFromCache(
+	ctx context.Context,
 	cfg ddprofiledefinition.MetricsConfig,
 	profileSource string,
 	mode tableSymbolMode,
@@ -215,7 +220,7 @@ func (tc *tableCollector) tryCollectFromCache(
 
 	columnOIDs := buildColumnOIDs(cfg)
 
-	ctx := &cacheProcessingContext{
+	cache := &cacheProcessingContext{
 		config:        cfg,
 		cachedOIDs:    cachedOIDs,
 		cachedTags:    cachedTags,
@@ -226,7 +231,7 @@ func (tc *tableCollector) tryCollectFromCache(
 		acquisition:   acquisition,
 	}
 
-	metrics, err := tc.collectWithCache(ctx, stats)
+	metrics, err := tc.collectWithCache(ctx, cache, stats)
 	if err != nil {
 		tc.log.Debugf("Cached collection failed for table %s: %v", cfg.Table.Name, err)
 		return nil
@@ -290,7 +295,7 @@ func (tc *tableCollector) resolvedDependenciesAvailable(
 // organizePDUsByRow groups PDUs by their row index
 func (tc *tableCollector) organizePDUsByRow(
 	ctx *tableProcessingContext,
-) (rows map[string]map[string]gosnmp.SnmpPDU, oidCache, tagCache map[string]map[string]string) {
+) (rows map[string]map[string]gosnmp.VarBind, oidCache, tagCache map[string]map[string]string) {
 	// Combine all column OIDs
 	allColumnOIDs := make([]string, 0, len(ctx.columnOIDs)+len(ctx.orderedTags))
 
@@ -304,7 +309,7 @@ func (tc *tableCollector) organizePDUsByRow(
 		}
 	}
 
-	rows = make(map[string]map[string]gosnmp.SnmpPDU)
+	rows = make(map[string]map[string]gosnmp.VarBind)
 	if ctx.cacheStructure {
 		oidCache = make(map[string]map[string]string)
 		tagCache = make(map[string]map[string]string)
@@ -316,7 +321,7 @@ func (tc *tableCollector) organizePDUsByRow(
 				index := after
 
 				if rows[index] == nil {
-					rows[index] = make(map[string]gosnmp.SnmpPDU)
+					rows[index] = make(map[string]gosnmp.VarBind)
 					if ctx.cacheStructure {
 						oidCache[index] = make(map[string]string)
 						tagCache[index] = make(map[string]string)
@@ -412,14 +417,15 @@ func (tc *tableCollector) processRows(
 
 // collectWithCache collects metrics using cached structure
 func (tc *tableCollector) collectWithCache(
-	ctx *cacheProcessingContext,
+	ctx context.Context,
+	cache *cacheProcessingContext,
 	stats *ddsnmp.CollectionStats,
 ) ([]ddsnmp.Metric, error) {
 	// Build list of OIDs to GET
 	var oidsToGet []string
-	for _, columns := range ctx.cachedOIDs {
+	for _, columns := range cache.cachedOIDs {
 		for columnOID, fullOID := range columns {
-			if _, isMetric := ctx.columnOIDs[columnOID]; isMetric {
+			if _, isMetric := cache.columnOIDs[columnOID]; isMetric {
 				oidsToGet = append(oidsToGet, fullOID)
 			}
 		}
@@ -432,12 +438,12 @@ func (tc *tableCollector) collectWithCache(
 	// GET current values
 	source := sourceRecorder(tc.snmpClient)
 	cursor := source.Cursor()
-	pdus, err := tc.snmpGet(oidsToGet, stats)
-	if source != nil && ctx.acquisition != nil {
+	pdus, err := tc.snmpGet(ctx, oidsToGet, stats)
+	if source != nil && cache.acquisition != nil {
 		requests := source.requestsSince(cursor)
 		for _, oid := range oidsToGet {
 			for _, operation := range requests[trimOID(oid)] {
-				ctx.acquisition.candidateSources = append(ctx.acquisition.candidateSources, ddsnmp.SourceBinding{
+				cache.acquisition.candidateSources = append(cache.acquisition.candidateSources, ddsnmp.SourceBinding{
 					Operation: operation,
 					OID:       trimOID(oid),
 					Role:      "primary",
@@ -451,10 +457,10 @@ func (tc *tableCollector) collectWithCache(
 
 	// Apply the same eligibility rule as a fresh WALK: every cached row must
 	// still contain at least one current configured symbol PDU.
-	for index, columns := range ctx.cachedOIDs {
+	for index, columns := range cache.cachedOIDs {
 		hasSymbol := false
 		for columnOID, fullOID := range columns {
-			if _, isMetric := ctx.columnOIDs[columnOID]; !isMetric {
+			if _, isMetric := cache.columnOIDs[columnOID]; !isMetric {
 				continue
 			}
 			if _, ok := pdus[trimOID(fullOID)]; ok {
@@ -468,8 +474,8 @@ func (tc *tableCollector) collectWithCache(
 	}
 
 	// Add PDUs to context and build metrics
-	ctx.pdus = pdus
-	return tc.buildMetricsFromCache(ctx, stats)
+	cache.pdus = pdus
+	return tc.buildMetricsFromCache(cache, stats)
 }
 
 // buildMetricsFromCache builds metrics from cached structure and current values
@@ -526,7 +532,7 @@ func (tc *tableCollector) buildMetricsFromCache(
 							columnOID,
 							fullOID,
 							pdu.Name,
-							pdu.Type,
+							pdu.Value.Type(),
 						)
 					}
 					rowErrors.add(index, err)
@@ -556,27 +562,28 @@ func (tc *tableCollector) buildMetricsFromCache(
 // SNMP operations
 
 func (tc *tableCollector) snmpWalk(
+	ctx context.Context,
 	oid string,
 	stats *ddsnmp.CollectionStats,
 	execution *AcquisitionExecutionReport,
-) (map[string]gosnmp.SnmpPDU, error) {
-	pdus := make(map[string]gosnmp.SnmpPDU)
+) (map[string]gosnmp.VarBind, error) {
+	pdus := make(map[string]gosnmp.VarBind)
 
-	var resp []gosnmp.SnmpPDU
+	var resp []gosnmp.VarBind
 	var err error
 
 	stats.SNMP.WalkRequests++
 
 	useWalk := tc.req.version == gosnmp.Version1 || tc.disableBulkWalk
 	if useWalk {
-		resp, err = tc.snmpClient.WalkAll(oid)
+		resp, _, err = tc.snmpClient.WalkAll(ctx, oid)
 	} else {
-		resp, err = tc.snmpClient.BulkWalkAll(oid, tc.maxRepetitions)
+		resp, _, err = tc.snmpClient.BulkWalkAll(ctx, oid, tc.maxRepetitions)
 	}
 	if operation := sourceRecorder(tc.snmpClient).Cursor(); execution != nil && operation != 0 {
 		execution.WalkOperations = append(execution.WalkOperations, operation)
 	}
-	if err != nil {
+	if err != nil && !isPartialWalk(err) {
 		return nil, err
 	}
 
@@ -590,11 +597,19 @@ func (tc *tableCollector) snmpWalk(
 		}
 	}
 
-	return pdus, nil
+	return pdus, err
 }
 
-func (tc *tableCollector) snmpGet(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	return getSNMPValues(tc.snmpClient, tc.req, oids, tc.missingOIDs, stats)
+// isPartialWalk reports a walk that an error-status ended: the agent answered,
+// and the rows before the status are the table as far as it returned it. Such a
+// table is collected, with the error reported, and its structure is not cached.
+func isPartialWalk(err error) bool {
+	var status *gosnmp.StatusError
+	return errors.As(err, &status)
+}
+
+func (tc *tableCollector) snmpGet(ctx context.Context, oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.VarBind, error) {
+	return getSNMPValues(ctx, tc.snmpClient, tc.req, oids, tc.missingOIDs, stats)
 }
 
 func parseStaticTags(staticTags []ddprofiledefinition.StaticMetricTagConfig) map[string]string {

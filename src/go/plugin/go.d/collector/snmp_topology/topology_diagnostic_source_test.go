@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
@@ -65,10 +65,10 @@ func TestDiagnosticCaptureKeepsLargeEvidence(t *testing.T) {
 }
 
 func TestSourceEvidenceArchiveAndInspection(t *testing.T) {
-	pdus := []gosnmp.SnmpPDU{
-		{Name: "1.3.6.1.4.1.99999.1.1.7", Type: gosnmp.OctetString, Value: []byte{0, 255}},
-		{Name: "1.3.6.1.4.1.99999.1.1.7", Type: gosnmp.Counter64, Value: uint64(math.MaxUint64)},
-		{Name: "1.3.6.1.4.1.99999.1.99", Type: gosnmp.NoSuchInstance},
+	pdus := []gosnmp.VarBind{
+		{Name: "1.3.6.1.4.1.99999.1.1.7", Value: gosnmp.OctetStringValue([]byte{0, 255})},
+		{Name: "1.3.6.1.4.1.99999.1.1.7", Value: gosnmp.Counter64Value(uint64(math.MaxUint64))},
+		{Name: "1.3.6.1.4.1.99999.1.99", Value: gosnmp.NoSuchInstanceValue()},
 	}
 	capture := collectSourceTestCapture(t, pdus)
 	scenario := newLLDPDirectScenario()
@@ -130,11 +130,11 @@ func TestVLANSourceEvidenceUsesActualContextCollection(t *testing.T) {
 			if tc.failed {
 				walkErr = context.DeadlineExceeded
 			}
-			pdus := []gosnmp.SnmpPDU{{Name: root + ".1.7", Type: gosnmp.Integer, Value: 7}}
-			handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return(pdus, walkErr)
+			pdus := []gosnmp.VarBind{{Name: root + ".1.7", Value: gosnmp.IntegerValue(7)}}
+			handler.EXPECT().BulkWalkAll(gomock.Any(), root, gomock.Any()).Return(pdus, gosnmp.WalkEnd{}, walkErr)
 			handler.EXPECT().Close().Return(nil)
 			collector := newTestSNMPTopologyCollector()
-			collector.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return handler }
+			collector.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return handler, nil }
 			profiles := []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{Kind: ddsnmp.KindIfName, MetricsConfig: ddprofiledefinition.MetricsConfig{Table: ddprofiledefinition.SymbolConfig{OID: root, Name: "table"}, Symbols: []ddprofiledefinition.SymbolConfig{{OID: root + ".1", Name: "value"}}}}}}}}
 			recorder := newTopologyAcquisitionRecorder(testTopologyAttemptID(1), topologyDeviceInputFromConnection(dev), testTopologyTarget())
 			observer := recorder.beginContext(1, tc.vlan, "synthetic")
@@ -153,9 +153,9 @@ func TestVLANSourceEvidenceUsesActualContextCollection(t *testing.T) {
 func BenchmarkTopologySourceEvidenceMemory(b *testing.B) {
 	for name, tc := range map[string]struct{ pdus int }{"4096 PDUs": {4096}, "100000 PDUs": {100000}} {
 		b.Run(name, func(b *testing.B) {
-			pdus := make([]gosnmp.SnmpPDU, tc.pdus)
+			pdus := make([]gosnmp.VarBind, tc.pdus)
 			for i := range pdus {
-				pdus[i] = gosnmp.SnmpPDU{Name: fmt.Sprintf("1.3.6.1.4.1.99999.1.1.%d", i), Type: gosnmp.Counter64, Value: uint64(math.MaxUint64)}
+				pdus[i] = gosnmp.VarBind{Name: fmt.Sprintf("1.3.6.1.4.1.99999.1.1.%d", i), Value: gosnmp.Counter64Value(uint64(math.MaxUint64))}
 			}
 			for range b.N {
 				runtime.GC()

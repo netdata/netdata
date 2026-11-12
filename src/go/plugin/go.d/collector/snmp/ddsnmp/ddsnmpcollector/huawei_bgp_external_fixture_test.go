@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +27,7 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 		"1.3.6.1.2.1.1.2.0",
 		"1.3.6.1.2.1.1.5.0",
 		"1.3.6.1.2.1.1.6.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createStringPDU("1.3.6.1.2.1.1.1.0", "Huawei VRP"),
 		createPDU("1.3.6.1.2.1.1.2.0", gosnmp.ObjectIdentifier, "1.3.6.1.4.1.2011.2.224.279"),
 		createStringPDU("1.3.6.1.2.1.1.5.0", "huawei"),
@@ -35,7 +36,7 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.2.1.1.5.0",
 		"1.3.6.1.4.1.2011.5.25.31.6.5.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createStringPDU("1.3.6.1.2.1.1.5.0", "huawei"),
 		createStringPDU("1.3.6.1.4.1.2011.5.25.31.6.5.0", "NetEngine"),
 	})
@@ -43,7 +44,7 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 		"1.3.6.1.4.1.2011.5.25.177.1.4.1.0",
 		"1.3.6.1.4.1.2011.5.25.177.1.4.2.0",
 		"1.3.6.1.4.1.2011.5.25.177.1.4.3.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.4.1.0", 12),
 		createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.4.2.0", 4),
 		createGauge32PDU("1.3.6.1.4.1.2011.5.25.177.1.4.3.0", 8),
@@ -59,7 +60,7 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 		SysObjectID: "1.3.6.1.4.1.2011.2.224.279",
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Empty(t, results[0].Metrics)

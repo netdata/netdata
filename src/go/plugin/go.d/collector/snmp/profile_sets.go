@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -45,12 +46,12 @@ func (c *Collector) resolveProfiles(si *snmputils.SysInfo) ([]*ddsnmp.Profile, *
 	return profiles, view.Context()
 }
 
-func (c *Collector) ensureDeviceProfile() error {
+func (c *Collector) ensureDeviceProfile(ctx context.Context) error {
 	if c.sysInfo != nil {
 		return nil
 	}
 
-	si, err := c.getSysInfo()
+	si, err := c.getSysInfo(ctx)
 	if err != nil {
 		return snmputils.WithFailure(err, "system_identity", "")
 	}

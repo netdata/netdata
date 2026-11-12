@@ -4,11 +4,12 @@ package snmptopology
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -72,23 +73,21 @@ func TestTopologyBGPSemanticIdentifiersFromAcquisitionAndReplay(t *testing.T) {
 					require.NoError(t, ddsnmp.CompileTransforms(profile))
 					ddsnmp.FinalizeProfiles([]*ddsnmp.Profile{profile})
 					handler := snmpmock.NewMockSession(gomock.NewController(t))
-					var pdus []gosnmp.SnmpPDU
+					var pdus []gosnmp.VarBind
 					for i, value := range values {
 						pdus = append(
 							pdus,
-							gosnmp.SnmpPDU{
+							gosnmp.VarBind{
 								Name:  fmt.Sprintf("%s.1.%d", root, i+1),
-								Type:  gosnmp.Counter32,
-								Value: uint(i + 100),
+								Value: gosnmp.Counter32Value(uint32(i + 100)),
 							},
-							gosnmp.SnmpPDU{
+							gosnmp.VarBind{
 								Name:  fmt.Sprintf("%s.2.%d", root, i+1),
-								Type:  gosnmp.OctetString,
-								Value: []byte(value),
+								Value: gosnmp.OctetStringValue([]byte(value)),
 							},
 						)
 					}
-					handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return(pdus, nil)
+					handler.EXPECT().BulkWalkAll(gomock.Any(), root, gomock.Any()).Return(pdus, gosnmp.WalkEnd{}, nil)
 					input := topologydiag.DeviceInput{
 						Hostname: "192.0.2.2",
 					}
@@ -110,7 +109,7 @@ func TestTopologyBGPSemanticIdentifiersFromAcquisitionAndReplay(t *testing.T) {
 						Log:                 logger.NewWithWriter(&bytes.Buffer{}),
 						AcquisitionObserver: recorder.beginContext(0, "", ""),
 					})
-					pms, err := collector.Collect()
+					pms, err := collector.Collect(context.Background())
 					require.NoError(t, err)
 					require.Len(t, pms, 1)
 					require.Len(t, pms[0].BGPRows, len(values))

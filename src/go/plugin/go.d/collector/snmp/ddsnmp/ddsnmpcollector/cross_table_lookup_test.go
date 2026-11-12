@@ -5,7 +5,7 @@ package ddsnmpcollector
 import (
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +22,7 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_NormalizesIPv6CurrentRowIn
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4",
 	)
 
-	refTablePDUs := map[string]gosnmp.SnmpPDU{
+	refTablePDUs := map[string]gosnmp.VarBind{
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.2.1.2.16.32.1.18.248.0.0.0.0.0.0.0.0.2.35.2.83": createStringPDU(
 			"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.2.1.2.16.32.1.18.248.0.0.0.0.0.0.0.0.2.35.2.83",
 			"2001:12F8::223:253",
@@ -49,7 +49,7 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_AllowsDuplicateRowsWhenTar
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4",
 	)
 
-	refTablePDUs := map[string]gosnmp.SnmpPDU{
+	refTablePDUs := map[string]gosnmp.VarBind{
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.1.1.1.4.10.45.2.2": createStringPDU(
 			"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.1.1.1.4.10.45.2.2",
 			"10.45.2.2",
@@ -91,7 +91,7 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_RejectsDuplicateRowsWhenTa
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4",
 	)
 
-	refTablePDUs := map[string]gosnmp.SnmpPDU{
+	refTablePDUs := map[string]gosnmp.VarBind{
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.1.1.1.4.10.45.2.2": createStringPDU(
 			"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.1.1.1.4.10.45.2.2",
 			"10.45.2.2",
@@ -131,7 +131,7 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_DoesNotCacheLookupErrorsAs
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4",
 	)
 
-	refTablePDUs := map[string]gosnmp.SnmpPDU{
+	refTablePDUs := map[string]gosnmp.VarBind{
 		"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.1.1.1.4.10.45.2.2": createStringPDU(
 			"1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.0.1.1.1.4.10.45.2.2",
 			"10.45.2.2",
@@ -174,22 +174,22 @@ func TestCrossTableResolver_ResolveLookupIndexByValue_SeparatesNormalizationSema
 
 	resolver := newCrossTableResolver(logger.New())
 	ctx := newCrossTableContext(nil, nil)
-	prefixedPDUs := map[string]gosnmp.SnmpPDU{
+	prefixedPDUs := map[string]gosnmp.VarBind{
 		lookupOID + ".1": createStringPDU(lookupOID+".1", "A:one"),
 		lookupOID + ".2": createStringPDU(lookupOID+".2", "B:two"),
 	}
-	mappedPDUs := map[string]gosnmp.SnmpPDU{
+	mappedPDUs := map[string]gosnmp.VarBind{
 		lookupOID + ".1": createStringPDU(lookupOID+".1", "one"),
 		lookupOID + ".2": createStringPDU(lookupOID+".2", "two"),
 	}
-	binaryPDUs := map[string]gosnmp.SnmpPDU{
+	binaryPDUs := map[string]gosnmp.VarBind{
 		lookupOID + ".1": createPDU(lookupOID+".1", gosnmp.OctetString, []byte{1, 2}),
 		lookupOID + ".2": createPDU(lookupOID+".2", gosnmp.OctetString, []byte{10, 11}),
 	}
 
 	tests := []struct {
 		name        string
-		refPDUs     map[string]gosnmp.SnmpPDU
+		refPDUs     map[string]gosnmp.VarBind
 		lookupValue string
 		wantIndex   string
 		configure   func(*ddprofiledefinition.SymbolConfigCompat)

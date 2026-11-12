@@ -3,13 +3,14 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -24,7 +25,7 @@ import (
 // statefulSNMPDevice models device state across collection cycles without
 // coupling the tests to a specific cache wire strategy.
 type statefulSNMPDevice struct {
-	values    map[string]gosnmp.SnmpPDU
+	values    map[string]gosnmp.VarBind
 	getErrs   map[string]error
 	walkErrs  map[string]error
 	walkCount map[string]int
@@ -32,7 +33,7 @@ type statefulSNMPDevice struct {
 
 func newStatefulSNMPDevice() *statefulSNMPDevice {
 	return &statefulSNMPDevice{
-		values:    make(map[string]gosnmp.SnmpPDU),
+		values:    make(map[string]gosnmp.VarBind),
 		getErrs:   make(map[string]error),
 		walkErrs:  make(map[string]error),
 		walkCount: make(map[string]int),
@@ -40,45 +41,45 @@ func newStatefulSNMPDevice() *statefulSNMPDevice {
 }
 
 func (d *statefulSNMPDevice) install(mockHandler *snmpmock.MockSession) {
-	mockHandler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) {
+	mockHandler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oid string, _ uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 		root := trimOID(oid)
 		d.walkCount[root]++
 		if err := d.walkErrs[root]; err != nil {
-			return nil, err
+			return nil, gosnmp.WalkEnd{}, err
 		}
-		var pdus []gosnmp.SnmpPDU
+		var pdus []gosnmp.VarBind
 		for name, pdu := range d.values {
 			if strings.HasPrefix(name, root+".") {
 				pdus = append(pdus, pdu)
 			}
 		}
 		sort.Slice(pdus, func(i, j int) bool { return pdus[i].Name < pdus[j].Name })
-		return pdus, nil
+		return pdus, gosnmp.WalkEnd{}, nil
 	}).AnyTimes()
-	mockHandler.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
+	mockHandler.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oids []string) (*gosnmp.Message, error) {
 		for _, oid := range oids {
 			if err := d.getErrs[trimOID(oid)]; err != nil {
 				return nil, err
 			}
 		}
-		vars := make([]gosnmp.SnmpPDU, 0, len(oids))
+		vars := make([]gosnmp.VarBind, 0, len(oids))
 		for _, oid := range oids {
 			if pdu, ok := d.values[trimOID(oid)]; ok {
 				vars = append(vars, pdu)
 			} else {
-				vars = append(vars, gosnmp.SnmpPDU{
-					Name: oid,
-					Type: gosnmp.NoSuchInstance,
+				vars = append(vars, gosnmp.VarBind{
+					Name:  oid,
+					Value: gosnmp.NoSuchInstanceValue(),
 				})
 			}
 		}
-		return &gosnmp.SnmpPacket{
-			Variables: vars,
+		return &gosnmp.Message{
+			VarBinds: vars,
 		}, nil
 	}).AnyTimes()
 }
 
-func (d *statefulSNMPDevice) set(pdu gosnmp.SnmpPDU) {
+func (d *statefulSNMPDevice) set(pdu gosnmp.VarBind) {
 	d.values[trimOID(pdu.Name)] = pdu
 }
 
@@ -159,7 +160,7 @@ func TestCollector_Collect_AlternatingOmissionDiscardsStaleDependent(t *testing.
 	device.set(createGauge32PDU(ownerMetricOID, 100))
 	device.set(createStringPDU(depMetricOID, "alpha"))
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	metric := findMetric(results, sourceProfile.SourceFile, "sourceValue")
@@ -172,7 +173,7 @@ func TestCollector_Collect_AlternatingOmissionDiscardsStaleDependent(t *testing.
 	device.set(createGauge32PDU(ownerScalarOID, 1))
 	device.set(createStringPDU(depMetricOID, "beta"))
 
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, ownerProfile.SourceFile, results[0].Source)
@@ -183,7 +184,7 @@ func TestCollector_Collect_AlternatingOmissionDiscardsStaleDependent(t *testing.
 	device.set(createGauge32PDU(ownerMetricOID, 110))
 	device.set(createStringPDU(depMetricOID, "gamma"))
 
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	metric = findMetric(results, sourceProfile.SourceFile, "sourceValue")
@@ -215,7 +216,7 @@ func TestCollector_Collect_BGPIneligibleWalkIsNotCached(t *testing.T) {
 	})
 
 	device.set(createGauge32PDU("1.3.6.1.4.1.99999.30.1.9.42", 5))
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Empty(t, results[0].BGPRows)
@@ -224,7 +225,7 @@ func TestCollector_Collect_BGPIneligibleWalkIsNotCached(t *testing.T) {
 	device.set(createIntegerPDU("1.3.6.1.4.1.99999.30.1.2.42", 6))
 	device.set(createGauge32PDU("1.3.6.1.4.1.99999.30.1.3.42", 65001))
 	device.set(createGauge32PDU("1.3.6.1.4.1.99999.30.1.4.42", 7200))
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].BGPRows, 1)
@@ -276,7 +277,7 @@ func TestCollector_Collect_LicensingIneligibleWalkIsNotCached(t *testing.T) {
 	})
 
 	device.set(createStringPDU("1.3.6.1.4.1.99999.3.9.7", "noise"))
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Empty(t, results[0].LicenseRows)
@@ -284,7 +285,7 @@ func TestCollector_Collect_LicensingIneligibleWalkIsNotCached(t *testing.T) {
 
 	device.set(createStringPDU("1.3.6.1.4.1.99999.3.1.7", "security"))
 	device.set(createIntegerPDU("1.3.6.1.4.1.99999.3.3.7", 1))
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].LicenseRows, 1)
@@ -315,7 +316,7 @@ func TestCollector_Collect_SharesEmptyDirectTableWalkPerPass(t *testing.T) {
 			Log: logger.New(),
 		})
 
-		results, err := collector.Collect()
+		results, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.Empty(t, results[0].BGPRows)
@@ -359,7 +360,7 @@ func TestCollector_Collect_SharesEmptyDirectTableWalkPerPass(t *testing.T) {
 			Log: logger.New(),
 		})
 
-		results, err := collector.Collect()
+		results, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.Empty(t, results[0].LicenseRows)
@@ -396,7 +397,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 			}),
 		})
 
-		results, err := collector.Collect()
+		results, err := collector.Collect(context.Background())
 		require.ErrorIs(t, err, device.walkErrs[trimOID(first.Table.OID)])
 		require.Empty(t, results)
 		assert.Equal(t, 1, device.walkCount[trimOID(first.Table.OID)])
@@ -433,7 +434,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 			Log: logger.New(),
 		})
 
-		results, err := collector.Collect()
+		results, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.Empty(t, results[0].BGPRows)
@@ -486,7 +487,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 			}),
 		})
 
-		results, err := collector.Collect()
+		results, err := collector.Collect(context.Background())
 		require.ErrorIs(t, err, device.walkErrs[trimOID(first.Table.OID)])
 		require.Empty(t, results)
 		assert.Equal(t, 1, device.walkCount[trimOID(first.Table.OID)])
@@ -551,7 +552,7 @@ func TestCollector_Collect_SharesFailedDirectTableWalkPerPass(t *testing.T) {
 			Log: logger.New(),
 		})
 
-		results, err := collector.Collect()
+		results, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.Empty(t, results[0].LicenseRows)
@@ -618,14 +619,14 @@ func TestCollector_Collect_BGPCrossTableTagIsCurrentOnEveryCollection(t *testing
 
 	device.set(createIntegerPDU("1.3.6.1.4.1.99999.80.1.2.7", 6))
 	device.set(createStringPDU("1.3.6.1.4.1.99999.81.1.1.7", "red"))
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].BGPRows, 1)
 	assert.Equal(t, "red", results[0].BGPRows[0].Tags["peer_group"])
 
 	device.set(createStringPDU("1.3.6.1.4.1.99999.81.1.1.7", "blue"))
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].BGPRows, 1)
@@ -650,7 +651,7 @@ func TestTableCollector_OrganizePDUsByRow_AllocatesCacheMapsOnlyWhenEligible(t *
 	organize := func(cacheStructure bool) *tableProcessingContext {
 		ctx := &tableProcessingContext{
 			config:         config,
-			pdus:           map[string]gosnmp.SnmpPDU{rowOID: createGauge32PDU(rowOID, 1)},
+			pdus:           map[string]gosnmp.VarBind{rowOID: createGauge32PDU(rowOID, 1)},
 			columnOIDs:     buildColumnOIDs(config),
 			orderedTags:    buildOrderedTags(config),
 			cacheStructure: cacheStructure,

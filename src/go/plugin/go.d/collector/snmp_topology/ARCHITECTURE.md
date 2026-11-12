@@ -231,16 +231,16 @@ profile tags, and metadata. Bindings associate each consuming route with its act
 remain shared while logical routes keep their own configured roots and processing outcomes.
 
 Source operations preserve ordered returned OIDs and typed values from actual GET/WALK calls, including failed calls
-that returned partial data. Structured failure classifications replace free-form error text. These are decoded Handler
+that returned partial data. Structured failure classifications replace free-form error text. These are decoded client
 results, not packets or a replayable SNMP server recording. Cached inputs retain references to their producing operations,
 so a later poll does not misrepresent cached data as newly fetched. Connection credentials, full profile programs, and
 raw error strings are excluded; arbitrary returned values remain sensitive.
 
 Execution accounting records preparation elapsed/request/error counters and references to executed walks in the source
-operation table. Shared consumers do not duplicate executions. Walk timing includes Handler processing, retries, and
+operation table. Shared consumers do not duplicate executions. Walk timing includes client processing, retries, and
 pagination, but ends before local PDU-map/row processing; profile phase totals remain inclusive. Preparation is finalized
 on all exits, and scalar timing includes failed and topology scalar work. Missing execution accounting means not recorded.
-A successful Handler return does not prove table completeness; terminal gosnmp response reasons are not yet available.
+A walk without an error does not prove table completeness: the evidence does not record how the walk ended.
 See the [diagnostics tool](/src/go/tools/snmp-diagnostics/README.md#collection-cost) for interpretation and exclusions.
 
 BGP evidence keeps one logical unit per configured BGP row definition. Its digest covers the main table name/root and
@@ -343,7 +343,7 @@ BGP rows, and successful VLAN-context rows. The retained values use positive per
 allowlists and are copied synchronously from the collector's borrowed result. They keep only metadata, tags, topology
 rows, and BGP fallback tags consumed by those builder operations. The semantic replay projection excludes non-VLAN rows in VLAN events, credentials, profile
 source paths, ordinary metric values, transform definitions, raw packets, and error text. Separate diagnostic source
-operations preserve the original decoded Handler values, including evidence from failed operations.
+operations preserve the original decoded client values, including evidence from failed operations.
 Retained decoded strings are exact-sized copies so a small retained substring cannot keep a larger SNMP response buffer
 alive unnecessarily. Stable schema/profile tag keys may remain shared because they are not decoded
 response data and their owners outlive the capture.

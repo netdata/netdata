@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/snmpauth"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -20,9 +20,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func serve(t *testing.T, reply func(*gosnmp.SnmpPacket) *gosnmp.SnmpPacket) (vnodes.SNMPConfig, <-chan struct{}) {
+func serve(t *testing.T, reply func(*gosnmp.Message) *gosnmp.Message) (vnodes.SNMPConfig, <-chan struct{}) {
 	t.Helper()
 	conn, err := net.ListenPacket("udp", "127.0.0.1:0")
+	require.NoError(t, err)
+	// An empty receiver decodes an SNMPv1 or SNMPv2c message of any PDU type.
+	receiver, err := gosnmp.NewReceiver(gosnmp.ReceiverConfig{})
 	require.NoError(t, err)
 	done := make(chan struct{})
 	seen := make(chan struct{}, 1)
@@ -37,12 +40,12 @@ func serve(t *testing.T, reply func(*gosnmp.SnmpPacket) *gosnmp.SnmpPacket) (vno
 				}
 				return
 			}
-			decoder := &gosnmp.GoSNMP{}
-			p, err := decoder.SnmpDecodePacket(buf[:n])
+			request, _, err := receiver.Receive(buf[:n])
 			if err != nil {
 				t.Errorf("SNMP fixture decode request: %v", err)
 				return
 			}
+			p := &request.Message
 			select {
 			case seen <- struct{}{}:
 			default:
@@ -50,9 +53,9 @@ func serve(t *testing.T, reply func(*gosnmp.SnmpPacket) *gosnmp.SnmpPacket) (vno
 			if response := reply(p); response != nil {
 				response.Version = p.Version
 				response.Community = p.Community
-				response.PDUType = gosnmp.GetResponse
+				response.PDUType = gosnmp.Response
 				response.RequestID = p.RequestID
-				raw, err := response.MarshalMsg()
+				raw, err := response.Encode(nil)
 				if err != nil {
 					t.Errorf("SNMP fixture encode response: %v", err)
 					return
@@ -73,15 +76,14 @@ func serve(t *testing.T, reply func(*gosnmp.SnmpPacket) *gosnmp.SnmpPacket) (vno
 	return vnodes.SNMPConfig{Config: snmpauth.Config{Credentials: &snmpauth.Community{Community: "fixture-secret"}}, Address: "127.0.0.1", Port: portNum, Retries: &retries, Timeout: confopt.Duration(time.Second)}, seen
 }
 func TestAcquireRealUDP(t *testing.T) {
-	c, _ := serve(t, func(p *gosnmp.SnmpPacket) *gosnmp.SnmpPacket {
-		result := &gosnmp.SnmpPacket{}
-		for _, request := range p.Variables {
-			v := gosnmp.SnmpPDU{Name: request.Name, Type: gosnmp.NoSuchObject}
+	c, _ := serve(t, func(p *gosnmp.Message) *gosnmp.Message {
+		result := &gosnmp.Message{}
+		for _, request := range p.VarBinds {
+			v := gosnmp.VarBind{Name: request.Name, Value: gosnmp.NoSuchObjectValue()}
 			if request.Name == "."+snmputils.OidSysDescr {
-				v.Type = gosnmp.OctetString
-				v.Value = []byte("fixture device")
+				v.Value = gosnmp.OctetStringValue([]byte("fixture device"))
 			}
-			result.Variables = append(result.Variables, v)
+			result.VarBinds = append(result.VarBinds, v)
 		}
 		return result
 	})
@@ -93,13 +95,13 @@ func TestAcquireRealUDP(t *testing.T) {
 }
 
 func TestAcquireV1RecoversFromIndexedMissingSystemOIDs(t *testing.T) {
-	c, _ := serve(t, func(p *gosnmp.SnmpPacket) *gosnmp.SnmpPacket {
-		for i, v := range p.Variables {
+	c, _ := serve(t, func(p *gosnmp.Message) *gosnmp.Message {
+		for i, v := range p.VarBinds {
 			if v.Name != "."+snmputils.OidSysName {
-				return &gosnmp.SnmpPacket{Error: gosnmp.NoSuchName, ErrorIndex: uint8(i + 1), Variables: p.Variables}
+				return &gosnmp.Message{ErrorStatus: gosnmp.NoSuchName, ErrorIndex: uint8(i + 1), VarBinds: p.VarBinds}
 			}
 		}
-		return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{{Name: "." + snmputils.OidSysName, Type: gosnmp.OctetString, Value: "v1-router"}}}
+		return &gosnmp.Message{VarBinds: []gosnmp.VarBind{{Name: "." + snmputils.OidSysName, Value: gosnmp.OctetStringValue([]byte("v1-router"))}}}
 	})
 	c.Version = "1"
 	m, err := (SNMP{}).Acquire(t.Context(), c)
@@ -109,23 +111,23 @@ func TestAcquireV1RecoversFromIndexedMissingSystemOIDs(t *testing.T) {
 
 func TestAcquireRealUDPProfileFailureRetainsSystemIdentity(t *testing.T) {
 	var enrichmentRequests atomic.Int32
-	c, _ := serve(t, func(p *gosnmp.SnmpPacket) *gosnmp.SnmpPacket {
-		for _, request := range p.Variables {
+	c, _ := serve(t, func(p *gosnmp.Message) *gosnmp.Message {
+		for _, request := range p.VarBinds {
 			if !strings.HasPrefix(request.Name, ".1.3.6.1.2.1.1.") {
 				enrichmentRequests.Add(1)
-				return &gosnmp.SnmpPacket{Error: gosnmp.GenErr, Variables: p.Variables}
+				return &gosnmp.Message{ErrorStatus: gosnmp.GenErr, VarBinds: p.VarBinds}
 			}
 		}
-		r := &gosnmp.SnmpPacket{}
-		for _, request := range p.Variables {
-			v := gosnmp.SnmpPDU{Name: request.Name, Type: gosnmp.NoSuchObject}
+		r := &gosnmp.Message{}
+		for _, request := range p.VarBinds {
+			v := gosnmp.VarBind{Name: request.Name, Value: gosnmp.NoSuchObjectValue()}
 			switch request.Name {
 			case "." + snmputils.OidSysObject:
-				v.Type, v.Value = gosnmp.ObjectIdentifier, ".1.3.6.1.4.1.6574.1"
+				v.Value = gosnmp.ObjectIdentifierValue(".1.3.6.1.4.1.6574.1")
 			case "." + snmputils.OidSysName:
-				v.Type, v.Value = gosnmp.OctetString, "storage"
+				v.Value = gosnmp.OctetStringValue([]byte("storage"))
 			}
-			r.Variables = append(r.Variables, v)
+			r.VarBinds = append(r.VarBinds, v)
 		}
 		return r
 	})
@@ -138,20 +140,20 @@ func TestAcquireRealUDPProfileFailureRetainsSystemIdentity(t *testing.T) {
 
 func TestAcquireRealUDPIgnoresNonOIDSystemObject(t *testing.T) {
 	var enrichmentRequests atomic.Int32
-	c, _ := serve(t, func(p *gosnmp.SnmpPacket) *gosnmp.SnmpPacket {
-		r := &gosnmp.SnmpPacket{}
-		for _, request := range p.Variables {
+	c, _ := serve(t, func(p *gosnmp.Message) *gosnmp.Message {
+		r := &gosnmp.Message{}
+		for _, request := range p.VarBinds {
 			if !strings.HasPrefix(request.Name, ".1.3.6.1.2.1.1.") {
 				enrichmentRequests.Add(1)
 			}
-			v := gosnmp.SnmpPDU{Name: request.Name, Type: gosnmp.NoSuchObject}
+			v := gosnmp.VarBind{Name: request.Name, Value: gosnmp.NoSuchObjectValue()}
 			switch request.Name {
 			case "." + snmputils.OidSysObject:
-				v.Type, v.Value = gosnmp.OctetString, "private device identifier"
+				v.Value = gosnmp.OctetStringValue([]byte("private device identifier"))
 			case "." + snmputils.OidSysName:
-				v.Type, v.Value = gosnmp.OctetString, "printer"
+				v.Value = gosnmp.OctetStringValue([]byte("printer"))
 			}
-			r.Variables = append(r.Variables, v)
+			r.VarBinds = append(r.VarBinds, v)
 		}
 		return r
 	})
@@ -163,9 +165,9 @@ func TestAcquireRealUDPIgnoresNonOIDSystemObject(t *testing.T) {
 }
 
 func TestAcquireRejectsEmptyAndErrorResponses(t *testing.T) {
-	for _, status := range []gosnmp.SNMPError{gosnmp.NoError, gosnmp.GenErr} {
+	for _, status := range []gosnmp.ErrorStatus{gosnmp.NoError, gosnmp.GenErr} {
 		t.Run(status.String(), func(t *testing.T) {
-			c, _ := serve(t, func(*gosnmp.SnmpPacket) *gosnmp.SnmpPacket { return &gosnmp.SnmpPacket{Error: status} })
+			c, _ := serve(t, func(*gosnmp.Message) *gosnmp.Message { return &gosnmp.Message{ErrorStatus: status} })
 			m, err := (SNMP{}).Acquire(context.Background(), c)
 			require.Nil(t, m)
 			require.Error(t, err)
@@ -174,7 +176,7 @@ func TestAcquireRejectsEmptyAndErrorResponses(t *testing.T) {
 	}
 }
 func TestCancellationClosesBlockedUDPRead(t *testing.T) {
-	c, seen := serve(t, func(*gosnmp.SnmpPacket) *gosnmp.SnmpPacket { return nil })
+	c, seen := serve(t, func(*gosnmp.Message) *gosnmp.Message { return nil })
 	c.Timeout = confopt.Duration(time.Minute)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -196,10 +198,10 @@ func TestCancellationClosesBlockedUDPRead(t *testing.T) {
 func TestAcquireWhitespaceSystemName(t *testing.T) {
 	for _, description := range []string{"", "usable description"} {
 		t.Run(description, func(t *testing.T) {
-			c, _ := serve(t, func(p *gosnmp.SnmpPacket) *gosnmp.SnmpPacket {
-				result := &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{{Name: "." + snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("   ")}}}
+			c, _ := serve(t, func(p *gosnmp.Message) *gosnmp.Message {
+				result := &gosnmp.Message{VarBinds: []gosnmp.VarBind{{Name: "." + snmputils.OidSysName, Value: gosnmp.OctetStringValue([]byte("   "))}}}
 				if description != "" {
-					result.Variables = append(result.Variables, gosnmp.SnmpPDU{Name: "." + snmputils.OidSysDescr, Type: gosnmp.OctetString, Value: []byte(description)})
+					result.VarBinds = append(result.VarBinds, gosnmp.VarBind{Name: "." + snmputils.OidSysDescr, Value: gosnmp.OctetStringValue([]byte(description))})
 				}
 				return result
 			})

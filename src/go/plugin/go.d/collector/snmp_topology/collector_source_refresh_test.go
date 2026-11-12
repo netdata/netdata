@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
@@ -38,7 +38,7 @@ func TestCollectorRefreshReclassificationWithinRegistration(t *testing.T) {
 				calls := 0
 				fail := false
 				noProfiles := false
-				coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session {
+				coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
 					calls++
 					client := snmpmock.NewMockSession(gomock.NewController(t))
 					switch {
@@ -50,7 +50,7 @@ func TestCollectorRefreshReclassificationWithinRegistration(t *testing.T) {
 					default:
 						expectTopologyRefreshSNMPClient(client, dev)
 					}
-					return client
+					return client, nil
 				}
 				coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
 					if noProfiles {
@@ -135,7 +135,7 @@ func TestCollectorRefreshChangedDeviceInformationReacquires(t *testing.T) {
 	store.Register("job-a", dev)
 	calls := 0
 	fail := false
-	coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session {
+	coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
 		calls++
 		client := snmpmock.NewMockSession(gomock.NewController(t))
 		if fail {
@@ -143,7 +143,7 @@ func TestCollectorRefreshChangedDeviceInformationReacquires(t *testing.T) {
 		} else {
 			expectTopologyRefreshSNMPClient(client, dev)
 		}
-		return client
+		return client, nil
 	}
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
@@ -233,7 +233,7 @@ func TestCollectorRefreshReclassificationCancellationKeepsCommittedCut(t *testin
 	}
 	store.Register("job-a", dev)
 	calls := 0
-	coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session {
+	coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
 		calls++
 		client := snmpmock.NewMockSession(gomock.NewController(t))
 		if calls == 2 {
@@ -242,7 +242,7 @@ func TestCollectorRefreshReclassificationCancellationKeepsCommittedCut(t *testin
 		} else {
 			expectTopologyRefreshSNMPClient(client, dev)
 		}
-		return client
+		return client, nil
 	}
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
 	ctx, cancel := context.WithCancel(context.Background())

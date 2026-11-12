@@ -568,13 +568,13 @@ modules:
                 - name: rate_limited
                   description: Traps dropped or sampled by per-source rate limit
                 - name: auth_failures
-                  description: SNMPv1/v2c community mismatch
+                  description: SNMPv3 messages whose digest does not verify or that do not decrypt with the configured user keys
                 - name: usm_failures
-                  description: SNMPv3 messages no configured USM user could authenticate, and unauthenticated or non-USM messages for users configured with authentication
+                  description: SNMPv3 messages no configured USM user accepts (unknown user name, a security level the user rejects, a non-USM security model), and authenticated INFORMs outside the local engine time window
                 - name: unknown_engine_id
-                  description: SNMPv3 trap from an unknown or unregistered engine ID
+                  description: SNMPv3 messages naming an engine ID the job has no users for (engine ID discovery requests included), INFORMs naming another engine ID than the local one, and engine IDs learned by dynamic discovery
                 - name: inform_response_failed
-                  description: Failed to send INFORM response to sender
+                  description: Failed to send an INFORM response or an SNMPv3 Report to the sender
                 - name: binary_encoded
                   description: Field values written with binary journal encoding for CWE-117 protection
                 - name: profile_load_failed
@@ -630,10 +630,19 @@ modules:
               In dynamic mode, the first accepted `(engineID, username)` pair increments this once as
               operator visibility. Repeated or rejected increments usually indicate cap exhaustion,
               invalid sender state, or an unauthorized sender.
+
+              An INFORM must name the job's local engine ID (`local_engine_id`); one naming another engine
+              ID counts here. Senders learn the local engine ID from the Report the job sends to an engine ID
+              discovery request; each such request also counts here once, as RFC 3414's
+              `usmStatsUnknownEngineIDs` does, and writes a decode-error entry.
           - name: USM authentication failures
             description: |
               Check that the USM user's `auth_proto`, `auth_key`, `priv_proto`, and `priv_key` match the
               sender device's configuration. Verify engine ID matches. Use Netdata secret references for keys.
+
+              After a job restart, each sender's first authenticated INFORM counts once in `usm_failures`:
+              the job's engine boots rise at every start, the INFORM falls outside the time window, and the
+              sender resynchronizes from the Report it gets.
           - name: journal retention eating disk space
             description: |
               The default direct journal retention uses size-based eviction (`max_size: 10GB`) with no time-based age limit.

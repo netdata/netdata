@@ -3,25 +3,23 @@
 package snmptopology
 
 import (
+	"context"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	"github.com/netdata/gosnmp"
 )
 
 type topologySNMPRecHandler struct {
-	snmputils.Session
-	entries           []gosnmp.SnmpPDU
-	byOID             map[string]gosnmp.SnmpPDU
+	entries           []gosnmp.VarBind
+	byOID             map[string]gosnmp.VarBind
 	hiddenOIDPrefixes []string
 	walkRoots         []string
 }
 
-func newTopologySNMPHandler(entries []gosnmp.SnmpPDU) *topologySNMPRecHandler {
+func newTopologySNMPHandler(entries []gosnmp.VarBind) *topologySNMPRecHandler {
 	handler := &topologySNMPRecHandler{
-		Session: snmputils.NewSession(gosnmp.NewHandler()),
 		entries: entries,
-		byOID:   make(map[string]gosnmp.SnmpPDU, len(entries)),
+		byOID:   make(map[string]gosnmp.VarBind, len(entries)),
 	}
 	for _, pdu := range entries {
 		handler.byOID[strings.TrimPrefix(pdu.Name, ".")] = pdu
@@ -29,43 +27,43 @@ func newTopologySNMPHandler(entries []gosnmp.SnmpPDU) *topologySNMPRecHandler {
 	return handler
 }
 
-func (h *topologySNMPRecHandler) addEntries(entries ...gosnmp.SnmpPDU) {
+func (h *topologySNMPRecHandler) addEntries(entries ...gosnmp.VarBind) {
 	for _, pdu := range entries {
 		h.entries = append(h.entries, pdu)
 		h.byOID[strings.TrimPrefix(pdu.Name, ".")] = pdu
 	}
 }
 
-func (h *topologySNMPRecHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
-	variables := make([]gosnmp.SnmpPDU, 0, len(oids))
+func (h *topologySNMPRecHandler) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
+	variables := make([]gosnmp.VarBind, 0, len(oids))
 	for _, oid := range oids {
 		key := strings.TrimPrefix(strings.TrimSpace(oid), ".")
 		if h.isHiddenOID(key) {
-			variables = append(variables, gosnmp.SnmpPDU{Name: key, Type: gosnmp.NoSuchObject})
+			variables = append(variables, gosnmp.VarBind{Name: key, Value: gosnmp.NoSuchObjectValue()})
 			continue
 		}
 		if pdu, ok := h.byOID[key]; ok {
 			variables = append(variables, pdu)
 			continue
 		}
-		variables = append(variables, gosnmp.SnmpPDU{Name: key, Type: gosnmp.NoSuchObject})
+		variables = append(variables, gosnmp.VarBind{Name: key, Value: gosnmp.NoSuchObjectValue()})
 	}
-	return &gosnmp.SnmpPacket{Variables: variables}, nil
+	return &gosnmp.Message{VarBinds: variables}, nil
 }
 
-func (h *topologySNMPRecHandler) WalkAll(root string) ([]gosnmp.SnmpPDU, error) {
-	return h.walkAll(root), nil
+func (h *topologySNMPRecHandler) WalkAll(ctx context.Context, root string) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+	return h.walkAll(root), gosnmp.WalkEnd{}, nil
 }
 
-func (h *topologySNMPRecHandler) BulkWalkAll(root string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
-	return h.walkAll(root), nil
+func (h *topologySNMPRecHandler) BulkWalkAll(ctx context.Context, root string, maxRepetitions uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+	return h.walkAll(root), gosnmp.WalkEnd{}, nil
 }
 
-func (h *topologySNMPRecHandler) walkAll(root string) []gosnmp.SnmpPDU {
+func (h *topologySNMPRecHandler) walkAll(root string) []gosnmp.VarBind {
 	root = strings.TrimPrefix(strings.TrimSpace(root), ".")
 	h.walkRoots = append(h.walkRoots, root)
 	prefix := root + "."
-	var out []gosnmp.SnmpPDU
+	var out []gosnmp.VarBind
 	for _, pdu := range h.entries {
 		name := strings.TrimPrefix(pdu.Name, ".")
 		if h.isHiddenOID(name) {

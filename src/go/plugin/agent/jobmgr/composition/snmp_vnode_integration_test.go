@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -51,6 +51,9 @@ func newVNodeSNMPPeer(t *testing.T, community, hostname string, metrics bool) *v
 	require.NoError(t, err)
 	peer := &vnodeSNMPPeer{port: portNum}
 	peer.enabled.Store(true)
+	// An empty receiver decodes an SNMPv1 or SNMPv2c message of any PDU type.
+	receiver, err := gosnmp.NewReceiver(gosnmp.ReceiverConfig{})
+	require.NoError(t, err)
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -60,36 +63,37 @@ func newVNodeSNMPPeer(t *testing.T, community, hostname string, metrics bool) *v
 			if err != nil {
 				return
 			}
-			p, err := (&gosnmp.GoSNMP{}).SnmpDecodePacket(buf[:n])
-			if err != nil || p.Community != community {
+			request, _, err := receiver.Receive(buf[:n])
+			if err != nil || request.Message.Community != community {
 				continue
 			}
+			p := &request.Message
 			peer.requests.Add(1)
 			if !peer.enabled.Load() {
 				continue
 			}
-			r := &gosnmp.SnmpPacket{Version: p.Version, Community: p.Community, PDUType: gosnmp.GetResponse, RequestID: p.RequestID}
-			for _, request := range p.Variables {
-				v := gosnmp.SnmpPDU{Name: request.Name, Type: gosnmp.NoSuchObject}
+			r := &gosnmp.Message{Version: p.Version, Community: p.Community, PDUType: gosnmp.Response, RequestID: p.RequestID}
+			for _, request := range p.VarBinds {
+				v := gosnmp.VarBind{Name: request.Name, Value: gosnmp.NoSuchObjectValue()}
 				switch request.Name {
 				case ".1.3.6.1.2.1.1.5.0":
-					v.Type, v.Value = gosnmp.OctetString, hostname
+					v.Value = gosnmp.OctetStringValue([]byte(hostname))
 				case ".1.3.6.1.2.1.1.1.0":
-					v.Type, v.Value = gosnmp.OctetString, "synthetic device"
+					v.Value = gosnmp.OctetStringValue([]byte("synthetic device"))
 				default:
 					if !strings.HasPrefix(request.Name, ".1.3.6.1.2.1.1.") {
 						peer.metrics.Add(1)
 						if metrics {
-							v.Type, v.Value = gosnmp.Counter32, uint32(42)
+							v.Value = gosnmp.Counter32Value(42)
 						}
 					}
 				}
 				if p.PDUType != gosnmp.GetRequest {
-					v.Type, v.Value = gosnmp.EndOfMibView, nil
+					v.Value = gosnmp.EndOfMibViewValue()
 				}
-				r.Variables = append(r.Variables, v)
+				r.VarBinds = append(r.VarBinds, v)
 			}
-			raw, err := r.MarshalMsg()
+			raw, err := r.Encode(nil)
 			if err == nil {
 				_, _ = conn.WriteTo(raw, addr)
 			}

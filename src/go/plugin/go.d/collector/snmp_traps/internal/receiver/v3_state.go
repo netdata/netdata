@@ -12,15 +12,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
 
-const (
-	maxSnmpEngineBoots = 2147483647
-	maxSnmpEngineTime  = uint32(4294967295)
-)
+const maxSnmpEngineBoots = 2147483647
 
 type engineStatePaths struct {
 	dir           string
@@ -74,12 +70,13 @@ func cleanupCreatedEngineState(paths engineStatePaths, removeEngineBoots, remove
 	}
 }
 
+// engineBoots is the job's persisted snmpEngineBoots, raised at every start
+// (RFC 3414 section 2.2.2); the receiver counts the engine time.
 type engineBoots struct {
-	mu        sync.Mutex
-	path      string
-	value     int64
-	startedAt time.Time
-	valid     bool
+	mu    sync.Mutex
+	path  string
+	value int64
+	valid bool
 }
 
 func newEngineBoots(paths engineStatePaths) (*engineBoots, error) {
@@ -90,8 +87,7 @@ func newEngineBoots(paths engineStatePaths) (*engineBoots, error) {
 	}
 
 	eb := &engineBoots{
-		path:      paths.engineBoots,
-		startedAt: time.Now(),
+		path: paths.engineBoots,
 	}
 	if err := eb.init(); err != nil {
 		return nil, err
@@ -135,32 +131,6 @@ func (eb *engineBoots) bootsValue() int64 {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
 	return eb.value
-}
-
-func (eb *engineBoots) engineTime() uint32 {
-	eb.mu.Lock()
-	defer eb.mu.Unlock()
-	return eb.engineTimeLocked()
-}
-
-func (eb *engineBoots) snapshot() (int64, uint32) {
-	eb.mu.Lock()
-	defer eb.mu.Unlock()
-	return eb.value, eb.engineTimeLocked()
-}
-
-func (eb *engineBoots) engineTimeLocked() uint32 {
-	if eb.startedAt.IsZero() {
-		return 0
-	}
-	elapsed := time.Since(eb.startedAt)
-	if elapsed <= 0 {
-		return 0
-	}
-	if elapsed.Seconds() > float64(maxSnmpEngineTime) {
-		return maxSnmpEngineTime
-	}
-	return uint32(elapsed / time.Second)
 }
 
 type localEngineID struct {
@@ -274,20 +244,4 @@ func (lid *localEngineID) bytes() []byte {
 	out := make([]byte, len(lid.value))
 	copy(out, lid.value)
 	return out
-}
-
-func (lid *localEngineID) equalRaw(raw string) bool {
-	// GoSNMP stores authoritative engine IDs as strings containing raw bytes.
-	// Compare byte-by-byte without converting either side through hex.
-	lid.mu.Lock()
-	defer lid.mu.Unlock()
-	if !lid.valid || len(lid.value) != len(raw) {
-		return false
-	}
-	for i, v := range lid.value {
-		if v != raw[i] {
-			return false
-		}
-	}
-	return true
 }

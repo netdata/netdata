@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -26,7 +27,7 @@ type Config struct {
 	LogKeyPrefix string
 	SnmpClient   snmputils.Client
 	// Version is the SNMP version SnmpClient was configured with.
-	Version gosnmp.SnmpVersion
+	Version gosnmp.Version
 	// MaxOIDs is the maximum OIDs per Get SnmpClient was configured with; 0 means gosnmp.MaxOids.
 	MaxOIDs int
 	// MaxRepetitions is sent with every bulk walk.
@@ -126,14 +127,14 @@ type (
 	}
 )
 
-func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
+func (c *Collector) CollectDeviceMetadata(ctx context.Context) (map[string]ddsnmp.MetaTag, error) {
 	c.failures = ddsnmp.CollectionFailures{}
 	c.requests = snmpRequestState{}
 	meta := make(map[string]ddsnmp.MetaTag)
 
 	for _, prof := range c.profiles {
 		stats := &ddsnmp.CollectionStats{}
-		profDeviceMeta, err := c.deviceMetadataCollector.collectObserved(prof.profile, stats, nil)
+		profDeviceMeta, err := c.deviceMetadataCollector.collectObserved(ctx, prof.profile, stats, nil)
 		c.failures.Processing.Preparation += stats.Errors.Processing.Preparation
 		if err != nil {
 			err = snmputils.WithFailure(err, "metadata", "")
@@ -152,7 +153,7 @@ func (c *Collector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
 // Collect preserves partial profile results, but returns no results when every
 // current request fails without a response. Cached/no-op profiles cannot mask
 // an unresponsive target; per-profile diagnostic reports are still delivered.
-func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
+func (c *Collector) Collect(ctx context.Context) ([]*ddsnmp.ProfileMetrics, error) {
 	c.failures = ddsnmp.CollectionFailures{}
 	c.requests = snmpRequestState{}
 	var prepared []*preparedProfileCollection
@@ -164,7 +165,7 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	}
 
 	for ordinal, state := range c.sortedProfileStates() {
-		profile, err := c.prepareProfileCollection(state, uint32(ordinal))
+		profile, err := c.prepareProfileCollection(ctx, state, uint32(ordinal))
 		if err != nil {
 			errs = append(errs, err)
 			recordCollectionFailure(&c.failures.Profiles, err, "prepare", "")
@@ -193,18 +194,18 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 			profile.topologyScope.execution = profile.acquisition.executionReport()
 		}
 	}
-	session.resolve()
+	session.resolve(ctx)
 
 	var metrics []*ddsnmp.ProfileMetrics
 	for _, profile := range prepared {
-		if err := c.collectPreparedProfileTables(profile, session); err != nil {
+		if err := c.collectPreparedProfileTables(ctx, profile, session); err != nil {
 			errs = append(errs, err)
 			recordCollectionFailure(&c.failures.Profiles, err, "tables", "")
 			c.observeAcquisitionProfile(profile, AcquisitionProfileOutcomeFailed, AcquisitionFailurePhaseTables)
 			continue
 		}
 
-		c.collectPreparedProfileRows(profile)
+		c.collectPreparedProfileRows(ctx, profile)
 		c.attachProfileMetrics(profile.metrics)
 		c.updateProfileMetrics(profile.metrics)
 		metrics = append(metrics, profile.metrics)
@@ -357,7 +358,7 @@ func (c *Collector) PreparedDeviceMetadata() map[string]ddsnmp.MetaTag {
 // prepared, so the owner can publish them without acquiring them twice.
 func (c *Collector) ProfileInputRevision() uint64 { return c.profileInputRevision }
 
-func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (*preparedProfileCollection, error) {
+func (c *Collector) prepareProfileCollection(ctx context.Context, ps *profileState, ordinal uint32) (*preparedProfileCollection, error) {
 	pm := &ddsnmp.ProfileMetrics{Source: ps.profile.SourceFile}
 	prepared := &preparedProfileCollection{
 		state:   ps,
@@ -375,12 +376,12 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 		)
 	}
 
-	if err := c.prepareProfileInputs(prepared); err != nil {
+	if err := c.prepareProfileInputs(ctx, prepared); err != nil {
 		return prepared, err
 	}
 
 	now := time.Now()
-	scalarMetrics, err := c.scalarCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition.metricScalarObserver())
+	scalarMetrics, err := c.scalarCollector.collectObserved(ctx, ps.profile, &pm.Stats, prepared.acquisition.metricScalarObserver())
 	pm.Stats.Timing.Scalar = time.Since(now)
 	if err != nil {
 		return prepared, err
@@ -394,9 +395,10 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 		var topologyScalars []ddsnmp.Metric
 		now = time.Now()
 		if prepared.acquisition == nil {
-			topologyScalars, err = c.scalarCollector.collect(topologyProfile, &pm.Stats)
+			topologyScalars, err = c.scalarCollector.collect(ctx, topologyProfile, &pm.Stats)
 		} else {
 			topologyScalars, err = c.scalarCollector.collectObserved(
+				ctx,
 				topologyProfile,
 				&pm.Stats,
 				prepared.acquisition.topologyScalarObserver(),
@@ -415,7 +417,7 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 	return prepared, nil
 }
 
-func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) error {
+func (c *Collector) prepareProfileInputs(ctx context.Context, prepared *preparedProfileCollection) error {
 	ps, pm := prepared.state, prepared.metrics
 	started := time.Now()
 	defer func() {
@@ -440,7 +442,7 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 		cache := ps.cache
 		recorder := sourceRecorder(c.globalTagsCollector.snmpClient)
 		cursor := recorder.Cursor()
-		globalTags, err := c.globalTagsCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
+		globalTags, err := c.globalTagsCollector.collectObserved(ctx, ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
 			return fmt.Errorf("failed to collect global tags: %w", err)
 		}
@@ -449,7 +451,7 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 			cache.tagEvidence = &AcquisitionCacheInput{Kind: "profile_tags", CreatedAt: time.Now().UTC(), Tags: globalTags, Sources: recorder.operationsSince(cursor)}
 		}
 		cursor = recorder.Cursor()
-		metadata, err := c.deviceMetadataCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
+		metadata, err := c.deviceMetadataCollector.collectObserved(ctx, ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
 			err = snmputils.WithFailure(err, "metadata", "")
 			return fmt.Errorf("failed to collect device metadata: %w", err)
@@ -469,11 +471,12 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 }
 
 func (c *Collector) collectPreparedProfileTables(
+	ctx context.Context,
 	profile *preparedProfileCollection,
 	session *tableCollectionSession,
 ) error {
 	now := time.Now()
-	tableMetrics, err := session.collectScope(profile.regularScope)
+	tableMetrics, err := session.collectScope(ctx, profile.regularScope)
 	profile.metrics.Stats.Timing.Table += time.Since(now)
 	if err != nil {
 		return err
@@ -485,7 +488,7 @@ func (c *Collector) collectPreparedProfileTables(
 		return nil
 	}
 	now = time.Now()
-	topologyMetrics, err := session.collectScope(profile.topologyScope)
+	topologyMetrics, err := session.collectScope(ctx, profile.topologyScope)
 	profile.metrics.Stats.Timing.Table += time.Since(now)
 	if err != nil {
 		return err
@@ -495,12 +498,12 @@ func (c *Collector) collectPreparedProfileTables(
 	return nil
 }
 
-func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollection) {
+func (c *Collector) collectPreparedProfileRows(ctx context.Context, profile *preparedProfileCollection) {
 	ps := profile.state
 	pm := profile.metrics
 
 	now := time.Now()
-	licenseRows, err := c.collectLicenseRowsObserved(ps.profile, &pm.Stats, profile.acquisition)
+	licenseRows, err := c.collectLicenseRowsObserved(ctx, ps.profile, &pm.Stats, profile.acquisition)
 	if err != nil {
 		c.log.Limit(c.logKeyPrefix+licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
 			Warningf("failed to collect licensing rows for profile %q: %v", ps.profile.SourceFile, err)
@@ -512,9 +515,9 @@ func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollectio
 	now = time.Now()
 	var bgpRows []ddsnmp.BGPRow
 	if profile.acquisition == nil {
-		bgpRows, err = c.collectBGPRows(ps.profile, &pm.Stats)
+		bgpRows, err = c.collectBGPRows(ctx, ps.profile, &pm.Stats)
 	} else {
-		bgpRows, err = c.collectBGPRowsObserved(ps.profile, &pm.Stats, profile.acquisition)
+		bgpRows, err = c.collectBGPRowsObserved(ctx, ps.profile, &pm.Stats, profile.acquisition)
 	}
 	if err != nil {
 		pm.BGPCollectError = err

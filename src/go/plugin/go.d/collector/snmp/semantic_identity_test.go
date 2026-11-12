@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -86,25 +86,23 @@ licensing:
 	} {
 		t.Run(name, func(t *testing.T) {
 			handler := snmpmock.NewMockSession(gomock.NewController(t))
-			handler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) {
+			handler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oid string, _ uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 				require.Contains(t, []string{root + ".1", root + ".2", root + ".3"}, oid)
-				var pdus []gosnmp.SnmpPDU
+				var pdus []gosnmp.VarBind
 				for i, value := range values {
 					pdus = append(
 						pdus,
-						gosnmp.SnmpPDU{
+						gosnmp.VarBind{
 							Name:  fmt.Sprintf("%s.1.%d", oid, i+1),
-							Type:  gosnmp.Counter32,
-							Value: uint(100 + i),
+							Value: gosnmp.Counter32Value(uint32(100 + i)),
 						},
-						gosnmp.SnmpPDU{
+						gosnmp.VarBind{
 							Name:  fmt.Sprintf("%s.2.%d", oid, i+1),
-							Type:  gosnmp.OctetString,
-							Value: []byte(value),
+							Value: gosnmp.OctetStringValue([]byte(value)),
 						},
 					)
 				}
-				return pdus, nil
+				return pdus, gosnmp.WalkEnd{}, nil
 			}).AnyTimes()
 			acquisition := ddsnmpcollector.New(
 				ddsnmpcollector.Config{
@@ -115,7 +113,7 @@ licensing:
 				},
 			)
 			for range 2 {
-				result, err := acquisition.Collect()
+				result, err := acquisition.Collect(context.Background())
 				require.NoError(t, err)
 				require.Len(t, result, 1)
 				pm := result[0]

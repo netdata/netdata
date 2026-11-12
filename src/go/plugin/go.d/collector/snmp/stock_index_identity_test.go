@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -11,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,17 +72,17 @@ func TestStockIndexIdentity_FinalCharts(t *testing.T) {
 			require.NoError(t, err)
 			profile = stockIdentitySelectRow(t, profile, tc)
 			ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
-			var pdus []gosnmp.SnmpPDU
+			var pdus []gosnmp.VarBind
 			var symbols []string
 			for _, symbol := range profile.Definition.Metrics[0].Symbols {
 				symbols = append(symbols, symbol.Name)
 				for i, row := range tc.Rows {
-					pdus = append(pdus, gosnmp.SnmpPDU{Name: symbol.OID + "." + row.Suffix, Type: gosnmp.Gauge32, Value: uint(100 + i)})
+					pdus = append(pdus, gosnmp.VarBind{Name: symbol.OID + "." + row.Suffix, Value: gosnmp.Gauge32Value(uint32(100 + i))})
 				}
 			}
 			for _, row := range tc.Rows {
 				for _, pdu := range row.PDUs {
-					pdus = append(pdus, gosnmp.SnmpPDU{Name: pdu.OID, Type: gosnmp.OctetString, Value: []byte(pdu.Value)})
+					pdus = append(pdus, gosnmp.VarBind{Name: pdu.OID, Value: gosnmp.OctetStringValue([]byte(pdu.Value))})
 				}
 			}
 			metrics := stockIdentityAcquire(t, profile, pdus)
@@ -161,21 +162,21 @@ func stockIdentitySelectRow(t *testing.T, profile *ddsnmp.Profile, tc stockIdent
 	return profile
 }
 
-func stockIdentityAcquire(t *testing.T, profile *ddsnmp.Profile, pdus []gosnmp.SnmpPDU) []ddsnmp.Metric {
+func stockIdentityAcquire(t *testing.T, profile *ddsnmp.Profile, pdus []gosnmp.VarBind) []ddsnmp.Metric {
 	t.Helper()
 	handler := snmpmock.NewMockSession(gomock.NewController(t))
-	handler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) {
-		var found []gosnmp.SnmpPDU
+	handler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oid string, _ uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+		var found []gosnmp.VarBind
 		prefix := strings.Trim(oid, ".") + "."
 		for _, pdu := range pdus {
 			if strings.HasPrefix(pdu.Name, prefix) {
 				found = append(found, pdu)
 			}
 		}
-		return found, nil
+		return found, gosnmp.WalkEnd{}, nil
 	}).AnyTimes()
 	collector := ddsnmpcollector.New(ddsnmpcollector.Config{Version: gosnmp.Version2c, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
-	result, err := collector.Collect()
+	result, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 	return result[0].Metrics
@@ -231,7 +232,7 @@ func TestStockIndexIdentity_PublicUPSReturnedColumns(t *testing.T) {
 	tc := stockIdentityFixture{Profile: "_std-ups-mib.yaml", TableOID: "1.3.6.1.2.1.33.1.4.4", Metric: "upsOutputVoltage"}
 	data, err := os.ReadFile(capture)
 	require.NoError(t, err)
-	var pdus, withoutIndex []gosnmp.SnmpPDU
+	var pdus, withoutIndex []gosnmp.VarBind
 	for _, line := range strings.Split(string(data), "\n") {
 		fields := strings.SplitN(line, "|", 3)
 		if len(fields) != 3 || !strings.HasPrefix(fields[0], tc.TableOID+".") {
@@ -240,7 +241,7 @@ func TestStockIndexIdentity_PublicUPSReturnedColumns(t *testing.T) {
 		require.Equal(t, "2", fields[1], "this public table uses INTEGER values")
 		value, err := strconv.Atoi(fields[2])
 		require.NoError(t, err)
-		pdu := gosnmp.SnmpPDU{Name: fields[0], Type: gosnmp.Integer, Value: value}
+		pdu := gosnmp.VarBind{Name: fields[0], Value: gosnmp.IntegerValue(int32(value))}
 		pdus = append(pdus, pdu)
 		if !strings.HasPrefix(pdu.Name, tc.TableOID+".1.1.") {
 			withoutIndex = append(withoutIndex, pdu)

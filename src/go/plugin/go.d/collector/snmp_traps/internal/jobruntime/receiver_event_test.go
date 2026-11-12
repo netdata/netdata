@@ -116,13 +116,13 @@ func TestJobMapsReceiverOperationalEvents(t *testing.T) {
 			metric:    "snmp_trap_errors_inform_response_failed",
 			logSubstr: []string{"SNMP trap INFORM response failed", "response failed"},
 		},
-		"discovery Report failure": {
+		"Report failure": {
 			event: receiver.Event{
-				Type: receiver.EventDiscoveryReportFailed,
+				Type: receiver.EventReportFailed,
 				Err:  errors.New("report failed"),
 			},
 			metric:    "snmp_trap_errors_inform_response_failed",
-			logSubstr: []string{"SNMP trap INFORM discovery Report failed", "report failed"},
+			logSubstr: []string{"SNMP trap Report failed", "report failed"},
 		},
 	}
 

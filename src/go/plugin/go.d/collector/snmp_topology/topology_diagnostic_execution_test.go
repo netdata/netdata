@@ -4,10 +4,11 @@ package snmptopology
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -21,27 +22,26 @@ import (
 type executionTestHandler struct {
 	snmputils.Session
 	walkRoots []string
-	walkPDUs  []gosnmp.SnmpPDU
+	walkPDUs  []gosnmp.VarBind
 }
 
-func (*executionTestHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
-	packet := &gosnmp.SnmpPacket{}
+func (*executionTestHandler) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
+	packet := &gosnmp.Message{}
 	for _, oid := range oids {
-		packet.Variables = append(
-			packet.Variables,
-			gosnmp.SnmpPDU{
+		packet.VarBinds = append(
+			packet.VarBinds,
+			gosnmp.VarBind{
 				Name:  oid,
-				Type:  gosnmp.OctetString,
-				Value: []byte("synthetic"),
+				Value: gosnmp.OctetStringValue([]byte("synthetic")),
 			},
 		)
 	}
 	return packet, nil
 }
 
-func (h *executionTestHandler) BulkWalkAll(oid string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
+func (h *executionTestHandler) BulkWalkAll(ctx context.Context, oid string, maxRepetitions uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 	h.walkRoots = append(h.walkRoots, oid)
-	return h.walkPDUs, errors.New("synthetic failure")
+	return h.walkPDUs, gosnmp.WalkEnd{}, errors.New("synthetic failure")
 }
 
 // Use the real collector/observer boundary, including a failed profile with no
@@ -51,7 +51,7 @@ func collectExecutionTestCapture(tb testing.TB) *topologydiag.AcquisitionCapture
 	return collectSourceTestCapture(tb, nil)
 }
 
-func collectSourceTestCapture(tb testing.TB, pdus []gosnmp.SnmpPDU) *topologydiag.AcquisitionCapture {
+func collectSourceTestCapture(tb testing.TB, pdus []gosnmp.VarBind) *topologydiag.AcquisitionCapture {
 	tb.Helper()
 	const root = "1.3.6.1.4.1.99999.1"
 	recorder := newTopologyAcquisitionRecorder(topologydiag.AcquisitionAttemptID{
@@ -93,7 +93,7 @@ func collectSourceTestCapture(tb testing.TB, pdus []gosnmp.SnmpPDU) *topologydia
 			},
 		}}},
 	})
-	_, err := collector.Collect()
+	_, err := collector.Collect(context.Background())
 	require.Error(tb, err)
 	require.Equal(tb, []string{root}, handler.walkRoots)
 	recorder.completeContext(0, failedAcquisitionPhase(topologydiag.AcquisitionFailureCollection))

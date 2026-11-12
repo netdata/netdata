@@ -4,13 +4,14 @@ package ddsnmpcollector
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -41,7 +42,7 @@ func TestTableRejectedRowsBoundedLoggingAndRecovery(t *testing.T) {
 				SourceFile: "custom.yaml",
 				Definition: def,
 			}
-			pdus := make([]gosnmp.SnmpPDU, badRows)
+			pdus := make([]gosnmp.VarBind, badRows)
 			for i := range pdus {
 				// Length consumes the integer, or an octet is outside its legal range.
 				suffix := fmt.Sprintf("3.65.66.%d", i)
@@ -57,7 +58,7 @@ func TestTableRejectedRowsBoundedLoggingAndRecovery(t *testing.T) {
 			for cycle := 0; cycle < 2; cycle++ {
 				expectSNMPWalk(handler, gosnmp.Version2c, root, pdus)
 				var stats ddsnmp.CollectionStats
-				metrics, err := collector.collect(profile, &stats)
+				metrics, err := collector.collect(context.Background(), profile, &stats)
 				require.NoError(t, err)
 				require.EqualValues(t, badRows, stats.Errors.Processing.Table)
 				require.EqualValues(t, len(pdus), stats.Metrics.Rows)
@@ -79,9 +80,9 @@ func TestTableRejectedRowsBoundedLoggingAndRecovery(t *testing.T) {
 				}
 			}
 			// Recovery is observed through a fresh WALK, with no logger or cache reset.
-			expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.SnmpPDU{createGauge32PDU(root+".1.1.82.7", 30)})
+			expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.VarBind{createGauge32PDU(root+".1.1.82.7", 30)})
 			var stats ddsnmp.CollectionStats
-			metrics, err := collector.collect(profile, &stats)
+			metrics, err := collector.collect(context.Background(), profile, &stats)
 			require.NoError(t, err)
 			require.Len(t, metrics, 1)
 			require.Equal(t, "R", metrics[0].Tags["name"])
@@ -94,6 +95,7 @@ func TestTableRejectedRowsBoundedLoggingAndRecovery(t *testing.T) {
 			changed.Metrics[0].MetricTags[0].Tag = "other_name"
 			expectSNMPWalk(handler, gosnmp.Version2c, root, pdus)
 			_, err = collector.collect(
+				context.Background(),
 				&ddsnmp.Profile{
 					SourceFile: "custom.yaml",
 					Definition: changed,
@@ -120,14 +122,14 @@ func TestTableRejectionDiagnosticsIdentifyEachProfile(t *testing.T) {
 	for _, profile := range profiles {
 		require.Len(t, profile.Definition.Metrics, 1)
 	}
-	handler := &sourceTestHandler{walk: func(string) ([]gosnmp.SnmpPDU, error) {
-		return []gosnmp.SnmpPDU{createGauge32PDU(base+".1.7.8", 10), createGauge32PDU(base+".2.7.8", 20)}, nil
+	handler := &sourceTestHandler{walk: func(string) ([]gosnmp.VarBind, error) {
+		return []gosnmp.VarBind{createGauge32PDU(base+".1.7.8", 10), createGauge32PDU(base+".2.7.8", 20)}, nil
 	}}
 	var output bytes.Buffer
 	collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: handler, Profiles: profiles, Log: logger.NewWithWriter(&output)})
 	firstLogBytes := 0
 	for cycle := 0; cycle < 2; cycle++ {
-		result, err := collector.Collect()
+		result, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, result, 2)
 		for _, profile := range result {
@@ -162,11 +164,11 @@ func BenchmarkTableRejectedRowSummary(b *testing.B) {
 				config:      cfg,
 				columnOIDs:  buildColumnOIDs(cfg),
 				orderedTags: buildOrderedTags(cfg),
-				rows:        make(map[string]map[string]gosnmp.SnmpPDU, count),
+				rows:        make(map[string]map[string]gosnmp.VarBind, count),
 			}
 			for i := 0; i < count; i++ {
 				index := fmt.Sprintf("3.65.66.%d", i)
-				ctx.rows[index] = map[string]gosnmp.SnmpPDU{root + ".1": createGauge32PDU(root+".1."+index, 10)}
+				ctx.rows[index] = map[string]gosnmp.VarBind{root + ".1": createGauge32PDU(root+".1."+index, 10)}
 			}
 			collector := newTableCollector(
 				nil,
@@ -206,7 +208,7 @@ func BenchmarkCachedTableProcessingErrors(b *testing.B) {
 				profileSource: "custom.yaml",
 				cachedOIDs:    make(map[string]map[string]string, count),
 				cachedTags:    make(map[string]map[string]string, count),
-				pdus:          make(map[string]gosnmp.SnmpPDU, count),
+				pdus:          make(map[string]gosnmp.VarBind, count),
 			}
 			for i := 0; i < count; i++ {
 				index := fmt.Sprint(i + 1)

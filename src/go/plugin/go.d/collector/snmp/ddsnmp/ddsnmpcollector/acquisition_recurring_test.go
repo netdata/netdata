@@ -3,11 +3,12 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,14 +25,14 @@ func TestRecurringTableEvidence(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			handler := &sourceTestHandler{
-				walk: func(string) ([]gosnmp.SnmpPDU, error) {
-					return []gosnmp.SnmpPDU{createGauge32PDU(root+".1.1", 7)}, nil
+				walk: func(string) ([]gosnmp.VarBind, error) {
+					return []gosnmp.VarBind{createGauge32PDU(root+".1.1", 7)}, nil
 				},
-				get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+				get: func(oids []string) (*gosnmp.Message, error) {
 					if tc.fallback {
 						return nil, errors.New("candidate timeout")
 					}
-					return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{createGauge32PDU(oids[0], 9)}}, nil
+					return &gosnmp.Message{VarBinds: []gosnmp.VarBind{createGauge32PDU(oids[0], 9)}}, nil
 				},
 			}
 			profile := createTestProfile("table.yaml", []ddprofiledefinition.MetricsConfig{{
@@ -45,7 +46,7 @@ func TestRecurringTableEvidence(t *testing.T) {
 				MaxOIDs: 1, SnmpClient: first.Wrap(handler), Profiles: []*ddsnmp.Profile{profile}, Log: logger.New(),
 				AcquisitionObserver: AcquisitionObserverFunc(func(report AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, report) }),
 			})
-			_, err := collector.Collect()
+			_, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			firstSources := first.Finish()
 			require.Len(t, firstSources, 1)
@@ -53,7 +54,7 @@ func TestRecurringTableEvidence(t *testing.T) {
 			require.False(t, firstSources[0].StartedAt.IsZero())
 			second := &SourceRecorder{ContextID: 2}
 			collector.SetSNMPClient(second.Wrap(handler))
-			metrics, err := collector.Collect()
+			metrics, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			sources := second.Finish()
 			require.Len(t, reports, 2)
@@ -92,14 +93,14 @@ func TestRecurringTableEvidence(t *testing.T) {
 }
 
 func TestRecurringNegativeEvidence(t *testing.T) {
-	for name, tc := range map[string]struct{ kind gosnmp.Asn1BER }{
+	for name, tc := range map[string]struct{ kind gosnmp.ValueType }{
 		"no such object":   {gosnmp.NoSuchObject},
 		"no such instance": {gosnmp.NoSuchInstance},
 	} {
 		t.Run(name, func(t *testing.T) {
 			const oid = "1.3.6.1.4.1.99999.90.0"
-			handler := &sourceTestHandler{get: func([]string) (*gosnmp.SnmpPacket, error) {
-				return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{{Name: oid, Type: tc.kind}}}, nil
+			handler := &sourceTestHandler{get: func([]string) (*gosnmp.Message, error) {
+				return &gosnmp.Message{VarBinds: []gosnmp.VarBind{{Name: oid, Value: testValue(tc.kind, nil)}}}, nil
 			}}
 			profile := createTestProfile("scalar.yaml", []ddprofiledefinition.MetricsConfig{{Symbol: ddprofiledefinition.SymbolConfig{OID: oid, Name: "missing"}}})
 			var report AcquisitionProfileReport
@@ -109,12 +110,12 @@ func TestRecurringNegativeEvidence(t *testing.T) {
 				MaxOIDs: 1, SnmpClient: first.Wrap(handler), Profiles: []*ddsnmp.Profile{profile}, Log: logger.New(),
 				AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = value }),
 			})
-			_, err := collector.Collect()
+			_, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			first.Finish()
 			second := &SourceRecorder{ContextID: 12}
 			collector.SetSNMPClient(second.Wrap(handler))
-			_, err = collector.Collect()
+			_, err = collector.Collect(context.Background())
 			require.NoError(t, err)
 			assert.Empty(t, second.Finish())
 			assert.Equal(t, 1, handler.gets)
@@ -138,17 +139,17 @@ func TestRecurringDependencySettlementEvidence(t *testing.T) {
 			dependency, source := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999.81")
 			poll := 1
 			handler := &sourceTestHandler{
-				get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+				get: func(oids []string) (*gosnmp.Message, error) {
 					if oids[0] == dependency.Symbols[0].OID+".1" {
 						return nil, errors.New("dependency cache miss")
 					}
-					return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{createGauge32PDU(oids[0], 99)}}, nil
+					return &gosnmp.Message{VarBinds: []gosnmp.VarBind{createGauge32PDU(oids[0], 99)}}, nil
 				},
-				walk: func(root string) ([]gosnmp.SnmpPDU, error) {
+				walk: func(root string) ([]gosnmp.VarBind, error) {
 					if poll == 2 && tc.dependencyFailure && root == dependency.Table.OID {
 						return nil, errors.New("dependency unavailable")
 					}
-					return []gosnmp.SnmpPDU{createGauge32PDU(root+".1.1", uint(poll*10))}, nil
+					return []gosnmp.VarBind{createGauge32PDU(root+".1.1", uint(poll*10))}, nil
 				},
 			}
 			profile := createTestProfile("dependencies.yaml", []ddprofiledefinition.MetricsConfig{source, dependency})
@@ -159,13 +160,13 @@ func TestRecurringDependencySettlementEvidence(t *testing.T) {
 				MaxOIDs: 1, SnmpClient: first.Wrap(handler), Profiles: []*ddsnmp.Profile{profile}, Log: logger.New(),
 				AcquisitionObserver: AcquisitionObserverFunc(func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = value }),
 			})
-			_, err := collector.Collect()
+			_, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			first.Finish()
 			poll = 2
 			second := &SourceRecorder{ContextID: 2}
 			collector.SetSNMPClient(second.Wrap(handler))
-			_, err = collector.Collect()
+			_, err = collector.Collect(context.Background())
 			require.NoError(t, err)
 			operations := second.Finish()
 			require.Len(t, operations, 4)
@@ -201,15 +202,15 @@ func TestRecurringNegativeEvidenceIgnoresDynamicInstances(t *testing.T) {
 			const root, scalar = "1.3.6.1.4.1.99999.82", "1.3.6.1.4.1.99999.83.0"
 			poll := 0
 			handler := &sourceTestHandler{
-				get: func(oids []string) (*gosnmp.SnmpPacket, error) {
-					packet := &gosnmp.SnmpPacket{}
+				get: func(oids []string) (*gosnmp.Message, error) {
+					packet := &gosnmp.Message{}
 					for _, oid := range oids {
-						packet.Variables = append(packet.Variables, gosnmp.SnmpPDU{Name: oid, Type: gosnmp.NoSuchInstance})
+						packet.VarBinds = append(packet.VarBinds, gosnmp.VarBind{Name: oid, Value: gosnmp.NoSuchInstanceValue()})
 					}
 					return packet, nil
 				},
-				walk: func(string) ([]gosnmp.SnmpPDU, error) {
-					return []gosnmp.SnmpPDU{createGauge32PDU(fmt.Sprintf("%s.1.%d", root, poll), 7)}, nil
+				walk: func(string) ([]gosnmp.VarBind, error) {
+					return []gosnmp.VarBind{createGauge32PDU(fmt.Sprintf("%s.1.%d", root, poll), 7)}, nil
 				},
 			}
 			profile := createTestProfile("churn.yaml", []ddprofiledefinition.MetricsConfig{
@@ -220,7 +221,7 @@ func TestRecurringNegativeEvidenceIgnoresDynamicInstances(t *testing.T) {
 			for poll = 1; poll <= tc.polls; poll++ {
 				recorder := &SourceRecorder{ContextID: uint64(poll)}
 				collector.SetSNMPClient(recorder.Wrap(handler))
-				metrics, err := collector.Collect()
+				metrics, err := collector.Collect(context.Background())
 				require.NoError(t, err)
 				require.Len(t, metrics[0].Metrics, 1)
 				recorder.Finish()

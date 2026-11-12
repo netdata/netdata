@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
@@ -42,25 +43,27 @@ type diagnosticClient struct {
 	requests *snmpRequestState
 }
 
-func (c *diagnosticClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
-	packet, err := c.Client.Get(oids)
-	c.requests.observe(packet != nil, err)
+// A request the agent's answer ended responded, also when the answer failed it
+// (an SNMPv3 Report, an error-status): gosnmp.ErrAnswered marks those errors.
+func (c *diagnosticClient) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
+	packet, err := c.Client.Get(ctx, oids)
+	c.requests.observe(packet != nil || errors.Is(err, gosnmp.ErrAnswered), err)
 	c.failures.GET.Record(snmputils.ClassifyGetFailure(packet, err))
 	return packet, err
 }
 
-func (c *diagnosticClient) WalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
-	values, err := c.Client.WalkAll(oid)
-	c.requests.observe(err == nil || len(values) > 0, err)
+func (c *diagnosticClient) WalkAll(ctx context.Context, oid string) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+	values, end, err := c.Client.WalkAll(ctx, oid)
+	c.requests.observe(err == nil || len(values) > 0 || errors.Is(err, gosnmp.ErrAnswered), err)
 	c.recordWalk(err)
-	return values, err
+	return values, end, err
 }
 
-func (c *diagnosticClient) BulkWalkAll(oid string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
-	values, err := c.Client.BulkWalkAll(oid, maxRepetitions)
-	c.requests.observe(err == nil || len(values) > 0, err)
+func (c *diagnosticClient) BulkWalkAll(ctx context.Context, oid string, maxRepetitions uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+	values, end, err := c.Client.BulkWalkAll(ctx, oid, maxRepetitions)
+	c.requests.observe(err == nil || len(values) > 0 || errors.Is(err, gosnmp.ErrAnswered), err)
 	c.recordWalk(err)
-	return values, err
+	return values, end, err
 }
 
 func (c *diagnosticClient) recordWalk(err error) {

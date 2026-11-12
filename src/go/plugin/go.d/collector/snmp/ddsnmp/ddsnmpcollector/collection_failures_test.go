@@ -8,7 +8,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -57,19 +57,19 @@ func TestCollectionFailuresObserveWarmPollAndRecovery(t *testing.T) {
 		},
 	)
 	for cycle := 0; cycle < 3; cycle++ {
-		expectSNMPGet(handler, []string{scalarOID}, []gosnmp.SnmpPDU{createTimeTicksPDU(scalarOID, 123456)})
+		expectSNMPGet(handler, []string{scalarOID}, []gosnmp.VarBind{createTimeTicksPDU(scalarOID, 123456)})
 		if cycle == 1 {
 			expectSNMPGet(
 				handler,
 				[]string{licenseOID},
-				[]gosnmp.SnmpPDU{createStringPDU(licenseOID, "SECRET malformed state")},
+				[]gosnmp.VarBind{createStringPDU(licenseOID, "SECRET malformed state")},
 			)
 			expectSNMPGetError(handler, bgpOIDs, gosnmp.ErrWrongDigest)
 		} else {
-			expectSNMPGet(handler, []string{licenseOID}, []gosnmp.SnmpPDU{createIntegerPDU(licenseOID, 0)})
-			expectSNMPGet(handler, bgpOIDs, []gosnmp.SnmpPDU{createIntegerPDU(bgpOIDs[0], 6), createGauge32PDU(bgpOIDs[1], 3600)})
+			expectSNMPGet(handler, []string{licenseOID}, []gosnmp.VarBind{createIntegerPDU(licenseOID, 0)})
+			expectSNMPGet(handler, bgpOIDs, []gosnmp.VarBind{createIntegerPDU(bgpOIDs[0], 6), createGauge32PDU(bgpOIDs[1], 3600)})
 		}
-		metrics, err := collector.Collect()
+		metrics, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, metrics, 1)
 		require.Len(t, metrics[0].Metrics, 1, "partial typed-row failures must not change ordinary metric output")
@@ -98,17 +98,14 @@ func TestCollectionFailuresObserveWarmPollAndRecovery(t *testing.T) {
 func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
 	tests := map[string]struct {
 		get    bool
-		packet *gosnmp.SnmpPacket
-		values []gosnmp.SnmpPDU
+		packet *gosnmp.Message
+		values []gosnmp.VarBind
 		err    error
 		want   ddsnmp.CollectionFailures
 	}{
 		"packet error preserves response and index": {
 			get: true,
-			packet: &gosnmp.SnmpPacket{
-				Error:      gosnmp.NoSuchName,
-				ErrorIndex: 2,
-			},
+			err: &gosnmp.StatusError{Status: gosnmp.NoSuchName, Index: 2},
 			want: ddsnmp.CollectionFailures{
 				GET: ddsnmp.FailureCount{
 					Count: 1,
@@ -121,9 +118,9 @@ func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
 				},
 			},
 		},
-		"empty successful walk has no inferred termination reason": {values: []gosnmp.SnmpPDU{}},
+		"empty successful walk has no inferred termination reason": {values: []gosnmp.VarBind{}},
 		"failed walk preserves partial values": {
-			values: []gosnmp.SnmpPDU{{Name: "1.3.6.1", Type: gosnmp.Integer, Value: 1}},
+			values: []gosnmp.VarBind{{Name: "1.3.6.1", Value: gosnmp.IntegerValue(1)}},
 			err:    context.DeadlineExceeded,
 			want: ddsnmp.CollectionFailures{
 				WALK: ddsnmp.FailureCount{
@@ -147,14 +144,14 @@ func TestDiagnosticClientPreservesObservedOutcomes(t *testing.T) {
 			}
 			var err error
 			if tc.get {
-				handler.EXPECT().Get([]string{"1.3.6"}).Return(tc.packet, tc.err)
-				var packet *gosnmp.SnmpPacket
-				packet, err = client.Get([]string{"1.3.6"})
+				handler.EXPECT().Get(gomock.Any(), []string{"1.3.6"}).Return(tc.packet, tc.err)
+				var packet *gosnmp.Message
+				packet, err = client.Get(context.Background(), []string{"1.3.6"})
 				require.Same(t, tc.packet, packet)
 			} else {
-				handler.EXPECT().BulkWalkAll("1.3.6", gomock.Any()).Return(tc.values, tc.err)
-				var values []gosnmp.SnmpPDU
-				values, err = client.BulkWalkAll("1.3.6", 0)
+				handler.EXPECT().BulkWalkAll(gomock.Any(), "1.3.6", gomock.Any()).Return(tc.values, gosnmp.WalkEnd{}, tc.err)
+				var values []gosnmp.VarBind
+				values, _, err = client.BulkWalkAll(context.Background(), "1.3.6", 0)
 				require.Equal(t, tc.values, values)
 			}
 			if tc.err != nil {
@@ -189,7 +186,7 @@ func TestReplacementClientKeepsFailureObservation(t *testing.T) {
 	})
 	c.SetSNMPClient(handler)
 	expectSNMPGetError(handler, []string{"1.3.6.1.2.1.1.3.0"}, gosnmp.ErrWrongDigest)
-	_, _ = c.Collect()
+	_, _ = c.Collect(context.Background())
 	require.EqualValues(t, 1, c.CollectionFailures().GET.Count)
 	require.Equal(t, "wrong_digest", c.CollectionFailures().GET.Last.Reason)
 }
@@ -235,9 +232,9 @@ func TestMetadataProcessingDoesNotRelabelLaterTransportFailure(t *testing.T) {
 		SysObjectID: oid,
 		Log:         logger.New(),
 	})
-	expectSNMPGet(handler, []string{first}, []gosnmp.SnmpPDU{createStringPDU(first, "invalid number")})
+	expectSNMPGet(handler, []string{first}, []gosnmp.VarBind{createStringPDU(first, "invalid number")})
 	expectSNMPGetError(handler, []string{second}, gosnmp.ErrWrongDigest)
-	_, err := c.CollectDeviceMetadata()
+	_, err := c.CollectDeviceMetadata(context.Background())
 	require.ErrorIs(t, err, gosnmp.ErrWrongDigest)
 	require.Equal(t, "wrong_digest", snmputils.ClassifyFailure(err).Reason)
 	failures := c.CollectionFailures()
@@ -294,10 +291,10 @@ func TestCollectionFailuresPreserveDependencyReasons(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					ctrl, handler := setupMockSession(t)
 					defer ctrl.Finish()
-					expectSNMPWalk(handler, gosnmp.Version2c, spec.mainOID, []gosnmp.SnmpPDU{
+					expectSNMPWalk(handler, gosnmp.Version2c, spec.mainOID, []gosnmp.VarBind{
 						createGauge32PDU(spec.valueOID, 42),
 					})
-					handler.EXPECT().BulkWalkAll(spec.dependencyOID, gomock.Any()).Return(nil, tc.cause)
+					handler.EXPECT().BulkWalkAll(gomock.Any(), spec.dependencyOID, gomock.Any()).Return(nil, gosnmp.WalkEnd{}, tc.cause)
 					c := New(Config{
 						Version:    gosnmp.Version2c,
 						MaxOIDs:    10,
@@ -307,7 +304,7 @@ func TestCollectionFailuresPreserveDependencyReasons(t *testing.T) {
 							SourceFile: "synthetic.yaml", Definition: spec.definition.Clone(),
 						}},
 					})
-					results, err := c.Collect()
+					results, err := c.Collect(context.Background())
 					require.NoError(t, err)
 					require.Len(t, results, 1)
 					f := c.CollectionFailures()
@@ -331,12 +328,12 @@ func TestAllRequestsFailedPreservesCacheProbeAndWalkErrors(t *testing.T) {
 	probeErr, walkErr := context.DeadlineExceeded, gosnmp.ErrWrongDigest
 	failed := false
 	handler := &sourceTestHandler{
-		get: func([]string) (*gosnmp.SnmpPacket, error) { return nil, probeErr },
-		walk: func(string) ([]gosnmp.SnmpPDU, error) {
+		get: func([]string) (*gosnmp.Message, error) { return nil, probeErr },
+		walk: func(string) ([]gosnmp.VarBind, error) {
 			if failed {
 				return nil, walkErr
 			}
-			return []gosnmp.SnmpPDU{createGauge32PDU(columnOID+".1", 10)}, nil
+			return []gosnmp.VarBind{createGauge32PDU(columnOID+".1", 10)}, nil
 		},
 	}
 	profile := createTestProfile(
@@ -359,10 +356,10 @@ func TestAllRequestsFailedPreservesCacheProbeAndWalkErrors(t *testing.T) {
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
-	_, err := c.Collect()
+	_, err := c.Collect(context.Background())
 	require.NoError(t, err)
 	failed = true
-	metrics, err := c.Collect()
+	metrics, err := c.Collect(context.Background())
 	require.Empty(t, metrics)
 	require.ErrorIs(t, err, probeErr)
 	require.ErrorIs(t, err, walkErr)

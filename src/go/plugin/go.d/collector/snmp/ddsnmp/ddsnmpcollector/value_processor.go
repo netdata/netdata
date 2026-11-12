@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
@@ -24,7 +24,7 @@ func newValueProcessor() *valueProcessor {
 	}
 }
 
-func (p *valueProcessor) processValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
+func (p *valueProcessor) processValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.VarBind) (int64, error) {
 	if isStringValueFormat(sym.Format) {
 		return p.stringProcessor.processValue(sym, pdu)
 	}
@@ -46,8 +46,8 @@ func isStringValueFormat(format string) bool {
 // numericValueProcessor handles numeric PDU types
 type numericValueProcessor struct{}
 
-func (p *numericValueProcessor) processValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
-	switch pdu.Type {
+func (p *numericValueProcessor) processValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.VarBind) (int64, error) {
+	switch pdu.Value.Type() {
 	case gosnmp.OpaqueFloat:
 		return p.processOpaqueFloat(sym, pdu)
 	case gosnmp.OpaqueDouble:
@@ -59,11 +59,11 @@ func (p *numericValueProcessor) processValue(sym ddprofiledefinition.SymbolConfi
 
 func (p *numericValueProcessor) processOpaqueFloat(
 	sym ddprofiledefinition.SymbolConfig,
-	pdu gosnmp.SnmpPDU,
+	pdu gosnmp.VarBind,
 ) (int64, error) {
-	floatVal, ok := pdu.Value.(float32)
+	floatVal, ok := pdu.Value.Float32()
 	if !ok {
-		return 0, fmt.Errorf("OpaqueFloat has unexpected type %T", pdu.Value)
+		return 0, fmt.Errorf("OpaqueFloat has unexpected type %v", pdu.Value.Type())
 	}
 
 	if sym.ScaleFactor != 0 {
@@ -74,11 +74,11 @@ func (p *numericValueProcessor) processOpaqueFloat(
 
 func (p *numericValueProcessor) processOpaqueDouble(
 	sym ddprofiledefinition.SymbolConfig,
-	pdu gosnmp.SnmpPDU,
+	pdu gosnmp.VarBind,
 ) (int64, error) {
-	floatVal, ok := pdu.Value.(float64)
+	floatVal, ok := pdu.Value.Float64()
 	if !ok {
-		return 0, fmt.Errorf("OpaqueDouble has unexpected type %T", pdu.Value)
+		return 0, fmt.Errorf("OpaqueDouble has unexpected type %v", pdu.Value.Type())
 	}
 
 	if sym.ScaleFactor != 0 {
@@ -89,7 +89,7 @@ func (p *numericValueProcessor) processOpaqueDouble(
 
 func (p *numericValueProcessor) processInteger(
 	sym ddprofiledefinition.SymbolConfig,
-	pdu gosnmp.SnmpPDU,
+	pdu gosnmp.VarBind,
 ) (int64, error) {
 	value, err := convNumericPduToInt64f(pdu, sym.Format)
 	if err != nil {
@@ -113,7 +113,7 @@ func (p *numericValueProcessor) processInteger(
 // stringValueProcessor handles string-based PDU types
 type stringValueProcessor struct{}
 
-func (p *stringValueProcessor) processValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (int64, error) {
+func (p *stringValueProcessor) processValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.VarBind) (int64, error) {
 	s, err := convPduToStringf(pdu, sym.Format)
 	if err != nil {
 		return 0, err

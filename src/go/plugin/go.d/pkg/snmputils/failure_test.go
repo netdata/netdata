@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,14 +62,14 @@ func TestClassifyFailureUsesTypedEvidence(t *testing.T) {
 
 func TestFailureAnnotationsPreserveErrors(t *testing.T) {
 	tests := map[string]struct {
-		packet    *gosnmp.SnmpPacket
+		status    *gosnmp.StatusError
 		operation string
 		want      Failure
 	}{
 		"typed cause": {operation: "get",
 			want: Failure{Operation: "get", Reason: "cancelled"}},
 		"packet status": {
-			packet:    &gosnmp.SnmpPacket{Error: gosnmp.AuthorizationError, ErrorIndex: 2},
+			status:    &gosnmp.StatusError{Status: gosnmp.AuthorizationError, Index: 2},
 			operation: "system_identity",
 			want: Failure{
 				Operation:    "system_identity",
@@ -83,8 +83,8 @@ func TestFailureAnnotationsPreserveErrors(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cause := fmt.Errorf("SECRET: %w", context.Canceled)
 			var annotated error
-			if tc.packet != nil {
-				annotated = WithPacketFailure(cause, tc.operation, tc.packet)
+			if tc.status != nil {
+				annotated = WithPacketFailure(cause, tc.operation, tc.status)
 			} else {
 				annotated = WithFailure(cause, tc.operation, "")
 			}
@@ -119,13 +119,13 @@ func TestFailureValidation(t *testing.T) {
 }
 
 func TestFailureAnnotationsStayValid(t *testing.T) {
-	packetCause := WithPacketFailure(context.DeadlineExceeded, "get", &gosnmp.SnmpPacket{
-		Error:      gosnmp.GenErr,
-		ErrorIndex: 2,
+	packetCause := WithPacketFailure(context.DeadlineExceeded, "get", &gosnmp.StatusError{
+		Status: gosnmp.GenErr,
+		Index:  2,
 	})
 	for name, tc := range map[string]struct {
 		cause            error
-		packet           *gosnmp.SnmpPacket
+		status           *gosnmp.StatusError
 		packetAnnotation bool
 		reason           string
 		want             Failure
@@ -133,10 +133,6 @@ func TestFailureAnnotationsStayValid(t *testing.T) {
 		"nil failure":        {},
 		"nil packet failure": {packetAnnotation: true},
 		"nil response": {cause: context.DeadlineExceeded, packetAnnotation: true, want: Failure{
-			Operation: "get",
-			Reason:    "deadline",
-		}},
-		"successful response with failure": {cause: context.DeadlineExceeded, packetAnnotation: true, packet: &gosnmp.SnmpPacket{}, want: Failure{
 			Operation: "get",
 			Reason:    "deadline",
 		}},
@@ -157,7 +153,7 @@ func TestFailureAnnotationsStayValid(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var annotated error
 			if tc.packetAnnotation {
-				annotated = WithPacketFailure(tc.cause, "get", tc.packet)
+				annotated = WithPacketFailure(tc.cause, "get", tc.status)
 			} else {
 				annotated = WithFailure(tc.cause, "get", tc.reason)
 			}

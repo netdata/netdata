@@ -4,11 +4,12 @@ package ddsnmpcollector
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -105,8 +106,8 @@ func typedRejectionTestProfile(t testing.TB, kind string, tc typedRejectionTestC
 	}
 }
 
-func typedRejectionTestPDUs(tc typedRejectionTestCase, count int) []gosnmp.SnmpPDU {
-	pdus := make([]gosnmp.SnmpPDU, count)
+func typedRejectionTestPDUs(tc typedRejectionTestCase, count int) []gosnmp.VarBind {
+	pdus := make([]gosnmp.VarBind, count)
 	for i := range pdus {
 		oid := typedRejectionTestRoot + ".1." + tc.badIndex(i)
 		if tc.badValue {
@@ -132,7 +133,7 @@ func TestTypedTableRejectedRowsBoundedDiagnostics(t *testing.T) {
 								pdus = append(pdus, goodPDU)
 							}
 							handler := &sourceTestHandler{
-								walk: func(oid string) ([]gosnmp.SnmpPDU, error) {
+								walk: func(oid string) ([]gosnmp.VarBind, error) {
 									require.Equal(t, typedRejectionTestRoot, oid)
 									return pdus, nil
 								},
@@ -155,7 +156,7 @@ func TestTypedTableRejectedRowsBoundedDiagnostics(t *testing.T) {
 							}
 							initialLogSize := 0
 							for cycle := 0; cycle < 2; cycle++ {
-								results, err := collector.Collect()
+								results, err := collector.Collect(context.Background())
 								require.NoError(t, err)
 								require.Len(t, results, 1)
 								pm := results[0]
@@ -217,8 +218,8 @@ func TestTypedTableRejectedRowsBoundedDiagnostics(t *testing.T) {
 								}
 							}
 							// Fresh typed-row acquisition recovers without changing the profile, collector or logger.
-							pdus = []gosnmp.SnmpPDU{goodPDU}
-							results, err := collector.Collect()
+							pdus = []gosnmp.VarBind{goodPDU}
+							results, err := collector.Collect(context.Background())
 							require.NoError(t, err)
 							require.Len(t, results, 1)
 							pm := results[0]
@@ -256,7 +257,7 @@ func BenchmarkTypedTableRejectedRows(b *testing.B) {
 				tc := typedRejectionTestCases()["invalid octet"]
 				pdus := typedRejectionTestPDUs(tc, count)
 				handler := &sourceTestHandler{
-					walk: func(string) ([]gosnmp.SnmpPDU, error) { return pdus, nil },
+					walk: func(string) ([]gosnmp.VarBind, error) { return pdus, nil },
 				}
 				collector := New(
 					Config{
@@ -265,12 +266,12 @@ func BenchmarkTypedTableRejectedRows(b *testing.B) {
 						Log:        logger.NewWithWriter(io.Discard),
 					},
 				)
-				_, err := collector.Collect()
+				_, err := collector.Collect(context.Background())
 				require.NoError(b, err)
 				b.ReportAllocs()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					if _, err := collector.Collect(); err != nil {
+					if _, err := collector.Collect(context.Background()); err != nil {
 						b.Fatal(err)
 					}
 				}

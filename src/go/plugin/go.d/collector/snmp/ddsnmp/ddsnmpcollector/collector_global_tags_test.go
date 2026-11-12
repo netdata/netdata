@@ -3,10 +3,11 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
@@ -85,21 +86,19 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.2.1.1.1.0",
 					"1.3.6.1.2.1.1.6.0",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.1.1.0",
-								Type:  gosnmp.OctetString,
-								Value: []byte("Cisco IOS Software"),
+								Value: gosnmp.OctetStringValue([]byte("Cisco IOS Software")),
 							},
 							{
 								Name:  "1.3.6.1.2.1.1.6.0",
-								Type:  gosnmp.OctetString,
-								Value: []byte("DataCenter-1"),
+								Value: gosnmp.OctetStringValue([]byte("DataCenter-1")),
 							},
 						},
 					}, nil,
@@ -130,13 +129,12 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.5.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.1.5.0",
-								Type:  gosnmp.OctetString,
-								Value: []byte("router-01"),
+								Value: gosnmp.OctetStringValue([]byte("router-01")),
 							},
 						},
 					}, nil,
@@ -169,13 +167,12 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.2.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.2.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.1.2.0",
-								Type:  gosnmp.ObjectIdentifier,
-								Value: "1.3.6.1.4.1.9.1.2",
+								Value: gosnmp.ObjectIdentifierValue("1.3.6.1.4.1.9.1.2"),
 							},
 						},
 					}, nil,
@@ -206,13 +203,12 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.5.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.1.5.0",
-								Type:  gosnmp.OctetString,
-								Value: []byte("NYC-CORE-01"),
+								Value: gosnmp.OctetStringValue([]byte("NYC-CORE-01")),
 							},
 						},
 					}, nil,
@@ -240,13 +236,12 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.5.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.1.5.0",
-								Type:  gosnmp.NoSuchObject,
-								Value: nil,
+								Value: gosnmp.NoSuchObjectValue(),
 							},
 						},
 					}, nil,
@@ -270,7 +265,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.5.0"}).Return(
 					nil,
 					errors.New("SNMP timeout"),
 				)
@@ -294,13 +289,12 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.5.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.1.5.0",
-								Type:  gosnmp.OctetString,
-								Value: []byte("router-01"),
+								Value: gosnmp.OctetStringValue([]byte("router-01")),
 							},
 						},
 					}, nil,
@@ -342,30 +336,27 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 			},
 			setupMock: func(m *snmpmock.MockSession) {
 				// First chunk
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0", "1.3.6.1.2.1.1.2.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.1.0", "1.3.6.1.2.1.1.2.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.1.1.0",
-								Type:  gosnmp.OctetString,
-								Value: []byte("value1"),
+								Value: gosnmp.OctetStringValue([]byte("value1")),
 							},
 							{
 								Name:  "1.3.6.1.2.1.1.2.0",
-								Type:  gosnmp.OctetString,
-								Value: []byte("value2"),
+								Value: gosnmp.OctetStringValue([]byte("value2")),
 							},
 						},
 					}, nil,
 				)
 				// Second chunk
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.3.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.3.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
 							{
 								Name:  "1.3.6.1.2.1.1.3.0",
-								Type:  gosnmp.OctetString,
-								Value: []byte("value3"),
+								Value: gosnmp.OctetStringValue([]byte("value3")),
 							},
 						},
 					}, nil,
@@ -395,7 +386,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 			}
 			collector := newGlobalTagsCollector(mockHandler, requests, missingOIDs, logger.New())
 
-			result, err := collector.collect(tc.profile)
+			result, err := collector.collect(context.Background(), tc.profile)
 
 			if tc.expectedError {
 				assert.Error(t, err)

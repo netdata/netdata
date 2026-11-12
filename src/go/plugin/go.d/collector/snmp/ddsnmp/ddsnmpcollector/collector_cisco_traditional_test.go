@@ -3,12 +3,13 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -147,7 +148,7 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile(t *testing.T) {
 				SysObjectID: "",
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 
@@ -191,7 +192,7 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile_OmitsMalformedNonPla
 		SysObjectID: "",
 	})
 
-	rows, err := collector.collectLicenseRows(profile, &ddsnmp.CollectionStats{})
+	rows, err := collector.collectLicenseRows(context.Background(), profile, &ddsnmp.CollectionStats{})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 
@@ -225,7 +226,7 @@ type ciscoTraditionalRow struct {
 }
 
 func expectCiscoTraditionalLicensingWalk(mockHandler *snmpmock.MockSession, rows ...ciscoTraditionalRow) {
-	pdus := make([]gosnmp.SnmpPDU, 0, len(rows)*10)
+	pdus := make([]gosnmp.VarBind, 0, len(rows)*10)
 
 	for _, row := range rows {
 		idx := strconv.Itoa(row.entPhysical) + "." + strconv.Itoa(row.storeUsed) + "." + strconv.Itoa(row.index)

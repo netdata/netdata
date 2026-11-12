@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,21 +29,20 @@ func TestHuaweiProcessesRetainAllCountersThroughChartsAndFunctions(t *testing.T)
 		func(row ddprofiledefinition.BGPConfig) bool { return row.ID != "huawei-bgp-peer-statistics" },
 	)
 	const root = "1.3.6.1.4.1.2011.5.25.177.1.1.7"
-	var pdus []gosnmp.SnmpPDU
+	var pdus []gosnmp.VarBind
 	for process := 0; process < 3; process++ {
 		for column := 4; column <= 9; column++ {
 			pdus = append(
 				pdus,
-				gosnmp.SnmpPDU{
+				gosnmp.VarBind{
 					Name:  fmt.Sprintf("%s.1.%d.%d.7.4.10.0.4.1", root, column, process),
-					Type:  gosnmp.Counter32,
-					Value: uint(process*100 + column),
+					Value: gosnmp.Counter32Value(uint32(process*100 + column)),
 				},
 			)
 		}
 	}
 	handler := snmpmock.NewMockSession(gomock.NewController(t))
-	handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return(pdus, nil).AnyTimes()
+	handler.EXPECT().BulkWalkAll(gomock.Any(), root, gomock.Any()).Return(pdus, gosnmp.WalkEnd{}, nil).AnyTimes()
 
 	acquisition := ddsnmpcollector.New(
 		ddsnmpcollector.Config{
@@ -67,7 +66,7 @@ func TestHuaweiProcessesRetainAllCountersThroughChartsAndFunctions(t *testing.T)
 					},
 				)
 			}
-			pms, err := acquisition.Collect()
+			pms, err := acquisition.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, pms, 1)
 			require.NoError(t, pms[0].BGPCollectError)

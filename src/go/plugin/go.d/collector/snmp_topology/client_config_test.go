@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -18,39 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 )
 
-type topologyClientSettings struct {
-	Target         string
-	Port           uint16
-	Retries        int
-	Timeout        time.Duration
-	MaxOids        int
-	Version        gosnmp.SnmpVersion
-	Community      string
-	ContextName    string
-	SecurityModel  gosnmp.SnmpV3SecurityModel
-	MsgFlags       gosnmp.SnmpV3MsgFlags
-	SecurityParams *gosnmp.UsmSecurityParameters
-}
-
-func topologyClientSettingsOf(h gosnmp.Handler) topologyClientSettings {
-	s := topologyClientSettings{
-		Target:      h.Target(),
-		Port:        h.Port(),
-		Retries:     h.Retries(),
-		Timeout:     h.Timeout(),
-		MaxOids:     h.MaxOids(),
-		Version:     h.Version(),
-		Community:   h.Community(),
-		ContextName: h.ContextName(),
-	}
-	if s.Version == gosnmp.Version3 {
-		s.SecurityModel, s.MsgFlags = h.SecurityModel(), h.MsgFlags()
-		s.SecurityParams, _ = h.SecurityParameters().(*gosnmp.UsmSecurityParameters)
-	}
-	return s
-}
-
-func TestNewSNMPHandlerFromDeviceInfo(t *testing.T) {
+func TestSNMPClientConfigFromDeviceInfo(t *testing.T) {
 	base := ddsnmp.DeviceConnectionInfo{
 		Hostname:       "192.0.2.10",
 		Port:           1161,
@@ -64,16 +32,16 @@ func TestNewSNMPHandlerFromDeviceInfo(t *testing.T) {
 	v3.SNMPVersion = "3"
 	v3.V3User, v3.V3SecurityLevel, v3.V3ContextName = "fixture-user", "authPriv", "fixture-context"
 	v3.V3AuthProto, v3.V3AuthKey, v3.V3PrivProto, v3.V3PrivKey = "sha", "fixture-auth", "aes", "fixture-priv"
-	common := topologyClientSettings{Target: "192.0.2.10", Port: 1161, Retries: 2, Timeout: 7 * time.Second, MaxOids: 30}
+	common := gosnmp.Config{Target: "192.0.2.10", Port: 1161, Retries: 2, Timeout: 7 * time.Second, MaxOids: 30}
 
 	tests := map[string]struct {
 		dev     ddsnmp.DeviceConnectionInfo
-		want    topologyClientSettings
+		want    gosnmp.Config
 		wantErr bool
 	}{
 		"SNMPv1": {
 			dev: func() ddsnmp.DeviceConnectionInfo { d := base; d.SNMPVersion = "1"; return d }(),
-			want: func() topologyClientSettings {
+			want: func() gosnmp.Config {
 				s := common
 				s.Version, s.Community = gosnmp.Version1, "fixture-community"
 				return s
@@ -81,7 +49,7 @@ func TestNewSNMPHandlerFromDeviceInfo(t *testing.T) {
 		},
 		"SNMPv2c": {
 			dev: func() ddsnmp.DeviceConnectionInfo { d := base; d.SNMPVersion = "2c"; return d }(),
-			want: func() topologyClientSettings {
+			want: func() gosnmp.Config {
 				s := common
 				s.Version, s.Community = gosnmp.Version2c, "fixture-community"
 				return s
@@ -89,16 +57,15 @@ func TestNewSNMPHandlerFromDeviceInfo(t *testing.T) {
 		},
 		"SNMPv3": {
 			dev: v3,
-			want: func() topologyClientSettings {
+			want: func() gosnmp.Config {
 				s := common
-				s.Version, s.Community, s.ContextName = gosnmp.Version3, "public", "fixture-context"
-				s.SecurityModel, s.MsgFlags = gosnmp.UserSecurityModel, gosnmp.AuthPriv
-				s.SecurityParams = &gosnmp.UsmSecurityParameters{
-					UserName:                 "fixture-user",
-					AuthenticationProtocol:   gosnmp.SHA,
-					AuthenticationPassphrase: "fixture-auth",
-					PrivacyProtocol:          gosnmp.AES,
-					PrivacyPassphrase:        "fixture-priv",
+				s.Version, s.ContextName, s.SecurityLevel = gosnmp.Version3, "fixture-context", gosnmp.AuthPriv
+				s.User = gosnmp.User{
+					Name:           "fixture-user",
+					AuthProtocol:   gosnmp.SHA,
+					AuthPassphrase: "fixture-auth",
+					PrivProtocol:   gosnmp.AES,
+					PrivPassphrase: "fixture-priv",
 				}
 				return s
 			}(),
@@ -111,13 +78,13 @@ func TestNewSNMPHandlerFromDeviceInfo(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			h, err := newSNMPHandlerFromDeviceInfo(tc.dev)
+			cfg, err := snmpClientConfigFromDeviceInfo(tc.dev)
 			if tc.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, tc.want, topologyClientSettingsOf(h))
+			assert.Equal(t, tc.want, cfg)
 		})
 	}
 }
@@ -138,10 +105,10 @@ func TestRefreshDeviceTopologyConfiguresClientAndProfileCollector(t *testing.T) 
 	expectTopologyRefreshSNMPClient(session, dev)
 
 	coll := newTestSNMPTopologyCollector()
-	var client topologyClientSettings
-	coll.newSnmpClient = func(h gosnmp.Handler) snmputils.Session {
-		client = topologyClientSettingsOf(h)
-		return session
+	var client gosnmp.Config
+	coll.newSnmpClient = func(cfg gosnmp.Config) (snmputils.Session, error) {
+		client = cfg
+		return session, nil
 	}
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
 	var collector ddsnmpcollector.Config
@@ -152,7 +119,7 @@ func TestRefreshDeviceTopologyConfiguresClientAndProfileCollector(t *testing.T) 
 
 	_, _, _ = coll.refreshDeviceTopology(context.Background(), testTopologyAttemptID(1), dev, testTopologyTarget())
 
-	assert.Equal(t, topologyClientSettings{
+	assert.Equal(t, gosnmp.Config{
 		Target:    "192.0.2.10",
 		Port:      161,
 		MaxOids:   30,
@@ -171,7 +138,7 @@ func TestVLANContextConfiguresClientAndProfileCollector(t *testing.T) {
 		wantContextName string
 	}{
 		"SNMPv2c appends the VLAN to the community": {version: "2c", wantCommunity: "fixture-community@100"},
-		"SNMPv3 selects the VLAN context":           {version: "3", wantCommunity: "public", wantContextName: "vlan-100"},
+		"SNMPv3 selects the VLAN context":           {version: "3", wantContextName: "vlan-100"},
 	}
 
 	for name, tc := range tests {
@@ -190,14 +157,14 @@ func TestVLANContextConfiguresClientAndProfileCollector(t *testing.T) {
 				MaxRepetitions:  15,
 			}
 			session := snmpmock.NewMockSession(ctrl)
-			session.EXPECT().Connect().Return(nil)
+			session.EXPECT().Connect(gomock.Any()).Return(nil)
 			session.EXPECT().Close().Return(nil)
 
 			coll := newTestSNMPTopologyCollector()
 			var community, contextName string
-			coll.newSnmpClient = func(h gosnmp.Handler) snmputils.Session {
-				community, contextName = h.Community(), h.ContextName()
-				return session
+			coll.newSnmpClient = func(cfg gosnmp.Config) (snmputils.Session, error) {
+				community, contextName = cfg.Community, cfg.ContextName
+				return session, nil
 			}
 			var collector ddsnmpcollector.Config
 			coll.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {

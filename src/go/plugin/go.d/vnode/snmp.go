@@ -9,7 +9,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -22,22 +22,31 @@ type SNMP struct{}
 
 func (SNMP) Acquire(ctx context.Context, config vnodes.SNMPConfig) (*vnodes.Metadata, error) {
 	config = config.Defaults()
-	client := &gosnmp.GoSNMP{Target: config.Address, Port: uint16(config.Port), Timeout: config.Timeout.Duration(), Retries: *config.Retries, MaxOids: 60, Context: ctx}
-	if err := config.Config.Apply(client); err != nil {
+	clientConfig := gosnmp.Config{
+		Target:  config.Address,
+		Port:    uint16(config.Port),
+		Timeout: config.Timeout.Duration(),
+		Retries: *config.Retries,
+		MaxOids: gosnmp.MaxOids,
+	}
+	if err := config.Apply(&clientConfig); err != nil {
 		return nil, err
 	}
-	if err := client.Connect(); err != nil {
+	// Its errors name the configuration field, never a value.
+	client, err := gosnmp.NewClient(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	if err := client.Connect(ctx); err != nil {
 		return nil, errors.New("SNMP connection failed")
 	}
-	conn := client.Conn
-	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
-	defer func() { stop(); _ = conn.Close() }()
-	return acquire(client, client.Version, client.MaxOids, config.Address)
+	defer func() { _ = client.Close() }()
+	return acquire(ctx, client, clientConfig.Version, clientConfig.MaxOids, config.Address)
 }
 
 // acquire reads the identity through a client configured with version and maxOIDs.
-func acquire(client snmputils.ScalarClient, version gosnmp.SnmpVersion, maxOIDs int, address string) (*vnodes.Metadata, error) {
-	si, err := snmputils.GetSysInfo(client, version, maxOIDs)
+func acquire(ctx context.Context, client snmputils.ScalarClient, version gosnmp.Version, maxOIDs int, address string) (*vnodes.Metadata, error) {
+	si, err := snmputils.GetSysInfo(ctx, client, version, maxOIDs)
 	if err != nil {
 		return nil, errors.New("SNMP system identity acquisition failed")
 	}
@@ -48,14 +57,14 @@ func acquire(client snmputils.ScalarClient, version gosnmp.SnmpVersion, maxOIDs 
 	if !si.Probe.SeenSysName {
 		si.Name = ""
 	}
-	base, _ := ddsnmp.AcquireDeviceIdentity(si, nil, ddsnmp.DeviceIdentityOptions{Address: address})
+	base, _ := ddsnmp.AcquireDeviceIdentity(ctx, si, nil, ddsnmp.DeviceIdentityOptions{Address: address})
 	result := &vnodes.Metadata{Hostname: si.Name, Labels: base.Labels}
 	if si.SysObjectID == "" {
 		return result, nil
 	}
 	profiles := ddsnmp.DefaultCatalog().Resolve(ddsnmp.ResolveRequest{SysObjectID: si.SysObjectID, SysDescr: si.Descr}).Profiles()
 	// Acquisition reports safe phase errors; raw returned values stay out of logs.
-	meta, err := ddsnmpcollector.CollectDeviceMetadata(client, version, maxOIDs, profiles, si.SysObjectID, logger.NewWithWriter(io.Discard))
+	meta, err := ddsnmpcollector.CollectDeviceMetadata(ctx, client, version, maxOIDs, profiles, si.SysObjectID, logger.NewWithWriter(io.Discard))
 	if err != nil {
 		return result, errors.New("SNMP profile metadata acquisition failed")
 	}

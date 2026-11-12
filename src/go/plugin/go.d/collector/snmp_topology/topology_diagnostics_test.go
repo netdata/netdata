@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
@@ -63,7 +63,7 @@ func TestCollectorDiagnosticsPublishesCommittedSweepCut(t *testing.T) {
 	store.Register("job-a", dev)
 	registrationID := store.Entries()[0].RegistrationID
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
-	coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return mockHandler }
+	coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockHandler, nil }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
 	}
@@ -142,7 +142,7 @@ func TestCollectorPanicDiagnosticIdentifiesActiveDeviceRefresh(t *testing.T) {
 	coll, store := newTestSNMPTopologyCollectorWithStore()
 	store.Register("job-a", ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10"})
 	registrationID := store.Entries()[0].RegistrationID
-	coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { panic("device refresh panic") }
+	coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { panic("device refresh panic") }
 
 	require.NotPanics(t, func() { coll.refreshTopologyRecovering(context.Background()) })
 
@@ -186,7 +186,7 @@ func TestCollectorDiagnosticProjectionFailureDoesNotAffectTopologyCommit(t *test
 			store.Register("job-a", dev)
 			coll.projectTopologyDiagnosticCut = tc.projector
 			coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
-			coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return mockHandler }
+			coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockHandler, nil }
 			coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 				return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
 			}
@@ -314,7 +314,11 @@ func TestCollectorDiagnosticCheckpointOnExpiryWithoutAcquisition(t *testing.T) {
 	store.Register("job-a", dev)
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
 	calls := 0
-	coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { handler := handlers[calls]; calls++; return handler }
+	coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
+		handler := handlers[calls]
+		calls++
+		return handler, nil
+	}
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
 	}

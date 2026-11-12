@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
@@ -46,8 +46,8 @@ func TestTopologyRowWarningsAreScopedAcrossRefreshes(t *testing.T) {
 			dev := ddsnmp.DeviceConnectionInfo{Hostname: host, Port: 161, SNMPVersion: "2c"}
 			handler := snmpmock.NewMockSession(gomock.NewController(t))
 			expectTopologyRefreshSNMPClient(handler, dev)
-			handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return([]gosnmp.SnmpPDU{{Name: fmt.Sprintf("%s.1.7.8", root), Type: gosnmp.OctetString, Value: []byte("Gi0/1")}}, nil)
-			coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return handler }
+			handler.EXPECT().BulkWalkAll(gomock.Any(), root, gomock.Any()).Return([]gosnmp.VarBind{{Name: fmt.Sprintf("%s.1.7.8", root), Value: gosnmp.OctetStringValue([]byte("Gi0/1"))}}, gosnmp.WalkEnd{}, nil)
+			coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return handler, nil }
 			attempt := testTopologyAttemptID(ddsnmp.DeviceRegistrationID(i + 1))
 			attempt.Ordinal += uint64(refresh)
 			snapshot, outcome, capture := coll.refreshDeviceTopology(context.Background(), attempt, dev, testTopologyTarget())
@@ -62,9 +62,9 @@ func TestTopologyRowWarningsAreScopedAcrossRefreshes(t *testing.T) {
 			for _, vlan := range vlans {
 				handler := snmpmock.NewMockSession(gomock.NewController(t))
 				expectTopologyVLANClient(handler, dev, vlan, nil)
-				handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return([]gosnmp.SnmpPDU{{Name: fmt.Sprintf("%s.1.7.8", root), Type: gosnmp.OctetString, Value: []byte("Gi0/1")}}, nil)
+				handler.EXPECT().BulkWalkAll(gomock.Any(), root, gomock.Any()).Return([]gosnmp.VarBind{{Name: fmt.Sprintf("%s.1.7.8", root), Value: gosnmp.OctetStringValue([]byte("Gi0/1"))}}, gosnmp.WalkEnd{}, nil)
 				handler.EXPECT().Close().Return(nil)
-				coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return handler }
+				coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return handler, nil }
 				_, progress, err := collectTopologyVLANContext(context.Background(), coll, attempt.RegistrationID, dev, vlan, []*ddsnmp.Profile{profile}, nil)
 				require.NoError(t, err)
 				require.Equal(t, topologydiag.AcquisitionPhaseSuccess, progress.collection.Outcome)
