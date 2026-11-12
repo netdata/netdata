@@ -3126,7 +3126,8 @@ fn test_refresh_persistent_call_bound_winshm_attach_failure_falls_back() {
     cleanup_all(&svc);
 
     let mut listener = NpListener::bind(TEST_RUN_DIR, &svc, shm_server_config()).expect("bind");
-    let server_thread = thread::spawn(move || {
+    let (server_tx, server_rx) = std::sync::mpsc::channel();
+    thread::spawn(move || {
         let mut selected = Vec::new();
         let mut recv_buf = vec![0u8; RESPONSE_BUF_SIZE];
         for _ in 0..3 {
@@ -3136,7 +3137,7 @@ fn test_refresh_persistent_call_bound_winshm_attach_failure_falls_back() {
             selected.push(session.selected_profile);
             let _ = session.receive(&mut recv_buf);
         }
-        selected
+        let _ = server_tx.send(selected);
     });
 
     let mut client = increment_client(&svc, shm_client_config());
@@ -3173,7 +3174,9 @@ fn test_refresh_persistent_call_bound_winshm_attach_failure_falls_back() {
 
     client.close();
     assert_eq!(
-        server_thread.join().expect("server join"),
+        server_rx
+            .recv_timeout(server::TEST_WAIT_LIMIT)
+            .expect("session server finished"),
         vec![PROFILE_SHM_HYBRID, PROFILE_SHM_HYBRID, PROFILE_BASELINE]
     );
     cleanup_all(&svc);

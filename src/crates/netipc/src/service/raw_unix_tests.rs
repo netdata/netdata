@@ -3232,7 +3232,11 @@ fn test_refresh_shm_attach_failure_falls_back_to_baseline() {
 /// Accepts `n` sessions on `listener`, one after the other, serves each
 /// until the client closes it, and returns their selected profiles.
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-fn serve_sessions_until_closed(listener: UdsListener, n: usize) -> thread::JoinHandle<Vec<u32>> {
+fn serve_sessions_until_closed(
+    listener: UdsListener,
+    n: usize,
+) -> std::sync::mpsc::Receiver<Vec<u32>> {
+    let (tx, rx) = std::sync::mpsc::channel();
     thread::spawn(move || {
         let mut selected = Vec::new();
         let mut recv_buf = vec![0u8; RESPONSE_BUF_SIZE];
@@ -3243,8 +3247,9 @@ fn serve_sessions_until_closed(listener: UdsListener, n: usize) -> thread::JoinH
             selected.push(session.selected_profile);
             let _ = session.receive(&mut recv_buf);
         }
-        selected
-    })
+        let _ = tx.send(selected);
+    });
+    rx
 }
 
 /// A region that never becomes attachable, with a call timeout below the
@@ -3296,7 +3301,9 @@ fn test_refresh_persistent_call_bound_attach_failure_falls_back() {
 
     client.close();
     assert_eq!(
-        server.join().expect("server join"),
+        server
+            .recv_timeout(server::TEST_WAIT_LIMIT)
+            .expect("session server finished"),
         vec![PROFILE_SHM_FUTEX, PROFILE_SHM_FUTEX, PROFILE_BASELINE]
     );
     cleanup_all(svc);
@@ -3337,7 +3344,9 @@ fn test_refresh_permanent_attach_error_falls_back_at_once() {
 
     client.close();
     assert_eq!(
-        server.join().expect("server join"),
+        server
+            .recv_timeout(server::TEST_WAIT_LIMIT)
+            .expect("session server finished"),
         vec![PROFILE_SHM_FUTEX, PROFILE_BASELINE]
     );
     let _ = std::fs::remove_file(&region_path);

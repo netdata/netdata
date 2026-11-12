@@ -151,21 +151,22 @@ nipc_client_state_t nipc_service_win_client_try_connect(nipc_client_ctx_t *ctx)
                     serr != NIPC_WIN_SHM_ERR_OPEN_EVENT &&
                     serr != NIPC_WIN_SHM_ERR_BAD_MAGIC)
                     break;
-                if (GetTickCount64() >= deadline_ms) {
-                    keep_shm = call_bound &&
-                               (nipc_service_win_peer_disconnected(&session) ||
-                                ++ctx->shm_call_bound_failures <
-                                    CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT);
-                    break;
-                }
                 if (nipc_service_common_client_abort_requested(ctx)) {
                     keep_shm = true;
                     break;
                 }
                 /* A server that refused or died breaks the session pipe;
-                 * waiting for its SHM objects would only burn the timeout. */
+                 * waiting for its SHM objects would only burn the timeout.
+                 * Checked before the deadline, so a peer gone at either
+                 * deadline is never taken for a WinSHM failure. */
                 if (nipc_service_win_peer_disconnected(&session)) {
                     keep_shm = true;
+                    break;
+                }
+                if (GetTickCount64() >= deadline_ms) {
+                    keep_shm = call_bound &&
+                               ++ctx->shm_call_bound_failures <
+                                   CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT;
                     break;
                 }
                 Sleep(CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS);

@@ -64,13 +64,19 @@ impl RawClient {
                                 Err(
                                     ShmError::NotReady | ShmError::Open(_) | ShmError::BadMagic,
                                 ) => {
+                                    if self.abort_requested() {
+                                        return ClientState::Disconnected;
+                                    }
+                                    // A server that refused or died closes the
+                                    // session socket; its SHM region will never
+                                    // appear. Not an SHM problem: keep SHM enabled.
+                                    // Checked before the deadline, so a peer gone
+                                    // at either deadline is never an SHM failure.
+                                    if super::server_session_unix::peer_disconnected(session.fd()) {
+                                        return ClientState::Disconnected;
+                                    }
                                     if std::time::Instant::now() >= deadline {
                                         if call_bound {
-                                            if super::server_session_unix::peer_disconnected(
-                                                session.fd(),
-                                            ) {
-                                                return ClientState::Disconnected;
-                                            }
                                             self.shm_call_bound_failures += 1;
                                             if self.shm_call_bound_failures
                                                 < CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT
@@ -79,15 +85,6 @@ impl RawClient {
                                             }
                                         }
                                         break;
-                                    }
-                                    if self.abort_requested() {
-                                        return ClientState::Disconnected;
-                                    }
-                                    // A server that refused or died closes the
-                                    // session socket; its SHM region will never
-                                    // appear. Not an SHM problem: keep SHM enabled.
-                                    if super::server_session_unix::peer_disconnected(session.fd()) {
-                                        return ClientState::Disconnected;
                                     }
                                     std::thread::sleep(std::time::Duration::from_millis(
                                         CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS,

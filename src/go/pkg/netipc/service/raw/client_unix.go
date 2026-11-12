@@ -134,20 +134,6 @@ func (c *Client) tryConnect() ClientState {
 				!errors.Is(serr, posix.ErrShmBadMagic) {
 				break
 			}
-			if !time.Now().Before(deadline) {
-				if callBound {
-					if peerDisconnected(session.Fd()) {
-						session.Close()
-						return StateDisconnected
-					}
-					c.shmCallBoundFailures++
-					if c.shmCallBoundFailures < clientShmCallBoundFailureLimit {
-						session.Close()
-						return StateDisconnected
-					}
-				}
-				break
-			}
 			if c.abortRequested.Load() {
 				session.Close()
 				return StateDisconnected
@@ -155,9 +141,21 @@ func (c *Client) tryConnect() ClientState {
 			// A server that refused or died closes the session socket; its
 			// SHM region will never appear. Not an SHM problem: keep SHM
 			// enabled for the next connect.
+			// Checked before the deadline, so a peer gone at either deadline
+			// is never taken for an SHM failure.
 			if peerDisconnected(session.Fd()) {
 				session.Close()
 				return StateDisconnected
+			}
+			if !time.Now().Before(deadline) {
+				if callBound {
+					c.shmCallBoundFailures++
+					if c.shmCallBoundFailures < clientShmCallBoundFailureLimit {
+						session.Close()
+						return StateDisconnected
+					}
+				}
+				break
 			}
 			time.Sleep(clientShmAttachRetryInterval)
 		}

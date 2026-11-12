@@ -145,21 +145,22 @@ nipc_client_state_t nipc_service_posix_client_try_connect(nipc_client_ctx_t *ctx
                     serr != NIPC_SHM_ERR_OPEN &&
                     serr != NIPC_SHM_ERR_BAD_MAGIC)
                     break;
-                if (nipc_service_platform_monotonic_ms() >= deadline_ms) {
-                    keep_shm = call_bound &&
-                               (nipc_service_posix_peer_disconnected(session.fd) ||
-                                ++ctx->shm_call_bound_failures <
-                                    CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT);
-                    break;
-                }
                 if (nipc_service_common_client_abort_requested(ctx)) {
                     keep_shm = true;
                     break;
                 }
                 /* A server that refused or died closes the session socket;
-                 * waiting for its SHM region would only burn the timeout. */
+                 * waiting for its SHM region would only burn the timeout.
+                 * Checked before the deadline, so a peer gone at either
+                 * deadline is never taken for an SHM failure. */
                 if (nipc_service_posix_peer_disconnected(session.fd)) {
                     keep_shm = true;
+                    break;
+                }
+                if (nipc_service_platform_monotonic_ms() >= deadline_ms) {
+                    keep_shm = call_bound &&
+                               ++ctx->shm_call_bound_failures <
+                                   CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT;
                     break;
                 }
                 nipc_service_posix_sleep_us(CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS * 1000u);

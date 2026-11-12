@@ -177,7 +177,7 @@ func TestWinShmPersistentCallBoundAttachFailureFallsBack(t *testing.T) {
 	client.Close()
 
 	want := []uint32{protocol.ProfileSHMHybrid, protocol.ProfileSHMHybrid, protocol.ProfileBaseline}
-	got := <-doneCh
+	got := recvWithin(t, doneCh, "session server")
 	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
 		t.Fatalf("server selected profiles = %#x, want %#x", got, want)
 	}
@@ -266,7 +266,7 @@ func TestWinShmAttachFailureFallsBackToBaseline(t *testing.T) {
 
 	client.Close()
 
-	result := <-doneCh
+	result := recvWithin(t, doneCh, "attach-failure server")
 	if result.err != nil {
 		t.Fatalf("attach-failure fallback server failed: %v", result.err)
 	}

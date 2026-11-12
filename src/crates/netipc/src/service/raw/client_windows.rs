@@ -59,13 +59,19 @@ impl RawClient {
                                 | WinShmError::OpenEvent(_)
                                 | WinShmError::BadMagic,
                             ) => {
+                                if self.abort_requested() {
+                                    return ClientState::Disconnected;
+                                }
+                                // A server that refused or died breaks the
+                                // session pipe; its SHM objects will never
+                                // appear. Not a WinSHM problem: keep it enabled.
+                                // Checked before the deadline, so a peer gone
+                                // at either deadline is never a WinSHM failure.
+                                if super::server_session_windows::peer_disconnected(&session) {
+                                    return ClientState::Disconnected;
+                                }
                                 if std::time::Instant::now() >= deadline {
                                     if call_bound {
-                                        if super::server_session_windows::peer_disconnected(
-                                            &session,
-                                        ) {
-                                            return ClientState::Disconnected;
-                                        }
                                         self.shm_call_bound_failures += 1;
                                         if self.shm_call_bound_failures
                                             < CLIENT_SHM_CALL_BOUND_FAILURE_LIMIT
@@ -74,15 +80,6 @@ impl RawClient {
                                         }
                                     }
                                     break;
-                                }
-                                if self.abort_requested() {
-                                    return ClientState::Disconnected;
-                                }
-                                // A server that refused or died breaks the
-                                // session pipe; its SHM objects will never
-                                // appear. Not a WinSHM problem: keep it enabled.
-                                if super::server_session_windows::peer_disconnected(&session) {
-                                    return ClientState::Disconnected;
                                 }
                                 std::thread::sleep(std::time::Duration::from_millis(
                                     CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS,

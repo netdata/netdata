@@ -132,20 +132,6 @@ func (c *Client) tryConnect() ClientState {
 				!errors.Is(serr, windows.ErrWinShmBadMagic) {
 				break
 			}
-			if !time.Now().Before(deadline) {
-				if callBound {
-					if pipePeerDisconnected(session) {
-						session.Close()
-						return StateDisconnected
-					}
-					c.shmCallBoundFailures++
-					if c.shmCallBoundFailures < clientShmCallBoundFailureLimit {
-						session.Close()
-						return StateDisconnected
-					}
-				}
-				break
-			}
 			if c.abortRequested.Load() {
 				session.Close()
 				return StateDisconnected
@@ -153,9 +139,21 @@ func (c *Client) tryConnect() ClientState {
 			// A server that refused or died breaks the session pipe; its
 			// SHM objects will never appear. Not a WinSHM problem: keep it
 			// enabled for the next connect.
+			// Checked before the deadline, so a peer gone at either deadline
+			// is never taken for a WinSHM failure.
 			if pipePeerDisconnected(session) {
 				session.Close()
 				return StateDisconnected
+			}
+			if !time.Now().Before(deadline) {
+				if callBound {
+					c.shmCallBoundFailures++
+					if c.shmCallBoundFailures < clientShmCallBoundFailureLimit {
+						session.Close()
+						return StateDisconnected
+					}
+				}
+				break
 			}
 			time.Sleep(clientShmAttachRetryInterval)
 		}

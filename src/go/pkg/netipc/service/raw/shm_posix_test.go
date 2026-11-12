@@ -181,7 +181,7 @@ func TestUnixShmAttachFailureFallsBackToBaseline(t *testing.T) {
 
 	client.Close()
 
-	result := <-doneCh
+	result := recvWithin(t, doneCh, "attach-failure server")
 	if result.err != nil {
 		t.Fatalf("attach-failure fallback server failed: %v", result.err)
 	}
@@ -256,7 +256,7 @@ func TestUnixShmPersistentCallBoundAttachFailureFallsBack(t *testing.T) {
 	client.Close()
 
 	want := []uint32{protocol.ProfileSHMHybrid, protocol.ProfileSHMHybrid, protocol.ProfileBaseline}
-	if got := <-doneCh; !slices.Equal(got, want) {
+	if got := recvWithin(t, doneCh, "session server"); !slices.Equal(got, want) {
 		t.Fatalf("server selected profiles = %#x, want %#x", got, want)
 	}
 }
@@ -298,7 +298,7 @@ func TestUnixShmPermanentAttachErrorFallsBackAtOnce(t *testing.T) {
 	client.Close()
 
 	want := []uint32{protocol.ProfileSHMHybrid, protocol.ProfileBaseline}
-	if got := <-doneCh; !slices.Equal(got, want) {
+	if got := recvWithin(t, doneCh, "session server"); !slices.Equal(got, want) {
 		t.Fatalf("server selected profiles = %#x, want %#x", got, want)
 	}
 }
@@ -347,7 +347,7 @@ func TestUnixDoRawCallShmRejectsBadMessageID(t *testing.T) {
 		t.Fatalf("doRawCall bad SHM message_id = %v, want %v", err, protocol.ErrBadLayout)
 	}
 
-	if err := <-serverDone; err != nil {
+	if err := recvWithin(t, serverDone, "raw SHM server"); err != nil {
 		t.Fatalf("raw POSIX SHM server failed: %v", err)
 	}
 }
@@ -405,7 +405,7 @@ func TestUnixCallIncrementBatchShmRejectsBadMessageID(t *testing.T) {
 		t.Fatalf("CallIncrementBatch bad SHM message_id = %v, want %v", err, protocol.ErrBadLayout)
 	}
 
-	if err := <-serverDone; err != nil {
+	if err := recvWithin(t, serverDone, "raw SHM server"); err != nil {
 		t.Fatalf("raw POSIX SHM server failed: %v", err)
 	}
 }
@@ -444,7 +444,7 @@ func TestUnixCallIncrementBatchShmRejectsMalformedPayload(t *testing.T) {
 		t.Fatalf("CallIncrementBatch malformed SHM payload = %v, want %v", err, protocol.ErrTruncated)
 	}
 
-	if err := <-serverDone; err != nil {
+	if err := recvWithin(t, serverDone, "raw SHM server"); err != nil {
 		t.Fatalf("raw POSIX SHM server failed: %v", err)
 	}
 }

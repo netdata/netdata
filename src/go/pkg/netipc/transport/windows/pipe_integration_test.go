@@ -141,7 +141,7 @@ func TestPipeSingleClientPingPong(t *testing.T) {
 
 // A profile bit Windows does not implement, offered and preferred by both
 // peers, is never selected: they would otherwise run the pipe under that
-// label. 0x08 is assigned on POSIX only.
+// label. 0x08 (SHM_WAITADDR) is reserved and no transport implements it.
 func TestPipeUnassignedProfileBitNotSelected(t *testing.T) {
 	service := uniquePipeService(t)
 	const unassigned = protocol.ProfileSHMWaitAddr
