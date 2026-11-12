@@ -268,7 +268,9 @@ pub async fn reconcile_remote_uploads<S: Storage>(
 /// catalog names them. An SFST that is not local any more
 /// has its only copy on the old remote; it cannot be lost here, so it does
 /// not hold the catalog back: at a later start, when the local ones are on
-/// the new remote, the old catalog is uploaded too.
+/// the new remote, the old catalog is uploaded too (unless a new catalog
+/// with the same name replaced it meanwhile: the catalog builder's
+/// `rotate_scope`).
 ///
 /// Strategy: per-catalog `stat()` beats a LIST + symmetric-diff when the
 /// local catalog count is small (≤ retention_days × rotations_per_day) and

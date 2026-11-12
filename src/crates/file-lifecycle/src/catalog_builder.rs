@@ -1,8 +1,10 @@
 //! The catalog builder component: accumulates `otel_catalog::CatalogEntry`
 //! rows in memory per `(tenant, date, machine, instance)` scope — each catalog
 //! file is single-identity by construction because the scope key carries the
-//! machine and instance — and rotates a scope to an immutable catalog file on
-//! the first of three triggers: `rotation_count` entries accumulated,
+//! machine and instance — and rotates a scope to a catalog file (written
+//! whole and never changed in place; a rotation that gives the name of an
+//! existing file replaces it, see `rotate_scope`) on the first of three
+//! triggers: `rotation_count` entries accumulated,
 //! `rotation_period` elapsed since the accumulator was created, or an explicit
 //! `Flush` (clean shutdown).
 //!
@@ -287,6 +289,8 @@ async fn rotate_scope(
     // recovery and the upload of the catalog take each entry as such, and a
     // confirmed entry lets retention delete the local index file. The
     // entries of the older file are not carried over: nothing confirms them.
+    // One of them whose index file is local and on the remote is held back
+    // from retention until the next start, which catalogs it again.
     if let Err(e) = write_local_atomic(&path, bytes).await {
         tracing::error!(
             tenant = %tenant_id,

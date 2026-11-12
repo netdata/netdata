@@ -186,6 +186,40 @@ async fn rotation_fires_at_threshold_and_writes_file() {
 }
 
 #[tokio::test]
+async fn a_rotation_onto_a_file_with_the_same_name_writes_only_its_own_entries() {
+    // A first rotation writes the entries 1, 2 and 3. Then 2 and 3 come
+    // again (their uploads were taken back at a start, after a move to
+    // another bucket) and are flushed: the same largest seq and the same
+    // times make the same file name.
+    let mut h = Harness::new(3);
+    h.send_recv(add_request(1)).await;
+    h.send_recv(add_request(2)).await;
+    let CatalogBuilderResponse::Rotated { path: first, .. } = h.send_recv(add_request(3)).await
+    else {
+        panic!("expected the first rotation");
+    };
+
+    h.send_recv(add_request(2)).await;
+    h.send_recv(add_request(3)).await;
+    let CatalogBuilderResponse::Rotated { path, mut seqs, .. } =
+        h.send_recv(CatalogBuilderRequest::Flush).await
+    else {
+        panic!("expected the second rotation");
+    };
+
+    // Entry 1 is not carried over: nothing confirms its upload to the
+    // current remote, and an entry of a catalog file lets retention delete
+    // the local index file once the catalog is uploaded.
+    assert_eq!(path, first);
+    let catalog = Catalog::from_container_bytes(&std::fs::read(&path).unwrap()).unwrap();
+    let mut in_file: Vec<u64> = catalog.entries.keys().map(|id| id.seq).collect();
+    in_file.sort();
+    assert_eq!(in_file, [2, 3]);
+    seqs.sort();
+    assert_eq!(seqs, [2, 3]);
+}
+
+#[tokio::test]
 async fn accumulator_is_drained_on_rotation() {
     let mut h = Harness::new(2);
     assert!(matches!(

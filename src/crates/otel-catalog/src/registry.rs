@@ -145,7 +145,8 @@ pub struct Registry {
     tenant_id: TenantId,
     /// Keyed by on-disk path. The path encodes the file's full
     /// `(date, machine, instance, max_seq, min_ts, max_ts)` identity, and
-    /// catalog files are immutable — a file's tracked key never changes.
+    /// a catalog file is never changed in place (a rotation writes a whole
+    /// file) — a file's tracked key never changes.
     files: BTreeMap<PathBuf, File>,
 }
 

@@ -341,9 +341,10 @@ impl SignalConfig {
     ///
     /// The line between the ingest window and the retention age is a little
     /// generous: a record just inside both can be over the age when its file
-    /// is indexed. The catalog `horizon` needs no check of its own: the load requires it
-    /// to be longer than the retention `max_age` ([`RetentionPolicy::validate`]),
-    /// so an ingest window that reaches it is longer than `max_age` too.
+    /// is indexed. The catalog `horizon` needs no check of its own: the load
+    /// requires it to be longer than the retention `max_age`
+    /// ([`RetentionPolicy::validate`]), so an ingest window that reaches it
+    /// is longer than `max_age` too.
     fn harmful_values(&self, signal: &str, found: &mut Vec<String>) {
         let format = humantime_serde::re::humantime::format_duration;
 
