@@ -125,8 +125,8 @@ logs:
     # Incoming logs are appended to a current file; a new file starts when
     # any of these limits is reached. The "default" entry applies to every
     # tenant without its own entry below.
-    # Do not set a limit to 0: every export request then makes a file of
-    # its own.
+    # Do not set a limit to 0: every export request then makes new files
+    # of its own.
     default:
       max_file_size: "25MB"
       max_entries: 50000
@@ -153,8 +153,8 @@ traces:
     # Incoming spans are appended to a current file; a new file starts when
     # any of these limits is reached. The "default" entry applies to every
     # tenant without its own entry below.
-    # Do not set a limit to 0: every export request then makes a file of
-    # its own.
+    # Do not set a limit to 0: every export request then makes new files
+    # of its own.
     default:
       max_file_size: "25MB"
       max_entries: 50000

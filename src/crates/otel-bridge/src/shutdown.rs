@@ -10,7 +10,7 @@
 //!    output first, there is no `QUIT`: the supervisor sees its input end.)
 //! 2. `spawn_popen_kill` closes the plugin's pipes and waits up to
 //!    [`AGENT_EXIT_WAIT`] for the plugin to leave by itself. Then it sends
-//!    SIGTERM, and 2 seconds later SIGKILL.
+//!    SIGTERM, and SIGKILL when the plugin is still there 2 seconds later.
 //! 3. When the agent itself shuts down, it cancels the thread that does
 //!    these waits at a later step of its own shutdown. From that moment no
 //!    wait is left: SIGTERM and SIGKILL follow at once.
@@ -22,7 +22,8 @@
 //! workers then leave at once (`otel-plugin/src/lifeline.rs`).
 //!
 //! The plugin's own budgets are upper bounds for a worker that hangs, not
-//! times that a stop needs: a stop takes milliseconds.
+//! times that a stop needs: in by-hand runs of an idle plugin the
+//! supervisor was gone in less than 10 milliseconds.
 //!
 //! - On `QUIT` the supervisor sends `Shutdown` to every worker and waits
 //!   [`WORKERS_EXIT_WAIT`] for all of them together. A worker that is still

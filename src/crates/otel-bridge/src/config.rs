@@ -115,7 +115,7 @@ impl PluginConfig {
             );
         }
         for (signal, config) in [("logs", &self.logs), ("traces", &self.traces)] {
-            config.harmful_values(signal, self.remote_storage.enabled, &mut found);
+            config.harmful_values(signal, &mut found);
         }
 
         found
@@ -338,7 +338,11 @@ fn default_derived_metrics_max_services() -> usize {
 impl SignalConfig {
     /// This signal's part of [`PluginConfig::harmful_values`], for the
     /// `default` entry and for every tenant that has an entry of its own.
-    fn harmful_values(&self, signal: &str, remote_storage: bool, found: &mut Vec<String>) {
+    ///
+    /// The catalog `horizon` needs no check of its own: the load requires it
+    /// to be longer than the retention `max_age` ([`RetentionPolicy::validate`]),
+    /// so an ingest window that reaches it is longer than `max_age` too.
+    fn harmful_values(&self, signal: &str, found: &mut Vec<String>) {
         let format = humantime_serde::re::humantime::format_duration;
 
         let mut tenants: Vec<&str> = self.rotation.tenants.keys().map(String::as_str).collect();
@@ -358,8 +362,8 @@ impl SignalConfig {
             }
             for key in zero {
                 found.push(format!(
-                    "{signal}.rotation.{tenant}.{key} is 0: every export request makes a file of \
-                     its own and an indexing operation of its own"
+                    "{signal}.rotation.{tenant}.{key} is 0: every export request makes new files \
+                     and indexing operations of its own"
                 ));
             }
         }
@@ -373,18 +377,9 @@ impl SignalConfig {
                 found.push(format!(
                     "{signal}.ingest.max_age ({}) is longer than {signal}.retention.{tenant}.max_age \
                      ({}): a record older than the retention age is accepted, indexed, and then \
-                     deleted at once",
+                     deleted by the next retention pass",
                     format(self.ingest.max_age),
                     format(retention.max_age),
-                ));
-            }
-            if remote_storage && self.ingest.max_age >= retention.horizon {
-                found.push(format!(
-                    "{signal}.ingest.max_age ({}) is not shorter than \
-                     {signal}.retention.{tenant}.horizon ({}): the catalog of records that old can \
-                     be deleted before it is uploaded",
-                    format(self.ingest.max_age),
-                    format(retention.horizon),
                 ));
             }
         }
@@ -1148,7 +1143,8 @@ traces:
         );
         config.logs.rotation.apply_overrides(&rotation);
         config.logs.ingest.max_age = Duration::from_secs(8 * 86_400);
-        // Traces: an ingest window that reaches the catalog horizon.
+        // Traces: an ingest window that reaches the catalog horizon is
+        // longer than the retention age too, and is reported as that.
         config.traces.ingest.max_age = config.traces.retention.resolve("default").horizon;
 
         let found = config.harmful_values();
@@ -1164,24 +1160,10 @@ traces:
                 "logs.rotation.acme.max_entries",
                 "logs.ingest.max_age",
                 "traces.ingest.max_age",
-                "traces.ingest.max_age",
             ]
         );
         assert!(found[2].contains("logs.retention.default.max_age (7days)"));
         assert!(found[3].contains("traces.retention.default.max_age"));
-        assert!(found[4].contains("traces.retention.default.horizon"));
-    }
-
-    #[test]
-    fn the_catalog_horizon_is_not_judged_without_remote_storage() {
-        let mut config = full_config();
-        config.remote_storage.enabled = false;
-        config.traces.ingest.max_age = config.traces.retention.resolve("default").horizon;
-
-        let found = config.harmful_values();
-
-        assert_eq!(found.len(), 1);
-        assert!(found[0].contains("traces.retention.default.max_age"));
     }
 
     #[test]
