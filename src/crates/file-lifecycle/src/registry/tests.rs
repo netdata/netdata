@@ -46,7 +46,8 @@
 //! side of `query_snapshot` (SFST-wins dedup and the `valid_up_to == 0`
 //! exclusion — only tenant scoping is pinned above), `orphaned_wal_ids`, and
 //! the zero-means-unknown bound handling in `PartitionStat::add`.
-//! `holds_seq` and `unindexed_ids` are pinned by recovery/tests.rs;
+//! `unindexed_ids` (with `orphaned_wal_ids`) is pinned below; `holds_seq` by
+//! recovery/tests.rs;
 //! `local_servable_seqs` and the selector's remote half (`with_catalog`
 //! over real catalog entries) by query/tests.rs.
 use super::*;
@@ -91,6 +92,59 @@ fn unuploaded_ids_excludes_uploaded_seqs() {
 
     let unuploaded: Vec<u64> = reg.unuploaded_ids().iter().map(|id| id.seq).collect();
     assert_eq!(unuploaded, vec![1]);
+}
+
+/// Track `seq` as a WAL file: `Created`, then `Closed` unless `active`.
+fn track_wal(reg: &mut Registry, seq: u64, active: bool) -> FileId {
+    use file_registry::TimestampNs;
+    let file_id = FileId::new(ident(), 0, seq, 0);
+    reg.wal
+        .apply_event(&wal::FileEvent::Created {
+            file_id,
+            created_at_ns: TimestampNs(1),
+            content_meta: Vec::new(),
+        })
+        .unwrap();
+    if !active {
+        reg.wal
+            .apply_event(&wal::FileEvent::Closed {
+                file_id,
+                frame_count: 1,
+                min_timestamp_ns: TimestampNs(1),
+                max_timestamp_ns: TimestampNs(1),
+                size: ByteSize(4096),
+                valid_up_to: ByteSize(4096),
+                entry_count: 1,
+            })
+            .unwrap();
+    }
+    file_id
+}
+
+/// The startup backlog the ledger queues on the indexer: archived WALs with no
+/// SFST. An indexed archived WAL is an orphan for deletion instead, and the
+/// active WAL is still being written, so neither is returned.
+#[test]
+fn unindexed_ids_lists_only_archived_wals_without_an_index() {
+    let mut reg = make_registry();
+    let unindexed = track_wal(&mut reg, 1, false);
+    let indexed = track_wal(&mut reg, 2, false);
+    reg.sfst.track(indexed, ByteSize(1), empty_summary());
+    track_wal(&mut reg, 3, true);
+
+    assert_eq!(reg.unindexed_ids(), vec![unindexed]);
+    assert_eq!(reg.orphaned_wal_ids(), vec![indexed]);
+}
+
+#[test]
+fn unindexed_ids_is_empty_without_archived_wals() {
+    let mut reg = make_registry();
+    assert!(reg.unindexed_ids().is_empty());
+    track_wal(&mut reg, 1, true);
+    assert!(
+        reg.unindexed_ids().is_empty(),
+        "an active WAL is not backlog"
+    );
 }
 
 #[test]

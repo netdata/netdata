@@ -3784,6 +3784,7 @@ dependencies = [
  "ferryboat",
  "file-registry",
  "humantime",
+ "libc",
  "netdata-plugin-protocol",
  "netdata-plugin-types",
  "otel-ingestor",
