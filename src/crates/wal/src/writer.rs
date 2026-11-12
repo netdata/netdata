@@ -104,7 +104,7 @@ struct ActiveFile {
     /// these — not the live `bytes_written` / `log_entry_count` — so a
     /// sealed file's authoritative prefix never includes bytes past the last
     /// fsync; that differs from the live values when the file is closed
-    /// with no sync before it: on `Drop`, and after a failed write or fsync.
+    /// with no sync before it: after a failed write or fsync.
     synced_up_to: ByteSize,
     synced_entry_count: u64,
 }
@@ -247,8 +247,7 @@ impl Stream {
     /// (header page included).
     fn write_frame(&mut self, data: &[u8], meta: FrameMeta) -> Result<u64> {
         if self.should_rotate_with(meta.entry_count as u64, meta.ingestion_ns) {
-            self.sync()?;
-            self.close_active_file();
+            self.seal()?;
         }
 
         self.ensure_file()?;
@@ -324,10 +323,20 @@ impl Stream {
         Ok(frame_offset)
     }
 
+    /// Close the active file (if any) the one way a healthy file is closed:
+    /// fsync it, then queue its `Closed`, which carries the durable prefix.
+    /// No `Synced` comes before it: the `Closed` says the same. The
+    /// rotation on the write path, the idle sweep and a shutdown all end a
+    /// file here; only a file whose write or fsync failed ends another way
+    /// ([`Self::abandon_active_file`]).
+    fn seal(&mut self) -> Result<()> {
+        self.sync_data()?;
+        self.close_active_file();
+        Ok(())
+    }
+
     /// Flush and fsync the active file, recording the now-durable prefix on
-    /// it. Emits no `Synced` event: the rotation paths use this and then
-    /// seal, relying on the authoritative `Closed` (which carries the
-    /// prefix) instead of a redundant `Synced` on an already-synced file.
+    /// it. Emits no event: [`Self::seal`] and [`Self::sync`] do.
     fn sync_data(&mut self) -> Result<()> {
         if let Some(active) = &mut self.active {
             let synced = match active.writer.flush() {
@@ -340,8 +349,9 @@ impl Stream {
             }
 
             // The just-fsynced prefix is now durable; remember it so a later
-            // `Closed` (which may not be preceded by a fresh sync on the `Drop`
-            // path) reports the durable value, not unsynced tail bytes.
+            // `Closed` with no fresh sync before it (a file abandoned after a
+            // failed write or fsync) reports the durable value, not unsynced
+            // tail bytes.
             active.synced_up_to = active.bytes_written;
             active.synced_entry_count = active.log_entry_count;
         }
@@ -423,8 +433,7 @@ impl Stream {
     }
 
     fn shutdown(&mut self) -> Result<Vec<FileEvent>> {
-        self.sync()?;
-        self.close_active_file();
+        self.seal()?;
         Ok(self.take_events())
     }
 
@@ -545,9 +554,9 @@ impl Stream {
         false
     }
 
-    /// Seal the active file (if any) and queue its `Closed` event — the
-    /// file's final state, with the durable prefix rather than the live
-    /// counters.
+    /// Take the active file (if any) out of the stream and queue its
+    /// `Closed` event — the file's final state, with the durable prefix
+    /// rather than the live counters. [`Self::seal`] is the caller.
     fn close_active_file(&mut self) {
         if let Some(active) = self.active.take() {
             self.pending_events.push(active.closed_event());
@@ -590,15 +599,12 @@ impl Stream {
     /// and the size arm also seals a file whose last write pushed it over
     /// `max_file_size` with no further write to rotate it (write-path
     /// rotation is checked only at the next `write_frame`). A stream with no
-    /// active file is a no-op (never creates a file). Fsyncs via `sync_data`
-    /// but emits no `Synced`: the `Closed` it queues carries the durable
-    /// prefix, so a redundant `Synced` is not sent.
+    /// active file is a no-op (never creates a file).
     fn rotate_if_expired(&mut self, now_ns: TimestampNs) -> Result<bool> {
         if self.active.is_none() || !self.should_rotate_with(0, now_ns) {
             return Ok(false);
         }
-        self.sync_data()?;
-        self.close_active_file();
+        self.seal()?;
         Ok(true)
     }
 }
@@ -650,14 +656,6 @@ fn fsync(file: &File) -> Result<()> {
 
 /// Local alias for [`FRAME_HEADER_SIZE`] used in the frame-size math below.
 const FRAME_ALIGNMENT_HEADER: usize = FRAME_HEADER_SIZE;
-
-impl Drop for Stream {
-    fn drop(&mut self) {
-        // No final sync here: the `Closed` this queues carries the durable
-        // prefix (`synced_up_to`), not the unsynced tail — see `ActiveFile`.
-        self.close_active_file();
-    }
-}
 
 impl Config {
     /// The only compression this writer emits is LZ4, so `Config`'s
@@ -1266,6 +1264,36 @@ mod tests {
             wal_name.starts_with(&format!("{machine_hex}-{instance_hex}-")),
             "filename {wal_name} must start with the passed identity pair"
         );
+    }
+
+    #[test]
+    fn a_rotation_on_the_write_path_closes_its_file_with_a_closed_event_only() {
+        // The default `max_entries` is 100,000: the second frame does not
+        // fit the first file.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut writer = test_writer(tmp.path());
+        let meta = |entry_count, ns| crate::FrameMeta {
+            entry_count,
+            ingestion_ns: TimestampNs(ns),
+            log_ts_range: None,
+        };
+        writer
+            .write_frame(pk(1), &[], b"full", meta(100_000, 1))
+            .unwrap();
+        let _ = writer.take_all_events();
+
+        writer.write_frame(pk(1), &[], b"next", meta(1, 2)).unwrap();
+
+        // The old file: fsynced, then one `Closed` whose durable prefix is
+        // the whole file, and no `Synced` before it. Then the new file.
+        let events = writer.take_all_events();
+        assert!(matches!(
+            events.as_slice(),
+            [
+                FileEvent::Closed { size, valid_up_to, entry_count: 100_000, .. },
+                FileEvent::Created { .. },
+            ] if size == valid_up_to
+        ));
     }
 
     #[test]
