@@ -364,11 +364,12 @@ impl Stream {
     /// writer's. The kernel reports a failed write-back once for each open
     /// of a file (Linux 4.13 and later: the `errseq_t` of the file's
     /// mapping, with one position for each open; an older kernel reports it
-    /// once for the file, and there this open changes nothing). The round fsyncs without the lock, so a
-    /// rotation or the idle sweep can fsync the same file through the
-    /// writer's handle meanwhile. With two opens each of them learns of a
-    /// failure; a duplicate would share the writer's position, and only the
-    /// first of the two to ask would learn of it.
+    /// once for the file, and there this open changes nothing). The round
+    /// fsyncs without the lock, so a rotation or the idle sweep can fsync
+    /// the same file through the writer's handle meanwhile. With two opens
+    /// each of them learns of a failure; a duplicate would share the
+    /// writer's position, and only the first of the two to ask would learn
+    /// of it.
     fn begin_sync(&mut self) -> Result<Option<FileSync>> {
         let Some(active) = &mut self.active else {
             return Ok(None);

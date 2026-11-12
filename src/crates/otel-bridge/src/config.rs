@@ -339,7 +339,9 @@ impl SignalConfig {
     /// This signal's part of [`PluginConfig::harmful_values`], for the
     /// `default` entry and for every tenant that has an entry of its own.
     ///
-    /// The catalog `horizon` needs no check of its own: the load requires it
+    /// The line between the ingest window and the retention age is a little
+    /// generous: a record just inside both can be over the age when its file
+    /// is indexed. The catalog `horizon` needs no check of its own: the load requires it
     /// to be longer than the retention `max_age` ([`RetentionPolicy::validate`]),
     /// so an ingest window that reaches it is longer than `max_age` too.
     fn harmful_values(&self, signal: &str, found: &mut Vec<String>) {
@@ -376,8 +378,8 @@ impl SignalConfig {
             if self.ingest.max_age > retention.max_age {
                 found.push(format!(
                     "{signal}.ingest.max_age ({}) is longer than {signal}.retention.{tenant}.max_age \
-                     ({}): a record older than the retention age is accepted, indexed, and then \
-                     deleted by the next retention pass",
+                     ({}): a record older than the retention age is accepted, indexed, and can \
+                     then be deleted by the next retention pass",
                     format(self.ingest.max_age),
                     format(retention.max_age),
                 ));
