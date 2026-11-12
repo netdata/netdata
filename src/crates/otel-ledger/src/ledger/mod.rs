@@ -429,9 +429,14 @@ impl Ledger {
         // that teardown and may never be recorded.
         loop {
             let event = tokio::select! {
-                msg = self.ingestor.recv() => LedgerEvent::WalMsg(msg.inspect_err(
-                    |e| tracing::error!("writer-socket recv failed: {e}"),
-                )?),
+                msg = self.ingestor.recv() => match msg {
+                    Ok(msg) => LedgerEvent::WalMsg(msg),
+                    Err(ferryboat::Error::ConnectionClosed) => LedgerEvent::WriterLinkClosed,
+                    Err(e) => {
+                        tracing::error!("writer-socket recv failed: {e}");
+                        return Err(e.into());
+                    }
+                },
                 // Merged per-pipeline worker responses (indexer + catalog
                 // builder of every pipeline), tagged with the owning `Signal`.
                 resp = self.pipeline_rx.recv() => match resp {
@@ -473,6 +478,16 @@ impl Ledger {
 
             match event {
                 LedgerEvent::WalMsg(msg) => self.handle_ingestor_msg(msg).await,
+                LedgerEvent::WriterLinkClosed => {
+                    // The ingestor stopped, or it is gone: either way the
+                    // supervisor stops the plugin, and no file event comes any
+                    // more. On a stop its `Shutdown` to this ledger can come
+                    // after this, so the run ends here as it does there, and
+                    // which of the two comes first changes nothing.
+                    tracing::info!("the ingestor closed its event link; leaving");
+                    self.flush_catalogs_on_shutdown().await;
+                    return Ok(());
+                }
                 LedgerEvent::PipelineResp(signal, resp) => match resp {
                     PipelineResp::Indexer(r) => self.handle_indexer_resp(signal, r).await,
                     PipelineResp::CatalogBuilder(r) => {
@@ -494,9 +509,9 @@ impl Ledger {
                         tracing::error!("supervisor request handling failed: {e}")
                     })?;
                     if exit {
-                        // Clean shutdown (the only exit=true path): persist
-                        // in-flight catalog accumulators locally before the
-                        // connection drops and the supervisor reaps workers.
+                        // Clean shutdown: persist in-flight catalog
+                        // accumulators locally before the connection drops
+                        // and the supervisor reaps workers.
                         self.flush_catalogs_on_shutdown().await;
                         return Ok(());
                     }

@@ -16,10 +16,14 @@ pub enum LedgerEvent {
     /// notification that a WAL file was Created/Synced/Closed, not payload
     /// (`wal/src/format.rs` `FileEvent`). Routed to its pipeline by the
     /// event's `pipeline_id()`, decoded to a `Signal` in
-    /// `Ledger::handle_ingestor_msg` (unknown ids dropped). A failed recv
-    /// here is fatal — the writer connection is never re-established — so
-    /// the arm `?`s [`crate::Ledger::run`] out.
+    /// `Ledger::handle_ingestor_msg` (unknown ids dropped). The writer
+    /// connection is never re-established: its end is
+    /// [`Self::WriterLinkClosed`], and any other failed recv is an error
+    /// that ends [`crate::Ledger::run`].
     WalMsg(wal::Message),
+    /// The ingestor closed its end of the writer link: it stopped, or it is
+    /// gone.
+    WriterLinkClosed,
     /// A response from a per-pipeline worker (indexer or catalog builder),
     /// tagged with the owning `Signal` by its `spawn_forwarder` task
     /// (`ledger/pipeline.rs`). The shared workers (cleaner, uploader)
