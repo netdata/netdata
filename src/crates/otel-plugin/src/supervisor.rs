@@ -14,9 +14,11 @@
 //! Lifecycle: resolve identity + config, spawn and handshake each worker,
 //! then one event loop ([`Supervisor::run`]) until the agent sends QUIT,
 //! stdin closes, or SIGINT/SIGTERM arrives — followed by IPC Shutdown with a
-//! bounded wait and a SIGKILL fallback (`ChildGuard`). A supervisor that is
-//! killed runs none of that: each worker then exits on its own, because the
-//! pipe it has as stdin closes (`crate::lifeline`).
+//! bounded wait and a SIGKILL fallback (`ChildGuard`). The same requests end
+//! a handshake too (`recv_during_startup`): a worker's start-up has no limit,
+//! and a stop does not wait for it (`Supervisor::stop_before_serving`). A
+//! supervisor that is killed runs none of that: each worker then exits on its
+//! own, because the pipe it has as stdin closes (`crate::lifeline`).
 //!
 //! The agent stops a plugin that writes nothing for two minutes, so from the
 //! first handshake on the supervisor writes `PLUGIN_KEEPALIVE` every
@@ -45,8 +47,9 @@ use otel_bridge::{
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-use tokio::io::AsyncWrite;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::process::Command;
+use tokio::signal::unix::{Signal, SignalKind};
 use tokio::time::Interval;
 
 /// Maximum time to wait for a worker to connect after spawning.
@@ -121,6 +124,17 @@ impl ChildGuard {
     }
 }
 
+impl ChildGuard {
+    /// End the worker and wait until it is gone: for a stop that comes while
+    /// the worker cannot be asked to leave (see
+    /// `Supervisor::stop_before_serving`).
+    async fn kill(&mut self) {
+        if let Err(e) = self.child.kill().await {
+            tracing::warn!("failed to end worker {}: {e}", self.name);
+        }
+    }
+}
+
 impl Drop for ChildGuard {
     fn drop(&mut self) {
         // Workers are expected to exit after receiving Shutdown over IPC.
@@ -158,6 +172,118 @@ impl Worker {
             Worker::LegacyLogs => "legacy-logs",
         }
     }
+}
+
+/// SIGINT and SIGTERM: the signals that ask the plugin to stop. This is the
+/// one place that names them.
+struct StopSignals {
+    sigint: Signal,
+    sigterm: Signal,
+}
+
+impl StopSignals {
+    /// From this call on the process no longer dies of these signals: someone
+    /// must wait in [`StopSignals::recv`]. So this is called where the wait
+    /// begins, not earlier: a signal that arrives before it ends the process
+    /// by its default action, which is right while nothing watches.
+    fn register() -> anyhow::Result<Self> {
+        Ok(Self {
+            sigint: tokio::signal::unix::signal(SignalKind::interrupt())
+                .context("failed to register SIGINT handler")?,
+            sigterm: tokio::signal::unix::signal(SignalKind::terminate())
+                .context("failed to register SIGTERM handler")?,
+        })
+    }
+
+    /// Wait for one of the signals, and say which one came.
+    async fn recv(&mut self) -> &'static str {
+        tokio::select! {
+            _ = self.sigint.recv() => "received SIGINT",
+            _ = self.sigterm.recv() => "received SIGTERM",
+        }
+    }
+}
+
+/// What the agent's side asks of the supervisor next.
+enum AgentEvent {
+    /// The plugin must stop; the reason, for the log.
+    Stop(&'static str),
+    /// A message of the agent that is not a stop request.
+    Message(Message),
+    /// It is time to write a keepalive ([`AgentLink::send_keepalive`]).
+    KeepaliveDue,
+}
+
+/// The supervisor's side of its link with the agent: the agent's messages,
+/// the plugin's output, the keepalive timer, and the stop signals. Every way
+/// in which the plugin is asked to stop arrives here (`QUIT`, the end of the
+/// agent's messages, a signal), so the handshakes of start-up and the event
+/// loop share one rule for a stop.
+struct AgentLink<I, O>
+where
+    I: AsyncRead + Unpin,
+    O: AsyncWrite + Unpin,
+{
+    reader: MessageReader<I>,
+    writer: MessageWriter<O>,
+    /// Ticks every [`KEEPALIVE_INTERVAL`]. The handshakes and the event loop
+    /// share it, so that the time between them counts too.
+    keepalive: Interval,
+    signals: StopSignals,
+}
+
+impl<I, O> AgentLink<I, O>
+where
+    I: AsyncRead + Unpin,
+    O: AsyncWrite + Unpin,
+{
+    /// Registers the stop signals: see [`StopSignals::register`] for when to
+    /// call this.
+    fn new(input: I, output: O) -> anyhow::Result<Self> {
+        Ok(Self {
+            reader: MessageReader::new(input),
+            writer: MessageWriter::new(output),
+            keepalive: tokio::time::interval(KEEPALIVE_INTERVAL),
+            signals: StopSignals::register()?,
+        })
+    }
+
+    /// Wait for the next event.
+    ///
+    /// This writes nothing, the keepalive included: callers use it as one
+    /// branch of a `select!`, and a write that another branch cut in the
+    /// middle of a line would reach the agent as a line it cannot parse.
+    async fn next_event(&mut self) -> AgentEvent {
+        loop {
+            tokio::select! {
+                reason = self.signals.recv() => return AgentEvent::Stop(reason),
+                message = self.reader.recv() => match message {
+                    Some(Ok(Message::Quit)) => return AgentEvent::Stop("received QUIT from agent"),
+                    Some(Ok(message)) => return AgentEvent::Message(message),
+                    Some(Err(e)) => tracing::error!("stdin parse error: {e}"),
+                    None => return AgentEvent::Stop("stdin closed"),
+                },
+                _ = self.keepalive.tick() => return AgentEvent::KeepaliveDue,
+            }
+        }
+    }
+
+    /// Write `PLUGIN_KEEPALIVE` to the agent. The agent does nothing with the
+    /// line; that the plugin wrote one is what resets its idle timer.
+    async fn send_keepalive(&mut self) -> anyhow::Result<()> {
+        self.writer
+            .write_raw(b"PLUGIN_KEEPALIVE\n")
+            .await
+            .context("keepalive write failed")
+    }
+}
+
+/// How a wait for a worker's answer during start-up ended.
+enum Startup<T> {
+    /// The worker answered.
+    Answer(T),
+    /// The agent asked the plugin to stop first; the reason, for the log.
+    Stop(&'static str),
 }
 
 /// All supervisor IPC state: the agent connection, one ferryboat connection
@@ -199,11 +325,7 @@ struct Supervisor {
     /// leak path is a worker that accepts a Call but never replies and is
     /// never cancelled.
     transactions: HashMap<String, Worker>,
-    reader: MessageReader<tokio::io::Stdin>,
-    writer: MessageWriter<tokio::io::Stdout>,
-    /// Ticks every [`KEEPALIVE_INTERVAL`]. The handshakes and the event loop
-    /// share it, so that the time between them counts too.
-    keepalive: Interval,
+    agent: AgentLink<tokio::io::Stdin, tokio::io::Stdout>,
     /// Removes socket files on drop.
     #[allow(dead_code)]
     sockets: [SocketGuard; 4],
@@ -232,7 +354,8 @@ impl Supervisor {
         );
         for decl in declarations {
             let name = decl.name.clone();
-            self.writer
+            self.agent
+                .writer
                 .send(Message::FunctionDeclaration(Box::new(decl)))
                 .await
                 .with_context(|| {
@@ -256,20 +379,22 @@ impl Supervisor {
     async fn configure_ingestor(
         &mut self,
         config: PluginConfig,
-    ) -> anyhow::Result<Vec<FunctionDeclaration>> {
+    ) -> anyhow::Result<Startup<Vec<FunctionDeclaration>>> {
         self.ingestor
             .send(IngestorRequest::Configure(Box::new(config)))
             .await
             .context("failed to send Configure to ingestor")?;
 
-        let response =
-            recv_keeping_agent_alive(&mut self.ingestor, &mut self.writer, &mut self.keepalive)
-                .await
-                .context("ingestor handshake")?;
+        let response = recv_during_startup(&mut self.ingestor, &mut self.agent)
+            .await
+            .context("ingestor handshake")?;
 
         match response {
-            IngestorResponse::Ready { declarations } => Ok(declarations),
-            other => bail!("expected Ready from ingestor, got: {other:?}"),
+            Startup::Answer(IngestorResponse::Ready { declarations }) => {
+                Ok(Startup::Answer(declarations))
+            }
+            Startup::Answer(other) => bail!("expected Ready from ingestor, got: {other:?}"),
+            Startup::Stop(reason) => Ok(Startup::Stop(reason)),
         }
     }
 
@@ -279,20 +404,22 @@ impl Supervisor {
     async fn configure_ledger(
         &mut self,
         config: PluginConfig,
-    ) -> anyhow::Result<Vec<FunctionDeclaration>> {
+    ) -> anyhow::Result<Startup<Vec<FunctionDeclaration>>> {
         self.ledger
             .send(LedgerRequest::Configure(Box::new(config)))
             .await
             .context("failed to send Configure to ledger")?;
 
-        let response =
-            recv_keeping_agent_alive(&mut self.ledger, &mut self.writer, &mut self.keepalive)
-                .await
-                .context("ledger handshake")?;
+        let response = recv_during_startup(&mut self.ledger, &mut self.agent)
+            .await
+            .context("ledger handshake")?;
 
         match response {
-            LedgerResponse::Ready { declarations } => Ok(declarations),
-            other => bail!("expected Ready from ledger, got: {other:?}"),
+            Startup::Answer(LedgerResponse::Ready { declarations }) => {
+                Ok(Startup::Answer(declarations))
+            }
+            Startup::Answer(other) => bail!("expected Ready from ledger, got: {other:?}"),
+            Startup::Stop(reason) => Ok(Startup::Stop(reason)),
         }
     }
 
@@ -303,29 +430,33 @@ impl Supervisor {
     async fn configure_legacy(
         &mut self,
         config: LegacyLogsConfig,
-    ) -> anyhow::Result<Vec<FunctionDeclaration>> {
+    ) -> anyhow::Result<Startup<Vec<FunctionDeclaration>>> {
         self.legacy
             .send(LegacyLogsRequest::Configure(config))
             .await
             .context("failed to send Configure to legacy-logs")?;
 
-        let response =
-            recv_keeping_agent_alive(&mut self.legacy, &mut self.writer, &mut self.keepalive)
-                .await
-                .context("legacy-logs handshake")?;
+        let response = recv_during_startup(&mut self.legacy, &mut self.agent)
+            .await
+            .context("legacy-logs handshake")?;
 
         match response {
-            LegacyLogsResponse::Ready { declarations } => Ok(declarations),
-            LegacyLogsResponse::Disabled => {
+            Startup::Stop(reason) => Ok(Startup::Stop(reason)),
+            Startup::Answer(LegacyLogsResponse::Ready { declarations }) => {
+                Ok(Startup::Answer(declarations))
+            }
+            Startup::Answer(LegacyLogsResponse::Disabled) => {
                 // Nothing to serve (or handler init failed — the worker logged
                 // why). The worker exits right after sending this; reap it here
                 // so it does not sit as a zombie until plugin shutdown.
                 tracing::info!("legacy-logs reported Disabled; reaping the worker");
                 self.disable_legacy();
                 self.reap_legacy().await;
-                Ok(Vec::new())
+                Ok(Startup::Answer(Vec::new()))
             }
-            other => bail!("expected Ready or Disabled from legacy-logs, got: {other:?}"),
+            Startup::Answer(other) => {
+                bail!("expected Ready or Disabled from legacy-logs, got: {other:?}")
+            }
         }
     }
 
@@ -499,6 +630,7 @@ impl Supervisor {
             return;
         }
         if let Err(e) = self
+            .agent
             .writer
             .send(Message::FunctionResult(Box::new(result)))
             .await
@@ -524,7 +656,7 @@ impl Supervisor {
             done,
             all: total,
         }));
-        if let Err(e) = self.writer.send(msg).await {
+        if let Err(e) = self.agent.writer.send(msg).await {
             tracing::error!("failed to emit progress: {e}");
         }
     }
@@ -540,7 +672,7 @@ impl Supervisor {
                 total,
             } => self.forward_progress(transaction, done, total).await,
             IngestorResponse::ChartData { payload } => {
-                if let Err(e) = self.writer.write_raw(&payload).await {
+                if let Err(e) = self.agent.writer.write_raw(&payload).await {
                     tracing::error!("failed to emit chart data: {e}");
                 }
             }
@@ -560,7 +692,7 @@ impl Supervisor {
                 total,
             } => self.forward_progress(transaction, done, total).await,
             LedgerResponse::ChartData { payload } => {
-                if let Err(e) = self.writer.write_raw(&payload).await {
+                if let Err(e) = self.agent.writer.write_raw(&payload).await {
                     tracing::error!("failed to emit chart data: {e}");
                 }
             }
@@ -594,11 +726,10 @@ impl Supervisor {
         }
     }
 
-    /// Handle a parsed message from stdin. Returns a shutdown reason if the
-    /// plugin should exit, or `None` to continue the event loop.
-    async fn handle_agent_message(&mut self, msg: Message) -> Option<&'static str> {
+    /// Handle a message of the agent that is not a stop request
+    /// ([`AgentEvent::Message`]).
+    async fn handle_agent_message(&mut self, msg: Message) {
         match msg {
-            Message::Quit => return Some("received QUIT from agent"),
             Message::FunctionCall(call) => {
                 self.handle_function_call(*call).await;
             }
@@ -609,7 +740,24 @@ impl Supervisor {
                 tracing::trace!("unhandled agent message: {other:?}");
             }
         }
-        None
+    }
+
+    /// Stop while the plugin starts, before the ingestor serves. Nothing is
+    /// acknowledged yet and no worker holds work that a stop must finish, and
+    /// a worker in its start-up cannot be asked to leave: the ledger does not
+    /// read its connection before its `Ready`, and a worker that waits for
+    /// `Configure` takes anything else as an error. So the workers are ended,
+    /// and before their connections close: a worker that sees its connection
+    /// close logs an error, and a stop is none.
+    ///
+    /// Ending the ledger inside its start-up is what a lost supervisor
+    /// already does to it (`crate::lifeline`): every step there can be cut
+    /// (`file_lifecycle::recovery`).
+    async fn stop_before_serving(mut self, reason: &'static str) {
+        tracing::info!("{reason} during start-up, stopping");
+        self.ledger_child.kill().await;
+        self.ingestor_child.kill().await;
+        self.legacy_child.kill().await;
     }
 
     /// Main event loop: read from stdin + ingestor + ledger + legacy-logs.
@@ -620,32 +768,13 @@ impl Supervisor {
     /// We intentionally do not restart workers — the Netdata agent is
     /// responsible for restarting the entire plugin.
     async fn run(&mut self) -> anyhow::Result<&'static str> {
-        let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
-            .context("failed to register SIGINT handler")?;
-        let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .context("failed to register SIGTERM handler")?;
-
         loop {
             tokio::select! {
-                _ = sigint.recv() => {
-                    return Ok("received SIGINT");
-                }
-                _ = sigterm.recv() => {
-                    return Ok("received SIGTERM");
-                }
-                msg = self.reader.recv() => {
-                    match msg {
-                        Some(Ok(msg)) => {
-                            if let Some(reason) = self.handle_agent_message(msg).await {
-                                return Ok(reason);
-                            }
-                        }
-                        Some(Err(e)) => {
-                            tracing::error!("stdin parse error: {e}");
-                        }
-                        None => {
-                            return Ok("stdin closed");
-                        }
+                event = self.agent.next_event() => {
+                    match event {
+                        AgentEvent::Stop(reason) => return Ok(reason),
+                        AgentEvent::Message(message) => self.handle_agent_message(message).await,
+                        AgentEvent::KeepaliveDue => self.agent.send_keepalive().await?,
                     }
                 }
                 resp = self.ingestor.recv() => {
@@ -672,48 +801,44 @@ impl Supervisor {
                         }
                     }
                 }
-                _ = self.keepalive.tick() => {
-                    send_keepalive(&mut self.writer).await?;
-                }
             }
         }
     }
 }
 
-/// Wait for `worker`'s next message, and write a keepalive to the agent on
-/// every tick of `keepalive` until it arrives.
+/// Wait for `worker`'s answer to its `Configure`. Until it arrives, write a
+/// keepalive to the agent whenever one is due, and end the wait when the
+/// agent asks the plugin to stop.
 ///
-/// For the handshakes: the supervisor has nothing else to write to the agent
-/// until the worker answers, and the worker answers only when its startup is
-/// over.
-async fn recv_keeping_agent_alive<S, R, W>(
+/// For the handshakes: a worker answers only when its start-up is over, which
+/// has no limit (the ledger indexes its whole backlog of WAL files, and waits
+/// for object storage when that is enabled), and the supervisor has nothing
+/// else to write to the agent meanwhile.
+async fn recv_during_startup<S, R, I, O>(
     worker: &mut Connection<S, R>,
-    agent: &mut MessageWriter<W>,
-    keepalive: &mut Interval,
-) -> anyhow::Result<R>
+    agent: &mut AgentLink<I, O>,
+) -> anyhow::Result<Startup<R>>
 where
     S: Serialize + Send + 'static,
     R: DeserializeOwned + Send + 'static,
-    W: AsyncWrite + Unpin,
+    I: AsyncRead + Unpin,
+    O: AsyncWrite + Unpin,
 {
     loop {
         tokio::select! {
-            response = worker.recv() => return Ok(response?),
-            _ = keepalive.tick() => send_keepalive(agent).await?,
+            response = worker.recv() => return Ok(Startup::Answer(response?)),
+            event = agent.next_event() => match event {
+                AgentEvent::Stop(reason) => return Ok(Startup::Stop(reason)),
+                AgentEvent::KeepaliveDue => agent.send_keepalive().await?,
+                // No function is declared before the last handshake is over
+                // (`Supervisor::register_declarations`): the agent has nothing
+                // to call or to cancel yet.
+                AgentEvent::Message(message) => {
+                    tracing::debug!("agent message during start-up, ignored: {message:?}");
+                }
+            },
         }
     }
-}
-
-/// Write `PLUGIN_KEEPALIVE` to the agent. The agent does nothing with the
-/// line; that the plugin wrote one is what resets its idle timer.
-async fn send_keepalive<W>(agent: &mut MessageWriter<W>) -> anyhow::Result<()>
-where
-    W: AsyncWrite + Unpin,
-{
-    agent
-        .write_raw(b"PLUGIN_KEEPALIVE\n")
-        .await
-        .context("keepalive write failed")
 }
 
 /// Guard for one IPC socket file, whose name holds this process's id: `new`
@@ -935,13 +1060,14 @@ pub async fn run() -> anyhow::Result<()> {
         legacy_alive: true,
         routing: HashMap::new(),
         transactions: HashMap::new(),
-        reader: MessageReader::new(tokio::io::stdin()),
-        writer: MessageWriter::new(tokio::io::stdout()),
-        keepalive: tokio::time::interval(KEEPALIVE_INTERVAL),
+        // From here on a stop request is watched without a gap: by each
+        // handshake below, then by the event loop.
+        agent: AgentLink::new(tokio::io::stdin(), tokio::io::stdout())?,
         sockets: [writer_sock, ledger_sock, ingestor_sock, legacy_sock],
     };
 
     supervisor
+        .agent
         .writer
         .write_raw(b"TRUST_DURATIONS 1\n")
         .await
@@ -958,20 +1084,43 @@ pub async fn run() -> anyhow::Result<()> {
     // unwind: the ledger does not read its supervisor connection while it
     // waits in `accept_writer`, so a graceful Shutdown would not reach it
     // anyway, and legacy-logs treats a pre-Configure Shutdown as an error.
-    let ledger_declarations = supervisor
+    //
+    // A stop request ends a handshake (`recv_during_startup`). Until the
+    // ingestor's `Ready` no worker serves: `stop_before_serving`. After it the
+    // ingestor does, and a stop takes the same path as one from the event loop.
+    let ledger_declarations = match supervisor
         .configure_ledger(plugin_config.clone())
         .await
-        .context("ledger configuration failed")?;
+        .context("ledger configuration failed")?
+    {
+        Startup::Answer(declarations) => declarations,
+        Startup::Stop(reason) => {
+            supervisor.stop_before_serving(reason).await;
+            return Ok(());
+        }
+    };
 
-    let ingestor_declarations = supervisor
+    let ingestor_declarations = match supervisor
         .configure_ingestor(plugin_config)
         .await
-        .context("ingestor configuration failed")?;
+        .context("ingestor configuration failed")?
+    {
+        Startup::Answer(declarations) => declarations,
+        Startup::Stop(reason) => {
+            supervisor.stop_before_serving(reason).await;
+            return Ok(());
+        }
+    };
 
     // The legacy-logs viewer is best-effort and decoupled from the new pipeline:
     // a configure failure disables it but MUST NOT take down the new pipeline.
     let legacy_declarations = match supervisor.configure_legacy(legacy_config).await {
-        Ok(declarations) => declarations,
+        Ok(Startup::Answer(declarations)) => declarations,
+        Ok(Startup::Stop(reason)) => {
+            tracing::info!("{reason}, shutting down");
+            supervisor.shutdown_workers().await;
+            return Ok(());
+        }
         Err(e) => {
             tracing::error!("legacy-logs configuration failed, disabling it: {e:#}");
             supervisor.disable_legacy();
@@ -1019,11 +1168,10 @@ mod tests {
     use std::time::Duration;
 
     use ferryboat::{Connection, Endpoint, Listener};
-    use netdata_plugin_protocol::MessageWriter;
-    use tokio::io::{AsyncReadExt, DuplexStream};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
 
     use super::{
-        KEEPALIVE_INTERVAL, recv_keeping_agent_alive, resolve_identity, worker_command,
+        AgentLink, Startup, recv_during_startup, resolve_identity, worker_command,
         worker_malloc_arena_max,
     };
 
@@ -1038,15 +1186,33 @@ mod tests {
         (supervisor.unwrap(), worker.unwrap())
     }
 
+    /// The supervisor's link with an agent, and the agent's two ends of it:
+    /// where the agent writes its messages, and where it reads the plugin's
+    /// output.
+    fn agent_link() -> (
+        AgentLink<DuplexStream, DuplexStream>,
+        DuplexStream,
+        DuplexStream,
+    ) {
+        let (agent_writes, input) = tokio::io::duplex(1024);
+        let (output, agent_reads) = tokio::io::duplex(1024);
+
+        (
+            AgentLink::new(input, output).unwrap(),
+            agent_writes,
+            agent_reads,
+        )
+    }
+
     /// Everything that was written to the agent.
     async fn written_to(
-        agent: MessageWriter<DuplexStream>,
-        mut agent_side: DuplexStream,
+        agent: AgentLink<DuplexStream, DuplexStream>,
+        mut agent_reads: DuplexStream,
     ) -> String {
         drop(agent);
 
         let mut written = String::new();
-        agent_side.read_to_string(&mut written).await.unwrap();
+        agent_reads.read_to_string(&mut written).await.unwrap();
         written
     }
 
@@ -1058,18 +1224,16 @@ mod tests {
             worker.send(7).await.unwrap();
             worker
         });
-        let (agent, agent_side) = tokio::io::duplex(1024);
-        let mut agent = MessageWriter::new(agent);
-        let mut keepalive = tokio::time::interval(KEEPALIVE_INTERVAL);
+        let (mut agent, _agent_writes, agent_reads) = agent_link();
 
-        let answer = recv_keeping_agent_alive(&mut supervisor, &mut agent, &mut keepalive)
+        let answer = recv_during_startup(&mut supervisor, &mut agent)
             .await
             .unwrap();
 
-        assert_eq!(answer, 7);
+        assert!(matches!(answer, Startup::Answer(7)));
         // One at once, one after 60 s, one after 120 s; the answer came at 150 s.
         assert_eq!(
-            written_to(agent, agent_side).await,
+            written_to(agent, agent_reads).await,
             "PLUGIN_KEEPALIVE\n".repeat(3)
         );
         drop(worker);
@@ -1078,16 +1242,67 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_keepalive_the_agent_does_not_take_ends_the_wait() {
         let (mut supervisor, _worker) = connected("keepalive-to-a-closed-agent").await;
-        let (agent, agent_side) = tokio::io::duplex(1024);
-        let mut agent = MessageWriter::new(agent);
-        let mut keepalive = tokio::time::interval(KEEPALIVE_INTERVAL);
-        drop(agent_side);
+        let (mut agent, _agent_writes, agent_reads) = agent_link();
+        drop(agent_reads);
 
-        let error = recv_keeping_agent_alive(&mut supervisor, &mut agent, &mut keepalive)
+        let error = recv_during_startup(&mut supervisor, &mut agent)
             .await
-            .unwrap_err();
+            .err()
+            .unwrap();
 
         assert_eq!(error.to_string(), "keepalive write failed");
+    }
+
+    /// A worker's start-up has no limit (the ledger can wait for object
+    /// storage): the agent's `QUIT` must not wait for it.
+    #[tokio::test(start_paused = true)]
+    async fn a_quit_ends_the_wait_for_a_worker_that_does_not_answer() {
+        let (mut supervisor, _worker) = connected("quit-during-a-handshake").await;
+        let (mut agent, mut agent_writes, _agent_reads) = agent_link();
+        agent_writes.write_all(b"QUIT\n").await.unwrap();
+
+        let end = recv_during_startup(&mut supervisor, &mut agent)
+            .await
+            .unwrap();
+
+        assert!(matches!(end, Startup::Stop("received QUIT from agent")));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn the_end_of_the_agents_messages_ends_the_wait_for_a_worker() {
+        let (mut supervisor, _worker) = connected("end-of-input-during-a-handshake").await;
+        let (mut agent, agent_writes, _agent_reads) = agent_link();
+        drop(agent_writes);
+
+        let end = recv_during_startup(&mut supervisor, &mut agent)
+            .await
+            .unwrap();
+
+        assert!(matches!(end, Startup::Stop("stdin closed")));
+    }
+
+    /// Only a stop ends the wait: a line that the agent's parser refuses, or
+    /// a message that is not a stop, leaves it waiting for the worker.
+    #[tokio::test(start_paused = true)]
+    async fn what_is_not_a_stop_does_not_end_the_wait_for_a_worker() {
+        let (mut supervisor, mut worker) = connected("other-input-during-a-handshake").await;
+        let worker = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            worker.send(7).await.unwrap();
+            worker
+        });
+        let (mut agent, mut agent_writes, _agent_reads) = agent_link();
+        agent_writes
+            .write_all(b"NOT_A_COMMAND 1 2 3\nFUNCTION_CANCEL 6d5a\n")
+            .await
+            .unwrap();
+
+        let end = recv_during_startup(&mut supervisor, &mut agent)
+            .await
+            .unwrap();
+
+        assert!(matches!(end, Startup::Answer(7)));
+        drop(worker);
     }
 
     #[test]

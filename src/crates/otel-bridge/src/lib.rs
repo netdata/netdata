@@ -62,6 +62,14 @@
 //!    any other first message as a failed start.
 //! 4. The supervisor enters its main loop, routing function calls, results,
 //!    progress and chart data between the agent and the workers.
+//!
+//! A worker's start-up has no limit: the ledger indexes its whole backlog of
+//! WAL files, and with remote storage enabled it waits until the remote
+//! answers. The supervisor honours a stop request (the agent's `QUIT`, the end
+//! of its input, SIGINT, SIGTERM) at any step above. Until the ingestor's
+//! `Ready` it ends the workers at once: none of them serves yet, and a worker
+//! in its start-up cannot be asked to leave. After it, a stop is the one of
+//! the main loop ([`shutdown`]).
 
 pub mod config;
 pub mod driver;

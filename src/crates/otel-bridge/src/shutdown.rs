@@ -32,6 +32,10 @@
 //!   of the service map, the ledger writes its catalog entries to local
 //!   catalog files) has [`WORKER_STOP_BUDGET`].
 //!
+//! A stop while the plugin starts, before the ingestor's `Ready`, has no
+//! stop work and none of these budgets: the supervisor ends its workers at
+//! once (`otel_bridge`, "Handshake protocol").
+//!
 //! What a stop does not finish, for any of these reasons, the next start
 //! recovers: stop work is never needed for what the plugin acknowledged.
 //!
