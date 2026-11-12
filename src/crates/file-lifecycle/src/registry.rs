@@ -18,6 +18,44 @@
 //! I/O: catalog reads, WAL chunk indexing and tail scans, and remote plans
 //! all run after it.
 //!
+//! ## The life of one file
+//!
+//! One file (one seq of one tenant of one signal) goes through the states
+//! below. No single record holds "the state of a file": each state is a
+//! fact in the container that owns that step, and memory is rebuilt from
+//! the disk and the remote at every start. "Running" is what moves the file
+//! on in a running plugin; "At start" is what brings the state back.
+//!
+//! | State | Held in (key) | Running | At start |
+//! |---|---|---|---|
+//! | WAL file open | the ingestor's `wal::Writer` stream; here an `Active` entry of [`wal::Registry`] (bare seq) and the seq's route | `Created` and `Synced` events ([`TenantRegistries::apply_wal_event`]) | never: a file that was open comes back as closed |
+//! | WAL file closed, to be indexed | an `Archived` entry of [`wal::Registry`] (bare seq) | the `Closed` event; the ledger sends the file to the indexer | [`wal::Registry::recover`]: every readable WAL file; `recovery::recover_wals` indexes those with no index |
+//! | indexing | the indexer's running operations (otel-ledger) and a temporary file | the indexer's response | the temporary file is swept ([`Registry::recover`]); the file is "closed" again |
+//! | indexing failed | the WAL entry stays (not tried again in this run) | `IndexFailed` | the entry is dropped, the file stays on the disk and the next start tries again |
+//! | indexed, WAL file not deleted yet | an [`sfst::Registry`] entry and the WAL entry (bare seq) | `Indexed`, then `WalFileDeleted` drops the WAL entry | `recovery::recover_wals` deletes the WAL file |
+//! | index file local, not uploaded | no `SeqState`, or `NotUploaded` ([`SeqKey`]); the request is with the uploader | `helpers::sfst_upload_request` | `recovery::recover_unuploaded`, the same request |
+//! | upload failed, waiting | [`crate::upload_retry::UploadRetry`] (`SeqKey` or remote key) | `UploadFailed`; a timer sends it again | not kept: "not uploaded" again |
+//! | uploaded, in no catalog file yet | `SeqState::upload`; the entry is with the catalog builder | `Uploaded`: [`Registry::mark_uploaded`] and `AddEntry` | `recovery::reconcile_remote_uploads` (a LIST of the remote) |
+//! | in a local catalog file | `CatalogStage::RotatedLocal`; the file in [`otel_catalog::Registry`] (path) | the builder's `Rotated`: [`Registry::mark_rotated_many`], then the catalog's upload | `recovery::seed_from_catalog_files`; [`Registry::forget_catalog_claims`] takes it back for index files that the remote lacks |
+//! | catalog entry on the remote | `CatalogStage::Remote` | `CatalogUploaded`: [`Registry::mark_remote_cataloged`] | `recovery::reconcile_local_catalog_uploads` |
+//! | deletion on its way | the `pending_deletion` flag of the [`sfst::Registry`] entry; the request is with the cleaner | retention, through [`Registry::index_evictions`] | `recovery::recover_retention`, the same function, with no flag (it waits for the cleaner) |
+//! | gone locally | nothing: [`Registry::evict_seq`] and [`TenantRegistries::forget_seq`]; the seq lives on as a catalog entry | `IndexFileDeleted` | [`Registry::evict_seq`] |
+//!
+//! Without remote storage a file goes from "index file local" straight to
+//! "deletion on its way". An indexing operation that finds no records
+//! leaves nothing tracked: its index file and its WAL file are deleted.
+//!
+//! Two key spaces meet here: the WAL and index registries and the routes
+//! use the bare seq, the per-seq state and the retries use [`SeqKey`]. They
+//! agree because one seq allocator serves the whole plugin and starts above
+//! every seq on the disk, so a bare seq names at most one local file.
+//!
+//! The running path and the start-up path differ on purpose in two places:
+//! a failed indexing operation keeps the WAL entry while the plugin runs
+//! (the file stays queryable) and drops it at start; and start-up recovery
+//! sets no `pending_deletion` flag, because it waits for each answer of
+//! the cleaner before it goes on.
+//!
 //! Errors: [`TenantRegistries::apply_wal_event`] surfaces `wal::Registry`'s
 //! event-bookkeeping rejections, which the caller logs and drops;
 //! [`Registry::recover`] is the one fatal site (a WAL directory-scan failure
