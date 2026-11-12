@@ -39,6 +39,51 @@ const (
 	revocationClockSkew = 5 * time.Minute
 )
 
+// The outcomes of a revocation check, the states of the revocation check status chart. A check that cannot determine
+// the status names one of the outcomes other than success.
+const (
+	checkSuccess          = "success"
+	checkRequestFailed    = "request_failed"
+	checkInvalidAnswer    = "invalid_answer"
+	checkIssuerNotFound   = "issuer_not_found"
+	checkNoRevocationInfo = "no_revocation_info"
+	checkOutsideValidity  = "outside_validity"
+)
+
+var checkOutcomes = []string{
+	checkSuccess,
+	checkRequestFailed,
+	checkInvalidAnswer,
+	checkIssuerNotFound,
+	checkNoRevocationInfo,
+	checkOutsideValidity,
+}
+
+// checkError is a revocation status that could not be determined, with the outcome that says why.
+type checkError struct {
+	outcome string
+	err     error
+}
+
+func failCheck(outcome string, err error) error {
+	return &checkError{outcome: outcome, err: err}
+}
+
+func (e *checkError) Error() string { return e.err.Error() }
+
+func (e *checkError) Unwrap() error { return e.err }
+
+// checkOutcome returns the outcome of a check that returned err, or "" for an error that names none.
+func checkOutcome(err error) string {
+	if err == nil {
+		return checkSuccess
+	}
+	if ce, ok := errors.AsType[*checkError](err); ok {
+		return ce.outcome
+	}
+	return ""
+}
+
 // revocationChecker checks a certificate against the CRLs and then the OCSP responders it lists. It uses only CRLs and
 // OCSP answers from the certificate's issuer, which must have signed the certificate: one the source presented with
 // it or TLS verification found, or else one downloaded from the issuer URLs the certificate lists.
@@ -70,9 +115,9 @@ func newRevocationChecker() *revocationChecker {
 }
 
 // status reports whether cert is revoked; issuers are certificates that may have issued it. An error means that the
-// status could not be determined, and names why: the certificate is outside its validity period, no issuer that
-// signed it is found, a CRL cannot be downloaded, parsed or verified, or no OCSP responder gives a usable answer. Any
-// OCSP status other than good counts as revoked.
+// status could not be determined, and names why, with an outcome (checkOutcome): the certificate is outside its
+// validity period, lists no CRL or OCSP URL to use, no issuer that signed it is found, a CRL cannot be downloaded,
+// parsed or verified, or no OCSP responder gives a usable answer. Any OCSP status other than good counts as revoked.
 func (rc *revocationChecker) status(
 	ctx context.Context,
 	cert *x509.Certificate,
@@ -81,16 +126,17 @@ func (rc *revocationChecker) status(
 ) (bool, error) {
 	// The validity period includes both bounds (RFC 5280 4.1.2.5).
 	if now.After(cert.NotAfter) {
-		return false, fmt.Errorf("certificate expired at %s", cert.NotAfter)
+		return false, failCheck(checkOutsideValidity, fmt.Errorf("certificate expired at %s", cert.NotAfter))
 	}
 	if now.Before(cert.NotBefore) {
-		return false, fmt.Errorf("certificate is not valid until %s", cert.NotBefore)
+		return false, failCheck(checkOutsideValidity, fmt.Errorf("certificate is not valid until %s", cert.NotBefore))
 	}
 
 	issuer := sync.OnceValues(func() (*x509.Certificate, error) { return rc.findIssuer(ctx, cert, issuers) })
 
 	// The only expiry rule: a verdict without a future next update serves no later check.
 	maps.DeleteFunc(rc.crls, func(_ crlKey, v crlVerdict) bool { return !now.Before(v.nextUpdate) })
+	var crlChecked bool
 	for _, crlURL := range cert.CRLDistributionPoints {
 		if isLDAPURL(crlURL) {
 			continue
@@ -99,9 +145,14 @@ func (rc *revocationChecker) status(
 		if err != nil || revoked {
 			return revoked, err
 		}
+		crlChecked = true
 	}
 
 	if len(cert.OCSPServer) == 0 {
+		if !crlChecked {
+			return false, failCheck(checkNoRevocationInfo,
+				errors.New("the certificate lists no OCSP URL and no CRL URL other than LDAP"))
+		}
 		return false, nil
 	}
 	return rc.ocspStatus(ctx, cert, issuer, now)
@@ -134,10 +185,10 @@ func (rc *revocationChecker) crlStatus(
 	}
 	crl, err := parseCRL(body)
 	if err != nil {
-		return false, fmt.Errorf("parse CRL '%s': %w", crlURL, err)
+		return false, failCheck(checkInvalidAnswer, fmt.Errorf("parse CRL '%s': %w", crlURL, err))
 	}
 	if err := verifyCRL(crl, cert, iss, now); err != nil {
-		return false, fmt.Errorf("verify CRL '%s': %w", crlURL, err)
+		return false, failCheck(checkInvalidAnswer, fmt.Errorf("verify CRL '%s': %w", crlURL, err))
 	}
 
 	revoked := slices.ContainsFunc(crl.RevokedCertificateEntries, func(e x509.RevocationListEntry) bool {
@@ -150,7 +201,8 @@ func (rc *revocationChecker) crlStatus(
 	return revoked, nil
 }
 
-// ocspStatus reports the status the first responder with a usable answer gives; failing responders are skipped.
+// ocspStatus reports the status the first responder with a usable answer gives; failing responders are skipped. When
+// none gives one, the outcome is a failed request only if every request failed.
 func (rc *revocationChecker) ocspStatus(
 	ctx context.Context,
 	cert *x509.Certificate,
@@ -169,10 +221,12 @@ func (rc *revocationChecker) ocspStatus(
 		Hash: crypto.SHA1,
 	})
 	if err != nil {
-		return false, fmt.Errorf("create OCSP request: %w", err)
+		// Not expected: the request takes only the issuer's key from it, which signedBy accepted.
+		return false, failCheck(checkIssuerNotFound, fmt.Errorf("create OCSP request: %w", err))
 	}
 
 	var reasons []string
+	outcome := checkRequestFailed
 	for _, server := range cert.OCSPServer {
 		resp, err := rc.queryOCSP(ctx, server, req, cert)
 		if err == nil {
@@ -181,9 +235,12 @@ func (rc *revocationChecker) ocspStatus(
 		if err == nil {
 			return resp.Status != ocsp.Good, nil
 		}
+		if checkOutcome(err) != checkRequestFailed {
+			outcome = checkInvalidAnswer
+		}
 		reasons = append(reasons, fmt.Sprintf("'%s': %s", server, err))
 	}
-	return false, fmt.Errorf("no usable OCSP answer: %s", strings.Join(reasons, "; "))
+	return false, failCheck(outcome, fmt.Errorf("no usable OCSP answer: %s", strings.Join(reasons, "; ")))
 }
 
 // queryOCSP sends a request of up to 256 bytes with GET, encoded into the URL as RFC 6960 Appendix A.1 describes,
@@ -202,7 +259,7 @@ func (rc *revocationChecker) queryOCSP(
 		var req *http.Request
 		req, err = http.NewRequestWithContext(ctx, http.MethodPost, server, bytes.NewReader(ocspReq))
 		if err != nil {
-			return nil, err
+			return nil, failCheck(checkRequestFailed, err)
 		}
 		req.Header.Set("Content-Type", "application/ocsp-request")
 		body, err = rc.do(req)
@@ -224,7 +281,8 @@ func (rc *revocationChecker) queryOCSP(
 }
 
 // findIssuer returns the certificate that signed cert: the first of issuers that did, or else the first one
-// downloaded from the issuer URLs cert lists.
+// downloaded from the issuer URLs cert lists. When none is found, the outcome is a failed request only if every
+// download request failed.
 func (rc *revocationChecker) findIssuer(
 	ctx context.Context,
 	cert *x509.Certificate,
@@ -237,17 +295,23 @@ func (rc *revocationChecker) findIssuer(
 	}
 
 	reasons := []string{"no certificate the source sent or TLS verification found signed it"}
+	outcome := checkIssuerNotFound
 	if len(cert.IssuingCertificateURL) == 0 {
 		reasons = append(reasons, "the certificate lists no issuer URL")
+	} else {
+		outcome = checkRequestFailed
 	}
 	for _, issuerURL := range cert.IssuingCertificateURL {
 		issuer, err := rc.downloadIssuer(ctx, cert, issuerURL)
 		if err == nil {
 			return issuer, nil
 		}
+		if checkOutcome(err) != checkRequestFailed {
+			outcome = checkIssuerNotFound
+		}
 		reasons = append(reasons, err.Error())
 	}
-	return nil, fmt.Errorf("issuer certificate not found: %s", strings.Join(reasons, "; "))
+	return nil, failCheck(outcome, fmt.Errorf("issuer certificate not found: %s", strings.Join(reasons, "; ")))
 }
 
 // downloadIssuer returns the certificate at issuerURL if it signed cert.
@@ -532,19 +596,22 @@ func namesCRLURL(dpName cryptobyte.String, urls []string) bool {
 func (rc *revocationChecker) get(ctx context.Context, rawURL string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, failCheck(checkRequestFailed, err)
 	}
 	return rc.do(req)
 }
 
-// do returns the body of a 200 OK response; its errors name the URL.
+// do returns the body of a 200 OK response; its errors name the URL and are failed requests.
 func (rc *revocationChecker) do(req *http.Request) ([]byte, error) {
 	var body []byte
 	err := web.DoHTTP(rc.client).Request(req, func(r io.Reader) (err error) {
 		body, err = io.ReadAll(r)
 		return err
 	})
-	return body, err
+	if err != nil {
+		return nil, failCheck(checkRequestFailed, err)
+	}
+	return body, nil
 }
 
 // isLDAPURL reports an LDAP CRL distribution point, which is not fetched.

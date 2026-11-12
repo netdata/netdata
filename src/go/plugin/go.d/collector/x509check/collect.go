@@ -66,8 +66,8 @@ func (c *Collector) fetchCertificates(ctx context.Context) (sourceCertificates, 
 	return src, nil
 }
 
-// collectRevocationStatus records the status of the server certificate and leaves a gap when it cannot be
-// determined. It returns only the context error.
+// collectRevocationStatus records the status of the server certificate, with a gap when it cannot be determined, and
+// the outcome of the check. It returns only the context error.
 func (c *Collector) collectRevocationStatus(
 	ctx context.Context,
 	src sourceCertificates,
@@ -79,17 +79,24 @@ func (c *Collector) collectRevocationStatus(
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return ctxErr
 	}
+
 	if err != nil {
 		c.Limit("x509check:revocation", 1, time.Hour).
 			Warningf("revocation status of '%s' could not be determined: %s", c.Source, err)
-		return nil
+	} else {
+		c.metrics.revocationStatus.ObserveStateSet(metrix.StateSetPoint{
+			States: map[string]bool{
+				"not_revoked": !revoked,
+				"revoked":     revoked,
+			},
+		}, labels)
 	}
 
-	c.metrics.revocationStatus.ObserveStateSet(metrix.StateSetPoint{
-		States: map[string]bool{
-			"not_revoked": !revoked,
-			"revoked":     revoked,
-		},
-	}, labels)
+	// An error that names no outcome leaves a gap rather than a guessed one.
+	if outcome := checkOutcome(err); outcome != "" {
+		c.metrics.revocationCheckStatus.ObserveStateSet(metrix.StateSetPoint{
+			States: map[string]bool{outcome: true},
+		}, labels)
+	}
 	return nil
 }
