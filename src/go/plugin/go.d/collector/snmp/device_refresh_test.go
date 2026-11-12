@@ -428,6 +428,62 @@ func TestCollectorRuntimeSystemChangeFailedFirstPollKeepsPublication(t *testing.
 	c.Cleanup(context.Background())
 }
 
+func TestCollectorRuntimeUnpreparedDeviceIsNotPublished(t *testing.T) {
+	const modelOID = "1.3.6.1.4.1.99999.95.0"
+	withModel := func(st *systemChangeTest) {
+		st.device.setText(modelOID, "observed-model")
+		st.c.snmpProfiles[0].Definition.Metadata["device"].Fields["model"] = ddprofiledefinition.MetadataField{
+			Symbol: ddprofiledefinition.SymbolConfig{OID: modelOID},
+		}
+	}
+
+	t.Run("new job", func(t *testing.T) {
+		st := newSystemChangeTest(t)
+		c, device := st.c, st.device
+		withModel(st)
+		device.failOID = modelOID
+		require.Empty(t, c.Collect(context.Background()))
+		assert.Nil(t, c.VirtualNode())
+		assert.Empty(t, c.deviceStore.Entries())
+
+		device.failOID = ""
+		require.NotEmpty(t, c.Collect(context.Background()))
+		assert.Equal(t, "observed-model", c.VirtualNode().Labels["model"])
+		entries := c.deviceStore.Entries()
+		require.Len(t, entries, 1)
+		assert.Equal(t, "observed-model", entries[0].Info.Model)
+	})
+
+	t.Run("replacement", func(t *testing.T) {
+		st := newSystemChangeTest(t)
+		c, device := st.c, st.device
+		withModel(st)
+		require.NotEmpty(t, c.Collect(context.Background()))
+		device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+			Name:  snmputils.OidSysObject,
+			Type:  gosnmp.ObjectIdentifier,
+			Value: replacementTestObjectID,
+		}
+		device.setText(snmputils.OidSysName, "replacement")
+		device.failOID = modelOID
+		require.Empty(t, st.collectAfter(time.Minute))
+		require.Equal(t, 1, st.clients)
+		assert.False(t, c.rebuildPending)
+		assert.Empty(t, c.deviceStore.Entries(), "the withdrawn device returns with its profile metadata, not before")
+		assert.Equal(t, "before", c.VirtualNode().Hostname)
+
+		device.failOID = ""
+		require.NotEmpty(t, c.Collect(context.Background()))
+		assert.Equal(t, "replacement", c.VirtualNode().Hostname)
+		entries := c.deviceStore.Entries()
+		require.Len(t, entries, 1)
+		assert.Equal(t, replacementTestObjectID, entries[0].Info.SysObjectID)
+		assert.Equal(t, "replacement", entries[0].Info.SysName)
+		assert.Equal(t, "observed-model", c.ddSnmpColl.PreparedDeviceMetadata()["model"].Value)
+		c.Cleanup(context.Background())
+	})
+}
+
 func TestCollectorRuntimeSystemChangeRelabelsPingCharts(t *testing.T) {
 	st := newSystemChangeTest(t)
 	c := st.c

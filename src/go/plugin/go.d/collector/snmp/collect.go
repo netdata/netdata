@@ -121,8 +121,8 @@ func (c *Collector) ensureInitialized() error {
 	}
 
 	// ping_only never polls profiles, so it publishes its identity here. Normal
-	// collection publishes after its first profile poll, in the same cycle and
-	// before any sample leaves the collector (syncDeviceMetadata).
+	// collection publishes once a profile poll has prepared inputs, in the same
+	// cycle and before any sample leaves the collector (syncDeviceMetadata).
 	if c.PingOnly || c.ddSnmpColl == nil {
 		var metadata map[string]ddsnmp.MetaTag
 		if c.ddSnmpColl != nil {

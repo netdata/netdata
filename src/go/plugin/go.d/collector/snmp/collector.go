@@ -150,7 +150,7 @@ type (
 		sysInfo                       *snmputils.SysInfo
 		snmpProfiles                  []*ddsnmp.Profile
 		initialized                   bool
-		devicePublished               bool
+		devicePublished               bool // the current device state has been published
 		publishedProfileInputRevision uint64
 		now                           func() time.Time
 		nextSysInfoCheck              time.Time

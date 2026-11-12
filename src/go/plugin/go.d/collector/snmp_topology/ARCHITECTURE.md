@@ -859,12 +859,13 @@ and retained device-generation state; they are not the topology payload.
   `topologyDeviceSnapshot`. A completed sweep activates successful snapshots as
   `topologyDeviceGeneration` values at one shared publication time. A failed
   collection retains the prior successful device generation and deadline.
-- Each device's refresh state records the registered device information it last acted on. A changed registered
-  sysObjectID discards the retained acquisition and retry state before the next attempt, so failed or unsupported
-  replacement setup cannot retain the prior device's topology. Any other change to that information (name,
-  description, contact, location, vendor, model, vnode identity or labels) acquires the device again on the current
-  sweep; the retained generation stays visible until that acquisition succeeds, and a failure follows the normal
-  retry backoff. Cancellation still leaves the entire prior committed cut visible.
+- Each device's refresh state records the registered device information it last acted on. A registered sysObjectID
+  that changes to a non-empty value discards the retained acquisition and retry state before the next attempt, so
+  failed or unsupported replacement setup cannot retain the prior device's topology. Any other change to that
+  information (name, description, contact, location, vendor, model, vnode identity or labels, or a sysObjectID that
+  becomes empty) acquires the device again on the current sweep; the retained generation stays visible until that
+  acquisition succeeds, and a failure follows the normal retry backoff. Cancellation still leaves the entire prior
+  committed cut visible.
 - A completed sweep fixes renderable membership and publishes one immutable
   `topologyGeneration` through an atomic pointer. Cancellation or panic leaves
   the previous generation visible.

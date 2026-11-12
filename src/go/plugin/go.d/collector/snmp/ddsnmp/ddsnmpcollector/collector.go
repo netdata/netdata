@@ -420,15 +420,18 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 	if ps.initialized {
 		prepared.acquisition.restoreInputRoutes(ps.cache.inputRoutes)
 	} else {
+		// Install the cache only when every input is prepared, so a failed
+		// attempt leaves no partial tags or evidence behind.
+		cache := ps.cache
 		recorder := sourceRecorder(c.globalTagsCollector.snmpClient)
 		cursor := recorder.Cursor()
 		globalTags, err := c.globalTagsCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
 			return fmt.Errorf("failed to collect global tags: %w", err)
 		}
-		ps.cache.globalTags = globalTags
+		cache.globalTags = globalTags
 		if recorder != nil {
-			ps.cache.tagEvidence = &AcquisitionCacheInput{Kind: "profile_tags", CreatedAt: time.Now().UTC(), Tags: globalTags, Sources: recorder.operationsSince(cursor)}
+			cache.tagEvidence = &AcquisitionCacheInput{Kind: "profile_tags", CreatedAt: time.Now().UTC(), Tags: globalTags, Sources: recorder.operationsSince(cursor)}
 		}
 		cursor = recorder.Cursor()
 		metadata, err := c.deviceMetadataCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
@@ -436,12 +439,13 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 			err = snmputils.WithFailure(err, "metadata", "")
 			return fmt.Errorf("failed to collect device metadata: %w", err)
 		}
-		ps.cache.deviceMetadata = metadata
+		cache.deviceMetadata = metadata
 		if recorder != nil {
-			ps.cache.metadataEvidence = &AcquisitionCacheInput{Kind: "profile_metadata", CreatedAt: time.Now().UTC(), Metadata: metadata, Sources: recorder.operationsSince(cursor)}
+			cache.metadataEvidence = &AcquisitionCacheInput{Kind: "profile_metadata", CreatedAt: time.Now().UTC(), Metadata: metadata, Sources: recorder.operationsSince(cursor)}
 		}
+		cache.inputRoutes = prepared.acquisition.retainInputRoutes(recorder)
+		ps.cache = cache
 		ps.initialized = true
-		ps.cache.inputRoutes = prepared.acquisition.retainInputRoutes(recorder)
 		c.profileInputRevision++
 	}
 	pm.Tags = maps.Clone(ps.cache.globalTags)

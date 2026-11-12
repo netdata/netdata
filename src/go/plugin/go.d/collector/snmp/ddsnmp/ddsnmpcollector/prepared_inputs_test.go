@@ -62,6 +62,44 @@ func TestPreparedDeviceMetadataFollowsProfilePreparation(t *testing.T) {
 	assert.EqualValues(t, 1, collector.ProfileInputRevision())
 }
 
+func TestCachedInputsExcludeUnpreparedProfiles(t *testing.T) {
+	const tagOID, metadataOID = "1.2.3.1.0", "1.2.3.2.0"
+	profile := metadataTestProfile("device.yaml", metadataOID)
+	profile.Definition.MetricTags = []ddprofiledefinition.GlobalMetricTagConfig{{
+		MetricTagConfig: ddprofiledefinition.MetricTagConfig{
+			Tag:    "site",
+			Symbol: ddprofiledefinition.SymbolConfigCompat{OID: tagOID, Name: "site"},
+		},
+	}}
+	failMetadata := true
+	handler := &sourceTestHandler{
+		get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+			if failMetadata && oids[0] == metadataOID {
+				return nil, errors.New("request failed")
+			}
+			return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{createStringPDU(oids[0], "value")}}, nil
+		},
+	}
+	collector := New(Config{
+		SnmpClient: new(SourceRecorder).Wrap(handler),
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+	})
+
+	_, err := collector.Collect()
+	require.Error(t, err)
+	assert.Empty(t, collector.CachedInputs(), "tags acquired by a failed preparation are not a cache")
+
+	failMetadata = false
+	_, err = collector.Collect()
+	require.NoError(t, err)
+	var kinds []string
+	for _, input := range collector.CachedInputs() {
+		kinds = append(kinds, input.Kind)
+	}
+	assert.Equal(t, []string{"profile_metadata", "profile_tags"}, kinds)
+}
+
 func TestProfileInputMetadataFailureClassification(t *testing.T) {
 	handler := &sourceTestHandler{
 		get: func([]string) (*gosnmp.SnmpPacket, error) { return nil, gosnmp.ErrWrongDigest },

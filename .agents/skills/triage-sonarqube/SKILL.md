@@ -48,11 +48,13 @@ The token is used as **HTTP Basic auth username with empty password**:
 
 No browser tab is required for token-based auth. Tokens can expire or be revoked; verify access when executing.
 
-For a public project, read-only API calls may work anonymously when local credentials are absent. Verify complete,
-PR-scoped results from `/api/issues/search?componentKeys=<project>&pullRequest=<pr>` and
-`/api/hotspots/search?projectKey=<project>&pullRequest=<pr>`, paging through each reported total. Check
-`/api/qualitygates/project_status?projectKey=<project>&pullRequest=<pr>` separately. An HTTP error is a coverage gap,
-not an empty result; this fallback does not authorize remote changes or require credential setup.
+For a public project, read-only API calls may work anonymously when local credentials are absent; check availability
+each time. The helper scripts require `SONAR_TOKEN`, so call the API directly. Verify complete, PR-scoped results from
+`/api/issues/search?componentKeys=<project>&pullRequest=<pr>&sinceLeakPeriod=true&statuses=OPEN,CONFIRMED` and
+`/api/hotspots/search?projectKey=<project>&pullRequest=<pr>`: request pages with `p` and `ps` (at most 500) until
+`paging.total` is reached. Check `/api/qualitygates/project_status?projectKey=<project>&pullRequest=<pr>` separately.
+An HTTP error is a coverage gap, not an empty result; this fallback does not authorize remote changes or require
+credential setup.
 
 ## Triage decision matrix
 
@@ -197,7 +199,7 @@ Keep a record of profile decisions in a project-local doc under
 | Symptom                                | Likely cause                                                |
 |----------------------------------------|-------------------------------------------------------------|
 | HTTP 401 / 403 with HTML body          | Token wrong/expired, or Cloudflare blocking non-ASCII       |
-| Missing `.env` for a public PR query   | Try `https://sonarcloud.io/api/issues/search` with `componentKeys`, `pullRequest`, `sinceLeakPeriod=true`, and `statuses=OPEN,CONFIRMED`; anonymous reads have worked for public projects, but availability must be checked; failure is an evidence gap. |
+| Missing `.env` for a public PR query   | Use the anonymous read-only fallback under [Setup](#setup); a failed request is an evidence gap. |
 | Token works for issues but not hotspots| Hotspot endpoints have separate auth checks — token must have `Browse` permission |
 | Family-mode appears to stop at 500     | Outdated -- `sonar-mark.sh` family-mode now paginates transparently via `sq_paginate`. If you still see truncation, check `sq_paginate`'s array-key recognition list. |
 | `falsepositive` transition rejected    | Check current state, available transitions and permissions; do not assume a previously supported transition is still available |

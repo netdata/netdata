@@ -140,14 +140,13 @@ func (c *Collector) applyDeviceMetadata(si *snmputils.SysInfo, metadata map[stri
 	return nil
 }
 
-// syncDeviceMetadata publishes device identity after a profile poll: once for
-// a device without a current publication, then whenever profile inputs become
-// prepared. A rebuilt device that kept its classification keeps the previous
-// publication until then, so a failed first poll never publishes a partial
-// identity.
+// syncDeviceMetadata publishes device identity after a profile poll, whenever
+// the profile collector has newly prepared inputs. Samples only come from
+// profiles with prepared inputs, so the vnode exists before any sample leaves
+// the collector, and a poll that prepared nothing publishes nothing: a new or
+// rebuilt device is never visible without its profile metadata.
 func (c *Collector) syncDeviceMetadata() {
-	revision := c.ddSnmpColl.ProfileInputRevision()
-	if c.sysInfo == nil || c.devicePublished && revision == c.publishedProfileInputRevision {
+	if c.sysInfo == nil || c.publishedProfileInputRevision == c.ddSnmpColl.ProfileInputRevision() {
 		return
 	}
 	if err := c.applyDeviceMetadata(c.sysInfo, c.ddSnmpColl.PreparedDeviceMetadata()); err != nil {
@@ -189,7 +188,7 @@ func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	c.ddSnmpColl = c.newProfileCollector()
 	c.activateProfiles(profiles, profileContext)
 	c.rebuildPending = false
-	c.publishedProfileInputRevision = 0
+	c.devicePublished, c.publishedProfileInputRevision = false, 0
 	c.resetDeviceFunctionState()
 	c.resetDevicePresentation()
 	_ = previous.Close()
