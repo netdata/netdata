@@ -531,7 +531,7 @@ func TestCheckIsSupervisedWithoutWorkflowInput(t *testing.T) {
 		calls++
 		assert.Empty(t, raw)
 		assert.Equal(t, []string{paths.EntryPoint, "--check"}, args)
-		fmt.Fprintf(out, `{"version":%q,"contract":1,"uid":%d,"gid":%d}`, paths.Identity.Version, os.Geteuid(), os.Getegid())
+		fmt.Fprintf(out, `{"version":%q,"contract":2,"uid":%d,"gid":%d}`, paths.Identity.Version, os.Geteuid(), os.Getegid())
 		return ndexec.TreeResult{Drained: true}
 	})
 	require.NoError(t, e.Check(context.Background(), synthetic.Journey))

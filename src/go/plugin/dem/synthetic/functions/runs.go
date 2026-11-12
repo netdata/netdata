@@ -37,6 +37,7 @@ func (h *Handler) runs(ctx context.Context, args map[string]string, response map
 				run.VnodeGUID,
 				timestamp(run.ScheduledUS),
 				timestamp(run.QueuedUS),
+				run.TerminationReason,
 			},
 		)
 	}
@@ -76,5 +77,6 @@ var runsMethod = method{
 		column{"vnode_guid", "Vnode GUID", funcapi.FieldTypeString, ""},
 		column{"scheduled_us", "Selected due time", funcapi.FieldTypeTimestamp, ""},
 		column{"queued_us", "Original admission queue time", funcapi.FieldTypeTimestamp, ""},
+		column{"termination_reason", "Termination reason", funcapi.FieldTypeString, ""},
 	),
 }

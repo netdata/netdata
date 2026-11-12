@@ -5,7 +5,7 @@ locked production npm dependencies, Debian's unbranded Chromium, the private ELF
 loader/library closure, fonts, notices, and the complete release-owned execution
 adapters from `src/dem-runtime`. `nd-run` remains an Agent component. DEM disables
 video recording, so no Playwright FFmpeg artifact is shipped. Exact component pins
-are runtime-owned; the Agent validates semantic execution contract 1 and immutable
+are runtime-owned; the Agent validates semantic execution contract 2 and immutable
 release identity. The Agent integration remains experimental while delivery is
 qualified. The builder itself does not publish. The separate [release workflow](RELEASE.md)
 assembles optional native packages and defines protected signing/publication steps.
@@ -62,7 +62,7 @@ The output contains:
 
 - `<sha256>.tar.zst`: sorted entries with normalized ownership/mode/time, excluding
   source trees, compressed with zstd level 19, one thread, a checksum and an 8 MiB window;
-- `manifest.json`: format 1 identity, execution contract 1, exact compressed/tar/regular-file byte bounds,
+- `manifest.json`: format 1 identity, execution contract 2, exact compressed/tar/regular-file byte bounds,
   entry count, layout including `entrypoint: runner/run.mjs`, and authenticated ELF bindings;
 - `provenance.json`: complete runtime source/test and recipe hashes, exact input locks, original copied
   library hashes, and exact redistributed Debian source records;

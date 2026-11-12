@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"path"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
 // Manifest is administrator-trusted release metadata. Archive-supplied metadata
@@ -69,8 +71,8 @@ func (m Manifest) Validate() error {
 	if m.Format != 1 || m.Version == "" || (m.Platform != "linux/amd64" && m.Platform != "linux/arm64") || !validID(m.Archive.SHA256) {
 		return errors.New("invalid runtime identity or platform")
 	}
-	if m.Contract != 1 {
-		return fmt.Errorf("unsupported runtime execution contract %d (Agent supports 1); upgrade the Agent or select a compatible runtime release", m.Contract)
+	if m.Contract != synthetic.ExecutionContract {
+		return fmt.Errorf("unsupported runtime execution contract %d (Agent supports %d); upgrade the Agent or select a compatible runtime release", m.Contract, synthetic.ExecutionContract)
 	}
 	a := m.Archive
 	if a.Bytes <= 0 || a.TarBytes <= 0 || a.ExpandedBytes <= 0 || a.ExpandedBytes > a.TarBytes || a.Entries <= 0 || a.Bytes == math.MaxInt64 || a.TarBytes == math.MaxInt64 {

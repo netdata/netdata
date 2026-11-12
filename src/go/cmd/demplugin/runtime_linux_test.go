@@ -33,7 +33,7 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 		{"node", prefix}, {"browser", prefix}, {"loader", []byte("loader")},
 		{"dependencies/package.json", []byte("{}")}, {"fonts/test.ttf", []byte("font")},
 		{"runner/run.mjs", []byte("// non-executable qualification fixture")},
-		{"runtime.json", []byte(`{"contract":1,"version":"cli-fixture","paths":{"dependencies":"dependencies","browser":"chrome"}}`)},
+		{"runtime.json", []byte(`{"contract":2,"version":"cli-fixture","paths":{"dependencies":"dependencies","browser":"chrome"}}`)},
 	}
 	var raw, compressed bytes.Buffer
 	tw := tar.NewWriter(&raw)
@@ -51,7 +51,7 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 	require.NoError(t, err)
 	require.NoError(t, encoder.Close())
 	digest := sha256.Sum256(compressed.Bytes())
-	manifest := runtime.Manifest{Format: 1, Contract: 1, Version: "cli-fixture", Platform: "linux/" + goruntime.GOARCH,
+	manifest := runtime.Manifest{Format: 1, Contract: 2, Version: "cli-fixture", Platform: "linux/" + goruntime.GOARCH,
 		Archive:  runtime.Archive{SHA256: hex.EncodeToString(digest[:]), Bytes: int64(compressed.Len()), TarBytes: int64(raw.Len()), ExpandedBytes: expanded, Entries: len(entries)},
 		Layout:   runtime.Layout{EntryPoint: "runner/run.mjs", Node: "node", Browser: "browser", Dependencies: "dependencies", Loader: "loader", Fonts: "fonts"},
 		Bindings: []runtime.Binding{{Path: "node", Expected: prefix}, {Path: "browser", Expected: prefix}},

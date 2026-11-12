@@ -7,6 +7,7 @@ import os from 'node:os';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {metricsFromLHR} from '../runner/lighthouse.mjs';
+import {monotonicMilliseconds} from '../runner/journey.mjs';
 const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const dependencies = process.env.DEM_TEST_DEPENDENCIES || sourceRoot;
 
@@ -17,7 +18,7 @@ async function fixtureRuntime(dependencyRoot, browser = 'missing-prepared-browse
   const pins = JSON.parse(await fs.readFile(path.join(sourceRoot, 'manifest.json'), 'utf8'));
   pins.node_version = process.versions.node;
   await fs.writeFile(path.join(root, 'manifest.json'), JSON.stringify(pins));
-  await fs.writeFile(path.join(root, 'runtime.json'), JSON.stringify({contract:1, version:'test-release',
+  await fs.writeFile(path.join(root, 'runtime.json'), JSON.stringify({contract:2, version:'test-release',
     paths:{dependencies:'dependencies',browser}}));
   return root;
 }
@@ -26,8 +27,8 @@ const assets = path.join(runtimeRoot, 'runner');
 
 async function run(source, options = {}, root = runtimeRoot) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'dem-runner-test-'));
-  const request = {version: 1, kind: 'journey', run_id: 'test',
-    work_dir: dir, script: source, timeout_ms: 10000,
+  const request = {version: 2, kind: 'journey', run_id: 'test',
+    work_dir: dir, script: source, timeout_ms: 10000, stop_at_monotonic_ms: monotonicMilliseconds() + 60000,
     capture: false, secrets: {}, ...options};
   const child = spawn(process.execPath, [path.join(root, 'runner/run.mjs')], {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, NODE_OPTIONS: '', DEM_SECRET_UNPASSED: 'must-not-inherit'}});
   let out = '', err = '';
@@ -62,6 +63,7 @@ for (const [name, [source,status,expected]] of Object.entries(outcomes)) {
   test(name, async () => {
     const actual = await run(prefix + source);
     assert.equal(actual.result.status,status);
+    assert.equal(actual.result.termination_reason, name === 'test timeout' ? 'test_timeout' : undefined);
     assert.deepEqual(actual.result.tests,expected);
     assert.equal(actual.events.find(e=>e.kind==='suite'&&e.phase==='discovery').declared_tests,expected.declared);
     assert.equal(actual.result.capture_state,'disabled');
@@ -83,8 +85,46 @@ test('observed unexpected failure dominates a later browser startup error', asyn
   assert.ok(actual.events.some(e=>e.kind==='error'&&e.message.includes('browserType.launch')));
 });
 
+test('parent budget stop preserves first assertion and actual later interruption', async () => {
+  const actual = await run(prefix + "test('first failure',async()=>{expect(1).toBe(2)});test('later hang',async()=>{test.setTimeout(0);await new Promise(()=>{})});",
+    {stop_at_monotonic_ms:monotonicMilliseconds() + 3000});
+  assert.equal(actual.result.status,'timeout');
+  assert.equal(actual.result.termination_reason,'execution_budget');
+  assert.match(actual.result.error,/expect/);
+  assert.deepEqual(actual.result.tests,counts({declared:2,failed:1,not_run:1}));
+  assert.ok(actual.events.some(event=>event.kind==='test'&&event.phase==='end'&&event.status==='interrupted'));
+});
+
+test('script test-timeout overrides retain native semantics without a competing suite timer', async () => {
+  const actual=await run(prefix+"test('extended',async()=>{test.setTimeout(1000);await new Promise(resolve=>setTimeout(resolve,150));});",{timeout_ms:100});
+  assert.equal(actual.result.status,'success');
+  assert.equal(actual.result.termination_reason,undefined);
+});
+
+test('real native suite timeout takes precedence over earlier assertion and global onError', async () => {
+  const dir=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'dem-native-suite-')));
+  const entry=path.join(dir,'suite.spec.cjs');
+  await fs.writeFile(entry,`const {test,expect}=require(${JSON.stringify(path.join(dependencies,'node_modules/@playwright/test'))});
+    test('first failure',async()=>expect(1).toBe(2));test('later hang',async()=>{await new Promise(()=>{})});`);
+  const config=path.join(dir,'playwright.config.cjs');
+  await fs.writeFile(config,'module.exports='+JSON.stringify({testDir:dir,workers:1,retries:0,timeout:10000,globalTimeout:3000,
+    reporter:[[path.join(assets,'reporter.cjs'),{workDir:dir,capture:false}]]}));
+  const child=spawn(process.execPath,[path.join(dependencies,'node_modules/playwright/cli.js'),'test','--config',config],
+    {cwd:dir,stdio:['ignore','ignore','pipe','pipe'],env:{...process.env,NODE_OPTIONS:''}});
+  let wire='',stderr='';child.stdio[3].on('data',data=>wire+=data);child.stderr.on('data',data=>stderr+=data);
+  const code=await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',resolve)});
+  assert.notEqual(code,0,stderr);
+  const records=wire.trim().split('\n').map(JSON.parse);
+  const result=records.find(record=>record.type==='result')?.result;
+  assert.equal(result?.status,'timeout',wire+stderr);
+  assert.equal(result.termination_reason,'suite_timeout');
+  assert.match(result.error,/expect/);
+  assert.equal(result.tests.failed,1);
+  assert.ok(records.some(record=>record.event?.phase==='execution'&&/timed out|timeout/i.test(record.event.message)),wire);
+});
+
 test('Lighthouse startup inability preserves disabled capture policy', async () => {
-  const actual = await run(undefined, {kind:'lighthouse',url:'http://127.0.0.1:1',capture:false});
+  const actual = await run(undefined, {kind:'lighthouse',url:'http://127.0.0.1:1',capture:false,stop_at_monotonic_ms:undefined});
   assert.equal(actual.result.status,'error');
   assert.equal(actual.result.capture_state,'disabled');
 });
@@ -285,7 +325,7 @@ test('self-check verifies runtime-owned versions and private imports without a s
   const good=await check(root);
   assert.equal(good.code,0,good.stderr);
   assert.equal(good.stderr,'');
-  assert.deepEqual(JSON.parse(good.stdout),{contract:1,version:'test-release',uid:process.geteuid(),gid:process.getegid()});
+  assert.deepEqual(JSON.parse(good.stdout),{contract:2,version:'test-release',uid:process.geteuid(),gid:process.getegid()});
   assert.ok(Buffer.byteLength(good.stdout)<4096);
   for(const [changed,message] of [
     [{...pins,packages:{...pins.packages,playwright:'0.0.0'}},/package version mismatch/],

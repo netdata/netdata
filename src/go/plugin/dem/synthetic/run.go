@@ -53,32 +53,48 @@ type LabMetrics struct {
 	CLS         *float64 `json:"cls,omitempty"`
 }
 
+// ExecutionContract is the semantic Agent/runtime request and result contract.
+const ExecutionContract = 2
+
+// TerminationReason describes why execution stopped, separately from its first error.
+type TerminationReason string
+
+const (
+	ExecutionBudget   TerminationReason = "execution_budget"
+	TestTimeout       TerminationReason = "test_timeout"
+	SuiteTimeout      TerminationReason = "suite_timeout"
+	ExecutionDeadline TerminationReason = "execution_deadline"
+	CallerDeadline    TerminationReason = "caller_deadline"
+	CallerCancelled   TerminationReason = "cancelled"
+)
+
 // Run is a self-contained immutable history/diagnosis record. A missing
 // CompletedUS means no verified terminal result, never an invented failure.
 // StartedUS is immutable across both phases. Positive completion wall time may
 // precede start after a clock adjustment; DurationMS is measured independently.
 type Run struct {
-	Runtime       *RuntimeIdentity `json:"runtime,omitempty"`
-	ID            string           `json:"id"`
-	JobID         string           `json:"job_id"`
-	Kind          Kind             `json:"kind"`
-	Name          string           `json:"name"`
-	VnodeGUID     string           `json:"vnode_guid,omitempty"`
-	Target        string           `json:"target,omitempty"`
-	ScheduledUS   int64            `json:"scheduled_us,omitempty"`
-	QueuedUS      int64            `json:"queued_us,omitempty"`
-	StartedUS     int64            `json:"started_us"`
-	CompletedUS   int64            `json:"completed_us"`
-	DurationMS    *float64         `json:"duration_ms,omitempty"`
-	Outcome       Outcome          `json:"outcome"`
-	Error         string           `json:"error,omitempty"`
-	Tests         *TestCounts      `json:"tests,omitempty"`
-	Metrics       *LabMetrics      `json:"metrics,omitempty"`
-	Events        []Event          `json:"events"`
-	DroppedEvents int              `json:"dropped_events"`
-	CaptureState  string           `json:"capture_state"`
-	Artifacts     []Artifact       `json:"artifacts"`
-	HistoryError  string           `json:"history_error,omitempty"`
+	Runtime           *RuntimeIdentity  `json:"runtime,omitempty"`
+	ID                string            `json:"id"`
+	JobID             string            `json:"job_id"`
+	Kind              Kind              `json:"kind"`
+	Name              string            `json:"name"`
+	VnodeGUID         string            `json:"vnode_guid,omitempty"`
+	Target            string            `json:"target,omitempty"`
+	ScheduledUS       int64             `json:"scheduled_us,omitempty"`
+	QueuedUS          int64             `json:"queued_us,omitempty"`
+	StartedUS         int64             `json:"started_us"`
+	CompletedUS       int64             `json:"completed_us"`
+	DurationMS        *float64          `json:"duration_ms,omitempty"`
+	Outcome           Outcome           `json:"outcome"`
+	TerminationReason TerminationReason `json:"termination_reason,omitempty"`
+	Error             string            `json:"error,omitempty"`
+	Tests             *TestCounts       `json:"tests,omitempty"`
+	Metrics           *LabMetrics       `json:"metrics,omitempty"`
+	Events            []Event           `json:"events"`
+	DroppedEvents     int               `json:"dropped_events"`
+	CaptureState      string            `json:"capture_state"`
+	Artifacts         []Artifact        `json:"artifacts"`
+	HistoryError      string            `json:"history_error,omitempty"`
 }
 
 type Execution struct {

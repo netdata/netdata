@@ -23,10 +23,10 @@ class BuilderTests(unittest.TestCase):
             entrypoint = bundle.install_runner(assets, root, '2026.10.29.2')
             self.assertEqual(entrypoint, 'runner/run.mjs')
             self.assertEqual(json.loads((root / 'runtime.json').read_text()), {
-                'contract': 1, 'version': '2026.10.29.2',
+                'contract': 2, 'version': '2026.10.29.2',
                 'paths': {'dependencies': 'dependencies', 'browser': 'chrome'}})
             names = {'runner/run.mjs', 'runner/reporter.cjs', 'runner/protocol.cjs',
-                     'runner/lighthouse.mjs', 'runner/runtime.mjs', 'manifest.json', 'README.md'}
+                     'runner/lighthouse.mjs', 'runner/runtime.mjs', 'runner/journey.mjs', 'manifest.json', 'README.md'}
             for name in names:
                 self.assertEqual((assets / name).read_bytes(), (root / name).read_bytes())
             self.assertFalse((root / 'chrome').exists(), 'store preparation owns the bound browser wrapper')

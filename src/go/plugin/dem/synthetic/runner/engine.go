@@ -128,7 +128,9 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 	finishUnstarted := func(err error, drained bool) synthetic.Execution {
 		if errors.Is(err, context.Canceled) {
 			run.Outcome = synthetic.Cancelled
+			run.TerminationReason = synthetic.CallerCancelled
 		} else if errors.Is(err, context.DeadlineExceeded) {
+			run.TerminationReason = synthetic.CallerDeadline
 			run.Outcome = synthetic.Cancelled
 			if run.StartedUS > 0 {
 				run.Outcome = synthetic.Timeout
@@ -214,6 +216,15 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		Capture:    request.Capture,
 		Secrets:    request.Secrets,
 	}
+	if request.Kind == synthetic.Journey {
+		deadline, _ := attempt.Deadline()
+		req.StopAtMonotonicMS, err = journeyStopAt(deadline, admittedAt)
+		if err != nil {
+			run.Error = redact.text(err.Error())
+			e.complete(&run, []synthetic.Capture{}, redact)
+			return synthetic.Execution{Run: run, Drained: true}
+		}
+	}
 	raw, err := json.Marshal(req)
 	if err == nil && len(raw) > FrameMaxBytes {
 		err = errors.New("runner request exceeds 4 MiB transport limit")
@@ -243,8 +254,10 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 	if startErr != nil {
 		if errors.Is(attempt.Err(), context.Canceled) {
 			run.Outcome = synthetic.Cancelled
+			run.TerminationReason = synthetic.CallerCancelled
 		} else if errors.Is(attempt.Err(), context.DeadlineExceeded) {
 			run.Outcome = synthetic.Timeout
+			run.TerminationReason = deadlineReason(ctx, attempt)
 		}
 		run.Error = redact.text(startErr.Error())
 	} else {
@@ -255,15 +268,27 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		run.Events = snapshot.events
 		run.DroppedEvents = snapshot.dropped
 		run.Tests = snapshot.partial
+		if snapshot.err == nil && snapshot.result != nil {
+			// Observed test/measurement facts survive a later shutdown deadline.
+			if snapshot.result.Tests != nil {
+				run.Tests = snapshot.result.Tests
+			}
+			run.Metrics = snapshot.result.Metrics
+		}
 		switch {
 		case !drained:
 			run.Error = redact.text("process-tree completion is unverified: " + errorText(result.Err))
 		case errors.Is(attempt.Err(), context.DeadlineExceeded):
 			run.Outcome = synthetic.Timeout
-			run.Error = redact.text("overall execution deadline exceeded")
+			run.TerminationReason = deadlineReason(ctx, attempt)
+			run.Error = "overall execution deadline exceeded"
+			if run.TerminationReason == synthetic.CallerDeadline {
+				run.Error = "caller deadline exceeded"
+			}
 		case errors.Is(attempt.Err(), context.Canceled):
 			run.Outcome = synthetic.Cancelled
-			run.Error = redact.text("execution cancelled")
+			run.TerminationReason = synthetic.CallerCancelled
+			run.Error = "execution cancelled"
 		case snapshot.err != nil:
 			run.Error = redact.text(snapshot.err.Error())
 		case snapshot.result == nil:
@@ -272,9 +297,8 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 			run.Error = redact.text("runner exited unsuccessfully after reporting success")
 		default:
 			run.Outcome = snapshot.result.Status
+			run.TerminationReason = snapshot.result.TerminationReason
 			run.Error = redact.text(snapshot.result.Error)
-			run.Tests = snapshot.result.Tests
-			run.Metrics = snapshot.result.Metrics
 			run.CaptureState = snapshot.result.CaptureState
 		}
 		if !drained {
@@ -288,6 +312,13 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		captures := []synthetic.Capture{}
 		if snapshot.err == nil && snapshot.result != nil {
 			captures = append(captures, snapshot.result.Artifacts...)
+			if run.TerminationReason == synthetic.ExecutionBudget {
+				captures = append(captures, snapshot.result.InterruptedArtifacts...)
+			}
+			// A shutdown deadline or cancellation does not erase a reported first failure.
+			if run.TerminationReason != "" && snapshot.result.Error != "" {
+				run.Error = redact.text(snapshot.result.Error)
+			}
 		}
 		e.complete(&run, captures, redact)
 		return synthetic.Execution{

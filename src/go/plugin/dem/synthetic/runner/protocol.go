@@ -66,12 +66,14 @@ func clip(s string) string {
 
 // result is terminal reporter evidence, not process-tree completion evidence.
 type reporterResult struct {
-	Status       synthetic.Outcome     `json:"status"`
-	Error        string                `json:"error,omitempty"`
-	Tests        *synthetic.TestCounts `json:"tests,omitempty"`
-	Metrics      *synthetic.LabMetrics `json:"metrics,omitempty"`
-	Artifacts    []synthetic.Capture   `json:"artifacts,omitempty"`
-	CaptureState string                `json:"capture_state"`
+	Status               synthetic.Outcome           `json:"status"`
+	TerminationReason    synthetic.TerminationReason `json:"termination_reason,omitempty"`
+	InterruptedArtifacts []synthetic.Capture         `json:"interrupted_artifacts,omitempty"`
+	Error                string                      `json:"error,omitempty"`
+	Tests                *synthetic.TestCounts       `json:"tests,omitempty"`
+	Metrics              *synthetic.LabMetrics       `json:"metrics,omitempty"`
+	Artifacts            []synthetic.Capture         `json:"artifacts,omitempty"`
+	CaptureState         string                      `json:"capture_state"`
 }
 
 type frame struct {
@@ -314,7 +316,8 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 	default:
 		return errors.New("invalid terminal outcome")
 	}
-	if !capture && (result.CaptureState != "disabled" || len(result.Artifacts) != 0) {
+	candidateCount := len(result.Artifacts) + len(result.InterruptedArtifacts)
+	if !capture && (result.CaptureState != "disabled" || candidateCount != 0) {
 		return errors.New("runner captured content while capture was disabled")
 	}
 	if capture {
@@ -323,9 +326,25 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 		default:
 			return errors.New("invalid capture state")
 		}
-		if (result.CaptureState == "available") != (len(result.Artifacts) > 0) {
+		if (result.CaptureState == "available") != (candidateCount > 0) {
 			return errors.New("capture state contradicts artifact candidates")
 		}
+	}
+	switch result.TerminationReason {
+	case "":
+	case synthetic.ExecutionBudget, synthetic.TestTimeout, synthetic.SuiteTimeout:
+		if kind != synthetic.Journey || result.Status != synthetic.Timeout {
+			return errors.New("journey timeout reason contradicts terminal outcome")
+		}
+	case synthetic.CallerCancelled:
+		if result.Status != synthetic.Cancelled {
+			return errors.New("cancellation reason contradicts terminal outcome")
+		}
+	default:
+		return errors.New("unsupported runner termination reason")
+	}
+	if len(result.InterruptedArtifacts) > 0 && (kind != synthetic.Journey || result.TerminationReason != synthetic.ExecutionBudget) {
+		return errors.New("interrupted captures require a journey budget stop")
 	}
 	if kind == synthetic.Journey {
 		if result.Metrics != nil {
@@ -380,6 +399,11 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 			}
 		}
 	}
+	for _, a := range result.InterruptedArtifacts {
+		if a.Kind != "screenshot" || a.MIME != "image/png" {
+			return errors.New("unsupported interrupted journey capture")
+		}
+	}
 	for _, a := range result.Artifacts {
 		if kind == synthetic.Journey && (a.Kind != "screenshot" || a.MIME != "image/png") {
 			return errors.New("unsupported journey capture")
@@ -393,14 +417,15 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 
 type wireRequest struct {
-	Version    int               `json:"version"`
-	Kind       synthetic.Kind    `json:"kind"`
-	RunID      string            `json:"run_id"`
-	WorkDir    string            `json:"work_dir"`
-	Script     string            `json:"script,omitempty"`
-	ScriptPath string            `json:"script_path,omitempty"`
-	URL        string            `json:"url,omitempty"`
-	TimeoutMS  int64             `json:"timeout_ms"`
-	Capture    bool              `json:"capture"`
-	Secrets    map[string]string `json:"secrets,omitempty"`
+	Version           int               `json:"version"`
+	Kind              synthetic.Kind    `json:"kind"`
+	RunID             string            `json:"run_id"`
+	WorkDir           string            `json:"work_dir"`
+	Script            string            `json:"script,omitempty"`
+	ScriptPath        string            `json:"script_path,omitempty"`
+	URL               string            `json:"url,omitempty"`
+	TimeoutMS         int64             `json:"timeout_ms"`
+	StopAtMonotonicMS int64             `json:"stop_at_monotonic_ms,omitempty"`
+	Capture           bool              `json:"capture"`
+	Secrets           map[string]string `json:"secrets,omitempty"`
 }

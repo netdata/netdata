@@ -639,7 +639,7 @@ the stuck process before retrying removal or repair.
 
 **Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
 acquired at startup. A process started without a runtime stays unavailable until restarted. Runtime releases can
-update their components without an Agent upgrade while preserving execution contract 1. Runs record the actual
+update their components without an Agent upgrade while preserving execution contract 2. Runs record the actual
 release version, archive digest and execution contract for investigation.
 
 Explicit installation enables automatic preparation by default and prints this policy before proceeding. Use
@@ -779,6 +779,34 @@ A journey succeeds only when all ordinary declared tests actually pass. Unexpect
 incomplete coverage. Skipped, expected-failure, empty or incomplete suites are inconclusive unless there is a real
 unexpected failure/timeout. Errors loading/running the monitor are execution inability. Cancellation and an interrupted
 start are distinct from a failed target. A workflow failure means a declared check failed, not proof of a service-wide outage.
+
+Journey timeouts start when a browser slot is admitted, including runtime startup. The runner reserves up to five
+seconds inside the effective budget for Playwright's final diagnostic report (one fifth of budgets below 25 seconds).
+An earlier caller deadline shortens that budget. When the work interval expires, the runner requests a graceful
+Playwright stop. A cooperative interrupted test can report its locator error and an opted-in screenshot; its actual
+status remains `interrupted`, not a fabricated test timeout. Script-specified test timeouts remain supported.
+Lighthouse does not use this reporting reserve.
+
+Run detail and run lists expose `termination_reason` independently of the first reported `error`:
+
+| Reason | Meaning |
+| --- | --- |
+| `execution_budget` | The journey runner exhausted its work interval and requested a graceful stop before receiving the terminal report. |
+| `test_timeout` | Playwright reported a timed-out test. |
+| `suite_timeout` | Playwright reported a suite timeout. |
+| `execution_deadline` | The configured hard execution deadline expired before verified shutdown. |
+| `caller_deadline` | An earlier caller deadline expired before verified shutdown. |
+| `cancelled` | The caller cancelled, or Playwright reported interruption without a runner budget stop. |
+
+Other outcomes and older history may have no termination reason. A previously reported assertion error can coexist
+with a later timeout reason. A terminal report received before the graceful-stop timer is preserved, but shutdown
+still must finish within the hard deadline. Hung hooks, blocked workers and forced termination may prevent reporting
+or screenshots. Caller cancellation takes precedence and does not publish interrupted-test screenshots; already
+reported ordinary failure captures retain their existing policy. Captures are never recovered by scanning output files.
+
+The execution timeout does not bound the entire call: verified process-tree drainage precedes artifact publication and
+history completion, which use the existing separate ten-second completion budget. The browser slot remains held until
+completion. Cleanup uncertainty preserves work and closes admission; it never authorizes publication.
 
 Use the journey configuration's **Test** action to execute an unsaved draft on the selected Agent with its resolved
 secrets and installed browser runtime. Test returns pass/fail; failed, skipped/incomplete, interrupted or unavailable
