@@ -5962,8 +5962,8 @@ modules:
           follow the `Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter, except that a printer
           reporting several status flags at once gets its most severe state (problems first), a connection whose
           print server is offline reports `other`, a status the server reports as unknown reports `unknown`, a blocked
-          job counts as `error`, and a job waiting for user intervention counts as `degraded`. Job user names, machine
-          names, and document titles are not collected.
+          job counts as `error`, and a job waiting for user intervention counts as `degraded`. The job owner,
+          submitting machine, and document title returned with each job are never stored, logged, or exported.
       supported_platforms:
         include: ["windows"]
         exclude: []

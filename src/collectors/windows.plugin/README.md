@@ -121,7 +121,16 @@ Status values match the `Win32_Printer` and `Win32_PrintJob` mappings used by Wi
   unknown reports `unknown`.
 - A job the driver cannot print (blocked) counts as `error`; a job waiting for user intervention counts as `degraded`.
 
-An offline printer reports `other`. Job user names, machine names, and document titles are never collected.
+An offline printer reports `other`. These states come from the printer's status, so they appear only when it can be
+read:
+
+- If a printer cannot be opened or its status cannot be read (for example, its print server is unreachable), all four
+  of its charts have a gap for that cycle.
+- If only its job list cannot be read, the queued jobs and problems charts still update, and the status and jobs by
+  status charts have a gap.
+
+The spooler returns the job owner, submitting machine, and document title with each job; the module reads only the job
+status, and never stores, logs, or exports those fields.
 
 The module always runs on its own thread, so a slow spooler call never delays other modules; if that thread cannot be
 created, the module stays disabled. Opening a selected printer connection whose print server is unreachable can block;
