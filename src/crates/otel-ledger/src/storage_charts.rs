@@ -4,7 +4,8 @@
 //! confirmed their catalog entry.
 //!
 //! One set of charts for the ledger, a dimension per signal, all tenants
-//! together: the tenants have no bound, so they get no chart each. The
+//! together: the tenants have no bound, so they get no chart each, and one
+//! chart counts them. The
 //! retention limits are per tenant and stay in the configuration; these
 //! charts are where a host whose index files grow, or whose remote storage
 //! holds evictions back, shows.
@@ -70,6 +71,8 @@ pub(crate) struct IndexTotals {
     /// Those over a retention limit that stay until remote storage confirms
     /// their catalog entry.
     pub(crate) waiting_for_remote: u64,
+    /// The tenants that the ledger tracks files for.
+    pub(crate) tenants: u64,
 }
 
 /// The uploads to remote storage, index files and catalog files together.
@@ -103,6 +106,7 @@ struct SignalTotals {
     files: AtomicU64,
     bytes: AtomicU64,
     waiting_for_remote: AtomicU64,
+    tenants: AtomicU64,
 }
 
 impl StorageTotals {
@@ -113,6 +117,7 @@ impl StorageTotals {
         of_signal
             .waiting_for_remote
             .store(totals.waiting_for_remote, Ordering::Relaxed);
+        of_signal.tenants.store(totals.tenants, Ordering::Relaxed);
     }
 
     pub(crate) fn get(&self, signal: Signal) -> IndexTotals {
@@ -121,6 +126,7 @@ impl StorageTotals {
             files: of_signal.files.load(Ordering::Relaxed),
             bytes: of_signal.bytes.load(Ordering::Relaxed),
             waiting_for_remote: of_signal.waiting_for_remote.load(Ordering::Relaxed),
+            tenants: of_signal.tenants.load(Ordering::Relaxed),
         }
     }
 
@@ -166,6 +172,7 @@ pub(crate) struct StorageCharts {
     index_files: Gauge<PerSignal>,
     index_size: Gauge<PerSignal>,
     waiting_for_remote: Gauge<PerSignal>,
+    tenants: Gauge<PerSignal>,
     /// Present when remote storage is enabled.
     uploads: Option<UploadCharts>,
 }
@@ -204,6 +211,14 @@ impl StorageCharts {
             chart_type: ChartType::Stacked,
             priority: 150_032,
         })?;
+        let tenants = builder.gauge::<PerSignal>(ChartDescriptor {
+            title: "Tenants with stored data".into(),
+            units: "tenants".into(),
+            family: "storage".into(),
+            context: "netdata.otel.tenants".into(),
+            chart_type: ChartType::Line,
+            priority: 150_033,
+        })?;
         let uploads = if remote_storage {
             Some(UploadCharts {
                 in_progress: builder.gauge::<UploadState>(ChartDescriptor {
@@ -235,6 +250,7 @@ impl StorageCharts {
             index_files,
             index_size,
             waiting_for_remote,
+            tenants,
             uploads,
         })
     }
@@ -261,7 +277,8 @@ impl StorageCharts {
                     self.waiting_for_remote,
                     signal,
                     totals.waiting_for_remote as f64,
-                );
+                )
+                .set_value(self.tenants, signal, totals.tenants as f64);
         }
         if let Some(uploads) = &self.uploads {
             measurements
@@ -342,11 +359,13 @@ mod tests {
             files: 12,
             bytes: 3_000,
             waiting_for_remote: 2,
+            tenants: 3,
         };
         let traces = IndexTotals {
             files: 4,
             bytes: 500,
             waiting_for_remote: 0,
+            tenants: 1,
         };
 
         let mut chunks = charts.emit(100, logs, traces, UploadTotals::default());
@@ -362,6 +381,9 @@ mod tests {
         ));
         assert!(out.contains(
             "BEGIN netdata.otel.index_files_waiting_for_remote 1000000\nSET logs = 2\nSET traces = 0\nEND 101 0 1\n"
+        ));
+        assert!(out.contains(
+            "BEGIN netdata.otel.tenants 1000000\nSET logs = 3\nSET traces = 1\nEND 101 0 1\n"
         ));
     }
 
@@ -436,6 +458,7 @@ mod tests {
             files: 7,
             bytes: 70,
             waiting_for_remote: 1,
+            tenants: 2,
         };
 
         totals.set(Signal::Logs, logs);

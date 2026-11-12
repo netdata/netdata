@@ -44,8 +44,8 @@ impl Ledger {
 
     /// The index files of `signal` on the local disk, over `tenant_ids`: how
     /// many, how large, and how many are over a retention limit but stay
-    /// until remote storage confirms their catalog entry. Files whose
-    /// deletion is on its way are not counted.
+    /// until remote storage confirms their catalog entry; and the number of
+    /// those tenants. Files whose deletion is on its way are not counted.
     async fn index_totals(&self, signal: Signal, tenant_ids: &[TenantId]) -> IndexTotals {
         let pipeline = self.pipelines.get(signal);
         let storage_enabled = self.uploader.is_some();
@@ -56,6 +56,7 @@ impl Ledger {
             let Some(registry) = registries.get(tenant_id) else {
                 continue;
             };
+            totals.tenants += 1;
             for file in registry.sfst.values() {
                 if !file.is_pending_deletion() {
                     totals.files += 1;
