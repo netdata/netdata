@@ -348,6 +348,14 @@ impl Chart {
     /// Returns `false` when the chart does not take the point: it would add
     /// a dimension whose name is longer than [`MAX_NAME_BYTES`], or one more
     /// than [`MAX_DIMENSIONS`].
+    ///
+    /// A value that is not finite (NaN, an infinity) is left out, and that
+    /// is not a refusal: the agent's `SET` takes an integer, and the value
+    /// would be charted as 0 or as the largest one, and would stay in a
+    /// cumulative dimension's state. Every value passes here: a number
+    /// point's (which `DataPointRef::value` already leaves out, with its
+    /// point), and a histogram's or a summary's sum, minimum, maximum and
+    /// quantiles.
     pub fn ingest(
         &mut self,
         dimension_name: &str,
@@ -355,6 +363,10 @@ impl Chart {
         timestamp_ns: u64,
         start_time_ns: u64,
     ) -> bool {
+        if !value.is_finite() {
+            return true;
+        }
+
         let dimension_id = sanitize_dimension_id(dimension_name);
         if !self.dimensions.contains(&dimension_id) {
             let dimensions = self.dimensions.len();
@@ -846,6 +858,23 @@ mod tests {
 
         netdata_plugin_protocol::validate_chart_stream(&buf).unwrap();
         assert!(text(&buf).contains("BEGIN my_metric.42 "), "{}", text(&buf));
+    }
+
+    /// A histogram's sum, minimum and maximum and a summary's sum and
+    /// quantiles reach a chart here with whatever the sender put in them.
+    #[test]
+    fn a_value_that_is_not_finite_makes_no_dimension() {
+        let mut chart = gauge_chart();
+        chart.init_definition("load", "Load", "load", Vec::new());
+
+        assert!(chart.ingest("sum", f64::NAN, ns(100), 0));
+        assert!(chart.ingest("max", f64::INFINITY, ns(100), 0));
+        assert!(chart.ingest("min", f64::NEG_INFINITY, ns(100), 0));
+        assert_eq!(chart.dimensions.len(), 0);
+
+        // The value of the same dimension that follows is taken.
+        assert!(chart.ingest("sum", 2.0, ns(100), 0));
+        assert_eq!(chart.dimensions.len(), 1);
     }
 
     /// A chart's labels come from the request's attributes, in any number
