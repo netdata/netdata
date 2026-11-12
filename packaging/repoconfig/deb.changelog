@@ -1,3 +1,10 @@
+@PKG_NAME@ (5-6) unstable; urgency=medium
+
+  * Add preview repository configuration packages
+  * Ensure repository configuration variants conflict with each other
+
+ -- Austin Hemmelgarn <austin@netdata.cloud>  Tue, 10 Nov 2026 12:00:00 -0500
+
 @PKG_NAME@ (5-5) unstable; urgency=medium
 
   * Version bump to keep in sync with RPM repo packages

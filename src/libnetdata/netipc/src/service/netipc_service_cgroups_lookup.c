@@ -78,7 +78,7 @@ static nipc_error_t cgroups_lookup_do_raw_call_with_retry(
       .timeout_ms = timeout_ms,
   };
   return nipc_service_platform_call_with_retry(
-      ctx, cgroups_lookup_raw_call_attempt, &state);
+      ctx, cgroups_lookup_raw_call_attempt, &state, timeout_ms);
 }
 
 static bool
@@ -295,8 +295,12 @@ static nipc_error_t do_cgroups_lookup_attempt(nipc_client_ctx_t *ctx,
                                         &one_item_size) &&
             cgroups_lookup_request_capacity_can_reconnect(ctx,
                                                           one_item_size)) {
-          err = nipc_service_platform_ensure_request_capacity(ctx,
-                                                              one_item_size);
+          uint32_t capacity_timeout;
+          err = cgroups_lookup_remaining_timeout(ctx, s->deadline_ms,
+                                                 &capacity_timeout);
+          if (err == NIPC_OK)
+            err = nipc_service_platform_ensure_request_capacity(
+                ctx, one_item_size, capacity_timeout);
           if (err == NIPC_OK)
             continue;
           goto cleanup;

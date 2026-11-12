@@ -1,4 +1,6 @@
-//go:build unix
+//go:build unix && netipc_extended
+
+// Stress tests run only from tests/run-extended-stress.sh.
 
 package raw
 
@@ -12,40 +14,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
 )
-
-// simpleHash: djb2 matching the C implementation
-func simpleHash(s string) uint32 {
-	var hash uint32 = 5381
-	for _, c := range []byte(s) {
-		hash = ((hash << 5) + hash) + uint32(c)
-	}
-	return hash
-}
-
-// largeHandler builds a snapshot with N items (realistic container names).
-func largeHandler(n int) DispatchHandler {
-	return SnapshotDispatch(func(request *protocol.CgroupsRequest, builder *protocol.CgroupsBuilder) bool {
-		if request.LayoutVersion != 1 || request.Flags != 0 {
-			return false
-		}
-		builder.SetHeader(1, 42)
-
-		for i := range n {
-			name := fmt.Sprintf("container-%04d", i)
-			path := fmt.Sprintf("/sys/fs/cgroup/docker/%04d", i)
-			hash := simpleHash(name)
-			enabled := uint32(1)
-			if i%5 == 0 {
-				enabled = 0
-			}
-			if err := builder.Add(hash, 0x10, enabled,
-				[]byte(name), []byte(path)); err != nil {
-				return false
-			}
-		}
-		return true
-	}, uint32(n))
-}
 
 // verifySnapshot checks all items in a snapshot view match expected data.
 func verifySnapshot(t *testing.T, view *protocol.CgroupsResponseView, n int) bool {
@@ -115,38 +83,7 @@ func startLargeServer(service string, handler DispatchHandler, maxResp uint32) *
 	cfg.PacketSize = 65536 // force smaller packets for reliable chunking
 
 	s := NewServer(testRunDir, service, cfg, protocol.MethodCgroupsSnapshot, handler)
-	doneCh := make(chan struct{})
-
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-
-	waitUnixServerReady(service)
-	return &testServer{server: s, doneCh: doneCh}
-}
-
-// startServerWithWorkers creates a server with explicit worker count.
-func startServerWithWorkers(service string, handler DispatchHandler, workers int) *testServer {
-	ensureRunDir()
-	cleanupAll(service)
-
-	s := NewServerWithWorkers(
-		testRunDir,
-		service,
-		testServerConfig(),
-		protocol.MethodCgroupsSnapshot,
-		handler,
-		workers,
-	)
-	doneCh := make(chan struct{})
-
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-
-	waitUnixServerReady(service)
+	doneCh := runServerForTest(s)
 	return &testServer{server: s, doneCh: doneCh}
 }
 
@@ -555,12 +492,7 @@ func TestStressMixedTransport(t *testing.T) {
 		protocol.MethodCgroupsSnapshot,
 		testSnapshotDispatch(),
 	)
-	doneCh := make(chan struct{})
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-	waitUnixServerReady(svc)
+	doneCh := runServerForTest(s)
 
 	defer func() {
 		s.Stop()

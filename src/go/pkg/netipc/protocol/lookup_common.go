@@ -180,12 +180,17 @@ func buildPayloadExceededSuffixBytes(itemLens []int) ([]uint32, bool) {
 	return suffixBytes, true
 }
 
-func makePayloadExceededSuffixBytes(itemCount uint32) ([]uint32, bool) {
+// reusePayloadExceededSuffixBytes returns a table of itemCount+1 entries,
+// reusing dst when it is large enough. Callers write every entry.
+func reusePayloadExceededSuffixBytes(dst []uint32, itemCount uint32) ([]uint32, bool) {
 	count, ok := checkedInt(uint64(itemCount))
 	if !ok || count == maxIntValue() {
-		return nil, false
+		return dst, false
 	}
-	return make([]uint32, count+1), true
+	if cap(dst) < count+1 {
+		return make([]uint32, count+1), true
+	}
+	return dst[:count+1], true
 }
 
 func finishPayloadExceededSuffixBytes(suffixBytes []uint32) bool {
