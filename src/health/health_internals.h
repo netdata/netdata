@@ -149,6 +149,14 @@ struct health_plugin_globals {
     struct {
         DICTIONARY *dict;
         bool registering;
+
+        // every re-match of a chart takes the next value; alerts it keeps or creates carry at least that value,
+        // so the alerts it did not account for (their rule is gone) are the ones left with a smaller one
+        uint64_t rematch_seq;
+
+        // a reload empties the dictionary and loads the rules one by one: re-matching against that partial set
+        // would remove alerts whose rules are about to return. Reload holds it for writing, re-matches for reading.
+        netdata_rwlock_t reload_rwlock;
     } prototypes;
 };
 
@@ -167,6 +175,9 @@ void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_u
 void health_alarm_wait_for_execution(ALARM_ENTRY *ae);
 
 bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *ap);
+bool rrdcalc_rematch_keep(RRDSET *st, STRING *alert_name, RRD_ALERT_PROTOTYPE *winner, uint64_t seq);
+bool rrdcalc_rrdset_has_alert(RRDSET *st, STRING *alert_name);
+void rrdcalc_rematch_sweep_rrdset(RRDSET *st, uint64_t seq);
 
 int dyncfg_health_cb(const char *transaction, const char *id, DYNCFG_CMDS cmd, const char *add_name,
                      BUFFER *payload, usec_t *stop_monotonic_ut, bool *cancelled,
@@ -185,7 +196,6 @@ void alerts_raised_summary_free(struct health_raised_summary *hrm);
 void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm);
 void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm);
 
-void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap);
 
 // the lookup condition exactly as configured, or NULL when the alert did

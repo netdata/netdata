@@ -119,6 +119,10 @@ struct rrdcalc {
     uint32_t labels_version;
     struct rrdset *rrdset;
 
+    // the latest re-match that kept or created this alert (health_globals.prototypes.rematch_seq);
+    // written under the host's alert dictionary write lock
+    uint64_t rematch_seq;
+
     struct rrdcalc *next;
     struct rrdcalc *prev;
 

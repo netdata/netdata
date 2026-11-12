@@ -252,10 +252,9 @@ bool health_prototype_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused, vo
 
             rw_spinlock_write_lock(&ap->_internal.rw_spinlock);
             DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap->_internal.next, alloced, _internal.prev, _internal.next);
-            rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
-
             if(alloced->_internal.enabled)
                 ap->_internal.enabled = true;
+            rw_spinlock_write_unlock(&ap->_internal.rw_spinlock);
         }
     }
     else {
@@ -280,6 +279,12 @@ void health_prototype_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void
 }
 
 void health_init_prototypes(void) {
+    static bool reload_rwlock_initialized = false;
+    if(!reload_rwlock_initialized) {
+        netdata_rwlock_init(&health_globals.prototypes.reload_rwlock);
+        reload_rwlock_initialized = true;
+    }
+
     if(health_globals.prototypes.dict)
         return;
 
@@ -503,16 +508,16 @@ void health_reload_prototypes(void) {
     // remove all dyncfg related to prototypes
     health_dyncfg_unregister_all_prototypes();
 
-    // clear old prototypes from memory
+    // clear old prototypes from memory and load the prototypes from disk; re-matches wait for the complete set
+    netdata_rwlock_wrlock(&health_globals.prototypes.reload_rwlock);
     dictionary_flush(health_globals.prototypes.dict);
-
-    // load the prototypes from disk
     recursive_config_double_dir_load(
         health_user_config_dir(),
         health_globals.config.stock_enabled ? health_stock_config_dir() : NULL,
         NULL,
         health_readfile,
         NULL, 0);
+    netdata_rwlock_wrunlock(&health_globals.prototypes.reload_rwlock);
 
     // register all loaded prototypes
     __atomic_store_n(&health_globals.prototypes.registering, true, __ATOMIC_RELAXED);
@@ -618,11 +623,13 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
     dst->crit_repeat_every = src->crit_repeat_every;
 }
 
-static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
+// The rule of `ap` that attaches to `st`, or NULL: instance rules before templates, each in chain order, first match
+// wins. Alerts are keyed by chart and alert name, so at most one rule of a chain attaches to a chart.
+// The caller holds ap->_internal.rw_spinlock for reading.
+static RRD_ALERT_PROTOTYPE *health_prototype_winner_for_rrdset_unsafe(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
     if(!ap->_internal.enabled)
-        return;
+        return NULL;
 
-    rw_spinlock_read_lock(&ap->_internal.rw_spinlock);
     for(size_t template = 0; template < 2; template++) {
         bool want_template = template ? true : false;
 
@@ -644,15 +651,49 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
             if (!prototype_matches_host(st->rrdhost, t))
                 continue;
 
-            rrdcalc_add_from_prototype(st->rrdhost, st, t);
+            return t;
         }
     }
+
+    return NULL;
+}
+
+static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap) {
+    rw_spinlock_read_lock(&ap->_internal.rw_spinlock);
+    RRD_ALERT_PROTOTYPE *winner = health_prototype_winner_for_rrdset_unsafe(st, ap);
+    if(winner)
+        rrdcalc_add_from_prototype(st->rrdhost, st, winner);
     rw_spinlock_read_unlock(&ap->_internal.rw_spinlock);
+}
+
+// Re-matches the alert named by `ap` on `st`: keeps it when the rule that attaches now is the one it was created
+// from, otherwise deletes it and creates the alert of the rule that attaches now, if any.
+static void health_prototype_rematch_on_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap, uint64_t seq) {
+    rw_spinlock_read_lock(&ap->_internal.rw_spinlock);
+    RRD_ALERT_PROTOTYPE *winner = health_prototype_winner_for_rrdset_unsafe(st, ap);
+
+    // most rules match nothing on most charts: take the host alert dictionary write lock only when the chart has an
+    // alert of this name to keep or delete; an alert another thread adds meanwhile is stamped for the sweep when linked
+    bool kept = false;
+    if(rrdcalc_rrdset_has_alert(st, ap->config.name))
+        kept = rrdcalc_rematch_keep(st, ap->config.name, winner, seq);
+
+    if(!kept && winner)
+        rrdcalc_add_from_prototype(st->rrdhost, st, winner);
+    rw_spinlock_read_unlock(&ap->_internal.rw_spinlock);
+}
+
+static uint64_t health_prototype_rematch_seq_next(void) {
+    return __atomic_add_fetch(&health_globals.prototypes.rematch_seq, 1, __ATOMIC_SEQ_CST);
 }
 
 extern __thread bool is_health_thread;
 
 void health_prototype_alerts_for_rrdset_incrementally(RRDSET *st) {
+    // attaching from a set a reload is still loading would pick partial rule chains, which the re-match after the
+    // reload would then replace
+    netdata_rwlock_rdlock(&health_globals.prototypes.reload_rwlock);
+
     RRD_ALERT_PROTOTYPE *ap;
     dfe_start_read(health_globals.prototypes.dict, ap) {
         if (is_health_thread && !service_running(SERVICE_HEALTH))
@@ -660,75 +701,76 @@ void health_prototype_alerts_for_rrdset_incrementally(RRDSET *st) {
         health_prototype_apply_to_rrdset(st, ap);
     }
     dfe_done(ap);
+
+    netdata_rwlock_rdunlock(&health_globals.prototypes.reload_rwlock);
 }
 
-void health_prototype_reset_alerts_for_rrdset(RRDSET *st) {
-    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
-    health_prototype_alerts_for_rrdset_incrementally(st);
+// Brings the alerts of `st` in line with the current labels and prototypes without touching the alerts whose rule
+// did not change: a label change, a health reload or a re-registered prototype must not remove and re-raise them.
+// Alerts whose rule changed are replaced, alerts whose rule is gone are removed, newly matching rules are added.
+void health_prototype_rematch_rrdset(RRDSET *st) {
+    // the whole walk sees one complete set of prototypes, not one a reload is still loading
+    netdata_rwlock_rdlock(&health_globals.prototypes.reload_rwlock);
+
+    uint64_t seq = health_prototype_rematch_seq_next();
+    bool complete = true;
+
+    RRD_ALERT_PROTOTYPE *ap;
+    dfe_start_read(health_globals.prototypes.dict, ap) {
+        if (is_health_thread && !service_running(SERVICE_HEALTH)) {
+            complete = false;
+            break;
+        }
+        health_prototype_rematch_on_rrdset(st, ap, seq);
+    }
+    dfe_done(ap);
+
+    // an interrupted walk did not visit every prototype, so it cannot tell which alerts lost theirs
+    if(complete)
+        rrdcalc_rematch_sweep_rrdset(st, seq);
+
+    netdata_rwlock_rdunlock(&health_globals.prototypes.reload_rwlock);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 
-void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap) {
-    if(!ap->_internal.enabled)
-        return;
-
-    if(unlikely(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
-        return;
-
-    RRDSET *st;
-    rrdset_foreach_read(st, host) {
-        health_prototype_apply_to_rrdset(st, ap);
-    }
-    rrdset_foreach_done(st);
-}
-
+// A prototype was added, changed, enabled or disabled: re-match its alert on every chart of every host. Alerts whose
+// rule did not change are kept; a disabled prototype attaches nowhere, so its alerts are removed.
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap) {
+    // like every re-match, wait for a reload that is still loading the rules
+    netdata_rwlock_rdlock(&health_globals.prototypes.reload_rwlock);
+
+    uint64_t seq = health_prototype_rematch_seq_next();
+
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host){
         if(unlikely(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
             continue;
 
-        RRDCALC *rc;
-        foreach_rrdcalc_in_rrdhost_reentrant(host, rc) {
-            if(rc->config.name != ap->config.name)
-                continue;
-
-            rrdcalc_unlink_and_delete(host, rc, false);
+        RRDSET *st;
+        rrdset_foreach_reentrant(st, host) {
+            health_prototype_rematch_on_rrdset(st, ap, seq);
         }
-        foreach_rrdcalc_in_rrdhost_done(rc);
+        rrdset_foreach_done(st);
         dictionary_garbage_collect(host->rrdcalc_root_index);
-
-        if(ap->_internal.enabled)
-            health_apply_prototype_to_host(host, ap);
     }
     dfe_done(host);
+
+    netdata_rwlock_rdunlock(&health_globals.prototypes.reload_rwlock);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
 
+// Re-matches every chart of the host against the current prototypes (health initialization and reload).
 void health_apply_prototypes_to_host(RRDHOST *host) {
     if(unlikely(!host->health.enabled || !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)))
         return;
 
-    // free all running alarms
-    rrdcalc_delete_all(host);
-
-    // invalidate all previous entries in the alarm log
-    rw_spinlock_read_lock(&host->health_log.spinlock);
-    ALARM_ENTRY *t;
-    for(t = host->health_log.alarms ; t ; t = t->next) {
-        if(t->new_status != RRDCALC_STATUS_REMOVED)
-            t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
-    }
-    rw_spinlock_read_unlock(&host->health_log.spinlock);
-
-    // apply all the prototypes for the charts of the host
     RRDSET *st;
     rrdset_foreach_reentrant(st, host) {
         if (is_health_thread && !service_running(SERVICE_HEALTH))
             break;
-        health_prototype_reset_alerts_for_rrdset(st);
+        health_prototype_rematch_rrdset(st);
     }
     rrdset_foreach_done(st);
     dictionary_garbage_collect(host->rrdcalc_root_index);
