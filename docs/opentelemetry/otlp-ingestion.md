@@ -197,6 +197,10 @@ object storage. It gives you charts for these conditions. Netdata ships no alert
 
 The plugin relies on these rules and does not check them:
 
+- Do not change `remote_storage.uri` to another location, and do not empty the location, before you copy the
+  stored objects to the new location. The plugin does not check that the location holds its files, and its local
+  retention can then delete files that are in no other place. See
+  [what a change of the location needs](/docs/logs/log-storage-and-retention.md).
 - Use one plugin for one data directory. Two Agents that write to the same `base_dir` can damage the stored data.
   Do not let other programs delete or change the files under `base_dir`: no cleanup jobs, and no temporary
   filesystem that is emptied at boot.
