@@ -102,6 +102,12 @@ A **profile** defines:
 2. Picks the best matching vendor/model profile(s)
 3. Collects exactly the metrics those profiles define
 
+Jobs collecting SNMP metrics check standard system information once per minute. When the name, description,
+contact, location or `sysObjectID` changes, the job identifies the device again: it reselects profiles and
+rebuilds device-specific collection state. The vnode GUID and history stay the same, and configured hostname
+and label overrides keep precedence. A device swapped for hardware reporting the same five values is not
+detected until the job restarts. `ping_only` jobs retain their setup-only SNMP probe.
+
 
 This collector is supported on all platforms.
 

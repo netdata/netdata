@@ -43,10 +43,11 @@ Sites are explicitly configured; websites are not discovered automatically.
 
 #### Limits
 
-Breakdown charts show current-window top groups. Missing browser observations cannot be reconstructed, and
-capacity loss suppresses affected percentiles and window counts. Duplicate detection is best effort across a bounded
-30-minute retention period; capacity pressure or restart can shorten it. Quality alerts require at least 30
-observations for that metric and complete local measurement state. Quiet traffic alone does not trigger an alert.
+Breakdown charts show current-window top groups; page Functions expose all retained document-entry groups.
+Missing browser observations cannot be reconstructed. Measurements use the configured window (five minutes by
+default); replay evidence is retained for 30 minutes unless the site job restarts, is replaced, or changes its
+vnode association. Later replays can count again.
+Quality alerts require at least 30 observations for that metric. Quiet traffic alone does not trigger an alert.
 
 RUM and synthetic history share the 30-day and 1-GiB defaults in `dem.conf`, including disabled sites and retained
 machine identities. The byte target counts full journal file sizes including preallocation, with an 8-MiB minimum.
@@ -63,7 +64,7 @@ complete sessions or traces are not guaranteed. Export acceptance does not guara
 
 #### Performance Impact
 
-Resource usage depends on accepted browser traffic and the configured measurement window. Optional OTLP export and investigation history add network and local disk work.
+Measurement and replay memory grows with admitted distinct state and retained text over the configured measurement window (five minutes by default) and 30-minute identity horizon. There is no independent aggregate count or byte cap. Investigation detail has separate session and entry limits. Optional OTLP export and investigation history add network and local disk work. These retention rules do not establish a qualified full-scale workload.
 
 ## Setup
 
@@ -144,6 +145,12 @@ Options apply independently to each site job. Native job name is the beacon and 
 | **Normalization** | redact_paths | Apply site-specific URL-path replacements before built-in normalization. These rules do not anonymize user IDs or provide general data-loss prevention. |  | no |
 |  | redact_paths[].pattern | Go regular expression matching private path identifiers. Empty patterns are ignored. |  | no |
 |  | redact_paths[].replace | Replacement text for matching path segments. Leave empty to remove them. |  | no |
+| **Virtual Node** | [vnode](#option-virtual-node-vnode) | Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+<a id="option-virtual-node-vnode"></a>
+##### vnode
+
+Define a static vnode through `dem:vnode` or a YAML file in the Netdata configuration directory’s `vnodes/` directory. Enter its reference name, not its GUID. Leave empty to keep charts on the collecting Agent. A different resolved GUID starts a fresh rolling measurement window and Pages view. Saved and buffered investigation records keep their original GUID; hostname or label edits do not reset measurements. Job-wide transport and history counters continue.
 
 
 </details>
@@ -167,13 +174,14 @@ sudo ./edit-config dem/rum.conf
 
 ###### Website
 
-Native charts, session timelines and errors, with country-only location and frustration heuristics disabled. No OTLP receiver is required.
+Define the `storefront` vnode first, or omit `vnode` to use the collecting Agent. Native charts, session timelines and errors use country-only location with frustration heuristics disabled. No OTLP receiver is required.
 
 <details open><summary>Examples</summary>
 
 ```yaml
 jobs:
   - name: shop
+    vnode: storefront
     allowed_origins: [https://shop.example.org]
 
 ```
@@ -188,6 +196,7 @@ Keep measurements and live views for all received traffic, with detail selected 
 ```yaml
 jobs:
   - name: shop
+    vnode: storefront
     allowed_origins: [https://shop.example.org]
     investigate:
       sample_rate: 0
@@ -204,6 +213,7 @@ Keep measurements and live views without retained native detail or event-log and
 ```yaml
 jobs:
   - name: shop
+    vnode: storefront
     allowed_origins: [https://shop.example.org]
     investigate:
       sample_rate: 0
@@ -221,6 +231,7 @@ Search sampled events and optional console messages with a local OTLP/gRPC recei
 ```yaml
 jobs:
   - name: shop
+    vnode: storefront
     allowed_origins: [https://shop.example.org]
     event_logs:
       enabled: true
@@ -238,6 +249,7 @@ Send browser spans to your backend tracing receiver without enabling event logs.
 ```yaml
 jobs:
   - name: shop
+    vnode: storefront
     allowed_origins: [https://shop.example.org]
     tracing:
       enabled: true
@@ -272,11 +284,11 @@ Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
-All charts remain on this Agent. Native job identity scopes site charts; display_name is optional metadata.
+Charts belong to the configured vnode, or to this Agent when vnode is omitted. Native job identity scopes site charts; display_name is optional metadata.
 The window uses receiver arrival time. Each Web Vital contributes its latest report per document experience;
 percentiles cannot be averaged across times or groups. Population charts show retained observations and ratings.
-No observations means no percentile. Capacity loss makes affected percentiles and counts unavailable; lost_reports
-is retained loss evidence, not a denominator or an exact count of missing observations in the window.
+No observations means no percentile; measured zero remains a valid value. Canonical measurements are retained
+exactly for the configured receipt window, with no independent aggregate count or byte cap.
 
 Document views count initial activations and back-forward cache restores. Application views count explicit route
 occurrences separately. Observed sessions are distinct browser session identities seen in the window, not concurrent
@@ -305,34 +317,32 @@ Metrics:
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
 | rum.lcp | Largest Contentful Paint among recent observed document experiences | p50, p75, p95 | milliseconds |
-| rum.lcp_population | Largest Contentful Paint observed population | observed, good, needs_improvement, poor, lost_reports | observations |
+| rum.lcp_population | Largest Contentful Paint observed population | observed, good, needs_improvement, poor | observations |
 | rum.fcp | First Contentful Paint among recent observed document experiences | p50, p75, p95 | milliseconds |
-| rum.fcp_population | First Contentful Paint observed population | observed, good, needs_improvement, poor, lost_reports | observations |
+| rum.fcp_population | First Contentful Paint observed population | observed, good, needs_improvement, poor | observations |
 | rum.ttfb | Time to First Byte among recent observed document experiences | p50, p75, p95 | milliseconds |
-| rum.ttfb_population | Time to First Byte observed population | observed, good, needs_improvement, poor, lost_reports | observations |
+| rum.ttfb_population | Time to First Byte observed population | observed, good, needs_improvement, poor | observations |
 | rum.inp | Interaction to Next Paint among recent observed document experiences | p50, p75, p95 | milliseconds |
-| rum.inp_population | Interaction to Next Paint observed population | observed, good, needs_improvement, poor, lost_reports | observations |
+| rum.inp_population | Interaction to Next Paint observed population | observed, good, needs_improvement, poor | observations |
 | rum.cls | Cumulative Layout Shift among recent observed document experiences | p50, p75, p95 | score |
-| rum.cls_population | Cumulative Layout Shift observed population | observed, good, needs_improvement, poor, lost_reports | observations |
+| rum.cls_population | Cumulative Layout Shift observed population | observed, good, needs_improvement, poor | observations |
 | rum.load | Document load time | p50, p75, p95 | milliseconds |
 | rum.dom_content_loaded_handler | DOMContentLoaded handler duration | p50, p75, p95 | milliseconds |
 | rum.same_site_fetch | Same-site fetch and XHR duration | p50, p75, p95 | milliseconds |
-| rum.load_population | Document load time observation population | observed, lost_reports | observations |
-| rum.dom_content_loaded_handler_population | DOMContentLoaded handler duration observation population | observed, lost_reports | observations |
-| rum.same_site_fetch_population | Same-site fetch and XHR duration observation population | observed, lost_reports | observations |
+| rum.load_population | Document load time observation population | observed | observations |
+| rum.dom_content_loaded_handler_population | DOMContentLoaded handler duration observation population | observed | observations |
+| rum.same_site_fetch_population | Same-site fetch and XHR duration observation population | observed | observations |
 | rum.document_views | Document views | views | views/s |
 | rum.js_errors | JavaScript errors | errors | errors/s |
 | rum.observed_sessions | Sessions observed in the window | observed | sessions |
 | rum.window_totals | Document views, application views and JavaScript errors in the window | document_views, application_views, js_errors | events |
 | rum.frustration | Frustration heuristics | rage_clicks, dead_clicks, error_clicks | signals/s |
 | rum.application_views | Explicit application views | views | views/s |
-| rum.measurement_loss | Retained capacity-loss evidence for window summaries | activity, sessions | reports |
 | rum.resources | Reported application resource entries | same_site, cross_site, unknown | entries/s |
 | rum.beacons | RUM beacons | accepted, rejected_origin, rejected_rate, rejected_size, invalid, bots | beacons/s |
 | rum.otlp | Event log export outcomes | sent, dropped, errors | records/s |
 | rum.history | RUM history writes | written, dropped | records/s |
 | rum.spans | Browser span export outcomes | sent, dropped, errors | spans/s |
-| rum.samples_dropped | Reports lost from bounded measurement state | dropped | reports/s |
 | rum.ingress_state | RUM ingress availability | available, unavailable | state |
 | rum.invalid_measurements | Measurements without valid identity or revision | invalid | reports/s |
 
@@ -355,8 +365,7 @@ Metrics:
 |:------|:------------|:----------|:----|
 | rum.resource_host_p75 | Resource duration by host in the window | p75 | milliseconds |
 | rum.resource_host_count | Reported resource entries by host in the window | count | entries |
-| rum.resource_host_population | Resource duration population by host | observed, lost_reports | observations |
-| rum.resource_host_loss | Retained capacity-loss evidence for resource counts by host | lost_reports | reports |
+| rum.resource_host_population | Resource duration population by host | observed | observations |
 
 
 ### Per site fingerprint
@@ -376,7 +385,6 @@ Metrics:
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
 | rum.error_groups | JavaScript error reports by fingerprint in the window | errors | reports |
-| rum.error_group_loss | Retained capacity-loss evidence for error fingerprints | lost_reports | reports |
 
 
 ### Per site browser
@@ -403,7 +411,6 @@ Metrics:
 | rum.browser_document_views | Document views by browser in the window | views | views |
 | rum.browser_js_errors | JavaScript error reports by browser in the window | errors | reports |
 | rum.browser_vital_population | Web Vital observation populations by browser | lcp, fcp, ttfb, inp, cls | observations |
-| rum.browser_loss | Retained capacity-loss evidence by browser | activity, lcp, fcp, ttfb, inp, cls | reports |
 
 
 ### Per site device
@@ -430,7 +437,6 @@ Metrics:
 | rum.device_document_views | Document views by device in the window | views | views |
 | rum.device_js_errors | JavaScript error reports by device in the window | errors | reports |
 | rum.device_vital_population | Web Vital observation populations by device | lcp, fcp, ttfb, inp, cls | observations |
-| rum.device_loss | Retained capacity-loss evidence by device | activity, lcp, fcp, ttfb, inp, cls | reports |
 
 
 ### Per site country
@@ -457,7 +463,6 @@ Metrics:
 | rum.country_document_views | Document views by country in the window | views | views |
 | rum.country_js_errors | JavaScript error reports by country in the window | errors | reports |
 | rum.country_vital_population | Web Vital observation populations by country | lcp, fcp, ttfb, inp, cls | observations |
-| rum.country_loss | Retained capacity-loss evidence by country | activity, lcp, fcp, ttfb, inp, cls | reports |
 
 
 ### Per site page
@@ -484,7 +489,6 @@ Metrics:
 | rum.page_document_views | Document views by page in the window | views | views |
 | rum.page_js_errors | JavaScript error reports by page in the window | errors | reports |
 | rum.page_vital_population | Web Vital observation populations by page | lcp, fcp, ttfb, inp, cls | observations |
-| rum.page_loss | Retained capacity-loss evidence by page | activity, lcp, fcp, ttfb, inp, cls | reports |
 
 
 ### Per site version
@@ -511,7 +515,6 @@ Metrics:
 | rum.version_document_views | Document views by version in the window | views | views |
 | rum.version_js_errors | JavaScript error reports by version in the window | errors | reports |
 | rum.version_vital_population | Web Vital observation populations by version | lcp, fcp, ttfb, inp, cls | observations |
-| rum.version_loss | Retained capacity-loss evidence by version | activity, lcp, fcp, ttfb, inp, cls | reports |
 
 
 ### Per site view
@@ -531,13 +534,12 @@ Metrics:
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
 | rum.view_activity | Explicit application views and error reports in the window | views, errors | events |
-| rum.view_loss | Retained capacity-loss evidence by application view | lost_reports | reports |
 
 
 
 ## Live Data
 
-Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live activity and retained investigation history. Invoke their public rum-* names; filter by site where supported.
+Use these process-wide Functions through the Netdata Agent or Cloud to inspect RUM setup, live activity and retained investigation history. Invoke their public rum-* names on the collecting Agent; use vnode:storefront to select the exact configured vnode name, not its display hostname. Names use current configuration even with disabled or no jobs; renamed or removed names stop resolving, and reused names select their current GUID. Use vnode_guid for retained history by canonical GUID after removal. Omit both selectors for all vnodes and unassigned data. Filters retain Agent-level access and do not provide per-site authorization. Viewing them requires a signed-in member of the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial; beacons are received and history is stored on every plan.
 
 ### RUM Sites
 
@@ -546,8 +548,8 @@ Inspect site setup, sampling, receiver availability and recent activity to diagn
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Rum-sites` |
-| Require Cloud | no |
-| Performance | Reads bounded local activity snapshots without contacting the monitored website. |
+| Require Cloud | yes |
+| Performance | Reads current local activity snapshots without contacting the monitored website. |
 | Security | Results can include page paths, browser metadata, user identifiers, error messages and stack traces. Restrict access to authorized operators. |
 | Availability | Available while dem.plugin is running; activity comes from admitted site jobs. |
 
@@ -557,7 +559,11 @@ No additional configuration is required.
 
 #### Parameters
 
-This function has no parameters.
+| Parameter | Type | Description | Required | Default | Options |
+|:---------|:-----|:------------|:--------:|:--------|:--------|
+| vnode | string | Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown names are rejected. Omit this parameter when not selecting by name. Supply either vnode or vnode_guid, never both, even with empty values. | no | Not supplied |  |
+| vnode_guid | string | Filter by canonical vnode GUID. No configured name is required. Do not also supply vnode. Leave empty or omit both selectors to include every vnode and unassigned data. | no |  |  |
+| site | string | Filter by native site job name. Leave empty to include all sites. | no |  |  |
 
 #### Returns
 
@@ -589,8 +595,7 @@ One admitted site job. The response also includes collector public URL and ingre
 | capture_geolocation | string |  |  | Current Geolocation Capture. |
 | capture_frustration_signals | boolean |  |  | Current Frustration Capture. |
 | application_views_window | integer |  |  | Explicit application-view occurrences in the window. |
-| window_lost | integer |  |  | Retained capacity-loss evidence; affected measurements are unavailable. |
-| sessions_lost | integer |  |  | Retained capacity-loss evidence; affected measurements are unavailable. |
+| vnode_guid | string |  |  | Recorded canonical vnode GUID; empty means unassigned. |
 
 ### RUM Pages
 
@@ -599,8 +604,8 @@ Compare document-entry pages using recent observed traffic, Web Vital population
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Rum-pages` |
-| Require Cloud | no |
-| Performance | Reads bounded local activity snapshots without contacting the monitored website. |
+| Require Cloud | yes |
+| Performance | Reads current local activity snapshots without contacting the monitored website. |
 | Security | Results can include page paths, browser metadata, user identifiers, error messages and stack traces. Restrict access to authorized operators. |
 | Availability | Available while dem.plugin is running; activity comes from admitted site jobs. |
 
@@ -612,11 +617,13 @@ No additional configuration is required.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
+| vnode | string | Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown names are rejected. Omit this parameter when not selecting by name. Supply either vnode or vnode_guid, never both, even with empty values. | no | Not supplied |  |
+| vnode_guid | string | Filter by canonical vnode GUID. No configured name is required. Do not also supply vnode. Leave empty or omit both selectors to include every vnode and unassigned data. | no |  |  |
 | site | string | Filter by native site job name. Leave empty to include all sites. | no |  |  |
 
 #### Returns
 
-All retained document-entry groups, independent of chart top groups. Null values indicate absent or incomplete measurements; loss fields identify retained capacity-loss evidence.
+All retained document-entry groups, independent of chart top groups. Null values indicate absent measurements; zero counts mean no retained occurrences for that field. A page can have vital measurements with zero document views.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -636,11 +643,7 @@ All retained document-entry groups, independent of chart top groups. Null values
 | lcp_samples | integer |  |  | Retained observations for LCP. |
 | inp_samples | integer |  |  | Retained observations for INP. |
 | cls_samples | integer |  |  | Retained observations for CLS. |
-| lcp_lost | integer |  |  | Retained capacity-loss evidence; affected measurements are unavailable. |
-| inp_lost | integer |  |  | Retained capacity-loss evidence; affected measurements are unavailable. |
-| cls_lost | integer |  |  | Retained capacity-loss evidence; affected measurements are unavailable. |
-| window_lost | integer |  |  | Retained capacity-loss evidence; affected measurements are unavailable. |
-| sessions_lost | integer |  |  | Retained capacity-loss evidence; affected measurements are unavailable. |
+| vnode_guid | string |  |  | Recorded canonical vnode GUID; empty means unassigned. |
 
 ### RUM Live
 
@@ -649,7 +652,7 @@ Read recent browser events for live activity views, optionally continuing from a
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Rum-live` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads bounded local activity snapshots without contacting the monitored website. |
 | Security | Results can include page paths, browser metadata, user identifiers, error messages and stack traces. Restrict access to authorized operators. |
 | Availability | Available while dem.plugin is running; activity comes from admitted site jobs. |
@@ -662,6 +665,8 @@ No additional configuration is required.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
+| vnode | string | Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown names are rejected. Omit this parameter when not selecting by name. Supply either vnode or vnode_guid, never both, even with empty values. | no | Not supplied |  |
+| vnode_guid | string | Filter by canonical vnode GUID. No configured name is required. Do not also supply vnode. Leave empty or omit both selectors to include every vnode and unassigned data. | no |  |  |
 | site | string | Filter by native site job name. Leave empty to include all sites. | no |  |  |
 | after | string | Opaque next cursor from the previous rum-live response. Pass it unchanged; leave empty for recent events. | no |  |  |
 
@@ -695,6 +700,7 @@ Recent observation rows. Vital revisions update the same document metric; rows a
 | vital | string |  |  | Web Vital reported by this row. |
 | metric_id | string |  |  | Browser SDK metric identity. |
 | revision | integer |  |  | Increasing report revision within this metric or event identity. |
+| vnode_guid | string |  |  | Recorded canonical vnode GUID; empty means unassigned. |
 
 ### RUM Sessions
 
@@ -703,7 +709,7 @@ Investigate sampled sessions with retained observations received within a time r
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Rum-sessions` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads local retained history; work grows with the selected range and retained records. |
 | Security | Results can include page paths, browser metadata, user identifiers, error messages and stack traces. Restrict access to authorized operators. |
 | Availability | Available while dem.plugin is running. History results require retained investigation data. |
@@ -716,6 +722,8 @@ No additional configuration is required.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
+| vnode | string | Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown names are rejected. Omit this parameter when not selecting by name. Supply either vnode or vnode_guid, never both, even with empty values. | no | Not supplied |  |
+| vnode_guid | string | Filter by canonical vnode GUID. No configured name is required. Do not also supply vnode. Leave empty or omit both selectors to include every vnode and unassigned data. | no |  |  |
 | site | string | Filter by native site job name. Leave empty to include all sites. | no |  |  |
 | user_id | string | Exact application user ID observed in retained events in the selected range. Leave empty to include all sessions. | no |  |  |
 | after | integer | Inclusive Agent receipt-time lower bound in Unix seconds; zero is epoch and negative values are offsets from now. | no | 15 minutes before before, clamped to epoch |  |
@@ -744,6 +752,7 @@ One session with retained observations originally received by the Agent in the s
 | row_id | string |  | hidden | Stable row identity scoped to the site; the visible values remain available for filtering. |
 | application_views | integer |  |  | Retained application-view occurrences. |
 | last_observed_us | timestamp |  |  | Last Selected Observation in Unix microseconds; default descending sort. |
+| vnode_guid | string |  |  | Recorded canonical vnode GUID; empty means unassigned. |
 
 ### RUM Errors
 
@@ -752,7 +761,7 @@ Group errors originally received by the Agent in the selected range by fingerpri
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Rum-errors` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads local retained history; work grows with the selected range and retained records. |
 | Security | Results can include page paths, browser metadata, user identifiers, error messages and stack traces. Restrict access to authorized operators. |
 | Availability | Available while dem.plugin is running. History results require retained investigation data. |
@@ -765,6 +774,8 @@ No additional configuration is required.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
+| vnode | string | Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown names are rejected. Omit this parameter when not selecting by name. Supply either vnode or vnode_guid, never both, even with empty values. | no | Not supplied |  |
+| vnode_guid | string | Filter by canonical vnode GUID. No configured name is required. Do not also supply vnode. Leave empty or omit both selectors to include every vnode and unassigned data. | no |  |  |
 | site | string | Filter by native site job name. Leave empty to include all sites. | no |  |  |
 | fingerprint | string | Select an error fingerprint to compute affected-session, top-page and browser statistics. Leave empty for the count overview. | no |  |  |
 | after | integer | Inclusive Agent receipt-time lower bound in Unix seconds; zero is epoch and negative values are offsets from now. | no | 15 minutes before before, clamped to epoch |  |
@@ -788,6 +799,7 @@ One error fingerprint per site with observations originally received by the Agen
 | browsers | string |  |  | Browsers (selected fingerprint). |
 | sample_stack | string |  |  | Sample Stack. |
 | row_id | string |  | hidden | Stable row identity scoped to the site; the visible values remain available for filtering. |
+| vnode_guid | string |  |  | Recorded canonical vnode GUID; empty means unassigned. |
 
 ### RUM Session Events
 
@@ -796,7 +808,7 @@ Read the retained event timeline for a session to follow navigation, errors and 
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Rum-session-events` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads local retained history; work grows with the selected range and retained records. |
 | Security | Results can include page paths, browser metadata, user identifiers, error messages and stack traces. Restrict access to authorized operators. |
 | Availability | Available while dem.plugin is running. History results require retained investigation data. |
@@ -809,6 +821,8 @@ No additional configuration is required.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
+| vnode | string | Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown names are rejected. Omit this parameter when not selecting by name. Supply either vnode or vnode_guid, never both, even with empty values. | no | Not supplied |  |
+| vnode_guid | string | Filter by canonical vnode GUID. No configured name is required. Do not also supply vnode. Leave empty or omit both selectors to include every vnode and unassigned data. | no |  |  |
 | site | string | Filter by native site job name. Leave empty to include all sites. | no |  |  |
 | session_id | string | Session identifier returned by rum-sessions. Specify site when the same session identifier exists on multiple sites. | yes |  |  |
 
@@ -829,6 +843,7 @@ One retained or pending session event, with Agent receipt time in Unix microseco
 | view_id | string |  |  | Application-view occurrence identity. |
 | metric_id | string |  |  | Browser SDK metric identity. |
 | revision | integer |  |  | Increasing report revision within this metric or event identity. |
+| vnode_guid | string |  |  | Recorded canonical vnode GUID; empty means unassigned. |
 
 
 

@@ -878,7 +878,7 @@ The public topology function is `topology:vsphere`. The function builds actors a
 | Require Cloud | yes |
 | Performance | Uses cached collector state only:<br/>• No additional vCenter or ESXi API requests are triggered by the function<br/>• Response size grows with discovered inventory object count<br/>• `collect_network_topology` adds Network discovery during normal collector discovery cycles when enabled |
 | Security | Exposes discovered inventory object names and status attributes already visible through vSphere chart labels and metrics:<br/>• Does not expose the configured vCenter URL, username, or password |
-| Availability | Available when:<br/>• The vSphere collector job is running<br/>• Initial discovery has completed successfully<br/>• Returns HTTP 503 while topology data is not cached yet |
+| Availability | Available when:<br/>• The vSphere collector job is running<br/>• Initial discovery has completed successfully<br/>• Returns HTTP 503 while topology data is not cached yet<br/>• Viewing requires a signed-in member of a Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial |
 
 #### Prerequisites
 
