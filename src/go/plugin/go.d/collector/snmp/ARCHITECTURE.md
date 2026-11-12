@@ -26,16 +26,16 @@ when correlating them. File cadence, retention, and publication remain documente
 
 ## SNMP Requests
 
-The job's client is a `gosnmp.Client` (`github.com/netdata/gosnmp`) built from `snmpClientConfig` (`init.go`) by
-`newSNMPSession` (`snmp_session.go`); the profile acquisition sees it through the `snmputils.Client` interface. Request
-rules the collector relies on:
+The job's client is a `gosnmp.Client` (`github.com/netdata/gosnmp`) built from `snmpClientConfig` (`init.go`) and
+wrapped in `engineForgettingClient` by `newSNMPSession` (`snmp_session.go`); the profile acquisition sees it through the
+`snmputils.Client` interface. Request rules the collector relies on:
 
 - Every request takes its caller's context: `Check`, topology, VLAN contexts, vnode acquisition and snmpsd probes
   end when theirs does. The V1 job runtime calls `Collect` with `context.TODO()`, so a poll in flight ends by its
   timeout and retries.
 - An SNMPv3 client discovers the agent's engine ID once and keeps it. A request that fails with an unknown engine ID
-  (a replaced device, or a forged discovery answer) makes the client forget that engine, and the next request
-  discovers it again; the log line for it is rate-limited.
+  (a replaced device, or a forged discovery answer) makes the client forget that engine (`engineForgettingClient`), and
+  the next request discovers it again; the log line for it is rate-limited.
 - Bulk walks pass the max-repetitions that `adjustMaxRepetitions` found for the device. `max_repetitions` is bounded at
   2147483647 (RFC 3416); 0 or a negative value disables bulk walks.
 - An answer whose error-status is not noError fails the request (`gosnmp.StatusError`). An SNMPv1 GET answered with
