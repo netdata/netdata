@@ -20,7 +20,7 @@ import (
 )
 
 func trustedFixture() runtime.Manifest {
-	return runtime.Manifest{Format: 1, Contract: 1, Version: "test", Platform: "linux/" + goruntime.GOARCH,
+	return runtime.Manifest{Format: 1, Contract: 2, Version: "test", Platform: "linux/" + goruntime.GOARCH,
 		Archive:  runtime.Archive{SHA256: strings.Repeat("a", 64), Bytes: 100, TarBytes: 10240, ExpandedBytes: 200, Entries: 2},
 		Layout:   runtime.Layout{EntryPoint: "runtime.mjs", Node: "node", Dependencies: "dependencies", Browser: "browser", Loader: "loader", Fonts: "fonts"},
 		Bindings: []runtime.Binding{{Path: "node", Expected: []byte("loader\x00")}, {Path: "browser", Expected: []byte("loader\x00")}}}

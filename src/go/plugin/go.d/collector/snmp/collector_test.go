@@ -606,7 +606,7 @@ func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
 				{Name: metadataOID, Type: gosnmp.OctetString, Value: []byte("profile-vendor")},
 			},
 		}, nil
-	}).Times(2)
+	}).Times(1)
 
 	deviceStore := ddsnmp.NewDeviceStore()
 	collr := New(deviceStore)
@@ -639,7 +639,7 @@ func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
 	assert.Nil(t, collr.vnode)
 	collr.Collect(context.Background())
 	require.True(t, collr.initialized)
-	assert.Equal(t, 2, metadataCalls, "initial vnode acquisition must not seed metric preparation caches")
+	assert.Equal(t, 1, metadataCalls, "initial identity reuses the normal profile preparation")
 	entries := deviceStore.Entries()
 	require.Len(t, entries, 1)
 	wantInfo := ddsnmp.DeviceConnectionInfo{
@@ -664,14 +664,12 @@ func TestCollector_InitializationPublishesResolvedDeviceIdentity(t *testing.T) {
 	}
 	assert.Equal(t, wantInfo, entries[0].Info)
 	wantConfigVnode := vnodes.VirtualNode{
-		GUID:     "8ec4cad3-78e2-5ea1-ba26-cd6fdc51f121",
-		Hostname: "unifi-ap",
-		Labels:   map[string]string{"model": "operator-model"},
+		Labels: map[string]string{"model": "operator-model"},
 	}
 	assert.Equal(t, wantConfigVnode, collr.LocalVnode)
 
 	collr.Collect(context.Background())
-	assert.Equal(t, 2, metadataCalls, "subsequent collections reuse preparation caches")
+	assert.Equal(t, 1, metadataCalls, "subsequent collections reuse preparation caches")
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -716,7 +714,11 @@ func TestCollector_Check(t *testing.T) {
 					m.EXPECT().Get([]string{snmputils.OidSysContact, snmputils.OidSysName}).Return(
 						&gosnmp.SnmpPacket{
 							Variables: []gosnmp.SnmpPDU{
-								{Name: snmputils.OidSysContact, Value: []byte("mock sysContact"), Type: gosnmp.OctetString},
+								{
+									Name:  snmputils.OidSysContact,
+									Value: []byte("mock sysContact"),
+									Type:  gosnmp.OctetString,
+								},
 								{Name: snmputils.OidSysName, Value: []byte("mock sysName"), Type: gosnmp.OctetString},
 							},
 						},
@@ -1730,6 +1732,22 @@ func (m *mockDdSnmpCollector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag
 	return m.meta, nil
 }
 
+func (m *mockDdSnmpCollector) PreparedDeviceMetadata() map[string]ddsnmp.MetaTag {
+	meta := make(map[string]ddsnmp.MetaTag)
+	ddsnmp.MergeMetaTags(meta, m.meta)
+	for _, pm := range m.pms {
+		ddsnmp.MergeMetaTags(meta, pm.DeviceMetadata)
+	}
+	return meta
+}
+
+func (m *mockDdSnmpCollector) ProfileInputRevision() uint64 {
+	if m.collectCalls > 0 {
+		return 1
+	}
+	return 0
+}
+
 func prepareV3Config() Config {
 	cfg := prepareV2Config()
 	cfg.Options.Version = gosnmp.Version3.String()
@@ -1865,7 +1883,7 @@ func TestCollectorInitializationMetadataFailureIsPublished(t *testing.T) {
 			staticVendor: true,
 			attempts:     1,
 			outcome:      ddsnmp.DeviceLifecycleOutcomeSuccess,
-			processing:   2,
+			processing:   1,
 		},
 	}
 	for name, tc := range tests {
@@ -1882,7 +1900,7 @@ func TestCollectorInitializationMetadataFailureIsPublished(t *testing.T) {
 					},
 				}
 			}
-			handler.EXPECT().Get([]string{metadataOID}).Return(packet, tc.getErr).Times(2)
+			handler.EXPECT().Get([]string{metadataOID}).Return(packet, tc.getErr).Times(tc.attempts)
 			collector := newTestSNMPCollector()
 			collector.Config = prepareV2Config()
 			collector.Ping.Enabled = false

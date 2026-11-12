@@ -36,6 +36,11 @@ agent logged nothing.
 - **The performance-library dump**, the most common Windows collector surface. When it cannot run it
   holds a marker stating why - not elevated, timed out, or an access error - so the reason is visible
   rather than the file simply being missing.
+  - A metric that collects but disagrees with `Get-Counter`: check the dump for byte-identical values under unrelated
+    counter names. Windows shares data on purpose in some objects (PhysicalDisk `% Disk Time` and
+    `Avg. Disk Queue Length`), but in others its registry view attaches values to the wrong names, which Netdata reads.
+  - PDH (`Get-Counter`) is the reference; `PerflibSMB` reads through PDH for this reason
+    (`src/libnetdata/os/windows-pdh/`). Debug logging reports each object whose counters share data.
 - **Access control detail** - lists with inheritance state, protected-list detection, integrity
   labels, and alternate data streams. A download-marker stream records that the file arrived from another
   machine; it is provenance, not proof that Windows blocked execution, so do not conclude a failure

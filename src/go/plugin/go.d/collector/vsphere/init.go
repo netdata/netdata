@@ -109,7 +109,7 @@ func (c *Collector) initClient(ctx context.Context) (*client.Client, error) {
 }
 
 func (c *Collector) initDiscoverer(cli *client.Client) error {
-	d := discover.New(cli)
+	d := discover.New(cli, cli.InstanceUUID())
 	d.Logger = c.Logger
 	d.CollectDatastoreClusters = c.CollectDatastoreClusters
 	d.CollectVSAN = c.CollectVSAN

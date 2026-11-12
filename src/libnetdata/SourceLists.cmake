@@ -248,6 +248,8 @@ set(LIBNETDATA_FILES
         os/windows-perflib/perflib.h
         os/windows-perflib/perflib-names.c
         os/windows-perflib/perflib-dump.c
+        os/windows-pdh/windows-pdh.c
+        os/windows-pdh/windows-pdh.h
         os/system-maps/cached-uid-username.c
         os/system-maps/cached-uid-username.h
         os/system-maps/cached-sid-username.c
@@ -474,6 +476,7 @@ set(NETIPC_POSIX_SERVICE_FILES
 set(NETIPC_WINDOWS_TRANSPORT_FILES
         netipc/src/transport/windows/netipc_named_pipe.c
         netipc/src/transport/windows/netipc_win_shm.c
+        netipc/src/transport/windows/netipc_win_security.c
 )
 
 # netipc: the Windows transport and service (service)

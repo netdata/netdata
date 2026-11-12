@@ -108,8 +108,9 @@ func TestStockIndexIdentity_FinalCharts(t *testing.T) {
 					matched = matched || same
 				}
 				assert.True(t, matched, "acquired symbol %s must carry a pinned identity", metric.Name)
-				chart := c.tableMetricCharts[key]
-				require.NotNil(t, chart, "acquired metric must emit a chart")
+				state := c.tableMetricCharts[key]
+				require.NotNil(t, state, "acquired metric must emit a chart")
+				chart := state.chart
 				for tag, value := range metric.Tags {
 					assert.Equal(t, value, chartLabels(chart)[strings.TrimPrefix(tag, "_")], "chart label %s", tag)
 				}
@@ -188,7 +189,8 @@ func stockIdentityObservations(metrics []ddsnmp.Metric, c *Collector) []stockIde
 		unit := metric.Unit
 		var labels map[string]string
 		context := ""
-		if chart := c.tableMetricCharts[tableMetricKey(metric)]; chart != nil {
+		if state := c.tableMetricCharts[tableMetricKey(metric)]; state != nil {
+			chart := state.chart
 			chartID = chart.ID
 			unit = chart.Units
 			labels = chartLabels(chart)

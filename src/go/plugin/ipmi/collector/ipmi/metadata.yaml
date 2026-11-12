@@ -471,7 +471,7 @@ modules:
                 unit: ''
                 description: Row health severity.
                 visibility: hidden
-          require_cloud: false
+          require_cloud: true
           performance: Reads the records the collector already read from the BMC; sends no BMC requests.
           security: Read-only hardware event records from the configured target.
           availability: Available for jobs with collect_sel enabled while they run; when no job collects the SEL,

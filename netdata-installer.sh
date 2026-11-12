@@ -200,6 +200,7 @@ USAGE: ${PROGRAM} [options]
   --dont-wait                Run installation in non-interactive mode.
   --stable-channel           Use packages from GitHub release pages instead of nightly updates.
                              This results in less frequent updates.
+  --preview-channel          Use preview releases for updates.
   --nightly-channel          Use most recent nightly updates instead of GitHub releases.
                              This results in more frequent updates.
   --disable-ebpf             Disable eBPF Kernel plugin. Default: enabled.
@@ -286,7 +287,7 @@ FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 REMOVE_BUILD=1
 
-RELEASE_CHANNEL="nightly" # valid values are 'nightly' and 'stable'
+RELEASE_CHANNEL="nightly" # valid values are 'nightly', 'stable' and 'preview'
 IS_NETDATA_STATIC_BINARY="${IS_NETDATA_STATIC_BINARY:-"no"}"
 # The parser keeps legacy no-op flags for command-line compatibility.
 # shellcheck disable=SC2034
@@ -301,6 +302,7 @@ while [ -n "${1}" ]; do
     "--auto-update" | "-u") ;;
     "--auto-update-type") ;;
     "--stable-channel") RELEASE_CHANNEL="stable" ;;
+    "--preview-channel") RELEASE_CHANNEL="preview" ;;
     "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
     "--force-legacy-cxx") FORCE_LEGACY_CXX=1 ;;
     "--enable-plugin-freeipmi") ENABLE_FREEIPMI=1 ;;

@@ -38,7 +38,6 @@ if [ "${CACHE_HIT:-0}" -eq 0 ]; then
         --disable-tftp \
         --disable-pop3 \
         --disable-imap \
-        --disable-smb \
         --disable-smtp \
         --disable-gopher \
         --enable-ipv6 \

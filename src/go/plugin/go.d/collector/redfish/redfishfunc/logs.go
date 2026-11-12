@@ -20,6 +20,7 @@ func logsMethod(updateEvery int) funcapi.FunctionConfig {
 		Name:           "Redfish Logs",
 		UpdateEvery:    updateEvery,
 		Help:           logsHelp,
+		RequireCloud:   true,
 		Tags:           "logs",
 		ResponseType:   "table",
 		RawRequest:     true,

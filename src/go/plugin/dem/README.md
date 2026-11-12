@@ -8,13 +8,98 @@ is built, from the overall data flow to package ownership and runtime lifetimes.
 
 The stock configuration starts one loopback receiver and no sites. Configuration follows the normal Go Agent layout:
 `dem.conf` for plugin policy and `dem/receiver.conf` / `dem/rum.conf` for collectors. The receiver is a canonical single
-object (`dem:collector:receiver`); each site is an independent job (`dem:collector:rum:<name>`). Native `name` is the
-stable beacon/history key; `display_name` is presentation metadata. Renaming a site starts a new history namespace.
+object (`dem:collector:receiver`); each RUM monitor is an independent job (`dem:collector:rum:<name>`). Native `name` is the
+stable beacon/history key; `display_name` is presentation metadata. Renaming a RUM job starts a new history namespace.
+
+## Organize monitors on a site vnode
+
+A DEM site is a configured Virtual Node (vnode). Set the optional `vnode` reference on independent RUM, journey and
+Lighthouse jobs to place their charts on that node. Omit it to keep charts on the collecting Agent and leave the job
+unassigned to a site. A site with only synthetic monitors needs no RUM job or receiver.
+
+Create a static vnode through the plugin's `dem:vnode` dynamic configuration entry, or define one in a YAML file under
+`vnodes/` in the Netdata configuration directory. For example, `/etc/netdata/vnodes/sites.yaml`:
+
+```yaml
+- hostname: storefront
+  guid: 12345678-1234-4234-8234-123456789abc
+  labels:
+    environment: production
+```
+
+Generate a unique GUID for each site, for example with `uuidgen`. For file-defined static vnodes, `hostname` is also
+the reference name used by jobs. A dynamically configured vnode uses its configuration entry's name as the reference.
+Use the reference name in `vnode`, not the GUID. See [node identities](../../../../docs/learn/node-identities.md#virtual-nodes-vnodes)
+for the standard configuration and identity rules.
+
+These entries place two independent jobs on Storefront:
+
+```yaml
+# dem/rum.conf
+jobs:
+  - name: storefront-rum
+    vnode: storefront
+    display_name: Storefront
+    allowed_origins: [https://shop.example.org]
+```
+
+```yaml
+# dem/journey.conf
+jobs:
+  - name: storefront-checkout
+    vnode: storefront
+    script_path: /etc/netdata/dem/checkout.spec.ts
+    check_every: 300
+    update_every: 10
+    timeout: 120
+```
+
+The RUM installation key remains `storefront-rum`, so its script URL ends in `/rum/storefront-rum.js`. Each job keeps
+its own configuration, DynCfg entry, schedule, secrets and enable/disable controls. Names must be distinct within each
+collector module. Guided site setup creates or selects a vnode and submits ordinary independent job operations;
+partial success must show which operations need attention. A vnode does not own child jobs, browser workers or shared
+retention budgets, and referencing it does not deploy jobs to other Agents.
+
+DEM Functions remain global on the collecting Agent. Invoke their existing names through that Agent or Cloud and
+select a site by its configured vnode name, for example `synthetics-runs vnode:storefront` or
+`rum-pages vnode:storefront`. The name is the exact resource name used by the job's `vnode` option, not its display
+hostname. Name lookup uses current vnode configuration, including when all jobs are disabled or no jobs reference it.
+Renamed or removed names stop resolving; reusing a name selects its current GUID, without aliases to earlier identities.
+
+Use `vnode_guid` with the recorded canonical GUID to query an earlier identity or retained history after its vnode is
+removed, for example `synthetics-runs vnode_guid:12345678-1234-4234-8234-123456789abc`. Supply only one selector;
+empty or unknown vnode names and requests containing both selectors are rejected, even if either value is empty.
+Omitting both selectors, or supplying only an empty `vnode_guid`, includes all vnodes and unassigned data.
+These selectors apply to all six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts`;
+`synthetics-run` and `synthetics-artifact` keep their existing detail parameters.
+
+The selectors filter data under the existing Agent-level access model; they are not a per-site authorization boundary.
+Functions are not registered on each vnode. Frontend consumers retain the collecting Agent relationship when selecting
+a site, including for archived vnodes and retained history.
+
+Functions and retained evidence expose `vnode_guid`; charts use normal vnode placement without an extra GUID label.
+Existing RUM `site` fields identify the physical RUM job. RUM observations capture the resolved GUID when admitted;
+synthetic attempts capture it when submitted to the execution queue, before waiting for browser admission. Saved and
+buffered investigation records, runs and captures retain that GUID after reassignment. A changed RUM GUID starts a fresh rolling measurement window and Pages view; hostname or label
+edits with the same GUID do not reset measurements. Transport and history counters remain job-wide. Old evidence without
+a captured GUID stays unassigned; legacy `site_id` text is not mapped to a vnode or rewritten.
+
+Vnode placement does not combine RUM populations, change artifact ownership or increase browser capacity. Execution,
+receiver service and retention remain shared by the collecting Agent.
+
+## Receive browser reports
 
 Expose the receiver through HTTPS, configure its public URL and actual trusted proxy addresses, then install
 `<script async src="https://rum.example.org/rum/shop.js"></script>` on the configured website. Public URLs may include a
 reverse-proxy path prefix. The receiver serves the pinned Faro 2.11.0 SDK and optional tracing bundle; visitors need no
 SDK CDN connection. Client IP addresses are used for rate limiting/geolocation and are not stored.
+
+`dem-history-status` is always announced. The six RUM Functions appear once a RUM site is active or RUM history is
+retained; the five synthetics Functions appear once a journey or Lighthouse job is active, or synthetic history or
+published captures are retained. Retained data makes the corresponding group available after restart even without
+jobs. A receiver alone does not enable RUM Functions. Once announced, a group stays available for that framework run,
+even after the last job stops or its data expires. A process restart reconstructs availability from data present when
+the stores open. If startup retention then expires that data, its group still appears for that process lifetime.
 
 RUM and synthetic Function providers are independent of collector selection. Disabling `rum` or `journey`, selecting
 only `lighthouse`, or disabling all collectors preserves investigation of retained history while the plugin is enabled.
@@ -22,7 +107,10 @@ Setting `enabled: no` disables the whole plugin. Handler instances belong to eac
 keeps shared stores open until a clean shutdown.
 
 Six process Functions use the regular Netdata Function transport: `rum-sites`, `rum-pages`, `rum-live`, `rum-sessions`,
-`rum-errors`, and `rum-session-events`. Runtime observations include only admitted site jobs. Consumers join native
+`rum-errors`, and `rum-session-events`. Viewing them, and the `synthetics-*` Functions, requires a signed-in member of
+the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial; collection and
+history storage are not restricted.
+Runtime observations include only admitted site jobs. Consumers join native
 DynCfg state to show disabled or failed configurations. Journal history remains queryable after a site stops. History range
 arguments select when the Agent originally received an observation, using inclusive Unix seconds: both endpoints include
 their entire second. Negative values are offsets from one captured now; explicit zero means epoch. With omitted bounds,
@@ -67,9 +155,10 @@ retention policy, defaulting to 7 days and 2 GiB.
 
 `dem-history-status` reports the effective policy, sampled file bytes/count, observation time, latest cleanup attempt,
 last successful cleanup, and separate inventory, cleanup, writer and policy reload errors. It is a read-only member
-Function available even with all collectors disabled, with no arguments, payload or time filters. Unknown or unattempted
-values are `null`; an inventory failure does not erase cleanup or writer facts. These facts help diagnose storage pressure
-and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
+Function that, like every DEM Function, requires a signed-in member of the node's Space with permission to view
+sensitive data, on a paid plan or an active trial. It works even with all collectors
+disabled, with no arguments, payload or time filters. Unknown or unattempted values are `null`; an inventory failure
+does not erase cleanup or writer facts. These facts help diagnose storage pressure and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
 Unusable history at startup still stops the plugin before Functions register; inspect process logs in that case.
 
 Queued events flush every five seconds or 500 records.
@@ -100,7 +189,7 @@ old or partial schemas, detected index damage and quarantined `.journal~` files 
 operator recovery; there is no automatic migration, repair or deletion. External file modification is outside this
 archive-provenance guarantee.
 
-The browser normalization, bounded aggregation, OTLP and query behavior originated in the experimental
+The browser normalization, rolling aggregation, OTLP and query behavior originated in the experimental
 [Netdata digital-experience POC](https://github.com/netdata-labs/dem), commit
 `b3de4662f567dc63d33fee6201f8c2313568301b`. Its private configuration controller, scheduler, protocol emitter and root
 state reconciliation are replaced by the native Agent framework. Embedded third-party asset notices remain beside their source.
@@ -176,19 +265,21 @@ visualization. Later reports retain their own user and application-view context 
 attributed to the original document.
 
 The configured `window` uses receiver arrival time, including for delayed reports. A genuinely newer revision extends
-that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for up to 30 minutes,
-subject to capacity and runtime restart. Identified SDK session lifecycle events follow the same rule, so replay does
-not renew observed-session windows. It is best effort, not exactly-once delivery. Reports arriving after retained
-evidence expires can be counted again. Late observations are not rejected merely to claim perfect deduplication.
+that metric's presence in the window; a duplicate does not. Duplicate detection retains evidence for 30 minutes,
+unless the site job restarts, is replaced, or changes its vnode association. Identified SDK session lifecycle events
+follow the same rule, so replay does not renew observed-session windows. It is best effort, not exactly-once delivery.
+Reports arriving after retained evidence expires can be counted again. Late observations are not rejected merely to
+claim perfect deduplication.
 Errors, console logs, spans and ordinary custom events are not covered by this identity-based replay suppression;
 repeated delivery of these records can count again and refresh observed-session activity.
 
-Population charts show retained observations, good/needs-improvement/poor counts and capacity-loss evidence. Percentiles
-are unavailable when there are no observations or the local population is incomplete. A zero CLS or zero timing is a
-valid observation. Lost-report fields conservatively remain nonzero until the latest relevant loss leaves the window;
-they can include older loss from a continuous overload episode. They are neither exact missing-window counts nor part
-of the percentile denominator. The cumulative drop diagnostic counts actual discarded reports. Restart starts fresh
-in-memory windows; retained investigation history is independent.
+Population charts show exact retained observations and good/needs-improvement/poor counts. Percentiles are unavailable
+when there are no observations. A zero CLS or zero timing is a valid observation. Canonical measurements remain in the
+configured receipt window (five minutes by default); replay identities remain for 30 minutes. There is no independent
+aggregate count or byte cap. Memory grows with admitted distinct state and retained text over these horizons, plus
+investigation detail and query state. This is time retention, not a fixed memory guarantee or a qualified full-scale
+workload claim. Restarting or replacing the site job, or changing its vnode association, starts fresh in-memory
+windows; retained investigation history is independent and preserves its original vnode attribution.
 
 `rum.observed_sessions` counts distinct browser session identities seen in the receipt window. It does not estimate
 people, concurrency or time on site. Page session counts use the same window. JavaScript errors are events: several can
@@ -197,9 +288,8 @@ corresponding measurement and increments an invalid-measurement diagnostic; no t
 
 Breakdown traffic counts and vital populations use the same current window. Top groups and the pooled complement are
 computed from current observations. `bucket=value` distinguishes a literal label named `other` from `bucket=other`.
-The Pages Function exposes all retained document-entry groups, including groups outside the chart top list; loss
-fields reveal bounded-state truncation. Percentiles cannot be averaged across time windows, groups or sites to obtain a
-combined percentile.
+The Pages Function exposes all retained document-entry groups, including groups outside the chart top list. Percentiles
+cannot be averaged across time windows, groups or sites to obtain a combined percentile.
 
 Navigation charts report document load time and **DOMContentLoaded handler duration**. Same-site fetch timing includes
 reported same-site fetch/XHR resource entries, not all backend API requests or server availability. Resource counts
@@ -446,10 +536,41 @@ receiver recovery.
 ## Synthetic monitoring
 
 Each `journey` job runs one configured Playwright Test entry and its imports. Each `lighthouse` job runs one desktop
-performance lab audit. Both use native job configuration and scheduling. Stock configuration enables no browser jobs.
-Journey defaults to 900 seconds between attempts and a 120-second admitted timeout; Lighthouse defaults to 1800/180 seconds.
-One plugin-wide admission slot serializes expensive runs. Waiting time is separate from execution time; cancellation
-while waiting starts no browser. A fresh browser is created for each run.
+performance lab audit. Both use native job configuration. Stock configuration enables no browser jobs.
+`check_every` controls browser execution: 900 seconds for journeys and 1800 seconds for Lighthouse by default.
+Admitted attempt timeouts default to 120 and 180 seconds respectively. `update_every` controls chart refreshes and defaults
+to 10 seconds for both. When updating an existing test configuration, move its old browser interval from `update_every`
+to `check_every`; otherwise it will only change chart refresh frequency.
+
+A job queues its first check immediately. The first recurring check is spread deterministically between one and two
+check intervals after activation; later due times follow a fixed cadence. A busy job keeps at most one active and one
+pending monitoring occurrence. A newer due occurrence replaces the older pending one without losing its admission
+position. Replaced occurrences count as coalesced; they never ran and do not establish website failure. There is no
+catch-up backlog or automatic attempt retry. Equal-job turns do not imply equal CPU time or per-site quotas.
+
+Charts show the latest completed observation, its age, and independent active/pending and delay measurements.
+Refreshing a chart does not start or count another check. Observations older than two check intervals become `stale`;
+missing or stale duration, test and Lighthouse measurements remain gaps. Outcome counters count each completed attempt
+once, including attempts between chart refreshes, and reset on native job restart/replacement. These job diagnostics
+continue across vnode changes. Reassignment clears latest measurements, age and last success/failure until a check
+submitted for the new association completes. Earlier queued or running attempts keep their captured GUID in history
+and cannot repopulate current observations, including after switching back to the original vnode. History retains per-run
+evidence under its normal retention and availability policy. Stopping or replacing a job cancels its queued/active work
+and joins execution before the replacement starts.
+
+`browser.concurrency` in `dem.conf` limits simultaneous browser attempts in one plugin process. It defaults to 1 and
+accepts a positive integer; restart the plugin to apply changes. Monitoring, journey rehearsals and in-process runtime
+qualification share this allowance. Ready jobs take turns, and monitoring and rehearsals for the same job cannot overlap.
+Waiting time is separate from execution time; cancellation while waiting starts no browser. A fresh browser is created
+for each run.
+
+Choose concurrency for the Agent's CPU and memory budget and the accuracy needed from Lighthouse measurements.
+The setting is not a hard memory limit or a count of every child process. Concurrent activation checks share one
+runtime contract probe per runtime consumer; probes run outside browser slots so a long audit cannot block activation.
+A later activation checks the runtime again. Standalone administration commands have their own process budget.
+
+See [DEM performance and sizing](PERFORMANCE.md) for a measured mixed browser/RUM workload, its resource use,
+startup behavior and measurement limits.
 
 Browser jobs require Linux amd64 or arm64 and an unprivileged plugin identity. Chromium sandboxing stays enabled;
 containers need compatible namespace/seccomp support. RUM does not require a browser runtime.
@@ -518,14 +639,14 @@ the stuck process before retrying removal or repair.
 
 **Restart DEM after installation, update or repair, including the first installation.** Each process keeps the runtime it
 acquired at startup. A process started without a runtime stays unavailable until restarted. Runtime releases can
-update their components without an Agent upgrade while preserving execution contract 1. Runs record the actual
+update their components without an Agent upgrade while preserving execution contract 2. Runs record the actual
 release version, archive digest and execution contract for investigation.
 
 Explicit installation enables automatic preparation by default and prints this policy before proceeding. Use
 `--manual-updates` on install or repair to disable it. The running plugin checks roughly daily with jitter, downloads
 and qualifies a newer signed release beside the working release, and reports that restart is required. It never
 restarts the Agent. Security fixes remain inactive until the administrator or deployment system restarts DEM.
-Qualification shares the browser execution slot, so monitors can wait while these local checks run. Failures preserve
+Qualification shares the browser execution allowance, so monitors can wait while these local checks run. Failures preserve
 the selected release and appear as update maintenance errors, separately from website measurements.
 
 Signatures authenticate publication order and complete preparation instructions. They cannot detect withheld updates
@@ -659,20 +780,48 @@ incomplete coverage. Skipped, expected-failure, empty or incomplete suites are i
 unexpected failure/timeout. Errors loading/running the monitor are execution inability. Cancellation and an interrupted
 start are distinct from a failed target. A workflow failure means a declared check failed, not proof of a service-wide outage.
 
+Journey timeouts start when a browser slot is admitted, including runtime startup. The runner reserves up to five
+seconds inside the effective budget for Playwright's final diagnostic report (one fifth of budgets below 25 seconds).
+An earlier caller deadline shortens that budget. When the work interval expires, the runner requests a graceful
+Playwright stop. A cooperative interrupted test can report its locator error and an opted-in screenshot; its actual
+status remains `interrupted`, not a fabricated test timeout. Script-specified test timeouts remain supported.
+Lighthouse does not use this reporting reserve.
+
+Run detail and run lists expose `termination_reason` independently of the first reported `error`:
+
+| Reason | Meaning |
+| --- | --- |
+| `execution_budget` | The journey runner exhausted its work interval and requested a graceful stop before receiving the terminal report. |
+| `test_timeout` | Playwright reported a timed-out test. |
+| `suite_timeout` | Playwright reported a suite timeout. |
+| `execution_deadline` | The configured hard execution deadline expired before verified shutdown. |
+| `caller_deadline` | An earlier caller deadline expired before verified shutdown. |
+| `cancelled` | The caller cancelled, or Playwright reported interruption without a runner budget stop. |
+
+Other outcomes and older history may have no termination reason. A previously reported assertion error can coexist
+with a later timeout reason. A terminal report received before the graceful-stop timer is preserved, but shutdown
+still must finish within the hard deadline. Hung hooks, blocked workers and forced termination may prevent reporting
+or screenshots. Caller cancellation takes precedence and does not publish interrupted-test screenshots; already
+reported ordinary failure captures retain their existing policy. Captures are never recovered by scanning output files.
+
+The execution timeout does not bound the entire call: verified process-tree drainage precedes artifact publication and
+history completion, which use the existing separate ten-second completion budget. The browser slot remains held until
+completion. Cleanup uncertainty preserves work and closes admission; it never authorizes publication.
+
 Use the journey configuration's **Test** action to execute an unsaved draft on the selected Agent with its resolved
 secrets and installed browser runtime. Test returns pass/fail; failed, skipped/incomplete, interrupted or unavailable
 execution is not success. It does not save the draft, change monitoring observations, publish metrics or alerts, or
 retain captures. `screenshot_on_failure` applies to monitoring only. Test actions against the website are real and
 are not rolled back. Activation still checks runtime preparation without executing the workflow.
 
-Test shares the browser slot with monitoring and may wait for another attempt or delay a later one. The caller's
+Test shares the browser allowance with monitoring and may wait for another attempt or delay a later one. The caller's
 request deadline covers waiting and execution, so it may expire before the configured workflow timeout. Cancellation
 requests process-tree shutdown. If drainage cannot be verified, DEM exits and preserves uncertain work instead of
 claiming cleanup. A timed-out caller may not receive the final diagnosis, and there is no retained result to retrieve
 later. Existing secret-reference redaction can replace detailed errors with a generic failure.
 
 The static `dem_journey_failed` template warns on the latest fresh failed/timed-out observation. A new successful
-observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two native
+observation clears it. Unknown, inconclusive, execution error, cancellation and observations older than two check
 intervals are UNDEFINED, not recovery. Replacement/restart begins unknown until a new observation. Critical escalation
 and configurable sensitivity are left for a separate alert-policy decision. Native job status identifies unavailable
 dependencies; plugin logs explain runtime setup/execution errors. The installation CLI reports preparation and
@@ -691,9 +840,12 @@ Process Functions use the regular Netdata transport: `synthetics-checks` for act
 for retained history, `synthetics-run` for one run's full diagnosis, `synthetics-artifacts` for retained capture sets and
 storage status, and `synthetics-artifact` for one set's metadata or bytes.
 Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
-status. Current-generation last success/failure and freshness do not reconstruct a historical incident. A running or
-waiting attempt does not refresh its previous result. Run summaries are capped at 2000 rows with an explicit truncation
-flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
+status. Last success/failure and freshness describe the current activation and vnode association; reassignment resets
+these observations. They do not reconstruct a historical incident. A running or
+waiting attempt does not refresh its previous result. Active rows also expose check cadence, scheduled/admitted/coalesced
+counts and queue/admission delays for the current activation; these diagnostics continue across vnode changes.
+Run records preserve selected due and original queue timestamps when produced by the monitor scheduler; older and
+immediate diagnostic records may omit them. Run summaries are capped at 2000 rows with an explicit truncation flag; refine the start-time range when truncated. Ranges select the attempt’s actual start using inclusive Unix seconds,
 including the entire endpoint seconds. Explicit zero means epoch, negative values are offsets from one captured now, and
 omitted bounds cover epoch through now. Run timestamps use Unix microseconds, while reporter event `at_ms` uses Unix
 milliseconds.

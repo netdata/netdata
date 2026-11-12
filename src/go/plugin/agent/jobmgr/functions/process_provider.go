@@ -29,7 +29,8 @@ type controllerGroupKey struct {
 func ValidateProcessProviders(providers []funcapi.ProcessFunctionProvider) error {
 	seen := make(map[string]struct{}, len(providers))
 	for _, provider := range providers {
-		if provider.ID == "" || provider.Functions == nil || provider.NewHandler == nil {
+		if provider.ID == "" || provider.Functions == nil ||
+			(provider.NewHandler == nil) == (provider.NewHandlerWithContext == nil) {
 			return errors.New("jobmgr Function controller: incomplete process Function provider")
 		}
 		if _, ok := seen[provider.ID]; ok {
@@ -49,7 +50,11 @@ func buildProcessProviderPlan(provider funcapi.ProcessFunctionProvider) (control
 	if err != nil {
 		return controllerModulePlan{}, err
 	}
-	bundle, err := newFunctionBundle(functionBundleAgent, provider.ID, provider.NewHandler, nil, methods)
+	create := provider.NewHandler
+	if provider.NewHandlerWithContext != nil {
+		create = func() funcapi.MethodHandler { return provider.NewHandlerWithContext(funcapi.ProcessFunctionContext{}) }
+	}
+	bundle, err := newFunctionBundle(functionBundleAgent, provider.ID, create, nil, methods)
 	if err != nil {
 		return controllerModulePlan{}, err
 	}

@@ -4,7 +4,6 @@ package raw
 
 import (
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
@@ -16,8 +15,8 @@ func pingPongIncrementDispatch() DispatchHandler {
 }
 
 func pingPongStringReverseDispatch() DispatchHandler {
-	return StringReverseDispatch(func(s string) (string, bool) {
-		return reverseString(s), true
+	return StringReverseDispatch(func(s []byte) (string, bool) {
+		return reverseString(string(s)), true
 	})
 }
 
@@ -117,11 +116,12 @@ func TestStringReversePingPong(t *testing.T) {
 
 		// verify response is the character-by-character reverse of the sent string
 		expectedReversed := reverseString(current)
-		if view.Str != expectedReversed {
+		if string(view.Str) != expectedReversed {
 			t.Fatalf("round %d: sent %q, expected reverse %q, got %q", i+1, current, expectedReversed, view.Str)
 		}
 
-		current = view.Str
+		// The view borrows the client buffer that the next call reuses.
+		current = string(view.Str)
 	}
 
 	if responsesReceived != 6 {
@@ -163,18 +163,11 @@ func TestIncrementBatch(t *testing.T) {
 		protocol.MethodIncrement,
 		pingPongIncrementDispatch(),
 	)
-	doneCh := make(chan struct{})
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
+	doneCh := runServerForTest(s)
 	defer func() {
 		s.Stop()
 		<-doneCh
 	}()
-
-	// Wait for server
-	time.Sleep(100 * time.Millisecond)
 
 	// Client config with batch support
 	cCfg := testClientConfig()

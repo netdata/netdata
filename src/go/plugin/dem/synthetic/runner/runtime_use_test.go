@@ -155,7 +155,7 @@ func TestCheckUsesOneAcquiredRelease(t *testing.T) {
 		assert.Equal(t, u.paths.Node, bin)
 		assert.Equal(t, []string{u.paths.EntryPoint, "--check"}, args)
 		return starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
-			fmt.Fprintf(out, `{"version":%q,"contract":1,"uid":%d,"gid":%d}`, u.paths.Identity.Version, os.Geteuid(), os.Getegid())
+			fmt.Fprintf(out, `{"version":%q,"contract":2,"uid":%d,"gid":%d}`, u.paths.Identity.Version, os.Geteuid(), os.Getegid())
 			return ndexec.TreeResult{Drained: true}
 		})(ctx, opts, bin, args...)
 	}
@@ -270,7 +270,7 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 				assert.Empty(t, u.finished())
 				return resultPayload(success())(ctx, args, raw, out, errOut)
 			}
-			fmt.Fprintf(out, `{"version":%q,"contract":1,"uid":%d,"gid":%d}`, u.paths.Identity.Version, os.Geteuid(), os.Getegid())
+			fmt.Fprintf(out, `{"version":%q,"contract":2,"uid":%d,"gid":%d}`, u.paths.Identity.Version, os.Geteuid(), os.Getegid())
 			return ndexec.TreeResult{Drained: true}
 		})(ctx, opts, bin, args...)
 	}

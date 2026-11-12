@@ -26,6 +26,10 @@ type ClientConfig transportconfig.TypedConfig
 
 type ServerConfig transportconfig.TypedConfig
 
+// HandlerFunc is the typed callback used by the cgroups-lookup service.
+// The request borrows the receive buffer and the builder writes into the
+// response buffer; both are valid only during the call, so copy what you
+// keep.
 type HandlerFunc = func(*protocol.CgroupsLookupRequestView, *protocol.CgroupsLookupBuilder) bool
 
 type Handler struct {

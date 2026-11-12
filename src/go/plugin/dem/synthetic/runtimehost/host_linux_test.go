@@ -59,7 +59,7 @@ func testBundle(t *testing.T, version string) (runtime.Manifest, []byte) {
 	require.NoError(t, encoder.Close())
 	m := runtime.Manifest{
 		Format:   1,
-		Contract: 1,
+		Contract: 2,
 		Version:  version,
 		Platform: "linux/" + goruntime.GOARCH,
 		Archive: runtime.Archive{
@@ -133,7 +133,7 @@ func TestHostSelectionIsFixedAcrossInstallationUpdates(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, test.manifest.Archive.SHA256, use.Paths().Identity.SHA256)
 		require.Equal(t, test.manifest.Version, use.Paths().Identity.Version)
-		require.Equal(t, 1, use.Paths().Identity.Contract)
+		require.Equal(t, test.manifest.Contract, use.Paths().Identity.Contract)
 		require.FileExists(t, use.Paths().Node)
 		content, err := os.ReadFile(use.Paths().EntryPoint)
 		require.NoError(t, err)

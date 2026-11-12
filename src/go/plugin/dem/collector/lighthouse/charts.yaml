@@ -2,32 +2,110 @@ version: v1
 context_namespace: dem_synthetic
 groups:
   - family: Execution
-    metrics: [execution_state, duration]
+    metrics: [execution_state, duration, observation_age, attempts_success, attempts_failed, attempts_timeout, attempts_inconclusive, attempts_error, attempts_cancelled, attempts_unknown]
     charts:
       - context: execution_state
-        title: Synthetic attempt outcome
+        lifecycle:
+          expire_after_cycles: 0
+        title: Latest synthetic observation state
         units: state
         type: stacked
         dimensions:
           - selector: execution_state
       - context: duration
-        title: Synthetic attempt duration
+        lifecycle:
+          expire_after_cycles: 0
+        title: Latest synthetic attempt duration
         units: milliseconds
         dimensions:
           - selector: duration
             name: duration
+      - context: observation_age
+        lifecycle:
+          expire_after_cycles: 0
+        title: Age of latest synthetic observation
+        units: seconds
+        dimensions:
+          - selector: observation_age
+            name: age
+      - context: attempts
+        lifecycle:
+          expire_after_cycles: 0
+        title: Completed synthetic attempts
+        units: attempts/s
+        type: stacked
+        dimensions:
+          - selector: attempts_success
+            name: success
+          - selector: attempts_failed
+            name: failed
+          - selector: attempts_timeout
+            name: timeout
+          - selector: attempts_inconclusive
+            name: inconclusive
+          - selector: attempts_error
+            name: error
+          - selector: attempts_cancelled
+            name: cancelled
+          - selector: attempts_unknown
+            name: unknown
+  - family: Scheduling
+    metrics: [scheduled, admitted, coalesced, active, pending, queue_age, scheduling_delay]
+    charts:
+      - context: occurrences
+        lifecycle:
+          expire_after_cycles: 0
+        title: Synthetic scheduled occurrences
+        units: occurrences/s
+        dimensions:
+          - selector: scheduled
+            name: scheduled
+          - selector: admitted
+            name: admitted
+          - selector: coalesced
+            name: coalesced
+      - context: scheduler_state
+        lifecycle:
+          expire_after_cycles: 0
+        title: Synthetic active and pending attempts
+        units: attempts
+        dimensions:
+          - selector: active
+            name: active
+          - selector: pending
+            name: pending
+      - context: queue_age
+        lifecycle:
+          expire_after_cycles: 0
+        title: Oldest synthetic admission wait
+        units: seconds
+        dimensions:
+          - selector: queue_age
+            name: age
+      - context: scheduling_delay
+        lifecycle:
+          expire_after_cycles: 0
+        title: Latest synthetic admission delay from selected due time
+        units: seconds
+        dimensions:
+          - selector: scheduling_delay
+            name: delay
   - family: Desktop lab performance
     context_namespace: lighthouse
     metrics: [performance, fcp, lcp, tbt, si, cls]
     charts:
       - context: performance
-        title: Lighthouse performance score
+        lifecycle:
+          expire_after_cycles: 0
+        title: Latest Lighthouse performance score
         units: points
         dimensions:
           - selector: performance
             name: performance
       - context: timings
-        title: Lighthouse lab timings
+        lifecycle:
+          expire_after_cycles: 0
+        title: Latest Lighthouse lab timings
         units: milliseconds
         dimensions:
           - selector: fcp
@@ -39,7 +117,9 @@ groups:
           - selector: si
             name: speed_index
       - context: cls
-        title: Lighthouse cumulative layout shift
+        lifecycle:
+          expire_after_cycles: 0
+        title: Latest Lighthouse cumulative layout shift
         units: ratio
         dimensions:
           - selector: cls

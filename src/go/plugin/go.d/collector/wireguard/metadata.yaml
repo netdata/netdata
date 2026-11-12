@@ -22,28 +22,43 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors WireGuard VPN devices and peers traffic.
+          Monitor WireGuard VPN interfaces and their peers: traffic, peer counts, and the time since each peer's latest handshake.
         method_description: |
-          It connects to the local WireGuard instance using [wireguard-go client](https://github.com/WireGuard/wireguard-go).
+          Reads the state of the local WireGuard interfaces once per collection interval through the WireGuard control API, using the [wgctrl](https://github.com/WireGuard/wgctrl-go) library:
+
+          - On Linux, kernel WireGuard interfaces are read over netlink.
+          - Userspace implementations, such as wireguard-go and BoringTun, are read through their control sockets in `/var/run/wireguard`.
+
+          The collector only reads interface and peer state; it never changes the WireGuard configuration.
       default_behavior:
         auto_detection:
           description: |
-            It automatically detects instances running on localhost.
+            The stock configuration runs one `wireguard` job that reads every WireGuard interface on the host. If the host has no WireGuard interface when the job starts, the job does not start; set `autodetection_retry` to keep checking for interfaces that come up later.
         limits:
           description: |
-            Doesn't work if Netdata or WireGuard is installed in the container.
+            - Only interfaces in the Agent's network namespace are visible. WireGuard running inside a container with its own network, such as a containerized VPN server, is not collected.
+            - If any interface cannot be read, the whole collection fails and every WireGuard chart has a gap for that interval.
         performance_impact:
           description: ""
       additional_permissions:
         description: |
-          This collector requires the CAP_NET_ADMIN capability, but it is set automatically during installation, so no manual configuration is needed.
-      multi_instance: true
+          Reading kernel WireGuard interfaces on Linux requires the `CAP_NET_ADMIN` capability. Standard installations grant it to `go.d.plugin` automatically; a containerized Agent needs it added to the container (see Prerequisites).
+      multi_instance: false
       supported_platforms:
         include: []
         exclude: []
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: Add NET_ADMIN to a containerized Agent
+            description: |
+              Applies only to Agents running in a container. Reading kernel WireGuard interfaces needs the host network, which the documented `docker run` and Compose examples already use (`--network=host`), and the `NET_ADMIN` capability, which they do not add. Add it to the container:
+
+              ```text
+              --cap-add NET_ADMIN
+              ```
+
+              With Docker Compose, add `NET_ADMIN` to the service's `cap_add` list.
       configuration:
         file:
           name: go.d/wireguard.conf
@@ -52,36 +67,54 @@ modules:
             The following options can be defined globally: update_every, autodetection_retry.
           folding:
             title: Config options
-            enabled: true
+            enabled: false
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval, in seconds.
               default_value: 1
               required: false
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.
               default_value: 0
               required: false
         examples:
           folding:
             title: Config
             enabled: true
-          list: []
+          list:
+            - name: Basic
+              description: The stock configuration. One job reads every WireGuard interface on the host.
+              config: |
+                jobs:
+                  - name: wireguard
+            - name: WireGuard starts after Netdata
+              description: Keeps retrying every 60 seconds while the host has no WireGuard interface, so the job starts once the VPN comes up.
+              config: |
+                jobs:
+                  - name: wireguard
+                    autodetection_retry: 60
     troubleshooting:
-      problems:
-        list: []
+      errors:
+        list:
+          - error: no WireGuard devices found
+            cause: The job found no WireGuard interface in the Agent's network namespace when it started, so it did not start. This happens when the VPN comes up after Netdata, or when WireGuard runs in a container with its own network.
+            fix: Set `autodetection_retry` so the job starts on its own once an interface appears (see the "WireGuard starts after Netdata" example), or restart Netdata after bringing the interface up. WireGuard inside a container with its own network cannot be collected.
+          - error: 'retrieving WireGuard devices: operation not permitted'
+            cause: '`go.d.plugin` lacks the `CAP_NET_ADMIN` capability needed to read kernel WireGuard interfaces. Usually the Agent runs in a container started without `NET_ADMIN`, or a hardened install dropped the plugin''s file capabilities.'
+            fix: In a container, add `NET_ADMIN` as described in Prerequisites. Otherwise re-run the Netdata installer, which restores the plugin's file capabilities.
     metrics:
       folding:
         title: Metrics
         enabled: false
-      description: ""
+      description: |
+        Peers that have never completed a handshake count toward the interface's peer total, but have no per-peer charts and add nothing to the interface traffic. An interface whose peers have not completed any handshake has no traffic chart until the first one does.
       availability: []
       scopes:
         - name: device
-          description: These metrics refer to the VPN network interface.
+          description: A WireGuard network interface on the host.
           labels:
             - name: device
-              description: VPN network interface
+              description: WireGuard interface name, for example `wg0`.
           metrics:
             - name: wireguard.device_network_io
               description: Device traffic
@@ -97,12 +130,12 @@ modules:
               dimensions:
                 - name: peers
         - name: peer
-          description: These metrics refer to the VPN peer.
+          description: A peer configured on a WireGuard interface. Appears after the peer's first handshake.
           labels:
             - name: device
-              description: VPN network interface
+              description: WireGuard interface name, for example `wg0`.
             - name: public_key
-              description: Public key of a peer
+              description: The peer's public key, base64-encoded.
           metrics:
             - name: wireguard.peer_network_io
               description: Peer traffic

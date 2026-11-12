@@ -133,7 +133,7 @@ impl RawClient {
                 Ok(next) => next,
                 Err(err) if err == NipcError::Overflow && start < paths.len() => {
                     let one_item_size = cgroups_lookup_request_size(&paths[start..start + 1])?;
-                    if self.ensure_lookup_request_capacity(one_item_size)? {
+                    if self.ensure_lookup_request_capacity(one_item_size, deadline)? {
                         continue;
                     }
                     raw_items.push(cgroups_lookup_oversized_request_item(paths[start])?);

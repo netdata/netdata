@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/internal/framing"
 )
@@ -23,11 +24,9 @@ func (s *Session) ReceiveTimeout(buf []byte, timeoutMs uint32, abortCh <-chan st
 		return protocol.Header{}, nil, wrapErr(ErrBadParam, "session closed")
 	}
 
-	recv := func(dst []byte) (int, error) { return rawRecv(s.handle, dst) }
-	if timeoutMs != 0 || abortCh != nil {
-		wait := newReceiveWait(timeoutMs, abortCh)
-		recv = func(dst []byte) (int, error) { return s.rawRecvWithTimeout(dst, wait) }
-	}
+	s.initReceiveFns()
+	s.recvControl = timeoutMs != 0 || abortCh != nil
+	s.recvWait = newReceiveWait(timeoutMs, abortCh)
 
 	return framing.SessionReceive(framing.SessionReceiveConfig{
 		RoleServer:              s.role == RoleServer,
@@ -39,13 +38,13 @@ func (s *Session) ReceiveTimeout(buf []byte, timeoutMs uint32, abortCh <-chan st
 		InflightIDs:             s.inflightIDs,
 		RecvBuf:                 &s.recvBuf,
 		PacketBuf:               &s.pktBuf,
-		Recv:                    recv,
+		Recv:                    s.recvPacketFn,
 		EnsurePacketScratch:     ensurePipeScratchBuf,
 		IsRecvDisconnect:        func(err error) bool { return errors.Is(err, ErrDisconnected) },
 		PropagateRecvError: func(err error) bool {
 			return errors.Is(err, ErrTimeout) || errors.Is(err, ErrAborted)
 		},
-		FailAllInflight:  s.failAllInflight,
+		FailAllInflight:  s.failInflights,
 		ErrLimitExceeded: func(msg string) error { return wrapErr(ErrLimitExceeded, msg) },
 		ErrProtocol:      func(msg string) error { return wrapErr(ErrProtocol, msg) },
 		ErrChunk:         func(msg string) error { return wrapErr(ErrChunk, msg) },
@@ -54,9 +53,27 @@ func (s *Session) ReceiveTimeout(buf []byte, timeoutMs uint32, abortCh <-chan st
 	}, buf)
 }
 
+// initReceiveFns builds the session's receive closures once. They read the
+// call's state from the session (recvControl, recvWait).
+func (s *Session) initReceiveFns() {
+	if s.recvPacketFn != nil {
+		return
+	}
+	s.recvPacketFn = func(dst []byte) (int, error) {
+		if s.pending.queued() {
+			return s.pending.pop(dst)
+		}
+		if s.recvControl {
+			return s.rawRecvWithTimeout(dst, s.recvWait)
+		}
+		return s.readPacket(dst)
+	}
+	s.failInflights = s.failAllInflight
+}
+
 type receiveWait struct {
 	infinite bool
-	deadline time.Time
+	deadline int64 // monotime nanoseconds
 	abortCh  <-chan struct{}
 }
 
@@ -66,7 +83,7 @@ func newReceiveWait(timeoutMs uint32, abortCh <-chan struct{}) receiveWait {
 		abortCh:  abortCh,
 	}
 	if !w.infinite {
-		w.deadline = time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
+		w.deadline = monotime.After(time.Duration(timeoutMs) * time.Millisecond)
 	}
 	return w
 }
@@ -85,7 +102,7 @@ func (w receiveWait) waitMs() (uint32, error) {
 		return waitMs, nil
 	}
 
-	remaining := time.Until(w.deadline)
+	remaining := time.Duration(w.deadline - monotime.Now())
 	if remaining <= 0 {
 		return 0, ErrTimeout
 	}
@@ -120,6 +137,6 @@ func (s *Session) rawRecvWithTimeout(buf []byte, wait receiveWait) (int, error) 
 		if !ready {
 			continue
 		}
-		return rawRecv(s.handle, buf)
+		return s.readPacket(buf)
 	}
 }

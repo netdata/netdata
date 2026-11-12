@@ -166,7 +166,7 @@ virtual_metrics: <calculated metrics>
 | [**topology**](#41-topology)              | Defines SNMP topology rows and their topology kind.                                |
 | [**bgp**](#bgp-rows)                      | Defines typed BGP device, peer, and peer-family rows.                              |
 | [**licensing**](#licensing-rows)          | Defines typed license rows.                                                        |
-| [**metric_tags**](#5-metric_tags)         | Defines global dynamic tags collected once per device and attached to all metrics. |
+| [**metric_tags**](#5-metric_tags)         | Defines global dynamic tags shared by all metrics from a device.                   |
 | [**static_tags**](#6-static_tags)         | Defines fixed tags applied to all metrics.                                         |
 | [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others.                          |
 
@@ -262,7 +262,8 @@ Ordinary device metadata permits static values alongside symbols; `sysobjectid_m
 
 The `metadata` section defines **device-level information** (not metric tags).
 
-It is collected **once per device** and populates the device’s **host labels** in Netdata (the “virtual node” labels shown on the device page).
+It populates the device’s **host labels** in Netdata (the “virtual node” labels shown on the device page).
+Normal SNMP metric polling caches these values between polls and refreshes them when system information changes.
 
 It always follows the structure `metadata → device → fields`, where each field defines a single label.
 
@@ -586,9 +587,10 @@ renderer sanitizes labels for the plugin wire only after IDs have been built. Tw
 names that look the same after display sanitation still have separate chart IDs
 and samples. Temporary `rm:` tags are removed before export.
 
-The `metric_tags` section defines **global dynamic tags** — values collected once from the device and applied to **every metric** in the profile.
+The `metric_tags` section defines **global dynamic tags** — cached device-scoped values applied to **every metric** in
+the profile. Normal SNMP metric polling refreshes these values when system information changes.
 
-They are evaluated during collection, just like other SNMP symbols, and remain the same for all metrics within that device.
+Each cached tag value is shared by all metrics in the profile.
 
 **Typical uses**:
 
@@ -610,7 +612,8 @@ metric_tags:
 
 **How it works**:
 
-- Each tag is collected once per device, not per metric or per table row.
+- Each tag is collected at device scope. Normal SNMP metric polling refreshes cached values when system information
+  changes.
 - The resulting tag values are attached to **all metrics** collected by the profile.
 - Tags can be transformed (for example, reformatted or mapped) using the same rules as per-metric tags.
 - Top-level `metric_tags` are available to both regular metrics and topology by

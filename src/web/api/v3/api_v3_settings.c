@@ -3,23 +3,25 @@
 /*
  * /api/v3/settings
  *
+ * There is one settings object per agent: 'default'. It is shared by
+ * every caller admitted to this API (anonymous or bearer). The dashboard
+ * keeps agent-wide preferences in it (e.g. the preferred nodes of the
+ * agent's local space).
+ *
  * QUERY STRING PARAMETERS:
- * - file=a file name (alphanumerics, dashes, underscores)
- *   When the user is not authenticated with a bearer token
- *   only the 'default' file is allowed.
- *   Authenticated users can create, store and update any
- *   settings file.
+ * - file=default (optional; an empty value counts as omitted;
+ *   any other value is rejected)
  *
  * HTTP METHODS
- * - GET to retrieve a file
- * - PUT to create or update a file
+ * - GET to retrieve the settings object
+ * - PUT to create or update the settings object
  *
  * PAYLOAD
- * - The payload MUST have the member 'version'.
+ * - The payload MUST have the member 'version', a positive integer.
  * - The payload MAY have anything else.
  * - The maximum payload size in JSON is 20MiB.
  * - When updating the payload, the caller must specify the
- *   version of the existing file. If this check fails,
+ *   version of the stored object. If this check fails,
  *   Netdata will return 409 (conflict).
  *   When the caller receives 409, it means there are updates
  *   in the payload outside its control and the object MUST
@@ -34,6 +36,7 @@
 #include "api_v3_calls.h"
 
 #define MAX_SETTINGS_SIZE_BYTES (20 * 1024 * 1024)
+#define SETTINGS_FILE "default"
 
 // we need an r/w spinlock to ensure that reads and write do not happen
 // concurrently for settings files
@@ -43,10 +46,10 @@ static inline void settings_path(char out[FILENAME_MAX]) {
     filename_from_path_entry(out, netdata_configured_varlib_dir, "settings", NULL);
 }
 
-static inline void settings_filename(char out[FILENAME_MAX], const char *file, const char *extension) {
+static inline void settings_filename(char out[FILENAME_MAX], const char *extension) {
     char path[FILENAME_MAX];
     settings_path(path);
-    filename_from_path_entry(out, path, file, extension);
+    filename_from_path_entry(out, path, SETTINGS_FILE, extension);
 }
 
 static inline bool settings_ensure_path_exists(void) {
@@ -55,21 +58,26 @@ static inline bool settings_ensure_path_exists(void) {
     return filename_is_dir(path, true);
 }
 
-static inline size_t settings_extract_json_version(const char *json) {
+// a valid version is a JSON integer from 1 to INT64_MAX - 1; settings_put() refuses to increment
+// INT64_MAX - 1, so a stored version always stays valid
+// returns 0 when the version is missing or invalid
+static inline int64_t settings_json_object_version(struct json_object *jobj) {
+    struct json_object *version_obj;
+    if(!json_object_object_get_ex(jobj, "version", &version_obj) || !json_object_is_type(version_obj, json_type_int))
+        return 0;
+
+    int64_t version = json_object_get_int64(version_obj);
+    return (version > 0 && version < INT64_MAX) ? version : 0;
+}
+
+static inline int64_t settings_extract_json_version(const char *json) {
     if(!json || !*json) return 0;
 
-    // Parse the JSON string into a JSON-C object
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse(json);
     if (jobj == NULL)
         return 0;
 
-    // Access the "version" field
-    struct json_object *version_obj;
-    if (json_object_object_get_ex(jobj, "version", &version_obj))
-        // Extract the integer value of the version
-        return (size_t)json_object_get_int(version_obj);
-
-    return 0;
+    return settings_json_object_version(jobj);
 }
 
 static inline void settings_initial_version(BUFFER *wb) {
@@ -79,9 +87,9 @@ static inline void settings_initial_version(BUFFER *wb) {
     buffer_json_finalize(wb);
 }
 
-static inline void settings_get(BUFFER *wb, const char *file, bool have_lock) {
+static inline void settings_get(BUFFER *wb, bool have_lock) {
     char filename[FILENAME_MAX];
-    settings_filename(filename, file, NULL);
+    settings_filename(filename, NULL);
 
     buffer_reset(wb);
 
@@ -94,9 +102,9 @@ static inline void settings_get(BUFFER *wb, const char *file, bool have_lock) {
         rw_spinlock_read_unlock(&settings_spinlock);
 
     if(rc) {
-        size_t version = settings_extract_json_version(buffer_tostring(wb));
+        int64_t version = settings_extract_json_version(buffer_tostring(wb));
         if (!version) {
-            nd_log(NDLS_DAEMON, NDLP_ERR, "file '%s' cannot be parsed to extract version", filename);
+            nd_log(NDLS_DAEMON, NDLP_ERR, "settings file '%s' has no valid version; serving the initial object", filename);
             settings_initial_version(wb);
         }
         else {
@@ -108,9 +116,9 @@ static inline void settings_get(BUFFER *wb, const char *file, bool have_lock) {
         settings_initial_version(wb);
 }
 
-static inline size_t settings_get_version(const char *path, bool have_lock) {
+static inline int64_t settings_get_version(bool have_lock) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    settings_get(wb, path, have_lock);
+    settings_get(wb, have_lock);
 
     return settings_extract_json_version(buffer_tostring(wb));
 }
@@ -234,7 +242,7 @@ static bool settings_write_tmp_file(FILE *fp, const char *data, size_t len) {
     return !failed;
 }
 
-static inline int settings_put(struct web_client *w, char *file) {
+static inline int settings_put(struct web_client *w) {
     rw_spinlock_write_lock(&settings_spinlock);
 
     if(!settings_ensure_path_exists()) {
@@ -242,10 +250,10 @@ static inline int settings_put(struct web_client *w, char *file) {
         return nrpc_call_error(
             w->response.data,
             "Settings path cannot be created or accessed.",
-            HTTP_RESP_BAD_REQUEST);
+            HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
 
-    size_t old_version = settings_get_version(file, true);
+    int64_t old_version = settings_get_version(true);
 
     // Parse the JSON string into a JSON-C object
     CLEAN_JSON_OBJECT *jobj = json_tokener_parse(buffer_tostring(w->payload));
@@ -267,7 +275,14 @@ static inline int settings_put(struct web_client *w, char *file) {
             HTTP_RESP_BAD_REQUEST);
     }
 
-    size_t new_version = (size_t)json_object_get_int(version_obj);
+    int64_t new_version = settings_json_object_version(jobj);
+    if (!new_version) {
+        rw_spinlock_write_unlock(&settings_spinlock);
+        return nrpc_call_error(
+            w->response.data,
+            "Field version must be a positive integer",
+            HTTP_RESP_BAD_REQUEST);
+    }
 
     if (old_version != new_version) {
         rw_spinlock_write_unlock(&settings_spinlock);
@@ -277,15 +292,31 @@ static inline int settings_put(struct web_client *w, char *file) {
             HTTP_RESP_CONFLICT);
     }
 
+    // the stored version must stay valid after the increment
+    if (new_version >= INT64_MAX - 1) {
+        rw_spinlock_write_unlock(&settings_spinlock);
+        return nrpc_call_error(
+            w->response.data,
+            "Field version cannot be incremented any further",
+            HTTP_RESP_BAD_REQUEST);
+    }
+
     new_version++;
     // Set the new version back into the JSON object
-    json_object_object_add(jobj, "version", json_object_new_int((int)new_version));
+    json_object_object_add(jobj, "version", json_object_new_int64(new_version));
 
     // Convert the updated JSON object back to a string
     const char *updated_json_str = json_object_to_json_string(jobj);
+    if (!updated_json_str) {
+        rw_spinlock_write_unlock(&settings_spinlock);
+        return nrpc_call_error(
+            w->response.data,
+            "Cannot serialize the payload",
+            HTTP_RESP_INTERNAL_SERVER_ERROR);
+    }
 
     char tmp_filename[FILENAME_MAX];
-    settings_filename(tmp_filename, file, "new");
+    settings_filename(tmp_filename, "new");
 
     // Save the updated JSON string to a file
     FILE *fp = settings_open_tmp_file(tmp_filename);
@@ -310,7 +341,7 @@ static inline int settings_put(struct web_client *w, char *file) {
     }
 
     char filename[FILENAME_MAX];
-    settings_filename(filename, file, NULL);
+    settings_filename(filename, NULL);
 
     bool renamed = os_rename(tmp_filename, filename) == 0;
     if(!renamed)
@@ -332,23 +363,8 @@ static inline int settings_put(struct web_client *w, char *file) {
         HTTP_RESP_OK);
 }
 
-static inline bool is_settings_file_valid(char *file) {
-    char *s = file;
-
-    if(!s || !*s)
-        return false;
-
-    while(*s) {
-        if(!isalnum((uint8_t)*s) && *s != '-' && *s != '_')
-            return false;
-        s++;
-    }
-
-    return true;
-}
-
 int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
-    char *file = NULL;
+    bool file_is_default = true;
 
     while(url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
@@ -361,14 +377,14 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
         // name and value are now the parameters
         // they are not null and not empty
 
-        if(!strcmp(name, "file"))
-            file = value;
+        if(!strcmp(name, "file") && strcmp(value, SETTINGS_FILE) != 0)
+            file_is_default = false;
     }
 
-    if(!is_settings_file_valid(file))
+    if(!file_is_default)
         return nrpc_call_error(
             w->response.data,
-            "Invalid settings file given.",
+            "Only the '" SETTINGS_FILE "' settings file is supported.",
             HTTP_RESP_BAD_REQUEST);
 
     if(host != localhost)
@@ -377,15 +393,9 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
             "Settings API is only allowed for the agent node.",
             HTTP_RESP_BAD_REQUEST);
 
-    if(w->user_auth.method != USER_AUTH_METHOD_BEARER && strcmp(file, "default") != 0)
-        return nrpc_call_error(
-            w->response.data,
-            "Only the 'default' settings file is allowed for anonymous users",
-            HTTP_RESP_BAD_REQUEST);
-
     switch(w->mode) {
         case HTTP_REQUEST_MODE_GET:
-            settings_get(w->response.data, file, false);
+            settings_get(w->response.data, false);
             return HTTP_RESP_OK;
 
         case HTTP_REQUEST_MODE_PUT:
@@ -401,7 +411,7 @@ int api_v3_settings(RRDHOST *host, struct web_client *w, char *url) {
                     "Settings API PUT payload exceeds the maximum allowed size.",
                     HTTP_RESP_CONTENT_TOO_LONG);
 
-            return settings_put(w, file);
+            return settings_put(w);
 
         default:
             return nrpc_call_error(w->response.data,

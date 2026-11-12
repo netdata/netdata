@@ -30,6 +30,7 @@ PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packag
 NETDATA_STABLE_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata/releases}"
 NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata-nightlies/releases}"
 NETDATA_STABLE_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/stable}"
+NETDATA_PREVIEW_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/preview}"
 NETDATA_NIGHTLY_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/edge}"
 RELEASE_ARTIFACT_URL_PREFIX="https://artifacts.netdata.cloud"
 NETDATA_DEFAULT_ACCEPT_MAJOR_VERSIONS="1 2"
@@ -850,15 +851,28 @@ else:
   [ "${commit_date}" -ge "${script_date}" ]
 }
 
+# Native packages can carry a stable .environment even when using the preview repo.
+is_preview_install() {
+  case "${INSTALL_TYPE}" in
+    *binpkg-deb*) dpkg-query -s netdata-repo-preview > /dev/null 2>&1 ;;
+    *binpkg-rpm*) rpm -q netdata-repo-preview > /dev/null 2>&1 ;;
+    *) [ "${RELEASE_CHANNEL}" = preview ] ;;
+  esac
+}
+
 self_update() {
-  if [ -z "${NETDATA_NO_UPDATER_SELF_UPDATE}" ] && newer_commit_date; then
+  if is_preview_install; then RELEASE_CHANNEL=preview; fi
+  # Preview checks the hosted script directly, without a GitHub freshness query.
+  if [ -z "${NETDATA_NO_UPDATER_SELF_UPDATE}" ] &&
+     { [ "${RELEASE_CHANNEL}" = preview ] || newer_commit_date; }; then
     info "Downloading newest version of updater script."
 
     create_exec_tmp_directory
     cd "${ndtmpdir}" || exit 1
 
     if _safe_download "${RELEASE_ARTIFACT_URL_PREFIX}/installer/netdata-updater.sh" ./netdata-updater.sh ||
-       _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; then
+       { [ "${RELEASE_CHANNEL}" != preview ] &&
+         _safe_download "https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-updater.sh" ./netdata-updater.sh; }; then
       chmod +x ./netdata-updater.sh || exit 1
       export ENVIRONMENT_FILE="${ENVIRONMENT_FILE}"
 
@@ -896,12 +910,13 @@ parse_version() {
     r="$(echo "${r}" | sed -e 's/^v\(.*\)/\1/')"
   fi
 
+  r="${r%%+*}"
   tmpfile="$(mktemp)"
   echo "${r}" | tr '-' ' ' > "${tmpfile}"
   read -r v b1 b2 _ < "${tmpfile}"
 
-  if echo "${b1}" | grep -Eq "^rc[0-9]+$"; then
-    rc="$(echo "${b1}" | tr -d 'rc')"
+  if echo "${b1}" | grep -Eq "^rc\.?[0-9]+$"; then
+    rc="$(echo "${b1}" | tr -d 'rc.')"
 
     if echo "${b2}" | grep -Eq "^[0-9]+$"; then
       t=2
@@ -949,6 +964,12 @@ get_latest_tag() {
       download "${NETDATA_TARBALL_URL_PREFIX}/Version" "${ndtmpdir}/Version"
       _latest_tag="$(cat "${ndtmpdir}/Version")"
       [ -n "${_latest_tag}" ] || fatal "Release Version file is empty" U002B
+    elif [ "${1}" = preview ]; then
+      create_exec_tmp_directory
+      preview_prefix="${NETDATA_TARBALL_URL_PREFIX:-${NETDATA_ARTIFACT_URL_PREFIX:-${RELEASE_ARTIFACT_URL_PREFIX}/preview/latest}}"
+      download "${preview_prefix}/Version" "${ndtmpdir}/Version" || return 1
+      _latest_tag="$(cat "${ndtmpdir}/Version")"
+      [ -n "${_latest_tag}" ] || fatal "Release Version file is empty" U002B
     elif [ -z "${NETDATA_BASE_URL}" ] && [ -z "${NETDATA_OFFLINE_INSTALL_SOURCE}" ] &&
          { [ "${1}" = stable ] || [ "${1}" = nightly ]; }; then
       create_exec_tmp_directory
@@ -977,24 +998,42 @@ validate_environment_file() {
   fi
 }
 
-get_current_version() {
+get_current_tag() {
   basepath="$(dirname "$(dirname "$(dirname "${NETDATA_LIB_DIR}")")")"
   searchpath="${basepath}/bin:${basepath}/sbin:${basepath}/usr/bin:${basepath}/usr/sbin:${PATH}"
   searchpath="${basepath}/netdata/bin:${basepath}/netdata/sbin:${basepath}/netdata/usr/bin:${basepath}/netdata/usr/sbin:${searchpath}"
-  ndbinary="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
+  ndbinary="$(PATH="${searchpath}" command -v netdata 2>/dev/null || true)"
 
-  if [ -z "${ndbinary}" ]; then
-    _current_version=0
-  else
-    _current_version="$(parse_version "$(${ndbinary} -V | cut -f 2 -d ' ')")"
+  if [ -n "${ndbinary}" ]; then
+    "${ndbinary}" -V | cut -f 2 -d ' '
   fi
+}
 
-  echo "${_current_version:-0}"
+get_current_version() {
+  current_tag="$(get_current_tag)"
+  if [ -n "${current_tag}" ]; then
+    parse_version "${current_tag}"
+  else
+    echo 0
+  fi
 }
 
 get_latest_version() {
   latest_tag="$(get_latest_tag "${RELEASE_CHANNEL}")" || return 1
   parse_version "${latest_tag}"
+}
+
+# Hosted Version comes from packaging/version, while Git builds use git describe.
+# Ignore only its terminal distance/hash suffix and the optional leading v;
+# preserve prerelease and build identifiers, and follow the publication even backwards.
+preview_release_identity() {
+  printf '%s\n' "${1#v}" | sed 's/-[0-9][0-9]*-g[0-9a-f][0-9a-f]*$//'
+}
+
+# Preview tags are not constrained by the legacy numeric version encoding.
+version_major() {
+  version_tag="${1#v}"
+  printf '%s\n' "${version_tag%%.*}"
 }
 
 update_available() {
@@ -1003,8 +1042,15 @@ update_available() {
      return 0
   fi
 
-  current_version="$(get_current_version)"
-  latest_version="$(get_latest_version)" || fatal "Unable to determine latest version" U002B
+  if [ "${RELEASE_CHANNEL}" = preview ]; then
+    current_tag="$(get_current_tag)"
+    latest_tag="$(get_latest_tag preview)" || fatal "Unable to determine latest version" U002B
+    current_version="${current_tag}"
+    latest_version="${latest_tag}"
+  else
+    current_version="$(get_current_version)"
+    latest_version="$(get_latest_version)" || fatal "Unable to determine latest version" U002B
+  fi
 
   info "Current Version: ${current_version}"
   info "Latest Version: ${latest_version}"
@@ -1012,16 +1058,25 @@ update_available() {
   if [ -z "${latest_version}" ] || [ -z "${current_version}" ] ; then
     info "Unable to compare versions for update check, assuming an update is required."
     return 0
-  elif [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${latest_version}" ]; then
-    info "Newest version (current=${current_version} >= latest=${latest_version}) is already installed"
+  elif { [ "${RELEASE_CHANNEL}" = preview ] &&
+         [ "$(preview_release_identity "${current_tag}")" = "$(preview_release_identity "${latest_tag}")" ]; } ||
+       { [ "${RELEASE_CHANNEL}" != preview ] && [ "${latest_version}" -gt 0 ] &&
+         [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${latest_version}" ]; }; then
+    info "Newest published version is already installed"
     return 1
   else
     info "Update available"
 
-    if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
+    if [ "${RELEASE_CHANNEL}" = preview ]; then
+      current_major="$(version_major "${current_tag}")"
+      latest_major="$(version_major "${latest_tag}")"
+    else
       current_major="$(echo "${current_version}" | head -c 3)"
       latest_major="$(echo "${latest_version}" | head -c 3)"
+    fi
 
+    if [ -n "${current_major}" ] && [ -n "${latest_major}" ] &&
+       [ "${current_major}" -ne 0 ] && [ "${latest_major}" -ne 0 ]; then
       if [ "${current_major}" -ne "${latest_major}" ]; then
         update_safe=0
 
@@ -1044,7 +1099,7 @@ update_available() {
 
 set_tarball_urls() {
   case "${1}" in
-    stable|nightly) ;;
+    stable|nightly|preview) ;;
     *) fatal "Unknown release channel ${1}, unable to update" U0029 ;;
   esac
 
@@ -1063,7 +1118,7 @@ set_tarball_urls() {
   elif [ -n "${NETDATA_ARTIFACT_URL_PREFIX}" ]; then
     NETDATA_TARBALL_URL_PREFIX="${NETDATA_ARTIFACT_URL_PREFIX}"
     prefix_set=1
-  elif [ -z "${NETDATA_BASE_URL}" ]; then
+  elif [ "${1}" = preview ] || [ -z "${NETDATA_BASE_URL}" ]; then
     NETDATA_TARBALL_URL_PREFIX="${RELEASE_ARTIFACT_URL_PREFIX}/${1}/latest"
   else
     # Preserve the legacy override used by existing local mirrors and CI.
@@ -1073,6 +1128,8 @@ set_tarball_urls() {
   if [ -n "${NETDATA_TARBALL_URL_PREFIX}" ] &&
      check_for_remote_file "${NETDATA_TARBALL_URL_PREFIX}/Manifest"; then
     NETDATA_MANIFEST_INSTALL=1
+  elif [ "${1}" = preview ]; then
+    fatal "Unable to fetch the preview release manifest from artifact hosting" U0029
   elif [ "${prefix_set}" -eq 0 ]; then
     case "${1}" in
       stable) release_base="${NETDATA_STABLE_BASE_URL}" ;;
@@ -1127,6 +1184,34 @@ verify_manifest() {
 
   if [ -z "${file_hash}" ] || ! echo "${file_hash} *${required_file}" | safe_sha256sum -c - >&3 2>&3; then
     fatal "Archive checksum validation failed for ${required_file}. Leaving archive in ${ndtmpdir}. Retry later in case an older copy was cached upstream." U002D
+  fi
+}
+
+# Bundled installers may reset the channel because they only accept stable/nightly flags.
+restore_preview_channel() {
+  [ "${RELEASE_CHANNEL}" = preview ] || return 0
+  # Resolve links before staging so rename updates the target, preserving the links.
+  preview_destination="${ENVIRONMENT_FILE}"
+  preview_link_count=0
+  while [ -L "${preview_destination}" ]; do
+    preview_link_count=$((preview_link_count + 1))
+    [ "${preview_link_count}" -le 40 ] ||
+      fatal "Unable to resolve preview environment symlink" U002B
+    preview_link="$(readlink "${preview_destination}")" ||
+      fatal "Unable to resolve preview environment symlink" U002B
+    case "${preview_link}" in
+      /*) preview_destination="${preview_link}" ;;
+      *) preview_destination="$(dirname "${preview_destination}")/${preview_link}" ;;
+    esac
+  done
+  # Keep the replacement on the target filesystem so rename is atomic.
+  preview_environment="$(mktemp "${preview_destination}.XXXXXX")" ||
+    fatal "Unable to stage preview release channel" U002B
+  if ! cp -p "${preview_destination}" "${preview_environment}" ||
+    ! sed 's/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL="preview"/' "${preview_destination}" > "${preview_environment}" ||
+    ! mv -f "${preview_environment}" "${preview_destination}"; then
+    rm -f "${preview_environment}"
+    fatal "Unable to preserve preview release channel" U002B
   fi
 }
 
@@ -1242,6 +1327,8 @@ update_build() {
       fi
     fi
 
+    restore_preview_channel
+
     # We no longer store checksum info here. but leave this so that we clean up all environment files upon next update.
     sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
 
@@ -1283,6 +1370,7 @@ update_static() {
     # Do not pass any options other than the accept, for now
     # shellcheck disable=SC2086
     if sh "${ndtmpdir}/${archive_name}" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
+      restore_preview_channel
       rm -r "${ndtmpdir}"
     else
       info "NOTE: did not remove: ${ndtmpdir}"
@@ -1421,7 +1509,7 @@ update_binpkg() {
       ;;
   esac
 
-  initial_version="$(get_current_version)"
+  initial_version=""
 
   if [ -n "${repo_subcmd}" ]; then
     # shellcheck disable=SC2086
@@ -1431,10 +1519,14 @@ update_binpkg() {
   if ${pkg_installed_check} netdata-repo > /dev/null 2>&1; then
     RELEASE_CHANNEL="stable"
     repopkg="netdata-repo"
+  elif ${pkg_installed_check} netdata-repo-preview > /dev/null 2>&1; then
+    RELEASE_CHANNEL="preview"
+    repopkg="netdata-repo-preview"
   elif ${pkg_installed_check} netdata-repo-edge > /dev/null 2>&1; then
     RELEASE_CHANNEL="nightly"
     repopkg="netdata-repo-edge"
   else
+    initial_version="$(get_current_version)"
     case "$(echo "${initial_version}" | cut -c 10)" in
       0)
         RELEASE_CHANNEL="nightly"
@@ -1451,8 +1543,15 @@ update_binpkg() {
     esac
   fi
 
+  if [ "${RELEASE_CHANNEL}" = preview ]; then
+    initial_tag="$(get_current_tag)"
+  elif [ -z "${initial_version}" ]; then
+    initial_version="$(get_current_version)"
+  fi
+
   if [ -n "${repo_path}" ]; then
     case "${RELEASE_CHANNEL}" in
+      preview) check_url="${NETDATA_PREVIEW_REPO_URL}/${repo_path}/.currently.published" ;;
       stable) check_url="${NETDATA_STABLE_REPO_URL}/${repo_path}/.currently.published" ;;
       nightly) check_url="${NETDATA_NIGHTLY_REPO_URL}/${repo_path}/.currently.published" ;;
     esac
@@ -1497,7 +1596,12 @@ update_binpkg() {
     fi
   fi
 
-  current_major="$(get_current_version | head -c 3 | awk '{ print $1 + 0 }')"
+  if [ "${RELEASE_CHANNEL}" = preview ]; then
+    current_major="$(version_major "${initial_tag}")"
+    [ -n "${current_major}" ] || current_major=0
+  else
+    current_major="$(get_current_version | head -c 3 | awk '{ print $1 + 0 }')"
+  fi
   latest_major="$(get_new_binpkg_major)"
 
   # current_major == 0 means we could not determine the installed version
@@ -1535,21 +1639,38 @@ update_binpkg() {
   # Keep ownership of metadata downloads outside command substitutions so the
   # EXIT trap can clean them up even when updater self-update was skipped.
   create_exec_tmp_directory
-  current_version="$(get_current_version)"
-  latest_version="$(get_latest_version)" || fatal "Unable to determine latest version" U002B
+  if [ "${RELEASE_CHANNEL}" = preview ]; then
+    latest_tag="$(get_latest_tag preview)" || fatal "Unable to determine latest version" U002B
+  else
+    current_version="$(get_current_version)"
+    latest_version="$(get_latest_version)" || fatal "Unable to determine latest version" U002B
+  fi
 
-  if [ "${RELEASE_CHANNEL}" != "none" ] && [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
-    if [ "${current_version}" -lt "${latest_version}" ] && [ "${initial_version}" -eq "${current_version}" ]; then
-      error ""
-      error "NETDATA WAS NOT UPDATED!"
-      error ""
-      error "A newer version of Netdata is available, but the system package manager does not appear to have updated to that version."
-      error ""
-      error "Most likely, your system is not up to date, and you have it configured in a way that prevents updating one or more of Netdata's dependencies."
-      error "Please try updating your system manually and then re-running the Netdata updater before reporting an issue with the update process."
-      error ""
-      fatal "Package manager did not fully update Netdata despite not reporting a failure." U001D
+  update_incomplete=0
+  if [ "${RELEASE_CHANNEL}" = preview ]; then
+    current_tag="$(get_current_tag)"
+    # Repositories and hosted Version publish independently. Any installed build
+    # change counts as progress, even within the same preview release.
+    if [ "${current_tag#v}" = "${initial_tag#v}" ] &&
+       [ "$(preview_release_identity "${current_tag}")" != "$(preview_release_identity "${latest_tag}")" ]; then
+      update_incomplete=1
     fi
+  elif [ "${RELEASE_CHANNEL}" != "none" ] && [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
+    if [ "${current_version}" -lt "${latest_version}" ] && [ "${initial_version}" -eq "${current_version}" ]; then
+      update_incomplete=1
+    fi
+  fi
+
+  if [ "${update_incomplete}" -eq 1 ]; then
+    error ""
+    error "NETDATA WAS NOT UPDATED!"
+    error ""
+    error "A newer version of Netdata is available, but the system package manager does not appear to have updated to that version."
+    error ""
+    error "Most likely, your system is not up to date, and you have it configured in a way that prevents updating one or more of Netdata's dependencies."
+    error "Please try updating your system manually and then re-running the Netdata updater before reporting an issue with the update process."
+    error ""
+    fatal "Package manager did not fully update Netdata despite not reporting a failure." U001D
   fi
 
   [ -n "${logfile}" ] && rm "${logfile}" && logfile=

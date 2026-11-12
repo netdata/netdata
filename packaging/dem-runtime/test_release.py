@@ -230,7 +230,7 @@ class SignedPublicationTests(unittest.TestCase):
         for arch in release.ARCHITECTURES:
             directory = root / 'artifacts' / ('dem-runtime-' + arch)
             directory.mkdir(parents=True)
-            manifest = {'format': 1, 'contract': 1, 'version': '1.2.3', 'platform': 'linux/' + arch,
+            manifest = {'format': 1, 'contract': 2, 'version': '1.2.3', 'platform': 'linux/' + arch,
                         'archive': {'sha256': digest, 'bytes': len(data), 'tar_bytes': len(raw.getvalue()),
                                     'expanded_bytes': sum(map(len, entries.values())), 'entries': len(entries)},
                         'layout': {'node': 'node', 'browser': 'browser', 'loader': 'lib/loader',

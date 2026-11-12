@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/require"
 )
 
@@ -66,7 +67,6 @@ func TestMeasurementPublicationReplacesVitalWithoutCountingAnotherDocument(t *te
 	c, _ := measurementCollector(t)
 	population := []string{
 		"cls_observations",
-		"cls_lost_reports",
 		"cls_good",
 		"cls_needs_improvement",
 		"cls_poor",
@@ -79,7 +79,7 @@ func TestMeasurementPublicationReplacesVitalWithoutCountingAnotherDocument(t *te
 	}
 	empty := collectMeasurements(t, c)
 	require.Equal(t, map[string]float64{
-		"cls_observations": 0, "cls_lost_reports": 0, "cls_good": 0, "cls_needs_improvement": 0, "cls_poor": 0,
+		"cls_observations": 0, "cls_good": 0, "cls_needs_improvement": 0, "cls_poor": 0,
 		"document_views": 0, "window_document_views": 0, "observed_sessions": 0,
 	}, measurementValues(empty, population...))
 	b := &beacon.Beacon{
@@ -94,7 +94,7 @@ func TestMeasurementPublicationReplacesVitalWithoutCountingAnotherDocument(t *te
 	c.aggregator.Ingest(b)
 	first := collectMeasurements(t, c)
 	want := map[string]float64{
-		"cls_observations": 1, "cls_lost_reports": 0, "cls_good": 1, "cls_needs_improvement": 0, "cls_poor": 0,
+		"cls_observations": 1, "cls_good": 1, "cls_needs_improvement": 0, "cls_poor": 0,
 		"cls_p50": 0.1, "cls_p75": 0.1, "cls_p95": 0.1,
 		"document_views": 1, "window_document_views": 1, "observed_sessions": 1,
 	}
@@ -118,62 +118,27 @@ func TestMeasurementPublicationReplacesVitalWithoutCountingAnotherDocument(t *te
 	)
 }
 
-func TestMeasurementPublicationWithdrawsPercentilesAfterCapacityLoss(t *testing.T) {
+func TestMeasurementPublicationRetainsCompleteLargePopulation(t *testing.T) {
 	c, _ := measurementCollector(t)
 	now := time.Now()
-	ingest := func(i int) {
+	for i := range 10001 {
 		c.aggregator.Ingest(&beacon.Beacon{
-			Site:         "shop",
-			ExperienceID: fmt.Sprint(i),
-			SessionID:    fmt.Sprint(i),
-			PageGroup:    "/entry",
-			Received:     now,
-			Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
+			Site: "shop", ExperienceID: fmt.Sprint(i), SessionID: fmt.Sprint(i), PageGroup: "/entry", Received: now,
+			Vitals: []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
 		})
 	}
-	ingest(0)
-	before := collectMeasurements(t, c)
-	require.Equal(
-		t,
-		map[string]float64{"lcp_p75": 100, "lcp_observations": 1, "lcp_lost_reports": 0},
-		measurementValues(before, "lcp_p75", "lcp_observations", "lcp_lost_reports"),
-	)
-	// The production canonical population holds 10,000 observations. Cross that
-	// budget through admitted measurements, without replacing internal state or limits.
-	for i := 1; i <= 10000; i++ {
-		ingest(i)
-	}
 	after := collectMeasurements(t, c)
-	require.Equal(
-		t,
-		map[string]float64{"lcp_observations": 10000, "lcp_good": 10000, "lcp_needs_improvement": 0, "lcp_poor": 0},
-		measurementValues(after, "lcp_observations", "lcp_good", "lcp_needs_improvement", "lcp_poor"),
-	)
-	loss, ok := after.Value("lcp_lost_reports", nil)
-	require.True(t, ok)
-	require.Positive(t, loss)
-	sessionLoss, present := after.Value("sessions_lost_reports", nil)
-	require.True(t, present)
-	require.Positive(t, sessionLoss)
-	_, present = after.Value("observed_sessions", nil)
-	require.False(t, present, "an incomplete session population is unavailable")
-	require.Empty(
-		t,
-		measurementValues(after, "lcp_p50", "lcp_p75", "lcp_p95"),
-		"a previously published percentile must become unavailable",
-	)
-	labels := metrix.Labels{
-		"page":   "/entry",
-		"bucket": "value",
-	}
-	_, ok = after.Value("breakdown_page_lcp", labels)
-	require.False(t, ok, "incomplete facet percentiles must also disappear")
+	require.Equal(t, map[string]float64{
+		"lcp_observations": 10001, "lcp_good": 10001, "lcp_needs_improvement": 0, "lcp_poor": 0,
+		"lcp_p50": 100, "lcp_p75": 100, "lcp_p95": 100, "observed_sessions": 10001,
+	}, measurementValues(after, "lcp_observations", "lcp_good", "lcp_needs_improvement", "lcp_poor", "lcp_p50", "lcp_p75", "lcp_p95", "observed_sessions"))
+	labels := metrix.Labels{"page": "/entry", "bucket": "value"}
 	count, ok := after.Value("breakdown_page_lcp_observations", labels)
 	require.True(t, ok)
-	require.Equal(t, float64(10000), count)
-	loss, ok = after.Value("breakdown_page_lcp_lost_reports", labels)
+	require.Equal(t, float64(10001), count)
+	percentile, ok := after.Value("breakdown_page_lcp", labels)
 	require.True(t, ok)
-	require.Positive(t, loss)
+	require.Equal(t, float64(100), percentile)
 }
 
 func TestMeasurementPublicationStopsWhenMeasurementUnavailable(t *testing.T) {
@@ -209,14 +174,11 @@ func TestMeasurementPublicationStopsWhenMeasurementUnavailable(t *testing.T) {
 					after,
 					"lcp_p75",
 					"lcp_observations",
-					"lcp_lost_reports",
 					"document_views",
 					"observed_sessions",
 					"window_document_views",
 					"window_application_views",
 					"window_js_errors",
-					"window_lost_reports",
-					"sessions_lost_reports",
 				),
 			)
 			diagnostics := map[string]float64{}
@@ -257,7 +219,6 @@ func TestMeasurementPublicationSeparatesApplicationViewAndDocumentFacets(t *test
 		map[string]float64{
 			"breakdown_view_application_views": 1,
 			"breakdown_view_js_errors":         0,
-			"breakdown_view_lost_reports":      0,
 		},
 		views,
 	)
@@ -267,7 +228,7 @@ func TestMeasurementPublicationSeparatesApplicationViewAndDocumentFacets(t *test
 			contexts[create.Meta.Context] = true
 		}
 	}
-	require.Equal(t, map[string]bool{"rum.view_activity": true, "rum.view_loss": true}, contexts)
+	require.Equal(t, map[string]bool{"rum.view_activity": true}, contexts)
 
 }
 
@@ -361,4 +322,36 @@ func TestMeasurementPublicationDistinguishesMissingAndLiteralUnknownHost(t *test
 	}
 	require.Len(t, ids, 2)
 	require.NotEqual(t, ids["unknown"], ids["value"])
+}
+
+func TestConfiguredVnodeDoesNotBecomeChartLabelOrIdentity(t *testing.T) {
+	ctx := context.Background()
+	db, err := demjournal.Open(ctx, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	hub := registry.New()
+	t.Cleanup(hub.PublishReceiver(registry.Availability{Serving: true}).Close)
+	var baseline []string
+	for _, group := range []string{"", "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"} {
+		c := New(Dependencies{Registry: hub, History: history.NewStore(db)})
+		c.Name, c.DisplayName = "job", "Readable job"
+		c.SetConfiguredVnode(vnodes.VirtualNode{GUID: group})
+		c.AllowedOrigins = []string{"https://example.org"}
+		require.NoError(t, c.Init(ctx))
+		c.aggregator.Ingest(&beacon.Beacon{Site: "job", SessionID: "session", ExperienceID: "document", PageGroup: "/entry", Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}}, Vitals: []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}}})
+		collectMeasurements(t, c)
+		charts := measurementCharts(t, c)
+		require.NotEmpty(t, charts)
+		var identities []string
+		for _, chart := range charts {
+			identities = append(identities, chart.ChartID)
+			require.NotContains(t, chart.Labels, "vnode_guid")
+			require.Equal(t, "Readable job", chart.Labels["display_name"])
+		}
+		if baseline == nil {
+			baseline = identities
+		} else {
+			require.ElementsMatch(t, baseline, identities, "site association is metadata, never chart identity")
+		}
+	}
 }

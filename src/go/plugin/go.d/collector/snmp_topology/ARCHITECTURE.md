@@ -394,7 +394,13 @@ topologyRegistry.snapshotWithEnvironment(options, environment)
   read the generation's fixed renderable device membership and producer scope
   aggregate per-device observations
   build a topology graph
+  bind cached focus choices to surviving managed actor handles
 ```
+
+The Function uses `snapshotResultWithEnvironment` to receive graph data and focus
+choices from that same acquired generation. Existing data-only snapshot and replay
+readers wrap the same capture/build path. Publication during a build cannot mix a
+newer generation's choices with the older map.
 
 Each device generation contributes:
 
@@ -616,7 +622,7 @@ flowchart TD
     Request["snmp:topology:snmp request"]
     Handler["snmptopologyfunc.Handle"]
     Options["resolve QueryOptions"]
-    Registry["topologyRegistry.snapshotWithEnvironment"]
+    Registry["topologyRegistry.snapshotResultWithEnvironment"]
     Snapshot["fresh device-generation snapshots"]
     Aggregate["aggregate observations"]
     L2["l2topology BuildL2Result -> ToGraph"]
@@ -633,10 +639,18 @@ flowchart TD
 snmp:topology:snmp request
   -> snmptopologyfunc.Handle
   -> funcDepsAdapter.Snapshot(options)
-  -> topologyRegistry.snapshotWithEnvironment(options, cache-only DNS)
+  -> topologyRegistry.snapshotResultWithEnvironment(options, cache-only DNS)
   -> topologyv1.Render(data)
-  -> Function response with type "topology"
+  -> Function response with type "topology" and same-generation focus metadata
 ```
+
+The model stores only private focus binding handles. The renderer resolves them
+to final actor rows in a hidden actor-owned append table; it never serializes
+handles. Data response choices come from the same snapshot result, while `info`
+still reads cached choices without building a graph. Resolved focus policy is
+declared in the data metadata (IP cleanup differs from MAC); local filtering is
+unchanged. Generic consumer obligations live in
+`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus`.
 
 The Function returns `503` while no usable topology snapshot exists yet.
 
@@ -845,6 +859,13 @@ and retained device-generation state; they are not the topology payload.
   `topologyDeviceSnapshot`. A completed sweep activates successful snapshots as
   `topologyDeviceGeneration` values at one shared publication time. A failed
   collection retains the prior successful device generation and deadline.
+- Each device's refresh state records the registered device information it last acted on. A registered sysObjectID
+  that changes to a non-empty value discards the retained acquisition and retry state before the next attempt, so
+  failed or unsupported replacement setup cannot retain the prior device's topology. Any other change to that
+  information (name, description, contact, location, vendor, model, vnode identity or labels, or a sysObjectID that
+  becomes empty) acquires the device again on the current sweep; the retained generation stays visible until that
+  acquisition succeeds, and a failure follows the normal retry backoff. Cancellation still leaves the entire prior
+  committed cut visible.
 - A completed sweep fixes renderable membership and publishes one immutable
   `topologyGeneration` through an atomic pointer. Cancellation or panic leaves
   the previous generation visible.
@@ -921,7 +942,8 @@ An unchanged golden is expected for internal ownership and generation refactors.
 
 `TestSNMPTopologyScenarioGoldens` starts from synthetic SNMP-shaped `ddsnmp`
 inputs, runs the real cache, registry, and Function rendering path, validates
-the final `topology.v1` payload, and compares it with one full-payload oracle
+the final `topology.v1` payload, and compares its established graph/presentation
+planes with one oracle
 per golden scenario (`topologyScenarioGoldenCases`, currently five of the
 eighteen scenarios; all eighteen run `TestSNMPTopologyScenarioSemantics` with
 assertions and a determinism check, and only the five also have an oracle). The
@@ -934,3 +956,10 @@ neither is present the suite skips (it fails instead only under
 checkout says nothing about the golden payloads; check the test output for the
 skip line before trusting it. The per-render normalized golden above stays
 tracked in this repository.
+
+The hidden focus binding table/type is excluded only from this external-oracle
+comparison. `TestTopologyFocusBindingsGolden` pins that new supporting plane over
+the same scenarios in Agent-owned `testdata/topology_focus_bindings.golden.json`.
+Regenerate it alone with `-run TestTopologyFocusBindingsGolden
+-update-snmp-topology-scenario-goldens`; the external checkout is not needed.
+Other normalized comparisons and determinism checks retain the binding plane.

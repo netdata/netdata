@@ -32,7 +32,7 @@ Netdata fuses these per device into one live graph: LLDP and CDP give the links,
 
 ## Open and shape the map
 
-The device topology is served by the **`topology:snmp`** function — open it from the topology view to see the fabric. A few controls shape what you see, so you can move between a high-trust overview and the complete picture:
+The device topology is served by the **`topology:snmp`** function — open it from the topology view to see the fabric. Viewing it requires a signed-in member of the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial. A few controls shape what you see, so you can move between a high-trust overview and the complete picture:
 
 - **Nodes identity** — show actors by **IP** (the default, which collapses duplicates and drops non-IP inferred nodes) or by **MAC**.
 - **Map** — choose **Managed Fabric Map** (the default — all monitored SNMP devices, direct LLDP/CDP and managed STP links, and FDB paths through qualified broadcast-domain segments), the legacy **LLDP/CDP/Managed Devices Map**, **High Confidence Inferred Map**, or **All Devices (Low Confidence)**. Logical Layer 3 subnet, OSPF, and BGP relationships remain visible in every mode with their distinct dashed presentation.

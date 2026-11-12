@@ -17,11 +17,11 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 
 	pms, err := c.ddSnmpColl.Collect()
 	c.captureCollectionFailures()
+	c.syncDeviceMetadata()
 	if err != nil {
 		c.markBGPCollectFailed(err)
 		return err
 	}
-	c.syncDeviceMetadata(pms)
 	if c.bgp == nil && profileMetricsHaveBGP(pms) {
 		c.enableBGPIntegration()
 	}
@@ -37,6 +37,9 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	c.finalizeIfaceCache()
 	c.finalizeProfileMetrics()
 	c.commitNormalConsumers(pms)
+	if c.staleCharts != nil {
+		c.retireStaleCharts()
+	}
 
 	return nil
 }
@@ -51,9 +54,11 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 			continue
 		}
 
-		if !c.seenScalarMetrics[m.Name] {
-			c.seenScalarMetrics[m.Name] = true
-			c.addProfileScalarMetricChart(m)
+		state := c.seenScalarMetrics[m.Name]
+		if state == nil {
+			// A rejected chart stays recorded so it is not retried every cycle.
+			state = &metricChartState{chart: c.addProfileScalarMetricChart(m)}
+			c.seenScalarMetrics[m.Name] = state
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -66,6 +71,7 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 		var ids []string
 		for k, v := range m.MultiValue {
 			id := metricIDFromName(m.Name, k)
+			state.observeDimension(id, k, dimAlgoFromDdSnmpType(m))
 			mx[id] = v
 			ids = append(ids, id)
 		}
@@ -96,14 +102,16 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			continue
 		}
 
+		state := c.tableMetricCharts[key]
 		if !seen[key] {
 			seen[key] = true
-			// Samples may share a key; the first one owns the chart's metadata.
+			// Samples sharing a key keep the first sample's metadata.
 			c.profileMetricLabels(labels, m)
-			if chart := c.tableMetricCharts[key]; chart != nil {
-				updateProfileChartLabels(chart, labels)
+			if state != nil {
+				updateProfileChartLabels(state.chart, labels)
 			} else if chart := c.addProfileTableMetricChart(m, key, labels); chart != nil {
-				c.tableMetricCharts[key] = chart
+				state = &metricChartState{chart: chart}
+				c.tableMetricCharts[key] = state
 			}
 		}
 
@@ -115,6 +123,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			var ids []string
 			for k, v := range m.MultiValue {
 				id := metricIDFromKey(key, k)
+				state.observeDimension(id, k, dimAlgoFromDdSnmpType(m))
 				mx[id] = v
 				ids = append(ids, id)
 			}
@@ -126,11 +135,11 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 		}
 	}
 
-	for key, chart := range c.tableMetricCharts {
+	for key, state := range c.tableMetricCharts {
 		if !seen[key] {
 			delete(c.tableMetricCharts, key)
-			chart.MarkRemove()
-			chart.MarkNotCreated()
+			state.chart.MarkRemove()
+			state.chart.MarkNotCreated()
 		}
 	}
 }

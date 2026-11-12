@@ -2,6 +2,11 @@
  * netipc_service_posix_client.c - POSIX public service client API.
  */
 
+/* pipe2() is a GNU/BSD extension on glibc and musl. */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include "netipc/netipc_service.h"
 #include "netipc/netipc_protocol.h"
 #include "netipc/netipc_uds.h"
@@ -28,11 +33,6 @@ static nipc_uds_client_config_t service_client_config_to_transport(
 
     NIPC_SERVICE_COMMON_APPLY_TRANSPORT_FIELDS(&transport, &fields);
     return transport;
-}
-
-static void client_sleep_ms(uint32_t ms)
-{
-    nipc_service_posix_sleep_us(ms * 1000u);
 }
 
 static void close_abort_pipe(nipc_client_ctx_t *ctx)
@@ -89,18 +89,26 @@ static void init_abort_pipe(nipc_client_ctx_t *ctx)
         return;
     ctx->abort_pipe_lock_initialized = true;
 
+    /* Close-on-exec so a consumer's exec'd children do not inherit it. */
     int fds[2];
+#if defined(__linux__) || defined(__FreeBSD__)
+    if (pipe2(fds, O_CLOEXEC | O_NONBLOCK) != 0) {
+#else
     if (pipe(fds) != 0) {
+#endif
         pthread_mutex_destroy(&ctx->abort_pipe_lock);
         ctx->abort_pipe_lock_initialized = false;
         return;
     }
 
+#if !defined(__linux__) && !defined(__FreeBSD__)
     for (int i = 0; i < 2; i++) {
         int flags = fcntl(fds[i], F_GETFL, 0);
         if (flags >= 0)
             (void)fcntl(fds[i], F_SETFL, flags | O_NONBLOCK);
+        (void)fcntl(fds[i], F_SETFD, FD_CLOEXEC);
     }
+#endif
 
     ctx->abort_pipe[0] = fds[0];
     ctx->abort_pipe[1] = fds[1];
@@ -113,9 +121,6 @@ const nipc_service_common_client_ops_t *nipc_service_posix_client_ops(void)
         .disconnect = nipc_service_posix_client_disconnect,
         .try_connect = nipc_service_posix_client_try_connect,
         .reconnect_for_call = nipc_service_posix_client_reconnect_for_call,
-        .sleep_ms = client_sleep_ms,
-        .reconnect_drain_ms = CLIENT_CALL_RECONNECT_DRAIN_MS,
-        .reconnect_retry_interval_ms = CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS,
     };
     return &ops;
 }

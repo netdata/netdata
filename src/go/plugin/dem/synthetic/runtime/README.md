@@ -7,7 +7,7 @@ Release inputs and adapters live in `src/dem-runtime` and `packaging/dem-runtime
 
 ## Trust and preparation
 
-A publisher-authenticated format-1 descriptor identifies execution contract 1,
+A publisher-authenticated format-1 descriptor identifies execution contract 2,
 release version, platform, archive SHA256/size, tar/expanded bounds, entry count,
 layout and authenticated interpreter slots. The archive is not its own trust anchor.
 Production release discovery and CLI delivery integration are separate from these

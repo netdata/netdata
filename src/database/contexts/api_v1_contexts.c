@@ -67,10 +67,15 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
     if(before && (!rm->first_time_s || before < rm->first_time_s))
         return 0;
 
+    // the name is replaced while we use it: match and report the same name, which we hold (rrdmetric_name_get())
+    STRING *name = rrdmetric_name_get(rm);
+
     if(t->chart_dimensions
        && !simple_pattern_matches_string(t->chart_dimensions, rm->id)
-       && (rm->name == rm->id || !simple_pattern_matches_string(t->chart_dimensions, rm->name)))
+       && (name == rm->id || !simple_pattern_matches_string(t->chart_dimensions, name))) {
+        rrd_name_release(name, rm->id);
         return 0;
+    }
 
     if(t->written) {
         t->combined_first_time_s = MIN(t->combined_first_time_s, rm->first_time_s);
@@ -91,7 +96,8 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
         buffer_json_member_add_string(wb, "uuid", uuid);
     }
 
-    buffer_json_member_add_string(wb, "name", string2str(rm->name));
+    buffer_json_member_add_string(wb, "name", string2str(name));
+    rrd_name_release(name, rm->id);
     buffer_json_member_add_time_t_formatted(wb, "first_time_t", rm->first_time_s, options & RRDCONTEXT_OPTION_RFC3339);
     buffer_json_member_add_time_t_formatted(wb, "last_time_t", rrd_flag_is_collected(rm) ? (long long)t->now : (long long)rm->last_time_s, options & RRDCONTEXT_OPTION_RFC3339);
     buffer_json_member_add_boolean(wb, "collected", rrd_flag_is_collected(rm));
@@ -205,11 +211,24 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
         buffer_json_member_add_string(wb, "uuid", uuid);
     }
 
-    buffer_json_member_add_string(wb, "name", string2str(ri->name));
+    // these are replaced while we use them: take our own references (rrdinstance_acquired_name_dup())
+    spinlock_lock(&ri->spinlock);
+    STRING *name = string_dup(ri->name);
+    STRING *title = string_dup(ri->title);
+    STRING *units = string_dup(ri->units);
+    STRING *family = string_dup(ri->family);
+    spinlock_unlock(&ri->spinlock);
+
+    buffer_json_member_add_string(wb, "name", string2str(name));
     buffer_json_member_add_string(wb, "context", string2str(ri->rc->id));
-    buffer_json_member_add_string(wb, "title", string2str(ri->title));
-    buffer_json_member_add_string(wb, "units", string2str(ri->units));
-    buffer_json_member_add_string(wb, "family", string2str(ri->family));
+    buffer_json_member_add_string(wb, "title", string2str(title));
+    buffer_json_member_add_string(wb, "units", string2str(units));
+    buffer_json_member_add_string(wb, "family", string2str(family));
+
+    string_freez(name);
+    string_freez(title);
+    string_freez(units);
+    string_freez(family);
     buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(ri->chart_type));
     buffer_json_member_add_uint64(wb, "priority", ri->priority);
     buffer_json_member_add_time_t(wb, "update_every", ri->update_every_s);

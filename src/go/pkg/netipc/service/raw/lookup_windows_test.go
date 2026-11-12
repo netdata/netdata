@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	windows "github.com/netdata/netdata/go/plugins/pkg/netipc/transport/windows"
 )
@@ -520,7 +521,7 @@ func TestWinLookupProactiveRequestSplitAndLimits(t *testing.T) {
 		ccfg.MaxRequestPayloadBytes = 48
 		client := NewCgroupsLookupClient(winTestRunDir, "unused", ccfg)
 		_, err := client.CallCgroupsLookup([][]byte{[]byte("/request-key-too-large-for-configured-cap")})
-		if !errors.Is(err, protocol.ErrBadLayout) {
+		if !errors.Is(err, protocol.ErrNotReady) {
 			t.Fatalf("expected not-ready failure before local oversized response, got %v", err)
 		}
 		client.Close()
@@ -719,7 +720,7 @@ func TestWinLookupRequestCapacityReconnectPaths(t *testing.T) {
 		}
 
 		client.session.MaxRequestPayloadBytes = 64
-		if err := client.ensureLookupRequestCapacity(128); err != nil {
+		if err := client.ensureLookupRequestCapacity(128, monotime.After(time.Second)); err != nil {
 			t.Fatalf("capacity reconnect should succeed: %v", err)
 		}
 		if client.state != StateReady {
@@ -730,14 +731,14 @@ func TestWinLookupRequestCapacityReconnectPaths(t *testing.T) {
 		}
 
 		client.session.MaxRequestPayloadBytes = 256
-		if err := client.ensureLookupRequestCapacity(128); err != nil {
+		if err := client.ensureLookupRequestCapacity(128, monotime.After(time.Second)); err != nil {
 			t.Fatalf("already-large session capacity = %v", err)
 		}
 
 		missing := NewAppsLookupClient(winTestRunDir, uniqueWinService("go_win_lookup_request_capacity_missing"), ccfg)
 		defer missing.Close()
 		missing.state = StateReady
-		if err := missing.ensureLookupRequestCapacity(128); err != nil {
+		if err := missing.ensureLookupRequestCapacity(128, monotime.After(time.Second)); err != nil {
 			t.Fatalf("sessionless configured capacity should not reconnect: %v", err)
 		}
 	})
@@ -759,7 +760,7 @@ func TestWinLookupRequestCapacityReconnectPaths(t *testing.T) {
 		client.session.MaxRequestPayloadBytes = 64
 		ts.stop()
 
-		if err := client.ensureLookupRequestCapacity(128); !errors.Is(err, protocol.ErrOverflow) {
+		if err := client.ensureLookupRequestCapacity(128, monotime.After(time.Second)); !errors.Is(err, protocol.ErrOverflow) {
 			t.Fatalf("missing endpoint capacity reconnect error = %v, want ErrOverflow", err)
 		}
 		if client.errorCount == 0 {
@@ -835,10 +836,12 @@ func TestWinLookupTimeoutDuringFollowupSubcall(t *testing.T) {
 		cfg := testWinServerConfig()
 		cfg.MaxResponsePayloadBytes = 320
 		var calls atomic.Uint32
+		// The second subcall is held until the client has given up on it.
+		release := make(chan struct{})
 		ts := startTestServerWinWithConfig(svc, cfg, protocol.MethodAppsLookup, AppsLookupDispatch(
 			func(req *protocol.AppsLookupRequestView, builder *protocol.AppsLookupBuilder) bool {
 				if calls.Add(1) == 2 {
-					time.Sleep(150 * time.Millisecond)
+					<-release
 				}
 				builder.SetGeneration(9)
 				for i := uint32(0); i < req.ItemCount; i++ {
@@ -858,12 +861,16 @@ func TestWinLookupTimeoutDuringFollowupSubcall(t *testing.T) {
 			},
 		))
 		defer ts.stop()
+		defer close(release)
 
 		client := NewAppsLookupClient(winTestRunDir, svc, testWinClientConfig())
 		defer client.Close()
 		waitWinClientReady(t, client)
 
-		_, err := client.CallAppsLookupWithTimeout([]uint32{11, 22, 33}, 30)
+		// The budget leaves slow or emulated runners room for the first
+		// subcall; only the held second subcall can expire it.
+
+		_, err := client.CallAppsLookupWithTimeout([]uint32{11, 22, 33}, 500)
 		if !errors.Is(err, protocol.ErrTimeout) {
 			t.Fatalf("apps follow-up timeout error = %v, want ErrTimeout", err)
 		}
@@ -877,10 +884,12 @@ func TestWinLookupTimeoutDuringFollowupSubcall(t *testing.T) {
 		cfg := testWinServerConfig()
 		cfg.MaxResponsePayloadBytes = 160
 		var calls atomic.Uint32
+		// The second subcall is held until the client has given up on it.
+		release := make(chan struct{})
 		ts := startTestServerWinWithConfig(svc, cfg, protocol.MethodCgroupsLookup, CgroupsLookupDispatch(
 			func(req *protocol.CgroupsLookupRequestView, builder *protocol.CgroupsLookupBuilder) bool {
 				if calls.Add(1) == 2 {
-					time.Sleep(150 * time.Millisecond)
+					<-release
 				}
 				builder.SetGeneration(7)
 				for i := uint32(0); i < req.ItemCount; i++ {
@@ -900,12 +909,16 @@ func TestWinLookupTimeoutDuringFollowupSubcall(t *testing.T) {
 			},
 		))
 		defer ts.stop()
+		defer close(release)
 
 		client := NewCgroupsLookupClient(winTestRunDir, svc, testWinClientConfig())
 		defer client.Close()
 		waitWinClientReady(t, client)
 
-		_, err := client.CallCgroupsLookupWithTimeout([][]byte{[]byte("/a"), []byte("/huge"), []byte("/b")}, 30)
+		// The budget leaves slow or emulated runners room for the first
+		// subcall; only the held second subcall can expire it.
+
+		_, err := client.CallCgroupsLookupWithTimeout([][]byte{[]byte("/a"), []byte("/huge"), []byte("/b")}, 500)
 		if !errors.Is(err, protocol.ErrTimeout) {
 			t.Fatalf("cgroups follow-up timeout error = %v, want ErrTimeout", err)
 		}
@@ -921,12 +934,14 @@ func TestWinLookupAbortDuringFollowupSubcall(t *testing.T) {
 		cfg := testWinServerConfig()
 		cfg.MaxResponsePayloadBytes = 320
 		var calls atomic.Uint32
+		// The second subcall is held until the client has given up on it.
+		release := make(chan struct{})
 		secondCall := make(chan struct{}, 1)
 		ts := startTestServerWinWithConfig(svc, cfg, protocol.MethodAppsLookup, AppsLookupDispatch(
 			func(req *protocol.AppsLookupRequestView, builder *protocol.AppsLookupBuilder) bool {
 				if calls.Add(1) == 2 {
 					secondCall <- struct{}{}
-					time.Sleep(250 * time.Millisecond)
+					<-release
 				}
 				builder.SetGeneration(9)
 				for i := uint32(0); i < req.ItemCount; i++ {
@@ -946,6 +961,7 @@ func TestWinLookupAbortDuringFollowupSubcall(t *testing.T) {
 			},
 		))
 		defer ts.stop()
+		defer close(release)
 
 		client := NewAppsLookupClient(winTestRunDir, svc, testWinClientConfig())
 		defer client.Close()
@@ -979,12 +995,14 @@ func TestWinLookupAbortDuringFollowupSubcall(t *testing.T) {
 		cfg := testWinServerConfig()
 		cfg.MaxResponsePayloadBytes = 160
 		var calls atomic.Uint32
+		// The second subcall is held until the client has given up on it.
+		release := make(chan struct{})
 		secondCall := make(chan struct{}, 1)
 		ts := startTestServerWinWithConfig(svc, cfg, protocol.MethodCgroupsLookup, CgroupsLookupDispatch(
 			func(req *protocol.CgroupsLookupRequestView, builder *protocol.CgroupsLookupBuilder) bool {
 				if calls.Add(1) == 2 {
 					secondCall <- struct{}{}
-					time.Sleep(250 * time.Millisecond)
+					<-release
 				}
 				builder.SetGeneration(7)
 				for i := uint32(0); i < req.ItemCount; i++ {
@@ -1004,6 +1022,7 @@ func TestWinLookupAbortDuringFollowupSubcall(t *testing.T) {
 			},
 		))
 		defer ts.stop()
+		defer close(release)
 
 		client := NewCgroupsLookupClient(winTestRunDir, svc, testWinClientConfig())
 		defer client.Close()
@@ -1849,8 +1868,8 @@ func TestWinLookupEndpointAbsentBeforeCall(t *testing.T) {
 		if client.state != StateNotFound {
 			t.Fatalf("apps absent state = %d, want StateNotFound", client.state)
 		}
-		if _, err := client.CallAppsLookupWithTimeout([]uint32{11, 22}, 1000); !errors.Is(err, protocol.ErrBadLayout) {
-			t.Fatalf("apps absent lookup error = %v, want ErrBadLayout", err)
+		if _, err := client.CallAppsLookupWithTimeout([]uint32{11, 22}, 1000); !errors.Is(err, protocol.ErrNotReady) {
+			t.Fatalf("apps absent lookup error = %v, want ErrNotReady", err)
 		}
 	})
 
@@ -1865,8 +1884,8 @@ func TestWinLookupEndpointAbsentBeforeCall(t *testing.T) {
 			t.Fatalf("cgroups absent state = %d, want StateNotFound", client.state)
 		}
 		paths := [][]byte{[]byte("/a"), []byte("/b")}
-		if _, err := client.CallCgroupsLookupWithTimeout(paths, 1000); !errors.Is(err, protocol.ErrBadLayout) {
-			t.Fatalf("cgroups absent lookup error = %v, want ErrBadLayout", err)
+		if _, err := client.CallCgroupsLookupWithTimeout(paths, 1000); !errors.Is(err, protocol.ErrNotReady) {
+			t.Fatalf("cgroups absent lookup error = %v, want ErrNotReady", err)
 		}
 	})
 }

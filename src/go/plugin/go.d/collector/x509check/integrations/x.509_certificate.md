@@ -27,7 +27,9 @@ This collector tracks how long X.509 (SSL/TLS) certificates remain valid and whe
 It reads the certificate that a website or any other TLS service presents, including mail servers that
 use STARTTLS, or a certificate stored in a local file. It charts the time left until the certificate
 expires and, optionally, the expiration of every certificate in the chain and the revocation status of
-the server certificate. Stock alerts fire before a certificate expires and when it is revoked.
+the server certificate, with the outcome of each revocation check. Stock alerts fire before a certificate
+expires, when it is revoked, and when revocation checks keep failing for a reason that can be fixed: a
+failed request, an unusable answer, or a missing issuer certificate.
 
 
 Every collection interval, each job connects to its `source` and completes a TLS handshake, after a
@@ -35,10 +37,12 @@ Every collection interval, each job connects to its `source` and completes a TLS
 is read from disk instead. The collector never requests a page or sends mail.
 
 With `check_revocation_status` enabled, the collector also downloads the CRLs and queries the OCSP
-responders listed in the server certificate, and fetches the issuer certificate listed in it to verify the
-CRL and build the OCSP request. These requests go to the HTTP or HTTPS URLs in the certificate, so the Agent
-host needs outbound access to them. Each request times out after 10 seconds; `timeout` does not apply to
-them. Each job reuses a CRL's result for a certificate until the next update time the CRL states.
+responders listed in the server certificate. It verifies their answers with the certificate of the issuer
+that signed the server certificate: one the server sends or that TLS verification of the server certificate
+reached, such as a root CA from `tls_ca`, or else the one downloaded from the issuer URL listed in the server
+certificate. These requests go to the HTTP or HTTPS URLs in the certificate, so the Agent host needs
+outbound access to them. Each request times out after 10 seconds; `timeout` does not apply
+to them. Each job reuses a CRL's result for a certificate until the next update time the CRL states.
 
 
 This collector is supported on all platforms.
@@ -64,10 +68,19 @@ This integration doesn't support auto-detection.
   a private CA, or `tls_skip_verify` to read such certificates anyway.
 - A `file://` source provides only the first certificate in the file, so `check_full_chain` has no effect
   there.
-- Revocation status is checked for the server certificate only. A certificate that lists no CRL or OCSP
-  URL is always reported as not revoked (LDAP CRL URLs are skipped), and an OCSP `unknown` answer is
-  reported as revoked. When the issuer certificate cannot be downloaded, a CRL is used without checking
-  its signature.
+- Revocation status is checked for the server certificate only, and an OCSP `unknown` answer is reported
+  as revoked. Only the HTTP and HTTPS URLs a certificate lists are used, not LDAP or other ones, so a
+  certificate that lists no HTTP or HTTPS CRL or OCSP URL has no revocation status to check: the
+  revocation status chart shows a gap and the revocation check status shows `no_revocation_info`.
+- For a certificate that lists CRL or OCSP URLs, revocation status comes only from CRLs and OCSP answers
+  that verify against the issuer of the server certificate and are current by the Agent host's clock,
+  within 5 minutes. The issuer certificate must be one the server sends, one that TLS verification reached
+  through `tls_ca` or the system's trusted CAs, or the one at the issuer URL listed in the server
+  certificate. Without it the revocation status chart shows a gap, for example with `tls_skip_verify` for a
+  private CA whose certificates list no issuer URL, behind a server that does not send the CA certificate,
+  or for a `file://` source whose certificate lists none. The revocation status chart also shows a gap when
+  the CA publishes outdated CRLs or OCSP answers, and can show one when the Agent host's clock is more than
+  5 minutes off.
 - With an `smtp://` source, `timeout` covers the whole SMTP exchange. A mail server that delays its
   greeting, a common anti-spam measure on port 25, needs a `timeout` longer than that delay.
 
@@ -163,8 +176,21 @@ server includes it.
 <a id="option-checks-check-revocation-status"></a>
 ##### check_revocation_status
 
-The revocation status chart exists only for the server certificate (`depth` `0`). It appears with the
-first check that determines a status.
+The revocation charts exist only for the server certificate (`depth` `0`). The revocation status chart
+appears with the first check that determines a status, and shows a gap when a check cannot. The
+revocation check status chart shows the outcome of every check:
+
+| State | Meaning |
+|:------|:--------|
+| `success` | The revocation status was determined. |
+| `request_failed` | A CRL, OCSP or issuer certificate request failed (DNS, connection, timeout or HTTP status); with several OCSP responders or issuer URLs, every request failed. |
+| `invalid_answer` | A CRL or OCSP answer could not be used: it is larger than 64 MiB, cannot be parsed, is an OCSP error status such as `unauthorized` or `tryLater`, or failed verification (signature, issuer, scope or freshness). |
+| `issuer_not_found` | The certificate of the CA that issued the server certificate is unavailable: the source did not send it, TLS verification did not reach it, and the server certificate lists no HTTP or HTTPS issuer URL, or one that does not serve that certificate. |
+| `no_revocation_info` | The certificate lists no HTTP or HTTPS CRL or OCSP URL, so there is nothing to check. |
+| `outside_validity` | The certificate is expired or not yet valid. |
+
+Only `request_failed`, `invalid_answer` and `issuer_not_found` count toward the stock alert on failing
+revocation checks: the others have no fix in the check, and the expiration alerts cover validity.
 
 
 
@@ -348,6 +374,7 @@ The following alerts are available:
 |:------------|:----------|:------------|
 | [ x509check_days_until_expiration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.time_until_expiration | SSL cert expiring soon (${label:source} cn:${label:common_name}) |
 | [ x509check_revocation_status ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.revocation_status | SSL cert revoked (${label:source}) |
+| [ x509check_revocation_check_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/x509check.conf) | x509check.revocation_check_status | Percentage of SSL cert revocation checks in the last 30 minutes that failed on a request, an unusable answer or a missing issuer certificate (${label:source}) |
 
 
 
@@ -357,8 +384,8 @@ Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
-When a certificate cannot be read, or its revocation status cannot be determined, the affected charts show
-gaps rather than zeros.
+When a certificate cannot be read, its charts show gaps rather than zeros. When its revocation status cannot
+be determined, the revocation status chart shows a gap and the revocation check status chart shows why.
 
 
 
@@ -380,6 +407,7 @@ Metrics:
 |:------|:------------|:----------|:----|
 | x509check.time_until_expiration | Time Until Certificate Expiration | expiry | seconds |
 | x509check.revocation_status | Revocation Status | not_revoked, revoked | boolean |
+| x509check.revocation_check_status | Revocation Check Status | success, request_failed, invalid_answer, issuer_not_found, no_revocation_info, outside_validity | status |
 
 
 
@@ -728,7 +756,7 @@ The files set in `tls_cert` and `tls_key` are not a matching PEM certificate and
 
 Point `tls_cert` and `tls_key` at the certificate and the private key of the same pair.
 
-#### revocation status check for `source` failed: `reason`
+#### revocation status of `source` could not be determined: issuer certificate not found: `reason`
 
 **When**
 
@@ -736,13 +764,13 @@ Point `tls_cert` and `tls_key` at the certificate and the private key of the sam
 
 **Cause**
 
-A CRL listed in the certificate could not be downloaded, parsed or verified (`reason` names the URL; only version 2 CRLs up to 64 MiB are accepted), or the certificate is expired or not yet valid. The revocation status chart shows a gap.
+The certificate of the CA that issued the server certificate is unavailable: the server does not send it, TLS verification did not reach it (for example, `tls_skip_verify` is set or the source is `file://`), and the server certificate lists no HTTP or HTTPS issuer URL, or the one it lists is unreachable or does not serve that certificate as a single DER or PEM certificate; `reason` says which. The revocation status chart shows a gap, and the revocation check status shows `request_failed` when every issuer URL request failed, otherwise `issuer_not_found`.
 
 **Fix**
 
-Check that the Agent host can reach the CRL URLs listed in the certificate, and renew an expired certificate. For an `unsupported crl version` reason, have the CA issue version 2 CRLs (with OpenSSL, set `crlnumber` in the CA configuration).
+Configure the server to send the CA certificate that issued its certificate, or set `tls_ca` to that CA certificate and remove `tls_skip_verify`. Otherwise check that the Agent host can reach the issuer URL listed in the certificate. A `file://` source does not use `tls_ca`: use a certificate that lists its issuer URL, or set `check_revocation_status` to `no` for the job.
 
-#### revocation status of `source` could not be determined
+#### revocation status of `source` could not be determined: no usable OCSP answer: `reason`
 
 **When**
 
@@ -750,8 +778,36 @@ Check that the Agent host can reach the CRL URLs listed in the certificate, and 
 
 **Cause**
 
-No OCSP responder listed in the certificate returned a usable answer, or the issuer certificate needed for the OCSP request is not listed or could not be downloaded. The revocation status chart shows a gap.
+No OCSP responder listed in the certificate returned a usable answer: one about this certificate, current within 5 minutes, and signed by the issuer or by a responder it authorized for OCSP signing; `reason` gives each responder's problem. The revocation status chart shows a gap, and the revocation check status shows `request_failed` when every request failed, otherwise `invalid_answer`.
 
 **Fix**
 
-Check that the Agent host can reach the OCSP and issuer certificate URLs listed in the certificate.
+Check that the Agent host can reach the OCSP URLs listed in the certificate and that its clock is correct. For an `outdated since` reason, the responder serves stale answers; report it to the CA.
+
+#### revocation status of `source` could not be determined: the certificate lists no HTTP or HTTPS CRL or OCSP URL
+
+**When**
+
+`check_revocation_status` is enabled.
+
+**Cause**
+
+The server certificate lists no OCSP responder and no CRL that the collector uses (it uses only HTTP and HTTPS URLs, not LDAP ones), so its revocation status cannot be checked. The revocation status chart shows a gap, and the revocation check status shows `no_revocation_info`.
+
+**Fix**
+
+Set `check_revocation_status` to `no` for this job. For a certificate of your own CA, have the CA include an HTTP CRL distribution point or an OCSP URL in the certificates it issues.
+
+#### revocation status of `source` could not be determined: `reason`
+
+**When**
+
+`check_revocation_status` is enabled.
+
+**Cause**
+
+A CRL listed in the certificate could not be downloaded, parsed or verified, and `reason` names its URL and the problem; or the certificate is expired or not yet valid, and `reason` gives the time. The revocation status chart shows a gap. The revocation check status shows `request_failed` for a CRL that could not be downloaded, `invalid_answer` for one over 64 MiB or that could not be parsed or verified, and `outside_validity` for the certificate's validity. A CRL must be a complete version 2 CRL (not a delta or indirect CRL) up to 64 MiB, issued and signed by the certificate's issuer, covering the server certificate, and current within 5 minutes.
+
+**Fix**
+
+Check that the Agent host can reach the CRL URLs listed in the certificate and that its clock is correct, and renew an expired certificate. For an `unsupported crl version` reason, have the CA issue version 2 CRLs (with OpenSSL, set `crlnumber` in the CA configuration). For an `outdated since` reason, have the CA publish a current CRL.

@@ -1238,7 +1238,9 @@ modules:
         metrics_description: |
           Monitor SMB server share activity and throughput counters on Windows systems.
         method_description: |
-          It queries the 'SMB Server Shares' object from Perflib in order to gather the metrics.
+          It reads the 'SMB Server Shares' performance counters through the Performance Data Helper (PDH), the same
+          source as Performance Monitor and `Get-Counter`. The registry view of this object reports some counters
+          under the wrong names on some Windows builds, so it is not used.
       supported_platforms:
         include: ["windows"]
         exclude: []
@@ -1248,7 +1250,7 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            This collector is enabled by default and automatically detects all available SMB share instances and metrics. On systems where the 'SMB Server Shares' object is not available, no SMB metrics are collected.
+            This collector is enabled by default and automatically detects all SMB shares served by this host. The aggregate `_Total` instance is not collected. On systems without the SMB server role, no SMB metrics are collected; the collector keeps checking and starts collecting once the role is installed, without restarting the Agent.
         limits:
           description: ""
         performance_impact:
@@ -1322,6 +1324,172 @@ modules:
               chart_type: line
               dimensions:
                 - name: opened
+            - name: smb.server_shares_tree_connects
+              description: Current number of tree connects (client connections) to the SMB share.
+              unit: "connections"
+              chart_type: line
+              dimensions:
+                - name: connects
+            - name: smb.server_shares_traffic
+              description: Bytes received and sent on the SMB share, including SMB protocol data such as packet headers.
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+  - meta:
+      plugin_name: windows.plugin
+      module_name: PerflibSMBClient
+      monitored_instance:
+        name: SMB Client Shares
+        link: "https://learn.microsoft.com/en-us/windows-server/storage/file-server/file-server-smb-overview"
+        categories:
+          - data-collection.storage
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - smb
+        - smb client
+        - share
+        - network drive
+        - file sharing
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor the remote SMB shares this Windows host uses as a client: traffic, requests, queues, and latency.
+        method_description: |
+          It queries the 'SMB Client Shares' object from Perflib. Each remote share the host has open is one instance,
+          named `\server\share`; the aggregate `_Total` instance and names that do not split into a server and a
+          share are skipped.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            This collector is enabled by default. It charts every remote share the host is connected to, including
+            shares connected after the Agent starts, and removes a share's charts when the connection closes. A host
+            with no SMB client connections produces no charts.
+        limits:
+          description: |
+            One set of nine charts is created per connected remote share; the number of charts follows the number of
+            shares the host has open.
+        performance_impact:
+          description: |
+            One Perflib query per collection interval.
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibSMBClient]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: SMB client share
+          description: "These metrics refer to a remote SMB share this host is connected to."
+          labels:
+            - name: server
+              description: Server part of the share path, as reported by the SMB Client Shares performance object.
+            - name: share
+              description: Share name on that server.
+          metrics:
+            - name: smb.client_share_traffic
+              description: SMB client share traffic
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_requests
+              description: SMB client share requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: metadata
+            - name: smb.client_share_smbdirect_traffic
+              description: SMB client share traffic via SMB Direct
+              unit: "bytes/s"
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_smbdirect_requests
+              description: SMB client share requests via SMB Direct
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_turbo_io
+              description: SMB client share Turbo I/O requests
+              unit: "requests/s"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_credit_stalls
+              description: SMB client share requests delayed by insufficient credits
+              unit: "stalls/s"
+              chart_type: line
+              dimensions:
+                - name: stalls
+            - name: smb.client_share_outstanding_requests
+              description: SMB client share outstanding requests
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: outstanding
+            - name: smb.client_share_avg_queue_length
+              description: SMB client share average queue length
+              unit: "requests"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+            - name: smb.client_share_latency
+              description: SMB client share average request latency
+              unit: "milliseconds"
+              chart_type: line
+              dimensions:
+                - name: read
+                - name: write
+                - name: data
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibTerminalServices
@@ -5376,6 +5544,209 @@ modules:
                 - name: queued
   - meta:
       plugin_name: windows.plugin
+      module_name: GetFSRMQuota
+      monitored_instance:
+        name: FSRM Quotas
+        description: "Monitor Windows File Server Resource Manager quota usage, limits, and state."
+        link: "https://learn.microsoft.com/en-us/windows-server/storage/fsrm/quota-management"
+        categories:
+          - data-collection.storage
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - microsoft
+        - fsrm
+        - quota
+        - file server
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors File Server Resource Manager (FSRM) quotas on Windows: space used, the highest usage
+          recorded, the quota limit, and whether each quota is disabled, a soft limit, or still matches its template.
+        method_description: |
+          It queries the `MSFT_FSRMQuota` WMI class in the `root\Microsoft\Windows\FSRM` namespace on its own thread,
+          so a slow WMI service cannot delay other Windows collectors.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: |
+          The Netdata service account needs read access to the `root\Microsoft\Windows\FSRM` WMI namespace. The
+          default `LocalSystem` account has it; whether other accounts can read quotas has not been verified.
+      default_behavior:
+        auto_detection:
+          description: |
+            The module is disabled by default. Once enabled, it charts every quota the FSRM provider returns. Quotas
+            created later appear on the next collection; deleted quotas stop being charted.
+        limits:
+          description: |
+            Every quota is charted individually, with two charts per quota. Hosts with thousands of quotas create a
+            matching number of charts.
+        performance_impact:
+          description: |
+            Each collection runs one WMI query. If the query fails, the module retries with exponential backoff, up to
+            every 10 minutes, so a host without the FSRM role costs almost nothing.
+    setup:
+      prerequisites:
+        list:
+          - title: FSRM role installed
+            description: |
+              The File Server Resource Manager role service must be installed and the `SrmSvc` service running. Quotas
+              are optional: with none configured, the module reports zero quotas.
+          - title: Enable the module
+            description: |
+              Set `GetFSRMQuota = yes` in the `[plugin:windows]` section of `netdata.conf` and restart Netdata.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:GetFSRMQuota]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      errors:
+        list:
+          - error: "GetFSRMQuota: the FSRM service (SrmSvc) is not running (service state `state`; 0 means not installed or not accessible); skipping this cycle"
+            cause: |
+              The File Server Resource Manager service is stopped, still starting, not installed, or its state cannot
+              be read by the Netdata service account. While it is not running, the FSRM WMI provider answers with an
+              empty or incomplete list instead of an error, so the module leaves a gap in the charts rather than
+              reporting zero quotas.
+            fix: |
+              Run `Get-Service SrmSvc`. If the service is not found, install the FSRM role with
+              `Install-WindowsFeature FS-Resource-Manager` (Windows Server). If it exists but is not running, start it
+              with `Start-Service SrmSvc` and check its startup type. If it is running but the state is 0, the Netdata
+              service account lacks permission to query it; run Netdata as `LocalSystem`. Charts resume on the next
+              successful collection.
+      problems:
+        list:
+          - name: No FSRM charts after enabling the module
+            description: |
+              Check the Netdata collector log for `GetFSRMQuota` errors. `FSRM WMI provider not found` means the FSRM
+              role is not installed; `access denied` means the service account cannot read the FSRM WMI namespace;
+              `timed out` means the WMI service did not answer in time. A host with no quotas shows only the quota
+              count chart, at 0.
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: "A failed WMI query leaves a gap in every chart instead of reporting zeros."
+      availability: []
+      scopes:
+        - name: global
+          description: "These metrics refer to all FSRM quotas on the host."
+          labels: []
+          metrics:
+            - name: fsrm.quotas
+              description: FSRM quotas
+              unit: quotas
+              chart_type: line
+              dimensions:
+                - name: quotas
+        - name: quota
+          description: "These metrics refer to one FSRM quota."
+          labels:
+            - name: path
+              description: The folder or volume path the quota applies to.
+            - name: template
+              description: The quota template the quota was created from; empty when none.
+          metrics:
+            - name: fsrm.quota_space
+              description: FSRM quota space
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+                - name: peak
+                - name: limit
+            - name: fsrm.quota_state
+              description: FSRM quota state
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: disabled
+                - name: soft_limit
+                - name: matches_template
+    functions:
+      description: |
+        View every FSRM quota, including its description, which is not kept as a chart label.
+      list:
+        - id: fsrm-quotas
+          name: FSRM Quotas
+          description: |
+            Shows the quotas from the latest successful collection with usage, limit, peak usage, percentage used, and
+            state. Returns an error when no collection has succeeded within three collection intervals.
+          parameters: []
+          returns:
+            description: "One row per quota; unavailable values are empty."
+            columns:
+              - name: Path
+                type: string
+                unit: ""
+                description: "Quota path."
+              - name: Template
+                type: string
+                unit: ""
+                description: "Quota template; empty when none."
+              - name: Description
+                type: string
+                unit: ""
+                description: "Quota description."
+              - name: Used
+                type: number
+                unit: bytes
+                description: "Disk space charged to the quota."
+              - name: Limit
+                type: number
+                unit: bytes
+                description: "Quota size."
+              - name: Peak
+                type: number
+                unit: bytes
+                description: "Highest usage charged to the quota."
+                visibility: hidden
+              - name: Used%
+                type: number
+                unit: "%"
+                description: "Usage as a percentage of the quota size."
+              - name: SoftLimit
+                type: string
+                unit: ""
+                description: "`yes` for a soft limit, `no` for a hard limit."
+              - name: Disabled
+                type: string
+                unit: ""
+                description: "`yes` when the quota is disabled."
+              - name: MatchesTemplate
+                type: string
+                unit: ""
+                description: "`yes` when the quota properties match its template."
+                visibility: hidden
+          performance: "Reads the in-memory result of the latest collection; it does not query WMI."
+          security: "Requires signed-in, same-space access because quota paths and descriptions can contain user-entered text."
+          availability: "Available after the first successful collection with the module enabled."
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibNUMA
       monitored_instance:
         name: NUMA Architecture
@@ -5727,3 +6098,165 @@ modules:
               chart_type: line
               dimensions:
                 - name: failure
+  - meta:
+      plugin_name: windows.plugin
+      module_name: GetPrinters
+      monitored_instance:
+        name: Windows printers
+        link: "https://learn.microsoft.com/en-us/windows/win32/printdocs/print-spooler-api-functions"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - printer
+        - print queue
+        - spooler
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Windows print queues: queued jobs, printer status, and jobs by status.
+          It covers local printers and printer connections configured on the host; it does not poll printer devices,
+          which the SNMP collector covers.
+        method_description: |
+          It calls the print spooler API. `EnumPrintersW` lists printer names from the local registry and
+          cache without contacting print servers. Each selected printer is then opened to read its status
+          flags and queued job count (`GetPrinterW`) and, when jobs are queued, its jobs (`EnumJobsW`). Status
+          values follow the `Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter, except
+          that a printer reporting several status flags at once gets its most severe state (problems first), a
+          connection whose print server is offline reports `other`, a status the server reports as unknown
+          reports `unknown`, a job with no status flags counts as `queued` (and leaves an otherwise flagless
+          printer `idle`), and a blocked job or one waiting for user intervention counts as `degraded`. The
+          job owner, submitting machine, and document title returned with each job are never logged, charted,
+          or exported.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector is disabled by default. When enabled, it discovers printers automatically and charts up to
+            100 printers matching `printers to monitor`, chosen in case-insensitive alphabetical order. Printers that
+            do not match or exceed the limit get no charts, and their queues are not opened.
+        limits:
+          description: |
+            By default, at most 100 printers are charted, four charts each.
+        performance_impact:
+          description: |
+            One name enumeration per collection, plus one printer open and status read per selected printer, and a job
+            read for selected printers with queued jobs. Unselected printers are never opened. For a selected printer
+            connection, opening it can contact the print server and block when it is unreachable. The
+            module always runs on its own thread; a blocked call stops only this module, but Netdata shutdown waits for
+            it to return.
+    setup:
+      prerequisites:
+        list:
+          - title: Print Spooler service running
+            description: |
+              The Windows `Spooler` service must be running. While it is stopped, the charts show gaps and existing
+              printers are kept until a successful enumeration shows they are gone.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:GetPrinters]"
+          description: "The Netdata main configuration file. Enable the module with `GetPrinters = yes` in `[plugin:windows]`."
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: printers to monitor
+              description: |
+                Case-insensitive simple patterns separated by commas or pipes, matched against the full printer name.
+                Printer connection names such as `\\server\printer` can be pasted verbatim; escape a comma or pipe with
+                a backslash to match it literally. Prefix a pattern with `!` to exclude matching printers, and add a
+                positive pattern, for example `!*PDF*,*`, to select every other printer.
+              default_value: "*"
+              required: false
+            - name: max monitored printers
+              description: Maximum number of matching printers to chart. 0 charts none; a negative value uses the default.
+              default_value: 100
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: printer
+          description: "These metrics refer to one print queue."
+          labels:
+            - name: printer
+              description: The full Windows printer name, including the server for printer connections.
+          metrics:
+            - name: windows.printer_jobs
+              description: Printer queued jobs
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: windows.printer_status
+              description: Printer status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: other
+                - name: unknown
+                - name: idle
+                - name: printing
+                - name: warmup
+            - name: windows.printer_problems
+              description: Printer problems
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: paused
+                - name: error
+                - name: pending_deletion
+                - name: paper_jam
+                - name: paper_out
+                - name: manual_feed
+                - name: paper_problem
+                - name: offline
+                - name: output_bin_full
+                - name: toner_low
+                - name: no_toner
+                - name: page_punt
+                - name: user_intervention
+                - name: out_of_memory
+                - name: door_open
+                - name: server_offline
+                - name: driver_update_needed
+            - name: windows.printer_job_status
+              description: Printer jobs by status
+              unit: jobs
+              chart_type: stacked
+              dimensions:
+                - name: error
+                - name: degraded
+                - name: ok
+                - name: queued
+                - name: unknown

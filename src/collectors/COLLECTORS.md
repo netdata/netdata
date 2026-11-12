@@ -250,6 +250,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [vm.swap_info](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.swap_info.md) | Collect information about SWAP memory. |
 | [vm.swap_reserved](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.swap_reserved.md) | Read how much anonymous memory the kernel has reserved for running processes. |
 | [vm.vmtotal](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/vm.vmtotal.md) | Collect Virtual Memory information from host. |
+| [Windows printers](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/windows_printers.md) | This collector monitors Windows print queues: queued jobs, printer status, and jobs by status. |
 | [Windows Services](https://github.com/netdata/netdata/blob/master/src/collectors/apps.plugin/integrations/windows_services.md) | This integration monitors resource utilization grouped by Windows Service. |
 | [Windows Services](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/windows_services.md) | This collector monitors Windows Services Status and States. |
 | [ZRAM](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/zram.md) | Monitor zRAM device capacity, compression, memory use, and I/O activity on Linux systems. |
@@ -320,7 +321,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Ubiquiti UFiber OLT](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/ubiquiti_ufiber_olt.md) | Track Ubiquiti UFiber GPON (Gigabit Passive Optical Network) device metrics for efficient fiber-optic network management and performance. |
 | [Unbound](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/unbound/integrations/unbound.md) | This collector monitors Unbound servers. |
 | [Windows Network Protocols](https://github.com/netdata/netdata/blob/master/src/collectors/network-viewer.plugin/integrations/windows_network_protocols.md) | This collector exposes TCP and UDP stack statistics on Windows systems via a real-time table function. |
-| [WireGuard](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | This collector monitors WireGuard VPN devices and peers traffic. |
+| [WireGuard](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/wireguard/integrations/wireguard.md) | Monitor WireGuard VPN interfaces and their peers: traffic, peer counts, and the time since each peer's latest handshake. |
 | [Wireless network interfaces](https://github.com/netdata/netdata/blob/master/src/collectors/proc.plugin/integrations/wireless_network_interfaces.md) | Monitor wireless devices with metrics about status, link quality, signal level, noise level and more. |
 
 ### Cloud and DevOps
@@ -558,6 +559,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [eBPF VFS](https://github.com/netdata/netdata/blob/master/src/collectors/ebpf.plugin/integrations/ebpf_vfs.md) | Monitor I/O events on Linux Virtual Filesystem. |
 | [EOS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/eos.md) | Monitor CERN EOS metrics for efficient storage management. |
 | [FreeBSD NFS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/freebsd_nfs.md) | Monitor FreeBSD Network File System metrics for efficient file sharing management and performance. |
+| [FSRM Quotas](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/fsrm_quotas.md) | This collector monitors File Server Resource Manager (FSRM) quotas on Windows: space used, the highest usage recorded, the quota limit, and whether each quota is disabled, a soft limit, or still matches its template. |
 | [Generic storage enclosure tool](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/generic_storage_enclosure_tool.md) | Monitor storage enclosure metrics for efficient storage device management and performance. |
 | [getmntinfo](https://github.com/netdata/netdata/blob/master/src/collectors/freebsd.plugin/integrations/getmntinfo.md) | Collect information per mount point. |
 | [Hadoop Distributed File System (HDFS)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/hdfs/integrations/hadoop_distributed_file_system_hdfs.md) | This collector monitors HDFS nodes. |
@@ -579,6 +581,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Physical and Logical Disk Performance Metrics](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/physical_and_logical_disk_performance_metrics.md) | Detailed statistics for all disk devices and volumes. |
 | [S.M.A.R.T.](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/smartctl/integrations/s.m.a.r.t..md) | This collector monitors the health status of storage devices by analyzing S.M.A.R.T. |
 | [Samba](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/samba/integrations/samba.md) | This collector monitors Samba syscalls and SMB2 calls. |
+| [SMB Client Shares](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/smb_client_shares.md) | Monitor the remote SMB shares this Windows host uses as a client: traffic, requests, queues, and latency. |
 | [SMB Server Shares](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/smb_server_shares.md) | Monitor SMB server share activity and throughput counters on Windows systems. |
 | [StoreCLI RAID](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/storcli/integrations/storecli_raid.md) | Monitors the health of StoreCLI Hardware RAID by tracking the status of RAID adapters, physical drives, and backup batteries in your storage system. |
 | [Storidge](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/storidge.md) | Keep an eye on Storidge storage metrics for efficient storage management and performance. |

@@ -48,9 +48,12 @@ func Declarations() []funcapi.FunctionConfig {
 		Name:         "DEM History Status",
 		UpdateEvery:  60,
 		Help:         help,
-		Tags:         "dem hidden",
+		Tags:         "dem",
 		RawRequest:   true,
 		ManagedInfo:  true,
+		// Every DEM view requires a paid plan or an active trial (access 0x0017).
+		RequireCloud:      true,
+		RequireCommercial: true,
 	}}
 }
 

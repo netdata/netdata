@@ -1895,6 +1895,16 @@
           ]
         },
         "type": "actor_ports"
+      },
+      "focus_roots": {
+        "table": {
+          "columns": [
+            "option:string:role=attribute",
+            "actor:actor_ref:role=reference"
+          ],
+          "rows": null
+        },
+        "type": "focus_root_bindings"
       }
     }
   },
@@ -19662,6 +19672,27 @@
           ],
           "label": "Ports",
           "order": 1
+        },
+        "role": "actor_detail"
+      },
+      "focus_root_bindings": {
+        "aggregation": "append",
+        "columns": [
+          {
+            "id": "option",
+            "role": "attribute",
+            "type": "string"
+          },
+          {
+            "id": "actor",
+            "role": "reference",
+            "type": "actor_ref"
+          }
+        ],
+        "owner": "actor",
+        "presentation": {
+          "default_visibility": "hidden",
+          "label": "Focus bindings"
         },
         "role": "actor_detail"
       }

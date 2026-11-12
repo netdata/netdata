@@ -1,5 +1,5 @@
 /*
- * netipc_shm.h - L1 POSIX SHM transport (Linux only).
+ * netipc_shm.h - L1 POSIX SHM transport (Linux and FreeBSD).
  *
  * Shared memory data plane with spin+futex synchronization.
  * The SHM region carries the same outer protocol envelope as the UDS
@@ -54,6 +54,7 @@ typedef enum {
     NIPC_SHM_ERR_BAD_PARAM,         /* invalid argument */
     NIPC_SHM_ERR_PEER_DEAD,         /* owner process has exited */
     NIPC_SHM_ERR_ALLOCATE,          /* backing allocation failed; errno preserved */
+    NIPC_SHM_ERR_UNSUPPORTED,       /* no POSIX SHM on this platform (Linux and FreeBSD only) */
 } nipc_shm_error_t;
 
 /* ------------------------------------------------------------------ */
@@ -118,7 +119,6 @@ typedef struct {
     uint64_t local_resp_seq;     /* last known resp_seq */
 
     uint32_t spin_tries;         /* spin count before futex wait */
-    uint32_t owner_generation;   /* cached for PID reuse detection */
 
     char     path[256];          /* stored for unlink on destroy */
 
@@ -202,13 +202,6 @@ nipc_shm_error_t nipc_shm_receive(nipc_shm_ctx_t *ctx,
                                     size_t buf_size,
                                     size_t *msg_len_out,
                                     uint32_t timeout_ms);
-
-/* ------------------------------------------------------------------ */
-/*  Utility                                                            */
-/* ------------------------------------------------------------------ */
-
-/* Check if the region's owner process is still alive. */
-bool nipc_shm_owner_alive(const nipc_shm_ctx_t *ctx);
 
 /*
  * Scan for and unlink stale per-session SHM files left by a crashed

@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F0530
+# Next unused error code: F0533
 
 # ======================================================================
 # Constants
@@ -20,8 +20,8 @@ KICKSTART_SOURCE="$(
     echo "$(pwd -P)/${self##*/}"
 )"
 DEFAULT_PLUGIN_PACKAGES=""
-REPOCONFIG_DEB_VERSION="5-5"
-REPOCONFIG_RPM_VERSION="5-5"
+REPOCONFIG_DEB_VERSION="5-6"
+REPOCONFIG_RPM_VERSION="5-6"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l armv6l aarch64"
 
@@ -54,6 +54,7 @@ PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packag
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 RELEASE_INFO_URL="https://repo.netdata.cloud/releases"
 STABLE_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/stable"
+PREVIEW_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/preview"
 NIGHTLY_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/edge"
 REPOCONFIG_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
@@ -113,7 +114,30 @@ RELEASE_BADNET_MSG="This usually means there is some networking issue preventing
 # ======================================================================
 # Core program logic
 
+# An explicit preview selection always uses that channel, including version pins.
+release_channel_for_version() {
+  if [ "${2}" = preview ]; then
+    echo preview
+  elif echo "${1}" | grep -Eq '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(\+[[:alnum:].-]+)?$'; then
+    echo stable
+  elif echo "${1}" | grep -Eq 'nightly|-[[:digit:]]+-g[[:xdigit:]]+$'; then
+    echo nightly
+  elif echo "${1}" | grep -Eq '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+[-~][[:alnum:]][[:alnum:].+-]*$'; then
+    echo preview
+  else
+    echo nightly
+  fi
+}
+
 main() {
+  if [ -n "${INSTALL_VERSION}" ]; then
+    NEW_SELECTED_RELEASE_CHANNEL="$(release_channel_for_version "${INSTALL_VERSION}" "${SELECTED_RELEASE_CHANNEL}")"
+    if [ "${NEW_SELECTED_RELEASE_CHANNEL}" != "${SELECTED_RELEASE_CHANNEL}" ]; then
+      warning "Selected release channel does not match this version and it will be changed automatically."
+      SELECTED_RELEASE_CHANNEL="${NEW_SELECTED_RELEASE_CHANNEL}"
+    fi
+  fi
+
   case "${ACTION}" in
     uninstall)
       uninstall
@@ -147,19 +171,6 @@ main() {
   handle_existing_install
   set_tmpdir
 
-  if [ -n "${INSTALL_VERSION}" ]; then
-    if echo "${INSTALL_VERSION}" | grep -E -o "^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$" > /dev/null 2>&1; then
-      NEW_SELECTED_RELEASE_CHANNEL="stable"
-    else
-      NEW_SELECTED_RELEASE_CHANNEL="nightly"
-    fi
-
-    if ! [ "${NEW_SELECTED_RELEASE_CHANNEL}" = "${SELECTED_RELEASE_CHANNEL}" ]; then
-        warning "Selected release channel does not match this version and it will be changed automatically."
-        SELECTED_RELEASE_CHANNEL="${NEW_SELECTED_RELEASE_CHANNEL}"
-    fi
-  fi
-
   case "${SYSTYPE}" in
     Linux) install_on_linux ;;
     Darwin) install_on_macos ;;
@@ -170,6 +181,7 @@ main() {
     claim
   fi
 
+  save_release_channel
   set_auto_updates
   install_dem_runtime
 
@@ -197,7 +209,7 @@ USAGE: kickstart.sh [options]
   --dem-docker-policy-remove TOKEN Retire that registration; requires --deployments-stopped.
   --install-dem-runtime            Explicitly install the optional browser runtime for DEM synthetic monitoring.
   --dry-run                        Report what we would do with the given options on this system, but don’t actually do anything.
-  --release-channel                Specify the release channel to use for the install (default: ${DEFAULT_RELEASE_CHANNEL})
+  --release-channel                Specify the release channel: stable, preview, nightly, default (default: ${DEFAULT_RELEASE_CHANNEL})
   --stable-channel                 Equivalent to "--release-channel stable"
   --nightly-channel                Equivalent to "--release-channel nightly"
   --no-updates                     Do not enable automatic updates (default: enable automatic updates using the best supported scheduling method)
@@ -2089,6 +2101,29 @@ setup_dem_runtime() {
 
 # ======================================================================
 # Auto-update handling code.
+# Older bundled installers only accept stable/nightly flags. Persist preview after
+# they finish so published archives need no new installer option.
+save_release_channel() {
+  [ "${SELECTED_RELEASE_CHANNEL}" = preview ] || return 0
+  case "${SELECTED_INSTALL_METHOD}" in static|build) ;; *) return 0 ;; esac
+
+  if [ "${DRY_RUN}" -eq 1 ]; then
+    progress "Would save preview release channel information."
+    return 0
+  fi
+
+  for channel_env in "${INSTALL_PREFIX}/etc/netdata/.environment" "${INSTALL_PREFIX}/netdata/etc/netdata/.environment"; do
+    if run_as_root test -f "${channel_env}"; then
+      if ! run_as_root sed -e 's/^RELEASE_CHANNEL=.*/RELEASE_CHANNEL="preview"/' "${channel_env}" > "${tmpdir}/channel-environment" ||
+         ! run_as_root cp "${tmpdir}/channel-environment" "${channel_env}"; then
+        fatal "Unable to save preview release channel information." F0531
+      fi
+      return 0
+    fi
+  done
+  fatal "Could not find installed release channel configuration." F0531
+}
+
 set_auto_updates() {
   if run_as_root test -x "${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"; then
     updater="${INSTALL_PREFIX}/usr/libexec/netdata/netdata-updater.sh"
@@ -2174,11 +2209,11 @@ netdata_avail_check() {
       ;;
     centos|fedora|ol|amzn)
       # shellcheck disable=SC2086
-      LC_ALL=C ${pm_cmd} info --nogpgcheck netdata | grep -qE '^(Repo(sitory)?|From repo) *: *netdata(-edge)?(/.*)?$'
+      LC_ALL=C ${pm_cmd} info --nogpgcheck netdata | grep -qE '^(Repo(sitory)?|From repo) *: *netdata(-(edge|preview))?(/.*)?$'
       return $?
       ;;
     opensuse)
-      zypper packages -r "$(zypper repos | grep -E 'netdata |netdata-edge ' | cut -f 1 -d '|' | tr -d ' ')" | grep -E 'netdata '
+      zypper packages -r "$(zypper repos | grep -E 'netdata(-edge|-preview)? ' | cut -f 1 -d '|' | tr -d ' ')" | grep -E 'netdata '
       return $?
       ;;
     *) return 1 ;;
@@ -2232,7 +2267,7 @@ cleanup_apt_state() {
       run_as_root find "${cache_dir}" -type f -name 'netdata*.deb' -delete
   fi
 
-  for p in netdata-repo netdata-repo-edge; do
+  for p in netdata-repo netdata-repo-edge netdata-repo-preview; do
     if pkg_installed "${p}" ; then
       warning "Detected already installed repository configuration ${p}, attempting to remove it."
       # shellcheck disable=SC2086
@@ -2242,7 +2277,7 @@ cleanup_apt_state() {
 }
 
 cleanup_dnf_state() {
-  for p in "" "-edge"; do
+  for p in "" "-edge" "-preview"; do
     if pkg_installed "netdata-repo${p}"; then
       warning "Detected already installed repository configuration netdata-repo${p}, attempting to remove it."
       run_as_root "${pm_cmd}" clean all --disablerepo "*" --enablerepo "netdata${p}"
@@ -2252,7 +2287,7 @@ cleanup_dnf_state() {
 }
 
 cleanup_zypper_state() {
-  for p in netdata-repo netdata-repo-edge; do
+  for p in netdata-repo netdata-repo-edge netdata-repo-preview; do
     if pkg_installed "${p}" ; then
       warning "Detected already installed repository configuration ${p}, attempting to remove it."
       # shellcheck disable=SC2086
@@ -2266,7 +2301,7 @@ common_rpm_opts() {
   pkg_suffix=".noarch"
   pkg_vsep="-"
   INSTALL_TYPE="binpkg-rpm"
-  NATIVE_VERSION="${INSTALL_VERSION:+"-${INSTALL_VERSION}.${SYSARCH}"}"
+  NATIVE_VERSION="${native_install_version:+"-${native_install_version}.${SYSARCH}"}"
 }
 
 common_dnf_opts() {
@@ -2288,6 +2323,10 @@ common_dnf_opts() {
 configure_native_package_manager() {
   interactive_opts=""
   env=""
+  native_install_version="${INSTALL_VERSION}"
+  if [ "${SELECTED_RELEASE_CHANNEL}" = preview ]; then
+    native_install_version="$(printf '%s' "${INSTALL_VERSION}" | sed 's/-/~/')"
+  fi
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
       if [ "${INTERACTIVE}" = "0" ]; then
@@ -2308,7 +2347,7 @@ configure_native_package_manager() {
       repo_prefix="${DISTRO_COMPAT_NAME}/${SYSCODENAME}"
       pkg_suffix="+${DISTRO_COMPAT_NAME}${SYSVERSION}_all"
       INSTALL_TYPE="binpkg-deb"
-      NATIVE_VERSION="${INSTALL_VERSION:+"=${INSTALL_VERSION}"}"
+      NATIVE_VERSION="${native_install_version:+"=${native_install_version}"}"
       ;;
     centos)
       common_rpm_opts
@@ -2372,11 +2411,11 @@ try_package_install() {
     progress "Attempting to install using native packages..."
   fi
 
-  if [ "${SELECTED_RELEASE_CHANNEL}" = "nightly" ]; then
-    release="-edge"
-  else
-    release=""
-  fi
+  case "${SELECTED_RELEASE_CHANNEL}" in
+    nightly) release="-edge" ;;
+    preview) release="-preview" ;;
+    stable) release="" ;;
+  esac
 
   if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
     warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open a feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
@@ -2384,23 +2423,10 @@ try_package_install() {
 
   configure_native_package_manager || return $?
 
-  if [ -n "${INSTALL_VERSION}" ]; then
-    if echo "${INSTALL_VERSION}" | grep -q "nightly"; then
-      new_release="-edge"
-    else
-      new_release=
-    fi
-
-    if { [ -n "${new_release}" ] && [ -z "${release}" ]; } || { [ -z "${new_release}" ] && [ -n "${release}" ]; }; then
-      warning "Selected release channel does not match this version and it will be changed automatically."
-    fi
-
-    release="${new_release}"
-  fi
-
   repoconfig_name="netdata-repo${release}"
 
   case "${SELECTED_RELEASE_CHANNEL}" in
+    preview) REPO_URL_PREFIX="${PREVIEW_REPO_URL_PREFIX}" ;;
     stable) REPO_URL_PREFIX="${STABLE_REPO_URL_PREFIX}" ;;
     nightly) REPO_URL_PREFIX="${NIGHTLY_REPO_URL_PREFIX}" ;;
   esac
@@ -2571,7 +2597,9 @@ set_static_archive_urls() {
     0) NETDATA_MANIFEST_INSTALL=1 ;;
     *)
       if [ "${prefix_set}" -eq 0 ]; then
-        if [ "${1}" = "stable" ]; then
+        if [ "${1}" = preview ]; then
+          fatal "Unable to fetch the preview release manifest from artifact hosting. ${RELEASE_BADNET_MSG}" F0530
+        elif [ "${1}" = "stable" ]; then
           if [ -n "${INSTALL_VERSION}" ]; then
             version="v${INSTALL_VERSION}"
           else
@@ -2728,7 +2756,9 @@ set_source_archive_urls() {
     0) NETDATA_MANIFEST_INSTALL=1 ;;
     *)
       if [ "${prefix_set}" -eq 0 ]; then
-        if [ "${1}" = "stable" ]; then
+        if [ "${1}" = preview ]; then
+          fatal "Unable to fetch the preview release manifest from artifact hosting. ${RELEASE_BADNET_MSG}" F0530
+        elif [ "${1}" = "stable" ]; then
           if [ -n "${INSTALL_VERSION}" ]; then
             version="v${INSTALL_VERSION}"
           else
@@ -3132,6 +3162,7 @@ install_on_linux() {
           native|auto)
             case "${SELECTED_RELEASE_CHANNEL}" in
               stable) fatal "A stable build with native packages has not yet been published for this system, but is expected to be published within the next few weeks. If you need to install now, you should be able to do so either by using a nightly build (add --release-channel=nightly to the options passed to this script) or by using a static build (add --install-type=static to the options passed to this script). Note that if you use a static build, you may have to reinstall once a stable build is published with native packages for this system to get full support." F051D ;;
+              preview) fatal "A preview build with native packages has not yet been published for this system. Try again later or use a static build (add --install-type=static)." F0532 ;;
               nightly) fatal "A nightly build with native packages has not yet been published for this system, but is expected to be published at 01:00 UTC tomorrow. Please try again tomorrow." F051E ;;
             esac
             ;;
@@ -3357,12 +3388,16 @@ parse_args() {
       "--interactive") INTERACTIVE=1 ;;
       "--dry-run") DRY_RUN=1 ;;
       "--install-dem-runtime") NETDATA_INSTALL_DEM_RUNTIME=1 ;;
-      "--release-channel")
-        RELEASE_CHANNEL="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+      "--release-channel"|--release-channel=*)
+        case "${1}" in
+          --release-channel=*) channel_arg="${1#*=}" ;;
+          *) channel_arg="${2}"; shift 1 ;;
+        esac
+        RELEASE_CHANNEL="$(echo "${channel_arg}" | tr '[:upper:]' '[:lower:]')"
         case "${RELEASE_CHANNEL}" in
-          nightly|stable|default) shift 1 ;;
+          nightly|stable|preview|default) ;;
           *)
-            echo "Unrecognized value for --release-channel. Valid release channels are: stable, nightly, default"
+            echo "Unrecognized value for --release-channel. Valid release channels are: stable, preview, nightly, default"
             exit 1
             ;;
         esac

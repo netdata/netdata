@@ -1079,6 +1079,16 @@ func TestTopologyRegistry_ManagedFocusUsesOnlyReconciledManagementAddresses(t *t
 	require.NotContains(t, baselineA.Detail.L2.Device.ManagementAddresses, "192.0.2.20")
 	require.NotEmpty(t, baselineA.Detail.SNMP.ManagementAddresses)
 	require.Equal(t, "192.0.2.20", baselineA.Detail.SNMP.ManagementAddresses[0].Address)
+	baselineB := findDeviceActorBySysName(baseline, "sw-b")
+	require.NotNil(t, baselineB)
+	var bound []topologymodel.ActorHandle
+	for _, binding := range baseline.FocusRootBindings {
+		if binding.OptionID == "ip:192.0.2.20" {
+			bound = append(bound, binding.ActorHandle)
+		}
+	}
+	require.Equal(t, []topologymodel.ActorHandle{baselineB.ActorHandle}, bound,
+		"raw SNMP addresses must not regain focus authority through aggregate bindings")
 
 	options := defaultTopologyQueryOptionsForTest()
 	options.ManagedDeviceFocus = "ip:192.0.2.20"

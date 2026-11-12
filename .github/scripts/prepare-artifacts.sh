@@ -17,7 +17,6 @@ MSI_ARCHES="x64"
 STATIC_ARCHES="x86_64 aarch64 armv6l armv7l"
 STATIC_EXTENSIONS="gz"
 VERSION="$(cat packaging/version)"
-VERSION_URL_PREFIX="https://artifacts.netdata.cloud/${build_type}"
 
 copy_static_builds() {
     for ext in ${STATIC_EXTENSIONS}; do
@@ -136,113 +135,125 @@ cat Manifest
 cd "${TOP}"
 echo "::endgroup::"
 
-echo "::group::Preparing R2 versioned release artifacts"
-mkdir -p "artifacts/r2/${VERSION}"
-cd "artifacts/r2/${VERSION}"
-copy_source_tarball "${VERSION}"
-copy_static_builds "${VERSION}"
-copy_msi_packages "${VERSION}"
-echo "${VERSION}" > Version
-create_manifest
-cat Manifest
-cd "${TOP}"
-echo "::endgroup::"
+# Each channel selects aliases against its own published metadata.
+prepare_r2_artifacts() {
+    local build_type="${1}" r2_dir="${2}"
+    local VERSION_URL_PREFIX="https://artifacts.netdata.cloud/${build_type}"
+    local prepare_latest prepare_target major minor t dl_log ret
 
-prepare_latest=0
-if [ "${event_type}" != 'pull_request' ] && [ "${build_type}" != 'nightly' ]; then
-    dl_log="./dl.log"
-
-    rm -f "${dl_log}"
-    set +e
-    wget -S -o "${dl_log}" "${VERSION_URL_PREFIX}/latest/Version"
-    ret="$?"
-    set -e
-
-    case "${ret}" in
-        0)
-            if version_compare "$(cat Version)" "${VERSION}"; then
-                prepare_latest=0
-            else
-                prepare_latest=1
-            fi
-            ;;
-        8)
-            case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
-                404) prepare_latest=1 ;;
-                *)
-                    echo "::error::Failed to determine latest published ${build_type} version."
-                    cat "${dl_log}"
-                    exit 1
-                    ;;
-            esac
-            ;;
-        *)
-            echo "::error::Failed to determine latest published ${build_type} version."
-                    cat "${dl_log}"
-            exit 1
-            ;;
-    esac
-
-    rm -f Version
-
-    if [ "${build_type}" != "release-candidate" ]; then
-        major="$(echo "${VERSION}" | tr -d 'v' | cut -f 1 -d '.')"
-        minor="$(echo "${VERSION}" | tr -d 'v' | cut -f 2 -d '.')"
-        for t in "${major}" "${major}.${minor}" ; do
-            rm -f "${dl_log}"
-            set +e
-            wget -S -o "${dl_log}" "${VERSION_URL_PREFIX}/${t}/Version"
-            ret="$?"
-            set -e
-
-            case "${ret}" in
-                0)
-                    if version_compare "$(cat Version)" "${VERSION}"; then
-                        prepare_target=0
-                    else
-                        prepare_target=1
-                    fi
-                    ;;
-                8)
-                    case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
-                        404) prepare_target=1 ;;
-                        *)
-                            echo "::error::Failed to determine latest published ${build_type} v${t} version."
-                            cat "${dl_log}"
-                            exit 1
-                            ;;
-                    esac
-                    ;;
-                *)
-                    echo "::error::Failed to determine latest published ${build_type} v${t} version."
-                    cat "${dl_log}"
-                    exit 1
-                    ;;
-            esac
-
-            if [ "${prepare_target}" -eq 1 ]; then
-                echo "::group::Preparing R2 secondary versioned release artifacts (${t})"
-                cp -va "artifacts/r2/${VERSION}" "artifacts/r2/${t}"
-                echo "::endgroup::"
-            fi
-
-            rm -f Version
-        done
-    fi
-else
-    prepare_latest=1
-fi
-
-if [ "${prepare_latest}" -eq 1 ]; then
-    echo "::group::Preparing R2 latest release artifacts"
-    mkdir -p artifacts/r2/latest
-    cd artifacts/r2/latest
-    copy_source_tarball latest
-    copy_static_builds latest
-    copy_msi_packages latest
+    echo "::group::Preparing R2 versioned release artifacts"
+    mkdir -p "${r2_dir}/${VERSION}"
+    cd "${r2_dir}/${VERSION}"
+    copy_source_tarball "${VERSION}"
+    copy_static_builds "${VERSION}"
+    copy_msi_packages "${VERSION}"
     echo "${VERSION}" > Version
     create_manifest
     cat Manifest
     cd "${TOP}"
     echo "::endgroup::"
+
+    prepare_latest=0
+    if [ "${event_type}" != 'pull_request' ] && [ "${build_type}" != 'nightly' ]; then
+        dl_log="./dl.log"
+
+        rm -f "${dl_log}"
+        set +e
+        wget -S -o "${dl_log}" "${VERSION_URL_PREFIX}/latest/Version"
+        ret="$?"
+        set -e
+
+        case "${ret}" in
+            0)
+                if version_compare "$(cat Version)" "${VERSION}"; then
+                    prepare_latest=0
+                else
+                    prepare_latest=1
+                fi
+                ;;
+            8)
+                case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
+                    404) prepare_latest=1 ;;
+                    *)
+                        echo "::error::Failed to determine latest published ${build_type} version."
+                cat "${dl_log}"
+                        exit 1
+                        ;;
+                esac
+                ;;
+            *)
+                echo "::error::Failed to determine latest published ${build_type} version."
+                cat "${dl_log}"
+                exit 1
+                ;;
+        esac
+
+        rm -f Version
+
+        if [ "${build_type}" != "release-candidate" ]; then
+            major="$(echo "${VERSION}" | tr -d 'v' | cut -f 1 -d '.')"
+            minor="$(echo "${VERSION}" | tr -d 'v' | cut -f 2 -d '.')"
+            for t in "${major}" "${major}.${minor}" ; do
+                rm -f "${dl_log}"
+                set +e
+                wget -S -o "${dl_log}" "${VERSION_URL_PREFIX}/${t}/Version"
+                ret="$?"
+                set -e
+
+                case "${ret}" in
+                    0)
+                        if version_compare "$(cat Version)" "${VERSION}"; then
+                            prepare_target=0
+                        else
+                            prepare_target=1
+                        fi
+                        ;;
+                    8)
+                        case "$(grep "HTTP/" "${dl_log}" | tail -n 1 | awk '{ print $2 }')" in
+                            404) prepare_target=1 ;;
+                            *)
+                                echo "::error::Failed to determine latest published ${build_type} v${t} version."
+                                cat "${dl_log}"
+                                exit 1
+                                ;;
+                        esac
+                        ;;
+                    *)
+                        echo "::error::Failed to determine latest published ${build_type} v${t} version."
+                        cat "${dl_log}"
+                        exit 1
+                        ;;
+                esac
+
+                if [ "${prepare_target}" -eq 1 ]; then
+                    echo "::group::Preparing R2 secondary versioned release artifacts (${t})"
+                    cp -va "${r2_dir}/${VERSION}" "${r2_dir}/${t}"
+                    echo "::endgroup::"
+                fi
+
+                rm -f Version
+            done
+        fi
+    else
+        prepare_latest=1
+    fi
+
+    if [ "${prepare_latest}" -eq 1 ]; then
+        echo "::group::Preparing R2 latest release artifacts"
+        mkdir -p "${r2_dir}/latest"
+        cd "${r2_dir}/latest"
+        copy_source_tarball latest
+        copy_static_builds latest
+        copy_msi_packages latest
+        echo "${VERSION}" > Version
+        create_manifest
+        cat Manifest
+        cd "${TOP}"
+        echo "::endgroup::"
+    fi
+}
+
+prepare_r2_artifacts "${build_type}" artifacts/r2
+if [ "${build_type}" = stable ] && [ "${event_type}" != pull_request ]; then
+    prepare_r2_artifacts preview artifacts/r2-preview
 fi
