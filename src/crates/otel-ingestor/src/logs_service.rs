@@ -1308,8 +1308,9 @@ mod tests {
 
         // A frame keeps some bytes for each record, whatever the record
         // holds: a million empty records are 2 MB on the wire and a frame
-        // over `wal::MAX_FRAME_DATA`. A small stream comes first: it must
-        // not be written either.
+        // over `wal::MAX_FRAME_DATA`. The request also has a small stream:
+        // it must not be written either, in whatever order the two are
+        // taken.
         let status = service
             .export_logs(
                 &tenant,
@@ -1325,8 +1326,7 @@ mod tests {
 
         assert_eq!(status.code(), tonic::Code::InvalidArgument);
         assert!(status.message().contains("1000000 records"));
-        let tenant_dir = tmp.path().join(tenant.as_str());
-        assert!(!tenant_dir.exists() || std::fs::read_dir(&tenant_dir).unwrap().count() == 0);
+        assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), 0);
     }
 
     #[tokio::test]

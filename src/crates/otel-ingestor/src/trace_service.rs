@@ -834,8 +834,7 @@ mod tests {
         assert_eq!(status.code(), tonic::Code::InvalidArgument);
         assert!(status.message().contains("300000 spans"));
         assert!(recorder.committed.lock().unwrap().is_empty());
-        let tenant_dir = tmp.path().join(tenant.as_str());
-        assert!(!tenant_dir.exists() || std::fs::read_dir(&tenant_dir).unwrap().count() == 0);
+        assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), 0);
     }
 
     #[tokio::test]

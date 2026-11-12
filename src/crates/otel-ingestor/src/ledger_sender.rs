@@ -121,11 +121,11 @@ async fn sender_task(
 
     while let Some(msg) = rx.recv().await {
         queued.fetch_sub(1, Ordering::Relaxed);
-        if conn.send(msg).await.is_err() {
+        if let Err(e) = conn.send(msg).await {
             // At a stop the ledger can leave first; when the ledger died,
             // the supervisor says so and stops the plugin. Either way the
             // next start recovers the files whose events were not sent.
-            tracing::warn!("the ledger closed the event link: no more file events are sent");
+            tracing::warn!("the event link to the ledger ended, no more file events are sent: {e}");
             break;
         }
     }

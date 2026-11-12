@@ -434,6 +434,9 @@ impl Ledger {
                 msg = self.ingestor.recv() => match msg {
                     Ok(msg) => LedgerEvent::WalMsg(msg),
                     Err(ferryboat::Error::ConnectionClosed) => LedgerEvent::WriterLinkClosed,
+                    // An ingestor that died in the middle of a message ends
+                    // the link with an I/O error, not with a close: it takes
+                    // this arm.
                     Err(e) => {
                         tracing::error!("writer-socket recv failed: {e}");
                         return Err(e.into());

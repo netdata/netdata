@@ -35,13 +35,19 @@
 //!    the worker connects and waits. The order of the spawns means nothing.
 //! 2. The supervisor sends `Configure` with the worker's resolved config,
 //!    to one worker at a time, and waits for that worker's answer: the
-//!    ledger first, then the ingestor, then legacy-logs. The ledger comes
-//!    before the ingestor because both write the seq high-water file
-//!    (`wal/src/seq.rs`), which has one writer at a time: the ledger's
-//!    start-up raises it to what the remote holds, and the ingestor reads it
-//!    and writes it from then on. No other rule orders the two: the ingestor
-//!    connects to the ledger's event socket by itself, with retries, and the
-//!    ledger binds that socket only after its own `Ready`.
+//!    ledger first, then the ingestor, then legacy-logs. The ingestor must
+//!    not write before the ledger's `Ready`, for two reasons:
+//!    - The ledger's start-up recovery takes every WAL file on the disk as
+//!      a closed file of the last run (`wal::Registry::recover`): it indexes
+//!      the file and deletes it. A file that a live ingestor still writes
+//!      would lose the records that come after the indexing.
+//!    - Both write the seq high-water file (`wal/src/seq.rs`), which has
+//!      one writer at a time: the ledger's start-up raises it to what the
+//!      remote holds, and the ingestor reads it and writes it from then on.
+//!
+//!    The event socket is not a reason: the ingestor connects to it by
+//!    itself, with retries, and the ledger binds it only after its own
+//!    `Ready`.
 //! 3. The worker initializes, then sends `Ready` with zero or more function
 //!    declarations — only once startup fully succeeded. The supervisor
 //!    forwards those declarations to the agent, and a declared function

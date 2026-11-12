@@ -428,8 +428,7 @@ impl Supervisor {
             }
         }
 
-        // The wait ends inside the time that the agent gives the plugin to
-        // leave by itself (`otel_bridge::shutdown`).
+        // The wait ends before the agent's SIGKILL (`otel_bridge::shutdown`).
         let _ = tokio::time::timeout(otel_bridge::shutdown::WORKERS_EXIT_WAIT, async {
             let (r1, r2, r3) = tokio::join!(
                 self.ingestor_child.child.wait(),
@@ -946,8 +945,9 @@ pub async fn run() -> anyhow::Result<()> {
         .context("failed to write TRUST_DURATIONS to agent")?;
 
     // The ledger is configured first, and the ingestor only after the
-    // ledger's `Ready`: the seq high-water file has one writer at a time
-    // (`otel_bridge`, "Handshake protocol"). The ledger's declarations are
+    // ledger's `Ready`: the ledger's start-up recovery must find no live
+    // writer of WAL files, and the seq high-water file has one writer at a
+    // time (`otel_bridge`, "Handshake protocol"). The ledger's declarations are
     // forwarded only after the ingestor's handshake also succeeded — bind
     // before declare (see `register_declarations`). A handshake failure here
     // returns straight out and ChildGuard SIGKILLs the remaining workers on

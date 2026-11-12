@@ -56,9 +56,11 @@ pub(crate) fn storage_unavailable(message: &'static str) -> tonic::Status {
 ///
 /// The task is cancelled when the plugin stops while the request waits for
 /// its sync: the runtime drops it. That is a normal end, not an error. The
-/// frames are in their WAL file, so the next start indexes them; the sender
-/// got no answer and sends the records again. A task that panicked is a
-/// defect of this plugin.
+/// frames are in their WAL file, so the next start indexes them. The sender
+/// gets `UNAVAILABLE` (or no answer, when its connection is gone first) and
+/// sends the records again. This is not a storage error, so it has its own
+/// status and the records are not counted as `failed`. A task that panicked
+/// is a defect of this plugin.
 pub(crate) fn export_task_ended(
     error: tokio::task::JoinError,
     what: &'static str,
@@ -67,7 +69,7 @@ pub(crate) fn export_task_ended(
         tracing::info!(
             "the plugin stopped before a {what} export was synced: it is not acknowledged"
         );
-        return storage_unavailable("the plugin is stopping");
+        return tonic::Status::unavailable("the plugin is stopping");
     }
 
     tracing::error!(%error, "the task that syncs and counts a {what} export failed");

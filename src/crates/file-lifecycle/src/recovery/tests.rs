@@ -27,8 +27,8 @@
 //!   per-catalog stat confirm/re-upload pass, its per-identity seq floor, and
 //!   the `remote_cataloged` seeds that gate `recover_retention` eviction.
 //!
-//! `recover_wals_*` runs the three WAL passes in their order with the real
-//! cleaner.
+//! `recover_wals_*` runs the three WAL passes with the real cleaner and
+//! pins their end state (it does not tell every wrong order apart).
 //!
 //! Not pinned here: `recover_unuploaded` has no direct test, and the caller wiring
 //! (otel-ledger `build_pipeline`: pass order, STARTUP_REMOTE_BUDGET, the
