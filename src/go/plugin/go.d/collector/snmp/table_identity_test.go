@@ -143,7 +143,8 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 					c.collectProfileTableMetrics(samples, metrics)
 					require.Len(t, c.tableMetricCharts, 2, "distinct MIB INDEX tuples require separate final charts")
 					ids := map[string]bool{}
-					for _, chart := range c.tableMetricCharts {
+					for _, state := range c.tableMetricCharts {
+						chart := state.chart
 						require.False(t, ids[chart.ID], "chart IDs must be unique")
 						ids[chart.ID] = true
 						require.Regexp(t, `^[a-zA-Z0-9_]+$`, chart.ID)
@@ -262,7 +263,8 @@ func TestTableIdentityAggregationAndDimensions(t *testing.T) {
 			samples = map[string]int64{}
 			c.collectProfileTableMetrics(samples, rows[:1])
 			require.Len(t, samples, 5)
-			for _, chart := range c.tableMetricCharts {
+			for _, state := range c.tableMetricCharts {
+				chart := state.chart
 				require.Len(t, chart.Dims, 5)
 				for _, dim := range chart.Dims {
 					require.Equal(t, rows[0].MultiValue[dim.Name], samples[dim.ID])
