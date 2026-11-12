@@ -8,10 +8,9 @@
 //! tenant's files can pass a count or a size limit. It also runs for every
 //! tenant on the ledger's periodic timer, because a file passes its age
 //! limit by time alone: a tenant with no new data has no rotation. Each
-//! pass collects
-//! decisions under the tenant registry's write lock, then marks entries
-//! pending deletion and dispatches the `CleanerRequest`s after dropping the
-//! lock. The cleaner's response handler completes the flow — success removes
+//! pass takes the tenant registry's write lock once: it decides, marks each
+//! entry pending deletion and sends its `CleanerRequest` under that one
+//! hold. The cleaner's response handler completes the flow — success removes
 //! the entry from the registry, failure un-marks it
 //! (`Ledger::handle_cleaner_resp`, `ledger/cleaner.rs`).
 
@@ -70,24 +69,22 @@ impl Ledger {
     /// limits but stay, because remote storage has not confirmed their
     /// catalog entry yet.
     ///
-    /// Cancel-safety invariant: the mark-then-send-then-clear-on-failure
-    /// pattern below is only safe because `self.cleaner.send` is non-awaiting
-    /// (`ComponentHandle::send`, an unbounded mpsc send —
-    /// `file-lifecycle/src/component.rs`).
-    /// If this ever becomes awaiting (bounded channel with backpressure, RPC,
-    /// etc.), a dropped task between `mark_pending_deletion` and the matching
-    /// `clear_pending_deletion` would leave the file marked — hidden from
-    /// queries and future retention scans — with no in-flight cleaner request
-    /// and no rollback path. A cancellation-safe rollback (e.g. a clear-on-drop
-    /// guard) would have to come first.
+    /// A file that is marked for deletion is hidden from queries and from
+    /// later passes, so a mark must never be left with no delete on its way.
+    /// Each mark, its send and the rollback of a failed send happen under
+    /// one hold of the registries' lock with no `.await` in between: the
+    /// send only queues (`ComponentHandle::send`,
+    /// `file-lifecycle/src/component.rs`). The cleaner's answer completes
+    /// the flow: success removes the entry, failure takes the mark back
+    /// (`Ledger::handle_cleaner_resp`, `ledger/cleaner.rs`).
     pub(super) async fn evaluate_retention(
         &mut self,
         signal: Signal,
         tenant_id: &TenantId,
     ) -> usize {
-        // Resolve the per-tenant retention config and clone the registries
-        // handle up front, so nothing borrows `self` across the awaits below
-        // and the `&mut self` fields (uploader, cleaner) stay reachable.
+        // The per-tenant retention config and a clone of the registries
+        // handle, so that nothing borrows `self` while the lock is held and
+        // the cleaner stays reachable.
         let pipeline = self.pipelines.get(signal);
         let retention = pipeline
             .config()
@@ -102,113 +99,71 @@ impl Ledger {
         let catalog_days = catalog_retention_days(&retention);
         let today = chrono::Utc::now().date_naive();
 
-        // SFST retention pass — collect deletion requests under the
-        // write lock, then send them after dropping the guard.
-        let (sfst_reqs, deferred): (Vec<CleanerRequest>, usize) = {
-            let mut registries = registries.write().await;
-            let registry = match registries.get_mut(tenant_id) {
-                Some(r) => r,
-                None => return 0,
-            };
-
-            // The resolved config is lowered onto sfst's plain-data policy
-            // (`sfst_retention_policy`, `file-lifecycle/src/helpers.rs`); the
-            // registry walks the files oldest-first and says which to evict,
-            // and which it would evict if their catalog entry were already
-            // confirmed on the remote (`Registry::index_evictions`).
-            let evictions = registry.index_evictions(
-                &sfst_retention_policy(&retention),
-                now_ns(),
-                storage_enabled,
-            );
-            let deferred = evictions.deferred.len();
-            // One line per pass, not per file: the pass repeats on a timer.
-            if let Some(&oldest) = evictions.deferred.first() {
-                tracing::warn!(
-                    signal = signal.segment(),
-                    tenant = %tenant_id,
-                    "retention: {} index file(s) are over the limits and stay until their catalog \
-                     entries are confirmed on the remote (the oldest is seq={oldest})",
-                    evictions.deferred.len(),
-                );
-            }
-
-            let mut reqs = Vec::with_capacity(evictions.evict.len());
-            for seq in evictions.evict {
-                registry.sfst.mark_pending_deletion(seq);
-                if let Some(entry) = registry.sfst.get(seq) {
-                    let key = SeqKey::from(&entry.id);
-                    let path = registry.sfst.file_path(entry.id);
-                    tracing::info!("retention: evicting seq={key} path={}", path.display());
-                    reqs.push(CleanerRequest::DeleteIndexFile {
-                        pipeline_id: entry.id.pipeline_id,
-                        sequence: key,
-                        path,
-                    });
-                }
-            }
-            (reqs, deferred)
+        let mut registries = registries.write().await;
+        let Some(registry) = registries.get_mut(tenant_id) else {
+            return 0;
         };
 
-        // Send outside the lock. A failed send rolls back the mark here; a
-        // failed deletion is un-marked later by the cleaner's failure
-        // response (`Ledger::handle_cleaner_resp`).
-        for req in sfst_reqs {
-            let key = match &req {
-                CleanerRequest::DeleteIndexFile { sequence, .. } => *sequence,
-                _ => unreachable!(),
+        // Index files. The resolved config is lowered onto sfst's plain-data
+        // policy (`sfst_retention_policy`, `file-lifecycle/src/helpers.rs`);
+        // the registry walks the files oldest-first and says which to evict,
+        // and which it would evict if their catalog entry were already
+        // confirmed on the remote (`Registry::index_evictions`).
+        let evictions = registry.index_evictions(
+            &sfst_retention_policy(&retention),
+            now_ns(),
+            storage_enabled,
+        );
+        let deferred = evictions.deferred.len();
+        // One line per pass, not per file: the pass repeats on a timer.
+        if let Some(&oldest) = evictions.deferred.first() {
+            tracing::warn!(
+                signal = signal.segment(),
+                tenant = %tenant_id,
+                "retention: {deferred} index file(s) are over the limits and stay until their \
+                 catalog entries are confirmed on the remote (the oldest is seq={oldest})",
+            );
+        }
+
+        for seq in evictions.evict {
+            let Some(entry) = registry.sfst.get(seq) else {
+                continue;
             };
-            if let Err(e) = self.cleaner.send(req) {
+            let key = SeqKey::from(&entry.id);
+            let path = registry.sfst.file_path(entry.id);
+            tracing::info!("retention: evicting seq={key} path={}", path.display());
+            let request = CleanerRequest::DeleteIndexFile {
+                pipeline_id: entry.id.pipeline_id,
+                sequence: key,
+                path,
+            };
+
+            registry.sfst.mark_pending_deletion(seq);
+            if let Err(e) = self.cleaner.send(request) {
                 tracing::error!("failed to send index eviction seq={key}: {e}");
-                let mut registries = registries.write().await;
-                if let Some(registry) = registries.get_mut(tenant_id) {
-                    registry.sfst.clear_pending_deletion(key.seq);
-                }
+                registry.sfst.clear_pending_deletion(seq);
             }
         }
 
-        // Catalog retention pass. Day count from the tenant's remote-archive
-        // `horizon` (decoupled from SFST `max_age`; config load enforces
-        // horizon > max_age in day units so a catalog file always outlives the
-        // SFSTs it gates) — see `catalog_retention_days`. A catalog file is
-        // evicted when its date is strictly older than `today - max_days`.
-        let catalog_reqs: Vec<CleanerRequest> = {
-            let mut registries = registries.write().await;
-            let registry = match registries.get_mut(tenant_id) {
-                Some(r) => r,
-                None => return deferred,
+        // Catalog files. Day count from the tenant's remote-archive `horizon`
+        // (decoupled from SFST `max_age`; config load enforces horizon >
+        // max_age in day units so a catalog file always outlives the SFSTs it
+        // gates) — see `catalog_retention_days`. A catalog file is evicted
+        // when its date is strictly older than `today - max_days`.
+        let expired = registry
+            .catalog_files
+            .evaluate_retention(catalog_days, today);
+        for path in expired {
+            tracing::info!("retention: evicting catalog path={}", path.display());
+            let request = CleanerRequest::DeleteCatalogFile {
+                pipeline_id: signal.pipeline_id(),
+                path: path.clone(),
             };
-            let to_evict_catalog = registry
-                .catalog_files
-                .evaluate_retention(catalog_days, today);
-            let mut reqs = Vec::with_capacity(to_evict_catalog.len());
-            for path in to_evict_catalog {
-                registry.catalog_files.mark_pending_deletion(&path);
-                tracing::info!("retention: evicting catalog path={}", path.display());
-                reqs.push(CleanerRequest::DeleteCatalogFile {
-                    pipeline_id: signal.pipeline_id(),
-                    path,
-                });
-            }
-            reqs
-        };
 
-        // Same dispatch pattern as the SFST pass, with the catalog failure
-        // rollback in `Ledger::handle_cleaner_resp`.
-        for req in catalog_reqs {
-            let path = match &req {
-                CleanerRequest::DeleteCatalogFile { path, .. } => path.clone(),
-                _ => unreachable!(),
-            };
-            if let Err(e) = self.cleaner.send(req) {
-                tracing::error!(
-                    path = %path.display(),
-                    "failed to send catalog eviction: {e}",
-                );
-                let mut registries = registries.write().await;
-                if let Some(registry) = registries.get_mut(tenant_id) {
-                    registry.catalog_files.clear_pending_deletion(&path);
-                }
+            registry.catalog_files.mark_pending_deletion(&path);
+            if let Err(e) = self.cleaner.send(request) {
+                tracing::error!(path = %path.display(), "failed to send catalog eviction: {e}");
+                registry.catalog_files.clear_pending_deletion(&path);
             }
         }
 
