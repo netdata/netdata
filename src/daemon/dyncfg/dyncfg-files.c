@@ -268,7 +268,7 @@ void dyncfg_file_load(const char *d_name) {
     snprintf(fixed_filename, sizeof(fixed_filename), "%s/%s.dyncfg", dyncfg_globals.dir, fixed_id);
 
     if(strcmp(filename, fixed_filename) != 0) {
-        if(rename(filename, fixed_filename) != 0)
+        if(os_rename(filename, fixed_filename) != 0)
             nd_log(NDLS_DAEMON, NDLP_ERR,
                 "DYNCFG: cannot rename file '%s' into '%s'. Saving a new configuraton may not overwrite the old one.",
                 filename, fixed_filename);
@@ -284,7 +284,8 @@ void dyncfg_load_all(void) {
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strendswith(entry->d_name, ".dyncfg"))
+        unsigned char type = nd_dirent_type(dyncfg_globals.dir, entry);
+        if ((type == DT_REG || type == DT_LNK) && strendswith(entry->d_name, ".dyncfg"))
             dyncfg_file_load(entry->d_name);
     }
 
@@ -296,10 +297,7 @@ void dyncfg_load_all(void) {
 
 static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
     struct stat st = { 0 };
-    if(stat(filename, &st) != 0 || !S_ISREG(st.st_mode))
-        return false;
-
-    int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK, 0666);
+    int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     if(unlikely(fd == -1))
         return false;
 

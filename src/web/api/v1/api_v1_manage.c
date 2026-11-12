@@ -18,7 +18,11 @@ static char *get_mgmt_api_key(void) {
     int fd = -1;
 #ifdef O_NOFOLLOW
     if(lstat(api_key_filename, &st) == 0 && S_ISREG(st.st_mode))
+#if defined(OS_WINDOWS)
+        fd = nd_open_no_follow(api_key_filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK, 0);
+#else
         fd = open(api_key_filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW);
+#endif
 #else
     if(stat(api_key_filename, &st) == 0 && S_ISREG(st.st_mode))
         fd = open(api_key_filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
@@ -60,7 +64,11 @@ static char *get_mgmt_api_key(void) {
             goto temp_key;
         }
 
+#if defined(OS_WINDOWS)
+        fd = nd_open_no_follow(api_key_filename, O_RDWR|O_CREAT|O_CLOEXEC|O_NONBLOCK, 0600);
+#else
         fd = open(api_key_filename, O_RDWR|O_CREAT|O_CLOEXEC|O_NONBLOCK|O_NOFOLLOW, 0600);
+#endif
         if(fd == -1) {
             netdata_log_error("Cannot create unique management API key file '%s'. Please adjust config parameter 'netdata management api key file' to a proper path and file.", api_key_filename);
             goto temp_key;

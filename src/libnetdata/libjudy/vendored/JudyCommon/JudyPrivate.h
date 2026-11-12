@@ -307,7 +307,7 @@ typedef int bool_t;
 
 // A word that is all-ones, normally equal to -1UL, but safer with ~0:
 
-#define cJU_ALLONES  (~0UL)
+#define cJU_ALLONES  (~(Word_t)0)
 
 // Note, these are forward references, but thats OK:
 
@@ -411,7 +411,7 @@ typedef PWord_t Pjv_t;   // pointer to JudyL value area.
 // processors.
 
 #define JU_LEASTBYTESMASK(BYTES) \
-        ((0x100UL << (cJU_BITSPERBYTE * ((BYTES) - 1))) - 1)
+        (((Word_t)0x100 << (cJU_BITSPERBYTE * ((BYTES) - 1))) - 1)
 
 #define JU_LEASTBYTES(INDEX,BYTES)  ((INDEX) & JU_LEASTBYTESMASK(BYTES))
 
@@ -802,7 +802,20 @@ static inline BITMAPL_t j__udyCountBitsL(BITMAPL_t word)
 // TBD:  Perhaps use an array[32] of masks instead of calculating them.
 
 #define JU_BITPOSMASKB(BITNUM) (1L << ((BITNUM) % cJU_BITSPERSUBEXPB))
+// On Windows LLP64 builds (MSVC, MinGW/UCRT64, etc.), `long` is 32 bits even in
+// 64-bit mode, so `(1L << N)` for N >= 32 is undefined behavior. We must use
+// the BITMAPL_t (uint64_t on 64-bit) constant shift. The guard uses the
+// compiler-defined _WIN32 instead of Netdata's OS_WINDOWS because the vendored
+// Judy sources do not include libnetdata-platform-fwd.h and thus OS_WINDOWS is
+// not defined when these TUs compile -- the previous OS_WINDOWS guard was inert
+// and the UB path ran on every Windows build, corrupting Judy bitmap leaves
+// during cascades and surfacing as STATUS_HEAP_CORRUPTION-equivalent crashes
+// inside RtlAllocateHeap.
+#ifdef _WIN32
+#define JU_BITPOSMASKL(BITNUM) ((BITMAPL_t)1 << ((BITNUM) % cJU_BITSPERSUBEXPL))
+#else
 #define JU_BITPOSMASKL(BITNUM) (1L << ((BITNUM) % cJU_BITSPERSUBEXPL))
+#endif
 
 
 // TEST/SET/CLEAR A BIT IN A BITMAP LEAF:

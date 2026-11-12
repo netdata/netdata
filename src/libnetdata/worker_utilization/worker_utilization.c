@@ -396,7 +396,7 @@ void worker_utilization_cleanup(void) {
         JudyLFreeArray(&workers_globals.workers_JudyL, PJE0);
         workers_globals.workers_JudyL = NULL;
     }
-    
+
     if (workers_globals.worknames_JudyL) {
         JudyLFreeArray(&workers_globals.worknames_JudyL, PJE0);
         workers_globals.worknames_JudyL = NULL;

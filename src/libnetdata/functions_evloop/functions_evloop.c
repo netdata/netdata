@@ -436,7 +436,8 @@ static void functions_evloop_config_cb(const char *transaction, char *function, 
     pluginsd_function_result_begin_to_stdout(transaction, code, content_type_id2string(result->content_type), result->expires);
     printf("%s", buffer_tostring(result));
     pluginsd_function_result_end_to_stdout();
-    fflush(stdout);
+    if (unlikely(!pluginsd_flush_stdout()))
+        fatal("Cannot write to Netdata on stdout");
     netdata_mutex_unlock(wg->stdout_mutex);
 }
 
@@ -475,7 +476,8 @@ void functions_evloop_dyncfg_add(struct functions_evloop_globals *wg, const char
             (HTTP_ACCESS_FORMAT_CAST)view_access,
             (HTTP_ACCESS_FORMAT_CAST)edit_access
     );
-    fflush(stdout);
+    if (unlikely(!pluginsd_flush_stdout()))
+        fatal("Cannot write to Netdata on stdout");
 
     netdata_mutex_unlock(wg->stdout_mutex);
 }
@@ -493,7 +495,8 @@ void functions_evloop_dyncfg_del(struct functions_evloop_globals *wg, const char
     fprintf(stdout,
             PLUGINSD_KEYWORD_CONFIG " %s " PLUGINSD_KEYWORD_CONFIG_ACTION_DELETE "\n",
             id);
-    fflush(stdout);
+    if (unlikely(!pluginsd_flush_stdout()))
+        fatal("Cannot write to Netdata on stdout");
 
     netdata_mutex_unlock(wg->stdout_mutex);
 }
@@ -510,7 +513,8 @@ void functions_evloop_dyncfg_status(struct functions_evloop_globals *wg, const c
             PLUGINSD_KEYWORD_CONFIG " %s " PLUGINSD_KEYWORD_CONFIG_ACTION_STATUS " %s\n",
             id, dyncfg_id2status(status));
 
-    fflush(stdout);
+    if (unlikely(!pluginsd_flush_stdout()))
+        fatal("Cannot write to Netdata on stdout");
 
     netdata_mutex_unlock(wg->stdout_mutex);
 }
