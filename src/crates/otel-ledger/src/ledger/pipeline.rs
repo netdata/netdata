@@ -38,10 +38,7 @@ use file_lifecycle::ipc::{
     CleanerRequest, CleanerResponse, IndexerRequest, IndexerResponse, UploaderRequest,
     UploaderResponse,
 };
-use file_lifecycle::recovery::{
-    drain_wal_deletes, recover_orphaned_wals, recover_retention, recover_unindexed,
-    recover_unuploaded,
-};
+use file_lifecycle::recovery::{recover_retention, recover_unuploaded, recover_wals};
 use file_lifecycle::registry::TenantRegistries;
 use file_lifecycle::storage::OpendalStorage;
 
@@ -148,19 +145,18 @@ where
     // Populate routing and run recovery per tenant.
     //
     // Recovery order matters:
-    //   1. Delete orphaned WALs (have .sfst, WAL is redundant)
-    //   2. Index unindexed WALs (no .sfst yet)
-    //   3. Drain the WAL deletes step 2 sent to the cleaner
-    //   4. Seed rotated / uploaded state from local catalog files
-    //   5. LIST remote (if enabled) → mark uploaded and
+    //   1. The WAL files of the last run: delete the indexed ones, index
+    //      the others (`recover_wals`, which owns the order of its passes)
+    //   2. Seed rotated / uploaded state from local catalog files
+    //   3. LIST remote (if enabled) → mark uploaded and
     //      re-send uncataloged entries to the catalog builder
-    //   6. Stat local catalogs on the remote; re-upload missing ones, or
+    //   4. Stat local catalogs on the remote; re-upload missing ones, or
     //      un-mark their .sfst files that the remote lacks too
-    //      (only when 5 succeeded — also seeds the eviction gate)
-    //   7. Queue uploads of un-uploaded .sfst files, those of 6 included
+    //      (only when 3 succeeded — also seeds the eviction gate)
+    //   5. Queue uploads of un-uploaded .sfst files, those of 4 included
     //      (fire-and-forget; success → AddEntry, handled once the run
     //      loop starts)
-    //   8. Evaluate retention (rotated state already reflects disk)
+    //   6. Evaluate retention (rotated state already reflects disk)
     let mut seq_routes: Vec<(u64, TenantId)> = Vec::new();
     for (tenant_id, registry) in registries.iter_mut() {
         for file in registry.wal.archived_files() {
@@ -170,9 +166,7 @@ where
             seq_routes.push((file.id.seq, tenant_id.clone()));
         }
 
-        recover_orphaned_wals(registry, cleaner).await?;
-        recover_unindexed(registry, &mut indexer, cleaner).await?;
-        drain_wal_deletes(registry, cleaner).await?;
+        recover_wals(registry, &mut indexer, cleaner).await?;
 
         file_lifecycle::recovery::seed_from_catalog_files(
             registry,

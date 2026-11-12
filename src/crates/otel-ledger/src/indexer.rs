@@ -39,7 +39,7 @@
 //! through a temporary file and leaves its WAL file alone, and the next start
 //! indexes the file again.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -425,6 +425,57 @@ fn usage_text(usage: Usage) -> String {
     )
 }
 
+/// The indexing operations that run, each in a task of its own, with the
+/// file of each. It keeps one rule: every operation that starts gives one
+/// response, also when its task ends without one (it panicked). Start-up
+/// recovery waits for exactly one response per request, with no time limit
+/// (`file_lifecycle::component::batch_recover`).
+#[derive(Default)]
+struct RunningOperations {
+    tasks: JoinSet<(IndexerResponse, Option<Measured>)>,
+    files: HashMap<tokio::task::Id, FileId>,
+}
+
+impl RunningOperations {
+    /// Run `operation`, which indexes the file `file_id`, in a new task.
+    fn spawn(
+        &mut self,
+        file_id: FileId,
+        operation: impl Future<Output = (IndexerResponse, Option<Measured>)> + Send + 'static,
+    ) {
+        let task = self.tasks.spawn(operation);
+        self.files.insert(task.id(), file_id);
+    }
+
+    /// The response of the next operation that ends, with what it measured.
+    /// `None` when no operation runs. Cancel safe.
+    async fn next(&mut self) -> Option<(IndexerResponse, Option<Measured>)> {
+        loop {
+            match self.tasks.join_next_with_id().await? {
+                Ok((task, ended)) => {
+                    self.files.remove(&task);
+                    return Some(ended);
+                }
+                Err(e) => {
+                    // Every task is in `files`: the loop only guards the map.
+                    let Some(file_id) = self.files.remove(&e.id()) else {
+                        continue;
+                    };
+                    tracing::error!(
+                        file = %file_id.to_filename("wal"),
+                        "the task of an indexing operation ended without a response: {e}",
+                    );
+                    let response = IndexerResponse::IndexFailed {
+                        file_id,
+                        error: format!("the task of the indexing operation failed: {e}"),
+                    };
+                    return Some((response, None));
+                }
+            }
+        }
+    }
+}
+
 /// The indexer component: a unit struct — all state lives in
 /// `Component::run`'s locals; one instance per signal pipeline.
 pub struct Indexer;
@@ -443,7 +494,7 @@ impl Component for Indexer {
         let mut expected_memory = ExpectedMemory::default();
         // Dropped when the loop exits, which abandons the operations still in
         // it.
-        let mut operations = JoinSet::new();
+        let mut operations = RunningOperations::default();
 
         loop {
             tokio::select! {
@@ -464,19 +515,15 @@ impl Component for Indexer {
                             decoded_size,
                             expected,
                         );
-                        operations.spawn(operation);
+                        operations.spawn(file_id, operation);
                     }
                     None => break,
                 },
-                Some(ended) = operations.join_next() => {
-                    // An operation task ends without a response only if it
-                    // panicked: there is nothing to forward then.
-                    if let Ok((response, measured)) = ended {
-                        if let Some(measured) = measured {
-                            expected_memory.learn(measured.decoded_size, measured.peak_memory);
-                        }
-                        let _ = tx.send(response);
+                Some((response, measured)) = operations.next() => {
+                    if let Some(measured) = measured {
+                        expected_memory.learn(measured.decoded_size, measured.peak_memory);
                     }
+                    let _ = tx.send(response);
                 }
             }
         }
@@ -492,6 +539,23 @@ mod tests {
     /// The id of the test file with `seq`.
     fn file_id(seq: u64) -> FileId {
         crate::ledger::traces_fixtures::test_file_id(seq)
+    }
+
+    #[tokio::test]
+    async fn an_operation_whose_task_panics_still_gives_its_one_response() {
+        let mut operations = RunningOperations::default();
+        operations.spawn(file_id(7), async {
+            panic!("a defect in an indexing operation")
+        });
+
+        let (response, measured) = operations.next().await.unwrap();
+
+        assert!(matches!(
+            response,
+            IndexerResponse::IndexFailed { file_id: failed, .. } if failed == file_id(7)
+        ));
+        assert!(measured.is_none());
+        assert!(operations.next().await.is_none());
     }
 
     /// The WAL file name of [`file_id`]`(seq)`, under `dir`. The file need

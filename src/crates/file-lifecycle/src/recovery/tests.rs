@@ -27,8 +27,10 @@
 //!   per-catalog stat confirm/re-upload pass, its per-identity seq floor, and
 //!   the `remote_cataloged` seeds that gate `recover_retention` eviction.
 //!
-//! Not pinned here: `recover_orphaned_wals`, `drain_wal_deletes` and
-//! `recover_unuploaded` have no direct test, and the caller wiring
+//! `recover_wals_*` runs the three WAL passes in their order with the real
+//! cleaner.
+//!
+//! Not pinned here: `recover_unuploaded` has no direct test, and the caller wiring
 //! (otel-ledger `build_pipeline`: pass order, STARTUP_REMOTE_BUDGET, the
 //! remote_ok skip policy) is exercised only through the Err/skip contracts the
 //! passes themselves expose.
@@ -1632,6 +1634,106 @@ impl crate::component::Component for IdleCleaner {
             panic!("the orphan path must send no cleaner requests, got: {req:?}");
         }
     }
+}
+
+/// Indexer mock that answers every request with a one-record index (it
+/// writes no file).
+struct IndexingStub;
+
+impl crate::component::Component for IndexingStub {
+    type Request = crate::ipc::IndexerRequest;
+    type Response = crate::ipc::IndexerResponse;
+    type Args = ();
+
+    async fn run(
+        _args: (),
+        mut rx: tokio::sync::mpsc::UnboundedReceiver<Self::Request>,
+        tx: tokio::sync::mpsc::UnboundedSender<Self::Response>,
+        _cancel: tokio_util::sync::CancellationToken,
+    ) {
+        while let Some(req) = rx.recv().await {
+            let crate::ipc::IndexerRequest::Index { file_id, .. } = req;
+            let _ = tx.send(crate::ipc::IndexerResponse::Indexed {
+                file_id,
+                summary: crate::test_helpers::summary_for("", "", 1, 0, 0),
+                size: file_registry::ByteSize(0),
+            });
+        }
+    }
+}
+
+#[tokio::test]
+async fn recover_wals_deletes_the_indexed_wal_indexes_the_other_and_owes_the_cleaner_nothing() {
+    // Two WAL files of the last run: the first already has its index (a
+    // stop between the index and the WAL delete), the second has none.
+    let wal_dir = tempfile::tempdir().unwrap();
+    let seq_alloc = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(
+        wal_dir.path(),
+        wal::Config::default(),
+        seq_alloc,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: 7,
+        },
+        ident(),
+    )
+    .unwrap();
+    for partition_key in [1, 2] {
+        let meta = wal::FrameMeta {
+            entry_count: 1,
+            ingestion_ns: file_registry::TimestampNs(partition_key),
+            log_ts_range: None,
+        };
+        writer
+            .write_frame(partition_key, &[], b"frame", meta)
+            .unwrap();
+    }
+    writer.shutdown_all().unwrap();
+
+    let mut wal_reg = wal::Registry::new(wal_dir.path());
+    wal_reg.recover().unwrap();
+    let sfst_dir = tempfile::tempdir().unwrap();
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut registry = Registry::new(
+        wal_reg,
+        sfst::Registry::new(sfst_dir.path()),
+        otel_catalog::Registry::new(catalog_dir.path(), TenantId::from("tenant1")),
+    );
+    let ids = registry.unindexed_ids();
+    assert_eq!(ids.len(), 2);
+    let (indexed, unindexed) = (ids[0], ids[1]);
+    registry.sfst.track(
+        indexed,
+        file_registry::ByteSize(1),
+        crate::test_helpers::summary_for("", "", 1, 0, 0),
+    );
+    let wal_paths = [
+        registry.wal.file_path(indexed),
+        registry.wal.file_path(unindexed),
+    ];
+
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut indexer = crate::component::ComponentHandle::spawn::<IndexingStub>((), cancel.clone());
+    let mut cleaner =
+        crate::component::ComponentHandle::spawn::<crate::cleaner::Cleaner>((), cancel.clone());
+
+    recover_wals(&mut registry, &mut indexer, &mut cleaner)
+        .await
+        .unwrap();
+
+    // Every answer of the cleaner was taken by the pass that asked for it.
+    assert_eq!(cleaner.pending(), 0);
+    for (id, path) in [indexed, unindexed].iter().zip(&wal_paths) {
+        assert!(registry.wal.get(id.seq).is_none(), "WAL entry untracked");
+        assert!(!path.exists(), "WAL file deleted");
+    }
+    assert!(
+        registry.sfst.get(unindexed.seq).is_some(),
+        "the new index is tracked"
+    );
+
+    cancel.cancel();
 }
 
 #[tokio::test]

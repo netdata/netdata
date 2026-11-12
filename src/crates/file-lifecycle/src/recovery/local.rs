@@ -11,19 +11,18 @@
 //! `build_pipeline` (otel-ledger/src/ledger/pipeline.rs) drives these per
 //! tenant of each signal, in this order:
 //!
-//! 1. [`recover_orphaned_wals`] — delete WALs whose SFST already exists.
-//! 2. [`recover_unindexed`] — index WALs with no SFST yet; an unindexable one
-//!    stays on disk as an untracked orphan (see its doc).
-//! 3. [`drain_wal_deletes`] — drain the WAL-delete responses pass 2 fired at
-//!    the shared cleaner as side effects.
-//! 4. [`seed_from_catalog_files`] — replay local catalog files into the
+//! 1. [`recover_wals`] — the WAL files left by the last run: delete those
+//!    whose SFST already exists, index the others, and take the answers of
+//!    the WAL deletes that the indexing sent. It owns the order of its three
+//!    passes.
+//! 2. [`seed_from_catalog_files`] — replay local catalog files into the
 //!    uploaded / rotated state.
-//! 5. [`recover_retention`] — evict SFSTs and catalogs per retention, SFST
+//! 3. [`recover_retention`] — evict SFSTs and catalogs per retention, SFST
 //!    eviction gated on remote-cataloged confirmation.
 //!
-//! The remote phase queues its uploads fire-and-forget between passes 4 and 5
-//! (never awaited — `recovery/remote.rs`); these three deletion/indexing
-//! passes are recovery's only [`batch_recover`] users.
+//! The remote phase queues its uploads fire-and-forget between passes 2 and 3
+//! (never awaited — `recovery/remote.rs`); the passes of [`recover_wals`] and
+//! [`recover_retention`] are recovery's only [`batch_recover`] users.
 //!
 //! Error semantics (component.rs's contract): a dead worker channel
 //! mid-batch or mid-drain is the fatal `anyhow` error that fails startup;
@@ -44,6 +43,31 @@ use crate::registry::Registry;
 
 use super::now_ns;
 
+/// The WAL files that the last run left for a tenant, in three passes:
+///
+/// 1. `recover_orphaned_wals` deletes the WAL files whose SFST exists.
+/// 2. `recover_unindexed` indexes the others. Each success sends a WAL
+///    delete to the cleaner and does not wait for its answer.
+/// 3. `drain_wal_deletes` takes those answers.
+///
+/// The order is a rule of the shared cleaner, and this function is its one
+/// owner. [`batch_recover`] takes exactly as many answers as it sent
+/// requests, whatever they answer; [`drain_pending`] takes every answer that
+/// is still owed. So pass 1 must take its own answers before pass 2 sends
+/// deletes, and pass 3 must take the answers of pass 2 before anything else
+/// uses the cleaner ([`recover_retention`], the ledger's run loop):
+/// otherwise a pass takes an answer that is not its own, a WAL file that is
+/// gone stays tracked, and a pass waits for an answer that another one took.
+pub async fn recover_wals(
+    registry: &mut Registry,
+    indexer: &mut ComponentHandle<IndexerRequest, IndexerResponse>,
+    cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
+) -> anyhow::Result<()> {
+    recover_orphaned_wals(registry, cleaner).await?;
+    recover_unindexed(registry, indexer, cleaner).await?;
+    drain_wal_deletes(registry, cleaner).await
+}
+
 /// Index the tenant's archived WALs that have no SFST entry yet
 /// (`Registry::unindexed_ids`) as one [`batch_recover`] over the per-pipeline
 /// indexer. A success tracks the SFST in the registry and fires a
@@ -59,7 +83,7 @@ use super::now_ns;
 /// indexing operation, and re-orphans it on failure — so a transient cause
 /// (e.g. a disk error) self-heals, while an undecodable file is retried and
 /// logged once per restart, never silently dropped.
-pub async fn recover_unindexed(
+pub(crate) async fn recover_unindexed(
     registry: &mut Registry,
     indexer: &mut ComponentHandle<IndexerRequest, IndexerResponse>,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
@@ -156,13 +180,13 @@ pub async fn recover_unindexed(
 /// are consumed by the wrong handler.
 ///
 /// This is [`drain_pending`]'s production target (per component.rs): the
-/// precondition holds because the earlier cleaner round
-/// ([`recover_orphaned_wals`]) was consumed 1:1 by its own `batch_recover`,
-/// so the pending counter counts only these fire-and-forget sends. A failed
+/// precondition holds because [`recover_wals`] runs it right after the
+/// passes whose answers it must not see, so the pending counter counts only
+/// these fire-and-forget sends. A failed
 /// delete logs and leaves the WAL tracked — it keeps its SFST, so the next
 /// restart's [`recover_orphaned_wals`] retries; a cleaner that dies mid-drain
 /// is the fatal `anyhow` error of [`drain_pending`].
-pub async fn drain_wal_deletes(
+pub(crate) async fn drain_wal_deletes(
     registry: &mut Registry,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
 ) -> anyhow::Result<()> {
@@ -190,7 +214,7 @@ pub async fn drain_wal_deletes(
 /// `sfst::IndexWriter::write_file`), so its presence guarantees a complete
 /// index and the WAL is safe to delete. A failed delete logs and leaves the
 /// WAL tracked; the next restart retries.
-pub async fn recover_orphaned_wals(
+pub(crate) async fn recover_orphaned_wals(
     registry: &mut Registry,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
 ) -> anyhow::Result<()> {
