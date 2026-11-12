@@ -10,10 +10,22 @@ use netdata_plugin_metrics::{
 use otel_bridge::signals::Signal;
 
 columns! {
-    /// What became of the records of an export.
+    /// What became of the data points of a metrics export.
     enum Acceptance {
         Accepted = "accepted",
         Rejected = "rejected",
+    }
+}
+
+columns! {
+    /// What became of the records of a logs or traces export. `Failed`: the
+    /// plugin could not store them (a storage error) and told the sender so;
+    /// the sender sends them again. A metrics export stores nothing, so its
+    /// chart has no such dimension.
+    enum Storing {
+        Accepted = "accepted",
+        Rejected = "rejected",
+        Failed = "failed",
     }
 }
 
@@ -43,8 +55,8 @@ pub(crate) struct IngestOutcomes {
     metric_set: MetricSet,
     aggregator: SharedAggregator,
     metric_data_points: Counter<Acceptance>,
-    log_records: Counter<Acceptance>,
-    spans: Counter<Acceptance>,
+    log_records: Counter<Storing>,
+    spans: Counter<Storing>,
 }
 
 impl IngestOutcomes {
@@ -58,7 +70,7 @@ impl IngestOutcomes {
             chart_type: ChartType::Stacked,
             priority: 149_999,
         })?;
-        let log_records = builder.counter::<Acceptance>(ChartDescriptor {
+        let log_records = builder.counter::<Storing>(ChartDescriptor {
             title: "OpenTelemetry log records received".into(),
             units: "records/s".into(),
             family: "ingest".into(),
@@ -66,7 +78,7 @@ impl IngestOutcomes {
             chart_type: ChartType::Stacked,
             priority: 150_000,
         })?;
-        let spans = builder.counter::<Acceptance>(ChartDescriptor {
+        let spans = builder.counter::<Storing>(ChartDescriptor {
             title: "OpenTelemetry spans received".into(),
             units: "spans/s".into(),
             family: "ingest".into(),
@@ -88,26 +100,52 @@ impl IngestOutcomes {
     /// Count the outcome of one export request of `signal` at `now` (Unix
     /// seconds): records stored and records rejected.
     pub(crate) fn record(&self, signal: Signal, accepted: u64, rejected: u64, now: u64) {
-        let counter = match signal {
+        let counter = self.counter_of(signal);
+        let mut batch = Batch::new(&self.metric_set);
+        batch
+            .entity(Labels::new())
+            .record(now)
+            .add(counter, Storing::Accepted, accepted as f64)
+            .add(counter, Storing::Rejected, rejected as f64);
+        self.aggregator.merge(batch, now);
+    }
+
+    /// Count the records of one export request of `signal` that the plugin
+    /// could not store, at `now` (Unix seconds).
+    pub(crate) fn record_failed(&self, signal: Signal, failed: u64, now: u64) {
+        let counter = self.counter_of(signal);
+        let mut batch = Batch::new(&self.metric_set);
+        batch
+            .entity(Labels::new())
+            .record(now)
+            .add(counter, Storing::Failed, failed as f64);
+        self.aggregator.merge(batch, now);
+    }
+
+    fn counter_of(&self, signal: Signal) -> Counter<Storing> {
+        match signal {
             Signal::Logs => self.log_records,
             Signal::Traces => self.spans,
-        };
-        self.count(counter, accepted, rejected, now);
+        }
     }
 
     /// Count the outcome of one metrics export request at `now` (Unix
     /// seconds): data points charted and data points dropped.
     pub(crate) fn record_metric_data_points(&self, accepted: u64, rejected: u64, now: u64) {
-        self.count(self.metric_data_points, accepted, rejected, now);
-    }
-
-    fn count(&self, counter: Counter<Acceptance>, accepted: u64, rejected: u64, now: u64) {
         let mut batch = Batch::new(&self.metric_set);
         batch
             .entity(Labels::new())
             .record(now)
-            .add(counter, Acceptance::Accepted, accepted as f64)
-            .add(counter, Acceptance::Rejected, rejected as f64);
+            .add(
+                self.metric_data_points,
+                Acceptance::Accepted,
+                accepted as f64,
+            )
+            .add(
+                self.metric_data_points,
+                Acceptance::Rejected,
+                rejected as f64,
+            );
         self.aggregator.merge(batch, now);
     }
 
@@ -241,15 +279,17 @@ mod tests {
         let outcomes = IngestOutcomes::new().unwrap();
         outcomes.record(Signal::Traces, 7, 2, 100);
         outcomes.record(Signal::Logs, 3, 0, 100);
+        // An export of 5 log records that could not be stored.
+        outcomes.record_failed(Signal::Logs, 5, 100);
         let mut chunks = Vec::new();
         outcomes.emit(101, &mut chunks);
         let out = readable(chunks);
         netdata_plugin_protocol::validate_chart_stream(out.as_bytes()).unwrap();
         assert!(out.contains(
-            "BEGIN netdata.otel.spans 1000000\nSET accepted = 7\nSET rejected = 2\nEND 101 0 1\n"
+            "BEGIN netdata.otel.spans 1000000\nSET accepted = 7\nSET rejected = 2\nSET failed = 0\nEND 101 0 1\n"
         ));
         assert!(out.contains(
-            "BEGIN netdata.otel.log_records 1000000\nSET accepted = 3\nSET rejected = 0\nEND 101 0 1\n"
+            "BEGIN netdata.otel.log_records 1000000\nSET accepted = 3\nSET rejected = 0\nSET failed = 5\nEND 101 0 1\n"
         ));
         assert!(out.contains("'netdata.otel.spans'"));
     }
@@ -279,7 +319,7 @@ mod tests {
         outcomes.emit(101, &mut chunks);
         let out = readable(chunks);
         assert!(out.contains("CHART netdata.otel.spans "));
-        assert!(out.contains("SET accepted = 0\nSET rejected = 0\n"));
+        assert!(out.contains("SET accepted = 0\nSET rejected = 0\nSET failed = 0\n"));
     }
 
     #[test]

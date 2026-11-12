@@ -397,7 +397,7 @@ modules:
               The plugin rejects an export request larger than 4 MiB as a whole, and the Collector drops that batch. Make the batches smaller. On the exporter, cap them by size with `sending_queue: { batch: { sizer: bytes, max_size: 3000000 } }`. Alternatively, lower `send_batch_max_size` on the `batch` processor; it counts items (spans, data points, log records), not bytes.
           - name: The Collector reports `Unavailable` or HTTP 503 for logs or traces
             description: |
-              The plugin could not store the data: its disk is full, or a write to its disk failed. It answers `UNAVAILABLE` (HTTP 503) with `WAL write error`, `WAL sync error` or `WAL writer creation failed`, and the Agent journal has an error from `otel-plugin/ingestor`. The Collector keeps the batch and sends it again, so no data is lost while its retry settings allow it. Make room on the disk that holds `base_dir`, or repair it. One failure can refuse more than one batch of the same tenant, and a refused batch can be on the disk in part or in full. When the Collector sends such a batch again, the plugin stores it again, so some records can appear two times.
+              The plugin could not store the data: its disk is full, or a write to its disk failed. It answers `UNAVAILABLE` (HTTP 503) with `WAL write error`, `WAL sync error` or `WAL writer creation failed`, and the Agent journal has an error from `otel-plugin/ingestor`. The Collector keeps the batch and sends it again, so no data is lost while its retry settings allow it. The charts `netdata.otel.log_records` and `netdata.otel.spans` show these records on their `failed` dimension. Make room on the disk that holds `base_dir`, or repair it. One failure can refuse more than one batch of the same tenant, and a refused batch can be on the disk in part or in full. When the Collector sends such a batch again, the plugin stores it again, so some records can appear two times.
           - name: Some exported metric data points are missing
             description: |
               The plugin rejects a metric data point when its timestamp is further from the current time than the expiry of its chart (`metrics.expiry_duration_secs`, 15 minutes by default), in the past or in the future. The chart `netdata.otel.metric_data_points` shows these data points on its `rejected` dimension, and the plugin logs a warning in the Agent journal. Check the clock of the host that produced the metrics. The plugin also rejects a data point when the name of its metric or of its dimension is longer than 255 bytes, and when its chart already has 4,096 dimensions. For a histogram or a summary, the plugin leaves out the buckets or quantiles that do not fit and does not reject the data point. A chart keeps at most 1,024 labels. When the attributes of a metric give more labels, the plugin leaves out the rest.
@@ -417,7 +417,7 @@ modules:
       description: |
         Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
 
-        The plugin also makes charts about the data it receives, listed below. These charts count the records of an export only when the plugin accepts the export, even when it rejects some of its records. An export that fails does not show on these charts.
+        The plugin also makes charts about the data it receives, listed below. These charts count the records of an export when the plugin accepts the export, even when it rejects some of its records. When the plugin cannot store the records of an export of logs or spans (a storage error), the records show as `failed`, and the sender sends them again. An export that fails for another reason does not show on these charts.
       availability: []
       dynamic_context_prefixes:
         - prefix: otel.
@@ -443,6 +443,7 @@ modules:
               dimensions:
                 - name: accepted
                 - name: rejected
+                - name: failed
             - name: netdata.otel.spans
               description: OpenTelemetry spans received
               unit: spans/s
@@ -450,6 +451,7 @@ modules:
               dimensions:
                 - name: accepted
                 - name: rejected
+                - name: failed
             - name: netdata.otel.indexing_operations
               description: Indexing operations running and waiting
               unit: operations

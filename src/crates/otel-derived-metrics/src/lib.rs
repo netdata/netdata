@@ -142,6 +142,14 @@ impl DerivedMetrics {
             .record(signal, accepted, rejected, unix_now());
     }
 
+    /// Count the records of one export request of `signal` that the plugin
+    /// could not store: the request was answered with a storage error, and
+    /// the sender sends its records again.
+    pub fn record_ingest_failed(&self, signal: Signal, failed: u64) {
+        self.ingest_outcomes
+            .record_failed(signal, failed, unix_now());
+    }
+
     /// Count the outcome of one metrics export request: data points that
     /// reached a chart and data points that were dropped.
     pub fn record_metric_data_points(&self, accepted: u64, rejected: u64) {

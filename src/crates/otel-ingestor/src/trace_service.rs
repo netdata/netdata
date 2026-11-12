@@ -414,13 +414,20 @@ impl NetdataTracesService {
         // `.await` while the guard is held.
         let tenant_writer = self.writers.writer_for(tenant_id).map_err(|e| {
             tracing::error!(%e, tenant = %tenant_id, "failed to create traces WAL writer");
+            count_failed(self.derived_metrics.as_deref(), kept);
             storage_unavailable("WAL writer creation failed")
         })?;
         let mark = {
             let mut writer = tenant_writer.lock();
 
             for s in &storable_spans {
-                s.write_to(&mut writer, &self.clock)?;
+                s.write_to(&mut writer, &self.clock).inspect_err(|status| {
+                    // A storage error refuses the whole request; the other
+                    // errors of `write_to` are defects of this plugin.
+                    if status.code() == tonic::Code::Unavailable {
+                        count_failed(self.derived_metrics.as_deref(), kept);
+                    }
+                })?;
             }
 
             writer.write_mark()
@@ -438,6 +445,7 @@ impl NetdataTracesService {
         let stored = tokio::spawn(async move {
             tenant_writer.make_durable(mark).await.map_err(|e| {
                 tracing::error!(%e, "failed to sync traces WAL");
+                count_failed(derived_metrics.as_deref(), kept);
                 storage_unavailable("WAL sync error")
             })?;
             for observation in observations {
@@ -461,11 +469,21 @@ impl NetdataTracesService {
     }
 }
 
+/// Count the `kept` spans of an export that could not be stored: its answer
+/// is [`storage_unavailable`], and the sender sends them again. They show as
+/// `failed` on `netdata.otel.spans`.
+fn count_failed(derived_metrics: Option<&DerivedMetrics>, kept: usize) {
+    if let Some(derived_metrics) = derived_metrics {
+        derived_metrics.record_ingest_failed(Signal::Traces, kept as u64);
+    }
+}
+
 /// The response of a successful export that carried spans, counted for
 /// self-monitoring on the way out: `kept` spans are on disk, `out_of_window`
 /// spans were rejected. Every such exit of
-/// [`NetdataTracesService::export_traces`] ends here, so a failed export
-/// counts nothing.
+/// [`NetdataTracesService::export_traces`] ends here; an export that fails
+/// for a storage error is counted by [`count_failed`], any other failed
+/// export counts nothing.
 fn counted_response(
     derived_metrics: Option<&DerivedMetrics>,
     kept: usize,
@@ -792,7 +810,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_wal_write_error_fails_the_export_and_counts_nothing() {
+    async fn a_wal_write_error_fails_the_export_and_counts_its_spans_as_failed() {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -828,6 +846,7 @@ mod tests {
         assert!(recorder.committed.lock().unwrap().is_empty());
         let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
         assert_eq!(sum_of(&out, "accepted"), 0.0);
+        assert_eq!(sum_of(&out, "failed"), 2.0);
         assert_eq!(sum_of(&out, "success"), 0.0);
     }
 

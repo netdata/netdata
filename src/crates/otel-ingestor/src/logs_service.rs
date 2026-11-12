@@ -767,13 +767,20 @@ impl NetdataLogsService {
         // `ingestion_ns` is ticked per frame inside the lock (`write_to`).
         let tenant_writer = self.writers.writer_for(tenant_id).map_err(|e| {
             tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
+            count_failed(self.derived_metrics.as_deref(), kept);
             storage_unavailable("WAL writer creation failed")
         })?;
         let mark = {
             let mut writer = tenant_writer.lock();
 
             for s in &storable_streams {
-                s.write_to(&mut writer, &self.clock)?;
+                s.write_to(&mut writer, &self.clock).inspect_err(|status| {
+                    // A storage error refuses the whole request; the other
+                    // errors of `write_to` are defects of this plugin.
+                    if status.code() == tonic::Code::Unavailable {
+                        count_failed(self.derived_metrics.as_deref(), kept);
+                    }
+                })?;
             }
 
             writer.write_mark()
@@ -791,6 +798,7 @@ impl NetdataLogsService {
         let stored = tokio::spawn(async move {
             tenant_writer.make_durable(mark).await.map_err(|e| {
                 tracing::error!(%e, "failed to sync WAL");
+                count_failed(derived_metrics.as_deref(), kept);
                 storage_unavailable("WAL sync error")
             })?;
             if let Some(batch) = derived_batch {
@@ -811,11 +819,21 @@ impl NetdataLogsService {
     }
 }
 
+/// Count the `kept` records of an export that could not be stored: its
+/// answer is [`storage_unavailable`], and the sender sends them again. They
+/// show as `failed` on `netdata.otel.log_records`.
+fn count_failed(derived_metrics: Option<&DerivedMetrics>, kept: usize) {
+    if let Some(derived_metrics) = derived_metrics {
+        derived_metrics.record_ingest_failed(Signal::Logs, kept as u64);
+    }
+}
+
 /// The response of a successful export, counted for self-monitoring on the
 /// way out: `kept` records are on disk, the rest were rejected (an empty
 /// request counts zero of each). Every successful exit of
-/// [`NetdataLogsService::export_logs`] ends here, so a failed export counts
-/// nothing.
+/// [`NetdataLogsService::export_logs`] ends here; an export that fails for a
+/// storage error is counted by [`count_failed`], any other failed export
+/// counts nothing.
 fn counted_response(
     derived_metrics: Option<&DerivedMetrics>,
     kept: usize,
@@ -1845,7 +1863,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_wal_write_error_fails_the_export_and_counts_nothing() {
+    async fn a_wal_write_error_fails_the_export_and_counts_its_records_as_failed() {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -1887,6 +1905,7 @@ mod tests {
         );
         let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
         assert_eq!(sum_of(&out, "accepted"), 0.0);
+        assert_eq!(sum_of(&out, "failed"), 2.0);
         assert_eq!(sum_of(&out, "info"), 0.0);
     }
 
