@@ -175,10 +175,12 @@ pub struct OpendalStorage {
 impl OpendalStorage {
     /// Build from a storage URI (e.g. `fs:///path`, `s3://bucket/?region=…`),
     /// wrapped in opendal's retry layer: exponential backoff 1 s → 30 s with
-    /// jitter, at most 10 attempts — a worst-case ~3-minute backoff ceiling
-    /// per operation, which `otel_bridge::config`'s `startup_op_timeout` should
-    /// stay above. Each retry is logged at `warn` with the redacted error
-    /// text. Err only on URI parse failure, as a raw `std::io::Error`
+    /// jitter, at most 10 retries — between 3 and 6 minutes of pauses for one
+    /// operation that keeps failing (181 s, and the jitter adds up to as much
+    /// again). Each retry is logged at `warn` with the redacted error text.
+    /// The layer retries only the errors that opendal marks temporary (a
+    /// refused connection, a 503); a refusal (403, a bucket that does not
+    /// exist) comes back at once. Err only on URI parse failure, as a raw `std::io::Error`
     /// carrying opendal's error display — not a [`StorageError`], so it does
     /// not pass through the `Display` redaction.
     ///
@@ -186,7 +188,7 @@ impl OpendalStorage {
     /// ledger; the caller still gates construction on `remote_storage.enabled`
     /// so a malformed URI can't abort a local-only deployment.
     pub fn new(uri: &str) -> std::io::Result<Self> {
-        // Worst-case backoff sum: 1+2+4+8+16+30·5 s ≈ 181 s ≈ 3 min per op.
+        // The pauses without jitter: 1+2+4+8+16+30·5 s = 181 s per op.
         let retry_layer = opendal::layers::RetryLayer::new()
             .with_min_delay(Duration::from_secs(1))
             .with_max_delay(Duration::from_secs(30))

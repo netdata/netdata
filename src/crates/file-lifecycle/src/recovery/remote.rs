@@ -1,7 +1,7 @@
 //! The remote half of startup recovery: per-tenant reconciliation against
 //! remote object storage. The ledger's `build_pipeline`
 //! (otel-ledger/src/ledger/pipeline.rs) runs these per storage-enabled tenant,
-//! after [`super::startup`]'s fail-closed catalog diff-sync and the local
+//! after [`super::startup`]'s required catalog diff-sync and the local
 //! replay passes ([`super::local`]), before [`super::recover_retention`].
 //! Precondition: the diff-sync has made the local catalog set complete and
 //! `seed_from_catalog_files` has seeded the uploaded/rotated state these

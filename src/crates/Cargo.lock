@@ -1275,6 +1275,7 @@ dependencies = [
  "reqwest",
  "sfst",
  "tempfile",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-util",
  "tracing",

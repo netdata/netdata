@@ -1,5 +1,5 @@
-//! Startup catalog diff-sync (P7): the required, fail-closed phase that makes
-//! the local catalog set complete before per-tenant recovery. Runs per signal
+//! Startup catalog diff-sync (P7): the required phase that makes the local
+//! catalog set complete before per-tenant recovery. Runs per signal
 //! when storage is enabled, BEFORE tenant discovery, inside the ledger
 //! configuration path — `build_pipeline` in otel-ledger/src/ledger/pipeline.rs
 //! is the grep-verified sole production caller (it imports through the glob
@@ -8,16 +8,30 @@
 //! (`recovery::remote`) it is deliberately NOT wrapped in the caller's
 //! STARTUP_REMOTE_BUDGET — it must not be skipped.
 //!
-//! Contract: the phase either completes — the local catalog dir now holds
-//! every own-machine catalog the remote knows about, the WAL seq high-water
-//! covers the remote max, and the remote-discovered tenant set is returned
-//! for per-tenant registry instantiation — or it errors and the ledger fails
-//! to configure (the agent's restart loop is the outer retry). Infrastructure
-//! failures (LIST error, download transport error, per-op timeout) are hard
-//! errors; a single bad/absent OBJECT is skipped loudly (a restart cannot
-//! heal it, and one bad object must not brick startup).
+//! Contract: the phase completes — the local catalog dir now holds every
+//! own-machine catalog the remote knows about, the WAL seq high-water covers
+//! the remote max, and the remote-discovered tenant set is returned for
+//! per-tenant registry instantiation — or it ends on a local error and the
+//! ledger fails to configure. It never completes with less.
 //!
-//! Items: [`startup_catalog_sync`] is the phase; [`heal_corrupt_catalog`] is
+//! A remote that does not answer, or answers with an error (LIST error,
+//! download transport error, per-op timeout), does not end the phase: the
+//! phase waits [`RETRY_PAUSE`] and starts again, as often as it takes. The
+//! start waits meanwhile: the
+//! ledger reports `Ready` only after the phase, so the plugin accepts no
+//! data, and it recovers by itself when the remote does. Nobody else would
+//! try again: the agent disables a plugin that exits with an error before
+//! it sent any data, until the agent restarts.
+//!
+//! Every remote error is tried again, a refusal too (credentials, a bucket
+//! that does not exist). After the storage client's own retries an error
+//! says only its kind, and no kind means "cannot go away": S3 refuses with
+//! 403 while the host's clock is not set, and a wrong endpoint looks like an
+//! outage. A single bad or absent OBJECT is skipped loudly (trying again
+//! cannot heal it, and one bad object must not stop every start).
+//!
+//! Items: [`startup_catalog_sync`] is the phase and `sync_once` one attempt
+//! of it; [`heal_corrupt_catalog`] is
 //! the corrupt-catalog startup heal (D-P8.1), called only by
 //! `recovery::local::seed_from_catalog_files`; [`validate_catalog`] is the
 //! downloaded-body oracle whose `Err` makes its only caller
@@ -29,7 +43,11 @@
 //! the ledger's event loop starts; every remote op is individually
 //! timeout-bounded while local I/O deliberately is not (see the seq-seed
 //! comment below), and the blocking atomic installs run off-runtime under
-//! `spawn_blocking`.
+//! `spawn_blocking`. Nothing in the process stops the phase while it waits
+//! for the remote: the supervisor ends a ledger that it no longer wants
+//! (`otel-plugin`'s supervisor, a stop during start-up), and every step of
+//! an attempt can be cut at any point (atomic installs, a high-water that
+//! only rises).
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -48,11 +66,87 @@ use crate::storage::{Storage, StorageError};
 /// (otel-ledger/src/ledger/mod.rs) — same rationale: one global budget, no knob.
 pub(crate) const DOWNLOAD_CONCURRENCY: usize = 8;
 
+/// The pause between two attempts of the phase. An attempt that the remote
+/// refuses fails in milliseconds, so this is what spaces the warnings; an
+/// attempt against a remote that is down already took the storage client's
+/// own retries (`OpendalStorage::new`), whose longest pause is the same.
+pub(crate) const RETRY_PAUSE: Duration = Duration::from_secs(30);
+
+/// Why one attempt of the phase failed.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum SyncError {
+    /// The remote did not answer a request in time, or answered it with an
+    /// error. Another attempt can succeed.
+    #[error("{0:#}")]
+    Remote(anyhow::Error),
+
+    /// The local disk failed (the high-water file, the install of a catalog
+    /// file). Another attempt would not change that.
+    #[error("{0:#}")]
+    Local(anyhow::Error),
+}
+
+/// The phase: make the local catalog set complete, however long the remote
+/// takes to answer (module docs). Returns what `sync_once` returns; its
+/// only error is a local one.
+pub async fn startup_catalog_sync<S: Storage>(
+    storage: &S,
+    signal: &str,
+    own_machine: MachineId,
+    catalog_base_dir: &Path,
+    seq_highwater_path: &Path,
+    op_timeout: Duration,
+) -> anyhow::Result<HashSet<TenantId>> {
+    let started = tokio::time::Instant::now();
+    let mut attempt: u64 = 1;
+
+    loop {
+        let error = match sync_once(
+            storage,
+            signal,
+            own_machine,
+            catalog_base_dir,
+            seq_highwater_path,
+            op_timeout,
+        )
+        .await
+        {
+            Ok(remote_tenants) => {
+                if attempt > 1 {
+                    tracing::info!(
+                        "startup catalog sync ({signal}): completed at attempt {attempt}, {} s \
+                         after the first one",
+                        started.elapsed().as_secs()
+                    );
+                }
+                return Ok(remote_tenants);
+            }
+            Err(SyncError::Local(error)) => return Err(error),
+            Err(SyncError::Remote(error)) => error,
+        };
+
+        tracing::warn!(
+            "startup catalog sync ({signal}): attempt {attempt} failed, {} s after the first \
+             one: {error:#}; the plugin accepts no data until the sync completes; next attempt \
+             in {} s",
+            started.elapsed().as_secs(),
+            RETRY_PAUSE.as_secs()
+        );
+        tokio::time::sleep(RETRY_PAUSE).await;
+        attempt += 1;
+    }
+}
+
+/// One attempt of the phase:
 /// LIST → filter → seed high-water → diff-download+install the signal's
 /// catalogs. Returns the set of tenants discovered from the (own-machine)
 /// remote keys, so the caller can instantiate per-tenant registries for
 /// remote-only tenants (local discovery is the caller's
 /// `TenantRegistries::discover_tenants` dir scan).
+///
+/// An attempt can follow a failed one: the high-water only rises, a catalog
+/// file is installed whole or not at all, and what is missing locally is
+/// worked out again each time.
 ///
 /// `op_timeout` bounds every individual remote operation (LIST and each GET), so
 /// a hung connection cannot stall startup; there is deliberately no phase-total
@@ -67,28 +161,29 @@ pub(crate) const DOWNLOAD_CONCURRENCY: usize = 8;
 /// catalog cardinality — order 100 MB at 10^6 keys — while the derived
 /// `kept`/`missing` sets are own-machine only. Streaming the LIST instead of
 /// materializing it is a possible future optimization, not done here.
-pub async fn startup_catalog_sync<S: Storage>(
+pub(crate) async fn sync_once<S: Storage>(
     storage: &S,
     signal: &str,
     own_machine: MachineId,
     catalog_base_dir: &Path,
     seq_highwater_path: &Path,
     op_timeout: Duration,
-) -> anyhow::Result<HashSet<TenantId>> {
+) -> Result<HashSet<TenantId>, SyncError> {
     // 1. Recursive LIST of the whole catalog prefix for this signal
     //    (`remote_keys::catalog_prefix`), bounded by `op_timeout`.
     let prefix = crate::remote_keys::catalog_prefix(signal);
     let keys = match tokio::time::timeout(op_timeout, storage.list(&prefix)).await {
         Ok(Ok(keys)) => keys,
         Ok(Err(e)) => {
-            return Err(anyhow::anyhow!(
+            return Err(SyncError::Remote(anyhow::anyhow!(
                 "startup catalog LIST ({signal}) failed: {e}"
-            ));
+            )));
         }
         Err(_) => {
-            return Err(anyhow::anyhow!(
-                "startup catalog LIST ({signal}) timed out after {op_timeout:?}"
-            ));
+            return Err(SyncError::Remote(anyhow::anyhow!(
+                "startup catalog LIST ({signal}) timed out after {op_timeout:?} \
+                 (remote_storage.startup_op_timeout)"
+            )));
         }
     };
 
@@ -138,13 +233,14 @@ pub async fn startup_catalog_sync<S: Storage>(
     //    This high-water read/write — like all startup LOCAL I/O (the replay
     //    passes' local-catalog reads, the atomic installs below) — is
     //    deliberately NOT wrapped in `op_timeout`, which bounds only REMOTE
-    //    ops; a hung local filesystem is bounded by the agent's plugin-restart
-    //    loop, the same outer bound the whole configure path uses.
+    //    ops; nothing bounds a hung local filesystem, here or anywhere else in
+    //    the configure path.
     if remote_max > 0 {
         let current = wal::read_seq_highwater(seq_highwater_path).unwrap_or(0);
         if remote_max > current {
             wal::write_seq_highwater(seq_highwater_path, remote_max)
-                .with_context(|| format!("startup sync: write seq highwater ({signal})"))?;
+                .with_context(|| format!("startup sync: write seq highwater ({signal})"))
+                .map_err(SyncError::Local)?;
         }
     }
 
@@ -157,14 +253,17 @@ pub async fn startup_catalog_sync<S: Storage>(
     let installed = AtomicUsize::new(0);
 
     // Bounded to DOWNLOAD_CONCURRENCY and SHORT-CIRCUITING: `try_collect` stops
-    // at the first Err (a transport error / timeout is fail-closed) and drops
-    // the stream, so a hung backend fails the phase after ~one op_timeout, not
+    // at the first Err (a transport error / timeout ends the attempt) and drops
+    // the stream, so a hung backend fails the attempt after ~one op_timeout, not
     // ceil(total / concurrency) of them. Dropping in-flight downloads is safe:
     // a download that has not reached its install holds no local state at all,
     // and an install already inside `spawn_blocking` is detached, not
     // cancelled — `write_atomic`'s own `AtomicFile` guard reaps its `.tmp` on
-    // failure, so nothing is left half-installed. A skipped object (404 /
-    // invalid) returned `Ok` above and does not stop the stream.
+    // failure, so nothing is left half-installed. (A detached install that
+    // still runs when the next attempt installs the same catalog shares its
+    // `.tmp` name with it: the bytes are the same, and the worst outcome is a
+    // rename error, which ends the phase as a local error.) A skipped object
+    // (404 / invalid) returned `Ok` above and does not stop the stream.
     futures::stream::iter(missing.iter())
         .map(|(key, parsed)| {
             download_and_install(
@@ -317,10 +416,11 @@ fn local_catalog_path(base: &Path, p: &ParsedCatalogKey) -> PathBuf {
 /// corrupt-catalog re-fetch (`heal_corrupt_catalog`).
 ///
 /// A 404 (object gone) or a validation failure is logged and SKIPPED
-/// (`Ok(())`) — neither is healable by retry, and a hard error would brick
-/// startup on one bad object. A transport error, per-op timeout, or a failed
-/// install (I/O or join error) IS returned (fail-closed). `installed`/`total`
-/// feed the coarse progress log only.
+/// (`Ok(())`) — neither is healable by retry, and a hard error would stop
+/// every start on one bad object. A transport error or per-op timeout is
+/// returned as [`SyncError::Remote`], a failed install (I/O or join error)
+/// as [`SyncError::Local`]. `installed`/`total` feed the coarse progress log
+/// only.
 // Nine distinct primitives (the last two feed progress logging only); a
 // one-off struct would add indirection for the two call sites.
 #[allow(clippy::too_many_arguments)]
@@ -334,7 +434,7 @@ async fn download_and_install<S: Storage>(
     op_timeout: Duration,
     installed: &AtomicUsize,
     total: usize,
-) -> anyhow::Result<()> {
+) -> Result<(), SyncError> {
     let bytes = match tokio::time::timeout(op_timeout, storage.read(key)).await {
         Ok(Ok(bytes)) => bytes,
         Ok(Err(StorageError::NotFound)) => {
@@ -344,11 +444,16 @@ async fn download_and_install<S: Storage>(
             tracing::warn!(key = %key, "startup sync: catalog object 404 on download, skipping");
             return Ok(());
         }
-        Ok(Err(e)) => return Err(anyhow::anyhow!("startup sync: download {key} failed: {e}")),
+        Ok(Err(e)) => {
+            return Err(SyncError::Remote(anyhow::anyhow!(
+                "startup sync: download {key} failed: {e}"
+            )));
+        }
         Err(_) => {
-            return Err(anyhow::anyhow!(
-                "startup sync: download {key} timed out after {op_timeout:?}"
-            ));
+            return Err(SyncError::Remote(anyhow::anyhow!(
+                "startup sync: download {key} timed out after {op_timeout:?} \
+                 (remote_storage.startup_op_timeout)"
+            )));
         }
     };
 
@@ -365,8 +470,9 @@ async fn download_and_install<S: Storage>(
     let write_dest = dest.clone();
     tokio::task::spawn_blocking(move || file_registry::durable::write_atomic(&write_dest, &bytes))
         .await
-        .map_err(|e| anyhow::anyhow!("startup sync: install join error: {e}"))?
-        .with_context(|| format!("startup sync: install catalog {}", dest.display()))?;
+        .map_err(|e| SyncError::Local(anyhow::anyhow!("startup sync: install join error: {e}")))?
+        .with_context(|| format!("startup sync: install catalog {}", dest.display()))
+        .map_err(SyncError::Local)?;
     tracing::debug!(key = %key, path = %dest.display(), "startup sync: installed catalog");
     // Coarse progress for large restores (a per-catalog line at info would flood).
     let n = installed.fetch_add(1, Ordering::Relaxed) + 1;

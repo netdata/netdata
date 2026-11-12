@@ -552,17 +552,20 @@ pub struct RemoteStorageConfig {
     /// Default 1 GB.
     #[serde(default = "default_read_cache_max_size")]
     pub read_cache_max_size: ByteSize,
-    /// Per-operation timeout for the required startup catalog diff-sync: the
-    /// recursive LIST and each download are each bounded by it, as is the
-    /// corrupt-catalog remote re-fetch. Default 5 min. It SHOULD exceed the
-    /// storage retry layer's ~3-min in-op backoff ceiling so inner retries
-    /// still run; a lower value cuts those retries short and can crash-loop
-    /// the plugin under a flaky remote (fail-closed is still safe, just
-    /// noisy). Not enforced — a lab/test operator may legitimately want a fast
-    /// fail. There is no phase-total cap, so a large restore stays
-    /// work-proportional. It also bounds the single recursive LIST, which
-    /// scales with the whole bucket's catalog cardinality (shared buckets list
-    /// every machine's objects), so very large fleets may need a higher value.
+    /// The longest wait for one request to object storage while the plugin
+    /// starts: the recursive LIST of the required startup catalog diff-sync,
+    /// each of its downloads, and the remote re-fetch of a corrupt catalog.
+    /// Default 5 min. When the LIST or a download of the diff-sync fails or
+    /// takes longer, the sync waits 30 s and starts again, and the plugin
+    /// accepts no data until it completes
+    /// (`file_lifecycle::recovery::startup_catalog_sync`). The storage client
+    /// retries inside one request for 3 to 6 minutes; a lower value cuts
+    /// those retries short, which only makes the attempts more frequent.
+    /// There is no phase-total cap, so a large restore stays
+    /// work-proportional. The value must stay above the time that the single
+    /// recursive LIST takes, or the sync never completes: the LIST scales
+    /// with the whole bucket's catalog cardinality (shared buckets list every
+    /// machine's objects), so very large fleets may need a higher value.
     #[serde(with = "duration", default = "default_startup_op_timeout")]
     pub startup_op_timeout: Duration,
 }

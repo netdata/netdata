@@ -51,12 +51,14 @@ use file_lifecycle::remote_read::RemoteRead;
 pub(crate) const CHUNK_MIN_ENTRIES: u64 = 16_384;
 /// Maximum time startup waits on remote object storage (LIST/stat
 /// reconciliation) per tenant before proceeding to Ready. A slow/unreachable
-/// remote must not delay ingestion — on timeout the remote reconcile is skipped
+/// remote must not delay ingestion for these — on timeout the remote reconcile is skipped
 /// (local upload recovery still runs fire-and-forget, and eviction stays
 /// deferred until a later reconcile confirms the remote, so nothing is at risk).
 /// This is a phase-total cap on the two optional reconciles below; the required
 /// startup catalog sync and the catalog seeding instead take the caller's
-/// `startup_op_timeout`, which bounds each individual remote op.
+/// `startup_op_timeout`, which bounds each individual remote op. The required
+/// sync is the one step that does delay ingestion for the remote: it repeats
+/// until the remote answers.
 const STARTUP_REMOTE_BUDGET: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Assemble a pipeline for any signal; the module docs describe the steps.
@@ -105,9 +107,10 @@ where
     // catalog set complete BEFORE tenant discovery. It runs first so a local
     // tenant that gains new catalogs sees them through `discover_tenants`'
     // per-tenant `recover()`; remote-ONLY tenants (no local WAL/index dir) are
-    // then instantiated explicitly. Required + fail-closed: any infrastructure
-    // failure returns here (before `Ready`). NOT wrapped in STARTUP_REMOTE_BUDGET
-    // — unlike the two optional reconciles below, this phase must not be skipped.
+    // then instantiated explicitly. Required: while the remote does not
+    // answer, the call does not return (it tries again, and `Ready` waits);
+    // only a local error returns here. NOT wrapped in STARTUP_REMOTE_BUDGET —
+    // unlike the two optional reconciles below, this phase must not be skipped.
     if let Some(storage) = storage {
         let remote_tenants = file_lifecycle::recovery::startup_catalog_sync(
             storage,

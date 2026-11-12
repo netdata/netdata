@@ -2,13 +2,14 @@
 //! passes documented in `recovery/{mod,local,remote,startup}.rs`, at the seams
 //! where those passes meet the components and remote storage:
 //!
-//! - `startup` (P7 fail-closed diff-sync): `startup_sync_*` pins the recursive
+//! - `startup` (P7 required diff-sync): `startup_sync_*` pins the recursive
 //!   LIST → parse/sanitize + own-machine (D6) filter → high-water seed →
 //!   bounded, short-circuiting diff-download-and-install pipeline: restore
 //!   after a wipe (incl. the auth-off `default` tenant), zero downloads when
 //!   everything is local, filename-only high-water seeding, hostile-key and
-//!   invalid-body skipping, and `Err` on every LIST/transport/timeout failure
-//!   (never a partial high-water write). The `validate_catalog_*` tests pin
+//!   invalid-body skipping, a failed attempt on every LIST/transport/timeout
+//!   failure (never a partial high-water write), and the repeat of the
+//!   attempt until the remote answers. The `validate_catalog_*` tests pin
 //!   the install oracle's per-entry arm priority;
 //!   `rotated_catalog_passes_validate_catalog` pins a real builder-rotation
 //!   round-trip.
@@ -2230,6 +2231,40 @@ impl crate::storage::Storage for HangingStorage {
     }
 }
 
+/// A `Storage` whose first `list_failures` LISTs fail and whose later ones
+/// answer with an empty listing: an outage of the remote that ends.
+struct RecoveringStorage {
+    list_failures: usize,
+    list_calls: std::sync::atomic::AtomicUsize,
+}
+
+impl crate::storage::Storage for RecoveringStorage {
+    async fn write(
+        &self,
+        _key: &str,
+        _data: Vec<u8>,
+    ) -> Result<crate::storage::WriteMeta, crate::storage::StorageError> {
+        unreachable!("the start-up sync writes nothing to the remote")
+    }
+    async fn list(&self, _prefix: &str) -> Result<Vec<String>, crate::storage::StorageError> {
+        let call = self
+            .list_calls
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if call < self.list_failures {
+            return Err(crate::storage::StorageError::Other(anyhow::anyhow!(
+                "connection refused"
+            )));
+        }
+        Ok(Vec::new())
+    }
+    async fn read(&self, _key: &str) -> Result<Vec<u8>, crate::storage::StorageError> {
+        unreachable!("an empty listing has nothing to download")
+    }
+    async fn stat(&self, _key: &str) -> Result<(), crate::storage::StorageError> {
+        unreachable!("the start-up sync probes nothing")
+    }
+}
+
 /// An op_timeout no test operation can hit; the hang test passes its own
 /// short timeout instead.
 fn long_timeout() -> std::time::Duration {
@@ -2383,7 +2418,7 @@ async fn startup_sync_restores_after_wipe() {
 }
 
 /// Acceptance 7 — fail-closed: LIST error, download transport error, and a hang
-/// each surface as an Err out of the phase (not a warn/skip).
+/// each fail the attempt as a remote error (not a warn/skip).
 #[tokio::test]
 async fn startup_sync_fails_closed_on_list_error() {
     let catalog_base = tempfile::tempdir().unwrap();
@@ -2393,17 +2428,19 @@ async fn startup_sync_fails_closed_on_list_error() {
         ..crate::storage::MockStorage::default()
     };
     assert!(
-        startup_catalog_sync(
-            &storage,
-            "logs",
-            machine(),
-            catalog_base.path(),
-            &hw.path().join("hw"),
-            long_timeout()
-        )
-        .await
-        .is_err(),
-        "LIST error must fail closed"
+        matches!(
+            sync_once(
+                &storage,
+                "logs",
+                machine(),
+                catalog_base.path(),
+                &hw.path().join("hw"),
+                long_timeout()
+            )
+            .await,
+            Err(SyncError::Remote(_))
+        ),
+        "a LIST error fails the attempt as a remote error"
     );
 }
 
@@ -2419,17 +2456,19 @@ async fn startup_sync_fails_closed_on_transport_error() {
         ..crate::storage::MockStorage::default()
     };
     assert!(
-        startup_catalog_sync(
-            &storage,
-            "logs",
-            machine(),
-            catalog_base.path(),
-            &hw.path().join("hw"),
-            long_timeout()
-        )
-        .await
-        .is_err(),
-        "download transport error must fail closed"
+        matches!(
+            sync_once(
+                &storage,
+                "logs",
+                machine(),
+                catalog_base.path(),
+                &hw.path().join("hw"),
+                long_timeout()
+            )
+            .await,
+            Err(SyncError::Remote(_))
+        ),
+        "a download transport error fails the attempt as a remote error"
     );
 }
 
@@ -2439,18 +2478,85 @@ async fn startup_sync_fails_closed_on_hang() {
     let hw = tempfile::tempdir().unwrap();
     // Every op pends; a short op_timeout must turn it into an Err, not a hang.
     assert!(
-        startup_catalog_sync(
-            &HangingStorage,
-            "logs",
-            machine(),
-            catalog_base.path(),
-            &hw.path().join("hw"),
-            std::time::Duration::from_millis(50),
-        )
-        .await
-        .is_err(),
+        matches!(
+            sync_once(
+                &HangingStorage,
+                "logs",
+                machine(),
+                catalog_base.path(),
+                &hw.path().join("hw"),
+                std::time::Duration::from_millis(50),
+            )
+            .await,
+            Err(SyncError::Remote(_))
+        ),
         "a hung backend must time out, not hang"
     );
+}
+
+/// A remote that does not answer does not end the start: the sync tries
+/// again after a pause, as often as it takes, and completes when the remote
+/// answers.
+#[tokio::test(start_paused = true)]
+async fn startup_sync_repeats_until_the_remote_answers() {
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    let storage = RecoveringStorage {
+        list_failures: 3,
+        list_calls: std::sync::atomic::AtomicUsize::new(0),
+    };
+    let started = tokio::time::Instant::now();
+
+    let tenants = startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw.path().join("hw"),
+        long_timeout(),
+    )
+    .await
+    .unwrap();
+
+    assert!(tenants.is_empty());
+    assert_eq!(
+        storage
+            .list_calls
+            .load(std::sync::atomic::Ordering::Relaxed),
+        4
+    );
+    // Three failures, one pause after each.
+    assert_eq!(started.elapsed(), std::time::Duration::from_secs(3 * 30));
+}
+
+/// A local error ends the start at once: another attempt would not change
+/// what the local disk does.
+#[tokio::test(start_paused = true)]
+async fn startup_sync_ends_on_a_local_error() {
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    // The high-water file cannot be written: its directory is a file.
+    let not_a_dir = hw.path().join("file");
+    std::fs::write(&not_a_dir, b"").unwrap();
+    let (key, _bytes) = catalog_object(&TenantId::from("t1"), d(17), ident(), &[5]);
+    let storage = crate::storage::MockStorage {
+        list_response: vec![key],
+        ..crate::storage::MockStorage::default()
+    };
+    let started = tokio::time::Instant::now();
+
+    let result = startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &not_a_dir.join("hw"),
+        long_timeout(),
+    )
+    .await;
+
+    assert!(result.is_err());
+    assert_eq!(started.elapsed(), std::time::Duration::ZERO);
 }
 
 /// Normal boot: all listed catalogs already local ⇒ zero downloads, and the
@@ -2686,7 +2792,7 @@ async fn startup_sync_short_circuits_on_first_download_error() {
     let catalog_base = tempfile::tempdir().unwrap();
     let hw = tempfile::tempdir().unwrap();
 
-    let res = startup_catalog_sync(
+    let res = sync_once(
         &storage,
         "logs",
         machine(),
@@ -2696,7 +2802,10 @@ async fn startup_sync_short_circuits_on_first_download_error() {
     )
     .await;
 
-    assert!(res.is_err(), "first download error must fail the phase");
+    assert!(
+        matches!(res, Err(SyncError::Remote(_))),
+        "the first download error fails the attempt"
+    );
     let attempted = read_calls.load(std::sync::atomic::Ordering::Relaxed);
     // `buffer_unordered` eagerly polls at most one concurrency window before the
     // first error short-circuits `try_collect`, so no more than
@@ -2858,7 +2967,7 @@ async fn startup_sync_list_error_leaves_highwater_untouched() {
         ..crate::storage::MockStorage::default()
     };
     assert!(
-        startup_catalog_sync(
+        sync_once(
             &storage,
             "logs",
             machine(),

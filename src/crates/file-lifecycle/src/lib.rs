@@ -37,7 +37,7 @@
 //!   `LedgerSender`.
 //! - Recovery: [`recovery`] reconciles local disk, the in-memory
 //!   registries, and remote storage in three per-signal phases before the
-//!   run loop starts — the fail-closed startup catalog diff-sync
+//!   run loop starts — the required startup catalog diff-sync
 //!   (`startup`), the per-tenant local replay with retention eviction
 //!   (`local`), and the per-tenant remote reconciliation (`remote`).
 //!
