@@ -34,6 +34,20 @@ pub(crate) struct TenantWriter {
     ledger_sender: Arc<LedgerSender>,
 }
 
+/// The answer to a request whose records could not be stored: the WAL
+/// directory could not be made, or a write or an fsync failed. The storage
+/// may work again (a full disk gets room), so the status is `UNAVAILABLE`
+/// (HTTP 503), which the OTLP specification lists as retryable: the
+/// OpenTelemetry Collector keeps the batch and sends it again. `INTERNAL`
+/// (HTTP 500) is not retryable, and the sender would drop the batch.
+///
+/// A request that failed can have stored a part of its records (the frames
+/// of its other streams), so a resend can store those twice: OTLP delivery
+/// is at-least-once.
+pub(crate) fn storage_unavailable(message: &'static str) -> tonic::Status {
+    tonic::Status::unavailable(message)
+}
+
 impl TenantWriter {
     /// Lock the writer, to write frames. Never held across an `.await`.
     pub(crate) fn lock(&self) -> MutexGuard<'_, wal::Writer> {
@@ -49,11 +63,11 @@ impl TenantWriter {
     ///
     /// # Errors
     ///
-    /// The round's first failure. Also `wal::Error::FramesLost`, when an
-    /// fsync of this writer failed while the frames were not durable yet (an
-    /// earlier round's, a rotation's, the sweep's): the next fsync of the
-    /// file would succeed whatever became of the frames, so the request
-    /// fails and the client sends the records again.
+    /// The round's first failure. Also `wal::Error::FramesLost`, when a
+    /// write or an fsync of this writer failed while the frames were not
+    /// durable yet (an earlier round's, a rotation's, the sweep's): no later
+    /// sync can vouch for them. The request then fails with
+    /// [`storage_unavailable`], and the sender sends the records again.
     pub(crate) async fn make_durable(&self, mark: wal::WriteMark) -> wal::Result<()> {
         let _turn = self.sync_turn.lock().await;
 

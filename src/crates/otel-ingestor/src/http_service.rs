@@ -646,9 +646,10 @@ fn rpc_error(codec: Codec, status: Status) -> Response<Body> {
 }
 
 /// The collector's gRPC→HTTP table (otlpreceiver `GetHTTPStatusCodeFromStatus`).
-/// Today only three codes reach it: `InvalidArgument` (undecodable body,
-/// invalid tenant), `Unauthenticated` (missing tenant header) and `Internal`
-/// (frame encoding and WAL failures). The other arms are kept so a future
+/// Today four codes reach it: `InvalidArgument` (undecodable body, invalid
+/// tenant), `Unauthenticated` (missing tenant header), `Internal` (frame
+/// encoding) and `Unavailable` (the records could not be stored:
+/// `tenant_writers::storage_unavailable`). The other arms are kept so a future
 /// core error maps correctly without touching the transport — e.g.
 /// throttling's `ResourceExhausted` becomes the retryable 429. The 503 arm is
 /// the spec's retryable set; `Unimplemented` → 404 is the collector's choice.

@@ -52,7 +52,7 @@ use tonic::{Request, Response, Status};
 use crate::ledger_sender::LedgerSender;
 use crate::observer::TraceObserver;
 use crate::tenant::extract_tenant_id;
-use crate::tenant_writers::TenantWriters;
+use crate::tenant_writers::{TenantWriters, storage_unavailable};
 use otel_bridge::config::AuthConfig;
 use otel_bridge::signals::Signal;
 use otel_derived_metrics::DerivedMetrics;
@@ -167,7 +167,7 @@ impl StorableSpans {
             )
             .map_err(|e| {
                 tracing::error!(%e, "failed to write traces WAL frame");
-                Status::internal("WAL write error")
+                storage_unavailable("WAL write error")
             })?;
         Ok(())
     }
@@ -414,7 +414,7 @@ impl NetdataTracesService {
         // `.await` while the guard is held.
         let tenant_writer = self.writers.writer_for(tenant_id).map_err(|e| {
             tracing::error!(%e, tenant = %tenant_id, "failed to create traces WAL writer");
-            Status::internal("WAL writer creation failed")
+            storage_unavailable("WAL writer creation failed")
         })?;
         let mark = {
             let mut writer = tenant_writer.lock();
@@ -438,7 +438,7 @@ impl NetdataTracesService {
         let stored = tokio::spawn(async move {
             tenant_writer.make_durable(mark).await.map_err(|e| {
                 tracing::error!(%e, "failed to sync traces WAL");
-                Status::internal("WAL sync error")
+                storage_unavailable("WAL sync error")
             })?;
             for observation in observations {
                 observation.commit();
@@ -822,7 +822,7 @@ mod tests {
 
         assert_eq!(
             (status.code(), status.message()),
-            (tonic::Code::Internal, "WAL write error")
+            (tonic::Code::Unavailable, "WAL write error")
         );
         assert_eq!(recorder.prepared.lock().unwrap().len(), 1);
         assert!(recorder.committed.lock().unwrap().is_empty());

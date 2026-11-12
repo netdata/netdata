@@ -51,7 +51,7 @@ use tonic::{Request, Response, Status};
 
 use crate::ledger_sender::LedgerSender;
 use crate::tenant::extract_tenant_id;
-use crate::tenant_writers::TenantWriters;
+use crate::tenant_writers::{TenantWriters, storage_unavailable};
 
 /// What the logs export asks of an OTLP `ResourceLogs`.
 trait ResourceLogsExt {
@@ -285,7 +285,7 @@ impl StorableStream {
             )
             .map_err(|e| {
                 tracing::error!(%e, "failed to write WAL entry");
-                Status::internal("WAL write error")
+                storage_unavailable("WAL write error")
             })?;
         Ok(())
     }
@@ -767,7 +767,7 @@ impl NetdataLogsService {
         // `ingestion_ns` is ticked per frame inside the lock (`write_to`).
         let tenant_writer = self.writers.writer_for(tenant_id).map_err(|e| {
             tracing::error!(%e, tenant = %tenant_id, "failed to create WAL writer");
-            Status::internal("WAL writer creation failed")
+            storage_unavailable("WAL writer creation failed")
         })?;
         let mark = {
             let mut writer = tenant_writer.lock();
@@ -791,7 +791,7 @@ impl NetdataLogsService {
         let stored = tokio::spawn(async move {
             tenant_writer.make_durable(mark).await.map_err(|e| {
                 tracing::error!(%e, "failed to sync WAL");
-                Status::internal("WAL sync error")
+                storage_unavailable("WAL sync error")
             })?;
             if let Some(batch) = derived_batch {
                 batch.commit();
@@ -1883,7 +1883,7 @@ mod tests {
 
         assert_eq!(
             (status.code(), status.message()),
-            (tonic::Code::Internal, "WAL write error")
+            (tonic::Code::Unavailable, "WAL write error")
         );
         let out = String::from_utf8(derived.emit(now / 1_000_000_000 + 13).concat()).unwrap();
         assert_eq!(sum_of(&out, "accepted"), 0.0);
