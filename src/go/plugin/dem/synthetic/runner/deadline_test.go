@@ -153,3 +153,25 @@ func TestTerminalTerminationReasonsAndInterruptedCandidates(t *testing.T) {
 		})
 	}
 }
+
+func TestBudgetTerminalWithoutCountsPreservesIncrementalTestFacts(t *testing.T) {
+	e, _, _ := testEngine(t)
+	e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
+		emit(out, frame{Type: "event", Event: &synthetic.Event{
+			Kind: "suite", Phase: "discovery", DeclaredTests: intPointer(2),
+		}})
+		emit(out, frame{Type: "event", Event: &synthetic.Event{
+			Kind: "test", Phase: "end", TestID: "completed", Status: "passed", ExpectedStatus: "passed",
+		}})
+		emit(out, frame{Type: "result", Result: &reporterResult{
+			Status: synthetic.Timeout, TerminationReason: synthetic.ExecutionBudget,
+			Error: "Runner exited without a terminal result (SIGINT)", CaptureState: "disabled",
+		}})
+		return ndexec.TreeResult{Drained: true}
+	})
+	ex := e.Execute(context.Background(), journey(), nil)
+	require.True(t, ex.Drained)
+	assert.Equal(t, synthetic.Timeout, ex.Run.Outcome)
+	require.NotNil(t, ex.Run.Tests)
+	assert.Equal(t, synthetic.TestCounts{Declared: 2, Passed: 1, NotRun: 1}, *ex.Run.Tests)
+}

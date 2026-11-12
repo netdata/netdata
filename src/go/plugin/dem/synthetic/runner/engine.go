@@ -270,7 +270,9 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		run.Tests = snapshot.partial
 		if snapshot.err == nil && snapshot.result != nil {
 			// Observed test/measurement facts survive a later shutdown deadline.
-			run.Tests = snapshot.result.Tests
+			if snapshot.result.Tests != nil {
+				run.Tests = snapshot.result.Tests
+			}
 			run.Metrics = snapshot.result.Metrics
 		}
 		switch {
