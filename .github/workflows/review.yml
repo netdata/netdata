@@ -117,7 +117,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@619a81ec64ff8c0211cd6146eb2b21e8f1d7f440 # v1.81.1
+        uses: reviewdog/action-actionlint@a7d35aaf8c309203a4ae861d32b7bd490baa7bf3 # v1.83.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -209,7 +209,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run hadolint
-        uses: reviewdog/action-hadolint@1df92335c6c70880e301926d46148aeb27de1912 # v1.55.0
+        uses: reviewdog/action-hadolint@a3bc84c51f4ddbcbc5b91d950d0b66c15c88b113 # v1.56.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -226,7 +226,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Run shellcheck
-        uses: reviewdog/action-shellcheck@d0b8d5fd7fad6afdb6e1b6ce1778892be4d1f427 # v1.34.1
+        uses: reviewdog/action-shellcheck@b4ffc0b2a69f857f82b74d1310cd3e62e932f9f7 # v1.35.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
@@ -252,7 +252,7 @@ jobs:
           submodules: recursive
           fetch-depth: 0
       - name: Run yamllint
-        uses: reviewdog/action-yamllint@072d1a6ca6f5a03de10f492f6119fcbc8d47302b # v1.25.4
+        uses: reviewdog/action-yamllint@020fba38ce9fed550c704d933aeeb7d6360f7d47 # v1.26.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
