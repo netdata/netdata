@@ -3,7 +3,7 @@
 //!
 //! Responses arrive on the merged per-pipeline channel, tagged with the owning
 //! `Signal` by that pipeline's forwarder (`pipeline.rs` `spawn_forwarder`).
-//! On `Rotated` — a scope's entries are now an immutable catalog file on local
+//! On `Rotated` — a scope's entries are now a catalog file on local
 //! disk — this records the file in the tenant registry (query-time discovery
 //! + retention scan it), marks the covered SFST seqs locally cataloged
 //! (`mark_rotated_many`: reconciliation bookkeeping — eviction itself waits

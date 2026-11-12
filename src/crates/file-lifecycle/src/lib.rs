@@ -68,7 +68,7 @@
 //!   semaphore-bounded concurrent PUTs over [`storage::Storage`]).
 //! - [`catalog_builder`] — the per-signal catalog-rotation component:
 //!   accumulates `otel_catalog::CatalogEntry` rows per scope and rotates a
-//!   scope to an immutable catalog file on count, period, or flush
+//!   scope to a catalog file on count, period, or flush
 //!   triggers.
 //! - [`storage`] — the backend-agnostic [`storage::Storage`] seam and its
 //!   opendal [`storage::OpendalStorage`] impl, keeping opendal confined to

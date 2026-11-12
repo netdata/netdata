@@ -8,6 +8,9 @@
 //!   holds exactly that scope's entries.
 //! - Rotation drains the accumulator: the next rotation holds only the
 //!   post-rotation entries, under a new filename.
+//! - A rotation that gives the name of an existing file replaces it and
+//!   holds only its own entries (each comes from a confirmed upload; an
+//!   older file's entries are not carried over).
 //! - A `rotation_count` of 1 rotates on every `AddEntry`.
 //! - A failed rotation returns `RotationFailed` and keeps the accumulator; the
 //!   next trigger retries with every entry still in it.

@@ -232,7 +232,7 @@ pub struct Registry {
     /// The tenant's sealed SFST files (`{index_base}/{tenant}/*.sfst`),
     /// tracked by the indexer-response path and recovery — see `sfst::registry`.
     pub sfst: sfst::Registry,
-    /// Immutable catalog files present on local disk — path-keyed, the
+    /// Catalog files present on local disk — path-keyed, the
     /// `{catalog_base}/{date}/{tenant}/` layout; see `otel_catalog`.
     pub catalog_files: otel_catalog::Registry,
     /// Per-identity lifecycle state (upload + catalog axes), keyed by full

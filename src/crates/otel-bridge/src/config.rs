@@ -439,7 +439,7 @@ impl Default for SignalConfig {
 #[serde(deny_unknown_fields)]
 pub struct CatalogTuning {
     /// Number of SFST entries accumulated before the catalog builder
-    /// rotates an in-memory accumulator to an immutable catalog file.
+    /// rotates an in-memory accumulator to a catalog file.
     #[serde(default = "default_catalog_rotation_count")]
     pub rotation_count: usize,
     /// Age (since the accumulator's first entry) at which a non-empty
@@ -593,7 +593,7 @@ pub struct CatalogConfig {
     /// Directory for catalog file storage. Layout: `{dir}/{date}/{tenant}/*.catalog`.
     pub dir: PathBuf,
     /// Number of SFST entries accumulated before the catalog builder
-    /// rotates an in-memory accumulator to an immutable catalog file.
+    /// rotates an in-memory accumulator to a catalog file.
     pub rotation_count: usize,
     /// Age at which a non-empty accumulator rotates on the time trigger (see
     /// [`CatalogTuning::rotation_period`]).
