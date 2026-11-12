@@ -568,9 +568,10 @@ pub struct TraceParams {
     /// Optional assembly bounds, unix seconds: only files whose
     /// summary range overlaps `[after, before)` are probed for the
     /// trace's spans. Both-or-neither; `after < before` — violations
-    /// are client errors, any width accepted. Absent = full retention,
-    /// local and remote; the response's `coverage` declares the range
-    /// actually used either way.
+    /// are client errors, any width accepted. Absent = the full retention
+    /// range, read from local files only: an offloaded file is not
+    /// downloaded and makes the answer partial (`remote_unavailable`).
+    /// The response's `coverage` declares the range used either way.
     #[serde(default)]
     pub after: Option<u32>,
     #[serde(default)]
