@@ -43,8 +43,8 @@ pub const MAX_NAME_BYTES: usize = 255;
 /// The whole of a block stays under the 16 MiB a message may have
 /// (`otel_bridge::IPC_MAX_MESSAGE_SIZE`): next to its dimensions, a
 /// definition has its labels ([`MAX_LABELS`], near 1 MiB) and one copy of
-/// the metric's description and unit, which are part of one request (at most
-/// 4 MiB).
+/// the metric's description and unit, which are part of one request
+/// ([`MAX_REQUEST_BYTES`](crate::MAX_REQUEST_BYTES)).
 pub const MAX_DIMENSIONS: usize = 4096;
 
 /// The most labels one chart takes; the rest of a longer set is left out.

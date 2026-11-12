@@ -73,13 +73,13 @@ use crate::otlp_json::{OtlpJson, OtlpJsonResponse};
 use crate::tenant::extract_tenant_id_from_headers;
 use crate::trace_service::NetdataTracesService;
 
-/// The maximum accepted request body, on the wire AND after gzip expansion.
-///
-/// This mirrors tonic's default `max_decoding_message_size` (4 MiB), so the
-/// two transports reject the same requests; capping the expanded body too is
-/// the decompression-bomb guard (a 4 MiB gzip stream can otherwise expand
-/// unboundedly before prost ever sees a length).
-const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
+/// The maximum accepted request body, on the wire AND after gzip expansion:
+/// [`MAX_REQUEST_BYTES`](crate::MAX_REQUEST_BYTES), the limit that the gRPC
+/// services have too, so the two transports reject the same requests.
+/// Capping the expanded body too is the decompression-bomb guard (a 4 MiB
+/// gzip stream can otherwise expand unboundedly before prost ever sees a
+/// length).
+const MAX_BODY_BYTES: usize = crate::MAX_REQUEST_BYTES;
 
 /// The three signals' service handles plus the shared tenant policy. Cheap to
 /// clone: three `Arc`s and a one-flag `AuthConfig`.

@@ -77,6 +77,14 @@ use logs_service::NetdataLogsService;
 use metrics_service::{ChartManager, NetdataMetricsService};
 use trace_service::NetdataTracesService;
 
+/// The largest export request that the plugin accepts, in bytes, after
+/// decompression: one limit for both transports. The gRPC services get it as
+/// their decoding limit (it is also tonic's default, which a new version of
+/// tonic could change), and the OTLP/HTTP front end reads at most this much
+/// (`http_service.rs`). What a request can make the plugin hold or write is
+/// sized against it, for example a chart's definition (`chart.rs`).
+pub(crate) const MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
+
 /// How often the idle-rotation sweep runs. Fixed, no config knob: it bounds
 /// only the *idle*-stream rotation latency — active streams still rotate
 /// precisely on the next write. A no-op tick is cheap (one lock + arithmetic
@@ -634,11 +642,14 @@ fn grpc_server(
     }
 
     let metrics_svc = MetricsServiceServer::from_arc(Arc::clone(metrics_service))
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        .max_decoding_message_size(MAX_REQUEST_BYTES);
     let logs_svc = LogsServiceServer::from_arc(Arc::clone(logs_service))
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        .max_decoding_message_size(MAX_REQUEST_BYTES);
     let traces_svc = TraceServiceServer::from_arc(Arc::clone(traces_service))
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        .max_decoding_message_size(MAX_REQUEST_BYTES);
 
     tracing::info!(%endpoint, "OTLP/gRPC server starting (metrics + logs + traces)");
     let server = server_builder
