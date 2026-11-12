@@ -417,13 +417,13 @@ modules:
       description: |
         Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
 
-        The plugin also makes charts about the data it receives, listed below. These charts count the records of an export when the plugin accepts the export, even when it rejects some of its records. When the plugin cannot store the records of an export of logs or spans (a storage error), the records show as `failed`, and the sender sends them again. An export that fails for another reason does not show on these charts.
+        The plugin also makes charts about the data it receives, listed below. These charts count the records of an export when the plugin accepts the export, even when it rejects some of its records. When the plugin cannot store the records of an export of logs or spans (a storage error), the records show as `failed`, and the sender sends them again. An export that fails more than one time counts each time. An export that fails for another reason does not show on these charts.
 
         The plugin has two worker processes: the ingestor receives the data and writes it, and the ledger indexes it. The ingestor tells the ledger about each file it creates, syncs, and closes. `netdata.otel.wal_events_queued` shows how many of these messages wait to be sent. The number is near zero when the ledger keeps up. When it grows, the ledger is slower than the ingestor, and the memory of the ingestor grows with it.
 
-        The charts of the index files (`netdata.otel.index_files`, `netdata.otel.index_size`, `netdata.otel.index_files_waiting_for_remote`) are totals of all tenants, and the plugin updates them every 30 seconds. `netdata.otel.tenants` shows how many tenants these totals cover: each tenant has its own files and its own retention limits, so the disk that the plugin needs grows with the number of tenants. The retention limits are per tenant: compare the totals with the limits that you configured. A file waits for remote storage when it is over a retention limit but remote storage did not confirm its catalog entry yet. Such files stay on the local disk, so the disk can hold more than the limits while remote storage is unreachable.
+        The charts of the index files (`netdata.otel.index_files`, `netdata.otel.index_size`) are totals of all tenants, and the plugin updates them every 30 seconds. `netdata.otel.tenants` shows how many tenants these totals cover: each tenant has its own files and its own retention limits, so the disk that the plugin needs grows with the number of tenants. The plugin keeps a tenant in this number after the data of the tenant expires. The retention limits are per tenant: compare the totals with the limits that you configured.
 
-        The charts of the uploads (`netdata.otel.uploads`, `netdata.otel.uploads_finished`) exist only when `remote_storage.enabled` is `true`. They count the uploads of index files and of catalog files together. An upload that fails waits and is tried again: it shows as `failed` each time it fails, and as `waiting` between its tries.
+        Three charts exist only when `remote_storage.enabled` is `true`. `netdata.otel.index_files_waiting_for_remote` shows the files that are over a retention limit while remote storage did not confirm their catalog entry yet. Such files stay on the local disk, so the disk can hold more than the limits while remote storage is unreachable. `netdata.otel.uploads` and `netdata.otel.uploads_finished` count the uploads of index files and of catalog files together. An upload is `in_progress` from the moment the plugin starts it until it ends; the plugin runs a few uploads at the same time and the others wait for their turn. An upload that fails shows as `failed` each time it fails, and as `waiting_for_retry` until the plugin tries it again.
       availability: []
       dynamic_context_prefixes:
         - prefix: otel.
@@ -432,7 +432,7 @@ modules:
             otel.<metric name>.
       scopes:
         - name: global
-          description: The plugin itself, with charts of the metric data points, log records and spans that it receives, and of the indexing operations that make stored logs and traces searchable.
+          description: The plugin itself, with charts of the metric data points, log records and spans that it receives, of the indexing operations that make stored logs and traces searchable, of the files that it keeps on the local disk, and of its uploads to remote storage.
           labels: []
           metrics:
             - name: netdata.otel.metric_data_points
@@ -498,6 +498,13 @@ modules:
               dimensions:
                 - name: logs
                 - name: traces
+            - name: netdata.otel.tenants
+              description: Tenants known to the plugin
+              unit: tenants
+              chart_type: line
+              dimensions:
+                - name: logs
+                - name: traces
             - name: netdata.otel.index_files_waiting_for_remote
               description: Index files over the retention limits that wait for remote storage
               unit: files
@@ -505,20 +512,13 @@ modules:
               dimensions:
                 - name: logs
                 - name: traces
-            - name: netdata.otel.tenants
-              description: Tenants with stored data
-              unit: tenants
-              chart_type: line
-              dimensions:
-                - name: logs
-                - name: traces
             - name: netdata.otel.uploads
-              description: Uploads to remote storage running and waiting for a retry
+              description: Uploads to remote storage in progress and waiting for a retry
               unit: operations
               chart_type: stacked
               dimensions:
-                - name: running
-                - name: waiting
+                - name: in_progress
+                - name: waiting_for_retry
             - name: netdata.otel.uploads_finished
               description: Uploads to remote storage finished
               unit: operations/s

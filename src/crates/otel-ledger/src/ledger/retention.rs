@@ -33,23 +33,22 @@ impl Ledger {
             let registries = self.pipelines.get(signal).registries().clone();
             let tenant_ids = registries.read().await.tenant_ids();
 
+            let mut waiting_for_remote = 0;
             for tenant_id in &tenant_ids {
-                self.evaluate_retention(signal, tenant_id).await;
+                waiting_for_remote += self.evaluate_retention(signal, tenant_id).await;
             }
 
-            let totals = self.index_totals(signal, &tenant_ids).await;
+            let mut totals = self.index_totals(signal, &tenant_ids).await;
+            totals.waiting_for_remote = waiting_for_remote as u64;
             self.storage_totals.set(signal, totals);
         }
     }
 
     /// The index files of `signal` on the local disk, over `tenant_ids`: how
-    /// many, how large, and how many are over a retention limit but stay
-    /// until remote storage confirms their catalog entry; and the number of
-    /// those tenants. Files whose deletion is on its way are not counted.
+    /// many and how large, and the number of those tenants. Files whose
+    /// deletion is on its way are not counted.
     async fn index_totals(&self, signal: Signal, tenant_ids: &[TenantId]) -> IndexTotals {
-        let pipeline = self.pipelines.get(signal);
-        let storage_enabled = self.uploader.is_some();
-        let registries = pipeline.registries().read().await;
+        let registries = self.pipelines.get(signal).registries().read().await;
 
         let mut totals = IndexTotals::default();
         for tenant_id in tenant_ids {
@@ -63,22 +62,14 @@ impl Ledger {
                     totals.bytes += file.size.0;
                 }
             }
-
-            let retention = pipeline
-                .config()
-                .index
-                .retention
-                .resolve(tenant_id.as_str());
-            let evictions = registry.index_evictions(
-                &sfst_retention_policy(&retention),
-                now_ns(),
-                storage_enabled,
-            );
-            totals.waiting_for_remote += evictions.deferred.len() as u64;
         }
         totals
     }
 
+    /// Returns how many of the tenant's index files are over the retention
+    /// limits but stay, because remote storage has not confirmed their
+    /// catalog entry yet.
+    ///
     /// Cancel-safety invariant: the mark-then-send-then-clear-on-failure
     /// pattern below is only safe because `self.cleaner.send` is non-awaiting
     /// (`ComponentHandle::send`, an unbounded mpsc send —
@@ -89,7 +80,11 @@ impl Ledger {
     /// queries and future retention scans — with no in-flight cleaner request
     /// and no rollback path. A cancellation-safe rollback (e.g. a clear-on-drop
     /// guard) would have to come first.
-    pub(super) async fn evaluate_retention(&mut self, signal: Signal, tenant_id: &TenantId) {
+    pub(super) async fn evaluate_retention(
+        &mut self,
+        signal: Signal,
+        tenant_id: &TenantId,
+    ) -> usize {
         // Resolve the per-tenant retention config and clone the registries
         // handle up front, so nothing borrows `self` across the awaits below
         // and the `&mut self` fields (uploader, cleaner) stay reachable.
@@ -109,11 +104,11 @@ impl Ledger {
 
         // SFST retention pass — collect deletion requests under the
         // write lock, then send them after dropping the guard.
-        let sfst_reqs: Vec<CleanerRequest> = {
+        let (sfst_reqs, deferred): (Vec<CleanerRequest>, usize) = {
             let mut registries = registries.write().await;
             let registry = match registries.get_mut(tenant_id) {
                 Some(r) => r,
-                None => return,
+                None => return 0,
             };
 
             // The resolved config is lowered onto sfst's plain-data policy
@@ -126,6 +121,7 @@ impl Ledger {
                 now_ns(),
                 storage_enabled,
             );
+            let deferred = evictions.deferred.len();
             // One line per pass, not per file: the pass repeats on a timer.
             if let Some(&oldest) = evictions.deferred.first() {
                 tracing::warn!(
@@ -151,7 +147,7 @@ impl Ledger {
                     });
                 }
             }
-            reqs
+            (reqs, deferred)
         };
 
         // Send outside the lock. A failed send rolls back the mark here; a
@@ -180,7 +176,7 @@ impl Ledger {
             let mut registries = registries.write().await;
             let registry = match registries.get_mut(tenant_id) {
                 Some(r) => r,
-                None => return,
+                None => return deferred,
             };
             let to_evict_catalog = registry
                 .catalog_files
@@ -215,5 +211,7 @@ impl Ledger {
                 }
             }
         }
+
+        deferred
     }
 }

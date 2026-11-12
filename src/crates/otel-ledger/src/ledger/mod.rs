@@ -513,11 +513,12 @@ impl Ledger {
             }
 
             // For the upload charts: an event can have sent an upload, taken
-            // an answer, or queued a retry.
+            // an answer, or queued a retry. A retry that is with the
+            // uploader again is in its `pending`, not among those that wait.
             if let Some(uploader) = &self.uploader {
-                self.storage_totals.set_uploads_in_progress(
+                self.storage_totals.set_uploads_now(
                     uploader.pending() as u64,
-                    self.upload_retry.len() as u64,
+                    self.upload_retry.waiting() as u64,
                 );
             }
         }

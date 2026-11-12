@@ -172,9 +172,10 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// and `Flush` rotations each emit a `Rotated` with no preceding
     /// `AddEntry`), so `pending` is a lower bound on the responses still
     /// queued, not an exact send/recv balance. Production code consults the
-    /// counter only in the synchronous recovery drains, which run against
-    /// 1:1 request/response workers; steady-state routing goes through
-    /// [`ComponentHandle::into_parts`] and ignores it.
+    /// counter in the synchronous recovery drains and, for the uploader, in
+    /// the ledger's upload chart: both run against 1:1 request/response
+    /// workers, where it is exact. The other steady-state routing goes
+    /// through [`ComponentHandle::into_parts`] and ignores it.
     ///
     /// Returns `None` once the component task is gone and the queue is
     /// drained — responses buffered before its exit are still delivered.

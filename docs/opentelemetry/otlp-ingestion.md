@@ -188,7 +188,7 @@ add the alerts that fit your installation.
 | Data that the plugin cannot store | `netdata.otel.log_records` and `netdata.otel.spans`, dimension `failed` | The disk is full, or a write to it failed. The sender sends these records again. |
 | Data that the plugin rejects | `netdata.otel.metric_data_points`, `netdata.otel.log_records`, `netdata.otel.spans`, dimension `rejected` | Usually a timestamp outside the accepted time window. See the troubleshooting list below. |
 | Disk space | The Agent's `disk.space` chart of the filesystem that holds the OpenTelemetry data; `netdata.otel.index_size`, `netdata.otel.index_files` | The retention limits apply to the indexed files of each tenant. Files that are not indexed yet, catalogs, and the download cache use more space. |
-| Tenants | `netdata.otel.tenants` | Each tenant has its own files and its own retention limits. More tenants need more disk. |
+| Tenants | `netdata.otel.tenants` | Each tenant has its own files and its own retention limits. More tenants need more disk. The number does not go down when the data of a tenant expires. |
 | Indexing | `netdata.otel.indexing_operations`, `netdata.otel.indexing_operations_oldest_wait`, `netdata.otel.indexing_operations_finished` | When the number of waiting operations grows, the host receives data faster than it can index it. |
 | The two worker processes | `netdata.otel.wal_events_queued` | When this number grows, the indexing process is slower than the receiving process, and the plugin uses more memory. |
 | Object storage | `netdata.otel.uploads`, `netdata.otel.uploads_finished`, `netdata.otel.index_files_waiting_for_remote` | Uploads that fail, and local files that the plugin cannot delete until object storage confirms them. While these files wait, the local disk can hold more than the retention limits. |
@@ -201,8 +201,9 @@ The plugin relies on these rules and does not check them:
 - Use one object storage location for one Agent. Do not clone a host together with its Netdata machine GUID and
   point both hosts at the same location.
 - The plugin does not delete objects from object storage: the location grows until you set expiry rules on it. If you
-  set expiry rules, do not let the objects under `tenants` expire before the objects under `catalog`. A catalog that
-  names an object that is gone makes queries incomplete.
+  set expiry rules, do not let the objects under `<signal>/tenants` expire before the objects under
+  `<signal>/catalog` (the signal is `logs` or `traces`). A catalog that names an object that is gone makes queries
+  incomplete.
 
 ## Troubleshoot the pipeline
 
