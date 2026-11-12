@@ -290,7 +290,7 @@ Processes and CGroups tables for the selected actor.
 | Name | `Network-viewer.plugin:topology:network-connections` |
 | Require Cloud | no |
 | Performance | group_by:container performs APPS_LOOKUP cache reads to derive canonical container_name; cache warming runs asynchronously. |
-| Security | Free-form labels are denied by default. Raw cgroup paths may expose operator-chosen path segments and are hidden in table views by default. |
+| Security | Free-form labels are denied by default. Raw cgroup paths may expose operator-chosen path segments and are hidden in table views by default. Viewing the topology requires a signed-in member of a Netdata Cloud Space on a paid plan or an active trial; both the topology and the network-connections table require permission to view sensitive data, and the table needs no paid plan. |
 | Availability | container_name uses APPS_LOOKUP data when available, keeps retry-later lookups pending, and falls back to process name for host/root, permanently unknown, and unresolved namespace-relative cgroup cases. |
 
 #### Prerequisites
