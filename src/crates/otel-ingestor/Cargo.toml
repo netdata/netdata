@@ -45,6 +45,7 @@ serde_json = { workspace = true, features = ["preserve_order"] }
 serde_regex = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tokio-rustls = { workspace = true }
 tonic = { workspace = true, features = ["gzip", "tls-ring"] }
 tracing = { workspace = true }

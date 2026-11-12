@@ -65,6 +65,7 @@ use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequ
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use otel_bridge::config::{AuthConfig, ProtocolConfig};
 use prost::Message as _;
+use tokio_util::sync::CancellationToken;
 use tonic::{Code, Status};
 
 use crate::logs_service::NetdataLogsService;
@@ -232,16 +233,23 @@ pub(crate) async fn bind_http(listener: &ProtocolConfig) -> Result<Option<HttpLi
     }
 }
 
-/// Serve the router on the bound listener until the server future is dropped.
-/// axum's serve loop never returns (it retries accept errors itself), so the
-/// `Result` only satisfies axum's signature; the contexts name the transport
-/// should that ever change.
-pub(crate) async fn serve(listener: HttpListener, app: Router) -> Result<()> {
+/// Serve the router on the bound listener until `stop` is cancelled. From
+/// then on the server takes no new request, and the future ends when the
+/// requests in progress have their answers (`run_ingestor` gives that a
+/// budget). Before that, axum's serve loop never returns (it retries accept
+/// errors itself); the contexts name the transport should that ever change.
+pub(crate) async fn serve(
+    listener: HttpListener,
+    app: Router,
+    stop: CancellationToken,
+) -> Result<()> {
     match listener {
         HttpListener::Plain(listener) => axum::serve(listener, app)
+            .with_graceful_shutdown(stop.cancelled_owned())
             .await
             .context("OTLP/HTTP server error"),
         HttpListener::Tls(listener) => axum::serve(listener, app)
+            .with_graceful_shutdown(stop.cancelled_owned())
             .await
             .context("OTLP/HTTP TLS server error"),
     }
@@ -830,7 +838,11 @@ mod tests {
     ) -> (HttpState, tempfile::TempDir) {
         let tmp = tempfile::tempdir().unwrap();
         let socket = format!("/tmp/netdata-http-service-test-{}.sock", std::process::id());
-        let sender = Arc::new(LedgerSender::new(&socket, Arc::default()));
+        let sender = Arc::new(LedgerSender::new(
+            &socket,
+            Arc::default(),
+            tokio_util::sync::CancellationToken::new(),
+        ));
         let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
         let clock = Arc::new(Mutex::new(MonotonicClock::new()));
         let identity = Identity::new(
@@ -1424,6 +1436,45 @@ mod tests {
         assert_eq!(v["code"], serde_json::json!(3));
     }
 
+    /// A stop does not cut a request in progress: the server takes no new
+    /// request, the one in progress gets its answer, and then the server
+    /// ends by itself.
+    #[tokio::test]
+    async fn a_stop_ends_the_server_after_the_request_in_progress_is_answered() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let app = Router::new().route(
+            "/slow",
+            axum::routing::post(|| async {
+                tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                "done"
+            }),
+        );
+        let stop = CancellationToken::new();
+        let server = tokio::spawn(serve(HttpListener::Plain(listener), app, stop.clone()));
+
+        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(b"POST /slow HTTP/1.1\r\nhost: x\r\ncontent-length: 0\r\n\r\n")
+            .await
+            .unwrap();
+        // The request is in its handler when the stop comes.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        stop.cancel();
+
+        let mut answer = String::new();
+        stream.read_to_string(&mut answer).await.unwrap();
+        assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+        assert!(answer.ends_with("done"), "{answer}");
+        tokio::time::timeout(std::time::Duration::from_secs(5), server)
+            .await
+            .expect("the server ends after the answer")
+            .unwrap()
+            .unwrap();
+    }
+
     /// End-to-end over a real listener: a hand-rolled HTTP/1.1 request (no
     /// client dependencies) must land in the WAL and answer 200.
     #[tokio::test]
@@ -1432,9 +1483,13 @@ mod tests {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
-            serve(HttpListener::Plain(listener), router(state))
-                .await
-                .unwrap();
+            serve(
+                HttpListener::Plain(listener),
+                router(state),
+                CancellationToken::new(),
+            )
+            .await
+            .unwrap();
         });
 
         let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
@@ -1576,9 +1631,13 @@ mod tests {
         let addr = listener.listener.local_addr().unwrap();
         let (state, tmp) = test_state(AuthConfig::default());
         let server = tokio::spawn(async move {
-            serve(HttpListener::Tls(listener), router(state))
-                .await
-                .unwrap();
+            serve(
+                HttpListener::Tls(listener),
+                router(state),
+                CancellationToken::new(),
+            )
+            .await
+            .unwrap();
         });
         (addr, server, tmp)
     }

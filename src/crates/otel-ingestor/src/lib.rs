@@ -53,6 +53,7 @@ use otel_bridge::signals::Signal;
 use otel_bridge::{IngestorRequest, IngestorResponse};
 use otel_derived_metrics::DerivedMetrics;
 use tokio::sync::RwLock;
+use tokio_util::sync::CancellationToken;
 use tonic::transport::server::TcpIncoming;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
 
@@ -251,10 +252,16 @@ async fn run_ingestor(
     // Set up the logs + traces pipelines. They SHARE one writer→ledger sender
     // and one global seq allocator: the ledger accepts a single writer
     // connection, and file `seq` must be globally unique across signals.
+    //
+    // `stop` is cancelled when this worker stops: both servers then take no
+    // new request and end when the requests in progress have their answers,
+    // and the sender knows that the ledger's leaving is expected.
+    let stop = CancellationToken::new();
     let (ledger_sender, seq_allocator) = create_shared_writer_state(
         &config,
         &config.writer_socket_path,
         derived_metrics.wal_events_queued(),
+        stop.clone(),
     )?;
     // One process-wide monotonic clock, shared across signals — the WAL writer's
     // contract is that all per-frame `ingestion_ns` come from a single clock so
@@ -339,6 +346,7 @@ async fn run_ingestor(
             &metrics_service,
             &logs_service,
             &traces_service,
+            stop.clone(),
         )?),
         None => None,
     };
@@ -353,7 +361,7 @@ async fn run_ingestor(
             metrics: Arc::clone(&metrics_service),
             auth: config.auth.clone(),
         });
-        http_service::serve(listener, router)
+        http_service::serve(listener, router, stop.clone())
     });
 
     // Every fallible startup step is behind us and the listener is bound, so
@@ -365,31 +373,40 @@ async fn run_ingestor(
     .await?;
     tracing::info!("signaled ready to supervisor");
 
-    // Main loop: forward chart data to supervisor, handle incoming requests,
-    // run both transport servers
-    tokio::select! {
-        result = async {
-            match grpc_server {
-                Some(server) => server.await,
-                // Disabled receiver: this arm then never resolves, like the
-                // HTTP one below.
-                None => std::future::pending::<Result<()>>().await,
+    // A receiver that is disabled has no server: its future waits for the
+    // stop and ends with it, so the select! arms and the stop below have one
+    // shape either way.
+    let grpc_server = async {
+        match grpc_server {
+            Some(server) => server.await,
+            None => {
+                stop.cancelled().await;
+                Ok(())
             }
-        } => {
-            result?;
         }
-        result = async {
-            match http_server {
-                Some(server) => server.await,
-                // Disabled receiver: this arm then never resolves. Neither
-                // does an enabled one in practice (axum's serve loop never
-                // returns), so the gRPC arm or the supervisor loop below
-                // drives the exit.
-                None => std::future::pending::<Result<()>>().await,
+    };
+    let http_server = async {
+        match http_server {
+            Some(server) => server.await,
+            None => {
+                stop.cancelled().await;
+                Ok(())
             }
-        } => {
-            // `serve` already names the transport (plain or TLS).
+        }
+    };
+    tokio::pin!(grpc_server, http_server);
+
+    // Main loop: forward chart data to supervisor, handle incoming requests,
+    // run both transport servers. A server ends only after the stop below, so
+    // one that ends here failed (`serve` names the transport).
+    tokio::select! {
+        result = &mut grpc_server => {
             result?;
+            anyhow::bail!("the OTLP/gRPC server ended with no stop request");
+        }
+        result = &mut http_server => {
+            result?;
+            anyhow::bail!("the OTLP/HTTP server ended with no stop request");
         }
         _ = async {
             loop {
@@ -452,13 +469,44 @@ async fn run_ingestor(
     tick_handle.abort();
     logs_sweep_handle.abort();
     traces_sweep_handle.abort();
-    if let Some(map) = service_map {
-        if tokio::time::timeout(otel_bridge::shutdown::WORKER_STOP_BUDGET, map.shutdown())
-            .await
-            .is_err()
-        {
-            tracing::warn!("service map: shutdown took too long; its open minutes are lost");
+
+    // The stop work, all of it inside one budget (`otel_bridge::shutdown`).
+    // The exports in progress get their answer: an export that is cut gets
+    // none, and its sender sends again records that are on the disk already.
+    // The service map writes its open minutes.
+    //
+    // A server ends when its connections are closed: it tells each client
+    // that it stops, and a client closes its connection when its exports
+    // have their answers. A peer that never closes (a connection that sent
+    // nothing, a client that ignores the notice) costs the whole budget.
+    stop.cancel();
+    let budget = otel_bridge::shutdown::WORKER_STOP_BUDGET;
+    let exports = async {
+        let (grpc, http) = tokio::join!(&mut grpc_server, &mut http_server);
+        for result in [grpc, http] {
+            if let Err(e) = result {
+                tracing::warn!("a server ended its stop with an error: {e:#}");
+            }
         }
+    };
+    let map = async {
+        if let Some(map) = &service_map {
+            map.shutdown().await;
+        }
+    };
+    let (exports, map) = tokio::join!(
+        tokio::time::timeout(budget, exports),
+        tokio::time::timeout(budget, map)
+    );
+    if exports.is_err() {
+        tracing::info!(
+            "connections were still open {} ms after the stop request: an export in progress \
+             on one of them gets no answer",
+            budget.as_millis()
+        );
+    }
+    if map.is_err() {
+        tracing::warn!("service map: shutdown took too long; its open minutes are lost");
     }
     Ok(())
 }
@@ -492,6 +540,7 @@ fn create_shared_writer_state(
     config: &PluginConfig,
     writer_socket_path: &str,
     wal_events_queued: Arc<std::sync::atomic::AtomicU64>,
+    stop: CancellationToken,
 ) -> Result<(Arc<ledger_sender::LedgerSender>, Arc<wal::SeqAllocator>)> {
     let logs_lc = config.lifecycle_for(Signal::Logs);
     let traces_lc = config.lifecycle_for(Signal::Traces);
@@ -517,6 +566,7 @@ fn create_shared_writer_state(
     let ledger_sender = Arc::new(ledger_sender::LedgerSender::new(
         writer_socket_path,
         wal_events_queued,
+        stop,
     ));
 
     tracing::info!(
@@ -612,6 +662,7 @@ fn grpc_server(
     metrics_service: &Arc<NetdataMetricsService>,
     logs_service: &Arc<NetdataLogsService>,
     traces_service: &Arc<NetdataTracesService>,
+    stop: CancellationToken,
 ) -> Result<impl std::future::Future<Output = Result<()>> + use<>> {
     let endpoint = listener.endpoint.clone();
     let mut server_builder = Server::builder();
@@ -654,7 +705,7 @@ fn grpc_server(
         .add_service(metrics_svc)
         .add_service(logs_svc)
         .add_service(traces_svc)
-        .serve_with_incoming(incoming);
+        .serve_with_incoming_shutdown(incoming, stop.cancelled_owned());
     Ok(async move {
         server
             .await

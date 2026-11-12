@@ -3710,6 +3710,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "tonic",
  "tower",
  "tracing",

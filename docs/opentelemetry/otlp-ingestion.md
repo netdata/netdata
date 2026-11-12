@@ -231,13 +231,42 @@ The plugin relies on these rules and does not check them:
   default). Set a larger value only if the attempts still time out when object storage answers: a location with
   very many catalog objects can need more time for the list.
 
+## Delivery is at least once
+
+Netdata answers an export of logs or traces with success only after the records are on its disk. A sender that gets
+no success answer sends the batch again: the OpenTelemetry protocol expects this. Netdata stores what it receives. It
+does not compare records to find copies, because the protocol gives a log record no identity. So Netdata does not
+lose a record after a success answer, but it can store a record two times. These are the causes:
+
+- **A storage error:** the disk is full, or a write to it failed. Netdata answers `UNAVAILABLE` (HTTP 503). A part of
+  the batch, or all of it, can be on the disk already. The charts `netdata.otel.log_records` and `netdata.otel.spans`
+  show these records on their `failed` dimension.
+- **A stop or a restart of the Agent:** the plugin first answers the exports that are in progress, for up to one
+  second. An export that it could not answer in that time gets no answer, and its records can be on the disk.
+- **A crash of the Agent or of the host** after the plugin wrote the records and before the sender got the answer.
+- **An answer that is late or lost:** Netdata stored the batch, but the sender did not wait long enough, or the
+  network lost the answer.
+- **Copies that are made before the data reaches Netdata:** for example, a Collector that reads a log file again
+  after its own restart, or two pipelines that send the same data.
+
+For traces, the view of one trace shows each span one time, also when Netdata stored copies of it. Counts of spans
+include each stored copy.
+
+Netdata has no setting for this. To keep copies rare:
+
+- Give the exporter a `timeout` that is longer than the time Netdata needs to write a batch. The Collector's default
+  is 5 seconds. Increase it if the disk of the Agent is slow.
+- For the `filelog` receiver, use a `file_storage` extension, so that a restart of the Collector does not read the
+  files again. See [logs collection](/docs/opentelemetry/logs-collection.md).
+- Send each set of data through one pipeline.
+
 ## Troubleshoot the pipeline
 
 - **The plugin is absent:** on Linux native packages, confirm the `netdata-plugin-otel` package is installed; on ARMv6 static builds, Windows, and FreeBSD the plugin is not available.
 - **The plugin does not start:** check the Agent journal for strict `otel.yaml` or `NETDATA_OTEL_CFG_*` validation errors.
 - **The Collector connects but data is absent:** check that the exporter uses the right port: `4317` for `otlp_grpc`, `4318` for `otlp_http`. The `otlp_http` exporter needs the OTLP/HTTP listener, which is off by default. Then look for rejected exports in the Collector log and in the Agent journal. On a systemd-based Agent host, query recent plugin messages with `journalctl SYSLOG_IDENTIFIER=otel-plugin SYSLOG_IDENTIFIER=otel-plugin/ingestor --since "-10 min"`.
 - **A metric is absent:** exponential histograms are not currently ingested. For other metrics, inspect mapping errors and search for the `otel.<metric-name>` context.
-- **The Collector reports `Unavailable` or HTTP 503 for logs or traces:** first check if the Agent stopped or restarted at that time. An export that was in progress then usually ends with a closed connection and no answer (in rare cases with the message `the plugin is stopping`). There is nothing to repair: the Collector sends the batch again. Netdata can have the records of that export on its disk already, so they can appear two times. In the other cases Netdata could not store the data: its disk is full, or a write to its disk failed. The Collector keeps the batch and sends it again. The charts `netdata.otel.log_records` and `netdata.otel.spans` show these records on their `failed` dimension. Make room on the disk that holds the OpenTelemetry data, or repair it. One failure can refuse more than one batch, and a refused batch can be on the disk in part or in full. When the Collector sends such a batch again, Netdata stores it again, so some records can appear two times.
+- **The Collector reports `Unavailable` or HTTP 503 for logs or traces:** first check if the Agent stopped or restarted at that time. When it stops, the plugin first answers the exports that are in progress, for up to one second. An export that it could not answer in that time, or that the end of the process cut, ends with a closed connection and no answer (in rare cases with the message `the plugin is stopping`), and exports that come while the plugin is down get a refused connection. There is nothing to repair: the Collector sends the batch again. Netdata can have the records of an export that was cut on its disk already, so they can appear two times (see [Delivery is at least once](#delivery-is-at-least-once)). In the other cases Netdata could not store the data: its disk is full, or a write to its disk failed. The Collector keeps the batch and sends it again. The charts `netdata.otel.log_records` and `netdata.otel.spans` show these records on their `failed` dimension. Make room on the disk that holds the OpenTelemetry data, or repair it. One failure can refuse more than one batch, and a refused batch can be on the disk in part or in full. When the Collector sends such a batch again, Netdata stores it again, so some records can appear two times.
 - **Some metric data points are absent:** Netdata rejects a metric data point when its timestamp is further from the current time than the expiry of its chart (15 minutes by default), in the past or in the future. The chart `netdata.otel.metric_data_points` shows these data points on its `rejected` dimension, and the plugin logs a warning in the Agent journal. Check the clock of the host that produced the metrics. Netdata also rejects a data point when the name of its metric or of its dimension is longer than 255 bytes, and when its chart already has 4,096 dimensions. For a histogram or a summary, Netdata leaves out the buckets or quantiles that do not fit and does not reject the data point. A chart keeps at most 1,024 labels. When the attributes of a metric give more labels, Netdata leaves out the rest.
 - **Some logs are absent:** by default, Netdata accepts log timestamps from up to 24 hours in the past through 10 minutes in the future. Records outside this window are rejected, and the Collector logs a `Partial success response` warning for them.
 - **Some spans are absent:** by default, Netdata accepts a span only if it started no more than 24 hours ago and ends no more than 10 minutes in the future; a span without an end time is judged by its start. The Collector logs a `Partial success response` warning for rejected spans, and the Agent logs a warning in its journal.

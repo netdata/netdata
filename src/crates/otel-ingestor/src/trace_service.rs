@@ -568,7 +568,11 @@ mod tests {
             "/tmp/netdata-traces-ingestor-test-{}.sock",
             std::process::id()
         );
-        let sender = Arc::new(LedgerSender::new(&socket, Arc::default()));
+        let sender = Arc::new(LedgerSender::new(
+            &socket,
+            Arc::default(),
+            tokio_util::sync::CancellationToken::new(),
+        ));
 
         let mut rotation = HashMap::new();
         rotation.insert(
@@ -1217,7 +1221,11 @@ mod tests {
             .expect("bind ledger listener");
 
         // A zero rotation duration makes any elapsed time expire an idle stream.
-        let sender = Arc::new(LedgerSender::new(&socket, Arc::default()));
+        let sender = Arc::new(LedgerSender::new(
+            &socket,
+            Arc::default(),
+            tokio_util::sync::CancellationToken::new(),
+        ));
         let mut rotation = HashMap::new();
         rotation.insert(
             "default".to_string(),

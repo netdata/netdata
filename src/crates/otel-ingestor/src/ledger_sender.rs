@@ -31,6 +31,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use ferryboat::{Connection, Endpoint};
 use file_registry::TenantId;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 /// Sends WAL events to the ledger over that one IPC connection. Shared via a
 /// single `Arc` by the WAL writers of both signals (`TenantWriters`: their
@@ -52,13 +53,16 @@ impl LedgerSender {
     /// connection exists; the task retries the socket indefinitely (1 s
     /// apart), so the ledger does not have to be up yet. Events queued before
     /// it connects simply wait in the channel. `queued` is the counter of
-    /// the events that wait, kept here and charted by its owner.
-    pub fn new(socket_path: &str, queued: Arc<AtomicU64>) -> Self {
+    /// the events that wait, kept here and charted by its owner. `stop` is
+    /// the ingestor's stop: once it is cancelled, a link that ends is what
+    /// is expected.
+    pub fn new(socket_path: &str, queued: Arc<AtomicU64>, stop: CancellationToken) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         tokio::spawn(sender_task(
             rx,
             socket_path.to_string(),
             Arc::clone(&queued),
+            stop,
         ));
         Self { tx, queued }
     }
@@ -97,6 +101,7 @@ async fn sender_task(
     mut rx: mpsc::UnboundedReceiver<wal::Message>,
     socket_path: String,
     queued: Arc<AtomicU64>,
+    stop: CancellationToken,
 ) {
     let endpoint = Endpoint::ipc(&socket_path);
 
@@ -122,10 +127,18 @@ async fn sender_task(
     while let Some(msg) = rx.recv().await {
         queued.fetch_sub(1, Ordering::Relaxed);
         if let Err(e) = conn.send(msg).await {
-            // At a stop the ledger can leave first; when the ledger died,
-            // the supervisor says so and stops the plugin. Either way the
-            // next start recovers the files whose events were not sent.
-            tracing::warn!("the event link to the ledger ended, no more file events are sent: {e}");
+            // At a stop the ledger leaves at once, while this worker still
+            // answers the exports in progress: the link ends first, and that
+            // is no fault. When the ledger died, the supervisor says so and
+            // stops the plugin. Either way the next start recovers the files
+            // whose events were not sent.
+            if stop.is_cancelled() {
+                tracing::info!("the event link to the ledger ended with the stop: {e}");
+            } else {
+                tracing::warn!(
+                    "the event link to the ledger ended, no more file events are sent: {e}"
+                );
+            }
             break;
         }
     }

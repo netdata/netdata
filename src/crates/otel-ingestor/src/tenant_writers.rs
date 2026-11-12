@@ -54,14 +54,15 @@ pub(crate) fn storage_unavailable(message: &'static str) -> tonic::Status {
 /// frames and counts its records) ended without a result. `what` names the
 /// signal ("logs", "traces").
 ///
-/// The task is cancelled when the plugin stops while the request waits for
-/// its sync: the runtime drops it. That is a normal end, not an error. The
-/// frames are in their WAL file, so the next start indexes them. The
-/// sender's connection usually ends with no answer at that moment (seen by
-/// hand: 22 of 23 exports cut by a stop got none, 1 got this status), and a
-/// sender that sends the records again stores them twice. This is not a
-/// storage error, so the records are not counted as `failed`. A task that
-/// panicked is a defect of this plugin.
+/// The task is cancelled when the runtime is dropped while the request
+/// waits for its sync. That happens only to an export that is still in
+/// progress when the worker's stop budget ends: at a stop the worker first
+/// lets the exports in progress finish (`run_ingestor`). It is a normal end,
+/// not an error. The frames are in their WAL file, so the next start indexes
+/// them, and a sender that sends the records again stores them twice. The
+/// sender's connection usually ends with no answer at that moment, so few
+/// senders see this status. This is not a storage error, so the records are
+/// not counted as `failed`. A task that panicked is a defect of this plugin.
 pub(crate) fn export_task_ended(
     error: tokio::task::JoinError,
     what: &'static str,
@@ -427,7 +428,11 @@ mod tests {
                 MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
                 InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
             ),
-            Arc::new(LedgerSender::new(socket, Arc::default())),
+            Arc::new(LedgerSender::new(
+                socket,
+                Arc::default(),
+                tokio_util::sync::CancellationToken::new(),
+            )),
         )
     }
 
@@ -443,7 +448,11 @@ mod tests {
         );
         let _ = std::fs::remove_file(&socket);
         let queued = Arc::new(AtomicU64::new(0));
-        let sender = LedgerSender::new(&socket, Arc::clone(&queued));
+        let sender = LedgerSender::new(
+            &socket,
+            Arc::clone(&queued),
+            tokio_util::sync::CancellationToken::new(),
+        );
         let file_id = file_registry::FileId::new(
             Identity::new(
                 MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
