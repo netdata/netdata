@@ -147,7 +147,8 @@ With `remote_storage.enabled: true`, every sealed indexed file is also uploaded 
 [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md#offloading-to-object-storage).
 Uploading changes nothing locally: files stay under local retention, and
 a local file is not deleted by retention until its catalog entry confirms it is in the remote. While an older file
-waits for this confirmation, retention deletes the oldest files that are confirmed, so the limits hold. When a query
+waits for this confirmation, retention deletes the oldest files that are confirmed. The files that wait still count
+against the limits, so the limits hold only when enough files are confirmed. When a query
 needs an offloaded file that is no longer local, the Agent downloads it whole into a download cache at
 `<base_dir>/remote-read`, bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then
 answers from it; repeated queries over the same files are served from the cache.
