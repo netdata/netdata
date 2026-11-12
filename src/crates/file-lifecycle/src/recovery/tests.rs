@@ -1656,7 +1656,7 @@ impl crate::component::Component for IndexingStub {
             let _ = tx.send(crate::ipc::IndexerResponse::Indexed {
                 file_id,
                 summary: crate::test_helpers::summary_for("", "", 1, 0, 0),
-                size: file_registry::ByteSize(0),
+                size: file_registry::ByteSize(4242),
             });
         }
     }
@@ -1728,10 +1728,9 @@ async fn recover_wals_deletes_the_indexed_wal_indexes_the_other_and_owes_the_cle
         assert!(registry.wal.get(id.seq).is_none(), "WAL entry untracked");
         assert!(!path.exists(), "WAL file deleted");
     }
-    assert!(
-        registry.sfst.get(unindexed.seq).is_some(),
-        "the new index is tracked"
-    );
+    // The new index is tracked, with the size that the indexer gave.
+    let tracked = registry.sfst.get(unindexed.seq).unwrap();
+    assert_eq!(tracked.size, file_registry::ByteSize(4242));
 
     cancel.cancel();
 }

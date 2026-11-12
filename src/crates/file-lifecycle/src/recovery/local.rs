@@ -34,7 +34,7 @@
 //! splits the per-pipeline ones only after recovery). Consumers
 //! (grep-verified): the `build_pipeline` above and `recovery/tests.rs`.
 
-use file_registry::{ByteSize, SeqKey};
+use file_registry::SeqKey;
 use otel_catalog::Catalog;
 
 use crate::component::{ComponentHandle, batch_recover, drain_pending};
@@ -109,7 +109,7 @@ pub(crate) async fn recover_unindexed(
         IndexerResponse::Indexed {
             file_id: id,
             summary,
-            ..
+            size,
         } => {
             let seq = id.seq;
 
@@ -139,12 +139,7 @@ pub(crate) async fn recover_unindexed(
                 }
                 tracing::warn!("recovery: indexed empty WAL seq={seq}; dropped (no SFST tracked)");
             } else {
-                let index_size = ByteSize(
-                    std::fs::metadata(&index_file_path)
-                        .map(|m| m.len())
-                        .unwrap_or(0),
-                );
-                registry.sfst.track(id, index_size, summary);
+                registry.sfst.track(id, size, summary);
                 tracing::info!("recovery: indexed seq={seq}");
             }
         }
