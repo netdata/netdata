@@ -7,6 +7,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 )
 
 func TestReceiveClosedSession(t *testing.T) {
@@ -40,7 +42,7 @@ func TestReceiveWaitHelpers(t *testing.T) {
 		t.Fatalf("infinite wait = %d/%v, want %d/nil", waitMs, err, receiveAbortPollMs)
 	}
 
-	expired := receiveWait{deadline: time.Now().Add(-time.Millisecond)}
+	expired := receiveWait{deadline: monotime.After(-time.Millisecond)}
 	if _, err := expired.waitMs(); !errors.Is(err, ErrTimeout) {
 		t.Fatalf("expired wait error = %v, want ErrTimeout", err)
 	}
@@ -53,7 +55,7 @@ func TestReceiveWaitHelpers(t *testing.T) {
 	}
 
 	timed := newReceiveWait(50, nil)
-	if timed.infinite || timed.deadline.IsZero() {
+	if timed.infinite || timed.deadline == 0 {
 		t.Fatalf("timed wait = %+v, want finite wait with deadline", timed)
 	}
 }
@@ -63,7 +65,7 @@ func TestRawRecvWithTimeoutClosedSession(t *testing.T) {
 	if _, err := session.rawRecvWithTimeout(make([]byte, 1), receiveWait{infinite: true}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("rawRecvWithTimeout on closed session = %v, want ErrBadParam", err)
 	}
-	if _, err := session.rawRecvWithTimeout(make([]byte, 1), receiveWait{deadline: time.Now().Add(-time.Millisecond)}); !errors.Is(err, ErrTimeout) {
+	if _, err := session.rawRecvWithTimeout(make([]byte, 1), receiveWait{deadline: monotime.After(-time.Millisecond)}); !errors.Is(err, ErrTimeout) {
 		t.Fatalf("rawRecvWithTimeout expired wait = %v, want ErrTimeout", err)
 	}
 }

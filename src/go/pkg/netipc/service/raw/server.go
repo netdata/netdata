@@ -2,6 +2,7 @@ package raw
 
 import (
 	"errors"
+	"math"
 	"sync/atomic"
 	"time"
 
@@ -47,6 +48,84 @@ func (s *Server) initCommon(
 	s.responsePayloadGrowthCeiling = responsePayloadGrowthCeiling
 	s.learnedRequestPayloadBytes.Store(maxRequestPayloadBytes)
 	s.learnedResponsePayloadBytes.Store(maxResponsePayloadBytes)
+	s.timings = defaultServerTimings()
+	s.listening = make(chan struct{})
+}
+
+const serverStopRetry = 50 * time.Millisecond
+
+// serverTimings holds the server's internal waits. Production always uses
+// defaultServerTimings; tests shorten them per instance so they can prove
+// timeout behaviour without waiting out production values.
+type serverTimings struct {
+	// pollMs bounds every blocking wait, so it sets how fast stop is noticed.
+	pollMs uint32
+	// stopGrace is how long stop waits for workers to exit on their own
+	// before interrupting their blocking I/O.
+	stopGrace time.Duration
+	// handshakeMs bounds how long a connection may take to send HELLO.
+	handshakeMs uint32
+}
+
+func defaultServerTimings() serverTimings {
+	return serverTimings{
+		pollMs:      serverPollTimeoutMs,
+		stopGrace:   1000 * time.Millisecond,
+		handshakeMs: protocol.ServerHandshakeTimeoutMs,
+	}
+}
+
+// slotWait is how long a connection waits for a worker slot before it is
+// refused. Two poll slices: a worker whose client left exits within one.
+func (t serverTimings) slotWait() time.Duration {
+	return 2 * time.Duration(t.pollMs) * time.Millisecond
+}
+
+// Listening returns a channel closed once Run has bound the listener and
+// clients can connect. It stays open if Run fails or returns before binding.
+func (s *Server) Listening() <-chan struct{} {
+	return s.listening
+}
+
+// headerPayloadLen returns the SHM area size for a payload limit, or false
+// when header plus payload does not fit in uint32.
+func headerPayloadLen(payload uint32) (uint32, bool) {
+	if payload > math.MaxUint32-uint32(protocol.HeaderSize) {
+		return 0, false
+	}
+	return payload + uint32(protocol.HeaderSize), true
+}
+
+// notifyTestHook signals a test hook channel; production servers leave the
+// hooks nil.
+func (s *Server) notifyTestHook(ch chan struct{}) {
+	if ch == nil {
+		return
+	}
+	select {
+	case ch <- struct{}{}:
+	default:
+	}
+}
+
+// markListening records that the listener is bound and accepting.
+func (s *Server) markListening() {
+	s.listeningOnce.Do(func() { close(s.listening) })
+}
+
+// stopChan is closed once a stop is requested; handshakes wait on it.
+func (s *Server) stopChan() <-chan struct{} {
+	s.stopInit.Do(func() { s.stopCh = make(chan struct{}) })
+	return s.stopCh
+}
+
+// markStopped records a stop request. The flag is never cleared, so a stop
+// that lands before Run starts still stops it.
+func (s *Server) markStopped() {
+	s.stopRequested.Store(true)
+	s.running.Store(false)
+	s.stopChan()
+	s.stopClose.Do(func() { close(s.stopCh) })
 }
 
 func (s *Server) retryAcceptAfter(cleanup func()) bool {
@@ -60,17 +139,30 @@ func (s *Server) retryAcceptAfter(cleanup func()) bool {
 	return true
 }
 
+// acquireWorkerSlot waits up to timings.slotWait() for a free worker, so a
+// client that reconnects right after closing is not refused while its old
+// worker exits. Clients queued behind this one wait as well, but while every
+// worker stays busy they would be refused too.
 func (s *Server) acquireWorkerSlot(sem chan struct{}, cleanup func(), closeSession func()) bool {
 	select {
 	case sem <- struct{}{}:
 		return true
 	default:
-		if cleanup != nil {
-			cleanup()
-		}
-		closeSession()
-		return false
 	}
+
+	timer := time.NewTimer(s.timings.slotWait())
+	defer timer.Stop()
+	select {
+	case sem <- struct{}{}:
+		return true
+	case <-timer.C:
+	case <-s.stopChan():
+	}
+	if cleanup != nil {
+		cleanup()
+	}
+	closeSession()
+	return false
 }
 
 func (s *Server) startSessionWorker(sem chan struct{}, run func()) {
@@ -81,6 +173,7 @@ func (s *Server) startSessionWorker(sem chan struct{}, run func()) {
 				// Session handler panicked; keep the accept loop alive.
 			}
 			<-sem
+			s.notifyTestHook(s.sessionExited)
 			s.wg.Done()
 		}()
 		run()
@@ -136,6 +229,9 @@ func (s *Server) handleServerSession(ops serverSessionOps) {
 
 	defer ops.close()
 
+	// One response header per session: its address goes to ops.send, so a
+	// per-request variable would be a heap allocation per request.
+	var respHdr protocol.Header
 	for s.running.Load() {
 		hdr, payload, action := ops.receive(recvBuf)
 		switch action {
@@ -149,7 +245,9 @@ func (s *Server) handleServerSession(ops serverSessionOps) {
 			return
 		}
 
-		respHdr, responseLen, closeAfterSend := s.handleServerRequest(
+		var responseLen int
+		var closeAfterSend bool
+		respHdr, responseLen, closeAfterSend = s.handleServerRequest(
 			hdr, payload, respBuf, itemRespBuf, ops.maxResponsePayloadBytes)
 		if err := ops.send(&respHdr, respBuf[:responseLen], &msgBuf); err != nil {
 			return

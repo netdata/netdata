@@ -114,6 +114,8 @@ elseif(OS_WINDOWS)
 
     add_library(netipc STATIC ${NETIPC_FILES})
     target_include_directories(netipc PUBLIC ${CMAKE_SOURCE_DIR}/src/libnetdata/netipc/include)
+    # The owner-only security descriptors of pipes and SHM objects use advapi32.
+    target_link_libraries(netipc PUBLIC advapi32)
     set_target_properties(netipc PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON)
 endif()
 

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -27,7 +28,9 @@ var testServiceCounter atomic.Uint64
 func uniqueService(t *testing.T) string {
 	t.Helper()
 	n := testServiceCounter.Add(1)
-	return fmt.Sprintf("gotest_%d_%d", os.Getpid(), n)
+	service := fmt.Sprintf("gotest_%d_%d", os.Getpid(), n)
+	trackTestLock(filepath.Join(os.TempDir(), "nipc_go_test"), service)
+	return service
 }
 
 func testRunDir(t *testing.T) string {
@@ -36,6 +39,19 @@ func testRunDir(t *testing.T) string {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatalf("cannot create run dir: %v", err)
 	}
+	return dir
+}
+
+// shortTempDir is a per-test directory for socket paths. t.TempDir() follows
+// $TMPDIR, which on macOS is long enough to push a socket path past the
+// 104-byte sun_path limit.
+func shortTempDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("/tmp", "nipc_go_")
+	if err != nil {
+		t.Fatalf("create temp dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	return dir
 }
 
@@ -654,7 +670,7 @@ func TestStaleRecovery(t *testing.T) {
 func TestStaleRecoveryInGroupWritableRunDir(t *testing.T) {
 	// Crash recovery must work regardless of run-dir permissions
 	// (netdata's systemd unit ships RuntimeDirectoryMode=0775).
-	runDir := t.TempDir()
+	runDir := shortTempDir(t)
 	if err := os.Chmod(runDir, 0o775); err != nil {
 		t.Fatalf("chmod run dir: %v", err)
 	}
@@ -671,6 +687,30 @@ func TestStaleRecoveryInGroupWritableRunDir(t *testing.T) {
 		t.Fatalf("Listen must reclaim the endpoint in a group-writable run dir: %v", err)
 	}
 	listener.Close()
+}
+
+// An empty directory at the socket path is reclaimed on every platform, as
+// in C and Rust.
+func TestStaleRecoveryReclaimsEmptyDirectory(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	sockPath := filepath.Join(runDir, service+".sock")
+	defer os.Remove(sockPath)
+
+	if err := os.Mkdir(sockPath, 0o700); err != nil {
+		t.Fatalf("cannot create directory at socket path: %v", err)
+	}
+
+	listener, err := Listen(runDir, service, defaultServerConfig())
+	if err != nil {
+		t.Fatalf("Listen must reclaim an empty directory: %v", err)
+	}
+	defer listener.Close()
+
+	info, err := os.Lstat(sockPath)
+	if err != nil || info.Mode()&os.ModeSocket == 0 {
+		t.Fatalf("socket must replace the directory: info=%v err=%v", info, err)
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -880,9 +920,79 @@ func TestProfileSelection(t *testing.T) {
 	server := sr.session
 	defer server.Close()
 
-	// Preferred intersection = SHMFutex (0x04), highest bit = 0x04
-	if client.SelectedProfile != protocol.ProfileSHMFutex {
-		t.Errorf("selected = 0x%x, want 0x%x (SHMFutex)", client.SelectedProfile, protocol.ProfileSHMFutex)
+	// Preferred intersection = SHMFutex (0x04), highest bit = 0x04. Without
+	// POSIX SHM the platform limit leaves baseline on both sides.
+	want := uint32(protocol.ProfileSHMFutex)
+	if platformProfiles == protocol.ProfileBaseline {
+		want = protocol.ProfileBaseline
+	}
+	if client.SelectedProfile != want || server.SelectedProfile != want {
+		t.Errorf("selected = 0x%x/0x%x, want 0x%x", client.SelectedProfile, server.SelectedProfile, want)
+	}
+}
+
+// An unassigned profile bit offered and preferred by both peers is never
+// selected: they would otherwise run baseline under that label.
+func TestUnassignedProfileBitNotSelected(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	defer os.Remove(filepath.Join(runDir, service+".sock"))
+
+	const unassigned = 0x10
+	sCfg := defaultServerConfig()
+	sCfg.SupportedProfiles = protocol.ProfileBaseline | unassigned
+	sCfg.PreferredProfiles = unassigned
+	listener := startListener(t, runDir, service, sCfg)
+	defer listener.Close()
+
+	acceptCh := acceptAsync(listener)
+
+	cCfg := defaultClientConfig()
+	cCfg.SupportedProfiles = protocol.ProfileBaseline | unassigned
+	cCfg.PreferredProfiles = unassigned
+	client, err := Connect(runDir, service, &cCfg)
+	if err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer client.Close()
+
+	sr := <-acceptCh
+	if sr.err != nil {
+		t.Fatalf("Accept failed: %v", sr.err)
+	}
+	defer sr.session.Close()
+
+	if client.SelectedProfile != protocol.ProfileBaseline || sr.session.SelectedProfile != protocol.ProfileBaseline {
+		t.Errorf("selected = 0x%x/0x%x, want baseline", client.SelectedProfile, sr.session.SelectedProfile)
+	}
+}
+
+// A deadline-bounded send of an untracked message with nothing in flight
+// still has room for one response in its pending queue.
+func TestBoundedControlSendIdle(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	defer os.Remove(filepath.Join(runDir, service+".sock"))
+
+	listener := startListener(t, runDir, service, defaultServerConfig())
+	defer listener.Close()
+	acceptCh := acceptAsync(listener)
+
+	cCfg := defaultClientConfig()
+	client, err := Connect(runDir, service, &cCfg)
+	if err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer client.Close()
+	sr := <-acceptCh
+	if sr.err != nil {
+		t.Fatalf("Accept failed: %v", sr.err)
+	}
+	defer sr.session.Close()
+
+	hdr := protocol.Header{Kind: protocol.KindControl, MessageID: 1}
+	if err := client.SendTimeout(&hdr, nil, 5000, nil); err != nil {
+		t.Fatalf("bounded control send: %v", err)
 	}
 }
 
@@ -1311,8 +1421,7 @@ func TestAcceptWithTimeout(t *testing.T) {
 		}
 	}()
 
-	// Short delay then connect
-	time.Sleep(50 * time.Millisecond)
+	// The listener is bound, so the connect queues until the accept runs.
 	cCfg := defaultClientConfig()
 	client, err := Connect(runDir, service, &cCfg)
 	if err != nil {
@@ -1884,4 +1993,58 @@ func TestUnknownMessageID(t *testing.T) {
 	if !errors.Is(err, ErrUnknownMsgID) {
 		t.Errorf("error = %v, want ErrUnknownMsgID", err)
 	}
+}
+
+// ---------------------------------------------------------------------------
+//  Test: close-on-exec
+// ---------------------------------------------------------------------------
+
+// Sockets must not leak into children a consumer forks and execs: an
+// inherited session socket keeps the peer from ever seeing EOF, which is the
+// dead-peer signal.
+func TestListenerAndSessionSocketsAreCloexec(t *testing.T) {
+	runDir := testRunDir(t)
+	service := uniqueService(t)
+	defer os.Remove(filepath.Join(runDir, service+".sock"))
+
+	listener := startListener(t, runDir, service, defaultServerConfig())
+	defer listener.Close()
+	acceptCh := acceptAsync(listener)
+
+	cCfg := defaultClientConfig()
+	client, err := Connect(runDir, service, &cCfg)
+	if err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer client.Close()
+	res := <-acceptCh
+	if res.err != nil {
+		t.Fatalf("Accept failed: %v", res.err)
+	}
+	defer res.session.Close()
+
+	for name, fd := range map[string]int{
+		"listener": listener.Fd(),
+		"accepted": res.session.Fd(),
+		"client":   client.Fd(),
+	} {
+		flags, err := fcntlGetFd(fd)
+		if err != nil || flags&syscall.FD_CLOEXEC == 0 {
+			t.Errorf("%s socket fd %d must be close-on-exec (flags=%#x err=%v)", name, fd, flags, err)
+		}
+	}
+	// Where the listener is non-blocking (accept under ForkLock), the
+	// accepted socket inherits O_NONBLOCK on BSD; sessions must block.
+	status, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(res.session.Fd()), syscall.F_GETFL, 0)
+	if errno != 0 || status&syscall.O_NONBLOCK != 0 {
+		t.Errorf("accepted socket must be blocking (status=%#x err=%v)", status, errno)
+	}
+}
+
+func fcntlGetFd(fd int) (uintptr, error) {
+	flags, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(fd), syscall.F_GETFD, 0)
+	if errno != 0 {
+		return 0, errno
+	}
+	return flags, nil
 }

@@ -774,3 +774,34 @@ func testWinShmReceiveIgnoresSpuriousWake(t *testing.T, serverReceives bool) {
 		t.Fatal("second WinShmReceive timed out")
 	}
 }
+
+// Send rejects zero-length messages, so a slot published with length 0 is
+// corruption: receive reports ErrWinShmBadHeader instead of an empty message.
+func TestWinShmReceiveRejectsZeroLength(t *testing.T) {
+	runDir := t.TempDir()
+	service := "zero-length-slot"
+	const authToken uint64 = 0x8917
+	const sessionID uint64 = 29
+
+	server, err := WinShmServerCreate(runDir, service, authToken, sessionID, WinShmProfileHybrid, 4096, 4096)
+	if err != nil {
+		t.Fatalf("WinShmServerCreate failed: %v", err)
+	}
+	defer server.WinShmDestroy()
+
+	client, err := WinShmClientAttach(runDir, service, authToken, sessionID, WinShmProfileHybrid)
+	if err != nil {
+		t.Fatalf("WinShmClientAttach failed: %v", err)
+	}
+	defer client.WinShmClose()
+
+	// Publish the response slot length as 0 before its sequence advances.
+	data := unsafe.Slice((*byte)(unsafe.Pointer(server.base)), server.size)
+	atomic.StoreInt32((*int32)(unsafe.Pointer(&data[wshOFFRespLen])), 0)
+	atomic.AddInt64((*int64)(unsafe.Pointer(&data[wshOFFRespSeq])), 1)
+
+	n, err := client.WinShmReceive(make([]byte, 8192), 1000)
+	if !errors.Is(err, ErrWinShmBadHeader) || n != 0 {
+		t.Fatalf("zero-length slot: n=%d err=%v, want 0 and ErrWinShmBadHeader", n, err)
+	}
+}

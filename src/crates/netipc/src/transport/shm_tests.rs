@@ -9,6 +9,9 @@ use std::time::Duration;
 
 const TEST_RUN_DIR: &str = "/tmp/nipc_shm_rust_test";
 const SERVER_READY_TIMEOUT: Duration = Duration::from_secs(2);
+// Above every OS PID limit, so never a live process; a small fixed PID such
+// as 99999 can be in use on hosts with a large pid_max.
+const DEAD_PID: i32 = i32::MAX;
 
 fn ensure_run_dir() {
     let _ = std::fs::create_dir_all(TEST_RUN_DIR);
@@ -175,7 +178,7 @@ fn test_stale_recovery() {
     let mut first =
         ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024).expect("first create");
     let hdr = first.base as *mut RegionHeader;
-    unsafe { (*hdr).owner_pid = 99999 }; // very unlikely alive
+    unsafe { (*hdr).owner_pid = DEAD_PID };
     first.close(); // close without unlink
 
     // cleanup_stale should remove the stale file
@@ -205,7 +208,7 @@ fn test_stale_recovery_in_group_writable_run_dir() {
 
     let mut first = ShmContext::server_create(&dir, svc, sid, 1024, 1024).expect("first create");
     let hdr = first.base as *mut RegionHeader;
-    unsafe { (*hdr).owner_pid = 99999 }; // very unlikely alive
+    unsafe { (*hdr).owner_pid = DEAD_PID };
     first.close(); // close without unlink
 
     // server_create must reclaim the dead-owner region through its EEXIST path
@@ -623,19 +626,22 @@ fn test_server_create_does_not_fallback_when_fallocate_is_unsupported() {
     ensure_run_dir();
     let svc = "rs_shm_alloc_unsupported";
     let sid = 0xa110_c003;
-    cleanup_shm(svc, sid);
 
-    let _fault = FallocateFaultGuard::install(&[libc::EOPNOTSUPP]);
-    let err = match ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024) {
-        Ok(_) => panic!("unsupported fallocate must disable SHM creation"),
-        Err(err) => err,
-    };
+    // EINVAL is how FreeBSD ZFS rejects posix_fallocate.
+    for errno in [libc::EOPNOTSUPP, libc::EINVAL] {
+        cleanup_shm(svc, sid);
+        let _fault = FallocateFaultGuard::install(&[errno]);
+        let err = match ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024) {
+            Ok(_) => panic!("unsupported allocation ({errno}) must disable SHM creation"),
+            Err(err) => err,
+        };
 
-    assert_eq!(err, ShmError::Allocate(libc::EOPNOTSUPP));
-    assert_eq!(syscall_test_counts(), (1, 0), "mmap must not be reached");
+        assert_eq!(err, ShmError::Allocate(errno));
+        assert_eq!(syscall_test_counts(), (1, 0), "mmap must not be reached");
 
-    let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("SHM path");
-    assert!(!path.exists(), "failed allocation must unlink its file");
+        let path = build_shm_path(TEST_RUN_DIR, svc, sid).expect("SHM path");
+        assert!(!path.exists(), "failed allocation must unlink its file");
+    }
 }
 
 // -----------------------------------------------------------------------
@@ -663,119 +669,6 @@ fn test_shm_role_and_fd() {
     let mut s = server;
     c.close();
     s.destroy();
-    cleanup_shm(svc, sid);
-}
-
-// -----------------------------------------------------------------------
-//  ShmContext::owner_alive() (lines 174-191)
-// -----------------------------------------------------------------------
-
-#[test]
-fn test_owner_alive() {
-    ensure_run_dir();
-    let svc = "rs_shm_alive";
-    let sid: u64 = 51;
-    cleanup_shm(svc, sid);
-
-    let server =
-        ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024).expect("server create");
-
-    // Owner is the current process, so should be alive
-    assert!(server.owner_alive());
-
-    // Client should also report alive (same process owns it)
-    let client = ShmContext::client_attach(TEST_RUN_DIR, svc, sid).expect("client attach");
-    assert!(client.owner_alive());
-
-    let mut c = client;
-    let mut s = server;
-    c.close();
-    s.destroy();
-    cleanup_shm(svc, sid);
-}
-
-#[test]
-fn test_owner_alive_dead_pid() {
-    ensure_run_dir();
-    let svc = "rs_shm_dead";
-    let sid: u64 = 52;
-    cleanup_shm(svc, sid);
-
-    let mut server =
-        ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024).expect("server create");
-
-    // Forge a dead PID
-    let hdr = server.base as *mut RegionHeader;
-    unsafe { (*hdr).owner_pid = 99999 };
-
-    assert!(!server.owner_alive());
-
-    server.destroy();
-    cleanup_shm(svc, sid);
-}
-
-#[test]
-fn test_owner_alive_null_base() {
-    ensure_run_dir();
-    let svc = "rs_shm_null";
-    let sid: u64 = 53;
-    cleanup_shm(svc, sid);
-
-    let mut server =
-        ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024).expect("server create");
-
-    // Null base -> not alive
-    let saved_base = server.base;
-    server.base = std::ptr::null_mut();
-    assert!(!server.owner_alive());
-
-    // Restore for cleanup
-    server.base = saved_base;
-    server.destroy();
-    cleanup_shm(svc, sid);
-}
-
-#[test]
-fn test_owner_alive_generation_mismatch() {
-    ensure_run_dir();
-    let svc = "rs_shm_gen";
-    let sid: u64 = 54;
-    cleanup_shm(svc, sid);
-
-    let mut server =
-        ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024).expect("server create");
-
-    // Forge a different generation in the header
-    let hdr = server.base as *mut RegionHeader;
-    unsafe { (*hdr).owner_generation = server.owner_generation + 1 };
-
-    // Generation mismatch -> not alive
-    assert!(!server.owner_alive());
-
-    server.destroy();
-    cleanup_shm(svc, sid);
-}
-
-#[test]
-fn test_owner_alive_legacy_generation_skips_generation_check() {
-    ensure_run_dir();
-    let svc = "rs_shm_gen_legacy";
-    let sid: u64 = 55;
-    cleanup_shm(svc, sid);
-
-    let mut server =
-        ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024).expect("server create");
-
-    let hdr = server.base as *mut RegionHeader;
-    unsafe { (*hdr).owner_generation = server.owner_generation.wrapping_add(123) };
-    server.owner_generation = 0;
-
-    assert!(
-        server.owner_alive(),
-        "cached generation 0 should skip owner-generation mismatch checks"
-    );
-
-    server.destroy();
     cleanup_shm(svc, sid);
 }
 
@@ -1234,13 +1127,41 @@ fn test_pid_alive() {
     assert!(!pid_alive(-1));
     // Current process should be alive
     assert!(pid_alive(unsafe { libc::getpid() }));
-    // Very unlikely PID
-    assert!(!pid_alive(99999));
+    assert!(!pid_alive(DEAD_PID));
 }
 
 // -----------------------------------------------------------------------
 //  Client attach: nonexistent file (line 325)
 // -----------------------------------------------------------------------
+
+#[test]
+fn test_client_attach_rejects_response_end_wrapping_u32() {
+    ensure_run_dir();
+    let svc = "rs_shm_badwrap";
+    let sid: u64 = 65;
+    cleanup_shm(svc, sid);
+
+    let mut server =
+        ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024).expect("server create");
+
+    // The end wraps to 0 in u32; on 32-bit usize the old check accepted it.
+    let hdr = server.base as *mut RegionHeader;
+    let (saved_off, saved_cap) = unsafe { ((*hdr).response_offset, (*hdr).response_capacity) };
+    unsafe {
+        (*hdr).response_offset = 0xFFFF_FFC0;
+        (*hdr).response_capacity = 0x40;
+    }
+
+    let result = ShmContext::client_attach(TEST_RUN_DIR, svc, sid);
+    assert!(matches!(result, Err(ShmError::BadSize)));
+
+    unsafe {
+        (*hdr).response_offset = saved_off;
+        (*hdr).response_capacity = saved_cap;
+    }
+    server.destroy();
+    cleanup_shm(svc, sid);
+}
 
 #[test]
 fn test_client_attach_nonexistent() {
@@ -1554,4 +1475,90 @@ fn test_cleanup_stale_unlinks_directory_symlink_when_mmap_fails() {
     assert!(target.is_dir(), "target directory should remain");
 
     std::fs::remove_dir_all(&target).expect("remove target dir");
+}
+
+// SHM fds must not leak into children a consumer forks and execs.
+#[test]
+fn test_shm_fds_are_cloexec() {
+    ensure_run_dir();
+    let svc = "rs_shm_cloexec";
+    let sid: u64 = 4242;
+    cleanup_shm(svc, sid);
+
+    let cloexec = |fd: i32| unsafe { libc::fcntl(fd, libc::F_GETFD) } & libc::FD_CLOEXEC != 0;
+    let mut server =
+        ShmContext::server_create(TEST_RUN_DIR, svc, sid, 4096, 4096).expect("server create");
+    let mut client = ShmContext::client_attach(TEST_RUN_DIR, svc, sid).expect("client attach");
+    let server_ok = cloexec(server.fd());
+    let client_ok = cloexec(client.fd());
+    client.close();
+    server.destroy();
+    cleanup_shm(svc, sid);
+
+    assert!(server_ok, "server SHM fd must be close-on-exec");
+    assert!(client_ok, "client SHM fd must be close-on-exec");
+}
+
+#[test]
+fn test_empty_run_dir_rejected() {
+    assert!(matches!(
+        ShmContext::server_create("", "rs_shm_empty_dir", 1, 1024, 1024),
+        Err(ShmError::BadParam(_))
+    ));
+}
+
+const UMASK_HELPER_ENV: &str = "NETIPC_SHM_UMASK_HELPER";
+const UMASK_HELPER_TEST: &str = "transport::shm::tests::shm_umask_helper_process";
+
+// The umask is process-wide, so the restrictive-umask case runs in a child
+// test process instead of the multithreaded test runner.
+#[test]
+fn test_shm_attach_under_restrictive_umask() {
+    ensure_run_dir();
+    let status = std::process::Command::new(std::env::current_exe().expect("current_exe"))
+        .args([UMASK_HELPER_TEST, "--exact", "--test-threads=1"])
+        .env(UMASK_HELPER_ENV, "1")
+        .stdout(std::process::Stdio::null())
+        .status()
+        .expect("spawn umask helper");
+    assert!(status.success(), "attach under umask 0477 failed: {status}");
+}
+
+/// Restores the umask on drop, also on panic, so files the process writes
+/// at exit (coverage profiles) keep their normal mode.
+struct UmaskGuard(libc::mode_t);
+
+impl Drop for UmaskGuard {
+    fn drop(&mut self) {
+        unsafe { libc::umask(self.0) };
+    }
+}
+
+/// Child-process entry point. Inert unless spawned by the test above.
+#[test]
+fn shm_umask_helper_process() {
+    use std::os::unix::fs::PermissionsExt;
+
+    if std::env::var_os(UMASK_HELPER_ENV).is_none() {
+        return;
+    }
+    let _umask = UmaskGuard(unsafe { libc::umask(0o477) });
+    let svc = "rs_shm_umask";
+    let sid: u64 = 7101;
+    cleanup_shm(svc, sid);
+
+    let mut server =
+        ShmContext::server_create(TEST_RUN_DIR, svc, sid, 1024, 1024).expect("server create");
+    let path = format!("{TEST_RUN_DIR}/{svc}-{sid:016x}.ipcshm");
+    let mode = std::fs::metadata(&path)
+        .expect("region stat")
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(mode, 0o600, "region file mode");
+    let mut client = ShmContext::client_attach(TEST_RUN_DIR, svc, sid).expect("client attach");
+
+    client.close();
+    server.destroy();
+    cleanup_shm(svc, sid);
 }

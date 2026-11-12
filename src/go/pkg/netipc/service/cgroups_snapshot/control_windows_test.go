@@ -25,8 +25,8 @@ func TestClientAndCacheControlMethodsWindows(t *testing.T) {
 	if status.State != StateNotFound {
 		t.Fatalf("client state = %v, want StateNotFound", status.State)
 	}
-	if _, err := client.CallSnapshotWithTimeout(1); err != protocol.ErrBadLayout {
-		t.Fatalf("CallSnapshotWithTimeout without READY = %v, want ErrBadLayout", err)
+	if _, err := client.CallSnapshotWithTimeout(1); err != protocol.ErrNotReady {
+		t.Fatalf("CallSnapshotWithTimeout without READY = %v, want ErrNotReady", err)
 	}
 
 	cache := NewCache(testWinRunDir, service, testWinClientConfig())

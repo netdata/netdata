@@ -476,6 +476,7 @@ set(NETIPC_POSIX_SERVICE_FILES
 set(NETIPC_WINDOWS_TRANSPORT_FILES
         netipc/src/transport/windows/netipc_named_pipe.c
         netipc/src/transport/windows/netipc_win_shm.c
+        netipc/src/transport/windows/netipc_win_security.c
 )
 
 # netipc: the Windows transport and service (service)
