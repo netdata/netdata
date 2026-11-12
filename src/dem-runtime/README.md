@@ -1,6 +1,6 @@
 # DEM browser runtime
 
-This tree owns the complete implementation of DEM execution contract 1: JavaScript
+This tree owns the complete implementation of DEM execution contract 2: JavaScript
 adapters, exact component versions, private import paths and release tests. An
 unchanged Agent can execute successive qualified runtime releases implementing
 that contract. The Agent owns scheduling, supervised execution, contract validation,
@@ -34,20 +34,38 @@ diagnostic on stderr. The Agent compares it with the acquired release identity
 and consuming identity. This check does not replace real journey and Lighthouse
 qualification through the supervised Agent execution path.
 
-`runner/run.mjs` receives one JSON request on stdin. The Go caller supplies version 1,
+`runner/run.mjs` receives one JSON request on stdin. The Go caller supplies version 2,
 kind, run_id, work_dir, timeout_ms, capture and
 optional secrets. Journeys select exactly one of inline script and absolute
-script_path; Lighthouse uses url. The Go owner creates the private working
+script_path and require a positive safe-integer stop_at_monotonic_ms; Lighthouse
+uses url. The Go owner creates the private working
 folder. Node writes only generated configuration, script/cache/profile state
 and output there. Resolved secrets enter only the controlled child environment
 under DEM_SECRET_ names. Caller NODE_OPTIONS, proxies and other arbitrary
 application variables are not inherited.
 
-## Contract 1 semantics
+## Contract 2 semantics
 
 There is one supported execution contract and no version adapters. Runtime-internal
 dependency and browser locations are not request fields. The outer descriptor's
-`contract` and request `version` are both 1; release versions are independent.
+`contract` and request `version` are both 2; release versions are independent.
+
+The Agent retains the admission-based hard execution deadline, including an earlier
+caller deadline. Journeys reserve min(5 seconds, one fifth of that effective admitted
+duration) inside this budget for reporting. The Agent sends the resulting absolute
+Linux CLOCK_MONOTONIC soft stop as stop_at_monotonic_ms. The pinned Linux Node
+24.20.0 runtime uses the same clock for process.hrtime.bigint(); a shared origin is
+not a portable Node API guarantee. Configuration and startup consume this budget.
+If startup exhausts it, no CLI/user work starts. Otherwise the journey parent sends
+SIGINT once to its exact owned CLI child at the soft stop, unless a terminal report
+has already arrived or that child has exited. Long timer delays are clamped and
+rechecked. Child exit clears the timer, while inherited pipes still join through EOF.
+
+timeout_ms keeps its native per-test semantics, including script test-timeout
+overrides; the competing generated Playwright globalTimeout is disabled. Lighthouse
+keeps its existing timeout semantics and has no journey soft-stop timer. A blocked
+worker or teardown may still require the hard supervisor deadline and lose final
+reporting. Neither the soft stop nor reporter completion proves process drainage.
 
 Journey discovery emits a `suite` event with `phase: discovery` and integer
 `declared_tests`, including zero. Its human-readable title has no machine meaning.
@@ -63,10 +81,20 @@ The terminal result status is `success`, `failed`, `timeout`, `cancelled`,
 of `passed`, `failed`, `timed_out`, `skipped`, `expected_failure` and `not_run`.
 Both unexpected passes of expected-failing tests and expected failures belong to
 `expected_failure`; interrupted or unstarted tests belong to `not_run`. A test
-timeout takes precedence over observed unexpected failure, then executor failure.
-The suite's timeout/cancellation applies next; only complete ordinary passing
-coverage is success. Forced termination is classified by the Agent using its
+timeout or native suite timeout reports timeout. Native suite timeout takes precedence
+over earlier assertion and executor errors; a native interrupted suite reports
+cancelled. Ordinary test timeout precedes unexpected failure, then executor failure.
+Only complete ordinary passing coverage is success. Forced termination is
+classified by the Agent using its
 supervisor and partial evidence, not by a missing reporter result.
+
+Optional termination_reason is independent of the first error. Runtime reasons are
+test_timeout, suite_timeout, cancelled and execution_budget; ordinary outcomes omit
+it. execution_budget means the parent requested its graceful stop before the terminal
+report, without asserting which OS signal caused each reported observation. This
+sets overall timeout while preserving the first error and actual interrupted test
+status/counts. The parent supplies a budget message if no error was reported. The
+Agent can supersede this with caller_deadline, execution_deadline or cancelled.
 
 Lighthouse success describes a completed desktop performance audit, without a
 site-quality threshold. `performance` ranges from 0 to 100; `fcp_ms`, `lcp_ms`,
@@ -129,7 +157,14 @@ or executor error occurs. Import and managed-browser launch failures are
 execution errors. CLI exit alone does not determine monitoring success.
 
 Optional failure screenshots use Playwright's own capture path. Only PNG
-screenshot attachments inside output are candidate artifacts. They may be absent
+screenshot attachments inside output are candidate artifacts. Failed/timedOut-test
+candidates use artifacts; interrupted-test candidates use a separate
+interrupted_artifacts list with IDs unique across both lists. The parent forwards
+interrupted candidates only when its budget stop preceded the terminal report.
+Go preserves this provenance and rejects interrupted candidates if a caller
+cancellation or hard deadline supersedes the report; earlier ordinary-failure
+candidates remain eligible. capture_state reflects both eligible lists. They may
+be absent
 on forced termination. Lighthouse uses its actual desktop preset and retains
 nullable metrics; a missing observation never becomes zero. Failure to save its
 optional report preserves completed measurements and adds an unavailable-capture

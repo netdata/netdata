@@ -30,7 +30,7 @@ func checkWaiters(t *testing.T, e *Engine, n int, retiring bool) {
 	}, time.Second, time.Millisecond)
 }
 func checkReply(out *os.File) ndexec.TreeResult {
-	_, err := fmt.Fprintf(out, `{"version":"release-a","contract":1,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
+	_, err := fmt.Fprintf(out, `{"version":"release-a","contract":2,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
 	return ndexec.TreeResult{Drained: true, Err: err}
 }
 func TestConcurrentChecksShareOneProbeAndLaterCheckIsFresh(t *testing.T) {

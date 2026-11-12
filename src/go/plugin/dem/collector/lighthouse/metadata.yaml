@@ -555,6 +555,10 @@ modules:
                 type: timestamp
                 unit: ''
                 description: Original admission queue time.
+              - name: termination_reason
+                type: string
+                unit: ''
+                description: Reason execution stopped, separate from the first reported error.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require

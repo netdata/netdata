@@ -59,7 +59,7 @@ func testBundle(t *testing.T, version string) (runtime.Manifest, []byte) {
 	require.NoError(t, encoder.Close())
 	m := runtime.Manifest{
 		Format:   1,
-		Contract: 1,
+		Contract: 2,
 		Version:  version,
 		Platform: "linux/" + goruntime.GOARCH,
 		Archive: runtime.Archive{

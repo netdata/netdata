@@ -391,3 +391,24 @@ func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
 		})
 	}
 }
+
+func TestTimeoutReasonSurvivesJournalReopen(t *testing.T) {
+	ctx := context.Background()
+	root := filepath.Join(t.TempDir(), "history")
+	journal, err := demjournal.Open(ctx, root)
+	require.NoError(t, err)
+	run := synthetic.Run{ID: "timeout", JobID: "journey:test", Kind: synthetic.Journey,
+		StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro(), Outcome: synthetic.Timeout,
+		TerminationReason: synthetic.ExecutionBudget, Error: "earlier assertion failed"}
+	_, err = history.NewStore(journal).AppendRun(ctx, "complete", run)
+	require.NoError(t, err)
+	require.NoError(t, journal.Sync(ctx))
+	require.NoError(t, journal.Close())
+	journal, err = demjournal.Open(ctx, root)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, journal.Close()) }()
+	retained, err := history.NewStore(journal).GetRun(ctx, run.JobID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, run.TerminationReason, retained.TerminationReason)
+	assert.Equal(t, run.Error, retained.Error)
+}

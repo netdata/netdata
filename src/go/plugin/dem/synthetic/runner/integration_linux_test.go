@@ -452,10 +452,28 @@ test('selected entry',async({message},info)=>{
 		assert.Equal(t, synthetic.Error, got.Run.Outcome)
 		assert.Nil(t, got.Run.DurationMS)
 	})
+	t.Run("graceful-budget-with-screenshot", func(t *testing.T) {
+		body := "test('missing action',async({page})=>{await page.goto(" + string(urlJSON) + ");await page.locator('#never-present').click();});"
+		got := run(t, context.Background(), "graceful-budget", browserPrefix+body, 9*time.Second, true)
+		require.Equal(t, synthetic.Timeout, got.Run.Outcome)
+		assert.Equal(t, synthetic.ExecutionBudget, got.Run.TerminationReason)
+		require.NotNil(t, got.Run.Tests)
+		assert.Equal(t, 0, got.Run.Tests.TimedOut, "interrupted is not a native timedOut test")
+		assert.Equal(t, 1, got.Run.Tests.NotRun)
+		require.Len(t, got.Run.Artifacts, 1)
+		_, data, err := captures.Fetch(context.Background(), got.Run.JobID, got.Run.ID, got.Run.Artifacts[0].ID)
+		require.NoError(t, err)
+		assert.Greater(t, len(data), 8)
+		verifyGone(t)
+		retained, err := observedHistory.GetRun(context.Background(), got.Run.JobID, got.Run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, synthetic.CloneRun(got.Run), synthetic.CloneRun(retained))
+	})
 	for _, scenario := range []struct{ name, body string }{{"busy-loop", "test('busy',async({page})=>{while(true){}});"}, {"hanging-hook", "test.afterEach(async()=>{await new Promise(()=>{})});test('hook',async({page})=>{});"}} {
 		t.Run(scenario.name, func(t *testing.T) {
 			got := run(t, context.Background(), scenario.name, browserPrefix+scenario.body, 5*time.Second, false)
 			assert.Equal(t, synthetic.Timeout, got.Run.Outcome)
+			assert.Equal(t, synthetic.ExecutionDeadline, got.Run.TerminationReason)
 			verifyGone(t)
 			next := run(
 				t,

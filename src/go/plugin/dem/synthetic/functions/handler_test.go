@@ -636,3 +636,13 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	assert.Equal(t, run.CompletedUS, detail.RawResponse["run"].(map[string]any)["completed_us"])
 	validate(t, detail)
 }
+
+func TestTerminationReasonIsIndependentOfFirstError(t *testing.T) {
+	run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout,
+		TerminationReason: model.ExecutionBudget, Error: "earlier assertion failed"}
+	src := &source{history: map[string]model.Run{"journey:a/r": run}}
+	got := call(newHandler(src), "synthetics-run", "job_id:journey:a", "run_id:r")
+	detail := got.RawResponse["run"].(map[string]any)
+	assert.Equal(t, run.TerminationReason, detail["termination_reason"])
+	assert.Equal(t, run.Error, detail["error"])
+}

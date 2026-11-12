@@ -69,7 +69,7 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded.",
+        "description": "Browser attempt budget, in seconds, excluding time waiting for a browser slot. Journeys reserve up to 5 seconds (20% for budgets below 25 seconds) inside this budget for timeout reporting. Verified cleanup and persistence follow execution.",
         "type": "number",
         "default": 120,
         "minimum": 0.001

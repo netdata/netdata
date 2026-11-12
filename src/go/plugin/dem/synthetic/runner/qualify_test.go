@@ -97,7 +97,7 @@ func TestQualificationUsesBothModesWithoutPublishingMonitorHistory(t *testing.T)
 	var kinds []synthetic.Kind
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		if slices.Contains(args, "--check") {
-			_, err := fmt.Fprintf(out, `{"version":"candidate-b","contract":1,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
+			_, err := fmt.Fprintf(out, `{"version":"candidate-b","contract":2,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
 			return ndexec.TreeResult{Drained: true, Err: err}
 		}
 		var request wireRequest
