@@ -86,6 +86,7 @@
             "description": "Controls how many SNMP variables to retrieve in a single GETBULK request.",
             "type": "integer",
             "minimum": 1,
+            "maximum": 2147483647,
             "default": 25
           },
           "max_request_size": {

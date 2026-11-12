@@ -3,10 +3,11 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"regexp"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -64,12 +65,12 @@ func TestBGPProcessingEvidenceFollowsCollection(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			cfg := tableBGPTestConfig()
 			tc.configure(&cfg)
-			pdus := []gosnmp.SnmpPDU{createIntegerPDU(root+".2.42", 6), createGauge32PDU(root+".3.42", 65001), createGauge32PDU(root+".4.42", 7200)}
-			handler := &sourceTestHandler{walk: func(string) ([]gosnmp.SnmpPDU, error) { return pdus, nil }}
+			pdus := []gosnmp.VarBind{createIntegerPDU(root+".2.42", 6), createGauge32PDU(root+".3.42", 65001), createGauge32PDU(root+".4.42", 7200)}
+			handler := &sourceTestHandler{walk: func(string) ([]gosnmp.VarBind, error) { return pdus, nil }}
 			source := &SourceRecorder{}
 			var report AcquisitionProfileReport
 			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Len(t, results[0].BGPRows, tc.rows)
@@ -97,20 +98,20 @@ func TestCrossTableProcessingEvidenceFollowsCollection(t *testing.T) {
 			primary.MetricTags[0].Symbol.MatchPatternCompiled = regexp.MustCompile("^never$")
 			profile := &ddsnmp.Profile{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{Kind: ddsnmp.KindArpEntry, MetricsConfig: primary}}}}
 			ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
-			handler := &sourceTestHandler{walk: func(oid string) ([]gosnmp.SnmpPDU, error) {
+			handler := &sourceTestHandler{walk: func(oid string) ([]gosnmp.VarBind, error) {
 				if oid == primary.Table.OID {
-					return []gosnmp.SnmpPDU{createGauge32PDU(primary.Symbols[0].OID+".7", 10)}, nil
+					return []gosnmp.VarBind{createGauge32PDU(primary.Symbols[0].OID+".7", 10)}, nil
 				}
 				index := ".7"
 				if tc.missing {
 					index = ".8"
 				}
-				return []gosnmp.SnmpPDU{createStringPDU(primary.MetricTags[0].Symbol.OID+index, "unmatched")}, nil
+				return []gosnmp.VarBind{createStringPDU(primary.MetricTags[0].Symbol.OID+index, "unmatched")}, nil
 			}}
 			source := &SourceRecorder{}
 			var report AcquisitionProfileReport
 			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{profile}, AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Len(t, results[0].TopologyMetrics, 1)
@@ -187,14 +188,14 @@ func TestMetadataProcessingEvidenceUsesLogicalField(t *testing.T) {
 					},
 				},
 			}
-			handler := &sourceTestHandler{get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+			handler := &sourceTestHandler{get: func(oids []string) (*gosnmp.Message, error) {
 				pdu := createStringPDU(oids[0], tc.value)
 				if oids[0] == fallbackOID {
 					pdu = createStringPDU(fallbackOID, "fallback value")
 				} else if tc.missing {
 					pdu = createNoSuchObjectPDU(oid)
 				}
-				return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{pdu}}, nil
+				return &gosnmp.Message{VarBinds: []gosnmp.VarBind{pdu}}, nil
 			}}
 			var report AcquisitionProfileReport
 			collector := New(Config{
@@ -207,7 +208,7 @@ func TestMetadataProcessingEvidenceUsesLogicalField(t *testing.T) {
 					report = r
 				}),
 			})
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.Equal(t, tc.wantErr, err != nil)
 			require.Len(t, report.Routes, 1)
 			require.Equal(t, []ddsnmp.ProcessingEvent{{Field: "serial_number", OID: oid, Reason: tc.wantReason}}, report.Routes[0].Processing)

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -44,15 +44,13 @@ func compositeRefreshTestProfile(device *refreshTestDevice, table bool) (*ddsnmp
 		}}
 		key = refreshTestTableKey("traffic", "1")
 	}
-	device.values[inOID] = gosnmp.SnmpPDU{
+	device.values[inOID] = gosnmp.VarBind{
 		Name:  inOID,
-		Type:  gosnmp.Counter64,
-		Value: uint64(12),
+		Value: gosnmp.Counter64Value(12),
 	}
-	device.values[outOID] = gosnmp.SnmpPDU{
+	device.values[outOID] = gosnmp.VarBind{
 		Name:  outOID,
-		Type:  gosnmp.Counter64,
-		Value: uint64(34),
+		Value: gosnmp.Counter64Value(34),
 	}
 	virtual := ddprofiledefinition.VirtualMetricConfig{
 		Name: "traffic",
@@ -87,16 +85,15 @@ func TestCollectorRuntimeReplacementPartialDimensionsRecover(t *testing.T) {
 			require.NotEmpty(t, c.Collect(context.Background()))
 			client, _ := newReplacementTestClient(t, device, nil)
 			t.Cleanup(func() { c.Cleanup(context.Background()) })
-			c.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return client }
+			c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return client, nil }
 			c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 				cfg.Profiles = []*ddsnmp.Profile{profile}
 				return ddsnmpcollector.New(cfg)
 			}
 			device.omittedOID = outOID
-			device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+			device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 				Name:  snmputils.OidSysObject,
-				Type:  gosnmp.ObjectIdentifier,
-				Value: replacementTestObjectID,
+				Value: gosnmp.ObjectIdentifierValue(replacementTestObjectID),
 			}
 			*now = now.Add(time.Minute)
 			first := c.Collect(context.Background())

@@ -3,12 +3,13 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -90,8 +91,8 @@ func TestCrossTableResolver_IndexFrom(t *testing.T) {
 					}},
 				},
 			}
-			ctx := newCrossTableContext(map[string]map[string]gosnmp.SnmpPDU{
-				"1.2": {"1.2.1.1.2": {Name: "1.2.1.1.2", Type: gosnmp.OctetString, Value: []byte{0x0a}}},
+			ctx := newCrossTableContext(map[string]map[string]gosnmp.VarBind{
+				"1.2": {"1.2.1.1.2": {Name: "1.2.1.1.2", Value: gosnmp.OctetStringValue([]byte{0x0a})}},
 				"1.3": {"1.3.1.4.0": createIntegerPDU("1.3.1.4.0", 9)},
 				"1.4": {"1.4.1.9": createStringPDU("1.4.1.9", "expected")},
 			}, map[string]string{"first": "1.2", "second": "1.3", "final": "1.4"})
@@ -170,9 +171,9 @@ func TestTableCollector_IndexFromReturnsToSourceTable(t *testing.T) {
 	}})
 	require.NoError(t, ddprofiledefinition.ValidateEnrichProfile(profile.Definition))
 	handler := &sourceTestHandler{
-		walk: func(oid string) ([]gosnmp.SnmpPDU, error) {
+		walk: func(oid string) ([]gosnmp.VarBind, error) {
 			assert.Equal(t, root, oid)
-			return []gosnmp.SnmpPDU{
+			return []gosnmp.VarBind{
 				createIntegerPDU(root+".1.1", 7),
 				createIntegerPDU(root+".2.1", 9),
 				createStringPDU(root+".3.9", "remote row"),
@@ -186,7 +187,7 @@ func TestTableCollector_IndexFromReturnsToSourceTable(t *testing.T) {
 		Log:        logger.New(),
 		Profiles:   []*ddsnmp.Profile{profile},
 	})
-	results, err := c.Collect()
+	results, err := c.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].Metrics, 1)
@@ -210,10 +211,10 @@ func BenchmarkCrossTableResolver_IndexFrom(b *testing.B) {
 					},
 				}
 				ctx := newCrossTableContext(
-					make(map[string]map[string]gosnmp.SnmpPDU),
+					make(map[string]map[string]gosnmp.VarBind),
 					map[string]string{"final": "1.2"},
 				)
-				ctx.walkedData["1.2"] = make(map[string]gosnmp.SnmpPDU)
+				ctx.walkedData["1.2"] = make(map[string]gosnmp.VarBind)
 				indexes := make([]string, rows)
 				for i := range rows {
 					indexes[i] = strconv.Itoa(i + 1)
@@ -223,7 +224,7 @@ func BenchmarkCrossTableResolver_IndexFrom(b *testing.B) {
 					table := fmt.Sprintf("hop%d", hop)
 					root := fmt.Sprintf("1.3.%d", hop)
 					ctx.tableNameToOID[table] = root
-					pdus := make(map[string]gosnmp.SnmpPDU)
+					pdus := make(map[string]gosnmp.VarBind)
 					for _, index := range indexes {
 						pdus[root+".1."+index] = createStringPDU(root+".1."+index, index)
 					}

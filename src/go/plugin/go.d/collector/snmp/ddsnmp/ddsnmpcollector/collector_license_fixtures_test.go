@@ -3,11 +3,12 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -99,7 +100,7 @@ func TestCollector_Collect_LicensingProfileFixtures(t *testing.T) {
 				SysObjectID: "",
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 
@@ -140,9 +141,9 @@ func assertCiscoTraditionalFixtureRows(t *testing.T, rows []ddsnmp.LicenseRow) {
 	require.NotEmpty(t, permanent.ID)
 	assert.Equal(t, "1.1.1", permanent.ID)
 	require.True(t, permanent.Usage.HasCapacity)
-	assert.EqualValues(t, 4294967295, permanent.Usage.Capacity)
+	assert.EqualValues(t, int64(4294967295), permanent.Usage.Capacity)
 	require.True(t, permanent.Usage.HasAvailable)
-	assert.EqualValues(t, 4294967295, permanent.Usage.Available)
+	assert.EqualValues(t, int64(4294967295), permanent.Usage.Available)
 	require.True(t, permanent.State.Has)
 	assert.EqualValues(t, 0, permanent.State.Severity)
 	assert.Equal(t, "permanent", permanent.Type)

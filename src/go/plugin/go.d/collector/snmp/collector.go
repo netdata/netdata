@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -92,12 +92,13 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 		ifaceCache: newIfaceCache(),
 		licensing:  newLicensingIntegration(),
 
-		newPinger:     pinger.New,
-		newSnmpClient: snmputils.NewSession,
+		newPinger: pinger.New,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
 	}
+
+	c.newSnmpClient = func(cfg gosnmp.Config) (snmputils.Session, error) { return newSNMPSession(cfg, c.Logger) }
 
 	c.funcRouter = newFuncRouter(c.ifaceCache)
 	c.licensing.registerFunction(c.funcRouter)
@@ -145,7 +146,7 @@ type (
 		// request path to it, wrapped while a normal-diagnostics attempt records.
 		snmpSession   snmputils.Session
 		snmpClient    snmputils.Client
-		newSnmpClient func(gosnmp.Handler) snmputils.Session
+		newSnmpClient func(gosnmp.Config) (snmputils.Session, error)
 
 		ddSnmpColl    ddCollector
 		newDdSnmpColl func(ddsnmpcollector.Config) ddCollector
@@ -164,8 +165,8 @@ type (
 		disableBulkWalk bool
 	}
 	ddCollector interface {
-		Collect() ([]*ddsnmp.ProfileMetrics, error)
-		CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error)
+		Collect(ctx context.Context) ([]*ddsnmp.ProfileMetrics, error)
+		CollectDeviceMetadata(ctx context.Context) (map[string]ddsnmp.MetaTag, error)
 		PreparedDeviceMetadata() map[string]ddsnmp.MetaTag
 		ProfileInputRevision() uint64
 	}
@@ -201,7 +202,7 @@ func (c *Collector) Init(context.Context) (err error) {
 		)
 	}
 
-	if _, err := c.configuredSNMPHandler(); err != nil {
+	if _, err := c.configuredSNMPClient(); err != nil {
 		return lifecycleFailureError(
 			fmt.Errorf("failed to initialize SNMP client: %v", err),
 			err,
@@ -239,7 +240,7 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 	}()
 
 	if c.snmpSession == nil {
-		session, err := c.initAndConnectSNMPClient()
+		session, err := c.initAndConnectSNMPClient(ctx)
 		if err != nil {
 			return lifecycleFailureError(
 				fmt.Errorf("failed to init and connect SNMP client: %v", err),
@@ -252,7 +253,7 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 		c.wrapNormalClient()
 	}
 
-	if err := c.ensureDeviceProfile(); err != nil {
+	if err := c.ensureDeviceProfile(ctx); err != nil {
 		return err
 	}
 

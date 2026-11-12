@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,22 +15,20 @@ import (
 func TestConvPduToStringf_SNMPDateAndTime(t *testing.T) {
 	tests := []struct {
 		name string
-		pdu  gosnmp.SnmpPDU
+		pdu  gosnmp.VarBind
 		want int64
 	}{
 		{
 			name: "without timezone",
-			pdu: gosnmp.SnmpPDU{
-				Type:  gosnmp.OctetString,
-				Value: []byte{0x07, 0xE8, 0x04, 0x03, 0x0A, 0x0B, 0x0C, 0x00},
+			pdu: gosnmp.VarBind{
+				Value: gosnmp.OctetStringValue([]byte{0x07, 0xE8, 0x04, 0x03, 0x0A, 0x0B, 0x0C, 0x00}),
 			},
 			want: time.Date(2024, time.April, 3, 10, 11, 12, 0, time.UTC).Unix(),
 		},
 		{
 			name: "with timezone",
-			pdu: gosnmp.SnmpPDU{
-				Type:  gosnmp.OctetString,
-				Value: []byte{0x07, 0xE8, 0x04, 0x03, 0x0A, 0x0B, 0x0C, 0x00, '+', 0x02, 0x00},
+			pdu: gosnmp.VarBind{
+				Value: gosnmp.OctetStringValue([]byte{0x07, 0xE8, 0x04, 0x03, 0x0A, 0x0B, 0x0C, 0x00, '+', 0x02, 0x00}),
 			},
 			want: time.Date(2024, time.April, 3, 8, 11, 12, 0, time.UTC).Unix(),
 		},
@@ -114,9 +112,8 @@ func TestConvPduToDateAndTimeUnix_Invalid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := convPduToDateAndTimeUnix(gosnmp.SnmpPDU{
-				Type:  gosnmp.OctetString,
-				Value: tt.value,
+			_, err := convPduToDateAndTimeUnix(gosnmp.VarBind{
+				Value: gosnmp.OctetStringValue([]byte(tt.value)),
 			})
 			require.Error(t, err)
 		})

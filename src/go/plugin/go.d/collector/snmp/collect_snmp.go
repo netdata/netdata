@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -10,12 +11,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-func (c *Collector) collectSNMP(mx map[string]int64) error {
+func (c *Collector) collectSNMP(ctx context.Context, mx map[string]int64) error {
 	if c.ddSnmpColl == nil {
 		return nil
 	}
 
-	pms, err := c.ddSnmpColl.Collect()
+	pms, err := c.ddSnmpColl.Collect(ctx)
 	c.captureCollectionFailures()
 	c.syncDeviceMetadata()
 	if err != nil {

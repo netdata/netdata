@@ -3,10 +3,11 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,7 +25,7 @@ func TestCollector_Collect_StatsSnapshot(t *testing.T) {
 	// Scalar: sysUpTime.0
 	expectSNMPGet(mockHandler,
 		[]string{"1.3.6.1.2.1.1.3.0"},
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456),
 		},
 	)
@@ -33,7 +34,7 @@ func TestCollector_Collect_StatsSnapshot(t *testing.T) {
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.2.1.2.2",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			// Row 1
 			createCounter32PDU("1.3.6.1.2.1.2.2.1.10.1", 1000), // ifInOctets.1
 			// Row 2
@@ -96,7 +97,7 @@ func TestCollector_Collect_StatsSnapshot(t *testing.T) {
 
 	// --- Run collection ------------------------------------------------------
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 
@@ -177,10 +178,10 @@ func TestCollector_Collect_SharesCanonicalFreshTableViewAcrossProfiles(t *testin
 	}
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(sourceProfile)
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 10),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 20),
 	})
 
@@ -191,7 +192,7 @@ func TestCollector_Collect_SharesCanonicalFreshTableViewAcrossProfiles(t *testin
 		Profiles:   []*ddsnmp.Profile{dependencyProfile, sourceProfile},
 		Log:        logger.New(),
 	})
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 
@@ -231,14 +232,14 @@ func TestCollector_Collect_SharesCanonicalFreshTableViewAcrossProfiles(t *testin
 	assert.False(t, collector.tableCache.isConfigCached(sourceConfig))
 	assert.False(t, collector.tableCache.isConfigCached(*auxiliaryConfig))
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 12),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 30),
 	})
 
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	var refreshedSourceResult *ddsnmp.ProfileMetrics
@@ -259,12 +260,12 @@ func TestCollector_Collect_SharesCanonicalFreshTableViewAcrossProfiles(t *testin
 	assert.False(t, collector.tableCache.isConfigCached(sourceConfig))
 	assert.False(t, collector.tableCache.isConfigCached(*auxiliaryConfig))
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 14),
 	})
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, dependencyTableOID, errors.New("dependency timeout"))
 
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Equal(t, sourceProfile.SourceFile, results[0].Source)
@@ -296,10 +297,10 @@ func TestCollector_Collect_DiscardsPromotedSourceCacheAfterFreshWalkFailure(t *t
 	}
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 10),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 20),
 	})
 
@@ -310,7 +311,7 @@ func TestCollector_Collect_DiscardsPromotedSourceCacheAfterFreshWalkFailure(t *t
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].Metrics, 2)
@@ -327,16 +328,16 @@ func TestCollector_Collect_DiscardsPromotedSourceCacheAfterFreshWalkFailure(t *t
 	require.NotNil(t, sourceMetric)
 	assert.Equal(t, map[string]string{"dependency_value": "20"}, sourceMetric.Tags)
 
-	expectSNMPGet(mockHandler, []string{sourceMetricOID}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{sourceMetricOID}, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 11),
 	})
 	expectSNMPGet(mockHandler, []string{dependencyMetricOID}, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 30),
 	})
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, sourceTableOID, errors.New("source timeout"))
 
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].Metrics, 1)
@@ -344,14 +345,14 @@ func TestCollector_Collect_DiscardsPromotedSourceCacheAfterFreshWalkFailure(t *t
 	assert.True(t, collector.tableCache.isConfigCached(dependencyConfig))
 	require.False(t, collector.tableCache.isConfigCached(sourceConfig), "failed promoted route retained stale tags")
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 12),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 40),
 	})
 
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].Metrics, 2)
@@ -409,10 +410,10 @@ func TestCollector_Collect_KeepsTopologyCacheIneligibleWhenRegularScopeFails(t *
 		},
 	}
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, regularTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, regularTableOID, []gosnmp.VarBind{
 		createGauge32PDU(regularMetricOID, 10),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, topologyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, topologyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(topologyMetricOID, 20),
 	})
 
@@ -423,7 +424,7 @@ func TestCollector_Collect_KeepsTopologyCacheIneligibleWhenRegularScopeFails(t *
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].Metrics, 1)
@@ -433,11 +434,11 @@ func TestCollector_Collect_KeepsTopologyCacheIneligibleWhenRegularScopeFails(t *
 
 	expectSNMPGet(mockHandler, []string{regularMetricOID}, nil)
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, regularTableOID, errors.New("regular timeout"))
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, topologyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, topologyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(topologyMetricOID, 30),
 	})
 
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.Error(t, err)
 	assert.Empty(t, results)
 	require.False(t, collector.tableCache.isConfigCached(topologyConfig), "topology presence must remain cache-ineligible")
@@ -461,13 +462,13 @@ func TestCollector_Collect_DiscardsOmittedCachedDependentWhenDependencyRefreshes
 	})
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(sourceProfile)
 
-	expectSNMPGet(mockHandler, []string{scalarOID}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{scalarOID}, []gosnmp.VarBind{
 		createGauge32PDU(scalarOID, 1),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 10),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 20),
 	})
 
@@ -478,7 +479,7 @@ func TestCollector_Collect_DiscardsOmittedCachedDependentWhenDependencyRefreshes
 		Profiles:   []*ddsnmp.Profile{dependencyProfile, sourceProfile},
 		Log:        logger.New(),
 	})
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	assert.True(t, collector.tableCache.isConfigCached(sourceConfig))
@@ -503,28 +504,28 @@ func TestCollector_Collect_DiscardsOmittedCachedDependentWhenDependencyRefreshes
 
 	expectSNMPGetError(mockHandler, []string{scalarOID}, errors.New("scalar timeout"))
 	expectSNMPGet(mockHandler, []string{dependencyMetricOID}, nil)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 30),
 	})
 
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Equal(t, dependencyProfile.SourceFile, results[0].Source)
 	assert.True(t, collector.tableCache.isConfigCached(dependencyConfig))
 	require.False(t, collector.tableCache.isConfigCached(sourceConfig), "omitted reverse dependent retained stale tags")
 
-	expectSNMPGet(mockHandler, []string{scalarOID}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{scalarOID}, []gosnmp.VarBind{
 		createGauge32PDU(scalarOID, 2),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, sourceTableOID, []gosnmp.VarBind{
 		createGauge32PDU(sourceMetricOID, 12),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(dependencyMetricOID, 40),
 	})
 
-	results, err = collector.Collect()
+	results, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	sourceMetric = findMetric(results, sourceProfile.SourceFile, "sourceValue")
@@ -548,12 +549,12 @@ func TestCollector_Collect_FreshAuxiliaryWalkMakesFailedSourcesPartialSuccess(t 
 		profile.Definition.Metrics...,
 	)
 
-	expectSNMPGet(mockHandler, []string{scalarOID}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{scalarOID}, []gosnmp.VarBind{
 		createGauge32PDU(scalarOID, 42),
 	})
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, sourceTableOID1, errors.New("source one timeout"))
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, sourceTableOID2, errors.New("source two timeout"))
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependencyOID, []gosnmp.VarBind{
 		createStringPDU(dependencyOID+".1", "dependency"),
 	})
 
@@ -564,7 +565,7 @@ func TestCollector_Collect_FreshAuxiliaryWalkMakesFailedSourcesPartialSuccess(t 
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].Metrics, 1)
@@ -583,7 +584,7 @@ func TestCollector_Collect_PreservesHiddenMetrics(t *testing.T) {
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.99999.1",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createCounter32PDU("1.3.6.1.4.1.99999.1.1.1", 100),
 		},
 	)
@@ -639,7 +640,7 @@ func TestCollector_Collect_PreservesHiddenMetrics(t *testing.T) {
 		SysObjectID: "",
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 
@@ -658,13 +659,13 @@ func TestCollector_Collect_SeparatesTopologyMetricsFromHiddenMetrics(t *testing.
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.99999.1",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createCounter32PDU("1.3.6.1.4.1.99999.1.1.1", 100),
 		},
 	)
 	expectSNMPGet(mockHandler,
 		[]string{"1.3.6.1.4.1.99999.2.0"},
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createIntegerPDU("1.3.6.1.4.1.99999.2.0", 1),
 		},
 	)
@@ -709,7 +710,7 @@ func TestCollector_Collect_SeparatesTopologyMetricsFromHiddenMetrics(t *testing.
 		SysObjectID: "",
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 

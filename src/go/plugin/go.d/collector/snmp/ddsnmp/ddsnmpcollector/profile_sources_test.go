@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -56,7 +56,7 @@ func TestProfileIndexTagSources(t *testing.T) {
 				index:     "7.8",
 				tableName: "example",
 				tags:      map[string]string{},
-				pdus:      map[string]gosnmp.SnmpPDU{},
+				pdus:      map[string]gosnmp.VarBind{},
 			}
 			p := newTableRowProcessor(logger.New())
 			ordered := buildOrderedTags(cfg)
@@ -131,7 +131,7 @@ func TestProfileTypedSourcePrecedence(t *testing.T) {
 func TestProfileBitmaskValues(t *testing.T) {
 	for name, tc := range map[string]struct {
 		value     any
-		pduType   gosnmp.Asn1BER
+		pduType   gosnmp.ValueType
 		format    string
 		raw       int64
 		dims      map[string]int64
@@ -195,10 +195,9 @@ func TestProfileBitmaskValues(t *testing.T) {
 				),
 			)
 			sym := def.Metrics[0].Symbol
-			pdu := gosnmp.SnmpPDU{
+			pdu := gosnmp.VarBind{
 				Name:  sym.OID,
-				Type:  tc.pduType,
-				Value: tc.value,
+				Value: testValue(tc.pduType, tc.value),
 			}
 			value, err := newValueProcessor().processValue(sym, pdu)
 			if tc.wantError {
@@ -236,9 +235,9 @@ virtual_metrics:
 			row := &tableRowData{
 				index:     "1",
 				tableName: "example",
-				pdus: map[string]gosnmp.SnmpPDU{
-					"1.2.3.1": {Name: "1.2.3.1.1", Type: gosnmp.Integer, Value: 1},
-					"1.2.3.2": {Name: "1.2.3.2.1", Type: gosnmp.Integer, Value: 1},
+				pdus: map[string]gosnmp.VarBind{
+					"1.2.3.1": {Name: "1.2.3.1.1", Value: gosnmp.IntegerValue(1)},
+					"1.2.3.2": {Name: "1.2.3.2.1", Value: gosnmp.IntegerValue(1)},
 				},
 			}
 			metrics, err := newTableRowProcessor(logger.New()).processRowMetrics(row, &tableRowProcessingContext{
@@ -266,9 +265,8 @@ func BenchmarkProfileBitmaskDecoding(b *testing.B) {
 			Items: map[string]string{"0": "zero", "1": "low", "128": "high"},
 		},
 	}
-	pdu := gosnmp.SnmpPDU{
-		Type:  gosnmp.OctetString,
-		Value: []byte("129"),
+	pdu := gosnmp.VarBind{
+		Value: gosnmp.OctetStringValue([]byte("129")),
 	}
 	p := newValueProcessor()
 	b.ReportAllocs()

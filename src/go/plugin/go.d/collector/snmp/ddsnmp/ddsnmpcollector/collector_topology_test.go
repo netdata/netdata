@@ -3,11 +3,12 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"slices"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -50,7 +51,7 @@ func TestCollector_Collect_CiscoCDPTopologyWithoutOrdinaryMetrics(t *testing.T) 
 	})
 
 	for range 2 {
-		results, err := collector.Collect()
+		results, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, results, 1)
 		assert.Empty(t, results[0].Metrics)
@@ -79,8 +80,8 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStruc
 	)
 
 	pdu := createPDU(rowOID, gosnmp.OctetString, []byte{0x00, 0x50, 0x56, 0xab, 0xcd, 0xef})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{pdu})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{pdu})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{pdu})
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{pdu})
 
 	profile := &ddsnmp.Profile{
 		SourceFile: "topology-presence-profile.yaml",
@@ -129,7 +130,7 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStruc
 	}
 
 	var walkStats ddsnmp.CollectionStats
-	walkMetrics, err := collector.collectTopologyMetrics(profile, &walkStats)
+	walkMetrics, err := collector.collectTopologyMetrics(context.Background(), profile, &walkStats)
 	require.NoError(t, err)
 	require.Equal(t, expected, walkMetrics)
 	require.Equal(t, int64(1), walkStats.SNMP.WalkRequests)
@@ -137,7 +138,7 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStruc
 	require.Equal(t, int64(0), walkStats.SNMP.TablesCached)
 
 	var secondWalkStats ddsnmp.CollectionStats
-	secondWalkMetrics, err := collector.collectTopologyMetrics(profile, &secondWalkStats)
+	secondWalkMetrics, err := collector.collectTopologyMetrics(context.Background(), profile, &secondWalkStats)
 	require.NoError(t, err)
 	require.Equal(t, expected, secondWalkMetrics)
 	require.Equal(t, int64(1), secondWalkStats.SNMP.WalkRequests)
@@ -185,7 +186,7 @@ func TestCollector_CollectTopologyMetrics_DependencyOnlyRouteWaitsForAnchorRows(
 		Log:        logger.New(),
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Empty(t, results[0].TopologyMetrics)
@@ -239,7 +240,7 @@ func TestCollector_CollectTopologyMetrics_DependencyWithSymbolOwnerRemainsEager(
 		Log:        logger.New(),
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Empty(t, results[0].TopologyMetrics)

@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
@@ -19,13 +20,13 @@ const sysInfoCheckEvery = time.Minute
 // refreshDeviceState runs on the collection owner, before normal metric polling.
 // Any answered system scalar that changed rebuilds device state. Only a changed
 // sysObjectID makes the incumbent state incompatible and suspends it.
-func (c *Collector) refreshDeviceState() error {
+func (c *Collector) refreshDeviceState(ctx context.Context) error {
 	if c.now().Before(c.nextSysInfoCheck) {
 		return c.pendingRebuildError()
 	}
 	defer func() { c.nextSysInfoCheck = c.now().Add(sysInfoCheckEvery) }()
 
-	observed, err := c.getSysInfo()
+	observed, err := c.getSysInfo(ctx)
 	if err != nil {
 		c.Limit("snmp:sysinfo", 1, 5*time.Minute).Warningf("failed to refresh SNMP system information: %v", err)
 		return c.pendingRebuildError()
@@ -40,7 +41,7 @@ func (c *Collector) refreshDeviceState() error {
 		c.rebuildPending = true
 		// A newly classified device cannot inherit unanswered fields from the
 		// previous device's identity.
-		return c.rebuildDevice(observed)
+		return c.rebuildDevice(ctx, observed)
 	}
 	if c.rebuildPending {
 		return c.pendingRebuildError()
@@ -51,7 +52,7 @@ func (c *Collector) refreshDeviceState() error {
 	}
 	// The incumbent state is still compatible, so a failed rebuild keeps it
 	// collecting and the next check retries.
-	if err := c.rebuildDevice(next); err != nil {
+	if err := c.rebuildDevice(ctx, next); err != nil {
 		c.Limit("snmp:rebuild", 1, 5*time.Minute).Warningf("failed to refresh SNMP device state: %v", err)
 	}
 	return nil
@@ -166,12 +167,12 @@ func (c *Collector) preparedProfileMetadata() map[string]ddsnmp.MetaTag {
 // Identity and chart changes are published when the new state reports
 // (syncDeviceMetadata, retireStaleCharts), not here.
 // It runs only for normal polling jobs; ping_only keeps setup-only SNMP.
-func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
+func (c *Collector) rebuildDevice(ctx context.Context, si *snmputils.SysInfo) error {
 	profiles, profileContext := c.resolveProfiles(si)
 	if len(profiles) == 0 {
 		return snmputils.WithFailure(noMetricProfilesError(si), "profile_resolution", "no_profiles")
 	}
-	session, disableBulk, repetitions, err := c.connectSNMPClient()
+	session, disableBulk, repetitions, err := c.connectSNMPClient(ctx)
 	if err != nil {
 		return err
 	}

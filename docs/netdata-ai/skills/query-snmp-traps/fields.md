@@ -35,7 +35,7 @@ The collector writes structured fields that are useful for queries:
 | `TRAP_PACKET_SIZE` | Decode-error rows only; received datagram size |
 | `TRAP_PACKET_SHA256` | Decode-error rows only; packet fingerprint without raw bytes |
 | `TRAP_LISTENER` | Decode-error rows only; listener endpoint when known |
-| `TRAP_ENGINE_ID` | Decode-error rows only; SNMPv3 engine ID when safely extractable |
+| `TRAP_ENGINE_ID` | Decode-error rows only; SNMPv3 engine ID when the message header parses and names one |
 
 ## Row Decoding
 

@@ -285,8 +285,6 @@ github.com/ibmdb/go_ibm_db v0.5.4 h1:cveEOt1J2PoQivQdxIQB0f8ugDJYKaSmh7RUKAaJyAE
 github.com/ibmdb/go_ibm_db v0.5.4/go.mod h1:BA12Alfe+h5BMGZGE+b0pqP4leILZkpoxe5qr/iMoHw=
 github.com/ibmruntimes/go-recordio/v2 v2.0.0-20260316030125-5f5b8d0a3634 h1:hNqSwr82ttA5vO6q+bICpbgJuzO1sxwjDlJQuaGWcbY=
 github.com/ibmruntimes/go-recordio/v2 v2.0.0-20260316030125-5f5b8d0a3634/go.mod h1:NSpUK0x9IyEoM1EjTp2/S8ErxZfRHoA2DfwiYobFSkc=
-github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e h1:3f1r8AJrTdUWUVa4H4tRYmJAEEmnsU5COu4ycVOCAjo=
-github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e/go.mod h1:CxVS6bXqmWZlafUj9pZUnQX5e4fAltqPcijxWpCitDo=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
 github.com/jackc/pgpassfile v1.0.0/go.mod h1:CEx0iS5ambNFdcRtxPj5JhEz+xB6uRky5eyVu/W2HEg=
 github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 h1:iCEnooe7UlwOQYpKFhBabPMi4aNAfoODPEFNiAnClxo=
@@ -396,6 +394,8 @@ github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f h1:KUppIJq7/+SVif2QVs3tOP0zanoHgBEVAwHxUSIzRqU=
 github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
+github.com/netdata/gosnmp v0.0.0-20261112121521-088919090b99 h1:dajjsOpslmuy3X4lgWFmf0PT0vdtHxmVW+7D0cSNeFo=
+github.com/netdata/gosnmp v0.0.0-20261112121521-088919090b99/go.mod h1:euKupAa7r6133FrZeTnSKWHM+vGyRgfBwnIiWqGvmo0=
 github.com/netdata/systemd-journal-sdk/go v0.10.0 h1:WKU2KBDXRJd20eRecyu3mnuUOUpzblcDyg9BY+82D6Q=
 github.com/netdata/systemd-journal-sdk/go v0.10.0/go.mod h1:9Ja2zbfDOVEYzFSw060+KmHvfq7iHj7eOW3DgXIrMlE=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=

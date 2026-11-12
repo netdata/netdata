@@ -3,7 +3,9 @@
 package ddsnmpcollector
 
 import (
-	"github.com/gosnmp/gosnmp"
+	"context"
+
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -14,8 +16,9 @@ import (
 // table, topology, or diagnostic state. Missing-OID suppression lasts one attempt.
 // The client was configured with version and maxOIDs (0 meaning gosnmp.MaxOids).
 func CollectDeviceMetadata(
+	ctx context.Context,
 	client snmputils.ScalarClient,
-	version gosnmp.SnmpVersion,
+	version gosnmp.Version,
 	maxOIDs int,
 	profiles []*ddsnmp.Profile,
 	sysObjectID string,
@@ -26,7 +29,7 @@ func CollectDeviceMetadata(
 	collector.strict = true
 	result := make(map[string]ddsnmp.MetaTag)
 	for _, profile := range profiles {
-		meta, err := collector.collect(profile)
+		meta, err := collector.collect(ctx, profile)
 		if err != nil {
 			return nil, err
 		}

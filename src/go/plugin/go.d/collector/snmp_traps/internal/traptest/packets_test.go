@@ -5,7 +5,7 @@ package traptest
 import (
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 )
 
 func TestV3PacketFlagsFollowParsedProtocols(t *testing.T) {
@@ -14,7 +14,7 @@ func TestV3PacketFlagsFollowParsedProtocols(t *testing.T) {
 		privProto string
 		authKey   string
 		privKey   string
-		want      gosnmp.SnmpV3MsgFlags
+		want      gosnmp.SecurityLevel
 	}{
 		"empty aliases": {
 			want: gosnmp.NoAuthNoPriv,
@@ -53,7 +53,7 @@ func TestV3PacketFlagsFollowParsedProtocols(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			client, _, _ := newV3PacketParts(t, V3Spec{
+			msg, _ := newV3Message(t, gosnmp.SNMPv2Trap, V3Spec{
 				User:        "testuser",
 				EngineIDHex: "80001f888077dfe44faa700258",
 				AuthProto:   tc.authProto,
@@ -62,8 +62,8 @@ func TestV3PacketFlagsFollowParsedProtocols(t *testing.T) {
 				PrivKey:     tc.privKey,
 				TrapOID:     "1.3.6.1.6.3.1.1.5.1",
 			})
-			if client.MsgFlags != tc.want {
-				t.Fatalf("MsgFlags = %v, want %v", client.MsgFlags, tc.want)
+			if msg.SecurityLevel != tc.want {
+				t.Fatalf("SecurityLevel = %v, want %v", msg.SecurityLevel, tc.want)
 			}
 		})
 	}

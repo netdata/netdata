@@ -3,10 +3,11 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -83,14 +84,14 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.2.1.1.1.0",
 					"1.3.6.1.4.1.674.10892.5.1.3.2.0",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.4.1.674.10892.5.1.3.2.0", Type: gosnmp.OctetString, Value: []byte("ABC123XYZ")},
-							{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: []byte("Dell EMC Networking OS10")},
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.4.1.674.10892.5.1.3.2.0", Value: gosnmp.OctetStringValue([]byte("ABC123XYZ"))},
+							{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("Dell EMC Networking OS10"))},
 						},
 					}, nil,
 				)
@@ -120,14 +121,14 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.4.1.674.10892.5.1.3.2.0",
 					"1.3.6.1.4.1.674.10892.5.1.3.3.0",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.4.1.674.10892.5.1.3.2.0", Type: gosnmp.NoSuchObject, Value: nil},
-							{Name: "1.3.6.1.4.1.674.10892.5.1.3.3.0", Type: gosnmp.OctetString, Value: []byte("BACKUP123")},
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.4.1.674.10892.5.1.3.2.0", Value: gosnmp.NoSuchObjectValue()},
+							{Name: "1.3.6.1.4.1.674.10892.5.1.3.3.0", Value: gosnmp.OctetStringValue([]byte("BACKUP123"))},
 						},
 					}, nil,
 				)
@@ -157,10 +158,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: []byte("device-name-3 263829375 Isilon OneFS v8.2.0.0")},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("device-name-3 263829375 Isilon OneFS v8.2.0.0"))},
 						},
 					}, nil,
 				)
@@ -189,10 +190,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.4.1.674.10892.5.4.200.10.1.2.1.3.1"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.4.1.674.10892.5.4.200.10.1.2.1.3.1", Type: gosnmp.OctetString, Value: []byte("25C")},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.4.1.674.10892.5.4.200.10.1.2.1.3.1"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.4.1.674.10892.5.4.200.10.1.2.1.3.1", Value: gosnmp.OctetStringValue([]byte("25C"))},
 						},
 					}, nil,
 				)
@@ -228,10 +229,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.4.1.674.10892.5.2.1.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.4.1.674.10892.5.2.1.0", Type: gosnmp.Integer, Value: 3},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.4.1.674.10892.5.2.1.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.4.1.674.10892.5.2.1.0", Value: gosnmp.IntegerValue(3)},
 						},
 					}, nil,
 				)
@@ -260,10 +261,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.2.2.1.6.1"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.2.1.2.2.1.6.1", Type: gosnmp.OctetString, Value: []byte{0x00, 0x50, 0x56, 0xAB, 0xCD, 0xEF}},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.2.2.1.6.1"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.2.1.2.2.1.6.1", Value: gosnmp.OctetStringValue([]byte{0x00, 0x50, 0x56, 0xAB, 0xCD, 0xEF})},
 						},
 					}, nil,
 				)
@@ -314,7 +315,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.4.1.674.10892.5.1.3.2.0"}).Return(nil, errors.New("SNMP timeout"))
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.4.1.674.10892.5.1.3.2.0"}).Return(nil, errors.New("SNMP timeout"))
 			},
 			expectedResult: nil,
 			expectedError:  true,
@@ -345,14 +346,14 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get(gomock.InAnyOrder([]string{
+				m.EXPECT().Get(gomock.Any(), gomock.InAnyOrder([]string{
 					"1.3.6.1.4.1.674.10892.5.1.3.1.0",
 					"1.3.6.1.4.1.674.10892.5.1.3.2.0",
 				})).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.4.1.674.10892.5.1.3.2.0", Type: gosnmp.NoSuchObject, Value: nil},
-							{Name: "1.3.6.1.4.1.674.10892.5.1.3.1.0", Type: gosnmp.OctetString, Value: []byte("PowerEdge R740")},
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.4.1.674.10892.5.1.3.2.0", Value: gosnmp.NoSuchObjectValue()},
+							{Name: "1.3.6.1.4.1.674.10892.5.1.3.1.0", Value: gosnmp.OctetStringValue([]byte("PowerEdge R740"))},
 						},
 					}, nil,
 				)
@@ -379,18 +380,18 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0", "1.3.6.1.2.1.1.2.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: []byte("value1")},
-							{Name: "1.3.6.1.2.1.1.2.0", Type: gosnmp.OctetString, Value: []byte("value2")},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.1.0", "1.3.6.1.2.1.1.2.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("value1"))},
+							{Name: "1.3.6.1.2.1.1.2.0", Value: gosnmp.OctetStringValue([]byte("value2"))},
 						},
 					}, nil,
 				)
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.3.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.2.1.1.3.0", Type: gosnmp.OctetString, Value: []byte("value3")},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.3.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.2.1.1.3.0", Value: gosnmp.OctetStringValue([]byte("value3"))},
 						},
 					}, nil,
 				)
@@ -510,9 +511,9 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.4.1.9.9.109.1.1.1.1.3.1"}).Return(
-					&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
-						{Name: "1.3.6.1.4.1.9.9.109.1.1.1.1.3.1", Type: gosnmp.OctetString, Value: []byte("9.2(4)")},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.4.1.9.9.109.1.1.1.1.3.1"}).Return(
+					&gosnmp.Message{VarBinds: []gosnmp.VarBind{
+						{Name: "1.3.6.1.4.1.9.9.109.1.1.1.1.3.1", Value: gosnmp.OctetStringValue([]byte("9.2(4)"))},
 					}}, nil,
 				)
 			},
@@ -630,7 +631,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.4.1.9.9.109.1.1.1.1.3.1"}).Return(nil, errors.New("SNMP timeout"))
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.4.1.9.9.109.1.1.1.1.3.1"}).Return(nil, errors.New("SNMP timeout"))
 			},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
 			expectedResult: map[string]ddsnmp.MetaTag{
@@ -660,10 +661,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: []byte("Cisco NX-OS(tm) m9100, Software (m9100-s2ek9-mz), Version 4.1(1c), RELEASE SOFTWARE Copyright (c) 2002-2008 by Cisco Systems, Inc. Compiled 11/24/2008 18:00:00")},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("Cisco NX-OS(tm) m9100, Software (m9100-s2ek9-mz), Version 4.1(1c), RELEASE SOFTWARE Copyright (c) 2002-2008 by Cisco Systems, Inc. Compiled 11/24/2008 18:00:00"))},
 						},
 					}, nil,
 				)
@@ -693,10 +694,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: []byte("Juniper Networks, Inc. mx960 internet router, kernel JUNOS 12.3R3.4")},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("Juniper Networks, Inc. mx960 internet router, kernel JUNOS 12.3R3.4"))},
 						},
 					}, nil,
 				)
@@ -727,10 +728,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: []byte("Some other device description")},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("Some other device description"))},
 						},
 					}, nil,
 				)
@@ -769,10 +770,10 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				},
 			},
 			setupMock: func(m *snmpmock.MockSession) {
-				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
-					&gosnmp.SnmpPacket{
-						Variables: []gosnmp.SnmpPDU{
-							{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: []byte("Cisco IOS XR Software (Cisco ASR9K Series), Version 4.2.3[Default] Copyright (c) 2013 by Cisco Systems, Inc.")},
+				m.EXPECT().Get(gomock.Any(), []string{"1.3.6.1.2.1.1.1.0"}).Return(
+					&gosnmp.Message{
+						VarBinds: []gosnmp.VarBind{
+							{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("Cisco IOS XR Software (Cisco ASR9K Series), Version 4.2.3[Default] Copyright (c) 2013 by Cisco Systems, Inc."))},
 						},
 					}, nil,
 				)
@@ -906,7 +907,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			}
 			collector := newDeviceMetadataCollector(mockHandler, requests, missingOIDs, logger.New(), tc.sysobjectid)
 
-			result, err := collector.collect(tc.profile)
+			result, err := collector.collect(context.Background(), tc.profile)
 
 			if tc.expectedError {
 				assert.Error(t, err)

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -26,14 +26,14 @@ func BenchmarkCrossTableResolver_Direct(b *testing.B) {
 					Name: "label",
 				},
 			}
-			pdus := make(map[string]gosnmp.SnmpPDU)
+			pdus := make(map[string]gosnmp.VarBind)
 			indexes := make([]string, rows)
 			for i := range rows {
 				indexes[i] = strconv.Itoa(i + 1)
 				pdus["1.2.1."+indexes[i]] = createStringPDU("1.2.1."+indexes[i], "label")
 			}
 			ctx := newCrossTableContext(
-				map[string]map[string]gosnmp.SnmpPDU{"1.2": pdus},
+				map[string]map[string]gosnmp.VarBind{"1.2": pdus},
 				map[string]string{"target": "1.2"},
 			)
 			ctx.rowTags = make(map[string]string)
@@ -61,7 +61,7 @@ func BenchmarkCrossTableResolver_JuniperPeerFamilyLookupScaling(b *testing.B) {
 	for _, peers := range []int{32, 128, 512} {
 		b.Run(fmt.Sprintf("peers=%d", peers), func(b *testing.B) {
 			resolver := newCrossTableResolver(logger.New())
-			refTablePDUs := make(map[string]gosnmp.SnmpPDU, peers*(targetFields+1))
+			refTablePDUs := make(map[string]gosnmp.VarBind, peers*(targetFields+1))
 			lookupValues := make([]string, peers)
 			tagConfigs := make([]ddprofiledefinition.MetricTagConfig, targetFields)
 

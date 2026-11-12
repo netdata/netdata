@@ -3,10 +3,11 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -58,7 +59,7 @@ func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *tes
 		),
 	})
 
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.ErrorContains(t, err, "secret transport detail")
 	require.Empty(t, metrics)
 	require.Len(t, got, 2)
@@ -121,8 +122,8 @@ func TestCollector_AcquisitionObserverReportsCachedProfileInputs(t *testing.T) {
 			},
 		},
 	}
-	expectSNMPGet(mockHandler, []string{tagOID}, []gosnmp.SnmpPDU{createStringPDU(tagOID, "lab")})
-	expectSNMPGet(mockHandler, []string{metadataOID}, []gosnmp.SnmpPDU{createNoSuchObjectPDU(metadataOID)})
+	expectSNMPGet(mockHandler, []string{tagOID}, []gosnmp.VarBind{createStringPDU(tagOID, "lab")})
+	expectSNMPGet(mockHandler, []string{metadataOID}, []gosnmp.VarBind{createNoSuchObjectPDU(metadataOID)})
 
 	var reports []AcquisitionProfileReport
 	collector := New(Config{
@@ -135,7 +136,7 @@ func TestCollector_AcquisitionObserverReportsCachedProfileInputs(t *testing.T) {
 			reports = append(reports, report)
 		}),
 	})
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.Equal(t, "lab", metrics[0].Tags["site"])
@@ -153,7 +154,7 @@ func TestCollector_AcquisitionObserverReportsCachedProfileInputs(t *testing.T) {
 	assert.Equal(t, AcquisitionRouteSourceGET, first[AcquisitionRouteKindMetadataScalar].Source)
 	assert.Equal(t, AcquisitionRouteOutcomeMissing, first[AcquisitionRouteKindMetadataScalar].Outcome)
 
-	metrics, err = collector.Collect()
+	metrics, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.Equal(t, "lab", metrics[0].Tags["site"], "normal collection must continue to reuse its live cache")
@@ -214,7 +215,7 @@ func TestCollector_AcquisitionObserverReportsLaterRoutesAsNotObservedAfterPrepar
 			report = value
 		}),
 	})
-	_, err := collector.Collect()
+	_, err := collector.Collect(context.Background())
 	require.Error(t, err)
 
 	require.Len(t, report.Routes, 2)
@@ -243,7 +244,7 @@ func TestCollector_AcquisitionObserverReportsPatternTagValue(t *testing.T) {
 			}},
 		},
 	}
-	expectSNMPGet(mockHandler, []string{tagOID}, []gosnmp.SnmpPDU{createStringPDU(tagOID, "lab-core")})
+	expectSNMPGet(mockHandler, []string{tagOID}, []gosnmp.VarBind{createStringPDU(tagOID, "lab-core")})
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
@@ -256,7 +257,7 @@ func TestCollector_AcquisitionObserverReportsPatternTagValue(t *testing.T) {
 			report = value
 		}),
 	})
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.Equal(t, "lab", metrics[0].Tags["site"])
@@ -281,7 +282,7 @@ func TestCollector_AcquisitionObserverPanicDoesNotChangeCollection(t *testing.T)
 		}),
 	})
 
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 }
@@ -327,7 +328,7 @@ func TestCollector_AcquisitionProfileDigestUsesRoutesNotSourcePath(t *testing.T)
 				},
 			),
 		})
-		_, err := collector.Collect()
+		_, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, reports, 1)
 		return reports[0].Identity.RouteDigest
@@ -414,7 +415,7 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyAndTagFailure(t 
 	}
 	require.NotEmpty(t, dependencyRouteOID)
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, []gosnmp.VarBind{
 		createGauge32PDU(source.Symbols[0].OID+".1", 10),
 	})
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, dependencyRouteOID, errors.New("dependency timeout"))
@@ -430,7 +431,7 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyAndTagFailure(t 
 			report = value
 		}),
 	})
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].TopologyMetrics, 1)
@@ -473,10 +474,10 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t 
 	}
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, []gosnmp.VarBind{
 		createGauge32PDU(source.Symbols[0].OID+".1", 10),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependency.Table.OID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependency.Table.OID, []gosnmp.VarBind{
 		createGauge32PDU(oidBase+".2.1.1", 20),
 		createGauge32PDU(oidBase+".2.2.1", 30),
 		createGauge32PDU(oidBase+".2.1.2", 40),
@@ -494,7 +495,7 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t 
 			report = value
 		}),
 	})
-	_, err := collector.Collect()
+	_, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 
 	require.Len(t, report.Routes, 2)
@@ -543,7 +544,7 @@ func TestCollector_AcquisitionObserverLeavesDormantDependencyUnobserved(t *testi
 			report = value
 		}),
 	})
-	_, err := collector.Collect()
+	_, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 
 	require.Len(t, report.Routes, 2)
@@ -586,10 +587,10 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 	}
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(topology)
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, source.Table.OID, []gosnmp.VarBind{
 		createGauge32PDU(source.Symbols[0].OID+".1", 10),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependency.Table.OID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, dependency.Table.OID, []gosnmp.VarBind{
 		createGauge32PDU(oidBase+".2.9.1", 20),
 	})
 
@@ -604,7 +605,7 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 			reports = append(reports, report)
 		}),
 	})
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 2)
 	require.Len(t, reports, 2)
@@ -662,7 +663,7 @@ func TestCollector_AcquisitionObserverLeavesTopologyRouteUnobservedWhenRegularTa
 		},
 	}
 	expectSNMPWalkError(mockHandler, gosnmp.Version2c, regularTableOID, errors.New("regular timeout"))
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, topologyTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, topologyTableOID, []gosnmp.VarBind{
 		createGauge32PDU(topologyTableOID+".1.1", 1),
 	})
 
@@ -677,7 +678,7 @@ func TestCollector_AcquisitionObserverLeavesTopologyRouteUnobservedWhenRegularTa
 			report = value
 		}),
 	})
-	_, err := collector.Collect()
+	_, err := collector.Collect(context.Background())
 	require.Error(t, err)
 
 	assert.Equal(t, AcquisitionProfileOutcomeFailed, report.Outcome)
@@ -725,10 +726,10 @@ func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *test
 			},
 		},
 	}
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, firstTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, firstTableOID, []gosnmp.VarBind{
 		createGauge32PDU(firstTableOID+".1.7", 1),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, secondTableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, secondTableOID, []gosnmp.VarBind{
 		createGauge32PDU(secondTableOID+".1.9", 1),
 	})
 
@@ -743,7 +744,7 @@ func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *test
 			report = value
 		}),
 	})
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].TopologyMetrics, 2)
@@ -789,7 +790,7 @@ func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSou
 			Name: "inheritedMissing",
 		},
 	})
-	expectSNMPGet(mockHandler, []string{oid}, []gosnmp.SnmpPDU{createNoSuchObjectPDU(oid)})
+	expectSNMPGet(mockHandler, []string{oid}, []gosnmp.VarBind{createNoSuchObjectPDU(oid)})
 
 	var reports []AcquisitionProfileReport
 	collector := New(Config{
@@ -802,7 +803,7 @@ func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSou
 			reports = append(reports, value)
 		}),
 	})
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 2)
 	require.Len(t, reports, 2)
@@ -824,7 +825,7 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 				Name: "missingMetric",
 			},
 		})
-		expectSNMPGet(mockHandler, []string{oid}, []gosnmp.SnmpPDU{createNoSuchObjectPDU(oid)})
+		expectSNMPGet(mockHandler, []string{oid}, []gosnmp.VarBind{createNoSuchObjectPDU(oid)})
 
 		var report AcquisitionProfileReport
 		collector := New(Config{
@@ -839,7 +840,7 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 				},
 			),
 		})
-		_, err := collector.Collect()
+		_, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, report.Routes, 1)
 		assert.Equal(t, AcquisitionRouteOutcomeMissing, report.Routes[0].Outcome)
@@ -854,7 +855,7 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 			"1.3.6.1.4.1.99999.20.1.0",
 			"1.3.6.1.4.1.99999.20.2.0",
 		}
-		expectSNMPGet(mockHandler, oids, []gosnmp.SnmpPDU{
+		expectSNMPGet(mockHandler, oids, []gosnmp.VarBind{
 			createNoSuchObjectPDU(oids[0]),
 			createNoSuchObjectPDU(oids[1]),
 		})
@@ -880,7 +881,7 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 				},
 			),
 		})
-		_, err := collector.Collect()
+		_, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, report.Routes, 1)
 		assert.Equal(t, AcquisitionRouteOutcomeMissing, report.Routes[0].Outcome)
@@ -895,7 +896,7 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 
 	expectSNMPGet(mockHandler,
 		[]string{"1.3.6.1.4.1.99999.20.1.0", "1.3.6.1.4.1.99999.20.2.0"},
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createIntegerPDU("1.3.6.1.4.1.99999.20.1.0", 6),
 			createGauge32PDU("1.3.6.1.4.1.99999.20.2.0", 3600),
 		},
@@ -923,7 +924,7 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 		}),
 	})
 
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].BGPRows, 1)
@@ -950,7 +951,7 @@ func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *test
 		stateOID  = "1.3.6.1.4.1.99999.20.1.0"
 		uptimeOID = "1.3.6.1.4.1.99999.20.2.0"
 	)
-	expectSNMPGet(mockHandler, []string{stateOID, uptimeOID}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{stateOID, uptimeOID}, []gosnmp.VarBind{
 		createNoSuchObjectPDU(stateOID),
 		createGauge32PDU(uptimeOID, 3600),
 	})
@@ -974,7 +975,7 @@ func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *test
 			report = value
 		}),
 	})
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].BGPRows, 1)
@@ -1068,10 +1069,10 @@ func TestCollector_AcquisitionObserverClassifiesBGPTableLookupFailureAsDependenc
 
 	cfg := crossTableBGPTestConfig()
 	cfg.Identity.RemoteAS.IndexTransform = []ddprofiledefinition.MetricIndexTransform{{Start: 99}}
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.1", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.1", []gosnmp.VarBind{
 		createGauge32PDU("1.3.6.1.4.1.99999.70.1.1.4.192.0.2.1.1.1", 42),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.2", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.2", []gosnmp.VarBind{
 		createGauge32PDU("1.3.6.1.4.1.99999.70.2.1.4.192.0.2.1", 65001),
 		createStringPDU("1.3.6.1.4.1.99999.70.2.2.4.192.0.2.1", "blue"),
 	})
@@ -1093,7 +1094,7 @@ func TestCollector_AcquisitionObserverClassifiesBGPTableLookupFailureAsDependenc
 		}),
 	})
 
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Error(t, metrics[0].BGPCollectError)
@@ -1107,10 +1108,10 @@ func TestCollector_AcquisitionObserverClassifiesMissingRequiredBGPTableCellAsDep
 	defer ctrl.Finish()
 
 	cfg := crossTableBGPTestConfig()
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.1", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.1", []gosnmp.VarBind{
 		createGauge32PDU("1.3.6.1.4.1.99999.70.1.1.4.192.0.2.1.1.1", 42),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.2", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.2", []gosnmp.VarBind{
 		createStringPDU("1.3.6.1.4.1.99999.70.2.2.4.192.0.2.1", "blue"),
 	})
 
@@ -1131,7 +1132,7 @@ func TestCollector_AcquisitionObserverClassifiesMissingRequiredBGPTableCellAsDep
 		}),
 	})
 
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.Empty(t, metrics[0].BGPRows)
@@ -1154,10 +1155,10 @@ func TestCollector_AcquisitionObserverIgnoresMissingOptionalBGPTableDescriptor(t
 			Name: "vendorBgpPeerDescription",
 		},
 	}
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.1", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.1", []gosnmp.VarBind{
 		createGauge32PDU("1.3.6.1.4.1.99999.70.1.1.4.192.0.2.1.1.1", 42),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.2", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.2", []gosnmp.VarBind{
 		createGauge32PDU("1.3.6.1.4.1.99999.70.2.1.4.192.0.2.1", 65001),
 		createStringPDU("1.3.6.1.4.1.99999.70.2.2.4.192.0.2.1", "blue"),
 	})
@@ -1179,7 +1180,7 @@ func TestCollector_AcquisitionObserverIgnoresMissingOptionalBGPTableDescriptor(t
 		}),
 	})
 
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].BGPRows, 1)
@@ -1195,12 +1196,12 @@ func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *test
 
 	expectSNMPGet(mockHandler,
 		[]string{"1.3.6.1.4.1.99999.20.1.0", "1.3.6.1.4.1.99999.20.2.0"},
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createIntegerPDU("1.3.6.1.4.1.99999.20.1.0", 6),
 			createGauge32PDU("1.3.6.1.4.1.99999.20.2.0", 3600),
 		},
 	)
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.30.1", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.30.1", []gosnmp.VarBind{
 		createIntegerPDU("1.3.6.1.4.1.99999.30.1.2.42", 6),
 		createGauge32PDU("1.3.6.1.4.1.99999.30.1.3.42", 65001),
 		createGauge32PDU("1.3.6.1.4.1.99999.30.1.4.42", 7200),
@@ -1232,7 +1233,7 @@ func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *test
 		}),
 	})
 
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Len(t, metrics[0].BGPRows, 2)

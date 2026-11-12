@@ -10,7 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -461,7 +461,7 @@ func TestCollectSNMP_HidesBGPDiagnosticsButKeepsFunctionCache(t *testing.T) {
 	collr.CreateVnode = false
 	collr.Ping.Enabled = false
 	collr.snmpProfiles = []*ddsnmp.Profile{{}}
-	collr.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return mockSNMP }
+	collr.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return mockSNMP, nil }
 	collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		row := typedBGPPeerRow()
 		row.LastError = ddsnmp.BGPLastError{

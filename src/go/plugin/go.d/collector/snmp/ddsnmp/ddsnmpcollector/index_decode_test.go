@@ -3,14 +3,16 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -66,10 +68,10 @@ func TestIndexDecodeRejectedRowsDoNotEnterCache(t *testing.T) {
 			defer ctrl.Finish()
 			cache := newTableCache(time.Hour, 0)
 			collector := newTableCollector(handler, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
-			expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.SnmpPDU{
+			expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.VarBind{
 				createGauge32PDU(root+".1."+goodIndex, 10), createGauge32PDU(root+".1."+badIndex, 20),
 			})
-			metrics, err := collector.collect(prof, &ddsnmp.CollectionStats{})
+			metrics, err := collector.collect(context.Background(), prof, &ddsnmp.CollectionStats{})
 			require.NoError(t, err)
 			require.Len(t, metrics, 1)
 			assert.Equal(t, "192.0.2.1", metrics[0].Tags["address"])
@@ -77,9 +79,9 @@ func TestIndexDecodeRejectedRowsDoNotEnterCache(t *testing.T) {
 			require.True(t, ok)
 			assert.NotContains(t, cachedOIDs, badIndex)
 			assert.NotContains(t, cachedTags, badIndex)
-			handler.EXPECT().Get([]string{root + ".1." + goodIndex}).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{createGauge32PDU(root+".1."+goodIndex, 11)}}, nil)
+			handler.EXPECT().Get(gomock.Any(), []string{root + ".1." + goodIndex}).Return(&gosnmp.Message{VarBinds: []gosnmp.VarBind{createGauge32PDU(root+".1."+goodIndex, 11)}}, nil)
 			var stats ddsnmp.CollectionStats
-			metrics, err = collector.collect(prof, &stats)
+			metrics, err = collector.collect(context.Background(), prof, &stats)
 			require.NoError(t, err)
 			require.Len(t, metrics, 1)
 			assert.Equal(t, "192.0.2.1", metrics[0].Tags["address"])
@@ -98,8 +100,8 @@ func TestIndexDecodeConfigChangeDoesNotReuseIdentity(t *testing.T) {
 	for _, component := range []uint{1, 2} {
 		changed := def.Clone()
 		changed.Metrics[0].MetricTags[0].IndexDecode.Component = component
-		expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.SnmpPDU{createGauge32PDU(root+".1.1.2", 10)})
-		metrics, err := collector.collect(&ddsnmp.Profile{SourceFile: "decode-test.yaml", Definition: changed}, &ddsnmp.CollectionStats{})
+		expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.VarBind{createGauge32PDU(root+".1.1.2", 10)})
+		metrics, err := collector.collect(context.Background(), &ddsnmp.Profile{SourceFile: "decode-test.yaml", Definition: changed}, &ddsnmp.CollectionStats{})
 		require.NoError(t, err)
 		require.Len(t, metrics, 1)
 		assert.Equal(t, fmt.Sprint(component), metrics[0].Tags["identity"])
@@ -139,11 +141,11 @@ func TestExtendedIndexTagConfigChangeDoesNotReuseIdentity(t *testing.T) {
 			for i, tags := range []string{tc.before, tc.after, tc.after} {
 				def := decodeContractProfile(t, "metrics:\n- table: {OID: "+root+", name: rows}\n  symbols: [{OID: "+root+".1, name: value}]\n  metric_tags:\n    "+strings.ReplaceAll(tags, "\n", "\n    "))
 				if i < 2 {
-					expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.SnmpPDU{pdu})
+					expectSNMPWalk(handler, gosnmp.Version2c, root, []gosnmp.VarBind{pdu})
 				} else {
-					handler.EXPECT().Get([]string{pdu.Name}).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{pdu}}, nil)
+					handler.EXPECT().Get(gomock.Any(), []string{pdu.Name}).Return(&gosnmp.Message{VarBinds: []gosnmp.VarBind{pdu}}, nil)
 				}
-				metrics, err := collector.collect(&ddsnmp.Profile{SourceFile: "decode-test.yaml", Definition: def}, &ddsnmp.CollectionStats{})
+				metrics, err := collector.collect(context.Background(), &ddsnmp.Profile{SourceFile: "decode-test.yaml", Definition: def}, &ddsnmp.CollectionStats{})
 				require.NoError(t, err)
 				require.Len(t, metrics, 1)
 				if i > 0 {

@@ -10,9 +10,10 @@
 package snmpmock
 
 import (
+	context "context"
 	reflect "reflect"
 
-	gosnmp "github.com/gosnmp/gosnmp"
+	gosnmp "github.com/netdata/gosnmp"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -41,18 +42,18 @@ func (m *MockScalarClient) EXPECT() *MockScalarClientMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockScalarClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+func (m *MockScalarClient) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", oids)
-	ret0, _ := ret[0].(*gosnmp.SnmpPacket)
+	ret := m.ctrl.Call(m, "Get", ctx, oids)
+	ret0, _ := ret[0].(*gosnmp.Message)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockScalarClientMockRecorder) Get(oids any) *gomock.Call {
+func (mr *MockScalarClientMockRecorder) Get(ctx, oids any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockScalarClient)(nil).Get), oids)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockScalarClient)(nil).Get), ctx, oids)
 }
 
 // MockClient is a mock of Client interface.
@@ -80,48 +81,50 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // BulkWalkAll mocks base method.
-func (m *MockClient) BulkWalkAll(rootOid string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
+func (m *MockClient) BulkWalkAll(ctx context.Context, rootOid string, maxRepetitions uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BulkWalkAll", rootOid, maxRepetitions)
-	ret0, _ := ret[0].([]gosnmp.SnmpPDU)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "BulkWalkAll", ctx, rootOid, maxRepetitions)
+	ret0, _ := ret[0].([]gosnmp.VarBind)
+	ret1, _ := ret[1].(gosnmp.WalkEnd)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // BulkWalkAll indicates an expected call of BulkWalkAll.
-func (mr *MockClientMockRecorder) BulkWalkAll(rootOid, maxRepetitions any) *gomock.Call {
+func (mr *MockClientMockRecorder) BulkWalkAll(ctx, rootOid, maxRepetitions any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BulkWalkAll", reflect.TypeOf((*MockClient)(nil).BulkWalkAll), rootOid, maxRepetitions)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BulkWalkAll", reflect.TypeOf((*MockClient)(nil).BulkWalkAll), ctx, rootOid, maxRepetitions)
 }
 
 // Get mocks base method.
-func (m *MockClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+func (m *MockClient) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", oids)
-	ret0, _ := ret[0].(*gosnmp.SnmpPacket)
+	ret := m.ctrl.Call(m, "Get", ctx, oids)
+	ret0, _ := ret[0].(*gosnmp.Message)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockClientMockRecorder) Get(oids any) *gomock.Call {
+func (mr *MockClientMockRecorder) Get(ctx, oids any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockClient)(nil).Get), oids)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockClient)(nil).Get), ctx, oids)
 }
 
 // WalkAll mocks base method.
-func (m *MockClient) WalkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
+func (m *MockClient) WalkAll(ctx context.Context, rootOid string) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WalkAll", rootOid)
-	ret0, _ := ret[0].([]gosnmp.SnmpPDU)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "WalkAll", ctx, rootOid)
+	ret0, _ := ret[0].([]gosnmp.VarBind)
+	ret1, _ := ret[1].(gosnmp.WalkEnd)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // WalkAll indicates an expected call of WalkAll.
-func (mr *MockClientMockRecorder) WalkAll(rootOid any) *gomock.Call {
+func (mr *MockClientMockRecorder) WalkAll(ctx, rootOid any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WalkAll", reflect.TypeOf((*MockClient)(nil).WalkAll), rootOid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WalkAll", reflect.TypeOf((*MockClient)(nil).WalkAll), ctx, rootOid)
 }
 
 // MockSession is a mock of Session interface.
@@ -149,18 +152,19 @@ func (m *MockSession) EXPECT() *MockSessionMockRecorder {
 }
 
 // BulkWalkAll mocks base method.
-func (m *MockSession) BulkWalkAll(rootOid string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
+func (m *MockSession) BulkWalkAll(ctx context.Context, rootOid string, maxRepetitions uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BulkWalkAll", rootOid, maxRepetitions)
-	ret0, _ := ret[0].([]gosnmp.SnmpPDU)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "BulkWalkAll", ctx, rootOid, maxRepetitions)
+	ret0, _ := ret[0].([]gosnmp.VarBind)
+	ret1, _ := ret[1].(gosnmp.WalkEnd)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // BulkWalkAll indicates an expected call of BulkWalkAll.
-func (mr *MockSessionMockRecorder) BulkWalkAll(rootOid, maxRepetitions any) *gomock.Call {
+func (mr *MockSessionMockRecorder) BulkWalkAll(ctx, rootOid, maxRepetitions any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BulkWalkAll", reflect.TypeOf((*MockSession)(nil).BulkWalkAll), rootOid, maxRepetitions)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BulkWalkAll", reflect.TypeOf((*MockSession)(nil).BulkWalkAll), ctx, rootOid, maxRepetitions)
 }
 
 // Close mocks base method.
@@ -178,45 +182,46 @@ func (mr *MockSessionMockRecorder) Close() *gomock.Call {
 }
 
 // Connect mocks base method.
-func (m *MockSession) Connect() error {
+func (m *MockSession) Connect(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Connect")
+	ret := m.ctrl.Call(m, "Connect", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Connect indicates an expected call of Connect.
-func (mr *MockSessionMockRecorder) Connect() *gomock.Call {
+func (mr *MockSessionMockRecorder) Connect(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connect", reflect.TypeOf((*MockSession)(nil).Connect))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Connect", reflect.TypeOf((*MockSession)(nil).Connect), ctx)
 }
 
 // Get mocks base method.
-func (m *MockSession) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+func (m *MockSession) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", oids)
-	ret0, _ := ret[0].(*gosnmp.SnmpPacket)
+	ret := m.ctrl.Call(m, "Get", ctx, oids)
+	ret0, _ := ret[0].(*gosnmp.Message)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockSessionMockRecorder) Get(oids any) *gomock.Call {
+func (mr *MockSessionMockRecorder) Get(ctx, oids any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSession)(nil).Get), oids)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSession)(nil).Get), ctx, oids)
 }
 
 // WalkAll mocks base method.
-func (m *MockSession) WalkAll(rootOid string) ([]gosnmp.SnmpPDU, error) {
+func (m *MockSession) WalkAll(ctx context.Context, rootOid string) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WalkAll", rootOid)
-	ret0, _ := ret[0].([]gosnmp.SnmpPDU)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "WalkAll", ctx, rootOid)
+	ret0, _ := ret[0].([]gosnmp.VarBind)
+	ret1, _ := ret[1].(gosnmp.WalkEnd)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // WalkAll indicates an expected call of WalkAll.
-func (mr *MockSessionMockRecorder) WalkAll(rootOid any) *gomock.Call {
+func (mr *MockSessionMockRecorder) WalkAll(ctx, rootOid any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WalkAll", reflect.TypeOf((*MockSession)(nil).WalkAll), rootOid)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WalkAll", reflect.TypeOf((*MockSession)(nil).WalkAll), ctx, rootOid)
 }

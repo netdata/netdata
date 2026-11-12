@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,8 +17,8 @@ import (
 
 func TestCollector_Collect_BGPRowsFromScalarBGPConfig(t *testing.T) {
 	tests := map[string]struct {
-		statePDU  gosnmp.SnmpPDU
-		uptimePDU gosnmp.SnmpPDU
+		statePDU  gosnmp.VarBind
+		uptimePDU gosnmp.VarBind
 	}{
 		"scalar peer row with state and signal": {
 			statePDU:  createIntegerPDU("1.3.6.1.4.1.99999.20.1.0", 6),
@@ -35,7 +36,7 @@ func TestCollector_Collect_BGPRowsFromScalarBGPConfig(t *testing.T) {
 					"1.3.6.1.4.1.99999.20.1.0",
 					"1.3.6.1.4.1.99999.20.2.0",
 				},
-				[]gosnmp.SnmpPDU{tc.statePDU, tc.uptimePDU},
+				[]gosnmp.VarBind{tc.statePDU, tc.uptimePDU},
 			)
 
 			collector := New(Config{
@@ -55,7 +56,7 @@ func TestCollector_Collect_BGPRowsFromScalarBGPConfig(t *testing.T) {
 				Log: logger.New(),
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 
@@ -89,10 +90,10 @@ func TestCollector_Collect_BGPRowsFromScalarBGPConfig(t *testing.T) {
 
 func TestCollector_Collect_BGPRowsFromTableBGPConfig(t *testing.T) {
 	tests := map[string]struct {
-		pdus []gosnmp.SnmpPDU
+		pdus []gosnmp.VarBind
 	}{
 		"table peer row with index identity": {
-			pdus: []gosnmp.SnmpPDU{
+			pdus: []gosnmp.VarBind{
 				createIntegerPDU("1.3.6.1.4.1.99999.30.1.2.42", 6),
 				createGauge32PDU("1.3.6.1.4.1.99999.30.1.3.42", 65001),
 				createGauge32PDU("1.3.6.1.4.1.99999.30.1.4.42", 7200),
@@ -124,7 +125,7 @@ func TestCollector_Collect_BGPRowsFromTableBGPConfig(t *testing.T) {
 				Log: logger.New(),
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 
@@ -154,8 +155,8 @@ func TestCollector_Collect_BGPRowsFromTableBGPConfig(t *testing.T) {
 
 func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 	tests := map[string]struct {
-		mainPDUs         []gosnmp.SnmpPDU
-		peerPDUs         []gosnmp.SnmpPDU
+		mainPDUs         []gosnmp.VarBind
+		peerPDUs         []gosnmp.VarBind
 		expectedRowKey   string
 		expectedNeighbor string
 		expectedAFI      ddprofiledefinition.BGPAddressFamily
@@ -163,10 +164,10 @@ func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 		expectedPeerType string
 	}{
 		"ipv4 peer family row resolves identity from peer table": {
-			mainPDUs: []gosnmp.SnmpPDU{
+			mainPDUs: []gosnmp.VarBind{
 				createGauge32PDU("1.3.6.1.4.1.99999.70.1.1.4.192.0.2.1.1.1", 42),
 			},
-			peerPDUs: []gosnmp.SnmpPDU{
+			peerPDUs: []gosnmp.VarBind{
 				createGauge32PDU("1.3.6.1.4.1.99999.70.2.1.4.192.0.2.1", 65001),
 				createStringPDU("1.3.6.1.4.1.99999.70.2.2.4.192.0.2.1", "blue"),
 			},
@@ -177,10 +178,10 @@ func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 			expectedPeerType: "01",
 		},
 		"ipv6 peer family row resolves AFI and SAFI from the tail of a variable-length row index": {
-			mainPDUs: []gosnmp.SnmpPDU{
+			mainPDUs: []gosnmp.VarBind{
 				createGauge32PDU("1.3.6.1.4.1.99999.70.1.1.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.1.2.1", 42),
 			},
-			peerPDUs: []gosnmp.SnmpPDU{
+			peerPDUs: []gosnmp.VarBind{
 				createGauge32PDU("1.3.6.1.4.1.99999.70.2.1.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.1", 65001),
 				createStringPDU("1.3.6.1.4.1.99999.70.2.2.16.32.1.13.184.0.0.0.0.0.0.0.0.0.0.0.1", "blue"),
 			},
@@ -217,7 +218,7 @@ func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 				Log: logger.New(),
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Len(t, results[0].BGPRows, 1)
@@ -242,7 +243,7 @@ func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 
 func TestCollector_Collect_BGPRowsFromCategoricalBGPFields(t *testing.T) {
 	tests := map[string]struct {
-		reasonPDU gosnmp.SnmpPDU
+		reasonPDU gosnmp.VarBind
 	}{
 		"mapped last down reason is emitted as text": {
 			reasonPDU: createIntegerPDU("1.3.6.1.4.1.99999.60.1.0", 2),
@@ -256,7 +257,7 @@ func TestCollector_Collect_BGPRowsFromCategoricalBGPFields(t *testing.T) {
 
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.4.1.99999.60.1.0"},
-				[]gosnmp.SnmpPDU{tc.reasonPDU},
+				[]gosnmp.VarBind{tc.reasonPDU},
 			)
 
 			collector := New(Config{
@@ -295,7 +296,7 @@ func TestCollector_Collect_BGPRowsFromCategoricalBGPFields(t *testing.T) {
 				Log: logger.New(),
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Len(t, results[0].BGPRows, 1)
@@ -311,7 +312,7 @@ func TestCollector_Collect_BGPRowsFromCategoricalBGPFields(t *testing.T) {
 
 func TestCollector_Collect_BGPRowsBestEffortForRegularMetrics(t *testing.T) {
 	tests := map[string]struct {
-		bgpPDU gosnmp.SnmpPDU
+		bgpPDU gosnmp.VarBind
 	}{
 		"invalid BGP signal does not drop scalar metric": {
 			bgpPDU: createStringPDU("1.3.6.1.4.1.99999.40.1.0", "not-a-number"),
@@ -325,11 +326,11 @@ func TestCollector_Collect_BGPRowsBestEffortForRegularMetrics(t *testing.T) {
 
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.2.1.1.3.0"},
-				[]gosnmp.SnmpPDU{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456)},
+				[]gosnmp.VarBind{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456)},
 			)
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.4.1.99999.40.1.0"},
-				[]gosnmp.SnmpPDU{tc.bgpPDU},
+				[]gosnmp.VarBind{tc.bgpPDU},
 			)
 
 			collector := New(Config{
@@ -373,7 +374,7 @@ func TestCollector_Collect_BGPRowsBestEffortForRegularMetrics(t *testing.T) {
 				Log: logger.New(),
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Len(t, results[0].Metrics, 1)
@@ -386,7 +387,7 @@ func TestCollector_Collect_BGPRowsBestEffortForRegularMetrics(t *testing.T) {
 
 func TestCollector_Collect_BGPRowsSkipsKnownMissingScalarOIDs(t *testing.T) {
 	tests := map[string]struct {
-		missingPDU gosnmp.SnmpPDU
+		missingPDU gosnmp.VarBind
 	}{
 		"no such object cached after first BGP poll": {
 			missingPDU: createNoSuchObjectPDU("1.3.6.1.4.1.99999.50.1.0"),
@@ -400,15 +401,15 @@ func TestCollector_Collect_BGPRowsSkipsKnownMissingScalarOIDs(t *testing.T) {
 
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.2.1.1.3.0"},
-				[]gosnmp.SnmpPDU{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456)},
+				[]gosnmp.VarBind{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456)},
 			)
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.4.1.99999.50.1.0"},
-				[]gosnmp.SnmpPDU{tc.missingPDU},
+				[]gosnmp.VarBind{tc.missingPDU},
 			)
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.2.1.1.3.0"},
-				[]gosnmp.SnmpPDU{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 223456)},
+				[]gosnmp.VarBind{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 223456)},
 			)
 
 			collector := New(Config{
@@ -452,13 +453,13 @@ func TestCollector_Collect_BGPRowsSkipsKnownMissingScalarOIDs(t *testing.T) {
 				Log: logger.New(),
 			})
 
-			first, err := collector.Collect()
+			first, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, first, 1)
 			assert.Empty(t, first[0].BGPRows)
 			assert.EqualValues(t, 1, first[0].Stats.Errors.MissingOIDs)
 
-			second, err := collector.Collect()
+			second, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, second, 1)
 			assert.Empty(t, second[0].BGPRows)

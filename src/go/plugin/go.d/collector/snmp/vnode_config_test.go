@@ -22,7 +22,7 @@ func TestNamedVnodeClientInitializationDoesNotLogCredentials(t *testing.T) {
 	c.Vnode = "router"
 	var logs bytes.Buffer
 	c.Logger = logger.NewWithWriter(&logs)
-	_, err := c.configuredSNMPHandler()
+	_, err := c.configuredSNMPClient()
 	require.NoError(t, err)
 	require.NotContains(t, logs.String(), c.Community)
 	c.Options.Version = "3"
@@ -31,7 +31,7 @@ func TestNamedVnodeClientInitializationDoesNotLogCredentials(t *testing.T) {
 	c.User.AuthKey = "fixture-auth-secret"
 	c.User.PrivKey = "fixture-priv-secret"
 	logs.Reset()
-	_, err = c.configuredSNMPHandler()
+	_, err = c.configuredSNMPClient()
 	require.NoError(t, err)
 	require.Contains(t, logs.String(), `context=\"routing-context\"`)
 	require.NotContains(t, logs.String(), c.Community)

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -57,32 +57,31 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 				Metric:   "jnxFWCounterPacketCount",
 			}
 			profile = stockIdentitySelectRow(t, profile, tc)
-			var pdus []gosnmp.SnmpPDU
+			var pdus []gosnmp.VarBind
 			for i, row := range rows {
 				pdus = append(
 					pdus,
-					gosnmp.SnmpPDU{
+					gosnmp.VarBind{
 						Name:  "1.3.6.1.4.1.2636.3.5.2.1.4." + suffix(row[0], row[1]),
-						Type:  gosnmp.Counter64,
-						Value: uint64(100 + i),
+						Value: gosnmp.Counter64Value(uint64(100 + i)),
 					},
 				)
 			}
 
 			handler := snmpmock.NewMockSession(gomock.NewController(t))
 			walks, gets := 0, 0
-			handler.EXPECT().BulkWalkAll(tc.TableOID, gomock.Any()).DoAndReturn(func(_ string, _ uint32) ([]gosnmp.SnmpPDU, error) {
+			handler.EXPECT().BulkWalkAll(gomock.Any(), tc.TableOID, gomock.Any()).DoAndReturn(func(_ context.Context, _ string, _ uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 				walks++
-				return pdus, nil
+				return pdus, gosnmp.WalkEnd{}, nil
 			}).AnyTimes()
-			handler.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
+			handler.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oids []string) (*gosnmp.Message, error) {
 				gets++
-				packet := &gosnmp.SnmpPacket{}
+				packet := &gosnmp.Message{}
 				for _, oid := range oids {
 					found := false
 					for _, pdu := range pdus {
 						if strings.Trim(oid, ".") == pdu.Name {
-							packet.Variables = append(packet.Variables, pdu)
+							packet.VarBinds = append(packet.VarBinds, pdu)
 							found = true
 						}
 					}
@@ -118,7 +117,7 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 						acquisition = acquire(stockIdentitySelectRow(t, reloaded, tc))
 					}
 					beforeWalk, beforeGet := walks, gets
-					results, err := acquisition.Collect()
+					results, err := acquisition.Collect(context.Background())
 					require.NoError(t, err)
 					require.Len(t, results, 1)
 					metrics := results[0].Metrics

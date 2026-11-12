@@ -5,14 +5,12 @@ package receiver
 import (
 	"errors"
 	"fmt"
-	"io"
-	"log"
 	"net"
 	"net/netip"
 	"strconv"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 )
 
@@ -37,7 +35,6 @@ const (
 )
 
 var (
-	trapDecodeLogger      = gosnmp.NewLogger(log.New(io.Discard, "", 0))
 	errBERTruncatedTLV    = errors.New("BER: truncated tag/length")
 	errBERMissingLength   = errors.New("BER: missing length byte")
 	errBERIndefinite      = errors.New("BER: indefinite length is unsupported")
@@ -45,42 +42,49 @@ var (
 )
 
 type packetContext struct {
-	Packet *gosnmp.SnmpPacket
-	PDU    *model.TrapPDU
+	Notification *gosnmp.Notification
+	PDU          *model.TrapPDU
 }
 
 type decodeOptions struct {
 	trustedRelay bool
 }
 
-func decodeTrap(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable) (*packetContext, error) {
-	return decodeTrapWithOptions(data, udpPeer, secTable, decodeOptions{})
+// decodeTrap decodes one datagram as Process does, without its policy checks.
+func decodeTrap(data []byte, udpPeer net.IP, receiver *gosnmp.Receiver) (*packetContext, []byte, error) {
+	envelope, err := gosnmp.ReadEnvelope(data)
+	v3 := err == nil && envelope.Version == gosnmp.Version3
+	return decodeTrapWithOptions(data, v3, udpPeer, receiver, decodeOptions{})
 }
 
-func decodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3SecurityParametersTable, opts decodeOptions) (*packetContext, error) {
-	pkt, err := decodePacket(data, secTable)
+// decodeTrapWithOptions decodes a datagram whose header says it is SNMPv3 when
+// v3 is set. It returns the response the receiver made for its sender, if any:
+// an inform's Response with the notification, or a Report with the error.
+func decodeTrapWithOptions(data []byte, v3 bool, udpPeer net.IP, receiver *gosnmp.Receiver, opts decodeOptions) (*packetContext, []byte, error) {
+	n, response, err := decodePacket(data, v3, receiver)
 	if err != nil {
-		return nil, err
+		return nil, response, err
 	}
+	pkt := &n.Message
 
 	varbinds, err := packetVarbinds(pkt)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	version, err := snmpVersion(pkt.Version)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	pduType, err := snmpPDUType(pkt.PDUType)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	trapOID := trapOIDFromVarbinds(varbinds)
 	if trapOID == "" {
-		return nil, errors.New("missing snmpTrapOID.0")
+		return nil, nil, errors.New("missing snmpTrapOID.0")
 	}
 
 	peerIP := ""
@@ -103,149 +107,71 @@ func decodeTrapWithOptions(data []byte, udpPeer net.IP, secTable *gosnmp.SnmpV3S
 	}
 
 	return &packetContext{
-		Packet: pkt,
-		PDU:    tpdu,
-	}, nil
+		Notification: n,
+		PDU:          tpdu,
+	}, response, nil
 }
 
+// classifyDecodeError labels a decode failure: the library's errors by their
+// category, Netdata's decode budget and trap-shape errors by their own text.
 func classifyDecodeError(err error) ErrorKind {
-	if err == nil {
+	switch {
+	case err == nil:
 		return ""
+	case errors.Is(err, gosnmp.ErrASNParse), errors.Is(err, gosnmp.ErrBadVersion), errors.Is(err, gosnmp.ErrInvalidMsgs):
+		return ErrorMalformedPDU
+	case errors.Is(err, gosnmp.ErrWrongDigest), errors.Is(err, gosnmp.ErrDecryption):
+		return ErrorAuthFailure
+	case errors.Is(err, gosnmp.ErrUnknownUsername), errors.Is(err, gosnmp.ErrUnknownSecurityLevel),
+		errors.Is(err, gosnmp.ErrUnknownSecurityModels), errors.Is(err, gosnmp.ErrNotInTimeWindow):
+		return ErrorUSMFailure
+	case errors.Is(err, gosnmp.ErrUnknownEngineID):
+		return ErrorUnknownEngine
 	}
 
-	// GoSNMP returns plain errors for several v3 USM decode failures. Keep the
-	// text mapping narrow and covered by tests until the fork exposes typed
-	// errors for authentication, decryption, and engine-ID failures.
 	s := err.Error()
 	switch {
-	case strings.Contains(s, "BER:"):
+	case strings.Contains(s, "BER:"),
+		strings.Contains(s, "datagram too large"),
+		strings.Contains(s, "too many varbinds"),
+		strings.Contains(s, "OctetString too long"),
+		strings.Contains(s, "missing snmpTrapOID.0"),
+		strings.Contains(s, "invalid SNMPv1"):
 		return ErrorMalformedPDU
-	case strings.Contains(s, "datagram too large"):
-		return ErrorMalformedPDU
-	case strings.Contains(s, "too many varbinds"):
-		return ErrorMalformedPDU
-	case strings.Contains(s, "OctetString too long"):
-		return ErrorMalformedPDU
-	case strings.Contains(s, "missing snmpTrapOID.0"):
-		return ErrorMalformedPDU
-	case strings.Contains(s, "invalid SNMPv1"):
-		return ErrorMalformedPDU
-	case strings.Contains(s, "authentication"):
-		return ErrorAuthFailure
-	case strings.Contains(s, "decrypt"):
-		return ErrorAuthFailure
-	case strings.Contains(s, "USM"):
-		return ErrorUSMFailure
-	case strings.Contains(s, "no security parameters"):
-		return ErrorUSMFailure
-	case strings.Contains(s, "no credentials"):
-		return ErrorUSMFailure
-	case strings.Contains(s, "unknown engine"):
-		return ErrorUnknownEngine
-	case strings.Contains(s, "engine ID"):
-		return ErrorUnknownEngine
 	default:
 		return ErrorDecodeFailed
 	}
 }
 
-func sniffSNMPVersion(data []byte) (model.SnmpVersion, bool) {
-	tag, content, _, err := readTLV(data)
-	if err != nil || tag != tagSequence {
-		return "", false
-	}
-	tag, versionData, _, err := readTLV(content)
-	if err != nil || tag != tagInteger {
-		return "", false
-	}
-
-	version, ok := parseBERVersion(versionData)
-	if !ok {
-		return "", false
-	}
-	v, err := snmpVersion(gosnmp.SnmpVersion(version))
-	if err != nil {
-		return "", false
-	}
-	return v, true
-}
-
-func extractSNMPv3EngineIDHex(data []byte) (string, bool, error) {
-	envelope, err := parseRawV3Envelope(data)
-	if err != nil {
-		return "", false, err
-	}
-	if envelope == nil {
-		return "", false, nil
-	}
-	engineID, _, err := parseRawUSMContext(envelope.securityParameters, false)
-	return engineID, err == nil, err
-}
-
-func ExtractEngineID(data []byte) (string, bool) {
-	engineID, ok, err := extractSNMPv3EngineIDHex(data)
-	return engineID, err == nil && ok && engineID != ""
-}
-
-func readBERElement(data []byte, pos int) (tag byte, valueStart, valueEnd, next int, err error) {
-	if pos < 0 || pos > len(data) {
-		return 0, 0, 0, 0, fmt.Errorf("BER: truncated element at offset %d", pos)
-	}
-	tag, content, consumed, err := readTLV(data[pos:])
-	if err != nil {
-		return 0, 0, 0, 0, fmt.Errorf("BER: element at offset %d: %w", pos, err)
-	}
-	valueEnd = pos + consumed
-	valueStart = valueEnd - len(content)
-	return tag, valueStart, valueEnd, valueEnd, nil
-}
-
-func parseBERVersion(data []byte) (int, bool) {
-	if len(data) == 0 || len(data) > 4 {
-		return 0, false
-	}
-	v := 0
-	for _, b := range data {
-		v = (v << 8) | int(b)
-	}
-	return v, true
-}
-
-func decodePacket(data []byte, secTable *gosnmp.SnmpV3SecurityParametersTable) (pkt *gosnmp.SnmpPacket, err error) {
+// decodePacket applies Netdata's decode budget, then the receiver's decode and
+// security processing.
+func decodePacket(data []byte, v3 bool, receiver *gosnmp.Receiver) (n *gosnmp.Notification, response []byte, err error) {
 	if len(data) > maxDatagramSize {
-		return nil, fmt.Errorf("datagram too large: %d > %d", len(data), maxDatagramSize)
+		return nil, nil, fmt.Errorf("datagram too large: %d > %d", len(data), maxDatagramSize)
 	}
-	version, versionKnown := sniffSNMPVersion(data)
-	if err := validateBERLimits(data, validateBEROptions{AllowLongOctetStrings: versionKnown && version == model.SnmpVersionV3}); err != nil {
-		return nil, err
+	if err := validateBERLimits(data, validateBEROptions{AllowLongOctetStrings: v3}); err != nil {
+		return nil, nil, err
 	}
 
 	defer func() {
 		if v := recover(); v != nil {
-			pkt = nil
+			n, response = nil, nil
 			err = fmt.Errorf("panic decoding SNMP trap: %v", v)
 		}
 	}()
 
-	decoder := &gosnmp.GoSNMP{
-		Logger:                      trapDecodeLogger,
-		TrapSecurityParametersTable: secTable,
-	}
-	if versionKnown && version == model.SnmpVersionV3 {
-		decoder.Version = gosnmp.Version3
-	}
-	pkt, err = decoder.UnmarshalTrap(data, false)
+	n, response, err = receiver.Receive(data)
 	if err != nil {
-		return nil, err
+		return nil, response, err
 	}
-	if len(pkt.Variables) > maxVarbinds {
-		return nil, fmt.Errorf("too many varbinds: %d > %d", len(pkt.Variables), maxVarbinds)
+	if len(n.Message.VarBinds) > maxVarbinds {
+		return nil, nil, fmt.Errorf("too many varbinds: %d > %d", len(n.Message.VarBinds), maxVarbinds)
 	}
-	return pkt, nil
+	return n, response, nil
 }
 
-func packetVarbinds(pkt *gosnmp.SnmpPacket) ([]model.VarbindValue, error) {
-	vbs, err := convertVarbinds(pkt.Variables)
+func packetVarbinds(pkt *gosnmp.Message) ([]model.VarbindValue, error) {
+	vbs, err := convertVarbinds(pkt.VarBinds)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +179,7 @@ func packetVarbinds(pkt *gosnmp.SnmpPacket) ([]model.VarbindValue, error) {
 		return vbs, nil
 	}
 
-	trapOID := v1TrapOID(pkt.Enterprise, pkt.GenericTrap, pkt.SpecificTrap)
+	trapOID := v1TrapOID(pkt.Enterprise, int(pkt.GenericTrap), int(pkt.SpecificTrap))
 	if trapOID == "" {
 		if pkt.GenericTrap == snmpV1TrapTypeEnterpriseSpec {
 			return nil, fmt.Errorf("invalid SNMPv1 enterprise-specific trap: specificTrap %d out of range", pkt.SpecificTrap)
@@ -265,12 +191,12 @@ func packetVarbinds(pkt *gosnmp.SnmpPacket) ([]model.VarbindValue, error) {
 		{Name: "sysUpTime.0", OID: model.SysUpTimeOID, Type: "TimeTicks", Value: uint64(pkt.Timestamp)},
 		{Name: "snmpTrapOID.0", OID: model.SNMPTrapOID, Type: "ObjectIdentifier", Value: trapOID},
 	}
-	if pkt.AgentAddress != "" {
+	if pkt.AgentAddress.IsValid() {
 		synthetic = append(synthetic, model.VarbindValue{
 			Name:  "snmpTrapAddress.0",
 			OID:   model.SNMPTrapAddressOID,
 			Type:  "IPAddress",
-			Value: pkt.AgentAddress,
+			Value: pkt.AgentAddress.String(),
 		})
 	}
 	if pkt.Community != "" {
@@ -293,7 +219,7 @@ func packetVarbinds(pkt *gosnmp.SnmpPacket) ([]model.VarbindValue, error) {
 	return append(synthetic, vbs...), nil
 }
 
-func convertVarbinds(pdus []gosnmp.SnmpPDU) ([]model.VarbindValue, error) {
+func convertVarbinds(pdus []gosnmp.VarBind) ([]model.VarbindValue, error) {
 	vbs := make([]model.VarbindValue, 0, len(pdus))
 	for _, pdu := range pdus {
 		val, err := normalizePDUValue(pdu)
@@ -302,60 +228,50 @@ func convertVarbinds(pdus []gosnmp.SnmpPDU) ([]model.VarbindValue, error) {
 		}
 		vbs = append(vbs, model.VarbindValue{
 			OID:   model.NormalizeOID(pdu.Name),
-			Type:  model.ASN1Type(pdu.Type.String()),
+			Type:  model.ASN1Type(pdu.Value.Type().String()),
 			Value: val,
 		})
 	}
 	return vbs, nil
 }
 
-func normalizePDUValue(pdu gosnmp.SnmpPDU) (any, error) {
-	switch v := pdu.Value.(type) {
-	case nil:
+// normalizePDUValue gives each SMI type the Go type the trap pipeline stores:
+// int64 for Integer, uint64 for the unsigned types, the OID and address as
+// text (an empty IpAddress, which some devices send, as nil), a copy of the
+// octets, float64 for the Opaque floats, nil for the types without a value.
+func normalizePDUValue(pdu gosnmp.VarBind) (any, error) {
+	v := pdu.Value
+	switch v.Type() {
+	case gosnmp.Null, gosnmp.NoSuchObject, gosnmp.NoSuchInstance, gosnmp.EndOfMibView, gosnmp.UnknownType:
 		return nil, nil
-	case string:
-		if pdu.Type == gosnmp.ObjectIdentifier {
-			return model.NormalizeOID(v), nil
+	case gosnmp.ObjectIdentifier:
+		oid, _ := v.OID()
+		return model.NormalizeOID(oid), nil
+	case gosnmp.IPAddress:
+		ip, _ := v.IP()
+		if !ip.IsValid() {
+			return nil, nil
 		}
-		if pdu.Type == gosnmp.OctetString && len(v) > maxOctetStringLen {
-			return nil, fmt.Errorf("OctetString too long: %d > %d", len(v), maxOctetStringLen)
+		return ip.String(), nil
+	case gosnmp.OctetString, gosnmp.Opaque:
+		bs, _ := v.Bytes()
+		if len(bs) > maxOctetStringLen {
+			return nil, fmt.Errorf("OctetString too long: %d > %d", len(bs), maxOctetStringLen)
 		}
-		return v, nil
-	case []byte:
-		if len(v) > maxOctetStringLen {
-			return nil, fmt.Errorf("OctetString too long: %d > %d", len(v), maxOctetStringLen)
-		}
-		out := make([]byte, len(v))
-		copy(out, v)
+		out := make([]byte, len(bs))
+		copy(out, bs)
 		return out, nil
-	case int:
-		return int64(v), nil
-	case int8:
-		return int64(v), nil
-	case int16:
-		return int64(v), nil
-	case int32:
-		return int64(v), nil
-	case int64:
-		return v, nil
-	case uint:
-		return uint64(v), nil
-	case uint8:
-		return uint64(v), nil
-	case uint16:
-		return uint64(v), nil
-	case uint32:
-		return uint64(v), nil
-	case uint64:
-		return v, nil
-	case float32:
-		return float64(v), nil
-	case float64:
-		return v, nil
-	case bool:
-		return v, nil
+	case gosnmp.Integer:
+		n, _ := v.Int32()
+		return int64(n), nil
+	case gosnmp.Counter32, gosnmp.Gauge32, gosnmp.TimeTicks, gosnmp.Uinteger32, gosnmp.Counter64:
+		n, _ := v.Uint64()
+		return n, nil
+	case gosnmp.OpaqueFloat, gosnmp.OpaqueDouble:
+		f, _ := v.Float64()
+		return f, nil
 	default:
-		return nil, fmt.Errorf("unsupported PDU value type %T", v)
+		return nil, fmt.Errorf("unsupported PDU value type %v", v.Type())
 	}
 }
 
@@ -478,7 +394,7 @@ func ipString(ip net.IP) string {
 	return ip.String()
 }
 
-func snmpVersion(v gosnmp.SnmpVersion) (model.SnmpVersion, error) {
+func snmpVersion(v gosnmp.Version) (model.SnmpVersion, error) {
 	switch v {
 	case gosnmp.Version1:
 		return model.SnmpVersionV1, nil

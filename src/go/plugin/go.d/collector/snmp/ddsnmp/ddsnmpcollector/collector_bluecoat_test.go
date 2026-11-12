@@ -3,11 +3,12 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,7 +106,7 @@ func TestCollector_Collect_BlueCoatLicensingProfile(t *testing.T) {
 				SysObjectID: "",
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 
@@ -129,7 +130,7 @@ type blueCoatLicenseRow struct {
 }
 
 func expectBlueCoatLicensingWalk(mockHandler *snmpmock.MockSession, rows ...blueCoatLicenseRow) {
-	pdus := make([]gosnmp.SnmpPDU, 0, len(rows)*7)
+	pdus := make([]gosnmp.VarBind, 0, len(rows)*7)
 
 	for _, row := range rows {
 		idx := strconv.Itoa(row.index)

@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,7 +29,7 @@ func TestCollector_Collect_AristaBGP_IPv6ZoneIndexTags(t *testing.T) {
 	defer ctrl.Finish()
 
 	expectSystemMetadataGets(mockHandler, "1.3.6.1.4.1.30065.1.3011.7010.427.48", "arista")
-	pdus := []gosnmp.SnmpPDU{
+	pdus := []gosnmp.VarBind{
 		createPDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.3", idx), gosnmp.OctetString, localAddr),
 		createGauge32PDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.7", idx), 65000),
 		createPDU(oidWithIndex("1.3.6.1.4.1.30065.4.1.1.2.1.8", idx), gosnmp.IPAddress, "198.51.100.12"),
@@ -53,7 +54,7 @@ func TestCollector_Collect_AristaBGP_IPv6ZoneIndexTags(t *testing.T) {
 		SysObjectID: "1.3.6.1.4.1.30065.1.3011.7010.427.48",
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Empty(t, results[0].Metrics)
@@ -104,7 +105,7 @@ func TestCollector_Collect_CiscoBgpPeer3_IPv6ZoneIndexTags(t *testing.T) {
 	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.9", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.9", []gosnmp.VarBind{
 		createStringPDU(oidWithIndex("1.3.6.1.4.1.9.9.187.1.2.9.1.4", idx), "blue"),
 		createPDU(oidWithIndex("1.3.6.1.4.1.9.9.187.1.2.9.1.3", idx), gosnmp.OctetString, remoteAddr),
 		createIntegerPDU(oidWithIndex("1.3.6.1.4.1.9.9.187.1.2.9.1.5", idx), 6),
@@ -131,7 +132,7 @@ func TestCollector_Collect_CiscoBgpPeer3_IPv6ZoneIndexTags(t *testing.T) {
 		SysObjectID: "1.3.6.1.4.1.9.1.923",
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Empty(t, results[0].Metrics)

@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -116,7 +117,7 @@ func TestCollector_Collect_TiMOSBGP_FromLibreNMSFixtures(t *testing.T) {
 				SysObjectID: tc.sysObjectID,
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Empty(t, results[0].Metrics)
@@ -167,7 +168,7 @@ func TestCollector_Collect_TiMOSBGP_StateAdminAndRoutingInstance(t *testing.T) {
 			profile := matchedBGPProjectionByFile(t, "1.3.6.1.4.1.6527.1.3.17", "nokia-service-router-os.yaml")
 			filterProfileForTypedBGPByID(t, profile, "nokia-timos-bgp-peer")
 
-			pdus := []gosnmp.SnmpPDU{
+			pdus := []gosnmp.VarBind{
 				createStringPDU(oidWithIndex("1.3.6.1.4.1.6527.3.1.2.3.1.1.4", tc.instanceID), tc.routingInstance),
 				createIntegerPDU(oidWithIndex("1.3.6.1.4.1.6527.3.1.2.14.4.7.1.6", tc.rowIndex), tc.shutdown),
 				createIntegerPDU(oidWithIndex("1.3.6.1.4.1.6527.3.1.2.14.4.7.1.59", tc.rowIndex), tc.state),
@@ -189,7 +190,7 @@ func TestCollector_Collect_TiMOSBGP_StateAdminAndRoutingInstance(t *testing.T) {
 				SysObjectID: "1.3.6.1.4.1.6527.1.3.17",
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Empty(t, results[0].Metrics)
@@ -209,7 +210,7 @@ func TestCollector_Collect_TiMOSBGP_StateAdminAndRoutingInstance(t *testing.T) {
 }
 
 func expectTiMOSMetadataGets(mockHandler *snmpmock.MockSession, sysObjectID string) {
-	mockHandler.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+	mockHandler.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&gosnmp.Message{VarBinds: []gosnmp.VarBind{
 		createStringPDU("1.3.6.1.2.1.1.1.0", "Nokia SR OS"),
 		createPDU("1.3.6.1.2.1.1.2.0", gosnmp.ObjectIdentifier, sysObjectID),
 		createStringPDU("1.3.6.1.2.1.1.5.0", "timos"),

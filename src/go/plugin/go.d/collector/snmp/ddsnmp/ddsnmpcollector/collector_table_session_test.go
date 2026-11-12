@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"slices"
@@ -115,8 +116,8 @@ func BenchmarkTableCollectorCachedAuxiliaryRoutingScaling(b *testing.B) {
 				var stats ddsnmp.CollectionStats
 				session := newTableCollectionSession(collector, identity)
 				scope := session.addScope(profile, tableSymbolModeValue, &stats)
-				session.resolve()
-				metrics, err := session.collectScope(scope)
+				session.resolve(context.Background())
+				metrics, err := session.collectScope(context.Background(), scope)
 				if err != nil {
 					b.Fatal(err)
 				}

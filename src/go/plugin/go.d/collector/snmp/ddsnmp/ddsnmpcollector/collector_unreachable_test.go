@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -34,9 +34,9 @@ func TestCollector_UnreachableWithNoopProfile(t *testing.T) {
 		if blocked {
 			expectSNMPGetError(handler, []string{oid}, context.DeadlineExceeded)
 		} else {
-			expectSNMPGet(handler, []string{oid}, []gosnmp.SnmpPDU{createTimeTicksPDU(oid, 100)})
+			expectSNMPGet(handler, []string{oid}, []gosnmp.VarBind{createTimeTicksPDU(oid, 100)})
 		}
-		metrics, err := c.Collect()
+		metrics, err := c.Collect(context.Background())
 		if blocked {
 			require.ErrorIs(t, err, context.DeadlineExceeded)
 			require.Empty(t, metrics, "a no-op profile must not publish statistics for an unresponsive device")
@@ -52,32 +52,27 @@ func TestCollector_FailedSiblingWithGETResponse(t *testing.T) {
 	const oid = "1.3.6.1.2.1.1.3.0"
 	const failedOID = "1.3.6.1.2.1.1.4.0"
 	for name, tc := range map[string]struct {
-		packet    *gosnmp.SnmpPacket
+		packet    *gosnmp.Message
 		err       error
 		wantError bool
 	}{
-		"value": {packet: &gosnmp.SnmpPacket{
-			Variables: []gosnmp.SnmpPDU{createTimeTicksPDU(oid, 100)},
+		"value": {packet: &gosnmp.Message{
+			VarBinds: []gosnmp.VarBind{createTimeTicksPDU(oid, 100)},
 		}},
-		"empty response": {packet: &gosnmp.SnmpPacket{}},
-		"missing object": {packet: &gosnmp.SnmpPacket{
-			Variables: []gosnmp.SnmpPDU{{Name: oid, Type: gosnmp.NoSuchObject}},
+		"empty response": {packet: &gosnmp.Message{}},
+		"missing object": {packet: &gosnmp.Message{
+			VarBinds: []gosnmp.VarBind{{Name: oid, Value: gosnmp.NoSuchObjectValue()}},
 		}},
-		"v1 missing name": {packet: &gosnmp.SnmpPacket{
-			Error:      gosnmp.NoSuchName,
-			ErrorIndex: 1,
-		}},
-		"packet error": {packet: &gosnmp.SnmpPacket{
-			Error: gosnmp.GenErr,
-		}},
-		"v3 error response": {packet: &gosnmp.SnmpPacket{}, err: gosnmp.ErrUnknownUsername},
+		"v1 missing name":   {err: &gosnmp.StatusError{Status: gosnmp.NoSuchName, Index: 1}},
+		"packet error":      {err: &gosnmp.StatusError{Status: gosnmp.GenErr}},
+		"v3 error response": {err: answeredError(gosnmp.ErrUnknownUsername)},
 		"no response":       {wantError: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			expectSNMPGetError(handler, []string{failedOID}, context.DeadlineExceeded)
-			handler.EXPECT().Get([]string{oid}).Return(tc.packet, tc.err)
+			handler.EXPECT().Get(gomock.Any(), []string{oid}).Return(tc.packet, tc.err)
 			c := New(Config{
 				Version:    gosnmp.Version1,
 				MaxOIDs:    10,
@@ -89,7 +84,7 @@ func TestCollector_FailedSiblingWithGETResponse(t *testing.T) {
 					createTestProfile("vendor.yaml", nil),
 				},
 			})
-			metrics, err := c.Collect()
+			metrics, err := c.Collect(context.Background())
 			if tc.wantError {
 				require.Error(t, err)
 				require.Empty(t, metrics)
@@ -106,23 +101,23 @@ func TestCollector_FailedSiblingWithWalkResponse(t *testing.T) {
 	const valueOID = tableOID + ".1.10"
 	const failedOID = "1.3.6.1.2.1.1.3.0"
 	for name, tc := range map[string]struct {
-		values    []gosnmp.SnmpPDU
+		values    []gosnmp.VarBind
 		err       error
 		wantError bool
 	}{
 		"empty response":   {},
-		"partial response": {values: []gosnmp.SnmpPDU{createCounter32PDU(valueOID+".1", 100)}, err: context.DeadlineExceeded},
+		"partial response": {values: []gosnmp.VarBind{createCounter32PDU(valueOID+".1", 100)}, err: context.DeadlineExceeded},
 		"no response":      {err: context.DeadlineExceeded, wantError: true},
 	} {
-		for _, version := range []gosnmp.SnmpVersion{gosnmp.Version1, gosnmp.Version2c} {
+		for _, version := range []gosnmp.Version{gosnmp.Version1, gosnmp.Version2c} {
 			t.Run(name+"/"+version.String(), func(t *testing.T) {
 				ctrl, handler := setupMockSession(t)
 				defer ctrl.Finish()
 				expectSNMPGetError(handler, []string{failedOID}, context.DeadlineExceeded)
 				if version == gosnmp.Version1 {
-					handler.EXPECT().WalkAll(tableOID).Return(tc.values, tc.err)
+					handler.EXPECT().WalkAll(gomock.Any(), tableOID).Return(tc.values, gosnmp.WalkEnd{}, tc.err)
 				} else {
-					handler.EXPECT().BulkWalkAll(tableOID, gomock.Any()).Return(tc.values, tc.err)
+					handler.EXPECT().BulkWalkAll(gomock.Any(), tableOID, gomock.Any()).Return(tc.values, gosnmp.WalkEnd{}, tc.err)
 				}
 				c := New(Config{
 					Version:    version,
@@ -141,7 +136,7 @@ func TestCollector_FailedSiblingWithWalkResponse(t *testing.T) {
 						createTestProfile("vendor.yaml", nil),
 					},
 				})
-				metrics, err := c.Collect()
+				metrics, err := c.Collect(context.Background())
 				if tc.wantError {
 					require.ErrorIs(t, err, context.DeadlineExceeded)
 					require.Empty(t, metrics)
@@ -165,7 +160,7 @@ func TestCollector_NoRequests(t *testing.T) {
 		Profiles:   []*ddsnmp.Profile{createTestProfile("vendor.yaml", nil)},
 	})
 	for range 2 {
-		metrics, err := c.Collect()
+		metrics, err := c.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, metrics, 1)
 	}
@@ -192,8 +187,8 @@ func TestCollector_UnreachableCachedTableAfterClientReplacement(t *testing.T) {
 			createTestProfile("vendor.yaml", nil),
 		},
 	})
-	expectSNMPWalk(handler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{createCounter32PDU(valueOID+".1", 100)})
-	metrics, err := c.Collect()
+	expectSNMPWalk(handler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{createCounter32PDU(valueOID+".1", 100)})
+	metrics, err := c.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics[0].Metrics, 1)
 
@@ -201,8 +196,8 @@ func TestCollector_UnreachableCachedTableAfterClientReplacement(t *testing.T) {
 	defer replacementCtrl.Finish()
 	c.SetSNMPClient(replacement)
 	expectSNMPGetError(replacement, []string{valueOID + ".1"}, context.DeadlineExceeded)
-	replacement.EXPECT().BulkWalkAll(tableOID, gomock.Any()).Return(nil, context.DeadlineExceeded)
-	metrics, err = c.Collect()
+	replacement.EXPECT().BulkWalkAll(gomock.Any(), tableOID, gomock.Any()).Return(nil, gosnmp.WalkEnd{}, context.DeadlineExceeded)
+	metrics, err = c.Collect(context.Background())
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	require.Empty(t, metrics)
 }
@@ -243,7 +238,7 @@ func TestCollector_UnreachableTypedRows(t *testing.T) {
 				Log:        logger.New(),
 				Profiles:   []*ddsnmp.Profile{profile, createTestProfile("vendor.yaml", nil)},
 			})
-			metrics, err := c.Collect()
+			metrics, err := c.Collect(context.Background())
 			require.ErrorIs(t, err, context.DeadlineExceeded)
 			require.Empty(t, metrics)
 		})

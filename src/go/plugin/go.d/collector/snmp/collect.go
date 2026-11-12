@@ -9,7 +9,7 @@ import (
 	"maps"
 	"syscall"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -23,11 +23,11 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	initializing := !c.initialized
-	if err := c.ensureInitialized(); err != nil {
+	if err := c.ensureInitialized(ctx); err != nil {
 		return nil, err
 	}
 	if !initializing && !c.PingOnly {
-		if err := c.refreshDeviceState(); err != nil {
+		if err := c.refreshDeviceState(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -64,7 +64,7 @@ func (c *Collector) collectDeviceMetrics(ctx context.Context) (map[string]int64,
 
 	g.Go(func() error {
 		m := make(map[string]int64)
-		if err := c.collectSNMP(m); err != nil {
+		if err := c.collectSNMP(groupCtx, m); err != nil {
 			return err
 		}
 		snmpMx = m
@@ -98,7 +98,7 @@ func (c *Collector) collectDeviceMetrics(ctx context.Context) (map[string]int64,
 	return mx, nil
 }
 
-func (c *Collector) ensureInitialized() error {
+func (c *Collector) ensureInitialized(ctx context.Context) error {
 	if c.snmpSession == nil {
 		return errors.New("snmp client not initialized")
 	}
@@ -107,7 +107,7 @@ func (c *Collector) ensureInitialized() error {
 		return nil
 	}
 
-	if err := c.ensureDeviceProfile(); err != nil {
+	if err := c.ensureDeviceProfile(ctx); err != nil {
 		return err
 	}
 	si := c.sysInfo
@@ -127,7 +127,7 @@ func (c *Collector) ensureInitialized() error {
 		var metadata map[string]ddsnmp.MetaTag
 		if c.ddSnmpColl != nil {
 			var err error
-			metadata, err = c.ddSnmpColl.CollectDeviceMetadata()
+			metadata, err = c.ddSnmpColl.CollectDeviceMetadata(ctx)
 			c.captureCollectionFailures()
 			if err != nil {
 				return err
@@ -162,8 +162,8 @@ func (c *Collector) newProfileCollector() ddCollector {
 	})
 }
 
-func (c *Collector) initAndConnectSNMPClient() (snmputils.Session, error) {
-	client, disableBulk, repetitions, err := c.connectSNMPClient()
+func (c *Collector) initAndConnectSNMPClient(ctx context.Context) (snmputils.Session, error) {
+	client, disableBulk, repetitions, err := c.connectSNMPClient(ctx)
 	if err == nil {
 		c.disableBulkWalk, c.adjMaxRepetitions = disableBulk, repetitions
 	}
@@ -172,14 +172,18 @@ func (c *Collector) initAndConnectSNMPClient() (snmputils.Session, error) {
 
 // connectSNMPClient derives learned transport settings from authored options.
 // A replacement candidate must not alter the incumbent's client or settings.
-func (c *Collector) connectSNMPClient() (session snmputils.Session, disableBulk bool, repetitions uint32, err error) {
-	handler, err := c.configuredSNMPHandler()
+func (c *Collector) connectSNMPClient(ctx context.Context) (session snmputils.Session, disableBulk bool, repetitions uint32, err error) {
+	cfg, err := c.configuredSNMPClient()
 	if err != nil {
 		return nil, false, 0, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
 	}
-	snmpClient := c.newSnmpClient(handler)
+	// NewClient checks the configuration: its errors name the field.
+	snmpClient, err := c.newSnmpClient(cfg)
+	if err != nil {
+		return nil, false, 0, snmputils.WithFailure(fmt.Errorf("init: %w", err), "client", "")
+	}
 
-	if err := snmpClient.Connect(); err != nil {
+	if err := snmpClient.Connect(ctx); err != nil {
 		return nil, false, 0, snmputils.WithFailure(fmt.Errorf("connect: %w", err), "connect", "")
 	}
 	defer func() {
@@ -188,7 +192,7 @@ func (c *Collector) connectSNMPClient() (session snmputils.Session, disableBulk 
 		}
 	}()
 
-	if c.snmpVersion() == gosnmp.Version1 {
+	if cfg.Version == gosnmp.Version1 {
 		return snmpClient, false, 0, nil
 	}
 
@@ -200,7 +204,7 @@ func (c *Collector) connectSNMPClient() (session snmputils.Session, disableBulk 
 	if c.normal != nil && c.normal.recorder != nil {
 		probeClient = c.normal.recorder.Wrap(snmpClient)
 	}
-	repetitions, ok, err := c.adjustMaxRepetitions(probeClient)
+	repetitions, ok, err := c.adjustMaxRepetitions(ctx, probeClient)
 	if err != nil {
 		return nil, false, 0, snmputils.WithFailure(
 			fmt.Errorf("re-adjust max repetitions SNMP client: %w", err),
@@ -218,9 +222,9 @@ func (c *Collector) connectSNMPClient() (session snmputils.Session, disableBulk 
 
 // adjustMaxRepetitions returns the max-repetitions the device answered the
 // system group with, or the configured value when none did (ok false).
-func (c *Collector) adjustMaxRepetitions(snmpClient snmputils.Client) (uint32, bool, error) {
+func (c *Collector) adjustMaxRepetitions(ctx context.Context, snmpClient snmputils.Client) (uint32, bool, error) {
 	orig := c.Options.MaxRepetitions
-	ok, err := c.detectBulkWalkSupport(snmpClient)
+	ok, err := c.detectBulkWalkSupport(ctx, snmpClient)
 	if err != nil {
 		c.Warningf("bulk support probe error: %v", err)
 		return uint32(orig), false, nil
@@ -236,8 +240,11 @@ func (c *Collector) adjustMaxRepetitions(snmpClient snmputils.Client) (uint32, b
 	for maxReps > 0 && attempts < maxAttempts {
 		attempts++
 
-		v, err := snmpClient.BulkWalkAll(snmputils.RootOidMibSystem, uint32(maxReps))
-		if err != nil {
+		// An error-status after values accepts the max-repetitions; without
+		// values (tooBig, or the genErr some devices answer a GETBULK too large
+		// with) it lowers them, as an empty answer does. Other errors fail.
+		v, _, err := snmpClient.BulkWalkAll(ctx, snmputils.RootOidMibSystem, uint32(maxReps))
+		if err != nil && !isStatusError(err) {
 			return 0, false, err
 		}
 
@@ -274,25 +281,31 @@ func isPingUnrecoverableError(err error) bool {
 	return errors.As(err, &errno) && (errors.Is(errno, syscall.EPERM) || errors.Is(errno, syscall.EACCES))
 }
 
-func (c *Collector) detectBulkWalkSupport(snmpClient snmputils.Client) (bool, error) {
+func (c *Collector) detectBulkWalkSupport(ctx context.Context, snmpClient snmputils.Client) (bool, error) {
 	if c.snmpVersion() == gosnmp.Version1 {
 		return false, nil
 	}
 
-	// Use a very small max-reps for the probe to be gentle
-	oids, err := snmpClient.BulkWalkAll(snmputils.RootOidMibSystem, 5)
-	if err != nil {
+	// Use a very small max-reps for the probe to be gentle. An error-status
+	// answers as the values before it do: none means no GETBULK support.
+	oids, _, err := snmpClient.BulkWalkAll(ctx, snmputils.RootOidMibSystem, 5)
+	if err != nil && !isStatusError(err) {
 		return false, err
 	}
 	return len(oids) > 0, nil
 }
 
+func isStatusError(err error) bool {
+	var status *gosnmp.StatusError
+	return errors.As(err, &status)
+}
+
 // snmpVersion is the SNMP version the configuration selects.
-func (c *Collector) snmpVersion() gosnmp.SnmpVersion {
+func (c *Collector) snmpVersion() gosnmp.Version {
 	return snmputils.ParseSNMPVersion(c.Options.Version)
 }
 
 // getSysInfo reads the system group as the configured client.
-func (c *Collector) getSysInfo() (*snmputils.SysInfo, error) {
-	return snmputils.GetSysInfo(c.snmpClient, c.snmpVersion(), snmputils.MaxOIDsOrDefault(c.Options.MaxOIDs))
+func (c *Collector) getSysInfo(ctx context.Context) (*snmputils.SysInfo, error) {
+	return snmputils.GetSysInfo(ctx, c.snmpClient, c.snmpVersion(), snmputils.MaxOIDsOrDefault(c.Options.MaxOIDs))
 }

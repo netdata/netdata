@@ -3,11 +3,12 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -35,11 +36,12 @@ func newDeviceMetadataCollector(snmpClient snmputils.ScalarClient, req requestCo
 	}
 }
 
-func (dc *deviceMetadataCollector) collect(prof *ddsnmp.Profile) (map[string]ddsnmp.MetaTag, error) {
-	return dc.collectObserved(prof, &ddsnmp.CollectionStats{}, nil)
+func (dc *deviceMetadataCollector) collect(ctx context.Context, prof *ddsnmp.Profile) (map[string]ddsnmp.MetaTag, error) {
+	return dc.collectObserved(ctx, prof, &ddsnmp.CollectionStats{}, nil)
 }
 
 func (dc *deviceMetadataCollector) collectObserved(
+	ctx context.Context,
 	prof *ddsnmp.Profile,
 	stats *ddsnmp.CollectionStats,
 	acquisition *acquisitionProfileCollection,
@@ -57,6 +59,7 @@ func (dc *deviceMetadataCollector) collectObserved(
 		for i, entry := range prof.Definition.SysobjectIDMetadata {
 			if ddprofiledefinition.SelectorOidMatches(dc.sysobjectid, entry.SysobjectID) {
 				err := dc.processMetadataFieldsObserved(
+					ctx,
 					entry.Metadata,
 					meta,
 					dc.sysobjectid == entry.SysobjectID,
@@ -75,6 +78,7 @@ func (dc *deviceMetadataCollector) collectObserved(
 	}
 
 	if err := dc.processMetadataFieldsObserved(
+		ctx,
 		cfg.Fields,
 		meta,
 		prof.Definition.Selector.HasExactOidMatch(dc.sysobjectid),
@@ -87,12 +91,8 @@ func (dc *deviceMetadataCollector) collectObserved(
 	return meta, nil
 }
 
-// processMetadataFields processes a single metadata resource
-func (dc *deviceMetadataCollector) processMetadataFields(fields map[string]ddprofiledefinition.MetadataField, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) error {
-	return dc.processMetadataFieldsObserved(fields, metadata, isExactMatch, &ddsnmp.CollectionStats{}, nil)
-}
-
 func (dc *deviceMetadataCollector) processMetadataFieldsObserved(
+	ctx context.Context,
 	fields map[string]ddprofiledefinition.MetadataField,
 	metadata map[string]ddsnmp.MetaTag,
 	isExactMatch bool,
@@ -108,7 +108,7 @@ func (dc *deviceMetadataCollector) processMetadataFieldsObserved(
 
 	source := sourceRecorder(dc.snmpClient)
 	cursor := source.Cursor()
-	pdus, err := dc.fetchMetadataValues(oids, stats)
+	pdus, err := dc.fetchMetadataValues(ctx, oids, stats)
 	if source != nil {
 		requests := source.requestsSince(cursor)
 		observer.bindSource(requests)
@@ -157,17 +157,13 @@ func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[strin
 	return oids
 }
 
-func (dc *deviceMetadataCollector) fetchMetadataValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	return getSNMPValues(dc.snmpClient, dc.req, oids, dc.missingOIDs, stats)
-}
-
-func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprofiledefinition.MetadataField, pdus map[string]gosnmp.SnmpPDU, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) error {
-	return dc.processDynamicFieldsObserved(fields, pdus, metadata, isExactMatch, &ddsnmp.CollectionStats{}, nil)
+func (dc *deviceMetadataCollector) fetchMetadataValues(ctx context.Context, oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.VarBind, error) {
+	return getSNMPValues(ctx, dc.snmpClient, dc.req, oids, dc.missingOIDs, stats)
 }
 
 func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 	fields map[string]ddprofiledefinition.MetadataField,
-	pdus map[string]gosnmp.SnmpPDU,
+	pdus map[string]gosnmp.VarBind,
 	metadata map[string]ddsnmp.MetaTag,
 	isExactMatch bool,
 	stats *ddsnmp.CollectionStats,
@@ -223,7 +219,7 @@ func (dc *deviceMetadataCollector) processDynamicFieldsObserved(
 	return nil
 }
 
-func (dc *deviceMetadataCollector) processSymbolValueObserved(fieldName string, cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.SnmpPDU, lastSymbol bool, processing *processingObserver) (string, error) {
+func (dc *deviceMetadataCollector) processSymbolValueObserved(fieldName string, cfg ddprofiledefinition.SymbolConfig, pdus map[string]gosnmp.VarBind, lastSymbol bool, processing *processingObserver) (string, error) {
 	pdu, ok := pdus[trimOID(cfg.OID)]
 	if !ok {
 		processing.record(fieldName, cfg.OID, "missing_input")

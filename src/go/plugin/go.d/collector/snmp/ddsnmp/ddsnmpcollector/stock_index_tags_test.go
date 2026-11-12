@@ -3,13 +3,14 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -62,7 +63,7 @@ func TestStockIndexTags_CollectWithoutIndexColumns(t *testing.T) {
 			profile.Definition.BGP = nil
 			profile.Definition.VirtualMetrics = nil
 			ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
-			var pdus []gosnmp.SnmpPDU
+			var pdus []gosnmp.VarBind
 			for i, row := range tc.Rows {
 				pdus = append(pdus, createGauge32PDU(tc.MetricOID+"."+row.Suffix, uint(100+i)))
 				for _, pdu := range row.PDUs {
@@ -78,7 +79,7 @@ func TestStockIndexTags_CollectWithoutIndexColumns(t *testing.T) {
 			defer ctrl.Finish()
 			expectFixtureAgent(handler, pdus)
 			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			outputName := tc.OutputMetric

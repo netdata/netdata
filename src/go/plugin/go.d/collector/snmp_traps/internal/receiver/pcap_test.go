@@ -59,7 +59,7 @@ func TestDecodeTrapFromPcapCorpus(t *testing.T) {
 				t.Fatalf("expected one UDP packet in %s, got %d", tc.fixture, len(packets))
 			}
 			packet := packets[0]
-			ctx, err := decodeTrap(packet.Payload, packet.Peer, nil)
+			ctx, _, err := decodeTrap(packet.Payload, packet.Peer, newPlainReceiver(t))
 			if err != nil {
 				t.Fatalf("decodeTrap failed: %v", err)
 			}

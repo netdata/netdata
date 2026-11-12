@@ -3,12 +3,13 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"runtime"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -18,7 +19,7 @@ import (
 
 type benchmarkTopologySNMPHandler struct {
 	snmputils.Client
-	pdus []gosnmp.SnmpPDU
+	pdus []gosnmp.VarBind
 }
 
 type benchmarkAcquisitionProjection struct {
@@ -65,16 +66,16 @@ func benchmarkAcquisitionObserverModes() []struct {
 	}
 }
 
-func (h *benchmarkTopologySNMPHandler) BulkWalkAll(string, uint32) ([]gosnmp.SnmpPDU, error) {
-	return h.pdus, nil
+func (h *benchmarkTopologySNMPHandler) BulkWalkAll(context.Context, string, uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+	return h.pdus, gosnmp.WalkEnd{}, nil
 }
 
 type benchmarkAcquisitionSNMPHandler struct{ benchmarkTopologySNMPHandler }
 
-func (*benchmarkAcquisitionSNMPHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
-	packet := &gosnmp.SnmpPacket{Variables: make([]gosnmp.SnmpPDU, len(oids))}
+func (*benchmarkAcquisitionSNMPHandler) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
+	packet := &gosnmp.Message{VarBinds: make([]gosnmp.VarBind, len(oids))}
 	for i, oid := range oids {
-		packet.Variables[i] = createStringPDU(oid, "value")
+		packet.VarBinds[i] = createStringPDU(oid, "value")
 	}
 	return packet, nil
 }
@@ -110,7 +111,7 @@ func BenchmarkCollector_AcquisitionAccounting(b *testing.B) {
 				b.ReportAllocs()
 				for b.Loop() {
 					cfg.AcquisitionObserver = mode.new()
-					results, err := New(cfg).Collect()
+					results, err := New(cfg).Collect(context.Background())
 					if err != nil || len(results) != len(profiles) {
 						b.Fatalf("profiles=%d err=%v", len(results), err)
 					}
@@ -176,7 +177,7 @@ func BenchmarkCollector_InitialCollectTopologyRows(b *testing.B) {
 	const columnOID = "1.3.6.1.4.1.99999.1.1"
 
 	for _, rowCount := range []int{0, 256, 4096} {
-		pdus := make([]gosnmp.SnmpPDU, 0, rowCount)
+		pdus := make([]gosnmp.VarBind, 0, rowCount)
 		for i := range rowCount {
 			oid := fmt.Sprintf("%s.%d", columnOID, i+1)
 			pdus = append(pdus, createGauge32PDU(oid, uint(i+1)))
@@ -197,7 +198,7 @@ func BenchmarkCollector_InitialCollectTopologyRows(b *testing.B) {
 						Log:                 log,
 						AcquisitionObserver: observer,
 					})
-					results, err := collector.Collect()
+					results, err := collector.Collect(context.Background())
 					topologyCount := -1
 					if len(results) == 1 {
 						topologyCount = len(results[0].TopologyMetrics)
@@ -225,7 +226,7 @@ func BenchmarkTableCollector_OrganizeRowsByCacheEligibility(b *testing.B) {
 	collector := newTableCollector(nil, testRequests, 0, make(map[string]bool), nil, logger.New(), false)
 
 	for _, rowCount := range []int{256, 4096} {
-		pdus := make(map[string]gosnmp.SnmpPDU, rowCount)
+		pdus := make(map[string]gosnmp.VarBind, rowCount)
 		for i := range rowCount {
 			rowOID := fmt.Sprintf("%s.%d", columnOID, i+1)
 			pdus[rowOID] = createGauge32PDU(rowOID, uint(i+1))
@@ -273,7 +274,7 @@ func BenchmarkTableRowProcessor_IPTopologyPresence(b *testing.B) {
 				index := fmt.Sprintf("198.18.%d.%d", i/254, i%254+1)
 				rows[i] = tableRowData{
 					index: index,
-					pdus: map[string]gosnmp.SnmpPDU{
+					pdus: map[string]gosnmp.VarBind{
 						ifIndexOID: createIntegerPDU(ifIndexOID+"."+index, i+1),
 						netmaskOID: createPDU(netmaskOID+"."+index, gosnmp.IPAddress, "255.255.255.0"),
 					},
@@ -341,12 +342,12 @@ func BenchmarkCollector_WarmDiagnostics(b *testing.B) {
 				profile.Definition.Topology = append(profile.Definition.Topology, benchmarkTopologyProfile(n).Definition.Topology...)
 			}
 			c := New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: &benchmarkAcquisitionSNMPHandler{}, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
-			if _, err := c.Collect(); err != nil {
+			if _, err := c.Collect(context.Background()); err != nil {
 				b.Fatal(err)
 			}
 			b.ReportAllocs()
 			for b.Loop() {
-				if _, err := c.Collect(); err != nil {
+				if _, err := c.Collect(context.Background()); err != nil {
 					b.Fatal(err)
 				}
 			}

@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,7 +22,7 @@ func TestCollector_Collect_CiscoBgpPeer2PrefixProfile(t *testing.T) {
 	prefixIndex := "1.4.192.0.2.1.1.128"
 	peerIndex := "1.4.192.0.2.1"
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.8", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.8", []gosnmp.VarBind{
 		createCounter32PDU("1.3.6.1.4.1.9.9.187.1.2.8.1.1."+prefixIndex, 1200),
 		createGauge32PDU("1.3.6.1.4.1.9.9.187.1.2.8.1.2."+prefixIndex, 7),
 		createGauge32PDU("1.3.6.1.4.1.9.9.187.1.2.8.1.3."+prefixIndex, 2000),
@@ -31,7 +32,7 @@ func TestCollector_Collect_CiscoBgpPeer2PrefixProfile(t *testing.T) {
 		createGauge32PDU("1.3.6.1.4.1.9.9.187.1.2.8.1.7."+prefixIndex, 3),
 		createGauge32PDU("1.3.6.1.4.1.9.9.187.1.2.8.1.8."+prefixIndex, 25),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.5.1", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.5.1", []gosnmp.VarBind{
 		createPDU("1.3.6.1.4.1.9.9.187.1.2.5.1.6."+peerIndex, gosnmp.OctetString, []byte{198, 51, 100, 1}),
 		createGauge32PDU("1.3.6.1.4.1.9.9.187.1.2.5.1.8."+peerIndex, 65000),
 		createPDU("1.3.6.1.4.1.9.9.187.1.2.5.1.9."+peerIndex, gosnmp.IPAddress, "198.51.100.10"),
@@ -39,7 +40,7 @@ func TestCollector_Collect_CiscoBgpPeer2PrefixProfile(t *testing.T) {
 		createGauge32PDU("1.3.6.1.4.1.9.9.187.1.2.5.1.11."+peerIndex, 65001),
 		createPDU("1.3.6.1.4.1.9.9.187.1.2.5.1.12."+peerIndex, gosnmp.IPAddress, "203.0.113.10"),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.7.1.3", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.7.1.3", []gosnmp.VarBind{
 		createStringPDU("1.3.6.1.4.1.9.9.187.1.2.7.1.3."+prefixIndex, "vpnv4 unicast"),
 	})
 
@@ -293,7 +294,7 @@ func TestCollector_Collect_CiscoBgpPeer2PrefixProfile(t *testing.T) {
 		SysObjectID: "",
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 

@@ -8,7 +8,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
@@ -21,7 +21,7 @@ func (r *crossTableResolver) resolveLookupIndexByValue(
 	tagCfg ddprofiledefinition.MetricTagConfig,
 	lookupValue string,
 	refTableOID string,
-	refTablePDUs map[string]gosnmp.SnmpPDU,
+	refTablePDUs map[string]gosnmp.VarBind,
 	ctx *crossTableContext,
 ) (string, error) {
 	normalizedLookupValue, ok := r.normalizeLookupValue(
@@ -44,7 +44,7 @@ func (r *crossTableResolver) findRowIndexByLookupValue(
 	tagCfg ddprofiledefinition.MetricTagConfig,
 	lookupValue string,
 	rowsByValue map[string][]string,
-	refTablePDUs map[string]gosnmp.SnmpPDU,
+	refTablePDUs map[string]gosnmp.VarBind,
 ) (string, error) {
 	lookupSym := tagCfg.LookupSymbol
 	matchedIndexes := rowsByValue[lookupValue]
@@ -72,7 +72,7 @@ func (r *crossTableResolver) findRowIndexByLookupValue(
 func (r *crossTableResolver) lookupValueIndex(
 	tagCfg ddprofiledefinition.MetricTagConfig,
 	refTableOID string,
-	refTablePDUs map[string]gosnmp.SnmpPDU,
+	refTablePDUs map[string]gosnmp.VarBind,
 	ctx *crossTableContext,
 ) *crossTableLookupValueIndex {
 	lookupSym := ddprofiledefinition.SymbolConfig(tagCfg.LookupSymbol)
@@ -130,7 +130,7 @@ func lookupMappingsEqual(a, b ddprofiledefinition.MappingConfig) bool {
 
 func (r *crossTableResolver) processLookupSymbolValue(
 	sym ddprofiledefinition.SymbolConfig,
-	pdu gosnmp.SnmpPDU,
+	pdu gosnmp.VarBind,
 ) (string, bool) {
 	val, err := convPduToStringf(pdu, sym.Format)
 	if err != nil {
@@ -195,7 +195,7 @@ func (r *crossTableResolver) finishLookupText(
 func (r *crossTableResolver) resolveAmbiguousLookupRows(
 	tagCfg ddprofiledefinition.MetricTagConfig,
 	rowIndexes []string,
-	refTablePDUs map[string]gosnmp.SnmpPDU,
+	refTablePDUs map[string]gosnmp.VarBind,
 ) (string, bool) {
 	wantValue := ""
 
@@ -219,7 +219,7 @@ func (r *crossTableResolver) resolveAmbiguousLookupRows(
 func (r *crossTableResolver) resolveLookupTargetTagValue(
 	tagCfg ddprofiledefinition.MetricTagConfig,
 	rowIndex string,
-	refTablePDUs map[string]gosnmp.SnmpPDU,
+	refTablePDUs map[string]gosnmp.VarBind,
 ) (string, bool) {
 	pdu, failure := lookupTableColumn(tagCfg.Symbol.OID, rowIndex, refTablePDUs)
 	if failure != nil {

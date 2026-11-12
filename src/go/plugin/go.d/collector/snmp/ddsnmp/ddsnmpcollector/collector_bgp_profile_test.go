@@ -3,11 +3,12 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"path/filepath"
 	"slices"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -50,7 +51,7 @@ func TestCollector_Collect_StdBGP4Profile(t *testing.T) {
 				Log:        logger.New(),
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 

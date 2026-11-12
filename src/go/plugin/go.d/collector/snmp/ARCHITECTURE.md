@@ -24,6 +24,24 @@ Acquisition success, emitted samples, stored consumer state, and a Function resp
 when correlating them. File cadence, retention, and publication remain documented under
 [Diagnostic Files And Publication](/src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#diagnostic-files-and-publication).
 
+## SNMP Requests
+
+The job's client is a `gosnmp.Client` (`github.com/netdata/gosnmp`) built from `snmpClientConfig` (`init.go`) by
+`newSNMPSession` (`snmp_session.go`); the profile acquisition sees it through the `snmputils.Client` interface. Request
+rules the collector relies on:
+
+- Every request takes the collection's context, so a job stop or cycle deadline ends a request in flight.
+- An SNMPv3 client discovers the agent's engine ID once and keeps it. A request that fails with an unknown engine ID
+  (a replaced device, or a forged discovery answer) makes the client forget that engine, and the next request
+  discovers it again; the log line for it is rate-limited.
+- Bulk walks pass the max-repetitions that `adjustMaxRepetitions` found for the device. `max_repetitions` is bounded at
+  2147483647 (RFC 3416); 0 or a negative value disables bulk walks.
+- An answer whose error-status is not noError fails the request (`gosnmp.StatusError`). An SNMPv1 GET answered with
+  noSuchName drops the OID the error-index names and retries the others.
+- A table walk that an error-status ended keeps the rows before it: they are collected and feed the tables that
+  depend on them, the error is reported (a warning, the SNMP error counter, `packet_error` source evidence), and
+  nothing built from those rows is cached, so the next collection walks the table again.
+
 ## Profile Selection
 
 For normal SNMP collection, `setupProfiles` uses `manual_profiles` only when `sysObjectID` is empty. A non-empty but

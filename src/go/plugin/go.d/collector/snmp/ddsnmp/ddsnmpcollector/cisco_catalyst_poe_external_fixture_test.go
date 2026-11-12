@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"slices"
@@ -10,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,7 +55,7 @@ func TestCollector_Collect_CiscoCatalystPoE_FromLibreNMSFixture(t *testing.T) {
 			pdus := loadSnmprecPDUs(t, "librenms/cisco_2960x_poe_tables.snmprec")
 			if tc.oid != "" {
 				found := false
-				pdus = slices.DeleteFunc(pdus, func(pdu gosnmp.SnmpPDU) bool {
+				pdus = slices.DeleteFunc(pdus, func(pdu gosnmp.VarBind) bool {
 					if strings.Trim(pdu.Name, ".") == tc.oid {
 						found = true
 						return true
@@ -75,7 +76,7 @@ func TestCollector_Collect_CiscoCatalystPoE_FromLibreNMSFixture(t *testing.T) {
 	}
 }
 
-func collectCiscoPoEFixture(t *testing.T, pdus []gosnmp.SnmpPDU, missingFirstMapping bool) {
+func collectCiscoPoEFixture(t *testing.T, pdus []gosnmp.VarBind, missingFirstMapping bool) {
 	t.Helper()
 
 	profile := matchedProfileByFile(t, ciscoCat29xxStackSysID, "cisco-catalyst.yaml")
@@ -96,7 +97,7 @@ func collectCiscoPoEFixture(t *testing.T, pdus []gosnmp.SnmpPDU, missingFirstMap
 		SysObjectID: ciscoCat29xxStackSysID,
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	// The two final labels and both PoE rows share dependency routes. No row performs its own network lookup.
@@ -219,8 +220,8 @@ func filterProfileForPoE(t *testing.T, profile *ddsnmp.Profile) {
 
 // No public capture carries Cisco pethPsePortTable rows. cpeExtPsePortEntry AUGMENTS pethPsePortEntry, so the
 // standard rows reuse the fixture's (group, port) indexes; each counter value is unique per row.
-func pethPsePortRowsFor(pdus []gosnmp.SnmpPDU) []gosnmp.SnmpPDU {
-	var rows []gosnmp.SnmpPDU
+func pethPsePortRowsFor(pdus []gosnmp.VarBind) []gosnmp.VarBind {
+	var rows []gosnmp.VarBind
 	for index := range fixtureColumns(pdus)[oidCpeExtPsePortEntry+".9"] {
 		group, port, _ := strings.Cut(index, ".")
 		g, _ := strconv.Atoi(group)
@@ -241,7 +242,7 @@ func pethPsePortRowsFor(pdus []gosnmp.SnmpPDU) []gosnmp.SnmpPDU {
 }
 
 // fixtureColumns maps "<entry>.<column>" to row index to integer value for the PoE entries.
-func fixtureColumns(pdus []gosnmp.SnmpPDU) map[string]map[string]int64 {
+func fixtureColumns(pdus []gosnmp.VarBind) map[string]map[string]int64 {
 	out := make(map[string]map[string]int64)
 	for _, pdu := range pdus {
 		name := strings.Trim(pdu.Name, ".")
@@ -255,18 +256,18 @@ func fixtureColumns(pdus []gosnmp.SnmpPDU) map[string]map[string]int64 {
 			if out[key] == nil {
 				out[key] = make(map[string]int64)
 			}
-			out[key][index] = gosnmp.ToBigInt(pdu.Value).Int64()
+			out[key][index] = pduInt64(pdu.Value)
 		}
 	}
 	return out
 }
 
-func expectFixtureAgent(mockHandler *snmpmock.MockSession, pdus []gosnmp.SnmpPDU) map[string]int {
+func expectFixtureAgent(mockHandler *snmpmock.MockSession, pdus []gosnmp.VarBind) map[string]int {
 	walks := make(map[string]int)
-	mockHandler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) {
+	mockHandler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oid string, _ uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 		oid = strings.Trim(oid, ".")
 		walks[oid]++
-		return snmprecPDUsWithPrefix(pdus, oid+"."), nil
+		return snmprecPDUsWithPrefix(pdus, oid+"."), gosnmp.WalkEnd{}, nil
 	}).AnyTimes()
 	return walks
 }

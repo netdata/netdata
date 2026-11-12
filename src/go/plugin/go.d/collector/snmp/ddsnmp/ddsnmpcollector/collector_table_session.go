@@ -3,13 +3,14 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -35,7 +36,7 @@ type tableCollectionSession struct {
 	scopes    []*tableCollectionScope
 	routes    map[string]*tableCollectionRoute
 	graph     tableRouteGraph
-	freshData map[string]map[string]gosnmp.SnmpPDU
+	freshData map[string]map[string]gosnmp.VarBind
 	resolved  bool
 }
 
@@ -64,13 +65,22 @@ type tableCollectionRequest struct {
 }
 
 type tableCollectionRoute struct {
-	sourceOperation        uint64
-	oid                    string
-	requests               []*tableCollectionRequest
-	state                  tableRouteState
-	pdus                   map[string]gosnmp.SnmpPDU
+	sourceOperation uint64
+	oid             string
+	requests        []*tableCollectionRequest
+	state           tableRouteState
+	pdus            map[string]gosnmp.VarBind
+	// err is a failed route's error, or a fresh route's when an error-status
+	// ended its walk after the rows it holds (partial).
 	err                    error
 	acquisitionValueCounts map[string]uint64
+}
+
+// partial reports a fresh route whose walk an error-status ended: its rows
+// are collected and feed dependents, its error is reported, and its structure
+// is not cached.
+func (r *tableCollectionRoute) partial() bool {
+	return r.state == tableRouteFresh && r.err != nil
 }
 
 type freshRouteWork struct {
@@ -127,7 +137,7 @@ func newTableCollectionSession(collector *tableCollector, identity *tableIdentit
 		collector: collector,
 		identity:  identity,
 		routes:    make(map[string]*tableCollectionRoute),
-		freshData: make(map[string]map[string]gosnmp.SnmpPDU),
+		freshData: make(map[string]map[string]gosnmp.VarBind),
 	}
 }
 
@@ -179,7 +189,7 @@ func (s *tableCollectionSession) addObservedScope(
 	return scope
 }
 
-func (s *tableCollectionSession) resolve() {
+func (s *tableCollectionSession) resolve(ctx context.Context) {
 	if s.resolved {
 		return
 	}
@@ -194,14 +204,14 @@ func (s *tableCollectionSession) resolve() {
 			s.requireFresh(route, freshTriggerForRoute(route), &freshQueue)
 		}
 	}
-	s.resolveFreshQueue(&freshQueue)
+	s.resolveFreshQueue(ctx, &freshQueue)
 	for _, route := range routes {
 		if route.state != tableRoutePending {
 			continue
 		}
-		if trigger := s.stageCached(route); trigger != nil {
+		if trigger := s.stageCached(ctx, route); trigger != nil {
 			s.requireFresh(route, trigger, &freshQueue)
-			s.resolveFreshQueue(&freshQueue)
+			s.resolveFreshQueue(ctx, &freshQueue)
 		} else if s.isDependencyOnlyTopologyRoute(route) {
 			route.state = tableRouteDormant
 		} else {
@@ -376,7 +386,7 @@ func freshTriggerForRoute(route *tableCollectionRoute) *tableCollectionRequest {
 	return route.requests[0]
 }
 
-func (s *tableCollectionSession) stageCached(route *tableCollectionRoute) *tableCollectionRequest {
+func (s *tableCollectionSession) stageCached(ctx context.Context, route *tableCollectionRoute) *tableCollectionRequest {
 	for _, req := range route.requests {
 		if !req.cacheEligible || len(req.config.Symbols) == 0 {
 			continue
@@ -388,6 +398,7 @@ func (s *tableCollectionSession) stageCached(route *tableCollectionRoute) *table
 			observation.staging = true
 		}
 		req.candidateMetrics = s.collector.tryCollectFromCache(
+			ctx,
 			req.config,
 			req.scope.profileSource,
 			req.scope.mode,
@@ -422,7 +433,7 @@ func (s *tableCollectionSession) requireFresh(
 	*queue = append(*queue, freshRouteWork{route: route, trigger: trigger})
 }
 
-func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
+func (s *tableCollectionSession) resolveFreshQueue(ctx context.Context, queue *[]freshRouteWork) {
 	for len(*queue) > 0 {
 		work := (*queue)[0]
 		*queue = (*queue)[1:]
@@ -435,7 +446,7 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 		for _, dependent := range s.graph.dependents(route) {
 			s.requireFresh(dependent, freshTriggerForRoute(dependent), queue)
 		}
-		s.resolveFreshRoute(route, work.trigger)
+		s.resolveFreshRoute(ctx, route, work.trigger)
 		if route.state != tableRouteFresh {
 			continue
 		}
@@ -451,15 +462,17 @@ func (s *tableCollectionSession) resolveFreshQueue(queue *[]freshRouteWork) {
 	}
 }
 
-func (s *tableCollectionSession) resolveFreshRoute(route *tableCollectionRoute, trigger *tableCollectionRequest) {
+func (s *tableCollectionSession) resolveFreshRoute(ctx context.Context, route *tableCollectionRoute, trigger *tableCollectionRequest) {
 	started := time.Now()
-	pdus, err := walkTableWithStats(s.collector, route.oid, trigger.scope.stats, trigger.scope.execution)
+	pdus, err := walkTableWithStats(ctx, s.collector, route.oid, trigger.scope.stats, trigger.scope.execution)
 	route.sourceOperation = sourceRecorder(s.collector.snmpClient).Cursor()
 	trigger.scope.stats.Timing.Table += time.Since(started)
 	if err != nil {
-		route.state = tableRouteFailed
 		route.err = fmt.Errorf("failed to walk table OID '%s': %w", route.oid, err)
-		return
+		if !isPartialWalk(err) {
+			route.state = tableRouteFailed
+			return
+		}
 	}
 
 	route.state = tableRouteFresh
@@ -467,7 +480,7 @@ func (s *tableCollectionSession) resolveFreshRoute(route *tableCollectionRoute, 
 	s.freshData[route.oid] = pdus
 }
 
-func tableHasEligibleRows(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.SnmpPDU) bool {
+func tableHasEligibleRows(cfg ddprofiledefinition.MetricsConfig, pdus map[string]gosnmp.VarBind) bool {
 	columnOIDs := buildColumnOIDs(cfg)
 	for oid := range pdus {
 		for columnOID := range columnOIDs {
@@ -513,9 +526,9 @@ func mergeTableCollectionStats(dst, src *ddsnmp.CollectionStats, includeRows boo
 	dst.Errors.MissingOIDs += src.Errors.MissingOIDs
 }
 
-func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]ddsnmp.Metric, error) {
+func (s *tableCollectionSession) collectScope(ctx context.Context, scope *tableCollectionScope) ([]ddsnmp.Metric, error) {
 	if !s.resolved {
-		s.resolve()
+		s.resolve(ctx)
 	}
 	if scope == nil {
 		return nil, nil
@@ -555,8 +568,13 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 			tablesSeen[req.route.oid] = true
 			// A current WALK is successful even when it is empty or auxiliary-only.
 			successful = true
+			cacheEligible := req.cacheEligible && !req.route.partial()
+			if req.route.partial() && !failedSeen[req.route.oid] {
+				failedSeen[req.route.oid] = true
+				errs = append(errs, req.route.err)
+			}
 			var cacheEvidence *AcquisitionCacheInput
-			if req.cacheEligible && sourceRecorder(s.collector.snmpClient) != nil {
+			if cacheEligible && sourceRecorder(s.collector.snmpClient) != nil {
 				cacheEvidence = &AcquisitionCacheInput{Kind: "table", RootOID: req.route.oid, CreatedAt: time.Now().UTC(), Marker: len(req.config.Symbols) == 0, Sources: s.cacheSources(req)}
 			}
 			if len(req.config.Symbols) == 0 {
@@ -564,12 +582,12 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 					acquisition.processed = true
 					acquisition.values = req.route.acquisitionValuesWithin(req.config.Table.OID)
 				}
-				if req.cacheEligible && !req.sharesRouteCache {
+				if cacheEligible && !req.sharesRouteCache {
 					s.collector.tableCache.cacheMarker(req.config, cacheEvidence)
 				}
 				continue
 			}
-			ctx := &tableProcessingContext{
+			tableCtx := &tableProcessingContext{
 				profileSource:  scope.profileSource,
 				cacheEvidence:  cacheEvidence,
 				config:         req.config,
@@ -577,22 +595,22 @@ func (s *tableCollectionSession) collectScope(scope *tableCollectionScope) ([]dd
 				walkedData:     s.freshData,
 				tableNameToOID: scope.tableNameToOID,
 				symbolMode:     scope.mode,
-				cacheStructure: req.cacheEligible,
+				cacheStructure: cacheEligible,
 				acquisition:    acquisition,
 			}
 			if acquisition != nil {
 				acquisition.processed = true
-				ctx.rejected = &acquisition.rejected
-				ctx.dependencyRejected = &acquisition.dependencyRejected
+				tableCtx.rejected = &acquisition.rejected
+				tableCtx.dependencyRejected = &acquisition.dependencyRejected
 			}
 			processingErrorsBefore := scope.stats.Errors.Processing.Table
-			tableMetrics, err := s.collector.processTableData(ctx, collectionCtx, scope.stats)
+			tableMetrics, err := s.collector.processTableData(tableCtx, collectionCtx, scope.stats)
 			if acquisition != nil {
-				acquisition.rows = uint64(len(ctx.rows))
+				acquisition.rows = uint64(len(tableCtx.rows))
 				acquisition.values = uint64(len(tableMetrics))
 				acquisition.rejected += uint64(scope.stats.Errors.Processing.Table - processingErrorsBefore)
 			}
-			scope.stats.Metrics.Rows += int64(len(ctx.rows))
+			scope.stats.Metrics.Rows += int64(len(tableCtx.rows))
 			if err != nil {
 				scope.stats.Errors.Processing.Table++
 				errs = append(errs, fmt.Errorf("table '%s': %w", req.config.Table.Name, err))
