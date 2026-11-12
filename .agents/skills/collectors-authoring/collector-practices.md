@@ -59,13 +59,19 @@ Mechanisms:
 - Avoid lifecycle churn when absence can be transient. Choose the source-appropriate successful-observation/expiry
   policy instead of a universal one-minute timer; do not delay a known permanent removal solely to satisfy that timer.
 
-For rotating V1 selections, keep chart identity tied to the source object, then verify actual runtime emission and
-stored Agent rates on re-entry. `src/go/plugin/framework/jobruntime/job_v1_render.go` emits a zero/omitted BEGIN
-interval for newly constructed or previously unmeasured charts, asking the Agent to measure elapsed time. Clearing obsolete alone does not reset
-incremental counters (`src/database/rrdset.c`); collection-gap handling lives in `src/database/rrdset-collection.c`.
-Seed collector-computed ratios from two complete observations, and keep chart references per selected entity so
-retirement is identity-exact and linear in that entity's charts. PostgreSQL's `relations_emission_test.go` demonstrates
-runtime retirement, pruning and stable-identity return; its captured frames can be replayed through an isolated Agent.
+Rotating V1 selections (a TOP-N set that changes between refreshes):
+
+- Identity: tie chart identity to the source object. Key per-entity state by its identity fields (a struct), not a
+  joined string: `name + "_" + table` keys collide where chart IDs with `_db_`/`_schema_` tokens do not, and evicting
+  on a key mismatch turns that collision into chart loss or churn.
+- Retirement: keep chart references per selected entity, so retirement is identity-exact and linear in its charts.
+- Re-entry: verify runtime emission and stored Agent rates. `src/go/plugin/framework/jobruntime/job_v1_render.go`
+  emits a zero/omitted BEGIN interval for new or previously unmeasured charts, so the Agent measures elapsed time.
+  Clearing obsolete alone does not reset incremental counters (`src/database/rrdset.c`); collection-gap handling
+  lives in `src/database/rrdset-collection.c`.
+- Derived ratios: seed collector-computed ratios from two complete observations.
+- Example: `src/go/plugin/go.d/collector/postgres/relations_emission_test.go` demonstrates retirement, pruning and
+  stable-identity return; its captured frames can be replayed through an isolated Agent.
 
 ### 1.6 Verify The Supported Source Contract
 
