@@ -288,6 +288,7 @@ fn populate_row_index(
     row_index.flags = Some(Flags(flags));
     row_index.dropped_attribute_counts = Some(DroppedAttributeCounts(dropped_attrs));
 
+    metrics.set_incomplete_tail(reader.incomplete_tail());
     Ok(stats)
 }
 
@@ -650,6 +651,7 @@ fn populate_trace_row_index(
     // all-UNSET-trace-id file — writes no chunk).
     row_index.trace_rollup = rollup.is_meaningful().then_some(rollup);
 
+    metrics.set_incomplete_tail(reader.incomplete_tail());
     Ok(stats)
 }
 

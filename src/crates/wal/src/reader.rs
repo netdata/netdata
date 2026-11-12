@@ -18,10 +18,15 @@
 //!   cleanly and stays stopped. Callers that must surface a shortfall
 //!   cross-check yielded counts against [`scan_frame_boundaries`] counts
 //!   first (chunk indexing does).
-//! - Unbounded: a payload shorter than its header promises is corruption and
-//!   errors — whole-file callers (indexing a closed WAL file) have no
-//!   entry-count cross-check to catch a silently dropped final frame. A
-//!   frame *header* torn by EOF ends either mode cleanly.
+//! - Unbounded: a frame that the end of the file cuts short, in its header,
+//!   its payload or its padding, ends the read, and
+//!   [`Reader::incomplete_tail`] then gives the bytes that were left. Such a
+//!   frame is a write that never finished (the writer was killed, or its
+//!   write failed): it was never fsynced whole, so no request was told that
+//!   it is stored, while the frames before it may have been acknowledged. A
+//!   whole-file caller (indexing a WAL file) reports the bytes left; it has
+//!   no entry-count cross-check. A whole frame that fails its checks is
+//!   corruption, and errors.
 //!
 //! # Verification
 //!
@@ -97,21 +102,22 @@ pub struct Reader {
     /// fully below `end`; a frame crossing it is a torn tail past the
     /// durable boundary and stops the read cleanly (latched, so a re-call
     /// also stops). `None` ([`open`](Self::open)) reads to EOF, where a
-    /// short payload is a truncated or corrupt file and errors from the
-    /// payload read — never a silent stop — because whole-file callers (the
-    /// indexer) have no entry-count cross-check to catch a silently-dropped
-    /// frame. The mode contract is in the module docs.
+    /// frame cut short by the end of the file ends the read and is counted
+    /// in `incomplete_tail`. The mode contract is in the module docs.
     end_bound: Option<u64>,
+    /// See [`incomplete_tail`](Self::incomplete_tail).
+    incomplete_tail: u64,
 }
 
 impl Reader {
     /// Open a WAL file for an unbounded read: every frame, from the first
     /// frame to end-of-file.
     ///
-    /// With no durable bound there is no expected torn tail: a payload
-    /// shorter than its frame header promises is a truncated or corrupt file
-    /// and errors (the `end_bound` field doc has the full contract).
-    /// Whole-file callers: indexing operations in `ng-index`, test fixtures.
+    /// The read ends at the last whole frame: a frame that the end of the
+    /// file cuts short is not yielded, and
+    /// [`incomplete_tail`](Self::incomplete_tail) counts its bytes (the
+    /// module docs have the contract). Whole-file callers: indexing
+    /// operations in `ng-index`, test fixtures.
     pub fn open(path: &Path) -> Result<Self> {
         Self::open_inner(path, HEADER_SIZE as u64, None)
     }
@@ -186,7 +192,26 @@ impl Reader {
             data_buf: Vec::with_capacity(1024 * 1024),
             position: start,
             end_bound: end,
+            incomplete_tail: 0,
         })
+    }
+
+    /// The bytes after the last whole frame, once a whole-file read
+    /// ([`open`](Self::open)) has reached the end of the file: 0 when the
+    /// file ends at a frame boundary, else the size of a frame that was
+    /// never written whole. The caller reports them: they are not corruption,
+    /// but they are data that a sender sent and that is not stored. Always 0
+    /// for a bounded read.
+    pub fn incomplete_tail(&self) -> u64 {
+        self.incomplete_tail
+    }
+
+    /// End a whole-file read at the frame that starts at `position` and that
+    /// the end of the file cuts short.
+    fn end_at_incomplete_frame(&mut self) -> Result<Option<Frame<'_>>> {
+        let file_len = self.reader.get_ref().metadata()?.len();
+        self.incomplete_tail = file_len.saturating_sub(self.position);
+        Ok(None)
     }
 
     /// The file's header page, parsed and fully validated at open. Its flags
@@ -215,9 +240,8 @@ impl Reader {
 
     /// Read and verify the next frame, or `None` at the end of the window:
     /// the durable bound — latched once a torn tail is seen — for
-    /// [`open_range`](Self::open_range), EOF for [`open`](Self::open). A
-    /// frame header torn by EOF (fewer than 24 bytes left) is a clean end in
-    /// both modes.
+    /// [`open_range`](Self::open_range), the last whole frame for
+    /// [`open`](Self::open) (see [`incomplete_tail`](Self::incomplete_tail)).
     ///
     /// Per frame: parse the 24-byte header (`format.rs` layout), reject
     /// payload or uncompressed sizes above 64 MiB, read the payload and its
@@ -228,8 +252,7 @@ impl Reader {
     /// [`Frame::data`] is always the decompressed bytes.
     ///
     /// Errors surface as [`Error`](crate::Error): I/O transparently
-    /// (`Error::Io` — unbounded reads meet it as a short payload; bounded
-    /// reads normally stop at the bound first), `Error::CrcMismatch`,
+    /// (`Error::Io`), `Error::CrcMismatch`,
     /// `Error::Decompression`, and oversize lengths as
     /// `Error::Deserialization`. The returned `Frame` borrows this reader's
     /// reused buffers; drop it before the next call.
@@ -248,7 +271,9 @@ impl Reader {
         let mut frame_header = [0u8; FRAME_HEADER_SIZE];
         match self.reader.read_exact(&mut frame_header) {
             Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                return self.end_at_incomplete_frame();
+            }
             Err(e) => return Err(e.into()),
         }
 
@@ -278,9 +303,6 @@ impl Reader {
         // the partial payload; latch the reader at `end` (so a re-call
         // also stops) and stop cleanly. Yielding short is observable to
         // callers that cross-check entry counts (chunk indexing).
-        // (For an unbounded read this branch is skipped, so a truncated
-        // payload reaches the `read_exact` below and errors — corruption
-        // is not silently dropped.)
         if let Some(end) = self.end_bound {
             if self.position + total > end {
                 self.position = end;
@@ -290,11 +312,19 @@ impl Reader {
 
         self.compressed_buf.clear();
         self.compressed_buf.resize(payload_len, 0);
-        self.reader.read_exact(&mut self.compressed_buf)?;
-
-        if padding > 0 {
-            let mut pad_buf = [0u8; FRAME_ALIGNMENT];
-            self.reader.read_exact(&mut pad_buf[..padding])?;
+        let mut pad_buf = [0u8; FRAME_ALIGNMENT];
+        let mut rest_of_frame = self.reader.read_exact(&mut self.compressed_buf);
+        if rest_of_frame.is_ok() {
+            rest_of_frame = self.reader.read_exact(&mut pad_buf[..padding]);
+        }
+        match rest_of_frame {
+            Ok(()) => {}
+            // Only a whole-file read meets the end of the file inside a
+            // frame: a bounded read stopped above, at its bound.
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof && self.end_bound.is_none() => {
+                return self.end_at_incomplete_frame();
+            }
+            Err(e) => return Err(e.into()),
         }
         self.position += total;
 
@@ -634,12 +664,11 @@ mod tests {
     }
 
     #[test]
-    fn open_to_eof_errors_on_a_truncated_payload() {
-        // A whole-file read (no durable bound) must not silently drop a
-        // torn/corrupt final frame: a header that promises a payload the
-        // file doesn't contain is an error, not a clean stop. (The
-        // bounded reader treats the same shape as an expected torn tail;
-        // `open` must not, since its callers have no count cross-check.)
+    fn a_whole_file_read_ends_at_a_frame_that_the_end_of_the_file_cuts_short() {
+        // A frame whose header promises a payload the file does not hold
+        // is a write that never finished. The read ends at the frame
+        // before it and counts the bytes it left, for the caller to
+        // report: `open`'s callers have no count cross-check.
         let dir = tempfile::tempdir().unwrap();
         let (path, bounds) = write_frames(dir.path(), &[b"alpha", b"bravo"]);
 
@@ -659,8 +688,23 @@ mod tests {
             reader.next_frame().unwrap().map(|f| f.data.to_vec()),
             Some(b"alpha".to_vec())
         );
-        // Frame 1's payload is truncated → error, not Ok(None).
-        assert!(reader.next_frame().is_err());
+        assert_eq!(reader.incomplete_tail(), 0);
+        // Frame 1 is its header and two bytes: the end, and it stays the end.
+        assert!(reader.next_frame().unwrap().is_none());
+        assert_eq!(reader.incomplete_tail(), FRAME_HEADER_SIZE as u64 + 2);
+        assert!(reader.next_frame().unwrap().is_none());
+        assert_eq!(reader.incomplete_tail(), FRAME_HEADER_SIZE as u64 + 2);
+    }
+
+    #[test]
+    fn a_whole_file_read_of_whole_frames_leaves_no_tail() {
+        let dir = tempfile::tempdir().unwrap();
+        let (path, _) = write_frames(dir.path(), &[b"alpha", b"bravo"]);
+
+        let mut reader = Reader::open(&path).unwrap();
+        while reader.next_frame().unwrap().is_some() {}
+
+        assert_eq!(reader.incomplete_tail(), 0);
     }
 
     #[test]

@@ -334,7 +334,17 @@ impl IndexingOperations {
                     summary,
                     size,
                     peak_memory,
+                    incomplete_tail,
                 }) => {
+                    if incomplete_tail > 0 {
+                        // Not corruption, but data a sender sent that is
+                        // not stored: after a crash, or a failed write.
+                        tracing::warn!(
+                            "the WAL file seq={seq} ends inside a frame: its last \
+                             {incomplete_tail} bytes are a write that never finished and are \
+                             not indexed"
+                        );
+                    }
                     let peak = peak_memory
                         .map(|bytes| format!(" peak_rss_kb={}", bytes / 1024))
                         .unwrap_or_default();
@@ -692,6 +702,7 @@ mod tests {
             summary: summary(),
             size: 4096,
             peak_memory: Some(77 * MIB),
+            incomplete_tail: 0,
         };
         std::fs::write(&answer, indexed.encode().unwrap()).unwrap();
         let executable = fake_executable(dir.path(), &format!("cat {}", answer.display()));
@@ -730,6 +741,7 @@ mod tests {
             summary: summary(),
             size: 4096,
             peak_memory: None,
+            incomplete_tail: 0,
         };
         std::fs::write(&answer, indexed.encode().unwrap()).unwrap();
         // One answer that decodes, one that does not, one failed child.
@@ -839,6 +851,7 @@ mod tests {
             summary: summary(),
             size: 4096,
             peak_memory: Some(1 << 30),
+            incomplete_tail: 0,
         };
         std::fs::write(&answer, indexed.encode().unwrap()).unwrap();
         // The fake records its arguments and its arena limit, one per line,

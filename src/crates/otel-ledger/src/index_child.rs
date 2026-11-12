@@ -37,6 +37,10 @@ pub struct IndexedFile {
     /// it from its own system when the indexing was done. `None` on a system
     /// where `ng_index::read_rss` has no way to read it.
     pub peak_memory: Option<u64>,
+    /// The bytes at the end of the WAL file that were not a whole frame, and
+    /// so are not in the index file: a write that never finished
+    /// (`wal::Reader::incomplete_tail`). 0 for a file of whole frames.
+    pub incomplete_tail: u64,
 }
 
 impl IndexedFile {
@@ -118,13 +122,15 @@ pub fn run(
         Signal::Traces => ng_index::index_traces_file,
     };
 
-    let (summary, size) = index(wal_path, sfst_path, &ng_index::Metrics::new())
+    let metrics = ng_index::Metrics::new();
+    let (summary, size) = index(wal_path, sfst_path, &metrics)
         .with_context(|| format!("indexing {}", wal_path.display()))?;
 
     let indexed = IndexedFile {
         summary,
         size,
         peak_memory: ng_index::read_rss().map(|rss| rss.peak_kb * 1024),
+        incomplete_tail: metrics.incomplete_tail(),
     };
     answer
         .write_all(&indexed.encode()?)
@@ -251,6 +257,47 @@ mod tests {
         assert_eq!(after, before.max(NICE));
     }
 
+    /// A crash during a write leaves a file that ends inside a frame. The
+    /// frame was never acknowledged; the frames before it were.
+    #[test]
+    fn a_file_that_ends_inside_a_frame_is_indexed_to_its_last_whole_frame() {
+        let dir = tempfile::tempdir().unwrap();
+        let whole_path = write_logs_wal(dir.path(), 7);
+        let whole = std::fs::read(&whole_path).unwrap();
+        // After the whole frame: the 24-byte header of a second frame and
+        // six bytes of its payload.
+        let second_frame = &whole[wal::HEADER_SIZE..wal::HEADER_SIZE + 30];
+        let mut cut_short = whole.clone();
+        cut_short.extend_from_slice(second_frame);
+        let cut_short_path = dir.path().join("cut-short.wal");
+        std::fs::write(&cut_short_path, cut_short).unwrap();
+
+        let (whole_index, cut_short_index) = (
+            dir.path().join("whole.sfst"),
+            dir.path().join("cut-short.sfst"),
+        );
+        let (mut whole_answer, mut cut_short_answer) = (Vec::new(), Vec::new());
+        run(Signal::Logs, &whole_path, &whole_index, &mut whole_answer).unwrap();
+        run(
+            Signal::Logs,
+            &cut_short_path,
+            &cut_short_index,
+            &mut cut_short_answer,
+        )
+        .unwrap();
+
+        let (whole, cut_short) = (
+            IndexedFile::decode(&whole_answer).unwrap(),
+            IndexedFile::decode(&cut_short_answer).unwrap(),
+        );
+        assert_eq!(cut_short.summary, whole.summary);
+        assert_eq!((whole.incomplete_tail, cut_short.incomplete_tail), (0, 30));
+        assert_eq!(
+            std::fs::read(&cut_short_index).unwrap(),
+            std::fs::read(&whole_index).unwrap()
+        );
+    }
+
     #[test]
     fn a_logs_file_is_indexed_as_by_a_direct_call() {
         let dir = tempfile::tempdir().unwrap();
@@ -322,6 +369,7 @@ mod tests {
             },
             size: 4,
             peak_memory: Some(5),
+            incomplete_tail: 0,
         };
         let mut answer = indexed.encode().unwrap();
         assert_eq!(IndexedFile::decode(&answer).unwrap(), indexed);

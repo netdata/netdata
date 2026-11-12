@@ -54,6 +54,7 @@ pub struct Metrics {
     bytes: Cell<u64>,
     frames: Cell<u64>,
     records: Cell<u64>,
+    incomplete_tail: Cell<u64>,
 }
 
 impl Metrics {
@@ -64,6 +65,7 @@ impl Metrics {
             bytes: Cell::new(0),
             frames: Cell::new(0),
             records: Cell::new(0),
+            incomplete_tail: Cell::new(0),
         }
     }
 
@@ -91,6 +93,18 @@ impl Metrics {
     /// feeding the logs/s rates in [`Metrics::report`].
     pub fn add_records(&self, n: u64) {
         self.records.set(self.records.get() + n);
+    }
+
+    /// The bytes at the end of the WAL file that were not a whole frame and
+    /// were not indexed (`wal::Reader::incomplete_tail`): recorded when the
+    /// read of the file ends.
+    pub fn set_incomplete_tail(&self, bytes: u64) {
+        self.incomplete_tail.set(bytes);
+    }
+
+    /// See [`Metrics::set_incomplete_tail`]. 0 for a file of whole frames.
+    pub fn incomplete_tail(&self) -> u64 {
+        self.incomplete_tail.get()
     }
 
     fn add_phase(&self, name: &'static str, elapsed: Duration) {
