@@ -15,11 +15,14 @@
 //! - mode selection: no selector means the implicit Functions view,
 //!   each of the three selectors its own mode, `tenant` riding beside
 //!   a selector;
-//! - strictness: unknown keys, a selector mixed with Functions
-//!   parameters, conflicting selectors (reported even when one is also
-//!   malformed), selector values that are not objects, present-but-null
-//!   selectors, duplicate top-level keys, and a non-object top level —
-//!   all client errors, with the message fragments clients match on;
+//! - leniency: a top-level key this build does not know is ignored in
+//!   every mode;
+//! - strictness: an unknown key inside a mode object, a selector mixed
+//!   with Functions parameters, conflicting selectors (reported even
+//!   when one is also malformed), selector values that are not objects,
+//!   present-but-null selectors, duplicate top-level keys, and a
+//!   non-object top level — all client errors, with the message
+//!   fragments clients match on;
 //! - the implicit view's parameter mapping through
 //!   `FunctionsParams::search_params`: defaults, relative-window
 //!   resolution, and the chips and text forwarding;
@@ -168,28 +171,45 @@ fn the_top_level_must_be_a_json_object() {
     }
 }
 
-/// Both rejection classes are deserialization-time client errors:
-/// genuinely unknown keys always, and each legal Functions parameter —
-/// even `timeout`, accepted but ignored — beside any selector, as the
-/// mixing error rather than an unknown-field error.
+/// The top level is built by generic Functions clients (the dashboard's
+/// shared request builder, the Agent's MCP tool), which add keys of
+/// their own: a key this build does not know is ignored in every mode,
+/// `timeout` and retired parameters included.
 #[test]
-fn unknown_and_retired_top_level_keys_are_client_errors() {
+fn unknown_top_level_keys_are_ignored() {
     for body in [
-        json!({"info": {}, "bogus": 1}),
         json!({"bogus": 1}),
-        json!({"attribute_values": {"key": "kind"}}),
+        json!({"timeout": 120000}),
         json!({"selections": {"name": ["GET"]}}),
         json!({"min_trace_duration_ns": 1}),
-        json!({"max_trace_duration_ns": 1}),
     ] {
-        let err = req_err(body.clone());
-        assert!(err.contains("unknown field"), "for {body}: {err}");
+        let TracesMode::Functions(p) = req(body.clone()).mode else {
+            panic!("Functions mode expected for {body}");
+        };
+        assert_eq!((p.after, p.before, p.last), (0, 0, 20), "for {body}");
+        assert!(p.conditions.is_empty() && p.text.is_empty(), "for {body}");
     }
 
+    assert!(matches!(
+        req(json!({"info": {}, "bogus": 1})).mode,
+        TracesMode::Info
+    ));
+    assert!(matches!(
+        req(json!({"info": {}, "timeout": 30})).mode,
+        TracesMode::Info
+    ));
+    let r = req(json!({"trace": {"id": "00"}, "source": "ui", "tenant": "t1"}));
+    assert!(matches!(r.mode, TracesMode::Trace(_)));
+    assert_eq!(r.tenant.as_deref(), Some("t1"));
+}
+
+/// A legal Functions parameter beside any selector is a
+/// deserialization-time client error: the two request forms do not mix.
+#[test]
+fn functions_parameters_beside_a_selector_are_client_errors() {
     for body in [
         json!({"info": {}, "after": 1, "before": 2}),
         json!({"info": {}, "last": 5}),
-        json!({"info": {}, "timeout": 30}),
         json!({"trace": {"id": "00"}, "anchor": "x"}),
         json!({"explore": {}, "skip_overview": true}),
     ] {

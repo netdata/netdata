@@ -7,8 +7,13 @@
 //! self-contained in its object. A request without a selector is the
 //! Functions view (the trace list): standard Functions parameters
 //! around the search page, wrapped as `type: "traces"`. Explicit modes keep their native
-//! response shapes. Mixing the two request forms, naming more than one
-//! selector, or an unknown key anywhere is a client error.
+//! response shapes. Mixing the two request forms or naming more than one
+//! selector is a client error, and so is an unknown key inside a mode
+//! object or a condition. An unknown TOP-LEVEL key is ignored: generic
+//! Functions clients (the dashboard's shared request builder, the
+//! Agent's MCP tool) build the top level and add keys of their own, such
+//! as `timeout`, so [`ACCEPTED_PARAMS`] is the contract there, not a
+//! rejection.
 //!
 //! Nanosecond values (`*_ns`, `time_unix_nano`) are JSON numbers and
 //! exceed 2^53: JavaScript consumers read them with ~256 ns granularity
@@ -34,12 +39,12 @@ use sfsq::traces::{PartialReason, QueryStatus};
 /// search bar's `conditions` and `text`, and `skip_overview`. A field the implicit view
 /// honours but this list omits is unreachable.
 ///
-/// `timeout` is deliberately NOT listed: the implicit view accepts it
-/// for protocol parity and ignores it (execution deadlines belong to
-/// the bridge call context), so advertising it would invite a client
-/// to believe it moved a deadline it did not move. Per-mode body
-/// fields (windows, `limit`, …) live inside their mode objects —
-/// documented on the param structs.
+/// A top-level key outside this list is ignored, never an error.
+/// `timeout` is one such key: generic clients send it, and execution
+/// deadlines belong to the bridge call context, so advertising it would
+/// invite a client to believe it moved a deadline it did not move.
+/// Per-mode body fields (windows, `limit`, …) live inside their mode
+/// objects — documented on the param structs.
 pub const ACCEPTED_PARAMS: &[&str] = &[
     "info",
     "trace",
@@ -62,8 +67,10 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
 /// top-level JSON object) and immediately converted by [`TryFrom`]
 /// into the typed request — nothing outside this module sees the raw
 /// form.
+///
+/// No `deny_unknown_fields`: a top-level key that is not a field here is
+/// ignored (see the module doc). The mode objects stay strict.
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct RawOtelTracesRequest {
     /// The capability-discovery selector. `{"info": {}}` — the strict
     /// empty object, validated by [`InfoParams`]; the traces GET shim
@@ -94,8 +101,6 @@ struct RawOtelTracesRequest {
     text: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     skip_overview: Option<serde_json::Value>,
-    #[serde(default, deserialize_with = "present")]
-    timeout: Option<serde_json::Value>,
     /// Tenant whose data the query reads — a scoping selector supplied
     /// by the caller, not a security boundary; omitted or invalid falls
     /// back to the default tenant
@@ -111,9 +116,9 @@ struct RawOtelTracesRequest {
 /// the optional call-scoping `tenant`. `Deserialize` is manual so the
 /// top level can be held to a JSON object (arrays and scalars are
 /// client errors): the object streams through `RawOtelTracesRequest`'s
-/// derived visitor, keeping TOP-LEVEL duplicate-key and unknown-key
-/// rejection (inside a mode object, duplicates collapse last-wins at
-/// the `Value` capture — a known serde_json DOM property). No
+/// derived visitor, keeping duplicate-key rejection for the TOP-LEVEL
+/// keys it knows (inside a mode object, duplicates collapse last-wins
+/// at the `Value` capture — a known serde_json DOM property). No
 /// `Serialize`: tests build JSON bodies directly.
 #[derive(Debug, Clone)]
 pub struct OtelTracesRequest {
@@ -185,8 +190,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
             || raw.anchor.is_some()
             || raw.conditions.is_some()
             || raw.text.is_some()
-            || raw.skip_overview.is_some()
-            || raw.timeout.is_some();
+            || raw.skip_overview.is_some();
 
         match present.as_slice() {
             [] => {}
@@ -222,7 +226,6 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
                 ("conditions", raw.conditions.as_ref()),
                 ("text", raw.text.as_ref()),
                 ("skip_overview", raw.skip_overview.as_ref()),
-                ("timeout", raw.timeout.as_ref()),
             ] {
                 if let Some(value) = value {
                     params.insert(name.to_string(), value.clone());
@@ -296,11 +299,6 @@ pub struct FunctionsParams {
     /// request builder drops falsy values.
     #[serde(default)]
     pub skip_overview: bool,
-    /// Accepted for parity with the Functions protocol. Execution
-    /// deadlines remain owned by the bridge call context.
-    #[serde(default)]
-    #[serde(rename = "timeout")]
-    pub _timeout: Option<u32>,
 }
 
 /// Resolve a Functions-convention window (unix seconds; `0` means

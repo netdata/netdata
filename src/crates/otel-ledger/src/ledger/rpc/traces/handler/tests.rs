@@ -2057,7 +2057,7 @@ async fn raw_call(payload: Option<&[u8]>) -> (u32, String) {
 #[tokio::test]
 async fn shape_errors_are_transport_400s() {
     for (payload, needle) in [
-        (&br#"{"bogus": 1}"#[..], "unknown field"),
+        (&br#"{"explore": {"bogus": 1}}"#[..], "unknown field"),
         (
             br#"{"info": {}, "after": 1}"#,
             "cannot mix a mode selector with Functions parameters",
