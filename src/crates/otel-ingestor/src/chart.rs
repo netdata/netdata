@@ -51,10 +51,23 @@ pub const MAX_DIMENSIONS: usize = 4096;
 /// The labels are the sender's attributes, and they can be many times larger
 /// than the request that carried them: a nested attribute gives one label
 /// per leaf, each with the whole path as its key. With this limit, and each
-/// key and value cut to what the agent keeps of it
-/// ([`MAX_LABEL_KEY_BYTES`], [`MAX_LABEL_VALUE_BYTES`]), a definition's
-/// labels stay near 1 MiB.
+/// key and value cut at the agent's limit for it ([`MAX_LABEL_KEY_BYTES`],
+/// [`MAX_LABEL_VALUE_BYTES`]), a definition's labels stay near 1 MiB.
+///
+/// The agent cuts a label too, after it sanitized the text, so the two cuts
+/// can differ for a key or a value over the limit: one with runs of spaces,
+/// or with multi-byte characters near the limit, is stored a little shorter
+/// than the agent alone would store it.
 pub const MAX_LABELS: usize = 1024;
+
+/// Cut `text` to at most `max_bytes`, at a character boundary, and give back
+/// the memory of what was cut: a cut `String` keeps its whole allocation.
+fn cut_text(text: &mut String, max_bytes: usize) {
+    if text.len() > max_bytes {
+        text.truncate(text.floor_char_boundary(max_bytes));
+        text.shrink_to_fit();
+    }
+}
 
 /// One dimension of a chart: a cross-slot context plus per-slot accumulators.
 ///
@@ -495,8 +508,8 @@ impl Chart {
     }
 
     /// Initialize the chart definition from metric metadata. Of `labels` it
-    /// takes the first [`MAX_LABELS`], each key and value cut to what the
-    /// agent keeps of it.
+    /// takes the first [`MAX_LABELS`], each key and value cut at the agent's
+    /// limit for it, and it keeps no memory for what it left out.
     ///
     /// Debug-asserts the definition is still unset; callers gate on
     /// [`has_definition()`](Self::has_definition) first.
@@ -510,9 +523,10 @@ impl Chart {
         debug_assert!(matches!(self.definition, DefinitionState::Unset));
 
         labels.truncate(MAX_LABELS);
+        labels.shrink_to_fit();
         for (key, value) in &mut labels {
-            key.truncate(key.floor_char_boundary(MAX_LABEL_KEY_BYTES));
-            value.truncate(value.floor_char_boundary(MAX_LABEL_VALUE_BYTES));
+            cut_text(key, MAX_LABEL_KEY_BYTES);
+            cut_text(value, MAX_LABEL_VALUE_BYTES);
         }
 
         // Rate-normalized charts emit per-second values; reflect that in the units.
@@ -836,7 +850,7 @@ mod tests {
 
     /// A chart's labels come from the request's attributes, in any number
     /// and of any length: the definition takes a limited number of them, each
-    /// cut to what the agent keeps, so its block of text has a limit too.
+    /// cut at the agent's limit, so its block of text has a limit too.
     #[test]
     fn a_definition_takes_a_limited_number_of_labels_of_limited_length() {
         let mut chart = gauge_chart();
@@ -866,6 +880,25 @@ mod tests {
             format!("CLABEL '{cut_key}' '{cut_value}' 1")
         );
         assert_eq!(label_lines[1], format!("CLABEL 'key.0001' '{cut_value}' 1"));
+    }
+
+    /// A chart lives for minutes: it must not hold the memory of the labels
+    /// and of the text that it left out.
+    #[test]
+    fn a_chart_holds_no_memory_for_what_it_cut_from_its_labels() {
+        let mut chart = gauge_chart();
+        let labels: Vec<(String, String)> = (0..2 * MAX_LABELS)
+            .map(|i| (format!("key.{i:04}"), "v".repeat(100_000)))
+            .collect();
+        chart.init_definition("load", "Load", "load", labels);
+
+        let DefinitionState::Pending(definition) = &chart.definition else {
+            panic!("the definition is not pending");
+        };
+        assert!(definition.labels.capacity() < 2 * MAX_LABELS);
+        for (_, value) in &definition.labels {
+            assert!(value.capacity() < 2 * MAX_LABEL_VALUE_BYTES);
+        }
     }
 
     #[test]

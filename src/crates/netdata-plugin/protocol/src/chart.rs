@@ -483,13 +483,17 @@ impl Chunker {
 /// error.
 pub const MAX_CHART_ID_BYTES: usize = 1199;
 
-/// The agent keeps at most this many bytes of a label key
-/// (`RRDLABELS_MAX_NAME_LENGTH`, src/database/rrdlabels.h) and cuts the rest.
+/// The agent's limit for a label key (`RRDLABELS_MAX_NAME_LENGTH`,
+/// src/database/rrdlabels.h). The agent applies it to the text its sanitizer
+/// writes, not to the text it is sent: the sanitizer skips leading spaces
+/// and keeps one space of a run (`text_sanitize`,
+/// src/libnetdata/sanitizers/utf8-sanitizer.c), and the last byte of the
+/// limit is its terminator. So this is close to what the agent keeps of a
+/// key, not the same for every text.
 pub const MAX_LABEL_KEY_BYTES: usize = 200;
 
-/// The agent keeps at most this many bytes of a label value
-/// (`RRDLABELS_MAX_VALUE_LENGTH`, src/database/rrdlabels.h) and cuts the
-/// rest.
+/// The agent's limit for a label value (`RRDLABELS_MAX_VALUE_LENGTH`,
+/// src/database/rrdlabels.h), applied as for [`MAX_LABEL_KEY_BYTES`].
 pub const MAX_LABEL_VALUE_BYTES: usize = 800;
 
 /// True when `id` is a valid chart id: `type.id` with both parts non-empty,
