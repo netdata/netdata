@@ -114,8 +114,8 @@ chart has one dimension per Windows problem flag (for example `offline`, `paper_
 flag is set, so several can be active together and each can be alerted on. Status values match the
 `Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter, except that a printer reporting several status
 flags at once gets its most severe state (problems such as offline or paper out first, then printing, warmup and idle)
-instead of falling back to its jobs; an offline printer reports `other`. Job user names, machine names, and document
-titles are never collected.
+instead of falling back to its jobs, and a printer connection whose print server is offline reports `other`; an offline
+printer reports `other`. Job user names, machine names, and document titles are never collected.
 
 The module runs on its own thread only while its `update every` differs from the global interval. Opening a selected
 printer connection whose print server is unreachable can block; while it is blocked, this module collects nothing and

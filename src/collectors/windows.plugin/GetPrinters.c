@@ -211,12 +211,14 @@ static BOOL spooler_enum_jobs_call(void *ctx, BYTE *data, DWORD size, DWORD *nee
     return EnumJobsW((HANDLE)ctx, 0, 0xFFFFFFFF, 1, data, size, needed, returned);
 }
 
-// Flag groups follow the Win32_Printer.PrinterStatus mapping used by windows_exporter.
+// Flag groups follow the Win32_Printer.PrinterStatus mapping used by windows_exporter, plus SERVER_OFFLINE: an
+// unreachable print server makes a connection unusable, so it must not read as idle.
 #define PRINTER_FLAGS_OTHER                                                                                            \
     (PRINTER_STATUS_PAUSED | PRINTER_STATUS_ERROR | PRINTER_STATUS_PENDING_DELETION | PRINTER_STATUS_PAPER_JAM |       \
      PRINTER_STATUS_PAPER_OUT | PRINTER_STATUS_MANUAL_FEED | PRINTER_STATUS_PAPER_PROBLEM | PRINTER_STATUS_OFFLINE |   \
      PRINTER_STATUS_OUTPUT_BIN_FULL | PRINTER_STATUS_TONER_LOW | PRINTER_STATUS_NO_TONER | PRINTER_STATUS_PAGE_PUNT |  \
-     PRINTER_STATUS_USER_INTERVENTION | PRINTER_STATUS_OUT_OF_MEMORY | PRINTER_STATUS_DOOR_OPEN)
+     PRINTER_STATUS_USER_INTERVENTION | PRINTER_STATUS_OUT_OF_MEMORY | PRINTER_STATUS_DOOR_OPEN |                     \
+     PRINTER_STATUS_SERVER_OFFLINE)
 #define PRINTER_FLAGS_UNKNOWN (PRINTER_STATUS_NOT_AVAILABLE)
 #define PRINTER_FLAGS_PRINTING                                                                                         \
     (PRINTER_STATUS_IO_ACTIVE | PRINTER_STATUS_BUSY | PRINTER_STATUS_PRINTING | PRINTER_STATUS_PROCESSING)
@@ -241,7 +243,7 @@ static enum printer_state printer_state_from_flags(DWORD status, bool *decided)
     if (status & PRINTER_FLAGS_IDLE)
         return PRINTER_STATE_IDLE;
 
-    // No mapped flag (zero, or only SERVER_OFFLINE/DRIVER_UPDATE_NEEDED): the first queued job decides.
+    // No mapped flag (zero, or only DRIVER_UPDATE_NEEDED, which does not stop printing): the first queued job decides.
     *decided = false;
     return PRINTER_STATE_UNKNOWN;
 }

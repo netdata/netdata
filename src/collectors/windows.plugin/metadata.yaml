@@ -5960,7 +5960,8 @@ modules:
           contacting print servers. Each selected printer is then opened to read its status flags and queued job count
           (`GetPrinterW`) and, when jobs are queued, its jobs (`EnumJobsW`). Status values
           follow the `Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter, except that a printer
-          reporting several status flags at once gets its most severe state (problems first). Job user names, machine
+          reporting several status flags at once gets its most severe state (problems first) and a connection whose
+          print server is offline reports `other`. Job user names, machine
           names, and document titles are not collected.
       supported_platforms:
         include: ["windows"]
