@@ -427,14 +427,15 @@ fn usage_text(usage: Usage) -> String {
 
 /// The indexing operations that run, each in a task of its own, with the
 /// file of each. It keeps one rule: every operation that starts gives one
-/// response, also when its task ends without one (it panicked). Start-up
+/// response, also when its task ends without one (it panicked, or the
+/// runtime cancelled it at a stop). Start-up
 /// recovery waits for exactly one response per request, with no time limit
 /// (`file_lifecycle::component::batch_recover`).
 struct RunningOperations {
     tasks: JoinSet<(IndexerResponse, Option<Measured>)>,
     files: HashMap<tokio::task::Id, FileId>,
     /// The ledger's count of ended operations: an operation counts itself,
-    /// and one whose task ended without a response is counted here.
+    /// and one whose task panicked is counted here.
     finished: Arc<Finished>,
 }
 
@@ -471,11 +472,22 @@ impl RunningOperations {
                     let Some(file_id) = self.files.remove(&e.id()) else {
                         continue;
                     };
-                    self.finished.failed.fetch_add(1, Ordering::Relaxed);
-                    tracing::error!(
-                        file = %file_id.to_filename("wal"),
-                        "the task of an indexing operation ended without a response: {e}",
-                    );
+                    // Nothing here cancels a task: only the runtime does, when
+                    // the ledger stops while it still waits here. That is no
+                    // failure of the operation, and the next start indexes
+                    // the file. A task that panicked is a defect.
+                    if e.is_cancelled() {
+                        tracing::info!(
+                            file = %file_id.to_filename("wal"),
+                            "an indexing operation was cut by the stop",
+                        );
+                    } else {
+                        self.finished.failed.fetch_add(1, Ordering::Relaxed);
+                        tracing::error!(
+                            file = %file_id.to_filename("wal"),
+                            "the task of an indexing operation ended without a response: {e}",
+                        );
+                    }
                     let response = IndexerResponse::IndexFailed {
                         file_id,
                         error: format!("the task of the indexing operation failed: {e}"),
@@ -570,6 +582,27 @@ mod tests {
         assert_eq!(finished.failed.load(Ordering::Relaxed), 1);
         assert!(operations.files.is_empty());
         assert!(operations.next().await.is_none());
+    }
+
+    /// At a stop the runtime cancels the tasks that still run. That is the
+    /// end of the ledger, not a failed indexing operation: the next start
+    /// indexes the file.
+    #[tokio::test]
+    async fn an_operation_whose_task_is_cancelled_is_not_counted_as_failed() {
+        let finished = Arc::<Finished>::default();
+        let mut operations = RunningOperations::new(Arc::clone(&finished));
+        operations.spawn(file_id(7), std::future::pending());
+        operations.tasks.abort_all();
+
+        let (response, measured) = operations.next().await.unwrap();
+
+        assert!(matches!(
+            response,
+            IndexerResponse::IndexFailed { file_id: cut, .. } if cut == file_id(7)
+        ));
+        assert!(measured.is_none());
+        assert_eq!(finished.failed.load(Ordering::Relaxed), 0);
+        assert!(operations.files.is_empty());
     }
 
     /// The WAL file name of [`file_id`]`(seq)`, under `dir`. The file need
