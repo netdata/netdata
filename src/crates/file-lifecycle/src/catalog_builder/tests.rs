@@ -186,6 +186,61 @@ async fn rotation_fires_at_threshold_and_writes_file() {
 }
 
 #[tokio::test]
+async fn a_rotation_keeps_the_entries_of_a_local_file_with_the_same_name() {
+    // A first rotation writes the entries 1, 2 and 3. Then 2 and 3 come
+    // again (their uploads were taken back at a start, after a move to
+    // another bucket) and are flushed: the same largest seq and the same
+    // times make the same file name.
+    let mut h = Harness::new(3);
+    h.send_recv(add_request(1)).await;
+    h.send_recv(add_request(2)).await;
+    let CatalogBuilderResponse::Rotated { path: first, .. } = h.send_recv(add_request(3)).await
+    else {
+        panic!("expected the first rotation");
+    };
+
+    h.send_recv(add_request(2)).await;
+    h.send_recv(add_request(3)).await;
+    let CatalogBuilderResponse::Rotated { path, mut seqs, .. } =
+        h.send_recv(CatalogBuilderRequest::Flush).await
+    else {
+        panic!("expected the second rotation");
+    };
+
+    // The file still names entry 1; the rotation answers for what it added.
+    assert_eq!(path, first);
+    let catalog = Catalog::from_container_bytes(&std::fs::read(&path).unwrap()).unwrap();
+    let mut in_file: Vec<u64> = catalog.entries.keys().map(|id| id.seq).collect();
+    in_file.sort();
+    assert_eq!(in_file, [1, 2, 3]);
+    seqs.sort();
+    assert_eq!(seqs, [2, 3]);
+    assert!(matches!(
+        h.recv().await,
+        CatalogBuilderResponse::FlushComplete
+    ));
+}
+
+#[tokio::test]
+async fn a_rotation_replaces_a_local_file_that_is_not_a_catalog() {
+    let mut h = Harness::new(3);
+    h.send_recv(add_request(1)).await;
+    h.send_recv(add_request(2)).await;
+    let CatalogBuilderResponse::Rotated { path, .. } = h.send_recv(add_request(3)).await else {
+        panic!("expected the first rotation");
+    };
+    std::fs::write(&path, b"not a catalog").unwrap();
+
+    h.send_recv(add_request(1)).await;
+    h.send_recv(add_request(2)).await;
+    let again = h.send_recv(add_request(3)).await;
+
+    assert!(matches!(again, CatalogBuilderResponse::Rotated { path: p, .. } if p == path));
+    let catalog = Catalog::from_container_bytes(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(catalog.entries.len(), 3);
+}
+
+#[tokio::test]
 async fn accumulator_is_drained_on_rotation() {
     let mut h = Harness::new(2);
     assert!(matches!(

@@ -250,8 +250,35 @@ async fn rotate_scope(
     // source, no drift.
     let (max_seq, min_timestamp_s, max_timestamp_s) = catalog.fold();
     let seqs: Vec<u64> = catalog.entries.values().map(|e| e.id.seq).collect();
+    let path = scope_path(
+        &args.catalog_base_dir,
+        &tenant_id,
+        date,
+        identity,
+        max_seq,
+        min_timestamp_s,
+        max_timestamp_s,
+    );
 
-    let bytes = match catalog.to_container_bytes() {
+    // A rotation never drops an entry that a local file holds. A file with
+    // this name is there already when the entries of a rotated file come
+    // again: after a move to another bucket, a start takes back the uploads
+    // of the index files that the new bucket lacks, they are uploaded again,
+    // and their entries can fold to the name of the file that still lists
+    // them, next to entries of index files that are gone locally. Those
+    // older entries are written again; the answer names only what this
+    // rotation added.
+    let serialized = match older_entries(&path, catalog).await {
+        older if older.is_empty() => catalog.to_container_bytes(),
+        older => {
+            let mut whole = catalog.clone();
+            for entry in older {
+                whole.add(entry);
+            }
+            whole.to_container_bytes()
+        }
+    };
+    let bytes = match serialized {
         Ok(b) => b,
         Err(e) => {
             tracing::error!(
@@ -270,15 +297,6 @@ async fn rotate_scope(
     };
     let size = ByteSize(bytes.len() as u64);
 
-    let path = scope_path(
-        &args.catalog_base_dir,
-        &tenant_id,
-        date,
-        identity,
-        max_seq,
-        min_timestamp_s,
-        max_timestamp_s,
-    );
     if let Err(e) = write_local_atomic(&path, bytes).await {
         tracing::error!(
             tenant = %tenant_id,
@@ -316,6 +334,53 @@ async fn rotate_scope(
         size,
         seqs,
     }
+}
+
+/// The entries of the local catalog file at `path` that `catalog` does not
+/// have. Empty when there is no such file, which is the usual case.
+///
+/// A file that cannot be read as a catalog, or whose entries do not fold to
+/// the name it has, holds nothing that a reader would accept: it is
+/// replaced, with a warning.
+async fn older_entries(path: &Path, catalog: &Catalog) -> Vec<otel_catalog::CatalogEntry> {
+    let file = path.to_path_buf();
+    let read = tokio::task::spawn_blocking(move || std::fs::read(&file))
+        .await
+        .unwrap_or_else(|e| Err(std::io::Error::other(e)));
+    let bytes = match read {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Vec::new(),
+        Err(e) => {
+            tracing::warn!(path = %path.display(), "a catalog file is replaced: cannot read it: {e}");
+            return Vec::new();
+        }
+    };
+    let existing = match Catalog::from_container_bytes(&bytes) {
+        Ok(existing) if existing.fold() == catalog.fold() => existing,
+        Ok(_) => {
+            tracing::warn!(path = %path.display(), "a catalog file is replaced: its entries do not fit its name");
+            return Vec::new();
+        }
+        Err(e) => {
+            tracing::warn!(path = %path.display(), "a catalog file is replaced: cannot decode it: {e}");
+            return Vec::new();
+        }
+    };
+
+    let mut older = Vec::new();
+    for (id, entry) in existing.entries {
+        if !catalog.entries.contains_key(&id) {
+            older.push(entry);
+        }
+    }
+    if !older.is_empty() {
+        tracing::info!(
+            path = %path.display(),
+            "a catalog file with this name exists: {} of its entries are kept",
+            older.len(),
+        );
+    }
+    older
 }
 
 /// Full on-disk path for a rotated catalog file:
