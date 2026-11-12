@@ -153,3 +153,40 @@ func TestRelationSelectionPostgreSQL(t *testing.T) {
 	assert.NotContains(t, c.dbConns, "netdata_top_secondary")
 	assert.NotContains(t, c.relations, secondary.db)
 }
+
+// Run against an isolated PostgreSQL cluster; this test creates a schema.
+func TestColumnStatisticsPostgreSQL(t *testing.T) {
+	dsn := os.Getenv("NETDATA_POSTGRES_TEST_DSN")
+	if dsn == "" {
+		t.Skip("NETDATA_POSTGRES_TEST_DSN must name an isolated test cluster")
+	}
+	ctx := context.Background()
+	c := New()
+	c.DSN = dsn
+	c.MaxDBTables, c.MaxDBIndexes = 0, 0
+	require.NoError(t, c.Init(ctx))
+	t.Cleanup(func() { c.Cleanup(ctx) })
+	db, err := c.openPrimaryConnection()
+	require.NoError(t, err)
+	c.db = db
+	// A legacy inheritance parent has pg_stats rows with and without its children; PostgreSQL 17
+	// stores the default statistics target as NULL.
+	_, err = db.Exec(`DROP SCHEMA IF EXISTS netdata_columns CASCADE; CREATE SCHEMA netdata_columns;
+CREATE TABLE netdata_columns.parent(id int, empty text);
+CREATE TABLE netdata_columns.child() INHERITS (netdata_columns.parent);
+INSERT INTO netdata_columns.parent(id) SELECT generate_series(1, 300);
+INSERT INTO netdata_columns.child(id) SELECT generate_series(1, 300);
+ANALYZE netdata_columns.parent; ANALYZE netdata_columns.child`)
+	require.NoError(t, err)
+	t.Cleanup(func() { _, _ = db.Exec(`DROP SCHEMA IF EXISTS netdata_columns CASCADE`) })
+	var dbname string
+	require.NoError(t, db.QueryRow(`SELECT current_database()`).Scan(&dbname))
+	require.NoError(t, c.doDBQueryStatUserTables(db))
+	require.NoError(t, c.doDBQueryColumns(db))
+	for _, table := range []string{"parent", "child"} {
+		m := c.mx.tables[tableKey{db: dbname, schema: "netdata_columns", name: table}]
+		require.NotNil(t, m, table)
+		require.NotNil(t, m.nullColumns, table)
+		assert.Equal(t, int64(1), *m.nullColumns, table)
+	}
+}

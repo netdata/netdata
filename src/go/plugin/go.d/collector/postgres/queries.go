@@ -785,12 +785,12 @@ FROM pg_class c
          JOIN
      pg_stats st
      ON
-         (st.schemaname = ns.nspname AND st.tablename = relname AND st.attname = at.attname)
+         (st.schemaname = ns.nspname AND st.tablename = relname AND st.attname = at.attname AND NOT st.inherited)
 WHERE relkind = 'r'
   AND nspname NOT LIKE E'pg\\_%'
   AND nspname != 'information_schema'
   AND NOT attisdropped
-  AND attstattarget != 0
+  AND attstattarget IS DISTINCT FROM 0
   AND reltuples >= 100
 ORDER BY nspname,
          relname,
