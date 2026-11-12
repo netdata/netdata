@@ -39,13 +39,13 @@ type ArtifactStore interface {
 type Engine struct {
 	*executionOwner
 	source        Source
+	browserSource *browserSource
 	history       historyWriter
 	unrecorded    bool
 	artifacts     ArtifactStore
 	start         startFunc
 	platform      func() error
 	checks        *checkOwner
-	qualification bool
 }
 
 func New(source Source, history historyWriter, artifacts ArtifactStore, concurrency int) (*Engine, error) {
@@ -58,12 +58,16 @@ func New(source Source, history historyWriter, artifacts ArtifactStore, concurre
 			jobs:     make(map[executionKey]*admissionJob),
 			fatal:    make(chan error, 1),
 			poisoned: make(chan struct{}),
+			idleFor:  browserIdleTimeout,
+			closing:  make(chan struct{}),
+			closed:   make(chan struct{}),
 		},
-		checks:    &checkOwner{},
-		source:    source,
-		history:   history,
-		artifacts: artifacts,
-		platform:  runtimeAllowed,
+		checks:        &checkOwner{},
+		source:        source,
+		browserSource: &browserSource{},
+		history:       history,
+		artifacts:     artifacts,
+		platform:      runtimeAllowed,
 		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
 		},
@@ -74,9 +78,9 @@ func (e *Engine) unrecordedView(source Source, artifacts ArtifactStore) *Engine 
 	return &Engine{
 		executionOwner: e.executionOwner,
 		source:         source,
+		browserSource:  &browserSource{},
 		unrecorded:     true,
 		checks:         &checkOwner{},
-		qualification:  e.qualification,
 		artifacts:      artifacts,
 		start:          e.start,
 		platform:       e.platform,
@@ -147,7 +151,11 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 	if state != nil {
 		state("waiting")
 	}
-	job, err := e.acquire(ctx, executionKey{jobID: request.JobID(), qualification: e.qualification})
+	var scope *browserSource
+	if request.Kind == synthetic.Journey && request.BrowserMode == "reuse" {
+		scope = e.browserSource
+	}
+	job, err := e.acquire(ctx, executionKey{jobID: request.JobID(), qualification: e.browserSource.ephemeral}, scope)
 	if err != nil {
 		return finishUnstarted(err, !errors.Is(err, ndexec.ErrTreeNotDrained))
 	}
@@ -182,7 +190,8 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 	if err != nil {
 		return e.failAdmitted(&run, err, redact)
 	}
-	defer func() { _ = use.Finish(drained) }()
+	cliDrained := true
+	defer func() { _ = use.Finish(cliDrained) }()
 	paths := use.Paths()
 	if err := e.checkFiles(request.Kind, paths); err != nil {
 		return e.failAdmitted(&run, err, redact)
@@ -214,11 +223,40 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		Capture:    request.Capture,
 		Secrets:    request.Secrets,
 	}
+	slot := job.slot
+	// Keep browser startup and required retirement within attempt duration,
+	// whether Chromium belongs to the CLI tree or a separate reusable owner.
+	started := time.Now()
+	req.Browser, err = e.prepareBrowser(attempt, slot, scope, paths)
+	if err != nil {
+		if errors.Is(err, ndexec.ErrTreeNotDrained) {
+			drained = false
+			return finishUndrained(&run, "browser owner retirement is unverified")
+		}
+		run.Error = redact.text(err.Error())
+		switch {
+		case errors.Is(err, context.Canceled):
+			run.Outcome = synthetic.Cancelled
+		case errors.Is(err, context.DeadlineExceeded):
+			run.Outcome = synthetic.Timeout
+		}
+		e.complete(&run, []synthetic.Capture{}, redact)
+		return synthetic.Execution{Run: run, Drained: true}
+	}
+	if req.Browser != nil {
+		redact = req.Browser.redactor(request.Secrets)
+	}
 	raw, err := json.Marshal(req)
 	if err == nil && len(raw) > FrameMaxBytes {
 		err = errors.New("runner request exceeds 4 MiB transport limit")
 	}
 	if err != nil {
+		if scope != nil && scope.ephemeral {
+			drained = slot.retireOwner()
+			if !drained {
+				return finishUndrained(&run, "browser owner retirement is unverified")
+			}
+		}
 		run.Error = redact.text(err.Error())
 		e.complete(&run, []synthetic.Capture{}, redact)
 		return synthetic.Execution{
@@ -227,7 +265,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		}
 	}
 	sink := newSink(request.Kind, request.Capture, redact)
-	started := time.Now()
+	sink.loan = req.Browser
 	if state != nil {
 		state("running")
 	}
@@ -240,34 +278,58 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		sink.consume,
 		sink.stderr,
 	)
+	executionErr := attempt.Err()
 	if startErr != nil {
-		if errors.Is(attempt.Err(), context.Canceled) {
+		if req.Browser != nil {
+			drained = slot.retireOwner()
+			if !drained {
+				return finishUndrained(&run, "browser owner retirement is unverified")
+			}
+		}
+		if errors.Is(executionErr, context.Canceled) {
 			run.Outcome = synthetic.Cancelled
-		} else if errors.Is(attempt.Err(), context.DeadlineExceeded) {
+		} else if errors.Is(executionErr, context.DeadlineExceeded) {
 			run.Outcome = synthetic.Timeout
 		}
 		run.Error = redact.text(startErr.Error())
 	} else {
-		elapsed := float64(time.Since(started)) / float64(time.Millisecond)
-		run.DurationMS = &elapsed
-		drained = result.Drained
+		cliDrained = result.Drained
+		drained = cliDrained
 		snapshot := sink.snapshot()
 		run.Events = snapshot.events
 		run.DroppedEvents = snapshot.dropped
 		run.Tests = snapshot.partial
+		var browserErr error
+		if !cliDrained && req.Browser != nil {
+			// Fail-stop owns the remaining work; promptly stop the separate
+			// browser supervisor without treating that request as a receipt.
+			slot.owner.force()
+		}
+		if cliDrained && req.Browser != nil {
+			drained, browserErr = slot.finishLoan(executionErr, snapshot)
+		}
+		elapsed := float64(time.Since(started)) / float64(time.Millisecond)
+		run.DurationMS = &elapsed
 		switch {
 		case !drained:
-			run.Error = redact.text("process-tree completion is unverified: " + errorText(result.Err))
-		case errors.Is(attempt.Err(), context.DeadlineExceeded):
+			if !cliDrained {
+				run.Error = redact.text("process-tree completion is unverified: " + errorText(result.Err))
+			} else {
+				run.Error = "browser owner retirement is unverified"
+			}
+		case errors.Is(executionErr, context.DeadlineExceeded):
 			run.Outcome = synthetic.Timeout
 			run.Error = redact.text("overall execution deadline exceeded")
-		case errors.Is(attempt.Err(), context.Canceled):
+		case errors.Is(executionErr, context.Canceled):
 			run.Outcome = synthetic.Cancelled
 			run.Error = redact.text("execution cancelled")
 		case snapshot.err != nil:
 			run.Error = redact.text(snapshot.err.Error())
 		case snapshot.result == nil:
 			run.Error = redact.text("runner exited without a terminal result: " + errorText(result.Err))
+		case browserErr != nil && snapshot.result.Status != synthetic.Failed && snapshot.result.Status != synthetic.Error &&
+			snapshot.result.Status != synthetic.Timeout && snapshot.result.Status != synthetic.Cancelled:
+			run.Error = browserErr.Error()
 		case snapshot.result.Status == synthetic.Success && result.Err != nil:
 			run.Error = redact.text("runner exited unsuccessfully after reporting success")
 		default:
@@ -300,6 +362,11 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		Run:     run,
 		Drained: true,
 	}
+}
+
+func finishUndrained(run *synthetic.Run, message string) synthetic.Execution {
+	run.Error = message
+	return synthetic.Execution{Run: *run, Drained: false}
 }
 
 // A slot was admitted, so infrastructure/validation failure is an actual error

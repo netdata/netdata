@@ -236,7 +236,10 @@ func loadGeneration(root *os.Root, id string) (generation, error) {
 		}
 		return g, err
 	}
-	if err := g.Manifest.Validate(); err != nil || g.Manifest.Archive.SHA256 != id || g.LastUsed.IsZero() {
+	if err := g.Manifest.Validate(); err != nil {
+		return g, damagedMetadata(metadata, err)
+	}
+	if g.Manifest.Archive.SHA256 != id || g.LastUsed.IsZero() {
 		return g, damagedMetadata(metadata, errors.New("invalid prepared generation metadata"))
 	}
 	return g, nil

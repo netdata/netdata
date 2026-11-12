@@ -43,10 +43,10 @@ func configured() *Collector {
 
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
-		`{"vnode":"storefront","name":"login","update_every":10,"check_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":false}`,
+		`{"vnode":"storefront","name":"login","update_every":10,"check_every":900,"timeout":120,"browser_mode":"fresh","script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":false}`,
 	)
 	cfgYAML := []byte(
-		"vnode: storefront\nname: login\nupdate_every: 10\ncheck_every: 900\ntimeout: 120\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: false\n",
+		"vnode: storefront\nname: login\nupdate_every: 10\ncheck_every: 900\ntimeout: 120\nbrowser_mode: fresh\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: false\n",
 	)
 	collecttest.TestConfigurationSerialize(t, New(Dependencies{}), cfgJSON, cfgYAML)
 	for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
@@ -55,6 +55,7 @@ func TestConfiguration(t *testing.T) {
 			input := []byte(`{"name":"login","script":"test('login', async () => {});","screenshot_on_failure":false}`)
 			require.NoError(t, decode(input, c))
 			want := Config{
+				BrowserMode: "reuse",
 				Name:        "login",
 				UpdateEvery: 10,
 				CheckEvery:  900,
@@ -83,6 +84,9 @@ func TestInitValidation(t *testing.T) {
 		valid  bool
 	}{
 		"inline":                  {func(*Collector) {}, true},
+		"fresh browser":           {func(c *Collector) { c.BrowserMode = "fresh" }, true},
+		"invalid browser mode":    {func(c *Collector) { c.BrowserMode = "fast" }, false},
+		"empty browser mode":      {func(c *Collector) { c.BrowserMode = "" }, false},
 		"file":                    {func(c *Collector) { c.Script = ""; c.ScriptPath = file }, true},
 		"missing source":          {func(c *Collector) { c.Script = "" }, false},
 		"whitespace source":       {func(c *Collector) { c.Script = "  \n" }, false},

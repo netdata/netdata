@@ -50,7 +50,7 @@ func TestNativeProtocolIsBoundedAndStrict(t *testing.T) {
 }
 
 func TestNativeQualificationRequiresEveryProofAndExactIdentity(t *testing.T) {
-	target := runtime.Manifest{Version: "fixture", Contract: 1, Archive: runtime.Archive{SHA256: strings.Repeat("a", 64)}}
+	target := runtime.Manifest{Version: "fixture", Contract: runtime.ExecutionContract, Archive: runtime.Archive{SHA256: strings.Repeat("a", 64)}}
 	qualified := runner.Qualification{ExecutionContract: true, SandboxedLocalJourney: true, SandboxedLocalLighthouse: true, ProcessTreeDrained: true, Runtime: &synthetic.RuntimeIdentity{Version: target.Version, Contract: target.Contract, SHA256: target.Archive.SHA256}}
 	encode := func(value runner.Qualification) []byte {
 		data, err := json.Marshal(value)
@@ -65,7 +65,7 @@ func TestNativeQualificationRequiresEveryProofAndExactIdentity(t *testing.T) {
 		func(q *runner.Qualification) { q.ProcessTreeDrained = false },
 		func(q *runner.Qualification) { q.Runtime = nil },
 		func(q *runner.Qualification) {
-			q.Runtime = &synthetic.RuntimeIdentity{Version: "different", Contract: 1, SHA256: target.Archive.SHA256}
+			q.Runtime = &synthetic.RuntimeIdentity{Version: "different", Contract: runtime.ExecutionContract, SHA256: target.Archive.SHA256}
 		},
 	} {
 		value := qualified

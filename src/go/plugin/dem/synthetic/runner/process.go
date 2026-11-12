@@ -27,6 +27,28 @@ func (e *Engine) executeProcess(
 	stdout func(io.Reader) error,
 	stderr func(io.Reader),
 ) (ndexec.TreeResult, error) {
+	return e.executeProcessWithInput(ctx, paths, completion, args, func(writer *os.File, _ <-chan struct{}) error {
+		_, err := writer.Write(input)
+		return err
+	}, stdout, stderr, nil)
+}
+
+func (e *Engine) executeProcessWithInput(
+	ctx context.Context,
+	paths Paths,
+	completion *ndexec.TreeCompletion,
+	args []string,
+	input func(*os.File, <-chan struct{}) error,
+	stdout func(io.Reader) error,
+	stderr func(io.Reader),
+	exited chan struct{},
+) (ndexec.TreeResult, error) {
+	joined := false
+	defer func() {
+		if exited != nil && !joined {
+			close(exited)
+		}
+	}()
 	processCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var files []*os.File
@@ -84,7 +106,7 @@ func (e *Engine) executeProcess(
 	go func() {
 		defer readers.Done()
 		defer inWrite.Close()
-		if _, err := inWrite.Write(input); err != nil {
+		if err := input(inWrite, exited); err != nil {
 			inputErr = err
 			cancel()
 		}
@@ -98,6 +120,10 @@ func (e *Engine) executeProcess(
 	}()
 	go func() { defer readers.Done(); defer errRead.Close(); stderr(errRead) }()
 	result := process.Wait()
+	if exited != nil {
+		close(exited)
+	}
+	joined = true
 	if !result.Drained {
 		e.poison(result.Err)
 		// Unknown descendants may still hold inherited writers/readers. Closing only

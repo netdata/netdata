@@ -236,8 +236,11 @@ func (f *nativeFixture) hold(t *testing.T, action string, target *Manifest) func
 	command.Stderr = &stderr
 	require.NoError(t, command.Start())
 	line, err := bufio.NewReader(output).ReadString('\n')
-	require.NoError(t, err, "%s", stderr.String())
-	require.Equal(t, "ready\n", line, "%s", stderr.String())
+	if err != nil || line != "ready\n" {
+		closeErr := input.Close()
+		waitErr := command.Wait()
+		t.Fatalf("native %s did not become ready: stdout=%q read=%v close=%v wait=%v stderr=%s", action, line, err, closeErr, waitErr, stderr.String())
+	}
 	var once sync.Once
 	stop := func() {
 		once.Do(func() {

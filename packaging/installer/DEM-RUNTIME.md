@@ -122,6 +122,11 @@ prepared to activate it. Until that restart, the running plugin keeps its curren
 again reuses a valid selection offline and preserves its update policy. An already-selected result by itself
 requires no additional restart.
 
+The Agent and browser runtime must implement the same execution contract,
+currently 2. Migration from older experimental runtime state is unsupported;
+prepare fresh compatible state for testing. Existing consumers and executions
+must drain before their installation is explicitly retired.
+
 The host command and sandboxed browser jobs were tested on Ubuntu 24.04 amd64 and Debian 13 amd64. Automatic
 AppArmor setup on hosts that restrict unprivileged user namespaces is qualified for Ubuntu 24.04. On hosts
 without that restriction, the command skips the policy installation. The standard runtime root inside the

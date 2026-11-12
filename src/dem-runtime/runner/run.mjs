@@ -6,6 +6,8 @@ import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import protocol from './protocol.cjs';
 import {runtimePaths, checkRuntime} from './runtime.mjs';
+import {browserOwner} from './browser-owner.mjs';
+import {validateLoan, prepareLoan} from './browser-loan.mjs';
 const {text, event, write} = protocol;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const emit = record => write(1, record);
@@ -15,12 +17,16 @@ function absolute(value, name) {
   if (typeof value !== 'string' || !path.isAbsolute(value)) throw new Error(name + ' must be an absolute path');
 }
 function validate(r) {
-  if (!r || r.version !== 1 || !['journey', 'lighthouse'].includes(r.kind)) throw new Error('unsupported runner request');
+  if (!r || r.version !== 2 || !['journey', 'lighthouse'].includes(r.kind)) throw new Error('unsupported runner request');
   absolute(r.work_dir, 'work_dir');
   if ('dependencies_path' in r || 'browser_path' in r) throw new Error('runtime component paths are not request fields');
   if (typeof r.run_id !== 'string' || !r.run_id) throw new Error('run_id is required');
   if (!Number.isSafeInteger(r.timeout_ms) || r.timeout_ms <= 0) throw new Error('timeout_ms must be positive');
   if (typeof r.capture !== 'boolean') throw new Error('capture must be boolean');
+  if (r.browser !== undefined) {
+    if (r.kind !== 'journey') throw new Error('browser loans are only valid for journeys');
+    validateLoan(r.browser);
+  }
   if (r.kind === 'journey') {
     if (Boolean(r.script) === Boolean(r.script_path)) throw new Error('set exactly one of script and script_path');
     if (r.script && typeof r.script !== 'string') throw new Error('script must be source text');
@@ -35,6 +41,7 @@ function validate(r) {
 }
 async function main() {
   if (process.argv.length !== 2) {
+    if (process.argv.length === 3 && process.argv[2] === '--browser-owner') return browserOwner(await runtimePaths());
     if (process.argv.length !== 3 || process.argv[2] !== '--check') throw new Error('unsupported runtime operation');
     write(1, await checkRuntime());
     return;
@@ -44,8 +51,9 @@ async function main() {
   for await (const chunk of process.stdin) chunks.push(chunk);
   request = JSON.parse(Buffer.concat(chunks).toString('utf8'));
   validate(request);
-  protocol.configureSecrets(request.secrets);
+  protocol.configureSecrets({...request.secrets, owner_endpoint: request.browser?.endpoint});
   const r = request;
+  const loan = r.browser ? await prepareLoan(runtime, r, here) : undefined;
   for (const dir of ['output', 'tmp', 'home', 'cache']) await fs.mkdir(path.join(r.work_dir, dir), {recursive: true, mode: 0o700});
   const env = {
     PATH: path.dirname(process.execPath) + ':/usr/bin:/bin', HOME: path.join(r.work_dir, 'home'),
@@ -68,7 +76,7 @@ async function main() {
       testDir: path.dirname(entry), workers: 1, retries: 0, repeatEach: 1, fullyParallel: false,
       forbidOnly: true, timeout: r.timeout_ms, globalTimeout: r.timeout_ms,
       respectGitIgnore: false, outputDir: path.join(r.work_dir, 'output'),
-      reporter: [[path.join(here, 'reporter.cjs'), {workDir: r.work_dir, capture: r.capture}]],
+      reporter: [[path.join(here, 'reporter.cjs'), {workDir: r.work_dir, capture: r.capture, ownerEndpoint: r.browser?.endpoint}]],
       projects: [{name: 'chromium', use: {browserName: 'chromium', headless: true,
         launchOptions: {executablePath: runtime.browser, chromiumSandbox: true},
         screenshot: r.capture ? 'only-on-failure' : 'off', trace: 'off', video: 'off'}}],
@@ -78,9 +86,9 @@ async function main() {
     await fs.writeFile(configPath, 'module.exports = Object.assign(' + JSON.stringify(config) + ', {testMatch: new RegExp(' + JSON.stringify('^' + escaped + '$') + ')});\n', {mode: 0o600});
     const tsconfig = path.join(r.work_dir, 'tsconfig.json');
     await fs.writeFile(tsconfig, JSON.stringify({compilerOptions: {allowJs: true, baseUrl: runtime.dependencies, paths: {
-      '@playwright/test': [path.join(modules, '@playwright/test/index.mjs')],
-      'playwright/test': [path.join(modules, 'playwright/test.mjs')],
-      'playwright': [path.join(modules, 'playwright/index.mjs')],
+      '@playwright/test': [loan?.shim || path.join(modules, '@playwright/test/index.mjs')],
+      'playwright/test': [loan?.shim || path.join(modules, 'playwright/test.mjs')],
+      'playwright': [loan?.playwright || path.join(modules, 'playwright/index.mjs')],
     }}}), {mode: 0o600});
     args = [path.join(modules, 'playwright/cli.js'), 'test', '--config', configPath, '--tsconfig', tsconfig, '--pass-with-no-tests'];
   } else {
@@ -107,13 +115,21 @@ async function main() {
   const ended = new Promise(resolve => lines.once('close', resolve));
   const exit = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', (code, signal) => resolve({code, signal})); });
   await ended;
+  if (loan) {
+    const disposition = await loan.disposition();
+    emit({type: 'browser', browser: disposition});
+    if (disposition.state === 'retire' && terminal && ['success', 'inconclusive'].includes(terminal.status)) {
+      terminal.status = 'error';
+      terminal.error = 'Managed browser cleanup or policy failed; use browser_mode: fresh for direct browser control';
+    }
+  }
   if (protocolError || !terminal) throw new Error(protocolError || 'Runner exited without a terminal result (' + (exit.signal || exit.code) + ')');
   if (terminal.status === 'success' && exit.code !== 0) throw new Error('Runner exited unsuccessfully after a successful report');
   emit({type: 'result', result: terminal});
 }
 main().catch(error => {
-  if (process.argv.includes('--check')) {
-    write(2, {error: text(error.message)});
+  if (process.argv.includes('--check') || process.argv.includes('--browser-owner')) {
+    write(2, {error: process.argv.includes('--browser-owner') ? 'Browser owner could not complete its lifetime' : text(error.message)});
     process.exitCode = 1;
     return;
   }

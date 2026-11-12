@@ -34,7 +34,7 @@ func (e *Engine) Qualify(ctx context.Context, source Source) (*Qualification, er
 		return nil, err
 	}
 	candidate := e.unrecordedView(source, captures)
-	candidate.qualification = true
+	candidate.browserSource.ephemeral = true
 	result, err := qualify(ctx, candidate)
 	if !errors.Is(err, ndexec.ErrTreeNotDrained) {
 		err = errors.Join(err, captures.Close())
@@ -55,7 +55,7 @@ func qualify(ctx context.Context, engine qualificationExecutor) (*Qualification,
 		return result, err
 	}
 	result.ExecutionContract = true
-	execution := engine.Execute(ctx, synthetic.Request{Kind: synthetic.Journey, Name: "runtime-qualification", Timeout: 30 * time.Second,
+	execution := engine.Execute(ctx, synthetic.Request{Kind: synthetic.Journey, BrowserMode: "reuse", Name: "runtime-qualification", Timeout: 30 * time.Second,
 		Script: `import { test, expect } from '@playwright/test';
  test('sandboxed local page', async ({ page }) => {
    await page.setContent('<title>DEM runtime qualification</title><h1>ready</h1>');

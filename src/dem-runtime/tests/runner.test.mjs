@@ -17,7 +17,7 @@ async function fixtureRuntime(dependencyRoot, browser = 'missing-prepared-browse
   const pins = JSON.parse(await fs.readFile(path.join(sourceRoot, 'manifest.json'), 'utf8'));
   pins.node_version = process.versions.node;
   await fs.writeFile(path.join(root, 'manifest.json'), JSON.stringify(pins));
-  await fs.writeFile(path.join(root, 'runtime.json'), JSON.stringify({contract:1, version:'test-release',
+  await fs.writeFile(path.join(root, 'runtime.json'), JSON.stringify({contract:2, version:'test-release',
     paths:{dependencies:'dependencies',browser}}));
   return root;
 }
@@ -26,7 +26,7 @@ const assets = path.join(runtimeRoot, 'runner');
 
 async function run(source, options = {}, root = runtimeRoot) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'dem-runner-test-'));
-  const request = {version: 1, kind: 'journey', run_id: 'test',
+  const request = {version: 2, kind: 'journey', run_id: 'test',
     work_dir: dir, script: source, timeout_ms: 10000,
     capture: false, secrets: {}, ...options};
   const child = spawn(process.execPath, [path.join(root, 'runner/run.mjs')], {stdio: ['pipe', 'pipe', 'pipe'], env: {...process.env, NODE_OPTIONS: '', DEM_SECRET_UNPASSED: 'must-not-inherit'}});
@@ -156,11 +156,11 @@ test('fragmented worker and CLI output cannot reconstruct controlled secrets', a
 });
 
 test('actual reporter protects fragmented buffers and unfinished secret prefixes', async()=>{
-  const script=`const p=require(${JSON.stringify(path.join(assets,'protocol.cjs'))});
-    p.configureSecrets({DEM_SECRET_TOKEN:'fixture-only-secret-0123456789',DEM_SECRET_UTF:'秘密🔐value'});
-    const Reporter=require(${JSON.stringify(path.join(assets,'reporter.cjs'))});const r=new Reporter({});
+  const script=`process.env.DEM_SECRET_TOKEN='fixture-only-secret-0123456789';process.env.DEM_SECRET_UTF='秘密🔐value';
+    const Reporter=require(${JSON.stringify(path.join(assets,'reporter.cjs'))});const r=new Reporter({ownerEndpoint:'ws://127.0.0.1:1234/private-capability'});
     r.onStdOut('fixture-only-secret-');r.onStdOut('0123456789\\n');
     const b=Buffer.from('秘密🔐value\\n');for(const byte of b)r.onStdErr(Buffer.from([byte]));
+    r.onStdErr('ws://127.0.0.1:1234/');r.onStdErr('private-capability\\n');
     r.onStdOut('safe-prefix fixture-only-secret-');r.finish();`;
   const child=spawn(process.execPath,['-e',script],{stdio:['ignore','ignore','pipe','pipe']});
   let wire='';child.stdio[3].on('data',b=>wire+=b);
@@ -169,6 +169,7 @@ test('actual reporter protects fragmented buffers and unfinished secret prefixes
   const recovered=records.filter(r=>r.type==='event').map(r=>r.event.message||'').join('');
   assert.ok(!recovered.includes('fixture-only-secret-'),recovered);
   assert.ok(!recovered.includes('秘密'),recovered);
+  assert.ok(!recovered.includes('private-capability'),recovered);
   assert.ok(recovered.includes('safe-prefix'),recovered);
   assert.ok(recovered.includes('[REDACTED]'),recovered);
 });
@@ -232,6 +233,11 @@ test('assertion failure takes precedence over launch inability in the same test'
   assert.equal(actual.result.status,'failed');
 });
 
+test('quoted managed policy text remains an ordinary website failure',async()=>{
+  const actual=await run(prefix+"test('website',()=>{expect(1,'DEM browser reuse: expected website text').toBe(2)});");
+  assert.equal(actual.result.status,'failed');
+});
+
 test('mixed stream chunks preserve byte ordering and empty UTF-8 boundaries',async()=>{
   const {default:protocol}=await import('../runner/protocol.cjs');
   for(const chunks of [[Buffer.from([0xe7]),'',Buffer.from([0x95,0x8c])],[Buffer.from([0xe7]),'middle',Buffer.from([0x95,0x8c])]]){
@@ -285,7 +291,7 @@ test('self-check verifies runtime-owned versions and private imports without a s
   const good=await check(root);
   assert.equal(good.code,0,good.stderr);
   assert.equal(good.stderr,'');
-  assert.deepEqual(JSON.parse(good.stdout),{contract:1,version:'test-release',uid:process.geteuid(),gid:process.getegid()});
+  assert.deepEqual(JSON.parse(good.stdout),{contract:2,version:'test-release',uid:process.geteuid(),gid:process.getegid()});
   assert.ok(Buffer.byteLength(good.stdout)<4096);
   for(const [changed,message] of [
     [{...pins,packages:{...pins.packages,playwright:'0.0.0'}},/package version mismatch/],

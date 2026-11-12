@@ -95,9 +95,9 @@ func TestQualificationUsesBothModesWithoutPublishingMonitorHistory(t *testing.T)
 	paths.Identity.Version = "candidate-b"
 	paths.Identity.SHA256 = strings.Repeat("b", 64)
 	var kinds []synthetic.Kind
-	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
+	e.start = withBrowserOwners(t, starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		if slices.Contains(args, "--check") {
-			_, err := fmt.Fprintf(out, `{"version":"candidate-b","contract":1,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
+			_, err := fmt.Fprintf(out, `{"version":"candidate-b","contract":%d,"uid":%d,"gid":%d}`, SupportedContract, os.Geteuid(), os.Getegid())
 			return ndexec.TreeResult{Drained: true, Err: err}
 		}
 		var request wireRequest
@@ -125,9 +125,14 @@ func TestQualificationUsesBothModesWithoutPublishingMonitorHistory(t *testing.T)
 			score := 95.0
 			result.Tests = nil
 			result.Metrics = &synthetic.LabMetrics{Performance: &score}
+		} else {
+			if request.Browser == nil {
+				return ndexec.TreeResult{Drained: true, Err: errors.New("qualification omitted the managed browser")}
+			}
+			assert.NoError(t, emitBrowserReport(out, request.Browser, "clean"))
 		}
 		return resultPayload(result)(ctx, args, raw, out, stderr)
-	})
+	}), nil)
 	qualified, err := e.Qualify(context.Background(), fixtureRuntime{Paths: paths})
 	require.NoError(t, err)
 	assert.True(t, qualified.ExecutionContract)

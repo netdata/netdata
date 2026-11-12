@@ -55,7 +55,8 @@ modules:
             not imply recovery. Failure screenshots are disabled unless requested. Configuration Test returns
             pass/fail within the caller's request deadline; long drafts may time out. Test does not retain screenshots.
         performance_impact:
-          description: Each attempt starts a fresh browser and consumes CPU, memory and target website requests.
+          description: Journeys reuse warm browsers by default, with fresh test processes and isolated browser contexts.
+            Fresh mode starts a browser for each attempt. Both modes consume CPU, memory and target website requests.
             Increasing check_every reduces browser frequency; update_every only refreshes charts. Jobs share the process browser.concurrency allowance (default 1), so concurrent
             due jobs and configuration tests can wait. A running Test can delay monitoring. Optional monitoring captures consume local disk space.
     setup:
@@ -117,6 +118,15 @@ modules:
               description: Absolute path to a readable Playwright Test JavaScript or TypeScript entry file.
                 Leave empty when using Script.
               default_value: ''
+              required: false
+              group: Journey
+            - name: browser_mode
+              description: Reuse a warm browser with fresh test processes and isolated contexts, or start a fresh browser for scripts needing direct browser control or local browser-file paths.
+              detailed_description: Use `fresh` for raw CDP, browser-wide tracing or binding, custom selector registration,
+                or `download.path()` and `video.path()`. Reuse supports `download.saveAs()`. Both modes retain real Playwright Test hooks and fixtures.
+                Browser cleanup is verified between attempts; cancellation or uncertain cleanup retires the browser.
+                A journey is never automatically replayed after it has performed actions.
+              default_value: reuse
               required: false
               group: Journey
             - name: secrets[].name

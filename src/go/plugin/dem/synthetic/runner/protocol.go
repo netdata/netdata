@@ -25,9 +25,14 @@ type textRedactor struct {
 	patterns *redact.Redactor
 }
 
-func newRedactor(values map[string]string) *textRedactor {
+func newRedactor(values map[string]string, private ...string) *textRedactor {
 	var known []string
 	for _, value := range values {
+		if value != "" {
+			known = append(known, value)
+		}
+	}
+	for _, value := range private {
 		if value != "" {
 			known = append(known, value)
 		}
@@ -75,9 +80,10 @@ type reporterResult struct {
 }
 
 type frame struct {
-	Type   string           `json:"type"`
-	Event  *synthetic.Event `json:"event,omitempty"`
-	Result *reporterResult  `json:"result,omitempty"`
+	Type    string           `json:"type"`
+	Event   *synthetic.Event `json:"event,omitempty"`
+	Result  *reporterResult  `json:"result,omitempty"`
+	Browser *browserReport   `json:"browser,omitempty"`
 }
 type sink struct {
 	streams      map[string]*diagnosticStream
@@ -89,6 +95,8 @@ type sink struct {
 	events       []synthetic.Event
 	dropped      int
 	result       *reporterResult
+	loan         *browserLoan
+	browser      *browserReport
 	err          error
 	declared     int
 	tests        map[string]synthetic.Event
@@ -97,6 +105,7 @@ type sinkSnapshot struct {
 	events  []synthetic.Event
 	dropped int
 	result  *reporterResult
+	browser *browserReport
 	err     error
 	partial *synthetic.TestCounts
 }
@@ -144,7 +153,7 @@ func (s *sink) consume(reader io.Reader) error {
 		}
 		switch record.Type {
 		case "event":
-			if record.Event == nil || record.Result != nil {
+			if record.Event == nil || record.Result != nil || record.Browser != nil {
 				s.mu.Unlock()
 				return s.fail(errors.New("invalid runner event envelope"))
 			}
@@ -154,7 +163,7 @@ func (s *sink) consume(reader io.Reader) error {
 			}
 			s.add(*record.Event)
 		case "result":
-			if record.Result == nil || record.Event != nil {
+			if record.Result == nil || record.Event != nil || record.Browser != nil {
 				s.mu.Unlock()
 				return s.fail(errors.New("invalid runner result envelope"))
 			}
@@ -164,6 +173,20 @@ func (s *sink) consume(reader io.Reader) error {
 			}
 			record.Result.Error = s.redact.text(record.Result.Error)
 			s.result = record.Result
+		case "browser":
+			if record.Event != nil || record.Result != nil || record.Browser == nil ||
+				s.loan == nil || s.browser != nil ||
+				record.Browser.OwnerID != s.loan.OwnerID || record.Browser.Epoch != s.loan.Epoch {
+				s.mu.Unlock()
+				return s.fail(errors.New("invalid managed browser acknowledgment"))
+			}
+			switch record.Browser.State {
+			case "clean", "unused", "retire":
+				s.browser = record.Browser
+			default:
+				s.mu.Unlock()
+				return s.fail(errors.New("invalid managed browser disposition"))
+			}
 		default:
 			s.mu.Unlock()
 			return s.fail(errors.New("unsupported runner frame type"))
@@ -281,6 +304,7 @@ func (s *sink) snapshot() sinkSnapshot {
 		events:  append([]synthetic.Event{}, s.events...),
 		dropped: s.dropped,
 		result:  s.result,
+		browser: s.browser,
 		err:     s.err,
 		partial: partial,
 	}
@@ -403,4 +427,5 @@ type wireRequest struct {
 	TimeoutMS  int64             `json:"timeout_ms"`
 	Capture    bool              `json:"capture"`
 	Secrets    map[string]string `json:"secrets,omitempty"`
+	Browser    *browserLoan      `json:"browser,omitempty"`
 }

@@ -40,6 +40,7 @@ type releaseEnvelope struct {
 	Signature []byte `json:"signature"`
 }
 
+// Validate checks a published descriptor for use by this Agent.
 func (r Release) Validate() error {
 	if r.Format != 1 || r.Sequence == 0 {
 		return errors.New("invalid runtime release format or publication sequence")
@@ -87,7 +88,7 @@ func EncodeRelease(signedPayload, signature []byte) ([]byte, error) {
 	return envelope, err
 }
 
-// VerifyRelease authenticates every preparation field and checks current signer validity.
+// VerifyRelease authenticates a descriptor for the current execution contract.
 func VerifyRelease(data []byte, trusted *ReleaseTrust) (Release, error) {
 	var result Release
 	if len(data) > ReleaseEnvelopeLimit {

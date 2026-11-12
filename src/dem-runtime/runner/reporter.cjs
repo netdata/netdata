@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 'use strict';
-const {text, event, write, captureState, screenshotCandidate, secretStream} = require('./protocol.cjs');
+const {text, event, write, captureState, screenshotCandidate, secretStream, configureSecrets} = require('./protocol.cjs');
 
 module.exports = class DEMReporter {
   constructor(options) {
     this.options = options;
+    configureSecrets({...Object.fromEntries(Object.entries(process.env).filter(([name]) => /^DEM_SECRET_[A-Za-z0-9_]+$/.test(name))),
+      owner_endpoint: options.ownerEndpoint});
     this.tests = new Map();
     this.artifacts = [];
     this.errors = [];
@@ -52,7 +54,7 @@ module.exports = class DEMReporter {
       const original = String(error.message || error.value || error);
       const message = text(original);
       // Classify original evidence; redaction must not change monitoring truth.
-      if (/browserType\.launch(?:PersistentContext)?:/.test(original)) {
+      if (/browserType\.(?:launch(?:PersistentContext)?|connect):|^ManagedBrowserError: DEM browser reuse:/.test(original)) {
         this.executionError = true;
       } else {
         launchOnly = false;

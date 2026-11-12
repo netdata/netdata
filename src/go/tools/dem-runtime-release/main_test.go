@@ -37,7 +37,7 @@ func newFixture(t *testing.T, arch string) fixture {
 	require.NoError(t, err)
 	m := runtime.Manifest{
 		Format:   1,
-		Contract: 1,
+		Contract: runtime.ExecutionContract,
 		Version:  "release-1",
 		Platform: "linux/" + arch,
 		Archive: runtime.Archive{

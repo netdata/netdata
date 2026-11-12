@@ -23,7 +23,7 @@ class BuilderTests(unittest.TestCase):
             entrypoint = bundle.install_runner(assets, root, '2026.10.29.2')
             self.assertEqual(entrypoint, 'runner/run.mjs')
             self.assertEqual(json.loads((root / 'runtime.json').read_text()), {
-                'contract': 1, 'version': '2026.10.29.2',
+                'contract': 2, 'version': '2026.10.29.2',
                 'paths': {'dependencies': 'dependencies', 'browser': 'chrome'}})
             names = {'runner/run.mjs', 'runner/reporter.cjs', 'runner/protocol.cjs',
                      'runner/lighthouse.mjs', 'runner/runtime.mjs', 'manifest.json', 'README.md'}
@@ -36,6 +36,24 @@ class BuilderTests(unittest.TestCase):
             self.assertIn('runtime.json', sources)
             self.assertIn('package-lock.json', sources)
             self.assertFalse(any(name.startswith('node_modules/') for name in sources))
+
+    def test_runtime_payload_rejects_legacy_unknown_and_mismatched_contracts(self):
+        source = Path(__file__).resolve().parents[2] / 'src/dem-runtime'
+        for runtime_contract, pins_contract in [(1, 1), (3, 3), (2, 1), (1, 2)]:
+            with self.subTest(runtime=runtime_contract, pins=pins_contract), tempfile.TemporaryDirectory() as directory:
+                assets = Path(directory) / 'assets'
+                assets.mkdir()
+                for name, field, contract in [('runtime.json', 'contract', runtime_contract),
+                                              ('manifest.json', 'protocol_version', pins_contract)]:
+                    path = assets / name
+                    value = json.loads((source / name).read_text())
+                    value[field] = contract
+                    bundle.write_json(path, value)
+                root = Path(directory) / 'payload'
+                root.mkdir()
+                with self.assertRaisesRegex(ValueError, 'unsupported runtime execution contract'):
+                    bundle.install_runner(assets, root, '2026.10.29.2')
+                self.assertEqual(list(root.iterdir()), [])
 
     def test_command_wrapper(self):
         cases = {'success': ('pass', 0), 'known_failure': ('raise SystemExit(37)', 37)}

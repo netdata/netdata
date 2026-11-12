@@ -7,7 +7,7 @@ Release inputs and adapters live in `src/dem-runtime` and `packaging/dem-runtime
 
 ## Trust and preparation
 
-A publisher-authenticated format-1 descriptor identifies execution contract 1,
+A publisher-authenticated format-1 descriptor identifies execution contract 2,
 release version, platform, archive SHA256/size, tar/expanded bounds, entry count,
 layout and authenticated interpreter slots. The archive is not its own trust anchor.
 Production release discovery and CLI delivery integration are separate from these
@@ -128,6 +128,14 @@ Normal checks reject regressions. Explicit repair can select an older authentica
 release after all consumers/executions drain, with a newly specified update policy.
 The CLI's explicit install and repair commands, including signed offline imports,
 enable future automatic online preparation unless `--manual-updates` is supplied.
+
+Runtime manifests and signed releases must declare execution contract 2, including
+stored descriptors and existing publication pointers. Migration from older
+experimental contracts is unsupported; use freshly prepared compatible state.
+Unrecognized metadata still refuses unsafe operations and is not automatically
+discarded. Existing consumers and executions must drain before retiring their
+installation.
+
 Offline import describes acquisition for that invocation, which uses only local
 files; it does not select a manual update policy. Protected preloads remain manual.
 

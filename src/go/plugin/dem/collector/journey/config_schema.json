@@ -25,6 +25,13 @@
         "description": "Absolute path to a readable Playwright Test JavaScript or TypeScript entry file. Leave empty when using Script.",
         "type": "string"
       },
+      "browser_mode": {
+        "title": "Browser mode",
+        "description": "Reuse a warm browser with fresh test processes and isolated contexts, or start a fresh browser for scripts needing direct browser control or local browser-file paths.",
+        "type": "string",
+        "enum": ["reuse", "fresh"],
+        "default": "reuse"
+      },
       "secrets": {
         "title": "Secrets",
         "description": "Credentials passed to the workflow as named environment variables. Leave empty for workflows without credentials.",
@@ -130,7 +137,8 @@
           "fields": [
             "name",
             "script",
-            "script_path"
+            "script_path",
+            "browser_mode"
           ]
         },
         {

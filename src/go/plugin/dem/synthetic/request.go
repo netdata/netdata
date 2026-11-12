@@ -31,15 +31,16 @@ type Schedule struct {
 
 // Request is ephemeral. Script and resolved secrets never enter history.
 type Request struct {
-	Kind       Kind
-	Name       string
-	VnodeGUID  string
-	Script     string
-	ScriptPath string
-	URL        string
-	Secrets    map[string]string
-	Timeout    time.Duration
-	Capture    bool
+	Kind        Kind
+	Name        string
+	VnodeGUID   string
+	Script      string
+	ScriptPath  string
+	BrowserMode string
+	URL         string
+	Secrets     map[string]string
+	Timeout     time.Duration
+	Capture     bool
 }
 
 func (r Request) JobID() string { return string(r.Kind) + ":" + r.Name }
@@ -57,6 +58,9 @@ func ValidateRequest(r Request) error {
 	}
 	switch r.Kind {
 	case Journey:
+		if r.BrowserMode != "" && r.BrowserMode != "reuse" && r.BrowserMode != "fresh" {
+			return errors.New("browser_mode must be reuse or fresh")
+		}
 		if (r.Script == "") == (r.ScriptPath == "") {
 			return errors.New("set exactly one of script and script_path")
 		}

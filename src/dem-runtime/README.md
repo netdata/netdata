@@ -1,6 +1,6 @@
 # DEM browser runtime
 
-This tree owns the complete implementation of DEM execution contract 1: JavaScript
+This tree owns the complete implementation of DEM execution contract 2: JavaScript
 adapters, exact component versions, private import paths and release tests. An
 unchanged Agent can execute successive qualified runtime releases implementing
 that contract. The Agent owns scheduling, supervised execution, contract validation,
@@ -34,20 +34,22 @@ diagnostic on stderr. The Agent compares it with the acquired release identity
 and consuming identity. This check does not replace real journey and Lighthouse
 qualification through the supervised Agent execution path.
 
-`runner/run.mjs` receives one JSON request on stdin. The Go caller supplies version 1,
+`runner/run.mjs` receives one JSON request on stdin. The Go caller supplies version 2,
 kind, run_id, work_dir, timeout_ms, capture and
-optional secrets. Journeys select exactly one of inline script and absolute
+optional secrets. A managed journey also receives a private `browser` loan with
+`owner_id`, decimal-string `epoch` and an absolute private Unix-socket `endpoint`.
+Journeys select exactly one of inline script and absolute
 script_path; Lighthouse uses url. The Go owner creates the private working
 folder. Node writes only generated configuration, script/cache/profile state
 and output there. Resolved secrets enter only the controlled child environment
 under DEM_SECRET_ names. Caller NODE_OPTIONS, proxies and other arbitrary
 application variables are not inherited.
 
-## Contract 1 semantics
+## Contract 2 semantics
 
 There is one supported execution contract and no version adapters. Runtime-internal
 dependency and browser locations are not request fields. The outer descriptor's
-`contract` and request `version` are both 1; release versions are independent.
+`contract` and request `version` are both 2; release versions are independent.
 
 Journey discovery emits a `suite` event with `phase: discovery` and integer
 `declared_tests`, including zero. Its human-readable title has no machine meaning.
@@ -74,7 +76,9 @@ site-quality threshold. `performance` ranges from 0 to 100; `fcp_ms`, `lcp_ms`,
 layout-shift score. Unavailable or invalid values are absent, never converted to
 zero. Legitimate zero measurements remain present.
 
-Stdout is newline-delimited event/result JSON, never raw user output. The
+Stdout is newline-delimited event/result JSON, never raw user output. Managed
+journeys also emit one private `browser` disposition before the terminal result;
+it is transport evidence, not a public history event. The
 Playwright reporter uses a separate child descriptor; ordinary child stdout and
 stderr are diagnostic events. Worker and CLI streams have separate redaction
 state across callbacks and UTF-8 reads; stream events describe that source rather
@@ -98,6 +102,45 @@ arbitrarily encoded or transformed credentials. Reporter completion is
 not process completion: Go must join the Linux supervised tree before publishing
 artifacts, releasing admission or replacing the job.
 
+## Managed browser lifetime
+
+The Agent defaults journeys to `browser_mode: reuse`. One reusable Chromium owner
+belongs to a shared capacity slot, independent of the jobs and vnodes using it.
+Each attempt starts new Node, Playwright Test CLI and worker processes. No script
+module, secret environment or browser context is retained between attempts.
+Lighthouse and `browser_mode: fresh` retire a slot's warm owner before running.
+Owners start lazily, expire after one idle minute, and retire after at most 100
+loans to bound connection state retained by the pinned Playwright server. This is an internal policy,
+not a capacity or long-term memory guarantee.
+
+`runner/run.mjs --browser-owner` accepts an initial newline-delimited request
+containing `version: 2`, `owner_id` and an absolute private `work_dir`. It launches
+a sandboxed browser with a separate, secret-free environment, binds it with the
+public Playwright named-pipe API, and reports exactly
+one `{type: "ready", owner_id, endpoint}` frame. EOF or `{type: "stop"}` requests
+shutdown. Unexpected browser death ends the owner, including while idle. The
+socket, browser profiles, artifacts and registry are confined to the owner's
+mode-0700 directory. No TCP listener or HTTP discovery route is opened. The
+endpoint remains private and must not enter public logs or history.
+
+Only the first compatible Test worker borrows a loan. Worker restarts,
+`test.use({reuseContext: true})` and different launch settings use fresh browsers. The managed fixture guards browser
+context creation and every exposed context's original close operation. Teardown
+seals new creation, joins pending creation and original closes, verifies an empty
+connected browser, and acknowledges the exact owner/epoch in the private attempt
+directory. Caught creation/cleanup or prohibited-operation errors remain sticky.
+The adapter reports `clean`, `unused` or `retire`; failure overrides a clean record.
+An unused loan is valid for a journey that never needed the browser.
+
+The Agent joins the complete CLI process tree before accepting that disposition.
+Timeout, cancellation, connection loss, malformed or missing acknowledgment, or
+cleanup failure retires the owner under the same capacity slot. Retirement must
+prove physical drainage before replacement or admission release. Unknown drainage
+retains fail-stop behavior. Rehearsals share the ordinary pool; qualification uses
+a separate candidate owner and retires it before returning. Shutdown joins all
+owners before releasing runtime storage ownership. No journey is replayed after
+actions have executed.
+
 ## Journey authoring
 
 Scripts use real Playwright assertions, hooks, fixtures and TypeScript loading.
@@ -108,8 +151,8 @@ import { test, expect } from '@playwright/test';
 // CommonJS: const { test, expect } = require('@playwright/test');
 ```
 
-Explicit generated tsconfig paths map canonical imports to the prepared real
-ESM exports. This keeps file-based scripts and relative helpers at their original
+Explicit generated tsconfig paths map canonical imports to the prepared SDK and,
+in reuse mode, the same managed Test fixture. This keeps file-based scripts and relative helpers at their original
 locations, without requiring adjacent node_modules. The callable CommonJS
 shorthand `const test = require('@playwright/test'); test(...)` is unsupported;
 use destructuring. Neighboring Playwright configuration, tsconfig aliases and
@@ -127,6 +170,15 @@ Only all declared ordinary tests passing is success. Skipped, expected-failure
 and incomplete coverage is inconclusive unless an unexpected failure/timeout
 or executor error occurs. Import and managed-browser launch failures are
 execution errors. CLI exit alone does not determine monitoring success.
+
+Ordinary hooks, fixtures, assertions, pages and browser contexts work in reuse
+mode. Use `browser_mode: fresh` for raw CDP, browser-wide tracing or binding,
+custom selector registration, or APIs requiring local browser artifact paths.
+Remote downloads support `saveAs()`; `download.path()` and `video.path()` require
+fresh mode. A worker that falls back to a fresh browser has ordinary browser
+APIs, but custom selector registration remains disabled by the managed Test shim.
+Explicit fresh mode exposes the ordinary SDK throughout. Context tracing is supported; automatic trace/video capture remains
+disabled. Scripts remain trusted service-account code, not isolated tenants.
 
 Optional failure screenshots use Playwright's own capture path. Only PNG
 screenshot attachments inside output are candidate artifacts. They may be absent
@@ -148,3 +200,5 @@ execution request. Fixtures stamp the test Node version; production archives use
 the release pin. Real Linux browser/audit and process-tree cancellation validation
 belongs to the Go-to-Node integration checks. Candidate installation qualification
 must exercise both journeys and Lighthouse with deterministic local content.
+See [browser cleanup and Agent integration proofs](tests/browser-reuse/README.md)
+for real browser validation of reuse, retirement and supervised ownership.

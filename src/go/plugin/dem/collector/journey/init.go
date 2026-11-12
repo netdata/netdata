@@ -23,6 +23,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.UpdateEvery <= 0 {
 		return errors.New("update_every must be positive")
 	}
+	if c.BrowserMode != "reuse" && c.BrowserMode != "fresh" {
+		return errors.New("browser_mode must be reuse or fresh")
+	}
 	secrets := make(map[string]string, len(c.Secrets))
 	for _, secret := range c.Secrets {
 		if _, exists := secrets[secret.Name]; exists {
@@ -31,14 +34,15 @@ func (c *Collector) Init(ctx context.Context) error {
 		secrets[secret.Name] = secret.Value
 	}
 	request := model.Request{
-		Kind:       model.Journey,
-		VnodeGUID:  c.vnodeGUID,
-		Name:       c.Name,
-		Script:     c.Script,
-		ScriptPath: c.ScriptPath,
-		Secrets:    secrets,
-		Timeout:    time.Duration(c.Timeout),
-		Capture:    c.ScreenshotOnFailure,
+		Kind:        model.Journey,
+		VnodeGUID:   c.vnodeGUID,
+		Name:        c.Name,
+		Script:      c.Script,
+		ScriptPath:  c.ScriptPath,
+		BrowserMode: c.BrowserMode,
+		Secrets:     secrets,
+		Timeout:     time.Duration(c.Timeout),
+		Capture:     c.ScreenshotOnFailure,
 	}
 	if err := model.ValidateRequest(request); err != nil {
 		return err

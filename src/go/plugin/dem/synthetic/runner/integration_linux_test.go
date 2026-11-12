@@ -88,6 +88,13 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	observedHistory := &identityHistory{Store: synthetichistory.NewStore(history)}
 	engine, err := runner.New(selectedRuntime{consumer}, observedHistory, captures, 1)
 	require.NoError(t, err)
+	defer func() {
+		if safe {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			safe = assert.NoError(t, engine.Close(ctx))
+		}
+	}()
 	verifyIdentity := func(t *testing.T, run synthetic.Run) {
 		t.Helper()
 		require.Equal(t, &expectedIdentity, run.Runtime)
@@ -252,6 +259,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 				"name":                  "unsaved-draft",
 				"module":                "journey",
 				"script":                script,
+				"browser_mode":          "fresh", // The process census uses browser-wide CDP.
 				"timeout":               "30s",
 				"screenshot_on_failure": true,
 				"secrets": []any{map[string]any{
@@ -306,6 +314,14 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 				assertIsolated(t)
 			})
 		}
+		t.Run("default-managed-rehearsal", func(t *testing.T) {
+			draft := config(prefix + "test('managed',async({page})=>{await page.goto(" + string(urlJSON) + ");await expect(page).toHaveTitle('DEM synthetic fixture');});")
+			delete(draft, "browser_mode")
+			ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+			defer cancel()
+			require.NoError(t, factory.Test(ctx, draft))
+			assertIsolated(t)
+		})
 		t.Run("script-path-load-failure", func(t *testing.T) {
 			entry := filepath.Join(base, "invalid-draft.spec.ts")
 			require.NoError(t, os.WriteFile(entry, []byte("export const invalid = ;"), 0600))
