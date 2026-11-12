@@ -8,6 +8,7 @@ import {EventEmitter} from 'node:events';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {journeyStop, journeyResult, monotonicMilliseconds} from '../runner/journey.mjs';
+import {baselineRecords} from './contract-2.mjs';
 
 const sourceRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 // Include two Node startups and filesystem preparation on a loaded test host.
@@ -99,7 +100,7 @@ async function runFake(cli, stopAfter, options = {}) {
   const started = monotonicMilliseconds();
   const code = await new Promise((resolve,reject) => {child.on('error',reject); child.on('close',resolve);});
   assert.equal(stderr, '');
-  const records = stdout.trim().split('\n').map(JSON.parse);
+  const records = baselineRecords(stdout);
   const results = records.filter(record => record.type === 'result'); assert.equal(results.length, 1, stdout);
   return {root, work, code, result:results[0].result, elapsed:monotonicMilliseconds() - started};
 }
@@ -116,12 +117,12 @@ test('exhausted startup budget does not spawn selected user work', async () => {
 
 test('short budget can stop a live CLI and preserves actual interrupted counts', async () => {
   const actual = await runFake(`const fs=require('node:fs');
-    process.on('SIGINT',()=>{fs.writeSync(3,JSON.stringify({type:'result',result:{status:'cancelled',termination_reason:'cancelled',tests:{declared:1,not_run:1},interrupted_artifacts:[{id:'screenshot-1'}]}})+'\\n');process.exit(0)});
+    process.on('SIGINT',()=>{fs.writeSync(3,JSON.stringify({type:'result',result:{status:'cancelled',termination_reason:'cancelled',tests:{declared:1,not_run:1},interrupted_artifacts:[{id:'screenshot-1',kind:'screenshot',path:'output/failure.png',mime:'image/png'}]}})+'\\n');process.exit(0)});
     setInterval(()=>{},1000);`, subprocessBudget);
   assert.equal(actual.result.status, 'timeout');
   assert.equal(actual.result.termination_reason, 'execution_budget');
   assert.deepEqual(actual.result.tests, {declared:1,not_run:1});
-  assert.deepEqual(actual.result.interrupted_artifacts, [{id:'screenshot-1'}]);
+  assert.deepEqual(actual.result.interrupted_artifacts, [{id:'screenshot-1',kind:'screenshot',path:'output/failure.png',mime:'image/png'}]);
   assert.ok(actual.elapsed >= subprocessBudget - 100, actual.elapsed);
 });
 
@@ -181,7 +182,7 @@ async function report(script) {
   let wire = '', stderr = '';
   child.stdio[3].on('data', data => wire += data); child.stderr.on('data', data => stderr += data);
   assert.equal(await new Promise(resolve => child.on('close', resolve)), 0, stderr);
-  return wire.trim().split('\n').map(JSON.parse).find(record => record.type === 'result').result;
+  return baselineRecords(wire).find(record => record.type === 'result').result;
 }
 
 test('native suite timeout beats onError and earlier assertion while retaining first error', async () => {
