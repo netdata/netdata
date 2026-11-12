@@ -1850,14 +1850,18 @@ mod tests {
         // no sync had covered, is in doubt: it is among the bytes that never
         // reach the file.
         let events = writer.take_all_events();
-        assert!(
-            matches!(events.as_slice(), [FileEvent::Closed { .. }]),
-            "{events:?}"
-        );
+        let closed_size = match events.as_slice() {
+            [FileEvent::Closed { size, .. }] => *size,
+            other => panic!("expected one `Closed`: {other:?}"),
+        };
         assert!(matches!(
             writer.is_durable(mark),
             Err(crate::Error::FramesLost)
         ));
+        // The size it reports is the file's, without the bytes that were
+        // only in the buffer.
+        let old_file = &wal_files(tmp.path())[0];
+        assert_eq!(closed_size.0, std::fs::metadata(old_file).unwrap().len());
 
         // The next frame goes to a new file. The old file holds what was
         // synced and nothing of the buffer: neither the whole frame nor the

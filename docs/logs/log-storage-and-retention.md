@@ -153,10 +153,6 @@ needs an offloaded file that is no longer local, the Agent downloads it whole in
 `<base_dir>/remote-read`, bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then
 answers from it; repeated queries over the same files are served from the cache.
 
-When you change `remote_storage.uri` to another location, the Agent uploads to the new location the indexed files
-that are still on the local disk, before local retention can delete them. It does not copy the files that are only
-in the old location. Copy those yourself if queries must still reach them: their object keys do not change.
-
 - A query whose offloaded files exceed the cache fails with a message to narrow the time window or stream filter.
 - A download may take 30 seconds plus one second per MiB of the file, at most 5 minutes. A file that takes longer, or
   that the remote cannot serve, is left out of the answer, and the query still reads its other files; the Logs tab
@@ -167,6 +163,13 @@ in the old location. Copy those yourself if queries must still reach them: their
   or traces, makes other queries wait for room and can evict their cached files.
 - If the cache directory becomes unwritable, downloads fail as above and the plugin logs the write errors; a query that
   needs room the cache cannot free fails with a message about the cache directory.
+
+The Agent can start with a remote location that does not hold its files: you enable remote storage on an Agent that
+already has data, you change `remote_storage.uri`, or you empty the bucket. The Agent then uploads to the configured
+location the indexed files that are still on the local disk, before local retention can delete them. It cannot upload
+a file that local retention already deleted. To keep such files reachable after a change of location, copy the `v2/`
+tree of the old location (the `catalog` and `tenants` directories of each signal) to the new location before you
+change the URI. The object keys are the same in both locations.
 
 ```yaml
 remote_storage:
