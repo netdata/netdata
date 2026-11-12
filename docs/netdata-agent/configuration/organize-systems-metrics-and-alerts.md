@@ -299,8 +299,8 @@ Notes:
   dots).
 - A label that the collector sets on a chart itself takes precedence over a job label with the same key. The
   label `_collect_job` is reserved.
-- Jobs created from the dynamic configuration GUI get their form from the collector's configuration schema,
-  which does not include `labels:` — set job labels by editing the job's YAML file on the Agent.
+- The dynamic configuration GUI does not currently offer `labels:` in job forms — set job labels in the
+  collector's YAML file on the Agent.
 
 ### Labels on a node instead of on charts
 
