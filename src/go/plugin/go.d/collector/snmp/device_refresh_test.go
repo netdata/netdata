@@ -629,7 +629,7 @@ func (d *refreshSelectiveFailure) Get(ctx context.Context, oids []string) (*gosn
 	if d.fail && slices.Contains(oids, d.failedOID) {
 		return nil, errors.New("synthetic profile input timeout")
 	}
-	return d.refreshTestDevice.Get(context.Background(), oids)
+	return d.refreshTestDevice.Get(ctx, oids)
 }
 
 func TestCollectorRuntimeInitialProfileMetadataRecovery(t *testing.T) {

@@ -247,9 +247,10 @@ Two sharp edges:
 1. Source-IP allowlist (`allowlist.source_cidrs`; default allows both `0.0.0.0/0` **and** `::/0` — the check is
    address-family-strict, so both are needed).
 2. The unauthenticated header (`gosnmp.ReadEnvelope`): its version rejects disallowed versions before the decode,
-   and its SNMPv3 engine ID goes into a decode-error entry. A header that does not parse gives neither: the packet
-   skips this check and fails the decode. A dynamic-discovery job drops an engine ID of all `0x00` or all `0xff`
-   octets here (`unknown_engine_id`): such an ID names no engine and is never learned.
+   and its SNMPv3 engine ID goes into the decode-error entry of a message that fails the decode (check 4). A header
+   that does not parse gives neither: the packet skips this check and fails the decode. A dynamic-discovery job drops
+   an engine ID of all `0x00` or all `0xff` octets here (`unknown_engine_id`): such an ID names no engine and is never
+   learned.
 3. **Home-grown BER pre-validation** before the decode (`validateBERLimits`; only the header read of check 2 comes
    first): max nesting depth 8,
    max encoded OID 128 bytes, max OctetString 1024 bytes (relaxed for v3, whose encrypted ScopedPDU is one large
@@ -263,6 +264,8 @@ Two sharp edges:
 6. **INFORM acknowledgment** — the Response the receiver made, sent *before* the rate-limit decision, so a
    rate-limited INFORM is still acked while its content is dropped.
 7. Rate limit (last).
+
+Only a decode failure (check 4) writes a decode-error entry; the other checks' drops are counted and write none.
 
 The decode budget is five fixed constants (`listener.go`, `decode.go`), enforced per job and deliberately not
 configurable: 8192-byte datagram (RFC 3417 requires receivers to accept at least 484 bytes; 8 KiB covers verbose vendor

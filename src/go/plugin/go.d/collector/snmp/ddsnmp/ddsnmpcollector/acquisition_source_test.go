@@ -38,7 +38,7 @@ func (h *sourceTestHandler) BulkWalkAll(ctx context.Context, oid string, maxRepe
 	return values, gosnmp.WalkEnd{}, err
 }
 func (h *sourceTestHandler) WalkAll(ctx context.Context, oid string) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
-	return h.BulkWalkAll(context.Background(), oid, 0)
+	return h.BulkWalkAll(ctx, oid, 0)
 }
 
 func TestSourceValuesPreserveDecodedData(t *testing.T) {
