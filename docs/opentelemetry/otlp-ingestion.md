@@ -180,20 +180,20 @@ the [OpenTelemetry plugin reference](/src/crates/otel-plugin/README.md) for ever
 ## Monitor the OpenTelemetry plugin
 
 The plugin does not slow senders down, and it leaves the capacity of the host to you: disk space, memory, and
-object storage. It gives you charts for these conditions. Netdata does not ship alerts for these charts:
-add the alerts that fit your installation.
+object storage. It gives you charts for these conditions. Netdata ships no alerts for the plugin's own charts
+(`netdata.otel.*`): add the alerts that fit your installation.
 
 | What to watch | Charts | What it means |
 |:--------------|:-------|:--------------|
 | Data that the plugin cannot store | `netdata.otel.log_records` and `netdata.otel.spans`, dimension `failed` | The disk is full, or a write to it failed. The sender sends these records again. |
 | Data that the plugin rejects | `netdata.otel.metric_data_points`, `netdata.otel.log_records`, `netdata.otel.spans`, dimension `rejected` | Usually a timestamp outside the accepted time window. See the troubleshooting list below. A request that the plugin rejects as a whole (for example, one larger than 4 MiB) is not on these charts: the sender gets the error. |
 | Disk space | The Agent's `disk.space` chart of the filesystem that holds the OpenTelemetry data; `netdata.otel.index_size`, `netdata.otel.index_files` | The retention limits apply to the indexed files of each tenant. Files that are not indexed yet, catalogs, and the download cache use more space. |
-| Tenants | `netdata.otel.tenants` | Each tenant has its own files and its own retention limits. More tenants need more disk and more memory. The plugin never removes a tenant: the number does not go down when the data of a tenant expires, and the tenant is there again after a restart. A number that rises when you added no tenant means that senders use tenant names that you did not plan. With object storage, each tenant can add up to 20 seconds to a start of the plugin while object storage is slow, and the plugin accepts no data until the start is complete. |
-| Indexing | `netdata.otel.indexing_operations`, `netdata.otel.indexing_operations_oldest_wait`, `netdata.otel.indexing_operations_finished` | When the number of waiting operations grows, the host receives data faster than it can index it. The files that wait use disk space that `netdata.otel.index_size` does not count. Give the host more CPU, or send less data. When the plugin starts, it first indexes the files that the last run left. It accepts no data until that is done, and these charts start after it. |
+| Tenants | `netdata.otel.tenants` | Each tenant has its own files and its own retention limits. More tenants need more disk and more memory. The plugin never removes a tenant: the number does not go down when the data of a tenant expires, and the tenant is there again after a restart. A number that rises when you added no tenant means that senders use tenant names that you did not plan. With object storage, a start of the plugin takes longer while object storage is slow: up to 20 seconds for each tenant of logs and for each tenant of traces, and more when catalogs must be downloaded. The plugin accepts no data until the start is complete. |
+| Indexing | `netdata.otel.indexing_operations`, `netdata.otel.indexing_operations_oldest_wait`, `netdata.otel.indexing_operations_finished` | When the number of waiting operations grows, the host receives data faster than it can index it. The files that wait use disk space that `netdata.otel.index_size` does not count. Give the host more CPU or more memory, or send less data. When the plugin starts, it first indexes the files that the last run left. It accepts no data until that is done, and these charts start after it. |
 | The two worker processes | `netdata.otel.wal_events_queued` | The number is near zero when the plugin keeps up. When it grows, the indexing process is slower than the receiving process, and the plugin uses more memory. Give the host more CPU, or send less data. |
-| Object storage | `netdata.otel.uploads`, `netdata.otel.uploads_finished`, `netdata.otel.index_files_waiting_for_remote` | These charts exist only when object storage is enabled. They show uploads that fail, and local files that the plugin cannot delete until object storage confirms them. While these files wait, the local disk can hold more than the retention limits. A file can wait for some minutes after its upload, until its catalog is uploaded too. If files still wait after an hour while uploads succeed, object storage was not reachable when the plugin started. The plugin checks the files of earlier runs only at start: restart the Agent when object storage is reachable. |
-| Memory and CPU of the plugin | The Agent's application charts (`app.mem_usage`, `app.cpu_utilization`), group `otel-plugin` | Memory grows with the volume of data and with the number of services and tenants. The plugin keeps a small state for each tenant and each service that it saw since it started. This memory does not go down while the plugin runs. |
-| Charts made from logs and traces | `netdata.otel.derived_services`, `netdata.otel.derived_expired_services`, `netdata.otel.derived_adjusted_records` | The number of services that have their own charts, against the limit `derived_metrics.max_services`. The services over the limit share one chart set. |
+| Object storage | `netdata.otel.uploads`, `netdata.otel.uploads_finished`, `netdata.otel.index_files_waiting_for_remote` | These charts exist only when object storage is enabled. They show uploads that fail, and local files that the plugin cannot delete until object storage confirms them. While these files wait, the local disk can hold more than the retention limits. A file can wait up to about 15 minutes after its upload, until its catalog is uploaded too. If files still wait after an hour while no upload fails, the plugin could not check the files of earlier runs when it started: object storage was slow or gave an error at that time, or it does not hold all the files of an earlier run (for example, after you changed `remote_storage.uri`). The plugin checks these files only when it starts. Restart the Agent. If the files still wait, look in the Agent journal for `startup budget` or `catalog stat failed`. |
+| Memory and CPU of the plugin | The Agent's application charts (`app.mem_usage`, `app.cpu_utilization`), group `otel-plugin` | Memory grows with the volume of data and with the number of services and tenants. The plugin keeps a small state for each tenant, and for each service that sent logs, for as long as it runs. This part of the memory does not go down until the Agent restarts. Indexing uses memory in bursts. |
+| Charts made from logs and traces | `netdata.otel.derived_services`, `netdata.otel.derived_expired_services`, `netdata.otel.derived_adjusted_records` | These charts exist when `derived_metrics.enabled` is `true`, one set for logs and one for traces. `netdata.otel.derived_services` shows the services that have their own charts, plus one for the shared chart set. When it reaches `derived_metrics.max_services`, the records of new services go to the shared chart set, and `netdata.otel.derived_adjusted_records` shows them as `overflowed`. A service that sends no data for 15 minutes loses its charts (`netdata.otel.derived_expired_services`), and its place becomes free. |
 
 The plugin relies on these rules and does not check them:
 
@@ -202,7 +202,8 @@ The plugin relies on these rules and does not check them:
   filesystem that is emptied at boot.
 - Keep the clock of the host correct. The plugin uses it to accept and reject records and to apply retention by age.
   The Agent's charts `system.clock_sync_state` and `system.clock_sync_offset` show a clock that is not synchronized.
-  After a large correction of the clock, restart the Agent.
+  If the clock was moved back by more than a few minutes, restart the Agent. Until then, or until the clock reaches
+  its earlier time again, the plugin can reject new records.
 - Several Agents can use one object storage location, but each must have its own Netdata machine GUID. Do not clone
   a host together with its GUID and point both hosts at the same location.
 - The plugin does not delete objects from object storage: the location grows until you set expiry rules on it. The
@@ -210,8 +211,12 @@ The plugin relies on these rules and does not check them:
   `logs` or `traces`). If you set expiry rules, do not let the objects under `tenants` expire before the objects
   under `catalog`. A catalog that names an object that is gone makes queries incomplete.
 - When the plugin starts, it lists all the catalog objects of the location, also those of other Agents that use the
-  same location, and it keeps the list in memory: about 100 MB for one million catalog objects. Expiry rules on old
-  catalogs keep this small.
+  same location. While it starts, the list uses memory: some hundred MB for one million catalog objects. Expiry
+  rules on old catalogs keep this small.
+- With object storage enabled, the plugin needs object storage to answer when it starts. If it does not answer, the
+  plugin stops, and the Agent starts it again only when the Agent restarts: no metrics, logs or traces are received
+  until then. The Agent journal has an error from `otel-plugin` with `startup catalog LIST`. Restart the Agent when
+  object storage is reachable.
 
 ## Troubleshoot the pipeline
 
