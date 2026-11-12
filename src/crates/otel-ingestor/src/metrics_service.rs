@@ -319,8 +319,13 @@ impl NetdataMetricsService {
         }
         count_chart.ingest("count", hdp.count as f64, timestamp_ns, start_time_ns);
 
+        // A chart is made only for a value it will take, and `Chart::ingest`
+        // takes no value that is not finite: a chart that took nothing is
+        // dropped at the next tick, and making it again at every request
+        // would use up the request's allowance of new charts.
+
         // ---- Sum chart (temporality-aware; only if the point carries a sum) ----
-        if let Some(sum) = hdp.sum {
+        if let Some(sum) = hdp.sum.filter(|sum| sum.is_finite()) {
             chart_name_buf.clear();
             let _ = write!(
                 chart_name_buf,
@@ -354,7 +359,9 @@ impl NetdataMetricsService {
         }
 
         // ---- Min/max chart (gauge, only if present) ----
-        if hdp.min.is_some() || hdp.max.is_some() {
+        let min = hdp.min.filter(|min| min.is_finite());
+        let max = hdp.max.filter(|max| max.is_finite());
+        if min.is_some() || max.is_some() {
             chart_name_buf.clear();
             let _ = write!(
                 chart_name_buf,
@@ -384,10 +391,10 @@ impl NetdataMetricsService {
                     dp.chart_labels(),
                 );
             }
-            if let Some(min) = hdp.min {
+            if let Some(min) = min {
                 minmax_chart.ingest("min", min, timestamp_ns, start_time_ns);
             }
-            if let Some(max) = hdp.max {
+            if let Some(max) = max {
                 minmax_chart.ingest("max", max, timestamp_ns, start_time_ns);
             }
         }
@@ -446,40 +453,44 @@ impl NetdataMetricsService {
         }
         count_chart.ingest("count", sdp.count as f64, timestamp_ns, start_time_ns);
 
-        // ---- Sum chart ----
-        chart_name_buf.clear();
-        let _ = write!(
-            chart_name_buf,
-            "{}.{}.sum",
-            dp.metric_ref.metric.name, chart_hash
-        );
+        // As in a histogram: a chart is made only for a value it will take.
 
-        if !Self::get_or_create_typed(
-            chart_manager,
-            chart_name_buf,
-            cumulative,
-            ChartType::Line,
-            chart_config,
-            new_charts,
-            budget,
-        ) {
-            return PointOutcome::Charted;
-        }
-        let sum_chart = chart_manager.get(chart_name_buf).unwrap();
-        if !sum_chart.has_definition() {
+        // ---- Sum chart (only if the sum is a finite number) ----
+        if sdp.sum.is_finite() {
             chart_name_buf.clear();
-            let _ = write!(chart_name_buf, "{}.sum", dp.metric_ref.metric.name);
-            sum_chart.init_definition(
+            let _ = write!(
                 chart_name_buf,
-                &dp.metric_ref.metric.description,
-                &dp.metric_ref.metric.unit,
-                dp.chart_labels(),
+                "{}.{}.sum",
+                dp.metric_ref.metric.name, chart_hash
             );
-        }
-        sum_chart.ingest("sum", sdp.sum, timestamp_ns, start_time_ns);
 
-        // ---- Quantiles chart (only if quantile values are present) ----
-        if !sdp.quantile_values.is_empty() {
+            if !Self::get_or_create_typed(
+                chart_manager,
+                chart_name_buf,
+                cumulative,
+                ChartType::Line,
+                chart_config,
+                new_charts,
+                budget,
+            ) {
+                return PointOutcome::Charted;
+            }
+            let sum_chart = chart_manager.get(chart_name_buf).unwrap();
+            if !sum_chart.has_definition() {
+                chart_name_buf.clear();
+                let _ = write!(chart_name_buf, "{}.sum", dp.metric_ref.metric.name);
+                sum_chart.init_definition(
+                    chart_name_buf,
+                    &dp.metric_ref.metric.description,
+                    &dp.metric_ref.metric.unit,
+                    dp.chart_labels(),
+                );
+            }
+            sum_chart.ingest("sum", sdp.sum, timestamp_ns, start_time_ns);
+        }
+
+        // ---- Quantiles chart (only if a quantile has a finite value) ----
+        if sdp.quantile_values.iter().any(|qv| qv.value.is_finite()) {
             chart_name_buf.clear();
             let _ = write!(
                 chart_name_buf,
@@ -759,8 +770,8 @@ impl MetricsService for NetdataMetricsService {
 mod tests {
     use opentelemetry_proto::tonic::metrics::v1::{
         AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
-        Histogram, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, metric::Data,
-        number_data_point::Value,
+        Histogram, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Summary, metric::Data,
+        number_data_point::Value, summary_data_point::ValueAtQuantile,
     };
 
     use super::*;
@@ -892,6 +903,59 @@ mod tests {
 
         assert_eq!(counted(&service), (0, 0));
         assert!(service.chart_manager.read().await.is_empty());
+    }
+
+    /// A histogram's sum, minimum and maximum and a summary's sum and
+    /// quantiles that are not finite make no chart: a chart that takes no
+    /// value is dropped at the next tick, and making it again at every
+    /// request would use up the request's allowance of new charts.
+    #[tokio::test]
+    async fn a_value_that_is_not_finite_makes_no_chart() {
+        let service = NetdataMetricsService::default();
+        let now = now_ns();
+        let histogram = Metric {
+            name: "latency".to_string(),
+            data: Some(Data::Histogram(Histogram {
+                aggregation_temporality: AggregationTemporality::Delta as i32,
+                data_points: vec![HistogramDataPoint {
+                    time_unix_nano: now,
+                    count: 3,
+                    sum: Some(f64::NAN),
+                    min: Some(f64::NAN),
+                    max: Some(f64::INFINITY),
+                    bucket_counts: vec![2, 1],
+                    explicit_bounds: vec![10.0],
+                    ..Default::default()
+                }],
+            })),
+            ..Default::default()
+        };
+        let summary = Metric {
+            name: "duration".to_string(),
+            data: Some(Data::Summary(Summary {
+                data_points: vec![SummaryDataPoint {
+                    time_unix_nano: now,
+                    count: 3,
+                    sum: f64::NAN,
+                    quantile_values: vec![ValueAtQuantile {
+                        quantile: 0.5,
+                        value: f64::NAN,
+                    }],
+                    ..Default::default()
+                }],
+            })),
+            ..Default::default()
+        };
+
+        service
+            .export_metrics(request(vec![histogram, summary]))
+            .await
+            .unwrap();
+
+        // The histogram's bucket and count charts, and the summary's count
+        // chart: both points are charted.
+        assert_eq!(counted(&service), (2, 0));
+        assert_eq!(service.chart_manager.read().await.len(), 3);
     }
 
     /// A metric's name becomes part of its charts' ids, and an id has a

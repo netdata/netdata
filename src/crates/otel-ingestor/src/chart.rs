@@ -355,7 +355,8 @@ impl Chart {
     /// cumulative dimension's state. Every value passes here: a number
     /// point's (which `DataPointRef::value` already leaves out, with its
     /// point), and a histogram's or a summary's sum, minimum, maximum and
-    /// quantiles.
+    /// quantiles (for which the callers make no chart when it would take
+    /// no value).
     pub fn ingest(
         &mut self,
         dimension_name: &str,
