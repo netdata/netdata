@@ -859,17 +859,12 @@ and retained device-generation state; they are not the topology payload.
   `topologyDeviceSnapshot`. A completed sweep activates successful snapshots as
   `topologyDeviceGeneration` values at one shared publication time. A failed
   collection retains the prior successful device generation and deadline.
-- Retained acquisition and retry state belong to the observed sysObjectID, independently of the accepted job's
-  registration lifetime. A changed registered classification discards incompatible state before its next attempt;
-  failed or unsupported replacement setup cannot retain the prior device's topology. Cancellation still leaves
-  the entire prior committed cut visible.
-- Registered presentation changes project onto retained observations and trap enrichment at the completed-sweep
-  boundary without extra SNMP acquisition or extending freshness. Diagnostics record that presentation separately
-  from immutable acquisition input and replay the same projection; historical archives without it retain
-  collected presentation. A present record supplies all display fields, including empty values that clear metadata.
-  Display metadata follows the same alias precedence and canonical-label normalization as
-  acquisition (including serial and software/firmware/hardware versions). Registration redraw leaves acquired
-  sysObjectID, OSPF router ID, uptime and their labels in the original acquisition generation.
+- Each device's refresh state records the registered device information it last acted on. A changed registered
+  sysObjectID discards the retained acquisition and retry state before the next attempt, so failed or unsupported
+  replacement setup cannot retain the prior device's topology. Any other change to that information (name,
+  description, contact, location, vendor, model, vnode identity or labels) acquires the device again on the current
+  sweep; the retained generation stays visible until that acquisition succeeds, and a failure follows the normal
+  retry backoff. Cancellation still leaves the entire prior committed cut visible.
 - A completed sweep fixes renderable membership and publishes one immutable
   `topologyGeneration` through an atomic pointer. Cancellation or panic leaves
   the previous generation visible.

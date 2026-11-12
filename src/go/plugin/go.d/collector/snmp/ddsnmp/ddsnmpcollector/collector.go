@@ -51,21 +51,14 @@ func New(cfg Config) *Collector {
 	}
 
 	for _, prof := range cfg.Profiles {
-		coll.profiles[prof.SourceFile] = &profileState{
-			profile: prof,
-		}
+		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
 	if cfg.AcquisitionObserver != nil {
 		coll.acquisitionObserver = cfg.AcquisitionObserver
 	}
 
 	coll.globalTagsCollector = newGlobalTagsCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
-	coll.deviceMetadataCollector = newDeviceMetadataCollector(
-		cfg.SnmpClient,
-		coll.missingOIDs,
-		coll.log,
-		cfg.SysObjectID,
-	)
+	coll.deviceMetadataCollector = newDeviceMetadataCollector(cfg.SnmpClient, coll.missingOIDs, coll.log, cfg.SysObjectID)
 	coll.scalarCollector = newScalarCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
 	coll.tableCollector = newTableCollector(cfg.SnmpClient, coll.missingOIDs, coll.tableCache, coll.log, cfg.DisableBulkWalk)
 	coll.tableCollector.logKeyPrefix = cfg.LogKeyPrefix
@@ -100,13 +93,11 @@ type (
 		identity    *AcquisitionProfileIdentity
 		initialized bool
 		cache       struct {
-			globalTags                 map[string]string
-			tagProcessingFailures      map[int]bool
-			metadataProcessingFailures map[metadataProcessingInput]bool
-			deviceMetadata             map[string]ddsnmp.MetaTag
-			tagEvidence                *AcquisitionCacheInput
-			metadataEvidence           *AcquisitionCacheInput
-			inputRoutes                []AcquisitionRouteReport
+			globalTags       map[string]string
+			deviceMetadata   map[string]ddsnmp.MetaTag
+			tagEvidence      *AcquisitionCacheInput
+			metadataEvidence *AcquisitionCacheInput
+			inputRoutes      []AcquisitionRouteReport
 		}
 	}
 	preparedProfileCollection struct {
@@ -335,20 +326,46 @@ func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
 	}
 }
 
+// PreparedDeviceMetadata returns an owned copy of the metadata prepared so far,
+// without acquiring data. Like Collect, only the synchronous owner calls it.
+func (c *Collector) PreparedDeviceMetadata() map[string]ddsnmp.MetaTag {
+	metadata := make(map[string]ddsnmp.MetaTag)
+	for _, state := range c.sortedProfileStates() {
+		if state.initialized {
+			ddsnmp.MergeMetaTags(metadata, state.cache.deviceMetadata)
+		}
+	}
+	return metadata
+}
+
+// ProfileInputRevision changes whenever a profile's tags and metadata become
+// prepared, so the owner can publish them without acquiring them twice.
+func (c *Collector) ProfileInputRevision() uint64 { return c.profileInputRevision }
+
 func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (*preparedProfileCollection, error) {
-	prepared := c.newProfileCollection(ps, ordinal)
-	pm := prepared.metrics
+	pm := &ddsnmp.ProfileMetrics{Source: ps.profile.SourceFile}
+	prepared := &preparedProfileCollection{
+		state:   ps,
+		metrics: pm,
+	}
+	if c.acquisitionObserver != nil {
+		if ps.identity == nil {
+			identity := buildAcquisitionProfileIdentity(ps.profile, ordinal)
+			ps.identity = &identity
+		}
+		prepared.acquisition = newAcquisitionProfileCollection(
+			*ps.identity,
+			ps.profile,
+			c.deviceMetadataCollector.sysobjectid,
+		)
+	}
 
 	if err := c.prepareProfileInputs(prepared); err != nil {
 		return prepared, err
 	}
 
 	now := time.Now()
-	scalarMetrics, err := c.scalarCollector.collectObserved(
-		ps.profile,
-		&pm.Stats,
-		prepared.acquisition.metricScalarObserver(),
-	)
+	scalarMetrics, err := c.scalarCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition.metricScalarObserver())
 	pm.Stats.Timing.Scalar = time.Since(now)
 	if err != nil {
 		return prepared, err
@@ -383,50 +400,7 @@ func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (
 	return prepared, nil
 }
 
-func (c *Collector) newProfileCollection(ps *profileState, ordinal uint32) *preparedProfileCollection {
-	prepared := &preparedProfileCollection{
-		state: ps,
-		metrics: &ddsnmp.ProfileMetrics{
-			Source: ps.profile.SourceFile,
-		},
-	}
-	if c.acquisitionObserver != nil {
-		if ps.identity == nil {
-			identity := buildAcquisitionProfileIdentity(ps.profile, ordinal)
-			ps.identity = &identity
-		}
-		prepared.acquisition = newAcquisitionProfileCollection(
-			*ps.identity,
-			ps.profile,
-			c.deviceMetadataCollector.sysobjectid,
-		)
-	}
-	return prepared
-}
-
 func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) error {
-	state := prepared.state
-	if state.initialized {
-		return c.prepareProfileInputsWithStrictness(prepared, false, nil)
-	}
-	staged := &profileState{
-		profile:  state.profile,
-		identity: state.identity,
-	}
-	prepared.state = staged
-	err := c.prepareProfileInputsWithStrictness(prepared, false, nil)
-	prepared.state = state
-	if err == nil {
-		c.installProfileInputs(state, staged)
-	}
-	return err
-}
-
-func (c *Collector) prepareProfileInputsWithStrictness(
-	prepared *preparedProfileCollection,
-	strict bool,
-	previous *profileState,
-) error {
 	ps, pm := prepared.state, prepared.metrics
 	started := time.Now()
 	defer func() {
@@ -446,54 +420,29 @@ func (c *Collector) prepareProfileInputsWithStrictness(
 	if ps.initialized {
 		prepared.acquisition.restoreInputRoutes(ps.cache.inputRoutes)
 	} else {
-		// Refresh preserves already unavailable processing inputs, but a newly failed
-		// input must not erase its previously usable snapshot. Startup stays partial.
-		tagsCollector := *c.globalTagsCollector
-		metadataCollector := *c.deviceMetadataCollector
-		tagsCollector.failedProcessing = nil
-		metadataCollector.failedProcessing = nil
-		if previous != nil {
-			tagsCollector.allowedProcessingFailures = previous.cache.tagProcessingFailures
-			metadataCollector.allowedProcessingFailures = previous.cache.metadataProcessingFailures
-		}
-		tagsCollector.strict = strict
-		metadataCollector.strict = strict
-		tagsCollector.requireComplete = strict
-		metadataCollector.requireComplete = strict
-		recorder := sourceRecorder(tagsCollector.snmpClient)
+		recorder := sourceRecorder(c.globalTagsCollector.snmpClient)
 		cursor := recorder.Cursor()
-		globalTags, err := tagsCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
+		globalTags, err := c.globalTagsCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
 			return fmt.Errorf("failed to collect global tags: %w", err)
 		}
 		ps.cache.globalTags = globalTags
-		ps.cache.tagProcessingFailures = tagsCollector.failedProcessing
 		if recorder != nil {
-			ps.cache.tagEvidence = &AcquisitionCacheInput{
-				Kind:      "profile_tags",
-				CreatedAt: time.Now().UTC(),
-				Tags:      globalTags,
-				Sources:   recorder.operationsSince(cursor),
-			}
+			ps.cache.tagEvidence = &AcquisitionCacheInput{Kind: "profile_tags", CreatedAt: time.Now().UTC(), Tags: globalTags, Sources: recorder.operationsSince(cursor)}
 		}
 		cursor = recorder.Cursor()
-		metadata, err := metadataCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
+		metadata, err := c.deviceMetadataCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
 			err = snmputils.WithFailure(err, "metadata", "")
 			return fmt.Errorf("failed to collect device metadata: %w", err)
 		}
 		ps.cache.deviceMetadata = metadata
-		ps.cache.metadataProcessingFailures = metadataCollector.failedProcessing
 		if recorder != nil {
-			ps.cache.metadataEvidence = &AcquisitionCacheInput{
-				Kind:      "profile_metadata",
-				CreatedAt: time.Now().UTC(),
-				Metadata:  metadata,
-				Sources:   recorder.operationsSince(cursor),
-			}
+			ps.cache.metadataEvidence = &AcquisitionCacheInput{Kind: "profile_metadata", CreatedAt: time.Now().UTC(), Metadata: metadata, Sources: recorder.operationsSince(cursor)}
 		}
 		ps.initialized = true
 		ps.cache.inputRoutes = prepared.acquisition.retainInputRoutes(recorder)
+		c.profileInputRevision++
 	}
 	pm.Tags = maps.Clone(ps.cache.globalTags)
 	pm.DeviceMetadata = maps.Clone(ps.cache.deviceMetadata)

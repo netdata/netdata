@@ -52,17 +52,10 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 		}
 
 		state := c.seenScalarMetrics[m.Name]
-		if state == nil || state.chart == nil {
-			state = &metricChartState{
-				metadataVersion: c.chartMetadataVersion,
-				chart:           c.addProfileScalarMetricChart(m),
-			}
+		if state == nil {
+			// A rejected chart stays recorded so it is not retried every cycle.
+			state = &metricChartState{chart: c.addProfileScalarMetricChart(m)}
 			c.seenScalarMetrics[m.Name] = state
-		} else if state.metadataVersion != c.chartMetadataVersion {
-			labels := make(map[string]string)
-			c.profileMetricLabels(labels, m)
-			updateProfileChartLabels(state.chart, labels)
-			state.metadataVersion = c.chartMetadataVersion
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -152,8 +145,8 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 	for _, pm := range pms {
 		name := stripFileNameExt(pm.Source)
 
-		if c.seenProfiles[name] != c.chartMetadataVersion {
-			c.seenProfiles[name] = c.chartMetadataVersion
+		if !c.seenProfiles[name] {
+			c.seenProfiles[name] = true
 			c.addProfileStatsCharts(name)
 		}
 

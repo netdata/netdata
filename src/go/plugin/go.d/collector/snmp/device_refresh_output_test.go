@@ -88,8 +88,9 @@ func TestRefreshOutputCleanupReleasesSenders(t *testing.T) {
 	}
 }
 
-func TestCollectorRuntimeMetadataNativeOutputRetries(t *testing.T) {
-	c, device, now := newRefreshTestCollector(t)
+func TestCollectorRuntimeSystemChangeNativeOutputRetries(t *testing.T) {
+	st := newSystemChangeTest(t)
+	c, device, now := st.c, st.device, st.now
 	sink, collect, cleanup := startRefreshOutputJob(t, c)
 	first := collect(1)
 	require.True(t, first.committed)
@@ -110,7 +111,7 @@ func TestCollectorRuntimeMetadataNativeOutputRetries(t *testing.T) {
 	assert.Contains(t, retried.payload, "CLABEL 'sysName' 'after'")
 	assert.Contains(t, retried.payload, "CLABEL 'snmp_host' 'after'")
 	assert.Contains(t, retried.payload, "SET 'ifTraffic' = 42")
-	assert.NotContains(t, retried.payload, "obsolete", "metadata refresh preserves chart lifetimes")
+	assert.NotContains(t, retried.payload, "obsolete", "charts reported again are redefined, not retired")
 	unchanged := collect(4)
 	assert.True(t, unchanged.committed)
 	assert.NotContains(t, unchanged.payload, "HOST_DEFINE")

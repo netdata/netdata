@@ -211,7 +211,8 @@ type topologyRefreshDevicePlan struct {
 }
 
 type deviceRefreshState struct {
-	sysObjectID         string
+	// registered is the device information this state last acted on.
+	registered          *topologydiag.DeviceInput
 	generation          *topologyDeviceGeneration
 	latestAttempt       *topologydiag.AcquisitionCapture
 	attemptOrdinal      uint64
@@ -293,17 +294,22 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		seen[registrationID] = true
 
 		state, exists := nextStates[registrationID]
-		previousSysObjectID, previousGeneration := state.sysObjectID, state.generation
-		if exists && dev.SysObjectID != "" && state.sysObjectID != dev.SysObjectID {
-			// The accepted job can reclassify within one registration lifetime.
-			// Its old topology and retry state belong to the previous classification.
-			state = deviceRefreshState{attemptOrdinal: state.attemptOrdinal}
-		}
-		if dev.SysObjectID != "" {
-			state.sysObjectID = dev.SysObjectID
-		}
-		state.generation = state.generation.withRegisteredPresentation(topologyDeviceInputFromConnection(dev))
-		if state.sysObjectID != previousSysObjectID || state.generation != previousGeneration {
+		registered := topologyDeviceInputFromConnection(dev)
+		if state.registered == nil || !sameTopologyDeviceInput(*state.registered, registered) {
+			if prior := state.registered; prior != nil {
+				if registered.SysObjectID != "" && registered.SysObjectID != prior.SysObjectID {
+					// The accepted job can reclassify within one registration lifetime.
+					// Its old topology and retry state belong to the previous classification.
+					state = deviceRefreshState{attemptOrdinal: state.attemptOrdinal}
+				} else {
+					// Acquire again with the current device information. The retained
+					// generation stays visible until that succeeds.
+					state.nextRetry = time.Time{}
+				}
+			}
+			// A separate copy keeps the per-device comparison value off the heap.
+			owned := cloneTopologyDeviceInput(registered)
+			state.registered = &owned
 			nextStates[registrationID] = state
 		}
 		if !exists || state.nextRetry.IsZero() || !now.Before(state.nextRetry) {
@@ -637,8 +643,6 @@ func (c *Collector) refreshDeviceTopology(
 		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 	snapshot := c.freezeTopologyBuilder(next)
-	ownedInput := cloneTopologyDeviceInput(deviceInput)
-	snapshot.sourceInput = &ownedInput
 	attempt := recorder.finish()
 	snapshot.acquisition = attempt
 	return snapshot, topologydiag.RefreshOutcomeSuccess, attempt

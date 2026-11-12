@@ -104,7 +104,6 @@ func (s Semantics) replayDiagnosticStagesWithObservationScope(
 			}
 			continue
 		}
-		snapshot = topologymodel.WithDevicePresentation(snapshot, device.Presentation)
 		replayed.observation = inspectionPresent
 		replayed.localDeviceID = snapshot.LocalDeviceID
 		replayed.localDevice = snapshot.LocalDevice

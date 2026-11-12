@@ -121,12 +121,8 @@ func (c *Collector) addLicenseChart(chart collectorapi.Chart) {
 	}
 
 	ch := chart.Copy()
-	ch.Labels = c.licenseChartLabels()
-	c.installChart(ch)
-}
-
-func (c *Collector) licenseChartLabels() []collectorapi.Label {
 	labels := c.chartBaseLabels()
 	labels["component"] = "licensing"
-	return toChartLabels(labels)
+	ch.Labels = toChartLabels(labels)
+	c.installChart(ch)
 }

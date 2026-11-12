@@ -10,11 +10,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
+	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +35,6 @@ type refreshTestDevice struct {
 	closes     int
 	probeErr   error
 	probePDUs  []gosnmp.SnmpPDU
-	inputErr   error
 	tableErr   error
 	omittedOID string
 }
@@ -50,8 +53,6 @@ func (d *refreshTestDevice) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 				Variables: slices.Clone(d.probePDUs),
 			}, nil
 		}
-	} else if d.inputErr != nil && (slices.Contains(oids, snmputils.OidSysName) || slices.Contains(oids, snmputils.OidSysLocation)) {
-		return nil, d.inputErr
 	}
 	if d.tableErr != nil {
 		for _, oid := range oids {
@@ -75,33 +76,6 @@ func (d *refreshTestDevice) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 		packet.Variables = append(packet.Variables, pdu)
 	}
 	return packet, nil
-}
-
-func TestCollectorRuntimeMetadataRetryKeepsPollingState(t *testing.T) {
-	c, device, now := newRefreshTestCollector(t)
-	require.NotEmpty(t, c.Collect(context.Background()))
-	dd := c.ddSnmpColl
-	device.setText(snmputils.OidSysName, "after")
-	device.inputErr = errors.New("synthetic metadata timeout")
-	*now = now.Add(time.Minute)
-	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.Equal(t, "after", c.VirtualNode().Hostname, "usable system metadata can publish while profile inputs retry")
-	assert.Equal(t, "before", c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value)
-	assert.NotNil(t, c.pendingSysInfo)
-	assert.Same(t, dd, c.ddSnmpColl)
-	device.inputErr = nil
-	*now = now.Add(time.Minute)
-	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.Equal(
-		t,
-		"after",
-		c.VirtualNode().Hostname,
-		"unchanged subsequent sysinfo must retry pending derived metadata",
-	)
-	assert.Nil(t, c.pendingSysInfo)
-	assert.Equal(t, "after", c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value)
-	assert.Same(t, dd, c.ddSnmpColl)
-	assert.Zero(t, device.closes)
 }
 
 func (d *refreshTestDevice) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, error) {
@@ -133,12 +107,20 @@ func refreshTestTableKey(name, index string) string {
 
 func newRefreshTestCollector(t *testing.T) (*Collector, *refreshTestDevice, *time.Time) {
 	t.Helper()
+	return newRefreshTestCollectorWithObjectID(t, "1.3.6.1.4.1.99999.1")
+}
+
+func newRefreshTestCollectorWithObjectID(
+	t *testing.T,
+	sysObjectID string,
+) (*Collector, *refreshTestDevice, *time.Time) {
+	t.Helper()
 	d := &refreshTestDevice{
 		values: map[string]gosnmp.SnmpPDU{
 			snmputils.OidSysObject: {
 				Name:  snmputils.OidSysObject,
 				Type:  gosnmp.ObjectIdentifier,
-				Value: "1.3.6.1.4.1.99999.1",
+				Value: sysObjectID,
 			},
 			refreshTestTable + ".1.1": {Name: refreshTestTable + ".1.1", Type: gosnmp.Counter64, Value: uint64(42)},
 		},
@@ -157,7 +139,7 @@ func newRefreshTestCollector(t *testing.T) (*Collector, *refreshTestDevice, *tim
 		Definition: &ddprofiledefinition.ProfileDefinition{
 			Selector: ddprofiledefinition.SelectorSpec{
 				{SysObjectID: ddprofiledefinition.SelectorIncludeExclude{
-					Include: []string{"1.3.6.1.4.1.99999.1"},
+					Include: []string{sysObjectID},
 				}},
 			},
 			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{
@@ -196,78 +178,220 @@ func newRefreshTestCollector(t *testing.T) (*Collector, *refreshTestDevice, *tim
 	return c, d, &now
 }
 
-func TestCollectorRuntimeMetadataRefresh(t *testing.T) {
-	c, device, now := newRefreshTestCollector(t)
+// systemChangeTestObjectID is resolved by the stock catalog, so a rebuild that
+// keeps the classification still selects real profiles.
+const systemChangeTestObjectID = "1.3.6.1.4.1.9.1.1"
+
+// systemChangeTest drives rebuilds that keep the sysObjectID. Every rebuilt DD
+// collector polls the initial test profiles through a fresh client.
+type systemChangeTest struct {
+	c          *Collector
+	device     *refreshTestDevice
+	now        *time.Time
+	connectErr error
+	clients    int
+	closes     int
+}
+
+func newSystemChangeTest(t *testing.T) *systemChangeTest {
+	t.Helper()
+	c, device, now := newRefreshTestCollectorWithObjectID(t, systemChangeTestObjectID)
+	st := &systemChangeTest{c: c, device: device, now: now}
+	c.newSnmpClient = func() gosnmp.Handler {
+		st.clients++
+		client := snmpmock.NewMockHandler(gomock.NewController(t))
+		// Register the concrete protocol before the shared helper's permissive getter.
+		client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+		setMockClientSetterExpect(client)
+		client.EXPECT().Connect().Return(st.connectErr).AnyTimes()
+		client.EXPECT().Close().DoAndReturn(func() error { st.closes++; return nil }).AnyTimes()
+		client.EXPECT().MaxOids().Return(20).AnyTimes()
+		client.EXPECT().Get(gomock.Any()).DoAndReturn(device.Get).AnyTimes()
+		client.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(device.BulkWalkAll).AnyTimes()
+		return client
+	}
+	var profiles []*ddsnmp.Profile
+	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
+		if profiles == nil {
+			profiles = cfg.Profiles
+		}
+		cfg.Profiles = profiles
+		return ddsnmpcollector.New(cfg)
+	}
+	return st
+}
+
+func (st *systemChangeTest) collectAfter(d time.Duration) map[string]int64 {
+	*st.now = st.now.Add(d)
+	return st.c.Collect(context.Background())
+}
+
+func chartLabelsForTest(chart *collectorapi.Chart) map[string]string {
+	labels := make(map[string]string, len(chart.Labels))
+	for _, label := range chart.Labels {
+		labels[label.Key] = label.Value
+	}
+	return labels
+}
+
+func TestCollectorRuntimeSystemChangeRebuilds(t *testing.T) {
+	st := newSystemChangeTest(t)
+	c, device := st.c, st.device
 	authored := c.Configuration()
 	require.NotEmpty(t, c.Collect(context.Background()))
+	require.NotEmpty(t, c.Collect(context.Background()))
+	require.NotNil(t, c.ifaceCache.interfaces["1"].rates.trafficIn)
 	guid := c.VirtualNode().GUID
-	dd, client, profiles := c.ddSnmpColl, c.snmpClient, c.snmpProfiles
-	iface, router := c.ifaceCache, c.funcRouter
-	charts := c.Charts()
-	walks := device.walks
+	entries := c.deviceStore.Entries()
+	require.Len(t, entries, 1)
+	registrationID := entries[0].RegistrationID
+	dd, router, iface := c.ddSnmpColl, c.funcRouter, c.ifaceCache
 	assert.Equal(t, authored, c.Configuration(), "acquired identity must not become an authored override")
 
 	device.setText(snmputils.OidSysName, "after")
 	device.setText(snmputils.OidSysContact, "after contact")
 	device.setText(snmputils.OidSysDescr, "after description")
 	device.setText(snmputils.OidSysLocation, "")
-	*now = now.Add(59 * time.Second)
-	require.NotEmpty(t, c.Collect(context.Background()))
+	require.NotEmpty(t, st.collectAfter(59*time.Second))
 	assert.Equal(t, "before", c.VirtualNode().Hostname)
 	assert.Equal(t, 1, device.probes)
-	*now = now.Add(time.Second)
-	require.NotEmpty(t, c.Collect(context.Background()))
+	assert.Zero(t, st.clients)
+
+	mx := st.collectAfter(time.Second)
+	require.Contains(t, mx, metricIDFromKey(refreshTestTableKey("ifTraffic", "1")), "the rebuild cycle collects")
 	assert.Equal(t, 2, device.probes)
+	assert.Equal(t, 1, st.clients)
+	assert.False(t, c.rebuildPending)
+	assert.NotSame(t, dd, c.ddSnmpColl)
+	assert.Equal(t, 1, device.closes, "retire the previous connection after the rebuild")
+	assert.Zero(t, st.closes, "the installed connection must remain open")
 	assert.Equal(t, "after", c.VirtualNode().Hostname)
 	assert.Equal(t, guid, c.VirtualNode().GUID)
 	assert.Equal(t, "after", c.VirtualNode().Labels["name"])
 	assert.Equal(t, "after contact", c.VirtualNode().Labels["contact"])
 	assert.Equal(t, "after description", c.VirtualNode().Labels["description"])
 	assert.Empty(t, c.VirtualNode().Labels["location"], "explicit empty metadata must clear the old value")
-	assert.Same(t, dd, c.ddSnmpColl)
-	assert.Same(t, client, c.snmpClient)
-	assert.Equal(t, profiles, c.snmpProfiles)
-	assert.Same(t, iface, c.ifaceCache)
+	assert.Equal(t, systemChangeTestObjectID, c.sysInfo.SysObjectID)
 	assert.Same(t, router, c.funcRouter)
-	assert.Same(t, charts, c.Charts())
-	assert.Equal(t, walks, device.walks, "metadata changes do not rediscover tables")
+	assert.Same(t, iface, c.ifaceCache)
+	require.Contains(t, c.ifaceCache.interfaces, "1")
+	assert.Nil(t, c.ifaceCache.interfaces["1"].rates.trafficIn, "rebuilt state starts new Function baselines")
 	assert.Equal(t, authored, c.Configuration())
+	require.NotEmpty(t, *c.Charts())
 	for _, chart := range *c.Charts() {
-		labels := make(map[string]string)
-		for _, label := range chart.Labels {
-			labels[label.Key] = label.Value
-		}
+		assert.False(t, chart.IsRemoved(), "%s is reported again, so it is redefined in place", chart.ID)
+		labels := chartLabelsForTest(chart)
 		assert.Equal(t, "after", labels["sysName"], chart.ID)
-		if strings.HasPrefix(chart.ID, "snmp_device_prof_ifTraffic") {
+		if chart.ID == refreshTestTableKey("ifTraffic", "1") {
 			assert.Equal(t, "after", labels["snmp_host"])
 		}
 	}
-	entries := c.deviceStore.Entries()
+	entries = c.deviceStore.Entries()
 	require.Len(t, entries, 1)
+	assert.Equal(t, registrationID, entries[0].RegistrationID)
 	assert.Equal(t, "after", entries[0].Info.SysName)
 	assert.Empty(t, entries[0].Info.SysLocation)
+	assert.Equal(t, guid, entries[0].Info.VnodeGUID)
 
-	*now = now.Add(24 * time.Hour)
+	require.NotEmpty(t, st.collectAfter(24*time.Hour))
+	assert.Equal(t, 1, st.clients, "elapsed time is never a rebuild trigger")
+	c.Cleanup(context.Background())
+	assert.Equal(t, 1, st.closes)
+}
+
+func TestCollectorRuntimeSystemChangeRebuildFailureKeepsCollecting(t *testing.T) {
+	st := newSystemChangeTest(t)
+	c, device := st.c, st.device
 	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.Same(t, dd, c.ddSnmpColl, "elapsed time is never a full-rebuild trigger")
-	assert.Equal(t, walks, device.walks)
+	dd := c.ddSnmpColl
+	interfaceRows := func() any {
+		params := funcapi.ResolvedParams{ifacesParamTypeGroup: {IDs: []string{"other"}}}
+		return c.funcRouter.Handle(context.Background(), ifacesMethodID, params).Data
+	}
+	require.Len(t, interfaceRows(), 1)
+
+	device.setText(snmputils.OidSysName, "after")
+	st.connectErr = errors.New("synthetic connect failure")
+	require.NotEmpty(t, st.collectAfter(time.Minute), "the incumbent is still compatible and keeps collecting")
+	assert.Equal(t, 1, st.clients)
+	assert.False(t, c.rebuildPending)
+	assert.Same(t, dd, c.ddSnmpColl)
+	assert.Zero(t, device.closes)
+	assert.Equal(t, "before", c.VirtualNode().Hostname)
+	assert.Len(t, interfaceRows(), 1, "Function contents stay with the incumbent state")
+	entries := c.deviceStore.Entries()
+	require.Len(t, entries, 1, "the connection stays eligible for SNMP-family consumers")
+	assert.Equal(t, "before", entries[0].Info.SysName)
+
+	require.NotEmpty(t, st.collectAfter(time.Second))
+	assert.Equal(t, 1, st.clients, "the rebuild retries on the next system check")
+
+	st.connectErr = nil
+	require.NotEmpty(t, st.collectAfter(time.Minute))
+	assert.Equal(t, 2, st.clients)
+	assert.NotSame(t, dd, c.ddSnmpColl)
+	assert.Equal(t, "after", c.VirtualNode().Hostname)
+	assert.Equal(t, "after", c.deviceStore.Entries()[0].Info.SysName)
+	c.Cleanup(context.Background())
+}
+
+func TestCollectorRuntimeSystemChangeRelabelsPingCharts(t *testing.T) {
+	st := newSystemChangeTest(t)
+	c := st.c
+	c.Ping.Enabled = true
+	c.pingClient = &mockPingClient{sample: pingSuccessSample("192.0.2.1")}
+	require.NotEmpty(t, c.Collect(context.Background()))
+	require.NotNil(t, c.Charts().Get(pingRTTChart.ID))
+
+	st.device.setText(snmputils.OidSysName, "after")
+	require.NotEmpty(t, st.collectAfter(time.Minute))
+	require.Equal(t, 1, st.clients)
+	for _, id := range []string{pingRTTChart.ID, pingRTTStdDevChart.ID} {
+		chart := c.Charts().Get(id)
+		require.NotNil(t, chart, id)
+		assert.False(t, chart.IsRemoved(), id)
+		assert.Equal(t, "after", chartLabelsForTest(chart)["sysName"], id)
+	}
+	c.Cleanup(context.Background())
+}
+
+func TestCollectorRuntimeUnansweredFieldsAreNotChanges(t *testing.T) {
+	st := newSystemChangeTest(t)
+	c, device := st.c, st.device
+	require.NotEmpty(t, c.Collect(context.Background()))
+	device.probePDUs = []gosnmp.SnmpPDU{
+		device.values[snmputils.OidSysObject],
+		{Name: snmputils.OidSysName, Type: gosnmp.NoSuchInstance},
+	}
+	require.NotEmpty(t, st.collectAfter(time.Minute))
+	assert.Equal(t, 2, device.probes)
+	assert.Zero(t, st.clients)
+	assert.Equal(t, "before", c.VirtualNode().Hostname)
+	assert.Equal(t, "before location", c.VirtualNode().Labels["location"])
+
+	device.probePDUs = nil
+	device.setText(snmputils.OidSysLocation, "after location")
+	require.NotEmpty(t, st.collectAfter(time.Minute))
+	assert.Equal(t, 1, st.clients)
+	assert.Equal(t, "after location", c.VirtualNode().Labels["location"])
+	c.Cleanup(context.Background())
 }
 
 func TestCollectorRuntimeProbeFailureRetainsCollection(t *testing.T) {
-	c, device, now := newRefreshTestCollector(t)
+	st := newSystemChangeTest(t)
+	c, device := st.c, st.device
 	require.NotEmpty(t, c.Collect(context.Background()))
 	dd := c.ddSnmpColl
 	device.probeErr = errors.New("synthetic probe timeout")
-	*now = now.Add(time.Minute)
-	require.NotEmpty(t, c.Collect(context.Background()), "failed housekeeping must not stop usable measurement")
+	require.NotEmpty(t, st.collectAfter(time.Minute), "failed housekeeping must not stop usable measurement")
 	assert.Equal(t, "before", c.VirtualNode().Hostname)
 	assert.Same(t, dd, c.ddSnmpColl)
 	assert.Equal(t, 2, device.probes)
 	device.probeErr = nil
 	device.setText(snmputils.OidSysName, "recovered")
-	*now = now.Add(time.Minute)
-	require.NotEmpty(t, c.Collect(context.Background()))
+	require.NotEmpty(t, st.collectAfter(time.Minute))
 	assert.Equal(t, "recovered", c.VirtualNode().Hostname)
+	c.Cleanup(context.Background())
 }
 
 func TestCollectorRuntimeUnusableObjectIDDoesNotRebuild(t *testing.T) {
@@ -288,10 +412,11 @@ func TestCollectorRuntimeUnusableObjectIDDoesNotRebuild(t *testing.T) {
 	}
 }
 
-func TestCollectorRuntimeMetadataPreservesAuthoredAndNamedVnodes(t *testing.T) {
+func TestCollectorRuntimeSystemChangePreservesAuthoredAndNamedVnodes(t *testing.T) {
 	for _, named := range []bool{false, true} {
 		t.Run(map[bool]string{false: "authored", true: "named"}[named], func(t *testing.T) {
-			c, device, now := newRefreshTestCollector(t)
+			st := newSystemChangeTest(t)
+			c, device := st.c, st.device
 			c.LocalVnode.Hostname = "authored"
 			c.LocalVnode.Labels = map[string]string{"contact": "", "site": "configured"}
 			c.snmpProfiles[0].Definition.Metadata["device"].Fields["vendor"] = ddprofiledefinition.MetadataField{
@@ -310,8 +435,9 @@ func TestCollectorRuntimeMetadataPreservesAuthoredAndNamedVnodes(t *testing.T) {
 			require.NotEmpty(t, c.Collect(context.Background()))
 			device.setText(snmputils.OidSysName, "changed")
 			device.setText(snmputils.OidSysContact, "changed contact")
-			*now = now.Add(time.Minute)
-			require.NotEmpty(t, c.Collect(context.Background()))
+			require.NotEmpty(t, st.collectAfter(time.Minute))
+			require.Equal(t, 1, st.clients)
+			t.Cleanup(func() { c.Cleanup(context.Background()) })
 			assert.Equal(t, authored, c.Configuration())
 			if named {
 				assert.Nil(t, c.VirtualNode())
@@ -364,114 +490,6 @@ func (d *refreshSelectiveFailure) Get(oids []string) (*gosnmp.SnmpPacket, error)
 		return nil, errors.New("synthetic profile input timeout")
 	}
 	return d.refreshTestDevice.Get(oids)
-}
-
-func TestCollectorRuntimePartialMetadataRefresh(t *testing.T) {
-	c, device, now := newRefreshTestCollector(t)
-	const tagOID = "1.3.6.1.4.1.99999.91.0"
-	const metricOID = "1.3.6.1.4.1.99999.92.0"
-	device.setText(tagOID, "before accessory")
-	device.values[metricOID] = gosnmp.SnmpPDU{
-		Name:  metricOID,
-		Type:  gosnmp.Integer,
-		Value: 7,
-	}
-	transport := &refreshSelectiveFailure{
-		refreshTestDevice: device,
-		failedOID:         tagOID,
-	}
-	c.snmpClient = transport
-	c.snmpProfiles = append(c.snmpProfiles, &ddsnmp.Profile{
-		SourceFile: "accessory.yaml",
-		Definition: &ddprofiledefinition.ProfileDefinition{
-			MetricTags: []ddprofiledefinition.GlobalMetricTagConfig{{
-				MetricTagConfig: ddprofiledefinition.MetricTagConfig{
-					Tag: "accessory",
-					Symbol: ddprofiledefinition.SymbolConfigCompat{
-						OID: tagOID,
-					},
-				},
-			}},
-			Metrics: []ddprofiledefinition.MetricsConfig{
-				{Symbol: ddprofiledefinition.SymbolConfig{
-					OID:  metricOID,
-					Name: "accessoryMetric",
-				}},
-			},
-		},
-	})
-	require.NotEmpty(t, c.Collect(context.Background()))
-	dd, client := c.ddSnmpColl, c.snmpClient
-	labels := func(id string) map[string]string {
-		result := make(map[string]string)
-		for _, label := range c.Charts().Get(id).Labels {
-			result[label.Key] = label.Value
-		}
-		return result
-	}
-	device.setText(snmputils.OidSysName, "after")
-	device.setText(tagOID, "after accessory")
-	transport.fail = true
-	*now = now.Add(time.Minute)
-	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.Equal(t, "after", c.VirtualNode().Hostname, "failed unrelated inputs cannot block healthy identity updates")
-	assert.Equal(t, "after", labels(refreshTestTableKey("ifTraffic", "1"))["snmp_host"])
-	assert.Equal(t, "before accessory", labels(chartIDFromName("accessoryMetric"))["accessory"])
-	require.NotNil(t, c.pendingSysInfo, "failed profile input refresh must remain retryable")
-	entries := c.deviceStore.Entries()
-	require.Len(t, entries, 1)
-	assert.Equal(t, "after", entries[0].Info.SysName)
-	version := c.chartMetadataVersion
-	*now = now.Add(time.Minute)
-	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.Equal(
-		t,
-		version,
-		c.chartMetadataVersion,
-		"identical usable snapshots do not redefine charts on a failed retry",
-	)
-
-	transport.fail = false
-	*now = now.Add(time.Minute)
-	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.Nil(t, c.pendingSysInfo)
-	assert.Equal(
-		t,
-		"after accessory",
-		labels(chartIDFromName("accessoryMetric"))["accessory"],
-		"recovered inputs refresh chart labels even with unchanged system metadata",
-	)
-	assert.Same(t, dd, c.ddSnmpColl)
-	assert.Same(t, client, c.snmpClient)
-}
-
-func TestCollectorRuntimeUnchangedObservationReconcilesNegativeInput(t *testing.T) {
-	c, device, now := newRefreshTestCollector(t)
-	// Check observed the name, but the subsequent profile input acquisition reports absence.
-	device.values[snmputils.OidSysName] = gosnmp.SnmpPDU{
-		Name: snmputils.OidSysName,
-		Type: gosnmp.NoSuchInstance,
-	}
-	require.NotEmpty(t, c.Collect(context.Background()))
-	require.Equal(t, "before", c.sysInfo.Name)
-	require.Empty(t, c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value)
-	device.setText(snmputils.OidSysName, "before")
-	*now = now.Add(time.Minute)
-
-	require.NotEmpty(t, c.Collect(context.Background()))
-	assert.Equal(t, 2, device.probes)
-	assert.Equal(
-		t,
-		"before",
-		c.ddSnmpColl.PreparedDeviceMetadata()["name"].Value,
-		"a successful system observation contradicts prior unsupported evidence even when its value is unchanged",
-	)
-	chart := c.Charts().Get(refreshTestTableKey("ifTraffic", "1"))
-	require.NotNil(t, chart)
-	assert.Contains(t, chart.Labels, collectorapi.Label{
-		Key:   "snmp_host",
-		Value: "before",
-	})
 }
 
 func TestCollectorRuntimeInitialProfileMetadataRecovery(t *testing.T) {

@@ -60,17 +60,9 @@ var (
 
 func (c *Collector) addPingCharts() {
 	for _, chart := range *pingCharts.Copy() {
-		chart.Labels = c.pingChartLabels()
+		chart.Labels = toChartLabels(c.chartBaseLabels())
 		c.installChart(chart)
 	}
-}
-
-func (c *Collector) pingChartLabels() []collectorapi.Label {
-	return toChartLabels(c.chartBaseLabels())
-}
-
-func isPingChart(chart *collectorapi.Chart) bool {
-	return chart.ID == pingRTTChart.ID || chart.ID == pingRTTStdDevChart.ID
 }
 
 var (
@@ -309,22 +301,6 @@ func (s *metricChartState) observeDimension(id, name string, algo collectorapi.D
 	}
 	s.dimensions[id] = true
 	s.chart.MarkNotCreated()
-}
-
-// Scalar profile charts use chartMetadataVersion; table labels follow current samples.
-// Ping and licensing charts need their device labels replaced here.
-func (c *Collector) refreshAuxiliaryChartLabels() {
-	for _, chart := range *c.charts {
-		switch {
-		case isPingChart(chart):
-			chart.Labels = c.pingChartLabels()
-		case strings.HasPrefix(chart.Ctx, "snmp.license."):
-			chart.Labels = c.licenseChartLabels()
-		default:
-			continue
-		}
-		chart.MarkNotCreated()
-	}
 }
 
 func toChartLabels(labels map[string]string) []collectorapi.Label {

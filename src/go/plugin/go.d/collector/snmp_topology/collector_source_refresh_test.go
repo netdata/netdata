@@ -3,7 +3,6 @@
 package snmptopology
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -14,7 +13,6 @@ import (
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
-	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/stretchr/testify/require"
 )
@@ -119,7 +117,7 @@ func TestCollectorRefreshReclassificationWithinRegistration(t *testing.T) {
 
 }
 
-func TestCollectorRefreshMetadataDoesNotAcquireTopology(t *testing.T) {
+func TestCollectorRefreshChangedDeviceInformationReacquires(t *testing.T) {
 	coll, store := newTestSNMPTopologyCollectorWithStore()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	coll.now = func() time.Time { return now }
@@ -135,10 +133,15 @@ func TestCollectorRefreshMetadataDoesNotAcquireTopology(t *testing.T) {
 	}
 	store.Register("job-a", dev)
 	calls := 0
+	fail := false
 	coll.newSnmpClient = func() gosnmp.Handler {
 		calls++
 		client := snmpmock.NewMockHandler(gomock.NewController(t))
-		expectTopologyRefreshSNMPClient(client, dev)
+		if fail {
+			expectTopologyRefreshSNMPClientConnectError(client, dev, errors.New("unreachable"))
+		} else {
+			expectTopologyRefreshSNMPClient(client, dev)
+		}
 		return client
 	}
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
@@ -147,75 +150,56 @@ func TestCollectorRefreshMetadataDoesNotAcquireTopology(t *testing.T) {
 	}
 	require.Zero(t, coll.refreshTopology(context.Background()).errors)
 	first := coll.topologyRegistry.acquireGeneration()
-	firstDevice := first.devices[0]
 	id := store.Entries()[0].RegistrationID
-	firstState := coll.deviceStates[id]
+
+	// Unchanged device information waits for the refresh deadline.
+	now = now.Add(time.Minute)
+	require.Zero(t, coll.refreshTopology(context.Background()).errors)
+	require.Equal(t, 1, calls)
+
 	dev.SysName, dev.SysContact, dev.SysLocation = "new-device", "new-contact", "new-location"
 	dev.VnodeLabels["name"], dev.VnodeLabels["location"] = dev.SysName, dev.SysLocation
 	store.Register("job-a", dev)
 	now = now.Add(time.Minute)
 	require.Zero(t, coll.refreshTopology(context.Background()).errors)
-	require.Equal(t, 1, calls)
-	current := coll.topologyRegistry.acquireGeneration()
-	require.Equal(t, "new-device", current.devices[0].trap.deviceHostname)
+	require.Equal(t, 2, calls, "changed device information must bypass the refresh deadline")
+	require.EqualValues(t, 2, coll.deviceStates[id].attemptOrdinal)
+	require.Equal(t, now.Add(defaultRefreshEvery), coll.deviceStates[id].nextRetry)
+	second := coll.topologyRegistry.acquireGeneration()
+	require.Equal(t, "new-device", second.devices[0].trap.deviceHostname)
+	require.Equal(t, "new-device", second.devices[0].acquisition.Evidence.Device.SysName)
 	enrichment := coll.topologyRegistry.trapEnrichmentForSource(dev.Hostname, "")
 	require.NotNil(t, enrichment)
 	require.Equal(t, "new-device", enrichment.DeviceHostname)
-	observation := current.observationSnapshots()[0]
-	require.Equal(t, "new-device", observation.LocalDevice.SysName)
-	require.Equal(t, "new-device", observation.L2Observations[0].Hostname)
-	require.Equal(t, "new-contact", observation.LocalDevice.SysContact)
-	require.Equal(t, "new-location", observation.LocalDevice.SysLocation)
-	require.Equal(t, "configured", observation.LocalDevice.Labels["site"])
-	require.Equal(t, "new-location", observation.LocalDevice.Labels["location"])
-	require.Equal(t, firstDevice.collectedAt, current.devices[0].collectedAt)
-	require.Equal(t, firstDevice.expiresAt, current.devices[0].expiresAt)
-	require.Equal(t, firstState.nextRetry, coll.deviceStates[id].nextRetry)
-	require.Equal(t, firstState.attemptOrdinal, coll.deviceStates[id].attemptOrdinal)
-	require.Same(t, firstDevice.acquisition, current.devices[0].acquisition)
-	require.Equal(t, "old-device", current.devices[0].acquisition.Evidence.Device.SysName)
-	require.Equal(t, "old-device", first.observationSnapshots()[0].LocalDevice.SysName)
-	require.Equal(t, "old-device", firstDevice.trap.deviceHostname)
+	local := second.observationSnapshots()[0].LocalDevice
+	require.Equal(t, "new-device", local.SysName)
+	require.Equal(t, "new-contact", local.SysContact)
+	require.Equal(t, "new-location", local.SysLocation)
+	require.Equal(t, "configured", local.Labels["site"])
+	require.Equal(t, "new-location", local.Labels["location"])
+	require.Equal(t, "old-device", first.observationSnapshots()[0].LocalDevice.SysName, "prior readers keep their view")
 
-	options := defaultTopologyQueryOptionsForTest()
-	live, ok, err := (funcDepsAdapter{
-		registry: coll.topologyRegistry,
-	}).Snapshot(options)
-	require.NoError(t, err)
-	require.True(t, ok)
-	cut := captureTopologyCut(coll.topologyRegistry, nil)
-	document, err := newTopologyDiagnosticArchiveDocumentV1(cut, "v-test")
-	require.NoError(t, err)
-	require.NotNil(t, document.Snapshot.Topology.Devices[0].Presentation)
-	require.Greater(t, cut.Topology.RecordCount, first.diagnostic.RecordCount)
-	require.Greater(t, cut.Topology.LogicalBytes, first.diagnostic.LogicalBytes)
-	var encoded bytes.Buffer
-	require.NoError(t, writeTopologyDiagnosticArchiveWithProducerVersion(&encoded, cut, "v-test"))
-	archive, err := readTestDiagnosticArchive(bytes.NewReader(encoded.Bytes()), snmpdiag.DefaultReadLimits())
-	require.NoError(t, err)
-	replayed, err := archive.Replay(testDiagnosticQuery(options))
-	require.NoError(t, err)
-	require.Equal(t, live.Data, replayed, "current presentation must survive archive replay separately from acquisition input")
-
-	dev.SysContact, dev.SysLocation = "", ""
-	delete(dev.VnodeLabels, "location")
+	// A failed acquisition keeps the retained topology and its own retry deadline.
+	dev.SysName = "renamed-again"
+	dev.VnodeLabels["name"] = dev.SysName
 	store.Register("job-a", dev)
 	now = now.Add(time.Minute)
+	fail = true
+	require.Equal(t, 1, coll.refreshTopology(context.Background()).errors)
+	require.Equal(t, 3, calls)
+	require.Equal(t, "new-device", coll.topologyRegistry.acquireGeneration().devices[0].trap.deviceHostname)
+	require.True(t, coll.acquireTopologyDiagnostics().Topology.Devices[0].HasRetainedSuccess)
+	retryAt := now.Add(defaultDeviceCheckEvery)
+	require.Equal(t, retryAt, coll.deviceStates[id].nextRetry)
+	now = now.Add(time.Second)
 	coll.refreshTopology(context.Background())
-	cleared := coll.topologyRegistry.acquireGeneration().observationSnapshots()[0].LocalDevice
-	require.Empty(t, cleared.SysContact)
-	require.Empty(t, cleared.SysLocation)
-	require.NotContains(t, cleared.Labels, "location")
-	require.Equal(t, 1, calls)
+	require.Equal(t, 3, calls, "the change must not retry before the failure deadline")
 
-	// Returning to the captured metadata must not retain an earlier projection.
-	dev.SysName, dev.SysContact, dev.SysLocation = "old-device", "old-contact", "old-location"
-	dev.VnodeLabels["name"], dev.VnodeLabels["location"] = dev.SysName, dev.SysLocation
-	store.Register("job-a", dev)
-	now = now.Add(time.Minute)
-	coll.refreshTopology(context.Background())
-	require.Equal(t, 1, calls)
-	require.Equal(t, first.observationSnapshots(), coll.topologyRegistry.acquireGeneration().observationSnapshots())
+	fail = false
+	now = retryAt
+	require.Zero(t, coll.refreshTopology(context.Background()).errors)
+	require.Equal(t, 4, calls)
+	require.Equal(t, "renamed-again", coll.topologyRegistry.acquireGeneration().devices[0].trap.deviceHostname)
 }
 
 func TestCollectorRefreshReclassificationCancellationKeepsCommittedCut(t *testing.T) {

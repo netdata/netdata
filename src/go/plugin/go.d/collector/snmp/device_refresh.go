@@ -17,7 +17,8 @@ import (
 const sysInfoCheckEvery = time.Minute
 
 // refreshDeviceState runs on the collection owner, before normal metric polling.
-// Only a usable changed sysObjectID justifies discarding device polling state.
+// Any answered system scalar that changed rebuilds device state. Only a changed
+// sysObjectID makes the incumbent state incompatible and suspends it.
 func (c *Collector) refreshDeviceState() error {
 	if c.now().Before(c.nextSysInfoCheck) {
 		return c.pendingRebuildError()
@@ -29,11 +30,6 @@ func (c *Collector) refreshDeviceState() error {
 		c.Limit("snmp:sysinfo", 1, 5*time.Minute).Warningf("failed to refresh SNMP system information: %v", err)
 		return c.pendingRebuildError()
 	}
-	base := c.sysInfo
-	if c.pendingSysInfo != nil {
-		base = c.pendingSysInfo
-	}
-	next := mergeSystemObservation(base, observed)
 	if observed.Probe.SeenSysObjectID && observed.SysObjectID != "" &&
 		(c.rebuildPending || observed.SysObjectID != c.sysInfo.SysObjectID) {
 		if !c.rebuildPending {
@@ -48,30 +44,14 @@ func (c *Collector) refreshDeviceState() error {
 	if c.rebuildPending {
 		return c.pendingRebuildError()
 	}
-	observedOIDs := observedSystemOIDs(observed)
-	systemChanged := !sameSystemMetadata(c.sysInfo, next)
-	if c.pendingSysInfo == nil && !systemChanged &&
-		(c.ddSnmpColl == nil || !c.ddSnmpColl.NeedsProfileInputRefresh(observedOIDs)) {
+	next := mergeSystemObservation(c.sysInfo, observed)
+	if sameSystemMetadata(c.sysInfo, next) {
 		return nil
 	}
-
-	c.pendingSysInfo = next
-	var refreshErr error
-	if c.ddSnmpColl != nil {
-		refreshErr = c.ddSnmpColl.RefreshProfileInputs(observedOIDs)
-		c.captureCollectionFailures()
-		if refreshErr != nil {
-			c.Limit("snmp:metadata", 1, sysInfoCheckEvery).
-				Warningf("failed to refresh profile metadata: %v", refreshErr)
-		}
-	}
-	if err := c.applyDeviceMetadata(next, c.preparedProfileMetadata()); err != nil {
-		c.Limit("snmp:metadata", 1, sysInfoCheckEvery).Warningf("failed to update device metadata: %v", err)
-		return nil
-	}
-	// Failed profile inputs stay pending and retry on the next check.
-	if refreshErr == nil {
-		c.pendingSysInfo = nil
+	// The incumbent state is still compatible, so a failed rebuild keeps it
+	// collecting and the next check retries.
+	if err := c.rebuildDevice(next); err != nil {
+		c.Limit("snmp:rebuild", 1, 5*time.Minute).Warningf("failed to refresh SNMP device state: %v", err)
 	}
 	return nil
 }
@@ -112,25 +92,6 @@ func sameSystemMetadata(a, b *snmputils.SysInfo) bool {
 	return a.Name == b.Name && a.Descr == b.Descr && a.Contact == b.Contact && a.Location == b.Location
 }
 
-func observedSystemOIDs(si *snmputils.SysInfo) []string {
-	var oids []string
-	for _, field := range []struct {
-		seen bool
-		oid  string
-	}{
-		{si.Probe.SeenSysObjectID && si.SysObjectID != "", snmputils.OidSysObject},
-		{si.Probe.SeenSysDescr, snmputils.OidSysDescr},
-		{si.Probe.SeenSysName, snmputils.OidSysName},
-		{si.Probe.SeenSysContact, snmputils.OidSysContact},
-		{si.Probe.SeenSysLocation, snmputils.OidSysLocation},
-	} {
-		if field.seen {
-			oids = append(oids, field.oid)
-		}
-	}
-	return oids
-}
-
 func (c *Collector) applyDeviceMetadata(si *snmputils.SysInfo, metadata map[string]ddsnmp.MetaTag) error {
 	var vnode *vnodes.VirtualNode
 	if c.CreateVnode && c.Vnode == "" {
@@ -165,22 +126,15 @@ func (c *Collector) applyDeviceMetadata(si *snmputils.SysInfo, metadata map[stri
 			}
 		}
 	}
-	changed := !sameSystemMetadata(c.sysInfo, si)
-	var inputRevision uint64
-	if c.ddSnmpColl != nil {
-		inputRevision = c.ddSnmpColl.ProfileInputRevision()
-		changed = changed || inputRevision != c.publishedProfileInputRevision
-	}
 	c.sysInfo = si
 	if vnode != nil {
 		c.vnode = vnode
 	}
-	if changed {
-		c.chartMetadataVersion++
-		c.refreshAuxiliaryChartLabels()
-	}
 	c.registerDeviceState(si, metadata)
-	c.publishedProfileInputRevision = inputRevision
+	c.publishedProfileInputRevision = 0
+	if c.ddSnmpColl != nil {
+		c.publishedProfileInputRevision = c.ddSnmpColl.ProfileInputRevision()
+	}
 	return nil
 }
 
@@ -202,7 +156,9 @@ func (c *Collector) preparedProfileMetadata() map[string]ddsnmp.MetaTag {
 	return c.ddSnmpColl.PreparedDeviceMetadata()
 }
 
-// rebuildDevice runs only for normal polling jobs; ping_only keeps setup-only SNMP.
+// rebuildDevice replaces every piece of device-derived state with a fresh one for
+// si. The candidate is prepared first, so a failure leaves the incumbent intact.
+// It runs only for normal polling jobs; ping_only keeps setup-only SNMP.
 func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	profiles, profileContext := c.resolveProfiles(si)
 	if len(profiles) == 0 {
@@ -224,24 +180,23 @@ func (c *Collector) rebuildDevice(si *snmputils.SysInfo) error {
 	c.disableBulkWalk, c.adjMaxRepetitions = disableBulk, repetitions
 	c.ddSnmpColl = c.newProfileCollector()
 	c.activateProfiles(profiles, profileContext)
-	c.pendingSysInfo, c.rebuildPending = nil, false
-	c.publishedProfileInputRevision = 0
+	c.rebuildPending = false
+	c.resetDeviceFunctionState()
 	c.resetDevicePresentation()
 	_ = previous.Close()
 	return c.applyDeviceMetadata(si, nil)
 }
 
 func (c *Collector) resetDevicePresentation() {
+	// Charts the new state reports again are redefined in place by installChart;
+	// the job runtime prunes the rest after publishing their removal.
 	for _, chart := range *c.charts {
-		if !isPingChart(chart) {
-			chart.MarkRemove()
-			chart.MarkNotCreated()
-		}
+		chart.MarkRemove()
+		chart.MarkNotCreated()
 	}
 	clear(c.seenScalarMetrics)
 	clear(c.tableMetricCharts)
 	clear(c.seenProfiles)
-	c.chartMetadataVersion++
 	c.normal.initialization = nil
 	c.normal.latest, c.normal.failed, c.normal.cut = nil, nil, nil
 	c.normal.bgpSources, c.normal.licenseSources = nil, nil
@@ -250,13 +205,13 @@ func (c *Collector) resetDevicePresentation() {
 			c.normal.initialization = append(c.normal.initialization, c.normal.recorder.Operation(ordinal))
 		}
 	}
-	if c.PingOnly || c.Ping.Enabled {
+	if c.Ping.Enabled {
 		c.addPingCharts()
 	}
 }
 
-// A confirmed incompatible classification invalidates Function data even when
-// profile resolution or replacement connection setup cannot finish yet.
+// Function data belongs to the device state it was collected with. A changed
+// sysObjectID clears it even when the rebuild cannot finish yet.
 func (c *Collector) resetDeviceFunctionState() {
 	c.ifaceCache.mu.Lock()
 	clear(c.ifaceCache.interfaces)

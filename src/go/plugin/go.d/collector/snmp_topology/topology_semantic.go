@@ -3,6 +3,7 @@
 package snmptopology
 
 import (
+	"maps"
 	"net/netip"
 	"path"
 	"slices"
@@ -162,6 +163,13 @@ func portableTopologySemanticOrigin(value string) bool {
 		}
 	}
 	return true
+}
+
+func sameTopologyDeviceInput(a, b topologydiag.DeviceInput) bool {
+	return a.Hostname == b.Hostname && a.SysObjectID == b.SysObjectID && a.SysName == b.SysName &&
+		a.SysDescr == b.SysDescr && a.SysContact == b.SysContact && a.SysLocation == b.SysLocation &&
+		a.Vendor == b.Vendor && a.Model == b.Model && a.VnodeGUID == b.VnodeGUID &&
+		maps.Equal(a.VnodeLabels, b.VnodeLabels)
 }
 
 func cloneTopologyDeviceInput(value topologydiag.DeviceInput) topologydiag.DeviceInput {

@@ -250,12 +250,11 @@ modules:
           2. Picks the best matching vendor/model profile(s)
           3. Collects exactly the metrics those profiles define
 
-          Jobs collecting SNMP metrics check standard system information once per minute. Name, contact, location,
-          and description changes update device metadata without restarting profile polling. A changed valid
-          `sysObjectID` reselects profiles and rebuilds device-specific collection state. The vnode GUID and history
-          stay the same, and configured hostname and label overrides keep precedence. A device swapped for hardware
-          reporting the same `sysObjectID` keeps its current polling profiles until the job restarts. `ping_only`
-          jobs retain their setup-only SNMP probe.
+          Jobs collecting SNMP metrics check standard system information once per minute. When the name, description,
+          contact, location or `sysObjectID` changes, the job identifies the device again: it reselects profiles and
+          rebuilds device-specific collection state. The vnode GUID and history stay the same, and configured hostname
+          and label overrides keep precedence. A device swapped for hardware reporting the same five values is not
+          detected until the job restarts. `ping_only` jobs retain their setup-only SNMP probe.
       supported_platforms:
         include: []
         exclude: []

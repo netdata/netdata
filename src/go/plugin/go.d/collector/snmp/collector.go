@@ -85,8 +85,7 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 		charts:               &collectorapi.Charts{},
 		seenScalarMetrics:    make(map[string]*metricChartState),
 		tableMetricCharts:    make(map[string]*metricChartState),
-		seenProfiles:         make(map[string]uint64),
-		chartMetadataVersion: 1,
+		seenProfiles:         make(map[string]bool),
 		deviceStore:          store,
 		deviceLifecycleStore: store,
 
@@ -120,8 +119,7 @@ type (
 		charts                   *collectorapi.Charts
 		seenScalarMetrics        map[string]*metricChartState
 		tableMetricCharts        map[string]*metricChartState
-		seenProfiles             map[string]uint64
-		chartMetadataVersion     uint64
+		seenProfiles             map[string]bool
 		deviceStore              *ddsnmp.DeviceStore
 		deviceLifecycleStore     deviceLifecycleStore
 		deviceWriter             *ddsnmp.DeviceWriter
@@ -154,7 +152,6 @@ type (
 		publishedProfileInputRevision uint64
 		now                           func() time.Time
 		nextSysInfoCheck              time.Time
-		pendingSysInfo                *snmputils.SysInfo
 		rebuildPending                bool
 
 		adjMaxRepetitions uint32
@@ -165,14 +162,11 @@ type (
 		Collect() ([]*ddsnmp.ProfileMetrics, error)
 		CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error)
 		PreparedDeviceMetadata() map[string]ddsnmp.MetaTag
-		NeedsProfileInputRefresh(observedOIDs []string) bool
 		ProfileInputRevision() uint64
-		RefreshProfileInputs(observedOIDs []string) error
 	}
 	metricChartState struct {
-		metadataVersion uint64
-		chart           *collectorapi.Chart
-		dimensions      map[string]bool
+		chart      *collectorapi.Chart
+		dimensions map[string]bool
 	}
 )
 
