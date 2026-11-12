@@ -16,13 +16,6 @@ func (c *Collector) doQueryRow(query string, v any) error {
 	return c.db.QueryRowContext(ctx, query).Scan(v)
 }
 
-func (c *Collector) doDBQueryRow(db *sql.DB, query string, v any) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
-	defer cancel()
-
-	return db.QueryRowContext(ctx, query).Scan(v)
-}
-
 func (c *Collector) doQuery(query string, assign func(column, value string, rowEnd bool)) error {
 	return c.doDBQuery(c.db, query, assign)
 }
