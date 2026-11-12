@@ -95,27 +95,38 @@ pub struct PluginConfig {
 }
 
 impl PluginConfig {
-    /// The values of this config that the plugin accepts and that do harm
-    /// with no other sign: one sentence for each, with its key. Empty for a
-    /// config with none, as the stock one.
+    /// Deal with the values of this config that the plugin accepts and that
+    /// would do harm with no other sign, and report each: one sentence, with
+    /// its key. Empty for a config with none, as the stock one.
     ///
     /// They are not errors: what `otel.yaml` accepts does not change, and a
-    /// plugin that ran with such a value still starts. The config load logs
-    /// each as a warning (`otel-plugin`, `ConfigResolver::resolve`). The
-    /// values that only the ingestor can judge (against its sweep interval)
-    /// are warned about there (`otel-ingestor`, `warn_signal_config`).
-    pub fn harmful_values(&self) -> Vec<String> {
+    /// plugin that ran with such a value still starts. The config load calls
+    /// this once, on the config of all layers, and logs each sentence as a
+    /// warning (`otel-plugin`, `ConfigResolver::resolve`).
+    ///
+    /// - A 0 in a rotation limit (every export request would make files and
+    ///   indexing operations of its own) or in the new-chart limit (no chart
+    ///   would ever be made for an OTLP metric) is read as "not set": this
+    ///   puts in its place what an absent key has, so the rest of the plugin
+    ///   never gets such a 0.
+    /// - An ingest window longer than the retention age is only reported: no
+    ///   value is the right one to put in its place.
+    ///
+    /// The values that only the ingestor can judge (against its sweep
+    /// interval) are warned about there (`otel-ingestor`,
+    /// `warn_signal_config`).
+    pub fn correct_harmful_values(&mut self) -> Vec<String> {
         let mut found = Vec::new();
 
         if self.metrics.max_new_charts_per_request == 0 {
-            found.push(
-                "metrics.max_new_charts_per_request is 0: no chart is ever made for an OTLP \
-                 metric"
-                    .to_string(),
-            );
+            self.metrics.max_new_charts_per_request = DEFAULT_MAX_NEW_CHARTS_PER_REQUEST;
+            found.push(format!(
+                "metrics.max_new_charts_per_request is 0, which is read as not set: the \
+                 built-in {DEFAULT_MAX_NEW_CHARTS_PER_REQUEST} is used"
+            ));
         }
-        for (signal, config) in [("logs", &self.logs), ("traces", &self.traces)] {
-            config.harmful_values(signal, &mut found);
+        for (signal, config) in [("logs", &mut self.logs), ("traces", &mut self.traces)] {
+            config.correct_harmful_values(signal, &mut found);
         }
 
         found
@@ -292,9 +303,16 @@ pub struct MetricsConfig {
     pub expiry_duration_secs: Option<u64>,
     /// New-chart budget per export request on either transport (cardinality
     /// limit): once exhausted, data points for not-yet-existing charts are
-    /// dropped until the next request; existing charts keep ingesting.
+    /// dropped until the next request; existing charts keep ingesting. A 0
+    /// is read as "not set" ([`PluginConfig::correct_harmful_values`]).
     pub max_new_charts_per_request: usize,
 }
+
+/// The new-chart budget of the stock file, which is what a
+/// `max_new_charts_per_request` of 0 is read as
+/// ([`PluginConfig::correct_harmful_values`]). The otel-plugin stock-file
+/// test pins it against the shipped value.
+pub const DEFAULT_MAX_NEW_CHARTS_PER_REQUEST: usize = 100;
 
 /// Metrics derived from ingested logs and traces.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -336,7 +354,7 @@ fn default_derived_metrics_max_services() -> usize {
 }
 
 impl SignalConfig {
-    /// This signal's part of [`PluginConfig::harmful_values`], for the
+    /// This signal's part of [`PluginConfig::correct_harmful_values`], for the
     /// `default` entry and for every tenant that has an entry of its own.
     ///
     /// The line between the ingest window and the retention age is a little
@@ -345,30 +363,18 @@ impl SignalConfig {
     /// requires it to be longer than the retention `max_age`
     /// ([`RetentionPolicy::validate`]), so an ingest window that reaches it
     /// is longer than `max_age` too.
-    fn harmful_values(&self, signal: &str, found: &mut Vec<String>) {
+    fn correct_harmful_values(&mut self, signal: &str, found: &mut Vec<String>) {
         let format = humantime_serde::re::humantime::format_duration;
 
-        let mut tenants: Vec<&str> = self.rotation.tenants.keys().map(String::as_str).collect();
-        tenants.sort_unstable();
-        tenants.insert(0, "default");
-        for tenant in tenants {
-            let rotation = self.rotation.resolve(tenant);
-            let mut zero = Vec::new();
-            if rotation.max_entries == 0 {
-                zero.push("max_entries");
-            }
-            if rotation.max_file_size.as_u64() == 0 {
-                zero.push("max_file_size");
-            }
-            if rotation.max_file_duration.is_zero() {
-                zero.push("max_file_duration");
-            }
-            for key in zero {
-                found.push(format!(
-                    "{signal}.rotation.{tenant}.{key} is 0: every export request makes new files \
-                     and indexing operations of its own"
-                ));
-            }
+        for unset in self.rotation.unset_zero_limits() {
+            let whose = match unset.tenant.as_str() {
+                "default" => "the built-in",
+                _ => "the default entry's",
+            };
+            found.push(format!(
+                "{signal}.rotation.{}.{} is 0, which is read as not set: {whose} {} is used",
+                unset.tenant, unset.key, unset.used
+            ));
         }
 
         let mut tenants: Vec<&str> = self.retention.tenants.keys().map(String::as_str).collect();
@@ -719,6 +725,81 @@ impl RotationPolicy {
         }
     }
 
+    /// Read every limit of 0 as "not set", and say which ones were: a limit
+    /// of 0 is reached by the first record, so every export request would
+    /// make files and indexing operations of its own. In the `default` entry
+    /// the built-in value ([`RotationPolicy::default`]) takes its place; a
+    /// tenant's entry loses the key, so the tenant has what the `default`
+    /// entry has. The `default` entry comes first, then the tenants by name.
+    fn unset_zero_limits(&mut self) -> Vec<UnsetLimit> {
+        let format = humantime_serde::re::humantime::format_duration;
+        let built_in = Self::default().default;
+        let mut unset = Vec::new();
+
+        if self.default.max_entries == 0 {
+            self.default.max_entries = built_in.max_entries;
+            unset.push(UnsetLimit::new(
+                "default",
+                "max_entries",
+                built_in.max_entries,
+            ));
+        }
+        if self.default.max_file_size.as_u64() == 0 {
+            self.default.max_file_size = built_in.max_file_size;
+            unset.push(UnsetLimit::new(
+                "default",
+                "max_file_size",
+                built_in.max_file_size.display().si(),
+            ));
+        }
+        if self.default.max_file_duration.is_zero() {
+            self.default.max_file_duration = built_in.max_file_duration;
+            unset.push(UnsetLimit::new(
+                "default",
+                "max_file_duration",
+                format(built_in.max_file_duration),
+            ));
+        }
+
+        let mut tenants: Vec<String> = self.tenants.keys().cloned().collect();
+        tenants.sort_unstable();
+        for tenant in tenants {
+            let Some(entry) = self.tenants.get_mut(&tenant) else {
+                continue;
+            };
+
+            if entry.max_entries == Some(0) {
+                entry.max_entries = None;
+                unset.push(UnsetLimit::new(
+                    &tenant,
+                    "max_entries",
+                    self.default.max_entries,
+                ));
+            }
+            if entry.max_file_size.is_some_and(|size| size.as_u64() == 0) {
+                entry.max_file_size = None;
+                unset.push(UnsetLimit::new(
+                    &tenant,
+                    "max_file_size",
+                    self.default.max_file_size.display().si(),
+                ));
+            }
+            if entry
+                .max_file_duration
+                .is_some_and(|duration| duration.is_zero())
+            {
+                entry.max_file_duration = None;
+                unset.push(UnsetLimit::new(
+                    &tenant,
+                    "max_file_duration",
+                    format(self.default.max_file_duration),
+                ));
+            }
+        }
+
+        unset
+    }
+
     /// Patch this policy from a partial override map (the config override
     /// layer: `otel-plugin`'s user-file/env merge): the `"default"` entry's
     /// set fields patch the complete default; any other key upserts a partial
@@ -748,6 +829,26 @@ impl RotationPolicy {
                     target.max_file_duration = Some(v);
                 }
             }
+        }
+    }
+}
+
+/// One rotation limit that was 0 and is now read as "not set"
+/// ([`RotationPolicy::unset_zero_limits`]).
+struct UnsetLimit {
+    /// `default`, or the tenant whose entry had the 0.
+    tenant: String,
+    key: &'static str,
+    /// The value in use from now on, as text for the report.
+    used: String,
+}
+
+impl UnsetLimit {
+    fn new(tenant: &str, key: &'static str, used: impl ToString) -> Self {
+        Self {
+            tenant: tenant.to_string(),
+            key,
+            used: used.to_string(),
         }
     }
 }
@@ -1129,7 +1230,7 @@ traces:
 
     #[test]
     fn a_config_with_no_harmful_value_has_none_to_report() {
-        assert_eq!(full_config().harmful_values(), Vec::<String>::new());
+        assert_eq!(full_config().correct_harmful_values(), Vec::<String>::new());
     }
 
     #[test]
@@ -1153,7 +1254,7 @@ traces:
         // longer than the retention age too, and is reported as that.
         config.traces.ingest.max_age = config.traces.retention.resolve("default").horizon;
 
-        let found = config.harmful_values();
+        let found = config.correct_harmful_values();
 
         let keys: Vec<&str> = found
             .iter()
@@ -1170,6 +1271,64 @@ traces:
         );
         assert!(found[2].contains("logs.retention.default.max_age (7days)"));
         assert!(found[3].contains("traces.retention.default.max_age"));
+    }
+
+    /// A 0 in a rotation limit or in the new-chart limit is read as "not
+    /// set": the config that the rest of the plugin gets holds the value that
+    /// an absent key has, and the report says which.
+    #[test]
+    fn a_zero_limit_is_read_as_not_set() {
+        let mut config = full_config();
+        config.metrics.max_new_charts_per_request = 0;
+        let mut rotation = HashMap::new();
+        // The `default` entry: the built-in value takes the place of a 0.
+        rotation.insert(
+            "default".to_string(),
+            RotationEntry {
+                max_file_size: Some(ByteSize::b(0)),
+                max_entries: Some(7_000),
+                max_file_duration: Some(Duration::ZERO),
+            },
+        );
+        // A tenant: its 0 is dropped, so it has what the `default` entry has.
+        rotation.insert(
+            "acme".to_string(),
+            RotationEntry {
+                max_file_size: Some(ByteSize::mb(1)),
+                max_entries: Some(0),
+                max_file_duration: None,
+            },
+        );
+        config.logs.rotation.apply_overrides(&rotation);
+
+        let found = config.correct_harmful_values();
+
+        assert_eq!(
+            found,
+            [
+                "metrics.max_new_charts_per_request is 0, which is read as not set: the \
+                 built-in 100 is used",
+                "logs.rotation.default.max_file_size is 0, which is read as not set: the \
+                 built-in 25.0 MB is used",
+                "logs.rotation.default.max_file_duration is 0, which is read as not set: the \
+                 built-in 15m is used",
+                "logs.rotation.acme.max_entries is 0, which is read as not set: the default \
+                 entry's 7000 is used",
+            ]
+        );
+        assert_eq!(
+            config.metrics.max_new_charts_per_request,
+            DEFAULT_MAX_NEW_CHARTS_PER_REQUEST
+        );
+        let default = config.logs.rotation.resolve("default");
+        assert_eq!(default.max_file_size, ByteSize::mb(25));
+        assert_eq!(default.max_entries, 7_000);
+        assert_eq!(default.max_file_duration, Duration::from_secs(15 * 60));
+        let acme = config.logs.rotation.resolve("acme");
+        assert_eq!(acme.max_file_size, ByteSize::mb(1));
+        assert_eq!(acme.max_entries, 7_000);
+        // Nothing is left to correct, so nothing is left to report.
+        assert_eq!(config.correct_harmful_values(), Vec::<String>::new());
     }
 
     #[test]

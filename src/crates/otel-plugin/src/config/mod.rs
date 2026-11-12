@@ -233,7 +233,7 @@ impl ConfigResolver {
         }
 
         validate(&config)?;
-        for sentence in config.harmful_values() {
+        for sentence in config.correct_harmful_values() {
             tracing::warn!("configuration: {sentence}");
         }
         log_config("effective", &config);
@@ -754,7 +754,11 @@ traces:
         assert_eq!(config.metrics.interval_secs, Some(10));
         assert_eq!(config.metrics.grace_period_secs, Some(60));
         assert_eq!(config.metrics.expiry_duration_secs, Some(900));
-        assert_eq!(config.metrics.max_new_charts_per_request, 100);
+        // What a 0 in a user file is read as must be the shipped value.
+        assert_eq!(
+            config.metrics.max_new_charts_per_request,
+            otel_bridge::config::DEFAULT_MAX_NEW_CHARTS_PER_REQUEST
+        );
         assert_eq!(
             config.metrics.chart_configs_dir.as_deref(),
             Some("/etc/netdata/otel.d/v1/metrics")
