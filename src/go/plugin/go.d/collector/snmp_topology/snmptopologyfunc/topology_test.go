@@ -255,6 +255,14 @@ func (d *fakeDeps) ManagedDeviceFocusTargets() []topologyoptions.ManagedFocusTar
 	return d.targets
 }
 
+func TestMethodsRequirePaidPlan(t *testing.T) {
+	// Viewing SNMP topology requires a paid plan (access 0x0017).
+	for _, method := range Methods() {
+		assert.True(t, method.RequireCloud, method.ID)
+		assert.True(t, method.RequireCommercial, method.ID)
+	}
+}
+
 func TestTopologyHandlerFocusUsesSnapshotChoicesAndResolvedPolicy(t *testing.T) {
 	for _, identity := range []string{NodesIdentityIP, NodesIdentityMAC} {
 		t.Run(identity, func(t *testing.T) {

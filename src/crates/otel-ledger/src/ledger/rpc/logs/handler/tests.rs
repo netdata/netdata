@@ -1008,20 +1008,25 @@ fn patched_args_payload_parses_as_a_logs_request() {
     assert_eq!(req.before, 200);
 }
 
-/// The Function declaration keeps the legacy shape: global visibility,
-/// the `logs` tag, and the SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
+/// The Function declaration advertises global visibility, the `logs` tag,
+/// and the SIGNED_ID | SAME_SPACE | COMMERCIAL_SPACE | SENSITIVE_DATA
 /// access mask.
 #[test]
-fn declaration_carries_legacy_flags() {
+fn declaration_advertises_otel_logs() {
     let h = make_handler(make_tenant_registries());
     let d = h.declaration();
     assert_eq!(d.name, "otel-logs");
     assert!(d.global);
     assert_eq!(d.tags.as_deref(), Some("logs"));
-    let access = d.access.unwrap();
-    assert!(access.contains(HttpAccess::SIGNED_ID));
-    assert!(access.contains(HttpAccess::SAME_SPACE));
-    assert!(access.contains(HttpAccess::SENSITIVE_DATA));
+    assert_eq!(
+        d.access,
+        Some(
+            HttpAccess::SIGNED_ID
+                | HttpAccess::SAME_SPACE
+                | HttpAccess::COMMERCIAL_SPACE
+                | HttpAccess::SENSITIVE_DATA
+        )
+    );
 }
 
 // ── Tenant scoping ────────────────────────────────────────────────

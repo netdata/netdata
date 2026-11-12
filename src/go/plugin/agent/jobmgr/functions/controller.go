@@ -1116,6 +1116,7 @@ func controllerGroupSignature(
 		writeDigestUint64(digest, uint64(method.UpdateEvery))
 		writeDigestString(digest, method.Help)
 		writeDigestBool(digest, method.RequireCloud)
+		writeDigestBool(digest, method.RequireCommercial)
 		writeDigestString(digest, method.Tags)
 		writeDigestString(digest, method.ResponseType)
 		writeDigestBool(digest, method.RawRequest)
@@ -1192,10 +1193,7 @@ func methodPublicationRecord(
 	if help == "" {
 		help = fmt.Sprintf("%s %s data function", module, method.ID)
 	}
-	access := "0x0000"
-	if method.RequireCloud {
-		access = "0x0013"
-	}
+	access := methodAccess(method)
 	tags := method.Tags
 	if tags == "" {
 		tags = "top"
@@ -1209,6 +1207,20 @@ func methodPublicationRecord(
 		Access:     access,
 		Priority:   100,
 		Version:    3,
+	}
+}
+
+// methodAccess returns the HTTP_ACCESS mask published for a method:
+// signed-in (0x01), same Space (0x02) and sensitive data (0x10), plus
+// commercial Space (0x04) for Functions that require a paid plan.
+func methodAccess(method funcapi.FunctionConfig) string {
+	switch {
+	case method.RequireCommercial:
+		return "0x0017"
+	case method.RequireCloud:
+		return "0x0013"
+	default:
+		return "0x0000"
 	}
 }
 

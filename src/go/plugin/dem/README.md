@@ -107,7 +107,10 @@ Setting `enabled: no` disables the whole plugin. Handler instances belong to eac
 keeps shared stores open until a clean shutdown.
 
 Six process Functions use the regular Netdata Function transport: `rum-sites`, `rum-pages`, `rum-live`, `rum-sessions`,
-`rum-errors`, and `rum-session-events`. Runtime observations include only admitted site jobs. Consumers join native
+`rum-errors`, and `rum-session-events`. Viewing them, and the `synthetics-*` Functions, requires a signed-in member of
+the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial; collection and
+history storage are not restricted.
+Runtime observations include only admitted site jobs. Consumers join native
 DynCfg state to show disabled or failed configurations. Journal history remains queryable after a site stops. History range
 arguments select when the Agent originally received an observation, using inclusive Unix seconds: both endpoints include
 their entire second. Negative values are offsets from one captured now; explicit zero means epoch. With omitted bounds,
@@ -152,9 +155,10 @@ retention policy, defaulting to 7 days and 2 GiB.
 
 `dem-history-status` reports the effective policy, sampled file bytes/count, observation time, latest cleanup attempt,
 last successful cleanup, and separate inventory, cleanup, writer and policy reload errors. It is a read-only member
-Function available even with all collectors disabled, with no arguments, payload or time filters. Unknown or unattempted
-values are `null`; an inventory failure does not erase cleanup or writer facts. These facts help diagnose storage pressure
-and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
+Function that, like every DEM Function, requires a signed-in member of the node's Space with permission to view
+sensitive data, on a paid plan or an active trial. It works even with all collectors
+disabled, with no arguments, payload or time filters. Unknown or unattempted values are `null`; an inventory failure
+does not erase cleanup or writer facts. These facts help diagnose storage pressure and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
 Unusable history at startup still stops the plugin before Functions register; inspect process logs in that case.
 
 Queued events flush every five seconds or 500 records.

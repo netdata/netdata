@@ -9,13 +9,14 @@ import (
 
 func topologyFunctionConfig(updateEvery int) funcapi.FunctionConfig {
 	return funcapi.FunctionConfig{
-		ID:           TopologyMethodID,
-		Aliases:      []string{TopologyMethodID},
-		Name:         "Topology (Cato Networks)",
-		UpdateEvery:  updateEvery,
-		Help:         "Cato Networks site, device, PoP, tunnel, and BGP topology data",
-		RequireCloud: true,
-		ResponseType: topologyv1.ResponseType,
+		ID:                TopologyMethodID,
+		Aliases:           []string{TopologyMethodID},
+		Name:              "Topology (Cato Networks)",
+		UpdateEvery:       updateEvery,
+		Help:              "Cato Networks site, device, PoP, tunnel, and BGP topology data",
+		RequireCloud:      true,
+		RequireCommercial: true,
+		ResponseType:      topologyv1.ResponseType,
 	}.WithPresentation(TopologyPresentation())
 }
 

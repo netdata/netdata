@@ -580,21 +580,48 @@ impl FunctionHandler for LegacyLogsHandler {
     }
 
     fn declaration(&self) -> FunctionDeclaration {
-        let mut func_decl = FunctionDeclaration::new(
-            "legacy-otel-logs",
-            "Query logs stored by the former OpenTelemetry plugin (read-only)",
-        );
-        func_decl.global = true;
-        func_decl.tags = Some(String::from("logs"));
-        func_decl.access =
-            Some(HttpAccess::SIGNED_ID | HttpAccess::SAME_SPACE | HttpAccess::SENSITIVE_DATA);
-        func_decl
+        legacy_logs_function_declaration()
     }
+}
+
+/// Same access as `otel-logs`: OpenTelemetry logs are a paid feature, so
+/// callers need a signed-in user of the Agent's space on a commercial plan,
+/// plus SENSITIVE_DATA since log payloads may carry sensitive content.
+fn legacy_logs_function_declaration() -> FunctionDeclaration {
+    let mut func_decl = FunctionDeclaration::new(
+        "legacy-otel-logs",
+        "Query logs stored by the former OpenTelemetry plugin (read-only)",
+    );
+    func_decl.global = true;
+    func_decl.tags = Some(String::from("logs"));
+    func_decl.access = Some(
+        HttpAccess::SIGNED_ID
+            | HttpAccess::SAME_SPACE
+            | HttpAccess::COMMERCIAL_SPACE
+            | HttpAccess::SENSITIVE_DATA,
+    );
+    func_decl
 }
 
 #[cfg(test)]
 mod tests {
-    use super::patch_args_into_payload;
+    use super::{legacy_logs_function_declaration, patch_args_into_payload};
+    use netdata_plugin_schema::HttpAccess;
+
+    #[test]
+    fn declaration_requires_commercial_space() {
+        let decl = legacy_logs_function_declaration();
+        assert_eq!(decl.name, "legacy-otel-logs");
+        assert_eq!(
+            decl.access,
+            Some(
+                HttpAccess::SIGNED_ID
+                    | HttpAccess::SAME_SPACE
+                    | HttpAccess::COMMERCIAL_SPACE
+                    | HttpAccess::SENSITIVE_DATA
+            )
+        );
+    }
 
     fn parse(out: Option<Vec<u8>>) -> serde_json::Value {
         serde_json::from_slice(&out.expect("expected a synthesized payload")).unwrap()

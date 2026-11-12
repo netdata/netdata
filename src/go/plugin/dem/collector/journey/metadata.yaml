@@ -283,6 +283,8 @@ modules:
         renamed or removed names stop resolving, and reused names select their current GUID. Use vnode_guid for retained
         history by canonical GUID after removal. Omit both selectors for all vnodes and unassigned data. Filters retain
         Agent-level access and do not provide per-site authorization; no active browser is required.
+        Viewing them requires a signed-in member of the node's Netdata Cloud Space with permission to view sensitive
+        data, on a paid plan or an active trial; journeys and audits run and their history is stored on every plan.
       list:
         - id: synthetics-checks
           function_name: synthetics-checks
@@ -433,7 +435,7 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-runs
@@ -580,7 +582,7 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-run
@@ -653,7 +655,7 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-artifacts
@@ -742,7 +744,7 @@ modules:
           security: Requires member-equivalent access. Exposes monitor identities and capture metadata, not capture contents.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse jobs
             and retained run history. Captures can expire under age or size limits.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []
         - id: synthetics-artifact
@@ -812,6 +814,6 @@ modules:
             and user input; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
-          require_cloud: false
+          require_cloud: true
           prerequisites:
             list: []

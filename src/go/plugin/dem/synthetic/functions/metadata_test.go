@@ -31,6 +31,10 @@ func TestBothIntegrationsDocumentSharedProcessFunctions(t *testing.T) {
 			h := syntheticfunctions.New(nil, nil)
 			for _, decl := range declarations {
 				t.Run(decl.ID, func(t *testing.T) {
+					// Registration must match the handler's own 0x1b permission check.
+					require.True(t, decl.RequireCloud)
+					// Viewing browser tests (journeys, Lighthouse) requires a paid plan (access 0x0017).
+					require.True(t, decl.RequireCommercial)
 					doc, exists := docs[decl.ID]
 					require.True(t, exists)
 					assert.Equal(t, decl.FunctionName, doc.FunctionName)

@@ -6,6 +6,9 @@ modules:
             configuration even with disabled or no jobs; renamed or removed names stop resolving, and reused names select
             their current GUID. Use vnode_guid for retained history by canonical GUID after removal. Omit both selectors
             for all vnodes and unassigned data. Filters retain Agent-level access and do not provide per-site authorization.
+            Viewing them requires a signed-in member of the node's Netdata Cloud Space with permission to view
+            sensitive data, on a paid plan or an active trial; beacons are received and history is stored on every
+            plan.
         list:
           - id: rum-sites
             function_name: rum-sites
@@ -147,7 +150,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-pages
@@ -259,7 +262,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-live
@@ -408,7 +411,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running; activity comes from admitted site jobs.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-sessions
@@ -549,7 +552,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running. History results require retained investigation data.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-errors
@@ -670,7 +673,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running. History results require retained investigation data.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
           - id: rum-session-events
@@ -769,7 +772,7 @@ modules:
             security: Results can include page paths, browser metadata, user identifiers, error messages and stack
                 traces. Restrict access to authorized operators.
             availability: Available while dem.plugin is running. History results require retained investigation data.
-            require_cloud: false
+            require_cloud: true
             prerequisites:
                 list: []
     meta:
