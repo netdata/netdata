@@ -2,7 +2,103 @@
 
 #include "windows_plugin.h"
 
+#include <ctype.h>
+
 __thread char windows_shared_buffer[8192];
+
+// Converts a user selector into a simple pattern list. Windows names contain backslashes, which simple patterns
+// treat as escapes, so they are doubled unless they escape a separator or a leading '!'.
+char *windows_plugin_normalize_patterns(const char *input)
+{
+    char *source = strdupz(input);
+    char *patterns = mallocz((strlen(source) * 2) + 1);
+    char *read = source, *write = patterns;
+    bool first = true;
+
+    while (*read) {
+        char *start = read;
+        while (*read && *read != ',' && *read != '|') {
+            if (*read == '\\' && read[1])
+                read += 2;
+            else
+                read++;
+        }
+
+        char *end = read;
+        while (start < end && isspace((unsigned char)*start))
+            start++;
+        while (end > start && isspace((unsigned char)end[-1]))
+            end--;
+
+        if (start < end) {
+            if (!first)
+                *write++ = ',';
+            bool token_start = true;
+            while (start < end) {
+                if (*start == '\\' && start + 1 < end) {
+                    char next = start[1];
+                    if (next == ',' || next == '|' || (next == '!' && token_start)) {
+                        *write++ = *start++;
+                        *write++ = *start++;
+                        token_start = false;
+                    } else {
+                        *write++ = '\\';
+                        *write++ = '\\';
+                        start++;
+                        token_start = false;
+                    }
+                } else if (*start == '\\') {
+                    *write++ = '\\';
+                    *write++ = '\\';
+                    start++;
+                    token_start = false;
+                } else {
+                    *write++ = *start++;
+                    token_start = false;
+                }
+            }
+            first = false;
+        }
+        if (*read)
+            read++;
+    }
+
+    *write = '\0';
+    freez(source);
+    return patterns;
+}
+
+// Builds "<prefix><instance>_<xxh3>_<suffix>" truncating only the visible instance part, so long or similar names
+// stay unique and the full "<type>.<id>" fits RRD_ID_LENGTH_MAX.
+void windows_plugin_instance_chart_id(
+    char *dst,
+    size_t size,
+    size_t chart_type_length,
+    const char *prefix,
+    const char *instance,
+    const char *suffix,
+    size_t suffix_length)
+{
+    const size_t instance_length = strnlen(instance, sizeof(windows_shared_buffer));
+    XXH64_hash_t hash = XXH3_64bits(instance, instance_length);
+    const size_t fixed_length = strlen(prefix) + 1 + 16 + 1 + suffix_length;
+    const size_t full_id_limit = RRD_ID_LENGTH_MAX - 1;
+    const size_t type_prefix_length = chart_type_length + 1;
+    size_t chart_id_limit = full_id_limit > type_prefix_length ? full_id_limit - type_prefix_length : 0;
+    if (size && chart_id_limit >= size)
+        chart_id_limit = size - 1;
+    size_t visible_instance_length = chart_id_limit > fixed_length ? chart_id_limit - fixed_length : 0;
+    snprintfz(
+        dst,
+        size,
+        "%s%.*s_%016llx_%s",
+        prefix,
+        (int)visible_instance_length,
+        instance,
+        (unsigned long long)hash,
+        suffix);
+    netdata_fix_chart_name(dst);
+}
 
 static struct proc_module {
     const char *name;
@@ -69,6 +165,15 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = do_GetServicesStatus_cleanup},
+    {.name = "GetPrinters",
+     .dim = "GetPrinters",
+     .enabled = CONFIG_BOOLEAN_NO,
+     .update_every = 10 * UPDATE_EVERY_MIN,
+     .dedicated_thread = true,
+     .func = do_GetPrinters,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_GetPrinters_cleanup},
 
     // the same is provided by PerflibProcessor, with more detailed analysis
     //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",       .enabled = CONFIG_BOOLEAN_YES,

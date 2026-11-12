@@ -23,6 +23,17 @@ void win_plugin_main(void *ptr);
 
 extern __thread char windows_shared_buffer[8192];
 
+// Shared helpers
+char *windows_plugin_normalize_patterns(const char *input);
+void windows_plugin_instance_chart_id(
+    char *dst,
+    size_t size,
+    size_t chart_type_length,
+    const char *prefix,
+    const char *instance,
+    const char *suffix,
+    size_t suffix_length);
+
 // Windows API
 int do_GetSystemUptime(int update_every, usec_t dt);
 int do_GetSystemRAM(int update_every, usec_t dt);
@@ -31,6 +42,7 @@ int do_GetPowerSupply(int update_every, usec_t dt);
 int do_GetServicesStatus(int update_every, usec_t dt);
 int do_GetHardwareInfo(int update_every, usec_t dt);
 int do_GetSensors(int update_every, usec_t dt);
+int do_GetPrinters(int update_every, usec_t dt);
 
 // Perflib
 int do_PerflibStorage(int update_every, usec_t dt);
@@ -78,6 +90,7 @@ void do_GetPowerSupply_cleanup();
 void do_PerflibSMB_cleanup();
 void do_PerflibSMBClient_cleanup(void);
 void do_PerflibStorage_cleanup();
+void do_GetPrinters_cleanup(void);
 void do_GetFSRMQuota_cleanup(void);
 void do_GetFSRMQuota_interrupt(void);
 
@@ -469,6 +482,11 @@ enum PERFLIB_PRIO {
     PRIO_IIS_EXTRA_CACHE = 25300,
     PRIO_IIS_APP_POOL_CURRENT_UPTIME = 25400,
     PRIO_IIS_APP_POOL_TIME_SINCE_FAILURE = 25401,
+
+    PRIO_PRINTER_JOBS = 25500,
+    PRIO_PRINTER_STATUS,
+    PRIO_PRINTER_PROBLEMS,
+    PRIO_PRINTER_JOB_STATUS,
 };
 
 #endif //NETDATA_WINDOWS_PLUGIN_H

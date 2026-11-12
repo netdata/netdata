@@ -6098,3 +6098,165 @@ modules:
               chart_type: line
               dimensions:
                 - name: failure
+  - meta:
+      plugin_name: windows.plugin
+      module_name: GetPrinters
+      monitored_instance:
+        name: Windows printers
+        link: "https://learn.microsoft.com/en-us/windows/win32/printdocs/print-spooler-api-functions"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - windows
+        - printer
+        - print queue
+        - spooler
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors Windows print queues: queued jobs, printer status, and jobs by status.
+          It covers local printers and printer connections configured on the host; it does not poll printer devices,
+          which the SNMP collector covers.
+        method_description: |
+          It calls the print spooler API. `EnumPrintersW` lists printer names from the local registry and
+          cache without contacting print servers. Each selected printer is then opened to read its status
+          flags and queued job count (`GetPrinterW`) and, when jobs are queued, its jobs (`EnumJobsW`). Status
+          values follow the `Win32_Printer` and `Win32_PrintJob` mappings used by Windows Exporter, except
+          that a printer reporting several status flags at once gets its most severe state (problems first), a
+          connection whose print server is offline reports `other`, a status the server reports as unknown
+          reports `unknown`, a job with no status flags counts as `queued` (and leaves an otherwise flagless
+          printer `idle`), and a blocked job or one waiting for user intervention counts as `degraded`. The
+          job owner, submitting machine, and document title returned with each job are never logged, charted,
+          or exported.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            The collector is disabled by default. When enabled, it discovers printers automatically and charts up to
+            100 printers matching `printers to monitor`, chosen in case-insensitive alphabetical order. Printers that
+            do not match or exceed the limit get no charts, and their queues are not opened.
+        limits:
+          description: |
+            By default, at most 100 printers are charted, four charts each.
+        performance_impact:
+          description: |
+            One name enumeration per collection, plus one printer open and status read per selected printer, and a job
+            read for selected printers with queued jobs. Unselected printers are never opened. For a selected printer
+            connection, opening it can contact the print server and block when it is unreachable. The
+            module always runs on its own thread; a blocked call stops only this module, but Netdata shutdown waits for
+            it to return.
+    setup:
+      prerequisites:
+        list:
+          - title: Print Spooler service running
+            description: |
+              The Windows `Spooler` service must be running. While it is stopped, the charts show gaps and existing
+              printers are kept until a successful enumeration shows they are gone.
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:GetPrinters]"
+          description: "The Netdata main configuration file. Enable the module with `GetPrinters = yes` in `[plugin:windows]`."
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 10
+              required: false
+            - name: printers to monitor
+              description: |
+                Case-insensitive simple patterns separated by commas or pipes, matched against the full printer name.
+                Printer connection names such as `\\server\printer` can be pasted verbatim; escape a comma or pipe with
+                a backslash to match it literally. Prefix a pattern with `!` to exclude matching printers, and add a
+                positive pattern, for example `!*PDF*,*`, to select every other printer.
+              default_value: "*"
+              required: false
+            - name: max monitored printers
+              description: Maximum number of matching printers to chart. 0 charts none; a negative value uses the default.
+              default_value: 100
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: printer
+          description: "These metrics refer to one print queue."
+          labels:
+            - name: printer
+              description: The full Windows printer name, including the server for printer connections.
+          metrics:
+            - name: windows.printer_jobs
+              description: Printer queued jobs
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: queued
+            - name: windows.printer_status
+              description: Printer status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: other
+                - name: unknown
+                - name: idle
+                - name: printing
+                - name: warmup
+            - name: windows.printer_problems
+              description: Printer problems
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: paused
+                - name: error
+                - name: pending_deletion
+                - name: paper_jam
+                - name: paper_out
+                - name: manual_feed
+                - name: paper_problem
+                - name: offline
+                - name: output_bin_full
+                - name: toner_low
+                - name: no_toner
+                - name: page_punt
+                - name: user_intervention
+                - name: out_of_memory
+                - name: door_open
+                - name: server_offline
+                - name: driver_update_needed
+            - name: windows.printer_job_status
+              description: Printer jobs by status
+              unit: jobs
+              chart_type: stacked
+              dimensions:
+                - name: error
+                - name: degraded
+                - name: ok
+                - name: queued
+                - name: unknown
