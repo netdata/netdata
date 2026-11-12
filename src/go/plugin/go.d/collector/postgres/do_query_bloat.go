@@ -45,7 +45,7 @@ func (c *Collector) doDBQueryBloat(db *sql.DB) error {
 		case "wastedbytes":
 			tableWasted = parseFloat(value)
 		case "iname":
-			iname = removeSpaces(value)
+			iname = value
 		case "wastedibytes":
 			idxWasted = parseFloat(value)
 		}
@@ -93,9 +93,10 @@ func (c *Collector) doDBQueryBloat(db *sql.DB) error {
 		if row.index == "?" {
 			continue
 		}
-		// Index metrics are keyed by the chart-safe name, as in the statistics query.
+		// Index metrics are keyed by the chart-safe name; names that differ only in whitespace share that key,
+		// so the PostgreSQL name selects the index that holds it.
 		key := indexKey{db: row.database, schema: row.schema, table: row.table, name: removeSpaces(row.index)}
-		if v := c.mx.indexes[key]; v != nil && v.owner == db && v.updated {
+		if v := c.mx.indexes[key]; v != nil && v.owner == db && v.updated && v.relname == row.index {
 			v.bloatSize, v.bloatSizePerc = new(row.indexWasted), new(calcPercentage(row.indexWasted, v.size))
 		}
 	}

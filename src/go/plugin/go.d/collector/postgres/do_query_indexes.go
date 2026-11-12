@@ -46,9 +46,10 @@ func (c *Collector) doDBQueryStatUserIndexes(db *sql.DB) error {
 			table = value
 		case "indexrelname":
 			name = removeSpaces(value)
-			m = &indexMetrics{owner: db, oid: oid, db: dbname, schema: schema, name: name, table: table}
+			m = &indexMetrics{owner: db, oid: oid, db: dbname, schema: schema, name: name, relname: value, table: table}
 			if old, ok := c.mx.indexes[m.key()]; ok && old.owner == db && old.oid == oid {
 				*m = *old
+				m.relname = value
 			}
 			m.updated = true
 		case "parent_relname":

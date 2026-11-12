@@ -430,6 +430,28 @@ func TestSlowRelationMetricsDatabaseOwnership(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestIndexBloatMatchesIndexName(t *testing.T) {
+	c := New()
+	require.NoError(t, c.Init(context.Background()))
+	db, mock := newRelationsMock(t)
+	c.db, c.MaxDBTables, c.MaxDBIndexes = db, 0, 0
+	// "a b" and "a_b" share one chart identity; the lowest OID ("a b") holds it.
+	mock.ExpectQuery(queryStatUserIndexes(false)).WillReturnRows(sqlmock.NewRows([]string{"datname", "indexrelid", "schemaname", "relname", "indexrelname", "size"}).
+		AddRow("db", 21, "public", "t", "a b", 1000).
+		AddRow("db", 22, "public", "t", "a_b", 1000))
+	require.NoError(t, c.doDBQueryStatUserIndexes(db))
+	mock.ExpectQuery(queryBloat(false)).WillReturnRows(sqlmock.NewRows([]string{"db", "schemaname", "tablename", "wastedbytes", "iname", "wastedibytes"}).
+		AddRow("db", "public", "t", 0, "a b", 11).
+		AddRow("db", "public", "t", 0, "a_b", 99))
+	require.NoError(t, c.doDBQueryBloat(db))
+	holder := c.mx.indexes[indexKey{db: "db", schema: "public", table: "t", name: "a_b"}]
+	require.NotNil(t, holder)
+	assert.Equal(t, uint32(21), holder.oid)
+	require.NotNil(t, holder.bloatSize)
+	assert.Equal(t, int64(11), *holder.bloatSize)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestSlowRelationMetricsDetailGap(t *testing.T) {
 	c := New()
 	require.NoError(t, c.Init(context.Background()))

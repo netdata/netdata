@@ -224,6 +224,7 @@ type indexMetrics struct {
 	hasBloatCharts bool
 	bloatValid     bool
 	name           string
+	relname        string // PostgreSQL name; name is its chart-safe form
 	db             string
 	schema         string
 	table          string
