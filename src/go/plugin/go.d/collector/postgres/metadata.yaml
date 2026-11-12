@@ -51,11 +51,14 @@ modules:
             for the selected objects are collected at each update interval. Oversized databases need two successful
             observations before the first selection; the second is attempted at the next update interval.
             Objects outside TOP have no individual metrics, and there is no aggregate for them. Rotation can cause gaps
-            in individual charts and their alerts. Set either limit to 0 for unlimited collection.
+            in individual charts and their alerts. While a limit is set, tables or indexes created after the last
+            selection, including ones recreated under the same name, have no metrics until the next refresh, even in a
+            database below the limit. Set either limit to 0 for unlimited collection.
         performance_impact:
           description: |
             Activity selection scans lightweight statistics for all accessible candidate tables and indexes at startup
-            and approximately every five minutes. In-memory selection state grows with the number of candidates.
+            and approximately every five minutes; a failed scan is retried after one minute.
+            In-memory selection state grows with the number of candidates.
             Detailed statistics and size queries cover the selected objects; bloat and column checks run every five minutes.
             Unlimited collection increases detailed query cost and the number of charts.
       additional_permissions:
