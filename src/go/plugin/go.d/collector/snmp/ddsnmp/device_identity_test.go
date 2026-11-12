@@ -7,11 +7,11 @@ import (
 	"maps"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
@@ -188,9 +188,7 @@ func TestAcquireDeviceIdentityFailure(t *testing.T) {
 
 func TestAcquireDeviceIdentityWithoutMetricsJob(t *testing.T) {
 	const metadataOID = "1.3.6.1.4.1.9.999.0"
-	client := snmpmock.NewMockHandler(gomock.NewController(t))
-	client.EXPECT().MaxOids().Return(20).AnyTimes()
-	client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+	client := snmpmock.NewMockSession(gomock.NewController(t))
 	gomock.InOrder(
 		client.EXPECT().
 			Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject, snmputils.OidSysContact, snmputils.OidSysName, snmputils.OidSysLocation}).
@@ -207,7 +205,7 @@ func TestAcquireDeviceIdentityWithoutMetricsJob(t *testing.T) {
 			},
 		}, nil),
 	)
-	si, err := snmputils.GetSysInfo(client)
+	si, err := snmputils.GetSysInfo(client, gosnmp.Version2c, 20)
 	require.NoError(t, err)
 	source := ddsnmpcollector.New(ddsnmpcollector.Config{
 		SnmpClient:  client,
@@ -247,9 +245,7 @@ func TestAcquiredDeviceNameUsesTrimmedFallback(t *testing.T) {
 		{"authored hostname", " ", " authored ", " authored "},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			client := snmpmock.NewMockHandler(gomock.NewController(t))
-			client.EXPECT().MaxOids().Return(20).AnyTimes()
-			client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+			client := snmpmock.NewMockSession(gomock.NewController(t))
 			client.EXPECT().
 				Get([]string{snmputils.OidSysDescr, snmputils.OidSysObject, snmputils.OidSysContact, snmputils.OidSysName, snmputils.OidSysLocation}).
 				Return(&gosnmp.SnmpPacket{
@@ -257,7 +253,7 @@ func TestAcquiredDeviceNameUsesTrimmedFallback(t *testing.T) {
 						{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte(tc.wireName)},
 					},
 				}, nil)
-			si, err := snmputils.GetSysInfo(client)
+			si, err := snmputils.GetSysInfo(client, gosnmp.Version2c, 20)
 			require.NoError(t, err)
 			original := *si
 			identity, err := ddsnmp.ComposeDeviceIdentity(

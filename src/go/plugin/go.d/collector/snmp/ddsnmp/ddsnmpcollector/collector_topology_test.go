@@ -38,10 +38,12 @@ func TestCollector_Collect_CiscoCDPTopologyWithoutOrdinaryMetrics(t *testing.T) 
 	device.set(createIntegerPDU(cdpCacheTableOID+".1.3.5.1", 1))
 	device.set(createIntegerPDU(cdpCacheTableOID+".1.3.6.2", 1))
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -67,7 +69,7 @@ func TestCollector_Collect_CiscoCDPTopologyWithoutOrdinaryMetrics(t *testing.T) 
 }
 
 func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStructureCache(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -110,8 +112,8 @@ func TestCollector_CollectTopologyMetrics_TableSymbolUsesPDUPresenceWithoutStruc
 
 	cache := newTableCache(time.Hour, 0)
 	collector := &Collector{
-		scalarCollector: newScalarCollector(mockHandler, make(map[string]bool), logger.New()),
-		tableCollector:  newTableCollector(mockHandler, make(map[string]bool), cache, logger.New(), false),
+		scalarCollector: newScalarCollector(mockHandler, testRequests, make(map[string]bool), logger.New()),
+		tableCollector:  newTableCollector(mockHandler, testRequests, 0, make(map[string]bool), cache, logger.New(), false),
 	}
 
 	expected := []ddsnmp.Metric{
@@ -172,10 +174,12 @@ func TestCollector_CollectTopologyMetrics_DependencyOnlyRouteWaitsForAnchorRows(
 	ddsnmp.HandleCrossTableTagsWithoutMetrics(profile)
 
 	device := newStatefulSNMPDevice()
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -224,10 +228,12 @@ func TestCollector_CollectTopologyMetrics_DependencyWithSymbolOwnerRemainsEager(
 	}
 
 	device := newStatefulSNMPDevice()
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 	device.install(mockHandler)
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),

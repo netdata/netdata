@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -69,15 +69,14 @@ type huaweiWalkInput struct {
 func newHuaweiIndexCollector(t *testing.T, input *huaweiWalkInput) *Collector {
 	t.Helper()
 	profile := mustLoadTypedBGPProfile(t, "_huawei-bgp-vpn", func(row ddprofiledefinition.BGPConfig) bool { return row.Table.OID != "" })
-	_, handler := setupMockHandler(t)
-	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	handler.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) {
+	_, handler := setupMockSession(t)
+	handler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) {
 		if input.forbiddenPrefix != "" {
 			require.False(t, strings.HasPrefix(oid, input.forbiddenPrefix), "unproved dependency WALK: %s", oid)
 		}
 		return snmprecPDUsWithPrefix(input.pdus, oid+"."), nil
 	}).AnyTimes()
-	return New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+	return New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 }
 
 func collectHuaweiIndexRows(t *testing.T, collector *Collector) []ddsnmp.BGPRow {
@@ -155,11 +154,10 @@ func TestHuaweiIndexIdentity_StatisticsIndependentOfOtherTables(t *testing.T) {
 					pdus = append(pdus, createCounter32PDU(fmt.Sprintf("%s7.1.%d.%d.7.4.192.0.2.1", huaweiTestRoot, column, process), uint(process*100+column)))
 				}
 			}
-			_, handler := setupMockHandler(t)
-			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-			handler.EXPECT().BulkWalkAll(huaweiTestRoot + "7").DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) { return snmprecPDUsWithPrefix(pdus, oid+"."), nil }).AnyTimes()
+			_, handler := setupMockSession(t)
+			handler.EXPECT().BulkWalkAll(huaweiTestRoot+"7", gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) { return snmprecPDUsWithPrefix(pdus, oid+"."), nil }).AnyTimes()
 			// No WALK for peer/family/session tables is allowed by this expectation.
-			collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 			rows := collectHuaweiIndexRows(t, collector)
 			require.Len(t, rows, 3)
 			for process := 0; process < 3; process++ {
@@ -192,9 +190,8 @@ func TestHuaweiIndexIdentity_ConfiguredProcessCannotFallBackToAS(t *testing.T) {
 	profile := mustLoadTypedBGPProfile(t, "_huawei-bgp-vpn", func(row ddprofiledefinition.BGPConfig) bool { return row.ID == "huawei-bgp-peer-statistics" })
 	profile.Definition.BGP[0].Identity.ProcessID = ddprofiledefinition.BGPValueConfig{Index: 100}
 	profile.Definition.BGP[0].Identity.RemoteAS = ddprofiledefinition.BGPValueConfig{Value: "65001"}
-	_, handler := setupMockHandler(t)
-	handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	handler.EXPECT().BulkWalkAll(huaweiTestRoot+"7").Return([]gosnmp.SnmpPDU{createCounter32PDU(huaweiTestRoot+"7.1.4.0.7.4.192.0.2.1", 11)}, nil).AnyTimes()
-	collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
+	_, handler := setupMockSession(t)
+	handler.EXPECT().BulkWalkAll(huaweiTestRoot+"7", gomock.Any()).Return([]gosnmp.SnmpPDU{createCounter32PDU(huaweiTestRoot+"7.1.4.0.7.4.192.0.2.1", 11)}, nil).AnyTimes()
+	collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 10, SnmpClient: handler, Profiles: []*ddsnmp.Profile{profile}, Log: logger.New()})
 	assert.Empty(t, collectHuaweiIndexRows(t, collector))
 }

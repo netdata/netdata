@@ -33,6 +33,8 @@ func TestPreparedDeviceMetadataFollowsProfilePreparation(t *testing.T) {
 		get: func([]string) (*gosnmp.SnmpPacket, error) { return nil, getErr },
 	}
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    1,
 		SnmpClient: handler,
 		Profiles:   []*ddsnmp.Profile{metadataTestProfile("device.yaml", oid)},
 		Log:        logger.New(),
@@ -81,6 +83,8 @@ func TestCachedInputsExcludeUnpreparedProfiles(t *testing.T) {
 		},
 	}
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    1,
 		SnmpClient: new(SourceRecorder).Wrap(handler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -105,6 +109,8 @@ func TestProfileInputMetadataFailureClassification(t *testing.T) {
 		get: func([]string) (*gosnmp.SnmpPacket, error) { return nil, gosnmp.ErrWrongDigest },
 	}
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    1,
 		SnmpClient: handler,
 		Profiles:   []*ddsnmp.Profile{metadataTestProfile("device.yaml", "1.2.3.0")},
 		Log:        logger.New(),

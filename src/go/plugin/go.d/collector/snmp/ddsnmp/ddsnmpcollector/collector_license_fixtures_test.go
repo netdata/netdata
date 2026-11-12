@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,13 +19,13 @@ import (
 func TestCollector_Collect_LicensingProfileFixtures(t *testing.T) {
 	tests := map[string]struct {
 		profileName string
-		setup       func(*testing.T, *snmpmock.MockHandler)
+		setup       func(*testing.T, *snmpmock.MockSession)
 		keep        func(ddprofiledefinition.LicensingConfig) bool
 		assertRows  func(*testing.T, []ddsnmp.LicenseRow)
 	}{
 		"cisco traditional": {
 			profileName: "cisco",
-			setup: func(t *testing.T, mockHandler *snmpmock.MockHandler) {
+			setup: func(t *testing.T, mockHandler *snmpmock.MockSession) {
 				fixture := mustLoadSNMPFixture(t, "testdata/licensing/cisco-traditional.snmpwalk")
 				expectSNMPWalkFromFixture(mockHandler, gosnmp.Version2c, fixture, "1.3.6.1.4.1.9.9.543.1.2.3.1")
 			},
@@ -36,7 +36,7 @@ func TestCollector_Collect_LicensingProfileFixtures(t *testing.T) {
 		},
 		"checkpoint community sample": {
 			profileName: "checkpoint",
-			setup: func(t *testing.T, mockHandler *snmpmock.MockHandler) {
+			setup: func(t *testing.T, mockHandler *snmpmock.MockSession) {
 				fixture := mustLoadSNMPFixture(t, "testdata/licensing/checkpoint-community.snmpwalk")
 				expectSNMPWalkFromFixture(mockHandler, gosnmp.Version2c, fixture, "1.3.6.1.4.1.2620.1.6.18.1")
 			},
@@ -59,7 +59,7 @@ func TestCollector_Collect_LicensingProfileFixtures(t *testing.T) {
 		},
 		"mikrotik scalar fixture": {
 			profileName: "mikrotik-router",
-			setup: func(t *testing.T, mockHandler *snmpmock.MockHandler) {
+			setup: func(t *testing.T, mockHandler *snmpmock.MockSession) {
 				fixture := mustLoadSNMPFixture(t, "testdata/licensing/mikrotik-router.snmprec")
 				mustExpectSNMPGetFromFixture(t, mockHandler, fixture, []string{
 					"1.3.6.1.4.1.14988.1.1.4.2.0",
@@ -72,7 +72,7 @@ func TestCollector_Collect_LicensingProfileFixtures(t *testing.T) {
 		},
 		"cisco smart entitlement fixture": {
 			profileName: "cisco",
-			setup: func(t *testing.T, mockHandler *snmpmock.MockHandler) {
+			setup: func(t *testing.T, mockHandler *snmpmock.MockSession) {
 				fixture := mustLoadSNMPFixture(t, "testdata/licensing/cisco-smart-iosxe-c9800.snmprec")
 				expectSNMPWalkFromFixture(mockHandler, gosnmp.Version2c, fixture, "1.3.6.1.4.1.9.9.831.0.5.1")
 			},
@@ -85,12 +85,14 @@ func TestCollector_Collect_LicensingProfileFixtures(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			tc.setup(t, mockHandler)
 			profile := mustLoadTypedLicensingProfile(t, tc.profileName, tc.keep)
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
@@ -109,7 +111,7 @@ func TestCollector_Collect_LicensingProfileFixtures(t *testing.T) {
 	}
 }
 
-func expectSophosFixtureGets(t *testing.T, mockHandler *snmpmock.MockHandler) {
+func expectSophosFixtureGets(t *testing.T, mockHandler *snmpmock.MockSession) {
 	t.Helper()
 
 	fixture := mustLoadSNMPFixture(t, "testdata/licensing/sophos-xgs-firewall.snmprec")

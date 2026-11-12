@@ -16,7 +16,7 @@ import (
 )
 
 func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const failedTagOID = "1.3.6.1.4.1.99999.1.0"
@@ -43,6 +43,8 @@ func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *tes
 	}
 	var got []observation
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{succeeded, failed},
 		Log:        logger.New(),
@@ -86,7 +88,7 @@ func TestCollector_AcquisitionObserverReportsEveryProfileInExecutionOrder(t *tes
 }
 
 func TestCollector_AcquisitionObserverReportsCachedProfileInputs(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -124,6 +126,8 @@ func TestCollector_AcquisitionObserverReportsCachedProfileInputs(t *testing.T) {
 
 	var reports []AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -164,7 +168,7 @@ func TestCollector_AcquisitionObserverReportsCachedProfileInputs(t *testing.T) {
 }
 
 func TestCollector_AcquisitionObserverReportsLaterRoutesAsNotObservedAfterPrepareFailure(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -201,6 +205,8 @@ func TestCollector_AcquisitionObserverReportsLaterRoutesAsNotObservedAfterPrepar
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -218,7 +224,7 @@ func TestCollector_AcquisitionObserverReportsLaterRoutesAsNotObservedAfterPrepar
 }
 
 func TestCollector_AcquisitionObserverReportsPatternTagValue(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const tagOID = "1.3.6.1.4.1.99999.12.1.0"
@@ -241,6 +247,8 @@ func TestCollector_AcquisitionObserverReportsPatternTagValue(t *testing.T) {
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -259,10 +267,12 @@ func TestCollector_AcquisitionObserverReportsPatternTagValue(t *testing.T) {
 }
 
 func TestCollector_AcquisitionObserverPanicDoesNotChangeCollection(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{createTestProfile("profile.yaml", nil)},
 		Log:        logger.New(),
@@ -284,7 +294,7 @@ func TestCollector_AcquisitionProfileDigestUsesRoutesNotSourcePath(t *testing.T)
 
 	collectDigest := func(t *testing.T, source, oid string) [32]byte {
 		t.Helper()
-		ctrl, mockHandler := setupMockHandler(t)
+		ctrl, mockHandler := setupMockSession(t)
 		defer ctrl.Finish()
 		expectSNMPWalk(mockHandler, gosnmp.Version2c, oid, nil)
 
@@ -306,6 +316,8 @@ func TestCollector_AcquisitionProfileDigestUsesRoutesNotSourcePath(t *testing.T)
 
 		var reports []AcquisitionProfileReport
 		collector := New(Config{
+			Version:    gosnmp.Version2c,
+			MaxOIDs:    10,
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
@@ -379,7 +391,7 @@ func TestAcquisitionProfileRouteDigestIncludesOrdinaryMetrics(t *testing.T) {
 }
 
 func TestCollector_AcquisitionObserverReportsSyntheticDependencyAndTagFailure(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	dependency, source := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999.50")
@@ -409,6 +421,8 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyAndTagFailure(t 
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -435,7 +449,7 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyAndTagFailure(t 
 }
 
 func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const oidBase = "1.3.6.1.4.1.99999.55"
@@ -471,6 +485,8 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t 
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -492,7 +508,7 @@ func TestCollector_AcquisitionObserverReportsSyntheticDependencyVarbindCounts(t 
 }
 
 func TestCollector_AcquisitionObserverLeavesDormantDependencyUnobserved(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	dependency, source := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999.57")
@@ -518,6 +534,8 @@ func TestCollector_AcquisitionObserverLeavesDormantDependencyUnobserved(t *testi
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -545,7 +563,7 @@ func TestCollector_AcquisitionObserverLeavesDormantDependencyUnobserved(t *testi
 }
 
 func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const oidBase = "1.3.6.1.4.1.99999.56"
@@ -577,6 +595,8 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 
 	var reports []AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{topology, owner},
 		Log:        logger.New(),
@@ -612,7 +632,7 @@ func TestCollector_AcquisitionObserverFiltersSharedWalkToSyntheticDependencyRoot
 }
 
 func TestCollector_AcquisitionObserverLeavesTopologyRouteUnobservedWhenRegularTableFails(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -648,6 +668,8 @@ func TestCollector_AcquisitionObserverLeavesTopologyRouteUnobservedWhenRegularTa
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -669,7 +691,7 @@ func TestCollector_AcquisitionObserverLeavesTopologyRouteUnobservedWhenRegularTa
 }
 
 func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -712,6 +734,8 @@ func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *test
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -749,7 +773,7 @@ func TestCollector_AcquisitionObserverAssociatesTopologyValuesWithRoutes(t *test
 }
 
 func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSources(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const oid = "1.3.6.1.4.1.99999.80.0"
@@ -769,6 +793,8 @@ func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSou
 
 	var reports []AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{second, first},
 		Log:        logger.New(),
@@ -788,7 +814,7 @@ func TestCollector_AcquisitionObserverDistinguishesCurrentAndInheritedMissingSou
 
 func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGET(t *testing.T) {
 	t.Run("topology scalar", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
+		ctrl, mockHandler := setupMockSession(t)
 		defer ctrl.Finish()
 
 		const oid = "1.3.6.1.4.1.99999.40.1.0"
@@ -802,6 +828,8 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 
 		var report AcquisitionProfileReport
 		collector := New(Config{
+			Version:    gosnmp.Version2c,
+			MaxOIDs:    10,
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
@@ -819,7 +847,7 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 	})
 
 	t.Run("BGP scalar", func(t *testing.T) {
-		ctrl, mockHandler := setupMockHandler(t)
+		ctrl, mockHandler := setupMockSession(t)
 		defer ctrl.Finish()
 
 		oids := []string{
@@ -841,6 +869,8 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 
 		var report AcquisitionProfileReport
 		collector := New(Config{
+			Version:    gosnmp.Version2c,
+			MaxOIDs:    10,
 			SnmpClient: mockHandler,
 			Profiles:   []*ddsnmp.Profile{profile},
 			Log:        logger.New(),
@@ -860,7 +890,7 @@ func TestCollector_AcquisitionObserverReportsScalarsDiscoveredMissingInCurrentGE
 }
 
 func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPGet(mockHandler,
@@ -883,6 +913,8 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 	}
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -911,7 +943,7 @@ func TestCollector_AcquisitionObserverReportsPartialBGPCollection(t *testing.T) 
 }
 
 func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -933,6 +965,8 @@ func TestCollector_AcquisitionObserverReportsMixedBGPScalarMissingInputs(t *test
 	}
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -1029,7 +1063,7 @@ func TestFirstBGPRouteOIDDoesNotBulkAllocateBySourceCount(t *testing.T) {
 }
 
 func TestCollector_AcquisitionObserverClassifiesBGPTableLookupFailureAsDependency(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	cfg := crossTableBGPTestConfig()
@@ -1044,6 +1078,8 @@ func TestCollector_AcquisitionObserverClassifiesBGPTableLookupFailureAsDependenc
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles: []*ddsnmp.Profile{{
 			SourceFile: "bgp-dependency-processing.yaml",
@@ -1067,7 +1103,7 @@ func TestCollector_AcquisitionObserverClassifiesBGPTableLookupFailureAsDependenc
 }
 
 func TestCollector_AcquisitionObserverClassifiesMissingRequiredBGPTableCellAsDependency(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	cfg := crossTableBGPTestConfig()
@@ -1080,6 +1116,8 @@ func TestCollector_AcquisitionObserverClassifiesMissingRequiredBGPTableCellAsDep
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles: []*ddsnmp.Profile{{
 			SourceFile: "bgp-required-dependency-missing.yaml",
@@ -1104,7 +1142,7 @@ func TestCollector_AcquisitionObserverClassifiesMissingRequiredBGPTableCellAsDep
 }
 
 func TestCollector_AcquisitionObserverIgnoresMissingOptionalBGPTableDescriptor(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	cfg := crossTableBGPTestConfig()
@@ -1126,6 +1164,8 @@ func TestCollector_AcquisitionObserverIgnoresMissingOptionalBGPTableDescriptor(t
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles: []*ddsnmp.Profile{{
 			SourceFile: "bgp-optional-dependency-missing.yaml",
@@ -1150,7 +1190,7 @@ func TestCollector_AcquisitionObserverIgnoresMissingOptionalBGPTableDescriptor(t
 }
 
 func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPGet(mockHandler,
@@ -1182,6 +1222,8 @@ func TestCollector_AcquisitionObserverAssociatesBGPTableValuesWithRoutes(t *test
 	}
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),

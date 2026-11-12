@@ -9,9 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -19,7 +17,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
@@ -69,11 +69,9 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 				)
 			}
 
-			handler := snmpmock.NewMockHandler(gomock.NewController(t))
-			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-			handler.EXPECT().MaxOids().Return(60).AnyTimes()
+			handler := snmpmock.NewMockSession(gomock.NewController(t))
 			walks, gets := 0, 0
-			handler.EXPECT().BulkWalkAll(tc.TableOID).DoAndReturn(func(string) ([]gosnmp.SnmpPDU, error) {
+			handler.EXPECT().BulkWalkAll(tc.TableOID, gomock.Any()).DoAndReturn(func(_ string, _ uint32) ([]gosnmp.SnmpPDU, error) {
 				walks++
 				return pdus, nil
 			}).AnyTimes()
@@ -95,6 +93,8 @@ func TestStockFirewallIdentitySurvivesChartSerialization(t *testing.T) {
 			acquire := func(p *ddsnmp.Profile) *ddsnmpcollector.Collector {
 				return ddsnmpcollector.New(
 					ddsnmpcollector.Config{
+						Version:    gosnmp.Version2c,
+						MaxOIDs:    60,
 						SnmpClient: handler,
 						Profiles:   []*ddsnmp.Profile{p},
 						Log:        logger.New(),

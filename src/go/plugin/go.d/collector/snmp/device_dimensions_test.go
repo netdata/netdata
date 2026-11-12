@@ -87,7 +87,7 @@ func TestCollectorRuntimeReplacementPartialDimensionsRecover(t *testing.T) {
 			require.NotEmpty(t, c.Collect(context.Background()))
 			client, _ := newReplacementTestClient(t, device, nil)
 			t.Cleanup(func() { c.Cleanup(context.Background()) })
-			c.newSnmpClient = func() gosnmp.Handler { return client }
+			c.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return client }
 			c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 				cfg.Profiles = []*ddsnmp.Profile{profile}
 				return ddsnmpcollector.New(cfg)

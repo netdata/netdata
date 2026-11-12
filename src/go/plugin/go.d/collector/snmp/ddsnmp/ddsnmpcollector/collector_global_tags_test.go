@@ -6,11 +6,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -28,7 +28,8 @@ func globalMetricTags(tags ...ddprofiledefinition.MetricTagConfig) []ddprofilede
 func TestGlobalTagsCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		profile        *ddsnmp.Profile
-		setupMock      func(m *snmpmock.MockHandler)
+		setupMock      func(m *snmpmock.MockSession)
+		requests       requestConfig // zero: testRequests
 		expectedResult map[string]string
 		expectedError  bool
 		errorContains  string
@@ -40,7 +41,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					StaticTags: []ddprofiledefinition.StaticMetricTagConfig{},
 				},
 			},
-			setupMock:      func(m *snmpmock.MockHandler) {},
+			setupMock:      func(m *snmpmock.MockSession) {},
 			expectedResult: nil,
 			expectedError:  false,
 		},
@@ -54,7 +55,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {},
+			setupMock: func(m *snmpmock.MockSession) {},
 			expectedResult: map[string]string{
 				"environment": "production",
 				"region":      "us-east-1",
@@ -83,8 +84,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					),
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get(gomock.InAnyOrder([]string{
 					"1.3.6.1.2.1.1.1.0",
 					"1.3.6.1.2.1.1.6.0",
@@ -129,8 +129,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					),
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -169,8 +168,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					),
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.2.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -207,8 +205,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					),
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -242,8 +239,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					),
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -273,8 +269,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					),
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
 					nil,
 					errors.New("SNMP timeout"),
@@ -298,8 +293,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					),
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.5.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -318,6 +312,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 			expectedError: false,
 		},
 		"chunked requests": {
+			requests: requestConfig{version: gosnmp.Version2c, maxOIDs: 2},
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					MetricTags: globalMetricTags(
@@ -345,8 +340,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 					),
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(2).AnyTimes() // Force chunking
+			setupMock: func(m *snmpmock.MockSession) {
 				// First chunk
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0", "1.3.6.1.2.1.1.2.0"}).Return(
 					&gosnmp.SnmpPacket{
@@ -391,11 +385,15 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockHandler := snmpmock.NewMockHandler(ctrl)
+			mockHandler := snmpmock.NewMockSession(ctrl)
 			tc.setupMock(mockHandler)
 
 			missingOIDs := make(map[string]bool)
-			collector := newGlobalTagsCollector(mockHandler, missingOIDs, logger.New())
+			requests := tc.requests
+			if requests == (requestConfig{}) {
+				requests = testRequests
+			}
+			collector := newGlobalTagsCollector(mockHandler, requests, missingOIDs, logger.New())
 
 			result, err := collector.collect(tc.profile)
 

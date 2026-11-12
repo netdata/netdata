@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 const (
@@ -24,7 +25,9 @@ const (
 
 // tableCollector handles collection of SNMP table metrics
 type tableCollector struct {
-	snmpClient      gosnmp.Handler
+	snmpClient      snmputils.Client
+	req             requestConfig
+	maxRepetitions  uint32
 	disableBulkWalk bool
 	missingOIDs     map[string]bool
 	tableCache      *tableCache
@@ -35,7 +38,9 @@ type tableCollector struct {
 
 // newTableCollector creates a new table collector
 func newTableCollector(
-	snmpClient gosnmp.Handler,
+	snmpClient snmputils.Client,
+	req requestConfig,
+	maxRepetitions uint32,
 	missingOIDs map[string]bool,
 	tableCache *tableCache,
 	log *logger.Logger,
@@ -43,6 +48,8 @@ func newTableCollector(
 ) *tableCollector {
 	return &tableCollector{
 		snmpClient:      snmpClient,
+		req:             req,
+		maxRepetitions:  maxRepetitions,
 		disableBulkWalk: disableBulkWalk,
 		missingOIDs:     missingOIDs,
 		tableCache:      tableCache,
@@ -560,11 +567,11 @@ func (tc *tableCollector) snmpWalk(
 
 	stats.SNMP.WalkRequests++
 
-	useWalk := tc.snmpClient.Version() == gosnmp.Version1 || tc.disableBulkWalk
+	useWalk := tc.req.version == gosnmp.Version1 || tc.disableBulkWalk
 	if useWalk {
 		resp, err = tc.snmpClient.WalkAll(oid)
 	} else {
-		resp, err = tc.snmpClient.BulkWalkAll(oid)
+		resp, err = tc.snmpClient.BulkWalkAll(oid, tc.maxRepetitions)
 	}
 	if operation := sourceRecorder(tc.snmpClient).Cursor(); execution != nil && operation != 0 {
 		execution.WalkOperations = append(execution.WalkOperations, operation)
@@ -587,7 +594,7 @@ func (tc *tableCollector) snmpWalk(
 }
 
 func (tc *tableCollector) snmpGet(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	return getSNMPValues(tc.snmpClient, oids, tc.missingOIDs, stats)
+	return getSNMPValues(tc.snmpClient, tc.req, oids, tc.missingOIDs, stats)
 }
 
 func parseStaticTags(staticTags []ddprofiledefinition.StaticMetricTagConfig) map[string]string {

@@ -68,7 +68,7 @@ func TestBGPProcessingEvidenceFollowsCollection(t *testing.T) {
 			handler := &sourceTestHandler{walk: func(string) ([]gosnmp.SnmpPDU, error) { return pdus, nil }}
 			source := &SourceRecorder{}
 			var report AcquisitionProfileReport
-			collector := New(Config{SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
 			results, err := collector.Collect()
 			require.NoError(t, err)
 			require.Len(t, results, 1)
@@ -109,7 +109,7 @@ func TestCrossTableProcessingEvidenceFollowsCollection(t *testing.T) {
 			}}
 			source := &SourceRecorder{}
 			var report AcquisitionProfileReport
-			collector := New(Config{SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{profile}, AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: source.Wrap(handler), Log: logger.New(), Profiles: []*ddsnmp.Profile{profile}, AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r })})
 			results, err := collector.Collect()
 			require.NoError(t, err)
 			require.Len(t, results, 1)
@@ -198,6 +198,8 @@ func TestMetadataProcessingEvidenceUsesLogicalField(t *testing.T) {
 			}}
 			var report AcquisitionProfileReport
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    1,
 				SnmpClient: new(SourceRecorder).Wrap(handler),
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),

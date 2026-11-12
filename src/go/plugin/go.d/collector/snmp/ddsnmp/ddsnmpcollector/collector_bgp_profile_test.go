@@ -37,12 +37,14 @@ func TestCollector_Collect_StdBGP4Profile(t *testing.T) {
 				createPDU("1.3.6.1.2.1.15.3.1.7.169.254.1.9", gosnmp.IPAddress, "169.254.1.9"),
 			)
 
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.2.1.15.3", pdus)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),

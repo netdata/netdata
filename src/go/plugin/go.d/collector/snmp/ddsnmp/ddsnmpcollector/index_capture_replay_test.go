@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -128,7 +128,7 @@ func TestStockIndexCaptureReplay(t *testing.T) {
 							func(pdu gosnmp.SnmpPDU) bool { return strings.HasPrefix(pdu.Name, tc.oldColumn+".") },
 						)
 					}
-					ctrl, handler := setupMockHandler(t)
+					ctrl, handler := setupMockSession(t)
 					defer ctrl.Finish()
 					expectSNMPWalkFromFixture(handler, gosnmp.Version2c, fixture, tc.root)
 					getCalls := 0
@@ -151,6 +151,8 @@ func TestStockIndexCaptureReplay(t *testing.T) {
 					}).AnyTimes()
 					profile := mustLoadIndexCaptureRow(t, tc.profile, tc.table)
 					collector := New(Config{
+						Version:    gosnmp.Version2c,
+						MaxOIDs:    10,
 						SnmpClient: handler,
 						Profiles:   []*ddsnmp.Profile{profile},
 						Log:        logger.New(),
@@ -224,10 +226,12 @@ func TestStockIndexCaptureReplay_RB750ScopedAcquisition(t *testing.T) {
 				Topology: profile.Definition.Topology,
 			}
 			fixture := mustLoadSNMPFixture(t, "../testdata/profile-mib-access-rb750gr3.snmprec")
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			expectSNMPWalkFromFixture(handler, gosnmp.Version2c, fixture, "1.0.8802.1.1.2.1.4.2")
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: handler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),

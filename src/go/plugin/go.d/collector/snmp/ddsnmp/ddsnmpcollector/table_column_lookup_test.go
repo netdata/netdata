@@ -180,6 +180,8 @@ func TestTableCollector_IndexFromReturnsToSourceTable(t *testing.T) {
 		},
 	}
 	c := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    1,
 		SnmpClient: handler,
 		Log:        logger.New(),
 		Profiles:   []*ddsnmp.Profile{profile},

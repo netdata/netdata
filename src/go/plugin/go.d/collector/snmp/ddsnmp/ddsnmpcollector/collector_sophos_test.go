@@ -14,7 +14,7 @@ import (
 )
 
 func TestCollector_Collect_SophosLicensingProfile_PreservesRawStateAndExpiryOnScalarRows(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPGet(mockHandler, []string{
@@ -87,6 +87,8 @@ func TestCollector_Collect_SophosLicensingProfile_PreservesRawStateAndExpiryOnSc
 	require.Len(t, profile.Definition.Licensing, 9)
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),

@@ -67,7 +67,7 @@ func TestCollector_Collect_CiscoBgpPeer2Prefixes_FromLibreNMSFixtures(t *testing
 }
 
 func TestCollector_Collect_CiscoBgpPeer2PrefixRows_OmitsInvalidOptionalLocalAddress(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	prefixIndex := "1.4.198.19.220.34.1.128"
@@ -85,6 +85,8 @@ func TestCollector_Collect_CiscoBgpPeer2PrefixRows_OmitsInvalidOptionalLocalAddr
 	filterProfileForTypedBGPByID(t, profile, "cisco-bgp-peer-family")
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
@@ -113,13 +115,15 @@ func collectCiscoPeer2PrefixRowsFromFixture(t *testing.T, sysObjectID, profileFi
 
 	pdus := loadSnmprecPDUs(t, fixturePath)
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.8", snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.9.9.187.1.2.8."))
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.5.1", snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.9.9.187.1.2.5.1."))
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),

@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -83,11 +83,13 @@ func collectCiscoPoEFixture(t *testing.T, pdus []gosnmp.SnmpPDU, missingFirstMap
 
 	pdus = append(pdus, pethPsePortRowsFor(pdus)...)
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 	walks := expectFixtureAgent(mockHandler, pdus)
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
@@ -259,10 +261,9 @@ func fixtureColumns(pdus []gosnmp.SnmpPDU) map[string]map[string]int64 {
 	return out
 }
 
-func expectFixtureAgent(mockHandler *snmpmock.MockHandler, pdus []gosnmp.SnmpPDU) map[string]int {
+func expectFixtureAgent(mockHandler *snmpmock.MockSession, pdus []gosnmp.SnmpPDU) map[string]int {
 	walks := make(map[string]int)
-	mockHandler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	mockHandler.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(func(oid string) ([]gosnmp.SnmpPDU, error) {
+	mockHandler.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) {
 		oid = strings.Trim(oid, ".")
 		walks[oid]++
 		return snmprecPDUsWithPrefix(pdus, oid+"."), nil

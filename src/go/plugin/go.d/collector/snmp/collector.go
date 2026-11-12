@@ -93,7 +93,7 @@ func New(store *ddsnmp.DeviceStore) *Collector {
 		licensing:  newLicensingIntegration(),
 
 		newPinger:     pinger.New,
-		newSnmpClient: gosnmp.NewHandler,
+		newSnmpClient: snmputils.NewSession,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
@@ -141,8 +141,11 @@ type (
 		pingClient pinger.Client
 		newPinger  func(pinger.Config, *logger.Logger) (pinger.Client, error)
 
-		snmpClient    gosnmp.Handler
-		newSnmpClient func() gosnmp.Handler
+		// snmpSession is the connection the collector owns; snmpClient is the
+		// request path to it, wrapped while a normal-diagnostics attempt records.
+		snmpSession   snmputils.Session
+		snmpClient    snmputils.Client
+		newSnmpClient func(gosnmp.Handler) snmputils.Session
 
 		ddSnmpColl    ddCollector
 		newDdSnmpColl func(ddsnmpcollector.Config) ddCollector
@@ -198,7 +201,7 @@ func (c *Collector) Init(context.Context) (err error) {
 		)
 	}
 
-	if _, err := c.initSNMPClient(); err != nil {
+	if _, err := c.configuredSNMPHandler(); err != nil {
 		return lifecycleFailureError(
 			fmt.Errorf("failed to initialize SNMP client: %v", err),
 			err,
@@ -235,8 +238,8 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 		c.completeDeviceLifecycle(ddsnmp.DeviceLifecyclePhaseCheck, err)
 	}()
 
-	if c.snmpClient == nil {
-		snmpClient, err := c.initAndConnectSNMPClient()
+	if c.snmpSession == nil {
+		session, err := c.initAndConnectSNMPClient()
 		if err != nil {
 			return lifecycleFailureError(
 				fmt.Errorf("failed to init and connect SNMP client: %v", err),
@@ -245,7 +248,7 @@ func (c *Collector) Check(ctx context.Context) (err error) {
 				"",
 			)
 		}
-		c.snmpClient = snmpClient
+		c.snmpSession, c.snmpClient = session, session
 		c.wrapNormalClient()
 	}
 
@@ -310,8 +313,8 @@ func (c *Collector) Cleanup(ctx context.Context) {
 			c.deviceStore.Unregister(ownerKey)
 		}
 	}
-	if c.snmpClient != nil {
-		_ = c.snmpClient.Close()
+	if c.snmpSession != nil {
+		_ = c.snmpSession.Close()
 	}
 }
 

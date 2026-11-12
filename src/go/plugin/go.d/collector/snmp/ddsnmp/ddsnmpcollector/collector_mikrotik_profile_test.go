@@ -24,7 +24,7 @@ func TestCollector_Collect_MikroTikGaugeProfile(t *testing.T) {
 		unitOID  = tableOID + ".1.4"
 	)
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
@@ -59,6 +59,8 @@ func TestCollector_Collect_MikroTikGaugeProfile(t *testing.T) {
 	})
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{mustLoadMikroTikGaugeProfile(t)},
 		Log:        logger.New(),

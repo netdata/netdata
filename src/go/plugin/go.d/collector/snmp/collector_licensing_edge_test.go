@@ -6,11 +6,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	ddsnmpcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -66,7 +67,7 @@ func TestCollector_Collect_LicensingAggregation_ReadsTypedRowsAndIgnoresPrivateM
 			mockCtl := gomock.NewController(t)
 			defer mockCtl.Finish()
 
-			mockSNMP := snmpmock.NewMockHandler(mockCtl)
+			mockSNMP := snmpmock.NewMockSession(mockCtl)
 			setMockClientInitExpect(mockSNMP)
 			setMockClientSysInfoExpect(mockSNMP)
 
@@ -75,7 +76,7 @@ func TestCollector_Collect_LicensingAggregation_ReadsTypedRowsAndIgnoresPrivateM
 			collr.CreateVnode = false
 			collr.Ping.Enabled = false
 			collr.snmpProfiles = []*ddsnmp.Profile{{}}
-			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
+			collr.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return mockSNMP }
 			collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 				pm := tc.profileMetrics
 				for i := range pm.HiddenMetrics {

@@ -16,27 +16,28 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/require"
 )
 
 type sourceTestHandler struct {
-	gosnmp.Handler
+	snmputils.Client
 	get         func([]string) (*gosnmp.SnmpPacket, error)
 	walk        func(string) ([]gosnmp.SnmpPDU, error)
 	gets, walks int
 }
 
-func (*sourceTestHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-func (*sourceTestHandler) MaxOids() int                { return 1 }
 func (h *sourceTestHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	h.gets++
 	return h.get(oids)
 }
-func (h *sourceTestHandler) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
+func (h *sourceTestHandler) BulkWalkAll(oid string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
 	h.walks++
 	return h.walk(oid)
 }
-func (h *sourceTestHandler) WalkAll(oid string) ([]gosnmp.SnmpPDU, error) { return h.BulkWalkAll(oid) }
+func (h *sourceTestHandler) WalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
+	return h.BulkWalkAll(oid, 0)
+}
 
 func TestSourceValuesPreserveDecodedData(t *testing.T) {
 	for name, tc := range map[string]struct {
@@ -125,7 +126,7 @@ func TestSourceEvidenceFollowsActualCollection(t *testing.T) {
 			}
 			source := &SourceRecorder{}
 			var reports []AcquisitionProfileReport
-			collector := New(Config{SnmpClient: source.Wrap(handler), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: tc.profile}}, Log: logger.New(), AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) })})
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: source.Wrap(handler), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: tc.profile}}, Log: logger.New(), AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) })})
 			values, err := collector.Collect()
 			if tc.wantErr {
 				require.Error(t, err)
@@ -190,7 +191,7 @@ func TestSourceRecorderLifecycleAndClientReplacement(t *testing.T) {
 			}}
 			source := &SourceRecorder{}
 			client := source.Wrap(handler)
-			collector := New(Config{SnmpClient: client, Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, AcquisitionObserver: AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})})
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: client, Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, AcquisitionObserver: AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})})
 			if tc.replace {
 				collector.SetSNMPClient(client)
 			}
@@ -225,14 +226,14 @@ func BenchmarkCollectorSourceEvidence(b *testing.B) {
 				log := logger.New()
 				b.ReportAllocs()
 				for b.Loop() {
-					var client gosnmp.Handler = &sourceTestHandler{walk: func(string) ([]gosnmp.SnmpPDU, error) { return pdus, nil }}
+					var client snmputils.Client = &sourceTestHandler{walk: func(string) ([]gosnmp.SnmpPDU, error) { return pdus, nil }}
 					source := &SourceRecorder{}
 					var observer AcquisitionObserver
 					if tc.capture {
 						client = source.Wrap(client)
 						observer = AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})
 					}
-					collector := New(Config{SnmpClient: client, Log: log, Profiles: []*ddsnmp.Profile{profile}, AcquisitionObserver: observer})
+					collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: client, Log: log, Profiles: []*ddsnmp.Profile{profile}, AcquisitionObserver: observer})
 					results, err := collector.Collect()
 					if err != nil {
 						b.Fatal(err)

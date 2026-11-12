@@ -12,20 +12,23 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 // scalarCollector handles collection of scalar (non-table) metrics
 type scalarCollector struct {
-	snmpClient  gosnmp.Handler
+	snmpClient  snmputils.Client
+	req         requestConfig
 	missingOIDs map[string]bool
 	log         *logger.Logger
 	valProc     *valueProcessor
 	tagProc     *globalTagProcessor
 }
 
-func newScalarCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, log *logger.Logger) *scalarCollector {
+func newScalarCollector(snmpClient snmputils.Client, req requestConfig, missingOIDs map[string]bool, log *logger.Logger) *scalarCollector {
 	return &scalarCollector{
 		snmpClient:  snmpClient,
+		req:         req,
 		missingOIDs: missingOIDs,
 		log:         log,
 		valProc:     newValueProcessor(),
@@ -118,7 +121,7 @@ func (sc *scalarCollector) identifyScalarOIDs(configs []ddprofiledefinition.Metr
 }
 
 func (sc *scalarCollector) getScalarValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	return getSNMPValues(sc.snmpClient, oids, sc.missingOIDs, stats)
+	return getSNMPValues(sc.snmpClient, sc.req, oids, sc.missingOIDs, stats)
 }
 
 // processScalarMetrics converts PDUs into metrics

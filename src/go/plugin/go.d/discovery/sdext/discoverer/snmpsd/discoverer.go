@@ -43,8 +43,8 @@ func NewDiscoverer(cfg Config) (*Discoverer, error) {
 		started:   make(chan struct{}),
 		cfgHash:   cfgHash,
 		subnets:   subnets,
-		newSnmpClient: func() (gosnmp.Handler, func()) {
-			return gosnmp.NewHandler(), func() {}
+		newSnmpClient: func(handler gosnmp.Handler) (snmputils.Session, func()) {
+			return snmputils.NewSession(handler), func() {}
 		},
 
 		rescanInterval:          defaultRescanInterval,
@@ -87,7 +87,7 @@ type (
 
 		subnets []subnet
 
-		newSnmpClient func() (gosnmp.Handler, func())
+		newSnmpClient func(gosnmp.Handler) (snmputils.Session, func())
 
 		parallelScansPerNetwork int
 		rescanInterval          time.Duration
@@ -175,13 +175,7 @@ func (d *Discoverer) discoverNetwork(ctx context.Context, in chan<- []model.Targ
 	}
 	p := pool.New().WithMaxGoroutines(d.parallelScansPerNetwork)
 
-	client, cleanup := d.newSnmpClient()
-	defer cleanup()
-
-	client.SetTimeout(d.timeout)
-	client.SetRetries(0)
-	setCredential(client, sub.credential)
-	d.Debugf("SNMP client info for '%s': %s", sub.str, snmputils.SnmpClientConnInfo(client))
+	d.Debugf("SNMP client info for '%s': %s", sub.str, snmputils.SnmpClientConnInfo(d.newProbeHandler("", sub.credential)))
 
 	for ip := range sub.ips.Iterate() {
 		ipAddr := ip.String()
@@ -253,13 +247,8 @@ func (d *Discoverer) probeIPAddress(ctx context.Context, sub subnet, ip string, 
 }
 
 func (d *Discoverer) getSnmpSysInfo(sub subnet, ip string) (*snmputils.SysInfo, error) {
-	client, cleanup := d.newSnmpClient()
+	client, cleanup := d.newSnmpClient(d.newProbeHandler(ip, sub.credential))
 	defer cleanup()
-
-	client.SetTarget(ip)
-	client.SetTimeout(d.timeout)
-	client.SetRetries(0)
-	setCredential(client, sub.credential)
 
 	if err := client.Connect(); err != nil {
 		return nil, fmt.Errorf("failed to connect: %v", err)
@@ -267,7 +256,18 @@ func (d *Discoverer) getSnmpSysInfo(sub subnet, ip string) (*snmputils.SysInfo, 
 
 	defer func() { _ = client.Close() }()
 
-	return snmputils.GetSysInfo(client)
+	return snmputils.GetSysInfo(client, snmputils.ParseSNMPVersion(sub.credential.Version), gosnmp.MaxOids)
+}
+
+// newProbeHandler builds the client of one probe: no retries, the discovery
+// timeout, the subnet's credential and the library's default max OIDs.
+func (d *Discoverer) newProbeHandler(target string, cred CredentialConfig) gosnmp.Handler {
+	client := gosnmp.NewHandler()
+	client.SetTarget(target)
+	client.SetTimeout(d.timeout)
+	client.SetRetries(0)
+	setCredential(client, cred)
+	return client
 }
 
 func send(ctx context.Context, in chan<- []model.TargetGroup, tgg model.TargetGroup) {

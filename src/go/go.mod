@@ -44,7 +44,6 @@ require (
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/gofrs/flock v0.13.2
 	github.com/gohugoio/hashstructure v1.1.0
-	github.com/golang/mock v1.6.0
 	github.com/golangsnmp/gomib v0.13.2
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
@@ -85,6 +84,7 @@ require (
 	go.mongodb.org/mongo-driver/v2 v2.10.0
 	go.opentelemetry.io/proto/otlp v1.11.1
 	go.uber.org/automaxprocs v1.6.0
+	go.uber.org/mock v0.6.0
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
 	golang.org/x/crypto v0.58.0
 	golang.org/x/net v0.62.0

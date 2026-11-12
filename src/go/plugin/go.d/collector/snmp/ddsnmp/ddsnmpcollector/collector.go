@@ -23,8 +23,14 @@ import (
 type Config struct {
 	// LogKeyPrefix isolates warning budgets when collectors share a logger.
 	// Callers must keep it stable across refreshes and exclude credentials.
-	LogKeyPrefix        string
-	SnmpClient          gosnmp.Handler
+	LogKeyPrefix string
+	SnmpClient   snmputils.Client
+	// Version is the SNMP version SnmpClient was configured with.
+	Version gosnmp.SnmpVersion
+	// MaxOIDs is the maximum OIDs per Get SnmpClient was configured with; 0 means gosnmp.MaxOids.
+	MaxOIDs int
+	// MaxRepetitions is sent with every bulk walk.
+	MaxRepetitions      uint32
 	Profiles            []*ddsnmp.Profile
 	Log                 *logger.Logger
 	SysObjectID         string
@@ -44,7 +50,7 @@ func New(cfg Config) *Collector {
 	}
 
 	cfg.SnmpClient = &diagnosticClient{
-		Handler:  cfg.SnmpClient,
+		Client:   cfg.SnmpClient,
 		failures: &coll.failures,
 		negative: &coll.negative,
 		requests: &coll.requests,
@@ -57,10 +63,19 @@ func New(cfg Config) *Collector {
 		coll.acquisitionObserver = cfg.AcquisitionObserver
 	}
 
-	coll.globalTagsCollector = newGlobalTagsCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
-	coll.deviceMetadataCollector = newDeviceMetadataCollector(cfg.SnmpClient, coll.missingOIDs, coll.log, cfg.SysObjectID)
-	coll.scalarCollector = newScalarCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
-	coll.tableCollector = newTableCollector(cfg.SnmpClient, coll.missingOIDs, coll.tableCache, coll.log, cfg.DisableBulkWalk)
+	req := requestConfig{version: cfg.Version, maxOIDs: snmputils.MaxOIDsOrDefault(cfg.MaxOIDs)}
+	coll.globalTagsCollector = newGlobalTagsCollector(cfg.SnmpClient, req, coll.missingOIDs, coll.log)
+	coll.deviceMetadataCollector = newDeviceMetadataCollector(cfg.SnmpClient, req, coll.missingOIDs, coll.log, cfg.SysObjectID)
+	coll.scalarCollector = newScalarCollector(cfg.SnmpClient, req, coll.missingOIDs, coll.log)
+	coll.tableCollector = newTableCollector(
+		cfg.SnmpClient,
+		req,
+		cfg.MaxRepetitions,
+		coll.missingOIDs,
+		coll.tableCache,
+		coll.log,
+		cfg.DisableBulkWalk,
+	)
 	coll.tableCollector.logKeyPrefix = cfg.LogKeyPrefix
 	coll.vmetricsCollector = newVirtualMetricsCollector(coll.log)
 
@@ -305,9 +320,9 @@ func collectHiddenMetrics(metrics []ddsnmp.Metric) []ddsnmp.Metric {
 	return hidden
 }
 
-func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
+func (c *Collector) SetSNMPClient(snmpClient snmputils.Client) {
 	snmpClient = &diagnosticClient{
-		Handler:  snmpClient,
+		Client:   snmpClient,
 		failures: &c.failures,
 		negative: &c.negative,
 		requests: &c.requests,

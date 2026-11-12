@@ -20,13 +20,11 @@ import (
 )
 
 type normalBenchmarkHandler struct {
-	gosnmp.Handler
+	snmputils.Session
 	rows int
 	fail bool
 }
 
-func (*normalBenchmarkHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-func (*normalBenchmarkHandler) MaxOids() int                { return 32 }
 func (h *normalBenchmarkHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	if h.fail {
 		return nil, errors.New("benchmark timeout")
@@ -73,7 +71,7 @@ func (h *normalBenchmarkHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) 
 	}
 	return packet, nil
 }
-func (h *normalBenchmarkHandler) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, error) {
+func (h *normalBenchmarkHandler) BulkWalkAll(root string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
 	values := make([]gosnmp.SnmpPDU, h.rows)
 	for i := range values {
 		values[i] = gosnmp.SnmpPDU{
@@ -155,11 +153,14 @@ func newNormalBenchmarkCollector(tables, rows int, record bool) *Collector {
 		SysObjectID: "1.3.6.1.4.1.99999.1",
 		Name:        "benchmark",
 	}
-	c.snmpClient = &normalBenchmarkHandler{
+	session := &normalBenchmarkHandler{
 		rows: rows,
 	}
+	c.snmpSession, c.snmpClient = session, session
 	cfg := ddsnmpcollector.Config{
 		SnmpClient: c.snmpClient,
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    32,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        c.Logger,
 	}

@@ -36,28 +36,28 @@ func (s *snmpRequestState) observe(responded bool, err error) {
 }
 
 type diagnosticClient struct {
-	gosnmp.Handler
+	snmputils.Client
 	failures *ddsnmp.CollectionFailures
 	negative *negativeEvidence
 	requests *snmpRequestState
 }
 
 func (c *diagnosticClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
-	packet, err := c.Handler.Get(oids)
+	packet, err := c.Client.Get(oids)
 	c.requests.observe(packet != nil, err)
 	c.failures.GET.Record(snmputils.ClassifyGetFailure(packet, err))
 	return packet, err
 }
 
 func (c *diagnosticClient) WalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
-	values, err := c.Handler.WalkAll(oid)
+	values, err := c.Client.WalkAll(oid)
 	c.requests.observe(err == nil || len(values) > 0, err)
 	c.recordWalk(err)
 	return values, err
 }
 
-func (c *diagnosticClient) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
-	values, err := c.Handler.BulkWalkAll(oid)
+func (c *diagnosticClient) BulkWalkAll(oid string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
+	values, err := c.Client.BulkWalkAll(oid, maxRepetitions)
 	c.requests.observe(err == nil || len(values) > 0, err)
 	c.recordWalk(err)
 	return values, err
@@ -83,4 +83,4 @@ func recordCollectionFailure(dst *ddsnmp.FailureCount, err error, operation, rea
 	dst.Record(f)
 }
 
-func (c *diagnosticClient) SourceRecorder() *SourceRecorder { return sourceRecorder(c.Handler) }
+func (c *diagnosticClient) SourceRecorder() *SourceRecorder { return sourceRecorder(c.Client) }

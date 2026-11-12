@@ -18,15 +18,17 @@ import (
 // deviceMetadataCollector handles collection of device metadata
 type deviceMetadataCollector struct {
 	snmpClient  snmputils.ScalarClient
+	req         requestConfig
 	missingOIDs map[string]bool
 	log         *logger.Logger
 	sysobjectid string
 	strict      bool
 }
 
-func newDeviceMetadataCollector(snmpClient snmputils.ScalarClient, missingOIDs map[string]bool, log *logger.Logger, sysobjectid string) *deviceMetadataCollector {
+func newDeviceMetadataCollector(snmpClient snmputils.ScalarClient, req requestConfig, missingOIDs map[string]bool, log *logger.Logger, sysobjectid string) *deviceMetadataCollector {
 	return &deviceMetadataCollector{
 		snmpClient:  snmpClient,
+		req:         req,
 		missingOIDs: missingOIDs,
 		log:         log,
 		sysobjectid: sysobjectid,
@@ -156,7 +158,7 @@ func (dc *deviceMetadataCollector) collectStaticAndIdentifyOIDs(fields map[strin
 }
 
 func (dc *deviceMetadataCollector) fetchMetadataValues(oids []string, stats *ddsnmp.CollectionStats) (map[string]gosnmp.SnmpPDU, error) {
-	return getSNMPValues(dc.snmpClient, oids, dc.missingOIDs, stats)
+	return getSNMPValues(dc.snmpClient, dc.req, oids, dc.missingOIDs, stats)
 }
 
 func (dc *deviceMetadataCollector) processDynamicFields(fields map[string]ddprofiledefinition.MetadataField, pdus map[string]gosnmp.SnmpPDU, metadata map[string]ddsnmp.MetaTag, isExactMatch bool) error {

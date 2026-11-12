@@ -91,13 +91,15 @@ func TestCollector_Collect_AlcatelBGP_TypedRows(t *testing.T) {
 		createIntegerPDU(oidWithIndex("1.3.6.1.4.1.6486.801.1.2.1.10.5.1.1.14.1.73", ipv6Idx), 30),
 	}
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSystemMetadataGets(mockHandler, sysObjectID, "alcatel")
 	expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),

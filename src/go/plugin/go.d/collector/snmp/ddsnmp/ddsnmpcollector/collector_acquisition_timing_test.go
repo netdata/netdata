@@ -11,6 +11,7 @@ import (
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -21,7 +22,7 @@ func TestCollector_AcquisitionScalarFailureTiming(t *testing.T) {
 	const oid = "1.3.6.1.4.1.99999.1.0"
 	for name, topology := range map[string]bool{"ordinary": false, "topology": true} {
 		t.Run(name, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			handler.EXPECT().Get([]string{oid}).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
 				time.Sleep(time.Millisecond)
@@ -38,6 +39,8 @@ func TestCollector_AcquisitionScalarFailureTiming(t *testing.T) {
 			}
 			var report AcquisitionProfileReport
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: handler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),
@@ -53,7 +56,7 @@ func TestCollector_AcquisitionScalarFailureTiming(t *testing.T) {
 }
 
 func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	profile := createTestProfile("preparation.yaml", nil)
 	var oids []string
@@ -79,6 +82,8 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 	expectSNMPGetError(handler, oids[10:], errors.New("second batch failed"))
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: new(SourceRecorder).Wrap(handler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -117,7 +122,7 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 }
 
 func TestCollector_AcquisitionPreparationNonfatalMetadataErrors(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	const base = "1.3.6.1.4.1.99999"
 	profile := createTestProfile("metadata.yaml", nil)
@@ -181,7 +186,7 @@ func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			version, failed := tc.version, tc.failed
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			const root = "1.3.6.1.4.1.99999.1"
 			metric := ddprofiledefinition.MetricsConfig{
@@ -195,15 +200,16 @@ func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 			if failed {
 				callErr = errors.New("walk failure")
 			}
-			handler.EXPECT().Version().Return(version)
 			walk := func(string) ([]gosnmp.SnmpPDU, error) { time.Sleep(time.Millisecond); return nil, callErr }
 			if version == gosnmp.Version1 {
 				handler.EXPECT().WalkAll(root).DoAndReturn(walk)
 			} else {
-				handler.EXPECT().BulkWalkAll(root).DoAndReturn(walk)
+				handler.EXPECT().BulkWalkAll(root, gomock.Any()).DoAndReturn(func(oid string, _ uint32) ([]gosnmp.SnmpPDU, error) { return walk(oid) })
 			}
 			var reports []AcquisitionProfileReport
 			collector := New(Config{
+				Version:    version,
+				MaxOIDs:    10,
 				SnmpClient: new(SourceRecorder).Wrap(handler),
 				Log:        logger.New(),
 				Profiles: []*ddsnmp.Profile{
@@ -229,7 +235,7 @@ func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 }
 
 func TestCollector_AcquisitionBGPWalkPassAccounting(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	const anchor = "1.3.6.1.4.1.99999.70.1"
 	const dependency = "1.3.6.1.4.1.99999.70.2"
@@ -248,6 +254,8 @@ func TestCollector_AcquisitionBGPWalkPassAccounting(t *testing.T) {
 	profile.Definition.BGP = []ddprofiledefinition.BGPConfig{crossTableBGPTestConfig(), crossTableBGPTestConfig()}
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: new(SourceRecorder).Wrap(handler),
 		Log:        logger.New(),
 		Profiles:   []*ddsnmp.Profile{profile},

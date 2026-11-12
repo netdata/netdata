@@ -50,7 +50,7 @@ func (c *Collector) ensureDeviceProfile() error {
 		return nil
 	}
 
-	si, err := snmputils.GetSysInfo(c.snmpClient)
+	si, err := c.getSysInfo()
 	if err != nil {
 		return snmputils.WithFailure(err, "system_identity", "")
 	}

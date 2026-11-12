@@ -27,14 +27,14 @@ var sysUptimeSources = []sysUptimeSource{
 	{oid: OidSysUpTime, scale: sysUptimeTimeTicks},
 }
 
-func GetSysUptime(client gosnmp.Handler) (int64, error) {
+func GetSysUptime(client ScalarClient) (int64, error) {
 	value, _, err := GetSysUptimeWithDiagnostics(client)
 	return value, err
 }
 
 // GetSysUptimeWithDiagnostics observes the response without changing the uptime
 // fallback or operational error behavior used by GetSysUptime.
-func GetSysUptimeWithDiagnostics(client gosnmp.Handler) (int64, Failure, error) {
+func GetSysUptimeWithDiagnostics(client ScalarClient) (int64, Failure, error) {
 	packet, err := client.Get(sysUptimeOIDs())
 	failure := ClassifyGetFailure(packet, err)
 	value, err := sysUptimeFromResponse(packet, err)

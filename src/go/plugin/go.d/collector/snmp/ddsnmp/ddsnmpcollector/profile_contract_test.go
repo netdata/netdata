@@ -39,7 +39,7 @@ func TestDeviceMetadataCollector_SysobjectIDMetadataWithoutDeviceResource(t *tes
     metadata:
       model: {value: example}
 `)
-			got, err := newDeviceMetadataCollector(nil, nil, logger.New(), tc.oid).collect(&ddsnmp.Profile{
+			got, err := newDeviceMetadataCollector(nil, testRequests, nil, logger.New(), tc.oid).collect(&ddsnmp.Profile{
 				Definition: def,
 			})
 			require.NoError(t, err)
@@ -263,7 +263,7 @@ func BenchmarkProfileDeviceMetadata(b *testing.B) {
 	prof := &ddsnmp.Profile{
 		Definition: def,
 	}
-	c := newDeviceMetadataCollector(nil, nil, logger.New(), "1.2.3")
+	c := newDeviceMetadataCollector(nil, testRequests, nil, logger.New(), "1.2.3")
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {

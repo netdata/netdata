@@ -27,7 +27,7 @@ func TestCollector_Collect_BGPRowsFromScalarBGPConfig(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
@@ -39,6 +39,8 @@ func TestCollector_Collect_BGPRowsFromScalarBGPConfig(t *testing.T) {
 			)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{
@@ -100,12 +102,14 @@ func TestCollector_Collect_BGPRowsFromTableBGPConfig(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.30.1", tc.pdus)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{
@@ -190,13 +194,15 @@ func TestCollector_Collect_BGPRowsWithCrossTableBGPValues(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.1", tc.mainPDUs)
 			expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.99999.70.2", tc.peerPDUs)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{
@@ -245,7 +251,7 @@ func TestCollector_Collect_BGPRowsFromCategoricalBGPFields(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
@@ -254,6 +260,8 @@ func TestCollector_Collect_BGPRowsFromCategoricalBGPFields(t *testing.T) {
 			)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{
@@ -312,7 +320,7 @@ func TestCollector_Collect_BGPRowsBestEffortForRegularMetrics(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
@@ -325,6 +333,8 @@ func TestCollector_Collect_BGPRowsBestEffortForRegularMetrics(t *testing.T) {
 			)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{
@@ -385,7 +395,7 @@ func TestCollector_Collect_BGPRowsSkipsKnownMissingScalarOIDs(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
@@ -402,6 +412,8 @@ func TestCollector_Collect_BGPRowsSkipsKnownMissingScalarOIDs(t *testing.T) {
 			)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{

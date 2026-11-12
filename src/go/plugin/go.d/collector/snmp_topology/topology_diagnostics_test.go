@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestCollectorDiagnosticCheckpointPreservesLifecycle(t *testing.T) {
@@ -55,14 +56,14 @@ func TestCollectorDiagnosticsPublishesCommittedSweepCut(t *testing.T) {
 		Port:        161,
 		SNMPVersion: gosnmp.Version2c.String(),
 	}
-	mockHandler := snmpmock.NewMockHandler(ctrl)
+	mockHandler := snmpmock.NewMockSession(ctrl)
 	expectTopologyRefreshSNMPClient(mockHandler, dev)
 
 	coll, store := newTestSNMPTopologyCollectorWithStore()
 	store.Register("job-a", dev)
 	registrationID := store.Entries()[0].RegistrationID
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
-	coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+	coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return mockHandler }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
 	}
@@ -141,7 +142,7 @@ func TestCollectorPanicDiagnosticIdentifiesActiveDeviceRefresh(t *testing.T) {
 	coll, store := newTestSNMPTopologyCollectorWithStore()
 	store.Register("job-a", ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10"})
 	registrationID := store.Entries()[0].RegistrationID
-	coll.newSnmpClient = func() gosnmp.Handler { panic("device refresh panic") }
+	coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { panic("device refresh panic") }
 
 	require.NotPanics(t, func() { coll.refreshTopologyRecovering(context.Background()) })
 
@@ -178,14 +179,14 @@ func TestCollectorDiagnosticProjectionFailureDoesNotAffectTopologyCommit(t *test
 			defer ctrl.Finish()
 
 			dev := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", Port: 161, SNMPVersion: gosnmp.Version2c.String()}
-			mockHandler := snmpmock.NewMockHandler(ctrl)
+			mockHandler := snmpmock.NewMockSession(ctrl)
 			expectTopologyRefreshSNMPClient(mockHandler, dev)
 
 			coll, store := newTestSNMPTopologyCollectorWithStore()
 			store.Register("job-a", dev)
 			coll.projectTopologyDiagnosticCut = tc.projector
 			coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
-			coll.newSnmpClient = func() gosnmp.Handler { return mockHandler }
+			coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return mockHandler }
 			coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 				return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
 			}
@@ -304,7 +305,7 @@ func (panickingTopologyLifecycleSource) LifecycleCut() ddsnmp.DeviceLifecycleCut
 func TestCollectorDiagnosticCheckpointOnExpiryWithoutAcquisition(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	dev := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.10", Port: 161, SNMPVersion: gosnmp.Version2c.String()}
-	handlers := []*snmpmock.MockHandler{snmpmock.NewMockHandler(ctrl), snmpmock.NewMockHandler(ctrl), snmpmock.NewMockHandler(ctrl)}
+	handlers := []*snmpmock.MockSession{snmpmock.NewMockSession(ctrl), snmpmock.NewMockSession(ctrl), snmpmock.NewMockSession(ctrl)}
 	expectTopologyRefreshSNMPClient(handlers[0], dev)
 	for _, handler := range handlers[1:] {
 		expectTopologyRefreshSNMPClientConnectError(handler, dev, errors.New("unreachable"))
@@ -313,7 +314,7 @@ func TestCollectorDiagnosticCheckpointOnExpiryWithoutAcquisition(t *testing.T) {
 	store.Register("job-a", dev)
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
 	calls := 0
-	coll.newSnmpClient = func() gosnmp.Handler { handler := handlers[calls]; calls++; return handler }
+	coll.newSnmpClient = func(gosnmp.Handler) snmputils.Session { handler := handlers[calls]; calls++; return handler }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
 		return ddCollectorFunc(func() ([]*ddsnmp.ProfileMetrics, error) { return nil, nil })
 	}

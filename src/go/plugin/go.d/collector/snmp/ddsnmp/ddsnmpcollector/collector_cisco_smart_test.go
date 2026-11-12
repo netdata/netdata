@@ -7,21 +7,21 @@ import (
 	"testing"
 
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCollector_Collect_CiscoSmartLicensingProfile(t *testing.T) {
 	tests := map[string]struct {
-		setup      func(*snmpmock.MockHandler)
+		setup      func(*snmpmock.MockSession)
 		assertRows func(*testing.T, []ddsnmp.LicenseRow)
 	}{
 		"complete data": {
-			setup: func(mockHandler *snmpmock.MockHandler) {
+			setup: func(mockHandler *snmpmock.MockSession) {
 				expectSNMPGet(mockHandler,
 					[]string{
 						"1.3.6.1.4.1.9.9.831.0.6.1.0",
@@ -95,7 +95,7 @@ func TestCollector_Collect_CiscoSmartLicensingProfile(t *testing.T) {
 			},
 		},
 		"partial data": {
-			setup: func(mockHandler *snmpmock.MockHandler) {
+			setup: func(mockHandler *snmpmock.MockSession) {
 				expectSNMPGet(mockHandler,
 					[]string{
 						"1.3.6.1.4.1.9.9.831.0.6.1.0",
@@ -152,13 +152,15 @@ func TestCollector_Collect_CiscoSmartLicensingProfile(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			tc.setup(mockHandler)
 			profile := mustLoadCiscoSmartProfile(t)
 			require.True(t, hasLicensingTable(profile, "1.3.6.1.4.1.9.9.831.0.5.1"))
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),

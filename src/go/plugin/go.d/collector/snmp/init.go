@@ -26,8 +26,9 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
-	client, err := c.newConfiguredSNMPClient()
+// configuredSNMPHandler builds the SNMP client the configuration describes.
+func (c *Collector) configuredSNMPHandler() (gosnmp.Handler, error) {
+	client, err := c.newConfiguredSNMPHandler()
 	if err != nil {
 		return nil, err
 	}
@@ -37,15 +38,14 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 	return client, nil
 }
 
-func (c *Collector) newConfiguredSNMPClient() (gosnmp.Handler, error) {
-	client := c.newSnmpClient()
+func (c *Collector) newConfiguredSNMPHandler() (gosnmp.Handler, error) {
+	client := gosnmp.NewHandler()
 
 	client.SetTarget(c.Hostname)
 	client.SetPort(uint16(c.Options.Port))
 	client.SetRetries(c.Options.Retries)
 	client.SetTimeout(time.Duration(c.Options.Timeout) * time.Second)
 	client.SetMaxOids(c.Options.MaxOIDs)
-	client.SetMaxRepetitions(uint32(c.Options.MaxRepetitions))
 
 	ver := snmputils.ParseSNMPVersion(c.Options.Version)
 	comm := c.Community

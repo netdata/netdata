@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -71,8 +71,7 @@ func TestTopologyBGPSemanticIdentifiersFromAcquisitionAndReplay(t *testing.T) {
 					}
 					require.NoError(t, ddsnmp.CompileTransforms(profile))
 					ddsnmp.FinalizeProfiles([]*ddsnmp.Profile{profile})
-					handler := snmpmock.NewMockHandler(gomock.NewController(t))
-					handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+					handler := snmpmock.NewMockSession(gomock.NewController(t))
 					var pdus []gosnmp.SnmpPDU
 					for i, value := range values {
 						pdus = append(
@@ -89,7 +88,7 @@ func TestTopologyBGPSemanticIdentifiersFromAcquisitionAndReplay(t *testing.T) {
 							},
 						)
 					}
-					handler.EXPECT().BulkWalkAll(root).Return(pdus, nil)
+					handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return(pdus, nil)
 					input := topologydiag.DeviceInput{
 						Hostname: "192.0.2.2",
 					}
@@ -105,6 +104,7 @@ func TestTopologyBGPSemanticIdentifiersFromAcquisitionAndReplay(t *testing.T) {
 						},
 					)
 					collector := ddsnmpcollector.New(ddsnmpcollector.Config{
+						Version:             gosnmp.Version2c,
 						SnmpClient:          handler,
 						Profiles:            []*ddsnmp.Profile{profile},
 						Log:                 logger.NewWithWriter(&bytes.Buffer{}),

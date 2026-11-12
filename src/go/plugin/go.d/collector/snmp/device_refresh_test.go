@@ -10,9 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -20,15 +18,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 const refreshTestTable = "1.3.6.1.4.1.99999.100"
 
 // refreshTestDevice answers from source state independently of collector caches.
 type refreshTestDevice struct {
-	gosnmp.Handler
+	snmputils.Session
 	values     map[string]gosnmp.SnmpPDU
 	probes     int
 	walks      int
@@ -40,9 +40,7 @@ type refreshTestDevice struct {
 	omittedOID string
 }
 
-func (*refreshTestDevice) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-func (*refreshTestDevice) MaxOids() int                { return 20 }
-func (d *refreshTestDevice) Close() error              { d.closes++; return nil }
+func (d *refreshTestDevice) Close() error { d.closes++; return nil }
 func (d *refreshTestDevice) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	if slices.Equal(oids, sysInfoOIDsForTest()) {
 		d.probes++
@@ -82,7 +80,7 @@ func (d *refreshTestDevice) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	return packet, nil
 }
 
-func (d *refreshTestDevice) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, error) {
+func (d *refreshTestDevice) BulkWalkAll(root string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
 	d.walks++
 	if root == refreshTestTable && d.tableErr != nil {
 		return nil, d.tableErr
@@ -137,7 +135,7 @@ func newRefreshTestCollectorWithObjectID(
 	c.Config = prepareV2Config()
 	c.CreateVnode = true
 	c.Ping.Enabled = false
-	c.snmpClient = d
+	c.snmpSession, c.snmpClient = d, d
 	c.snmpProfiles = []*ddsnmp.Profile{{
 		SourceFile: "refresh.yaml",
 		Definition: &ddprofiledefinition.ProfileDefinition{
@@ -201,17 +199,14 @@ func newSystemChangeTest(t *testing.T) *systemChangeTest {
 	t.Helper()
 	c, device, now := newRefreshTestCollectorWithObjectID(t, systemChangeTestObjectID)
 	st := &systemChangeTest{c: c, device: device, now: now}
-	c.newSnmpClient = func() gosnmp.Handler {
+	c.newSnmpClient = func(gosnmp.Handler) snmputils.Session {
 		st.clients++
-		client := snmpmock.NewMockHandler(gomock.NewController(t))
+		client := snmpmock.NewMockSession(gomock.NewController(t))
 		// Register the concrete protocol before the shared helper's permissive getter.
-		client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-		setMockClientSetterExpect(client)
 		client.EXPECT().Connect().Return(st.connectErr).AnyTimes()
 		client.EXPECT().Close().DoAndReturn(func() error { st.closes++; return nil }).AnyTimes()
-		client.EXPECT().MaxOids().Return(20).AnyTimes()
 		client.EXPECT().Get(gomock.Any()).DoAndReturn(device.Get).AnyTimes()
-		client.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(device.BulkWalkAll).AnyTimes()
+		client.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any()).DoAndReturn(device.BulkWalkAll).AnyTimes()
 		return client
 	}
 	var profiles []*ddsnmp.Profile
@@ -366,7 +361,7 @@ func TestCollectorRuntimeSystemChangeRebuildFailureKeepsCollecting(t *testing.T)
 func TestCollectorRuntimeSystemChangeWithoutProfilesKeepsCollecting(t *testing.T) {
 	// The stock catalog has no profile for this sysObjectID.
 	c, device, now := newRefreshTestCollectorWithObjectID(t, "1.3.6.1.2.1.999")
-	c.newSnmpClient = func() gosnmp.Handler {
+	c.newSnmpClient = func(gosnmp.Handler) snmputils.Session {
 		t.Fatal("no candidate connection is needed without profiles")
 		return nil
 	}
@@ -658,7 +653,7 @@ func TestCollectorRuntimeInitialProfileMetadataRecovery(t *testing.T) {
 				failedOID:         inputOID,
 				fail:              true,
 			}
-			c.snmpClient = transport
+			c.snmpSession, c.snmpClient = transport, transport
 			c.snmpProfiles = append(c.snmpProfiles, &ddsnmp.Profile{
 				SourceFile: "recovering.yaml",
 				Definition: &ddprofiledefinition.ProfileDefinition{

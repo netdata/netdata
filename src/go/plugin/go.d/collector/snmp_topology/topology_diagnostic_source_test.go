@@ -15,14 +15,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestDiagnosticCaptureKeepsLargeEvidence(t *testing.T) {
@@ -121,20 +122,19 @@ func TestVLANSourceEvidenceUsesActualContextCollection(t *testing.T) {
 	}{"successful VLAN": {vlan: "100"}, "failed VLAN with partial data": {vlan: "200", failed: true}} {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			handler := snmpmock.NewMockHandler(ctrl)
+			handler := snmpmock.NewMockSession(ctrl)
 			dev := ddsnmp.DeviceConnectionInfo{Hostname: "192.0.2.1", Port: 161, Community: "synthetic", SNMPVersion: gosnmp.Version2c.String()}
 			expectTopologyVLANClient(handler, dev, tc.vlan, nil)
-			handler.EXPECT().Version().Return(gosnmp.Version2c)
 			const root = "1.3.6.1.4.1.99999.1"
 			var walkErr error
 			if tc.failed {
 				walkErr = context.DeadlineExceeded
 			}
 			pdus := []gosnmp.SnmpPDU{{Name: root + ".1.7", Type: gosnmp.Integer, Value: 7}}
-			handler.EXPECT().BulkWalkAll(root).Return(pdus, walkErr)
+			handler.EXPECT().BulkWalkAll(root, gomock.Any()).Return(pdus, walkErr)
 			handler.EXPECT().Close().Return(nil)
 			collector := newTestSNMPTopologyCollector()
-			collector.newSnmpClient = func() gosnmp.Handler { return handler }
+			collector.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return handler }
 			profiles := []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{Kind: ddsnmp.KindIfName, MetricsConfig: ddprofiledefinition.MetricsConfig{Table: ddprofiledefinition.SymbolConfig{OID: root, Name: "table"}, Symbols: []ddprofiledefinition.SymbolConfig{{OID: root + ".1", Name: "value"}}}}}}}}
 			recorder := newTopologyAcquisitionRecorder(testTopologyAttemptID(1), topologyDeviceInputFromConnection(dev), testTopologyTarget())
 			observer := recorder.beginContext(1, tc.vlan, "synthetic")

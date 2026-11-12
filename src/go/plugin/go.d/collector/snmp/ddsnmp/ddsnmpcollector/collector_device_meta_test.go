@@ -6,10 +6,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -19,7 +19,8 @@ import (
 func TestDeviceMetadataCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		profile        *ddsnmp.Profile
-		setupMock      func(m *snmpmock.MockHandler)
+		setupMock      func(m *snmpmock.MockSession)
+		requests       requestConfig // zero: testRequests
 		sysobjectid    string
 		expectedResult map[string]ddsnmp.MetaTag
 		expectedError  bool
@@ -31,7 +32,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					Metadata: ddprofiledefinition.MetadataConfig{},
 				},
 			},
-			setupMock:      func(m *snmpmock.MockHandler) {},
+			setupMock:      func(m *snmpmock.MockSession) {},
 			expectedResult: nil,
 			expectedError:  false,
 		},
@@ -49,7 +50,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {},
+			setupMock: func(m *snmpmock.MockSession) {},
 			expectedResult: map[string]ddsnmp.MetaTag{
 				"vendor": {Value: "dell", IsExactMatch: false},
 				"type":   {Value: "router", IsExactMatch: false},
@@ -81,8 +82,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get(gomock.InAnyOrder([]string{
 					"1.3.6.1.2.1.1.1.0",
 					"1.3.6.1.4.1.674.10892.5.1.3.2.0",
@@ -119,8 +119,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get(gomock.InAnyOrder([]string{
 					"1.3.6.1.4.1.674.10892.5.1.3.2.0",
 					"1.3.6.1.4.1.674.10892.5.1.3.3.0",
@@ -157,8 +156,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -190,8 +188,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.4.1.674.10892.5.4.200.10.1.2.1.3.1"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -230,8 +227,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.4.1.674.10892.5.2.1.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -263,8 +259,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.2.2.1.6.1"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -295,7 +290,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {},
+			setupMock: func(m *snmpmock.MockSession) {},
 			expectedResult: map[string]ddsnmp.MetaTag{
 				"vendor": {Value: "cisco", IsExactMatch: false},
 			},
@@ -318,8 +313,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.4.1.674.10892.5.1.3.2.0"}).Return(nil, errors.New("SNMP timeout"))
 			},
 			expectedResult: nil,
@@ -350,8 +344,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get(gomock.InAnyOrder([]string{
 					"1.3.6.1.4.1.674.10892.5.1.3.1.0",
 					"1.3.6.1.4.1.674.10892.5.1.3.2.0",
@@ -371,6 +364,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			expectedError: false,
 		},
 		"chunked requests": {
+			requests: requestConfig{version: gosnmp.Version2c, maxOIDs: 2},
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
@@ -384,8 +378,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(2).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0", "1.3.6.1.2.1.1.2.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -437,7 +430,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock:   func(m *snmpmock.MockHandler) {},
+			setupMock:   func(m *snmpmock.MockSession) {},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
 			expectedResult: map[string]ddsnmp.MetaTag{
 				"vendor": {Value: "Cisco", IsExactMatch: false},
@@ -484,7 +477,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock:   func(m *snmpmock.MockHandler) {},
+			setupMock:   func(m *snmpmock.MockSession) {},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
 			expectedResult: map[string]ddsnmp.MetaTag{
 				"vendor":   {Value: "Cisco", IsExactMatch: false},      // base
@@ -516,8 +509,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.4.1.9.9.109.1.1.1.1.3.1"}).Return(
 					&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 						{Name: "1.3.6.1.4.1.9.9.109.1.1.1.1.3.1", Type: gosnmp.OctetString, Value: []byte("9.2(4)")},
@@ -551,7 +543,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock:   func(m *snmpmock.MockHandler) {},
+			setupMock:   func(m *snmpmock.MockSession) {},
 			sysobjectid: "1.3.6.1.4.1.9.1.700",
 			expectedResult: map[string]ddsnmp.MetaTag{
 				"vendor": {Value: "Cisco", IsExactMatch: false},
@@ -577,7 +569,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock:   func(m *snmpmock.MockHandler) {},
+			setupMock:   func(m *snmpmock.MockSession) {},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
 			expectedResult: map[string]ddsnmp.MetaTag{
 				"vendor": {Value: "Cisco", IsExactMatch: false},
@@ -608,7 +600,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock:   func(m *snmpmock.MockHandler) {},
+			setupMock:   func(m *snmpmock.MockSession) {},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
 			expectedResult: map[string]ddsnmp.MetaTag{
 				"vendor": {Value: "Cisco Systems", IsExactMatch: true},
@@ -637,8 +629,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.4.1.9.9.109.1.1.1.1.3.1"}).Return(nil, errors.New("SNMP timeout"))
 			},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
@@ -668,8 +659,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -702,8 +692,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -737,8 +726,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -780,8 +768,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				m.EXPECT().MaxOids().Return(10).AnyTimes()
+			setupMock: func(m *snmpmock.MockSession) {
 				m.EXPECT().Get([]string{"1.3.6.1.2.1.1.1.0"}).Return(
 					&gosnmp.SnmpPacket{
 						Variables: []gosnmp.SnmpPDU{
@@ -819,7 +806,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock:   func(m *snmpmock.MockHandler) {},
+			setupMock:   func(m *snmpmock.MockSession) {},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
 			expectedResult: map[string]ddsnmp.MetaTag{
 				"vendor": {Value: "Cisco", IsExactMatch: true},
@@ -858,7 +845,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock:   func(m *snmpmock.MockHandler) {},
+			setupMock:   func(m *snmpmock.MockSession) {},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
 			expectedResult: map[string]ddsnmp.MetaTag{
 				// base exact overwrites wildcard for overlapping keys
@@ -892,7 +879,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock:   func(m *snmpmock.MockHandler) {},
+			setupMock:   func(m *snmpmock.MockSession) {},
 			sysobjectid: "1.3.6.1.4.1.9.1.669",
 			expectedResult: map[string]ddsnmp.MetaTag{
 				// wildcard (not exact) is applied first and base (non-exact) cannot overwrite
@@ -909,11 +896,15 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			mockHandler := snmpmock.NewMockHandler(ctrl)
+			mockHandler := snmpmock.NewMockSession(ctrl)
 			tc.setupMock(mockHandler)
 
 			missingOIDs := make(map[string]bool)
-			collector := newDeviceMetadataCollector(mockHandler, missingOIDs, logger.New(), tc.sysobjectid)
+			requests := tc.requests
+			if requests == (requestConfig{}) {
+				requests = testRequests
+			}
+			collector := newDeviceMetadataCollector(mockHandler, requests, missingOIDs, logger.New(), tc.sysobjectid)
 
 			result, err := collector.collect(tc.profile)
 

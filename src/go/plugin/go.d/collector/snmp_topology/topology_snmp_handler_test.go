@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 type topologySNMPRecHandler struct {
-	gosnmp.Handler
+	snmputils.Session
 	entries           []gosnmp.SnmpPDU
 	byOID             map[string]gosnmp.SnmpPDU
 	hiddenOIDPrefixes []string
@@ -18,7 +19,7 @@ type topologySNMPRecHandler struct {
 
 func newTopologySNMPHandler(entries []gosnmp.SnmpPDU) *topologySNMPRecHandler {
 	handler := &topologySNMPRecHandler{
-		Handler: gosnmp.NewHandler(),
+		Session: snmputils.NewSession(gosnmp.NewHandler()),
 		entries: entries,
 		byOID:   make(map[string]gosnmp.SnmpPDU, len(entries)),
 	}
@@ -56,7 +57,7 @@ func (h *topologySNMPRecHandler) WalkAll(root string) ([]gosnmp.SnmpPDU, error) 
 	return h.walkAll(root), nil
 }
 
-func (h *topologySNMPRecHandler) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, error) {
+func (h *topologySNMPRecHandler) BulkWalkAll(root string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
 	return h.walkAll(root), nil
 }
 
@@ -93,6 +94,3 @@ func (h *topologySNMPRecHandler) isHiddenOID(oid string) bool {
 	}
 	return false
 }
-
-func (h *topologySNMPRecHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-func (h *topologySNMPRecHandler) MaxOids() int                { return 60 }

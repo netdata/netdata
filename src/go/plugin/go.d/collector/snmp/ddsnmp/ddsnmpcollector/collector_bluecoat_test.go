@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -87,7 +87,7 @@ func TestCollector_Collect_BlueCoatLicensingProfile(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectBlueCoatLicensingWalk(mockHandler, tc.rows...)
@@ -97,6 +97,8 @@ func TestCollector_Collect_BlueCoatLicensingProfile(t *testing.T) {
 			require.Len(t, profile.Definition.Licensing, 1)
 
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
@@ -126,7 +128,7 @@ type blueCoatLicenseRow struct {
 	hasExpiryPDU bool
 }
 
-func expectBlueCoatLicensingWalk(mockHandler *snmpmock.MockHandler, rows ...blueCoatLicenseRow) {
+func expectBlueCoatLicensingWalk(mockHandler *snmpmock.MockSession, rows ...blueCoatLicenseRow) {
 	pdus := make([]gosnmp.SnmpPDU, 0, len(rows)*7)
 
 	for _, row := range rows {

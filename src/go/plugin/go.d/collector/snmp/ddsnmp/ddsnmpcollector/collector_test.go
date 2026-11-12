@@ -16,7 +16,7 @@ import (
 )
 
 func TestCollector_Collect_StatsSnapshot(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	// --- SNMP expectations ---------------------------------------------------
@@ -86,6 +86,8 @@ func TestCollector_Collect_StatsSnapshot(t *testing.T) {
 	require.NoError(t, ddsnmp.CompileTransforms(profile))
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
@@ -151,7 +153,7 @@ func TestCollector_Collect_StatsSnapshot(t *testing.T) {
 }
 
 func TestCollector_Collect_SharesCanonicalFreshTableViewAcrossProfiles(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	dependencyConfig, sourceConfig := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999")
@@ -183,6 +185,8 @@ func TestCollector_Collect_SharesCanonicalFreshTableViewAcrossProfiles(t *testin
 	})
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{dependencyProfile, sourceProfile},
 		Log:        logger.New(),
@@ -276,7 +280,7 @@ func TestCollector_Collect_SharesCanonicalFreshTableViewAcrossProfiles(t *testin
 }
 
 func TestCollector_Collect_DiscardsPromotedSourceCacheAfterFreshWalkFailure(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	dependencyConfig, sourceConfig := crossTableDependencyTestConfigs("1.3.6.1.4.1.99999")
@@ -300,6 +304,8 @@ func TestCollector_Collect_DiscardsPromotedSourceCacheAfterFreshWalkFailure(t *t
 	})
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -361,7 +367,7 @@ func TestCollector_Collect_DiscardsPromotedSourceCacheAfterFreshWalkFailure(t *t
 }
 
 func TestCollector_Collect_KeepsTopologyCacheIneligibleWhenRegularScopeFails(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -411,6 +417,8 @@ func TestCollector_Collect_KeepsTopologyCacheIneligibleWhenRegularScopeFails(t *
 	})
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -437,7 +445,7 @@ func TestCollector_Collect_KeepsTopologyCacheIneligibleWhenRegularScopeFails(t *
 }
 
 func TestCollector_Collect_DiscardsOmittedCachedDependentWhenDependencyRefreshes(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const scalarOID = "1.3.6.1.4.1.99999.0"
@@ -464,6 +472,8 @@ func TestCollector_Collect_DiscardsOmittedCachedDependentWhenDependencyRefreshes
 	})
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{dependencyProfile, sourceProfile},
 		Log:        logger.New(),
@@ -523,7 +533,7 @@ func TestCollector_Collect_DiscardsOmittedCachedDependentWhenDependencyRefreshes
 }
 
 func TestCollector_Collect_FreshAuxiliaryWalkMakesFailedSourcesPartialSuccess(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -548,6 +558,8 @@ func TestCollector_Collect_FreshAuxiliaryWalkMakesFailedSourcesPartialSuccess(t 
 	})
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -565,7 +577,7 @@ func TestCollector_Collect_FreshAuxiliaryWalkMakesFailedSourcesPartialSuccess(t 
 }
 
 func TestCollector_Collect_PreservesHiddenMetrics(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler,
@@ -619,6 +631,8 @@ func TestCollector_Collect_PreservesHiddenMetrics(t *testing.T) {
 	require.NoError(t, ddsnmp.CompileTransforms(profile))
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
@@ -638,7 +652,7 @@ func TestCollector_Collect_PreservesHiddenMetrics(t *testing.T) {
 }
 
 func TestCollector_Collect_SeparatesTopologyMetricsFromHiddenMetrics(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler,
@@ -687,6 +701,8 @@ func TestCollector_Collect_SeparatesTopologyMetricsFromHiddenMetrics(t *testing.
 	}
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),

@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -27,10 +27,13 @@ func mustCompileRegex(pattern string) *regexp.Regexp {
 	return re
 }
 
-func setupMockHandler(t *testing.T) (*gomock.Controller, *snmpmock.MockHandler) {
+// testRequests is the request configuration of the tests' mock sessions:
+// SNMPv2c and 10 OIDs per Get.
+var testRequests = requestConfig{version: gosnmp.Version2c, maxOIDs: 10}
+
+func setupMockSession(t *testing.T) (*gomock.Controller, *snmpmock.MockSession) {
 	ctrl := gomock.NewController(t)
-	mockHandler := snmpmock.NewMockHandler(ctrl)
-	mockHandler.EXPECT().MaxOids().Return(10).AnyTimes()
+	mockHandler := snmpmock.NewMockSession(ctrl)
 	return ctrl, mockHandler
 }
 
@@ -70,17 +73,17 @@ func createScalarMetric(oid, name string) ddprofiledefinition.MetricsConfig {
 	}
 }
 
-func expectSNMPGet(mockHandler *snmpmock.MockHandler, oids []string, pdus []gosnmp.SnmpPDU) {
+func expectSNMPGet(mockHandler *snmpmock.MockSession, oids []string, pdus []gosnmp.SnmpPDU) {
 	mockHandler.EXPECT().Get(gomock.InAnyOrder(oids)).Return(
 		&gosnmp.SnmpPacket{Variables: pdus}, nil,
 	)
 }
 
-func expectSNMPGetError(mockHandler *snmpmock.MockHandler, oids []string, err error) {
+func expectSNMPGetError(mockHandler *snmpmock.MockSession, oids []string, err error) {
 	mockHandler.EXPECT().Get(gomock.InAnyOrder(oids)).Return(nil, err)
 }
 
-func expectSystemMetadataGets(mockHandler *snmpmock.MockHandler, sysObjectID, sysName string) {
+func expectSystemMetadataGets(mockHandler *snmpmock.MockSession, sysObjectID, sysName string) {
 	mockHandler.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
 		createStringPDU("1.0.8802.1.1.2.1.3.1.0", sysName),
 		createStringPDU("1.0.8802.1.1.2.1.3.2.0", sysName),
@@ -95,21 +98,19 @@ func expectSystemMetadataGets(mockHandler *snmpmock.MockHandler, sysObjectID, sy
 	}}, nil).AnyTimes()
 }
 
-func expectSNMPWalk(mockHandler *snmpmock.MockHandler, version gosnmp.SnmpVersion, oid string, pdus []gosnmp.SnmpPDU) {
-	mockHandler.EXPECT().Version().Return(version)
+func expectSNMPWalk(mockHandler *snmpmock.MockSession, version gosnmp.SnmpVersion, oid string, pdus []gosnmp.SnmpPDU) {
 	if version == gosnmp.Version1 {
 		mockHandler.EXPECT().WalkAll(oid).Return(pdus, nil)
 	} else {
-		mockHandler.EXPECT().BulkWalkAll(oid).Return(pdus, nil)
+		mockHandler.EXPECT().BulkWalkAll(oid, gomock.Any()).Return(pdus, nil)
 	}
 }
 
-func expectSNMPWalkError(mockHandler *snmpmock.MockHandler, version gosnmp.SnmpVersion, oid string, err error) {
-	mockHandler.EXPECT().Version().Return(version)
+func expectSNMPWalkError(mockHandler *snmpmock.MockSession, version gosnmp.SnmpVersion, oid string, err error) {
 	if version == gosnmp.Version1 {
 		mockHandler.EXPECT().WalkAll(oid).Return(nil, err)
 	} else {
-		mockHandler.EXPECT().BulkWalkAll(oid).Return(nil, err)
+		mockHandler.EXPECT().BulkWalkAll(oid, gomock.Any()).Return(nil, err)
 	}
 }
 

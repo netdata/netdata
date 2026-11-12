@@ -14,18 +14,15 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/require"
 )
 
 type executionTestHandler struct {
-	gosnmp.Handler
+	snmputils.Session
 	walkRoots []string
 	walkPDUs  []gosnmp.SnmpPDU
 }
-
-func (*executionTestHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-
-func (*executionTestHandler) MaxOids() int { return 10 }
 
 func (*executionTestHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	packet := &gosnmp.SnmpPacket{}
@@ -42,7 +39,7 @@ func (*executionTestHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 	return packet, nil
 }
 
-func (h *executionTestHandler) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
+func (h *executionTestHandler) BulkWalkAll(oid string, maxRepetitions uint32) ([]gosnmp.SnmpPDU, error) {
 	h.walkRoots = append(h.walkRoots, oid)
 	return h.walkPDUs, errors.New("synthetic failure")
 }
@@ -70,6 +67,8 @@ func collectSourceTestCapture(tb testing.TB, pdus []gosnmp.SnmpPDU) *topologydia
 	handler := &executionTestHandler{walkPDUs: pdus}
 	observer := recorder.beginContext(0, "", "")
 	collector := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:             gosnmp.Version2c,
+		MaxOIDs:             10,
 		SnmpClient:          recorder.sourceClient(handler),
 		Log:                 logger.New(),
 		AcquisitionObserver: observer,

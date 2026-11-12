@@ -120,13 +120,15 @@ func TestCollector_Collect_AristaAndDellBGP_FromLibreNMSFixtures(t *testing.T) {
 			profile := matchedBGPProjectionByFile(t, tc.sysObjectID, tc.profileFile)
 			pdus := loadSnmprecPDUs(t, tc.fixture)
 
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSystemMetadataGets(mockHandler, tc.sysObjectID, "bgp-device")
 			expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
@@ -169,13 +171,15 @@ func TestCollector_Collect_DellOS10BGP_IPv6Rows(t *testing.T) {
 		createGauge32PDU(familyOID("1.3.6.1.4.1.674.11000.5000.200.1.1.8.1.5"), 269),
 	}
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSystemMetadataGets(mockHandler, sysObjectID, "dell-ipv6")
 	expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),

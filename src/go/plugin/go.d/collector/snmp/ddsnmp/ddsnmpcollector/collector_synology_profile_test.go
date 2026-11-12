@@ -29,7 +29,7 @@ func TestCollector_CollectDeviceMetadata_SynologyProfile(t *testing.T) {
 		ddprofiledefinition.MetadataDeviceResource: device,
 	}
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPGet(mockHandler, []string{
@@ -43,6 +43,8 @@ func TestCollector_CollectDeviceMetadata_SynologyProfile(t *testing.T) {
 	})
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
@@ -72,7 +74,7 @@ func TestScalarCollector_Collect_SynologyUtilizationProfile(t *testing.T) {
 	})
 	require.Len(t, profile.Definition.Metrics, 2)
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPGet(mockHandler, []string{cpuOID, memoryOID}, []gosnmp.SnmpPDU{
@@ -80,7 +82,7 @@ func TestScalarCollector_Collect_SynologyUtilizationProfile(t *testing.T) {
 		createIntegerPDU(memoryOID, 4),
 	})
 
-	collector := newScalarCollector(mockHandler, make(map[string]bool), logger.New())
+	collector := newScalarCollector(mockHandler, testRequests, make(map[string]bool), logger.New())
 	got, err := collector.collect(profile, &ddsnmp.CollectionStats{})
 	require.NoError(t, err)
 	assertMetricsEqual(t, []ddsnmp.Metric{

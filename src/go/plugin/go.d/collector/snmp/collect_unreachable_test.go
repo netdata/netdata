@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func TestCollector_UnreachablePollDoesNotEmitProfileStats(t *testing.T) {
@@ -35,7 +36,7 @@ func TestCollector_UnreachablePollDoesNotEmitProfileStats(t *testing.T) {
 		}},
 		{SourceFile: "vendor.yaml", Definition: &ddprofiledefinition.ProfileDefinition{}},
 	}
-	c.newSnmpClient = func() gosnmp.Handler { return handler }
+	c.newSnmpClient = func(gosnmp.Handler) snmputils.Session { return handler }
 	c.newPinger = func(pinger.Config, *logger.Logger) (pinger.Client, error) {
 		return &mockPingClient{
 			sample: pingSuccessSample("192.0.2.1"),

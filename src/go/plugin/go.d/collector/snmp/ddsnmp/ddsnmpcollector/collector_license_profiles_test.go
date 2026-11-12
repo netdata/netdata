@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,13 +20,13 @@ import (
 func TestCollector_Collect_LicensingProfiles(t *testing.T) {
 	tests := map[string]struct {
 		profileName string
-		setup       func(*snmpmock.MockHandler)
+		setup       func(*snmpmock.MockSession)
 		keep        func(ddprofiledefinition.LicensingConfig) bool
 		assertRows  func(*testing.T, []ddsnmp.LicenseRow)
 	}{
 		"checkpoint": {
 			profileName: "checkpoint",
-			setup: func(mockHandler *snmpmock.MockHandler) {
+			setup: func(mockHandler *snmpmock.MockSession) {
 				expectSNMPWalk(mockHandler,
 					gosnmp.Version2c,
 					"1.3.6.1.4.1.2620.1.6.18.1",
@@ -96,7 +96,7 @@ func TestCollector_Collect_LicensingProfiles(t *testing.T) {
 		},
 		"mikrotik": {
 			profileName: "mikrotik-router",
-			setup: func(mockHandler *snmpmock.MockHandler) {
+			setup: func(mockHandler *snmpmock.MockSession) {
 				expectSNMPGet(mockHandler,
 					[]string{
 						"1.3.6.1.4.1.14988.1.1.4.2.0",
@@ -126,12 +126,14 @@ func TestCollector_Collect_LicensingProfiles(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			tc.setup(mockHandler)
 			profile := mustLoadTypedLicensingProfile(t, tc.profileName, tc.keep)
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
@@ -150,7 +152,7 @@ func TestCollector_Collect_LicensingProfiles(t *testing.T) {
 	}
 }
 
-func expectFortiGateLicensingWalks(mockHandler *snmpmock.MockHandler) {
+func expectFortiGateLicensingWalks(mockHandler *snmpmock.MockSession) {
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.12356.101.4.6.3.1.2",
