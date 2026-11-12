@@ -49,13 +49,14 @@ static const char *printer_state_names[PRINTER_STATE_MAX] = {
     [PRINTER_STATE_WARMUP] = "warmup",
 };
 
-// Job states follow the Win32_PrintJob.Status mapping used by windows_exporter, except that a job the driver cannot
-// print (BLOCKED_DEVQ) is an error and one waiting for user action (USER_INTERVENTION) is degraded; CIMWin32 reports
-// both as unknown.
+// Job states follow the Win32_PrintJob.Status mapping used by windows_exporter, except: a job with no status flags is
+// waiting its turn, so it is queued; a job the driver cannot print (BLOCKED_DEVQ) or one waiting for user action
+// (USER_INTERVENTION) is degraded. CIMWin32 reports all three as unknown.
 enum printer_job_state {
     PRINTER_JOB_STATE_ERROR = 0,
     PRINTER_JOB_STATE_DEGRADED,
     PRINTER_JOB_STATE_OK,
+    PRINTER_JOB_STATE_QUEUED,
     PRINTER_JOB_STATE_UNKNOWN,
 
     PRINTER_JOB_STATE_MAX,
@@ -65,6 +66,7 @@ static const char *printer_job_state_names[PRINTER_JOB_STATE_MAX] = {
     [PRINTER_JOB_STATE_ERROR] = "error",
     [PRINTER_JOB_STATE_DEGRADED] = "degraded",
     [PRINTER_JOB_STATE_OK] = "ok",
+    [PRINTER_JOB_STATE_QUEUED] = "queued",
     [PRINTER_JOB_STATE_UNKNOWN] = "unknown",
 };
 
@@ -274,19 +276,28 @@ static enum printer_state printer_state_from_first_job(const JOB_INFO_1W *jobs, 
     if (job->Status & (JOB_STATUS_SPOOLING | JOB_STATUS_PRINTING))
         return PRINTER_STATE_PRINTING;
 
+    // A first job with no flags is waiting its turn; with no printer flags either, nothing prints or fails, so the
+    // printer is idle (CIMWin32 reports unknown). A growing backlog stays visible in the queued jobs chart.
+    if (!job->Status)
+        return PRINTER_STATE_IDLE;
+
     return PRINTER_STATE_UNKNOWN;
 }
 
 static enum printer_job_state printer_job_state(DWORD status)
 {
-    if (status & (JOB_STATUS_ERROR | JOB_STATUS_BLOCKED_DEVQ))
+    if (status & JOB_STATUS_ERROR)
         return PRINTER_JOB_STATE_ERROR;
 
-    if (status & (JOB_STATUS_PAUSED | JOB_STATUS_OFFLINE | JOB_STATUS_PAPEROUT | JOB_STATUS_USER_INTERVENTION))
+    if (status & (JOB_STATUS_PAUSED | JOB_STATUS_OFFLINE | JOB_STATUS_PAPEROUT | JOB_STATUS_BLOCKED_DEVQ |
+                  JOB_STATUS_USER_INTERVENTION))
         return PRINTER_JOB_STATE_DEGRADED;
 
     if (status & (JOB_STATUS_DELETING | JOB_STATUS_SPOOLING | JOB_STATUS_PRINTING | JOB_STATUS_PRINTED))
         return PRINTER_JOB_STATE_OK;
+
+    if (!status)
+        return PRINTER_JOB_STATE_QUEUED;
 
     return PRINTER_JOB_STATE_UNKNOWN;
 }

@@ -120,7 +120,10 @@ Status values match the `Win32_Printer` and `Win32_PrintJob` mappings used by Wi
   first, then unknown, printing, warmup and idle) instead of falling back to its jobs.
 - A printer connection whose print server is offline reports `other`; a printer whose status the server reports as
   unknown reports `unknown`.
-- A job the driver cannot print (blocked) counts as `error`; a job waiting for user intervention counts as `degraded`.
+- A job with no status flags is waiting its turn and counts as `queued`; a job the driver cannot print (blocked) or one
+  waiting for user intervention counts as `degraded`.
+- A printer with no status flags whose first queued job is just waiting reports `idle`; a growing backlog shows in the
+  queued jobs chart.
 
 An offline printer reports `other`. These states come from the printer's status, so they appear only when it can be
 read:
