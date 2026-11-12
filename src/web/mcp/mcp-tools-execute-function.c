@@ -1758,7 +1758,7 @@ static BUFFER *build_post_payload_with_selections(struct json_object *selections
     }
     
     // Build selections object - start with provided selections and add condition-based selections for has_history functions.
-    // The object is opened with its first entry: a Function that takes no selections is not sent an empty "selections".
+    // The object is opened with its first entry: an empty "selections" is never sent (a Function may refuse a key it does not take).
     bool selections_added = false;
     
     // For has_history functions, add selections based on conditions with == or match operators

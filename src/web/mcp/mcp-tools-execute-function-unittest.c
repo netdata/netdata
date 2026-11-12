@@ -203,10 +203,9 @@ int mcp_execute_function_access_unittest(void) {
 // ----------------------------------------------------------------------------
 // The POST body sent to a v3 has_history Function carries "selections" only
 // when it holds an entry. A free-text "q" becomes a wildcard condition that
-// never turns into a selection, and Functions with a strict wire (otel-traces)
-// reject an empty "selections" object as an unknown field. The control
-// Function has a required parameter, so a caller's selection must still reach
-// its body.
+// never turns into a selection, and a Function may refuse a key it does not
+// take, so an empty "selections" object is never sent. The control Function
+// has a required parameter, so a caller's selection must still reach its body.
 
 #define MCP_UT_PAYLOAD_FN "unittest-mcp-payload"
 #define MCP_UT_PAYLOAD_REQUIRED_FN "unittest-mcp-payload-required"
