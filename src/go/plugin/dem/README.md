@@ -569,6 +569,9 @@ The setting is not a hard memory limit or a count of every child process. Concur
 runtime contract probe per runtime consumer; probes run outside browser slots so a long audit cannot block activation.
 A later activation checks the runtime again. Standalone administration commands have their own process budget.
 
+See [DEM performance and sizing](PERFORMANCE.md) for a measured mixed browser/RUM workload, its resource use,
+startup behavior and measurement limits.
+
 Browser jobs require Linux amd64 or arm64 and an unprivileged plugin identity. Chromium sandboxing stays enabled;
 containers need compatible namespace/seccomp support. RUM does not require a browser runtime.
 
