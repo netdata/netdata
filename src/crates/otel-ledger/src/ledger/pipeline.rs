@@ -154,10 +154,12 @@ where
     //   4. Seed rotated / uploaded state from local catalog files
     //   5. LIST remote (if enabled) → mark uploaded and
     //      re-send uncataloged entries to the catalog builder
-    //   6. Queue uploads of un-uploaded .sfst files (fire-and-forget;
-    //      success → AddEntry, handled once the run loop starts)
-    //   7. Stat local catalogs on the remote; re-upload missing ones
+    //   6. Stat local catalogs on the remote; re-upload missing ones, or
+    //      un-mark their .sfst files that the remote lacks too
     //      (only when 5 succeeded — also seeds the eviction gate)
+    //   7. Queue uploads of un-uploaded .sfst files, those of 6 included
+    //      (fire-and-forget; success → AddEntry, handled once the run
+    //      loop starts)
     //   8. Evaluate retention (rotated state already reflects disk)
     let mut seq_routes: Vec<(u64, TenantId)> = Vec::new();
     for (tenant_id, registry) in registries.iter_mut() {

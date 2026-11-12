@@ -758,11 +758,62 @@ async fn a_catalog_whose_index_file_is_not_on_the_remote_does_not_vouch_for_it()
 
     // Nothing was queued for upload, and the index file is one that still
     // has to be uploaded.
-    let queued = tokio::time::timeout(std::time::Duration::from_millis(200), uploader.recv()).await;
-    assert!(queued.is_err(), "{queued:?}");
+    assert_eq!(uploader.pending(), 0);
     assert_eq!(reg.unuploaded_ids(), vec![id]);
     assert!(!reg.is_rotated(sk(10)));
     assert!(!reg.is_remote_cataloged(sk(10)));
+
+    cancel.cancel();
+}
+
+/// A catalog names two local index files; the remote has one of them. The
+/// catalog is not uploaded, and only the missing file loses its marks: the
+/// other one is on the remote, as the catalog said.
+#[tokio::test]
+async fn only_the_index_files_that_the_remote_lacks_lose_their_marks() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+    place_local_catalog_of(&mut reg, date, &[9, 10], 100, 200);
+    for seq in [9, 10] {
+        reg.sfst
+            .track(make_entry(seq).id, ByteSize(1), empty_summary());
+        reg.mark_uploaded(sk(seq));
+        reg.mark_rotated(sk(seq));
+    }
+
+    let (op, _op_tmp) = fs_operator();
+    op.write(&make_entry(9).remote_key, b"index file".to_vec())
+        .await
+        .unwrap();
+    let storage = crate::storage::OpendalStorage::from_operator(op.clone());
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut uploader = crate::component::ComponentHandle::spawn::<
+        crate::uploader::Uploader<crate::storage::OpendalStorage>,
+    >(
+        crate::uploader::UploaderArgs {
+            storage: storage.clone(),
+            max_concurrent: 4,
+        },
+        cancel.child_token(),
+    );
+
+    reconcile_local_catalog_uploads(
+        &mut reg,
+        0,
+        "logs",
+        &mut uploader,
+        &storage,
+        &TenantId::from("tenant1"),
+        &evict_all_retention(),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(uploader.pending(), 0);
+    assert_eq!(reg.unuploaded_ids(), vec![make_entry(10).id]);
+    assert!(reg.is_uploaded(sk(9)) && reg.is_rotated(sk(9)));
+    assert!(!reg.is_remote_cataloged(sk(9)));
 
     cancel.cancel();
 }
@@ -1121,6 +1172,11 @@ async fn reconcile_local_catalog_uploads_skips_pending_deletion_files() {
     reg.catalog_files.mark_pending_deletion(&path);
 
     let (op, _op_tmp) = fs_operator();
+    // The index file is on the remote: only the pending-deletion filter
+    // keeps this catalog from being uploaded.
+    op.write(&make_entry(10).remote_key, b"index file".to_vec())
+        .await
+        .unwrap();
     let storage = crate::storage::OpendalStorage::from_operator(op.clone());
     let cancel = tokio_util::sync::CancellationToken::new();
     let mut uploader = crate::component::ComponentHandle::spawn::<

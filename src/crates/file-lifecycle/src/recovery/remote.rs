@@ -10,17 +10,20 @@
 //! 1. [`reconcile_remote_uploads`] — LIST the tenant's SFST keys for every
 //!    date from today back `min(catalog_retention_days,
 //!    ingest.reconcile_days())` days; mark every own-machine key uploaded
-//!    (sparing pass 2 a redundant re-upload) and re-send still-uncataloged
+//!    (sparing pass 3 a redundant re-upload) and re-send still-uncataloged
 //!    SFSTs to the catalog builder as `AddEntry` — the
 //!    uploaded-but-uncataloged crash-window repair.
-//! 2. [`recover_unuploaded`] — queue every tracked-but-unuploaded SFST to the
-//!    shared uploader. Fire-and-forget: only non-blocking channel sends, so a
-//!    slow or unreachable remote cannot delay startup; responses are
-//!    consumed by the steady-state run loop (`Ledger::handle_uploader_resp`).
-//! 3. [`reconcile_local_catalog_uploads`] — remote `stat` per local catalog:
+//! 2. [`reconcile_local_catalog_uploads`] — remote `stat` per local catalog:
 //!    confirmed → mark the covered SFSTs `remote_cataloged` (the eviction
 //!    gate; this pass is its only restart-time seed), missing → re-queue the
-//!    catalog upload.
+//!    catalog upload, or, when the remote also lacks a still-local SFST the
+//!    catalog names, take back what seeding marked for that SFST. Skipped
+//!    when pass 1 could not reach the remote.
+//! 3. [`recover_unuploaded`] — queue every tracked-but-unuploaded SFST to the
+//!    shared uploader, those of pass 2 included. Fire-and-forget: only
+//!    non-blocking channel sends, so a slow or unreachable remote cannot
+//!    delay startup; responses are consumed by the steady-state run loop
+//!    (`Ledger::handle_uploader_resp`).
 //!
 //! Unlike [`super::local`], nothing here uses
 //! [`crate::component::batch_recover`]: the reconciles talk to object storage
@@ -254,14 +257,15 @@ pub async fn reconcile_remote_uploads<S: Storage>(
 /// path. In that window the SFSTs are on the remote already.
 ///
 /// A catalog that is missing on the remote together with a still-local SFST
-/// it names is a different case: the remote is not the one the catalog was written for
+/// it names (asked with one `stat()` per such SFST, all at once; a failed
+/// `stat` counts as missing) is a different case: the remote is not the one the catalog was written for
 /// (`remote_storage.uri` now names another bucket, or the bucket was
 /// emptied). Uploaded as it is, the catalog would make its SFSTs evictable
 /// here while the remote never got them. So it is not uploaded, and what
-/// seeding took from it is taken back
-/// ([`Registry::forget_catalog_claims`]): the SFSTs that are still local are
-/// uploaded again (`recover_unuploaded`, which the caller runs after this
-/// pass) and a new catalog names them. An SFST that is not local any more
+/// seeding took from it for the missing SFSTs is taken back
+/// ([`Registry::forget_catalog_claims`]): they are uploaded again
+/// (`recover_unuploaded`, which the caller runs after this pass) and a new
+/// catalog names them. An SFST that is not local any more
 /// has its only copy on the old remote; it cannot be lost here, so it does
 /// not hold the catalog back: at a later start, when the local ones are on
 /// the new remote, the old catalog is uploaded too.
@@ -391,38 +395,31 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
                 // locally. So it goes there as it is only when the remote has
                 // every SFST it names that is still local: true when its
                 // upload was cut by a stop, false when the remote is not the
-                // one it was written for (a new or emptied bucket). Then the
-                // catalog vouches for nothing: the SFSTs that are still local
-                // are uploaded again, and a new catalog will name them. An
-                // SFST that is not local any more cannot be lost here, so it
-                // does not hold the catalog back.
+                // one it was written for (a new or emptied bucket). An SFST
+                // that is not local any more cannot be lost here, so it does
+                // not hold the catalog back.
                 let mut still_local = Vec::with_capacity(entries.len());
                 for (seq, sfst_key) in &entries {
                     if registry.sfst.get(*seq).is_some() {
-                        still_local.push(sfst_key.as_str());
+                        still_local.push((*seq, sfst_key.as_str()));
                     }
                 }
-                match missing_on_remote(storage, &still_local).await {
-                    Ok(0) => {}
-                    Ok(missing) => {
-                        registry
-                            .forget_catalog_claims(seqs.iter().map(|s| SeqKey::new(identity, *s)));
-                        tracing::warn!(
-                            path = %local_path.display(),
-                            "the remote has neither this catalog nor {missing} of the {} local \
-                             index file(s) it names: not uploading it; those index files are \
-                             uploaded again",
-                            still_local.len(),
-                        );
-                        continue;
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            remote_key = %remote_key,
-                            "stat of an index file failed; skipping this catalog: {e}",
-                        );
-                        continue;
-                    }
+                let missing = not_on_remote(storage, &still_local).await;
+                if !missing.is_empty() {
+                    // For these the catalog said what is not true of this
+                    // remote: they are uploaded again, and a new catalog
+                    // will name them. This catalog waits for a later start.
+                    registry.forget_catalog_claims(
+                        missing.iter().map(|seq| SeqKey::new(identity, *seq)),
+                    );
+                    tracing::warn!(
+                        path = %local_path.display(),
+                        "the remote has neither this catalog nor {} of the {} local index \
+                         file(s) it names: not uploading it; those index files are uploaded again",
+                        missing.len(),
+                        still_local.len(),
+                    );
+                    continue;
                 }
 
                 let req = UploaderRequest::UploadCatalog {
@@ -464,21 +461,25 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
     Ok(())
 }
 
-/// How many of `remote_keys` the remote does not have. One `stat` each; the
-/// first error other than "not found" ends it.
-async fn missing_on_remote<S: Storage>(
-    storage: &S,
-    remote_keys: &[&str],
-) -> Result<usize, StorageError> {
-    let mut missing = 0;
-    for remote_key in remote_keys {
-        match storage.stat(remote_key).await {
+/// The seqs of `sfsts` (seq and remote key) that the remote is not known to
+/// have: one `stat` each, all at once. A `stat` that fails counts as "not
+/// there": the SFST is then uploaded again, which writes the same bytes to
+/// the same key.
+async fn not_on_remote<S: Storage>(storage: &S, sfsts: &[(u64, &str)]) -> Vec<u64> {
+    let stats = futures::future::join_all(sfsts.iter().map(|(_, key)| storage.stat(key))).await;
+
+    let mut missing = Vec::new();
+    for ((seq, key), stat) in sfsts.iter().zip(stats) {
+        match stat {
             Ok(()) => {}
-            Err(StorageError::NotFound) => missing += 1,
-            Err(e) => return Err(e),
+            Err(StorageError::NotFound) => missing.push(*seq),
+            Err(e) => {
+                tracing::warn!(remote_key = %key, "stat of an index file failed: {e}");
+                missing.push(*seq);
+            }
         }
     }
-    Ok(missing)
+    missing
 }
 
 /// Read the SFSTs recorded in a local catalog file: the sequence number and

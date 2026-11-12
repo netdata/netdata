@@ -357,10 +357,12 @@ impl Registry {
 
     /// Take back what a local catalog file said of these SFSTs: that their
     /// bytes are on the remote, and that they are in a closed catalog.
-    /// Recovery calls it for a catalog that is not on the remote and that
-    /// names an index file the remote does not have either: the remote is
-    /// not the one the catalog was written for. The SFSTs that are still
-    /// local are then [`unuploaded_ids`](Self::unuploaded_ids) again.
+    /// Recovery calls it for the SFSTs that it asked the remote for and that
+    /// the remote does not have, named by a catalog that is not on the
+    /// remote either: the remote is not the one the catalog was written
+    /// for. They are then [`unuploaded_ids`](Self::unuploaded_ids) again.
+    /// Nothing else can have marked such an SFST: the other marks come from
+    /// what the remote lists or holds.
     pub fn forget_catalog_claims(&mut self, keys: impl IntoIterator<Item = SeqKey>) {
         for key in keys {
             self.seqs.remove(&key);
