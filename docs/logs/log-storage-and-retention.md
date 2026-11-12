@@ -197,8 +197,8 @@ remote_storage:
 - Uploads that fail are retried with backoff; while the remote is unreachable, sealed files accumulate locally without
   a ceiling. Monitor free disk on the receiving node.
 - The plugin needs the remote when it starts. It waits and tries again for some minutes. If the remote still does
-  not answer, the plugin stops, and when this happens at the start of the Agent, the Agent does not start the plugin
-  again until the Agent restarts. See
+  not answer, or gives an error that cannot go away, the plugin stops, and when this happens at the start of the
+  Agent, the Agent does not start the plugin again until the Agent restarts. See
   [Monitor the OpenTelemetry plugin](/docs/opentelemetry/otlp-ingestion.md#monitor-the-opentelemetry-plugin).
 - The Agent never deletes offloaded files, for logs or traces: expire them with the object storage's own lifecycle
   rules, such as an S3 lifecycle expiration rule.
