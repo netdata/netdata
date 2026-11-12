@@ -47,10 +47,11 @@ modules:
             By default, each database, including the database in the DSN, is monitored for up to 50 tables and 250 indexes.
             Above either limit, the collector selects TOP objects: tables by recent rows read, fetched, inserted, updated
             and deleted (PostgreSQL statistics counters, not SQL query counts), indexes by size. Table and index selection
-            is independent and refreshes approximately every five minutes. A selected object is replaced only by one with
-            more than twice its row activity or size. Detailed metrics for the selected objects are collected at each
-            update interval. Databases above the table limit need two successful observations before the first table
-            selection; the second is attempted at the next update interval.
+            is independent and refreshes approximately every five minutes. A selected object stays until another has more
+            than twice its row activity or size; a selected table also stays against tables below one row per second.
+            Detailed metrics for the selected objects are collected at each update interval. Databases above the table
+            limit need two successful observations before the first table selection; the second is attempted at the
+            next update interval.
             Objects outside TOP have no individual metrics, and there is no aggregate for them. Rotation can cause gaps
             in individual charts and their alerts. While a limit is set, tables or indexes created after the last
             selection, including ones recreated under the same name, have no metrics until the next refresh, even in a
@@ -159,7 +160,7 @@ modules:
               required: false
               group: Limits
             - name: max_db_indexes
-              description: Maximum indexes monitored per database, including the DSN database. Above the limit, select the largest indexes, independently of tables (0 = no limit).
+              description: Maximum indexes monitored per database, including the DSN database. Above the limit, select indexes by size, independently of tables; a selected index stays until another is more than twice as large (0 = no limit).
               default_value: 250
               required: false
               group: Limits

@@ -65,7 +65,8 @@ func TestRelationSelection(t *testing.T) {
 		"equal activity keeps membership":     {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 0), activity(2, "b", 0)), retained: []uint32{2}, want: 2},
 		"selected keeps place below twice":    {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 100), activity(2, "b", 150)), retained: []uint32{1}, want: 1},
 		"more than twice replaces selected":   {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 100), activity(2, "b", 250)), retained: []uint32{1}, want: 2},
-		"idle selected yields to activity":    {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 0), activity(2, "b", 1)), retained: []uint32{1}, want: 2},
+		"idle selected stays against trickle": {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 0), activity(2, "b", 17)), retained: []uint32{1}, want: 1},
+		"idle selected yields to activity":    {before: activityRows(activity(1, "a", 0), activity(2, "b", 0)), after: activityRows(activity(1, "a", 0), activity(2, "b", 35)), retained: []uint32{1}, want: 2},
 		"large integer delta stays precise":   {before: activityRows(activity(1, "a", 1<<60), activity(2, "b", 1<<60)), after: activityRows(activity(1, "a", (1<<60)+1), activity(2, "b", (1<<60)+2)), want: 2},
 	}
 	for name, test := range tests {

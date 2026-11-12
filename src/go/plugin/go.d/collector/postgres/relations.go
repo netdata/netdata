@@ -14,6 +14,9 @@ const (
 	relationRetryEvery = time.Minute
 	// A selected object yields only to one scoring more than this many times higher, limiting rotation churn.
 	relationRetainFactor = 2
+	// A selected table also stays against tables below this many rows per second, so a trickle of rows does not
+	// rotate the idle tail of a selection.
+	relationIdleRowsPerSecond = 1.0
 	// Repeated per-database query failures are logged at most once per window.
 	queryWarningEvery = 5 * time.Minute
 )
@@ -116,7 +119,8 @@ func (c *Collector) refreshRelations(now time.Time) {
 }
 
 // choose ranks tables by recent row activity, a rate that needs two observations, and indexes by size.
-// A selected object keeps its place unless another scores more than relationRetainFactor times higher.
+// A selected object keeps its place unless another scores more than relationRetainFactor times higher;
+// a selected table also keeps it against tables below relationIdleRowsPerSecond.
 func (s *relationSelection) choose(rows map[uint32]relationActivity, reset string, now time.Time, limit int64, bySize bool) {
 	type scored struct {
 		relationActivity
@@ -135,6 +139,9 @@ func (s *relationSelection) choose(rows map[uint32]relationActivity, reset strin
 		if selected, ok := s.selected[oid]; ok && sameRelation(selected, row) {
 			item.retained = true
 			item.score *= relationRetainFactor
+			if !bySize {
+				item.score = max(item.score, relationIdleRowsPerSecond)
+			}
 		}
 		ranked = append(ranked, item)
 	}

@@ -180,7 +180,7 @@
       },
       "max_db_indexes": {
         "title": "Index limit",
-        "description": "Maximum indexes monitored per database, including the DSN database. Above this limit, select the largest indexes, independently of table selection. Set to 0 for no limit.",
+        "description": "Maximum indexes monitored per database, including the DSN database. Above this limit, select indexes by size, independently of table selection; a selected index stays until another is more than twice as large. Set to 0 for no limit.",
         "type": "integer",
         "minimum": 0,
         "default": 250
