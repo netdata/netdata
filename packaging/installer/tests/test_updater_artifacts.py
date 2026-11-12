@@ -427,6 +427,13 @@ self_update
             ('v2.10.0', 'v2.9.0-rc1', True),
             ('v2.9.0-rc.1+build.8', 'v2.9.0-rc.1+build.8', False),
             ('2.9.0', 'v2.9.0', False),
+            ('v2.9.0-rc1-3-gabc1234', 'v2.9.0-rc1', False),
+            ('v2.9.0-rc1', 'v2.9.0-rc1-3-gabc1234', False),
+            ('v2.9.0-rc1-3-gabc1234', 'v2.9.0-rc1-8-gdef5678', False),
+            ('v2.9.0-rc1-3-gabc1234', 'v2.9.0-rc2', True),
+            ('v2.9.0-rc1-3-gabc1234', 'v2.9.0-rc1-3-gxyz', True),
+            ('v2.9.0-rc1+build.8', 'v2.9.0-rc1+build.9', True),
+            ('v2.9.0-rc1-3-gabc1234+build.8', 'v2.9.0-rc1', True),
         ]:
             with self.subTest(current=current, latest=latest):
                 self.run_shell(f'''
@@ -507,17 +514,27 @@ update_binpkg
                 self.assertIn('netdata-repo-preview', (self.work / 'pm-calls').read_text())
                 (self.work / 'pm-calls').unlink()
 
-    def test_preview_native_nonlatest_version_is_failure(self):
+    def test_preview_native_update_progress_and_publication_skew(self):
         release_file = self.root / 'os-release'
         release_file.write_text('ID=debian\nVERSION_ID=12\nVERSION_CODENAME=bookworm\n')
         functions = FUNCTIONS.replace('/etc/os-release', str(release_file))
-        for post_transaction in ('v2.9.0-alpha.1', 'v2.9.0-beta.1'):
-            with self.subTest(installed=post_transaction):
+        for initial, post_transaction, latest, succeeds in [
+            ('v2.9.0-rc1', 'v2.9.0-rc1', 'v2.9.0-rc3', False),
+            ('v2.9.0-rc1', 'v2.9.0-rc2', 'v2.9.0-rc3', True),
+            ('v2.9.0-rc1', 'v2.9.0-rc2', 'v2.9.0-rc1', True),
+            ('v2.9.0-rc1', 'v2.9.0-rc1', 'v2.9.0-rc1', True),
+            ('v2.9.0-rc1-3-gabc1234', 'v2.9.0-rc1-3-gabc1234', 'v2.9.0-rc1', True),
+            ('v2.9.0-rc1', 'v2.9.0-rc1', 'v2.9.0-rc1-3-gabc1234', True),
+            ('v2.9.0-rc1', '2.9.0-rc1', 'v2.9.0-rc3', False),
+            ('v2.9.0-rc1-3-gabc1234', 'v2.9.0-rc1-4-gdef5678', 'v2.9.0-rc3', True),
+            ('v2.9.0-rc3', 'v2.9.0-rc2', 'v2.9.0-rc1', True),
+        ]:
+            with self.subTest(initial=initial, installed=post_transaction, latest=latest):
                 result = self.run_shell(f'''
 INTERACTIVE=1
 NETDATA_NO_SYSTEMD_JOURNAL=1
 NETDATA_PREVIEW_REPO_URL=https://repository.netdata.cloud/repos/preview
-installed_tag=v2.9.0-alpha.1
+installed_tag={initial}
 env() {{ "$@"; }}
 apt-get() {{
   for arg do [ "$arg" != netdata ] || installed_tag={post_transaction}; done
@@ -525,12 +542,13 @@ apt-get() {{
 }}
 dpkg-query() {{ [ "$2" = netdata-repo-preview ]; }}
 get_current_tag() {{ echo "$installed_tag"; }}
-get_latest_tag() {{ echo v2.9.0-rc.1000; }}
+get_latest_tag() {{ echo {latest}; }}
 get_new_binpkg_major() {{ echo 2; }}
 check_for_remote_file() {{ return 0; }}
 update_binpkg
-''', functions=functions, success=False)
-                self.assertIn('Package manager did not fully update Netdata', result.stderr)
+''', functions=functions, success=succeeds)
+                if not succeeds:
+                    self.assertIn('Package manager did not fully update Netdata', result.stderr)
 
     def test_preview_missing_version_fails_in_update_check(self):
         result = self.run_shell('''

@@ -1023,6 +1023,13 @@ get_latest_version() {
   parse_version "${latest_tag}"
 }
 
+# Hosted Version comes from packaging/version, while Git builds use git describe.
+# Ignore only its terminal distance/hash suffix and the optional leading v;
+# preserve prerelease and build identifiers, and follow the publication even backwards.
+preview_release_identity() {
+  printf '%s\n' "${1#v}" | sed 's/-[0-9][0-9]*-g[0-9a-f][0-9a-f]*$//'
+}
+
 # Preview tags are not constrained by the legacy numeric version encoding.
 version_major() {
   version_tag="${1#v}"
@@ -1051,7 +1058,8 @@ update_available() {
   if [ -z "${latest_version}" ] || [ -z "${current_version}" ] ; then
     info "Unable to compare versions for update check, assuming an update is required."
     return 0
-  elif { [ "${RELEASE_CHANNEL}" = preview ] && [ "${current_tag#v}" = "${latest_tag#v}" ]; } ||
+  elif { [ "${RELEASE_CHANNEL}" = preview ] &&
+         [ "$(preview_release_identity "${current_tag}")" = "$(preview_release_identity "${latest_tag}")" ]; } ||
        { [ "${RELEASE_CHANNEL}" != preview ] && [ "${latest_version}" -gt 0 ] &&
          [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${latest_version}" ]; }; then
     info "Newest published version is already installed"
@@ -1641,7 +1649,10 @@ update_binpkg() {
   update_incomplete=0
   if [ "${RELEASE_CHANNEL}" = preview ]; then
     current_tag="$(get_current_tag)"
-    if [ "${current_tag#v}" != "${latest_tag#v}" ]; then
+    # Repositories and hosted Version publish independently. Any installed build
+    # change counts as progress, even within the same preview release.
+    if [ "${current_tag#v}" = "${initial_tag#v}" ] &&
+       [ "$(preview_release_identity "${current_tag}")" != "$(preview_release_identity "${latest_tag}")" ]; then
       update_incomplete=1
     fi
   elif [ "${RELEASE_CHANNEL}" != "none" ] && [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
