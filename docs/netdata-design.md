@@ -234,7 +234,7 @@ Your metrics stay on your Agents and Parents. Netdata Cloud routes queries and m
 
 ### Is Netdata open source?
 
-The whole engine is open source (GPLv3 or later). The dashboard is free to use under its own licence. See [Open by design](#open-by-design).
+The whole engine is open source (GPLv3 or later): collection, storage, machine learning, alerting, streaming, the APIs and the MCP server. The dashboard ships free with every Agent and is the same for free and paid users. See [Open by design](#open-by-design).
 
 ### Why does Netdata collect everything instead of what I select?
 

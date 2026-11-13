@@ -135,7 +135,7 @@ To control access to observability data, Netdata Cloud uses spaces and rooms to 
 
 ## Scalability
 
-Netdata scales out: you add capacity by adding Parents, and there is no limit on how large a monitored infrastructure can be.
+Netdata scales out: each Parent cluster is an independent shard, so you add capacity by adding Parents, and no central component caps the size of the monitored infrastructure.
 
 Ingestion and storage have no central component that caps them. When using standalone agents, each agent is independent of the others. When using parent-child agents, each Parent is sized on its own, and the system grows by adding Parents.
 
@@ -226,18 +226,18 @@ Comprehensive alert customization includes custom thresholds, complex conditions
 **Extensibility:**
 The plugin architecture supports custom collectors in multiple languages (Go recommended, Python, Bash, Node.js). Custom exporters offer format customization, filtering rules, transformation options, and batch processing. API extensions enable webhook development, custom endpoints, data processing, and event handling.
 
-## Cost and Licensing
+## Licensing and Total Cost of Ownership
 
 Netdata offers flexible licensing models designed to accommodate organizations of all sizes, from open-source deployments to enterprise on-premises installations.
 
 **Licensing Options:**
-The open-source version provides full agent functionality with unlimited metrics and community support. Netdata Cloud plans range from a free Community plan (5 nodes, 1 user) to Business plans (unlimited nodes, enterprise SSO) and Enterprise On-Prem (self-hosted control plane with custom contracts).
+The open-source Agent and Parents are free, with full functionality and no limit on metrics. The Netdata Cloud Business plan adds enterprise SSO, role-based access and centralized configuration management across the fleet. Enterprise adds On-Prem deployment and custom contracts.
 
 **Total Cost of Ownership:**
-Minimal infrastructure requirements, low bandwidth usage, efficient storage, and energy efficiency contribute to reduced infrastructure costs. Operational benefits include automated deployment, self-maintaining systems, minimal administration requirements, and low training needs.
+A standalone node uses under 5% of one CPU core, about 200 MB of RAM and a few GB of disk; Parents need about 20 cores and 80 GB of RAM per 500 nodes (see the sizing above). There is no separate database to run, tune or back up, and dashboards and alerts come ready-made.
 
 **Return on Investment:**
-Organizations typically realize immediate benefits through instant visibility, zero configuration overhead, automatic discovery, and real-time insights. Long-term value includes predictive capabilities, capacity optimization, performance improvements, operational efficiency gains, faster MTTR, prevented outages, and reduced tool sprawl.
+Value starts at installation: auto-discovery collects every system and application it finds, with working dashboards and alerts from the first minute. Over time, machine-learning anomaly ranking and AI investigations shorten troubleshooting, and one platform for metrics, logs, traces and alerts reduces tool sprawl.
 
 ## Training and Documentation
 
