@@ -308,6 +308,8 @@ At most limit retained attempts selected by start time, with explicit truncated 
 | first_failure | string |  |  | First unexpected journey test failure, with retained step path, source location and error excerpt when available. |
 | last_observed_step | string |  |  | Last retained running step observation; this does not imply the browser is still executing it. |
 | stop_context | string |  |  | Pending activity observed before cleanup in the first timed-out or interrupted test; this does not identify the cause of the stop. Source locations identify the displayed step or the test declaration when no step is known, not the timeout location. |
+| browser_summary_status | string |  |  | Optional journey browser summary reporting status (not_recorded, unavailable, unsupported, partial, complete or invalid); completion does not imply complete browser coverage. |
+| browser_errors | string |  |  | Observed browser error counts by category, with sampling limitations when reported; missing evidence is not zero errors. |
 
 ### Synthetic run detail
 
@@ -334,7 +336,7 @@ No additional configuration is required.
 
 #### Returns
 
-One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact metadata and history errors. Journey failure_evidence adds test and step observations, the first unexpected failure, reporting completeness and separate truncation flags; absent evidence is not a report of zero failures. dropped_events discloses omitted generic event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
+One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact metadata and history errors. Journey browser_summary adds typed fixture-context coverage, observed counts, bounded primitive samples and explicit omissions when enabled; missing evidence is not zero errors. Journey failure_evidence adds test and step observations, the first unexpected failure, reporting completeness and separate truncation flags; absent evidence is not a report of zero failures. dropped_events discloses omitted generic event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned. The run.captures field contains available publication decisions. For journeys, it can also contain test associations, screenshot attachment counts, reporting status and detail truncation. An absent field means reporting was not recorded, not zero captures.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -389,7 +391,7 @@ One row per retained capture set. The storage object reports global effective po
 
 ### Synthetic capture detail
 
-Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run history retention; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB.
+Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run history retention; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB. The test column identifies the associated test, not a page or failing step. Missing-capture observations and publication decisions are in `synthetics-run` while history remains.
 
 | Aspect | Description |
 |:-------|:------------|
@@ -423,6 +425,8 @@ Retained capture metadata remains available after run history expires. Fetch ver
 | bytes | integer | bytes |  | Size. |
 | sha256 | string |  |  | SHA-256. |
 | availability | string |  |  | Availability. |
+| test | string |  |  | Associated screenshot test title, redacted and possibly clipped, or Test not recorded; empty for Lighthouse reports. |
+| label | string |  |  | Screenshot or Lighthouse report. |
 
 
 
