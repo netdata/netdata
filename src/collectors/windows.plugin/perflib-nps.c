@@ -6,6 +6,8 @@
 // Network Policy Server (RADIUS). Both Perflib objects are single-instance and exist only when the IAS service
 // is installed. Every counter is PERF_COUNTER_RAWCOUNT: the event counters are cumulative since IAS started, so
 // algorithms are set explicitly instead of using perflib_rrddim_add(), which maps raw counts to absolute.
+// "Server Up Time" and "Server Reset Time" are already in seconds, although their help text says hundredths of a
+// second: on Windows Server 2025 the raw value was 303 about 304 s after IAS started.
 
 #define NPS_MAX_DIMS 6
 

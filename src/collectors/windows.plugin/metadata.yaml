@@ -5776,10 +5776,14 @@ modules:
     setup:
       prerequisites:
         list:
-          - title: Network Policy Server role
+          - title: Install the Network Policy and Access Services role
             description: |
-              Install the Network Policy and Access Services role (service `IAS`). The performance objects exist only
-              when the role is installed.
+              The NPS performance objects exist only while this role (service `IAS`) is installed. Add it with Server
+              Manager, or from an elevated PowerShell session:
+
+              ```powershell
+              Install-WindowsFeature NPAS -IncludeManagementTools
+              ```
       configuration:
         file:
           name: "netdata.conf"
@@ -5807,7 +5811,11 @@ modules:
       folding:
         title: Metrics
         enabled: false
-      description: ""
+      description: |
+        - Charts ending in `_total` show cumulative counts since the NPS service started; they restart from zero when
+          the service restarts.
+        - In the error charts, `invalid` counts packets from unknown RADIUS clients, and `no_record` (accounting only)
+          counts requests that were not written to the accounting log.
       availability: []
       scopes:
         - name: global
@@ -5815,8 +5823,7 @@ modules:
           labels: []
           metrics:
             - name: nps.authentication_requests
-              description: RADIUS Access-Request packets received and Access-Accept, Access-Reject and Access-Challenge
-                responses sent.
+              description: NPS authentication requests and responses
               unit: requests/s
               chart_type: line
               dimensions:
@@ -5825,7 +5832,7 @@ modules:
                 - name: rejects
                 - name: challenges
             - name: nps.authentication_requests_total
-              description: Cumulative authentication requests and responses since the NPS service started.
+              description: NPS authentication requests and responses since NPS start
               unit: requests
               chart_type: line
               dimensions:
@@ -5834,22 +5841,21 @@ modules:
                 - name: rejects
                 - name: challenges
             - name: nps.authentication_packets
-              description: Packets received and sent on the authentication port.
+              description: NPS authentication packets
               unit: packets/s
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: nps.authentication_packets_total
-              description: Cumulative authentication packets since the NPS service started.
+              description: NPS authentication packets since NPS start
               unit: packets
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: nps.authentication_errors
-              description: Authentication packets with an invalid authenticator, dropped, from unknown clients (invalid),
-                malformed, or of an unknown RADIUS type.
+              description: NPS authentication packet errors
               unit: packets/s
               chart_type: stacked
               dimensions:
@@ -5859,7 +5865,7 @@ modules:
                 - name: malformed
                 - name: unknown_type
             - name: nps.authentication_errors_total
-              description: Cumulative authentication packet errors since the NPS service started.
+              description: NPS authentication packet errors since NPS start
               unit: packets
               chart_type: stacked
               dimensions:
@@ -5869,43 +5875,42 @@ modules:
                 - name: malformed
                 - name: unknown_type
             - name: nps.authentication_uptime
-              description: Time since the NPS service started and since its authentication counters were last reset.
+              description: NPS authentication server uptime
               unit: seconds
               chart_type: line
               dimensions:
                 - name: uptime
                 - name: since_reset
             - name: nps.accounting_requests
-              description: RADIUS Accounting-Request packets received and Accounting-Response packets sent.
+              description: NPS accounting requests and responses
               unit: requests/s
               chart_type: line
               dimensions:
                 - name: requests
                 - name: responses
             - name: nps.accounting_requests_total
-              description: Cumulative accounting requests and responses since the NPS service started.
+              description: NPS accounting requests and responses since NPS start
               unit: requests
               chart_type: line
               dimensions:
                 - name: requests
                 - name: responses
             - name: nps.accounting_packets
-              description: Packets received and sent on the accounting port.
+              description: NPS accounting packets
               unit: packets/s
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: nps.accounting_packets_total
-              description: Cumulative accounting packets since the NPS service started.
+              description: NPS accounting packets since NPS start
               unit: packets
               chart_type: line
               dimensions:
                 - name: received
                 - name: sent
             - name: nps.accounting_errors
-              description: Accounting packets with an invalid authenticator, dropped, from unknown clients (invalid),
-                malformed, not written to the accounting log (no record), or of an unknown RADIUS type.
+              description: NPS accounting packet errors
               unit: packets/s
               chart_type: stacked
               dimensions:
@@ -5916,7 +5921,7 @@ modules:
                 - name: no_record
                 - name: unknown_type
             - name: nps.accounting_errors_total
-              description: Cumulative accounting packet errors since the NPS service started.
+              description: NPS accounting packet errors since NPS start
               unit: packets
               chart_type: stacked
               dimensions:
@@ -5927,7 +5932,7 @@ modules:
                 - name: no_record
                 - name: unknown_type
             - name: nps.accounting_uptime
-              description: Time since the NPS service started and since its accounting counters were last reset.
+              description: NPS accounting server uptime
               unit: seconds
               chart_type: line
               dimensions:
