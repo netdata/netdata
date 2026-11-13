@@ -75,8 +75,8 @@ metrics:
     metric_tags:
       - tag: optical_index
         symbol:
-          OID: 1.3.6.1.4.1.14988.1.1.19.1.1.1
           name: mtxrOpticalIndex
+        index: 1
       - tag: optical_name
         symbol:
           OID: 1.3.6.1.4.1.14988.1.1.19.1.1.2
@@ -119,8 +119,8 @@ metrics:
     metric_tags:
       - tag: poe_interface_index
         symbol:
-          OID: 1.3.6.1.4.1.14988.1.1.15.1.1.1
           name: mtxrPOEInterfaceIndex
+        index: 1
       - tag: poe_name
         symbol:
           OID: 1.3.6.1.4.1.14988.1.1.15.1.1.2

@@ -48,7 +48,7 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	require.Contains(t, components.Collectors, "journey")
 	require.Contains(t, components.Collectors, "lighthouse")
 	require.Len(t, components.Functions[1].Functions(), 5)
-	handler := components.Functions[1].NewHandler().(*syntheticfunctions.Handler)
+	handler := components.Functions[1].NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*syntheticfunctions.Handler)
 	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method:      "synthetics-checks",
 		Permissions: "0x7b",
@@ -71,21 +71,38 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	assert.Len(t, detail.RawResponse["data"], 1)
 }
 
-// This executor makes inventory preparation independent of an installed browser.
-// An inventory read must never execute a workflow.
-type inventoryExecutor struct{}
+// Hold the scheduled attempt before admission. Inventory reads cannot create
+// another attempt or alter its request.
+type inventoryExecutor struct{ waiting chan struct{} }
 
 func (inventoryExecutor) Check(context.Context, synthetic.Kind) error { return nil }
 func (inventoryExecutor) Rehearse(context.Context, synthetic.Request) error {
 	panic("inventory must not rehearse a browser")
 }
-func (inventoryExecutor) Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution {
-	panic("inventory must not execute a browser")
+
+func (e inventoryExecutor) ExecuteScheduled(
+	ctx context.Context,
+	_ synthetic.Request,
+	state func(string),
+	_ func(time.Time) synthetic.Schedule,
+) synthetic.Execution {
+	state("waiting")
+	close(e.waiting)
+	<-ctx.Done()
+	return synthetic.Execution{
+		Drained: true,
+		Run: synthetic.Run{
+			Outcome: synthetic.Cancelled,
+		},
+	}
 }
 
 func TestRegistrySyntheticInventoryRedactsTargetCredentials(t *testing.T) {
+	waiting := make(chan struct{})
 	components := dem.New(dem.Dependencies{
-		Executor: inventoryExecutor{},
+		Executor: inventoryExecutor{
+			waiting: waiting,
+		},
 	}, dem.DefaultConfig())
 	collector := components.Collectors["lighthouse"].CreateV2().(*lighthouse.Collector)
 	collector.Name = "home"
@@ -101,7 +118,12 @@ func TestRegistrySyntheticInventoryRedactsTargetCredentials(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("collector did not become ready")
 	}
-	handler := components.Functions[1].NewHandler().(*syntheticfunctions.Handler)
+	select {
+	case <-waiting:
+	case <-time.After(2 * time.Second):
+		t.Fatal("scheduled attempt did not queue")
+	}
+	handler := components.Functions[1].NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*syntheticfunctions.Handler)
 	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method:      "synthetics-checks",
 		Permissions: "0x1b",

@@ -216,6 +216,7 @@ int help(int exitcode) {
 int buffer_unittest(void);
 int url_unittest(void);
 int ringbuffer_unittest(void);
+int nd_work_queue_unittest(void);
 int onewayalloc_unittest(void);
 int log_stack_unittest(void);
 int clocks_unittest(void);
@@ -541,6 +542,7 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_opentsdb_http_unittest()) return 1;
                             if (exporting_opentsdb_telnet_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
+                            if (nd_work_queue_unittest()) return 1;
                             if (onewayalloc_unittest()) return 1;
                             if (timezone_windows_mapping_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
@@ -713,6 +715,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "ringbuffertest") == 0) {
                             unittest_running = true;
                             return ringbuffer_unittest();
+                        }
+                        else if(strcmp(optarg, "workqueuetest") == 0) {
+                            unittest_running = true;
+                            return nd_work_queue_unittest();
                         }
                         else if(strcmp(optarg, "owatest") == 0) {
                             unittest_running = true;

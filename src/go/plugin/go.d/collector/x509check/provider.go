@@ -3,131 +3,156 @@
 package x509check
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net"
 	"net/smtp"
-	"net/url"
 	"os"
+	"slices"
 	"time"
-
-	"context"
-
-	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
-type provider interface {
-	certificates() ([]*x509.Certificate, error)
+// certificateProvider fetches the certificates of the source.
+type certificateProvider interface {
+	certificates(ctx context.Context) (sourceCertificates, error)
 }
 
-type fromFile struct {
+// sourceCertificates are the certificates a source provides.
+type sourceCertificates struct {
+	// chain is what the source presents, the server certificate first.
+	chain []*x509.Certificate
+	// verified holds the chains that TLS verification built from chain up to a trusted CA certificate, which the
+	// source need not send, such as a root CA from tls_ca. It is empty when the source is not verified.
+	verified [][]*x509.Certificate
+}
+
+// issuerCandidates returns the certificates that may have issued the server certificate: the rest of the presented
+// chain, and the next certificate of each verified chain.
+func (s sourceCertificates) issuerCandidates() []*x509.Certificate {
+	candidates := slices.Clone(s.chain[1:])
+	for _, chain := range s.verified {
+		if len(chain) > 1 {
+			candidates = append(candidates, chain[1])
+		}
+	}
+	return candidates
+}
+
+// fileProvider reads the first PEM block of a local file.
+type fileProvider struct {
 	path string
 }
 
-type fromNet struct {
-	url       *url.URL
+// netProvider starts TLS directly on the connection.
+type netProvider struct {
+	endpoint
+}
+
+// smtpProvider upgrades an SMTP session with STARTTLS.
+type smtpProvider struct {
+	endpoint
+}
+
+type endpoint struct {
+	network   string
+	address   string
 	tlsConfig *tls.Config
 	timeout   time.Duration
 }
 
-type fromSMTP struct {
-	url       *url.URL
-	tlsConfig *tls.Config
-	timeout   time.Duration
-}
-
-func newProvider(ctx context.Context, config Config) (provider, error) {
-	sourceURL, err := url.Parse(config.Source)
+func (p *fileProvider) certificates(context.Context) (sourceCertificates, error) {
+	content, err := os.ReadFile(p.path)
 	if err != nil {
-		return nil, fmt.Errorf("source parse: %v", err)
-	}
-
-	tlsCfg, err := tlscfg.NewTLSConfig(ctx, config.TLSConfig)
-	if err != nil {
-		return nil, fmt.Errorf("create tls config: %v", err)
-	}
-
-	if tlsCfg == nil {
-		tlsCfg = &tls.Config{}
-	}
-	tlsCfg.ServerName = sourceURL.Hostname()
-
-	switch sourceURL.Scheme {
-	case "file":
-		return &fromFile{path: sourceURL.Path}, nil
-	case "https", "udp", "udp4", "udp6", "tcp", "tcp4", "tcp6":
-		if sourceURL.Scheme == "https" {
-			sourceURL.Scheme = "tcp"
-		}
-		return &fromNet{url: sourceURL, tlsConfig: tlsCfg, timeout: config.Timeout.Duration()}, nil
-	case "smtp":
-		sourceURL.Scheme = "tcp"
-		return &fromSMTP{url: sourceURL, tlsConfig: tlsCfg, timeout: config.Timeout.Duration()}, nil
-	default:
-		return nil, fmt.Errorf("unsupported scheme '%s'", sourceURL)
-	}
-}
-
-func (f fromFile) certificates() ([]*x509.Certificate, error) {
-	content, err := os.ReadFile(f.path)
-	if err != nil {
-		return nil, fmt.Errorf("error on reading '%s': %v", f.path, err)
+		return sourceCertificates{}, fmt.Errorf("error on reading '%s': %w", p.path, err)
 	}
 
 	block, _ := pem.Decode(content)
 	if block == nil {
-		return nil, fmt.Errorf("error on decoding '%s': PEM decode failed (not a valid PEM file)", f.path)
+		return sourceCertificates{}, fmt.Errorf(
+			"error on decoding '%s': PEM decode failed (not a valid PEM file)",
+			p.path,
+		)
 	}
 
+	// The parser error can quote file content, so it is replaced rather than wrapped.
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("error on parsing certificate '%s': invalid X.509 certificate", f.path)
+		return sourceCertificates{}, fmt.Errorf("error on parsing certificate '%s': invalid X.509 certificate", p.path)
 	}
 
-	return []*x509.Certificate{cert}, nil
+	return sourceCertificates{
+		chain: []*x509.Certificate{cert},
+	}, nil
 }
 
-func (f fromNet) certificates() ([]*x509.Certificate, error) {
-	ipConn, err := net.DialTimeout(f.url.Scheme, f.url.Host, f.timeout)
-	if err != nil {
-		return nil, fmt.Errorf("error on dial to '%s': %v", f.url, err)
-	}
-	defer func() { _ = ipConn.Close() }()
+func (p *netProvider) certificates(ctx context.Context) (sourceCertificates, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
 
-	conn := tls.Client(ipConn, f.tlsConfig.Clone())
+	conn, err := p.dial(ctx)
+	if err != nil {
+		return sourceCertificates{}, err
+	}
+
+	tlsConn := tls.Client(conn, p.tlsConfig.Clone())
+	// Closing the TLS connection sends close_notify after a completed handshake, then closes conn.
+	defer func() { _ = tlsConn.Close() }()
+
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		return sourceCertificates{}, fmt.Errorf("error on SSL handshake with '%s': %w", p.address, err)
+	}
+
+	return connectionCertificates(tlsConn.ConnectionState()), nil
+}
+
+func (p *smtpProvider) certificates(ctx context.Context) (sourceCertificates, error) {
+	ctx, cancel := context.WithTimeout(ctx, p.timeout)
+	defer cancel()
+
+	conn, err := p.dial(ctx)
+	if err != nil {
+		return sourceCertificates{}, err
+	}
 	defer func() { _ = conn.Close() }()
-	if err := conn.Handshake(); err != nil {
-		return nil, fmt.Errorf("error on SSL handshake with '%s': %v", f.url, err)
+
+	host, _, _ := net.SplitHostPort(p.address)
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return sourceCertificates{}, fmt.Errorf("error on creating SMTP client: %w", err)
+	}
+	defer func() { _ = client.Quit() }()
+
+	if err := client.StartTLS(p.tlsConfig.Clone()); err != nil {
+		return sourceCertificates{}, fmt.Errorf("error on startTLS with '%s': %w", p.address, err)
 	}
 
-	certs := conn.ConnectionState().PeerCertificates
-	return certs, nil
+	state, ok := client.TLSConnectionState()
+	if !ok {
+		return sourceCertificates{}, errors.New("startTLS didn't succeed")
+	}
+	return connectionCertificates(state), nil
 }
 
-func (f fromSMTP) certificates() ([]*x509.Certificate, error) {
-	ipConn, err := net.DialTimeout(f.url.Scheme, f.url.Host, f.timeout)
-	if err != nil {
-		return nil, fmt.Errorf("error on dial to '%s': %v", f.url, err)
+// connectionCertificates returns the certificates of a completed TLS handshake.
+func connectionCertificates(state tls.ConnectionState) sourceCertificates {
+	return sourceCertificates{
+		chain:    state.PeerCertificates,
+		verified: state.VerifiedChains,
 	}
-	defer func() { _ = ipConn.Close() }()
+}
 
-	host, _, _ := net.SplitHostPort(f.url.Host)
-	smtpClient, err := smtp.NewClient(ipConn, host)
+// dial connects to the endpoint. ctx also bounds every later exchange on the connection: once it is done,
+// pending and future reads and writes fail.
+func (e endpoint) dial(ctx context.Context) (net.Conn, error) {
+	var dialer net.Dialer
+	conn, err := dialer.DialContext(ctx, e.network, e.address)
 	if err != nil {
-		return nil, fmt.Errorf("error on creating SMTP client: %v", err)
+		return nil, fmt.Errorf("error on dial to '%s': %w", e.address, err)
 	}
-	defer func() { _ = smtpClient.Quit() }()
-
-	err = smtpClient.StartTLS(f.tlsConfig.Clone())
-	if err != nil {
-		return nil, fmt.Errorf("error on startTLS with '%s': %v", f.url, err)
-	}
-
-	conn, ok := smtpClient.TLSConnectionState()
-	if !ok {
-		return nil, fmt.Errorf("startTLS didn't succeed")
-	}
-	return conn.PeerCertificates, nil
+	context.AfterFunc(ctx, func() { _ = conn.SetDeadline(time.Now()) })
+	return conn, nil
 }

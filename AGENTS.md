@@ -15,7 +15,8 @@ Critical rules:
    problem is not allowed.
 2. Before patching code, you MUST understand the codebase and the implications of the change: what else is
    affected, what else uses this code.
-3. Do not duplicate code. Check whether similar code already exists and reuse it.
+3. Check for existing mechanisms and reuse them when appropriate. Assess duplication and proposed abstractions
+   under the maintainability rules in "Review".
 
 ## Requirement Language
 
@@ -110,10 +111,11 @@ removes debt beats a smaller one that preserves it.
     and disclose it rather than stopping to ask.
   - Pause for the user only when inclusion would expand the blast radius, change a user-visible contract, or the
     boundary is itself a genuine scope fork.
-- Touch the mess you touch: when code you modify already contains adjacent duplication, dead code, or a clear
+- Touch the mess you touch: when code you modify already contains meaningful duplication, dead code, or a clear
   pre-existing defect, you SHOULD clean it as part of this work rather than build on it, provided the cleanup is
-  low-risk and confined to the code you are already modifying. Cleanup reaching into unrelated code is independent
-  work (see "Scope Discipline At Every Step"). If you leave adjacent mess in place, record why under disclosure (iii).
+  low-risk and confined to the code you are already modifying. Apply the "Review" maintainability rules to
+  duplication and refactoring. Cleanup reaching into unrelated code is independent work (see "Scope Discipline At
+  Every Step"). If you leave adjacent mess in place, record why under disclosure (iii).
 - Reference search (when replacing a path or altering a contract):
   - You MUST run and record in the SOW (command and result) a search for remaining references to the replaced path
     or contract. Search construction sites and prefixes too, not only literal final names; identifiers here are often
@@ -123,7 +125,8 @@ removes debt beats a smaller one that preserves it.
     (ii). Record and explain unrelated search matches. An item you did not search for counts as silent scope-narrowing.
   - A repository-wide search cannot prove safety for consumers outside this repo (Netdata Cloud, exporters,
     streaming, ML, the docs pipeline). Renaming a shipped public contract is a user-owned breaking decision routed
-    through the Mandatory pause, not something the search clears.
+    through the Mandatory pause, not something the search clears. The explicit go.d V1-to-V2 chart/dimension ID
+    exception is owned by `src/go/plugin/go.d/docs/migrate-v1-to-v2.md#chart-and-dimension-ids`.
 - Allowed exceptions (pause conditions, not auto-routes). Recommend a non-clean route ONLY for:
   - (a) technically impossible: impossible to implement correctly at all, NOT within a preferred diff size;
   - (b) a concrete, evidenced safety risk: a named hazard such as data loss or a security/production-stability
@@ -415,8 +418,21 @@ Review findings are leads until verified against the relevant design or shipped 
   only when implementation is authorized.
 - A shipping blocker MUST identify a production-reachable trigger, the violated contract or invariant, the
   concrete consequence, and supporting code or test evidence.
-- Failing required validation or an unmet explicit acceptance criterion is also a shipping blocker, regardless of
-  the reviewer's severity label.
+- Failing required build, test or behavioral validation, or an unmet explicit acceptance criterion, is also a shipping
+  blocker, regardless of the reviewer's severity label. Report an analyzer-only quality-gate failure separately;
+  its score does not establish a source defect or justify a change that fails the benefit test below.
+- A review-driven source change MUST correct a verified defect, satisfy an explicit user/project contract, or deliver
+  a concrete maintainability benefit. Name the benefit: simpler ownership, one shared invariant, fewer places that
+  must change together, or clearer reasoning. A tool warning, severity label or improved score alone is not a benefit.
+- Cosmetic nits, equivalent rewrites and style preferences without that benefit MUST be left unchanged. Give a brief
+  disposition when reporting the review; do not manufacture follow-up work or extend the review to eliminate nits.
+- Duplication findings MUST identify shared behavior or a maintenance problem that consolidation would improve.
+  Similar tokens, standard boilerplate or repeated test setup alone are insufficient. Consolidate valid duplication
+  when the result is easier to maintain; preserve the distinct cases, semantics and coverage.
+- MUST NOT create artificial packages, interfaces, wrappers or other indirection solely to silence a reviewer or
+  analyzer. Prefer an existing owner or a local helper when sharing has a real benefit; retain separate code when
+  extraction would obscure ownership or add coupling. A failed tool gate does not authorize bypassing checks,
+  weakening tests, changing analysis policy or marking remote findings resolved.
 - An unreachable defensive scenario, optional refactor, style preference, or speculative future risk MUST NOT be
   promoted to a blocker. Reject it with evidence, or track it separately when it has independent value.
 - Optional test expansion, documentation polish, and maintainability suggestions without a concrete current defect

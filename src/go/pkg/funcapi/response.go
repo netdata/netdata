@@ -17,6 +17,9 @@ type FunctionConfig struct {
 	RequireCloud bool     // Indicates whether the method requires cloud connection
 	Tags         string   // Function tags for registration; empty defaults to "top"
 	ResponseType string   // Response schema type; empty defaults to "table" when dispatched
+	// RequireCommercial restricts viewing to members of a paid Netdata Cloud Space.
+	// It implies RequireCloud.
+	RequireCommercial bool
 	// Available gates publication of agent/process-backed Functions. Nil means available.
 	// Process providers are rechecked on the process tick even without jobs;
 	// collector AgentFunctions are rechecked while their module has scheduled jobs.
@@ -30,6 +33,10 @@ type FunctionConfig struct {
 	// scoped info calls HandleRaw, which supplies domain RequiredParams.
 	// Requires RawRequest. RawResponse still bypasses managed serialization.
 	ManagedInfo bool
+	// DynamicInfo calls MethodParams for structured info on a bound method.
+	// Without a running available job, job-backed methods retain static info.
+	// Unselected shared-job info remains static. Not valid with RawRequest.
+	DynamicInfo bool
 	// HasHistory advertises time-range support in managed info and data responses.
 	HasHistory bool
 	// AcceptedParams advertises inputs in addition to required selector IDs.

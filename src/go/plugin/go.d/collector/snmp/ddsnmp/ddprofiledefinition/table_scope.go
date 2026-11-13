@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// OutOfTableOIDs reports same-table symbol and tag OIDs that lie outside their row's table.OID. Metric and topology
-// rows walk only table.OID, so such OIDs are never collected and the collector reports nothing. An OID may also be a
+// OutOfTableOIDs reports same-table symbol and tag OIDs that lie outside their row's table.OID.
+// Row acquisition walks only table.OID, so such OIDs are never collected. An OID may also be a
 // prefix of table.OID: that is an anchor column whose table.OID appends a fixed index prefix. Call it after
 // ValidateEnrichProfile, which moves legacy tag OIDs into symbol.OID.
 func OutOfTableOIDs(p *ProfileDefinition) []string {
@@ -18,6 +18,14 @@ func OutOfTableOIDs(p *ProfileDefinition) []string {
 	}
 	for i := range p.Topology {
 		issues = append(issues, rowOutOfTableOIDs(fmt.Sprintf("topology[%d]", i), &p.Topology[i].MetricsConfig)...)
+	}
+	for i := range p.Licensing {
+		row := &p.Licensing[i]
+		issues = append(issues, tagOutOfTableOIDs(fmt.Sprintf("licensing[%d]", i), row.Table, row.MetricTags)...)
+	}
+	for i := range p.BGP {
+		row := &p.BGP[i]
+		issues = append(issues, tagOutOfTableOIDs(fmt.Sprintf("bgp[%d]", i), row.Table, row.MetricTags)...)
 	}
 	return issues
 }
@@ -40,11 +48,34 @@ func rowOutOfTableOIDs(path string, row *MetricsConfig) []string {
 	for i, sym := range row.Symbols {
 		check(fmt.Sprintf("symbols[%d]", i), sym.OID)
 	}
-	for i, tag := range row.MetricTags {
-		if tag.Table != "" && tag.Table != row.Table.Name {
-			continue // cross-table tags read the referenced table
+	issues = append(issues, tagOutOfTableOIDs(path, row.Table, row.MetricTags)...)
+
+	return issues
+}
+
+func tagOutOfTableOIDs(path string, table SymbolConfig, tags []MetricTagConfig) []string {
+	if table.OID == "" {
+		return nil
+	}
+	var issues []string
+	for i, tag := range tags {
+		check := func(oid string) {
+			if oid != "" && !isWithinTable(strings.TrimPrefix(table.OID, "."), strings.TrimPrefix(oid, ".")) {
+				issues = append(
+					issues,
+					fmt.Sprintf("%s.metric_tags[%d]: OID %s is outside table.OID %s and is never collected",
+						path, i, oid, table.OID),
+				)
+			}
 		}
-		check(fmt.Sprintf("metric_tags[%d]", i), tag.Symbol.OID)
+		if tag.Table == "" {
+			check(tag.Symbol.OID)
+		}
+		for source := range tag.TableSources() {
+			if source.Table == table.Name {
+				check(source.Symbol.OID)
+			}
+		}
 	}
 	return issues
 }

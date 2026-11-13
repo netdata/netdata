@@ -34,7 +34,11 @@ func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error 
 		return errors.Join(err, cleanupErr)
 	}
 	if execution.Run.Outcome != synthetic.Success || execution.Run.Error != "" {
-		err := fmt.Errorf("rehearsal %s: %s", execution.Run.Outcome, execution.Run.Error)
+		outcome := string(execution.Run.Outcome)
+		if execution.Run.TerminationReason != "" {
+			outcome += " (" + string(execution.Run.TerminationReason) + ")"
+		}
+		err := fmt.Errorf("rehearsal %s: %s", outcome, execution.Run.Error)
 		if execution.Run.Outcome == synthetic.Timeout {
 			err = errors.Join(err, context.DeadlineExceeded)
 		}

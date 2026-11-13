@@ -1064,11 +1064,17 @@ func validateConfiguredMethods(module string, methods []funcapi.FunctionConfig) 
 			return nil, errors.New("jobmgr Function controller: duplicate method ID")
 		}
 		seen[method.ID] = struct{}{}
+		if method.DynamicInfo && method.RawRequest {
+			return nil, fmt.Errorf("jobmgr Function controller: method %q DynamicInfo requires structured request handling", method.ID)
+		}
 		if method.ManagedInfo && !method.RawRequest {
 			return nil, fmt.Errorf("jobmgr Function controller: method %q ManagedInfo requires RawRequest", method.ID)
 		}
 		if len(method.AcceptedParams) != 0 && !method.RawRequest {
 			return nil, fmt.Errorf("jobmgr Function controller: method %q AcceptedParams requires RawRequest", method.ID)
+		}
+		if err := funcapi.ValidateFocusParams(method.RequiredParams); err != nil {
+			return nil, fmt.Errorf("jobmgr Function controller: method %q: %w", method.ID, err)
 		}
 		if !validQuotedProtocolField(method.Help) {
 			return nil, errors.New("jobmgr Function controller: invalid Function help")
@@ -1110,10 +1116,12 @@ func controllerGroupSignature(
 		writeDigestUint64(digest, uint64(method.UpdateEvery))
 		writeDigestString(digest, method.Help)
 		writeDigestBool(digest, method.RequireCloud)
+		writeDigestBool(digest, method.RequireCommercial)
 		writeDigestString(digest, method.Tags)
 		writeDigestString(digest, method.ResponseType)
 		writeDigestBool(digest, method.RawRequest)
 		writeDigestBool(digest, method.ManagedInfo)
+		writeDigestBool(digest, method.DynamicInfo)
 		writeDigestBool(digest, method.HasHistory)
 		writeDigestUint64(digest, uint64(len(method.AcceptedParams)))
 		for _, name := range method.AcceptedParams {
@@ -1128,12 +1136,22 @@ func controllerGroupSignature(
 			writeDigestString(digest, parameter.Help)
 			writeDigestUint64(digest, uint64(parameter.Selection))
 			writeDigestBool(digest, parameter.UniqueView)
+			writeDigestString(digest, parameter.ValueSeparator)
+			focus, err := json.Marshal(parameter.Focus)
+			if err != nil {
+				return "", fmt.Errorf("jobmgr Function controller: method %q focus: %w", method.ID, err)
+			}
+			writeDigestString(digest, string(focus))
 			for _, option := range parameter.Options {
 				writeDigestString(digest, option.ID)
 				writeDigestString(digest, option.Name)
 				writeDigestBool(digest, option.Default)
 				writeDigestBool(digest, option.Disabled)
 				writeDigestString(digest, option.Column)
+				writeDigestUint64(digest, uint64(len(option.Aliases)))
+				for _, alias := range option.Aliases {
+					writeDigestString(digest, alias)
+				}
 				if option.Sort != nil {
 					writeDigestString(digest, option.Sort.String())
 				} else {
@@ -1175,10 +1193,7 @@ func methodPublicationRecord(
 	if help == "" {
 		help = fmt.Sprintf("%s %s data function", module, method.ID)
 	}
-	access := "0x0000"
-	if method.RequireCloud {
-		access = "0x0013"
-	}
+	access := methodAccess(method)
 	tags := method.Tags
 	if tags == "" {
 		tags = "top"
@@ -1192,6 +1207,20 @@ func methodPublicationRecord(
 		Access:     access,
 		Priority:   100,
 		Version:    3,
+	}
+}
+
+// methodAccess returns the HTTP_ACCESS mask published for a method:
+// signed-in (0x01), same Space (0x02) and sensitive data (0x10), plus
+// commercial Space (0x04) for Functions that require a paid plan.
+func methodAccess(method funcapi.FunctionConfig) string {
+	switch {
+	case method.RequireCommercial:
+		return "0x0017"
+	case method.RequireCloud:
+		return "0x0013"
+	default:
+		return "0x0000"
 	}
 }
 

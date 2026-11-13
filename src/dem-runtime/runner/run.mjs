@@ -6,6 +6,7 @@ import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import protocol from './protocol.cjs';
 import {runtimePaths, checkRuntime} from './runtime.mjs';
+import {monotonicMilliseconds, journeyStop, journeyResult} from './journey.mjs';
 const {text, event, write} = protocol;
 const here = path.dirname(fileURLToPath(import.meta.url));
 const emit = record => write(1, record);
@@ -15,13 +16,14 @@ function absolute(value, name) {
   if (typeof value !== 'string' || !path.isAbsolute(value)) throw new Error(name + ' must be an absolute path');
 }
 function validate(r) {
-  if (!r || r.version !== 1 || !['journey', 'lighthouse'].includes(r.kind)) throw new Error('unsupported runner request');
+  if (!r || r.version !== 2 || !['journey', 'lighthouse'].includes(r.kind)) throw new Error('unsupported runner request');
   absolute(r.work_dir, 'work_dir');
   if ('dependencies_path' in r || 'browser_path' in r) throw new Error('runtime component paths are not request fields');
   if (typeof r.run_id !== 'string' || !r.run_id) throw new Error('run_id is required');
   if (!Number.isSafeInteger(r.timeout_ms) || r.timeout_ms <= 0) throw new Error('timeout_ms must be positive');
   if (typeof r.capture !== 'boolean') throw new Error('capture must be boolean');
   if (r.kind === 'journey') {
+    if (!Number.isSafeInteger(r.stop_at_monotonic_ms) || r.stop_at_monotonic_ms <= 0) throw new Error('stop_at_monotonic_ms must be a positive safe integer');
     if (Boolean(r.script) === Boolean(r.script_path)) throw new Error('set exactly one of script and script_path');
     if (r.script && typeof r.script !== 'string') throw new Error('script must be source text');
     if (r.script_path) {
@@ -66,7 +68,7 @@ async function main() {
     const modules = runtime.modules;
     const config = {
       testDir: path.dirname(entry), workers: 1, retries: 0, repeatEach: 1, fullyParallel: false,
-      forbidOnly: true, timeout: r.timeout_ms, globalTimeout: r.timeout_ms,
+      forbidOnly: true, timeout: r.timeout_ms, globalTimeout: 0,
       respectGitIgnore: false, outputDir: path.join(r.work_dir, 'output'),
       reporter: [[path.join(here, 'reporter.cjs'), {workDir: r.work_dir, capture: r.capture}]],
       projects: [{name: 'chromium', use: {browserName: 'chromium', headless: true,
@@ -86,9 +88,15 @@ async function main() {
   } else {
     args = [path.join(here, 'lighthouse.mjs')];
   }
+  // Configuration and filesystem awaits consume the same admitted work budget.
+  if (r.kind === 'journey' && monotonicMilliseconds() >= r.stop_at_monotonic_ms) {
+    emit({type: 'result', result: journeyResult({}, true, r.capture)});
+    return;
+  }
   const child = spawn(process.execPath, args, {cwd: r.work_dir, env, stdio: [r.kind === 'lighthouse' ? 'pipe' : 'ignore', 'pipe', 'pipe', 'pipe']});
   if (r.kind === 'lighthouse') child.stdin.end(JSON.stringify({...r, secrets: undefined}));
   let terminal;
+  const stop = r.kind === 'journey' ? journeyStop(child, r.stop_at_monotonic_ms, () => Boolean(terminal)) : undefined;
   let protocolError;
   for (const [kind, stream] of [['stdout', child.stdout], ['stderr', child.stderr]]) {
     const safe = protocol.secretStream(message => emit({type: 'event', event: event(kind, {phase: 'cli', message})}));
@@ -100,16 +108,24 @@ async function main() {
     try {
       const record = JSON.parse(line);
       if (record.type === 'event' && record.event) emit(record);
-      else if (record.type === 'result' && record.result && !terminal) terminal = record.result;
+      else if (record.type === 'result' && record.result && !terminal) {
+        terminal = record.result;
+        stop?.clear();
+      }
       else throw new Error('invalid or duplicate reporter record');
     } catch (error) { protocolError = text(error.message); }
   });
   const ended = new Promise(resolve => lines.once('close', resolve));
   const exit = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', (code, signal) => resolve({code, signal})); });
   await ended;
-  if (protocolError || !terminal) throw new Error(protocolError || 'Runner exited without a terminal result (' + (exit.signal || exit.code) + ')');
-  if (terminal.status === 'success' && exit.code !== 0) throw new Error('Runner exited unsuccessfully after a successful report');
-  emit({type: 'result', result: terminal});
+  if (protocolError) throw new Error(protocolError);
+  if (!terminal) {
+    const error = 'Runner exited without a terminal result (' + (exit.signal || exit.code) + ')';
+    if (!stop?.requested) throw new Error(error);
+    terminal = {error};
+  }
+  if (terminal.status === 'success' && exit.code !== 0 && !stop?.requested) throw new Error('Runner exited unsuccessfully after a successful report');
+  emit({type: 'result', result: r.kind === 'journey' ? journeyResult(terminal, stop.requested, r.capture) : terminal});
 }
 main().catch(error => {
   if (process.argv.includes('--check')) {

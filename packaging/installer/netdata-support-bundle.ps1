@@ -744,7 +744,7 @@ function Collect-SnmpDiagnostics {
 #  - CreateNoWindow stays $false: detaching from the console reproduces the same
 #    empty-output failure. The bundle runs from a console PowerShell, so the
 #    child inherits it and no extra window appears.
-#  - both pipes are drained asynchronously so a full buffer cannot deadlock the
+#  - both pipes are decoded as UTF-8 (see below) and drained asynchronously so a full buffer cannot deadlock the
 #    wait, which is bounded by WaitForExit (kill on timeout).
 function Invoke-NativeProcess([string]$exe, [string[]]$argList, [int]$timeoutSec) {
     $r = [pscustomobject]@{ StdOut = ''; StdErr = ''; ExitCode = $null; TimedOut = $false; LaunchError = '' }
@@ -757,6 +757,11 @@ function Invoke-NativeProcess([string]$exe, [string[]]$argList, [int]$timeoutSec
         $psi.UseShellExecute = $false
         $psi.RedirectStandardOutput = $true
         $psi.RedirectStandardError = $true
+        # the MSYS2 binaries write UTF-8; without this .NET decodes the pipes
+        # with the console code page and non-ASCII text (dyncfg names, labels)
+        # is mangled before it is re-written as UTF-8
+        $psi.StandardOutputEncoding = New-Object System.Text.UTF8Encoding $false
+        $psi.StandardErrorEncoding = New-Object System.Text.UTF8Encoding $false
         $psi.CreateNoWindow = $false
         $p = New-Object System.Diagnostics.Process
         $p.StartInfo = $psi
@@ -819,32 +824,45 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
     Add-Manifest $rel 'cmd' $originText $title
 }
 
-function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @()) {
-    # like Save-Cmd but with NO header/trailer, for commands whose output must
-    # stay parseable (JSON). Provenance lives in MANIFEST.json only. The file is
-    # removed if the command produced nothing.
-    if (Test-Deadline) { return }
-    $full = Join-Path $Work $rel
-    New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
-    $result = ''
+function Get-RawCmdOutput([scriptblock]$cmd, [string]$nativeExe, [string[]]$nativeArgs) {
     if ($nativeExe) {
         # MSYS2 binary: direct launch, never Start-Job (see Invoke-NativeProcess).
         # JSON output, so keep stdout ONLY (merging stderr would corrupt it); a
-        # failed/empty run leaves nothing and the file is dropped below.
+        # failed/empty run returns nothing.
         $np = Invoke-NativeProcess $nativeExe $nativeArgs $TimeoutSeconds
-        if (-not $np.TimedOut -and -not $np.LaunchError -and $np.ExitCode -eq 0) { $result = $np.StdOut }
-    } else {
-        try {
-            $job = Start-Job -ScriptBlock $cmd
-            $done = Wait-Job $job -Timeout $TimeoutSeconds
-            if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String }
-            Stop-Job $job -ErrorAction SilentlyContinue
-            Remove-Job $job -Force
-        } catch { Write-Verbose "collector failed: $_" }
+        if (-not $np.TimedOut -and -not $np.LaunchError -and $np.ExitCode -eq 0) { return $np.StdOut }
+        return ''
     }
+    $result = ''
+    try {
+        $job = Start-Job -ScriptBlock $cmd
+        $done = Wait-Job $job -Timeout $TimeoutSeconds
+        if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String }
+        Stop-Job $job -ErrorAction SilentlyContinue
+        Remove-Job $job -Force
+    } catch { Write-Verbose "collector failed: $_" }
+    return $result
+}
+
+function Limit-RawCmdOutput([string]$result, [bool]$dropOverCap) {
+    # a truncated JSON document is worse than none: fail closed
+    # measure the UTF-8 bytes written, not UTF-16 code units (see Save-Api)
+    if ([System.Text.Encoding]::UTF8.GetByteCount($result) -le 2MB) { return $result }
+    if ($dropOverCap) { return '' }
+    return '{"error":"output exceeded the cap and was withheld"}'
+}
+
+function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText, [string]$nativeExe = '', [string[]]$nativeArgs = @(), [switch]$dropOverCap) {
+    # like Save-Cmd but with NO header/trailer, for commands whose output must
+    # stay parseable (JSON). Provenance lives in MANIFEST.json only. The file is
+    # removed if the command produced nothing, and with -dropOverCap also if the
+    # output exceeds the cap, so a caller with a fallback source can still try it.
+    if (Test-Deadline) { return }
+    $full = Join-Path $Work $rel
+    New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
+    $result = Get-RawCmdOutput $cmd $nativeExe $nativeArgs
+    if ($result -and $result.Trim().Length -gt 0) { $result = Limit-RawCmdOutput $result $dropOverCap.IsPresent }
     if ($result -and $result.Trim().Length -gt 0) {
-        # a truncated JSON document is worse than none: fail closed
-        if ($result.Length -gt 2MB) { $result = '{"error":"output exceeded the cap and was withheld"}' }
         Write-Utf8 $full $result
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'cmd' $originText $title
@@ -1140,6 +1158,20 @@ if (Test-Path $CacheDir) {
 # ============================================================================
 # 07-runtime
 # ============================================================================
+# The dyncfg tree through the local command pipe: the agent answers it as a
+# member of its own space, which the web API needs and the bundle cannot be.
+# It does not need the web API, so it is tried whatever $ApiOk says - but at the
+# tree's own place in the order: sanitizing a large tree can take minutes, and
+# done first it would spend the deadline the smaller runtime captures need.
+# With -dropOverCap Save-CmdRaw leaves no file on any failure, so the API
+# fallback can use the same path.
+$DyncfgTreeTitle = 'Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state'
+function Save-DyncfgTreeCli {
+    if ((Test-Path $NetdataCli) -and $NetdataProc) {
+        # netdatacli.exe is MSYS2: native direct-launch, not Start-Job
+        Save-CmdRaw '07-runtime\dyncfg-tree.json' $DyncfgTreeTitle $null 'netdatacli.exe dyncfg-tree' -nativeExe $NetdataCli -nativeArgs 'dyncfg-tree' -dropOverCap
+    }
+}
 if ($ApiOk) {
     Show-Info 'collecting: runtime (agent is up)'
     Save-Api '07-runtime\info-v3.json' 'BEST SINGLE CALL: buildinfo, features, cloud status, per-tier retention' '/api/v3/info'
@@ -1150,12 +1182,17 @@ if ($ApiOk) {
     Save-Api '07-runtime\alerts-active.json' 'Currently raised alerts' '/api/v3/alerts?options=active'
     Save-Api '07-runtime\alerts-all.json' 'All alert instances (summary)' '/api/v1/alarms?all'
     Save-Api '07-runtime\functions.json' 'Registered functions' '/api/v1/functions'
-    Save-Api '07-runtime\dyncfg-tree.json' 'Dynamic configuration tree: go.d/scripts.d job states (accepted/running/failed/disabled/orphan/incomplete/none), service discovery, vnodes, secret stores, alert prototypes - THE source of collector job state' '/api/v3/config?action=tree'
+    Save-DyncfgTreeCli
+    # Agents that predate `netdatacli dyncfg-tree` (tried just above), or a bundle run
+    # by a user who cannot reach the command pipe, fall back to the API.
+    $dyncfgPath = Join-Path $Work '07-runtime\dyncfg-tree.json'
+    if (-not (Test-Path $dyncfgPath)) {
+        Save-Api '07-runtime\dyncfg-tree.json' $DyncfgTreeTitle '/api/v3/config?action=tree'
+    }
     # /api/v3/info answers without any access check, so $ApiOk can be true while
     # this endpoint - behind the dyncfg ACL - refuses us, and Save-Api deletes the
     # file on failure leaving no trace at all. The bundle cannot authenticate:
     # bearer token FILENAMES are themselves live tokens and are never collected.
-    $dyncfgPath = Join-Path $Work '07-runtime\dyncfg-tree.json'
     if (-not (Test-Path $dyncfgPath)) {
         # Every Save-Api in this block returns early once the deadline is past,
         # so 07-runtime may not exist yet and WriteAllText would throw.
@@ -1163,7 +1200,7 @@ if ($ApiOk) {
         if (-not (Test-Path $dyncfgDir)) { New-Item -ItemType Directory -Path $dyncfgDir -Force | Out-Null }
         # State what was observed, not a cause: a refusal, a timeout, a transport
         # error and a deadline all reach this point identically.
-        $marker = '{"error":"dyncfg tree was not collected","hint":"/api/v3/info answers with no access check, but /api/v3/config sits behind the dyncfg ACL, so a bearer-protected API is a common cause - a timeout, transport error, HTTP failure or an exceeded collection deadline is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Ask for the collector job state separately.","means":"NOT evidence that no collector jobs exist"}'
+        $marker = '{"error":"dyncfg tree was not collected","hint":"netdatacli dyncfg-tree was not usable (the agent predates it, the bundle could not reach the command pipe, or the call failed), so the bundle fell back to /api/v3/config, which only signed-in members of the agent''s space may list on current agents, and which a bearer-protected API refuses on older ones - a timeout, transport error, HTTP failure or an exceeded collection deadline is indistinguishable here. The bundle never collects bearer tokens and cannot authenticate. Run netdatacli.exe dyncfg-tree as an administrator, or ask for the collector job state separately.","means":"NOT evidence that no collector jobs exist"}'
         Write-Utf8 $dyncfgPath $marker
         Add-Manifest '07-runtime\dyncfg-tree.json' 'file' 'generated' 'Collector job state was unavailable (see hint in the file)'
     }
@@ -1177,6 +1214,7 @@ if ($ApiOk) {
     New-Item -ItemType Directory -Path $marker -Force | Out-Null
     Write-Utf8 (Join-Path $marker 'AGENT-WAS-DOWN.txt') "Agent API at 127.0.0.1:$NdPort was unreachable when this bundle was created. See 05-logs and 06-state\status-file.json for why."
     Add-Manifest '07-runtime\AGENT-WAS-DOWN.txt' 'file' 'generated' 'Marker: agent was not running'
+    Save-DyncfgTreeCli
 }
 # Elevation state: the perflib dump needs an elevated session, and the summary
 # reports it too. Computed once here (after the self-test path has already

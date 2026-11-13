@@ -2,17 +2,118 @@
 
 #include "windows_plugin.h"
 
+#include <ctype.h>
+
 __thread char windows_shared_buffer[8192];
+
+// Converts a user selector into a simple pattern list. Windows names contain backslashes, which simple patterns
+// treat as escapes, so they are doubled unless they escape a separator or a leading '!'.
+char *windows_plugin_normalize_patterns(const char *input)
+{
+    char *source = strdupz(input);
+    char *patterns = mallocz((strlen(source) * 2) + 1);
+    char *read = source, *write = patterns;
+    bool first = true;
+
+    while (*read) {
+        char *start = read;
+        while (*read && *read != ',' && *read != '|') {
+            if (*read == '\\' && read[1])
+                read += 2;
+            else
+                read++;
+        }
+
+        char *end = read;
+        while (start < end && isspace((unsigned char)*start))
+            start++;
+        while (end > start && isspace((unsigned char)end[-1]))
+            end--;
+
+        if (start < end) {
+            if (!first)
+                *write++ = ',';
+            bool token_start = true;
+            while (start < end) {
+                if (*start == '\\' && start + 1 < end) {
+                    char next = start[1];
+                    if (next == ',' || next == '|' || (next == '!' && token_start)) {
+                        *write++ = *start++;
+                        *write++ = *start++;
+                        token_start = false;
+                    } else {
+                        *write++ = '\\';
+                        *write++ = '\\';
+                        start++;
+                        token_start = false;
+                    }
+                } else if (*start == '\\') {
+                    *write++ = '\\';
+                    *write++ = '\\';
+                    start++;
+                    token_start = false;
+                } else {
+                    *write++ = *start++;
+                    token_start = false;
+                }
+            }
+            first = false;
+        }
+        if (*read)
+            read++;
+    }
+
+    *write = '\0';
+    freez(source);
+    return patterns;
+}
+
+// Builds "<prefix><instance>_<xxh3>_<suffix>" truncating only the visible instance part, so long or similar names
+// stay unique and the full "<type>.<id>" fits RRD_ID_LENGTH_MAX.
+void windows_plugin_instance_chart_id(
+    char *dst,
+    size_t size,
+    size_t chart_type_length,
+    const char *prefix,
+    const char *instance,
+    const char *suffix,
+    size_t suffix_length)
+{
+    const size_t instance_length = strnlen(instance, sizeof(windows_shared_buffer));
+    XXH64_hash_t hash = XXH3_64bits(instance, instance_length);
+    const size_t fixed_length = strlen(prefix) + 1 + 16 + 1 + suffix_length;
+    const size_t full_id_limit = RRD_ID_LENGTH_MAX - 1;
+    const size_t type_prefix_length = chart_type_length + 1;
+    size_t chart_id_limit = full_id_limit > type_prefix_length ? full_id_limit - type_prefix_length : 0;
+    if (size && chart_id_limit >= size)
+        chart_id_limit = size - 1;
+    size_t visible_instance_length = chart_id_limit > fixed_length ? chart_id_limit - fixed_length : 0;
+    snprintfz(
+        dst,
+        size,
+        "%s%.*s_%016llx_%s",
+        prefix,
+        (int)visible_instance_length,
+        instance,
+        (unsigned long long)hash,
+        suffix);
+    netdata_fix_chart_name(dst);
+}
 
 static struct proc_module {
     const char *name;
     const char *dim;
     int enabled;
     int update_every;
+    // Always run on a dedicated thread, so a blocking data source cannot stall the shared loop.
+    bool dedicated_thread;
     int (*func)(int update_every, usec_t dt);
     RRDDIM *rd;
     ND_THREAD *thread;
     void (*cleanup)();
+    // Optional; called from the main thread at shutdown, before joining the module's thread, to abort a blocking
+    // call (e.g. a WMI ConnectServer, up to ~2 minutes) that would otherwise delay the unbounded join.
+    void (*interrupt)(void);
 } win_modules[] = {
 
     // system metrics
@@ -64,6 +165,15 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = do_GetServicesStatus_cleanup},
+    {.name = "GetPrinters",
+     .dim = "GetPrinters",
+     .enabled = CONFIG_BOOLEAN_NO,
+     .update_every = 10 * UPDATE_EVERY_MIN,
+     .dedicated_thread = true,
+     .func = do_GetPrinters,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_GetPrinters_cleanup},
 
     // the same is provided by PerflibProcessor, with more detailed analysis
     //{.name = "GetSystemCPU",        .dim = "GetSystemCPU",       .enabled = CONFIG_BOOLEAN_YES,
@@ -117,6 +227,14 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = do_PerflibSMB_cleanup},
+    {.name = "PerflibSMBClient",
+     .dim = "PerflibSMBClient",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibSMBClient,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_PerflibSMBClient_cleanup},
     {.name = "PerflibTerminalServices",
      .dim = "PerflibTerminalServices",
      .enabled = CONFIG_BOOLEAN_YES,
@@ -245,6 +363,18 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = do_PerflibPagingFile_cleanup},
+
+    // WMI metrics
+    {.name = "GetFSRMQuota",
+     .dim = "GetFSRMQuota",
+     .enabled = CONFIG_BOOLEAN_NO,
+     .update_every = 10 * UPDATE_EVERY_MIN,
+     .dedicated_thread = true,
+     .func = do_GetFSRMQuota,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_GetFSRMQuota_cleanup,
+     .interrupt = do_GetFSRMQuota_interrupt},
     // the terminator of this array
     {.name = NULL, .dim = NULL, .func = NULL, .rd = NULL, .thread = NULL, .cleanup = NULL}};
 
@@ -297,6 +427,10 @@ static void windows_plugin_thread_worker(void *ptr __maybe_unused)
         mod->func(update_every, now - last);
         last = now;
     }
+
+    // Thread-owned resources (e.g. COM/WMI) must be released on the thread that created them.
+    if (mod->dedicated_thread && mod->cleanup)
+        mod->cleanup();
 }
 
 void win_plugin_main(void *ptr)
@@ -322,10 +456,15 @@ void win_plugin_main(void *ptr)
         pm->update_every = (int)inicfg_get_duration_seconds(
             &netdata_config, buf, "update every", (update_every != pm->update_every) ? pm->update_every : update_every);
 
-        if (pm->enabled && unlikely(update_every != pm->update_every)) {
+        if (pm->enabled && (pm->dedicated_thread || unlikely(update_every != pm->update_every))) {
             char tag_name[ND_THREAD_TAG_MAX];
             snprintfz(tag_name, ND_THREAD_TAG_MAX - 1, "WIN_PLUGIN[%d]", i);
             pm->thread = nd_thread_create(tag_name, NETDATA_THREAD_OPTION_DEFAULT, windows_plugin_thread_worker, pm);
+            if (!pm->thread && pm->dedicated_thread) {
+                // Running it inline could block every other module, so leave it disabled.
+                nd_log(NDLS_COLLECTORS, NDLP_ERR, "%s: cannot create its thread; module disabled", pm->name);
+                pm->enabled = 0;
+            }
         }
 
         worker_register_job_name(i, win_modules[i].dim);
@@ -370,16 +509,24 @@ void win_plugin_main(void *ptr)
         }
     }
 
+    // Abort blocking calls in every module thread first, so their joins below do not wait on each other.
+    for (i = 0; win_modules[i].name; i++) {
+        struct proc_module *pm = &win_modules[i];
+        if (pm->thread && pm->interrupt)
+            pm->interrupt();
+    }
+
     // Join threads
     for (i = 0; win_modules[i].name; i++) {
         struct proc_module *pm = &win_modules[i];
+        bool cleaned_by_thread = pm->thread && pm->dedicated_thread;
 
         if (pm->thread) {
             nd_thread_join(pm->thread);
             pm->thread = NULL;
         }
 
-        if (pm->cleanup)
+        if (pm->cleanup && !cleaned_by_thread)
             pm->cleanup();
     }
 }

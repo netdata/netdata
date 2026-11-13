@@ -242,6 +242,11 @@ impl ManagedServer {
     ///
     /// For reliable shutdown, call `stop()`. On Windows, changing this flag
     /// alone does not wake a blocking listener accept.
+    /// Returns a signal that is set once `run()` accepts connections.
+    pub fn listening_signal(&self) -> raw::ListeningSignal {
+        self.inner.listening_signal()
+    }
+
     pub fn running_flag(&self) -> Arc<AtomicBool> {
         self.inner.running_flag()
     }

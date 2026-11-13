@@ -5,7 +5,6 @@ package snmp
 import (
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -18,11 +17,11 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 
 	pms, err := c.ddSnmpColl.Collect()
 	c.captureCollectionFailures()
+	c.syncDeviceMetadata()
 	if err != nil {
 		c.markBGPCollectFailed(err)
 		return err
 	}
-	c.syncDeviceMetadata(pms)
 	if c.bgp == nil && profileMetricsHaveBGP(pms) {
 		c.enableBGPIntegration()
 	}
@@ -38,6 +37,9 @@ func (c *Collector) collectSNMP(mx map[string]int64) error {
 	c.finalizeIfaceCache()
 	c.finalizeProfileMetrics()
 	c.commitNormalConsumers(pms)
+	if c.staleCharts != nil {
+		c.retireStaleCharts()
+	}
 
 	return nil
 }
@@ -52,9 +54,11 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 			continue
 		}
 
-		if !c.seenScalarMetrics[m.Name] {
-			c.seenScalarMetrics[m.Name] = true
-			c.addProfileScalarMetricChart(m)
+		state := c.seenScalarMetrics[m.Name]
+		if state == nil {
+			// A rejected chart stays recorded so it is not retried every cycle.
+			state = &metricChartState{chart: c.addProfileScalarMetricChart(m)}
+			c.seenScalarMetrics[m.Name] = state
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -67,6 +71,7 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 		var ids []string
 		for k, v := range m.MultiValue {
 			id := metricIDFromName(m.Name, k)
+			state.observeDimension(id, k, dimAlgoFromDdSnmpType(m))
 			mx[id] = v
 			ids = append(ids, id)
 		}
@@ -76,6 +81,7 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, metrics []d
 
 func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []ddsnmp.Metric) {
 	seen := make(map[string]bool)
+	labels := make(map[string]string)
 
 	for _, m := range metrics {
 		if !m.IsTable {
@@ -96,11 +102,17 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			continue
 		}
 
-		seen[key] = true
-
-		if !c.seenTableMetrics[key] {
-			c.seenTableMetrics[key] = true
-			c.addProfileTableMetricChart(m)
+		state := c.tableMetricCharts[key]
+		if !seen[key] {
+			seen[key] = true
+			// Samples sharing a key keep the first sample's metadata.
+			c.profileMetricLabels(labels, m)
+			if state != nil {
+				updateProfileChartLabels(state.chart, labels)
+			} else if chart := c.addProfileTableMetricChart(m, key, labels); chart != nil {
+				state = &metricChartState{chart: chart}
+				c.tableMetricCharts[key] = state
+			}
 		}
 
 		if len(m.MultiValue) == 0 {
@@ -111,6 +123,7 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 			var ids []string
 			for k, v := range m.MultiValue {
 				id := metricIDFromKey(key, k)
+				state.observeDimension(id, k, dimAlgoFromDdSnmpType(m))
 				mx[id] = v
 				ids = append(ids, id)
 			}
@@ -122,10 +135,11 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, metrics []dd
 		}
 	}
 
-	for key := range c.seenTableMetrics {
+	for key, state := range c.tableMetricCharts {
 		if !seen[key] {
-			delete(c.seenTableMetrics, key)
-			c.removeProfileTableMetricChart(key)
+			delete(c.tableMetricCharts, key)
+			state.chart.MarkRemove()
+			state.chart.MarkNotCreated()
 		}
 	}
 }
@@ -168,39 +182,6 @@ func (c *Collector) collectProfileStats(mx map[string]int64, pms []*ddsnmp.Profi
 		mx[px+"errors_processing_licensing"] = pm.Stats.Errors.Processing.Licensing
 		mx[px+"errors_processing_bgp"] = pm.Stats.Errors.Processing.BGP
 	}
-}
-
-func tableMetricKey(m ddsnmp.Metric) string {
-	if m.Name == "" {
-		return ""
-	}
-
-	// Filter keys we actually use (skip "_" and empty values) and precompute final length.
-	include := make([]string, 0, len(m.Tags))
-	totalLen := len(m.Name)
-	for k, v := range m.Tags {
-		if v == "" || strings.HasPrefix(k, "_") {
-			continue
-		}
-		include = append(include, k)
-		totalLen += len("_") + len(v)
-	}
-	if len(include) == 0 {
-		return m.Name
-	}
-
-	sort.Strings(include)
-
-	var sb strings.Builder
-	sb.Grow(totalLen)
-
-	sb.WriteString(m.Name)
-	for _, k := range include {
-		sb.WriteByte('_')
-		sb.WriteString(m.Tags[k])
-	}
-
-	return sb.String()
 }
 
 func stripFileNameExt(path string) string {

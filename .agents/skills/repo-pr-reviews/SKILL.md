@@ -46,8 +46,8 @@ this PR (a flaky test on an unrelated module, an infra outage) are NOT
 in scope -- note them, surface to the user at the end, do not fix them
 here.
 
-The bar is the project's performance, stability, and long-term
-maintainability. Don't dismiss findings because they look minor.
+Use `AGENTS.md#review` for the evidence and maintainability requirements, including the treatment of nits, duplication
+and analyzer-only gate failures.
 
 ## MANDATORY rules
 
@@ -188,14 +188,16 @@ This script fetches the full SonarCloud finding set, including findings absent f
 
 Requires the same `.env` config the `triage-sonarqube` skill uses
 (`SONAR_TOKEN`, `SONAR_HOST_URL`, `SONAR_PROJECT`). If `.env` is missing,
-the script prints what's needed and exits.
+the script prints what's needed and exits. For public-project read-only fallback, see
+[Sonar setup](../triage-sonarqube/SKILL.md#setup).
 
 An empty issue/hotspot list does not prove the quality gate passed. Inspect
 `/api/qualitygates/project_status?projectKey=<project>&pullRequest=<PR>` for
 failed metric conditions. For duplication, use
 `/api/duplications/show?key=<file-component-key>&pullRequest=<PR>`: each
 `duplications[].blocks[]` identifies `from`, `size`, and `_ref`; `files`
-resolves those references. Preserve test cases when sharing duplicated setup.
+resolves those references. Evaluate the matched blocks under `AGENTS.md#review` before selecting a source change;
+a duplication percentage alone does not explain what should be shared. Preserve test cases when sharing useful setup.
 
 ### 1c. Note the CI signal as a third source
 

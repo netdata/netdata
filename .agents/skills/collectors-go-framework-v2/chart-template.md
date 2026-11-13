@@ -38,11 +38,11 @@ a *leaf* is the innermost family that holds charts.
   collector deliberately shares one with a sibling collector.
 - **Derived ids.** Omit chart `id`; chartengine derives it from the composed context with dots replaced by
   underscores (`src/go/plugin/framework/chartengine/compiler.go`). An existing collector whose
-  ids differ from the derived value keeps them: chart ids are a public contract
-  (`.agents/skills/collectors-authoring/collector-practices.md#13-ids-are-public-contracts`).
+  ids differ from the derived value keeps them; V1-to-V2 migrations follow
+  `src/go/plugin/go.d/docs/migrate-v1-to-v2.md#chart-and-dimension-ids` instead.
 - **What is a contract.** Contexts, chart ids, dimension names and instance labels are public. Metric names in the
   store and family paths are internal or display metadata and MAY be renamed when a V2 template is reworked; a
-  migration preserves them.
+  migration follows the compatibility requirements and ID exception in its guide.
 
 ## Say Only What Differs From The Framework
 

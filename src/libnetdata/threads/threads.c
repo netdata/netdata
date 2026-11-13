@@ -476,17 +476,19 @@ bool nd_thread_is_me(ND_THREAD *nti) {
 #define MAX_THREAD_CREATE_RETRIES (10)
 #define MAX_THREAD_CREATE_WAIT_MS (1000)
 
-static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int *retries)
+// only EAGAIN (out of threads, may be transient) is retried, sleeping between the attempts
+static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void *arg, int max_attempts, int *retries)
 {
     int err;
 
-    do {
+    while (true) {
         err = uv_thread_create(thread, thread_func, arg);
-        if (err == 0)
+        if (err != UV_EAGAIN || *retries + 1 >= max_attempts)
             break;
 
+        (*retries)++;
         sleep_usec(MAX_THREAD_CREATE_WAIT_MS * USEC_PER_MS);
-    } while (err == UV_EAGAIN && ++(*retries) < MAX_THREAD_CREATE_RETRIES);
+    }
 
     return err;
 }
@@ -501,7 +503,8 @@ ND_THREAD *nd_thread_create(const char *tag, NETDATA_THREAD_OPTIONS options, voi
     strncpyz(nti->tag, tag, ND_THREAD_TAG_MAX);
 
     int retries = 0;
-    int ret = create_uv_thread(&nti->thread, nd_thread_starting_point, nti, &retries);
+    int max_attempts = (options & NETDATA_THREAD_OPTION_NO_RETRY) ? 1 : MAX_THREAD_CREATE_RETRIES;
+    int ret = create_uv_thread(&nti->thread, nd_thread_starting_point, nti, max_attempts, &retries);
     if(ret != 0) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "failed to create new thread for %s. uv_thread_create() failed with code %d",

@@ -22,7 +22,7 @@ func TestScanCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	count := 0
-	err := s.scan(ctx, "shop", 0, time.Now().Unix()+1, func(EventRecord) { count++; cancel() })
+	err := s.scan(ctx, "shop", 0, time.Now().Unix()+1, "", func(EventRecord) { count++; cancel() })
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, 1, count)
 }
@@ -38,10 +38,10 @@ func TestCancelledDomainQueries(t *testing.T) {
 	})
 	assert.False(t, attempted)
 	assert.ErrorIs(t, err, context.Canceled)
-	_, err = s.QuerySessions(ctx, "", "", 0, time.Now().Unix(), 0)
+	_, err = s.QuerySessions(ctx, "", "", 0, time.Now().Unix(), 0, "")
 	assert.ErrorIs(t, err, context.Canceled)
-	_, err = s.QuerySessionEvents(ctx, "", "s")
+	_, err = s.QuerySessionEvents(ctx, "", "s", "")
 	assert.ErrorIs(t, err, context.Canceled)
-	_, err = s.QueryErrors(ctx, "", "", 0, time.Now().Unix())
+	_, err = s.QueryErrors(ctx, "", "", 0, time.Now().Unix(), "")
 	assert.ErrorIs(t, err, context.Canceled)
 }

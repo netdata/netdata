@@ -1,0 +1,8 @@
+# Source: librenms/librenms tests/snmpsim/gaia_5900.snmprec
+# Revision: b787b2e9d38a87f39d95a6a077c9382261262336
+# Source SHA256: 7af45eae6e3764d3207bdaca87c6ebdd9a2f1c5fcb0cebae3b9f68fedd9fb315
+# Projection: retained only index, readable tag and metric-anchor columns; values and suffixes unchanged.
+1.3.6.1.4.1.2620.1.6.7.9.1.1.1.1.0|2|1
+1.3.6.1.4.1.2620.1.6.7.9.1.1.1.2.0|2|2
+1.3.6.1.4.1.2620.1.6.7.9.1.1.2.1.0|4|Up
+1.3.6.1.4.1.2620.1.6.7.9.1.1.2.2.0|4|Up

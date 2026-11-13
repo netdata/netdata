@@ -104,8 +104,8 @@ metrics:
     metric_tags:
       - tag: dell_os10_power_supply_index
         symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.1.1.1
           name: dell.os10PowerSupplyIndex
+        index: 1
 
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
@@ -130,8 +130,8 @@ metrics:
     metric_tags:
       - tag: dell_os10_fan_tray_index
         symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.2.1.1
           name: dell.os10FanTrayIndex
+        index: 1
 
   - MIB: DELLEMC-OS10-CHASSIS-MIB
     table:
@@ -156,5 +156,5 @@ metrics:
     metric_tags:
       - tag: dell_os10_fan_index
         symbol:
-          OID: 1.3.6.1.4.1.674.11000.5000.100.4.1.2.3.1.1
           name: dell.os10FanIndex
+        index: 1

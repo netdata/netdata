@@ -201,8 +201,8 @@ metrics:
           unit: "%"
     metric_tags:
       - symbol:
-          OID: 1.3.6.1.2.1.33.1.4.4.1.1
           name: upsOutputLineIndex
+        index: 1
         tag: ups_output_line_index
   - MIB: UPS-MIB
     table:
@@ -235,8 +235,8 @@ metrics:
           unit: "W"
     metric_tags:
       - symbol:
-          OID: 1.3.6.1.2.1.33.1.3.3.1.1
           name: upsInputLineIndex
+        index: 1
         tag: ups_input_line_index
   - MIB: UPS-MIB
     table:
@@ -263,8 +263,8 @@ metrics:
           unit: "W"
     metric_tags:
       - symbol:
-          OID: 1.3.6.1.2.1.33.1.5.3.1.1
           name: upsBypassLineIndex
+        index: 1
         tag: ups_bypass_line_index
   - MIB: UPS-MIB
     table:

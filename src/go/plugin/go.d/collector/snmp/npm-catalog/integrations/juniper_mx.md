@@ -269,45 +269,45 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
 | `snmp.device_prof_jnxIkeNumOfTunnels` | `{tunnel}` | device | Total number of active IKE Phase 1 tunnels |
-| `snmp.device_prof_jnxIkeTunMonActiveTime` | `s` | per ike_tunnel_index | Time this IKE Phase 1 tunnel has been active |
-| `snmp.device_prof_jnxIkeTunMonDPDDownCount` | `{event}/s` | per ike_tunnel_index | Number of DPD (Dead Peer Detection) down events on this tunnel |
-| `snmp.device_prof_jnxIkeTunMonInOctets` | `By/s` | per ike_tunnel_index | Number of bytes received on this IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonInPkts` | `{packet}/s` | per ike_tunnel_index | Number of packets received on this IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonLifeTime` | `s` | per ike_tunnel_index | Remaining lifetime of the IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonOutOctets` | `By/s` | per ike_tunnel_index | Number of bytes sent on this IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonOutPkts` | `{packet}/s` | per ike_tunnel_index | Number of packets sent on this IKE Phase 1 tunnel |
-| `snmp.device_prof_jnxIkeTunMonState` | `{status}` | per ike_tunnel_index | Current state of the IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonActiveTime` | `s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Time this IKE Phase 1 tunnel has been active |
+| `snmp.device_prof_jnxIkeTunMonDPDDownCount` | `{event}/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of DPD (Dead Peer Detection) down events on this tunnel |
+| `snmp.device_prof_jnxIkeTunMonInOctets` | `By/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of bytes received on this IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonInPkts` | `{packet}/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of packets received on this IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonLifeTime` | `s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Remaining lifetime of the IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonOutOctets` | `By/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of bytes sent on this IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonOutPkts` | `{packet}/s` | per ike_tunnel_index, peer_address_type, peer_remote_address | Number of packets sent on this IKE Phase 1 tunnel |
+| `snmp.device_prof_jnxIkeTunMonState` | `{status}` | per ike_tunnel_index, peer_address_type, peer_remote_address | Current state of the IKE Phase 1 tunnel |
 | `snmp.device_prof_jnxIpSecNumOfTunnels` | `{tunnel}` | device | Total number of active IPSec Phase 2 tunnels |
-| `snmp.device_prof_jnxIpSecSaMonActiveTime` | `s` | per sa_index | Time this IPSec Security Association has been active |
-| `snmp.device_prof_jnxIpSecSaMonLifeTime` | `s` | per sa_index | Remaining lifetime of this IPSec Security Association |
-| `snmp.device_prof_jnxIpSecSaMonState` | `{status}` | per sa_index | Status of this IPSec Security Association |
-| `snmp.device_prof_jnxIpSecTunMonDecryptFails` | `{failure}/s` | per ipsec_tunnel_index | Number of decryption failures on this tunnel |
-| `snmp.device_prof_jnxIpSecTunMonDroppedPkts` | `{drop}/s` | per ipsec_tunnel_index | Total number of packets dropped on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonEspAuthFails` | `{failure}/s` | per ipsec_tunnel_index | Number of ESP authentication failures on this tunnel |
-| `snmp.device_prof_jnxIpSecTunMonInDecryptedBytes` | `By/s` | per ipsec_tunnel_index | Number of decrypted bytes received on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonInDecryptedPkts` | `{packet}/s` | per ipsec_tunnel_index | Number of decrypted packets received on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonOutEncryptedBytes` | `By/s` | per ipsec_tunnel_index | Number of encrypted bytes sent on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonOutEncryptedPkts` | `{packet}/s` | per ipsec_tunnel_index | Number of encrypted packets sent on this IPSec Phase 2 tunnel |
-| `snmp.device_prof_jnxIpSecTunMonReplayDropPkts` | `{drop}/s` | per ipsec_tunnel_index | Number of packets dropped due to anti-replay check failure |
+| `snmp.device_prof_jnxIpSecSaMonActiveTime` | `s` | per sa_index, ipsec_tunnel_index, peer_address_type, peer_remote_address | Time this IPSec Security Association has been active |
+| `snmp.device_prof_jnxIpSecSaMonLifeTime` | `s` | per sa_index, ipsec_tunnel_index, peer_address_type, peer_remote_address | Remaining lifetime of this IPSec Security Association |
+| `snmp.device_prof_jnxIpSecSaMonState` | `{status}` | per sa_index, ipsec_tunnel_index, peer_address_type, peer_remote_address | Status of this IPSec Security Association |
+| `snmp.device_prof_jnxIpSecTunMonDecryptFails` | `{failure}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of decryption failures on this tunnel |
+| `snmp.device_prof_jnxIpSecTunMonDroppedPkts` | `{drop}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Total number of packets dropped on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonEspAuthFails` | `{failure}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of ESP authentication failures on this tunnel |
+| `snmp.device_prof_jnxIpSecTunMonInDecryptedBytes` | `By/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of decrypted bytes received on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonInDecryptedPkts` | `{packet}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of decrypted packets received on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonOutEncryptedBytes` | `By/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of encrypted bytes sent on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonOutEncryptedPkts` | `{packet}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of encrypted packets sent on this IPSec Phase 2 tunnel |
+| `snmp.device_prof_jnxIpSecTunMonReplayDropPkts` | `{drop}/s` | per ipsec_tunnel_index, peer_address_type, peer_remote_address | Number of packets dropped due to anti-replay check failure |
 
 ### Network / VirtualChassis
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_jnxVirtualChassisPortCarrierTrans` | `{error}` | per port_name | Total number of Carrier errors on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortCollisions` | `{collision}` | per port_name | Total number of Collisions on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInCRCAlignErrors` | `{error}` | per port_name | Total number of Input CRC Alignment errors on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInMcasts` | `{packet}` | per port_name | Total number of multicast packets received on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInOctets` | `By` | per port_name | Total number of octets received on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInOctets1secRate` | `By/s` | per port_name | Total number of octets received per second on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInPkts` | `{packet}` | per port_name | Total number of packets received on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortInPkts1secRate` | `{packet}/s` | per port_name | Total number of packets received per second on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutMcasts` | `{packet}` | per port_name | Total number of multicast packets sent from the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutOctets` | `By` | per port_name | Total number of octets sent on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutOctets1secRate` | `By/s` | per port_name | Total number of octets sent per second on the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutPkts` | `{packet}` | per port_name | Total number of packets sent from the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortOutPkts1secRate` | `{packet}/s` | per port_name | Total number of packets sent per second from the virtual-chassis port |
-| `snmp.device_prof_jnxVirtualChassisPortUndersizePkts` | `{packet}` | per port_name | Total number of Undersize Packets on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortCarrierTrans` | `{error}` | per member_index, port_name | Total number of Carrier errors on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortCollisions` | `{collision}` | per member_index, port_name | Total number of Collisions on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInCRCAlignErrors` | `{error}` | per member_index, port_name | Total number of Input CRC Alignment errors on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInMcasts` | `{packet}` | per member_index, port_name | Total number of multicast packets received on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInOctets` | `By` | per member_index, port_name | Total number of octets received on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInOctets1secRate` | `By/s` | per member_index, port_name | Total number of octets received per second on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInPkts` | `{packet}` | per member_index, port_name | Total number of packets received on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortInPkts1secRate` | `{packet}/s` | per member_index, port_name | Total number of packets received per second on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutMcasts` | `{packet}` | per member_index, port_name | Total number of multicast packets sent from the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutOctets` | `By` | per member_index, port_name | Total number of octets sent on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutOctets1secRate` | `By/s` | per member_index, port_name | Total number of octets sent per second on the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutPkts` | `{packet}` | per member_index, port_name | Total number of packets sent from the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortOutPkts1secRate` | `{packet}/s` | per member_index, port_name | Total number of packets sent per second from the virtual-chassis port |
+| `snmp.device_prof_jnxVirtualChassisPortUndersizePkts` | `{packet}` | per member_index, port_name | Total number of Undersize Packets on the virtual-chassis port |
 
 ### System / Activity
 

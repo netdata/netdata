@@ -11,17 +11,17 @@ import (
 var sessionsMethod = method{
 	id:      "rum-sessions",
 	title:   "RUM Sessions",
-	help:    "Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
+	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
 	sort:    "last_observed_us",
 	every:   10,
 	history: true,
-	params:  []string{"site", "after", "before", "user_id"},
+	params:  []string{"site", "vnode", "vnode_guid", "after", "before", "user_id"},
 	columns: rumSessionsColumns,
 }
 
-func (h *Handler) sessionsRows(ctx context.Context, site, userID string, after, before, now int64) (rows [][]any, err error) {
+func (h *Handler) sessionsRows(ctx context.Context, site, userID string, after, before, now int64, vnodeGUID string) (rows [][]any, err error) {
 	var sessions []query.Session
-	sessions, err = h.deps.Sessions(ctx, site, userID, after, before)
+	sessions, err = h.deps.Sessions(ctx, site, userID, after, before, vnodeGUID)
 	for _, s := range sessions {
 		rows = append(
 			rows,
@@ -40,7 +40,7 @@ func (h *Handler) sessionsRows(ctx context.Context, site, userID string, after, 
 				s.LastPage,
 				s.UserIDs,
 				s.Frustrations,
-				rowID(s.Site, s.SessionID), s.ApplicationViews, s.LastObservedUS,
+				rowID(s.Site, rowID(s.VnodeGUID, s.SessionID)), s.ApplicationViews, s.LastObservedUS, s.VnodeGUID,
 			},
 		)
 	}
@@ -48,6 +48,7 @@ func (h *Handler) sessionsRows(ctx context.Context, site, userID string, after, 
 }
 
 var rumSessionsColumns = map[string]any{
+	"vnode_guid": (funcapi.Column{Index: 17, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
 	"last_observed_us": (funcapi.Column{
 		Index:         16,
 		Name:          "Last Selected Observation",

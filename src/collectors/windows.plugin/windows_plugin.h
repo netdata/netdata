@@ -23,6 +23,17 @@ void win_plugin_main(void *ptr);
 
 extern __thread char windows_shared_buffer[8192];
 
+// Shared helpers
+char *windows_plugin_normalize_patterns(const char *input);
+void windows_plugin_instance_chart_id(
+    char *dst,
+    size_t size,
+    size_t chart_type_length,
+    const char *prefix,
+    const char *instance,
+    const char *suffix,
+    size_t suffix_length);
+
 // Windows API
 int do_GetSystemUptime(int update_every, usec_t dt);
 int do_GetSystemRAM(int update_every, usec_t dt);
@@ -31,6 +42,7 @@ int do_GetPowerSupply(int update_every, usec_t dt);
 int do_GetServicesStatus(int update_every, usec_t dt);
 int do_GetHardwareInfo(int update_every, usec_t dt);
 int do_GetSensors(int update_every, usec_t dt);
+int do_GetPrinters(int update_every, usec_t dt);
 
 // Perflib
 int do_PerflibStorage(int update_every, usec_t dt);
@@ -62,9 +74,13 @@ void do_PerflibMSMQ_cleanup(void);
 int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
+int do_PerflibSMBClient(int update_every, usec_t dt __maybe_unused);
 int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
 int do_PerflibDNS(int update_every, usec_t dt __maybe_unused);
 int do_PerflibPagingFile(int update_every, usec_t dt __maybe_unused);
+
+// WMI
+int do_GetFSRMQuota(int update_every, usec_t dt);
 
 // Cleanup
 void do_GetHardwareInfo_cleanup();
@@ -73,8 +89,12 @@ void do_GetServicesStatus_cleanup();
 void do_GetSystemCPU_cleanup();
 void do_GetPowerSupply_cleanup();
 void do_PerflibSMB_cleanup();
+void do_PerflibSMBClient_cleanup(void);
 void do_PerflibStorage_cleanup();
 void do_PerflibPagingFile_cleanup(void);
+void do_GetPrinters_cleanup(void);
+void do_GetFSRMQuota_cleanup(void);
+void do_GetFSRMQuota_interrupt(void);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
@@ -418,6 +438,18 @@ enum PERFLIB_PRIO {
     PRIO_SMB_SERVER_SHARES_READ_REQUESTS,
     PRIO_SMB_SERVER_SHARES_METADATA_REQUESTS,
     PRIO_SMB_SERVER_SHARES_FILES_OPENED,
+    PRIO_SMB_SERVER_SHARES_TREE_CONNECTS,
+    PRIO_SMB_SERVER_SHARES_TRAFFIC,
+
+    PRIO_SMB_CLIENT_SHARE_TRAFFIC,
+    PRIO_SMB_CLIENT_SHARE_REQUESTS,
+    PRIO_SMB_CLIENT_SHARE_SMBDIRECT_TRAFFIC,
+    PRIO_SMB_CLIENT_SHARE_SMBDIRECT_REQUESTS,
+    PRIO_SMB_CLIENT_SHARE_TURBO_IO,
+    PRIO_SMB_CLIENT_SHARE_CREDIT_STALLS,
+    PRIO_SMB_CLIENT_SHARE_OUTSTANDING_REQUESTS,
+    PRIO_SMB_CLIENT_SHARE_AVG_QUEUE_LENGTH,
+    PRIO_SMB_CLIENT_SHARE_LATENCY,
 
     PRIO_TERMINAL_SERVICES_SESSIONS,
     PRIO_DNS_QUERIES,
@@ -442,12 +474,21 @@ enum PERFLIB_PRIO {
     PRIO_DNS_WINS_LOOKUPS,
     PRIO_DNS_WINS_RESPONSES,
 
+    PRIO_FSRM_QUOTAS,
+    PRIO_FSRM_QUOTA_SPACE,
+    PRIO_FSRM_QUOTA_STATE,
+
     PRIO_IIS_EXTRA_WEBSITE = 25000,
     PRIO_IIS_EXTRA_WORKER = 25100,
     PRIO_HTTP_SERVICE_QUEUE = 25200,
     PRIO_IIS_EXTRA_CACHE = 25300,
     PRIO_IIS_APP_POOL_CURRENT_UPTIME = 25400,
     PRIO_IIS_APP_POOL_TIME_SINCE_FAILURE = 25401,
+
+    PRIO_PRINTER_JOBS = 25500,
+    PRIO_PRINTER_STATUS,
+    PRIO_PRINTER_PROBLEMS,
+    PRIO_PRINTER_JOB_STATUS,
 };
 
 #endif //NETDATA_WINDOWS_PLUGIN_H

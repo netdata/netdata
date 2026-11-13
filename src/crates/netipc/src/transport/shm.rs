@@ -1,6 +1,7 @@
-//! L1 POSIX SHM transport (Linux only).
+//! L1 POSIX SHM transport (Linux and FreeBSD).
 //!
-//! Shared memory data plane with spin+futex synchronization.
+//! Shared memory data plane with spin+futex synchronization (FreeBSD:
+//! `_umtx_op` wait/wake on the same signal words).
 //! The SHM region carries the same outer protocol envelope as the UDS
 //! transport. Higher levels see no difference.
 //!
@@ -30,7 +31,9 @@ const OFF_REQ_SIGNAL: usize = 56;
 const OFF_RESP_SIGNAL: usize = 60;
 
 // futex operations
+#[cfg(target_os = "linux")]
 const FUTEX_WAIT: i32 = 0;
+#[cfg(target_os = "linux")]
 const FUTEX_WAKE: i32 = 1;
 
 // ---------------------------------------------------------------------------
@@ -155,7 +158,6 @@ pub struct ShmContext {
     local_resp_seq: u64,
 
     spin_tries: u32,
-    owner_generation: u32,
     path: PathBuf,
 }
 
@@ -172,39 +174,6 @@ impl ShmContext {
     /// Returns the raw file descriptor.
     pub fn fd(&self) -> i32 {
         self.fd
-    }
-
-    /// Check if the region's owner process is still alive.
-    pub fn owner_alive(&self) -> bool {
-        if self.base.is_null() || self.region_size < HEADER_LEN as usize {
-            return false;
-        }
-        // Read the PID and generation fields by computing their byte offsets
-        // directly from self.base, avoiding any pointer dereference through
-        // a reference type. This is safer than casting to *const RegionHeader
-        // and dereferencing because we never materialize a borrow of the
-        // header struct — we just read raw bytes at known offsets.
-        //
-        // SAFETY: self.base is a non-null mmap'd region of at least HEADER_LEN
-        // bytes (checked above). The field offsets below are within HEADER_LEN.
-        // owner_pid is at offset 8, owner_generation at offset 12
-        let pid: i32 = unsafe {
-            let p = self.base.add(8) as *const i32;
-            ptr::read_volatile(p)
-        };
-        if !pid_alive(pid) {
-            return false;
-        }
-        if self.owner_generation != 0 {
-            let cur_gen: u32 = unsafe {
-                let p = self.base.add(12) as *const u32;
-                ptr::read_volatile(p)
-            };
-            if cur_gen != self.owner_generation {
-                return false;
-            }
-        }
-        true
     }
 
     /// Create a SHM region (server side).
@@ -242,13 +211,13 @@ impl ShmContext {
         let mut fd = unsafe {
             libc::open(
                 c_path.as_ptr(),
-                libc::O_RDWR | libc::O_CREAT | libc::O_EXCL,
+                libc::O_RDWR | libc::O_CREAT | libc::O_EXCL | libc::O_CLOEXEC,
                 0o600,
             )
         };
 
         // If O_EXCL failed (file exists), do stale recovery and retry.
-        if fd < 0 && unsafe { *libc::__errno_location() } == libc::EEXIST {
+        if fd < 0 && errno() == libc::EEXIST {
             let stale = check_shm_stale(&path);
             if stale == StaleResult::LiveServer {
                 return Err(ShmError::AddrInUse);
@@ -257,19 +226,35 @@ impl ShmContext {
             fd = unsafe {
                 libc::open(
                     c_path.as_ptr(),
-                    libc::O_RDWR | libc::O_CREAT | libc::O_EXCL,
+                    libc::O_RDWR | libc::O_CREAT | libc::O_EXCL | libc::O_CLOEXEC,
                     0o600,
                 )
             };
             // If retry still fails with EEXIST, the stale check couldn't
             // unlink (e.g., EACCES) — treat as address-in-use rather than
             // leaking EEXIST up the stack.
-            if fd < 0 && unsafe { *libc::__errno_location() } == libc::EEXIST {
+            if fd < 0 && errno() == libc::EEXIST {
                 return Err(ShmError::AddrInUse);
             }
         }
         if fd < 0 {
             return Err(ShmError::Open(errno()));
+        }
+        // The file takes 0600 & ~umask; a umask without owner read or write
+        // would stop the client from attaching read-write. A region the
+        // client cannot attach is not created: the session then drops SHM.
+        loop {
+            if unsafe { libc::fchmod(fd, libc::S_IRUSR | libc::S_IWUSR) } == 0 {
+                break;
+            }
+            let e = errno();
+            if e != libc::EINTR {
+                unsafe {
+                    libc::close(fd);
+                    libc::unlink(c_path.as_ptr());
+                }
+                return Err(ShmError::Open(e));
+            }
         }
 
         if let Err(e) = allocate_region(fd, region_size) {
@@ -331,7 +316,6 @@ impl ShmContext {
             local_req_seq: 0,
             local_resp_seq: 0,
             spin_tries: DEFAULT_SPIN_TRIES,
-            owner_generation: generation,
             path,
         })
     }
@@ -345,7 +329,7 @@ impl ShmContext {
         let path = build_shm_path(run_dir, service_name, session_id)?;
         let c_path = path_to_cstring(&path)?;
 
-        let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDWR) };
+        let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDWR | libc::O_CLOEXEC) };
         if fd < 0 {
             return Err(ShmError::Open(errno()));
         }
@@ -443,11 +427,12 @@ impl ShmContext {
             return Err(ShmError::BadSize);
         }
 
-        // Validate region size
-        let req_end = req_off as usize + req_cap as usize;
-        let resp_end = resp_off as usize + resp_cap as usize;
+        // Validate region size in u64: usize sums wrap on 32-bit targets and
+        // would let a forged header pass the file-size check.
+        let req_end = u64::from(req_off) + u64::from(req_cap);
+        let resp_end = u64::from(resp_off) + u64::from(resp_cap);
         let needed = req_end.max(resp_end);
-        if file_size < needed {
+        if (file_size as u64) < needed {
             unsafe {
                 libc::munmap(base as *mut libc::c_void, file_size);
                 libc::close(fd);
@@ -458,7 +443,6 @@ impl ShmContext {
         // Read current sequence numbers
         let cur_req_seq = atomic_load_u64(base, OFF_REQ_SEQ);
         let cur_resp_seq = atomic_load_u64(base, OFF_RESP_SEQ);
-        let generation = unsafe { (*hdr).owner_generation };
 
         Ok(ShmContext {
             role: ShmRole::Client,
@@ -472,7 +456,6 @@ impl ShmContext {
             local_req_seq: cur_req_seq,
             local_resp_seq: cur_resp_seq,
             spin_tries: DEFAULT_SPIN_TRIES,
-            owner_generation: generation,
             path,
         })
     }
@@ -748,7 +731,7 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         };
 
         // Open read-only to inspect the header
-        let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
+        let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
         if fd < 0 {
             // Entries that cannot be opened are junk (vanished, unreadable,
             // dangling symlink) — remove them. Keep the entry only when fd
@@ -842,6 +825,9 @@ fn validate_service_name(name: &str) -> Result<(), ShmError> {
 }
 
 fn build_shm_path(run_dir: &str, service_name: &str, session_id: u64) -> Result<PathBuf, ShmError> {
+    if run_dir.is_empty() {
+        return Err(ShmError::BadParam("empty run_dir".into()));
+    }
     validate_service_name(service_name)?;
     let path = Path::new(run_dir).join(format!("{service_name}-{session_id:016x}.ipcshm"));
     if path.to_string_lossy().len() >= 256 {
@@ -856,40 +842,52 @@ fn path_to_cstring(path: &Path) -> Result<std::ffi::CString, ShmError> {
 }
 
 fn errno() -> i32 {
-    unsafe { *libc::__errno_location() }
+    std::io::Error::last_os_error().raw_os_error().unwrap_or(0)
 }
 
 /// Reserve all backing storage before exposing the region through mmap.
 ///
-/// Linux may interrupt fallocate before it changes the file, so retry EINTR.
-/// Every other error is returned to the caller; SHM has no unsafe sparse-file
-/// fallback.
+/// The allocation may be interrupted before it changes the file, so retry
+/// EINTR. Every other error is returned to the caller; SHM has no unsafe
+/// sparse-file fallback.
 fn allocate_region(fd: i32, region_size: usize) -> Result<(), i32> {
     loop {
         #[cfg(test)]
         record_fallocate_call();
 
         #[cfg(test)]
-        let result = match take_fallocate_fault() {
-            Some(error) => {
-                unsafe { *libc::__errno_location() = error };
-                -1
-            }
-            None => unsafe { libc::fallocate(fd, 0, 0, region_size as libc::off_t) },
+        let error = match take_fallocate_fault() {
+            Some(error) => error,
+            None => reserve_region(fd, region_size),
         };
 
         #[cfg(not(test))]
-        let result = unsafe { libc::fallocate(fd, 0, 0, region_size as libc::off_t) };
+        let error = reserve_region(fd, region_size);
 
-        if result == 0 {
-            return Ok(());
-        }
-
-        let error = errno();
-        if error != libc::EINTR {
-            return Err(error);
+        match error {
+            0 => return Ok(()),
+            libc::EINTR => continue,
+            e => return Err(e),
         }
     }
+}
+
+/// Reserve the whole file: 0 or the error number.
+#[cfg(target_os = "linux")]
+fn reserve_region(fd: i32, region_size: usize) -> i32 {
+    if unsafe { libc::fallocate(fd, 0, 0, region_size as libc::off_t) } == 0 {
+        0
+    } else {
+        errno()
+    }
+}
+
+/// Reserve the whole file: 0 or the error number. posix_fallocate returns
+/// the error itself; ZFS rejects it with EINVAL, so SHM preparation fails
+/// and the session uses baseline.
+#[cfg(target_os = "freebsd")]
+fn reserve_region(fd: i32, region_size: usize) -> i32 {
+    unsafe { libc::posix_fallocate(fd, 0, region_size as libc::off_t) }
 }
 
 unsafe fn map_region(fd: i32, region_size: usize) -> *mut libc::c_void {
@@ -1016,6 +1014,7 @@ fn atomic_add_u32(base: *mut u8, offset: usize, val: u32) {
     unsafe { (*ptr).fetch_add(val, std::sync::atomic::Ordering::Release) };
 }
 
+#[cfg(target_os = "linux")]
 fn futex_wake(addr: *mut u32, count: i32) -> i32 {
     unsafe {
         libc::syscall(
@@ -1030,6 +1029,7 @@ fn futex_wake(addr: *mut u32, count: i32) -> i32 {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn futex_wait(addr: *mut u32, expected: u32, timeout: Option<&libc::timespec>) -> i32 {
     // SYS_futex consumes kernel words, not libc's timespec. In particular,
     // 32-bit musl uses time64 even when SYS_futex is the legacy syscall.
@@ -1064,6 +1064,47 @@ fn futex_wait(addr: *mut u32, expected: u32, timeout: Option<&libc::timespec>) -
     }
 }
 
+// The shared (not _PRIVATE) umtx operations key on the mapped object, so they
+// cross processes. A wait whose expected value is already stale returns 0,
+// where a Linux futex returns EAGAIN; callers re-check either way.
+#[cfg(target_os = "freebsd")]
+fn futex_wake(addr: *mut u32, count: i32) -> i32 {
+    unsafe {
+        libc::_umtx_op(
+            addr.cast(),
+            libc::UMTX_OP_WAKE,
+            count as libc::c_ulong,
+            ptr::null_mut(),
+            ptr::null_mut(),
+        )
+    }
+}
+
+#[cfg(target_os = "freebsd")]
+fn futex_wait(addr: *mut u32, expected: u32, timeout: Option<&libc::timespec>) -> i32 {
+    let mut t = timeout.map(|ts| libc::_umtx_time {
+        _timeout: *ts,
+        _flags: 0,
+        _clockid: libc::CLOCK_MONOTONIC as u32,
+    });
+    let (size, tp) = match t.as_mut() {
+        Some(t) => (
+            std::mem::size_of::<libc::_umtx_time>() as *mut libc::c_void,
+            (t as *mut libc::_umtx_time).cast(),
+        ),
+        None => (ptr::null_mut(), ptr::null_mut()),
+    };
+    unsafe {
+        libc::_umtx_op(
+            addr.cast(),
+            libc::UMTX_OP_WAIT_UINT,
+            expected as libc::c_ulong,
+            size,
+            tp,
+        )
+    }
+}
+
 // ---------------------------------------------------------------------------
 //  Stale region recovery
 // ---------------------------------------------------------------------------
@@ -1088,8 +1129,10 @@ fn unlink_stale_path(c_path: &CString) -> bool {
     if unsafe { libc::unlink(c_path.as_ptr()) } == 0 || errno() == libc::ENOENT {
         return true;
     }
-    // A directory squatting on the region path is junk too.
-    errno() == libc::EISDIR && unsafe { libc::rmdir(c_path.as_ptr()) } == 0
+    // A directory squatting on the region path is junk too. Unlinking one
+    // fails with EISDIR on Linux and EPERM on FreeBSD.
+    let e = errno();
+    (e == libc::EISDIR || e == libc::EPERM) && unsafe { libc::rmdir(c_path.as_ptr()) } == 0
 }
 
 #[allow(dead_code)]
@@ -1111,7 +1154,7 @@ fn check_shm_stale(path: &Path) -> StaleResult {
         return StaleResult::Invalid;
     }
 
-    let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY) };
+    let fd = unsafe { libc::open(c_path.as_ptr(), libc::O_RDONLY | libc::O_CLOEXEC) };
     if fd < 0 {
         let e = errno();
         if e == libc::ENOENT {

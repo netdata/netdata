@@ -25,7 +25,9 @@ Module: PerflibSMB
 Monitor SMB server share activity and throughput counters on Windows systems.
 
 
-It queries the 'SMB Server Shares' object from Perflib in order to gather the metrics.
+It reads the 'SMB Server Shares' performance counters through the Performance Data Helper (PDH), the same
+source as Performance Monitor and `Get-Counter`. The registry view of this object reports some counters
+under the wrong names on some Windows builds, so it is not used.
 
 
 This collector is only supported on the following platforms:
@@ -39,7 +41,7 @@ This collector only supports collecting metrics from a single instance of this i
 
 #### Auto-Detection
 
-This collector is enabled by default and automatically detects all available SMB share instances and metrics. On systems where the 'SMB Server Shares' object is not available, no SMB metrics are collected.
+This collector is enabled by default and automatically detects all SMB shares served by this host. The aggregate `_Total` instance is not collected. On systems without the SMB server role, no SMB metrics are collected; the collector keeps checking and starts collecting once the role is installed, without restarting the Agent.
 
 
 
@@ -131,3 +133,5 @@ Metrics:
 | smb.server_shares_read_requests | Read requests on the SMB share. | reads | requests/s |
 | smb.server_shares_metadata_requests | Metadata requests on the SMB share. | metadata | requests/s |
 | smb.server_shares_files_opened | Files opened on the SMB share. | opened | files/s |
+| smb.server_shares_tree_connects | Current number of tree connects (client connections) to the SMB share. | connects | connections |
+| smb.server_shares_traffic | Bytes received and sent on the SMB share, including SMB protocol data such as packet headers. | received, sent | bytes/s |

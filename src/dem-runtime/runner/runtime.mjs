@@ -11,7 +11,7 @@ const readJSON = async file => JSON.parse(await fs.readFile(file, 'utf8'));
 // Locations are release-owned. Monitor requests cannot replace any component.
 export async function runtimePaths() {
   const metadata = await readJSON(path.join(root, 'runtime.json'));
-  if (metadata.contract !== 1 || typeof metadata.version !== 'string' ||
+  if (metadata.contract !== 2 || typeof metadata.version !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(metadata.version)) {
     throw new Error('invalid runtime execution identity');
   }

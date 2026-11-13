@@ -28,7 +28,9 @@ Labels — is the model. Every dashboard-shaping mechanism (§3) feeds into it.
 
 Chart `context`, chart IDs, dimension IDs, instance labels — once shipped, they bind health alerts, dashboards, exports,
 anomaly detection, ML jobs, streaming consumers, and Netdata Cloud. Renaming silently breaks all of them. Treat them as
-permanent.
+permanent outside an approved change. The explicit V1-to-V2 migration exception is owned by
+`src/go/plugin/go.d/docs/migrate-v1-to-v2.md#chart-and-dimension-ids`: normal V2 IDs are allowed while contexts and
+dimension names remain stable.
 
 ### 1.4 Gaps are data
 
@@ -56,6 +58,20 @@ Mechanisms:
   Use the V2 authoring or migration guide for the applicable collector contract.
 - Avoid lifecycle churn when absence can be transient. Choose the source-appropriate successful-observation/expiry
   policy instead of a universal one-minute timer; do not delay a known permanent removal solely to satisfy that timer.
+
+Rotating V1 selections (a TOP-N set that changes between refreshes):
+
+- Identity: tie chart identity to the source object. Key per-entity state by its identity fields (a struct), not a
+  joined string: `name + "_" + table` keys collide even where the chart IDs differ (`pk` + `order_items` versus
+  `pk_order` + `items`), and evicting on a key mismatch turns that collision into chart loss or churn.
+- Retirement: keep chart references per selected entity, so retirement is identity-exact and linear in its charts.
+- Re-entry: verify runtime emission and stored Agent rates. `src/go/plugin/framework/jobruntime/job_v1_render.go`
+  emits a zero/omitted BEGIN interval for new or previously unmeasured charts, so the Agent measures elapsed time.
+  Clearing obsolete alone does not reset incremental counters (`src/database/rrdset.c`); collection-gap handling
+  lives in `src/database/rrdset-collection.c`.
+- Derived ratios: seed collector-computed ratios from two complete observations.
+- Example: `src/go/plugin/go.d/collector/postgres/relations_emission_test.go` demonstrates retirement, pruning and
+  stable-identity return; its captured frames can be replayed through an isolated Agent.
 
 ### 1.6 Verify The Supported Source Contract
 
@@ -240,7 +256,9 @@ concern; see §1.5.) The bound is a per-domain decision, recorded in the design 
   so totals stay truthful; for percentiles, temperatures, timestamps, or states, do not invent an aggregate: disclose
   the excluded coverage explicitly (for example a charted-versus-reported count). A cap alone silently truncates
   whatever lands in the first N entries, so pair it with a selector that lets the operator choose which entities
-  survive.
+  survive. Worked example: apps.plugin (`src/collectors/apps.plugin/apps_targets.c`) - per-family `max-targets` cap,
+  an `other` target aggregated from per-process values, idle retirement (§1.5); `apps_groups.conf` selects permanent
+  application groups only, so the user, group, SID and service families have no selector.
 
 A public `max_*` option or selector is a config option like any other: it MUST name the operator decision it enables
 (`.agents/skills/collectors-go-design/operator-surface.md`). A bounded, low-cardinality entity set needs no knob.

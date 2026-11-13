@@ -149,6 +149,7 @@ func snmpTopologyV1BGPPeerModalColumns() []topologyapi.ModalColumn {
 		modalDirectColumn("remote_as", "Remote AS", "remote_as", "text"),
 		modalDirectColumn("state", "State", "state", "badge"),
 		modalActorRefColumn("remote_actor", "Remote Actor", "remote_actor"),
+		modalDirectColumnWithVisibility("process_id", "Process ID", "process_id", "text", "expanded"),
 		modalDirectColumnWithVisibility("routing_instance", "Routing Instance", "routing_instance", "text", "expanded"),
 		modalDirectColumnWithVisibility("admin_status", "Admin", "admin_status", "badge", "expanded"),
 		modalDirectColumnWithVisibility("local_ip", "Local IP", "local_ip", "text", "expanded"),
@@ -254,6 +255,7 @@ func snmpTopologyV1BGPPeersColumns() []topologyapi.Column {
 	return []topologyapi.Column{
 		topologyapi.NewColumn("actor", "actor_ref", topologyapi.WithRole("reference")),
 		topologyapi.NewColumn("remote_actor", "actor_ref", topologyapi.WithNullable(), topologyapi.WithRole("reference")),
+		topologyapi.NewColumn("process_id", "string_ref", topologyapi.WithNullable(), topologyapi.WithDictionary("strings")),
 		topologyapi.NewColumn("routing_instance", "string_ref", topologyapi.WithNullable(), topologyapi.WithDictionary("strings")),
 		topologyapi.NewColumn("neighbor_ip", "string_ref", topologyapi.WithNullable(), topologyapi.WithDictionary("strings")),
 		topologyapi.NewColumn("remote_as", "string_ref", topologyapi.WithNullable(), topologyapi.WithDictionary("strings")),

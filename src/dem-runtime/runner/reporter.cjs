@@ -7,6 +7,7 @@ module.exports = class DEMReporter {
     this.options = options;
     this.tests = new Map();
     this.artifacts = [];
+    this.interruptedArtifacts = [];
     this.errors = [];
     this.executionError = false;
     this.confirmedFailure = false;
@@ -62,12 +63,13 @@ module.exports = class DEMReporter {
     }
     if (result.status === 'failed' && test.expectedStatus !== 'failed' && !launchOnly) this.confirmedFailure = true;
     this.emit('test', {test_id: test.id, title: text(test.title), phase: 'end', status: result.status, expected_status: test.expectedStatus, duration_ms: result.duration});
-    if (this.options.capture && ['failed', 'timedOut'].includes(result.status)) {
+    if (this.options.capture && ['failed', 'timedOut', 'interrupted'].includes(result.status)) {
+      const artifacts = result.status === 'interrupted' ? this.interruptedArtifacts : this.artifacts;
       for (const attachment of result.attachments) {
         if (attachment.name !== 'screenshot' || attachment.contentType !== 'image/png' || !attachment.path) continue;
         try {
-          const candidate = screenshotCandidate(attachment.path, this.options.workDir, this.artifacts.length + 1);
-          if (candidate) this.artifacts.push(candidate);
+          const candidate = screenshotCandidate(attachment.path, this.options.workDir, this.artifacts.length + this.interruptedArtifacts.length + 1);
+          if (candidate) artifacts.push(candidate);
         } catch { /* Go also validates candidates; a missing capture does not hide the test result. */ }
       }
     }
@@ -87,13 +89,13 @@ module.exports = class DEMReporter {
       else if (result.status === 'passed' && test.expectedStatus === 'passed') counts.passed++;
       else counts.not_run++;
     }
-    let status = 'inconclusive';
-    if (counts.timed_out) status = 'timeout';
+    let status = 'inconclusive', terminationReason;
+    if (fullResult?.status === 'timedout') { status = 'timeout'; terminationReason = 'suite_timeout'; }
+    else if (fullResult?.status === 'interrupted') { status = 'cancelled'; terminationReason = 'cancelled'; }
+    else if (counts.timed_out) { status = 'timeout'; terminationReason = 'test_timeout'; }
     else if (this.confirmedFailure) status = 'failed';
     else if (this.executionError) status = 'error';
-    else if (fullResult?.status === 'timedout') status = 'timeout';
-    else if (fullResult?.status === 'interrupted') status = 'cancelled';
     else if (counts.declared > 0 && counts.passed === counts.declared && fullResult?.status === 'passed') status = 'success';
-    write(3, {type: 'result', result: {status, tests: counts, ...(this.errors.length ? {error: this.errors[0]} : {}), artifacts: this.artifacts, capture_state: captureState(this.options.capture, status, this.artifacts)}});
+    write(3, {type: 'result', result: {status, tests: counts, ...(terminationReason ? {termination_reason: terminationReason} : {}), ...(this.errors.length ? {error: this.errors[0]} : {}), artifacts: this.artifacts, interrupted_artifacts: this.interruptedArtifacts, capture_state: captureState(this.options.capture, status, this.artifacts)}});
   }
 };

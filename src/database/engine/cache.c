@@ -562,7 +562,7 @@ static ALWAYS_INLINE void evict_on_page_release_when_permitted(PGC *cache) {
 }
 
 static ALWAYS_INLINE void flush_inline(PGC *cache, bool on_release) {
-    // Never flush inline on a libuv pool thread (query / extent workers, ACLK query jobs).
+    // Never flush inline on a libuv pool thread (query preparation / extent workers).
     // The main cache save callback waits for an EXTENT_WRITE that needs a pool thread itself,
     // so a pool thread waiting here counts against the pool without being bounded by the
     // dbengine extent-waiters budget (rrdengine.c), and enough of them deadlock the pool.

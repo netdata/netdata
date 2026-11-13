@@ -4,7 +4,6 @@ package snmptopology
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
@@ -15,9 +14,9 @@ type funcDepsAdapter struct {
 	registry *topologyRegistry
 }
 
-func (a funcDepsAdapter) Snapshot(options topologyoptions.QueryOptions) (topologyv1.Data, bool, error) {
+func (a funcDepsAdapter) Snapshot(options topologyoptions.QueryOptions) (snmptopologyfunc.SnapshotResult, bool, error) {
 	if a.registry == nil {
-		return topologyv1.Data{}, false, nil
+		return snmptopologyfunc.SnapshotResult{}, false, nil
 	}
 
 	dnsCandidates := a.registry.reverseDNSCandidateCollector()
@@ -25,22 +24,22 @@ func (a funcDepsAdapter) Snapshot(options topologyoptions.QueryOptions) (topolog
 	if dnsCandidates != nil {
 		environment.resolveDNSName = dnsCandidates.lookupCached
 	}
-	data, ok, err := a.registry.snapshotWithEnvironment(options, environment)
+	result, ok, err := a.registry.snapshotResultWithEnvironment(options, environment)
 	if err != nil {
-		return topologyv1.Data{}, false, err
+		return snmptopologyfunc.SnapshotResult{}, false, err
 	}
 	if !ok {
-		return topologyv1.Data{}, false, nil
+		return snmptopologyfunc.SnapshotResult{}, false, nil
 	}
 	if dnsCandidates != nil {
 		a.registry.enqueueReverseDNSWarm(dnsCandidates.collectedCandidates())
 	}
 
-	payload, err := topologyv1renderer.Render(data)
+	payload, err := topologyv1renderer.Render(result.Data)
 	if err != nil {
-		return topologyv1.Data{}, false, err
+		return snmptopologyfunc.SnapshotResult{}, false, err
 	}
-	return payload, true, nil
+	return snmptopologyfunc.SnapshotResult{Data: payload, FocusTargets: result.FocusTargets}, true, nil
 }
 
 func (a funcDepsAdapter) ManagedDeviceFocusTargets() []topologyoptions.ManagedFocusTarget {

@@ -19,10 +19,23 @@
 #define NV_TOPOLOGY_CMDLINE_MAX 512
 #define NV_TOPOLOGY_LABEL_KEY_MAX 96
 #define NV_TOPOLOGY_LABEL_VALUE_MAX 512
-#define NV_TOPOLOGY_KEY_MAX 1024
+#define NV_TOPOLOGY_HOSTNAME_MAX 256
+#define NV_TOPOLOGY_MACHINE_GUID_MAX 128
+// either one is the node identity inside an actor id, which is sized by NV_TOPOLOGY_HOSTNAME_MAX
+_Static_assert(NV_TOPOLOGY_MACHINE_GUID_MAX <= NV_TOPOLOGY_HOSTNAME_MAX,
+               "the machine guid must not be longer than the hostname in an actor id");
 // Process display names can be longer than TASK_COMM_LEN (e.g. Windows
 // exe base names); the actor/link buffers use this bounded width.
 #define NV_TOPOLOGY_PROCESS_MAX 256
+
+// A process or container name percent-encoded into an actor id: up to 3 bytes per input byte.
+#define NV_TOPOLOGY_ENCODED_NAME_MAX ((NV_TOPOLOGY_CONTAINER_NAME_MAX * 3) + 1)
+_Static_assert(NV_TOPOLOGY_PROCESS_MAX <= NV_TOPOLOGY_CONTAINER_NAME_MAX,
+               "an encoded process name must fit NV_TOPOLOGY_ENCODED_NAME_MAX");
+
+// Fits the longest actor id, "container:<hostname>|name=<encoded name>"; every other key is shorter.
+#define NV_TOPOLOGY_KEY_MAX \
+    ((sizeof("container:") - 1) + (NV_TOPOLOGY_HOSTNAME_MAX - 1) + (sizeof("|name=") - 1) + NV_TOPOLOGY_ENCODED_NAME_MAX)
 
 typedef struct {
     pid_t pid;
@@ -143,8 +156,8 @@ typedef struct {
     NV_TOPOLOGY_ABORT_STATUS abort_status;
     uint64_t sockets_total;
     uint64_t skipped_sockets;
-    char hostname[256];
-    char machine_guid[128];
+    char hostname[NV_TOPOLOGY_HOSTNAME_MAX];
+    char machine_guid[NV_TOPOLOGY_MACHINE_GUID_MAX];
     NV_TOPOLOGY_OPTIONS options;
 } NV_TOPOLOGY_CONTEXT;
 
@@ -942,14 +955,14 @@ static void topology_actor_id_for_process(
     const char *node_identity = (ctx && ctx->machine_guid[0]) ? ctx->machine_guid : (ctx && ctx->hostname[0] ? ctx->hostname : "unknown");
     const char *safe_process = (process && *process) ? process : "[unknown]";
     if(ctx && ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_CONTAINER) {
-        char encoded_container[(NV_TOPOLOGY_CONTAINER_NAME_MAX * 3) + 1];
+        char encoded_container[NV_TOPOLOGY_ENCODED_NAME_MAX];
         topology_encode_identifier_component(
             encoded_container, sizeof(encoded_container),
             (container_name && *container_name) ? container_name : safe_process);
         snprintf(dst, dst_size, "container:%s|name=%s", node_identity, encoded_container);
     }
     else if(ctx && ctx->options.group_by == NV_TOPOLOGY_GROUP_BY_PROCESS_NAME) {
-        char encoded_process[((NV_TOPOLOGY_PROCESS_MAX) * 3) + 1];
+        char encoded_process[NV_TOPOLOGY_ENCODED_NAME_MAX];
         topology_encode_identifier_component(encoded_process, sizeof(encoded_process), safe_process);
         snprintf(dst, dst_size, "process:%s|comm=%s", node_identity, encoded_process);
     }
@@ -1669,6 +1682,12 @@ void network_viewer_emit_response(const char *transaction, BUFFER *wb)
     pluginsd_function_result_to_stdout(transaction, wb);
     netdata_mutex_unlock(&stdout_mutex);
 }
+static void topology_write_option_alias(BUFFER *wb, const char *alias) {
+    buffer_json_member_add_array(wb, "aliases");
+    buffer_json_add_array_item_string(wb, alias);
+    buffer_json_array_close(wb);
+}
+
 static void topology_write_response_metadata(BUFFER *wb) {
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "topology");
@@ -1716,6 +1735,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "container");
                     buffer_json_member_add_string(wb, "name", "Container Name");
+                    topology_write_option_alias(wb, "container_name");
                 }
                 buffer_json_object_close(wb);
             }
@@ -1756,6 +1776,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
             buffer_json_member_add_string(wb, "name", "Sockets");
             buffer_json_member_add_string(wb, "help", "Select one or more socket directions.");
             buffer_json_member_add_string(wb, "type", "multiselect");
+            buffer_json_member_add_string(wb, "value_separator", ",");
             buffer_json_member_add_array(wb, "options");
             {
                 buffer_json_add_array_item_object(wb);
@@ -1790,12 +1811,14 @@ static void topology_write_response_metadata(BUFFER *wb) {
             buffer_json_member_add_string(wb, "name", "Protocols");
             buffer_json_member_add_string(wb, "help", "Select one or more socket protocol families.");
             buffer_json_member_add_string(wb, "type", "multiselect");
+            buffer_json_member_add_string(wb, "value_separator", ",");
             buffer_json_member_add_array(wb, "options");
             {
                 buffer_json_add_array_item_object(wb);
                 {
                     buffer_json_member_add_string(wb, "id", "ipv4_tcp");
                     buffer_json_member_add_string(wb, "name", "IPv4 TCP");
+                    topology_write_option_alias(wb, "ipv4-tcp");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
@@ -1803,6 +1826,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "ipv6_tcp");
                     buffer_json_member_add_string(wb, "name", "IPv6 TCP");
+                    topology_write_option_alias(wb, "ipv6-tcp");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
@@ -1810,6 +1834,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "ipv4_udp");
                     buffer_json_member_add_string(wb, "name", "IPv4 UDP");
+                    topology_write_option_alias(wb, "ipv4-udp");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
@@ -1817,6 +1842,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "ipv6_udp");
                     buffer_json_member_add_string(wb, "name", "IPv6 UDP");
+                    topology_write_option_alias(wb, "ipv6-udp");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
@@ -1838,6 +1864,7 @@ static void topology_write_response_metadata(BUFFER *wb) {
                 {
                     buffer_json_member_add_string(wb, "id", "by_ip");
                     buffer_json_member_add_string(wb, "name", "Non-Private Endpoints by IP");
+                    topology_write_option_alias(wb, "by-ip");
                     buffer_json_member_add_boolean(wb, "defaultSelected", true);
                 }
                 buffer_json_object_close(wb);
@@ -1862,8 +1889,8 @@ static void topology_write_response_metadata(BUFFER *wb) {
 typedef struct {
     char id[NV_TOPOLOGY_KEY_MAX];
     char type[NV_TOPOLOGY_ACTOR_TYPE_MAX];
-    char machine_guid[128];
-    char hostname[256];
+    char machine_guid[NV_TOPOLOGY_MACHINE_GUID_MAX];
+    char hostname[NV_TOPOLOGY_HOSTNAME_MAX];
     char process[NV_TOPOLOGY_PROCESS_MAX];
     char username[NV_TOPOLOGY_USERNAME_MAX];
     char namespace_type[16];
@@ -1988,6 +2015,14 @@ typedef struct {
     char source[32];
     char kind[32];
 } NV_TOPOLOGY_V1_ACTOR_LABEL;
+
+// the label dedup key, "<actor>|<len>:<key>|<len>:<value>|<len>:<source>|<len>:<kind>", built from the stored fields
+_Static_assert(20 + 4 * (1 + 20 + 1) +
+               sizeof(((NV_TOPOLOGY_V1_ACTOR_LABEL *)NULL)->key) +
+               sizeof(((NV_TOPOLOGY_V1_ACTOR_LABEL *)NULL)->value) +
+               sizeof(((NV_TOPOLOGY_V1_ACTOR_LABEL *)NULL)->source) +
+               sizeof(((NV_TOPOLOGY_V1_ACTOR_LABEL *)NULL)->kind) <= NV_TOPOLOGY_KEY_MAX,
+               "the label dedup key must fit NV_TOPOLOGY_KEY_MAX");
 
 typedef struct {
     NV_TOPOLOGY_V1_ACTOR *actors;
@@ -2297,16 +2332,25 @@ static void topology_v1_add_actor_label_ex(
     if(!payload || !key || !*key || !value || !*value)
         return;
 
-    const char *label_source = source ? source : NETWORK_TOPOLOGY_SOURCE;
-    const char *label_kind = kind ? kind : "attribute";
+    NV_TOPOLOGY_V1_ACTOR_LABEL label = {
+        .actor = actor,
+        .has_value_index = has_value_index,
+        .value_index = value_index,
+    };
+    topology_v1_strncpy(label.key, sizeof(label.key), key);
+    topology_v1_strncpy(label.value, sizeof(label.value), value);
+    topology_v1_strncpy(label.source, sizeof(label.source), source ? source : NETWORK_TOPOLOGY_SOURCE);
+    topology_v1_strncpy(label.kind, sizeof(label.kind), kind ? kind : "attribute");
+
+    // deduplicate on the fields as stored, so labels that would be emitted identically are kept once
     if(payload->label_index) {
         char index_key[NV_TOPOLOGY_KEY_MAX];
         snprintfz(index_key, sizeof(index_key), "%"PRIu64"|%zu:%s|%zu:%s|%zu:%s|%zu:%s",
                   actor,
-                  strlen(key), key,
-                  strlen(value), value,
-                  strlen(label_source), label_source,
-                  strlen(label_kind), label_kind);
+                  strlen(label.key), label.key,
+                  strlen(label.value), label.value,
+                  strlen(label.source), label.source,
+                  strlen(label.kind), label.kind);
         if(dictionary_get(payload->label_index, index_key))
             return;
 
@@ -2320,15 +2364,7 @@ static void topology_v1_add_actor_label_ex(
         payload->labels_size = new_size;
     }
 
-    NV_TOPOLOGY_V1_ACTOR_LABEL *row = &payload->labels[payload->labels_used++];
-    *row = (NV_TOPOLOGY_V1_ACTOR_LABEL){ 0 };
-    row->actor = actor;
-    row->has_value_index = has_value_index;
-    row->value_index = value_index;
-    topology_v1_strncpy(row->key, sizeof(row->key), key);
-    topology_v1_strncpy(row->value, sizeof(row->value), value);
-    topology_v1_strncpy(row->source, sizeof(row->source), label_source);
-    topology_v1_strncpy(row->kind, sizeof(row->kind), label_kind);
+    payload->labels[payload->labels_used++] = label;
 }
 
 static void topology_v1_add_actor_label(

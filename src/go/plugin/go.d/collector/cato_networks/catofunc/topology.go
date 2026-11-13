@@ -12,10 +12,11 @@ import (
 const (
 	TopologyMethodID = "topology:cato_networks"
 
-	ActorTypeSite    = "cato_site"
-	ActorTypeDevice  = "cato_device"
-	ActorTypePop     = "cato_pop"
-	ActorTypeBGPPeer = "bgp_peer"
+	ActorTypeSite               = "cato_site"
+	ActorTypeDevice             = "cato_device"
+	ActorTypePop                = "cato_pop"
+	ActorTypeBGPPeer            = "bgp_peer"
+	ActorTypeBGPPeerObservation = "bgp_peer_observation"
 
 	LinkTypeOwnership          = "ownership"
 	LinkTypeTunnel             = "cato_tunnel"

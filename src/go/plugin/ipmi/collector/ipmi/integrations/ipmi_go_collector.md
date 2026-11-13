@@ -296,7 +296,7 @@ Browse the hardware events the BMC recorded, such as threshold crossings, fan, p
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Ipmi-sel` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads the records the collector already read from the BMC; sends no BMC requests. |
 | Security | Read-only hardware event records from the configured target. |
 | Availability | Available for jobs with collect_sel enabled while they run; when no job collects the SEL, requests return HTTP 404. Returns HTTP 503 before the first successful collection, after a collection failure, or while the BMC has not answered SEL requests. On the first collections of a large log, it shows the oldest records read so far. |

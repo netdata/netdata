@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
@@ -32,7 +33,7 @@ import (
 // Executor is the browser capability injected into native collectors.
 type Executor interface {
 	Check(context.Context, synthetic.Kind) error
-	Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution
+	monitor.Executor
 	Rehearse(context.Context, synthetic.Request) error
 }
 
@@ -113,14 +114,26 @@ func New(deps Dependencies, cfg Config) Components {
 		Collectors: collectors,
 		Functions: []funcapi.ProcessFunctionProvider{
 			{
-				ID:         "rum",
-				Functions:  rumfunctions.Declarations,
-				NewHandler: func() funcapi.MethodHandler { return rumfunctions.New(rumQueries) },
+				ID: "rum",
+				Functions: func() []funcapi.FunctionConfig {
+					return availableFunctions(rumfunctions.Declarations(), func() bool {
+						return rumRegistry.HasSites() || deps.History.HasObservedKind("rum")
+					})
+				},
+				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					return rumfunctions.New(rumQueries, ctx.LookupVnodeGUID)
+				},
 			},
 			{
-				ID:         "synthetics",
-				Functions:  syntheticfunctions.Declarations,
-				NewHandler: func() funcapi.MethodHandler { return syntheticfunctions.New(syntheticQueries) },
+				ID: "synthetics",
+				Functions: func() []funcapi.FunctionConfig {
+					return availableFunctions(syntheticfunctions.Declarations(), func() bool {
+						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind("synthetic") || deps.Artifacts.HasObservedPublished()
+					})
+				},
+				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					return syntheticfunctions.New(syntheticQueries, ctx.LookupVnodeGUID)
+				},
 			},
 			{
 				ID:         "dem-history",
@@ -130,4 +143,11 @@ func New(deps Dependencies, cfg Config) Components {
 		},
 		Retention: retention,
 	}
+}
+
+func availableFunctions(methods []funcapi.FunctionConfig, available func() bool) []funcapi.FunctionConfig {
+	for i := range methods {
+		methods[i].Available = available
+	}
+	return methods
 }

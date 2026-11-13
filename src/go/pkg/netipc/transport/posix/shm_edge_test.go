@@ -1,10 +1,11 @@
-//go:build linux
+//go:build linux || (freebsd && (amd64 || 386))
 
 package posix
 
 import (
 	"fmt"
 	"os"
+	"syscall"
 	"testing"
 )
 
@@ -59,24 +60,32 @@ func TestShmContextClientRole(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-//  OwnerAlive
+//  Close-on-exec
 // ---------------------------------------------------------------------------
 
-func TestShmOwnerAlive(t *testing.T) {
+// SHM fds must not leak into children a consumer forks and execs.
+func TestShmFdsAreCloexec(t *testing.T) {
 	ensureShmRunDir(t)
-	svc := "go_shm_alive"
+	svc := "go_shm_cloexec"
 	cleanupShmFiles(t, svc)
 	defer cleanupShmFiles(t, svc)
 
-	ctx, err := ShmServerCreate(testShmRunDir, svc, 1, 1024, 1024)
+	server, err := ShmServerCreate(testShmRunDir, svc, 1, 1024, 1024)
 	if err != nil {
 		t.Fatalf("server create: %v", err)
 	}
-	defer ctx.ShmDestroy()
+	defer server.ShmDestroy()
+	client, err := ShmClientAttach(testShmRunDir, svc, 1)
+	if err != nil {
+		t.Fatalf("client attach: %v", err)
+	}
+	defer client.ShmClose()
 
-	// Owner is current process, should be alive
-	if !ctx.OwnerAlive() {
-		t.Error("expected OwnerAlive() = true for current process")
+	for name, fd := range map[string]int{"server": server.Fd(), "client": client.Fd()} {
+		flags, _, errno := syscall.Syscall(syscall.SYS_FCNTL, uintptr(fd), syscall.F_GETFD, 0)
+		if errno != 0 || flags&syscall.FD_CLOEXEC == 0 {
+			t.Errorf("%s SHM fd %d must be close-on-exec (flags=%#x errno=%v)", name, fd, flags, errno)
+		}
 	}
 }
 

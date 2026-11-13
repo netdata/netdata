@@ -318,3 +318,48 @@ func TestCollectionFailuresPreserveDependencyReasons(t *testing.T) {
 		})
 	}
 }
+
+func TestAllRequestsFailedPreservesCacheProbeAndWalkErrors(t *testing.T) {
+	const tableOID = "1.3.6.1.4.1.99999.70.1"
+	const columnOID = tableOID + ".1"
+	probeErr, walkErr := context.DeadlineExceeded, gosnmp.ErrWrongDigest
+	failed := false
+	handler := &sourceTestHandler{
+		get: func([]string) (*gosnmp.SnmpPacket, error) { return nil, probeErr },
+		walk: func(string) ([]gosnmp.SnmpPDU, error) {
+			if failed {
+				return nil, walkErr
+			}
+			return []gosnmp.SnmpPDU{createGauge32PDU(columnOID+".1", 10)}, nil
+		},
+	}
+	profile := createTestProfile(
+		"cached.yaml",
+		[]ddprofiledefinition.MetricsConfig{
+			{
+				Table: ddprofiledefinition.SymbolConfig{
+					OID:  tableOID,
+					Name: "table",
+				},
+				Symbols:    []ddprofiledefinition.SymbolConfig{{OID: columnOID, Name: "value"}},
+				MetricTags: []ddprofiledefinition.MetricTagConfig{{Tag: "row", Index: 1}},
+			},
+		},
+	)
+	c := New(Config{
+		SnmpClient: handler,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        logger.New(),
+	})
+	_, err := c.Collect()
+	require.NoError(t, err)
+	failed = true
+	metrics, err := c.Collect()
+	require.Empty(t, metrics)
+	require.ErrorIs(t, err, probeErr)
+	require.ErrorIs(t, err, walkErr)
+	require.ErrorContains(t, err, "failed to walk table OID")
+	require.Equal(t, snmputils.Failure{
+		Reason: "wrong_digest",
+	}, snmputils.ClassifyFailure(err))
+}

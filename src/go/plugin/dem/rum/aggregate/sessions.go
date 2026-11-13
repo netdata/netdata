@@ -35,6 +35,7 @@ type sessionEvent struct {
 // eventContext is captured when an observation arrives. Replayed context must
 // not acquire the identity, release or location of a later promoting event.
 type eventContext struct {
+	vnodeGUID                                 string
 	browser, device, country, version, userID string
 	experienceID, view, viewID                string
 }
@@ -102,6 +103,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	}
 	sd.lastPage = page
 	context := eventContext{
+		vnodeGUID:    b.VnodeGUID,
 		experienceID: b.ExperienceID,
 		view:         b.View,
 		viewID:       b.ViewID,
@@ -241,6 +243,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 
 func (e sessionEvent) history(site, sessionID string) HistoryEvent {
 	rec := HistoryEvent{
+		VnodeGUID:    e.context.vnodeGUID,
 		ExperienceID: e.context.experienceID,
 		View:         e.context.view,
 		ViewID:       e.context.viewID,
@@ -333,6 +336,7 @@ func (st *siteState) dropSession(el *list.Element) {
 
 // SessionEventInfo is one rum-session-events row.
 type SessionEventInfo struct {
+	VnodeGUID                            string
 	ExperienceID, View, ViewID, MetricID string
 	Revision                             uint64
 	TS                                   time.Time
@@ -357,6 +361,7 @@ func (a *Aggregator) SessionEvents(sessionID string) ([]SessionEventInfo, bool) 
 	out := make([]SessionEventInfo, len(sd.events))
 	for i, e := range sd.events {
 		out[i] = SessionEventInfo{
+			VnodeGUID:    e.context.vnodeGUID,
 			ExperienceID: e.context.experienceID,
 			View:         e.context.view,
 			ViewID:       e.context.viewID,

@@ -109,6 +109,17 @@ jobs:
                 "$(basename "${pkgfile}")" || true
             .github/scripts/package_cloud_wrapper.sh push "${REPO_PREFIX}-repoconfig/${{ matrix.pkgclouddistro }}" "${pkgfile}"
           done
+      - name: Import GPG Keys
+        id: import-keys
+        if: matrix.format == 'deb' && github.event_name != 'pull_request'
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
+        with:
+          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
+      - name: Sign DEB Packages
+        id: sign-deb
+        if: matrix.format == 'deb' && github.event_name != 'pull_request'
+        shell: bash
+        run: .github/scripts/deb-sign.sh packaging/repoconfig/artifacts ${{ steps.import-keys.outputs.fingerprint }}
       - name: SSH setup
         id: ssh-setup
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
@@ -132,17 +143,6 @@ jobs:
               netdata/netdata-repoconfig \
               packaging/repoconfig/artifacts
           done
-      - name: Import GPG Keys
-        id: import-keys
-        if: matrix.format == 'deb' && github.event_name != 'pull_request'
-        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
-        with:
-          gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
-      - name: Sign DEB Packages
-        id: sign-deb
-        if: matrix.format == 'deb' && github.event_name != 'pull_request'
-        shell: bash
-        run: .github/scripts/deb-sign.sh packaging/repoconfig/artifacts ${{ steps.import-keys.outputs.fingerprint }}
       - name: Upload to packages2.netdata.cloud
         id: package2-upload
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
@@ -173,8 +173,8 @@ jobs:
               Build: ${{ steps.build.outcome }}
               Publish to PackageCloud: ${{ steps.publish.outcome }}
               Import SSH Key: ${{ steps.ssh-setup.outcome }}
-              Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
               Import GPG Keys: ${{ steps.import-keys.outcome }}
               Sign DEB Packages: ${{ steps.sign-deb.outcome }}
+              Publish to packages.netdata.cloud: ${{ steps.package-upload.outcome }}
               Publish to packages2.netdata.cloud: ${{ steps.package2-upload.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
