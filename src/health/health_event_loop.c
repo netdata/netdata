@@ -381,6 +381,39 @@ static void do_eval_expression(
 // across all hosts a single worker processes). The arena is reset between
 // alerts inside this function, so peak memory stays bounded by one alert's
 // scratch no matter how many hosts flow through it.
+// Transitions created while a loop walks the alert dictionary are linked into the health log there, but saved to SQLite
+// only after the walk: a save can take seconds on slow storage, and chart cleanup waits for this dictionary's write lock
+// while it holds the chart dictionary's, so ML, collectors and the web API would stall behind every save. The saves
+// stay synchronous and in creation order; each loop drains its own before the next loop starts. Only the health thread
+// runs these loops, so one buffer is reused.
+static __thread struct {
+    struct {
+        ALARM_ENTRY *update_ae;
+        ALARM_ENTRY *ae;
+    } *array;
+    size_t used;
+    size_t size;
+} health_pending_saves = { 0 };
+
+static void health_pending_saves_add(RRDHOST *host, ALARM_ENTRY *ae) {
+    if(unlikely(health_pending_saves.used == health_pending_saves.size)) {
+        health_pending_saves.size = health_pending_saves.size ? health_pending_saves.size * 2 : 64;
+        health_pending_saves.array = reallocz(
+            health_pending_saves.array, health_pending_saves.size * sizeof(*health_pending_saves.array));
+    }
+
+    health_pending_saves.array[health_pending_saves.used].update_ae = health_alarm_log_add_entry_linked(host, ae);
+    health_pending_saves.array[health_pending_saves.used].ae = ae;
+    health_pending_saves.used++;
+}
+
+static void health_pending_saves_drain(RRDHOST *host) {
+    for(size_t i = 0; i < health_pending_saves.used; i++)
+        health_alarm_log_save_linked(host, health_pending_saves.array[i].update_ae, health_pending_saves.array[i].ae);
+
+    health_pending_saves.used = 0;
+}
+
 static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run, ONEWAYALLOC *owa) {
     size_t runnable = 0;
     struct health_alert_status_counts status_counts = { 0 };
@@ -511,7 +544,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         rrdcalc_rrdset_read_unlock(st);
 
         if (removed_ae) {
-            health_alarm_log_add_entry(host, removed_ae, false);
+            health_pending_saves_add(host, removed_ae);
             health_log_alert(host, removed_ae);
             health_alert_status_counts_sub(&status_counts, rc->status);
             rc->old_status = rc->status;
@@ -641,6 +674,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         rrdset_acquired_release(rsa);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
+    health_pending_saves_drain(host);
 
     struct health_raised_summary *hrm = alerts_raised_summary_create(host);
 
@@ -763,7 +797,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 );
                 rrdcalc_rrdset_read_unlock(st);
 
-                health_alarm_log_add_entry(host, transition_ae, false);
+                health_pending_saves_add(host, transition_ae);
                 health_log_alert(host, transition_ae);
 
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -799,6 +833,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             rrdset_acquired_release(rsa);
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
+        health_pending_saves_drain(host);
 
         // the raised summary is no longer built here - health_send_notification()
         // populates it on first use, so a host with nothing to notify never
@@ -947,9 +982,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 rrdcalc_runtime_snapshot_publish_repeat_state(rc);
 
                 // Carry the entry out of the traversal. This is safe because `ae` is NOT owned by
-                // the dictionary and is not reachable from anywhere else: health_alarm_log_add_entry()
-                // is the only function that links an entry into host->health_log.alarms, and this
-                // repeating path never calls it - it only assigns an id and logs. (The "nounlink" in
+                // the dictionary and is not reachable from anywhere else: health_alarm_log_link_entry()
+                // (behind health_alarm_log_add_entry() and health_alarm_log_add_entry_linked()) is the
+                // only function that links an entry into host->health_log.alarms, and this repeating
+                // path never calls it - it only assigns an id and logs. (The "nounlink" in
                 // the free below means that function does not unlink; it does not by itself prove
                 // the entry was never linked. The free asserts ae->next/ae->prev are NULL, which
                 // holds here.) `ae` also borrows no RRDCALC*/RRDSET*: every field is a scalar or a

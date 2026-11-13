@@ -322,7 +322,7 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
         0,
         rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
-    health_alarm_log_add_entry(host, ae, true);
+    health_alarm_log_add_entry(host, ae);
     health_log_alert(host, ae);
     rrdcalc_runtime_snapshot_publish(rc, ae->global_id, &ae->transition_id);
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
@@ -349,7 +349,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
                     0,
                     0);
 
-            health_alarm_log_add_entry(host, ae, true);
+            health_alarm_log_add_entry(host, ae);
             health_log_alert(host, ae);
         }
     }
