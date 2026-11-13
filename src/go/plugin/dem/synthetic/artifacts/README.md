@@ -88,12 +88,15 @@ expired or unavailable. No tombstones grow independently of retention.
 Publication skips valid candidates whose initial size exceeds the same 5 MiB limit,
 after checking paths, types and PNG signatures. Exactly 5 MiB is allowed. The retained
 subset publishes atomically; no truncated artifact or empty manifest is published.
-Successful finalization returns retained candidates in input order, so the runner
-records absent candidates as `too_large` without adding a general run error.
+Successful finalization returns retained candidates in input order. The runner uses
+candidate ID membership to record absent candidates as `too_large` without adding
+a general run error.
 If every candidate is omitted, drained cleanup runs and capture state is `unavailable`.
 
-Invalid candidates, copy/close/sync errors and cancellation still fail the whole
-publication. The copy remains bounded: growth past the limit is a hard `ErrTooLarge`.
+Invalid candidates and copy/close/sync errors still fail the whole publication.
+Cancellation observed before publication starts also aborts it. Once the rename into
+`runs/` starts, finalization finishes its durability checks even if cancellation races it.
+The copy remains bounded: growth past the limit is a hard `ErrTooLarge`.
 Hard size failures carry the offending candidate ID, reported as `too_large`; other
 candidates in the failed set are `publication_failed`, including earlier size skips.
 Fetch retains its size guard for existing oversized captures.
