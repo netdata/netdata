@@ -72,15 +72,17 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", code);
 
 cleanup:
-    // stored before the flags change that announces it (release), so a concurrent save sees both or neither
+    if (in_process)
+        unlink_alarm_notify_in_progress(ae);
+
+    // Clearing EXEC_IN_PROGRESS is this function's last access to the entry: retention cleanup, on another thread,
+    // may free it as soon as it sees the flag cleared. exec_code is stored before it (release), so a concurrent save
+    // sees both or neither.
     __atomic_store_n(&ae->exec_code, code, __ATOMIC_RELAXED);
     if(code != 0)
         atomic_flags_set_and_clear(&ae->flags, HEALTH_ENTRY_FLAG_EXEC_FAILED, HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS);
     else
         atomic_flags_clear(&ae->flags, HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS);
-
-    if (in_process)
-        unlink_alarm_notify_in_progress(ae);
 }
 
 void wait_for_all_notifications_to_finish_before_allowing_health_to_be_cleaned_up(void) {

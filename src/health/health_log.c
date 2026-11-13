@@ -262,9 +262,10 @@ inline ALARM_ENTRY* health_create_alarm_entry(
 }
 
 // Link ae into the health log and mark the previous transition of the same alert as updated by it. Returns that
-// previous entry, or NULL. With pin, both entries are pinned (pending_save_count) before the lock is released, so
-// they stay alive until health_alarm_log_save_linked() saves them.
-static ALARM_ENTRY *health_alarm_log_link_entry(RRDHOST *host, ALARM_ENTRY *ae, bool pin)
+// previous entry, or NULL. Both entries are pinned (pending_save_count) before the lock is released: the previous
+// entry becomes UPDATED here, and retention cleanup frees old UPDATED entries that are not pinned, so without the pin
+// it could be freed before it is saved. health_alarm_log_save_pinned() saves and unpins them.
+static ALARM_ENTRY *health_alarm_log_link_entry(RRDHOST *host, ALARM_ENTRY *ae)
 {
     __atomic_add_fetch(&host->health_transitions, 1, __ATOMIC_RELAXED);
 
@@ -300,11 +301,9 @@ static ALARM_ENTRY *health_alarm_log_link_entry(RRDHOST *host, ALARM_ENTRY *ae, 
         }
     }
 
-    if(pin) {
-        __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
-        if(update_ae)
-            __atomic_add_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELAXED);
-    }
+    __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
+    if(update_ae)
+        __atomic_add_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELAXED);
 
     rw_spinlock_write_unlock(&host->health_log.spinlock);
 
@@ -313,37 +312,40 @@ static ALARM_ENTRY *health_alarm_log_link_entry(RRDHOST *host, ALARM_ENTRY *ae, 
     return update_ae;
 }
 
+// Save a linked transition after the previous one it updated, and drop the pins health_alarm_log_link_entry() took.
+// async queues the saves to the metadata worker, which pins each entry again until it is saved.
+static void health_alarm_log_save_pinned(RRDHOST *host, ALARM_ENTRY *update_ae, ALARM_ENTRY *ae, bool async)
+{
+    if (update_ae) {
+        health_alarm_log_save(host, update_ae, async);
+        // release: the save happens before whoever frees the entry sees the pin drop
+        __atomic_sub_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELEASE);
+    }
+
+    health_alarm_log_save(host, ae, async);
+    __atomic_sub_fetch(&ae->pending_save_count, 1, __ATOMIC_RELEASE);
+}
+
 // Add a transition and queue its save (and its predecessor's) to the metadata worker. For callers that hold
 // dictionary locks: nothing here waits for SQLite.
 inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    ALARM_ENTRY *update_ae = health_alarm_log_link_entry(host, ae, false);
-
-    if (update_ae)
-        health_alarm_log_save(host, update_ae, true);
-
-    health_alarm_log_save(host, ae, true);
+    ALARM_ENTRY *update_ae = health_alarm_log_link_entry(host, ae);
+    health_alarm_log_save_pinned(host, update_ae, ae, true);
 }
 
 // Add a transition now and save it later, synchronously, with health_alarm_log_save_linked(): for the health loop,
 // which creates transitions while it walks the alert dictionary and must not wait for SQLite under its lock.
-// Returns the previous transition it updated (or NULL); both are pinned until saved.
+// Returns the previous transition it updated (or NULL); both stay pinned until saved.
 ALARM_ENTRY *health_alarm_log_add_entry_linked(RRDHOST *host, ALARM_ENTRY *ae)
 {
-    return health_alarm_log_link_entry(host, ae, true);
+    return health_alarm_log_link_entry(host, ae);
 }
 
 // Save a transition added with health_alarm_log_add_entry_linked(), after the previous one it updated, and unpin both.
 void health_alarm_log_save_linked(RRDHOST *host, ALARM_ENTRY *update_ae, ALARM_ENTRY *ae)
 {
-    if (update_ae) {
-        health_alarm_log_save(host, update_ae, false);
-        // release: the save happens before whoever frees the entry sees the pin drop
-        __atomic_sub_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELEASE);
-    }
-
-    health_alarm_log_save(host, ae, false);
-    __atomic_sub_fetch(&ae->pending_save_count, 1, __ATOMIC_RELEASE);
+    health_alarm_log_save_pinned(host, update_ae, ae, false);
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
