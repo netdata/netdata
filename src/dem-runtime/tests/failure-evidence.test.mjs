@@ -278,3 +278,29 @@ test('successful tests release pending observations and do not claim stop contex
   evidence.stopContext(specimen('next'), result('timedOut'));
   assert.deepEqual(records.find(r => r.record === 'stop').stop.path, []);
 });
+
+test('candidate clipping announces text loss only when the stop snapshot is published', () => {
+  for (const status of ['passed', 'failed', 'timedOut', 'interrupted']) {
+    const {evidence, records} = fixture(), t = specimen();
+    for (let n = 0; n < 128; n++) {
+      const s = step('ordinary ' + n); evidence.step(t, s); evidence.step(t, s, true);
+    }
+    const pending = step('unawaited '.repeat(100)); pending.duration = -1;
+    evidence.step(t, pending); // This identity is outside the ordinary detail pool.
+    const cleanup = step('After Hooks', undefined, 'hook');
+    const r = result(status, [], [pending, cleanup]);
+    evidence.beforeCleanup(t, r, cleanup);
+    assert.equal(records.some(r => r.record === 'truncated' && r.scope === 'text'), false);
+    evidence.stopContext(t, r);
+    const stop = records.find(r => r.record === 'stop');
+    const textLoss = records.filter(r => r.record === 'truncated' && r.scope === 'text');
+    if (['timedOut', 'interrupted'].includes(status)) {
+      assert.equal(stop.stop.text_truncated, true);
+      assert.equal(stop.stop.path[0].text_truncated, true);
+      assert.equal(textLoss.length, 1);
+    } else {
+      assert.equal(stop, undefined);
+      assert.deepEqual(textLoss, []);
+    }
+  }
+});

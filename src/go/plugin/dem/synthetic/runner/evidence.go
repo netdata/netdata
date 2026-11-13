@@ -339,7 +339,7 @@ func validFailure(f synthetic.FailureDetail) bool {
 
 func validStop(f synthetic.FailureDetail) bool {
 	return slices.Contains([]string{"timedOut", "interrupted"}, f.Test.Status) && f.Message == "" &&
-		(len(f.Path) > 0 || f.PathIncomplete) && validDetail(f)
+		(f.PathIncomplete || len(f.Path) > 0 && f.Path[len(f.Path)-1].State == "running") && validDetail(f)
 }
 
 func validDetail(f synthetic.FailureDetail) bool {

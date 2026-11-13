@@ -286,17 +286,29 @@ func TestStopContextIsProtectedAndIndependentOfFirstFailure(t *testing.T) {
 	assert.Equal(t, &stop, e.StopContext)
 	assert.Contains(t, e.StopSummary(), "Submit order")
 	for name, mutate := range map[string]func(*synthetic.FailureDetail){
-		"success":             func(f *synthetic.FailureDetail) { f.Test.Status = "passed" },
-		"invented cause":      func(f *synthetic.FailureDetail) { f.Message = "cleanup failed" },
-		"undisclosed absence": func(f *synthetic.FailureDetail) { f.Path = nil },
+		"success":              func(f *synthetic.FailureDetail) { f.Test.Status = "passed" },
+		"invented cause":       func(f *synthetic.FailureDetail) { f.Message = "cleanup failed" },
+		"undisclosed absence":  func(f *synthetic.FailureDetail) { f.Path = nil },
+		"complete passed leaf": func(f *synthetic.FailureDetail) { f.Path[0].State = "passed" },
+		"complete failed leaf": func(f *synthetic.FailureDetail) { f.Path[0].State = "failed" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			bad := stop
+			bad.Path = append([]synthetic.EvidenceStep(nil), stop.Path...)
 			mutate(&bad)
 			e, _ := consumeEvidence(t, evidenceInit, evidenceRecord("stop", "stop", bad))
 			assert.Equal(t, "invalid", e.ReportingStatus())
 			assert.Nil(t, e.StopContext)
 		})
+	}
+	for _, state := range []string{"passed", "failed"} {
+		incomplete := stop
+		incomplete.Path = append([]synthetic.EvidenceStep(nil), stop.Path...)
+		incomplete.Path[0].State = state
+		incomplete.PathIncomplete = true
+		e, _ := consumeEvidence(t, evidenceInit, evidenceRecord("stop", "stop", incomplete))
+		assert.Equal(t, "partial", e.ReportingStatus())
+		assert.Equal(t, &incomplete, e.StopContext, "a common ancestor need not still be running")
 	}
 	e, _ = consumeEvidence(t, evidenceInit, evidenceRecord("stop", "stop", stop), evidenceRecord("stop", "stop", stop))
 	assert.Equal(t, "invalid", e.ReportingStatus())

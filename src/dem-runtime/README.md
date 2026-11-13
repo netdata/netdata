@@ -300,6 +300,8 @@ are not selected. Concurrent pending branches retain only common ancestry with `
 Missing boundary, no pending step, or depth uncertainty is explicitly incomplete; cleanup-only
 timeouts can have test-only context. Path states describe the observation before cleanup,
 even if those steps later complete. Test status describes the final reporter observation.
+Summary source locations identify the displayed step or, without a known step, the test
+declaration; they are not timeout locations.
 
 ### Feature budgets
 

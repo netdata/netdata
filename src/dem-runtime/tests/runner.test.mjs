@@ -567,3 +567,14 @@ test('cleanup-only timeouts disclose missing body context instead of blaming cle
   assert.deepEqual(stop.path, []);
   assert.equal(stop.path_incomplete, true);
 });
+
+test('discarded stop candidates do not announce text loss in a successful real journey', async () => {
+  const actual = await run(prefix + `test('unawaited after cap',async()=>{
+    for(let n=0;n<130;n++) await test.step('ordinary '+n,async()=>{});
+    void test.step('unawaited '.repeat(100),async()=>new Promise(()=>{}));
+  });`, {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'success');
+  const records = actual.optional.filter(r => r.type === 'extension').map(r => r.extension.data);
+  assert.equal(records.some(r => r.record === 'stop'), false);
+  assert.deepEqual(records.filter(r => r.record === 'truncated').map(r => r.scope), ['user_steps']);
+});

@@ -100,7 +100,9 @@ pending activity observed just before Playwright starts cleanup, even after ordi
 limits fill. The “Pending before cleanup” column describes that observation, not the cause or
 exact location of the timeout. Later cleanup errors do not replace it. Concurrent branches
 show their common ancestry and disclose incomplete detail; missing observations and
-cleanup-only timeouts can show only the test with an incomplete-path marker.
+cleanup-only timeouts can show only the test with an incomplete-path marker. Source locations
+identify the displayed pending step, or the test declaration when no step is known; they do
+not identify where the timeout occurred.
 
 Evidence status is `not_recorded` for older history or attempts without runtime evidence, `unavailable` when negotiation was not reported, `unsupported` when the
 runtime declined the feature, `partial` when reporting stopped, `complete` when its completion marker arrived,

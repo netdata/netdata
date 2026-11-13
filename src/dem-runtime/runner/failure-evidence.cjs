@@ -59,8 +59,11 @@ module.exports = class FailureEvidence {
     this.finished = false;
   }
   send(data) {
-    if (!this.finished)
-      this.emit({ type: "extension", extension: { feature: FEATURE, data } });
+    if (this.finished) return;
+    // Candidate snapshots may be discarded; only published items announce loss.
+    const item = data.test || data.step || data.failure || data.stop;
+    if (item?.text_truncated) this.truncate("text");
+    this.emit({ type: "extension", extension: { feature: FEATURE, data } });
   }
   truncate(scope) {
     if (this.truncated.has(scope)) return;
@@ -72,7 +75,6 @@ module.exports = class FailureEvidence {
     target[key] = result.value;
     if (result.truncated) {
       target.text_truncated = true;
-      this.truncate("text");
     }
   }
   location(value, target) {
@@ -103,7 +105,6 @@ module.exports = class FailureEvidence {
     };
     if (result.truncated) {
       target.text_truncated = true;
-      this.truncate("text");
     }
   }
   testValue(test, result) {
