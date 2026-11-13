@@ -20,6 +20,17 @@ import (
 
 const FetchMaxBytes int64 = 5 << 20
 
+// CaptureError identifies an item that prevented publication of the entire set.
+type CaptureError struct {
+	ID  string
+	Err error
+}
+
+func (e *CaptureError) Error() string { return e.Err.Error() }
+func (e *CaptureError) Unwrap() error { return e.Err }
+
+func ValidArtifactID(id string) bool { return artifactIDPattern.MatchString(id) }
+
 var (
 	ErrClosed         = os.ErrClosed
 	ErrNotFound       = errors.New("artifact not found")

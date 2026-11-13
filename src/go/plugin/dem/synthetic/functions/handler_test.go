@@ -531,6 +531,8 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 		},
 	)
 	assert.Equal(t, "available", rowValues(t, index, responseData(t, index)[0])["availability"])
+	assert.Equal(t, "Lighthouse report", rowValues(t, index, responseData(t, index)[0])["label"])
+	assert.Empty(t, rowValues(t, index, responseData(t, index)[0])["test"])
 	validate(t, index)
 	got := call(h, "synthetics-artifact", append(args, "artifact_id:report")...)
 	require.Len(t, responseData(t, got), 1)

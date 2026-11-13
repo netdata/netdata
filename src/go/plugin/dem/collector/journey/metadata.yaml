@@ -653,6 +653,8 @@ modules:
               reporting completeness and separate truncation flags; absent evidence is not a report of zero failures.
               dropped_events discloses omitted generic event detail. The run.vnode_guid field
               contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
+              The run.captures field contains available test association, screenshot attachment counts and
+              publication decisions; reporting status and truncation distinguish incomplete metadata.
             columns:
               - name: at_ms
                 type: timestamp
@@ -795,7 +797,9 @@ modules:
           description: Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run
             history retention; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent
             permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files
-            are expired or unavailable; fetches are limited to 5 MiB.
+            are expired or unavailable; fetches are limited to 5 MiB. Test labels identify the associated test,
+            not a page or failing step. Missing-capture observations and publication decisions are in `synthetics-run`
+            while history remains.
           parameters:
             - id: job_id
               name: Monitor (`job_id`)
@@ -849,6 +853,14 @@ modules:
                 type: string
                 unit: ''
                 description: Availability.
+              - name: test
+                type: string
+                unit: ''
+                description: Associated screenshot test title, or Test not recorded; empty for Lighthouse reports.
+              - name: label
+                type: string
+                unit: ''
+                description: Screenshot or Lighthouse report.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require

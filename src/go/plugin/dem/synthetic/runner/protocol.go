@@ -107,6 +107,7 @@ type sink struct {
 	tests        map[string]synthetic.Event
 }
 type sinkSnapshot struct {
+	captures *synthetic.CaptureReport
 	browser  *synthetic.BrowserSummary
 	evidence *synthetic.FailureEvidence
 	events   []synthetic.Event
@@ -118,7 +119,7 @@ type sinkSnapshot struct {
 
 func newSink(kind synthetic.Kind, capture bool, redact *textRedactor, browser bool) *sink {
 	return &sink{
-		extensions:   newExtensions(kind, browser),
+		extensions:   newExtensions(kind, browser, capture),
 		streams:      make(map[string]*diagnosticStream),
 		streamEvents: make(map[string]synthetic.Event),
 		kind:         kind,
@@ -330,6 +331,7 @@ func (s *sink) snapshot() sinkSnapshot {
 		partial = &counts
 	}
 	return sinkSnapshot{
+		captures: s.extensions.captures.snapshot(),
 		evidence: s.extensions.evidence.snapshot(),
 		browser:  s.extensions.browser.snapshot(),
 		events:   append([]synthetic.Event{}, s.events...),

@@ -2,11 +2,12 @@
 package functions_test
 
 import (
+	"testing"
+
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
@@ -18,6 +19,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout, TerminationReason: model.ExecutionBudget, Error: "core error", Events: []model.Event{{Kind: "step_end", Title: "legacy event"}}}
 			if rich {
+				run.Captures = &model.CaptureReport{Reporting: "partial", Unpublished: []model.CaptureOmission{{ID: "s1", Reason: "not_in_final_report"}}}
 				run.BrowserSummary = &model.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &model.BrowserAggregate{Tests: model.BrowserTestCounts{Observed: 1}, Counts: model.BrowserCounts{ConsoleError: 2}, Omissions: []string{"candidate_limit"}}}
 				run.FailureEvidence = &model.FailureEvidence{
 					Availability: "supported", Truncated: []string{"user_steps"},
@@ -44,6 +46,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 				"duration_ms": nil, "outcome": model.Timeout, "termination_reason": model.ExecutionBudget,
 				"error": "core error", "tests": (*model.TestCounts)(nil),
 				"capture_state": "", "artifacts": []model.Artifact(nil), "history_error": "",
+				"captures":       run.Captures,
 				"dropped_events": 0, "metrics": nil, "runtime": (*model.RuntimeIdentity)(nil),
 				"failure_evidence": run.FailureEvidence, "failure_evidence_status": status,
 				"browser_summary": run.BrowserSummary, "browser_summary_status": status,

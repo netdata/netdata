@@ -2,6 +2,7 @@
 "use strict";
 const { FEATURE } = require("./failure-evidence.cjs");
 const { FEATURE: BROWSER_SUMMARY } = require("./browser-summary.cjs");
+const { FEATURE: CAPTURE_DETAILS } = require("./capture-details.cjs");
 
 function selection(request) {
   if (
@@ -12,8 +13,10 @@ function selection(request) {
   )
     return undefined;
   return request.kind === "journey"
-    ? [FEATURE, BROWSER_SUMMARY].filter((feature) =>
-        request.extensions.includes(feature),
+    ? [FEATURE, BROWSER_SUMMARY, CAPTURE_DETAILS].filter(
+        (feature) =>
+          request.extensions.includes(feature) &&
+          (feature !== CAPTURE_DETAILS || request.capture),
       )
     : [];
 }

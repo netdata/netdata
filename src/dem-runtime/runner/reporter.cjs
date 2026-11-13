@@ -10,6 +10,7 @@ const {
 } = require("./protocol.cjs");
 const FailureEvidence = require("./failure-evidence.cjs");
 const BrowserSummary = require("./browser-summary.cjs");
+const CaptureDetails = require("./capture-details.cjs");
 
 module.exports = class DEMReporter {
   constructor(options) {
@@ -22,6 +23,10 @@ module.exports = class DEMReporter {
     this.executionError = false;
     this.confirmedFailure = false;
     this.finished = false;
+    this.captureDetails =
+      options.capture && options.extensions?.includes(CaptureDetails.FEATURE)
+        ? new CaptureDetails((record) => write(3, record))
+        : undefined;
     this.evidence = options.extensions?.includes(FailureEvidence.FEATURE)
       ? new FailureEvidence({ ...options, stepView: this.stepView }, (record) =>
           write(3, record),
@@ -167,13 +172,18 @@ module.exports = class DEMReporter {
         result.status === "interrupted"
           ? this.interruptedArtifacts
           : this.artifacts;
+      const first = artifacts.length;
+      let unaccepted = 0;
       for (const attachment of result.attachments) {
         if (
           attachment.name !== "screenshot" ||
-          attachment.contentType !== "image/png" ||
-          !attachment.path
+          attachment.contentType !== "image/png"
         )
           continue;
+        if (!attachment.path) {
+          unaccepted++;
+          continue;
+        }
         try {
           const candidate = screenshotCandidate(
             attachment.path,
@@ -181,10 +191,13 @@ module.exports = class DEMReporter {
             this.artifacts.length + this.interruptedArtifacts.length + 1,
           );
           if (candidate) artifacts.push(candidate);
+          else unaccepted++;
         } catch {
+          unaccepted++;
           /* Go also validates candidates; a missing capture does not hide the test result. */
         }
       }
+      this.captureDetails?.test(test, result, artifacts, first, unaccepted);
     }
   }
   onEnd(fullResult) {
@@ -234,6 +247,7 @@ module.exports = class DEMReporter {
       status = "success";
     this.evidence?.complete();
     this.browserSummary?.complete();
+    this.captureDetails?.complete();
     write(3, {
       type: "result",
       result: {

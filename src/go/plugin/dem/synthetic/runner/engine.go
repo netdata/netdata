@@ -218,6 +218,9 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 	}
 	if request.Kind == synthetic.Journey {
 		req.Extensions = []string{failureEvidenceFeature}
+		if request.Capture {
+			req.Extensions = append(req.Extensions, captureDetailsFeature)
+		}
 		if request.BrowserErrorSummary {
 			req.Extensions = append(req.Extensions, browserSummaryFeature)
 		}
@@ -271,6 +274,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		snapshot := sink.snapshot()
 		run.FailureEvidence = snapshot.evidence
 		run.BrowserSummary = snapshot.browser
+		run.Captures = snapshot.captures
 		run.Events = snapshot.events
 		run.DroppedEvents = snapshot.dropped
 		run.Tests = snapshot.partial
@@ -316,16 +320,20 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 			}
 		}
 		captures := []synthetic.Capture{}
+		var ineligible []synthetic.Capture
 		if snapshot.err == nil && snapshot.result != nil {
 			captures = append(captures, snapshot.result.Artifacts...)
 			if run.TerminationReason == synthetic.ExecutionBudget {
 				captures = append(captures, snapshot.result.InterruptedArtifacts...)
+			} else {
+				ineligible = snapshot.result.InterruptedArtifacts
 			}
 			// A shutdown deadline or cancellation does not erase a reported first failure.
 			if run.TerminationReason != "" && snapshot.result.Error != "" {
 				run.Error = redact.text(snapshot.result.Error)
 			}
 		}
+		joinCaptures(&run, captures, ineligible)
 		e.complete(&run, captures, redact)
 		return synthetic.Execution{
 			Run:     run,
@@ -357,6 +365,7 @@ func (e *Engine) complete(run *synthetic.Run, captures []synthetic.Capture, reda
 	if captures != nil {
 		artifacts, err := e.artifacts.Finalize(cleanup, run.ID, captures)
 		if err != nil {
+			capturePublicationFailed(run, captures, err)
 			run.Error = joinText(run.Error, redact.text("artifact publication: "+err.Error()))
 			if run.CaptureState != "disabled" {
 				run.CaptureState = "unavailable"

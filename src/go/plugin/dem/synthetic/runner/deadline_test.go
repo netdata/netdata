@@ -113,6 +113,12 @@ func TestBudgetStopCapturePolicyAfterDrain(t *testing.T) {
 			assert.Equal(t, 1, ex.Run.Tests.Failed)
 			assert.Equal(t, 1, ex.Run.Tests.NotRun)
 			require.Len(t, ex.Run.Artifacts, tc.captures)
+			require.NotNil(t, ex.Run.Captures)
+			if tc.reason == synthetic.ExecutionBudget {
+				assert.Empty(t, ex.Run.Captures.Unpublished)
+			} else {
+				assert.Equal(t, []synthetic.CaptureOmission{{ID: "interrupted", Reason: "not_eligible"}}, ex.Run.Captures.Unpublished)
+			}
 			assert.Equal(t, "earlier-failure", ex.Run.Artifacts[0].ID)
 			assert.Equal(t, int32(1), a.finalized.Load())
 			require.Len(t, history.runs, 2)

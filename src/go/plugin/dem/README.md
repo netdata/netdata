@@ -922,7 +922,7 @@ best effort; ambiguous append failures are never replayed, and history is not a 
 Basic diagnosis includes bounded test, step, error, stdout and stderr events (500 records, 2000 characters per text),
 with dropped-event counts. Stdout/stderr use bounded stream redaction: lines longer than 2000 characters are omitted
 with a marker, and forced termination can lose buffered text. Structured test/step/error evidence remains incremental.
-There is no automatic page-console/network capture; scripts can forward diagnostics with
+Browser error summaries are separately opt-in with `browser_error_summary`; scripts can also forward diagnostics with
 Playwright APIs. Optional failure PNG screenshots and Lighthouse HTML reports are disabled by default. Enable
 `screenshot_on_failure` or `save_report` before an incident if these captures are needed. Forced browser termination
 can prevent capture. Trace, HAR, video and filmstrip are not initial capabilities.
@@ -947,6 +947,22 @@ its files; absent recorded files mean “expired or unavailable”. Metadata pre
 fetch verifies size and digest. Capture metadata requires member-equivalent permissions. Downloads require
 administrator-equivalent permissions and are limited to 5 MiB; HTML is returned as base64 data. A capture exceeding
 5 MiB makes that run's capture publication unavailable; no partial set or truncated file is published.
+
+`synthetics-artifact` adds a kind-derived label and the associated test title for screenshots reported by a supporting
+runtime. The association identifies a test, not a page, failing step or exact screenshot time. Test labels remain with
+retained captures after run history expires; older or omitted associations show `Test not recorded`. Lighthouse reports
+belong to their run and have no test.
+
+`synthetics-run` returns `run.captures` while run history remains: per-test accepted/unaccepted screenshot attachment
+counts, candidate-to-test links, reporting status/truncation, and unpublished-candidate reasons. Zero accepted means
+no usable screenshot was reported; a positive unaccepted count means screenshot attachments were reported but could
+not be used, including when other screenshots succeeded. It does not establish page closure or a screenshot timeout.
+Go reports `too_large` for an offending size-limit candidate, `publication_failed` for the rejected set's other
+candidates, `not_eligible` for an interrupted candidate rejected by stop policy, and `not_in_final_report` for metadata
+without an accepted final candidate. Without a final candidate report, earlier screenshots are not recovered.
+These are historical decisions, separate from current artifact availability. Metadata may be partial, unsupported,
+invalid or truncated; none means zero captures. Labels use exact-secret redaction before clipping; this does not
+sanitize screenshot or report content.
 
 The runner retains admission and private files until Linux supervision proves the entire child tree is reaped.
 Unverified completion stops further admission and exits the plugin without deleting shared state. Unexpected supervisor
