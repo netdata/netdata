@@ -425,10 +425,11 @@ modules:
         - prefix: otel.
           reason: >-
             Chart contexts are generated at runtime from the received OpenTelemetry metric names as
-            otel.<metric name>.
+            otel.<metric name>. The contexts otel.derived_metrics.* are fixed: the plugin makes these
+            charts itself, and the service scope lists them.
       scopes:
         - name: global
-          description: The plugin itself, with charts of the metric data points, log records and spans that it receives, of the indexing operations that make stored logs and traces searchable, of the files that it keeps on the local disk, and of its uploads to remote storage.
+          description: The plugin itself, with charts of the metric data points, log records and spans that it receives, of the per-service charts that it makes from logs and traces, of the indexing operations that make stored logs and traces searchable, of the files that it keeps on the local disk, and of its uploads to remote storage.
           labels: []
           metrics:
             - name: netdata.otel.metric_data_points
