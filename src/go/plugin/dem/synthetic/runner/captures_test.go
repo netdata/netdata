@@ -86,11 +86,14 @@ func TestCaptureAssociationRetainsMixedOmissionsAndRedacts(t *testing.T) {
 	assert.Equal(t, "t1", candidates[0].Test.ID)
 	assert.Equal(t, []synthetic.CaptureOmission{{ID: "s2", Reason: "not_eligible"}}, run.Captures.Unpublished)
 	// Snapshot cloning is independent, including test/link/disposition slices.
+	originalTitle := run.Captures.Tests[0].Title
 	cloned := synthetic.CloneRun(run)
 	run.Captures.Tests[0].Title = "mutated"
 	run.Captures.Associations[0].ID = "changed"
 	run.Captures.Unpublished[0].Reason = "changed"
-	assert.NotEqual(t, run.Captures, cloned.Captures)
+	assert.Equal(t, originalTitle, cloned.Captures.Tests[0].Title)
+	assert.Equal(t, "s1", cloned.Captures.Associations[0].ID)
+	assert.Equal(t, "not_eligible", cloned.Captures.Unpublished[0].Reason)
 }
 
 func TestCaptureConflictingIdentityIsNotRetained(t *testing.T) {

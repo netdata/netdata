@@ -227,7 +227,7 @@ func TestScreenshotAssociationWithoutHistoryOrActiveJob(t *testing.T) {
 	assert.Equal(t, test, evidence.Artifacts[0].Test)
 	assert.Equal(t, body, evidence.Body)
 	_, err = service.Evidence(t.Context(), "journey:other", id, "s1")
-	require.Error(t, err)
+	require.ErrorIs(t, err, query.ErrNotFound)
 }
 
 func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {

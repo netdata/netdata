@@ -960,7 +960,8 @@ not be used, including when other screenshots succeeded. It does not establish p
 Go reports `too_large` for an offending size-limit candidate, `publication_failed` for the rejected set's other
 candidates, `not_eligible` for an interrupted candidate rejected by stop policy, and `not_in_final_report` for metadata
 without an accepted final candidate. Without a final candidate report, earlier screenshots are not recovered.
-These are historical decisions, separate from current artifact availability. Metadata may be partial, unsupported,
+These are historical decisions, separate from current artifact availability. An absent `run.captures` means reporting
+was not recorded, not zero captures. Metadata may be partial, unsupported,
 invalid or truncated; none means zero captures. Labels use exact-secret redaction before clipping; this does not
 sanitize screenshot or report content.
 

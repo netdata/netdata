@@ -105,13 +105,14 @@ function report(t, selected, capture = true) {
     const Reporter=require(${JSON.stringify(fileURLToPath(new URL("../runner/reporter.cjs", import.meta.url)))});
     const dir=process.argv[1], capture=process.argv[2]==="true", selected=JSON.parse(process.argv[3]);
     const reporter=new Reporter({workDir:dir,capture,extensions:selected});
-    for(const [id,status,expectedStatus] of [["mixed","failed","passed"],["absent","failed","passed"],["expected","failed","failed"],["unexpected","passed","failed"]]) {
+    for(const [id,status,expectedStatus] of [["mixed","failed","passed"],["absent","failed","passed"],["expected","failed","failed"],["timed","timedOut","passed"],["interrupted","interrupted","passed"],["expected-shot","failed","failed"],["unexpected","passed","failed"]]) {
+      const image={name:"screenshot",contentType:"image/png",path:dir+"/output/good.png"};
       const attachments=id==="mixed" ? [
-        {name:"screenshot",contentType:"image/png",path:dir+"/output/good.png"},
+        image,
         {name:"screenshot",contentType:"image/png",path:dir+"/output/bad.png"},
         {name:"screenshot",contentType:"image/png",body:Buffer.from("image")},
-        {name:"screenshot",contentType:"image/png",path:dir+"/output/good.png"}
-      ] : [];
+        image
+      ] : ["timed","interrupted","expected-shot"].includes(id) ? [image] : [];
       reporter.onTestEnd({id,title:id,expectedStatus},{status,duration:1,errors:status==="failed"?[{message:"assertion"}]:[],steps:[],attachments});
     }
     reporter.onEnd({status:"failed"});
@@ -134,24 +135,44 @@ test("real reporter preserves candidate authority and exposes mixed attachment r
     .filter((r) => r.record === "test")
     .map((r) => r.test);
   assert.deepEqual(
-    observations.map((r) => [r.id, r.accepted, r.unaccepted]),
+    observations.map((r) => [
+      r.id,
+      r.status,
+      r.expected_status,
+      r.accepted,
+      r.unaccepted,
+    ]),
     [
-      ["mixed", 2, 2],
-      ["absent", 0, 0],
-      ["expected", 0, 0],
+      ["mixed", "failed", "passed", 2, 2],
+      ["absent", "failed", "passed", 0, 0],
+      ["expected", "failed", "failed", 0, 0],
+      ["timed", "timedOut", "passed", 1, 0],
+      ["interrupted", "interrupted", "passed", 1, 0],
+      ["expected-shot", "failed", "failed", 1, 0],
     ],
   );
-  assert.equal(observations[2].expected_status, "failed");
   assert.deepEqual(
     detail.filter((r) => r.record === "capture"),
     [
       { record: "capture", id: "screenshot-1", test_id: "mixed" },
       { record: "capture", id: "screenshot-2", test_id: "mixed" },
+      { record: "capture", id: "screenshot-3", test_id: "timed" },
+      { record: "capture", id: "screenshot-4", test_id: "interrupted" },
+      { record: "capture", id: "screenshot-5", test_id: "expected-shot" },
     ],
   );
-  assert.equal(records.at(-1).result.artifacts.length, 2);
+  const { artifacts, interrupted_artifacts: interrupted } =
+    records.at(-1).result;
+  assert.deepEqual(
+    artifacts.map((a) => a.id),
+    ["screenshot-1", "screenshot-2", "screenshot-3", "screenshot-5"],
+  );
+  assert.deepEqual(
+    interrupted.map((a) => a.id),
+    ["screenshot-4"],
+  );
   assert(
-    records.at(-1).result.artifacts.every((a) => !Object.hasOwn(a, "test")),
+    [...artifacts, ...interrupted].every((a) => !Object.hasOwn(a, "test")),
   );
   const core = records.filter((r) => r.type !== "extension");
   baselineRecords(core.map(JSON.stringify).join("\n") + "\n");
