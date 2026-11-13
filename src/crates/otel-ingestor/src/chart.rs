@@ -1816,5 +1816,37 @@ mod tests {
                 chart_line
             );
         }
+
+        #[test]
+        fn untrusted_ids_cannot_split_or_shift_commands() {
+            // The chart ID carries the OTLP metric name and dimension names
+            // can carry an attribute value, both sender-controlled.
+            let mut chart = Chart::new(
+                "a.b\nDISABLE\nx.123",
+                ChartAggregationType::Gauge,
+                ChartType::Line,
+                test_config(),
+            );
+
+            chart.init_definition("a.b", "title", "units", vec![]);
+            chart.ingest("x\nDISABLE", 1.0, ms(500), 0);
+            chart.ingest("a 'b'=c\\", 2.0, ms(500), 0);
+
+            let mut buf = String::new();
+            chart.emit(2, &mut buf);
+
+            for line in buf.lines() {
+                let keyword = line.split(' ').next().unwrap();
+                assert!(
+                    matches!(keyword, "CHART" | "DIMENSION" | "BEGIN" | "SET" | "END"),
+                    "unexpected command line: {:?}",
+                    line
+                );
+            }
+            assert!(buf.contains("CHART a.b_DISABLE_x.123 ''"));
+            assert!(buf.contains("BEGIN a.b_DISABLE_x.123 "));
+            assert!(buf.contains("DIMENSION x_DISABLE x_DISABLE absolute"));
+            assert!(buf.contains("SET a__b__c_ = 2000"));
+        }
     }
 }
