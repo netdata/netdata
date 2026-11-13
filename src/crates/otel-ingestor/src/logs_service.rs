@@ -1841,7 +1841,7 @@ mod tests {
         assert_eq!(sum_of(&out, "accepted"), 2.0);
         assert_eq!(sum_of(&out, "rejected"), 1.0);
         assert!(out.contains("CLABEL 'resource.attributes.service.namespace' 'prod' 1"));
-        assert!(out.contains("'otel_service.log_records'"));
+        assert!(out.contains("'otel.derived_metrics.log_records'"));
     }
 
     #[tokio::test]

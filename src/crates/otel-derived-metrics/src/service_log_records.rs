@@ -52,10 +52,10 @@ impl ServiceLogRecords {
     pub(crate) fn new(max_services: usize) -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(service_settings(max_services))?;
         let records = builder.counter::<Severity>(ChartDescriptor {
-            title: "Service log records by severity".into(),
+            title: "Log records".into(),
             units: "records/s".into(),
             family: "logs".into(),
-            context: "otel_service.log_records".into(),
+            context: "otel.derived_metrics.log_records".into(),
             chart_type: ChartType::Stacked,
             priority: 60_000,
         })?;

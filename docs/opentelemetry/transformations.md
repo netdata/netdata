@@ -40,7 +40,7 @@ processors:
 
 The first statement preserves the source value as text. The next four statements set the OpenTelemetry severity number for the levels `debug`, `info`, `warn` or `warning`, and `error` or `err`, in upper or lower case. A record with a different level keeps the severity number "unspecified". Change the patterns to the levels that your source writes; do not assume that every application uses the same scale.
 
-Set the severity number, not only the severity text. Netdata counts log records by severity number in the per-service chart `otel_service.log_records`. In that chart, a record without a severity number counts as `unspecified`, whatever its severity text is.
+Set the severity number, not only the severity text. Netdata counts log records by severity number in the per-service chart `otel.derived_metrics.log_records`. In that chart, a record without a severity number counts as `unspecified`, whatever its severity text is.
 
 Use static resource values only when a pipeline handles one known service. For shared pipelines, derive identity from trusted receiver metadata or preserve the application's existing OpenTelemetry resource attributes.
 

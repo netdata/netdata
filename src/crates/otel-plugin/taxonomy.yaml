@@ -25,7 +25,7 @@ module_name: otel
 # src/crates/otel-ingestor/src/metrics_service.rs), so that context set is
 # decided entirely by the user's instrumentation and cannot be pre-declared
 # here. The plugin also has fixed contexts: the per-service charts derived from
-# traces and logs (`otel_service.*`) and its own operation charts
+# traces and logs (`otel.derived_metrics.*`) and its own operation charts
 # (`netdata.otel.*`), both listed in metadata.yaml. They are not placed here
 # because a file declares either `placements` or `taxonomy_optout`, and the
 # dynamic charts need the opt-out; the dashboard places them by context. The
@@ -36,4 +36,4 @@ taxonomy_optout:
     otel.plugin creates most metric charts dynamically from incoming OTLP
     data; that set of contexts depends entirely on the user's instrumentation
     and cannot be statically placed in the dashboard taxonomy. Its fixed
-    contexts (otel_service.* and netdata.otel.*) are placed by the dashboard.
+    contexts (otel.derived_metrics.* and netdata.otel.*) are placed by the dashboard.
