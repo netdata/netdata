@@ -75,7 +75,7 @@ impl IngestOutcomes {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
         let metric_data_points = builder.counter::<Acceptance>(ChartDescriptor {
-            title: "OpenTelemetry metric data points received".into(),
+            title: "Metric data points received".into(),
             units: "data points/s".into(),
             family: "ingest".into(),
             context: "netdata.otel.metric_data_points".into(),
@@ -83,7 +83,7 @@ impl IngestOutcomes {
             priority: 149_999,
         })?;
         let log_records = builder.counter::<Storing>(ChartDescriptor {
-            title: "OpenTelemetry log records received".into(),
+            title: "Log records received".into(),
             units: "records/s".into(),
             family: "ingest".into(),
             context: "netdata.otel.log_records".into(),
@@ -91,7 +91,7 @@ impl IngestOutcomes {
             priority: 150_000,
         })?;
         let spans = builder.counter::<Storing>(ChartDescriptor {
-            title: "OpenTelemetry spans received".into(),
+            title: "Spans received".into(),
             units: "spans/s".into(),
             family: "ingest".into(),
             context: "netdata.otel.spans".into(),
@@ -215,7 +215,7 @@ impl DerivationHealth {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
         let services = builder.gauge::<Services>(ChartDescriptor {
-            title: "Services with derived charts".into(),
+            title: "Services with derived metrics".into(),
             units: "services".into(),
             family: "derived metrics".into(),
             context: "netdata.otel.derived_services".into(),
@@ -223,7 +223,7 @@ impl DerivationHealth {
             priority: 150_010,
         })?;
         let expired = builder.cumulative_counter::<Expired>(ChartDescriptor {
-            title: "Services removed after 15 minutes without data".into(),
+            title: "Expired services".into(),
             units: "services/s".into(),
             family: "derived metrics".into(),
             context: "netdata.otel.derived_expired_services".into(),
@@ -231,7 +231,7 @@ impl DerivationHealth {
             priority: 150_011,
         })?;
         let adjusted = builder.cumulative_counter::<Adjustment>(ChartDescriptor {
-            title: "Records counted in another time slot or chart set".into(),
+            title: "Adjusted records".into(),
             units: "records/s".into(),
             family: "derived metrics".into(),
             context: "netdata.otel.derived_adjusted_records".into(),

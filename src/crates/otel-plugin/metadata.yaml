@@ -432,14 +432,14 @@ modules:
           labels: []
           metrics:
             - name: netdata.otel.metric_data_points
-              description: OpenTelemetry metric data points received
+              description: Metric data points received
               unit: data points/s
               chart_type: stacked
               dimensions:
                 - name: accepted
                 - name: rejected
             - name: netdata.otel.log_records
-              description: OpenTelemetry log records received
+              description: Log records received
               unit: records/s
               chart_type: stacked
               dimensions:
@@ -447,7 +447,7 @@ modules:
                 - name: rejected
                 - name: failed
             - name: netdata.otel.spans
-              description: OpenTelemetry spans received
+              description: Spans received
               unit: spans/s
               chart_type: stacked
               dimensions:
@@ -461,62 +461,62 @@ modules:
               dimensions:
                 - name: events
             - name: netdata.otel.indexing_operations
-              description: Indexing operations running and waiting
+              description: Indexing operations
               unit: operations
               chart_type: stacked
               dimensions:
                 - name: running
                 - name: waiting
             - name: netdata.otel.indexing_operations_oldest_wait
-              description: Longest wait of an indexing operation that has not started
+              description: Longest wait of a waiting indexing operation
               unit: seconds
               chart_type: line
               dimensions:
                 - name: wait
             - name: netdata.otel.indexing_operations_finished
-              description: Indexing operations finished
+              description: Finished indexing operations
               unit: operations/s
               chart_type: stacked
               dimensions:
                 - name: succeeded
                 - name: failed
             - name: netdata.otel.index_files
-              description: Index files on the local disk
+              description: Local index files
               unit: files
               chart_type: stacked
               dimensions:
                 - name: logs
                 - name: traces
             - name: netdata.otel.index_size
-              description: Size of the index files on the local disk
+              description: Local index size
               unit: bytes
               chart_type: stacked
               dimensions:
                 - name: logs
                 - name: traces
             - name: netdata.otel.tenants
-              description: Tenants known to the plugin
+              description: Tenants
               unit: tenants
               chart_type: line
               dimensions:
                 - name: logs
                 - name: traces
             - name: netdata.otel.index_files_waiting_for_remote
-              description: Index files over the retention limits that wait for remote storage
+              description: Index files waiting for remote storage
               unit: files
               chart_type: stacked
               dimensions:
                 - name: logs
                 - name: traces
             - name: netdata.otel.uploads
-              description: Uploads to remote storage in progress and waiting for a retry
+              description: Uploads to remote storage
               unit: operations
               chart_type: stacked
               dimensions:
                 - name: in_progress
                 - name: waiting_for_retry
             - name: netdata.otel.uploads_finished
-              description: Uploads to remote storage finished
+              description: Finished uploads to remote storage
               unit: operations/s
               chart_type: stacked
               dimensions:
@@ -529,19 +529,19 @@ modules:
               description: The signal that the per-service metrics are made from, `logs` or `traces`.
           metrics:
             - name: netdata.otel.derived_services
-              description: Services with derived charts
+              description: Services with derived metrics
               unit: services
               chart_type: line
               dimensions:
                 - name: services
             - name: netdata.otel.derived_expired_services
-              description: Services removed after 15 minutes without data
+              description: Expired services
               unit: services/s
               chart_type: line
               dimensions:
                 - name: expired
             - name: netdata.otel.derived_adjusted_records
-              description: Records counted in another time slot or chart set
+              description: Adjusted records
               unit: records/s
               chart_type: line
               dimensions:
