@@ -326,11 +326,13 @@ static void health_alarm_log_save_pinned(RRDHOST *host, ALARM_ENTRY *update_ae, 
     __atomic_sub_fetch(&ae->pending_save_count, 1, __ATOMIC_RELEASE);
 }
 
-// Add a transition and queue its save (and its predecessor's) to the metadata worker. For callers that hold
-// dictionary locks: nothing here waits for SQLite.
+// Add a transition, log it, and queue its save (and its predecessor's) to the metadata worker. For callers that hold
+// dictionary locks: nothing here waits for SQLite. The entry is logged here, while it is pinned: once the pin drops,
+// the metadata worker can save it and the notification pass can free it, so callers must not use ae afterwards.
 inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
 {
     ALARM_ENTRY *update_ae = health_alarm_log_link_entry(host, ae);
+    health_log_alert(host, ae);
     health_alarm_log_save_pinned(host, update_ae, ae, true);
 }
 
