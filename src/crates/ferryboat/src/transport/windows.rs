@@ -1,10 +1,4 @@
-//! Windows named-pipe transport: the `#[cfg(windows)]` half of ferryboat's
-//! private IPC transport ([`Endpoint::Ipc`](crate::Endpoint::Ipc)). The `unix`
-//! submodule is the other half and shares this module's `Listener` +
-//! `connect` surface shape. Only raw byte streams live here; serialization,
-//! compression, framing and size limits are layered in `lib.rs`/`mux.rs`, and
-//! every failure is a `std::io::Result`, surfaced as
-//! [`Error::Io`](crate::Error::Io).
+//! Windows named-pipe transport.
 //!
 //! Naming and lifecycle: paths pass through to the OS verbatim, so callers
 //! supply the full pipe name (`\\.\pipe\...`). Named pipes have no
@@ -13,38 +7,12 @@
 //! creates the first instance with `first_pipe_instance(true)`, which fails
 //! with `ErrorKind::PermissionDenied` while any instance of that name exists,
 //! so concurrent or leftover binders fail fast instead of sharing the pipe.
-//! Replacement instances created by `accept` omit that flag on purpose: the
-//! name has live instances by then.
 //!
-//! `accept` runs the per-client instance lifecycle, which is why it takes
-//! `&mut self`: the listener holds exactly one waiting instance between
-//! accepts; `accept` waits for a client (succeeding immediately if one is
-//! already connected), hands the connected instance out, and creates the next
-//! waiting instance in the same call. During that hand-over there is no
-//! waiting instance, so a client opening inside the window fails instead of
-//! queuing. If creating the replacement fails, `accept` returns `Err` without
-//! handing anything out and the connected instance stays in the listener; the
-//! next `accept` returns it immediately.
-//!
-//! The two ends are distinct tokio types (`NamedPipeServer`, `NamedPipeClient`
-//! — both `Send` + `Sync`, byte-mode, remote clients rejected by default), so
-//! each side of a connection gets its own stream type instead of the single
-//! `ConnectionStream` the Unix half exports — and the crate's plumbing is
-//! written for the Unix shape: this module exports `ServerStream`,
-//! `ClientStream`, `Listener` and `connect` but not `ConnectionStream`, while
-//! `lib.rs` and `mux.rs` use `ConnectionStream` unconditionally (`lib.rs`:
-//! the `use transport::{ConnectionStream, ..}` import plus the
-//! `Framed<ConnectionStream, ..>` field and the `Result<ConnectionStream>`
-//! return of the IPC connect helper; `mux.rs`: the
-//! `use crate::transport::ConnectionStream;` import behind `Writer::Ipc` and
-//! `Reader::Ipc`). No `#[cfg]` gate covers those uses, so on Windows the crate
-//! does not compile as written and only the Unix selection builds; the
-//! breakage is invisible to non-Windows builds, which never type-check this
-//! module.
-//!
-//! Crate-private (`mod transport` in `lib.rs`): consumed only by `lib.rs` and
-//! `mux.rs`; ferryboat's plugin users go through the public
-//! [`Connection`](crate::Connection)/[`Listener`](crate::Listener) API.
+//! `accept` takes `&mut self` because the listener holds exactly one waiting
+//! instance between accepts, and each `accept` hands out the connected
+//! instance and creates the next waiting one. During that hand-over there is
+//! no waiting instance, so a client opening inside the window fails instead
+//! of queuing.
 use std::io;
 use std::path::{Path, PathBuf};
 

@@ -6,25 +6,12 @@
 //! response, so requests can be dispatched, served, and answered out of
 //! order. Ids are scoped to one connection.
 //!
-//! Over IPC, frames are bincode-serialized (optionally LZ4-compressed),
-//! size-checked against the builders' `max_message_size`, and written as
-//! length-delimited frames; in-process, values move directly through
-//! bounded mpsc channels. Client and server must agree on `compress`, and
-//! each side's `max_message_size` must be at least as large as the peer's
-//! frames, or decode fails.
-//!
 //! [`RpcClient`] is a cloneable handle over one connection: a single
 //! dispatch task assigns ids, tracks pending calls, and fails all of them
 //! with [`Error::ConnectionClosed`] when the connection ends. [`RpcServer`]
 //! accepts one [`RpcSession`] per client; `serve` spawns a task per request
 //! and streams responses back through a bounded channel, so a slow client
 //! backpressures its own handlers only.
-//!
-//! Consumers: re-exported at the crate root, but used only inside ferryboat
-//! (crate doc examples, tests/integration.rs). The plugin crates
-//! (otel-ingestor, otel-ledger, file-lifecycle, otel-legacy-logs, and the
-//! otel-plugin supervisor) drive [`Connection`] and
-//! [`Listener`](crate::Listener) directly instead.
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -46,8 +33,6 @@ use crate::{Connection, ConnectionInner, Endpoint, Error, Listener, Result};
 // each RpcClient and outgoing responses on each RpcSession.
 const RPC_CHANNEL_BUFFER: usize = 64;
 
-// --- Wire frame ---
-
 /// Request envelope: a client-assigned correlation id plus the payload.
 ///
 /// Serialized on the wire for IPC, moved directly for in-process. The id
@@ -59,16 +44,9 @@ struct Frame<T> {
     payload: T,
 }
 
-// --- Split halves ---
-
 /// Send half of a split [`Connection`].
 ///
-/// In-process sends move the value into the peer's channel, failing with
-/// `Error::ConnectionClosed` once the peer is gone. IPC sends serialize the
-/// value (bincode, optional LZ4, size-checked against `max_message_size`)
-/// and write it as a length-delimited frame; I/O, encode, and oversize
-/// failures surface as [`Error`]. The `_phantom` field ties the raw-bytes
-/// sink to the message type.
+/// The `_phantom` field ties the raw-bytes sink to the message type.
 enum Writer<S> {
     InProcess(mpsc::Sender<S>),
     Ipc {
@@ -99,11 +77,7 @@ impl<S: Serialize> Writer<S> {
 
 /// Receive half of a split [`Connection`].
 ///
-/// In-process receives pop from the channel; IPC receives read the next
-/// length-delimited frame and deserialize it. An exhausted transport maps
-/// to `Error::ConnectionClosed`; frame-limit violations and decode
-/// failures surface as [`Error`]. The `_phantom` field ties the raw-bytes
-/// stream to the message type.
+/// The `_phantom` field ties the raw-bytes stream to the message type.
 enum Reader<R> {
     InProcess(mpsc::Receiver<R>),
     Ipc {
@@ -166,8 +140,6 @@ fn split_connection<S, R>(conn: Connection<S, R>) -> (Writer<S>, Reader<R>) {
     }
 }
 
-// --- RpcClient ---
-
 /// A multiplexed RPC client.
 ///
 /// Supports multiple in-flight requests on a single connection.
@@ -204,7 +176,6 @@ where
 
     /// Sends a request and waits for the response.
     ///
-    /// Takes `&self` — safe to call concurrently from multiple tasks.
     /// Returns [`Error::ConnectionClosed`] when the connection has ended,
     /// whether the request never left the queue or the response never
     /// arrived. A `call` future dropped mid-flight leaves its pending slot
@@ -316,8 +287,6 @@ where
         Ok(RpcClient::spawn(conn))
     }
 }
-
-// --- RpcServer ---
 
 /// A multiplexed RPC server that accepts connections from [`RpcClient`]s.
 ///
