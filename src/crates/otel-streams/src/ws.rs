@@ -39,7 +39,7 @@ async fn next_tick(timer: &mut Option<tokio::time::Interval>) {
 /// If `ping` is `Some`, sends WebSocket pings at that interval to keep the
 /// connection alive.
 ///
-/// Returns `Ok` when no frame arrives for [`IDLE_TIMEOUT`], so the caller's
+/// Returns `Ok` when no frame arrives for `IDLE_TIMEOUT`, so the caller's
 /// reconnect loop replaces a connection whose peer went silent without
 /// closing it.
 pub async fn run<H, F>(
