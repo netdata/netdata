@@ -99,6 +99,8 @@ The plugin is configured via `netflow.yaml` in the Netdata configuration directo
 | journal.journal_dir | Directory for journal files (relative to NETDATA_CACHE_DIR). | flows | no |
 | journal.tiers.&lt;tier&gt;.size_of_journal_files | Per-tier retained-artifact budget for journal data and finalized per-journal facet sidecars. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The protected active journal can temporarily exceed the budget. Set to `null` for time-only retention. | 10GB | no |
 | journal.tiers.&lt;tier&gt;.duration_of_journal_files | Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap. | null | no |
+| charts.memory_diagnostics.enabled | Enable the memory diagnostics charts (`netdata.netflow.memory_*`). They read the process memory maps and estimate the size of in-memory structures, so they cost more than the default charts. | no | no |
+| charts.memory_diagnostics.interval | How often the memory diagnostics charts update. When `enabled` is `true`, it must be at least `1s`. A value that is not whole seconds is rounded up to whole seconds. | 10s | no |
 
 
 </details>
