@@ -31,15 +31,16 @@ type Schedule struct {
 
 // Request is ephemeral. Script and resolved secrets never enter history.
 type Request struct {
-	Kind       Kind
-	Name       string
-	VnodeGUID  string
-	Script     string
-	ScriptPath string
-	URL        string
-	Secrets    map[string]string
-	Timeout    time.Duration
-	Capture    bool
+	Kind                Kind
+	Name                string
+	VnodeGUID           string
+	Script              string
+	ScriptPath          string
+	URL                 string
+	Secrets             map[string]string
+	Timeout             time.Duration
+	BrowserErrorSummary bool
+	Capture             bool
 }
 
 func (r Request) JobID() string { return string(r.Kind) + ":" + r.Name }

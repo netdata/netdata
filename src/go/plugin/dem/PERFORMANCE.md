@@ -259,6 +259,43 @@ and `12cf967cd1` for retained state, both compared with `5993198826`.
 Component percentages do not translate directly into whole-Agent savings. Keep their controlled comparisons
 separate from the dated mixed-workload observations, which include browser processes and the test harness.
 
+## Optional browser error summary costs
+
+`browser_error_summary` defaults to `false`. A 2026-11-13 controlled candidate-A observer probe compared matched
+fresh-process executions with observation off and on, using Node 24.20.0, Playwright 1.63.0 and Chromium on the same
+otherwise lightly loaded Linux VM. Each workload had one warmup pair and five measured pairs, alternating order.
+The table reports medians of paired increments, not differences between independently computed mode medians.
+
+| Workload | Added CPU seconds | Added peak charged memory | Added elapsed time |
+|---|---:|---:|---:|
+| Quiet page | 0.405 | 6.4 MiB | 277 ms |
+| 10,000 non-error console messages | 1.075 | 146.6 MiB | 488 ms |
+| 300 successful subresources | 0.478 | 24.2 MiB | 257 ms |
+| 10,000 console errors | 0.870 | 156.9 MiB | 625 ms |
+
+Console subscription incurs provider dispatch and handle costs before severity filtering, even when no sampling
+calls occur. Sampling quotas bound owned sampling work and retained detail; they do not bound provider-owned
+console dispatch, handles or total browser memory. Counts continuing past sample limits does not make observation
+free. Retain capacity and deadline margin for the monitored pages when enabling the option.
+
+These measurements include Node, worker and browser descendants, a synthetic loopback server and probe logging.
+Peak charged cgroup memory includes charged cache and kernel memory; it is not RSS or Go heap. Fresh cgroups may
+exclude previously charged immutable file pages. All 48 executions and 44 exact core/failure-evidence comparisons
+passed, with no outcome failures, OOM events or surviving task processes. The fixtures qualify these controlled
+workloads, not universal timing neutrality or mixed-load capacity. They measured the observer prototype before
+production producer, Go decoding and history integration, so they do not establish the full production Engine's
+incremental cost. The mixed qualification above did not enable browser error summaries.
+
+The final implementation was also measured through production Engine, nd-run, artifact finalization and journal
+reopen on the same pinned VM. Quiet and 10,000-error journeys each had one excluded warmup pair and three measured
+off/on pairs in alternating order, with fresh cgroups and scratch directories. The console-error median paired
+increment was **1.469 CPU seconds, 152.8 MiB peak charged memory and 508 ms elapsed**. CPU increments ranged from
+1.065 to 1.695 seconds. Quiet paired medians were -0.033 CPU seconds, -6.4 MiB and -303 ms; the negative differences
+and elapsed-time variability indicate measurement noise, not a claimed speed improvement. All 16 executions passed
+outcome, process-drainage and live/reopened journal-equality checks, without OOM events or surviving task cgroups.
+This includes the Go fixture server and journal work, while previously charged immutable pages can still be excluded.
+It qualifies these final-path fixtures, not broad mixed-workload capacity or a universal overhead percentage.
+
 ## Browser reuse experiment — deferred
 
 On 2026-11-11, [PR #24684](https://github.com/netdata/netdata/pull/24684) compared fresh browsers with supervised

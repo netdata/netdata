@@ -45,6 +45,8 @@ function sameError(left, right) {
 module.exports = class FailureEvidence {
   constructor(options, emit) {
     this.emit = emit;
+    this.view =
+      options.stepView || require("./step-view.cjs")(options.observerFile);
     this.sourceDir = options.sourceDir || options.workDir || process.cwd();
     this.tests = new Map();
     this.steps = new Map();
@@ -175,8 +177,9 @@ module.exports = class FailureEvidence {
       value.category = step.category;
     else this.string(step.category, 64, value, "category");
     this.location(step.location, value);
-    if (step.parent) {
-      value.parent_id = this.id(step.parent);
+    const parent = this.view.parent(step);
+    if (parent) {
+      value.parent_id = this.id(parent);
       if (!this.steps.has(value.parent_id)) value.parent_omitted = true;
     }
     return value;
@@ -278,18 +281,18 @@ module.exports = class FailureEvidence {
       pathIncomplete = false;
     // Bound temporary ancestry even for arbitrarily deep user-authored steps.
     // Skipping a deeper subtree is explicit; the actual first error survives.
-    const cursors = [{ steps: steps, index: 0 }];
+    const cursors = [{ iterator: this.view.children(steps), step: undefined }];
     while (cursors.length) {
       const cursor = cursors.at(-1);
-      if (cursor.index === cursor.steps.length) {
+      const next = cursor.iterator.next();
+      if (next.done) {
+        pathIncomplete ||= cursor.iterator.incomplete;
         cursors.pop();
         continue;
       }
-      const step = cursor.steps[cursor.index++];
+      const step = (cursor.step = next.value);
       if (matches(step)) {
-        const candidate = cursors.map(
-          (cursor) => cursor.steps[cursor.index - 1],
-        );
+        const candidate = cursors.map((cursor) => cursor.step);
         let shared = 0;
         while (
           shared < matchedPath.length &&
@@ -309,7 +312,11 @@ module.exports = class FailureEvidence {
       }
       if (step.steps?.length) {
         if (cursors.length === 64) pathIncomplete = true;
-        else cursors.push({ steps: step.steps, index: 0 });
+        else
+          cursors.push({
+            iterator: this.view.children(step.steps),
+            step: undefined,
+          });
       }
     }
     return { matchedPath, pathIncomplete };
@@ -319,7 +326,7 @@ module.exports = class FailureEvidence {
       last = [];
     let ancestors = 0;
     const matched = matchedPath.at(-1);
-    for (let step = matched; step; step = step.parent) {
+    for (let step = matched; step; step = this.view.parent(step)) {
       if (last.length < 8) last.push(step);
       else {
         first.push(step);
@@ -349,7 +356,7 @@ module.exports = class FailureEvidence {
     // Its public result tree still includes pending steps omitted by our detail caps.
     if (
       this.stopped ||
-      step.parent ||
+      this.view.parent(step) ||
       step.category !== "hook" ||
       step.title !== "After Hooks"
     )
@@ -395,3 +402,4 @@ module.exports = class FailureEvidence {
 };
 module.exports.FEATURE = FEATURE;
 module.exports.encoded = encoded;
+module.exports.clipped = clipped;

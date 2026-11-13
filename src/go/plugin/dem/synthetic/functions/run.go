@@ -87,6 +87,8 @@ func runDetail(run model.Run) map[string]any {
 		"metrics":                 nil,
 		"runtime":                 run.Runtime,
 		"failure_evidence":        run.FailureEvidence,
+		"browser_summary":         run.BrowserSummary,
+		"browser_summary_status":  run.BrowserSummary.ReportingStatus(),
 		"failure_evidence_status": run.FailureEvidence.ReportingStatus(),
 	}
 	if m := run.Metrics; m != nil {

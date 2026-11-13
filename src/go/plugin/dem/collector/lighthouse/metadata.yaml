@@ -576,6 +576,14 @@ modules:
                 unit: ''
                 description: Pending activity observed before cleanup in the first timed-out or interrupted test; this does not identify the cause of the stop.
                   Source locations identify the displayed step or the test declaration when no step is known, not the timeout location.
+              - name: browser_summary_status
+                type: string
+                unit: ''
+                description: Optional journey browser summary reporting status (not_recorded, unavailable, unsupported, partial, complete or invalid); completion does not imply complete browser coverage.
+              - name: browser_errors
+                type: string
+                unit: ''
+                description: Observed browser error counts by category, with sampling limitations when reported; missing evidence is not zero errors.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -610,7 +618,9 @@ modules:
           returns:
             description: One row per retained reporter event, preserving actual and expected status and failure
               phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact
-              metadata and history errors. Journey failure_evidence adds test and step observations, the first unexpected failure,
+              metadata and history errors. Journey browser_summary adds typed fixture-context coverage, observed counts,
+              bounded primitive samples and explicit omissions when enabled; missing evidence is not zero errors.
+              Journey failure_evidence adds test and step observations, the first unexpected failure,
               reporting completeness and separate truncation flags; absent evidence is not a report of zero failures.
               dropped_events discloses omitted generic event detail. The run.vnode_guid field
               contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.

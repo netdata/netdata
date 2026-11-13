@@ -34,6 +34,7 @@ func TestFormsRejectInvalidWorkflowInputs(t *testing.T) {
 		value any
 		valid bool
 	}{
+		{"browser_error_summary", true, true}, {"browser_error_summary", false, true},
 		{"check_every", 1, true}, {"check_every", 0, false}, {"check_every", -1, false},
 		{"check_every", int64(9223372036), true}, {"check_every", int64(9223372037), false},
 		{"timeout", 0.000999, false}, {"timeout", 0.001, true},

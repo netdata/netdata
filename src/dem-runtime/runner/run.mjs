@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import protocol from "./protocol.cjs";
 import extensions from "./extensions.cjs";
+import BrowserSummary from "./browser-summary.cjs";
 import { runtimePaths, checkRuntime } from "./runtime.mjs";
 import {
   monotonicMilliseconds,
@@ -112,6 +113,22 @@ async function main() {
     // Playwright reports canonical paths; the Agent supplies a short work alias.
     const sourceDir = path.dirname(await fs.realpath(entry).catch(() => entry));
     const modules = runtime.modules;
+    let wrapper;
+    const browserSummary = selected?.includes(BrowserSummary.FEATURE);
+    if (browserSummary) {
+      wrapper = path.join(r.work_dir, "browser-test.mjs");
+      const real = JSON.stringify(
+        pathToFileURL(path.join(modules, "playwright/test.mjs")).href,
+      );
+      const observe = JSON.stringify(
+        pathToFileURL(path.join(here, "browser-context.cjs")).href,
+      );
+      await fs.writeFile(
+        wrapper,
+        `export * from ${real};\nimport { test as base } from ${real};\nimport observe from ${observe};\nexport const test = observe(base);\nexport default test;\n`,
+        { mode: 0o600 },
+      );
+    }
     const config = {
       testDir: path.dirname(entry),
       workers: 1,
@@ -131,6 +148,13 @@ async function main() {
             sourceDir,
             capture: r.capture,
             ...(selected?.length ? { extensions: selected } : {}),
+            ...(browserSummary
+              ? {
+                  observerFile: await fs.realpath(
+                    path.join(here, "browser-sampler.cjs"),
+                  ),
+                }
+              : {}),
           },
         ],
       ],
@@ -171,9 +195,11 @@ async function main() {
           baseUrl: runtime.dependencies,
           paths: {
             "@playwright/test": [
-              path.join(modules, "@playwright/test/index.mjs"),
+              wrapper || path.join(modules, "@playwright/test/index.mjs"),
             ],
-            "playwright/test": [path.join(modules, "playwright/test.mjs")],
+            "playwright/test": [
+              wrapper || path.join(modules, "playwright/test.mjs"),
+            ],
             playwright: [path.join(modules, "playwright/index.mjs")],
           },
         },

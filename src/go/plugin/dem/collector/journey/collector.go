@@ -29,6 +29,7 @@ type Secret struct {
 }
 
 type Config struct {
+	BrowserErrorSummary bool             `yaml:"browser_error_summary" json:"browser_error_summary"`
 	CheckEvery          int              `yaml:"check_every"           json:"check_every"`
 	Vnode               string           `yaml:"vnode,omitempty"     json:"vnode,omitempty"`
 	Name                string           `yaml:"name"                  json:"name"`

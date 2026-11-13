@@ -42,6 +42,8 @@ func (h *Handler) runs(ctx context.Context, args map[string]string, response map
 				run.FailureEvidence.FailureSummary(),
 				run.FailureEvidence.LastObservedStepSummary(),
 				run.FailureEvidence.StopSummary(),
+				run.BrowserSummary.ReportingStatus(),
+				run.BrowserSummary.Summary(),
 			},
 		)
 	}
@@ -86,5 +88,7 @@ var runsMethod = method{
 		column{"first_failure", "First unexpected failure", funcapi.FieldTypeString, ""},
 		column{"last_observed_step", "Last observed running step", funcapi.FieldTypeString, ""},
 		column{"stop_context", "Pending before cleanup", funcapi.FieldTypeString, ""},
+		column{"browser_summary_status", "Browser summary reporting", funcapi.FieldTypeString, ""},
+		column{"browser_errors", "Browser errors", funcapi.FieldTypeString, ""},
 	),
 }

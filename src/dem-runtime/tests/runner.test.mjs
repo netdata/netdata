@@ -578,3 +578,76 @@ test('discarded stop candidates do not announce text loss in a successful real j
   assert.equal(records.some(r => r.record === 'stop'), false);
   assert.deepEqual(records.filter(r => r.record === 'truncated').map(r => r.scope), ['user_steps']);
 });
+
+const browserFeature = 'browser_summary.v1';
+const browserRecords = actual => actual.optional.filter(value => value.extension?.feature === browserFeature).map(value => value.extension.data);
+
+test('browser summary is opt-in and context-free tests have explicit no-summary coverage', async () => {
+  const source = prefix + "test('context-free',async()=>{expect(2).toBe(2)});";
+  const plain = await run(source);
+  assert.equal(plain.optional.length, 0);
+  const selected = await run(source, {extensions:['failure_evidence.v1', browserFeature, browserFeature]});
+  assert.deepEqual(selected.optional[0].extension_init.selected, ['failure_evidence.v1', browserFeature]);
+  assert.deepEqual(browserRecords(selected), [{record:'complete', run:{tests:{observed:0,incomplete:0,invalid:0,no_summary:1},counts:{uncaught:0,console_error:0,transport:0,http_error:0}}}]);
+  assert.equal(selected.result.status, plain.result.status);
+  const work = await fs.readdir(plain.dir);
+  assert.ok(!work.includes('browser-test.mjs'), 'disabled path must not create or load the wrapper');
+});
+
+test('selected summary survives missing browser launch as no-summary, without changing core outcome', async () => {
+  const actual = await run(prefix + "test('launch',async({page})=>{});", {extensions:[browserFeature]});
+  assert.equal(actual.result.status, 'error');
+  assert.equal(browserRecords(actual).at(-1).run.tests.no_summary, 1);
+});
+
+test('malformed user annotations preserve core failure and Failure evidence with browser summary enabled', async () => {
+  const source = prefix + "test('malformed annotation',async({},info)=>{info.annotations.push(null)});";
+  const plain = await run(source, {extensions:['failure_evidence.v1']});
+  const selected = await run(source, {extensions:['failure_evidence.v1',browserFeature]});
+  assert.equal(plain.result.status, 'failed');
+  assert.deepEqual(selected.result, plain.result);
+  assert.deepEqual(selected.result.tests, counts({declared:1,failed:1}));
+  const evidence = selected.optional.filter(value=>value.extension?.feature==='failure_evidence.v1').map(value=>value.extension.data);
+  assert.ok(evidence.some(value=>value.record==='test' && value.test.status==='failed' && value.test.reporting_complete));
+  assert.equal(evidence.find(value=>value.record==='failure').failure.message, plain.result.error);
+  assert.equal(evidence.at(-1).record, 'complete');
+  assert.equal(browserRecords(selected).at(-1).run.tests.no_summary, 1);
+});
+
+test('real browser summary preserves user operations and records primitive fixture-context samples', {skip: !process.env.DEM_TEST_BROWSER && 'set DEM_TEST_BROWSER to the pinned sandbox browser'}, async () => {
+  const fixture = await fixtureRuntime(dependencies, 'chrome');
+  await fs.symlink(process.env.DEM_TEST_BROWSER, path.join(fixture, 'chrome'));
+  for (const specifier of ['@playwright/test', 'playwright/test']) {
+    const work = await fs.mkdtemp(path.join(os.tmpdir(), 'bs.'));
+    const actual = await run(`import {test,expect} from ${JSON.stringify(specifier)};
+      test('browser samples',async({page,context})=>{
+        let messages=0; context.on('console',()=>messages++);
+        await test.step('Application action',async()=>{
+          await page.evaluate(()=>{
+            console.error('primitive-value',42,true,null,{private:'object'},'fifth');
+            console.error('secret-fixture http://user:password@example.invalid/path?token=private#fragment',undefined,123n,Symbol('hidden'));
+            console.error('x'.repeat(600),()=>{},Infinity,{toString(){throw Error('must not render')}});
+            for(let n=0;n<20;n++)console.error('later');
+          });
+        });
+        await expect.poll(()=>messages).toBe(23);
+        await page.waitForTimeout(100);
+      });`, {work_dir:work,extensions:['failure_evidence.v1',browserFeature],secrets:{DEM_SECRET_SAMPLE:'secret-fixture'}}, fixture);
+    assert.equal(actual.result.status, 'success', JSON.stringify(actual.result));
+    const records = browserRecords(actual), complete = records.at(-1);
+    assert.equal(complete.record, 'complete');
+    assert.equal(complete.run.counts.console_error, 23);
+    assert.equal(complete.run.tests.observed, 1);
+    assert.ok(complete.run.omissions.includes('candidate_limit'));
+    const samples = records.flatMap(value=>value.samples || []);
+    assert.equal(samples.length, 3);
+    assert.deepEqual(samples[0].args, [{value:'primitive-value'},{value:42},{value:true},{value:null}]);
+    assert.equal(samples[0].args_omitted, 2);
+    assert.deepEqual(samples[1].args, [{value:'[REDACTED] http://example.invalid/path'},{omitted:'unrepresentable'},{omitted:'unrepresentable'},{omitted:'symbol'}]);
+    assert.deepEqual(samples[2].args, [{omitted:'too_long'},{omitted:'function'},{omitted:'non_finite'},{omitted:'object'}]);
+    assert.equal(actual.events.filter(value=>value.kind==='step' && value.title==='Evaluate').length, 1, 'only the user evaluate is diagnosed');
+    const evidence = actual.optional.filter(value=>value.extension?.feature==='failure_evidence.v1');
+    assert.ok(!JSON.stringify(evidence).includes('browser-sampler.cjs'));
+    assert.ok(!JSON.stringify(records).includes('secret-fixture'));
+  }
+});

@@ -72,5 +72,11 @@ func rehearsalFailureText(run synthetic.Run) string {
 		}
 		text += "Pending before cleanup: " + stop
 	}
+	if summary := run.BrowserSummary.Summary(); summary != "" {
+		if text != "" {
+			text += "\n"
+		}
+		text += "Browser errors: " + summary
+	}
 	return text
 }

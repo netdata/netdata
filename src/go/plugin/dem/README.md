@@ -116,6 +116,38 @@ Error excerpts can include Playwright's call log, but are redacted and clipped. 
 or exhausted detail budgets are explicitly marked. A last-observed step describes a received observation, not
 current browser activity. Captures keep their existing access rules and publication requirements.
 
+## Optional journey browser error summaries
+
+Set `browser_error_summary: true` in a journey job to collect browser error counts and bounded primitive samples,
+including on passing tests. It defaults to `false`. The `synthetics-runs` columns `browser_summary_status` and
+`browser_errors` show reporting status and observed counts; `synthetics-run` returns typed `run.browser_summary`
+with coverage, aggregate counts, interesting test rows, samples and explicit omissions. Failed configuration
+rehearsals include a text summary; successful rehearsals retain their existing success response and do not save runs.
+
+Coverage is limited to contexts supplied by the journey's Playwright fixtures, including their pages and popups.
+Manually created contexts and contexts supplied by replacement fixtures are outside this scope; worker errors
+are not comprehensive. The categories are uncaught errors, console errors, failed requests and HTTP responses with status 400
+or higher. Missing or incomplete observations never establish zero errors. Counts continue after sample limits;
+report completeness, coverage and sampling omissions are separate facts. Browser anomalies do not change test
+outcomes, trigger retries or extend deadlines. Summary finalization does not wait for pending samples.
+
+Console samples contain only whole primitive values or explicit omissions; objects are not rendered. Unavailable,
+pending, unsupported and oversized values remain explicit. No headers, response bodies or cookies are captured.
+Structured URLs have credentials, query strings and fragments removed, and recognized embedded HTTP(S) URLs in
+text receive best-effort stripping. Known configured secret values are redacted before clipping or byte checks.
+Arbitrary page-derived text is not anonymized and can contain sensitive content.
+
+Owned detail is bounded to 64 interesting test rows and four representative samples per category, with sixteen
+samples total. Each test has three candidate opportunities per category, at most three console sampling calls and
+four arguments per call. Pending, rejected and duplicate candidates consume their opportunities. Counts are not
+estimates of distinct incidents, and differences between counts and retained samples are not lost-event counts.
+After the row limit, a previously unrepresented category can retain its first sample in the same pool.
+
+Enabling observation can add substantial CPU and memory cost on pages with heavy console traffic, even when the
+messages are not errors. Sample limits do not bound Playwright's message dispatch or handle memory. See
+[measured browser-summary costs](PERFORMANCE.md#optional-browser-error-summary-costs) before enabling it on noisy
+journeys or increasing concurrency.
+
 ## Receive browser reports
 
 Expose the receiver through HTTPS, configure its public URL and actual trusted proxy addresses, then install

@@ -31,7 +31,7 @@ func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 	evidence.StopContext = &synthetic.FailureDetail{Test: stopped, Path: []synthetic.EvidenceStep{pending}, PathIncomplete: true}
 	runs := []synthetic.Run{
 		{ID: "old", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now, CompletedUS: now + 1, Outcome: synthetic.Failed},
-		{ID: "rich", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now + 2, CompletedUS: now + 3, Outcome: synthetic.Timeout, TerminationReason: synthetic.ExecutionBudget, FailureEvidence: evidence},
+		{ID: "rich", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now + 2, CompletedUS: now + 3, Outcome: synthetic.Timeout, TerminationReason: synthetic.ExecutionBudget, FailureEvidence: evidence, BrowserSummary: &synthetic.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &synthetic.BrowserAggregate{Counts: synthetic.BrowserCounts{ConsoleError: 2}}, Tests: []synthetic.BrowserTest{{ID: "t", State: "incomplete"}}, Samples: []synthetic.BrowserSample{{ID: 1, TestID: "t", Category: "console_error", State: "pending"}}}},
 	}
 	for _, run := range runs {
 		_, err = history.NewStore(journal).AppendRun(ctx, "complete", run)

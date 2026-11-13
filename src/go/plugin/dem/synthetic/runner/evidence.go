@@ -26,13 +26,11 @@ const (
 )
 
 type evidenceState struct {
-	value       *synthetic.FailureEvidence
-	initialized bool
-	coreStarted bool
-	tests       map[string]int
-	steps       map[string]int
-	userSteps   int
-	otherSteps  int
+	value      *synthetic.FailureEvidence
+	tests      map[string]int
+	steps      map[string]int
+	userSteps  int
+	otherSteps int
 }
 
 func newEvidenceState(kind synthetic.Kind) *evidenceState {
@@ -45,12 +43,6 @@ func newEvidenceState(kind synthetic.Kind) *evidenceState {
 	}
 }
 
-func (e *evidenceState) core() {
-	if e != nil {
-		e.coreStarted = true
-	}
-}
-
 func (e *evidenceState) invalid(reason string) {
 	if e == nil || e.value.Availability == "invalid" {
 		return
@@ -58,36 +50,6 @@ func (e *evidenceState) invalid(reason string) {
 	e.value.Availability = "invalid"
 	e.value.Reason = reason
 	e.value.ReporterComplete = false
-}
-
-func (e *evidenceState) init(raw json.RawMessage) {
-	if e == nil {
-		return
-	}
-	if e.initialized || e.coreStarted {
-		e.invalid("late_or_duplicate_init")
-		return
-	}
-	e.initialized = true
-	var body struct {
-		Selected []string `json:"selected"`
-	}
-	if len(raw) > evidencePayloadLimit || decodeCore(raw, &body) != nil || body.Selected == nil || len(body.Selected) > 1 {
-		e.invalid("invalid_init")
-		return
-	}
-	if e.value.Availability == "invalid" {
-		return
-	}
-	if len(body.Selected) == 0 {
-		e.value.Availability, e.value.Reason = "unsupported", "runtime_declined"
-		return
-	}
-	if body.Selected[0] != failureEvidenceFeature {
-		e.invalid("unrequested_selection")
-		return
-	}
-	e.value.Availability, e.value.Reason = "supported", ""
 }
 
 func (e *evidenceState) truncate(scope string) {
@@ -98,25 +60,6 @@ func (e *evidenceState) truncate(scope string) {
 
 func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 	if e == nil || e.value.Availability == "invalid" {
-		return
-	}
-	var envelope struct {
-		Feature string          `json:"feature"`
-		Data    json.RawMessage `json:"data"`
-	}
-	if len(raw) > evidencePayloadLimit || decodeCore(raw, &envelope) != nil || envelope.Feature == "" {
-		e.invalid("invalid_extension")
-		return
-	}
-	if envelope.Feature == failureEvidenceFeature && !e.initialized {
-		e.invalid("data_before_init")
-		return
-	}
-	if envelope.Feature != failureEvidenceFeature || e.value.Availability != "supported" {
-		// No map/cache indexed by arbitrary advertised feature IDs.
-		if e.value.Reason == "" || e.value.Availability == "unsupported" {
-			e.value.Reason = "unselected_extension"
-		}
 		return
 	}
 	if e.value.ReporterComplete {
@@ -131,7 +74,7 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 		Stop    *synthetic.FailureDetail `json:"stop"`
 		Scope   string                   `json:"scope"`
 	}
-	if json.Unmarshal(envelope.Data, &data) != nil {
+	if json.Unmarshal(raw, &data) != nil {
 		e.invalid("invalid_record")
 		return
 	}
@@ -363,7 +306,9 @@ func validDetail(f synthetic.FailureDetail) bool {
 
 // Redaction can expand text; trim after redaction to preserve the feature budget.
 func evidenceText(value string, limit int, redact *textRedactor) (string, bool) {
-	value = redact.redacted(value)
+	return clippedEvidenceText(redact.redacted(value), limit)
+}
+func clippedEvidenceText(value string, limit int) (string, bool) {
 	clipped := utf8.RuneCountInString(value) > TextLimit
 	value = clip(value)
 	if boundedJSON(value, limit) {
