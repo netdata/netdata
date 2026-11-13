@@ -73,6 +73,7 @@ const (
 // StartedUS is immutable across both phases. Positive completion wall time may
 // precede start after a clock adjustment; DurationMS is measured independently.
 type Run struct {
+	Captures          *CaptureReport    `json:"captures,omitempty"`
 	BrowserSummary    *BrowserSummary   `json:"browser_summary,omitempty"`
 	FailureEvidence   *FailureEvidence  `json:"failure_evidence,omitempty"`
 	Runtime           *RuntimeIdentity  `json:"runtime,omitempty"`
@@ -107,6 +108,7 @@ type Execution struct {
 // CloneRun copies every mutable field crossing observation and history boundaries.
 func CloneRun(in Run) Run {
 	r := in
+	r.Captures = CloneCaptureReport(in.Captures)
 	r.BrowserSummary = CloneBrowserSummary(in.BrowserSummary)
 	r.FailureEvidence = CloneFailureEvidence(in.FailureEvidence)
 	if in.Runtime != nil {

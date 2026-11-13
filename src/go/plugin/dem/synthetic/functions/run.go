@@ -82,6 +82,7 @@ func runDetail(run model.Run) map[string]any {
 		"tests":                   run.Tests,
 		"capture_state":           run.CaptureState,
 		"artifacts":               run.Artifacts,
+		"captures":                run.Captures,
 		"history_error":           run.HistoryError,
 		"dropped_events":          run.DroppedEvents,
 		"metrics":                 nil,

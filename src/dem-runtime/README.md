@@ -203,8 +203,8 @@ baseline error event/result and does not authorize replay with weaker settings.
 
 Output extensions MUST be explicitly requested by an Agent that understands
 them and selected by the runtime for that attempt. The neutral `extensions` request
-member and `extension_init` acknowledgement implement this gate for `failure_evidence.v1`
-and the opt-in `browser_summary.v1`. The execution contract remains 2.
+member and `extension_init` acknowledgement implement this gate for `failure_evidence.v1`,
+the opt-in `browser_summary.v1`, and capture-enabled `capture_details.v1`. The execution contract remains 2.
 
 | Change | Compatible evolution rule |
 |---|---|
@@ -234,7 +234,7 @@ version 3 is currently unsupported. Introduce and validate it with the first rea
 required control, not as unused compatibility machinery. Never retry an unsupported
 control as an advisory field or infer enforcement from optional output selection.
 
-The extension owner directly routes the two typed consumers, Failure-evidence and browser summary.
+The extension owner directly routes typed Failure-evidence, browser summary and capture-detail consumers.
 There is no generic registry, version-range solver, capability cache or extra probe
 process in this design. Producer emission, parsing and retention must be bounded:
 optional traffic shares the result stream and must be measured near execution
@@ -430,3 +430,47 @@ pin advisory request tolerance and unsupported-version refusal before workflow w
 The shared `dem-runtime-node-tests.yml` workflow runs this suite with the manifest's
 Node pin for both DEM PR checks and runtime release builds; a failing suite blocks
 release assembly. These non-browser tests do not replace target qualification.
+
+## Optional capture details
+
+Capture-enabled journeys request `capture_details.v1` alongside other optional features. The parent selects it only
+when capture is enabled. An old runtime or a peer without this selection keeps existing capture behavior; no feature
+probe or extra job option is needed. The frozen core candidate objects and terminal lists are unchanged.
+
+The reporter emits these records after processing an eligible test's screenshot attachments:
+
+| `data.record` | Payload |
+|---|---|
+| `test` | `test`: `id`, `title`, optional `text_truncated`, `status`, `expected_status`, `accepted`, `unaccepted`. Counts cover usable candidates and unusable PNG attachments named `screenshot`, including mixed results. |
+| `capture` | `id`, `test_id`: links one accepted candidate to a preceding test observation. |
+| `truncated` | Detail was omitted; emitted at most once. |
+| `complete` | Reporter finished this stream; does not imply untruncated coverage or publication. |
+
+Eligibility retains existing actual statuses `failed`, `timedOut`, `interrupted`. Expected failures may have no
+screenshot; unexpected passes remain outside this capture loop. The runtime cannot infer why Playwright supplied no
+attachment. Association is to the test, not a page, step or screenshot instant. No extra browser calls are made.
+Only file-backed attachments below `output/` are candidates. Playwright's `testInfo.attach` with `body` retains inline
+bytes without a file path; a PNG named `screenshot` in that form contributes to `unaccepted`, not publication.
+
+One budget permits 256 test/link records per attempt (32 tests with four screenshots use 160). Both producer emission
+and consumer retention enforce it independently of capture publication. Later terminal candidates remain eligible,
+with association explicitly unrecorded. Existing encoded ID/title budgets (128/256 bytes) and the 32 KiB extension
+body limit apply; exact-secret redaction precedes title clipping. There is no per-test capture quota or byte ledger.
+
+Invalid bodies or unknown variants invalidate this feature alone and retain earlier valid observations; conflicting
+identities lose their disputed association. Shared envelopes and core records remain strict. Reporting states are
+`negotiation_not_reported`, `unsupported`, `partial`, `complete`, `invalid`; truncation is independent. An absent stored
+report means not recorded. Lighthouse has Go publication dispositions but no journey feature reporting state.
+
+Go joins labels only onto eligible terminal candidates. Metadata IDs never authorize files. A delivered association
+without an accepted final candidate is `not_in_final_report`; interrupted candidates visible to Go but rejected by
+its actual stop policy are `not_eligible`. Without terminal authority, earlier screenshots are not published even if
+their metadata arrived. Publication still requires verified drainage and rejects the entire set on any failure.
+An offending size-limit candidate is `too_large`, and other rejected candidates are `publication_failed`.
+
+Published artifact association is retained in manifest version 2 and run history. Missing association means no label;
+Go-authored stored records use ordinary typed JSON decoding. Optional-wire validation remains isolated from core
+outcomes and publication. Historical omissions remain in `run.captures`, never in empty manifests; current availability
+and byte access remain owned by the artifact store. Functions derive labels
+from artifact kind and display test titles separately. Titles outlive history when their captures do; redaction of
+metadata does not sanitize PNG or HTML content.

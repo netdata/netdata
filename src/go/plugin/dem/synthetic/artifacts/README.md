@@ -39,6 +39,15 @@ without creating a persistent empty manifest. `Manifest` and `Fetch` require the
 owning JobID; the manifest authorizes membership independently of journal history.
 History is only a fallback explanation for an absent capture set, never byte access.
 
+Manifest version 2 also retains optional artifact `test` metadata (`id`, `title`,
+`text_truncated`) joined by Go from independently validated journey observations.
+It cannot authorize a file or change membership. Old readers ignore these fields;
+missing association means no label. Go-authored manifests and history use ordinary
+typed JSON decoding; incorrectly typed stored fields make the record unreadable.
+Ownership, membership, size and digest validation remain strict. Labels survive history expiry.
+Capture observations and unpublished-candidate reasons live only in run history;
+they do not create empty manifests or change current availability.
+
 Retention first expires sets by publication age and rejects sets larger than the
 whole allowance. It then evicts oldest non-preferred sets before the newest
 eligible set per JobID; if those preferred sets do not fit, they expire oldest
@@ -80,3 +89,5 @@ Publication rejects captures exceeding the same 5 MiB limit with `ErrTooLarge`,
 without publishing a partial run or truncated artifact. The copy is bounded even
 if a source grows after its initial size check. Fetch retains its size guard for
 existing oversized captures.
+Size failures carry the offending candidate ID for run diagnostics. Other candidates
+in the rejected set are reported as `publication_failed`; this is not partial publication.

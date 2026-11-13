@@ -115,7 +115,7 @@ func (s *Store) Finalize(
 			return nil, errors.Join(err, source.Close())
 		}
 		if info.Size() > FetchMaxBytes {
-			return nil, errors.Join(ErrTooLarge, source.Close())
+			return nil, &CaptureError{ID: capture.ID, Err: errors.Join(ErrTooLarge, source.Close())}
 		}
 		if capture.Kind == "screenshot" {
 			var header [8]byte
@@ -147,7 +147,7 @@ func (s *Store) Finalize(
 			}, FetchMaxBytes+1),
 		)
 		if count > FetchMaxBytes {
-			copyErr = errors.Join(copyErr, ErrTooLarge)
+			copyErr = &CaptureError{ID: capture.ID, Err: errors.Join(copyErr, ErrTooLarge)}
 		}
 		closeErr := errors.Join(dest.Sync(), dest.Close(), source.Close())
 		if err = errors.Join(copyErr, closeErr); err != nil {
@@ -161,6 +161,7 @@ func (s *Store) Finalize(
 				MIME:   capture.MIME,
 				Bytes:  count,
 				SHA256: hex.EncodeToString(hash.Sum(nil)),
+				Test:   capture.Test,
 			},
 		)
 	}

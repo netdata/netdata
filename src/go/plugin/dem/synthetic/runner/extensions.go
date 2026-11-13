@@ -3,6 +3,7 @@ package runner
 
 import (
 	"encoding/json"
+
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
@@ -13,18 +14,26 @@ const browserSummaryFeature = "browser_summary.v1"
 type extensions struct {
 	evidence                 *evidenceState
 	browser                  *browserState
+	captures                 *captureState
 	initialized, coreStarted bool
 }
 
-func newExtensions(kind synthetic.Kind, browser bool) *extensions {
+func newExtensions(kind synthetic.Kind, browser, capture bool) *extensions {
 	e := &extensions{evidence: newEvidenceState(kind)}
+	if kind == synthetic.Journey && capture {
+		e.captures = newCaptureState()
+	}
 	if kind == synthetic.Journey && browser {
 		e.browser = &browserState{value: &synthetic.BrowserSummary{Availability: "unavailable", Reason: "negotiation_not_reported", Coverage: "fixture_context"}}
 	}
 	return e
 }
-func (e *extensions) core()                 { e.coreStarted = true }
-func (e *extensions) invalid(reason string) { e.evidence.invalid(reason); e.browser.invalid(reason) }
+func (e *extensions) core() { e.coreStarted = true }
+func (e *extensions) invalid(reason string) {
+	e.evidence.invalid(reason)
+	e.browser.invalid(reason)
+	e.captures.invalid()
+}
 func (e *extensions) init(raw json.RawMessage) {
 	if e.evidence == nil {
 		return
@@ -37,11 +46,11 @@ func (e *extensions) init(raw json.RawMessage) {
 	var body struct {
 		Selected []string `json:"selected"`
 	}
-	if len(raw) > evidencePayloadLimit || decodeCore(raw, &body) != nil || body.Selected == nil || len(body.Selected) > 2 {
+	if len(raw) > evidencePayloadLimit || decodeCore(raw, &body) != nil || body.Selected == nil || len(body.Selected) > 3 {
 		e.invalid("invalid_init")
 		return
 	}
-	fe, bs := false, false
+	fe, bs, cd := false, false, false
 	for _, f := range body.Selected {
 		switch f {
 		case failureEvidenceFeature:
@@ -56,6 +65,12 @@ func (e *extensions) init(raw json.RawMessage) {
 				return
 			}
 			bs = true
+		case captureDetailsFeature:
+			if cd || e.captures == nil {
+				e.invalid("unrequested_selection")
+				return
+			}
+			cd = true
 		default:
 			e.invalid("unrequested_selection")
 			return
@@ -79,6 +94,13 @@ func (e *extensions) init(raw json.RawMessage) {
 			e.browser.value.Reason = "runtime_declined"
 		}
 	}
+	if e.captures != nil && e.captures.value.Reporting != "invalid" {
+		if cd {
+			e.captures.value.Reporting = "partial"
+		} else {
+			e.captures.value.Reporting = "unsupported"
+		}
+	}
 }
 func (e *extensions) accept(raw json.RawMessage, r *textRedactor) {
 	if e.evidence == nil {
@@ -99,6 +121,9 @@ func (e *extensions) accept(raw json.RawMessage, r *textRedactor) {
 		if envelope.Feature == browserSummaryFeature {
 			e.browser.invalid("data_before_init")
 		}
+		if envelope.Feature == captureDetailsFeature {
+			e.captures.invalid()
+		}
 		return
 	}
 	switch envelope.Feature {
@@ -109,6 +134,10 @@ func (e *extensions) accept(raw json.RawMessage, r *textRedactor) {
 	case browserSummaryFeature:
 		if e.browser != nil && e.browser.value.Availability == "supported" {
 			e.browser.accept(envelope.Data, r)
+		}
+	case captureDetailsFeature:
+		if e.captures != nil && (e.captures.value.Reporting == "partial" || e.captures.value.Reporting == "complete") {
+			e.captures.accept(envelope.Data, r)
 		}
 	}
 }

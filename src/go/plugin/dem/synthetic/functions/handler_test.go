@@ -531,6 +531,8 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 		},
 	)
 	assert.Equal(t, "available", rowValues(t, index, responseData(t, index)[0])["availability"])
+	assert.Equal(t, "Lighthouse report", rowValues(t, index, responseData(t, index)[0])["label"])
+	assert.Empty(t, rowValues(t, index, responseData(t, index)[0])["test"])
 	validate(t, index)
 	got := call(h, "synthetics-artifact", append(args, "artifact_id:report")...)
 	require.Len(t, responseData(t, got), 1)
@@ -553,6 +555,43 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	require.NotNil(t, got.RawResponse)
 	assert.Equal(t, 404, got.RawResponse["status"])
 	assert.Equal(t, "expired_or_unavailable", got.RawResponse["capture_state"])
+	validate(t, got)
+}
+
+func TestScreenshotLabelsThroughRealStore(t *testing.T) {
+	store, err := artifacts.Open(t.TempDir())
+	require.NoError(t, err)
+	defer store.Close()
+	runID := fixtureRunID()
+	dir, err := store.Begin(runID, "journey:checkout", "")
+	require.NoError(t, err)
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "output"), 0700))
+	cases := []struct {
+		id    string
+		test  model.ArtifactTest
+		title string
+	}{
+		{id: "associated", test: model.ArtifactTest{ID: "test1", Title: "Checkout"}, title: "Checkout"},
+		{id: "unassociated", title: "Test not recorded"},
+	}
+	var candidates []model.Capture
+	for _, tc := range cases {
+		path := "output/" + tc.id + ".png"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, path), []byte("\x89PNG\r\n\x1a\nfixture"), 0600))
+		candidates = append(candidates, model.Capture{ID: tc.id, Kind: "screenshot", MIME: "image/png", Path: path, Test: tc.test})
+	}
+	_, err = store.Finalize(t.Context(), runID, candidates)
+	require.NoError(t, err)
+	h := newHandler(&source{artifacts: store})
+	got := call(h, "synthetics-artifact", "job_id:journey:checkout", "run_id:"+runID)
+	rows := responseData(t, got)
+	require.Len(t, rows, len(cases))
+	for i, tc := range cases {
+		row := rowValues(t, got, rows[i])
+		assert.Equal(t, tc.id, row["artifact_id"])
+		assert.Equal(t, "Screenshot", row["label"])
+		assert.Equal(t, tc.title, row["test"])
+	}
 	validate(t, got)
 }
 
