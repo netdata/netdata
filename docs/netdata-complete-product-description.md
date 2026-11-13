@@ -785,7 +785,7 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 
 ## Alerting and Notifications
 
-Netdata evaluates alerts on every Agent and Parent, close to the data, with 1,100+ stock alert definitions that activate automatically for the technologies detected, and delivers notifications from the Agent (30 methods) and from Netdata Cloud (16 integrations plus personal email) with role- and room-based routing.
+Netdata evaluates alerts on every Agent and Parent, close to the data, with 1,100+ stock alert definitions that activate automatically for the technologies detected, and delivers notifications from the Agent (31 methods) and from Netdata Cloud (16 integrations plus personal email) with role- and room-based routing.
 
 **Learn more:** [Alerts documentation](/src/health/README.md) · [Alerts and notifications on netdata.cloud](https://www.netdata.cloud/features/dataplatform/alerts-notifications/)
 
@@ -808,8 +808,8 @@ Netdata evaluates alerts on every Agent and Parent, close to the data, with 1,10
 - **Alert acknowledgement** and **[silencing rules](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-alert-notification-silencing-rules.md)** (space-wide or personal; hierarchy by space, room, node, alert, host labels; scheduled windows)
 - Flood protection
 
-**[Agent-dispatched notifications](/src/health/notifications/README.md)** (30 methods)
-- Alerta, Amazon SNS, custom scripts, Discord, Dynatrace, email, Fleep, Flock, Gotify, ilert, IRC, Kafka, Kavenegar, Matrix, MessageBird, Microsoft Teams, ntfy, Opsgenie, PagerDuty, Prowl, Pushbullet, Pushover, Rocket.Chat, SIGNL4, Slack, SMS (SMS Server Tools 3), SMSEagle, syslog (local and remote), Telegram, Twilio
+**[Agent-dispatched notifications](/src/health/notifications/README.md)** (31 methods)
+- Alerta, Amazon SNS, custom scripts, Discord, Dynatrace, email, Fleep, Flock, Gotify, ilert, IRC, itoc360, Kafka, Kavenegar, Matrix, MessageBird, Microsoft Teams, ntfy, Opsgenie, PagerDuty, Prowl, Pushbullet, Pushover, Rocket.Chat, SIGNL4, Slack, SMS (SMS Server Tools 3), SMSEagle, syslog (local and remote), Telegram, Twilio
 - Role-based recipients, severity filtering, and automation scripts on alert transitions
 
 **[Cloud-dispatched notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md)** (16 integrations, plus personal email)
@@ -822,7 +822,7 @@ Netdata evaluates alerts on every Agent and Parent, close to the data, with 1,10
 - **Alerting that keeps working.** Evaluation on Agents and Parents continues during network or Cloud outages, with Agent-side delivery as an independent path.
 - **Alerts on behavior, not only thresholds.** Anomaly-rate and rolling-window alerts catch unusual behavior and gradual changes that fixed thresholds miss.
 - **Less noise.** Acknowledgement, hierarchical silencing rules, hysteresis and flood protection keep notifications actionable.
-- **Notifications where teams work.** 30 Agent methods and 16 Cloud integrations reach chat, incident management, ticketing and mobile.
+- **Notifications where teams work.** 31 Agent methods and 16 Cloud integrations reach chat, incident management, ticketing and mobile.
 
 ## Dashboards and Visualization
 
