@@ -32,9 +32,9 @@ atomically, so a failed push cannot publish only part of that update.
 - The Release workflow is scheduled daily at 00:00 UTC. A scheduled run skips publication when `HEAD` is already
   the last nightly version-update commit. A manual `nightly` dispatch does not use that skip condition.
 - Preparation runs from `master`, generates the changelog and writes a version derived from the nearest tag and
-  the number of commits since it, in the form `<tag>-<count-plus-one>-nightly`. When the nearest tag is a release
-  candidate (first RCs are tagged on `master`), its `-rcX` suffix is dropped, so `v2.13.0-rc1` yields
-  `v2.13.0-<count-plus-one>-nightly`. The dispatch version remains `nightly`; downstream builds read the generated
+  the number of commits since it, in the form `<tag>-<count-plus-one>-nightly`, with the count zero-padded to five
+  digits (for example `00042`). When the nearest tag is a release candidate (first RCs are tagged on `master`), its
+  `-rcX` suffix is dropped, so `v2.13.0-rc1` yields `v2.13.0-<padded-count>-nightly`. The dispatch version remains `nightly`; downstream builds read the generated
   version from `packaging/version`.
 - Source, static installer and Windows artifacts go under the `nightly` artifact prefix, including `latest`.
   GitHub releases are published automatically in `netdata/netdata-nightlies`, rather than drafted in the main repository.

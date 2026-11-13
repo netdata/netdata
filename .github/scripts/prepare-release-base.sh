@@ -89,7 +89,8 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     LAST_TAG=$(git describe --abbrev=0 --tags)
     COMMITS_SINCE_RELEASE=$(git rev-list "${LAST_TAG}"..HEAD --count)
     # Release candidates are tagged on master; nightlies carry only the numeric core.
-    NEW_VERSION="${LAST_TAG%%-rc*}-$((COMMITS_SINCE_RELEASE + 1))-nightly"
+    # Zero-pad the count so nightly versions also sort correctly as text.
+    NEW_VERSION="${LAST_TAG%%-rc*}-$(printf '%05d' "$((COMMITS_SINCE_RELEASE + 1))")-nightly"
     LAST_VERSION_COMMIT="$(git rev-list -1 HEAD packaging/version)"
     HEAD_COMMIT="$(git rev-parse HEAD)"
     if [ "${EVENT_NAME}" = 'schedule' ] && [ "${LAST_VERSION_COMMIT}" = "${HEAD_COMMIT}" ] && grep -qE '.*-nightly$' packaging/version; then

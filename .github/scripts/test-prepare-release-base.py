@@ -211,7 +211,7 @@ class ReleasePreparationTest(unittest.TestCase):
         self.git('commit', '--allow-empty', '-m', 'change')
         result, outputs = self.prepare('nightly', 'nightly')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.root / 'packaging/version').read_text(), 'v2.13.0-2-nightly\n')
+        self.assertEqual((self.root / 'packaging/version').read_text(), 'v2.13.0-00002-nightly\n')
         result, outputs = self.prepare('v2.13.0-rc1', repo='example/fork')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(outputs, {'run': 'false'})

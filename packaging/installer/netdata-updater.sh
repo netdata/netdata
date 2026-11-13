@@ -947,6 +947,10 @@ parse_version() {
 
   rm -f "${tmpfile}"
 
+  # Nightly commit counts are zero-padded; printf would read them as octal.
+  b="${b#"${b%%[!0]*}"}"
+  b="${b:-0}"
+
   if [ "${#maj}" -gt 3 ] || [ "${#min}" -gt 3 ] || [ "${#patch}" -gt 3 ] || [ "${#rc}" -gt 3 ] || [ "${#b}" -gt 5 ]; then
     warning "Failed to parse version ${r}"
     printf "%s" "${vmax}"
