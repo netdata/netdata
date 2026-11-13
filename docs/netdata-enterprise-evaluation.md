@@ -137,7 +137,7 @@ To control access to observability data, Netdata Cloud uses spaces and rooms to 
 
 Netdata scales out: you add capacity by adding Parents, and there is no limit on how large a monitored infrastructure can be.
 
-For data ingestion and storage, there is no limit, theoretical or practical. When using standalone agents, each agent is independent of the others. When using parent-child agents, each parent is sized independently of the others and the system scales by adding more parents.
+Ingestion and storage have no central component that caps them. When using standalone agents, each agent is independent of the others. When using parent-child agents, each Parent is sized on its own, and the system grows by adding Parents.
 
 Queries run in parallel on the Agents and Parents that hold the data: each one aggregates its own nodes and Netdata Cloud merges the results, so adding Parents adds query capacity too. See [Fleet-wide queries](/docs/netdata-design.md#fleet-wide-queries).
 
@@ -187,7 +187,7 @@ For AI and Large Language Models, Netdata supports Model Context Protocol (MCP) 
 Netdata provides enterprise-grade security and compliance capabilities designed to meet the requirements of regulated industries and security-conscious organizations.
 
 **Compliance Standards:**
-Netdata maintains SOC 2 Type 2 certification, with ISO 27001 on the roadmap. The platform aligns with GDPR, CCPA, HIPAA (with BAA available), and PCI DSS requirements, making it suitable for financial services, healthcare, and government deployments.
+Netdata maintains SOC 2 Type 2 certification. The platform aligns with GDPR, CCPA, HIPAA (with BAA available), and PCI DSS requirements, making it suitable for financial services, healthcare, and government deployments.
 
 **Data Sovereignty Architecture:**
 The platform's architecture ensures complete data sovereignty - all metrics, logs and traces remain on customer infrastructure. Only metadata (node names, chart titles, alert configurations) is stored in Netdata Cloud; metric, log and trace data passes through Cloud only to answer the queries users run, with all data transmission protected by TLS encryption. Air-gapped deployment options are available for maximum security isolation.

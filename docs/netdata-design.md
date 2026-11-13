@@ -184,7 +184,6 @@ Centralized systems need database administration, capacity planning for central 
 
 Everything that collects, stores, analyzes, alerts on, streams and queries your data is open source (GPLv3 or later): collection, the database, machine learning, alerting, streaming and Parents, the APIs and the MCP server. Netdata Cloud is a thin orchestration layer over the Agents; by itself it holds and does nothing, because the data and its processing are in the Agents and Parents. The dashboard is the same for free and paid users.
 
-- **Licences, exactly.** The Agent is GPLv3 or later. The dashboard is licensed under the Netdata Cloud UI License (NCUL1): free to use, provided in binary form, and usable only to interface with Netdata Agents and Netdata Cloud.
 - **Embedding means calling the APIs.** Netdata's APIs are GPL, and anyone can embed API calls anywhere.
 - **Open in, open out.** Netdata ingests Prometheus and OpenTelemetry (metrics, logs and traces), Nagios plugins and StatsD, and can export metrics to Prometheus, Graphite, OpenTSDB and other systems when you want them elsewhere. Export is openness: your data is never locked in.
 - **Netdata is a complete platform on its own.** You do not need to run anything beside it to collect, store, visualize, alert on or analyze your data.
@@ -196,7 +195,7 @@ Everything that collects, stores, analyzes, alerts on, streams and queries your 
 - **No query language required.** Netdata has a structured query API, and people never have to write queries for it: the dashboard builds them from your clicks, AI assistants build them from your questions, and your scripts and tools can call it directly. Nobody on the team has to learn a query language, and nobody has to write one during a crisis, when every minute counts.
 - **Metrics live on your Agents and Parents.** Netdata has no object-storage tier for metrics. Retention is bounded by the disk you give your Parents, and it is configurable per tier.
 - **Parent clusters are shards.** They do not talk to each other. The view across all of them is what Netdata Cloud provides, as SaaS or On-Prem, including air-gapped.
-- **Netdata is opinionated.** It is built for teams that want monitoring that works from the start. Teams that want to hand-build dashboards, joins and recording rules over raw samples will find a different tool fits them better.
+- **Netdata is opinionated.** Every metric arrives with a ready-made chart and stock alerts, organized the same way across the infrastructure. Teams trade hand-built dashboards for coverage that is complete from the first minute, with nothing to maintain, and can still build custom dashboards whenever they want one.
 - **Netdata is infrastructure and application observability.** It is not a business-intelligence, SIEM, ITSM or data-warehouse platform; it can export metrics and forward logs and traces to the systems that are.
 
 ## Questions buyers ask

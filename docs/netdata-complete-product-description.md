@@ -764,7 +764,6 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 - **[AI for alerts](/docs/netdata-ai/alerts-automation/alerts-automation.md):** alert investigation reports, AI alert explanations, AI-generated and AI-suggested alert definitions, and alert evaluation against historical data before deployment
 - **[Infrastructure Knowledge and AI Memory](/docs/netdata-ai/infrastructure-knowledge.md):** a versioned description of the infrastructure (generated from the infrastructure, from a template or written) and remembered facts that ground AI answers in the customer's environment
 - **[MCP Connections](/docs/netdata-ai/mcp/mcp-connections.md):** Netdata AI connects to external MCP servers — GitHub, Atlassian (Jira, Confluence, Bitbucket), PagerDuty and custom HTTPS MCP servers — to combine monitoring data with code, tickets and incidents
-- **AI Co-SRE:** the next version of Netdata AI, a fully autonomous SRE agent that works 24/7 on the infrastructure; custom pricing.
 
 **[MCP servers](/docs/netdata-ai/mcp/README.md)** (for any AI assistant)
 - **Agent and Parent MCP server:** Streamable HTTP (`/mcp`), SSE (`/sse`) and WebSocket transports; `nd-mcp` bridge for stdio-only clients
@@ -778,7 +777,7 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 **Value**
 
 - **Anomaly detection on everything, without configuration.** Every metric of every system, container, application and device is monitored for unusual behavior from the moment it is collected.
-- **Fewer false alarms.** Consensus across multiple models flags only behavior that is unusual by every model's judgment, eliminating about 99% of false positives.
+- **Fewer false alarms.** A sample is flagged only when all 18 models, trained over the last ~54 hours, agree, which removes about 99% of false positives.
 - **Faster root-cause analysis.** Anomaly Advisor and Metric Correlations narrow thousands of metrics to the few that changed, across the whole infrastructure.
 - **Investigations in minutes.** Netdata AI produces troubleshooting and root-cause reports, capacity and performance reviews, and alert explanations from live infrastructure data.
 - **AI grounded in the customer's environment.** Infrastructure Knowledge, AI Memory and MCP Connections combine monitoring data with the customer's own context, code and incidents.
