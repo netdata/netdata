@@ -563,7 +563,7 @@ modules:
               description: Set to `true` only on the chart set that holds the services over the limit of 500 services.
           metrics:
             - name: otel.derived_metrics.log_records
-              description: Service log records by severity
+              description: Log records
               unit: records/s
               chart_type: stacked
               dimensions:
@@ -575,26 +575,26 @@ modules:
                 - name: trace
                 - name: unspecified
             - name: otel.derived_metrics.requests
-              description: Service requests
+              description: Requests
               unit: requests/s
               chart_type: stacked
               dimensions:
                 - name: success
                 - name: error
             - name: otel.derived_metrics.request_duration_avg
-              description: Service request duration average
+              description: Request duration average
               unit: seconds
               chart_type: line
               dimensions:
                 - name: avg
             - name: otel.derived_metrics.request_duration_max
-              description: Service request duration maximum
+              description: Request duration maximum
               unit: seconds
               chart_type: line
               dimensions:
                 - name: max
             - name: otel.derived_metrics.request_duration_histogram
-              description: Service request duration histogram
+              description: Request duration histogram
               unit: requests/s
               chart_type: heatmap
               dimensions:

@@ -41,7 +41,7 @@ impl ServiceRequests {
     pub(crate) fn new(max_services: usize) -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(service_settings(max_services))?;
         let requests = builder.counter::<Outcome>(ChartDescriptor {
-            title: "Service requests".into(),
+            title: "Requests".into(),
             units: "requests/s".into(),
             family: "requests".into(),
             context: "otel.derived_metrics.requests".into(),
@@ -54,7 +54,7 @@ impl ServiceRequests {
         let duration = builder.histogram(
             DURATION_BOUNDS,
             ChartDescriptor {
-                title: "Service request duration".into(),
+                title: "Request duration".into(),
                 units: "seconds".into(),
                 family: "requests".into(),
                 context: "otel.derived_metrics.request_duration".into(),
