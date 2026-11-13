@@ -402,7 +402,7 @@ What makes this layer predictable:
 | Store | Location | Default budget | Holds | Maintained by |
 |---|---|---|---|---|
 | Investigation journal | `${NETDATA_LIB_DIR}/dem/journal` | 30 days, 1 GiB | RUM investigation entries and synthetic run records | Retention worker, at startup and hourly |
-| Captures | `${NETDATA_LIB_DIR}/dem/artifacts` | 7 days, 2 GiB | Screenshots and HTML reports, one set per run | Retention worker, at startup and hourly |
+| Captures | `${NETDATA_LIB_DIR}/dem/artifacts` | 7 days, 2 GiB | Screenshots, trace ZIPs and HTML reports, one set per run | Retention worker, at startup and hourly |
 | Browser runtime store | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; selected release retained until uninstall/replacement; 7-day soft grace for most recently used unprotected obsolete release | Complete browser runtimes and preparation workspace | Runtime host worker, at startup and hourly; explicit installer |
 | In-memory site state | Memory | Measurements: per-site `window` (5 minutes by default); investigation context: bounded session and entry counts | Rolling populations, live feed, investigation context | The site job; lost on restart |
 
