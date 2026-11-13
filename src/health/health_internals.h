@@ -183,7 +183,10 @@ struct health_raised_summary *alerts_raised_summary_create(RRDHOST *host);
 void alerts_raised_summary_populate(struct health_raised_summary *hrm);
 void alerts_raised_summary_free(struct health_raised_summary *hrm);
 void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm);
-void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm);
+void health_alarm_log_collect_notifications(RRDHOST *host);
+bool health_alarm_log_notifications_collected(void);
+void health_alarm_log_send_notifications(RRDHOST *host, struct health_raised_summary *hrm);
+void health_alarm_log_discard_notifications(void);
 
 void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap);

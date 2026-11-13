@@ -833,6 +833,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             rrdset_acquired_release(rsa);
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
+
+        // before the drain: see health_alarm_log_collect_notifications()
+        if(likely(snapshot_complete))
+            health_alarm_log_collect_notifications(host);
         health_pending_saves_drain(host);
 
         // the raised summary is no longer built here - health_send_notification()
@@ -1050,6 +1054,8 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     }
 
     if(unlikely(!service_running(SERVICE_HEALTH) || !rrdhost_should_run_health(host))) {
+        if(health_alarm_log_notifications_collected())
+            health_alarm_log_discard_notifications();
         alerts_raised_summary_free(hrm);
         return;
     }
@@ -1058,7 +1064,9 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
     // and cleanup
 
     worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS);
-    health_alarm_log_process_to_send_notifications(host, hrm);
+    if(!health_alarm_log_notifications_collected())
+        health_alarm_log_collect_notifications(host);
+    health_alarm_log_send_notifications(host, hrm);
     alerts_raised_summary_free(hrm);
 
     int32_t pending = __atomic_load_n(&host->health.pending_transitions, __ATOMIC_RELAXED);

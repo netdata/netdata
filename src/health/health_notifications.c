@@ -315,7 +315,7 @@ struct health_raised_summary *alerts_raised_summary_create(RRDHOST *host) {
 //
 // It takes the host's alert dictionary read lock, so it MUST NOT be called
 // while the health-log lock is held - see the lock-order note in
-// health_alarm_log_process_to_send_notifications().
+// health_alarm_log_collect_notifications().
 void alerts_raised_summary_populate(struct health_raised_summary *hrm) {
     if(hrm->populated)
         return;
@@ -464,7 +464,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
     // Built here, past every bail-out above, so it costs nothing unless a
     // notification is actually rendered. Idempotent across repeated calls.
     // It walks the alert dictionary, so no health-log lock may be held here
-    // (see health_alarm_log_process_to_send_notifications()).
+    // (see health_alarm_log_collect_notifications()).
     alerts_raised_summary_populate(hrm);
 
     BUFFER *warn_alarms = buffer_create(1024, &netdata_buffers_statistics.buffers_health);
@@ -547,30 +547,41 @@ done:
 static __thread struct {
     ALARM_ENTRY **array;
     size_t size;
+    size_t used;
+    uint32_t first_waiting;
+    bool collected;
 } health_due_notifications = { 0 };
 
-void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm) {
+// Collect the entries due for a notification; health_alarm_log_send_notifications() sends them.
+//
+// Sending a notification queries and writes SQLite and spawns a process, which can take seconds per entry on slow
+// storage. None of that runs under the health-log lock: chart alert teardown waits for its write lock while it holds
+// the chart and alert dictionary write locks,
+//   rrdcalc_unlink_and_delete_all_rrdset_alerts()  [alert dict write]
+//     -> rrdcalc_unlink_and_delete()
+//       -> rrdcalc_unlink_from_rrdset()
+//         -> health_alarm_log_add_entry()          [health log write]
+// and everything that walks charts or alerts would queue behind it. Building the raised summary under the health-log
+// lock would also invert that lock order.
+//
+// So the due entries are collected under the read lock, and each is pinned with pending_save_count: retention cleanup
+// skips pinned entries, and freeing a pinned entry is deferred to the metadata worker until the count drops to zero.
+// The pin is taken while the lock still protects the pointer, and dropped after the entry's last use.
+//
+// An entry that a newer transition marks UPDATED is not collected, and that newer transition is notified instead.
+// Once collected, it is sent even if it is superseded before it is sent. The health loop collects right after it
+// walks the alerts, before it saves the transitions it created: chart removal, no longer blocked by those saves, would
+// otherwise supersede the alerts that just fired before they are notified.
+void health_alarm_log_collect_notifications(RRDHOST *host) {
     time_t now = now_realtime_sec();
-    uint32_t first_waiting;
-    size_t due = 0;
 
-    // Sending a notification queries and writes SQLite and spawns a process, which can take seconds per entry
-    // on slow storage. None of that runs under the health-log lock: chart alert teardown waits for its write
-    // lock while it holds the chart and alert dictionary write locks,
-    //   rrdcalc_unlink_and_delete_all_rrdset_alerts()  [alert dict write]
-    //     -> rrdcalc_unlink_and_delete()
-    //       -> rrdcalc_unlink_from_rrdset()
-    //         -> health_alarm_log_add_entry()          [health log write]
-    // and everything that walks charts or alerts would queue behind it. Building the raised summary under the
-    // health-log lock would also invert that lock order.
-    //
-    // So the due entries are collected under the read lock, and each is pinned with pending_save_count:
-    // retention cleanup skips pinned entries, and freeing a pinned entry is deferred to the metadata worker
-    // until the count drops to zero. The pin is taken while the lock still protects the pointer, and dropped
-    // after the entry's last use below.
+    internal_fatal(health_due_notifications.collected, "HEALTH: notifications collected twice");
+    health_due_notifications.used = 0;
+    health_due_notifications.collected = true;
+
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
-    first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
+    uint32_t first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
 
     for(ALARM_ENTRY *ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
         if(unlikely(!atomic_flags_check(&ae->flags, HEALTH_ENTRY_FLAG_PROCESSED | HEALTH_ENTRY_FLAG_UPDATED))) {
@@ -578,31 +589,52 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
                 first_waiting = ae->unique_id;
 
             if(likely(now >= ae->delay_up_to_timestamp)) {
-                if(unlikely(due == health_due_notifications.size)) {
+                if(unlikely(health_due_notifications.used == health_due_notifications.size)) {
                     health_due_notifications.size = health_due_notifications.size ? health_due_notifications.size * 2 : 64;
                     health_due_notifications.array = reallocz(
                         health_due_notifications.array, health_due_notifications.size * sizeof(ALARM_ENTRY *));
                 }
 
                 __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
-                health_due_notifications.array[due++] = ae;
+                health_due_notifications.array[health_due_notifications.used++] = ae;
             }
         }
     }
 
     rw_spinlock_read_unlock(&host->health_log.spinlock);
 
-    for(size_t i = 0; i < due; i++) {
+    health_due_notifications.first_waiting = first_waiting;
+}
+
+bool health_alarm_log_notifications_collected(void) {
+    return health_due_notifications.collected;
+}
+
+static void health_alarm_log_unpin_collected(RRDHOST *host, struct health_raised_summary *hrm) {
+    for(size_t i = 0; i < health_due_notifications.used; i++) {
         ALARM_ENTRY *ae = health_due_notifications.array[i];
 
-        // Sent even if a newer transition marked it UPDATED after it was collected: whether it is due was decided
-        // under the lock, as before. Re-checking here would drop the notification of every alert whose chart is
-        // removed while the pass runs, since the removal no longer waits for the pass.
-        health_send_notification(host, ae, hrm);
+        if(hrm)
+            health_send_notification(host, ae, hrm);
 
         // release: this entry's last use above happens before whoever frees it sees the pin drop
         __atomic_sub_fetch(&ae->pending_save_count, 1, __ATOMIC_RELEASE);
     }
+
+    health_due_notifications.used = 0;
+    health_due_notifications.collected = false;
+}
+
+// Drop the collected entries without sending them (shutdown, or the host stopped running health). They were not
+// marked PROCESSED, and the watermark is not advanced, so a later pass finds them again.
+void health_alarm_log_discard_notifications(void) {
+    health_alarm_log_unpin_collected(NULL, NULL);
+}
+
+// Send the collected entries, then free the log entries nothing needs any more.
+void health_alarm_log_send_notifications(RRDHOST *host, struct health_raised_summary *hrm) {
+    uint32_t first_waiting = health_due_notifications.first_waiting;
+    health_alarm_log_unpin_collected(host, hrm);
 
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
