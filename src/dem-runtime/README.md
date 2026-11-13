@@ -203,8 +203,8 @@ baseline error event/result and does not authorize replay with weaker settings.
 
 Output extensions MUST be explicitly requested by an Agent that understands
 them and selected by the runtime for that attempt. The neutral `extensions` request
-member and `extension_init` acknowledgement implement this gate for `failure_evidence.v1`
-and the opt-in `browser_summary.v1`. The execution contract remains 2.
+member and `extension_init` acknowledgement implement this gate for `failure_evidence.v1`,
+the opt-in `browser_summary.v1`, and capture-enabled `capture_details.v1`. The execution contract remains 2.
 
 | Change | Compatible evolution rule |
 |---|---|
