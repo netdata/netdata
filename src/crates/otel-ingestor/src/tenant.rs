@@ -9,8 +9,8 @@
 //! `TenantId::validate_ingest` (file-registry); this module only extracts
 //! the header and maps the outcomes onto transport errors.
 
-use bridge::config::AuthConfig;
 use file_registry::TenantId;
+use otel_bridge::config::AuthConfig;
 use tonic::Status;
 
 /// Resolve the tenant a gRPC OTLP export request belongs to.

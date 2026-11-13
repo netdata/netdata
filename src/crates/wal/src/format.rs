@@ -12,7 +12,7 @@
 //! and rejects in a fixed order — magic, version, header CRC, unknown flag
 //! bits, compression id, `content_meta` cap — so a corrupt or foreign file
 //! fails before any field is interpreted. The header carries no partition key
-//! and no footer: `part_key` lives only in the filename `FileId` stem (the
+//! and no footer: `partition_key` lives only in the filename `FileId` stem (the
 //! `file-registry` stem contract), and a file recovered from disk has no
 //! durable prefix or log-time range (`wal::registry` re-reads the header for
 //! identity only).
@@ -25,8 +25,8 @@
 //! by `wal::Writer` in the ingestor and, wrapped in [`Message`], applied by
 //! the ledger's per-tenant registries (`file-lifecycle` forwards to
 //! `wal::Registry::apply_event`); `Message` is that link's envelope,
-//! produced by the ingestor's `LedgerSender` and gap-checked + routed in
-//! `otel-ledger`'s ingestor.
+//! produced by the ingestor's `LedgerSender` and routed in `otel-ledger`'s
+//! ingestor.
 //! `Message` rides the ingestor→ledger ferryboat IPC link (length-delimited
 //! bincode, 8 MiB default) — that framing is the transport's, independent of
 //! the WAL frame layout below.
@@ -53,6 +53,18 @@ pub const HEADER_SIZE: usize = 4096;
 /// writer rejects a larger blob rather than truncate it (truncation would
 /// corrupt the identity).
 pub const MAX_CONTENT_META_BYTES: usize = 1024;
+
+/// The largest frame payload that the reader accepts, as stored (compressed
+/// or not) and after decompression. The reader refuses a larger one before
+/// it allocates anything, and with it the rest of the file.
+pub(crate) const MAX_FRAME_PAYLOAD: usize = 64 * 1024 * 1024;
+
+/// The largest frame data that the writer takes, before compression. The
+/// writer refuses more, so it never stores a frame that the reader refuses.
+/// It is half of what the reader accepts (`MAX_FRAME_PAYLOAD`): LZ4 makes
+/// data that does not compress a little larger (`lz4_flex` bounds it at 1.1
+/// times), and half leaves that room with a round number.
+pub const MAX_FRAME_DATA: usize = MAX_FRAME_PAYLOAD / 2;
 
 /// Byte offset where the header's `content_meta` blob begins:
 /// `MAGIC(4) + version(2) + flags(2) + created_at(8) + payload_format(2) +
@@ -110,10 +122,10 @@ pub const FRAME_ALIGNMENT: usize = 8;
 /// `payload_format(2)`, then `content_meta` length-prefixed —
 /// `content_meta_len(2) content_meta` — capped at [`MAX_CONTENT_META_BYTES`].
 /// The rest of the page is zero except the last 4 bytes, a CRC32 over
-/// everything before it. The header stores no partition key: the `part_key`
-/// is the single source of truth in the filename (`FileId`), and
-/// `content_meta` is an opaque content-plane blob (for OTel logs, the encoded
-/// service identity) the WAL never interprets.
+/// everything before it. The header stores no `partition_key`: the filename
+/// (`FileId`) is its single source of truth, and `content_meta` is an opaque
+/// content-plane blob (for OTel logs, the encoded service identity) the WAL
+/// never interprets.
 #[derive(Debug, Clone)]
 pub struct FileHeader {
     pub version: u16,
@@ -288,11 +300,9 @@ pub enum FileEvent {
         max_timestamp_ns: TimestampNs,
         size: ByteSize,
         /// Durable prefix at seal time: the end of the last frame fsynced
-        /// before the seal. May postdate the last `Synced` (the
-        /// idle-rotation and `Drop` close paths seal without emitting a
-        /// final `Synced`); carried so a sealed file's prefix is
-        /// authoritative even if the final `Synced` was reordered or lost
-        /// in flight to the ledger.
+        /// before the seal. Usually later than the last `Synced`: no seal
+        /// queues a `Synced` of its own (the writer's `Stream::seal`), so
+        /// a sealed file's prefix does not depend on a `Synced` before it.
         valid_up_to: ByteSize,
         /// Log records in that durable prefix at seal time.
         entry_count: u64,
@@ -301,10 +311,9 @@ pub enum FileEvent {
 
 impl FileEvent {
     /// The signal axis (`pipeline_id`) of the file this event concerns. Every
-    /// variant carries a `FileId`, which carries the pipeline. The ingestor
-    /// keys its per-signal `Message::frame_seq` stream by this value, and the
-    /// ledger routes the event to the owning pipeline by it (decoding the raw
-    /// id via `bridge::signals::Signal::try_from`).
+    /// variant carries a `FileId`, which carries the pipeline. The ledger
+    /// routes the event to the owning pipeline by it (decoding the raw id via
+    /// `otel_bridge::signals::Signal::try_from`).
     pub fn pipeline_id(&self) -> u16 {
         match self {
             FileEvent::Created { file_id, .. }
@@ -320,13 +329,13 @@ impl FileEvent {
 /// Cross-process wire contract: the two ends are separate processes
 /// exchanging bincode over the ferryboat link (8 MiB default), so enum
 /// variant order and field shapes must not change silently.
+///
+/// The link is one reliable ordered stream, and the ingestor queues a file's
+/// events under that file's writer lock: the ledger gets every event once,
+/// and the events of one file in the file's order. The messages carry no
+/// number, because the order of the events of different files means nothing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
-    /// The link's per-signal message sequence, not a WAL frame index: the
-    /// ingestor numbers each signal's messages from 1 (keyed by
-    /// [`FileEvent::pipeline_id`]) and the ledger gap-checks per signal — a
-    /// gap is a genuinely lost event for that signal.
-    pub frame_seq: u64,
     /// Tenant the event's file belongs to; routes the event to that tenant's
     /// registry (the event itself carries no tenant).
     pub tenant_id: TenantId,

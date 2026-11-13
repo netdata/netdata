@@ -3,7 +3,7 @@
 //!
 //! Responses arrive on the merged per-pipeline channel, tagged with the owning
 //! `Signal` by that pipeline's forwarder (`pipeline.rs` `spawn_forwarder`).
-//! On `Rotated` — a scope's entries are now an immutable catalog file on local
+//! On `Rotated` — a scope's entries are now a catalog file on local
 //! disk — this records the file in the tenant registry (query-time discovery
 //! + retention scan it), marks the covered SFST seqs locally cataloged
 //! (`mark_rotated_many`: reconciliation bookkeeping — eviction itself waits
@@ -11,20 +11,12 @@
 //! `UploadCatalog` with the shared uploader (none when remote storage is
 //! disabled). The remaining variants only log.
 
-use bridge::signals::Signal;
 use file_lifecycle::ipc::{CatalogBuilderRequest, CatalogBuilderResponse, UploaderRequest};
+use otel_bridge::signals::Signal;
 
 use crate::event::PipelineResp;
 
 use super::Ledger;
-
-/// Budget for the clean-shutdown catalog flush: the LOCAL rotations must
-/// finish inside it; the follow-up uploads are best effort (next boot's
-/// `recovery::remote::reconcile_local_catalog_uploads` re-uploads whatever
-/// didn't land). Kept BELOW the supervisor's 2s worker-exit wait
-/// (`supervisor.rs` `shutdown_workers`) so the flush can finish and the
-/// process exit before the supervisor stops waiting.
-const SHUTDOWN_FLUSH_BUDGET: std::time::Duration = std::time::Duration::from_secs(1);
 
 impl Ledger {
     pub(super) async fn handle_catalog_builder_resp(
@@ -140,13 +132,18 @@ impl Ledger {
     /// drains the merged worker channel until every builder reports
     /// `FlushComplete` or the budget expires.
     ///
-    /// Only the LOCAL writes are guaranteed: each `Rotated` handled here still
-    /// registers the file and queues an upload (best effort; next boot's
-    /// `reconcile_local_catalog_uploads` finishes the misses). The drain also
-    /// services `Indexer` responses (a late seal still registers its SFST and
-    /// queues its WAL delete) and counts a `WorkerGone` builder as done —
-    /// unlike the run loop, where worker death is fatal, the process is
-    /// exiting anyway and a dead builder must not hold the drain.
+    /// The budget is the worker's stop budget (`otel_bridge::shutdown`).
+    /// Only the LOCAL writes matter here: each `Rotated` handled here still
+    /// registers the file and queues an upload, but the ledger leaves right
+    /// after the flush and does not wait for uploads: against a real remote
+    /// they do not finish. The next start's
+    /// `recovery::remote::reconcile_local_catalog_uploads` uploads every
+    /// local catalog that the remote does not have. The drain also
+    /// services `Indexer` responses (a late indexing operation still
+    /// registers its SFST and queues its WAL delete) and counts a
+    /// `WorkerGone` builder as done — unlike the run loop, where worker death
+    /// is fatal, the process is exiting anyway and a dead builder must not
+    /// hold the drain.
     pub(in crate::ledger) async fn flush_catalogs_on_shutdown(&mut self) {
         let mut pending = 0usize;
         for signal in [Signal::Logs, Signal::Traces] {
@@ -177,8 +174,9 @@ impl Ledger {
                         }
                         other => self.handle_catalog_builder_resp(signal, other).await,
                     },
-                    // A seal may still be completing; handle it rather than drop
-                    // it (it registers the SFST / queues its WAL delete).
+                    // An indexing operation may still be completing; handle it
+                    // rather than drop it (it registers the SFST / queues its
+                    // WAL delete).
                     Some((signal, PipelineResp::Indexer(resp))) => {
                         self.handle_indexer_resp(signal, resp).await
                     }
@@ -195,14 +193,12 @@ impl Ledger {
             }
         };
 
-        if tokio::time::timeout(SHUTDOWN_FLUSH_BUDGET, drain)
-            .await
-            .is_err()
-        {
+        let budget = otel_bridge::shutdown::WORKER_STOP_BUDGET;
+        if tokio::time::timeout(budget, drain).await.is_err() {
             tracing::warn!(
                 "shutdown catalog flush exceeded {}s budget; {pending} builder(s) unconfirmed \
                  (next-boot reconcile re-uploads any missing catalogs)",
-                SHUTDOWN_FLUSH_BUDGET.as_secs(),
+                budget.as_secs(),
             );
         }
     }

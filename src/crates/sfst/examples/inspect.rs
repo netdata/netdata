@@ -142,16 +142,16 @@ fn dump(path: &PathBuf, limit: Option<u32>) -> Result<(), Box<dyn std::error::Er
     let string_table = reader.build_string_table(fields)?;
     eprintln!("string table: {} entries", string_table.len());
 
-    // part_key comes from the filename, not the file bytes — FileId::parse
+    // partition_key comes from the filename, not the file bytes — FileId::parse
     // reads the stem; 0 when the name isn't a conformant FileId.
-    let part_key = file_registry::FileId::parse(path)
-        .map(|id| id.part_key)
+    let partition_key = file_registry::FileId::parse(path)
+        .map(|id| id.partition_key)
         .unwrap_or(0);
     let entries = reader.load_all_stream_entries()?;
     let timestamps = reader.load_timestamps()?;
     eprintln!(
-        "part_key {:016x}: {} entries across {} batch(es)",
-        part_key,
+        "partition_key {:016x}: {} entries across {} batch(es)",
+        partition_key,
         entries.len(),
         reader.num_stream_batches(),
     );
@@ -263,15 +263,15 @@ fn sections(path: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // part_key from the filename, as in dump(); it labels each SB chunk.
-    let part_key = file_registry::FileId::parse(path)
-        .map(|id| id.part_key)
+    // partition_key from the filename, as in dump(); it labels each SB chunk.
+    let partition_key = file_registry::FileId::parse(path)
+        .map(|id| id.partition_key)
         .unwrap_or(0);
     let mut stream_total = 0usize;
     for b in 0..reader.num_stream_batches() {
         if let Ok(raw) = sfst.stream_batch_raw(b) {
             print_section(
-                &format!("SB{b:02} part_key={part_key:016x}"),
+                &format!("SB{b:02} partition_key={partition_key:016x}"),
                 raw.len(),
                 file_size,
             );

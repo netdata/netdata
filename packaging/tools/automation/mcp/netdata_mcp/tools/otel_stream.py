@@ -1,6 +1,6 @@
 """Otel streams: run a continuous real-world OTLP source against an agent.
 
-The live otel-streams sources (certstream / jetstream / github) are daemons —
+The live otel-streams sources (certstream / jetstream / github / ris) are daemons —
 they never exit on their own — so they get a start/status/stop lifecycle (like a
 launched agent), unlike the one-shot `netdata_agent_otel_push_logs`. One source-enum
 trio, not a tool per source: the lifecycle is identical across them; only a few
@@ -18,15 +18,17 @@ from .. import streams
 from ._common import get_runs, get_streams
 
 _Source = Annotated[
-    Literal["certstream", "jetstream", "github"],
-    Field(description="Which live source to run: certstream (CT logs), jetstream (Bluesky firehose), github (GH Archive replay)."),
+    Literal["certstream", "jetstream", "github", "ris"],
+    Field(description="Which live source to run: certstream (CT logs), jetstream (Bluesky firehose), github (GH Archive replay), ris (RIPE RIS Live BGP messages)."),
 ]
 _AgentId = Annotated[str, Field(description="A ready agent (declare + run_start) to feed.")]
 _StreamId = Annotated[str, Field(description="Stream id returned by netdata_agent_otel_stream_start.")]
-_Url = Annotated[str | None, Field(description="Override source URL — certstream (--certstream-url) or jetstream (--jetstream-url) only.")]
+_Url = Annotated[str | None, Field(description="Override source URL — certstream (--certstream-url), jetstream (--jetstream-url) or ris (--ris-url) only.")]
 _Collections = Annotated[str | None, Field(description="jetstream only: comma-separated collection filter.")]
 _Start = Annotated[str | None, Field(description="github only: archive start hour, YYYY-MM-DD-H.")]
 _Rate = Annotated[int | None, Field(description="github only: replay rate (events/s; 0 = unlimited).", ge=0)]
+_Host = Annotated[str | None, Field(description="ris only: stream from this one RRC collector (e.g. rrc00); default = all collectors.")]
+_MsgType = Annotated[str | None, Field(description="ris only: stream this one BGP message type (e.g. UPDATE); default = all types.")]
 _Tenant = Annotated[str | None, Field(description="Tenant id sent via the X-Scope-OrgID gRPC header.")]
 _BatchSize = Annotated[int, Field(description="Max records per gRPC export request.", ge=1)]
 _FlushMs = Annotated[int, Field(description="Max ms before flushing a partial batch.", ge=1)]
@@ -60,19 +62,24 @@ def _info(s: streams.Stream, *, message: str = "") -> StreamInfo:
 
 
 def validate_source_params(
-    source: str, *, url: str | None, collections: str | None, start: str | None, rate: int | None
+    source: str, *, url: str | None, collections: str | None, start: str | None, rate: int | None,
+    host: str | None = None, msg_type: str | None = None,
 ) -> str | None:
     """Reject params that don't apply to the chosen source, so a misdirected flag
     fails clearly instead of being silently ignored."""
     bad = []
-    if url is not None and source not in ("certstream", "jetstream"):
-        bad.append("url (certstream/jetstream only)")
+    if url is not None and source not in ("certstream", "jetstream", "ris"):
+        bad.append("url (certstream/jetstream/ris only)")
     if collections is not None and source != "jetstream":
         bad.append("collections (jetstream only)")
     if start is not None and source != "github":
         bad.append("start (github only)")
     if rate is not None and source != "github":
         bad.append("rate (github only)")
+    if host is not None and source != "ris":
+        bad.append("host (ris only)")
+    if msg_type is not None and source != "ris":
+        bad.append("msg_type (ris only)")
     if bad:
         return f"params not valid for source {source!r}: {', '.join(bad)}"
     return None
@@ -83,7 +90,7 @@ def register(mcp: FastMCP) -> None:
         name="netdata_agent_otel_stream_start",
         description=(
             "Start a continuous real-world OTLP source feeding a ready agent's otel "
-            "plugin (certstream/jetstream/github). Returns a stream_id; the source runs "
+            "plugin (certstream/jetstream/github/ris). Returns a stream_id; the source runs "
             "until netdata_agent_otel_stream_stop. For a deterministic one-shot corpus "
             "use netdata_agent_otel_push_logs / netdata_agent_otel_push_traces instead. "
             "First call also builds the source (cargo)."
@@ -97,6 +104,8 @@ def register(mcp: FastMCP) -> None:
         collections: _Collections = None,
         start: _Start = None,
         rate: _Rate = None,
+        host: _Host = None,
+        msg_type: _MsgType = None,
         tenant_id: _Tenant = None,
         batch_size: _BatchSize = 100,
         flush_interval_ms: _FlushMs = 1000,
@@ -109,12 +118,15 @@ def register(mcp: FastMCP) -> None:
                 error=f"Agent {agent_id!r} is not ready (state={state}) or has no OTLP endpoint. "
                 "Start it with netdata_run_start and poll until 'ready'.",
             )
-        verr = validate_source_params(source, url=url, collections=collections, start=start, rate=rate)
+        verr = validate_source_params(
+            source, url=url, collections=collections, start=start, rate=rate, host=host, msg_type=msg_type,
+        )
         if verr is not None:
             return StreamInfo(agent_id=agent_id, source=source, state="error", error=verr)
         cmd = streams.stream_cmd(
             source, run.otlp_endpoint, url=url, collections=collections, start=start,
             rate=rate, tenant_id=tenant_id, batch_size=batch_size, flush_interval_ms=flush_interval_ms,
+            host=host, msg_type=msg_type,
         )
         s = get_streams(ctx).start(agent_id, run.worktree, run.otlp_endpoint, source, cmd)
         return _info(s, message=f"stream {source} started; poll netdata_agent_otel_stream_status({s.stream_id!r})")

@@ -1,9 +1,9 @@
-//! Writer↔reader round-trip tests: files built chunk-by-chunk with the
-//! buffer-all [`FixtureWriter`] + `writer::pack` (deliberately looser
-//! than the public `ChunkWriter`, so partial files — no SUMR, no META —
-//! and multi-field/multi-batch layouts are expressible), read back
-//! through `ChunkReader` (once via [`IndexReader`]) and asserted to
-//! decode exactly what was written. The container-integrity section
+//! Writer↔reader round-trip tests: files written chunk-by-chunk with
+//! the buffer-all [`FixtureWriter`] + `writer::pack` (deliberately
+//! looser than the public `ChunkWriter`, so partial files — no SUMR, no
+//! META — and multi-field/multi-batch layouts are expressible), read
+//! back through `ChunkReader` (once via [`IndexReader`]) and asserted
+//! to decode exactly what was written. The container-integrity section
 //! instead byte-patches a valid minimal file.
 //!
 //! Pins:

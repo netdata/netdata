@@ -121,6 +121,14 @@ modules:
               description: Per-tier maximum age. Replace `<tier>` with `raw`, `minute_1`, `minute_5`, or `hour_1`. The default `null` disables time-based eviction; set a duration to add an age cap.
               default_value: "null"
               required: false
+            - name: charts.memory_diagnostics.enabled
+              description: Enable the memory diagnostics charts (`netdata.netflow.memory_*`). They read the process memory maps and estimate the size of in-memory structures, so they cost more than the default charts.
+              default_value: false
+              required: false
+            - name: charts.memory_diagnostics.interval
+              description: How often the memory diagnostics charts update. When `enabled` is `true`, it must be at least `1s`. A value that is not whole seconds is rounded up to whole seconds.
+              default_value: 10s
+              required: false
         examples:
           folding:
             title: Config
@@ -192,15 +200,21 @@ modules:
           labels: []
           metrics:
             - name: netdata.netflow.input_packets
-              description: UDP datagrams received by the collector and listener-buffer losses.
+              description: Netflow UDP Input Packets
               unit: packets/s
               chart_type: line
               dimensions:
                 - name: udp_received
                 - name: kernel_dropped
                 - name: empty
+            - name: netdata.netflow.input_bytes
+              description: Netflow Input Bytes
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: udp_received
             - name: netdata.netflow.protocol_packets
-              description: Successfully identified network-flow packets by wire protocol.
+              description: Netflow Protocol Packets
               unit: packets/s
               chart_type: stacked
               dimensions:
@@ -210,7 +224,7 @@ modules:
                 - name: ipfix
                 - name: sflow
             - name: netdata.netflow.flow_sets
-              description: NetFlow v9 and IPFIX Sets by protocol and Set purpose.
+              description: Netflow Sets
               unit: sets/s
               chart_type: stacked
               dimensions:
@@ -227,7 +241,7 @@ modules:
                 - name: ipfix_missing_template
                 - name: ipfix_ignored
             - name: netdata.netflow.templates
-              description: NetFlow v9 and IPFIX template definitions received.
+              description: Netflow Template Definitions
               unit: templates/s
               chart_type: stacked
               dimensions:
@@ -236,7 +250,7 @@ modules:
                 - name: ipfix_data
                 - name: ipfix_options
             - name: netdata.netflow.flow_records
-              description: Data Records decoded by wire protocol before row projection.
+              description: Netflow Decoded Data Records
               unit: records/s
               chart_type: stacked
               dimensions:
@@ -245,7 +259,7 @@ modules:
                 - name: netflow_v9
                 - name: ipfix
             - name: netdata.netflow.options_records
-              description: Options Records and sampling configuration Data Records.
+              description: Netflow Options Records
               unit: records/s
               chart_type: stacked
               dimensions:
@@ -253,7 +267,7 @@ modules:
                 - name: ipfix
                 - name: sampling_data
             - name: netdata.netflow.sflow_samples
-              description: sFlow samples by sample type.
+              description: sFlow Samples
               unit: samples/s
               chart_type: stacked
               dimensions:
@@ -264,7 +278,7 @@ modules:
                 - name: rt_flow
                 - name: unknown
             - name: netdata.netflow.decoder_exceptions
-              description: Exceptional receive and decode outcomes that explain missing rows.
+              description: Netflow Decoder Exceptions
               unit: events/s
               chart_type: line
               dimensions:
@@ -278,8 +292,18 @@ modules:
                 - name: decapsulation_failed_records
                 - name: unsupported_data_sets
                 - name: ipfix_zero_reverse_records
+            - name: netdata.netflow.decoder_scopes
+              description: Netflow Decoder Scope Counts
+              unit: scopes
+              chart_type: line
+              dimensions:
+                - name: v9_sources
+                - name: ipfix_sources
+                - name: legacy_sources
+                - name: namespaces
+                - name: hydrated_sources
             - name: netdata.netflow.flow_rows
-              description: Decoded rows and their final filtering or journal outcomes.
+              description: Netflow Row Pipeline
               unit: rows/s
               chart_type: line
               dimensions:
@@ -288,7 +312,7 @@ modules:
                 - name: journaled
                 - name: write_failed
             - name: netdata.netflow.nsel_events
-              description: Cisco NSEL records by firewall event type.
+              description: Cisco NSEL Events
               unit: records/s
               chart_type: stacked
               dimensions:
@@ -299,22 +323,89 @@ modules:
                 - name: unsupported
                 - name: malformed
             - name: netdata.netflow.nsel_rows
-              description: Forward and reverse traffic rows projected from Cisco NSEL updates.
+              description: Cisco NSEL Rows
               unit: rows/s
               chart_type: stacked
               dimensions:
                 - name: forward
                 - name: reverse
             - name: netdata.netflow.nsel_exceptions
-              description: Cisco NSEL counter outcomes that suppress or modify row projection.
+              description: Cisco NSEL Exceptions
               unit: events/s
               chart_type: line
               dimensions:
                 - name: counterless_updates
                 - name: partial_counter_directions
                 - name: zero_responder
+            - name: netdata.netflow.raw_journal_ops
+              description: Netflow Raw Journal Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: entries_written
+                - name: write_errors
+                - name: sync_calls
+                - name: sync_errors
+            - name: netdata.netflow.raw_journal_bytes
+              description: Netflow Raw Journal Logical Bytes
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: logical_written
+            - name: netdata.netflow.materialized_tier_ops
+              description: Netflow Materialized Tier Operations
+              unit: ops/s
+              chart_type: line
+              dimensions:
+                - name: minute_1_rows
+                - name: minute_5_rows
+                - name: hour_1_rows
+                - name: flushes
+                - name: write_errors
+                - name: sync_calls
+                - name: sync_errors
+            - name: netdata.netflow.materialized_tier_bytes
+              description: Netflow Materialized Tier Logical Bytes
+              unit: bytes/s
+              chart_type: stacked
+              dimensions:
+                - name: minute_1_logical_written
+                - name: minute_5_logical_written
+                - name: hour_1_logical_written
+            - name: netdata.netflow.tier_commit_age
+              description: Netflow Tier Commit Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: minute_1
+                - name: minute_5
+                - name: hour_1
+            - name: netdata.netflow.tier_commit_duration
+              description: Netflow Tier Commit Duration
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: minute_1
+                - name: minute_5
+                - name: hour_1
+            - name: netdata.netflow.tier_commit_batches
+              description: Netflow Tier Commit Batches
+              unit: batches/s
+              chart_type: line
+              dimensions:
+                - name: minute_1
+                - name: minute_5
+                - name: hour_1
+            - name: netdata.netflow.tier_commit_stretched
+              description: Netflow Tier Commit Stretched Windows
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: minute_1
+                - name: minute_5
+                - name: hour_1
             - name: netdata.netflow.journal_io_ops
-              description: Decoder-state persistence and facet-index operations and errors.
+              description: Netflow Journal Auxiliary I/O Operations
               unit: ops/s
               chart_type: line
               dimensions:
@@ -324,6 +415,103 @@ modules:
                 - name: facet_active_update_errors
                 - name: facet_lifecycle_errors
                 - name: facet_persist_errors
+            - name: netdata.netflow.journal_io_bytes
+              description: Netflow Journal Auxiliary I/O Bytes
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: decoder_state_persist_bytes
+            - name: netdata.netflow.open_tiers
+              description: Netflow Open Tier Rows
+              unit: rows
+              chart_type: stacked
+              dimensions:
+                - name: minute_1
+                - name: minute_5
+                - name: hour_1
+            - name: netdata.netflow.tier_index_entries
+              description: Netflow Tier Index Entries
+              unit: entries
+              chart_type: line
+              dimensions:
+                - name: hours
+                - name: flows
+            - name: netdata.netflow.facet_values
+              description: Netflow Facet Values
+              unit: values
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: exposed
+            - name: netdata.netflow.facet_fields
+              description: Netflow Facet Fields
+              unit: fields
+              chart_type: line
+              dimensions:
+                - name: populated
+                - name: autocomplete
+            - name: netdata.netflow.memory_resident_bytes
+              description: Netflow Process Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: rss
+                - name: hwm
+                - name: rss_anon
+                - name: rss_file
+                - name: rss_shmem
+                - name: anon_huge_pages
+            - name: netdata.netflow.memory_resident_mapping_bytes
+              description: Netflow Resident Mapping Breakdown
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: heap
+                - name: anon_other
+                - name: journal_raw
+                - name: journal_1m
+                - name: journal_5m
+                - name: journal_1h
+                - name: geoip_asn
+                - name: geoip_geo
+                - name: other_file
+                - name: shmem
+            - name: netdata.netflow.memory_allocator_bytes
+              description: Netflow Allocator Memory
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: heap_in_use
+                - name: heap_free
+                - name: heap_arena
+                - name: mmap_in_use
+                - name: releasable
+            - name: netdata.netflow.memory_accounted_bytes
+              description: Netflow Accounted Memory
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: facet_archived
+                - name: facet_active
+                - name: facet_active_contributions
+                - name: facet_published
+                - name: facet_archived_paths
+                - name: tier_indexes
+                - name: open_tiers
+                - name: geoip_asn
+                - name: geoip_geo
+                - name: unaccounted
+            - name: netdata.netflow.memory_tier_index_bytes
+              description: Netflow Tier Index Memory Breakdown
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: row_storage
+                - name: field_stores
+                - name: flow_lookup
+                - name: schema
+                - name: index_keys
+                - name: scratch_field_ids
 
   - meta:
       plugin_name: netflow-plugin
@@ -449,10 +637,10 @@ modules:
           - name: Verifying flow data is arriving and diagnosing failures
             description: |
               See [Troubleshooting](/docs/npm/network-flows/troubleshooting.md) for
-              the full diagnostic recipe. Use `netflow.input_packets` for UDP arrival,
-              `netflow.protocol_packets` for v5/v7/v9/IPFIX/sFlow identification, and
-              `netflow.decoder_exceptions` for parse failures. For v9/IPFIX, watch the
-              missing-template dimensions on `netflow.flow_sets`; Data Sets arriving before
+              the full diagnostic recipe. Use `netdata.netflow.input_packets` for UDP arrival,
+              `netdata.netflow.protocol_packets` for v5/v7/v9/IPFIX/sFlow identification, and
+              `netdata.netflow.decoder_exceptions` for parse failures. For v9/IPFIX, watch the
+              missing-template dimensions on `netdata.netflow.flow_sets`; Data Sets arriving before
               their templates cannot be decoded. See also
               [Validation and Data Quality](/docs/npm/network-flows/validation.md).
     metrics:

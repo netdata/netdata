@@ -14,8 +14,8 @@
 //! still exists; `handle_retry_tick` re-issues due entries with capped
 //! exponential backoff.
 
-use bridge::signals::Signal;
 use file_registry::{SeqKey, TimestampNs};
+use otel_bridge::signals::Signal;
 use tokio::time::Instant;
 
 use file_lifecycle::ipc::{CatalogBuilderRequest, UploaderRequest, UploaderResponse};
@@ -47,6 +47,13 @@ impl Ledger {
         // and await on the registries lock.
         let registries = pipeline.registries().clone();
         let catalog_builder_tx = pipeline.catalog_builder_tx().clone();
+
+        // For the upload charts: index files and catalog files together.
+        let succeeded = matches!(
+            resp,
+            UploaderResponse::Uploaded { .. } | UploaderResponse::CatalogUploaded { .. }
+        );
+        self.storage_totals.upload_finished(succeeded);
 
         match resp {
             UploaderResponse::Uploaded {

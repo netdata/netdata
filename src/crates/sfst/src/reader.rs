@@ -72,6 +72,31 @@ pub(crate) fn unpack<T: DeserializeOwned>(data: &[u8]) -> Result<T, Error> {
     Ok(val)
 }
 
+/// The FST of a packed [`PrefixMap`](crate::PrefixMap) payload. The
+/// payload serializes the FST bytes first (a bincode length, then the
+/// bytes) and the values after them, so decompression streams only up
+/// to the FST's end: listing a dictionary's keys never decompresses its
+/// position bitmaps.
+fn unpack_fst(data: &[u8]) -> Result<fst::Map<Vec<u8>>, Error> {
+    use std::io::Read;
+    let zstd_err = |e: std::io::Error| Error::Zstd(e.to_string());
+    let mut decoder = zstd::stream::read::Decoder::with_buffer(data).map_err(zstd_err)?;
+    let len: u64 = bincode::decode_from_std_read(&mut decoder, bincode::config::standard())?;
+    // `take` bounds the read by the stream, not by a length a corrupt
+    // payload could inflate.
+    let mut fst_bytes = Vec::new();
+    decoder
+        .take(len)
+        .read_to_end(&mut fst_bytes)
+        .map_err(zstd_err)?;
+    if fst_bytes.len() as u64 != len {
+        return Err(Error::CorruptIndex(
+            "dictionary FST shorter than its declared length".into(),
+        ));
+    }
+    fst::Map::new(fst_bytes).map_err(|e| Error::CorruptIndex(format!("dictionary FST: {e}")))
+}
+
 /// Zero-copy reader over a memory-mapped (or in-memory) SFST file.
 ///
 /// `open` parses only the header and TOC. Typed accessors decode their
@@ -236,6 +261,12 @@ impl<'a> ChunkReader<'a> {
         unpack(self.primary_raw()?)
     }
 
+    /// The primary chunk's FST alone, without the position bitmaps
+    /// that follow it in the payload (see [`unpack_fst`]).
+    pub(crate) fn primary_fst(&self) -> Result<fst::Map<Vec<u8>>, Error> {
+        unpack_fst(self.primary_raw()?)
+    }
+
     /// Raw compressed bytes of the primary chunk.
     pub fn primary_raw(&self) -> Result<&'a [u8], Error> {
         self.chunk_raw_by_id(CHUNK_PRIMARY)
@@ -246,6 +277,12 @@ impl<'a> ChunkReader<'a> {
     /// Decompress and deserialize a mid-card field FST by index.
     pub(crate) fn mid_field(&self, index: u16) -> Result<PrefixMap<BitmapValue>, Error> {
         unpack(self.mid_field_raw(index)?)
+    }
+
+    /// A mid-card field chunk's FST alone, without its position bitmaps
+    /// (see [`unpack_fst`]).
+    pub(crate) fn mid_field_fst(&self, index: u16) -> Result<fst::Map<Vec<u8>>, Error> {
+        unpack_fst(self.mid_field_raw(index)?)
     }
 
     /// Raw compressed bytes of a mid-card field chunk (crc32-verified).
@@ -452,8 +489,9 @@ impl<'a> ChunkReader<'a> {
     /// results, never a panic.
     pub fn trace_id_index(&self) -> Result<TraceIdIndex, Error> {
         // The index resolves positions against the `TRCE` column, so the column
-        // must be present — the writer guarantees TIDX ⟹ trace_id at seal; this
-        // is the symmetric read-side guard for a file produced out-of-band.
+        // must be present — the writer guarantees TIDX ⟹ trace_id at write
+        // time; this is the symmetric read-side guard for a file produced
+        // out-of-band.
         self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
         let index: TraceIdIndex = unpack(self.chunk_raw_by_id(CHUNK_TRACE_INDEX)?)?;
         index.validate(self.record_count()?)?;
@@ -472,10 +510,10 @@ impl<'a> ChunkReader<'a> {
     /// [`has_trace_id_bloom`](Self::has_trace_id_bloom).
     pub fn trace_id_bloom(&self) -> Result<crate::TraceIdBloom, Error> {
         // Guard the full dependency chain TBLM ⟹ TIDX ⟹ TRCE — the writer
-        // guarantees it at seal; this is the read-side check for files
-        // produced out-of-band. Without it, a definite bloom miss on such a
-        // file would silently answer "trace absent" instead of surfacing
-        // the corruption.
+        // guarantees it at write time; this is the read-side check for
+        // files produced out-of-band. Without it, a definite bloom miss on
+        // such a file would silently answer "trace absent" instead of
+        // surfacing the corruption.
         if !self.has_trace_id_index() {
             return Err(Error::CorruptIndex(
                 "trace_id bloom without the trace_id index it derives from".into(),
@@ -520,15 +558,33 @@ impl<'a> ChunkReader<'a> {
     /// guard — a length mismatch is a decode error, not a panic later).
     pub fn trace_rollup(&self) -> Result<crate::TraceRollup, Error> {
         // The rollup summarizes the `TRCE` column — the writer guarantees
-        // TRSU ⟹ trace_id at seal; this is the read-side guard for files
-        // produced out-of-band, same as TIDX and TBLM (without it a missing
-        // rollup row would answer "trace absent" instead of surfacing it).
+        // TRSU ⟹ trace_id at write time; this is the read-side guard for
+        // files produced out-of-band, same as TIDX and TBLM (without it a
+        // missing rollup row would answer "trace absent" instead of
+        // surfacing it).
         self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
         let rollup: crate::TraceRollup = unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP)?)?;
         // Structural validation lives on the type (unit-tested there):
         // index-parallelism, ref ranges, flags, strictly increasing ids.
         rollup.validate(self.metadata()?.id_ranges.high_end.0)?;
         Ok(rollup)
+    }
+
+    /// Whether the file carries the optional per-row rollup stats (`TRSS`).
+    pub fn has_trace_rollup_stats(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_TRACE_ROLLUP_STATS)
+    }
+
+    /// Decode the per-row rollup stats (`TRSS`) and validate them against
+    /// the file's decoded `rollup` (`trace_rollup`).
+    pub fn trace_rollup_stats(
+        &self,
+        rollup: &crate::TraceRollup,
+    ) -> Result<crate::TraceRollupStats, Error> {
+        let stats: crate::TraceRollupStats =
+            unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_ROLLUP_STATS)?)?;
+        stats.validate(rollup, self.metadata()?.id_ranges.high_end.0)?;
+        Ok(stats)
     }
 
     /// Decode and validate the span link structure (`LNKB`). See

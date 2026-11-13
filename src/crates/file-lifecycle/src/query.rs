@@ -282,7 +282,8 @@ fn select_remote_only(
     out: &mut Vec<otel_catalog::CatalogEntry>,
 ) {
     for e in catalog {
-        if !q.overlaps(e.min_timestamp_s, e.max_timestamp_s) || !q.matches_partition(e.id.part_key)
+        if !q.overlaps(e.min_timestamp_s, e.max_timestamp_s)
+            || !q.matches_partition(e.id.partition_key)
         {
             continue;
         }

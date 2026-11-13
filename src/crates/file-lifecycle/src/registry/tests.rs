@@ -36,11 +36,12 @@
 //!   shadow (identity+seq key, the post-index/pre-delete window); a WAL-only
 //!   stream — created and synced, never closed — lists from its `Created`
 //!   content metadata and is sized by its `valid_up_to` durable prefix; WAL
-//!   nanosecond ranges convert to seconds; output sorts by `part_key`; an
+//!   nanosecond ranges convert to seconds; output sorts by `partition_key`; an
 //!   unknown tenant lists nothing.
 //!
 //! Not pinned here: `recover` (including its fatal WAL-scan panic),
-//! `apply_wal_event`'s route-on-Created/Closed and its error surfacing,
+//! `apply_wal_event`'s route on an applied `Created` (only "a refused event
+//! leaves no route" is pinned),
 //! `discover_tenants`, `get_or_create`'s directory layout and its
 //! no-recovery-on-create contract, `sfst_candidates` standalone, the WAL
 //! side of `query_snapshot` (SFST-wins dedup and the `valid_up_to == 0`
@@ -223,6 +224,36 @@ fn for_seq_mut_round_trips_routing() {
     assert!(tr.for_seq(10).is_none());
 }
 
+/// An event the WAL registry refuses leaves no route behind: a route says
+/// that the tenant's registry tracks the file.
+#[test]
+fn a_refused_wal_event_leaves_no_route() {
+    let wal_base = tempfile::tempdir().unwrap();
+    let index_base = tempfile::tempdir().unwrap();
+    let catalog_base = tempfile::tempdir().unwrap();
+    let mut tr = TenantRegistries::new(
+        wal_base.path().to_path_buf(),
+        index_base.path().to_path_buf(),
+        catalog_base.path().to_path_buf(),
+    );
+    let tenant = TenantId::from("tenant-a");
+    // The `Closed` of a file whose `Created` never came.
+    let closed = wal::FileEvent::Closed {
+        file_id: file_registry::FileId::new(ident(), 0, 10, 0),
+        frame_count: 1,
+        min_timestamp_ns: file_registry::TimestampNs(1),
+        max_timestamp_ns: file_registry::TimestampNs(2),
+        size: file_registry::ByteSize(100),
+        valid_up_to: file_registry::ByteSize(100),
+        entry_count: 1,
+    };
+
+    let err = tr.apply_wal_event(&tenant, &closed).unwrap_err();
+
+    assert!(matches!(err, wal::Error::UnknownSequence(10)), "{err}");
+    assert!(tr.for_seq(10).is_none());
+}
+
 #[test]
 fn query_snapshot_is_scoped_to_one_tenant() {
     let wal_base = tempfile::tempdir().unwrap();
@@ -235,17 +266,17 @@ fn query_snapshot_is_scoped_to_one_tenant() {
         catalog_base.path().to_path_buf(),
     );
 
-    let part_key = crate::test_helpers::opaque_part_key("ns", "svc");
+    let partition_key = crate::test_helpers::opaque_partition_key("ns", "svc");
     let summary = crate::test_helpers::summary_for("ns", "svc", 1, 100, 200);
     let tenant_a = TenantId::from("tenant-a");
     let tenant_b = TenantId::from("tenant-b");
     tr.get_or_create(&tenant_a).sfst.track(
-        FileId::new(ident(), 0, 1, part_key),
+        FileId::new(ident(), 0, 1, partition_key),
         ByteSize(1),
         summary.clone(),
     );
     tr.get_or_create(&tenant_b).sfst.track(
-        FileId::new(ident(), 0, 2, part_key),
+        FileId::new(ident(), 0, 2, partition_key),
         ByteSize(1),
         summary,
     );
@@ -286,10 +317,10 @@ fn local_streams_dedup_and_aggregate_sfst_and_unsealed_wal() {
     let mid = MachineId::new(Uuid::from_u128(1)).unwrap();
     let bid = InstanceId::new(Uuid::from_u128(2)).unwrap();
     // Logical streams as opaque `(namespace, name)` tuples; the substrate keys
-    // them by an opaque `part_key` and never decodes the identity.
+    // them by an opaque `partition_key` and never decodes the identity.
     let api = ("prod", "api");
     let db = ("", "db"); // absent namespace, unsealed-only
-    let pk = |(ns, name): (&str, &str)| crate::test_helpers::opaque_part_key(ns, name);
+    let pk = |(ns, name): (&str, &str)| crate::test_helpers::opaque_partition_key(ns, name);
 
     let sfst_sum = |min, max, (ns, name): (&str, &str)| {
         crate::test_helpers::summary_for(ns, name, 1, min, max)
@@ -363,7 +394,7 @@ fn local_streams_dedup_and_aggregate_sfst_and_unsealed_wal() {
         time_range: 0..u32::MAX,
         partition_keys: Vec::new(),
     };
-    // The substrate yields neutral `PartitionStat`s ordered by opaque `part_key`;
+    // The substrate yields neutral `PartitionStat`s ordered by opaque `partition_key`;
     // decode + sort by `(namespace, name)` the way the rpc adapter does for display.
     let mut streams = tr.local_streams(&tenant, &full).with_catalog(&[]);
     let sid =

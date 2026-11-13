@@ -2,15 +2,11 @@ use crate::facet_runtime::{FacetCardinalitySnapshot, FacetMemoryBreakdown, Facet
 use crate::ingest::IngestMetrics;
 use crate::plugin_config::ChartsConfig;
 use crate::tiering::{OpenTierState, TierFlowIndexCardinality, TierFlowIndexStore};
-use rt::{ChartHandle, NetdataChart};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tokio::task::JoinHandle;
-use tokio::time::MissedTickBehavior;
 use tokio_util::sync::CancellationToken;
 
 mod metrics;
@@ -23,7 +19,7 @@ use metrics::*;
 pub(crate) use process_maps::*;
 pub(crate) use runtime::*;
 use snapshot::*;
-use udp::sample_udp_kernel_drops;
+use udp::{UdpKernelDrops, sample_udp_kernel_drops};
 
 #[cfg(test)]
 mod tests;

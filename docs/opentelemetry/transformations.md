@@ -22,7 +22,7 @@ Use a receiver-level `json_parser` instead when every line from one file has the
 
 ## Normalize severity and enrich resources
 
-This processor promotes a parsed `level` attribute to severity text and adds stable resource identity used by the Netdata Logs tab:
+This processor promotes a parsed `level` attribute to severity text and severity number, and adds stable resource identity used by the Netdata Logs tab:
 
 ```yaml
 processors:
@@ -30,11 +30,17 @@ processors:
     error_mode: ignore
     log_statements:
       - 'set(log.severity_text, log.attributes["level"]) where log.attributes["level"] != nil'
+      - 'set(log.severity_number, SEVERITY_NUMBER_DEBUG) where IsMatch(log.attributes["level"], "(?i)^debug$")'
+      - 'set(log.severity_number, SEVERITY_NUMBER_INFO) where IsMatch(log.attributes["level"], "(?i)^info$")'
+      - 'set(log.severity_number, SEVERITY_NUMBER_WARN) where IsMatch(log.attributes["level"], "(?i)^warn(ing)?$")'
+      - 'set(log.severity_number, SEVERITY_NUMBER_ERROR) where IsMatch(log.attributes["level"], "(?i)^err(or)?$")'
       - 'set(resource.attributes["service.name"], "my-application") where resource.attributes["service.name"] == nil'
       - 'set(resource.attributes["service.namespace"], "production") where resource.attributes["service.namespace"] == nil'
 ```
 
-The first statement preserves the source value as text; it does not infer an OpenTelemetry severity number. If conditions or dashboards depend on numeric severity, map the source's known levels explicitly instead of assuming every application uses the same scale.
+The first statement preserves the source value as text. The next four statements set the OpenTelemetry severity number for the levels `debug`, `info`, `warn` or `warning`, and `error` or `err`, in upper or lower case. A record with a different level keeps the severity number "unspecified". Change the patterns to the levels that your source writes; do not assume that every application uses the same scale.
+
+Set the severity number, not only the severity text. Netdata counts log records by severity number in the per-service chart `otel_service.log_records`. In that chart, a record without a severity number counts as `unspecified`, whatever its severity text is.
 
 Use static resource values only when a pipeline handles one known service. For shared pipelines, derive identity from trusted receiver metadata or preserve the application's existing OpenTelemetry resource attributes.
 
@@ -79,6 +85,10 @@ processors:
     log_statements:
       - 'merge_maps(log.attributes, ParseJSON(log.body), "insert") where IsString(log.body)'
       - 'set(log.severity_text, log.attributes["level"]) where log.attributes["level"] != nil'
+      - 'set(log.severity_number, SEVERITY_NUMBER_DEBUG) where IsMatch(log.attributes["level"], "(?i)^debug$")'
+      - 'set(log.severity_number, SEVERITY_NUMBER_INFO) where IsMatch(log.attributes["level"], "(?i)^info$")'
+      - 'set(log.severity_number, SEVERITY_NUMBER_WARN) where IsMatch(log.attributes["level"], "(?i)^warn(ing)?$")'
+      - 'set(log.severity_number, SEVERITY_NUMBER_ERROR) where IsMatch(log.attributes["level"], "(?i)^err(or)?$")'
       - 'set(resource.attributes["service.name"], "my-application") where resource.attributes["service.name"] == nil'
   filter/drop_health_checks:
     error_mode: ignore

@@ -1,258 +1,164 @@
 use super::*;
 use crate::memory_allocator::current_allocator_memory;
+use netdata_plugin_metrics::{Aggregator, Batch, Labels};
+use netdata_plugin_protocol::MessageWriter;
 use std::fs;
-use tokio::io::{AsyncRead, AsyncWrite};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::io::AsyncWrite;
 
-#[derive(Clone)]
+/// The plugin's charts with their aggregators. The sampler task records each
+/// tick's snapshot into them and writes what they emit.
 pub(crate) struct NetflowCharts {
-    input_packets: ChartHandle<InputPacketsMetrics>,
-    input_bytes: ChartHandle<InputBytesMetrics>,
-    protocol_packets: ChartHandle<ProtocolPacketsMetrics>,
-    flow_sets: ChartHandle<FlowSetMetrics>,
-    templates: ChartHandle<TemplateMetrics>,
-    flow_records: ChartHandle<FlowRecordMetrics>,
-    options_records: ChartHandle<OptionsRecordMetrics>,
-    sflow_samples: ChartHandle<SflowSampleMetrics>,
-    decoder_exceptions: ChartHandle<DecoderExceptionMetrics>,
-    flow_rows: ChartHandle<FlowRowMetrics>,
-    nsel_events: ChartHandle<NselEventMetrics>,
-    nsel_rows: ChartHandle<NselRowMetrics>,
-    nsel_exceptions: ChartHandle<NselExceptionMetrics>,
-    raw_journal_ops: ChartHandle<RawJournalOpsMetrics>,
-    raw_journal_bytes: ChartHandle<RawJournalBytesMetrics>,
-    materialized_tier_ops: ChartHandle<MaterializedTierOpsMetrics>,
-    materialized_tier_bytes: ChartHandle<MaterializedTierBytesMetrics>,
-    tier_commit_age: ChartHandle<TierCommitAgeMetrics>,
-    tier_commit_duration: ChartHandle<TierCommitDurationMetrics>,
-    tier_commit_batches: ChartHandle<TierCommitBatchesMetrics>,
-    tier_commit_stretched: ChartHandle<TierCommitStretchedMetrics>,
-    open_tiers: ChartHandle<OpenTierMetrics>,
-    journal_io_ops: ChartHandle<JournalIoOpsMetrics>,
-    journal_io_bytes: ChartHandle<JournalIoBytesMetrics>,
-    decoder_scopes: ChartHandle<DecoderScopeMetrics>,
-    facet_values: ChartHandle<FacetValueMetrics>,
-    facet_fields: ChartHandle<FacetFieldMetrics>,
-    tier_index_entries: ChartHandle<TierIndexEntryMetrics>,
-    memory_resident_bytes: Option<ChartHandle<MemoryResidentBytesMetrics>>,
-    memory_resident_mapping_bytes: Option<ChartHandle<MemoryResidentMappingBytesMetrics>>,
-    memory_allocator_bytes: Option<ChartHandle<MemoryAllocatorBytesMetrics>>,
-    memory_accounted_bytes: Option<ChartHandle<MemoryAccountedBytesMetrics>>,
-    memory_tier_index_bytes: Option<ChartHandle<MemoryTierIndexBytesMetrics>>,
+    operation: OperationCharts,
+    operation_aggregator: Aggregator,
+    /// Only when `charts.memory_diagnostics.enabled`.
+    memory: Option<(MemoryCharts, Aggregator)>,
 }
 
 impl NetflowCharts {
-    pub(crate) fn new<R, W>(runtime: &mut rt::PluginRuntime<R, W>, config: &ChartsConfig) -> Self
-    where
-        R: AsyncRead + Unpin + Send + 'static,
-        W: AsyncWrite + Unpin + Send + 'static,
-    {
-        let memory_interval = config.memory_diagnostics.interval;
-        let memory_enabled = config.memory_diagnostics.enabled;
-        Self {
-            input_packets: runtime
-                .register_chart(InputPacketsMetrics::default(), Duration::from_secs(1)),
-            input_bytes: runtime
-                .register_chart(InputBytesMetrics::default(), Duration::from_secs(1)),
-            protocol_packets: runtime
-                .register_chart(ProtocolPacketsMetrics::default(), Duration::from_secs(1)),
-            flow_sets: runtime.register_chart(FlowSetMetrics::default(), Duration::from_secs(1)),
-            templates: runtime.register_chart(TemplateMetrics::default(), Duration::from_secs(1)),
-            flow_records: runtime
-                .register_chart(FlowRecordMetrics::default(), Duration::from_secs(1)),
-            options_records: runtime
-                .register_chart(OptionsRecordMetrics::default(), Duration::from_secs(1)),
-            sflow_samples: runtime
-                .register_chart(SflowSampleMetrics::default(), Duration::from_secs(1)),
-            decoder_exceptions: runtime
-                .register_chart(DecoderExceptionMetrics::default(), Duration::from_secs(1)),
-            flow_rows: runtime.register_chart(FlowRowMetrics::default(), Duration::from_secs(1)),
-            nsel_events: runtime
-                .register_chart(NselEventMetrics::default(), Duration::from_secs(1)),
-            nsel_rows: runtime.register_chart(NselRowMetrics::default(), Duration::from_secs(1)),
-            nsel_exceptions: runtime
-                .register_chart(NselExceptionMetrics::default(), Duration::from_secs(1)),
-            raw_journal_ops: runtime
-                .register_chart(RawJournalOpsMetrics::default(), Duration::from_secs(1)),
-            raw_journal_bytes: runtime
-                .register_chart(RawJournalBytesMetrics::default(), Duration::from_secs(1)),
-            materialized_tier_ops: runtime.register_chart(
-                MaterializedTierOpsMetrics::default(),
-                Duration::from_secs(1),
-            ),
-            materialized_tier_bytes: runtime.register_chart(
-                MaterializedTierBytesMetrics::default(),
-                Duration::from_secs(1),
-            ),
-            tier_commit_age: runtime
-                .register_chart(TierCommitAgeMetrics::default(), Duration::from_secs(1)),
-            tier_commit_duration: runtime
-                .register_chart(TierCommitDurationMetrics::default(), Duration::from_secs(1)),
-            tier_commit_batches: runtime
-                .register_chart(TierCommitBatchesMetrics::default(), Duration::from_secs(1)),
-            tier_commit_stretched: runtime.register_chart(
-                TierCommitStretchedMetrics::default(),
-                Duration::from_secs(1),
-            ),
-            open_tiers: runtime.register_chart(OpenTierMetrics::default(), Duration::from_secs(1)),
-            journal_io_ops: runtime
-                .register_chart(JournalIoOpsMetrics::default(), Duration::from_secs(1)),
-            journal_io_bytes: runtime
-                .register_chart(JournalIoBytesMetrics::default(), Duration::from_secs(1)),
-            decoder_scopes: runtime
-                .register_chart(DecoderScopeMetrics::default(), Duration::from_secs(1)),
-            facet_values: runtime
-                .register_chart(FacetValueMetrics::default(), Duration::from_secs(1)),
-            facet_fields: runtime
-                .register_chart(FacetFieldMetrics::default(), Duration::from_secs(1)),
-            tier_index_entries: runtime
-                .register_chart(TierIndexEntryMetrics::default(), Duration::from_secs(1)),
-            memory_resident_bytes: memory_enabled.then(|| {
-                runtime.register_chart(MemoryResidentBytesMetrics::default(), memory_interval)
-            }),
-            memory_resident_mapping_bytes: memory_enabled.then(|| {
-                runtime.register_chart(
-                    MemoryResidentMappingBytesMetrics::default(),
-                    memory_interval,
-                )
-            }),
-            memory_allocator_bytes: memory_enabled.then(|| {
-                runtime.register_chart(MemoryAllocatorBytesMetrics::default(), memory_interval)
-            }),
-            memory_accounted_bytes: memory_enabled.then(|| {
-                runtime.register_chart(MemoryAccountedBytesMetrics::default(), memory_interval)
-            }),
-            memory_tier_index_bytes: memory_enabled.then(|| {
-                runtime.register_chart(MemoryTierIndexBytesMetrics::default(), memory_interval)
-            }),
+    pub(crate) fn new(config: &ChartsConfig) -> Result<Self, netdata_plugin_metrics::Error> {
+        let operation = OperationCharts::new()?;
+        let memory = if config.memory_diagnostics.enabled {
+            // Charts need whole seconds; the diagnostics refresh on the same
+            // rounded-up cadence.
+            let interval =
+                Duration::from_secs(diagnostic_refresh_ticks(config.memory_diagnostics.interval));
+            let charts = MemoryCharts::new(interval)?;
+            let aggregator = Aggregator::new(&charts.set);
+            Some((charts, aggregator))
+        } else {
+            None
+        };
+        Ok(Self {
+            operation_aggregator: Aggregator::new(&operation.set),
+            operation,
+            memory,
+        })
+    }
+
+    /// Records `snapshot` as the values at `now` (Unix seconds).
+    pub(super) fn record(&mut self, snapshot: &NetflowChartsSnapshot, now: u64) {
+        let mut batch = Batch::new(&self.operation.set);
+        self.operation
+            .record(&mut batch.entity(Labels::new()).record(now), snapshot);
+        self.operation_aggregator.merge(batch, now);
+
+        if let Some((charts, aggregator)) = &mut self.memory {
+            let mut batch = Batch::new(&charts.set);
+            charts.record(&mut batch.entity(Labels::new()).record(now), snapshot);
+            aggregator.merge(batch, now);
         }
     }
 
-    pub(crate) fn spawn_sampler(
-        self,
+    /// The chart text of every window closed by `now`, written straight to
+    /// stdout, so in one chunk per metric set.
+    pub(super) fn emit(&mut self, now: u64) -> Vec<Vec<u8>> {
+        let mut chunks = self.operation_aggregator.emit(now, usize::MAX);
+        if let Some((_, aggregator)) = &mut self.memory {
+            chunks.extend(aggregator.emit(now, usize::MAX));
+        }
+        chunks
+    }
+
+    /// Samples every second from now on, and charts the samples once
+    /// `publish` is cancelled: the plugin may not send chart data before its
+    /// startup has finished (see `main.rs`), but `udp_kernel_drops` and the
+    /// state samples must be kept current from the start.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn spawn_sampler<W>(
+        mut self,
         metrics: Arc<IngestMetrics>,
         open_tiers: Arc<RwLock<OpenTierState>>,
         tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
         facet_runtime: Arc<FacetRuntime>,
         resident_mapping_paths: ProcessResidentMappingPaths,
         config: ChartsConfig,
+        writer: Arc<tokio::sync::Mutex<MessageWriter<W>>>,
+        publish: CancellationToken,
         shutdown: CancellationToken,
-    ) -> JoinHandle<()> {
+    ) -> JoinHandle<()>
+    where
+        W: AsyncWrite + Unpin + Send + 'static,
+    {
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(1));
             let mut open_tier_sample = OpenTierSamplerState::default();
             let mut tier_index_cardinality = TierFlowIndexCardinality::default();
             let mut memory_diagnostics_state =
                 MemoryDiagnosticsSamplerState::new(config.memory_diagnostics.interval);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+            let mut udp_kernel_drops = UdpKernelDrops::default();
+            let mut write_failing = false;
 
             loop {
+                // Wake in the middle of each second and take the time first:
+                // the sample belongs to the window of that second however long
+                // sampling takes, and aiming at the wall clock on every pass
+                // keeps the phase after clock steps or a suspend.
                 tokio::select! {
                     _ = shutdown.cancelled() => break,
-                    _ = interval.tick() => {
-                        sample_udp_kernel_drops(metrics.as_ref());
-                        open_tier_sample = sample_open_tier_state(open_tiers.as_ref(), open_tier_sample);
-                        tier_index_cardinality = sample_tier_index_cardinality(
-                            tier_flow_indexes.as_ref(),
-                            tier_index_cardinality,
-                        );
-                        let memory_diagnostics = sample_memory_diagnostics_if_due(
-                            config.memory_diagnostics.enabled,
-                            &mut memory_diagnostics_state,
-                            open_tiers.as_ref(),
-                            tier_flow_indexes.as_ref(),
-                            facet_runtime.as_ref(),
-                            &resident_mapping_paths,
-                        );
-                        let snapshot = NetflowChartsSnapshot::collect(
-                            metrics.as_ref(),
-                            open_tier_sample.counts,
-                            tier_index_cardinality,
-                            facet_runtime.cardinality_snapshot(),
-                            memory_diagnostics,
-                        );
-                        self.apply_snapshot(snapshot);
+                    _ = tokio::time::sleep(delay_to_mid_second(SystemTime::now())) => {}
+                }
+                let now = unix_seconds(SystemTime::now());
+
+                sample_udp_kernel_drops(metrics.as_ref(), &mut udp_kernel_drops);
+                open_tier_sample = sample_open_tier_state(open_tiers.as_ref(), open_tier_sample);
+                tier_index_cardinality = sample_tier_index_cardinality(
+                    tier_flow_indexes.as_ref(),
+                    tier_index_cardinality,
+                );
+                let memory_diagnostics = sample_memory_diagnostics_if_due(
+                    config.memory_diagnostics.enabled,
+                    &mut memory_diagnostics_state,
+                    open_tiers.as_ref(),
+                    tier_flow_indexes.as_ref(),
+                    facet_runtime.as_ref(),
+                    &resident_mapping_paths,
+                );
+                if !publish.is_cancelled() {
+                    continue;
+                }
+
+                let snapshot = NetflowChartsSnapshot::collect(
+                    metrics.as_ref(),
+                    open_tier_sample.counts,
+                    tier_index_cardinality,
+                    facet_runtime.cardinality_snapshot(),
+                    memory_diagnostics,
+                );
+                self.record(&snapshot, now);
+                for chunk in self.emit(now) {
+                    match writer.lock().await.write_raw(&chunk).await {
+                        Ok(()) => write_failing = false,
+                        // Once per run of failures: a closed stdout fails
+                        // every second until the runtime stops.
+                        Err(err) if !write_failing => {
+                            write_failing = true;
+                            tracing::error!("writing the netflow charts: {err}");
+                        }
+                        Err(_) => {}
                     }
                 }
             }
         })
     }
+}
 
-    fn apply_snapshot(&self, snapshot: NetflowChartsSnapshot) {
-        self.input_packets
-            .update(|chart| *chart = snapshot.input_packets);
-        self.input_bytes
-            .update(|chart| *chart = snapshot.input_bytes);
-        self.protocol_packets
-            .update(|chart| *chart = snapshot.protocol_packets);
-        self.flow_sets.update(|chart| *chart = snapshot.flow_sets);
-        self.templates.update(|chart| *chart = snapshot.templates);
-        self.flow_records
-            .update(|chart| *chart = snapshot.flow_records);
-        self.options_records
-            .update(|chart| *chart = snapshot.options_records);
-        self.sflow_samples
-            .update(|chart| *chart = snapshot.sflow_samples);
-        self.decoder_exceptions
-            .update(|chart| *chart = snapshot.decoder_exceptions);
-        self.flow_rows.update(|chart| *chart = snapshot.flow_rows);
-        self.nsel_events
-            .update(|chart| *chart = snapshot.nsel_events);
-        self.nsel_rows.update(|chart| *chart = snapshot.nsel_rows);
-        self.nsel_exceptions
-            .update(|chart| *chart = snapshot.nsel_exceptions);
-        self.raw_journal_ops
-            .update(|chart| *chart = snapshot.raw_journal_ops);
-        self.raw_journal_bytes
-            .update(|chart| *chart = snapshot.raw_journal_bytes);
-        self.materialized_tier_ops
-            .update(|chart| *chart = snapshot.materialized_tier_ops);
-        self.materialized_tier_bytes
-            .update(|chart| *chart = snapshot.materialized_tier_bytes);
-        self.tier_commit_age
-            .update(|chart| *chart = snapshot.tier_commit_age);
-        self.tier_commit_duration
-            .update(|chart| *chart = snapshot.tier_commit_duration);
-        self.tier_commit_batches
-            .update(|chart| *chart = snapshot.tier_commit_batches);
-        self.tier_commit_stretched
-            .update(|chart| *chart = snapshot.tier_commit_stretched);
-        self.open_tiers.update(|chart| *chart = snapshot.open_tiers);
-        self.journal_io_ops
-            .update(|chart| *chart = snapshot.journal_io_ops);
-        self.journal_io_bytes
-            .update(|chart| *chart = snapshot.journal_io_bytes);
-        self.decoder_scopes
-            .update(|chart| *chart = snapshot.decoder_scopes);
-        self.facet_values
-            .update(|chart| *chart = snapshot.facet_values);
-        self.facet_fields
-            .update(|chart| *chart = snapshot.facet_fields);
-        self.tier_index_entries
-            .update(|chart| *chart = snapshot.tier_index_entries);
-        if let Some(handle) = &self.memory_resident_bytes {
-            handle.update(|chart| *chart = snapshot.memory_resident_bytes);
-        }
-        if let Some(handle) = &self.memory_resident_mapping_bytes {
-            handle.update(|chart| *chart = snapshot.memory_resident_mapping_bytes);
-        }
-        if let Some(handle) = &self.memory_allocator_bytes {
-            handle.update(|chart| *chart = snapshot.memory_allocator_bytes);
-        }
-        if let Some(handle) = &self.memory_accounted_bytes {
-            handle.update(|chart| *chart = snapshot.memory_accounted_bytes);
-        }
-        if let Some(handle) = &self.memory_tier_index_bytes {
-            handle.update(|chart| *chart = snapshot.memory_tier_index_bytes);
-        }
-    }
+fn unix_seconds(time: SystemTime) -> u64 {
+    time.duration_since(UNIX_EPOCH)
+        .map_or(0, |since_epoch| since_epoch.as_secs())
+}
 
-    #[cfg(test)]
-    pub(crate) fn memory_diagnostics_registered_for_test(&self) -> bool {
-        self.memory_resident_bytes.is_some()
-            && self.memory_resident_mapping_bytes.is_some()
-            && self.memory_allocator_bytes.is_some()
-            && self.memory_accounted_bytes.is_some()
-            && self.memory_tier_index_bytes.is_some()
+/// How long from `now` until the middle of a second.
+fn delay_to_mid_second(now: SystemTime) -> Duration {
+    let subsec = now
+        .duration_since(UNIX_EPOCH)
+        .map_or(Duration::ZERO, |since_epoch| {
+            Duration::from_nanos(u64::from(since_epoch.subsec_nanos()))
+        });
+    let mid = Duration::from_millis(500);
+    if subsec < mid {
+        mid - subsec
+    } else {
+        Duration::from_secs(1) + mid - subsec
     }
 }
 
@@ -268,6 +174,7 @@ pub(super) struct TierIndexSamplerState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(test, derive(Default))]
 pub(super) struct MemoryDiagnosticsSamplerState {
     refresh_ticks: u64,
     ticks_until_refresh: u64,
@@ -278,17 +185,6 @@ impl MemoryDiagnosticsSamplerState {
     fn new(interval: Duration) -> Self {
         Self {
             refresh_ticks: diagnostic_refresh_ticks(interval),
-            ticks_until_refresh: 0,
-            sample: MemoryDiagnosticsSample::default(),
-        }
-    }
-}
-
-#[cfg(test)]
-impl Default for MemoryDiagnosticsSamplerState {
-    fn default() -> Self {
-        Self {
-            refresh_ticks: 0,
             ticks_until_refresh: 0,
             sample: MemoryDiagnosticsSample::default(),
         }

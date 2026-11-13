@@ -1,8 +1,8 @@
 //! Tests for sfst's per-directory [`Registry`] (registry.rs): recovery of
 //! tracked state from disk, the `track()` rotation path, and the pure
 //! `candidates()` query filter. Every fixture is a real on-disk `.sfst` in
-//! a tempdir, built with the buffer-all `FixtureWriter` (PRIM + TIMS + one
-//! stream batch + SUMR, no META — recovery reads header, TOC, and SUMR
+//! a tempdir, written with the buffer-all `FixtureWriter` (PRIM + TIMS +
+//! one stream batch + SUMR, no META — recovery reads header, TOC, and SUMR
 //! only, so that's enough).
 //!
 //! Pins:
@@ -17,18 +17,19 @@
 //! - `candidates()` overlap: file ranges are inclusive on both ends, the
 //!   query half-open `[start, end)` — any shared second includes the
 //!   file, and an empty window matches nothing;
-//! - partition filter: exact match on the opaque `part_key` carried by
+//! - partition filter: exact match on the opaque `partition_key` carried by
 //!   the `FileId` (never in the summary); an empty key list is a
 //!   wildcard;
 //! - files marked pending-deletion are invisible to `candidates()`;
 //! - a fresh registry over an empty directory yields no candidates.
 //!
-//! Not pinned here: `evaluate_retention`/`RetentionPolicy` (no unit test
-//! in this crate — exercised indirectly by file-lifecycle's
-//! `recover_retention` tests), `remove`/`clear_pending_deletion`/
-//! `file_path`, the per-tenant layer above this type (file-lifecycle's
-//! tenant registry, consumed by otel-ledger), and writer↔reader
-//! round-trips (`src/tests/round_trip.rs`).
+//! - retention: each of the three limits alone, files pending deletion,
+//!   and a file the caller does not let go.
+//!
+//! Not pinned here: `remove`/`clear_pending_deletion`/`file_path`, the
+//! per-tenant layer above this type (file-lifecycle's tenant registry,
+//! consumed by otel-ledger), and writer↔reader round-trips
+//! (`src/tests/round_trip.rs`).
 use super::*;
 use crate::PrefixMap;
 use crate::tests::fixture::FixtureWriter;
@@ -39,7 +40,7 @@ use crate::writer::pack;
 /// recovery reads only header + TOC + SUMR.
 fn write_sfst_with_summary(dir: &Path, id: FileId, summary: &Summary) {
     let primary: PrefixMap<u64> = PrefixMap::build([("k", 1u64)]).unwrap();
-    // The buffer-all fixture builder permits a missing META chunk, and
+    // The buffer-all fixture writer permits a missing META chunk, and
     // recovery's read touches only header + TOC + SUMR — a META-less
     // file exercises the SUMR round-trip just fine.
     let mut writer = FixtureWriter::new();
@@ -133,7 +134,7 @@ fn track_sets_summary() {
 // ── Candidate selection (`candidates`) ───────────────────────────
 
 /// Track one file per tuple — `(seq, min_s, max_s, namespace, stream)`;
-/// the namespace/stream pair is hashed into the opaque `part_key`
+/// the namespace/stream pair is hashed into the opaque `partition_key`
 /// stamped on the `FileId`.
 fn populate(
     reg: &mut Registry,
@@ -142,10 +143,10 @@ fn populate(
     for &(seq, min_s, max_s, ns, name) in entries {
         // The partition lives only on the `FileId` (on disk: part of the
         // filename; `Summary` has no partition field), so filtering reads
-        // `f.id.part_key` — exactly what these tests drive.
-        let part_key = crate::opaque_part_key(ns, name);
+        // `f.id.partition_key` — exactly what these tests drive.
+        let partition_key = crate::opaque_partition_key(ns, name);
         reg.track(
-            FileId::new(file_registry::test_identity(), 0, seq, part_key),
+            FileId::new(file_registry::test_identity(), 0, seq, partition_key),
             ByteSize(1),
             Summary {
                 min_timestamp_s: min_s,
@@ -259,7 +260,7 @@ fn candidates_empty_query_matches_nothing() {
 
 #[test]
 fn candidates_filter_by_stream() {
-    // Partition filtering is an exact, opaque u64 match on part_key —
+    // Partition filtering is an exact, opaque u64 match on partition_key —
     // no partial or prefix matching. Only prod/api's file comes back;
     // a shared namespace ("prod"/"worker") or stream name
     // ("staging"/"api") is already a different key.
@@ -276,7 +277,7 @@ fn candidates_filter_by_stream() {
 
     let q = Query {
         time_range: 0..u32::MAX,
-        partition_keys: vec![crate::opaque_part_key("prod", "api")],
+        partition_keys: vec![crate::opaque_partition_key("prod", "api")],
     };
     assert_eq!(seqs(reg.candidates(&q)), vec![1]);
 }
@@ -337,4 +338,112 @@ fn candidates_on_empty_registry() {
         partition_keys: Vec::new(),
     };
     assert!(reg.candidates(&q).next().is_none());
+}
+
+// ── Retention (`evaluate_retention`) ─────────────────────────────
+
+/// A registry of files `(seq, size, newest record's second)`.
+fn registry_of(files: &[(u64, u64, u32)]) -> (Registry, tempfile::TempDir) {
+    let dir = tempfile::tempdir().unwrap();
+    let mut reg = Registry::new(dir.path());
+    for &(seq, size, max_s) in files {
+        reg.track(
+            FileId::new(file_registry::test_identity(), 0, seq, 0),
+            ByteSize(size),
+            Summary {
+                min_timestamp_s: max_s,
+                max_timestamp_s: max_s,
+                record_count: 1,
+                content_meta: Vec::new(),
+            },
+        );
+    }
+    (reg, dir)
+}
+
+/// A policy that keeps everything; a test lowers the limit it is about.
+const KEEP_ALL: RetentionPolicy = RetentionPolicy {
+    max_files: usize::MAX,
+    max_total_size: ByteSize(u64::MAX),
+    max_age: std::time::Duration::from_secs(u64::MAX / 2),
+};
+
+/// Now, as nanoseconds: second 1,000.
+const NOW_NS: u64 = 1_000 * 1_000_000_000;
+
+fn evict(seqs: &[u64]) -> Evictions {
+    Evictions {
+        evict: seqs.to_vec(),
+        deferred: Vec::new(),
+    }
+}
+
+#[test]
+fn retention_drops_the_oldest_files_until_the_limits_fit() {
+    // Four files of 10 bytes each, the newest record of each at second 900.
+    let files = [(1, 10, 900), (2, 10, 900), (3, 10, 900), (4, 10, 900)];
+    let (reg, _dir) = registry_of(&files);
+    let pass = |policy| reg.evaluate_retention(&policy, NOW_NS, |_| true);
+
+    assert_eq!(pass(KEEP_ALL), evict(&[]));
+    let two_files = RetentionPolicy {
+        max_files: 2,
+        ..KEEP_ALL
+    };
+    assert_eq!(pass(two_files), evict(&[1, 2]));
+    let thirty_bytes = RetentionPolicy {
+        max_total_size: ByteSize(30),
+        ..KEEP_ALL
+    };
+    assert_eq!(pass(thirty_bytes), evict(&[1]));
+}
+
+#[test]
+fn retention_drops_every_file_older_than_the_age() {
+    // The age is per file: the two old ones go, wherever they are.
+    let (reg, _dir) = registry_of(&[(1, 10, 100), (2, 10, 950), (3, 10, 200)]);
+    let one_minute_and_a_half = RetentionPolicy {
+        max_age: std::time::Duration::from_secs(90),
+        ..KEEP_ALL
+    };
+
+    let evictions = reg.evaluate_retention(&one_minute_and_a_half, NOW_NS, |_| true);
+
+    assert_eq!(evictions, evict(&[1, 3]));
+}
+
+#[test]
+fn retention_does_not_count_a_file_that_is_pending_deletion() {
+    let (mut reg, _dir) = registry_of(&[(1, 10, 900), (2, 10, 900), (3, 10, 900)]);
+    reg.mark_pending_deletion(1);
+    let two_files = RetentionPolicy {
+        max_files: 2,
+        ..KEEP_ALL
+    };
+
+    assert_eq!(
+        reg.evaluate_retention(&two_files, NOW_NS, |_| true),
+        evict(&[])
+    );
+}
+
+#[test]
+fn a_file_that_may_not_go_stays_and_still_counts() {
+    // Two files may stay. The oldest may not go: it keeps one of the two
+    // places, so the next oldest goes in its stead.
+    let (reg, _dir) = registry_of(&[(1, 10, 900), (2, 10, 900), (3, 10, 900)]);
+    let two_files = RetentionPolicy {
+        max_files: 2,
+        ..KEEP_ALL
+    };
+
+    let evictions = reg.evaluate_retention(&two_files, NOW_NS, |file| file.id.seq != 1);
+
+    assert_eq!(
+        evictions,
+        Evictions {
+            evict: vec![2],
+            deferred: vec![1],
+        }
+    );
 }

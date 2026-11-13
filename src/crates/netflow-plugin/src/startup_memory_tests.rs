@@ -1,5 +1,5 @@
 use super::{charts, facet_runtime, ingest, plugin_config, query, tiering};
-use rt::PluginRuntime;
+use netdata_plugin_rt::PluginRuntime;
 use std::env;
 use std::fs;
 use std::future::Future;
@@ -49,6 +49,7 @@ struct ProfilePluginRuntime {
     runtime_future: Option<Pin<Box<dyn Future<Output = netdata_plugin_error::Result<()>>>>>,
     output_drain_task: JoinHandle<anyhow::Result<u64>>,
     charts_task: JoinHandle<()>,
+    charts_publish: CancellationToken,
     charts_shutdown: CancellationToken,
     input_guard: Option<DuplexStream>,
 }
@@ -412,13 +413,16 @@ impl ProfilePluginRuntime {
             &cfg.enrichment.geoip.geo_database,
         );
         let charts_shutdown = CancellationToken::new();
-        let charts_task = charts::NetflowCharts::new(&mut runtime, &cfg.charts).spawn_sampler(
+        let charts_publish = CancellationToken::new();
+        let charts_task = charts::NetflowCharts::new(&cfg.charts)?.spawn_sampler(
             metrics,
             open_tiers,
             tier_flow_indexes,
             facet_runtime,
             resident_mapping_paths,
             cfg.charts.clone(),
+            runtime.writer(),
+            charts_publish.clone(),
             charts_shutdown.clone(),
         );
 
@@ -427,6 +431,7 @@ impl ProfilePluginRuntime {
             runtime_future: None,
             output_drain_task,
             charts_task,
+            charts_publish,
             charts_shutdown,
             input_guard: Some(input_guard),
         })
@@ -437,6 +442,7 @@ impl ProfilePluginRuntime {
             .runtime
             .take()
             .ok_or_else(|| anyhow::anyhow!("plugin runtime already started"))?;
+        self.charts_publish.cancel();
         self.runtime_future = Some(Box::pin(runtime.run()));
         Ok(())
     }

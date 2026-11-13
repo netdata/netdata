@@ -10,7 +10,7 @@
 //! assembled; the production assembler is the ledger's
 //! `TracesSourceSupplier` (`otel-ledger/src/ledger/rpc/traces/sources.rs`).
 //!
-//! The library never inspects `part_key` or any other content of a
+//! The library never inspects `partition_key` or any other content of a
 //! source's identity — [`SourceId`] is opaque, and the caller decides
 //! what the set covers. What it validates, on every operation, is set
 //! hygiene ([`validate_sources`]):
@@ -28,8 +28,8 @@
 //!   check could not see it at all.
 //!
 //! What it CANNOT validate, caller-owned: a sealed file and an active
-//! WAL holding the same data (the seal-vs-rotation window) must not
-//! both be offered — a sealed file carries no coverage to collide
+//! WAL holding the same data (the indexing-vs-rotation window) must
+//! not both be offered — a sealed file carries no coverage to collide
 //! with. The caller's registry snapshot owns that invariant, as it
 //! does for the logs engine.
 
@@ -43,7 +43,7 @@ use crate::source::Source;
 ///
 /// Uniqueness is the caller's contract; the documented production
 /// derivation is the full `FileId` (machine, instance, pipeline, seq,
-/// part_key) plus the chunk index for in-memory chunks and the byte
+/// partition_key) plus the chunk index for in-memory chunks and the byte
 /// range for tails — a bare `seq` is unique only within one process
 /// instance and is NOT sufficient.
 ///
@@ -77,8 +77,8 @@ pub struct WalCoverage {
     /// The WAL's identity, opaque to the library (same derivation rules
     /// as [`SourceId`]).
     pub wal_id: Arc<str>,
-    /// The half-open byte range of the WAL this source was built from /
-    /// scans.
+    /// The half-open byte range of the WAL this source was indexed from
+    /// (or scans).
     pub range: wal::FrameRange,
 }
 
@@ -89,10 +89,8 @@ pub struct TraceSfstCandidate {
     pub source_id: SourceId,
     /// Cheap time/stream/size facts ([`sfst::Summary`]). Consumed only by
     /// the operations that summary-prune: search's phase-1 file-granular
-    /// window prune ([`search`](super::search::search)) and attribute
-    /// enumeration's window prune
-    /// ([`attribute_names`](super::attribute_names) /
-    /// [`attribute_values`](super::attribute_values)). Trace-by-id never
+    /// window prune ([`search`](super::search::search)) and suggestions'
+    /// window prune ([`suggest`](super::suggest())). Trace-by-id never
     /// reads it — the TBLM bloom prunes a by-id probe better than time
     /// ranges — and no completion-role source is pruned by it at all.
     pub summary: sfst::Summary,
@@ -100,7 +98,7 @@ pub struct TraceSfstCandidate {
     /// [`Source::Memory`] an in-memory chunk image).
     pub source: Source,
     /// Present exactly when the SFST is an in-memory chunk of an active
-    /// WAL (`ng_index::build_sfst_traces_range`); a sealed file has no
+    /// WAL (`ng_index::index_traces_range`); a sealed file has no
     /// WAL coverage. ENFORCED by [`validate_sources`]: a
     /// [`Source::Memory`]-backed candidate without coverage is rejected —
     /// omitting it would silently bypass the overlap protection.
@@ -135,9 +133,8 @@ pub struct TraceUnavailable {
     pub source_id: SourceId,
     /// The known time range and counts of the missing data (for a
     /// remote file, its catalog entry). One summary-pruning consumer:
-    /// attribute enumeration applies its sealed-candidate window prune
-    /// to an unavailable source too
-    /// ([`attribute_names`](super::attribute_names)), so one
+    /// suggestions apply their sealed-candidate window prune to an
+    /// unavailable source too ([`suggest`](super::suggest())), so one
     /// outside the window is irrelevant rather than reported;
     /// operations without a summary prune always report it.
     pub summary: sfst::Summary,
@@ -211,7 +208,7 @@ pub enum SourceSetError {
 /// adjacent ranges are fine), and no in-memory chunk without its
 /// coverage. The one gate every operation runs before any I/O —
 /// `trace_by_id`, `search` (for both of its sets), `overview`,
-/// `slowest`, `attribute_names`/`attribute_values` — so a bad set is a
+/// `suggest`, `explore` — so a bad set is a
 /// request error, never a mid-query surprise.
 pub fn validate_sources(sources: &[TraceSource]) -> Result<(), SourceSetError> {
     let mut seen: HashSet<&SourceId> = HashSet::with_capacity(sources.len());

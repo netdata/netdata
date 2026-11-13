@@ -38,7 +38,7 @@ mod value_guard;
 pub mod writer;
 
 // Core file types: JournalFile, its reader and its writer.
-pub use file::{BucketUtilization, JournalFile, JournalFileOptions};
+pub use file::{JournalFile, JournalFileOptions};
 pub use reader::JournalReader;
 pub use writer::JournalWriter;
 
@@ -50,8 +50,7 @@ pub use offset_array::Direction;
 pub use cursor::JournalCursor;
 pub use filter::{FilterExpr, JournalFilter, LogicalOp};
 
-// Object-layout types other crates import (e.g. JournalState: journal-index,
-// journal-log-writer).
+// Object-layout types other crates import (e.g. JournalState: journal-index).
 pub use object::{EntryItemsType, HashableObject, HeaderIncompatibleFlags, JournalState};
 
 // memmap2 mapping types, surfaced via file/mmap.rs.

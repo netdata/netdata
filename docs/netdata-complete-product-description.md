@@ -647,12 +647,13 @@ Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, s
 **[Traces](/docs/opentelemetry/trace-storage-and-retention.md)**
 - Span storage with field-level indexing, trace-ID index and bloom filter, span events and links; retention and offload as for logs
 - **Traces explorer** (Netdata Cloud; users turn it on in the Early Access panel):
-  - Trace list: heatmap (trace count × duration band, with errors), volume, error and percentile charts over time, trace duration scatter, slowest traces
+  - Trace list: heatmap (trace count × duration band, with errors), volume, error and percentile charts over time, trace duration scatter
   - Trace detail: waterfall, span tree, span details, missing-span markers
   - Filters: service, operation, status, duration range, any resource, span, scope, event or link attribute
 - **RED analysis at query time:** the explorer computes rate, errors and duration (p50/p95/p99) directly from the stored spans of every matching trace in the selected time range, for any combination of attribute values and duration range. No metrics need to be pre-defined: any slice of the traffic can be analyzed after the fact, without cardinality limits or pre-declared dimensions.
+- **[Service map](/docs/opentelemetry/trace-storage-and-retention.md#service-map)** (`topology:tracing`): services, the calls between them and the databases, queues and external endpoints they call, with calls, errors and p50/p95/p99 latency per call direction, client side and server side apart, built from the spans each Agent receives
 - **RED metrics at collection time:** the collection stage (`spanmetrics`, with `transform` for percentiles) produces persistent RED metrics per service and operation, which Netdata stores long-term with per-second charts, machine learning anomaly detection and alerting.
-- Function `otel-traces`, also available to AI assistants through Netdata's MCP server
+- Functions `otel-traces` and `topology:tracing`, also available to AI assistants through Netdata's MCP server
 
 **Collector configurations in Netdata documentation**
 - Metrics: host metrics, Prometheus, Redis, nginx, PostgreSQL

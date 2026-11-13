@@ -123,9 +123,9 @@ Retention applies to sealed indexed files, oldest first, when any of three limit
 | `logs.retention.default.max_age` | 7 days | Maximum age of an indexed file, measured on its newest entry |
 
 `max_total_size` is not a cap on the plugin's disk usage: active write-ahead logs (up to `max_file_size` per stream),
-catalogs, and the download cache for offloaded data are additional. Retention runs when a file is sealed; when logs
-stop arriving, the last write-ahead log seals on idle (within about 15 minutes) and gets one final pass, and the
-remaining files are kept until logs arrive again or the Agent restarts.
+catalogs, and the download cache for offloaded data are additional. Retention runs when a file is sealed, and also
+every 30 seconds. When logs stop arriving, the last write-ahead log seals on idle (within about 15 minutes), and the
+files that pass `max_age` are still deleted.
 
 Set the limits under `logs.retention.default`; a user `otel.yaml` needs only the fields that change:
 
@@ -146,10 +146,12 @@ With `remote_storage.enabled: true`, every sealed indexed file is also uploaded 
 `fs://` location. Traces are uploaded the same way; how trace queries read them back is in
 [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md#offloading-to-object-storage).
 Uploading changes nothing locally: files stay under local retention, and
-a local file is not deleted by retention until its catalog entry confirms it is in the remote. When a query needs an
-offloaded file that is no longer local, the Agent downloads it whole into a download cache at `<base_dir>/remote-read`,
-bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then answers from it; repeated
-queries over the same files are served from the cache.
+a local file is not deleted by retention until its catalog entry confirms it is in the remote. While an older file
+waits for this confirmation, retention deletes the oldest files that are confirmed. The files that wait still count
+against the limits, so the limits hold only when enough files are confirmed. When a query
+needs an offloaded file that is no longer local, the Agent downloads it whole into a download cache at
+`<base_dir>/remote-read`, bounded by `remote_storage.read_cache_max_size` (1GB) and shared by logs and traces, then
+answers from it; repeated queries over the same files are served from the cache.
 
 - A query whose offloaded files exceed the cache fails with a message to narrow the time window or stream filter.
 - A download may take 30 seconds plus one second per MiB of the file, at most 5 minutes. A file that takes longer, or
@@ -161,6 +163,13 @@ queries over the same files are served from the cache.
   or traces, makes other queries wait for room and can evict their cached files.
 - If the cache directory becomes unwritable, downloads fail as above and the plugin logs the write errors; a query that
   needs room the cache cannot free fails with a message about the cache directory.
+
+The Agent can start with a remote location that does not hold its files: you enable remote storage on an Agent that
+already has data, you change `remote_storage.uri`, or you empty the bucket. The Agent then uploads to the configured
+location the indexed files that are still on the local disk, before local retention can delete them. It cannot upload
+a file that local retention already deleted. To keep such files reachable after a change of location, copy the `v2/`
+tree of the old location (the `catalog` and `tenants` directories of each signal) to the new location before you
+change the URI. The object keys are the same in both locations.
 
 ```yaml
 remote_storage:
@@ -187,6 +196,10 @@ remote_storage:
   Apply with `systemctl daemon-reload && systemctl restart netdata`.
 - Uploads that fail are retried with backoff; while the remote is unreachable, sealed files accumulate locally without
   a ceiling. Monitor free disk on the receiving node.
+- The plugin needs the remote when it starts. While the remote does not answer, or answers with an error, the
+  plugin waits and tries again, and it receives no data. When the remote answers again, the plugin completes its
+  start; you do not have to restart the Agent, unless your configuration caused the error. See
+  [Monitor the OpenTelemetry plugin](/docs/opentelemetry/otlp-ingestion.md#monitor-the-opentelemetry-plugin).
 - The Agent never deletes offloaded files, for logs or traces: expire them with the object storage's own lifecycle
   rules, such as an S3 lifecycle expiration rule.
 - This is how long retention is made cheap: keep days locally with a small `max_age`, keep months or years in object

@@ -81,14 +81,17 @@ metrics:
   # and falls back to built-in defaults, so change them together.
   grace_period_secs: 60
 
-  # Seconds without data after which a chart is removed.
+  # Seconds without data after which a chart is removed. A data point is
+  # rejected when its timestamp is further from the current time than the
+  # expiry of its chart, in the past or in the future.
   expiry_duration_secs: 900
 
   # Maximum number of new charts a single OTLP export request may create —
   # the guard against cardinality explosion from high-cardinality label
   # combinations. Points for charts beyond this budget are dropped (with a
   # warning); later requests get a fresh budget, so the total chart count
-  # is not capped by this.
+  # is not capped by this. A value of 0 is read as "not set": the plugin
+  # logs a warning and uses 100.
   max_new_charts_per_request: 100
 
 # Root directory for stored OpenTelemetry logs and traces. Must be an
@@ -107,6 +110,9 @@ logs:
     # Incoming logs are appended to a current file; a new file starts when
     # any of these limits is reached. The "default" entry applies to every
     # tenant without its own entry below.
+    # A limit of 0 is read as "not set": the plugin logs a warning and uses
+    # the value of the "default" entry for a tenant, and the value shown
+    # here for the "default" entry.
     default:
       max_file_size: "25MB"
       max_entries: 50000
@@ -133,6 +139,9 @@ traces:
     # Incoming spans are appended to a current file; a new file starts when
     # any of these limits is reached. The "default" entry applies to every
     # tenant without its own entry below.
+    # A limit of 0 is read as "not set": the plugin logs a warning and uses
+    # the value of the "default" entry for a tenant, and the value shown
+    # here for the "default" entry.
     default:
       max_file_size: "25MB"
       max_entries: 50000

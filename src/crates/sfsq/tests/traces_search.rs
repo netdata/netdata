@@ -2,10 +2,10 @@
 //!
 //! The core criteria:
 //!
-//! - **Oracle equivalence under re-layouts:** the same corpus sealed as
-//!   one file, split across files, or served partly as an in-memory
+//! - **Oracle equivalence under re-layouts:** the same corpus indexed
+//!   as one file, split across files, or served partly as an in-memory
 //!   chunk / WAL tail returns IDENTICAL results (ids, order, summary
-//!   numbers, attached spans, kinds).
+//!   numbers).
 //! - **The over-approximation never leaks:** a trace whose only match is
 //!   a LOSING resend copy is dropped by phase-2 canonical re-evaluation;
 //!   a trace whose canonical copy matches is found however its raw rank
@@ -16,14 +16,14 @@
 //!   are identical under source-order permutation.
 //!
 //! Also pinned: the summary numbers against ground truth (roots,
-//! envelope, counts, spans_per_trace trimming), the service breakdown's
+//! envelope, counts, ranks), the service breakdown's
 //! partition of the retained canonical spans, the request-validation
 //! matrix, post-validation source vanish, unavailable-source honesty
 //! (including the completion slack), the span-cap honesty pair,
 //! budget-truncated sources that cannot falsify completeness, the
-//! trace:id pin shortcut past discovery, tri-state exclusion of
-//! indeterminate trace-level candidates, UNSET trace ids, the empty
-//! window set, and the field-kind projection.
+//! trace_id pin shortcut past discovery, tri-state exclusion of
+//! indeterminate trace-level candidates, UNSET trace ids, and the empty
+//! window set.
 //!
 //! The op's engine contract lives in `src/traces/search.rs`; the
 //! sibling suites in this directory pin the other traces query ops, and
@@ -39,19 +39,24 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio_util::sync::CancellationToken;
 
 use common::{
-    SpanSpec, kv_str, memory_source, missing_source, req_with, sealed_source, sp, tail_source,
-    unavailable_source, write_wal,
+    SpanSpec, corrupt_chunk, hide_chunk, kv_int, kv_str, memory_source, missing_source, req_with,
+    sealed_source, sealed_source_at, sp, tail_source, unavailable_source, write_wal,
 };
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use sfsq::traces::{
     AttributeOwner, BuiltinField, CompareOp, Condition, PartialReason, Predicate, PredicateError,
     PredicateTarget, PredicateValue, QueryStatus, SERVICE_BREAKDOWN_TOP_K, SearchData, SearchQuery,
-    SearchRequestError, SearchSources, ServiceBreakdown, TimeWindow, TraceSource, search,
+    SearchRequestError, SearchSources, ServiceBreakdown, TimeWindow, Token, TokenQuery,
+    TraceSource, search,
 };
 
 /// One second in nanoseconds — the corpus' timestamp unit (`500 * NS`
 /// below reads as 500s).
 const NS: u64 = 1_000_000_000;
+
+/// T4's `big` attribute: 2^53 + 1, the first integer an `f64` cannot
+/// hold (it reads back as 2^53).
+const BIG: i64 = (1 << 53) + 1;
 
 fn tid(n: u8) -> [u8; 16] {
     let mut b = [0u8; 16];
@@ -97,17 +102,16 @@ fn run(sources: SearchSources, query: SearchQuery) -> SearchData {
 
 /// One summary rendered comparable across layouts.
 type SummaryPrint = (
-    String,                                // trace id (hex)
-    Option<String>,                        // root_service
-    Option<String>,                        // root_name
-    i64,                                   // start_ns
-    i64,                                   // duration_ns
-    usize,                                 // span_count
-    usize,                                 // error_count
-    usize,                                 // matched_count
-    Vec<(String, i64, i64)>,               // attached spans: (name, start, duration)
-    bool,                                  // exact
-    (Vec<(String, u64)>, u64, usize, u64), // service breakdown
+    String,                         // trace id (hex)
+    Option<String>,                 // root_service
+    Option<String>,                 // root_name
+    i64,                            // start_ns
+    i64,                            // duration_ns
+    usize,                          // span_count
+    usize,                          // error_count
+    i64,                            // newest_matched_start_ns (the rank)
+    bool,                           // exact
+    (Vec<(String, u64)>, u64, u64), // service breakdown
 );
 
 /// The whole result — rows plus status — in comparable form: the
@@ -125,24 +129,11 @@ fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
                 t.duration_ns,
                 t.span_count,
                 t.error_count,
-                t.matched_count,
-                t.matched_spans
-                    .iter()
-                    .map(|s| {
-                        let name = s
-                            .fields
-                            .iter()
-                            .find(|(k, _)| k == "name")
-                            .map(|(_, v)| v.clone())
-                            .unwrap_or_default();
-                        (name, s.start_ns, s.duration_ns)
-                    })
-                    .collect(),
+                t.newest_matched_start_ns,
                 t.exact,
                 (
                     t.service_breakdown.top.clone(),
                     t.service_breakdown.other,
-                    t.service_breakdown.other_services,
                     t.service_breakdown.unattributed,
                 ),
             )
@@ -152,23 +143,16 @@ fn norm(data: &SearchData) -> (Vec<SummaryPrint>, QueryStatus) {
 }
 
 /// Positional expected-value constructor for `ServiceBreakdown` asserts.
-fn breakdown(
-    top: &[(&str, u64)],
-    other: u64,
-    other_services: usize,
-    unattributed: u64,
-) -> ServiceBreakdown {
+fn breakdown(top: &[(&str, u64)], other: u64, unattributed: u64) -> ServiceBreakdown {
     ServiceBreakdown {
         top: top.iter().map(|&(s, n)| (s.to_string(), n)).collect(),
         other,
-        other_services,
         unattributed,
     }
 }
 
 /// Every returned row's breakdown partitions exactly the spans its
-/// `span_count` counts, within the cap, with `other` and
-/// `other_services` empty together.
+/// `span_count` counts, within the cap.
 fn assert_breakdowns_partition(data: &SearchData) {
     for t in &data.traces {
         let b = &t.service_breakdown;
@@ -182,7 +166,6 @@ fn assert_breakdowns_partition(data: &SearchData) {
             "trace {}",
             t.trace_id
         );
-        assert_eq!(b.other == 0, b.other_services == 0, "trace {}", t.trace_id);
     }
 }
 
@@ -239,7 +222,11 @@ fn early_requests() -> Vec<ExportTraceServiceRequest> {
             &[
                 SpanSpec {
                     kind: 5, // CONSUMER
-                    attrs: vec![kv_str("queue", "q1"), kv_str("retries", "3")],
+                    attrs: vec![
+                        kv_str("queue", "q1"),
+                        kv_str("retries", "3"),
+                        kv_int("big", BIG),
+                    ],
                     links: vec![
                         (tid(1), [0x11; 8], vec![kv_str("rel", "follows")]),
                         (tid(2), [0x22; 8], vec![kv_str("rel", "other")]),
@@ -365,6 +352,13 @@ fn ids(data: &SearchData) -> Vec<String> {
     data.traces.iter().map(|t| t.trace_id.to_string()).collect()
 }
 
+/// A query on the assembly path (rows off): for the tests that pin
+/// canonical-assembly properties — resend dedup, canonical ranks, the
+/// span cap — which the rows path deliberately does not have.
+fn canon_query(tokens: impl Into<TokenQuery>) -> SearchQuery {
+    SearchQuery::new(tokens).rows_for_tests(false)
+}
+
 /// Shared-world trace `n` hex-rendered, for expectation lists.
 fn hex(n: u8) -> String {
     sfst::TraceId::from(tid(n)).to_string()
@@ -381,12 +375,12 @@ fn oracle_equivalence_under_relayouts() {
     let queries: Vec<(&str, SearchQuery, Vec<String>)> = vec![
         (
             "all",
-            SearchQuery::new(Predicate::all()),
+            canon_query(Predicate::all()),
             vec![hex(3), hex(5), hex(6), hex(4), hex(2), hex(1)],
         ),
         (
             "service",
-            SearchQuery::new(pred(vec![attr_eq(
+            canon_query(pred(vec![attr_eq(
                 AttributeOwner::Resource,
                 "service.name",
                 "svc-a",
@@ -398,7 +392,7 @@ fn oracle_equivalence_under_relayouts() {
             // (900s): only the ROOT of T3 matches this pattern, so T3
             // ranks by 900s, not by its non-matching 1900s child.
             "name-regex",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Name,
                 CompareOp::Regex,
                 vec![text("GET .*")],
@@ -407,7 +401,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "status-error",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Status,
                 CompareOp::Eq,
                 vec![text("ERROR")],
@@ -416,7 +410,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "kind-keyword",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::Eq,
                 vec![text("CONSUMER")],
@@ -427,7 +421,7 @@ fn oracle_equivalence_under_relayouts() {
             // Regex over the kind LABEL set is stage-A evaluable (26A):
             // matches T4's CONSUMER (1200s) and T1's SERVER (1000s).
             "kind-regex",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::Regex,
                 vec![text("SERVER|CONSUMER")],
@@ -435,8 +429,18 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(4), hex(1)],
         ),
         (
+            // The non-root spans of T1, T3 and T5 have kind UNSPECIFIED.
+            "role-internal",
+            canon_query(pred(vec![builtin(
+                BuiltinField::Role,
+                CompareOp::Eq,
+                vec![text("INTERNAL")],
+            )])),
+            vec![hex(3), hex(5), hex(1)],
+        ),
+        (
             "duration-floor",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Duration,
                 CompareOp::Gte,
                 vec![PredicateValue::Integer(1_000_000)],
@@ -446,7 +450,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Span-group semantics: ONE span carries both conditions.
             "conjunction",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Resource, "service.name", "svc-a"),
                 attr_eq(AttributeOwner::Span, "http.method", "GET"),
             ])),
@@ -456,7 +460,7 @@ fn oracle_equivalence_under_relayouts() {
             // Window [1050s, 1600s): T6's canonical (1300s) is inside —
             // ranked by it; T1/T3 have no span starting inside.
             "window",
-            SearchQuery::new(Predicate::all())
+            canon_query(Predicate::all())
                 .window(TimeWindow::new(1_050 * NS as i64, 1_600 * NS as i64).unwrap()),
             vec![hex(5), hex(6), hex(4), hex(2)],
         ),
@@ -466,19 +470,19 @@ fn oracle_equivalence_under_relayouts() {
             // re-evaluation, and the trace is dropped — never a false
             // positive from raw phase-1.
             "ghost-only-on-loser",
-            SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "ghost", "yes")])),
+            canon_query(pred(vec![attr_eq(AttributeOwner::Span, "ghost", "yes")])),
             vec![],
         ),
         (
             // The canonical-matches direction: `flag` exists only on the
             // canonical copy; found regardless of the newer resend.
             "flag-on-canonical",
-            SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "flag", "on")])),
+            canon_query(pred(vec![attr_eq(AttributeOwner::Span, "flag", "on")])),
             vec![hex(6)],
         ),
         (
             "multi-value-or",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
                 CompareOp::Eq,
                 vec![text("GET"), text("POST")],
@@ -490,7 +494,7 @@ fn oracle_equivalence_under_relayouts() {
             // only T2's POST span; spans without http.method never
             // satisfy a negated comparison.
             "negated-attribute",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
                 CompareOp::NotEq,
                 vec![text("GET")],
@@ -503,7 +507,7 @@ fn oracle_equivalence_under_relayouts() {
             // nothing satisfies `ghost != x`, however the raw copies
             // look.
             "negated-absent-attribute",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "ghost".into()),
                 CompareOp::NotEq,
                 vec![text("x")],
@@ -516,7 +520,7 @@ fn oracle_equivalence_under_relayouts() {
             // every trace owning a non-SERVER span — all six (T1 through
             // its UNSPECIFIED child).
             "negated-kind",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::NotEq,
                 vec![text("SERVER")],
@@ -526,7 +530,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // The UNSPECIFIED default is a stored, selectable kind.
             "kind-unspecified",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Kind,
                 CompareOp::Eq,
                 vec![text("UNSPECIFIED")],
@@ -538,7 +542,7 @@ fn oracle_equivalence_under_relayouts() {
             // span sent without a status (T1's child, T3's late child,
             // T4, T6's canonical copy).
             "status-unset",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Status,
                 CompareOp::Eq,
                 vec![text("UNSET")],
@@ -549,7 +553,7 @@ fn oracle_equivalence_under_relayouts() {
             // `status != ERROR` reaches UNSET spans too, not only OK ones
             // (which alone would give T1 and T3).
             "status-not-error",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::Status,
                 CompareOp::NotEq,
                 vec![text("ERROR")],
@@ -557,11 +561,10 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(3), hex(6), hex(4), hex(1)],
         ),
         (
-            // The any-owner disjunction: `env` is a RESOURCE attribute of
-            // svc-a; the any-owner lookup reaches it.
-            "any-owner-attribute",
-            SearchQuery::new(pred(vec![cond(
-                PredicateTarget::Attribute(AttributeOwner::Any, "env".into()),
+            // `env` is a RESOURCE attribute of svc-a.
+            "resource-attribute",
+            canon_query(pred(vec![cond(
+                PredicateTarget::Attribute(AttributeOwner::Resource, "env".into()),
                 CompareOp::Eq,
                 vec![text("prod")],
             )])),
@@ -570,7 +573,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Dictionary numerics: `retries` renders as the token "3".
             "numeric-attribute",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "retries".into()),
                 CompareOp::Gte,
                 vec![PredicateValue::Integer(2)],
@@ -581,7 +584,7 @@ fn oracle_equivalence_under_relayouts() {
             // Numeric equality accepts the float spelling of an integer
             // token (the dictionary-numeric rule, not byte equality).
             "numeric-float-eq",
-            SearchQuery::new(pred(vec![cond(
+            canon_query(pred(vec![cond(
                 PredicateTarget::Attribute(AttributeOwner::Span, "retries".into()),
                 CompareOp::Eq,
                 vec![PredicateValue::Float(3.0)],
@@ -589,9 +592,47 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(4)],
         ),
         (
-            // span:id — the SPAN column scan; T5's middle child.
+            // Integers compare exactly past 2^53: T4's `big` is 2^53 + 1,
+            // which an f64 comparison would equate with 2^53.
+            "numeric-big-int-neighbor",
+            canon_query(pred(vec![cond(
+                PredicateTarget::Attribute(AttributeOwner::Span, "big".into()),
+                CompareOp::Eq,
+                vec![PredicateValue::Integer(BIG - 1)],
+            )])),
+            vec![],
+        ),
+        (
+            "numeric-big-int-eq",
+            canon_query(pred(vec![cond(
+                PredicateTarget::Attribute(AttributeOwner::Span, "big".into()),
+                CompareOp::Eq,
+                vec![PredicateValue::Integer(BIG)],
+            )])),
+            vec![hex(4)],
+        ),
+        (
+            "numeric-big-int-gt",
+            canon_query(pred(vec![cond(
+                PredicateTarget::Attribute(AttributeOwner::Span, "big".into()),
+                CompareOp::Gt,
+                vec![PredicateValue::Integer(BIG - 1)],
+            )])),
+            vec![hex(4)],
+        ),
+        (
+            "numeric-big-int-lte",
+            canon_query(pred(vec![cond(
+                PredicateTarget::Attribute(AttributeOwner::Span, "big".into()),
+                CompareOp::Lte,
+                vec![PredicateValue::Integer(BIG - 1)],
+            )])),
+            vec![],
+        ),
+        (
+            // span_id — the SPAN column scan; T5's middle child.
             "span-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::SpanId,
                 CompareOp::Eq,
                 vec![text("5252525252525252")],
@@ -599,9 +640,9 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(5)],
         ),
         (
-            // span:parentID — children of T5's root.
+            // parent_span_id — children of T5's root.
             "parent-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::ParentSpanId,
                 CompareOp::Eq,
                 vec![text("5151515151515151")],
@@ -612,7 +653,7 @@ fn oracle_equivalence_under_relayouts() {
             // Negated parent id: parent PRESENT and ≠ T5's root — roots
             // (unset parent = absent) never satisfy it.
             "negated-parent-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::ParentSpanId,
                 CompareOp::NotEq,
                 vec![text("5151515151515151")],
@@ -620,10 +661,10 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(3), hex(1)],
         ),
         (
-            // trace:id pins the candidate set; the span-local remainder
+            // trace_id pins the candidate set; the span-local remainder
             // still applies in phase 2.
             "trace-id-pin",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(
                     BuiltinField::TraceId,
                     CompareOp::Eq,
@@ -636,26 +677,26 @@ fn oracle_equivalence_under_relayouts() {
         (
             // A pin whose remainder fails phase-2 re-evaluation drops.
             "trace-id-pin-no-match",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(BuiltinField::TraceId, CompareOp::Eq, vec![text(&hex(1))]),
                 builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
             ])),
             vec![],
         ),
         (
-            // trace:id != excludes at pool admission.
+            // trace_id != excludes at pool admission.
             "trace-id-excluded",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
                 builtin(BuiltinField::TraceId, CompareOp::NotEq, vec![text(&hex(5))]),
             ])),
             vec![hex(2)],
         ),
         (
-            // link:spanID / link:traceID — the LNKB row scan; T4 links
+            // links.span_id / links.trace_id — the LNKB row scan; T4 links
             // to T1's root span.
             "link-span-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::LinkSpanId,
                 CompareOp::Eq,
                 vec![text("1111111111111111")],
@@ -664,7 +705,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "link-trace-id",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::LinkTraceId,
                 CompareOp::Eq,
                 vec![text(&hex(1))],
@@ -672,10 +713,10 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(4)],
         ),
         (
-            // event:name rides the flat events.name token; the span-side
+            // events.name rides the flat events.name token; the span-side
             // evaluator gathers from the STRUCTURED event names.
             "event-name",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::EventName,
                 CompareOp::Eq,
                 vec![text("exception")],
@@ -684,7 +725,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "event-name-regex",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::EventName,
                 CompareOp::Regex,
                 vec![text("exc.*")],
@@ -694,7 +735,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Event attribute through the structural refine.
             "event-attr",
-            SearchQuery::new(pred(vec![attr_eq(
+            canon_query(pred(vec![attr_eq(
                 AttributeOwner::Event,
                 "exception.type",
                 "IOError",
@@ -704,7 +745,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Same-event conjunction: name + attribute on ONE event.
             "event-subgroup-same",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(BuiltinField::EventName, CompareOp::Eq, vec![text("retry")]),
                 attr_eq(AttributeOwner::Event, "attempt", "2"),
             ])),
@@ -716,7 +757,7 @@ fn oracle_equivalence_under_relayouts() {
             // carries both — the mandatory refine rejects what a loose
             // span-level match would leak.
             "event-subgroup-counterexample",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Event, "exception.type", "IOError"),
                 attr_eq(AttributeOwner::Event, "attempt", "2"),
             ])),
@@ -725,7 +766,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Cross-condition on names: no single event is named both.
             "event-two-names-unsatisfiable",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(
                     BuiltinField::EventName,
                     CompareOp::Eq,
@@ -736,10 +777,10 @@ fn oracle_equivalence_under_relayouts() {
             vec![],
         ),
         (
-            // event:timeSinceStart computes in the refine (the corpus
+            // events.time_since_start computes in the refine (the corpus
             // writes events at start + 1ns).
             "event-time-since-start",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::EventTimeSinceStart,
                 CompareOp::Lte,
                 vec![PredicateValue::Integer(1)],
@@ -748,7 +789,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "event-time-since-start-none",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::EventTimeSinceStart,
                 CompareOp::Gt,
                 vec![PredicateValue::Integer(1)],
@@ -758,7 +799,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Link attribute + link id on the SAME link.
             "link-subgroup-same",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Link, "rel", "follows"),
                 builtin(
                     BuiltinField::LinkSpanId,
@@ -772,7 +813,7 @@ fn oracle_equivalence_under_relayouts() {
             // The LINK counterexample: attribute from one link, id from
             // the other — no single link has both.
             "link-subgroup-counterexample",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Link, "rel", "other"),
                 builtin(
                     BuiltinField::LinkSpanId,
@@ -784,7 +825,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "link-subgroup-other",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 attr_eq(AttributeOwner::Link, "rel", "other"),
                 builtin(
                     BuiltinField::LinkSpanId,
@@ -798,7 +839,7 @@ fn oracle_equivalence_under_relayouts() {
             // Trace-level only: phase-1 candidates come from All over
             // the window (C-4); the root evaluates post-assembly.
             "root-service",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::RootServiceName,
                 CompareOp::Eq,
                 vec![text("svc-a")],
@@ -807,7 +848,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "root-name-regex",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::RootName,
                 CompareOp::Regex,
                 vec![text("GET .*")],
@@ -816,7 +857,7 @@ fn oracle_equivalence_under_relayouts() {
         ),
         (
             "negated-root-name",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::RootName,
                 CompareOp::NotEq,
                 vec![text("GET /users")],
@@ -826,7 +867,7 @@ fn oracle_equivalence_under_relayouts() {
         (
             // Envelope duration: only T3 spans a second-scale envelope.
             "trace-duration",
-            SearchQuery::new(pred(vec![builtin(
+            canon_query(pred(vec![builtin(
                 BuiltinField::TraceDuration,
                 CompareOp::Gt,
                 vec![PredicateValue::Integer((100 * NS) as i64)],
@@ -837,7 +878,7 @@ fn oracle_equivalence_under_relayouts() {
             // MIXED: the span-local half lowers to the file plans, the
             // trace-level half applies post-assembly (C-4).
             "mixed-trace-level",
-            SearchQuery::new(pred(vec![
+            canon_query(pred(vec![
                 builtin(BuiltinField::Status, CompareOp::Eq, vec![text("ERROR")]),
                 builtin(
                     BuiltinField::RootServiceName,
@@ -867,6 +908,17 @@ fn oracle_equivalence_under_relayouts() {
             );
             let got = norm(&data);
             assert_eq!(got.1, QueryStatus::Complete, "query {qname} on {lname}");
+            // One loaded session at a time: every step releases the
+            // previous file, and the answer is the same.
+            let capped = run(
+                layout(dir.path(), &world, lname),
+                query.clone().loaded_sources_cap_for_tests(1),
+            );
+            assert_eq!(
+                norm(&capped),
+                got,
+                "query {qname} on {lname}: releasing sessions changed the answer"
+            );
             match &reference {
                 None => reference = Some(got),
                 Some(want) => {
@@ -877,8 +929,67 @@ fn oracle_equivalence_under_relayouts() {
     }
 }
 
+/// Discovery reads its columns through the sessions: with one loaded
+/// session at a time, a file's later bands decode its columns again
+/// after other files' reads released them, and the answer equals the
+/// default limit's — for match-all discovery and for a two-token query
+/// (every token compiled per file).
+#[test]
+fn discovery_survives_session_release() {
+    let dir = tempfile::tempdir().unwrap();
+    // Four files interleaved in time: file f holds traces f+1, f+5, ….
+    let wals: Vec<_> = (0..4u8)
+        .map(|f| {
+            let spans: Vec<SpanSpec> = (0..6u8)
+                .map(|i| {
+                    let t = f + 1 + i * 4;
+                    let name = if t % 3 == 0 { "hot" } else { "op" };
+                    let mut s = sp(1, 0, u64::from(t) * 1_000_000_000, name);
+                    s.trace = [0; 16];
+                    s.trace[15] = t;
+                    s
+                })
+                .collect();
+            let svc = vec![kv_str("service.name", "svc")];
+            write_wal(
+                dir.path(),
+                vec![req_with(svc, None, &spans)],
+                &format!("f{f}"),
+            )
+        })
+        .collect();
+    let sources = || {
+        both_roles(|| {
+            wals.iter()
+                .enumerate()
+                .map(|(f, wal)| sealed_source(dir.path(), wal, &format!("f{f}")))
+                .collect()
+        })
+    };
+    let any_name = builtin(BuiltinField::Name, CompareOp::Regex, vec![text("op|hot")]);
+    for (query, want) in [
+        (
+            SearchQuery::new(pred(vec![])).limit(3),
+            vec![hex(24), hex(23), hex(22)],
+        ),
+        (
+            SearchQuery::new(tokens(vec![
+                Token::positive(pred(vec![any_name])),
+                Token::positive(pred(vec![name_eq("op")])),
+            ]))
+            .limit(3),
+            vec![hex(23), hex(22), hex(20)],
+        ),
+    ] {
+        let wide = run(sources(), query.clone());
+        assert_eq!(ids(&wide), want);
+        let narrow = run(sources(), query.loaded_sources_cap_for_tests(1));
+        assert_eq!(norm(&narrow), norm(&wide));
+    }
+}
+
 /// Summary numbers against ground truth (single layout; equivalence is
-/// proven above): roots, envelope, counts, spans_per_trace trim, combiner order.
+/// proven above): roots, envelope, counts, ranks.
 #[test]
 fn summary_ground_truth() {
     let dir = tempfile::tempdir().unwrap();
@@ -887,10 +998,7 @@ fn summary_ground_truth() {
     let wal = write_wal(dir.path(), all, "world");
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
 
-    let data = run(
-        sources,
-        SearchQuery::new(Predicate::all()).spans_per_trace(2),
-    );
+    let data = run(sources, canon_query(Predicate::all()));
     assert_breakdowns_partition(&data);
     let by_id = |n: u8| {
         data.traces
@@ -905,11 +1013,10 @@ fn summary_ground_truth() {
     assert_eq!(t1.root_name.as_deref(), Some("GET /users"));
     assert_eq!(t1.start_ns, (1_000 * NS) as i64);
     assert_eq!(t1.duration_ns, 500_000);
-    assert_eq!((t1.span_count, t1.error_count, t1.matched_count), (2, 0, 2));
-    assert_eq!(t1.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0, 0));
-    // spans_per_trace(2) attaches both, in combiner (chronological) order.
-    assert_eq!(t1.matched_spans.len(), 2);
-    assert!(t1.matched_spans[0].start_ns < t1.matched_spans[1].start_ns);
+    assert_eq!((t1.span_count, t1.error_count), (2, 0));
+    assert_eq!(t1.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0));
+    // Ranked by the newest matching span: the child.
+    assert_eq!(t1.newest_matched_start_ns, (1_000 * NS + 10) as i64);
 
     // T3: spans scattered across the halves; envelope spans both.
     let t3 = by_id(3);
@@ -917,43 +1024,23 @@ fn summary_ground_truth() {
     assert_eq!(t3.start_ns, (900 * NS) as i64);
     assert_eq!(t3.duration_ns, (1_000 * NS + 50) as i64);
     assert_eq!(t3.span_count, 2);
-    assert_eq!(t3.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0, 0));
+    assert_eq!(t3.service_breakdown, breakdown(&[("svc-a", 2)], 0, 0));
 
     // T5: all three spans carry ERROR.
     let t5 = by_id(5);
     assert_eq!((t5.span_count, t5.error_count), (3, 3));
-    assert_eq!(t5.service_breakdown, breakdown(&[("svc-b", 3)], 0, 0, 0));
-    assert_eq!(
-        t5.matched_spans.len(),
-        2,
-        "spans_per_trace trims the attachment"
-    );
-    assert_eq!(
-        t5.matched_count, 3,
-        "matched_count is not trimmed by spans_per_trace"
-    );
+    assert_eq!(t5.service_breakdown, breakdown(&[("svc-b", 3)], 0, 0));
+    assert_eq!(t5.newest_matched_start_ns, (1_520 * NS) as i64);
 
     // T6: the resend collapsed to the canonical copy.
     let t6 = by_id(6);
     assert_eq!((t6.span_count, t6.start_ns), (1, (1_300 * NS) as i64));
-    assert_eq!(t6.service_breakdown, breakdown(&[("svc-b", 1)], 0, 0, 0));
-
-    // spans_per_trace = 0 attaches nothing, counts unaffected.
-    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let none = run(
-        sources,
-        SearchQuery::new(Predicate::all()).spans_per_trace(0),
-    );
-    assert!(none.traces.iter().all(|t| t.matched_spans.is_empty()));
-    assert_eq!(
-        none.traces.iter().map(|t| t.matched_count).sum::<usize>(),
-        10
-    );
+    assert_eq!(t6.service_breakdown, breakdown(&[("svc-b", 1)], 0, 0));
 }
 
 /// The per-service breakdown over the retained canonical spans: ranked
 /// by span count then name (ties at the cut included), capped with the
-/// tail folded into `other`/`other_services`, service-less spans
+/// tail folded into `other`, service-less spans
 /// counted as `unattributed`, a resend from another service counted
 /// once under its canonical copy's service, and a capped trace
 /// partitioning only its retained spans.
@@ -1029,14 +1116,14 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
     let wal = write_wal(dir.path(), reqs, "breakdown");
 
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let data = run(sources, SearchQuery::new(Predicate::all()));
+    let data = run(sources, canon_query(Predicate::all()));
     assert_eq!(ids(&data), vec![hex(22), hex(21)]);
     assert_breakdowns_partition(&data);
     let (t22, t21) = (&data.traces[0], &data.traces[1]);
     assert_eq!(t21.span_count, 9);
     assert_eq!(
         t21.service_breakdown,
-        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 0, 2)
+        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 2)
     );
     assert_eq!(t22.span_count, 17);
     assert_eq!(
@@ -1050,7 +1137,6 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
                 ("echo", 2)
             ],
             3,
-            2,
             0
         )
     );
@@ -1060,7 +1146,7 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let filtered = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(
+        canon_query(pred(vec![attr_eq(
             AttributeOwner::Resource,
             "service.name",
             "cart",
@@ -1069,28 +1155,24 @@ fn service_breakdown_partitions_the_retained_canonical_spans() {
     assert_eq!(ids(&filtered), vec![hex(21)]);
     assert_breakdowns_partition(&filtered);
     let t21 = &filtered.traces[0];
-    assert_eq!((t21.span_count, t21.matched_count), (9, 2));
+    assert_eq!(t21.span_count, 9);
+    // Ranked by its newest cart span, not by the trace's newest span.
+    assert_eq!(t21.newest_matched_start_ns, (5_004 * NS) as i64);
     assert_eq!(
         t21.service_breakdown,
-        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 0, 2)
+        breakdown(&[("frontend", 3), ("auth", 2), ("cart", 2)], 0, 2)
     );
 
     // Capped at 2 spans: each trace keeps its two earliest, inexact, and
     // the breakdown partitions exactly those.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let capped = run(
-        sources,
-        SearchQuery::new(Predicate::all()).span_cap_for_tests(2),
-    );
+    let capped = run(sources, canon_query(Predicate::all()).span_cap_for_tests(2));
     assert!(capped.status.has(PartialReason::SizeCap));
     assert_breakdowns_partition(&capped);
     let (t22, t21) = (&capped.traces[0], &capped.traces[1]);
     assert!(!t21.exact && !t22.exact);
-    assert_eq!(
-        t21.service_breakdown,
-        breakdown(&[("frontend", 2)], 0, 0, 0)
-    );
-    assert_eq!(t22.service_breakdown, breakdown(&[("alpha", 2)], 0, 0, 0));
+    assert_eq!(t21.service_breakdown, breakdown(&[("frontend", 2)], 0, 0));
+    assert_eq!(t22.service_breakdown, breakdown(&[("alpha", 2)], 0, 0));
 }
 
 /// The glm 7-trace construction (pin R2-1): losing resends inflate raw
@@ -1142,13 +1224,13 @@ fn inflated_raw_ranks_do_not_hide_the_true_top_trace() {
     let matching = pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]);
     // limit 1 → initial K = 3: the raw top-3 are all inflated resends.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let top = run(sources, SearchQuery::new(matching.clone()).limit(1));
+    let top = run(sources, canon_query(matching.clone()).limit(1));
     assert_eq!(ids(&top), vec![hex(6)], "the hidden winner surfaces");
     assert_eq!(top.status, QueryStatus::Complete);
 
     // Full ordering: canonical ranks throughout (500, then 105..101).
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let all = run(sources, SearchQuery::new(matching).limit(10));
+    let all = run(sources, canon_query(matching).limit(10));
     assert_eq!(
         ids(&all),
         vec![hex(6), hex(5), hex(4), hex(3), hex(2), hex(1)]
@@ -1170,7 +1252,7 @@ fn window_applies_to_the_canonical_copy() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let data = run(
         sources,
-        SearchQuery::new(Predicate::all())
+        canon_query(Predicate::all())
             .window(TimeWindow::new(1_890 * NS as i64, 2_000 * NS as i64).unwrap()),
     );
     assert_eq!(ids(&data), vec![hex(3)]);
@@ -1180,10 +1262,8 @@ fn window_applies_to_the_canonical_copy() {
     assert_eq!(t3.root_name.as_deref(), Some("GET /health"));
     assert_eq!(t3.start_ns, (900 * NS) as i64);
     assert_eq!(t3.span_count, 2);
-    // …but matched_count/attachment follow predicate + window.
-    assert_eq!(t3.matched_count, 1);
-    assert_eq!(t3.matched_spans.len(), 1);
-    assert_eq!(t3.matched_spans[0].start_ns, (1_900 * NS) as i64);
+    // …but the rank follows predicate + window.
+    assert_eq!(t3.newest_matched_start_ns, (1_900 * NS) as i64);
 }
 
 /// Request validation: everything rejected BEFORE any I/O.
@@ -1204,13 +1284,6 @@ fn request_validation_matrix() {
     assert!(matches!(
         try_search(sources(), SearchQuery::new(Predicate::all()).limit(0)),
         Err(SearchRequestError::ZeroLimit)
-    ));
-    assert!(matches!(
-        try_search(
-            sources(),
-            SearchQuery::new(Predicate::all()).spans_per_trace(129)
-        ),
-        Err(SearchRequestError::SpansPerTraceBeyondMax { got: 129 })
     ));
     // Structural predicate error.
     assert!(matches!(
@@ -1391,7 +1464,7 @@ fn assembled_ceiling_terminates_with_the_gathered_result() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let data = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
     );
     // Ceiling = max(1 × 16, 64) = 64 < 80 candidates: Partial.
     assert!(data.status.has(PartialReason::WorkCeiling));
@@ -1404,7 +1477,7 @@ fn assembled_ceiling_terminates_with_the_gathered_result() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let again = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).limit(1),
     );
     assert_eq!(norm(&data), norm(&again));
 }
@@ -1442,7 +1515,7 @@ fn visited_rows_ceiling_gates_refill() {
     let wal = write_wal(dir.path(), reqs, "visited");
 
     let q = || {
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]))
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]))
             .limit(1)
             .visited_rows_ceiling_for_tests(30)
     };
@@ -1545,8 +1618,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let dropped = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")]))
-            .span_cap_for_tests(2),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])).span_cap_for_tests(2),
     );
     assert_eq!(ids(&dropped), vec![hex(8)]);
     assert!(dropped.status.has(PartialReason::SizeCap));
@@ -1556,14 +1628,13 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let kept = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "a", "yes")]))
-            .span_cap_for_tests(2),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "a", "yes")])).span_cap_for_tests(2),
     );
     assert_eq!(ids(&kept), vec![hex(7), hex(9)]);
     assert!(kept.status.has(PartialReason::SizeCap));
     let t9 = &kept.traces[1];
     assert!(!t9.exact);
-    assert_eq!((t9.span_count, t9.matched_count), (2, 1));
+    assert_eq!(t9.span_count, 2);
 
     // Direction 3 (the trimmed-out shape): for `m2`, trace 9's computed
     // rank comes from its RETAINED spans (200s) though its true newest
@@ -1573,7 +1644,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let trimmed = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")]))
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")]))
             .span_cap_for_tests(2)
             .limit(1),
     );
@@ -1583,7 +1654,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let true_top = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")])).limit(1),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m2", "yes")])).limit(1),
     );
     assert_eq!(ids(&true_top), vec![hex(9)]);
     assert_eq!(true_top.status, QueryStatus::Complete);
@@ -1592,7 +1663,7 @@ fn capped_candidates_are_never_silently_dropped() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let uncapped = run(
         sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])),
+        canon_query(pred(vec![attr_eq(AttributeOwner::Span, "m", "yes")])),
     );
     assert_eq!(ids(&uncapped), vec![hex(9), hex(8)]);
     assert_eq!(uncapped.status, QueryStatus::Complete);
@@ -1670,7 +1741,7 @@ fn budget_truncated_old_source_cannot_falsify_completeness() {
     assert_eq!(ids(&unbudgeted), vec![hex(249)]);
 }
 
-/// `trace:id =` pins bypass phase-1 discovery entirely: the search
+/// `trace_id =` pins bypass phase-1 discovery entirely: the search
 /// answers with a ZERO visited-rows budget (assembly is not a
 /// discovery cost), proving no scan ran.
 #[test]
@@ -1727,7 +1798,7 @@ fn trace_level_conditions_exclude_indeterminate_candidates() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let full = run(
         sources,
-        SearchQuery::new(pred(vec![builtin(
+        canon_query(pred(vec![builtin(
             BuiltinField::RootName,
             CompareOp::Regex,
             vec![text("root-.*")],
@@ -1741,7 +1812,7 @@ fn trace_level_conditions_exclude_indeterminate_candidates() {
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let capped = run(
         sources,
-        SearchQuery::new(pred(vec![builtin(
+        canon_query(pred(vec![builtin(
             BuiltinField::RootName,
             CompareOp::Regex,
             vec![text("root-.*")],
@@ -1838,36 +1909,6 @@ fn empty_window_set_is_a_complete_empty() {
     let data = run(sources, SearchQuery::new(Predicate::all()));
     assert!(data.traces.is_empty());
     assert_eq!(data.status, QueryStatus::Complete);
-}
-
-/// FieldKinds cover exactly the returned traces' attached spans: names
-/// the attachment exposes, kinds from the contributing sources.
-#[test]
-fn field_kinds_describe_the_returned_data() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut all = early_requests();
-    all.extend(late_requests());
-    let wal = write_wal(dir.path(), all, "world");
-    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
-    let data = run(
-        sources,
-        SearchQuery::new(pred(vec![attr_eq(AttributeOwner::Span, "queue", "q1")])),
-    );
-    assert_eq!(ids(&data), vec![hex(4)]);
-    let names: Vec<&str> = data
-        .field_kinds
-        .fields
-        .iter()
-        .map(|(k, _)| k.as_str())
-        .collect();
-    assert!(names.contains(&"attributes.queue"), "{names:?}");
-    assert!(
-        names.contains(&"resource.attributes.service.name"),
-        "{names:?}"
-    );
-    // svc-a's attributes exist in the (single, contributing) file but on
-    // no attached span — the projection excludes them.
-    assert!(!names.contains(&"attributes.http.method"), "{names:?}");
 }
 
 /// Search across ONLY tails (no sealed file at all): the tail path
@@ -2017,4 +2058,1308 @@ fn an_unavailable_source_makes_trace_level_candidates_indeterminate() {
         degraded.status,
         QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
     );
+}
+
+/// Files open lazily: a corrupt dictionary in a slack-only file that
+/// holds none of the candidates is never read, so the page is complete.
+#[test]
+fn an_unread_corrupt_slack_file_does_not_degrade_the_page() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let mut a = sp(1, 0, 10 * NS, "a");
+    a.trace = tid(1);
+    let mut b = sp(2, 0, 20 * NS, "b");
+    b.trace = tid(2);
+    let w_window = write_wal(dir.path(), vec![req_with(svc(), None, &[a])], "window");
+    let w_slack = write_wal(dir.path(), vec![req_with(svc(), None, &[b])], "slack");
+    drop(sealed_source(dir.path(), &w_slack, "slack"));
+    corrupt_chunk(&dir.path().join("slack.sfst"), *b"PRIM");
+    let window = || sealed_source(dir.path(), &w_window, "window");
+    let data = run(
+        SearchSources {
+            window: vec![window()],
+            completion: vec![
+                window(),
+                sealed_source_at(&dir.path().join("slack.sfst"), "slack"),
+            ],
+        },
+        SearchQuery::new(Predicate::default()),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.traces.len(), 1);
+}
+
+/// Window files compile newest first, only while they can still beat
+/// the N-th result: an older file is never compiled (here its corrupt
+/// dictionary stays unread and the page is complete).
+#[test]
+fn a_window_file_that_cannot_beat_the_page_is_never_compiled() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let traced = |t: u8, at: u64| {
+        let mut s = sp(t, 0, at * NS, "op");
+        s.trace = tid(t);
+        s
+    };
+    let w_new = write_wal(
+        dir.path(),
+        vec![req_with(svc(), None, &[traced(1, 30), traced(2, 31)])],
+        "new",
+    );
+    let w_old = write_wal(
+        dir.path(),
+        vec![req_with(svc(), None, &[traced(3, 10)])],
+        "old",
+    );
+    drop(sealed_source(dir.path(), &w_old, "old"));
+    corrupt_chunk(&dir.path().join("old.sfst"), *b"PRIM");
+    let sources = || {
+        vec![
+            sealed_source(dir.path(), &w_new, "new"),
+            sealed_source_at(&dir.path().join("old.sfst"), "old"),
+        ]
+    };
+    let data = run(
+        SearchSources {
+            window: sources(),
+            completion: sources(),
+        },
+        SearchQuery::new(Predicate::default()).limit(2),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.traces.len(), 2);
+
+    // A page the old file could still change compiles it, and its
+    // corruption surfaces.
+    let data = run(
+        SearchSources {
+            window: sources(),
+            completion: sources(),
+        },
+        SearchQuery::new(Predicate::default()).limit(3),
+    );
+    assert!(data.status.has(PartialReason::SourceFailure));
+}
+
+/// A value longer than any defensive cut is evaluated whole, sealed or
+/// tail alike: a condition that depends on its last bytes matches.
+#[test]
+fn long_values_are_evaluated_whole_in_every_layout() {
+    let dir = tempfile::tempdir().unwrap();
+    let big = format!("{}-tail", "x".repeat(70_000));
+    let span = SpanSpec {
+        attrs: vec![kv_str("big", &big)],
+        ..span_in(1, 1, 0, 100 * NS, "op")
+    };
+    let wal = write_wal(
+        dir.path(),
+        vec![req_with(vec![kv_str("service.name", "svc")], None, &[span])],
+        "long",
+    );
+    let big_target = || PredicateTarget::Attribute(AttributeOwner::Span, "big".into());
+    let queries = [
+        (
+            "equal",
+            cond(big_target(), CompareOp::Eq, vec![text(&big)]),
+            vec![hex(1)],
+        ),
+        (
+            "regex past the cut",
+            cond(big_target(), CompareOp::Regex, vec![text("x+-tail")]),
+            vec![hex(1)],
+        ),
+        (
+            "negated",
+            cond(big_target(), CompareOp::NotEq, vec![text(&big)]),
+            vec![],
+        ),
+    ];
+    for (layout, sources) in [
+        (
+            "sealed",
+            both_roles(|| vec![sealed_source(dir.path(), &wal, "sealed")]),
+        ),
+        ("tail", both_roles(|| vec![tail_source(&wal, "tail")])),
+    ] {
+        let mut sources = Some(sources);
+        for (name, condition, want) in &queries {
+            let s = sources.take().unwrap_or_else(|| match layout {
+                "sealed" => both_roles(|| vec![sealed_source(dir.path(), &wal, "sealed")]),
+                _ => both_roles(|| vec![tail_source(&wal, "tail")]),
+            });
+            let data = run(s, SearchQuery::new(pred(vec![condition.clone()])));
+            assert_eq!(&ids(&data), want, "{name} on {layout}");
+            assert_eq!(data.status, QueryStatus::Complete, "{name} on {layout}");
+        }
+        // The trace view returns the value whole too.
+        let sources = match layout {
+            "sealed" => vec![sealed_source(dir.path(), &wal, "sealed")],
+            _ => vec![tail_source(&wal, "tail")],
+        };
+        let trace = sfsq::traces::trace_by_id(
+            sources,
+            sfsq::traces::TraceQuery::new(sfst::TraceId::from(tid(1))),
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .expect("valid request");
+        let value = trace.trace.spans[0]
+            .fields
+            .iter()
+            .find(|(k, _)| k == "attributes.big")
+            .map(|(_, v)| v.len());
+        assert_eq!(value, Some(big.len()), "{layout}: value cut");
+    }
+}
+
+/// A pending window file that may hold a newer candidate than the pool's
+/// best compiles before the pool is examined, as eager compile would have
+/// ranked it: the tail's older trace (over the span cap) is never
+/// assembled, so the page is complete instead of `size_cap`.
+#[test]
+fn a_newer_pending_file_compiles_before_older_pool_candidates() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let older = write_wal(
+        dir.path(),
+        vec![req_with(
+            svc(),
+            None,
+            &[
+                span_in(1, 1, 0, 100 * NS, "a"),
+                span_in(1, 2, 1, 101 * NS, "a"),
+            ],
+        )],
+        "older-tail",
+    );
+    let newer = write_wal(
+        dir.path(),
+        vec![req_with(svc(), None, &[span_in(2, 1, 0, 150 * NS, "b")])],
+        "newer",
+    );
+    let sources = || {
+        both_roles(|| {
+            vec![
+                tail_source(&older, "older-tail"),
+                sealed_source(dir.path(), &newer, "newer"),
+            ]
+        })
+    };
+    let data = run(
+        sources(),
+        SearchQuery::new(Predicate::all())
+            .limit(1)
+            .span_cap_for_tests(1),
+    );
+    assert_eq!(ids(&data), vec![hex(2)]);
+    assert_eq!(data.status, QueryStatus::Complete);
+}
+
+// ── Free text: index and span paths agree ──────────────────────────
+
+/// One span (and trace) of the free-text corpus, with the values free
+/// text should search, for the oracle.
+struct TextSpan {
+    trace: [u8; 16],
+    spec: SpanSpec,
+    /// Every value in the free-text scope: name, status message, span,
+    /// resource and scope attribute values, event names and attribute
+    /// values, link attribute values.
+    scope_values: Vec<String>,
+}
+
+const TEXT_TRACES: usize = 2400;
+const TEXT_BATCH: usize = 100;
+
+/// 2400 one-span traces in requests of 100, sized so each half (1200
+/// spans) indexes `name` and `rq` into the high tier, `route` into the
+/// mid tier and the rest into the low tier. Rare values: a low-card
+/// flag, status messages, an event (name + attribute), a link
+/// attribute, a resource attribute on batch 3 and a scope attribute on
+/// batch 5. Status ERROR without a message on others: free text never
+/// searches `status.code`.
+fn text_corpus() -> (
+    Vec<ExportTraceServiceRequest>,
+    Vec<ExportTraceServiceRequest>,
+    Vec<TextSpan>,
+) {
+    let mut spans = Vec::new();
+    let mut early = Vec::new();
+    let mut late = Vec::new();
+    for batch in 0..TEXT_TRACES / TEXT_BATCH {
+        let mut resource = vec![kv_str("service.name", &format!("svc-{}", batch % 4))];
+        if batch == 3 {
+            resource.push(kv_str("deployment", "blue-CANARY"));
+        }
+        let scope_attrs = vec![kv_str("feature", "telescope-mode")];
+        let scope = (batch == 5).then(|| ("lib", "1.0", scope_attrs.clone()));
+        let mut specs = Vec::new();
+        for i in batch * TEXT_BATCH..(batch + 1) * TEXT_BATCH {
+            let mut trace = [0u8; 16];
+            trace[0] = 1;
+            trace[14..].copy_from_slice(&(i as u16).to_be_bytes());
+            let name: &'static str = Box::leak(format!("op-{i:04}").into_boxed_str());
+            let mut spec = SpanSpec {
+                trace,
+                ..sp(1, 0, (1_000 + i as u64) * NS, name)
+            };
+            spec.attrs = vec![
+                kv_str("rq", &format!("rq{i:04}x")),
+                kv_str("route", &format!("route-{:03}", i % 150)),
+                common::kv_int("count", (i % 7) as i64),
+            ];
+            if i % 500 == 5 {
+                spec.attrs.push(kv_str("flag", "Golden-Ticket"));
+            }
+            if i % 400 == 11 {
+                spec.status = Some((2, "Upstream TIMEOUT at gateway"));
+            } else if i % 401 == 13 {
+                spec.status = Some((2, ""));
+            }
+            if i % 300 == 7 {
+                spec.events = vec![(
+                    "checkout.failed",
+                    vec![kv_str("error.detail", "Card DECLINED by issuer")],
+                )];
+            }
+            if i % 350 == 9 {
+                spec.links = vec![(tid(9), [0x99; 8], vec![kv_str("rel", "follows-from-batch")])];
+            }
+            let mut scope_values = vec![
+                name.to_string(),
+                format!("rq{i:04}x"),
+                format!("route-{:03}", i % 150),
+                (i % 7).to_string(),
+                format!("svc-{}", batch % 4),
+            ];
+            if i % 500 == 5 {
+                scope_values.push("Golden-Ticket".into());
+            }
+            if let Some((_, message)) = spec.status {
+                scope_values.push(message.to_string());
+            }
+            if batch == 3 {
+                scope_values.push("blue-CANARY".into());
+            }
+            if batch == 5 {
+                scope_values.push("telescope-mode".into());
+            }
+            if i % 300 == 7 {
+                scope_values.push("checkout.failed".into());
+                scope_values.push("Card DECLINED by issuer".into());
+            }
+            if i % 350 == 9 {
+                scope_values.push("follows-from-batch".into());
+            }
+            specs.push(spec.clone());
+            spans.push(TextSpan {
+                trace,
+                spec,
+                scope_values,
+            });
+        }
+        let request = req_with(resource, scope, &specs);
+        if batch < TEXT_TRACES / TEXT_BATCH / 2 {
+            early.push(request);
+        } else {
+            late.push(request);
+        }
+    }
+    (early, late, spans)
+}
+
+/// Free text finds the same traces whether a span is read through the
+/// index (sealed files: low, mid and high tiers, with or without event
+/// and link structures) or decoded (WAL tails): span names, status
+/// messages, span/resource/scope attribute values, event names and
+/// attribute values, and link attribute values, case-insensitively;
+/// never field names or `status.code`.
+#[test]
+fn text_index_span_parity() {
+    let dir = tempfile::tempdir().unwrap();
+    let (early, late, spans) = text_corpus();
+    assert!(spans.iter().all(|s| s.spec.trace == s.trace));
+    let mut all = early.clone();
+    all.extend(late.clone());
+    let wal_all = write_wal(dir.path(), all, "all");
+    let wal_early = write_wal(dir.path(), early, "early");
+    let wal_late = write_wal(dir.path(), late, "late");
+    // The tiers the corpus is sized for, in each sealed half.
+    for half in [&wal_early, &wal_late] {
+        sealed_source(dir.path(), half, "probe");
+        let bytes = std::fs::read(dir.path().join("probe.sfst")).unwrap();
+        let meta = sfst::MetaReader::open(&bytes).unwrap();
+        let tier = |name: &str| {
+            meta.field_table()
+                .unwrap()
+                .iter()
+                .find(|f| f.name == name)
+                .map(|f| f.tier)
+        };
+        assert_eq!(tier("name"), Some(sfst::FieldTier::High));
+        assert_eq!(tier("attributes.rq"), Some(sfst::FieldTier::High));
+        assert_eq!(tier("attributes.route"), Some(sfst::FieldTier::Mid));
+        assert_eq!(tier("attributes.flag"), Some(sfst::FieldTier::Low));
+    }
+    // A file sealed without its event and link structures (EVNB, LNKB):
+    // event names and event/link attributes then reach the spans as row
+    // facets under their storage names.
+    drop(sealed_source(dir.path(), &wal_all, "flat"));
+    let flat = dir.path().join("flat.sfst");
+    hide_chunk(&flat, *b"EVNB");
+    hide_chunk(&flat, *b"LNKB");
+    type Layout<'a> = (&'static str, Box<dyn Fn() -> Vec<TraceSource> + 'a>);
+    let layouts: [Layout; 5] = [
+        (
+            "sealed-without-structures",
+            Box::new(|| vec![sealed_source_at(&flat, "flat")]),
+        ),
+        (
+            "sealed",
+            Box::new(|| vec![sealed_source(dir.path(), &wal_all, "all")]),
+        ),
+        (
+            "sealed-halves",
+            Box::new(|| {
+                vec![
+                    sealed_source(dir.path(), &wal_early, "early"),
+                    sealed_source(dir.path(), &wal_late, "late"),
+                ]
+            }),
+        ),
+        ("tail", Box::new(|| vec![tail_source(&wal_all, "all-tail")])),
+        (
+            "sealed-plus-tail",
+            Box::new(|| {
+                vec![
+                    sealed_source(dir.path(), &wal_early, "early"),
+                    tail_source(&wal_late, "late-tail"),
+                ]
+            }),
+        ),
+    ];
+    let terms = [
+        ("RQ0777X", 1),       // high tier, upper case
+        ("op-1999", 1),       // span name, high tier
+        ("route-042", 16),    // mid tier
+        ("golden", 5),        // low tier
+        ("timeout", 6),       // status message
+        ("checkout.fail", 8), // event name
+        ("declined", 8),      // event attribute value
+        ("from-batch", 7),    // link attribute value
+        ("canary", 100),      // resource attribute value
+        ("telescope", 100),   // scope attribute value
+        ("error", 0),         // only a field name and `status.code`
+        ("rel", 0),           // only a field name
+    ];
+    for (term, count) in terms {
+        let needle = term.to_lowercase();
+        let want: BTreeSet<String> = spans
+            .iter()
+            .filter(|s| {
+                s.scope_values
+                    .iter()
+                    .any(|v| v.to_lowercase().contains(&needle))
+            })
+            .map(|s| sfst::TraceId::from(s.trace).to_string())
+            .collect();
+        assert_eq!(want.len(), count, "oracle for {term}");
+        for (name, build) in &layouts {
+            let query = SearchQuery::new(pred(vec![cond(
+                PredicateTarget::FreeText,
+                CompareOp::Contains,
+                vec![text(term)],
+            )]))
+            .limit(200);
+            let data = run(both_roles(build), query);
+            let got: BTreeSet<String> = ids(&data).into_iter().collect();
+            assert_eq!(got, want, "{term} on {name}");
+            assert_eq!(data.status, QueryStatus::Complete, "{term} on {name}");
+        }
+    }
+}
+
+// ── Tokens: trace-level AND across spans and files, NOT EXISTS ──────
+
+fn pos(conditions: Vec<Condition>) -> Token {
+    Token::positive(pred(conditions))
+}
+
+fn neg(conditions: Vec<Condition>) -> Token {
+    Token::negated(pred(conditions))
+}
+
+fn tokens(tokens: Vec<Token>) -> TokenQuery {
+    TokenQuery { tokens }
+}
+
+fn name_eq(name: &str) -> Condition {
+    builtin(BuiltinField::Name, CompareOp::Eq, vec![text(name)])
+}
+
+fn span_attr_eq(key: &str, value: &str) -> Condition {
+    attr_eq(AttributeOwner::Span, key, value)
+}
+
+/// `query` on every layout of the shared world: the expected ids in
+/// order, every row exact, Complete, and the same summaries (ranks
+/// included) as on the single sealed file. Returns that reference.
+fn on_every_layout(
+    dir: &Path,
+    world: &World,
+    name: &str,
+    query: &SearchQuery,
+    want: &[String],
+) -> (Vec<SummaryPrint>, QueryStatus) {
+    on_every_layout_with(dir, world, name, query, want, want)
+}
+
+/// [`on_every_layout`] on both paths: assembly (canonical spans) answers
+/// `want`, the rows path (stored rows, decision 49) `want_rows` — they
+/// differ where a losing resend moves a rank (T6's 1950 s copy). Returns
+/// the rows path's reference.
+fn on_every_layout_with(
+    dir: &Path,
+    world: &World,
+    name: &str,
+    query: &SearchQuery,
+    want: &[String],
+    want_rows: &[String],
+) -> (Vec<SummaryPrint>, QueryStatus) {
+    layouts_agree(
+        dir,
+        world,
+        &format!("{name} (assembly)"),
+        &query.clone().rows_for_tests(false),
+        want,
+    );
+    layouts_agree(dir, world, &format!("{name} (rows)"), query, want_rows)
+}
+
+/// Every layout answers `query` with `want`, exactly and completely, and
+/// with the same summaries.
+fn layouts_agree(
+    dir: &Path,
+    world: &World,
+    name: &str,
+    query: &SearchQuery,
+    want: &[String],
+) -> (Vec<SummaryPrint>, QueryStatus) {
+    let mut reference = None;
+    for layout_name in LAYOUTS {
+        let data = run(layout(dir, world, layout_name), query.clone());
+        assert_eq!(ids(&data), want, "{name} on {layout_name}");
+        assert!(
+            data.traces.iter().all(|t| t.exact),
+            "{name} on {layout_name}"
+        );
+        let got = norm(&data);
+        assert_eq!(got.1, QueryStatus::Complete, "{name} on {layout_name}");
+        match &reference {
+            None => reference = Some(got),
+            Some(r) => assert_eq!(&got, r, "{name} on {layout_name}: summaries"),
+        }
+    }
+    reference.expect("layouts")
+}
+
+/// Two positive tokens may match different spans of one trace (T1's
+/// root and its db child); the same conditions in ONE token need one
+/// span holding both. The rank is the older of the two tokens' newest
+/// matches.
+#[test]
+fn cross_span_and() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let split = SearchQuery::new(tokens(vec![
+        pos(vec![name_eq("GET /users")]),
+        pos(vec![span_attr_eq("db.system", "pg")]),
+    ]));
+    let (rows, _) = on_every_layout(dir.path(), &world, "split", &split, &[hex(1)]);
+    assert_eq!(
+        rows[0].7,
+        1_000 * NS as i64,
+        "min of the two newest matches"
+    );
+    let joined = SearchQuery::new(tokens(vec![pos(vec![
+        name_eq("GET /users"),
+        span_attr_eq("db.system", "pg"),
+    ])]));
+    on_every_layout(dir.path(), &world, "joined", &joined, &[]);
+}
+
+/// Tokens matched in different files (T3's early root, its late child)
+/// still AND: the trace assembles across sources. Its rank is the older
+/// match, so a trace whose newest match is recent can rank old.
+#[test]
+fn cross_file_and() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let query = SearchQuery::new(tokens(vec![
+        pos(vec![name_eq("GET /health")]),
+        pos(vec![name_eq("late-check")]),
+    ]));
+    let (rows, _) = on_every_layout(dir.path(), &world, "cross-file", &query, &[hex(3)]);
+    assert_eq!(rows[0].7, 900 * NS as i64);
+}
+
+/// A negated token is NOT EXISTS: no span of the trace matches its
+/// positive form — traces without the field pass. An in-token `!=`
+/// keeps its one-span meaning: the field present with another value.
+#[test]
+fn negated_token_is_not_exists() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let chip = SearchQuery::new(tokens(vec![neg(vec![span_attr_eq("http.method", "GET")])]));
+    on_every_layout_with(
+        dir.path(),
+        &world,
+        "not exists",
+        &chip,
+        &[hex(5), hex(6), hex(4), hex(2)],
+        &[hex(6), hex(5), hex(4), hex(2)],
+    );
+    let in_token = SearchQuery::new(tokens(vec![pos(vec![cond(
+        PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into()),
+        CompareOp::NotEq,
+        vec![text("GET")],
+    )])]));
+    on_every_layout(dir.path(), &world, "in-token !=", &in_token, &[hex(2)]);
+}
+
+/// A negated token on a field no span carries excludes nothing.
+#[test]
+fn negated_absent_field_passes() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let query = SearchQuery::new(tokens(vec![neg(vec![span_attr_eq("nowhere", "x")])]));
+    on_every_layout_with(
+        dir.path(),
+        &world,
+        "absent",
+        &query,
+        &[hex(3), hex(5), hex(6), hex(4), hex(2), hex(1)],
+        &[hex(6), hex(3), hex(5), hex(4), hex(2), hex(1)],
+    );
+}
+
+/// A negated event token excludes the traces holding a matching event
+/// (an in-token negated event condition is not evaluable; the token
+/// form is).
+#[test]
+fn negated_event_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let exception = || {
+        builtin(
+            BuiltinField::EventName,
+            CompareOp::Eq,
+            vec![text("exception")],
+        )
+    };
+    let query = SearchQuery::new(tokens(vec![neg(vec![exception()])]));
+    on_every_layout_with(
+        dir.path(),
+        &world,
+        "no exception",
+        &query,
+        &[hex(3), hex(5), hex(6), hex(4), hex(1)],
+        &[hex(6), hex(3), hex(5), hex(4), hex(1)],
+    );
+    let query = SearchQuery::new(tokens(vec![pos(vec![exception()])]));
+    on_every_layout(dir.path(), &world, "exception", &query, &[hex(2)]);
+}
+
+/// Negated trace-level and `trace_id` tokens: NOT on the trace's value.
+/// A positive root condition never holds without a true root, so a
+/// trace whose root was never exported passes the negated token.
+#[test]
+fn negated_trace_level_and_id_tokens() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let not_b = SearchQuery::new(tokens(vec![neg(vec![builtin(
+        BuiltinField::RootServiceName,
+        CompareOp::Eq,
+        vec![text("svc-b")],
+    )])]));
+    on_every_layout(
+        dir.path(),
+        &world,
+        "root not svc-b",
+        &not_b,
+        &[hex(3), hex(2), hex(1)],
+    );
+    let id = |n: u8| sfst::TraceId::from(tid(n)).to_string();
+    let not_t1 = SearchQuery::new(tokens(vec![neg(vec![builtin(
+        BuiltinField::TraceId,
+        CompareOp::Eq,
+        vec![text(&id(1)), text(&id(2))],
+    )])]));
+    on_every_layout_with(
+        dir.path(),
+        &world,
+        "not T1 or T2",
+        &not_t1,
+        &[hex(3), hex(5), hex(6), hex(4)],
+        &[hex(6), hex(3), hex(5), hex(4)],
+    );
+    // NOT (id ∉ {T4}) pins T4.
+    let only_t4 = SearchQuery::new(tokens(vec![neg(vec![builtin(
+        BuiltinField::TraceId,
+        CompareOp::NotEq,
+        vec![text(&id(4))],
+    )])]));
+    on_every_layout(dir.path(), &world, "pin T4", &only_t4, &[hex(4)]);
+
+    // A rootless trace (child spans only) passes a negated root token
+    // and fails the positive one.
+    let rootless = write_wal(
+        dir.path(),
+        vec![req_with(
+            vec![kv_str("service.name", "svc-r")],
+            None,
+            &[span_in(7, 0x72, 0x71, 1_000 * NS, "orphan")],
+        )],
+        "rootless",
+    );
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &rootless, "rootless")]);
+    let root = || {
+        vec![builtin(
+            BuiltinField::RootServiceName,
+            CompareOp::Eq,
+            vec![text("svc-r")],
+        )]
+    };
+    let data = run(sources(), SearchQuery::new(tokens(vec![neg(root())])));
+    assert_eq!(ids(&data), vec![hex(7)]);
+    let data = run(sources(), SearchQuery::new(tokens(vec![pos(root())])));
+    assert!(ids(&data).is_empty());
+}
+
+/// Whichever positive token drives discovery, the answer is the same.
+#[test]
+fn forced_driver_invariance() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let queries = [
+        (
+            tokens(vec![
+                pos(vec![name_eq("GET /users")]),
+                pos(vec![span_attr_eq("db.system", "pg")]),
+            ]),
+            vec![hex(1)],
+        ),
+        (
+            tokens(vec![
+                pos(vec![name_eq("GET /health")]),
+                pos(vec![name_eq("late-check")]),
+            ]),
+            vec![hex(3)],
+        ),
+        (
+            tokens(vec![
+                pos(vec![attr_eq(
+                    AttributeOwner::Resource,
+                    "service.name",
+                    "svc-b",
+                )]),
+                pos(vec![builtin(
+                    BuiltinField::Status,
+                    CompareOp::Eq,
+                    vec![text("ERROR")],
+                )]),
+                neg(vec![name_eq("fast-step")]),
+            ]),
+            vec![],
+        ),
+        (
+            tokens(vec![
+                pos(vec![cond(
+                    PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
+                    CompareOp::Regex,
+                    vec![text("svc-.*")],
+                )]),
+                pos(vec![builtin(
+                    BuiltinField::Status,
+                    CompareOp::Regex,
+                    vec![text("OK|UNSET")],
+                )]),
+            ]),
+            vec![hex(3), hex(6), hex(4), hex(1)],
+        ),
+    ];
+    for (i, (query, want)) in queries.iter().enumerate() {
+        // T6's stored 1950 s resend ranks it first on the rows path.
+        let want_rows = if i == 3 {
+            vec![hex(6), hex(3), hex(4), hex(1)]
+        } else {
+            want.clone()
+        };
+        let auto = on_every_layout_with(
+            dir.path(),
+            &world,
+            &format!("query {i}"),
+            &SearchQuery::new(query.clone()),
+            want,
+            &want_rows,
+        );
+        for driver in 0..2 {
+            let forced = on_every_layout_with(
+                dir.path(),
+                &world,
+                &format!("query {i}, driver {driver}"),
+                &SearchQuery::new(query.clone()).driver_for_tests(driver),
+                want,
+                &want_rows,
+            );
+            assert_eq!(forced, auto, "query {i}, driver {driver}");
+        }
+    }
+}
+
+/// A flat predicate and the tokens it means give the same answer:
+/// span-local conditions as one token, trace-level and `trace_id`
+/// conditions as their own.
+#[test]
+fn single_token_equals_predicate() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let service_a = || attr_eq(AttributeOwner::Resource, "service.name", "svc-a");
+    let get = || span_attr_eq("http.method", "GET");
+    let root_a = || {
+        builtin(
+            BuiltinField::RootServiceName,
+            CompareOp::Eq,
+            vec![text("svc-a")],
+        )
+    };
+    let not_t1 = || {
+        builtin(
+            BuiltinField::TraceId,
+            CompareOp::NotEq,
+            vec![text(&sfst::TraceId::from(tid(1)).to_string())],
+        )
+    };
+    let cases = [
+        (
+            pred(vec![service_a(), get()]),
+            vec![pos(vec![service_a(), get()])],
+        ),
+        (
+            pred(vec![get(), root_a(), not_t1()]),
+            vec![pos(vec![get()]), pos(vec![root_a()]), pos(vec![not_t1()])],
+        ),
+        (pred(vec![root_a()]), vec![pos(vec![root_a()])]),
+    ];
+    for (i, (flat, explicit)) in cases.into_iter().enumerate() {
+        for layout_name in LAYOUTS {
+            let a = run(
+                layout(dir.path(), &world, layout_name),
+                SearchQuery::new(flat.clone()),
+            );
+            let b = run(
+                layout(dir.path(), &world, layout_name),
+                SearchQuery::new(tokens(explicit.clone())),
+            );
+            assert_eq!(norm(&a), norm(&b), "case {i} on {layout_name}");
+            assert!(!a.traces.is_empty(), "case {i} on {layout_name}");
+        }
+    }
+}
+
+/// A multi-token result pages as prefixes: every limit returns the
+/// first rows of the full answer (the ledger's cursor reruns the query
+/// with a larger limit and drops the served prefix).
+#[test]
+fn multi_token_cursor_partition() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let query = tokens(vec![
+        pos(vec![cond(
+            PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
+            CompareOp::Regex,
+            vec![text("svc-.*")],
+        )]),
+        neg(vec![span_attr_eq("http.method", "GET")]),
+    ]);
+    for layout_name in LAYOUTS {
+        let full = run(
+            layout(dir.path(), &world, layout_name),
+            SearchQuery::new(query.clone()).limit(10),
+        );
+        // Rows path: T6's stored 1950 s resend ranks it first.
+        assert_eq!(
+            ids(&full),
+            vec![hex(6), hex(5), hex(4), hex(2)],
+            "{layout_name}"
+        );
+        let full = norm(&full).0;
+        for limit in 1..=full.len() {
+            let page = run(
+                layout(dir.path(), &world, layout_name),
+                SearchQuery::new(query.clone()).limit(limit),
+            );
+            assert_eq!(norm(&page).0, full[..limit], "{layout_name}, limit {limit}");
+        }
+    }
+}
+
+/// Token queries stop at the work ceilings: the visited-rows ceiling
+/// (tails, compiles and emissions, the driver count included) and the
+/// dictionary-bytes ceiling of a free-text token's walks.
+#[test]
+fn token_ceilings_terminate() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let query = tokens(vec![
+        pos(vec![cond(
+            PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into()),
+            CompareOp::Regex,
+            vec![text("svc-.*")],
+        )]),
+        pos(vec![builtin(
+            BuiltinField::Status,
+            CompareOp::Regex,
+            vec![text("OK|UNSET")],
+        )]),
+    ]);
+    for layout_name in LAYOUTS {
+        let data = run(
+            layout(dir.path(), &world, layout_name),
+            SearchQuery::new(query.clone()).visited_rows_ceiling_for_tests(1),
+        );
+        assert_eq!(
+            data.status,
+            QueryStatus::Partial([PartialReason::WorkCeiling].into()),
+            "{layout_name}"
+        );
+    }
+    let text_query = tokens(vec![pos(vec![cond(
+        PredicateTarget::FreeText,
+        CompareOp::Contains,
+        vec![text("users")],
+    )])]);
+    let data = run(
+        layout(dir.path(), &world, "single-sealed"),
+        SearchQuery::new(text_query.clone()).dict_bytes_ceiling_for_tests(1),
+    );
+    assert_eq!(
+        data.status,
+        QueryStatus::Partial([PartialReason::WorkCeiling].into())
+    );
+    let data = run(
+        layout(dir.path(), &world, "single-sealed"),
+        SearchQuery::new(text_query),
+    );
+    assert_eq!(ids(&data), vec![hex(1)]);
+    assert_eq!(data.status, QueryStatus::Complete);
+}
+
+/// A negated token needs the whole trace: when the assembly is capped,
+/// the unseen spans may hold what it forbids, so the trace is excluded
+/// as indeterminate (and the query is Partial). A trace assembled whole
+/// still returns.
+#[test]
+fn negated_token_excludes_capped_traces() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(
+        dir.path(),
+        vec![req_with(
+            vec![kv_str("service.name", "svc-x")],
+            None,
+            &[
+                // T1: an OK root, then an ERROR child the cap hides.
+                SpanSpec {
+                    status: Some((1, "")),
+                    ..span_in(1, 0x11, 0, 1_000 * NS, "root")
+                },
+                SpanSpec {
+                    status: Some((2, "boom")),
+                    ..span_in(1, 0x12, 0x11, 1_001 * NS, "child")
+                },
+                // T2: one OK span, whole under the cap.
+                SpanSpec {
+                    status: Some((1, "")),
+                    ..span_in(2, 0x21, 0, 1_002 * NS, "solo")
+                },
+            ],
+        )],
+        "capped-negation",
+    );
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let query = || {
+        canon_query(tokens(vec![
+            pos(vec![attr_eq(
+                AttributeOwner::Resource,
+                "service.name",
+                "svc-x",
+            )]),
+            neg(vec![builtin(
+                BuiltinField::Status,
+                CompareOp::Eq,
+                vec![text("ERROR")],
+            )]),
+        ]))
+    };
+    let whole = run(sources(), query());
+    assert_eq!(ids(&whole), vec![hex(2)]);
+    assert_eq!(whole.status, QueryStatus::Complete);
+    let capped = run(sources(), query().span_cap_for_tests(1));
+    assert_eq!(ids(&capped), vec![hex(2)]);
+    assert_eq!(
+        capped.status,
+        QueryStatus::Partial([PartialReason::SizeCap].into())
+    );
+}
+
+// ── The rows path (decision 49) ──────────────────────────────────────
+
+/// The row of trace `n` in `data`.
+fn row_of(data: &SearchData, n: u8) -> &sfsq::traces::TraceSummary {
+    data.traces
+        .iter()
+        .find(|t| t.trace_id.to_string() == hex(n))
+        .unwrap_or_else(|| panic!("trace {n} in {:?}", ids(data)))
+}
+
+/// Rows count stored rows: a resent span counts twice and its later copy
+/// sets the rank; assembly keeps one canonical copy.
+#[test]
+fn stored_rows_count_resends_and_a_losing_copy_matches() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let wal = write_wal(
+        dir.path(),
+        vec![
+            req_with(svc(), None, &[span_in(1, 0x11, 0, 100 * NS, "op")]),
+            req_with(svc(), None, &[span_in(1, 0x11, 0, 300 * NS, "op")]),
+        ],
+        "resend",
+    );
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let rows = run(sources(), SearchQuery::new(pred(vec![])));
+    let canon = run(sources(), canon_query(pred(vec![])));
+    let (row, assembled) = (row_of(&rows, 1), row_of(&canon, 1));
+    assert_eq!(
+        (row.span_count, row.newest_matched_start_ns),
+        (2, 300 * NS as i64)
+    );
+    assert_eq!(assembled.span_count, 1, "assembly dedups the resend");
+}
+
+/// The row's root is the earliest TRUE claim across files; a withheld
+/// claim at or before it leaves the root unknown, and a trace without
+/// an unset-parent span has none (no display promotion).
+#[test]
+fn root_is_the_earliest_recorded_claim_across_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let mut tie_a = span_in(2, 0x22, 0, 15 * NS, "tie");
+    tie_a.kind = 1;
+    let mut tie_b = tie_a.clone();
+    tie_b.kind = 2;
+    let wal_a = write_wal(
+        dir.path(),
+        vec![req_with(
+            svc(),
+            None,
+            &[
+                span_in(1, 0x11, 0, 10 * NS, "late"),
+                span_in(2, 0x21, 0, 20 * NS, "kept"),
+                span_in(3, 0x31, 0x99, 30 * NS, "orphan"),
+            ],
+        )],
+        "a",
+    );
+    let wal_b = write_wal(
+        dir.path(),
+        vec![req_with(
+            svc(),
+            None,
+            &[span_in(1, 0x12, 0, 5 * NS, "early"), tie_a, tie_b],
+        )],
+        "b",
+    );
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_a, "a"),
+                sealed_source(dir.path(), &wal_b, "b"),
+            ]
+        })
+    };
+    let rows = run(sources(), SearchQuery::new(pred(vec![])));
+    assert_eq!(row_of(&rows, 1).root_name.as_deref(), Some("early"));
+    assert_eq!(row_of(&rows, 2).root_name, None, "a withheld claim first");
+    assert_eq!(row_of(&rows, 3).root_name, None, "rootless");
+}
+
+/// A holder indexed before TRSS sends its candidates to assembly
+/// (canonical counts); a trace held only by files with stats keeps
+/// stored-row counts. Trace 1 straddles both files, its resend pair in
+/// the legacy one.
+#[test]
+fn legacy_holder_falls_back_to_assembly() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let pair = |t: u8, id: u8, at: u64| {
+        vec![
+            req_with(svc(), None, &[span_in(t, id, 0, at * NS, "op")]),
+            req_with(svc(), None, &[span_in(t, id, 0, at * NS, "op")]),
+        ]
+    };
+    let wal_old = write_wal(dir.path(), pair(1, 0x11, 100), "legacy-old");
+    let mut new = pair(2, 0x21, 200);
+    new.push(req_with(
+        svc(),
+        None,
+        &[span_in(1, 0x12, 0x11, 150 * NS, "child")],
+    ));
+    let wal_new = write_wal(dir.path(), new, "legacy-new");
+    drop(sealed_source(dir.path(), &wal_old, "old"));
+    let old = dir.path().join("old.sfst");
+    hide_chunk(&old, *b"TRSS");
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source_at(&old, "old"),
+                sealed_source(dir.path(), &wal_new, "new"),
+            ]
+        })
+    };
+    let data = run(sources(), SearchQuery::new(pred(vec![])));
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(row_of(&data, 1).span_count, 2, "assembled: the resend once");
+    assert_eq!(row_of(&data, 2).span_count, 2, "stored rows");
+}
+
+/// A corrupt TRSS chunk is reported, and the trace still returns exact
+/// through assembly (which never reads it).
+#[test]
+fn corrupt_stats_chunk_is_skipped_and_surfaced() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let wal = write_wal(
+        dir.path(),
+        vec![req_with(svc, None, &[span_in(1, 0x11, 0, 100 * NS, "op")])],
+        "corrupt-trss",
+    );
+    drop(sealed_source(dir.path(), &wal, "one"));
+    let path = dir.path().join("one.sfst");
+    corrupt_chunk(&path, *b"TRSS");
+    let data = run(
+        both_roles(|| vec![sealed_source_at(&path, "one")]),
+        SearchQuery::new(pred(vec![])),
+    );
+    assert_eq!(ids(&data), vec![hex(1)]);
+    assert!(data.traces[0].exact);
+    assert!(
+        data.status.has(PartialReason::SourceFailure),
+        "{:?}",
+        data.status
+    );
+}
+
+/// A row reads rollups, never spans, so the span cap does not touch it.
+#[test]
+fn rows_never_hit_the_span_cap() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let spans: Vec<SpanSpec> = (0..4u8)
+        .map(|i| {
+            span_in(
+                1,
+                0x11 + i,
+                if i == 0 { 0 } else { 0x11 },
+                (100 + u64::from(i)) * NS,
+                "op",
+            )
+        })
+        .collect();
+    let wal = write_wal(dir.path(), vec![req_with(svc, None, &spans)], "cap");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let rows = run(
+        sources(),
+        SearchQuery::new(pred(vec![])).span_cap_for_tests(2),
+    );
+    assert_eq!(rows.status, QueryStatus::Complete);
+    assert_eq!((rows.traces[0].span_count, rows.traces[0].exact), (4, true));
+    let canon = run(sources(), canon_query(pred(vec![])).span_cap_for_tests(2));
+    assert!(canon.status.has(PartialReason::SizeCap));
+}
+
+/// A withheld root claim (copies of one root span disagreeing on their
+/// facets) leaves the root unknown: a root chip of either polarity
+/// excludes the trace, on the list and the heatmap; without a root chip
+/// the trace lists, with no root shown.
+#[test]
+fn withheld_root_is_unknown_to_root_chips() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "x")];
+    let mut a = span_in(1, 0x11, 0, 100 * NS, "root");
+    a.kind = 1;
+    let mut b = a.clone();
+    b.kind = 2;
+    let wal = write_wal(dir.path(), vec![req_with(svc(), None, &[a, b])], "withheld");
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let root_x = || {
+        pred(vec![builtin(
+            BuiltinField::RootServiceName,
+            CompareOp::Eq,
+            vec![text("x")],
+        )])
+    };
+    let negated = TokenQuery {
+        tokens: vec![Token::negated(root_x())],
+    };
+    let positive = TokenQuery {
+        tokens: vec![Token::positive(root_x())],
+    };
+    assert!(
+        run(sources(), SearchQuery::new(negated.clone()))
+            .traces
+            .is_empty()
+    );
+    assert!(
+        run(sources(), SearchQuery::new(positive.clone()))
+            .traces
+            .is_empty()
+    );
+    let all = run(sources(), SearchQuery::new(pred(vec![])));
+    assert_eq!(ids(&all), vec![hex(1)]);
+    assert_eq!(all.traces[0].root_service, None);
+    let grid = |tokens: TokenQuery| {
+        sfsq::traces::overview(
+            vec![sealed_source(dir.path(), &wal, "g")],
+            sfsq::traces::OverviewQuery::new(sfst::Grid::new(0, 1_000 * NS as i64, 1))
+                .tokens(tokens),
+            CancellationToken::new(),
+            Arc::new(AtomicUsize::new(0)),
+        )
+        .unwrap()
+        .total_traces
+    };
+    assert_eq!(grid(negated), 0, "heatmap: negated");
+    assert_eq!(grid(positive), 0, "heatmap: positive");
+}
+
+/// Windows whose files discovery never compiles get their token sets
+/// for evidence alone, so the rows path decides them too: a trace-level
+/// chip (rollup discovery) with a negated span chip, and a `trace_id`
+/// pin with a span chip. Stored-row counts (the resend twice) show the
+/// rows path answered, not assembly.
+#[test]
+fn rollup_and_pinned_windows_take_the_rows_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = || vec![kv_str("service.name", "svc")];
+    let wal = write_wal(
+        dir.path(),
+        vec![
+            req_with(svc(), None, &[span_in(1, 0x11, 0, 100 * NS, "op")]),
+            req_with(svc(), None, &[span_in(1, 0x11, 0, 100 * NS, "op")]),
+        ],
+        "evidence",
+    );
+    let sources = || both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let duration = builtin(
+        BuiltinField::TraceDuration,
+        CompareOp::Gte,
+        vec![PredicateValue::Integer(0)],
+    );
+    let pin = builtin(BuiltinField::TraceId, CompareOp::Eq, vec![text(&hex(1))]);
+    for (name, query) in [
+        (
+            "duration + not",
+            tokens(vec![pos(vec![duration]), neg(vec![name_eq("zzz")])]),
+        ),
+        (
+            "pin + span",
+            tokens(vec![pos(vec![pin]), pos(vec![name_eq("op")])]),
+        ),
+    ] {
+        let data = run(sources(), SearchQuery::new(query));
+        assert_eq!(ids(&data), vec![hex(1)], "{name}");
+        assert_eq!(data.traces[0].span_count, 2, "{name}: stored rows");
+    }
+}
+
+/// A losing resend matches a positive chip on the rows path (stored
+/// rows, decision 49) and not on assembly (canonical copy): the shared
+/// world's T6 1950 s copy carries `ghost=yes`.
+#[test]
+fn a_losing_resend_matches_on_the_rows_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let world = world(dir.path());
+    let ghost = || tokens(vec![pos(vec![span_attr_eq("ghost", "yes")])]);
+    let rows = run(
+        layout(dir.path(), &world, "single-sealed"),
+        SearchQuery::new(ghost()),
+    );
+    let canon = run(
+        layout(dir.path(), &world, "single-sealed"),
+        canon_query(ghost()),
+    );
+    assert_eq!(ids(&rows), vec![hex(6)]);
+    assert!(canon.traces.is_empty());
+}
+
+/// Root claims across files: a withheld claim at or before the earliest
+/// TRUE claim leaves the root unknown (root chips of either polarity
+/// exclude the trace); a TRUE claim earlier than every withheld one is
+/// the root. Trace 1: withheld at 100 s in one file, an unset-parent
+/// span at 200 s in the other. Trace 2: withheld at 300 s, an
+/// unset-parent span at 250 s.
+#[test]
+fn withheld_claims_across_files() {
+    let dir = tempfile::tempdir().unwrap();
+    let withheld = |trace: u8, start: u64| {
+        let mut a = span_in(trace, 0x11, 0, start * NS, "root");
+        a.kind = 1;
+        let mut b = a.clone();
+        b.kind = 2;
+        req_with(vec![kv_str("service.name", "x")], None, &[a, b])
+    };
+    let other = |trace: u8, start: u64| {
+        req_with(
+            vec![kv_str("service.name", "y")],
+            None,
+            &[span_in(trace, 0x30, 0, start * NS, "late")],
+        )
+    };
+    let wal_0 = write_wal(dir.path(), vec![withheld(1, 100), withheld(2, 300)], "w0");
+    let wal_1 = write_wal(dir.path(), vec![other(1, 200), other(2, 250)], "w1");
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_0, "w0"),
+                sealed_source(dir.path(), &wal_1, "w1"),
+            ]
+        })
+    };
+    let root = |value: &str| {
+        vec![builtin(
+            BuiltinField::RootServiceName,
+            CompareOp::Eq,
+            vec![text(value)],
+        )]
+    };
+    let all = run(sources(), SearchQuery::new(pred(vec![])));
+    let roots: Vec<_> = all
+        .traces
+        .iter()
+        .map(|t| (t.trace_id.to_string(), t.root_service.clone()))
+        .collect();
+    assert_eq!(roots, vec![(hex(2), Some("y".into())), (hex(1), None)]);
+    for (name, query, want) in [
+        ("y", tokens(vec![pos(root("y"))]), vec![hex(2)]),
+        ("x", tokens(vec![pos(root("x"))]), vec![]),
+        ("not x", tokens(vec![neg(root("x"))]), vec![hex(2)]),
+        ("not y", tokens(vec![neg(root("y"))]), vec![]),
+    ] {
+        assert_eq!(
+            ids(&run(sources(), SearchQuery::new(query))),
+            want,
+            "{name}"
+        );
+    }
 }

@@ -144,7 +144,7 @@ where
 
 /// Reader-plus-writer over one pair of streams. A legacy convenience wrapper —
 /// new code composes [`MessageReader`] and [`MessageWriter`] directly, as the
-/// `rt` event loop and the otel-plugin supervisor do.
+/// `netdata-plugin-rt` event loop and the otel-plugin supervisor do.
 pub struct Transport<R, W>
 where
     R: AsyncRead + Unpin,

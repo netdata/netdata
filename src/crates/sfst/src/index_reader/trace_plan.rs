@@ -8,20 +8,29 @@
 //! set, then any number of RANK-BOUNDED extractions of the newest-K
 //! matched positions. Position algebra ([`super::PosSet`]) stays
 //! private to the format crate; the seam is plan in, positions + work
-//! out.
+//! out. Several plans (one per search token) compile against a file
+//! together ([`IndexReader::compile_trace_plans`]), sharing one
+//! stream-batch pass.
 //!
 //! # The term algebra
 //!
 //! Every dictionary term is `fields × matcher × negated`:
 //!
-//! - `fields` holds ONE storage field, or several OR-combined (the
-//!   grammar's unscoped attribute = resource ∪ span disjunction);
-//! - the matcher selects tokens — exact values and anchored regexes, or
-//!   a NUMERIC comparison evaluated at the dictionary (each distinct
-//!   stored value parsed once; unparseable values never match);
+//! - `fields` holds ONE storage field, or several OR-combined (a caller
+//!   may name several fields for one term; sfsq names one);
+//! - the matcher selects tokens — exact values and anchored regexes, a
+//!   NUMERIC comparison evaluated at the dictionary (each distinct
+//!   stored value parsed once; unparseable values never match), or a
+//!   case-insensitive substring ([`crate::ContainsMatcher`], the
+//!   free-text rule);
 //! - `negated` applies the pinned negation rule
 //!   `presence(fields) ∩ complement(match)`: an absent attribute never
 //!   satisfies a negated comparison.
+//!
+//! [`PlanTerm::FieldsIn`] is the free-text form: its fields are chosen
+//! per file from the field table (exact names and name prefixes), then
+//! it resolves as a positive multi-field term. Only values are tested,
+//! never field names.
 //!
 //! Terms resolve per tier: low/mid dictionary lookups and walks; ALL
 //! high-card probes (matches AND presence sets alike — a presence probe
@@ -42,17 +51,30 @@
 //! - each EMITTED matched position (rank-bounded extraction makes
 //!   emission itself the bounded unit).
 //!
-//! The caller's `ceiling` is enforced INSIDE each budgeted pass — the
-//! stream-batch scan and the subgroup refines (a counter alone could
-//! overshoot by a whole file): a compilation that would exceed it stops
-//! and returns `Ok(None)` — a truncated plan must never be used, it
-//! would under-approximate.
+//! [`ScanWork::dict_bytes`] counts the `field=value` key bytes of every
+//! dictionary WALK: the low-tier prefix walk, the mid-tier chunk walk,
+//! the high-tier key walk, and the subgroup KvId collection. A free-text
+//! term walks every attribute dictionary of every file, so dictionary
+//! work is no longer small next to row work. The high-tier exact-value
+//! binary search reads a handful of keys and stays free.
 //!
-//! Deliberately EXCLUDED (bounded by construction): dictionary walks
-//! (FST/arena — dictionary-sized), the DURN column pass (clipped to the
-//! caller's position range, so it is window-bounded) and other
-//! fixed-width column reads, and the `range_cardinality` probes of the
-//! extraction (tree walks, not row visits).
+//! The caller's [`ScanLimits`] are enforced INSIDE the compilation:
+//! `rows` within each budgeted pass — the stream-batch scan and the
+//! subgroup refines (a counter alone could overshoot by a whole file) —
+//! and `dict_bytes` after each field's walk (overshoot ≤ one field's
+//! dictionary). A compilation that would exceed either stops and returns
+//! `Ok(None)` — a truncated plan must never be used, it would
+//! under-approximate. Both counters are cumulative over the caller's
+//! query, so the limits are the query's totals; a compilation entered
+//! with `dict_bytes` already over its limit returns `Ok(None)` before
+//! any walk, so the overshoot stays one field per query, not per file.
+//!
+//! Deliberately EXCLUDED (bounded by construction): the field-table
+//! scan, the high-tier presence set (masks, no key bytes), the DURN
+//! column pass (clipped to the caller's position range, so it is
+//! window-bounded) and other fixed-width column reads, and the
+//! `range_cardinality` probes of the extraction (tree walks, not row
+//! visits).
 //!
 //! # Rank-bounded extraction (pin R3-1)
 //!
@@ -82,7 +104,7 @@
 //! each side re-deriving the same file-vs-bounds agreement. Budget
 //! exhaustion is not an error: it is the `Ok(None)` above.
 
-use super::{FieldLocation, IndexReader, KvId, KvIdSet, PosSet};
+use super::{BitmapFilter, FieldLocation, IndexReader, KvId, KvIdSet, PosSet};
 
 /// How a [`PlanTerm::Fields`] term selects dictionary tokens.
 #[derive(Debug, Clone, PartialEq)]
@@ -97,7 +119,14 @@ pub enum PlanMatcher {
     /// `values` (the pinned dictionary-numeric rule; several values =
     /// the grammar's multi-value numeric equality). See
     /// [`numeric_token_matches`].
-    Number { cmp: NumberCmp, values: Vec<f64> },
+    Number {
+        cmp: NumberCmp,
+        values: Vec<NumberValue>,
+    },
+    /// Values containing the term, Unicode-simple case-insensitive
+    /// ([`crate::ContainsMatcher`]: the same rule as suggest's contains
+    /// class). An empty term matches nothing.
+    Contains(String),
 }
 
 /// The numeric comparison of [`PlanMatcher::Number`]. Negated
@@ -111,15 +140,43 @@ pub enum NumberCmp {
     Lte,
 }
 
+/// The right-hand side of a [`PlanMatcher::Number`] comparison. An
+/// integer stays an integer so that [`numeric_token_matches`] can
+/// compare it exactly: an `f64` cannot tell integers apart past 2^53.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum NumberValue {
+    Int(i64),
+    Float(f64),
+}
+
 /// THE numeric token comparator — shared verbatim by the dictionary
 /// walks here and by the span-side evaluator in the engine crate, so
 /// the raw index path and the canonical span path can never disagree on
 /// what a numeric comparison means. A value that does not parse as a
 /// number never matches; a NaN `rhs` matches nothing.
-pub fn numeric_token_matches(value: &str, cmp: NumberCmp, rhs: f64) -> bool {
+///
+/// An integer `rhs` against a stored value that parses as an `i64`
+/// compares exactly; everything else compares as `f64`. The two agree
+/// whenever both sides lie within ±2^53. Stored values are text, so a
+/// double printed as integer digits compares by those digits, and a
+/// stored integer outside the `i64` range compares as `f64`.
+pub fn numeric_token_matches(value: &str, cmp: NumberCmp, rhs: NumberValue) -> bool {
+    if let NumberValue::Int(rhs) = rhs
+        && let Ok(v) = value.parse::<i64>()
+    {
+        return compare(cmp, v, rhs);
+    }
     let Ok(v) = value.parse::<f64>() else {
         return false;
     };
+    let rhs = match rhs {
+        NumberValue::Int(n) => n as f64,
+        NumberValue::Float(f) => f,
+    };
+    compare(cmp, v, rhs)
+}
+
+fn compare<T: PartialOrd>(cmp: NumberCmp, v: T, rhs: T) -> bool {
     match cmp {
         NumberCmp::Eq => v == rhs,
         NumberCmp::Gt => v > rhs,
@@ -133,9 +190,9 @@ pub fn numeric_token_matches(value: &str, cmp: NumberCmp, rhs: f64) -> bool {
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlanTerm {
     /// Rows selected by `matcher` over the union of `fields` (one
-    /// STORAGE field name, or several for the unscoped resource ∪ span
-    /// disjunction — the caller constructs names through its vocabulary
-    /// mapping; this crate does not interpret them). `negated` applies
+    /// STORAGE field name, or several OR-combined — the caller constructs
+    /// names through its vocabulary mapping; this crate does not
+    /// interpret them). `negated` applies
     /// the pinned rule in the module docs
     /// (`presence(fields) ∩ complement(match)`); a positive term on an
     /// absent field matches nothing (the `compile_filter` precedent).
@@ -143,6 +200,16 @@ pub enum PlanTerm {
         fields: Vec<String>,
         matcher: PlanMatcher,
         negated: bool,
+    },
+    /// Rows selected by `matcher` over the union of this file's fields
+    /// named exactly as an `exact` entry or starting with one of
+    /// `prefixes` — the free-text scope, chosen per file from the field
+    /// table (the caller owns the names; this crate does not interpret
+    /// them). Positive only; a file with no such field matches nothing.
+    FieldsIn {
+        exact: Vec<String>,
+        prefixes: Vec<String>,
+        matcher: PlanMatcher,
     },
     /// Rows whose DURN duration lies in ANY of the INCLUSIVE
     /// `[min_ns, max_ns]` intervals (bounds optional; the caller maps
@@ -191,7 +258,7 @@ pub enum GroupCondition {
         field: String,
         matcher: PlanMatcher,
     },
-    /// `event:timeSinceStart` in any of the inclusive ns intervals —
+    /// `events.time_since_start` in any of the inclusive ns intervals —
     /// computed in refine from the event time and the row start
     /// (event groups only).
     TimeSinceStart {
@@ -244,6 +311,18 @@ pub struct ScanWork {
     /// rows scanned, refine rows AND event/link records walked, and
     /// emitted extraction positions. One counter, one ceiling.
     pub rows_visited: u64,
+    /// Key bytes of every dictionary walk (module docs).
+    pub dict_bytes: u64,
+}
+
+/// The ceilings of one compilation, compared against the caller's
+/// cumulative [`ScanWork`] counters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScanLimits {
+    /// Ceiling of [`ScanWork::rows_visited`].
+    pub rows: u64,
+    /// Ceiling of [`ScanWork::dict_bytes`].
+    pub dict_bytes: u64,
 }
 
 /// A [`TracePlan`] resolved against one file: the matched-position set,
@@ -255,6 +334,10 @@ pub struct CompiledTracePlan {
     set: PosSet,
     /// The file's record count — the hard clamp on extraction ranges.
     universe: u32,
+    /// The compile range `[lo, hi)`: the set is exact within it only
+    /// (dictionary terms hold the whole file, column and refine terms
+    /// the range).
+    range: (u32, u32),
 }
 
 /// One per-field resolution: a set already known (low/mid tiers, absent
@@ -285,6 +368,93 @@ struct GroupSlot {
     /// short-circuit so an unrelated budgeted scan is never charged for
     /// a file this group already ruled out.
     impossible: bool,
+}
+
+/// One plan's terms resolved against a file, awaiting the shared
+/// stream-batch scan.
+struct ResolvedPlan {
+    /// Per term slot: a field term's parts (`None` for other slots).
+    resolved: Vec<Option<ResolvedTerm>>,
+    /// Per term slot: a set known before the scan (duration, id
+    /// column), or filled by a subgroup refine after it.
+    durations: Vec<Option<PosSet>>,
+    groups: Vec<GroupSlot>,
+}
+
+impl ResolvedPlan {
+    /// Whether the terms resolvable without the scan already collapse
+    /// the conjunction — the scan would be wasted work for this plan.
+    fn ready_empty(&self, total: u32) -> bool {
+        // A term combines WITHOUT the scan only if all parts are ready.
+        let or_parts = |parts: &[Part]| -> Option<PosSet> {
+            let mut acc = PosSet::empty(total);
+            for part in parts {
+                match part {
+                    Part::Ready(set) => acc.or_assign(set),
+                    Part::Probe(_) => return None,
+                }
+            }
+            Some(acc)
+        };
+        let combine_ready = |term: &ResolvedTerm| -> Option<PosSet> {
+            let matched = or_parts(&term.matches)?;
+            match &term.presence {
+                None => Some(matched),
+                Some(parts) => {
+                    let mut presence = or_parts(parts)?;
+                    presence.and_not_assign(&matched);
+                    Some(presence)
+                }
+            }
+        };
+        let group_ready_empty = |group: &GroupSlot| -> bool {
+            if group.impossible {
+                return true;
+            }
+            // An all-ready pre-filter that ANDs to empty leaves the
+            // refine nothing to visit.
+            let mut acc: Option<PosSet> = None;
+            for part in &group.prefilter {
+                let Part::Ready(set) = part else { return false };
+                match &mut acc {
+                    None => acc = Some(set.clone()),
+                    Some(a) => a.and_assign(set),
+                }
+            }
+            acc.is_some_and(|set| set.is_empty())
+        };
+        self.resolved
+            .iter()
+            .flatten()
+            .any(|term| combine_ready(term).is_some_and(|set| set.is_empty()))
+            || self.durations.iter().flatten().any(PosSet::is_empty)
+            || self.groups.iter().any(group_ready_empty)
+    }
+
+    /// Flag every shared probe this plan reads.
+    fn mark_probes(&self, needed: &mut [bool]) {
+        let mut mark = |parts: &[Part]| {
+            for part in parts {
+                if let Part::Probe(i) = part {
+                    needed[*i] = true;
+                }
+            }
+        };
+        for term in self.resolved.iter().flatten() {
+            mark(&term.matches);
+            if let Some(presence) = &term.presence {
+                mark(presence);
+            }
+        }
+        for group in &self.groups {
+            mark(&group.prefilter);
+        }
+    }
+}
+
+/// Whether the dictionary-bytes counter is over its ceiling.
+fn dict_exceeded(work: &ScanWork, limits: ScanLimits) -> bool {
+    work.dict_bytes > limits.dict_bytes
 }
 
 /// A subgroup condition resolved for KvId-level refine.
@@ -327,53 +497,224 @@ fn refine_rows(
     Some(PosSet::from_sorted(matched, total))
 }
 
-/// Whether a `field=value` key's VALUE bytes satisfy `matcher` (shared
-/// by the per-tier set walks and the subgroup KvId collection).
-fn matcher_hits(
-    kv_bytes: &[u8],
-    prefix_len: usize,
-    matcher: &PlanMatcher,
-    compiled_patterns: &[regex::bytes::Regex],
-) -> bool {
-    let value = &kv_bytes[prefix_len..];
-    match matcher {
-        PlanMatcher::Tokens { exact, .. } => {
-            exact.iter().any(|e| e.as_bytes() == value)
-                || compiled_patterns.iter().any(|r| r.is_match(value))
+/// A [`PlanMatcher`] compiled once per term for the dictionary walks
+/// (shared by the per-tier set walks and the subgroup KvId collection).
+enum ValueTest<'m> {
+    Tokens {
+        exact: &'m [String],
+        patterns: Vec<regex::bytes::Regex>,
+    },
+    Number {
+        cmp: NumberCmp,
+        values: &'m [NumberValue],
+    },
+    /// `None`: the empty term, which matches nothing.
+    Contains(Option<crate::ContainsMatcher>),
+}
+
+impl<'m> ValueTest<'m> {
+    fn new(matcher: &'m PlanMatcher) -> Result<Self, crate::Error> {
+        Ok(match matcher {
+            PlanMatcher::Tokens { exact, patterns } => ValueTest::Tokens {
+                exact,
+                patterns: patterns
+                    .iter()
+                    .map(|p| crate::query::compile_pattern(p))
+                    .collect::<Result<Vec<_>, _>>()?,
+            },
+            PlanMatcher::Number { cmp, values } => ValueTest::Number { cmp: *cmp, values },
+            PlanMatcher::Contains(term) if term.is_empty() => ValueTest::Contains(None),
+            PlanMatcher::Contains(term) => {
+                let matcher = crate::ContainsMatcher::new(term).ok_or_else(|| {
+                    crate::Error::InvalidPattern(format!(
+                        "contains term of {} bytes does not compile",
+                        term.len()
+                    ))
+                })?;
+                ValueTest::Contains(Some(matcher))
+            }
+        })
+    }
+
+    /// The exact values when they are the whole test: the high tier's
+    /// binary-search fast path.
+    fn exact_only(&self) -> Option<&'m [String]> {
+        match self {
+            ValueTest::Tokens { exact, patterns } if patterns.is_empty() => Some(exact),
+            _ => None,
         }
-        PlanMatcher::Number { cmp, values } => std::str::from_utf8(value).is_ok_and(|v| {
-            values
-                .iter()
-                .any(|&rhs| numeric_token_matches(v, *cmp, rhs))
-        }),
+    }
+
+    /// Whether a stored VALUE (the bytes after `field=`) satisfies the
+    /// test.
+    fn hits(&self, value: &[u8]) -> bool {
+        match self {
+            ValueTest::Tokens { exact, patterns } => {
+                exact.iter().any(|e| e.as_bytes() == value)
+                    || patterns.iter().any(|r| r.is_match(value))
+            }
+            ValueTest::Number { cmp, values } => std::str::from_utf8(value).is_ok_and(|v| {
+                values
+                    .iter()
+                    .any(|&rhs| numeric_token_matches(v, *cmp, rhs))
+            }),
+            ValueTest::Contains(matcher) => matcher.as_ref().is_some_and(|m| m.is_match(value)),
+        }
     }
 }
 
 impl IndexReader<'_> {
-    /// Resolve `plan` against this file for queries within the position
-    /// range `[lo, hi)` (the caller's window; pass `(0, record_count)`
-    /// for the whole file). See the module docs for the term algebra,
-    /// tier resolution, and work accounting. `Ok(None)` = the visited
-    /// budget ran out inside a budgeted pass — the shared stream-batch
-    /// scan or a subgroup refine; a truncated plan is never returned
-    /// (it would under-approximate).
+    /// Resolve `plans` against this file for queries within the
+    /// position range `[lo, hi)` (the caller's window; pass
+    /// `(0, record_count)` for the whole file), one compiled plan per
+    /// input plan, in order. See the module docs for the term algebra,
+    /// tier resolution, and work accounting. Every plan's high-card
+    /// probes share ONE stream-batch pass, so compiling several plans
+    /// (one per search token) costs one scan, not one per plan.
+    /// `Ok(None)` = a ceiling of `limits` ran out — rows inside the
+    /// shared stream-batch scan or a subgroup refine, dictionary bytes
+    /// after a field's walk; no plan is returned then, since a missing
+    /// or truncated one would under-approximate.
     ///
-    /// The compiled plan answers `count_in_range`/`newest_in_range`/
-    /// `matched_in_range` correctly only for sub-ranges of `[lo, hi)`
+    /// A compiled plan answers `count_in_range`/`newest_in_range`/
+    /// `matched_in_range`/`contains` correctly only within `[lo, hi)`
     /// (duration, id-column and subgroup-refine positions outside it
     /// were never collected).
+    pub fn compile_trace_plans(
+        &self,
+        plans: &[TracePlan],
+        range: (u32, u32),
+        limits: ScanLimits,
+        work: &mut ScanWork,
+    ) -> Result<Option<Vec<CompiledTracePlan>>, crate::Error> {
+        let total = self.summary().record_count;
+        let range = (range.0.min(total), range.1.min(total));
+        if dict_exceeded(work, limits) {
+            return Ok(None);
+        }
+
+        // ── Resolve every plan's terms (dictionary work) ─────────────
+        let mut probes: Vec<(KvIdSet, u8)> = Vec::new();
+        let mut resolved = Vec::with_capacity(plans.len());
+        for plan in plans {
+            let Some(r) = self.resolve_plan(plan, range, total, limits, &mut probes, work)? else {
+                return Ok(None);
+            };
+            resolved.push(r);
+        }
+
+        // ── Probe-free short-circuit: a plan whose ready terms already
+        // collapse its conjunction needs no scan — its probes are left
+        // out, and when no plan needs one the scan is skipped,
+        // deterministically. ─────────────────────────────────────────
+        let ready_empty: Vec<bool> = resolved.iter().map(|r| r.ready_empty(total)).collect();
+        let mut needed = vec![false; probes.len()];
+        for (plan, &empty) in resolved.iter().zip(&ready_empty) {
+            if !empty {
+                plan.mark_probes(&mut needed);
+            }
+        }
+        let refs: Vec<(&KvIdSet, u8)> = probes
+            .iter()
+            .zip(&needed)
+            .filter(|(_, needed)| **needed)
+            .map(|((targets, mask), _)| (targets, *mask))
+            .collect();
+        // Probes no live plan reads get throwaway empty sets.
+        let mut probe_sets: Vec<PosSet> = probes.iter().map(|_| PosSet::empty(total)).collect();
+        if !refs.is_empty() {
+            let Some(sets) =
+                self.scan_high_multi(&refs, total, limits.rows, &mut work.rows_visited)?
+            else {
+                return Ok(None); // budget ran out mid-scan
+            };
+            let slots = needed
+                .iter()
+                .enumerate()
+                .filter(|(_, n)| **n)
+                .map(|(i, _)| i);
+            for (slot, set) in slots.zip(sets) {
+                probe_sets[slot] = set;
+            }
+        }
+
+        let mut out = Vec::with_capacity(plans.len());
+        for (plan, empty) in resolved.into_iter().zip(ready_empty) {
+            let set = if empty {
+                PosSet::empty(total)
+            } else {
+                match self.finish_plan(plan, &probe_sets, range, total, limits.rows, work)? {
+                    Some(set) => set,
+                    None => return Ok(None),
+                }
+            };
+            out.push(CompiledTracePlan {
+                set,
+                universe: total,
+                range,
+            });
+        }
+        Ok(Some(out))
+    }
+
+    /// The positions within `[lo, hi)` whose trace id is one of `ids`: a
+    /// fixed-width TRCE column read over the range, excluded from the
+    /// work units (like DURN). An unset id never matches. This is the
+    /// span-level trace-id filter; the trace-level lookup of every span
+    /// of one trace is `TraceFileSession`. Errors if the file carries no
+    /// TRCE column (not a traces file).
+    pub fn compile_trace_ids(
+        &self,
+        ids: &[crate::TraceId],
+        range: (u32, u32),
+    ) -> Result<CompiledTracePlan, crate::Error> {
+        let total = self.summary().record_count;
+        let (lo, hi) = (range.0.min(total), range.1.min(total));
+        let column = self.trace_ids()?;
+        if (column.len() as u32) < hi {
+            return Err(crate::Error::CorruptIndex(format!(
+                "trace ids: column length {} < range end {hi}",
+                column.len()
+            )));
+        }
+        let positions: Vec<u32> = (lo..hi)
+            .filter(|&pos| {
+                let id = column.get(pos as usize);
+                !id.is_unset() && ids.contains(&id)
+            })
+            .collect();
+        Ok(CompiledTracePlan {
+            set: PosSet::from_sorted(positions, total),
+            universe: total,
+            range: (lo, hi),
+        })
+    }
+
+    /// [`Self::compile_trace_plans`] for one plan.
     pub fn compile_trace_plan(
         &self,
         plan: &TracePlan,
         range: (u32, u32),
-        ceiling: u64,
+        limits: ScanLimits,
         work: &mut ScanWork,
     ) -> Result<Option<CompiledTracePlan>, crate::Error> {
-        let total = self.summary().record_count;
-        let (range_lo, range_hi) = (range.0.min(total), range.1.min(total));
+        let compiled = self.compile_trace_plans(std::slice::from_ref(plan), range, limits, work)?;
+        Ok(compiled.map(|mut plans| plans.pop().expect("one plan in, one out")))
+    }
 
-        // ── Resolve every term: dictionary work only (uncounted) ─────
-        let mut probes: Vec<(KvIdSet, u8)> = Vec::new();
+    /// Resolve one plan's terms into its slots, registering its
+    /// high-card probes in the shared `probes`. Dictionary work only;
+    /// `Ok(None)` = the dictionary ceiling ran out.
+    fn resolve_plan(
+        &self,
+        plan: &TracePlan,
+        (range_lo, range_hi): (u32, u32),
+        total: u32,
+        limits: ScanLimits,
+        probes: &mut Vec<(KvIdSet, u8)>,
+        work: &mut ScanWork,
+    ) -> Result<Option<ResolvedPlan>, crate::Error> {
+        let dict_over = |work: &ScanWork| dict_exceeded(work, limits);
         let mut resolved: Vec<Option<ResolvedTerm>> = Vec::new(); // None = non-Fields slot
         let mut durations: Vec<Option<PosSet>> = Vec::new(); // parallel to `resolved`, zipped below
         let mut groups: Vec<GroupSlot> = Vec::new(); // event/link subgroups (refined post-pass)
@@ -384,30 +725,63 @@ impl IndexReader<'_> {
                     matcher,
                     negated,
                 } => {
-                    let compiled_patterns = match matcher {
-                        PlanMatcher::Tokens { patterns, .. } => patterns
-                            .iter()
-                            .map(|p| crate::query::compile_pattern(p))
-                            .collect::<Result<Vec<_>, _>>()?,
-                        PlanMatcher::Number { .. } => Vec::new(),
-                    };
+                    let test = ValueTest::new(matcher)?;
                     let mut matches = Vec::with_capacity(fields.len());
                     let mut presence = negated.then(|| Vec::with_capacity(fields.len()));
                     for field in fields {
                         let (m, p) = self.resolve_field(
                             field,
-                            matcher,
-                            &compiled_patterns,
+                            self.locate_field(field),
+                            &test,
                             *negated,
                             total,
-                            &mut probes,
+                            probes,
+                            work,
                         )?;
+                        if dict_over(work) {
+                            return Ok(None);
+                        }
                         matches.push(m);
                         if let (Some(acc), Some(part)) = (presence.as_mut(), p) {
                             acc.push(part);
                         }
                     }
                     resolved.push(Some(ResolvedTerm { matches, presence }));
+                    durations.push(None);
+                }
+                PlanTerm::FieldsIn {
+                    exact,
+                    prefixes,
+                    matcher,
+                } => {
+                    let test = ValueTest::new(matcher)?;
+                    let mut matches = Vec::new();
+                    for (entry, tier_index) in super::field_table_tiered(self.field_table()) {
+                        let name = entry.name.as_str();
+                        if !exact.iter().any(|e| e == name)
+                            && !prefixes.iter().any(|p| name.starts_with(p.as_str()))
+                        {
+                            continue;
+                        }
+                        let location = FieldLocation::of(entry, tier_index);
+                        let (m, _) = self.resolve_field(
+                            name,
+                            Some(location),
+                            &test,
+                            false,
+                            total,
+                            probes,
+                            work,
+                        )?;
+                        if dict_over(work) {
+                            return Ok(None);
+                        }
+                        matches.push(m);
+                    }
+                    resolved.push(Some(ResolvedTerm {
+                        matches,
+                        presence: None,
+                    }));
                     durations.push(None);
                 }
                 PlanTerm::IdColumn {
@@ -463,25 +837,28 @@ impl IndexReader<'_> {
                     for condition in conditions {
                         match condition {
                             GroupCondition::Field { field, matcher } => {
-                                let compiled_patterns = match matcher {
-                                    PlanMatcher::Tokens { patterns, .. } => patterns
-                                        .iter()
-                                        .map(|pat| crate::query::compile_pattern(pat))
-                                        .collect::<Result<Vec<_>, _>>()?,
-                                    PlanMatcher::Number { .. } => Vec::new(),
-                                };
+                                let test = ValueTest::new(matcher)?;
                                 let (m, _) = self.resolve_field(
                                     field,
-                                    matcher,
-                                    &compiled_patterns,
+                                    self.locate_field(field),
+                                    &test,
                                     false,
                                     total,
-                                    &mut probes,
+                                    probes,
+                                    work,
                                 )?;
+                                // Two walks of the same dictionary, each
+                                // checked: the overshoot stays one walk.
+                                if dict_over(work) {
+                                    return Ok(None);
+                                }
                                 parts.push((m, None));
                                 resolved_conditions.push(ResolvedGroupCondition::Kv(
-                                    self.field_matching_kvids(field, matcher, &compiled_patterns)?,
+                                    self.field_matching_kvids(field, &test, work)?,
                                 ));
+                                if dict_over(work) {
+                                    return Ok(None);
+                                }
                             }
                             GroupCondition::TimeSinceStart { intervals } => {
                                 resolved_conditions
@@ -507,15 +884,18 @@ impl IndexReader<'_> {
                             exact: Vec::new(),
                             patterns: vec![".*".to_string()],
                         };
-                        let compiled = vec![crate::query::compile_pattern(".*")?];
                         let (m, _) = self.resolve_field(
                             "events.name",
-                            &names,
-                            &compiled,
+                            self.locate_field("events.name"),
+                            &ValueTest::new(&names)?,
                             false,
                             total,
-                            &mut probes,
+                            probes,
+                            work,
                         )?;
+                        if dict_over(work) {
+                            return Ok(None);
+                        }
                         parts.push((m, None));
                     }
                     let chunk_absent = if is_event {
@@ -568,72 +948,30 @@ impl IndexReader<'_> {
                 }
             }
         }
+        Ok(Some(ResolvedPlan {
+            resolved,
+            durations,
+            groups,
+        }))
+    }
 
-        // ── Probe-free short-circuit: if the terms already resolvable
-        // collapse the conjunction, the stream-batch scan is wasted
-        // work — skip it, deterministically. ──────────────────────────
-        let combine_ready = |term: &ResolvedTerm| -> Option<PosSet> {
-            // A term combines WITHOUT the scan only if all parts are ready.
-            let or_parts = |parts: &[Part]| -> Option<PosSet> {
-                let mut acc = PosSet::empty(total);
-                for part in parts {
-                    match part {
-                        Part::Ready(set) => acc.or_assign(set),
-                        Part::Probe(_) => return None,
-                    }
-                }
-                Some(acc)
-            };
-            let matched = or_parts(&term.matches)?;
-            match &term.presence {
-                None => Some(matched),
-                Some(parts) => {
-                    let mut presence = or_parts(parts)?;
-                    presence.and_not_assign(&matched);
-                    Some(presence)
-                }
-            }
-        };
-        let group_ready_empty = |group: &GroupSlot| -> bool {
-            if group.impossible {
-                return true;
-            }
-            // An all-ready pre-filter that ANDs to empty leaves the
-            // refine nothing to visit.
-            let mut acc: Option<PosSet> = None;
-            for part in &group.prefilter {
-                let Part::Ready(set) = part else { return false };
-                match &mut acc {
-                    None => acc = Some(set.clone()),
-                    Some(a) => a.and_assign(set),
-                }
-            }
-            acc.is_some_and(|set| set.is_empty())
-        };
-        let ready_empty = resolved
-            .iter()
-            .flatten()
-            .any(|term| combine_ready(term).is_some_and(|set| set.is_empty()))
-            || durations.iter().flatten().any(PosSet::is_empty)
-            || groups.iter().any(group_ready_empty);
-        // When short-circuiting, the scan is skipped and the probe
-        // slots get throwaway empty sets — every consumer of
-        // `probe_sets` sits behind the early return below.
-        let probe_sets: Vec<PosSet> = if probes.is_empty() || ready_empty {
-            probes.iter().map(|_| PosSet::empty(total)).collect()
-        } else {
-            let refs: Vec<(&KvIdSet, u8)> = probes.iter().map(|(t, m)| (t, *m)).collect();
-            match self.scan_high_multi(&refs, total, ceiling, &mut work.rows_visited)? {
-                Some(sets) => sets,
-                None => return Ok(None), // budget ran out mid-scan
-            }
-        };
-        if ready_empty {
-            return Ok(Some(CompiledTracePlan {
-                set: PosSet::empty(total),
-                universe: total,
-            }));
-        }
+    /// One live plan's post-scan work: the subgroup refines, then the
+    /// conjunction in plan order. `Ok(None)` = the rows ceiling ran out
+    /// in a refine.
+    fn finish_plan(
+        &self,
+        plan: ResolvedPlan,
+        probe_sets: &[PosSet],
+        (range_lo, range_hi): (u32, u32),
+        total: u32,
+        ceiling: u64,
+        work: &mut ScanWork,
+    ) -> Result<Option<PosSet>, crate::Error> {
+        let ResolvedPlan {
+            resolved,
+            mut durations,
+            groups,
+        } = plan;
 
         // ── Structural refine per subgroup (MANDATORY, decision 10):
         // a single event/link must satisfy the whole subgroup — every
@@ -735,7 +1073,6 @@ impl IndexReader<'_> {
             };
             durations[group.term_index] = Some(set);
         }
-
         // ── Combine in plan order ─────────────────────────────────────
         let materialize = |parts: &[Part]| -> PosSet {
             let mut acc = PosSet::empty(total);
@@ -773,35 +1110,30 @@ impl IndexReader<'_> {
             }
         }
 
-        Ok(Some(CompiledTracePlan {
-            set: acc.unwrap_or_else(|| PosSet::full(total)),
-            universe: total,
-        }))
+        Ok(Some(acc.unwrap_or_else(|| PosSet::full(total))))
     }
 
-    /// Resolve one field of a term: the MATCH part and (for negated
-    /// terms) the PRESENCE part, each a ready set (low/mid, absent) or
-    /// a registered high-card probe. Dictionary work only.
+    /// Resolve one field of a term at its `location` (`None`: absent
+    /// from this file): the MATCH part and (for negated terms) the
+    /// PRESENCE part, each a ready set (low/mid, absent) or a registered
+    /// high-card probe. Dictionary work only, its key bytes charged to
+    /// `work.dict_bytes`.
+    #[allow(clippy::too_many_arguments)]
     fn resolve_field(
         &self,
         field: &str,
-        matcher: &PlanMatcher,
-        compiled_patterns: &[regex::bytes::Regex],
+        location: Option<FieldLocation>,
+        test: &ValueTest<'_>,
         want_presence: bool,
         total: u32,
         probes: &mut Vec<(KvIdSet, u8)>,
+        work: &mut ScanWork,
     ) -> Result<(Part, Option<Part>), crate::Error> {
         let prefix_len = field.len() + 1;
-        let value_matches =
-            |kv_bytes: &[u8]| matcher_hits(kv_bytes, prefix_len, matcher, compiled_patterns);
-
-        let location = match self.locate_field(field) {
-            Some(loc) => loc,
-            None => {
-                // Absent field: no matches, no presence.
-                let presence = want_presence.then(|| Part::Ready(PosSet::empty(total)));
-                return Ok((Part::Ready(PosSet::empty(total)), presence));
-            }
+        let Some(location) = location else {
+            // Absent field: no matches, no presence.
+            let presence = want_presence.then(|| Part::Ready(PosSet::empty(total)));
+            return Ok((Part::Ready(PosSet::empty(total)), presence));
         };
 
         match location {
@@ -809,29 +1141,35 @@ impl IndexReader<'_> {
                 let prefix = format!("{field}=");
                 let mut matched = PosSet::empty(total);
                 let mut presence = want_presence.then(|| PosSet::empty(total));
+                let mut walked = 0u64;
                 self.primary
                     .prefix_for_each(prefix.as_bytes(), |kv_bytes, bv| {
-                        if value_matches(kv_bytes) {
+                        walked += kv_bytes.len() as u64;
+                        if test.hits(&kv_bytes[prefix_len..]) {
                             matched.or_assign(&PosSet::from_value(bv));
                         }
                         if let Some(p) = presence.as_mut() {
                             p.or_assign(&PosSet::from_value(bv));
                         }
                     });
+                work.dict_bytes += walked;
                 Ok((Part::Ready(matched), presence.map(Part::Ready)))
             }
             FieldLocation::Mid(idx) => {
                 let chunk = self.sfst.mid_field(idx)?;
                 let mut matched = PosSet::empty(total);
                 let mut presence = want_presence.then(|| PosSet::empty(total));
+                let mut walked = 0u64;
                 chunk.for_each(|kv_bytes, bv| {
-                    if value_matches(kv_bytes) {
+                    walked += kv_bytes.len() as u64;
+                    if test.hits(&kv_bytes[prefix_len..]) {
                         matched.or_assign(&PosSet::from_value(bv));
                     }
                     if let Some(p) = presence.as_mut() {
                         p.or_assign(&PosSet::from_value(bv));
                     }
                 });
+                work.dict_bytes += walked;
                 Ok((Part::Ready(matched), presence.map(Part::Ready)))
             }
             FieldLocation::High(idx) => {
@@ -839,25 +1177,23 @@ impl IndexReader<'_> {
                 let base = self.high_kv_id(idx, 0).0;
                 let mut targets = KvIdSet::new(base, hf.len() as u32);
                 let mut mask: u8 = 0;
-                match matcher {
+                if let Some(exact) = test.exact_only() {
                     // Exact-only terms keep the pinned KvId fast path
-                    // (binary search per value); everything else walks
-                    // the dictionary once.
-                    PlanMatcher::Tokens { exact, patterns } if patterns.is_empty() => {
-                        for value in exact {
-                            let kv = format!("{field}={value}");
-                            if let Ok(local) = hf.binary_search(kv.as_bytes()) {
-                                targets.insert(KvId(base + local as u32));
-                                mask |= hf.masks[local];
-                            }
+                    // (binary search per value, uncharged); everything
+                    // else walks the dictionary once.
+                    for value in exact {
+                        let kv = format!("{field}={value}");
+                        if let Ok(local) = hf.binary_search(kv.as_bytes()) {
+                            targets.insert(KvId(base + local as u32));
+                            mask |= hf.masks[local];
                         }
                     }
-                    _ => {
-                        for (local, key) in hf.keys().enumerate() {
-                            if value_matches(key) {
-                                targets.insert(KvId(base + local as u32));
-                                mask |= hf.masks[local];
-                            }
+                } else {
+                    for (local, key) in hf.keys().enumerate() {
+                        work.dict_bytes += key.len() as u64;
+                        if test.hits(&key[prefix_len..]) {
+                            targets.insert(KvId(base + local as u32));
+                            mask |= hf.masks[local];
                         }
                     }
                 }
@@ -890,14 +1226,15 @@ impl IndexReader<'_> {
     /// The KvIds of `field`'s dictionary tokens selected by `matcher` —
     /// the subgroup refine's membership sets. KvIds are assigned per
     /// field in field-table order with values in dictionary order (the
-    /// tested `resolve_kv_strings` labeling), so the id of the `i`-th
+    /// labeling the KvId resolver's tests pin), so the id of the `i`-th
     /// walked value is `field_start + i`. An absent field yields the
-    /// empty set (unsatisfiable subgroup condition in this file).
+    /// empty set (unsatisfiable subgroup condition in this file). The
+    /// walk's key bytes are charged to `work.dict_bytes`.
     fn field_matching_kvids(
         &self,
         field: &str,
-        matcher: &PlanMatcher,
-        compiled_patterns: &[regex::bytes::Regex],
+        test: &ValueTest<'_>,
+        work: &mut ScanWork,
     ) -> Result<std::collections::HashSet<u32>, crate::Error> {
         let mut start = 0u32;
         let mut present = false;
@@ -913,7 +1250,11 @@ impl IndexReader<'_> {
             return Ok(out);
         }
         let prefix_len = field.len() + 1;
-        let hits = |kv: &[u8]| matcher_hits(kv, prefix_len, matcher, compiled_patterns);
+        let mut walked = 0u64;
+        let mut hits = |kv: &[u8]| {
+            walked += kv.len() as u64;
+            test.hits(&kv[prefix_len..])
+        };
         match self.locate_field(field) {
             None => {}
             Some(FieldLocation::Low) => {
@@ -946,11 +1287,63 @@ impl IndexReader<'_> {
                 }
             }
         }
+        work.dict_bytes += walked;
         Ok(out)
     }
 }
 
 impl CompiledTracePlan {
+    /// Keep only the positions `other` matched too: the AND of two
+    /// plans on the same row, e.g. two search tokens required of one
+    /// span. Both plans must come from the same file and compile range.
+    pub fn and_assign(&mut self, other: &CompiledTracePlan) {
+        self.assert_same_scope(other);
+        self.set.and_assign(&other.set);
+    }
+
+    /// Drop the positions `other` matched: a row that must not match
+    /// `other`, e.g. a negated search token read per span. Both plans
+    /// must come from the same file and compile range.
+    pub fn and_not_assign(&mut self, other: &CompiledTracePlan) {
+        self.assert_same_scope(other);
+        self.set.and_not_assign(&other.set);
+    }
+
+    fn assert_same_scope(&self, other: &CompiledTracePlan) {
+        assert_eq!(
+            (self.universe, self.range),
+            (other.universe, other.range),
+            "plans compiled for different files or ranges"
+        );
+    }
+
+    /// The matched positions within the compile range as a
+    /// [`BitmapFilter`], so the per-bucket statistics
+    /// ([`IndexReader::timeline`], [`IndexReader::timeline_totals`],
+    /// [`IndexReader::matched_count`]) count exactly these rows. The set
+    /// acts as a global constraint, as a full-text query does, so those
+    /// methods never take their unfiltered fast path.
+    pub fn to_filter(&self) -> BitmapFilter {
+        let mut full = PosSet::range(self.range.0, self.range.1, self.universe);
+        full.and_assign(&self.set);
+        BitmapFilter {
+            universe: self.universe,
+            per_field: Vec::new(),
+            query: Some(full.clone()),
+            full,
+        }
+    }
+
+    /// Whether position `pos` matched — a bitmap-tree probe, no row
+    /// visit. Its cost grows with the tree bytes before `pos` (the
+    /// serialized tree has no skip index), so many probes against one
+    /// plan are better batched. Positions outside the compile range
+    /// never match, whatever the term kinds.
+    pub fn contains(&self, pos: u32) -> bool {
+        let (lo, hi) = self.range;
+        (lo..hi).contains(&pos) && self.set.contains(pos)
+    }
+
     /// Matched-position count within `[lo, hi)` — a bitmap-tree walk, no
     /// row visits.
     pub fn count_in_range(&self, lo: u32, hi: u32) -> u64 {

@@ -28,16 +28,16 @@
 
 use std::time::Duration;
 
-use bridge::config::LegacyLogsConfig;
-use bridge::{LegacyLogsRequest, LegacyLogsResponse};
 use ferryboat::{Connection, Endpoint, Listener};
+use otel_bridge::config::LegacyLogsConfig;
+use otel_bridge::{LegacyLogsRequest, LegacyLogsResponse};
 use tokio::task::JoinHandle;
 
 /// Bind the supervisor end of the socket, spawn `run_worker` as the
 /// client, and return the accepted connection plus the worker's join
 /// handle. The 10 s accept timeout pins that the worker connects
 /// promptly; the message-size limit mirrors the worker's own
-/// `bridge::IPC_MAX_MESSAGE_SIZE`.
+/// `otel_bridge::IPC_MAX_MESSAGE_SIZE`.
 async fn start(
     sock: &str,
 ) -> (
@@ -45,7 +45,7 @@ async fn start(
     JoinHandle<anyhow::Result<()>>,
 ) {
     let mut listener = Listener::<LegacyLogsRequest, LegacyLogsResponse>::bind(Endpoint::ipc(sock))
-        .max_message_size(bridge::IPC_MAX_MESSAGE_SIZE)
+        .max_message_size(otel_bridge::IPC_MAX_MESSAGE_SIZE)
         .open()
         .unwrap();
     let sock = sock.to_owned();

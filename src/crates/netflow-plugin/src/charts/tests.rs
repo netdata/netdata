@@ -4,163 +4,105 @@ use crate::facet_runtime::FacetRuntime;
 use crate::memory_allocator::AllocatorMemorySample;
 use crate::plugin_config::{MemoryDiagnosticsConfig, PluginConfig};
 use crate::tiering::TierFlowIndexStore;
-use rt::PluginRuntime;
+use netdata_plugin_metrics::{Aggregator, Batch, Labels};
 
-#[test]
-fn chart_metadata_uses_honest_contexts_and_units() {
-    let input = InputPacketsMetrics::chart_metadata();
-    assert_eq!(input.context, "netdata.netflow.input_packets");
-    assert_eq!(input.units, "packets/s");
+/// Declares the charts from `config` and records a zero snapshot at `START`
+/// and the next second, then returns what closes by `now`, with values shown
+/// as decimals.
+fn render_netflow_charts(config: &ChartsConfig, now: u64) -> String {
+    let mut charts = NetflowCharts::new(config).expect("the netflow charts are valid");
+    let snapshot = zero_snapshot();
+    charts.record(&snapshot, START);
+    charts.record(&snapshot, START + 1);
+    netdata_plugin_protocol::readable_chart_stream(&charts.emit(now).concat())
+}
 
-    let protocols = ProtocolPacketsMetrics::chart_metadata();
-    assert_eq!(protocols.context, "netdata.netflow.protocol_packets");
-    assert_eq!(protocols.units, "packets/s");
+const START: u64 = 1_700_000_000;
 
-    let sets = FlowSetMetrics::chart_metadata();
-    assert_eq!(sets.context, "netdata.netflow.flow_sets");
-    assert_eq!(sets.units, "sets/s");
-
-    let templates = TemplateMetrics::chart_metadata();
-    assert_eq!(templates.context, "netdata.netflow.templates");
-    assert_eq!(templates.units, "templates/s");
-
-    let records = FlowRecordMetrics::chart_metadata();
-    assert_eq!(records.context, "netdata.netflow.flow_records");
-    assert_eq!(records.units, "records/s");
-
-    let options = OptionsRecordMetrics::chart_metadata();
-    assert_eq!(options.context, "netdata.netflow.options_records");
-    assert_eq!(options.units, "records/s");
-
-    let samples = SflowSampleMetrics::chart_metadata();
-    assert_eq!(samples.context, "netdata.netflow.sflow_samples");
-    assert_eq!(samples.units, "samples/s");
-
-    let exceptions = DecoderExceptionMetrics::chart_metadata();
-    assert_eq!(exceptions.context, "netdata.netflow.decoder_exceptions");
-    assert_eq!(exceptions.units, "events/s");
-
-    let rows = FlowRowMetrics::chart_metadata();
-    assert_eq!(rows.context, "netdata.netflow.flow_rows");
-    assert_eq!(rows.units, "rows/s");
-
-    let nsel_events = NselEventMetrics::chart_metadata();
-    assert_eq!(nsel_events.context, "netdata.netflow.nsel_events");
-    assert_eq!(nsel_events.units, "records/s");
-
-    let nsel_rows = NselRowMetrics::chart_metadata();
-    assert_eq!(nsel_rows.context, "netdata.netflow.nsel_rows");
-    assert_eq!(nsel_rows.units, "rows/s");
-
-    let nsel_exceptions = NselExceptionMetrics::chart_metadata();
-    assert_eq!(nsel_exceptions.context, "netdata.netflow.nsel_exceptions");
-    assert_eq!(nsel_exceptions.units, "events/s");
-
-    let raw_bytes = RawJournalBytesMetrics::chart_metadata();
-    assert_eq!(raw_bytes.context, "netdata.netflow.raw_journal_bytes");
-    assert_eq!(raw_bytes.family, "netflow");
-    assert_eq!(raw_bytes.units, "bytes/s");
-
-    let raw_ops = RawJournalOpsMetrics::chart_metadata();
-    assert_eq!(raw_ops.context, "netdata.netflow.raw_journal_ops");
-    assert_eq!(raw_ops.family, "netflow");
-    assert_eq!(raw_ops.units, "ops/s");
-
-    let open = OpenTierMetrics::chart_metadata();
-    assert_eq!(open.context, "netdata.netflow.open_tiers");
-    assert_eq!(open.family, "netflow");
-    assert_eq!(open.units, "rows");
-
-    let resident = MemoryResidentBytesMetrics::chart_metadata();
-    assert_eq!(resident.context, "netdata.netflow.memory_resident_bytes");
-    assert_eq!(resident.units, "bytes");
-
-    let resident_mapping = MemoryResidentMappingBytesMetrics::chart_metadata();
-    assert_eq!(
-        resident_mapping.context,
-        "netdata.netflow.memory_resident_mapping_bytes"
-    );
-    assert_eq!(resident_mapping.units, "bytes");
-
-    let allocator = MemoryAllocatorBytesMetrics::chart_metadata();
-    assert_eq!(allocator.context, "netdata.netflow.memory_allocator_bytes");
-    assert_eq!(allocator.units, "bytes");
-
-    let accounted = MemoryAccountedBytesMetrics::chart_metadata();
-    assert_eq!(accounted.context, "netdata.netflow.memory_accounted_bytes");
-    assert_eq!(accounted.units, "bytes");
-
-    let tier = MemoryTierIndexBytesMetrics::chart_metadata();
-    assert_eq!(tier.context, "netdata.netflow.memory_tier_index_bytes");
-    assert_eq!(tier.units, "bytes");
-
-    let decoder = DecoderScopeMetrics::chart_metadata();
-    assert_eq!(decoder.context, "netdata.netflow.decoder_scopes");
-    assert_eq!(decoder.units, "scopes");
-
-    let facet_values = FacetValueMetrics::chart_metadata();
-    assert_eq!(facet_values.context, "netdata.netflow.facet_values");
-    assert_eq!(facet_values.units, "values");
-
-    let facet_fields = FacetFieldMetrics::chart_metadata();
-    assert_eq!(facet_fields.context, "netdata.netflow.facet_fields");
-    assert_eq!(facet_fields.units, "fields");
-
-    let tier_index_entries = TierIndexEntryMetrics::chart_metadata();
-    assert_eq!(
-        tier_index_entries.context,
-        "netdata.netflow.tier_index_entries"
-    );
-    assert_eq!(tier_index_entries.units, "entries");
-
-    let commit_age = TierCommitAgeMetrics::chart_metadata();
-    assert_eq!(commit_age.context, "netdata.netflow.tier_commit_age");
-    assert_eq!(commit_age.family, "netflow");
-    assert_eq!(commit_age.units, "seconds");
-
-    let commit_duration = TierCommitDurationMetrics::chart_metadata();
-    assert_eq!(
-        commit_duration.context,
-        "netdata.netflow.tier_commit_duration"
-    );
-    assert_eq!(commit_duration.units, "microseconds");
-
-    let commit_batches = TierCommitBatchesMetrics::chart_metadata();
-    assert_eq!(
-        commit_batches.context,
-        "netdata.netflow.tier_commit_batches"
-    );
-    assert_eq!(commit_batches.units, "batches/s");
-
-    let commit_stretched = TierCommitStretchedMetrics::chart_metadata();
-    assert_eq!(
-        commit_stretched.context,
-        "netdata.netflow.tier_commit_stretched"
-    );
-    assert_eq!(commit_stretched.units, "events/s");
+fn zero_snapshot() -> NetflowChartsSnapshot {
+    NetflowChartsSnapshot::collect(
+        &IngestMetrics::default(),
+        (0, 0, 0),
+        TierFlowIndexCardinality::default(),
+        FacetCardinalitySnapshot::default(),
+        MemoryDiagnosticsSample::default(),
+    )
 }
 
 #[test]
-fn memory_byte_charts_are_registered_only_when_enabled() {
-    let (reader, writer) = tokio::io::duplex(64);
-    let mut runtime = PluginRuntime::with_streams("netflow-test", reader, writer);
-    let charts = NetflowCharts::new(&mut runtime, &PluginConfig::default().charts);
+fn memory_charts_are_declared_only_when_enabled() {
+    let disabled = render_netflow_charts(&PluginConfig::default().charts, START + 2);
+    assert!(disabled.contains("CHART netdata.netflow.input_packets "));
+    assert!(!disabled.contains("netdata.netflow.memory_"));
 
-    assert!(!charts.memory_diagnostics_registered_for_test());
-
-    let (reader, writer) = tokio::io::duplex(64);
-    let mut runtime = PluginRuntime::with_streams("netflow-test", reader, writer);
-    let charts = NetflowCharts::new(
-        &mut runtime,
+    // A fractional interval charts at the next whole second.
+    let enabled = render_netflow_charts(
         &ChartsConfig {
             memory_diagnostics: MemoryDiagnosticsConfig {
                 enabled: true,
-                interval: Duration::from_secs(10),
+                interval: Duration::from_millis(1500),
             },
         },
+        START + 2,
+    );
+    assert!(enabled.contains("BEGIN netdata.netflow.memory_resident_bytes 2000000\n"));
+}
+
+/// Sampling runs from the start, but chart text goes out only once `publish`
+/// is cancelled: before that the plugin has not finished its startup.
+#[tokio::test]
+async fn the_sampler_writes_charts_only_after_publication() {
+    use tokio::io::AsyncReadExt;
+
+    let tmp = tempfile::tempdir().expect("create chart sampler tempdir");
+    let (stdout, mut agent) = tokio::io::duplex(1 << 20);
+    let writer = Arc::new(tokio::sync::Mutex::new(
+        netdata_plugin_protocol::MessageWriter::new(stdout),
+    ));
+    let publish = CancellationToken::new();
+    let shutdown = CancellationToken::new();
+    let config = ChartsConfig::default();
+    let sampler = NetflowCharts::new(&config)
+        .expect("the netflow charts are valid")
+        .spawn_sampler(
+            Arc::new(IngestMetrics::default()),
+            Arc::new(RwLock::new(OpenTierState::default())),
+            Arc::new(RwLock::new(TierFlowIndexStore::default())),
+            Arc::new(FacetRuntime::new(tmp.path())),
+            ProcessResidentMappingPaths::new(
+                &tmp.path().join("raw"),
+                &tmp.path().join("1m"),
+                &tmp.path().join("5m"),
+                &tmp.path().join("1h"),
+                &[],
+                &[],
+            ),
+            config,
+            writer,
+            publish.clone(),
+            shutdown.clone(),
+        );
+
+    // At least one sampling pass, unpublished.
+    tokio::time::sleep(Duration::from_millis(1_600)).await;
+    let mut buf = vec![0; 1 << 20];
+    let before = tokio::time::timeout(Duration::from_millis(50), agent.read(&mut buf)).await;
+    assert!(before.is_err(), "chart text before publication");
+
+    // The first sample after publication opens a window; the next closes it.
+    publish.cancel();
+    let read = tokio::time::timeout(Duration::from_secs(10), agent.read(&mut buf))
+        .await
+        .expect("chart text within 10 s of publication")
+        .expect("read the chart text");
+    let text = String::from_utf8_lossy(&buf[..read]);
+    assert!(
+        text.contains("CHART netdata.netflow.input_packets "),
+        "{text}"
     );
 
-    assert!(charts.memory_diagnostics_registered_for_test());
+    shutdown.cancel();
+    sampler.await.expect("the sampler stops on shutdown");
 }
 
 #[test]
@@ -743,4 +685,51 @@ fn chart_sampler_work_helper_refreshes_memory_diagnostics_on_configured_cadence(
         &mut state,
     );
     assert_eq!(third.memory_diagnostics.open_tier_bytes, 8_192);
+}
+
+/// Renders both metric sets: every chart's definition and its first two
+/// windows (a running total's first window has no value, it is the baseline;
+/// the next has an increase of 0), and the memory charts' first window.
+fn render_chart_protocol() -> String {
+    let snapshot = zero_snapshot();
+    let mut text = String::new();
+
+    let operation = OperationCharts::new().expect("the netflow charts are valid");
+    let mut aggregator = Aggregator::new(&operation.set);
+    for now in [START, START + 1] {
+        let mut batch = Batch::new(&operation.set);
+        operation.record(&mut batch.entity(Labels::new()).record(now), &snapshot);
+        aggregator.merge(batch, now);
+    }
+    text += &netdata_plugin_protocol::readable_chart_stream(
+        &aggregator.emit(START + 2, usize::MAX).concat(),
+    );
+
+    let memory = MemoryCharts::new(Duration::from_secs(10)).expect("the memory charts are valid");
+    let mut aggregator = Aggregator::new(&memory.set);
+    let mut batch = Batch::new(&memory.set);
+    memory.record(&mut batch.entity(Labels::new()).record(START), &snapshot);
+    aggregator.merge(batch, START);
+    text += &netdata_plugin_protocol::readable_chart_stream(
+        &aggregator.emit(START + 10, usize::MAX).concat(),
+    );
+
+    text
+}
+
+/// Pins the exact chart protocol netflow emits, so changes in
+/// `netdata-plugin-metrics` cannot alter it unnoticed. Regenerate with
+/// `NETFLOW_CHART_GOLDEN_WRITE=1` only for an intended netflow change.
+#[test]
+fn chart_protocol_output_is_pinned() {
+    let golden = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/charts/testdata/chart_protocol.golden"
+    );
+    let actual = render_chart_protocol();
+    if std::env::var_os("NETFLOW_CHART_GOLDEN_WRITE").is_some() {
+        std::fs::write(golden, &actual).expect("write chart protocol golden file");
+    }
+    let expected = std::fs::read_to_string(golden).expect("read chart protocol golden file");
+    assert_eq!(actual, expected);
 }

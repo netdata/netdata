@@ -5,21 +5,26 @@
 //! workers (cleaner, uploader), the shared chunk cache and upload-retry
 //! queue, the function-response funnel, and the `select!` run-loop that
 //! dispatches every event. Per-signal state — tenant registries, lifecycle
-//! config, the seal/index and catalog-builder workers, and the query
+//! config, the indexer and catalog-builder workers, and the query
 //! handler — lives in a [`Pipeline`] per signal (today logs + traces); the
 //! wire `pipeline_id` is decoded to a `Signal` at each boundary, after
 //! which routing is total. Adding a signal means adding a `Pipeline` (and
-//! widening `PerSignal`), not reworking the shell.
+//! widening `PerSignal`), not reworking the shell. One exception: the
+//! traces chunk indexer (`traces_chunk_indexer`) is traces-only state on
+//! the shell; it shares the traces WAL prefixes with the traces pipeline,
+//! and the ingestor and indexer handlers reach it by matching
+//! `Signal::Traces`.
 //!
 //! Routing:
 //! - writer events → `Signal::try_from(msg.event.pipeline_id())` →
-//!   `pipelines[signal]`, after the per-signal frame-seq gap-check;
+//!   `pipelines[signal]`;
 //! - shared-worker responses → the pipeline whose inline `pipeline_id` they carry;
 //! - per-pipeline worker responses → funneled into one merged channel, tagged
 //!   with the owning `Signal` by a forwarder;
 //! - function calls → the pipeline whose declared function name matches.
 
 mod catalog_builder;
+mod chunk_indexer;
 mod cleaner;
 mod indexer;
 mod ingestor;
@@ -28,18 +33,22 @@ mod retention;
 mod rpc;
 mod traces_pipeline;
 mod uploader;
+mod wal_prefix;
 
 use file_lifecycle::Pipeline;
 pub(crate) use rpc::OtelLogsHandler;
+/// The traces fixtures, for the crate's tests that need real WAL files.
+#[cfg(test)]
+pub(crate) use rpc::traces_fixtures;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Context;
-use bridge::config::{LifecycleConfig, RemoteStorageConfig};
-use bridge::signals::Signal;
-use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::Connection;
+use otel_bridge::config::{LifecycleConfig, RemoteStorageConfig};
+use otel_bridge::signals::Signal;
+use otel_bridge::{LedgerRequest, LedgerResponse};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -63,7 +72,7 @@ const UPLOAD_CONCURRENCY: usize = 8;
 
 /// A value held once per signal. The signal axis is a closed enum, so a fixed
 /// pair (not a `HashMap<u16, _>`) is the total, exhaustive container: every signal
-/// is always present and `get`/`get_mut` cannot miss. The only place an out-of-set
+/// is always present and `get` cannot miss. The only place an out-of-set
 /// id can appear is decoding a raw `pipeline_id` off the wire/disk, which is a
 /// `Signal::try_from` at that boundary — after which routing is total.
 struct PerSignal<T> {
@@ -76,13 +85,6 @@ impl<T> PerSignal<T> {
         match signal {
             Signal::Logs => &self.logs,
             Signal::Traces => &self.traces,
-        }
-    }
-
-    fn get_mut(&mut self, signal: Signal) -> &mut T {
-        match signal {
-            Signal::Logs => &mut self.logs,
-            Signal::Traces => &mut self.traces,
         }
     }
 
@@ -106,21 +108,25 @@ pub struct Ledger {
     /// Every send site is gated on storage being enabled, so a `None` uploader
     /// is never asked to upload. Its responses carry the owning `pipeline_id`.
     uploader: Option<ComponentHandle<UploaderRequest, UploaderResponse>>,
-    /// Re-issue queue for failed uploads, drained by `retry_timer`. Shared
+    /// Re-issue queue for failed uploads, drained by `periodic_timer`. Shared
     /// across pipelines (the uploader is shared); keyed by seq/remote-key, both
     /// globally unique, so no per-pipeline partitioning is needed.
     upload_retry: file_lifecycle::upload_retry::UploadRetry,
-    /// Fires every 30s to re-drive `upload_retry` (due entries only).
-    retry_timer: tokio::time::Interval,
+    /// Fires every 30s: re-drives `upload_retry` (due entries only), and
+    /// runs retention, so a tenant that gets no new data still loses the
+    /// files that grow past their age.
+    periodic_timer: tokio::time::Interval,
     /// Query-time chunk SFSTs of active WALs; shared across pipelines (one
     /// global byte budget), keyed by `(seq, chunk index)`. A WAL's chunks are
     /// dropped when its authoritative SFST registers (or the WAL proves empty).
     chunk_cache: Arc<ChunkCache>,
-    /// Per-signal frame-sequence gap-check. The single writer process feeds every
-    /// signal over one connection, but assigns a separate monotonic `frame_seq`
-    /// per signal, so the next-expected seq is tracked per signal — a gap is then a
-    /// real lost event for that signal, not inter-signal interleaving.
-    expected_frame_seq: PerSignal<u64>,
+    /// The totals of the local index files that the periodic retention pass
+    /// takes, for the storage charts.
+    storage_totals: Arc<crate::storage_charts::StorageTotals>,
+    /// Indexes the traces WALs' chunks as the writer syncs, so traces
+    /// queries rarely index one; fed each traces `Synced` event, told to
+    /// forget a WAL when its chunks drop.
+    traces_chunk_indexer: chunk_indexer::ChunkIndexer,
     pub(crate) cancel: CancellationToken,
 
     /// Sender side of the outbound funnel. Spawned function-handler
@@ -153,9 +159,10 @@ impl Ledger {
     /// per-pipeline workers → per-tenant recovery → handler) → `Ready` →
     /// accept the ingestor writer connection. `Ready` is pinned between pipeline
     /// construction (which sets up the handlers) and the ingestor accept: the
-    /// supervisor configures workers sequentially, so the ingestor (which the
-    /// ledger then waits for on `writer_socket_path`) can't start until the
-    /// supervisor has seen Ready — moving Ready any later deadlocks. Ready here
+    /// supervisor configures workers sequentially (`otel_bridge`, "Handshake
+    /// protocol"), so the ingestor (which the ledger then waits for on
+    /// `writer_socket_path`) can't start until the supervisor has seen Ready
+    /// — moving Ready any later deadlocks every start. Ready here
     /// is a report to the supervisor, not yet an advertisement: the supervisor
     /// forwards these declarations to the agent only after the ingestor has
     /// bound its gRPC endpoint (bind before declare), so a failure before Ready
@@ -272,8 +279,26 @@ impl Ledger {
         // pressure — so re-evaluate it if either signal's query load grows.
         let chunk_cache = Arc::new(ChunkCache::new(CHUNK_CACHE_BYTES));
 
+        // Traces chunk boundaries, kept current across queries, and the
+        // chunk indexer that indexes new chunks as the writer syncs (traces
+        // only: logs have no per-keystroke query path, and indexing ahead
+        // chunks nobody queries spends CPU and the shared cache).
+        let traces_prefixes = Arc::new(wal_prefix::WalPrefixes::new(
+            traces_pipeline::TRACES_CHUNK_MIN_ENTRIES,
+        ));
+        let traces_chunk_indexer = chunk_indexer::ChunkIndexer::spawn(
+            Arc::clone(&traces_prefixes),
+            ng_index::index_traces_range,
+            Arc::clone(&chunk_cache),
+            cancel.child_token(),
+        );
+
         let (pipeline_tx, pipeline_rx) = mpsc::unbounded_channel();
         let (outbound_tx, outbound_rx) = mpsc::unbounded_channel();
+
+        // One for both signals: its limit covers every indexing operation of
+        // the ledger.
+        let indexing_operations = crate::indexer::IndexingOperations::new()?;
 
         // Build the logs pipeline: per-signal disk/registries/workers + recovery
         // (using the shared cleaner/uploader/storage). Adding a further signal
@@ -290,6 +315,7 @@ impl Ledger {
             storage.as_ref(),
             read_cache.as_ref(),
             chunk_cache.clone(),
+            &indexing_operations,
             &pipeline_tx,
         )
         .await?;
@@ -297,8 +323,8 @@ impl Ledger {
         // The traces pipeline: shares the same cleaner/uploader/storage, the
         // download cache and the chunk cache (seqs are process-global, so
         // cache keys never collide across signals) but has its own
-        // `{base}/traces/...` dirs, the traces seal
-        // (`ng_index::build_sfst_traces_file`), and the `otel-traces`
+        // `{base}/traces/...` dirs, traces indexing
+        // (`ng_index::index_traces_file`), and the `otel-traces`
         // Function handler.
         let traces = traces_pipeline::build_traces_pipeline(
             Signal::Traces,
@@ -312,6 +338,8 @@ impl Ledger {
             storage.as_ref(),
             read_cache.as_ref(),
             chunk_cache.clone(),
+            Arc::clone(&traces_prefixes),
+            &indexing_operations,
             &pipeline_tx,
         )
         .await?;
@@ -343,14 +371,37 @@ impl Ledger {
             .context("failed to signal ready to supervisor")?;
         tracing::info!("signaled ready to supervisor");
 
+        // Started after the start-up work, so the indexing operations of
+        // the start-up backlog are not charted. The handshake does not
+        // depend on this: chart data reaches the supervisor only from
+        // `Ledger::run`.
+        let indexing_charts = crate::indexing_charts::IndexingCharts::new()
+            .context("failed to declare the indexing charts")?;
+        tokio::spawn(crate::indexing_charts::run(
+            indexing_charts,
+            indexing_operations.clone(),
+            outbound_tx.clone(),
+            cancel.child_token(),
+        ));
+        let storage_totals = Arc::new(crate::storage_charts::StorageTotals::default());
+        let storage_charts = crate::storage_charts::StorageCharts::new(uploader.is_some())
+            .context("failed to declare the storage charts")?;
+        tokio::spawn(crate::storage_charts::run(
+            storage_charts,
+            Arc::clone(&storage_totals),
+            outbound_tx.clone(),
+            cancel.child_token(),
+        ));
+
         let ingestor = file_lifecycle::ipc::accept_writer(writer_socket_path).await?;
         tracing::info!("ingestor connected");
 
-        // Drives the upload-retry queue. Skip missed ticks (don't fire a burst
-        // of catch-up ticks after a slow run-loop turn); one drain per period is
-        // enough since each due item carries its own backoff.
-        let mut retry_timer = tokio::time::interval(std::time::Duration::from_secs(30));
-        retry_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // Drives the upload-retry queue and the periodic retention pass. Skip
+        // missed ticks (don't fire a burst of catch-up ticks after a slow
+        // run-loop turn); one turn per period is enough: each due upload
+        // carries its own backoff, and a retention pass looks at everything.
+        let mut periodic_timer = tokio::time::interval(std::time::Duration::from_secs(30));
+        periodic_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
         Ok(Self {
             supervisor,
@@ -358,11 +409,10 @@ impl Ledger {
             cleaner,
             uploader,
             upload_retry: file_lifecycle::upload_retry::UploadRetry::default(),
-            retry_timer,
+            periodic_timer,
             chunk_cache,
-            // Each signal's frame_seq stream starts at 1 (the ingestor's first
-            // assigned frame_seq), so the gap-check's next-expected seeds to 1.
-            expected_frame_seq: PerSignal { logs: 1, traces: 1 },
+            storage_totals,
+            traces_chunk_indexer,
             cancel,
             outbound_tx,
             outbound_rx,
@@ -381,9 +431,17 @@ impl Ledger {
         // that teardown and may never be recorded.
         loop {
             let event = tokio::select! {
-                msg = self.ingestor.recv() => LedgerEvent::WalMsg(msg.inspect_err(
-                    |e| tracing::error!("writer-socket recv failed: {e}"),
-                )?),
+                msg = self.ingestor.recv() => match msg {
+                    Ok(msg) => LedgerEvent::WalMsg(msg),
+                    Err(ferryboat::Error::ConnectionClosed) => LedgerEvent::WriterLinkClosed,
+                    // An ingestor that died in the middle of a message ends
+                    // the link with an I/O error, not with a close: it takes
+                    // this arm.
+                    Err(e) => {
+                        tracing::error!("writer-socket recv failed: {e}");
+                        return Err(e);
+                    }
+                },
                 // Merged per-pipeline worker responses (indexer + catalog
                 // builder of every pipeline), tagged with the owning `Signal`.
                 resp = self.pipeline_rx.recv() => match resp {
@@ -420,11 +478,21 @@ impl Ledger {
                     |e| tracing::error!("supervisor recv failed: {e}"),
                 )?),
                 Some(out) = self.outbound_rx.recv() => LedgerEvent::OutboundResp(out),
-                _ = self.retry_timer.tick() => LedgerEvent::RetryTick,
+                _ = self.periodic_timer.tick() => LedgerEvent::PeriodicTick,
             };
 
             match event {
                 LedgerEvent::WalMsg(msg) => self.handle_ingestor_msg(msg).await,
+                LedgerEvent::WriterLinkClosed => {
+                    // The ingestor stopped, or it is gone: either way the
+                    // supervisor stops the plugin, and no file event comes any
+                    // more. On a stop its `Shutdown` to this ledger can come
+                    // after this, so the run ends here as it does there, and
+                    // which of the two comes first changes nothing.
+                    tracing::info!("the ingestor closed its event link; leaving");
+                    self.flush_catalogs_on_shutdown().await;
+                    return Ok(());
+                }
                 LedgerEvent::PipelineResp(signal, resp) => match resp {
                     PipelineResp::Indexer(r) => self.handle_indexer_resp(signal, r).await,
                     PipelineResp::CatalogBuilder(r) => {
@@ -446,9 +514,9 @@ impl Ledger {
                         tracing::error!("supervisor request handling failed: {e}")
                     })?;
                     if exit {
-                        // Clean shutdown (the only exit=true path): persist
-                        // in-flight catalog accumulators locally before the
-                        // connection drops and the supervisor reaps workers.
+                        // Clean shutdown: persist in-flight catalog
+                        // accumulators locally before the connection drops
+                        // and the supervisor reaps workers.
                         self.flush_catalogs_on_shutdown().await;
                         return Ok(());
                     }
@@ -458,7 +526,20 @@ impl Ledger {
                         tracing::error!("failed to forward response to supervisor: {e}")
                     })?;
                 }
-                LedgerEvent::RetryTick => self.handle_retry_tick().await,
+                LedgerEvent::PeriodicTick => {
+                    self.handle_retry_tick().await;
+                    self.evaluate_retention_of_all_tenants().await;
+                }
+            }
+
+            // For the upload charts: an event can have sent an upload, taken
+            // an answer, or queued a retry. A retry that is with the
+            // uploader again is in its `pending`, not among those that wait.
+            if let Some(uploader) = &self.uploader {
+                self.storage_totals.set_uploads_now(
+                    uploader.pending() as u64,
+                    self.upload_retry.waiting() as u64,
+                );
             }
         }
     }
@@ -470,18 +551,17 @@ mod tests {
 
     /// `PerSignal::iter()` backs the declaration scan and function-name dispatch,
     /// so pin that it yields every signal (in the fixed logs→traces order) and
-    /// that `get`/`get_mut` address the matching slot. Unlike the `get`/`get_mut`
-    /// matches, `iter()`'s hand-written array is not compiler-checked against the
+    /// that `get` addresses the matching slot. Unlike the `get`
+    /// match, `iter()`'s hand-written array is not compiler-checked against the
     /// `Signal` variant set, so this test is the guard if a variant is added.
     #[test]
     fn per_signal_get_and_iter_cover_every_signal() {
-        let mut ps = PerSignal {
+        let ps = PerSignal {
             logs: 1u8,
             traces: 2u8,
         };
         assert_eq!(*ps.get(Signal::Logs), 1);
         assert_eq!(*ps.get(Signal::Traces), 2);
-        *ps.get_mut(Signal::Traces) = 9;
-        assert_eq!(ps.iter().copied().collect::<Vec<_>>(), vec![1, 9]);
+        assert_eq!(ps.iter().copied().collect::<Vec<_>>(), vec![1, 2]);
     }
 }

@@ -1,18 +1,22 @@
-//! `sfsq-cli trace` / `attributes` / `attribute-values` / `search` — the
+//! `sfsq-cli trace` / `suggest` / `overview` / `search` / `explore` — the
 //! `sfsq::traces` engine from the terminal, without a running agent. Each
 //! subcommand takes an explicit file list (`--sfst` sealed files, `--wal`
 //! traces WALs) instead of the logs front door's directory discovery;
-//! `trace` reconstructs one trace through the shared combiner,
-//! `attributes` / `attribute-values` enumerate the key vocabulary off the
-//! dictionaries, `search` filters whole traces.
+//! `trace` reconstructs one trace through the shared combiner, `suggest`
+//! lists keys, or one key's values, matching a term (and prints its time,
+//! for measurements), `overview`
+//! builds the list's heatmap grid (for measurements), `search` filters
+//! whole traces, `explore` serves the span view (spans per bucket and a
+//! page of spans). `search`, `overview`, `explore` and `trace` take the
+//! search bar's tokens ([`TokenArgs`]); `trace` marks the spans they match.
 //!
 //! WAL inputs are served as tail scans over the file's full frame range —
 //! right for shut-down or recovered WALs (the dev case); an actively
 //! written WAL should be queried through a live agent instead.
 //!
-//! The owner/builtin spellings here (`--owner span`, `--key status`)
-//! are this DEV TOOL's rendering of the engine's typed vocabulary — not
-//! a wire contract; wire adapters define their own.
+//! Keys are the engine's vocabulary — OTLP field paths such as
+//! `resource.attributes.service.name` or `status.code`
+//! (`sfsq::traces::parse_key`) — the same keys the agent's wire takes.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -22,10 +26,11 @@ use anyhow::{Context, Result, bail};
 use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
-    AttributeKey, AttributeNamesQuery, AttributeOwner, AttributeValuesQuery, BuiltinField,
-    CompareOp, Condition, Predicate, PredicateTarget, PredicateValue, QueryStatus, SearchQuery,
-    SearchSources, SourceId, TimeWindow, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail,
-    WalCoverage, attribute_names, attribute_values, search, trace_by_id,
+    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DEFAULT_ROWS_LIMIT,
+    ExploreQuery, KeyError, OverviewQuery, Predicate, PredicateTarget, PredicateValue, QueryStatus,
+    RowsSpec, SearchQuery, SearchSources, SourceId, SuggestQuery, TimeWindow, Token, TokenQuery,
+    TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage, explore, overview,
+    search, starts_with_pattern, suggest, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -46,6 +51,9 @@ pub struct TraceArgs {
     /// Span cap override (default 65,536); 0 is rejected.
     #[arg(long)]
     pub span_cap: Option<usize>,
+
+    #[command(flatten)]
+    pub tokens: TokenArgs,
 }
 
 /// Parse a 32-hex-char trace id.
@@ -151,7 +159,9 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     let trace_id = parse_trace_id(&args.trace_id)?;
     let sources = build_sources(&args.sfsts, &args.wals)?;
 
-    let mut query = TraceQuery::new(trace_id);
+    let highlight = args.tokens.tokens(Vec::new())?;
+    let highlighting = !highlight.tokens.is_empty();
+    let mut query = TraceQuery::new(trace_id).highlight(highlight);
     if let Some(cap) = args.span_cap {
         query = query.span_cap(cap);
     }
@@ -174,13 +184,22 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     let typed = data.field_kinds.fields.len()
         + data.field_kinds.event_attributes.len()
         + data.field_kinds.link_attributes.len();
+    let matched_count = if highlighting {
+        format!(", {} matched", data.matched.len())
+    } else {
+        String::new()
+    };
     writeln!(
         out,
-        "trace {}: {} span(s), {} root(s), status {status}, {typed} typed field(s)",
+        "trace {}: {} span(s), {} root(s), status {status}, {typed} typed field(s){matched_count}",
         args.trace_id,
         t.spans.len(),
         t.roots.len(),
     )?;
+    let mut matched = vec![false; t.spans.len()];
+    for &i in &data.matched {
+        matched[i as usize] = true;
+    }
 
     // Iterative revisit-guarded DFS (cycle edges survive in `children`).
     // The summary root is computed ONCE (it scans the span list).
@@ -201,7 +220,7 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
         let summary_root = (summary_root_idx == Some(i)).then_some(" [summary root]");
         writeln!(
             out,
-            "{:indent$}{} kind={} start={} dur={}ns ev={} lk={}{}",
+            "{:indent$}{} kind={} start={} dur={}ns ev={} lk={}{}{}",
             "",
             name,
             s.kind,
@@ -210,6 +229,7 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
             s.events.len(),
             s.links.len(),
             summary_root.unwrap_or(""),
+            if matched[i] { " [match]" } else { "" },
             indent = depth * 2,
         )?;
         for &c in t.children[i].iter().rev() {
@@ -219,109 +239,20 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
     Ok(())
 }
 
-// ── Key enumeration (attributes / attribute-values) ───────────────────
+// ── Keys ───────────────────────────────────────────────────────────────
 
-/// An `AttributeOwner` as a CLI word (this tool's rendering, not a
-/// wire contract). `Any` is deliberately absent: it exists for
-/// predicates (`--where .key=...`), not enumeration.
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
-pub enum OwnerArg {
-    Resource,
-    Span,
-    Instrumentation,
-    Event,
-    Link,
-    Builtin,
-}
-
-impl From<OwnerArg> for AttributeOwner {
-    fn from(s: OwnerArg) -> AttributeOwner {
-        match s {
-            OwnerArg::Resource => AttributeOwner::Resource,
-            OwnerArg::Span => AttributeOwner::Span,
-            OwnerArg::Instrumentation => AttributeOwner::Instrumentation,
-            OwnerArg::Event => AttributeOwner::Event,
-            OwnerArg::Link => AttributeOwner::Link,
-            OwnerArg::Builtin => AttributeOwner::Builtin,
+/// Parse a key given to `flag` (the engine's vocabulary); the error
+/// names the key forms.
+fn parse_key(flag: &str, key: &str) -> Result<(AttributeOwner, AttributeKey)> {
+    sfsq::traces::parse_key(key).map_err(|e| match e {
+        KeyError::EmptyAttribute => {
+            anyhow::anyhow!("{flag} key {key:?} has an empty attribute key")
         }
-    }
-}
-
-/// The CLI spelling of each builtin field (kebab-case), used by
-/// `--key` under `--owner builtin`, by `--where` builtin targets, and
-/// by the output rendering. Must stay 1:1 with the engine's
-/// `BuiltinField::ALL` — pinned by the `every_builtin_has_a_cli_word`
-/// test below.
-const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
-    ("name", BuiltinField::Name),
-    ("kind", BuiltinField::Kind),
-    ("status", BuiltinField::Status),
-    ("status-message", BuiltinField::StatusMessage),
-    ("instrumentation-name", BuiltinField::InstrumentationName),
-    (
-        "instrumentation-version",
-        BuiltinField::InstrumentationVersion,
-    ),
-    ("event-name", BuiltinField::EventName),
-    ("duration", BuiltinField::Duration),
-    ("span-id", BuiltinField::SpanId),
-    ("parent-span-id", BuiltinField::ParentSpanId),
-    ("trace-id", BuiltinField::TraceId),
-    ("link-span-id", BuiltinField::LinkSpanId),
-    ("link-trace-id", BuiltinField::LinkTraceId),
-    ("event-time-since-start", BuiltinField::EventTimeSinceStart),
-    ("root-name", BuiltinField::RootName),
-    ("root-service-name", BuiltinField::RootServiceName),
-    ("trace-duration", BuiltinField::TraceDuration),
-];
-
-fn owner_word(owner: AttributeOwner) -> &'static str {
-    match owner {
-        AttributeOwner::Resource => "resource",
-        AttributeOwner::Span => "span",
-        AttributeOwner::Instrumentation => "instrumentation",
-        AttributeOwner::Event => "event",
-        AttributeOwner::Link => "link",
-        AttributeOwner::Builtin => "builtin",
-        // Never enumerated (the engine rejects it); rendered only if a
-        // future path prints a predicate target through this table.
-        AttributeOwner::Any => "any",
-    }
-}
-
-fn key_word(key: &AttributeKey) -> String {
-    match key {
-        AttributeKey::Attribute(a) => a.clone(),
-        AttributeKey::Builtin(i) => BUILTIN_WORDS
-            .iter()
-            .find(|(_, v)| v == i)
-            .map(|(w, _)| (*w).to_string())
-            .expect("every builtin field has a CLI word"),
-    }
-}
-
-/// Parse `--key` against the owner: attribute owners take the bare key
-/// verbatim; the Builtin owner takes one of the kebab-case words.
-fn parse_key(owner: AttributeOwner, key: &str) -> Result<AttributeKey> {
-    if owner != AttributeOwner::Builtin {
-        // Same always-a-typo class as the `--where` guards: an empty
-        // key enumerates nothing, silently.
-        if key.is_empty() {
-            bail!("--key must not be empty");
-        }
-        return Ok(AttributeKey::Attribute(key.to_string()));
-    }
-    BUILTIN_WORDS
-        .iter()
-        .find(|(w, _)| *w == key)
-        .map(|(_, i)| AttributeKey::Builtin(*i))
-        .ok_or_else(|| {
-            let words: Vec<&str> = BUILTIN_WORDS.iter().map(|(w, _)| *w).collect();
-            anyhow::anyhow!(
-                "unknown builtin field {key:?}; one of: {}",
-                words.join(", ")
-            )
-        })
+        KeyError::Unknown => anyhow::anyhow!(
+            "unknown {flag} key {key:?}: use {}",
+            sfsq::traces::key_forms()
+        ),
+    })
 }
 
 /// Both-or-neither `--start-ns`/`--end-ns` into an engine window (the
@@ -341,9 +272,13 @@ fn status_word(status: &QueryStatus) -> String {
     }
 }
 
-/// Enumerate attribute and builtin-field keys across sealed SFSTs and traces WALs.
+// ── Suggest ────────────────────────────────────────────────────────────
+
+/// Suggest keys, or one key's values, matching a term — the search
+/// bar's suggestions, newest data first, bounded in items, sources and
+/// time — or every key of a tier.
 #[derive(Debug, clap::Args)]
-pub struct AttributesArgs {
+pub struct SuggestArgs {
     /// A sealed traces SFST file. Repeatable.
     #[arg(long = "sfst")]
     pub sfsts: Vec<PathBuf>,
@@ -352,13 +287,36 @@ pub struct AttributesArgs {
     #[arg(long = "wal")]
     pub wals: Vec<PathBuf>,
 
-    /// Enumerate only one owner.
-    #[arg(long, value_enum)]
-    pub owner: Option<OwnerArg>,
-
-    /// Cap the key list (exact truncation flag); 0 is rejected.
+    /// Suggest this key's values (`attributes.http.method`, `status.code`,
+    /// ...); without it, suggest keys.
     #[arg(long)]
-    pub max_keys: Option<usize>,
+    pub key: Option<String>,
+
+    /// The typed text; empty matches everything.
+    #[arg(long, default_value = "")]
+    pub term: String,
+
+    /// Suggest only the keys of this tier, every one: no item cap and no
+    /// stop at files that add nothing, unless --max-items or
+    /// --stale-files sets one. Not with --key.
+    #[arg(long, value_enum, conflicts_with = "key")]
+    pub tier: Option<TierArg>,
+
+    /// Cap the suggestions (exact truncation flag); 0 is rejected.
+    #[arg(long)]
+    pub max_items: Option<usize>,
+
+    /// Stop after this many sources that carry the key; 0 is rejected.
+    #[arg(long)]
+    pub max_files: Option<usize>,
+
+    /// Stop after this many consecutive sources that add nothing.
+    #[arg(long)]
+    pub stale_files: Option<usize>,
+
+    /// Stop walking sources after this many milliseconds.
+    #[arg(long)]
+    pub deadline_ms: Option<u64>,
 
     /// Window start, nanoseconds since the epoch (half-open; file-granular
     /// pruning). Requires --end-ns.
@@ -371,40 +329,228 @@ pub struct AttributesArgs {
     pub end_ns: Option<i64>,
 }
 
-pub fn run_attributes(args: &AttributesArgs, out: &mut dyn std::io::Write) -> Result<()> {
-    let sources = build_sources(&args.sfsts, &args.wals)?;
-    let mut query = AttributeNamesQuery::new();
-    if let Some(owner) = args.owner {
-        query = query.owner(owner.into());
+/// A key's cardinality tier, for `suggest --tier`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum TierArg {
+    Low,
+    Mid,
+    High,
+}
+
+impl From<TierArg> for sfst::FieldTier {
+    fn from(tier: TierArg) -> Self {
+        match tier {
+            TierArg::Low => sfst::FieldTier::Low,
+            TierArg::Mid => sfst::FieldTier::Mid,
+            TierArg::High => sfst::FieldTier::High,
+        }
     }
-    if let Some(max) = args.max_keys {
-        query = query.max_keys(max);
+}
+
+pub fn run_suggest(args: &SuggestArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let started = std::time::Instant::now();
+    let mut query = match (&args.key, args.tier) {
+        (Some(key), _) => {
+            let (owner, key) = parse_key("--key", key)?;
+            SuggestQuery::values(owner, key)
+        }
+        (None, Some(tier)) => SuggestQuery::keys_of_tier(tier.into()),
+        (None, None) => SuggestQuery::keys(),
+    };
+    query = query.term(args.term.clone());
+    if let Some(max) = args.max_items {
+        query = query.max_items(max);
+    }
+    if let Some(max) = args.max_files {
+        query = query.max_files(max);
+    }
+    if let Some(n) = args.stale_files {
+        query = query.stale_files(n);
+    }
+    if let Some(ms) = args.deadline_ms {
+        query = query.deadline(started + std::time::Duration::from_millis(ms));
     }
     if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
         query = query.window(window);
     }
-    let data = attribute_names(
+    let sources = build_sources(&args.sfsts, &args.wals)?;
+    let data = suggest(
         sources,
         query,
         CancellationToken::new(),
         Arc::new(AtomicUsize::new(0)),
     )?;
-    for (owner, key) in &data.keys {
-        writeln!(out, "{} {}", owner_word(*owner), key_word(key))?;
+    let elapsed = started.elapsed();
+    for s in &data.items {
+        let tier = s.tier.map(|t| format!(" tier={t:?}")).unwrap_or_default();
+        let cut = if s.truncated { " truncated" } else { "" };
+        let kinds = if s.kinds.is_empty() {
+            String::new()
+        } else {
+            let list: Vec<String> = s.kinds.iter().map(|k| format!("{k:?}")).collect();
+            format!(" kinds={}", list.join("+"))
+        };
+        writeln!(out, "{} match={:?}{tier}{cut}{kinds}", s.text, s.class)?;
     }
+    let complete = data
+        .complete_after
+        .map(|t| format!(", complete after {t}"))
+        .unwrap_or_default();
     writeln!(
         out,
-        "{} key(s), truncated {}, status {}",
-        data.keys.len(),
+        "{} suggestion(s), truncated {}, status {}{complete}, {:.1} ms",
+        data.items.len(),
         data.truncated,
         status_word(&data.status),
+        elapsed.as_secs_f64() * 1000.0,
     )?;
     Ok(())
 }
 
-/// Enumerate one key's values across sealed SFSTs and traces WALs.
+// ── Search-bar tokens (search / overview / trace) ─────────────────────
+
+/// The search bar's tokens as flags. Tokens AND at trace level: each may
+/// match a different span of the trace. This is the dev tool's rendering
+/// of the engine's [`TokenQuery`], not a wire grammar; values are engine
+/// storage labels.
+#[derive(Debug, Default, clap::Args)]
+pub struct TokenArgs {
+    /// A condition, repeatable: one span must satisfy every `--where`
+    /// together (trace-level targets are tokens of their own). COND is
+    /// `KEY<op>VALUE`. KEY is an OTLP field path:
+    /// `resource.attributes.<key>`, `scope.attributes.<key>`,
+    /// `attributes.<key>`, `events.attributes.<key>`,
+    /// `links.attributes.<key>`, or a field such as `name`, `kind`,
+    /// `status.code`, `duration`. OPS: `=`, `!=` (text), `=~`, `!~` (regex
+    /// anchored to the whole value), `^=`, `!^=` (starts with), `>`, `<`,
+    /// `>=`, `<=` (numeric).
+    #[arg(long = "where", value_name = "COND")]
+    pub conditions: Vec<String>,
+
+    /// A condition as a token of its own, repeatable: some span
+    /// satisfies it. Same grammar as `--where`.
+    #[arg(long = "and", value_name = "COND")]
+    pub and: Vec<String>,
+
+    /// A condition no span of the trace satisfies (NOT EXISTS),
+    /// repeatable. Same grammar as `--where`.
+    #[arg(long = "not", value_name = "COND")]
+    pub not: Vec<String>,
+
+    /// Free text, repeatable, one token per term: a case-insensitive
+    /// substring of a span's name, status message, event names or any
+    /// attribute value (never of a key); at least 3 characters.
+    #[arg(long = "text", value_name = "TERM", allow_hyphen_values = true)]
+    pub text: Vec<String>,
+}
+
+impl TokenArgs {
+    /// The query: the `--where` conditions plus `group` (the command's
+    /// own same-span conditions) as one flat predicate, then one token
+    /// per `--and`, `--not` and `--text`.
+    fn tokens(&self, mut group: Vec<Condition>) -> Result<TokenQuery> {
+        let mut conditions = self
+            .conditions
+            .iter()
+            .map(|spec| parse_condition("--where", spec))
+            .collect::<Result<Vec<_>>>()?;
+        conditions.append(&mut group);
+        let mut query = TokenQuery::from(Predicate { conditions });
+        let alone = |condition| Predicate {
+            conditions: vec![condition],
+        };
+        for spec in &self.and {
+            let condition = parse_condition("--and", spec)?;
+            query.tokens.push(Token::positive(alone(condition)));
+        }
+        for spec in &self.not {
+            let condition = parse_condition("--not", spec)?;
+            query.tokens.push(Token::negated(alone(condition)));
+        }
+        for term in &self.text {
+            query.tokens.push(Token::positive(alone(Condition {
+                target: PredicateTarget::FreeText,
+                op: CompareOp::Contains,
+                values: vec![PredicateValue::Text(term.clone())],
+            })));
+        }
+        Ok(query)
+    }
+}
+
+/// Parse one condition given to `flag`: `KEY <op> VALUE`. The op
+/// match is leftmost, longest-symbol first, so `>=` never parses as `>`
+/// with a `=value`, `=~` never as `=` with a `~value`, and `!^=` never as
+/// `^=` after a target ending in `!`. Ordering ops take numeric values;
+/// the others take text, and `^=`/`!^=` ("starts with") become the
+/// anchored regex of the escaped value.
+fn parse_condition(flag: &str, spec: &str) -> Result<Condition> {
+    // (symbol, op, starts with)
+    const OPS: [(&str, CompareOp, bool); 10] = [
+        ("!^=", CompareOp::NotRegex, true),
+        ("^=", CompareOp::Regex, true),
+        ("=~", CompareOp::Regex, false),
+        ("!~", CompareOp::NotRegex, false),
+        ("!=", CompareOp::NotEq, false),
+        (">=", CompareOp::Gte, false),
+        ("<=", CompareOp::Lte, false),
+        (">", CompareOp::Gt, false),
+        ("<", CompareOp::Lt, false),
+        ("=", CompareOp::Eq, false),
+    ];
+    let (target_word, (op, starts_with), value) = OPS
+        .iter()
+        .filter_map(|&(sym, op, starts_with)| {
+            spec.find(sym).map(|at| (at, sym.len(), (op, starts_with)))
+        })
+        .min_by_key(|&(at, len, _)| (at, std::cmp::Reverse(len)))
+        .map(|(at, len, op)| (&spec[..at], op, &spec[at + len..]))
+        .ok_or_else(|| anyhow::anyhow!("{flag} must be KEY<op>VALUE, got {spec:?}"))?;
+    // An empty value is a structurally valid predicate that matches no
+    // well-formed dictionary entry — in this dev tool it is always a
+    // typo, so fail loudly instead of returning a silent empty result.
+    if value.is_empty() {
+        bail!("{flag} {spec:?} has an empty value");
+    }
+    let target = parse_target(flag, target_word.trim())?;
+    let value = if matches!(
+        op,
+        CompareOp::Gt | CompareOp::Lt | CompareOp::Gte | CompareOp::Lte
+    ) {
+        if let Ok(n) = value.parse::<i64>() {
+            PredicateValue::Integer(n)
+        } else if let Ok(f) = value.parse::<f64>() {
+            PredicateValue::Float(f)
+        } else {
+            bail!("{flag} {spec:?}: ordering comparisons take a numeric value");
+        }
+    } else if starts_with {
+        PredicateValue::Text(starts_with_pattern(value))
+    } else {
+        PredicateValue::Text(value.to_string())
+    };
+    Ok(Condition {
+        target,
+        op,
+        values: vec![value],
+    })
+}
+
+/// A condition's target, given to `flag`: a key of the engine's
+/// vocabulary. An attribute prefix with nothing after it would be a
+/// structurally valid predicate that matches no dictionary entry — always
+/// a typo here, so it fails loudly instead of returning an empty result.
+fn parse_target(flag: &str, word: &str) -> Result<PredicateTarget> {
+    let (owner, key) = parse_key(flag, word)?;
+    Ok(PredicateTarget::from_key(owner, key))
+}
+
+// ── Overview ───────────────────────────────────────────────────────────
+
+/// Build the trace-density grid (time bucket × duration bin) — the
+/// list's heatmap — over sealed SFSTs and traces WALs.
 #[derive(Debug, clap::Args)]
-pub struct AttributeValuesArgs {
+pub struct OverviewArgs {
     /// A sealed traces SFST file. Repeatable.
     #[arg(long = "sfst")]
     pub sfsts: Vec<PathBuf>,
@@ -413,63 +559,177 @@ pub struct AttributeValuesArgs {
     #[arg(long = "wal")]
     pub wals: Vec<PathBuf>,
 
-    /// The key's owner.
-    #[arg(long, value_enum)]
-    pub owner: OwnerArg,
-
-    /// The key: the bare attribute name, or (under --owner builtin)
-    /// a builtin-field word such as `status` or `event-name`.
-    #[arg(long)]
-    pub key: String,
-
-    /// Cap the value list (exact truncation flag); 0 is rejected.
-    #[arg(long)]
-    pub max_values: Option<usize>,
-
-    /// Window start, nanoseconds since the epoch (half-open; file-granular
-    /// pruning). Requires --end-ns.
+    /// Grid start, nanoseconds since the epoch.
     #[arg(long, allow_hyphen_values = true)]
-    pub start_ns: Option<i64>,
+    pub start_ns: i64,
 
-    /// Window end, nanoseconds since the epoch (exclusive). Requires
-    /// --start-ns.
+    /// Grid end, nanoseconds since the epoch (exclusive).
     #[arg(long, allow_hyphen_values = true)]
-    pub end_ns: Option<i64>,
+    pub end_ns: i64,
+
+    /// Time buckets across the grid.
+    #[arg(long, default_value_t = 60)]
+    pub buckets: usize,
+
+    /// Count only the traces the tokens match (trace-duration tokens are
+    /// rejected: duration is the grid's own axis).
+    #[command(flatten)]
+    pub tokens: TokenArgs,
 }
 
-pub fn run_attribute_values(
-    args: &AttributeValuesArgs,
-    out: &mut dyn std::io::Write,
-) -> Result<()> {
-    let owner: AttributeOwner = args.owner.into();
-    let key = parse_key(owner, &args.key)?;
+/// `buckets` equal buckets over `[start_ns, end_ns)`. The window must
+/// split evenly: a rounded-up width would count past `end_ns`, and the
+/// commands are the engine's offline oracle.
+fn exact_grid(start_ns: i64, end_ns: i64, buckets: usize) -> Result<sfst::Grid> {
+    if buckets == 0 || end_ns <= start_ns {
+        bail!("--buckets must be positive and --end-ns after --start-ns");
+    }
+    let Some(span) = end_ns.checked_sub(start_ns) else {
+        bail!("--end-ns minus --start-ns overflows");
+    };
+    let count = i64::try_from(buckets)?;
+    if span % count != 0 {
+        bail!(
+            "--end-ns minus --start-ns ({span} ns) does not split into {buckets} equal buckets; \
+             a rounded width would count past --end-ns"
+        );
+    }
+    Ok(sfst::Grid::new(start_ns, span / count, buckets))
+}
+
+pub fn run_overview(args: &OverviewArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let started = std::time::Instant::now();
+    let grid = exact_grid(args.start_ns, args.end_ns, args.buckets)?;
+    let query = OverviewQuery::new(grid).tokens(args.tokens.tokens(Vec::new())?);
     let sources = build_sources(&args.sfsts, &args.wals)?;
-    let mut query = AttributeValuesQuery::new(owner, key);
-    if let Some(max) = args.max_values {
-        query = query.max_values(max);
-    }
-    if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
-        query = query.window(window);
-    }
-    let data = attribute_values(
+    let data = overview(
         sources,
         query,
         CancellationToken::new(),
         Arc::new(AtomicUsize::new(0)),
     )?;
-    for v in &data.values {
-        let kind = v
-            .kind
-            .map(|k| format!("{k:?}"))
-            .unwrap_or_else(|| "none".to_string());
-        writeln!(out, "{} kind={kind}", v.value)?;
+    writeln!(
+        out,
+        "{} trace(s), {} span(s), {} error(s), status {}, {:.1} ms",
+        data.total_traces,
+        data.total_spans,
+        data.total_errors,
+        status_word(&data.status),
+        started.elapsed().as_secs_f64() * 1000.0,
+    )?;
+    Ok(())
+}
+
+// ── Explore ────────────────────────────────────────────────────────────
+
+/// The span view over sealed SFSTs and traces WALs: the spans per time
+/// bucket stacked by a key, and the newest spans, one row per stored span
+/// (the tokens apply per span).
+#[derive(Debug, clap::Args)]
+pub struct ExploreArgs {
+    /// A sealed traces SFST file. Repeatable.
+    #[arg(long = "sfst")]
+    pub sfsts: Vec<PathBuf>,
+
+    /// A flattened traces WAL file, indexed into an image whole. Repeatable.
+    #[arg(long = "wal")]
+    pub wals: Vec<PathBuf>,
+
+    /// Grid start, nanoseconds since the epoch.
+    #[arg(long, allow_hyphen_values = true)]
+    pub start_ns: i64,
+
+    /// Grid end, nanoseconds since the epoch (exclusive).
+    #[arg(long, allow_hyphen_values = true)]
+    pub end_ns: i64,
+
+    /// Time buckets across the grid.
+    #[arg(long, default_value_t = 60)]
+    pub buckets: usize,
+
+    /// The key whose values stack the spans: a key with stored values.
+    #[arg(long, default_value = "status.code")]
+    pub stack: String,
+
+    /// Spans to list, newest first (0 lists none).
+    #[arg(long, default_value_t = DEFAULT_ROWS_LIMIT)]
+    pub limit: usize,
+
+    /// A key each listed span shows, repeatable: a key with stored values.
+    #[arg(long = "column")]
+    pub columns: Vec<String>,
+
+    #[command(flatten)]
+    pub tokens: TokenArgs,
+}
+
+pub fn run_explore(args: &ExploreArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let started = std::time::Instant::now();
+    let grid = exact_grid(args.start_ns, args.end_ns, args.buckets)?;
+    let mut query = ExploreQuery::new(grid)
+        .tokens(args.tokens.tokens(Vec::new())?)
+        .histogram(args.stack.clone());
+    if args.limit > 0 {
+        query = query.rows(RowsSpec {
+            limit: args.limit,
+            before: None,
+            columns: args.columns.clone(),
+        });
+    }
+    let sources = build_sources(&args.sfsts, &args.wals)?;
+    let data = explore(
+        sources,
+        query,
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )?;
+    for row in data.rows.iter().flat_map(|rows| &rows.items) {
+        let fields: Vec<String> = args
+            .columns
+            .iter()
+            .zip(&row.columns)
+            .map(|(key, values)| format!("{key}={}", values.join(",")))
+            .collect();
+        writeln!(
+            out,
+            "{} {} {} dur={}ns {}",
+            row.key.start_ns,
+            row.key.trace_id,
+            row.key.span_id,
+            row.duration_ns,
+            fields.join(" "),
+        )?;
+    }
+    if let Some(h) = &data.histogram {
+        let mut per_value = vec![0u64; h.dimensions.len()];
+        let (mut other, mut unset) = (0, 0);
+        for bucket in &h.buckets {
+            for (sum, count) in per_value.iter_mut().zip(&bucket.counts) {
+                *sum += count;
+            }
+            other += bucket.other;
+            unset += bucket.unset;
+        }
+        let stacked: Vec<String> = h
+            .dimensions
+            .iter()
+            .zip(per_value)
+            .map(|(value, count)| format!("{value}={count}"))
+            .collect();
+        writeln!(
+            out,
+            "{} span(s), {} error(s); by {}: {} other={other} unset={unset}",
+            h.total,
+            h.errors,
+            args.stack,
+            stacked.join(" "),
+        )?;
     }
     writeln!(
         out,
-        "{} value(s), truncated {}, status {}",
-        data.values.len(),
-        data.truncated,
+        "status {}, {:.1} ms",
         status_word(&data.status),
+        started.elapsed().as_secs_f64() * 1000.0,
     )?;
     Ok(())
 }
@@ -487,17 +747,11 @@ pub struct SearchArgs {
     #[arg(long = "wal")]
     pub wals: Vec<PathBuf>,
 
-    /// A filter condition, repeatable (conditions AND). TARGET is
-    /// `OWNER.KEY` (resource/span/instrumentation/event/link), `.KEY`
-    /// (any owner: resource ∪ span), or a builtin-field word (`name`,
-    /// `status`, `kind`, …). OPS: `=`, `!=` (text), `=~`, `!~`
-    /// (anchored regex), `>`, `<`, `>=`, `<=` (numeric). This is the
-    /// dev tool's rendering of the engine's typed predicate, not a wire
-    /// grammar; values are engine storage labels.
-    #[arg(long = "where")]
-    pub conditions: Vec<String>,
+    #[command(flatten)]
+    pub tokens: TokenArgs,
 
-    /// Minimum span duration, inclusive nanoseconds.
+    /// Minimum span duration, inclusive nanoseconds (a `--where`
+    /// condition: the same span as the others).
     #[arg(long)]
     pub min_duration_ns: Option<i64>,
 
@@ -508,10 +762,6 @@ pub struct SearchArgs {
     /// Result limit (top-K most recent traces; default 20, 0 rejected).
     #[arg(long)]
     pub limit: Option<usize>,
-
-    /// Matched spans attached per trace (default 3, max 128, 0 = none).
-    #[arg(long)]
-    pub spans_per_trace: Option<usize>,
 
     /// Window start, nanoseconds since the epoch (half-open; span-START
     /// semantics). Requires --end-ns.
@@ -524,109 +774,8 @@ pub struct SearchArgs {
     pub end_ns: Option<i64>,
 }
 
-/// Parse one `--where` condition: `TARGET <op> VALUE`. The op match is
-/// leftmost, longest-symbol first, so `>=` never parses as `>` with a
-/// `=value` and `=~` never as `=` with a `~value`. Ordering ops take
-/// numeric values; `=`/`!=`/`=~`/`!~` take text.
-fn parse_condition(spec: &str) -> Result<Condition> {
-    const OPS: [(&str, CompareOp); 8] = [
-        ("=~", CompareOp::Regex),
-        ("!~", CompareOp::NotRegex),
-        ("!=", CompareOp::NotEq),
-        (">=", CompareOp::Gte),
-        ("<=", CompareOp::Lte),
-        (">", CompareOp::Gt),
-        ("<", CompareOp::Lt),
-        ("=", CompareOp::Eq),
-    ];
-    let (target_word, op, value) = OPS
-        .iter()
-        .filter_map(|(sym, op)| spec.find(sym).map(|at| (at, sym.len(), *op)))
-        .min_by_key(|&(at, len, _)| (at, std::cmp::Reverse(len)))
-        .map(|(at, len, op)| (&spec[..at], op, &spec[at + len..]))
-        .ok_or_else(|| anyhow::anyhow!("--where must be TARGET<op>VALUE, got {spec:?}"))?;
-    // An empty value is a structurally valid predicate that matches no
-    // well-formed dictionary entry — in this dev tool it is always a
-    // typo, so fail loudly instead of returning a silent empty result.
-    if value.is_empty() {
-        bail!("--where {spec:?} has an empty value");
-    }
-    let target = parse_target(target_word.trim())?;
-    let value = if matches!(
-        op,
-        CompareOp::Gt | CompareOp::Lt | CompareOp::Gte | CompareOp::Lte
-    ) {
-        if let Ok(n) = value.parse::<i64>() {
-            PredicateValue::Integer(n)
-        } else if let Ok(f) = value.parse::<f64>() {
-            PredicateValue::Float(f)
-        } else {
-            bail!("--where {spec:?}: ordering comparisons take a numeric value");
-        }
-    } else {
-        PredicateValue::Text(value.to_string())
-    };
-    Ok(Condition {
-        target,
-        op,
-        values: vec![value],
-    })
-}
-
-/// A `--where` target: `OWNER.KEY` for the attribute owners, a bare
-/// builtin-field word otherwise.
-fn parse_target(word: &str) -> Result<PredicateTarget> {
-    // An empty key after the owner strip (a bare `.` or a trailing
-    // `owner.`) is a structurally valid predicate that matches no
-    // dictionary entry — positive or negated (the pinned rule is
-    // presence ∩ complement, so absence never satisfies `!=` either).
-    // The same always-a-typo class as an empty value: fail loudly
-    // instead of returning a silent empty result.
-    let non_empty = |key: &str| -> Result<String> {
-        if key.is_empty() {
-            bail!("--where target {word:?} has an empty attribute key");
-        }
-        Ok(key.to_string())
-    };
-    // `.KEY` = the any-owner attribute (resource ∪ span disjunction).
-    if let Some(key) = word.strip_prefix('.') {
-        return Ok(PredicateTarget::Attribute(
-            AttributeOwner::Any,
-            non_empty(key)?,
-        ));
-    }
-    for (owner_name, owner) in [
-        ("resource", AttributeOwner::Resource),
-        ("span", AttributeOwner::Span),
-        ("instrumentation", AttributeOwner::Instrumentation),
-        ("event", AttributeOwner::Event),
-        ("link", AttributeOwner::Link),
-    ] {
-        if let Some(key) = word
-            .strip_prefix(owner_name)
-            .and_then(|r| r.strip_prefix('.'))
-        {
-            return Ok(PredicateTarget::Attribute(owner, non_empty(key)?));
-        }
-    }
-    BUILTIN_WORDS
-        .iter()
-        .find(|(w, _)| *w == word)
-        .map(|(_, i)| PredicateTarget::Builtin(*i))
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "unknown --where target {word:?}: use OWNER.KEY \
-                 (resource/span/instrumentation/event/link) or a builtin-field word"
-            )
-        })
-}
-
 pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()> {
-    let mut conditions: Vec<Condition> = args
-        .conditions
-        .iter()
-        .map(|spec| parse_condition(spec))
-        .collect::<Result<_>>()?;
+    let mut conditions = Vec::new();
     if let Some(min) = args.min_duration_ns {
         conditions.push(Condition {
             target: PredicateTarget::Builtin(BuiltinField::Duration),
@@ -642,15 +791,12 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
         });
     }
 
-    let mut query = SearchQuery::new(Predicate { conditions });
+    let mut query = SearchQuery::new(args.tokens.tokens(conditions)?);
     if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
         query = query.window(window);
     }
     if let Some(limit) = args.limit {
         query = query.limit(limit);
-    }
-    if let Some(spans_per_trace) = args.spans_per_trace {
-        query = query.spans_per_trace(spans_per_trace);
     }
 
     // The dev shape: the same source list fills both roles — the engine
@@ -668,12 +814,12 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
         Arc::new(AtomicUsize::new(0)),
     )?;
 
-    // `[inexact]` marks a trace whose assembly was capped or degraded —
-    // its summary numbers may undercount (the engine's `exact` flag).
+    // `[inexact]` marks a trace with a failed source (or a capped
+    // fallback assembly) — its numbers may undercount (`exact`).
     for t in &data.traces {
         writeln!(
             out,
-            "{} {} / {} start={} dur={}ns spans={} errors={} matched={}{}",
+            "{} {} / {} start={} dur={}ns spans={} errors={} rank={}{}",
             t.trace_id,
             t.root_service.as_deref().unwrap_or("<no service>"),
             t.root_name.as_deref().unwrap_or("<unnamed>"),
@@ -681,22 +827,9 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
             t.duration_ns,
             t.span_count,
             t.error_count,
-            t.matched_count,
+            t.newest_matched_start_ns,
             if t.exact { "" } else { " [inexact]" },
         )?;
-        for span in &t.matched_spans {
-            let name = span
-                .fields
-                .iter()
-                .find(|(k, _)| k == "name")
-                .map(|(_, v)| v.as_str())
-                .unwrap_or("<unnamed>");
-            writeln!(
-                out,
-                "  {} start={} dur={}ns",
-                name, span.start_ns, span.duration_ns
-            )?;
-        }
     }
     writeln!(
         out,
@@ -711,25 +844,162 @@ pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()>
 mod tests {
     use super::*;
 
-    /// The empty-key guard fires on every owner spelling, and
-    /// dot-prefixed keys stay spellable (`..foo` = Any-owner key `.foo`).
+    /// Targets are vocabulary keys: the empty-key guard fires on every
+    /// attribute prefix, dotted attribute paths stay whole, and the
+    /// TraceQL-style forms are gone.
     #[test]
-    fn where_targets_reject_empty_keys_but_keep_dotted_ones() {
-        for bad in [".", "span.", "resource.", "event."] {
-            let err = parse_target(bad).expect_err(bad);
+    fn where_targets_are_vocabulary_keys() {
+        for bad in ["attributes.", "resource.attributes.", "events.attributes."] {
+            let err = parse_target("--where", bad).expect_err(bad);
             assert!(
                 err.to_string().contains("empty attribute key"),
                 "{bad}: {err}"
             );
         }
-        assert!(matches!(
-            parse_target("..foo"),
-            Ok(PredicateTarget::Attribute(AttributeOwner::Any, k)) if k == ".foo"
-        ));
-        assert!(matches!(
-            parse_target("span.http.method"),
-            Ok(PredicateTarget::Attribute(AttributeOwner::Span, k)) if k == "http.method"
-        ));
+        for bad in [".foo", "span.http.method", "status", "status-message"] {
+            let err = parse_target("--where", bad).expect_err(bad);
+            assert!(err.to_string().contains("unknown"), "{bad}: {err}");
+        }
+        assert_eq!(
+            parse_target("--where", "attributes.http.method").unwrap(),
+            PredicateTarget::Attribute(AttributeOwner::Span, "http.method".into())
+        );
+        assert_eq!(
+            parse_target("--where", "resource.attributes.service.name").unwrap(),
+            PredicateTarget::Attribute(AttributeOwner::Resource, "service.name".into())
+        );
+        assert_eq!(
+            parse_target("--where", "status.code").unwrap(),
+            PredicateTarget::Builtin(BuiltinField::Status)
+        );
+        assert_eq!(
+            parse_target("--where", "events.time_since_start").unwrap(),
+            PredicateTarget::Builtin(BuiltinField::EventTimeSinceStart)
+        );
+    }
+
+    fn text(v: &str) -> PredicateValue {
+        PredicateValue::Text(v.to_string())
+    }
+
+    fn cond(target: PredicateTarget, op: CompareOp, values: Vec<PredicateValue>) -> Condition {
+        Condition { target, op, values }
+    }
+
+    fn span_attr(key: &str) -> PredicateTarget {
+        PredicateTarget::Attribute(AttributeOwner::Span, key.to_string())
+    }
+
+    /// Every op spelling, matched leftmost and longest first: `^=` /
+    /// `!^=` become the starts-with regex, the others keep their value.
+    #[test]
+    fn condition_ops_parse_leftmost_longest() {
+        let name = || PredicateTarget::Builtin(BuiltinField::Name);
+        for (spec, want) in [
+            ("name=a=b", cond(name(), CompareOp::Eq, vec![text("a=b")])),
+            ("name!=a", cond(name(), CompareOp::NotEq, vec![text("a")])),
+            (
+                "name=~a.*",
+                cond(name(), CompareOp::Regex, vec![text("a.*")]),
+            ),
+            (
+                "name!~a",
+                cond(name(), CompareOp::NotRegex, vec![text("a")]),
+            ),
+            (
+                "name^=a.b",
+                cond(name(), CompareOp::Regex, vec![text(r"a\.b(?s:.*)")]),
+            ),
+            (
+                "attributes.k!^=x",
+                cond(span_attr("k"), CompareOp::NotRegex, vec![text("x(?s:.*)")]),
+            ),
+            (
+                "attributes.k>=5",
+                cond(
+                    span_attr("k"),
+                    CompareOp::Gte,
+                    vec![PredicateValue::Integer(5)],
+                ),
+            ),
+            (
+                "attributes.k<1.5",
+                cond(
+                    span_attr("k"),
+                    CompareOp::Lt,
+                    vec![PredicateValue::Float(1.5)],
+                ),
+            ),
+        ] {
+            assert_eq!(parse_condition("--and", spec).unwrap(), want, "{spec}");
+        }
+        for (spec, why) in [
+            ("name", "must be KEY<op>VALUE"),
+            ("name^=", "empty value"),
+            ("attributes.k>x", "numeric value"),
+            ("attributes.=x", "empty attribute key"),
+        ] {
+            let err = parse_condition("--not", spec).unwrap_err().to_string();
+            assert!(err.contains("--not") && err.contains(why), "{spec}: {err}");
+        }
+    }
+
+    /// `--where` (plus the command's own conditions) stays one same-span
+    /// group with its trace-level conditions split out; each `--and`,
+    /// `--not` and `--text` is a token of its own.
+    #[test]
+    fn token_flags_build_the_query() {
+        let flags = TokenArgs {
+            conditions: vec!["name=a".into(), "root_name=r".into()],
+            and: vec!["attributes.k^=p".into()],
+            not: vec!["status.code=ERROR".into()],
+            text: vec!["checkout".into()],
+        };
+        let duration = cond(
+            PredicateTarget::Builtin(BuiltinField::Duration),
+            CompareOp::Gte,
+            vec![PredicateValue::Integer(5)],
+        );
+        let group = |conditions| Predicate { conditions };
+        assert_eq!(
+            flags.tokens(vec![duration.clone()]).unwrap(),
+            TokenQuery {
+                tokens: vec![
+                    Token::positive(group(vec![
+                        cond(
+                            PredicateTarget::Builtin(BuiltinField::Name),
+                            CompareOp::Eq,
+                            vec![text("a")]
+                        ),
+                        duration,
+                    ])),
+                    Token::positive(group(vec![cond(
+                        PredicateTarget::Builtin(BuiltinField::RootName),
+                        CompareOp::Eq,
+                        vec![text("r")]
+                    )])),
+                    Token::positive(group(vec![cond(
+                        span_attr("k"),
+                        CompareOp::Regex,
+                        vec![text("p(?s:.*)")]
+                    )])),
+                    Token::negated(group(vec![cond(
+                        PredicateTarget::Builtin(BuiltinField::Status),
+                        CompareOp::Eq,
+                        vec![text("ERROR")]
+                    )])),
+                    Token::positive(group(vec![cond(
+                        PredicateTarget::FreeText,
+                        CompareOp::Contains,
+                        vec![text("checkout")]
+                    )])),
+                ]
+            }
+        );
+        assert_eq!(
+            TokenArgs::default().tokens(Vec::new()).unwrap(),
+            TokenQuery::default()
+        );
     }
 
     /// Content corruption is per-source: a WAL with a garbage header is
@@ -779,6 +1049,129 @@ mod tests {
             &sources[0],
             TraceSource::Tail(t) if t.path == good_wal.canonicalize().unwrap()
         ));
+    }
+
+    /// `explore` lists the newest spans with their columns and stacks
+    /// every span of the window.
+    #[test]
+    fn explore_lists_and_stacks_the_spans() {
+        use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+        use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status};
+        let span = |id: u8, start: u64, error: bool| Span {
+            trace_id: vec![9; 16],
+            span_id: vec![id; 8],
+            name: format!("op-{id}"),
+            start_time_unix_nano: start,
+            end_time_unix_nano: start + 1_000,
+            status: error.then(|| Status {
+                code: 2,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                scope_spans: vec![ScopeSpans {
+                    spans: vec![
+                        span(1, 1_000_000_000, false),
+                        span(2, 2_000_000_000, true),
+                        span(3, 3_000_000_000, false),
+                    ],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let frame = ng_flatten::prepare_trace_frame(request, 0, None).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let seq = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
+        let mut writer = wal::Writer::new(
+            dir.path(),
+            wal::Config::default(),
+            seq,
+            wal::FileStamp {
+                pipeline_id: 1,
+                payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
+            },
+            wal::test_identity(),
+        )
+        .unwrap();
+        writer
+            .write_frame(
+                0,
+                b"",
+                &frame.data,
+                wal::FrameMeta {
+                    entry_count: frame.records,
+                    ingestion_ns: file_registry::TimestampNs(1),
+                    log_ts_range: None,
+                },
+            )
+            .unwrap();
+        writer.shutdown_all().unwrap();
+        let wal = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .find(|p| p.extension().is_some_and(|x| x == "wal"))
+            .expect("one WAL");
+
+        let args = ExploreArgs {
+            sfsts: Vec::new(),
+            wals: vec![wal],
+            start_ns: 0,
+            end_ns: 4_000_000_000,
+            buckets: 4,
+            stack: "status.code".to_string(),
+            limit: 2,
+            columns: vec!["name".to_string()],
+            tokens: TokenArgs::default(),
+        };
+        let mut out = Vec::new();
+        run_explore(&args, &mut out).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 4, "{text}");
+        assert!(lines[0].starts_with("3000000000 ") && lines[0].ends_with(" name=op-3"));
+        assert!(lines[1].starts_with("2000000000 ") && lines[1].ends_with(" name=op-2"));
+        assert_eq!(
+            lines[2],
+            "3 span(s), 1 error(s); by status.code: UNSET=2 ERROR=1 other=0 unset=0"
+        );
+        assert!(lines[3].starts_with("status complete"), "{text}");
+    }
+
+    /// A window that does not split into equal buckets is refused: a
+    /// rounded width would count past `--end-ns`.
+    #[test]
+    fn a_window_must_split_into_equal_buckets() {
+        assert_eq!(
+            exact_grid(0, 4_000_000_000, 4).unwrap(),
+            sfst::Grid::new(0, 1_000_000_000, 4)
+        );
+        let err = exact_grid(0, 10, 3).unwrap_err().to_string();
+        assert!(err.contains("does not split into 3 equal buckets"), "{err}");
+        let explore = ExploreArgs {
+            sfsts: Vec::new(),
+            wals: Vec::new(),
+            start_ns: 0,
+            end_ns: 10,
+            buckets: 3,
+            stack: "status.code".to_string(),
+            limit: 0,
+            columns: Vec::new(),
+            tokens: TokenArgs::default(),
+        };
+        assert!(run_explore(&explore, &mut Vec::new()).is_err());
+        let overview = OverviewArgs {
+            sfsts: Vec::new(),
+            wals: Vec::new(),
+            start_ns: 0,
+            end_ns: 10,
+            buckets: 3,
+            tokens: TokenArgs::default(),
+        };
+        assert!(run_overview(&overview, &mut Vec::new()).is_err());
     }
 
     /// The torn-tail clamp: a WAL truncated mid-frame serves only the
@@ -852,26 +1245,5 @@ mod tests {
             (empty.start(), empty.end()),
             (wal::HEADER_SIZE as u64, wal::HEADER_SIZE as u64)
         );
-    }
-
-    /// The CLI word table must stay in lockstep with the engine's
-    /// builtin-field set: a variant without a word would make `key_word`
-    /// PANIC while rendering `attributes` output (the parse side already
-    /// fails gracefully). Walks the engine's `ALL`, so adding a builtin
-    /// engine-side breaks this test until the CLI learns it.
-    #[test]
-    fn every_builtin_has_a_cli_word() {
-        for builtin in BuiltinField::ALL {
-            assert!(
-                BUILTIN_WORDS.iter().any(|(_, v)| *v == builtin),
-                "builtin field {builtin:?} has no CLI word in BUILTIN_WORDS"
-            );
-        }
-        // And the table holds nothing stale: same size, distinct words.
-        assert_eq!(BUILTIN_WORDS.len(), BuiltinField::ALL.len());
-        let mut words: Vec<&str> = BUILTIN_WORDS.iter().map(|(w, _)| *w).collect();
-        words.sort_unstable();
-        words.dedup();
-        assert_eq!(words.len(), BUILTIN_WORDS.len(), "duplicate CLI words");
     }
 }

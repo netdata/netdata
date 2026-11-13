@@ -1,13 +1,13 @@
-//! Writer-event handling: gap-check, apply to registries, index on close.
+//! Writer-event handling: apply to registries, index on close.
 
 use super::Ledger;
-use bridge::signals::Signal;
 use file_lifecycle::ipc::IndexerRequest;
+use otel_bridge::signals::Signal;
 
 impl Ledger {
     #[tracing::instrument(
         skip_all,
-        fields(tenant = %msg.tenant_id, frame_seq = msg.frame_seq, event = ?msg.event),
+        fields(tenant = %msg.tenant_id, event = ?msg.event),
     )]
     pub(super) async fn handle_ingestor_msg(&mut self, msg: wal::Message) {
         // `pipeline_id` is a raw u16 stamped by the writer process; decode it
@@ -23,20 +23,6 @@ impl Ledger {
             }
         };
 
-        // Per-signal frame-seq gap-check: signals interleave on one connection
-        // but each has its own monotonic `frame_seq`, so a gap is a genuinely
-        // lost event of THIS signal (fire-and-forget IPC). Log it, apply anyway.
-        let expected = self.expected_frame_seq.get_mut(signal);
-        if msg.frame_seq != *expected {
-            tracing::error!(
-                pipeline_id,
-                "ingestor frame gap: expected={} got={}",
-                *expected,
-                msg.frame_seq,
-            );
-        }
-        *expected = msg.frame_seq + 1;
-
         let pipeline = self.pipelines.get(signal);
 
         let req = {
@@ -47,13 +33,32 @@ impl Ledger {
                 return;
             }
 
-            // Closed WAL: queue a seal (WAL → SFST) with the indexer.
+            // A traces WAL grew: let the chunk indexer index its new chunks.
+            if signal == Signal::Traces
+                && let wal::FileEvent::Synced {
+                    file_id,
+                    valid_up_to,
+                    ..
+                } = msg.event
+                && valid_up_to.0 > 0
+                && let Some(registry) = registries.get(&msg.tenant_id)
+            {
+                self.traces_chunk_indexer.synced(
+                    file_id.seq,
+                    registry.wal.file_path(file_id),
+                    valid_up_to.0,
+                );
+            }
+
+            // Closed WAL: queue an indexing operation (WAL → SFST) with the
+            // indexer.
             if let wal::FileEvent::Closed { file_id, .. } = msg.event {
                 let registry = registries
                     .get(&msg.tenant_id)
                     .expect("tenant registry present after applying WAL event");
 
                 Some(IndexerRequest::Index {
+                    file_id,
                     wal_path: registry.wal.file_path(file_id),
                     sfst_path: registry.sfst.file_path(file_id),
                 })

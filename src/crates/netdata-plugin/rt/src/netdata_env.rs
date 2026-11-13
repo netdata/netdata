@@ -13,7 +13,7 @@
 //! falls back per field; otel-plugin's supervisor, in contrast, aborts when
 //! `registry_unique_id` is missing).
 //!
-//! Inside `rt`, `tracing_setup::init_tracing_with_identifier` consumes
+//! Inside `netdata-plugin-rt`, `tracing_setup::init_tracing_with_identifier` consumes
 //! `log_method`, `log_level`, and `systemd_journal_path` to choose the journald
 //! or stderr logging layer. Other consumers read the fields directly:
 //! netflow-plugin for config locations, host prefix, and state directories,

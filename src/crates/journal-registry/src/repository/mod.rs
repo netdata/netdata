@@ -58,8 +58,7 @@ pub use crate::repository::file::{File, Origin, Source, Status};
 pub use crate::repository::metadata::FileInfo;
 
 // Chain/Repository/RepositoryError reach workspace consumers through these
-// short paths (journal-engine/src/error.rs,
-// journal-log-writer/src/log/chain.rs) and journal-core's glob shim
+// short paths (journal-engine/src/error.rs) and journal-core's glob shim
 // carries them on (journal-core/src/lib.rs). #[doc(hidden)] keeps them
 // out of rustdoc because lib.rs's flat exports deliberately
 // omit them; the types remain documented under their defining modules

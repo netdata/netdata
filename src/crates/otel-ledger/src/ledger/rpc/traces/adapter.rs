@@ -2,9 +2,10 @@
 //! the wire-neutral `sfsq::traces` engine — the traces analogue of
 //! the logs `adapter`: a pure translation layer, no I/O of its own.
 //!
-//! * wire → engine — request-side parsing: hex ids, the selection-key
-//!   grammar, the pagination cursor, window canonicalization
-//!   ([`resolve_window`]), the search predicate ([`build_predicate`]).
+//! * wire → engine — request-side parsing: hex ids, keys (the engine's
+//!   vocabulary, `sfsq::traces::parse_key`: OTLP field paths), the
+//!   pagination cursor, window canonicalization
+//!   ([`resolve_window`]), the search tokens ([`build_tokens`]).
 //! * engine → wire — the response shapers (`to_*_result`), ids rendered
 //!   as W3C lowercase hex.
 //!
@@ -12,20 +13,24 @@
 //! mode dispatch and the sealed-SFST + live-WAL source capture
 //! ([`super::sources`]) — the adapter never touches registry state.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use sfsq::traces::{
-    AttributeKey, AttributeNamesData, AttributeOwner, AttributeValuesData, BuiltinField, CompareOp,
-    Condition, DURATION_BIN_LABELS, DurationPercentiles, FieldKinds, OverviewData, Predicate,
-    PredicateTarget, PredicateValue, SearchData, SlowestData, TraceData,
+    AttributeKey, AttributeOwner, BuiltinField, CompareOp, Condition, DEFAULT_ROWS_LIMIT,
+    DURATION_BIN_LABELS, DurationPercentiles, ExploreData, ExploreQuery, FieldKinds, KeyError,
+    OverviewData, Predicate, PredicateError, PredicateTarget, PredicateValue, RowKey, RowsSpec,
+    SearchData, StorageName, TOKENS_MAX, Token, TokenQuery, TraceData, heatmap_row_bounds,
 };
 
 use super::wire::{
-    AnchorWire, AttributeValueWire, AttributeValuesResult, AttributesResult, CoverageWire,
-    EventWire, FacetListWire, FacetValueWire, FieldKindsWire, LinkWire, OverviewGridWire,
-    OverviewPercentilesWire, OverviewResult, OverviewSection, OverviewTotals, SearchItems,
-    SearchResult, ServiceBreakdownWire, ServiceSpansWire, SlowestResult, SlowestTraceWire,
-    SpanWire, StatusWire, TraceItems, TraceResult, TraceSummaryWire,
+    AnchorWire, CONDITION_VALUES_MAX, ConditionParams, ConditionValue, CoverageWire, EventWire,
+    ExploreBucketWire, ExploreHistogramWire, ExploreParams, ExplorePercentilesWire, ExploreResult,
+    ExploreRowsWire, ExploreSpanWire, ExploreWindowWire, FieldKindsWire, LinkWire,
+    OverviewGridWire, OverviewPercentilesWire, OverviewSection, OverviewTotals,
+    REQUEST_TEXT_MAX_BYTES, ResourceWire, SearchItems, SearchResult, ServiceBreakdownWire,
+    ServiceSpansWire, SpanWire, StatusWire, SuggestResult, SuggestionWire, TraceItems, TraceResult,
+    TraceSummaryWire,
 };
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
@@ -33,18 +38,30 @@ use super::wire::{
 /// here — rejecting it is the caller's semantic job (the handler
 /// pre-captures the engine's `UnsetTraceId` rejection).
 pub(crate) fn parse_trace_id(s: &str) -> Result<sfst::TraceId, String> {
+    parse_hex_id::<16>("trace id", s).map(sfst::TraceId::from)
+}
+
+/// Parse a W3C text-form span id: exactly 16 hex chars (8 bytes),
+/// case-insensitive; the unset sentinel parses, as for trace ids.
+pub(crate) fn parse_span_id(s: &str) -> Result<sfst::SpanId, String> {
+    parse_hex_id::<8>("span id", s).map(sfst::SpanId::from)
+}
+
+/// `N` bytes from exactly `2N` hex chars, surrounding whitespace ignored.
+fn parse_hex_id<const N: usize>(what: &str, s: &str) -> Result<[u8; N], String> {
     let s = s.trim();
-    if s.len() != 32 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if s.len() != 2 * N || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(format!(
-            "trace id must be 32 hex characters (16 bytes), got {s:?}"
+            "{what} must be {} hex characters ({N} bytes), got {s:?}",
+            2 * N
         ));
     }
-    let mut bytes = [0u8; 16];
+    let mut bytes = [0u8; N];
     for (i, chunk) in s.as_bytes().chunks_exact(2).enumerate() {
         // Infallible: both bytes were checked hex above.
         bytes[i] = u8::from_str_radix(std::str::from_utf8(chunk).unwrap(), 16).unwrap();
     }
-    Ok(sfst::TraceId::from(bytes))
+    Ok(bytes)
 }
 
 /// Validate the `trace` sub-object's optional assembly bounds into a
@@ -94,35 +111,522 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
     window.start.saturating_sub(slack)..window.end.saturating_add(slack)
 }
 
+// ── Response bounds ─────────────────────────────────────────────────
+
+/// Per-value cap on the strings a trace's spans carry, in JSON bytes
+/// (see [`truncate_value`]). The largest value seen in practice is a
+/// ~6 KB exception stack trace, so real values stay whole; the cap only
+/// stops a pathological value from dominating the response.
+pub(crate) const TRACE_VALUE_MAX_BYTES: usize = 8 * 1024;
+
+/// Budget for a trace's spans, their resources and their field kinds, in
+/// compact JSON bytes ([`WireShaper`]). Past it the engine keeps the
+/// earliest spans and reports `byte_budget`.
+pub(crate) const TRACE_SPANS_MAX_BYTES: usize = 2 * 1024 * 1024;
+
+/// Per-value cap, in JSON bytes (see [`truncate_value`]), on the
+/// free-length strings of list rows (root service and name, breakdown
+/// service names) and of value suggestions. Both are for display; the
+/// trace view carries values up to [`TRACE_VALUE_MAX_BYTES`]. Suggested
+/// keys are capped at [`super::wire::REQUEST_TEXT_MAX_BYTES`] instead, so
+/// they can be sent back. With at most [`super::wire::SEARCH_LIMIT_MAX`]
+/// rows or [`super::wire::SUGGEST_ITEMS_MAX`] suggestions, a response
+/// stays well under 1 MB by construction, so no byte budget has to cut
+/// items off. A suggest tier list has no item limit: its size follows the
+/// distinct keys of the visited sources.
+pub(crate) const LIST_VALUE_MAX_BYTES: usize = 256;
+
+/// Cut `s` at a character boundary so that it takes at most `max` bytes
+/// as a JSON string body (escapes counted, quotes not); `true` when it
+/// was cut. Counting the escaped form bounds what is sent: a control
+/// character takes six bytes on the wire. A cut value gives the rest of
+/// its allocation back, so a kept span holds what is sent.
+fn truncate_value(s: &mut String, max: usize) -> bool {
+    let mut used = 0;
+    for (i, c) in s.char_indices() {
+        used += json_escaped_len(c);
+        if used > max {
+            s.truncate(i);
+            s.shrink_to_fit();
+            return true;
+        }
+    }
+    false
+}
+
+/// Bytes `c` takes inside a JSON string, as serde_json writes it.
+fn json_escaped_len(c: char) -> usize {
+    match c {
+        '"' | '\\' | '\n' | '\r' | '\t' | '\u{08}' | '\u{0C}' => 2,
+        c if u32::from(c) < 0x20 => 6,
+        c => c.len_utf8(),
+    }
+}
+
+/// Apply [`TRACE_VALUE_MAX_BYTES`] to every value one span carries;
+/// `true` when any was cut.
+fn cap_span_values(s: &mut sfst::TraceSpan) -> bool {
+    let max = TRACE_VALUE_MAX_BYTES;
+    let mut cut = false;
+    for (_, v) in &mut s.fields {
+        cut |= truncate_value(v, max);
+    }
+    for e in &mut s.events {
+        cut |= truncate_value(&mut e.name, max);
+        for (_, v) in &mut e.attributes {
+            cut |= truncate_value(v, max);
+        }
+    }
+    for l in &mut s.links {
+        cut |= truncate_value(&mut l.trace_state, max);
+        for (_, v) in &mut l.attributes {
+            cut |= truncate_value(v, max);
+        }
+    }
+    cut
+}
+
+/// Bytes `value` takes as compact JSON.
+fn json_len(value: &impl serde::Serialize) -> usize {
+    struct Count(usize);
+    impl std::io::Write for Count {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0 += buf.len();
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut count = Count(0);
+    serde_json::to_writer(&mut count, value).expect("wire types serialize");
+    count.0
+}
+
 /// Shape one assembled trace into the wire result. `trace_id` is echoed
 /// back in canonical (lowercase) hex regardless of the request's casing.
 /// `coverage` is the capture range assembly actually used.
+///
+/// The engine already shaped the trace with [`WireShaper`]: values are
+/// capped (flagged per span in `span_cut`), a trace past the budget is
+/// its earliest spans with their own graph and field kinds and reports
+/// `byte_budget`. This maps it, leaving out the names [`span_wire`] does
+/// not emit; names outside the key vocabulary add `dropped_fields` and
+/// one warning for the whole response. `resources` numbers the spans'
+/// resources as the shaper numbered them; each distinct one goes out
+/// once, taken out of the first span that uses it (the shaper left it
+/// there). A span the shaper did not see keeps its resource pairs in its
+/// fields.
 pub(crate) fn to_trace_result(
     trace_id: &sfst::TraceId,
     data: TraceData,
+    resources: ShapedResources,
     coverage: CoverageWire,
 ) -> TraceResult {
-    let t = data.trace;
+    let mut t = data.trace;
+    let mut status = data.status;
+    let dropped = dropped_names(&t.spans);
+    if !dropped.is_empty() {
+        warn_dropped(trace_id, &dropped);
+        status = status.with(sfsq::traces::PartialReason::DroppedFields);
+    }
+    let cut = data
+        .span_cut
+        .iter()
+        .copied()
+        .chain(std::iter::repeat(false));
     let summary_root = t.summary_root();
+    let numbers = resources.kept(t.spans.len());
+    let mut resources = Vec::new();
+    let mut spans = Vec::with_capacity(t.spans.len());
+    for (i, (s, c)) in t.spans.iter_mut().zip(cut).enumerate() {
+        let resource = numbers.get(i).copied().flatten();
+        if resource.is_some_and(|number| number as usize == resources.len()) {
+            resources.push(ResourceWire {
+                attributes: take_resource_pairs(&mut s.fields),
+            });
+        }
+        spans.push(span_wire(s, resource, c));
+    }
     TraceResult {
         mode: "trace",
         version: 1,
         trace_id: trace_id.to_string(),
         coverage,
-        status: StatusWire::from(&data.status),
+        status: StatusWire::from(&status),
         items: TraceItems {
-            returned: t.spans.len(),
+            returned: spans.len(),
         },
         summary_root,
         roots: t.roots,
         children: t.children,
-        spans: t.spans.into_iter().map(span_wire).collect(),
+        spans,
+        resources,
         field_kinds: field_kinds_wire(data.field_kinds),
+        matched: data.matched,
+    }
+}
+
+/// Whether a stored name is a resource attribute key: the resource
+/// prefix and a non-empty attribute name, i.e. `Key(Resource,
+/// Attribute(_))` in the vocabulary, decided without allocating. The bare
+/// prefix is outside the vocabulary.
+fn is_resource_key(name: &str) -> bool {
+    let prefix = AttributeOwner::Resource
+        .attribute_prefix()
+        .expect("an attribute owner");
+    name.strip_prefix(prefix)
+        .is_some_and(|rest| !rest.is_empty())
+}
+
+/// Take a span's resource attribute pairs out of its `fields`, in stored
+/// order. The slots they took are given back: sources build `fields` at
+/// exact capacity, and a span that gives its resource up must not keep
+/// room for it.
+fn take_resource_pairs(fields: &mut Vec<(String, String)>) -> Vec<(String, String)> {
+    let mut pairs: Vec<(String, String)> = fields
+        .extract_if(.., |(name, _)| is_resource_key(name))
+        .collect();
+    if !pairs.is_empty() {
+        fields.shrink_to_fit();
+        pairs.shrink_to_fit();
+    }
+    pairs
+}
+
+/// How [`WireShaper`] numbered the resources of the spans it shaped: each
+/// distinct resource once, in first-use order, and each shaped span's
+/// number, in shaping order. Two resources are one when their pair lists
+/// (stored order, capped values) are equal.
+#[derive(Debug, Default)]
+pub(crate) struct ShapedResources {
+    /// Each distinct resource's number, keyed by its pairs (the shaper's
+    /// lookup copies).
+    numbers: HashMap<Vec<(String, String)>, u32>,
+    /// Each shaped span's resource number; `None` without resource
+    /// attributes.
+    spans: Vec<Option<u32>>,
+}
+
+impl ShapedResources {
+    /// The number of a resource already numbered.
+    fn get(&self, pairs: &[(String, String)]) -> Option<u32> {
+        self.numbers.get(pairs).copied()
+    }
+
+    /// Number a new resource.
+    fn insert(&mut self, pairs: Vec<(String, String)>) -> u32 {
+        let index = u32::try_from(self.numbers.len()).expect("fewer resources than spans");
+        self.numbers.insert(pairs, index);
+        index
+    }
+
+    /// The numbers of the first `kept` shaped spans: the engine keeps a
+    /// prefix of the spans it shaped (it stops at the first that does not
+    /// fit), so a resource only the refused span used numbers no kept span.
+    fn kept(mut self, kept: usize) -> Vec<Option<u32>> {
+        self.spans.truncate(kept);
+        self.spans
+    }
+}
+
+/// The [`ShapedResources`] a [`WireShaper`] fills: the shaper moves into
+/// the engine, so its caller keeps this handle to read them back once the
+/// merge is done.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct ResourcesHandle(Arc<Mutex<ShapedResources>>);
+
+impl ResourcesHandle {
+    fn lock(&self) -> MutexGuard<'_, ShapedResources> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The resources shaped so far, leaving the handle empty.
+    pub(crate) fn take(&self) -> ShapedResources {
+        std::mem::take(&mut *self.lock())
+    }
+}
+
+/// What a span field name is on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FieldUse {
+    /// An attribute key: emitted, with an entry in `field_kinds`.
+    Attribute,
+    /// A builtin key or the trace state: emitted, without kinds.
+    Plain,
+    /// An internal raw-int copy: never emitted.
+    Internal,
+    /// Outside the key vocabulary: left out and reported.
+    Unknown,
+}
+
+fn field_use(name: &str) -> FieldUse {
+    match sfsq::traces::classify_storage(name) {
+        StorageName::Key(_, AttributeKey::Attribute(_)) => FieldUse::Attribute,
+        StorageName::Key(_, AttributeKey::Builtin(_)) | StorageName::TraceState => FieldUse::Plain,
+        StorageName::Internal => FieldUse::Internal,
+        StorageName::Unknown => FieldUse::Unknown,
+    }
+}
+
+/// An event or link attribute's key: the owner's prefix and the engine's
+/// bare name; `None` for an empty name (an unresolvable reference),
+/// which names no attribute.
+fn attribute_key(owner: AttributeOwner, name: &str) -> Option<String> {
+    let prefix = owner.attribute_prefix().expect("an attribute owner");
+    (!name.is_empty()).then(|| format!("{prefix}{name}"))
+}
+
+/// The distinct names the spans carry that [`span_wire`] leaves out
+/// because they are outside the key vocabulary. An event or link
+/// attribute with no name is listed under its bare prefix.
+fn dropped_names(spans: &[sfst::TraceSpan]) -> BTreeSet<String> {
+    let mut dropped = BTreeSet::new();
+    let mut known: HashMap<&str, FieldUse> = HashMap::new();
+    for span in spans {
+        for (name, _) in &span.fields {
+            let used = *known.entry(name).or_insert_with(|| field_use(name));
+            if used == FieldUse::Unknown {
+                dropped.insert(name.clone());
+            }
+        }
+        for (owner, attributes) in span
+            .events
+            .iter()
+            .map(|e| (AttributeOwner::Event, &e.attributes))
+            .chain(
+                span.links
+                    .iter()
+                    .map(|l| (AttributeOwner::Link, &l.attributes)),
+            )
+        {
+            if attributes.iter().any(|(name, _)| name.is_empty()) {
+                dropped.insert(
+                    owner
+                        .attribute_prefix()
+                        .expect("an attribute owner")
+                        .to_string(),
+                );
+            }
+        }
+    }
+    dropped
+}
+
+/// The most names one warning lists.
+const DROPPED_NAMES_LISTED: usize = 16;
+
+/// One warning per response for the names left out.
+fn warn_dropped(trace_id: &sfst::TraceId, dropped: &BTreeSet<String>) {
+    let listed: Vec<&str> = dropped
+        .iter()
+        .take(DROPPED_NAMES_LISTED)
+        .map(String::as_str)
+        .collect();
+    let more = dropped.len().saturating_sub(DROPPED_NAMES_LISTED);
+    let tail = if more > 0 {
+        format!(" and {more} more")
+    } else {
+        String::new()
+    };
+    tracing::warn!(
+        "otel-traces: trace {trace_id}: left out {} field name(s) outside the key vocabulary: {:?}{tail}",
+        dropped.len(),
+        listed
+    );
+}
+
+/// Field kinds → the wire map: one entry per attribute key the spans
+/// expose (builtins carry none), each kind spelled as its [`kind_word`].
+/// A key the engine lists twice (a flat event facet beside the event's
+/// own attribute) takes the union.
+fn field_kinds_wire(k: FieldKinds) -> FieldKindsWire {
+    let mut map: BTreeMap<String, sfst::ValueKinds> = BTreeMap::new();
+    let mut add = |key: String, kinds: sfst::ValueKinds| {
+        let entry = map.entry(key).or_default();
+        *entry = entry.union(kinds);
+    };
+    for (name, kinds) in k.fields {
+        if field_use(&name) == FieldUse::Attribute {
+            add(name, kinds);
+        }
+    }
+    for (owner, section) in [
+        (AttributeOwner::Event, k.event_attributes),
+        (AttributeOwner::Link, k.link_attributes),
+    ] {
+        for (name, kinds) in section {
+            if let Some(key) = attribute_key(owner, &name) {
+                add(key, kinds);
+            }
+        }
+    }
+    map.into_iter()
+        .map(|(key, kinds)| (key, kind_words(kinds)))
+        .collect()
+}
+
+/// A kind set's wire words, in its canonical order.
+fn kind_words(kinds: sfst::ValueKinds) -> Vec<&'static str> {
+    kinds.iter().map(kind_word).collect()
+}
+
+/// The wire word for each schema value kind. Exhaustive on purpose: a
+/// new engine kind fails compilation here until its wire name is decided.
+fn kind_word(k: sfst::ValueKind) -> &'static str {
+    match k {
+        sfst::ValueKind::Null => "null",
+        sfst::ValueKind::Bool => "bool",
+        sfst::ValueKind::Int => "int",
+        sfst::ValueKind::Double => "double",
+        sfst::ValueKind::Str => "str",
+        sfst::ValueKind::Bytes => "bytes",
+        sfst::ValueKind::EmptyKvlist => "empty_kvlist",
+        sfst::ValueKind::EmptyArray => "empty_array",
+        // Interior kinds never label a value (`ValueKinds` holds leaves).
+        sfst::ValueKind::Kvlist => "kvlist",
+        sfst::ValueKind::Array => "array",
+    }
+}
+
+/// The most a name's field-kind entry can take beyond the name itself:
+/// `:`, the longest kind list (every leaf kind) and `,`.
+fn kind_entry_bound() -> usize {
+    json_len(&kind_words(
+        sfst::ValueKinds::LEAF_ORDER.into_iter().collect(),
+    )) + 2
+}
+
+/// Shapes a trace's spans for the wire while the engine merges them (the
+/// trace handler passes it to `TraceQuery::shaper`): caps each span's
+/// values at [`TRACE_VALUE_MAX_BYTES`], flags the span when it cut one,
+/// numbers the span's resource in [`ShapedResources`] (read back through
+/// [`WireShaper::resources`]), and weighs the span as its compact JSON
+/// (with its resource index, without its resource pairs) and the comma
+/// after it, plus its resource's entry and comma when it is the first
+/// span to use that resource, plus, for each attribute key it is the
+/// first to expose (the keys of `field_kinds`), an upper bound of that
+/// key's entry (kinds are known only once the merge is done). The first
+/// span also carries the spans and resources lists' brackets and the
+/// empty field-kind map. The engine keeps spans while they fit
+/// [`TRACE_SPANS_MAX_BYTES`], so `spans`, `resources` and `field_kinds`
+/// together never exceed it.
+///
+/// The kept spans hold what the answer sends, so the budget also bounds
+/// the merge's memory: a span gives its resource pairs up unless it is
+/// the first to use that resource, which keeps them for the engine (it
+/// derives `field_kinds` from the kept spans' names) and for the result's
+/// table; the shaper keeps one lookup copy of each resource.
+pub(crate) struct WireShaper {
+    /// Attribute keys already charged.
+    names: HashSet<String>,
+    /// How the shaped spans' resources were numbered, shared with the
+    /// caller.
+    resources: ResourcesHandle,
+    /// [`kind_entry_bound`], computed once.
+    entry: usize,
+    /// The fixed cost still to charge, on the first span: the spans and
+    /// resources lists' brackets and the empty field-kind map.
+    fixed: usize,
+}
+
+impl Default for WireShaper {
+    fn default() -> Self {
+        Self {
+            names: Default::default(),
+            resources: Default::default(),
+            entry: kind_entry_bound(),
+            fixed: 2 + 2 + json_len(&field_kinds_wire(FieldKinds::default())),
+        }
+    }
+}
+
+impl WireShaper {
+    /// The handle through which the caller reads back, after the merge,
+    /// how this shaper numbered the spans' resources.
+    pub(crate) fn resources(&self) -> ResourcesHandle {
+        self.resources.clone()
+    }
+}
+
+/// What exposing `key` in `field_kinds` costs: its entry's bound the first
+/// time, nothing after.
+fn key_charge(seen: &mut HashSet<String>, entry: usize, key: &str) -> usize {
+    if seen.contains(key) {
+        return 0;
+    }
+    seen.insert(key.to_string());
+    json_len(&key) + entry
+}
+
+impl sfst::trace_combine::SpanShaper for WireShaper {
+    fn shape(&mut self, span: &mut sfst::TraceSpan) -> sfst::trace_combine::Shaped {
+        let cut = cap_span_values(span);
+        let mut weight = std::mem::take(&mut self.fixed);
+        let pairs = take_resource_pairs(&mut span.fields);
+        let mut first_use = None;
+        let mut shaped = self.resources.lock();
+        let resource = if pairs.is_empty() {
+            None
+        } else if let Some(index) = shaped.get(&pairs) {
+            Some(index)
+        } else {
+            let entry = ResourceWire { attributes: pairs };
+            weight += json_len(&entry) + 1;
+            for (name, _) in &entry.attributes {
+                weight += key_charge(&mut self.names, self.entry, name);
+            }
+            first_use = Some(entry.attributes.clone());
+            Some(shaped.insert(entry.attributes))
+        };
+        shaped.spans.push(resource);
+        drop(shaped);
+        weight += json_len(&span_wire(span, resource, cut)) + 1;
+        let entry = self.entry;
+        let seen = &mut self.names;
+        let mut charge = |key: &str| weight += key_charge(seen, entry, key);
+        for (name, _) in &span.fields {
+            if field_use(name) == FieldUse::Attribute {
+                charge(name);
+            }
+        }
+        for (owner, attributes) in span
+            .events
+            .iter()
+            .map(|e| (AttributeOwner::Event, &e.attributes))
+            .chain(
+                span.links
+                    .iter()
+                    .map(|l| (AttributeOwner::Link, &l.attributes)),
+            )
+        {
+            for (name, _) in attributes {
+                if let Some(key) = attribute_key(owner, name) {
+                    charge(&key);
+                }
+            }
+        }
+        if let Some(pairs) = first_use {
+            span.fields.splice(0..0, pairs);
+        }
+        sfst::trace_combine::Shaped { weight, cut }
+    }
+
+    fn budget(&self) -> usize {
+        TRACE_SPANS_MAX_BYTES
     }
 }
 
 /// One assembled span → the wire shape (events and links ride along).
-fn span_wire(s: sfst::TraceSpan) -> SpanWire {
+/// `resource` is the span's index into the trace's resources, whose pairs
+/// are already out of the span (the shaper took them, or the result took
+/// them from the resource's first span); a span the shaper never saw has
+/// no index and keeps them in its fields. `truncated` says whether
+/// [`cap_span_values`] cut any of its values. Emits keys and the trace
+/// state only: internal raw-int copies and names outside the key
+/// vocabulary stay out, and event and link attributes carry their full
+/// keys.
+fn span_wire(s: &sfst::TraceSpan, resource: Option<u32>, truncated: bool) -> SpanWire {
     SpanWire {
         span_id: s.span_id.to_string(),
         // OTel semantics: an unset parent means "root", rendered as an
@@ -130,347 +634,377 @@ fn span_wire(s: sfst::TraceSpan) -> SpanWire {
         parent_span_id: (!s.parent_span_id.is_unset()).then(|| s.parent_span_id.to_string()),
         start_ns: s.start_ns,
         duration_ns: s.duration_ns,
-        kind: s.kind,
         flags: s.flags,
         dropped_attributes_count: s.dropped_attributes_count,
         dropped_events_count: s.dropped_events_count,
         dropped_links_count: s.dropped_links_count,
-        fields: s.fields,
-        events: s.events.into_iter().map(event_wire).collect(),
-        links: s.links.into_iter().map(link_wire).collect(),
+        resource,
+        fields: s
+            .fields
+            .iter()
+            .filter(|(name, _)| matches!(field_use(name), FieldUse::Attribute | FieldUse::Plain))
+            .cloned()
+            .collect(),
+        events: s.events.iter().map(event_wire).collect(),
+        links: s.links.iter().map(link_wire).collect(),
+        truncated,
     }
 }
 
+/// Event or link attributes → wire pairs keyed by their full keys.
+fn attribute_pairs(
+    owner: AttributeOwner,
+    attributes: &[(String, String)],
+) -> Vec<(String, String)> {
+    attributes
+        .iter()
+        .filter_map(|(name, value)| attribute_key(owner, name).map(|key| (key, value.clone())))
+        .collect()
+}
+
 /// One span event → the wire shape.
-fn event_wire(e: sfst::TraceEvent) -> EventWire {
+fn event_wire(e: &sfst::TraceEvent) -> EventWire {
     EventWire {
         time_unix_nano: e.time_unix_nano,
-        name: e.name,
+        name: e.name.clone(),
         dropped_attributes_count: e.dropped_attributes_count,
-        attributes: e.attributes,
+        attributes: attribute_pairs(AttributeOwner::Event, &e.attributes),
     }
 }
 
 /// One span link → the wire shape (the linked trace id, W3C hex).
-fn link_wire(l: sfst::TraceLink) -> LinkWire {
+fn link_wire(l: &sfst::TraceLink) -> LinkWire {
     LinkWire {
         trace_id: l.trace_id.to_string(),
         span_id: l.span_id.to_string(),
-        trace_state: l.trace_state,
+        trace_state: l.trace_state.clone(),
         flags: l.flags,
         dropped_attributes_count: l.dropped_attributes_count,
-        attributes: l.attributes,
+        attributes: attribute_pairs(AttributeOwner::Link, &l.attributes),
     }
 }
 
-/// Field-kind tables → the wire shape, each kind spelled as its wire
-/// word ([`kind_word`]).
-fn field_kinds_wire(k: FieldKinds) -> FieldKindsWire {
-    let section = |v: Vec<(String, sfst::ValueKind)>| -> Vec<(String, &'static str)> {
-        v.into_iter().map(|(n, k)| (n, kind_word(k))).collect()
-    };
-    FieldKindsWire {
-        fields: section(k.fields),
-        event_attributes: section(k.event_attributes),
-        link_attributes: section(k.link_attributes),
-    }
-}
+// ── Search: keys ────────────────────────────────────────────────────
 
-// ── Search: selection-key grammar ───────────────────────────────────
-
-/// The wire word for each builtin field (snake_case). Also the words
-/// key enumeration emits ([`render_attribute_key`]), so filters and
-/// facet keys stay one vocabulary. The lockstep test walks
-/// `BuiltinField::ALL`, so a new engine builtin breaks the suite until
-/// it gets a wire word.
-const BUILTIN_WORDS: [(&str, BuiltinField); 17] = [
-    ("name", BuiltinField::Name),
-    ("kind", BuiltinField::Kind),
-    ("status", BuiltinField::Status),
-    ("status_message", BuiltinField::StatusMessage),
-    ("instrumentation_name", BuiltinField::InstrumentationName),
-    (
-        "instrumentation_version",
-        BuiltinField::InstrumentationVersion,
-    ),
-    ("event_name", BuiltinField::EventName),
-    ("duration", BuiltinField::Duration),
-    ("span_id", BuiltinField::SpanId),
-    ("parent_span_id", BuiltinField::ParentSpanId),
-    ("trace_id", BuiltinField::TraceId),
-    ("link_span_id", BuiltinField::LinkSpanId),
-    ("link_trace_id", BuiltinField::LinkTraceId),
-    ("event_time_since_start", BuiltinField::EventTimeSinceStart),
-    ("root_name", BuiltinField::RootName),
-    ("root_service_name", BuiltinField::RootServiceName),
-    ("trace_duration", BuiltinField::TraceDuration),
-];
-
-/// The attribute owners a selection key may name, as `<owner>.<key>`.
-/// The engine enum has two further owners that stay un-named here:
-/// `Builtin` is spelled as the bare builtin words above, and the
-/// predicates-only `Any` is not wire-nameable at all. Enumeration emits
-/// attribute keys owner-qualified ([`render_attribute_key`]), so
-/// attribute selections are always qualified; its `.expect` keeps this
-/// table in lockstep with the engine enum.
-const OWNER_WORDS: [(&str, AttributeOwner); 5] = [
-    ("resource", AttributeOwner::Resource),
-    ("span", AttributeOwner::Span),
-    ("instrumentation", AttributeOwner::Instrumentation),
-    ("event", AttributeOwner::Event),
-    ("link", AttributeOwner::Link),
-];
-
-/// Parse one selection key: `<owner>.<key>` (the key part verbatim, dots
-/// included — `resource.service.name` → the `service.name` resource
-/// attribute) or a bare builtin word.
+/// Parse one key — the engine's vocabulary, its OTLP field path
+/// (`resource.attributes.service.name`, `status.code`) — as the target
+/// a condition tests.
 pub(crate) fn parse_selection_key(key: &str) -> Result<PredicateTarget, String> {
-    for (word, owner) in OWNER_WORDS {
-        if let Some(rest) = key.strip_prefix(word).and_then(|r| r.strip_prefix('.')) {
-            if rest.is_empty() {
-                return Err(format!("selection key {key:?} names no attribute"));
+    let (owner, key) = parse_enumeration_key(key)?;
+    Ok(PredicateTarget::from_key(owner, key))
+}
+
+/// The search tokens of a request: one token per chip and per free-text
+/// term. Every chip and term is validated alone, so a bad request is a
+/// client error before admission whose message names the chip as sent
+/// ([`chip_error`], [`text_error`]); the token count is the only rule
+/// over the whole query.
+pub(crate) fn build_tokens(
+    conditions: &[ConditionParams],
+    text: &[String],
+) -> Result<TokenQuery, String> {
+    let count = conditions.len() + text.len();
+    if count > TOKENS_MAX {
+        return Err(format!(
+            "at most {TOKENS_MAX} conditions and text terms, got {count}"
+        ));
+    }
+    let mut tokens = TokenQuery::default();
+    for condition in conditions {
+        tokens.tokens.push(chip_token(condition)?);
+    }
+    for term in text {
+        check_request_text("text", term)?;
+        let token = Token::positive(Predicate {
+            conditions: vec![Condition {
+                target: PredicateTarget::FreeText,
+                op: CompareOp::Contains,
+                values: vec![PredicateValue::Text(term.clone())],
+            }],
+        });
+        tokens
+            .tokens
+            .push(validated(token).map_err(|e| text_error(term, e))?);
+    }
+    debug_assert!(tokens.validate().is_ok(), "every token validated alone");
+    Ok(tokens)
+}
+
+/// One token validated as a query of its own: every rule but the count.
+fn validated(token: Token) -> Result<Token, PredicateError> {
+    let mut query = TokenQuery {
+        tokens: vec![token],
+    };
+    query.validate()?;
+    Ok(query.tokens.pop().expect("the query holds the token"))
+}
+
+/// A chip's validation error in the wire's own words — the key and op
+/// as sent, never the engine's diagnostic names (the engine stays
+/// wire-neutral: the CLI spells keys differently). The last arm holds
+/// the variants a single-condition chip on a parsed key cannot raise.
+fn chip_error(key: &str, op: &str, err: PredicateError) -> String {
+    let chip = format!("'{key} {op}'");
+    match err {
+        PredicateError::NoValues { .. } => format!("{chip} has no values"),
+        PredicateError::SingleValueArity { got, .. } => {
+            format!("{chip} takes exactly one value, got {got}")
+        }
+        PredicateError::InvalidOpForTarget { .. } => format!("'{op}' is not valid on '{key}'"),
+        PredicateError::TextValueRequired { .. } => format!("{chip} takes text values"),
+        PredicateError::NumericValueRequired { .. } => format!("{chip} takes numbers"),
+        PredicateError::NonIntegerDuration => format!("{chip} takes whole nanoseconds"),
+        PredicateError::InvalidPattern { pattern, msg } => format!(
+            "{chip}: invalid pattern {pattern:?}: {}",
+            msg.split_whitespace().collect::<Vec<_>>().join(" ")
+        ),
+        PredicateError::MixedValueTypes { .. } => format!("{chip} mixes text and numbers"),
+        PredicateError::NanValue { .. } => format!("{chip} compares against NaN"),
+        PredicateError::InvalidIdValue { value, width, .. } => {
+            format!("'{key}' takes {width}-character hex ids, got {value:?}")
+        }
+        PredicateError::NotYetEvaluable { .. } => format!("{chip} is not supported"),
+        PredicateError::AttributeUnderBuiltinOwner { .. }
+        | PredicateError::TextTooShort { .. }
+        | PredicateError::TextTooLong { .. }
+        | PredicateError::TooManyTokens { .. }
+        | PredicateError::EmptyToken
+        | PredicateError::TokenNotAlone { .. } => format!("{chip} is not valid"),
+    }
+}
+
+/// A free-text term's validation error in the wire's own words. The
+/// last arm holds the variants a free-text token cannot raise.
+fn text_error(term: &str, err: PredicateError) -> String {
+    match err {
+        PredicateError::TextTooShort { min, .. } => {
+            format!("text {term:?} is shorter than {min} characters")
+        }
+        PredicateError::TextTooLong { max, .. } => format!("text is longer than {max} bytes"),
+        PredicateError::InvalidPattern { .. } => format!("text {term:?} cannot be matched"),
+        PredicateError::NoValues { .. }
+        | PredicateError::SingleValueArity { .. }
+        | PredicateError::AttributeUnderBuiltinOwner { .. }
+        | PredicateError::InvalidOpForTarget { .. }
+        | PredicateError::TextValueRequired { .. }
+        | PredicateError::NumericValueRequired { .. }
+        | PredicateError::NonIntegerDuration
+        | PredicateError::MixedValueTypes { .. }
+        | PredicateError::NanValue { .. }
+        | PredicateError::InvalidIdValue { .. }
+        | PredicateError::NotYetEvaluable { .. }
+        | PredicateError::TooManyTokens { .. }
+        | PredicateError::EmptyToken
+        | PredicateError::TokenNotAlone { .. } => format!("text {term:?} is not valid"),
+    }
+}
+
+/// One chip as its token: a `!` op is NOT EXISTS over the positive form,
+/// and `^=` ("starts with") is the anchored regex of the escaped value
+/// followed by anything, line breaks included.
+fn chip_token(chip: &ConditionParams) -> Result<Token, String> {
+    let target = parse_selection_key(&chip.key)?;
+    let (op, negated, prefix) = match chip.op.as_str() {
+        "=" => (CompareOp::Eq, false, false),
+        "!=" => (CompareOp::Eq, true, false),
+        "=~" => (CompareOp::Regex, false, false),
+        "!~" => (CompareOp::Regex, true, false),
+        "^=" => (CompareOp::Regex, false, true),
+        "!^=" => (CompareOp::Regex, true, true),
+        ">" => (CompareOp::Gt, false, false),
+        ">=" => (CompareOp::Gte, false, false),
+        "<" => (CompareOp::Lt, false, false),
+        "<=" => (CompareOp::Lte, false, false),
+        other => return Err(format!("condition on '{}': unknown op '{other}'", chip.key)),
+    };
+    if chip.values.len() > CONDITION_VALUES_MAX {
+        return Err(format!(
+            "condition on '{}' carries {} values, over the limit of {CONDITION_VALUES_MAX}",
+            chip.key,
+            chip.values.len()
+        ));
+    }
+    let mut values = Vec::with_capacity(chip.values.len());
+    for value in &chip.values {
+        values.push(match value {
+            ConditionValue::Text(text) => {
+                check_request_text("condition value", text)?;
+                PredicateValue::Text(if prefix {
+                    sfsq::traces::starts_with_pattern(text)
+                } else {
+                    text.clone()
+                })
             }
-            return Ok(PredicateTarget::Attribute(owner, rest.to_string()));
-        }
+            ConditionValue::Number(_) if prefix => {
+                return Err(format!(
+                    "condition on '{}': '{}' takes text values",
+                    chip.key, chip.op
+                ));
+            }
+            ConditionValue::Number(n) => match n.as_i64() {
+                Some(i) => PredicateValue::Integer(i),
+                None => PredicateValue::Float(n.as_f64().ok_or_else(|| {
+                    format!("condition on '{}': number {n} is out of range", chip.key)
+                })?),
+            },
+        });
     }
-    BUILTIN_WORDS
-        .iter()
-        .find(|(w, _)| *w == key)
-        .map(|(_, f)| PredicateTarget::Builtin(*f))
-        .ok_or_else(|| {
-            format!(
-                "unknown selection key {key:?}: use resource.<key> / span.<key> / \
-                 instrumentation.<key> / event.<key> / link.<key>, or a builtin \
-                 field word"
-            )
-        })
+    let group = Predicate {
+        conditions: vec![Condition { target, op, values }],
+    };
+    let token = if negated {
+        Token::negated(group)
+    } else {
+        Token::positive(group)
+    };
+    validated(token).map_err(|e| chip_error(&chip.key, &chip.op, e))
 }
 
-/// Build the engine predicate from the wire's filters: each selection
-/// key is one Eq condition (values OR within the key, keys AND — the
-/// engine's multi-value semantics); the duration bounds become builtin
-/// Duration comparisons. Keys iterate sorted so requests are
-/// deterministic. An empty value list is no constraint.
-pub(crate) fn build_predicate(
-    selections: &HashMap<String, Vec<String>>,
-    min_duration_ns: Option<i64>,
-    max_duration_ns: Option<i64>,
-    min_trace_duration_ns: Option<i64>,
-    max_trace_duration_ns: Option<i64>,
-) -> Result<Predicate, String> {
-    if let (Some(min), Some(max)) = (min_duration_ns, max_duration_ns)
-        && min > max
-    {
-        return Err(format!(
-            "min_duration_ns {min} exceeds max_duration_ns {max}: nothing can match"
-        ));
-    }
-    if let (Some(min), Some(max)) = (min_trace_duration_ns, max_trace_duration_ns)
-        && min > max
-    {
-        return Err(format!(
-            "min_trace_duration_ns {min} exceeds max_trace_duration_ns {max}: nothing can match"
-        ));
-    }
-    let mut conditions = Vec::new();
-    let mut keys: Vec<&String> = selections.keys().collect();
-    keys.sort();
-    for key in keys {
-        // Validate the key even when its value list is empty — a typo'd
-        // key must not hide behind an empty selection.
-        let target = parse_selection_key(key)?;
-        let values = &selections[key];
-        if values.is_empty() {
-            continue;
-        }
-        conditions.push(Condition {
-            target,
-            op: CompareOp::Eq,
-            values: values
-                .iter()
-                .map(|v| PredicateValue::Text(v.clone()))
-                .collect(),
-        });
-    }
-    if let Some(min) = min_duration_ns {
-        conditions.push(Condition {
-            target: PredicateTarget::Builtin(BuiltinField::Duration),
-            op: CompareOp::Gte,
-            values: vec![PredicateValue::Integer(min)],
-        });
-    }
-    if let Some(max) = max_duration_ns {
-        conditions.push(Condition {
-            target: PredicateTarget::Builtin(BuiltinField::Duration),
-            op: CompareOp::Lte,
-            values: vec![PredicateValue::Integer(max)],
-        });
-    }
-    if let Some(min) = min_trace_duration_ns {
-        conditions.push(Condition {
-            target: PredicateTarget::Builtin(BuiltinField::TraceDuration),
-            op: CompareOp::Gte,
-            values: vec![PredicateValue::Integer(min)],
-        });
-    }
-    if let Some(max) = max_trace_duration_ns {
-        conditions.push(Condition {
-            target: PredicateTarget::Builtin(BuiltinField::TraceDuration),
-            op: CompareOp::Lte,
-            values: vec![PredicateValue::Integer(max)],
-        });
-    }
-    Ok(Predicate { conditions })
-}
-
-// ── Enumeration: owner words + key rendering ────────────────────────
-
-/// Parse the `attributes.owner` word: an attribute owner or `builtin`.
-/// (`Any` stays un-nameable — the engine rejects enumerating it.)
-pub(crate) fn parse_owner_word(word: &str) -> Result<AttributeOwner, String> {
-    if word == "builtin" {
-        return Ok(AttributeOwner::Builtin);
-    }
-    OWNER_WORDS
-        .iter()
-        .find(|(w, _)| *w == word)
-        .map(|(_, o)| *o)
-        .ok_or_else(|| {
-            format!(
-                "unknown owner {word:?}: one of resource, span, instrumentation, \
-                 event, link, builtin"
-            )
-        })
-}
-
-/// The selection-grammar word of a builtin field — for error messages
-/// that must speak the wire's language, not the engine's.
-pub(crate) fn builtin_word(field: BuiltinField) -> &'static str {
-    BUILTIN_WORDS
-        .iter()
-        .find(|(_, f)| *f == field)
-        .map(|(w, _)| *w)
-        .expect("the lockstep test pins a wire word for every builtin")
-}
-
-/// Render one enumerated key into the selection grammar — the exact
-/// inverse of [`parse_selection_key`] (round-trip pinned by tests), so
-/// the facet rail can feed keys straight back as selections.
-pub(crate) fn render_attribute_key(owner: AttributeOwner, key: &AttributeKey) -> String {
-    match key {
-        AttributeKey::Builtin(b) => BUILTIN_WORDS
+/// The heatmap's tokens: the page's, minus every trace-duration and
+/// trace-start one — they are the grid's own axes, so a cell click or a
+/// duration chip narrows the list beside the grid, not the grid.
+pub(crate) fn heatmap_tokens(tokens: &TokenQuery) -> TokenQuery {
+    TokenQuery {
+        tokens: tokens
+            .tokens
             .iter()
-            .find(|(_, f)| f == b)
-            .map(|(w, _)| (*w).to_string())
-            .expect("the lockstep test pins a wire word for every builtin"),
-        AttributeKey::Attribute(a) => {
-            let word = OWNER_WORDS
-                .iter()
-                .find(|(_, o)| *o == owner)
-                .map(|(w, _)| *w)
-                .expect("attribute keys only ever carry attribute owners");
-            format!("{word}.{a}")
-        }
+            .filter(|t| {
+                !t.group
+                    .conditions
+                    .iter()
+                    .any(|c| sfsq::traces::is_axis(&c.target))
+            })
+            .cloned()
+            .collect(),
     }
 }
 
-/// A selection-grammar key as the enumeration API's (owner, key) pair.
+// ── Suggest: keys ───────────────────────────────────────────────────
+
+/// A key whose values a request suggests: bounded in length,
+/// and with stored values (a virtual builtin such as the duration has
+/// none). Checked before admission, so a bad key is the client's error.
+pub(crate) fn parse_values_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
+    check_request_text("key", key)?;
+    let (owner, key) = parse_enumeration_key(key)?;
+    if let AttributeKey::Builtin(b) = key
+        && b.dictionary_field().is_none()
+    {
+        return Err(format!("'{}' has no stored values to list", b.key()));
+    }
+    Ok((owner, key))
+}
+
+/// Reject a request string past [`super::wire::REQUEST_TEXT_MAX_BYTES`]:
+/// the matcher built from it runs before any deadline.
+pub(crate) fn check_request_text(name: &str, text: &str) -> Result<(), String> {
+    let max = super::wire::REQUEST_TEXT_MAX_BYTES;
+    if text.len() > max {
+        return Err(format!("'{name}' is longer than {max} bytes"));
+    }
+    Ok(())
+}
+
+/// A key as the engine's (owner, key) pair; the error names the key
+/// forms.
 pub(crate) fn parse_enumeration_key(key: &str) -> Result<(AttributeOwner, AttributeKey), String> {
-    Ok(match parse_selection_key(key)? {
-        PredicateTarget::Attribute(owner, a) => (owner, AttributeKey::Attribute(a)),
-        PredicateTarget::Builtin(f) => (AttributeOwner::Builtin, AttributeKey::Builtin(f)),
+    sfsq::traces::parse_key(key).map_err(|e| match e {
+        KeyError::EmptyAttribute => format!("key {key:?} names no attribute"),
+        KeyError::Unknown => format!("unknown key {key:?}: use {}", sfsq::traces::key_forms()),
     })
 }
 
-/// Shape the key enumeration into the wire result.
-pub(crate) fn to_attributes_result(data: AttributeNamesData) -> AttributesResult {
-    AttributesResult {
-        mode: "attributes",
-        version: 1,
-        status: StatusWire::from(&data.status),
-        truncated: data.truncated,
-        keys: data
-            .keys
-            .iter()
-            .map(|(owner, key)| render_attribute_key(*owner, key))
-            .collect(),
+/// Shape suggestions into the wire result. `key` echoes the request's
+/// key for value suggestions. Values are capped at
+/// [`LIST_VALUE_MAX_BYTES`] of JSON (the engine cut raw bytes), keys at
+/// [`super::wire::REQUEST_TEXT_MAX_BYTES`] (the engine sends them whole),
+/// so every key that is not flagged can be sent back as a request key;
+/// a text cut to an earlier item's is listed once, with the higher tier
+/// and both items' kinds (the engine's merge rule).
+pub(crate) fn to_suggest_result(
+    data: sfsq::traces::SuggestData,
+    key: Option<String>,
+) -> SuggestResult {
+    let mut items: Vec<SuggestionWire> = Vec::with_capacity(data.items.len());
+    let mut kinds: Vec<sfst::ValueKinds> = Vec::with_capacity(data.items.len());
+    let mut listed: HashMap<String, usize> = HashMap::new();
+    let max = match key {
+        Some(_) => LIST_VALUE_MAX_BYTES,
+        None => super::wire::REQUEST_TEXT_MAX_BYTES,
+    };
+    for s in data.items {
+        let mut text = s.text;
+        let cut = truncate_value(&mut text, max);
+        if let Some(&i) = listed.get(&text) {
+            items[i].truncated |= cut || s.truncated;
+            items[i].tier = items[i].tier.max(s.tier.map(Into::into));
+            kinds[i] = kinds[i].union(s.kinds);
+            continue;
+        }
+        listed.insert(text.clone(), items.len());
+        items.push(SuggestionWire {
+            text,
+            match_class: s.class.into(),
+            truncated: cut || s.truncated,
+            tier: s.tier.map(Into::into),
+            is_virtual: !s.enumerable,
+            kinds: Vec::new(),
+        });
+        kinds.push(s.kinds);
     }
-}
-
-/// Shape one key's value enumeration into the wire result. `key` is the
-/// request's key, echoed in the selection grammar.
-pub(crate) fn to_attribute_values_result(
-    data: AttributeValuesData,
-    key: String,
-) -> AttributeValuesResult {
-    AttributeValuesResult {
-        mode: "attribute_values",
+    for (item, kinds) in items.iter_mut().zip(kinds) {
+        item.kinds = kind_words(kinds);
+    }
+    SuggestResult {
+        mode: "suggest",
         version: 1,
         status: StatusWire::from(&data.status),
-        truncated: data.truncated,
         key,
-        values: data
-            .values
-            .into_iter()
-            .map(|v| AttributeValueWire {
-                value: v.value,
-                kind: v.kind.map(kind_word),
-            })
-            .collect(),
+        items,
+        truncated: data.truncated,
+        complete_after: data.complete_after,
     }
 }
 
 // ── Overview: engine data → wire ────────────────────────────────────
 
-/// Everything the standalone overview mode and the search response's
-/// embedded section share. Shaped once so the two surfaces cannot
-/// report the same window differently.
-struct OverviewParts {
-    status: StatusWire,
-    grid: OverviewGridWire,
-    totals: OverviewTotals,
-    top_root_services: Option<FacetListWire>,
-    top_root_operations: Option<FacetListWire>,
-}
-
-/// Shape the trace-density grid's shared body. The wire's
+/// Shape the list response's embedded window aggregate. The wire's
 /// second-granular geometry derives from the SAME `grid` the engine
 /// binned on — one source of truth; the shared derivation guarantees
-/// whole seconds (debug-asserted).
-fn overview_parts(data: OverviewData, grid: sfst::Grid) -> OverviewParts {
+/// whole seconds (debug-asserted). `coverage` is the grid's aligned
+/// window (derived together with `grid`) and `scope` is what the
+/// engine pass actually carried, which only the caller knows. The wire
+/// contract is `OverviewSection`.
+pub(crate) fn to_overview_section(
+    data: OverviewData,
+    grid: sfst::Grid,
+    coverage: CoverageWire,
+) -> OverviewSection {
     const NS_PER_S: i64 = 1_000_000_000;
     debug_assert_eq!(grid.bucket_start_ns % NS_PER_S, 0);
     debug_assert_eq!(grid.bucket_width_ns % NS_PER_S, 0);
-    let to_list = |l: sfsq::traces::FacetList| FacetListWire {
-        top: l
-            .top
-            .into_iter()
-            .map(|(value, traces)| FacetValueWire { value, traces })
-            .collect(),
-        other: l.other,
-        unattributed: l.unattributed,
-    };
-    let (top_root_services, top_root_operations) = match data.root_facets {
-        Some(f) => (Some(to_list(f.services)), Some(to_list(f.operations))),
-        None => (None, None),
-    };
-    OverviewParts {
+    OverviewSection {
+        version: 1,
+        unit: "traces",
         status: StatusWire::from(&data.status),
+        coverage,
         grid: OverviewGridWire {
             bucket_start_s: (grid.bucket_start_ns / NS_PER_S) as u32,
             bucket_width_s: (grid.bucket_width_ns / NS_PER_S) as u32,
             duration_bins: DURATION_BIN_LABELS.to_vec(),
             cells: data.cells.iter().map(|row| row.to_vec()).collect(),
-            error_cells: data.error_cells.iter().map(|row| row.to_vec()).collect(),
+            error_spans: data.error_spans,
             duration_percentiles_ns: to_percentiles(&data.bucket_percentiles),
+            duration_rows: heatmap_row_bounds().to_vec(),
+            durations: data
+                .bucket_duration_rows
+                .iter()
+                .map(|rows| rows.to_vec())
+                .collect(),
         },
         totals: OverviewTotals {
             traces: data.total_traces,
-            spans: data.total_spans,
-            errors: data.total_errors,
         },
-        top_root_services,
-        top_root_operations,
     }
 }
 
@@ -481,99 +1015,6 @@ fn to_percentiles(buckets: &[Option<DurationPercentiles>]) -> OverviewPercentile
         p50: buckets.iter().map(|b| b.map(|p| p.p50)).collect(),
         p95: buckets.iter().map(|b| b.map(|p| p.p95)).collect(),
         p99: buckets.iter().map(|b| b.map(|p| p.p99)).collect(),
-    }
-}
-
-/// The heatmap's predicate from a request's `selections` alone — the
-/// page's grammar and builder, minus every duration bound (the grid
-/// never applies those; see the wire's `scope` doc). `None` when the
-/// selections constrain nothing, so the caller runs the plain grid.
-pub(crate) fn heatmap_predicate(
-    selections: &HashMap<String, Vec<String>>,
-) -> Result<Option<Predicate>, String> {
-    let predicate = build_predicate(selections, None, None, None, None)?;
-    Ok((!predicate.is_all()).then_some(predicate))
-}
-
-/// Shape the standalone `overview` mode's response; `scope` is what
-/// actually ran (the handler's decision, from the predicate it passed).
-pub(crate) fn to_overview_result(
-    data: OverviewData,
-    grid: sfst::Grid,
-    scope: &'static str,
-) -> OverviewResult {
-    let parts = overview_parts(data, grid);
-    OverviewResult {
-        mode: "overview",
-        version: 1,
-        unit: "traces",
-        status: parts.status,
-        scope,
-        grid: parts.grid,
-        totals: parts.totals,
-        top_root_services: parts.top_root_services,
-        top_root_operations: parts.top_root_operations,
-    }
-}
-
-/// Shape the same aggregate as the SEARCH response's embedded section:
-/// the body of [`to_overview_result`] minus `mode`, plus the caller's
-/// `coverage` (the grid's aligned window, derived together with
-/// `grid`) and `scope` — what the engine pass actually carried, which
-/// only the caller knows. The wire contract is `OverviewSection`.
-pub(crate) fn to_overview_section(
-    data: OverviewData,
-    grid: sfst::Grid,
-    coverage: CoverageWire,
-    scope: &'static str,
-) -> OverviewSection {
-    let parts = overview_parts(data, grid);
-    OverviewSection {
-        version: 1,
-        unit: "traces",
-        status: parts.status,
-        coverage,
-        scope,
-        grid: parts.grid,
-        totals: parts.totals,
-        top_root_services: parts.top_root_services,
-        top_root_operations: parts.top_root_operations,
-    }
-}
-
-// ── Slowest: engine data → wire ─────────────────────────────────────
-
-/// Shape the duration-ranked top-K into the wire result. `limit` is the
-/// resolved request limit (`items.max_to_return`); the engine already
-/// truncated to it.
-pub(crate) fn to_slowest_result(data: SlowestData, limit: usize) -> SlowestResult {
-    SlowestResult {
-        mode: "slowest",
-        version: 1,
-        status: StatusWire::from(&data.status),
-        items: SearchItems {
-            returned: data.traces.len(),
-            max_to_return: limit,
-        },
-        traces: data
-            .traces
-            .into_iter()
-            .map(|t| {
-                let (root_service, root_name) = match t.root {
-                    Some(r) => (r.service, r.name),
-                    None => (None, None),
-                };
-                SlowestTraceWire {
-                    trace_id: t.trace_id.to_string(),
-                    root_service,
-                    root_name,
-                    start_ns: t.min_start_ns,
-                    duration_ns: t.duration_ns,
-                    span_count: t.span_count,
-                    error_count: t.error_count,
-                }
-            })
-            .collect(),
     }
 }
 
@@ -605,7 +1046,7 @@ pub(crate) fn to_slowest_result(data: SlowestData, limit: usize) -> SlowestResul
 ///   indistinguishable from exhaustion). Late arrivals ranking BELOW
 ///   the key appear on later pages normally.
 /// - The cursor freezes the window but NOT the filters: echoing it with
-///   different selections re-partitions a different result set. The
+///   different chips or text re-partitions a different result set. The
 ///   client must keep the filters fixed for the walk's lifetime.
 ///
 /// Cost note: each page reruns the query with `limit = served + limit`,
@@ -689,6 +1130,238 @@ fn is_served(c: &SearchCursor, t: &sfsq::traces::TraceSummary) -> bool {
         || (t.newest_matched_start_ns == c.rank_ns && t.trace_id <= c.trace_id)
 }
 
+// ── Explore ─────────────────────────────────────────────────────────
+
+/// The keys a span row carries when the request names none: the service,
+/// the span name, the kind and the status.
+const EXPLORE_DEFAULT_COLUMNS: [&str; 4] = [
+    "resource.attributes.service.name",
+    "name",
+    "kind",
+    "status.code",
+];
+
+/// An `explore` call's engine request, plus what shaping its answer needs.
+pub(crate) struct ExploreRequest {
+    pub query: ExploreQuery,
+    /// The stack key, when the histogram is asked for.
+    pub stack: Option<String>,
+    /// The rows' keys, in request order.
+    pub columns: Vec<String>,
+}
+
+/// Build and validate an `explore` call over `grid`; `before` continues a
+/// rows walk. Every engine check runs here, so a bad request is refused
+/// before admission.
+pub(crate) fn explore_request(
+    params: &ExploreParams,
+    grid: sfst::Grid,
+    before: Option<RowKey>,
+) -> Result<ExploreRequest, String> {
+    let tokens = build_tokens(&params.conditions, &params.text)?;
+    let mut query = ExploreQuery::new(grid).tokens(tokens);
+    let stack = params.histogram.as_ref().map(|h| {
+        h.stack
+            .clone()
+            .unwrap_or_else(|| BuiltinField::Status.key().to_string())
+    });
+    if let Some(stack) = &stack {
+        query = query.histogram(stack.clone());
+    }
+    let mut columns = Vec::new();
+    if let Some(rows) = &params.rows {
+        columns = rows
+            .columns
+            .clone()
+            .unwrap_or_else(|| EXPLORE_DEFAULT_COLUMNS.map(String::from).to_vec());
+        query = query.rows(RowsSpec {
+            limit: rows.limit.unwrap_or(DEFAULT_ROWS_LIMIT),
+            before,
+            columns: columns.clone(),
+        });
+    }
+    query.validate().map_err(|e| e.to_string())?;
+    Ok(ExploreRequest {
+        query,
+        stack,
+        columns,
+    })
+}
+
+/// A rows walk's position: the window its first page was asked for,
+/// before alignment (re-aligning it gives that page's grid again), and
+/// the last listed span's key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ExploreAnchor {
+    pub after_s: u32,
+    pub before_s: u32,
+    pub key: RowKey,
+}
+
+/// The anchor's wire form: the `e1:` version prefix, then the window and
+/// the key, colon-joined.
+pub(crate) fn encode_explore_anchor(a: &ExploreAnchor) -> String {
+    format!(
+        "e1:{}:{}:{}:{}:{}",
+        a.after_s, a.before_s, a.key.start_ns, a.key.trace_id, a.key.span_id
+    )
+}
+
+/// Parse an anchor produced by [`encode_explore_anchor`]: exact shape and
+/// an ordered window, else one "malformed anchor" error.
+pub(crate) fn parse_explore_anchor(s: &str) -> Result<ExploreAnchor, String> {
+    let malformed = || format!("malformed anchor {s:?}");
+    let mut parts = s.split(':');
+    let (Some("e1"), Some(after), Some(before), Some(start), Some(trace), Some(span), None) = (
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+    ) else {
+        return Err(malformed());
+    };
+    let anchor = ExploreAnchor {
+        after_s: after.parse().map_err(|_| malformed())?,
+        before_s: before.parse().map_err(|_| malformed())?,
+        key: RowKey {
+            start_ns: start.parse().map_err(|_| malformed())?,
+            trace_id: parse_trace_id(trace).map_err(|_| malformed())?,
+            span_id: parse_span_id(span).map_err(|_| malformed())?,
+        },
+    };
+    if anchor.after_s >= anchor.before_s {
+        return Err(malformed());
+    }
+    Ok(anchor)
+}
+
+/// Shape an `explore` answer over `grid` (aligned to `[after_s,
+/// before_s)`). A page with older spans carries the anchor of its last
+/// span, with `asked`, the window before alignment, but only when its
+/// rows are complete: as the list's cursor, a partial page's continuation
+/// would not be a stable prefix, so the walk ends there with the status
+/// saying why. The stack's high-cardinality reason touches only the
+/// histogram, so it does not end the walk.
+pub(crate) fn to_explore_result(
+    data: ExploreData,
+    request: &ExploreRequest,
+    grid: sfst::Grid,
+    (after_s, before_s): (u32, u32),
+    asked: (u32, u32),
+) -> ExploreResult {
+    const NS_PER_S: i64 = 1_000_000_000;
+    let rows_complete = match &data.status {
+        sfsq::traces::QueryStatus::Complete => true,
+        sfsq::traces::QueryStatus::Partial(reasons) => reasons
+            .iter()
+            .all(|reason| *reason == sfsq::traces::PartialReason::StackFieldHighCard),
+    };
+    let histogram = data.histogram.map(|h| {
+        // A value longer than a request may carry could not come back as
+        // an equality chip, and two cut ones could share a name: it counts
+        // under `other`.
+        let named: Vec<bool> = h
+            .dimensions
+            .iter()
+            .map(|d| d.len() <= REQUEST_TEXT_MAX_BYTES)
+            .collect();
+        ExploreHistogramWire {
+            stack: request.stack.clone().unwrap_or_default(),
+            dimensions: h
+                .dimensions
+                .into_iter()
+                .zip(&named)
+                .filter_map(|(d, &named)| named.then_some(d))
+                .collect(),
+            buckets: h
+                .buckets
+                .into_iter()
+                .map(|b| {
+                    let mut counts = Vec::with_capacity(b.counts.len());
+                    let mut other = b.other;
+                    for (count, &named) in b.counts.into_iter().zip(&named) {
+                        if named {
+                            counts.push(count);
+                        } else {
+                            other += count;
+                        }
+                    }
+                    ExploreBucketWire {
+                        counts,
+                        other,
+                        unset: b.unset,
+                        durations: b.durations.to_vec(),
+                    }
+                })
+                .collect(),
+            total: h.total,
+            errors: h.errors,
+            percentiles: h.percentiles.map(|p| ExplorePercentilesWire {
+                p50_ns: p.p50,
+                p95_ns: p.p95,
+                p99_ns: p.p99,
+            }),
+            duration_rows: heatmap_row_bounds().to_vec(),
+        }
+    });
+    let rows = data.rows.map(|rows| {
+        let anchor = match rows.items.last() {
+            Some(last) if rows.more && rows_complete => Some(AnchorWire {
+                next: encode_explore_anchor(&ExploreAnchor {
+                    after_s: asked.0,
+                    before_s: asked.1,
+                    key: last.key,
+                }),
+            }),
+            _ => None,
+        };
+        let items = rows
+            .items
+            .into_iter()
+            .map(|item| {
+                let mut fields = Vec::new();
+                let mut truncated = false;
+                for (key, values) in request.columns.iter().zip(item.columns) {
+                    for mut value in values {
+                        truncated |= truncate_value(&mut value, LIST_VALUE_MAX_BYTES);
+                        fields.push((key.clone(), value));
+                    }
+                }
+                ExploreSpanWire {
+                    start_ns: item.key.start_ns,
+                    duration_ns: item.duration_ns,
+                    trace_id: item.key.trace_id.to_string(),
+                    span_id: item.key.span_id.to_string(),
+                    fields,
+                    truncated,
+                }
+            })
+            .collect();
+        ExploreRowsWire {
+            matched: rows.matched,
+            items,
+            anchor,
+        }
+    });
+    ExploreResult {
+        mode: "explore",
+        version: 1,
+        status: StatusWire::from(&data.status),
+        window: ExploreWindowWire {
+            after: after_s,
+            before: before_s,
+            bucket_start_s: (grid.bucket_start_ns / NS_PER_S) as u32,
+            bucket_width_s: (grid.bucket_width_ns / NS_PER_S) as u32,
+            buckets: grid.num_buckets,
+        },
+        histogram,
+        rows,
+    }
+}
+
 // ── Search: window canonicalization ─────────────────────────────────
 
 /// The canonicalized search window: the engine bounds in nanoseconds
@@ -754,7 +1427,6 @@ pub(crate) fn to_search_result(
     limit: usize,
     incoming: Option<&SearchCursor>,
     frozen: (u32, u32),
-    completion_coverage: CoverageWire,
 ) -> SearchResult {
     let mut traces = data.traces;
     if let Some(c) = incoming {
@@ -786,13 +1458,11 @@ pub(crate) fn to_search_result(
         mode: "search",
         version: 1,
         status: StatusWire::from(&data.status),
-        completion_coverage,
         items: SearchItems {
             returned: traces.len(),
             max_to_return: limit,
         },
         traces: traces.into_iter().map(summary_wire).collect(),
-        field_kinds: field_kinds_wire(data.field_kinds),
         anchor,
         // Composed by the caller when it ran the aggregate pass: only
         // the Functions view does, and only it holds the second engine
@@ -801,9 +1471,20 @@ pub(crate) fn to_search_result(
     }
 }
 
-/// One search-page summary → the wire shape (matched spans as full
-/// wire spans).
-fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
+/// One search-page summary → the wire shape, its free-length strings
+/// capped at [`LIST_VALUE_MAX_BYTES`].
+fn summary_wire(mut t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
+    let max = LIST_VALUE_MAX_BYTES;
+    let mut truncated = false;
+    for s in [&mut t.root_service, &mut t.root_name]
+        .into_iter()
+        .flatten()
+    {
+        truncated |= truncate_value(s, max);
+    }
+    for (name, _) in &mut t.service_breakdown.top {
+        truncated |= truncate_value(name, max);
+    }
     TraceSummaryWire {
         trace_id: t.trace_id.to_string(),
         root_service: t.root_service,
@@ -814,9 +1495,8 @@ fn summary_wire(t: sfsq::traces::TraceSummary) -> TraceSummaryWire {
         span_count: t.span_count,
         error_count: t.error_count,
         service_breakdown: service_breakdown_wire(t.service_breakdown),
-        matched_count: t.matched_count,
         exact: t.exact,
-        matched_spans: t.matched_spans.into_iter().map(span_wire).collect(),
+        truncated,
     }
 }
 
@@ -829,25 +1509,7 @@ fn service_breakdown_wire(b: sfsq::traces::ServiceBreakdown) -> ServiceBreakdown
             .map(|(value, spans)| ServiceSpansWire { value, spans })
             .collect(),
         other: b.other,
-        other_services: b.other_services,
         unattributed: b.unattributed,
-    }
-}
-
-/// The wire word for each schema value kind. Exhaustive on purpose: a
-/// new engine kind fails compilation here until its wire name is decided.
-fn kind_word(k: sfst::ValueKind) -> &'static str {
-    match k {
-        sfst::ValueKind::Null => "null",
-        sfst::ValueKind::Bool => "bool",
-        sfst::ValueKind::Int => "int",
-        sfst::ValueKind::Double => "double",
-        sfst::ValueKind::Str => "str",
-        sfst::ValueKind::Bytes => "bytes",
-        sfst::ValueKind::EmptyKvlist => "empty_kvlist",
-        sfst::ValueKind::EmptyArray => "empty_array",
-        sfst::ValueKind::Kvlist => "kvlist",
-        sfst::ValueKind::Array => "array",
     }
 }
 

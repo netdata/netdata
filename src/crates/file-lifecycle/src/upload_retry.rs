@@ -69,6 +69,19 @@ impl UploadRetry {
         self.items.is_empty()
     }
 
+    /// The failed uploads that wait for their next try. One that
+    /// [`take_due`](Self::take_due) handed out is with the uploader again
+    /// and does not wait, though it stays queued until its answer.
+    pub fn waiting(&self) -> usize {
+        let mut waiting = 0;
+        for item in self.items.values() {
+            if !item.in_flight {
+                waiting += 1;
+            }
+        }
+        waiting
+    }
+
     /// Highest attempt count across pending items (0 if empty); drives the
     /// retry tick's warn→error escalation at [`PERSISTENT_FAILURE_ATTEMPTS`].
     pub fn max_attempts(&self) -> u32 {
@@ -168,10 +181,14 @@ mod tests {
         // Not due before the first backoff window.
         assert!(q.take_due(t0).is_empty());
 
+        assert_eq!(q.waiting(), 1);
+
         // Due after 30s; taking marks it in flight so it won't re-fire.
         let due = q.take_due(t0 + Duration::from_secs(31));
         assert_eq!(due.len(), 1);
         assert!(q.take_due(t0 + Duration::from_secs(31)).is_empty());
+        // It is with the uploader again: queued, but it does not wait.
+        assert_eq!((q.len(), q.waiting()), (1, 0));
 
         // Success (or abandonment) removes it.
         q.clear_sfst(sk(1));

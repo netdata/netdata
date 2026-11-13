@@ -18,11 +18,11 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
 use async_trait::async_trait;
-use bridge::config::LegacyLogsConfig;
-use bridge::function::{FunctionCallContext, FunctionHandler};
 use netdata_plugin_error::Result;
 use netdata_plugin_protocol::FunctionDeclaration;
 use netdata_plugin_schema::HttpAccess;
+use otel_bridge::config::LegacyLogsConfig;
+use otel_bridge::function::{FunctionCallContext, FunctionHandler};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, instrument, trace, warn};
 
@@ -42,16 +42,16 @@ type LegacyLogsResponseBody = netdata::JournalResponse;
 /// Synthesize a JSON request payload from legacy GET-style URL args
 /// (`info`, `after:N`, `before:M`), mirroring the ledger's shim
 /// (`otel-ledger/src/ledger/rpc/mod.rs` `patch_args_into_payload`). The
-/// rt-level GET shim only rewrites `otel-logs` calls
+/// netdata-plugin-rt GET shim only rewrites `otel-logs` calls
 /// (`netdata-plugin/rt/src/lib.rs` `handle_function_call`), but the
 /// logs UI issues this function the same GET way, and the bridge builds the
 /// typed request from the payload alone
-/// (`netdata-plugin/bridge/src/function.rs` `HandlerAdapter::handle_raw`) —
+/// (`otel-bridge/src/function.rs` `HandlerAdapter::handle_raw`) —
 /// so without this translation GET args would never reach `JournalRequest`.
 /// Returns `None` when there are no args or a payload already exists (the
 /// caller then keeps the original).
 ///
-/// Divergence from the ledger: tokens parse as u64 (the rt shim's width),
+/// Divergence from the ledger: tokens parse as u64 (the netdata-plugin-rt shim's width),
 /// not the ledger's u32, so a token past `JournalRequest`'s u32 window
 /// fields synthesizes a value the deserializer rejects — failing the whole
 /// call with 400 — where the ledger skips the token.

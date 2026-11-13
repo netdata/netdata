@@ -7,7 +7,7 @@
 //! The hard need is `journal-function`: its Cargo.toml has no
 //! `journal-common` dependency, so this module is its only route to the
 //! aliases. The other `journal-core` dependents (journal-index,
-//! journal-engine, journal-log-writer) and journal-core's own modules import
+//! journal-engine) and journal-core's own modules import
 //! through here as well, keeping one import path across the stack;
 //! `journal-registry`, which does not depend on `journal-core`, imports
 //! `journal_common::collections` directly.
@@ -15,8 +15,7 @@
 //! Consumers (grep-verified): journal-core `field_map.rs`, `file/file.rs`
 //! (via `crate::collections`); journal-index `file_index.rs`,
 //! `file_indexer.rs`; journal-function `netdata/facets.rs`,
-//! `netdata/histogram.rs`; journal-engine `histogram.rs`; journal-log-writer
-//! `log/chain.rs`. Without this module, journal-function would not compile,
+//! `netdata/histogram.rs`; journal-engine `histogram.rs`. Without this module, journal-function would not compile,
 //! and the rest would need direct `journal_common::collections` imports.
 
 pub use journal_common::collections::{HashMap, HashSet, VecDeque};
