@@ -150,7 +150,8 @@ not provided. Inline source is a generated TypeScript module; relative helper
 imports belong in file-based scripts.
 
 One Chromium project and worker run without retries or repetition. Script retry
-overrides are rejected before workers start. Tracing and video are disabled.
+overrides are rejected before workers start. DEM configures video off and enables
+tracing only when `failure_trace.v1` is selected; see [Optional journey failure traces](#optional-journey-failure-traces).
 Captured diagnostic events describe test/step phases, errors and worker stdio;
 the reporter does not promise browser console or network-event instrumentation.
 Only all declared ordinary tests passing is success. Skipped, expected-failure
@@ -158,8 +159,8 @@ and incomplete coverage is inconclusive unless an unexpected failure/timeout
 or executor error occurs. Import and managed-browser launch failures are
 execution errors. CLI exit alone does not determine monitoring success.
 
-Optional failure screenshots use Playwright's own capture path. Only PNG
-screenshot attachments inside output are candidate artifacts. Failed/timedOut-test
+Optional failure screenshots use Playwright's own capture path. PNG screenshot attachments inside output are
+candidate artifacts; negotiated failure traces can also supply ZIPs. Failed/timedOut-test
 candidates use artifacts; interrupted-test candidates use a separate
 interrupted_artifacts list with IDs unique across both lists. The parent forwards
 interrupted candidates only when its budget stop preceded the terminal report.
@@ -204,7 +205,7 @@ baseline error event/result and does not authorize replay with weaker settings.
 Output extensions MUST be explicitly requested by an Agent that understands
 them and selected by the runtime for that attempt. The neutral `extensions` request
 member and `extension_init` acknowledgement implement this gate for `failure_evidence.v1`,
-the opt-in `browser_summary.v1`, and capture-enabled `capture_details.v1`. The execution contract remains 2.
+the opt-in `browser_summary.v1`, capture-enabled `capture_details.v1`, and opt-in `failure_trace.v1`. The execution contract remains 2.
 
 | Change | Compatible evolution rule |
 |---|---|
@@ -413,7 +414,7 @@ artifact publication.
 Run `npm ci --ignore-scripts` and `npm test` in this source directory, or set
 DEM_TEST_DEPENDENCIES to an absolute, separately prepared dependency root before running
 `node --test tests/*.test.mjs`. Set DEM_TEST_BROWSER to the pinned sandbox browser
-for the real-browser summary case. Tests use real non-browser Playwright execution
+for the real-browser summary and native trace cases. Tests also use real non-browser Playwright execution
 and synthetic fixture runtimes, without adding component path overrides to the
 execution request. Fixtures stamp the test Node version; production archives use
 the release pin. Real Linux browser/audit and process-tree cancellation validation
@@ -437,11 +438,11 @@ Capture-enabled journeys request `capture_details.v1` alongside other optional f
 when capture is enabled. An old runtime or a peer without this selection keeps existing capture behavior; no feature
 probe or extra job option is needed. The frozen core candidate objects and terminal lists are unchanged.
 
-The reporter emits these records after processing an eligible test's screenshot attachments:
+The reporter emits these records after processing an eligible test's capture attachments:
 
 | `data.record` | Payload |
 |---|---|
-| `test` | `test`: `id`, `title`, optional `text_truncated`, `status`, `expected_status`, `accepted`, `unaccepted`. Counts cover usable candidates and unusable PNG attachments named `screenshot`, including mixed results. |
+| `test` | `test`: `id`, `title`, optional `text_truncated`, `status`, `expected_status`, `accepted`, `unaccepted`. Counts cover usable PNG candidates and unusable PNG attachments named `screenshot`, including mixed results. |
 | `capture` | `id`, `test_id`: links one accepted candidate to a preceding test observation. |
 | `truncated` | Detail was omitted; emitted at most once. |
 | `complete` | Reporter finished this stream; does not imply untruncated coverage or publication. |
@@ -476,4 +477,49 @@ Go-authored stored records use ordinary typed JSON decoding. Optional-wire valid
 outcomes and publication. Historical omissions remain in `run.captures`, never in empty manifests; current availability
 and byte access remain owned by the artifact store. Functions derive labels
 from artifact kind and display test titles separately. Titles outlive history when their captures do; redaction of
-metadata does not sanitize PNG or HTML content.
+metadata does not sanitize PNG, ZIP or HTML content.
+
+## Optional journey failure traces
+
+`trace_on_failure` is off by default and requires `screenshot_on_failure`. Enabling the option requests
+`failure_trace.v1`; selecting it enables tracing in the generated Playwright configuration and allows the reporter
+to offer trace candidates. It adds no extension body records and does not change execution contract 2. Old Agent
+requests retain baseline output; an older runtime can decline the new feature without changing screenshot behavior.
+Core trace-kind admission depends on the Agent's
+request, never on optional `extension_init` validity.
+
+DEM configures `retain-on-failure`, snapshots/screenshots enabled, sources/attachments disabled. Trusted scripts can
+override these settings with `test.use({ trace: 'on' })`, invoke tracing APIs or supply their own trace attachments.
+Script-directed recording can occur even when DEM tracing is off or Configuration Test is used. Configuration Test
+never publishes captures; monitoring attempts publish only requested, eligible captures.
+
+Existing failed/timedOut/interrupted attachment eligibility applies. Under the configured defaults, expected failures
+produce no automatic trace; unexpected passes may write a ZIP that DEM does not offer and drained workspace cleanup
+removes. One test can merge multiple
+browser contexts into its native ZIP. Missing attachment/export is best effort, not proof of a clean page.
+
+The reporter accepts attachments named `trace` with MIME `application/zip`, checks the same output-root/regular-file
+boundary as PNGs and a ZIP local-file-header signature, then offers `trace-<index>` / kind `trace` candidates through
+the existing normal or interrupted list. IDs share the existing per-attempt index. Capture-detail test links apply to
+both kinds, while `accepted` and `unaccepted` remain PNG-only. No trace rejection counter or inferred absence reason
+is introduced. Existing Go omissions describe candidates rejected by terminal eligibility or publication.
+
+When requested, `run.captures.trace` describes negotiation: `supported`, `unsupported`, `negotiation_not_reported` or
+`invalid`; absent when disabled. It describes capability, not whether a trace was produced or retained. Bad
+capture-detail payloads do not change this independent capability state. Invalid shared negotiation affects optional
+reporting only, never outcomes or request-authorized core candidates.
+
+Trace ZIPs retain raw data, including resolved DEM credentials, cookies, form values, headers, bodies, object details
+and source fragments. Text/step redaction does not rewrite ZIPs. Source and attachment exclusion is not redaction.
+Recording costs CPU, memory and temporary space even on passing tests. Export precedes the terminal report and can
+exhaust its existing timeout reserve; captures remain best effort with no deadline extension, retry or early salvage.
+
+The shared 5 MiB publication/fetch limit applies after recording: valid ZIPs over the limit at the initial size check
+are omitted with `too_large` while valid PNG siblings remain. Growth beyond the limit during copying is a hard error
+that aborts the entire set, as do other hard publication errors. Existing administrator-equivalent byte access and
+atomic set retention apply. Download
+and base64-decode `synthetics-artifact` bytes to a ZIP, then use the standard local Playwright Trace Viewer.
+
+Manifest version remains 2. An Agent without trace-kind support rejects mixed sets, including their PNGs, and reports
+them as unclassified outside retention cleanup. Preserved files become readable again after re-upgrade. This is a
+known downgrade limitation; no alternate set format or compatibility adapter is added.

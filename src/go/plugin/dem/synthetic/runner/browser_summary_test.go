@@ -29,7 +29,7 @@ func browserTestRecord(n int64) map[string]any {
 }
 func consumeBrowser(t *testing.T, lines ...string) sinkSnapshot {
 	t.Helper()
-	s := newSink(synthetic.Journey, false, newRedactor(map[string]string{"DEM_SECRET_X": "secret"}), true)
+	s := newSink(synthetic.Journey, false, newRedactor(map[string]string{"DEM_SECRET_X": "secret"}), true, false)
 	require.NoError(t, s.consume(strings.NewReader(strings.Join(lines, "\n"))))
 	return s.snapshot()
 }
@@ -55,7 +55,7 @@ func TestBrowserFeatureIsolationAndNegotiation(t *testing.T) {
 			assert.Equal(t, want, s.browser.ReportingStatus())
 		})
 	}
-	s := newSink(synthetic.Journey, false, newRedactor(nil), false)
+	s := newSink(synthetic.Journey, false, newRedactor(nil), false, false)
 	require.NoError(t, s.consume(strings.NewReader(evidenceInit+"\n"+browserRecord(t, 3)+"\n"+evidenceRecord("complete", "", nil))))
 	assert.Nil(t, s.snapshot().browser)
 	assert.Equal(t, "complete", s.snapshot().evidence.ReportingStatus())

@@ -221,6 +221,9 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		if request.Capture {
 			req.Extensions = append(req.Extensions, captureDetailsFeature)
 		}
+		if request.Trace {
+			req.Extensions = append(req.Extensions, failureTraceFeature)
+		}
 		if request.BrowserErrorSummary {
 			req.Extensions = append(req.Extensions, browserSummaryFeature)
 		}
@@ -244,7 +247,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 			Drained: true,
 		}
 	}
-	sink := newSink(request.Kind, request.Capture, redact, request.BrowserErrorSummary)
+	sink := newSink(request.Kind, request.Capture, redact, request.BrowserErrorSummary, request.Trace)
 	started := time.Now()
 	if state != nil {
 		state("running")

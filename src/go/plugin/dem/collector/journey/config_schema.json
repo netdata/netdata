@@ -60,6 +60,12 @@
         "type": "boolean",
         "default": false
       },
+      "trace_on_failure": {
+        "title": "Capture failure trace",
+        "description": "Save a Playwright trace ZIP when a workflow check fails; requires failure screenshots and is disabled by default. ZIPs can contain raw passwords, cookies and request/response bodies without redaction.",
+        "type": "boolean",
+        "default": false
+      },
       "browser_error_summary": {
         "title": "Collect browser error summary",
         "description": "Collect bounded browser error counts and primitive samples from journey fixture contexts, including passing tests. Disabled by default; enabling can add substantial CPU and memory cost on console-heavy pages and retain sensitive text.",
@@ -124,6 +130,28 @@
             }
           }
         }
+      },
+      {
+        "if": {
+          "required": [
+            "trace_on_failure"
+          ],
+          "properties": {
+            "trace_on_failure": {
+              "const": true
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "screenshot_on_failure"
+          ],
+          "properties": {
+            "screenshot_on_failure": {
+              "const": true
+            }
+          }
+        }
       }
     ]
   },
@@ -149,6 +177,7 @@
           "title": "Diagnosis",
           "fields": [
             "screenshot_on_failure",
+            "trace_on_failure",
             "browser_error_summary"
           ]
         },
@@ -185,6 +214,9 @@
     "vnode": {
       "ui:placeholder": "storefront",
       "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define a static Virtual Node through `dem:vnode` or a YAML file in `vnodes/` under the Netdata configuration directory, then enter its reference name here. Leave empty to use the collecting Agent."
+    },
+    "trace_on_failure": {
+      "ui:help": "Recording adds CPU, memory and temporary disk use even on passing runs. ZIPs above 5 MiB are omitted; timeout capture is best effort. Download retained ZIPs and open them with the Playwright Trace Viewer.\n\nAfter downgrading to an Agent without trace support, capture sets containing traces cannot be read, including their screenshots, and are excluded from retention cleanup until re-upgrade."
     }
   }
 }

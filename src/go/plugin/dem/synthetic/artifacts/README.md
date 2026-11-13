@@ -16,7 +16,7 @@ supervised process tree has drained. Reporter completion or an old PID is not
 permission to finalize or remove working files.
 
 Finalization records and syncs a drainage marker outside the child work folder,
-copies approved PNG screenshots and HTML reports from `output/`, computes size
+copies approved PNG screenshots, trace ZIPs and HTML reports from `output/`, computes size
 and SHA-256, and syncs an immutable manifest before publishing the run directory.
 Capture paths must be clean relative paths below `output/`, with regular files
 and no symbolic-link components. Content remains potentially sensitive.
@@ -86,7 +86,7 @@ against its manifest, caps returned content at 5 MiB and serializes with expiry.
 Missing records return `ErrNotFound`; retained run evidence can explain these as
 expired or unavailable. No tombstones grow independently of retention.
 Publication skips valid candidates whose initial size exceeds the same 5 MiB limit,
-after checking paths, types and PNG signatures. Exactly 5 MiB is allowed. The retained
+after checking paths, types and PNG/ZIP signatures. Exactly 5 MiB is allowed. The retained
 subset publishes atomically; no truncated artifact or empty manifest is published.
 Successful finalization returns retained candidates in input order. The runner uses
 candidate ID membership to record absent candidates as `too_large` without adding
@@ -100,3 +100,18 @@ The copy remains bounded: growth past the limit is a hard `ErrTooLarge`.
 Hard size failures carry the offending candidate ID, reported as `too_large`; other
 candidates in the failed set are `publication_failed`, including earlier size skips.
 Fetch retains its size guard for existing oversized captures.
+
+## Journey trace ZIPs
+
+Trace candidates use kind `trace` and MIME `application/zip`. The store checks a ZIP local-file header (`PK\x03\x04`)
+before the initial-size decision. This is a format signature check, not archive extraction or proof of every ZIP
+member. The store never rewrites or sanitizes ZIP content. The existing 5 MiB limit, per-item omissions, atomic set
+publication, administrator-equivalent byte access and shared retention apply.
+
+See [Optional journey failure traces](../../README.md#optional-journey-failure-traces) for configuration, recording
+cost, timeout behavior and raw-content disclosures, and the [runtime contract](../../../../../dem-runtime/README.md#optional-journey-failure-traces)
+for negotiation and candidate eligibility.
+
+Manifest version stays 2. Readers without trace support reject the entire mixed set, so its PNGs cannot be fetched
+on downgrade either. These sets become unclassified and are outside age/size retention; they remain on disk and are
+readable again after re-upgrade if preserved. Trace-aware readers still read older PNG/HTML sets.

@@ -38,6 +38,7 @@ type Config struct {
 	Script              string           `yaml:"script,omitempty"      json:"script,omitempty"`
 	ScriptPath          string           `yaml:"script_path,omitempty" json:"script_path,omitempty"`
 	Secrets             []Secret         `yaml:"secrets,omitempty"     json:"secrets,omitempty"`
+	TraceOnFailure      bool             `yaml:"trace_on_failure" json:"trace_on_failure"`
 	ScreenshotOnFailure bool             `yaml:"screenshot_on_failure" json:"screenshot_on_failure"`
 }
 

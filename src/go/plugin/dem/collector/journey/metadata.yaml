@@ -53,13 +53,14 @@ modules:
           description: Empty suites, skipped tests and expected failures cannot establish successful coverage.
             A failed check takes precedence over incomplete coverage. Waiting and running attempts retain the
             prior result for diagnosis; that observation becomes stale after two check intervals and does
-            not imply recovery. Failure screenshots and browser error summaries are disabled unless requested.
+            not imply recovery. Failure screenshots, traces and browser error summaries are disabled unless requested.
             Browser summaries cover only fixture contexts; missing evidence does not mean zero browser errors. Configuration Test returns
-            pass/fail within the caller's request deadline; long drafts may time out. Test does not retain screenshots.
+            pass/fail within the caller's request deadline; long drafts may time out. Test does not enable tracing or publish captures;
+            scripts can still direct their own recording.
         performance_impact:
           description: Each attempt starts a fresh browser and consumes CPU, memory and target website requests.
             Increasing check_every reduces browser frequency; update_every only refreshes charts. Jobs share the process browser.concurrency allowance (default 1), so concurrent
-            due jobs and configuration tests can wait. A running Test can delay monitoring. Optional monitoring captures consume local disk space.
+            due jobs and configuration tests can wait. A running Test can delay monitoring. Optional monitoring captures consume local disk space. Trace recording adds CPU, memory and temporary disk use even on passing runs; ZIPs above 5 MiB are omitted and timeout capture is best effort.
             Enabling browser_error_summary can add substantial CPU and memory cost on console-heavy pages, even without
             console errors; sample limits do not bound browser event-dispatch cost.
     setup:
@@ -140,6 +141,20 @@ modules:
               default_value: false
               required: false
               group: Diagnosis
+            - name: trace_on_failure
+              description: Save a Playwright trace ZIP when a workflow check fails; requires failure screenshots and is disabled by default. ZIPs can contain raw passwords, cookies and request/response bodies without redaction.
+              default_value: false
+              required: false
+              group: Diagnosis
+              detailed_description: |
+                Requires `screenshot_on_failure: true`. DEM configures traces with DOM snapshots, network data and a visual
+                timeline, with source files and attachments off. Scripts can override this with `test.use({ trace: 'on' })`,
+                invoke tracing APIs or supply their own trace attachments. Credentials and source fragments can remain
+                even without overrides. Download the ZIP through `synthetics-artifact` and open it locally with the
+                Playwright Trace Viewer.
+
+                Downgrading to an Agent without trace support makes capture sets containing traces unreadable,
+                including their screenshots. These sets are excluded from retention cleanup until re-upgrade.
             - name: browser_error_summary
               description: Collect bounded browser error counts and primitive samples from journey fixture contexts, including passing tests. Disabled by default; enabling can add substantial CPU and memory cost on console-heavy pages and retain sensitive text.
               default_value: false
@@ -654,7 +669,7 @@ modules:
               dropped_events discloses omitted generic event detail. The run.vnode_guid field
               contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
               The run.captures field contains available publication decisions. For journeys, it can also contain
-              test associations, screenshot attachment counts, reporting status and detail truncation. An absent
+              test associations, screenshot attachment counts, trace support, reporting status and detail truncation. An absent
               field means reporting was not recorded, not zero captures.
             columns:
               - name: at_ms
@@ -706,7 +721,7 @@ modules:
         - id: synthetics-artifacts
           function_name: synthetics-artifacts
           name: Retained synthetic captures
-          description: Invoke `synthetics-artifacts` to find retained screenshot and report sets, newest publication
+          description: Invoke `synthetics-artifacts` to find retained screenshot, trace and report sets, newest publication
             first, even after run history expires or a monitor is disabled or deleted. Each set contains one run's
             captures. The shared default allowance is seven days and 2 GiB, preferring each monitor's newest
             eligible capture. Age and size pressure can still remove it; this is not complete incident history
@@ -797,7 +812,7 @@ modules:
           name: Synthetic capture detail
           description: Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run
             history retention; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent
-            permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files
+            permissions. Screenshots, raw trace ZIPs and HTML reports may contain sensitive content. Missing retained files
             are expired or unavailable; fetches are limited to 5 MiB. The test column identifies the associated test,
             not a page or failing step. Missing-capture observations and publication decisions are in `synthetics-run`
             while history remains.
@@ -857,11 +872,11 @@ modules:
               - name: test
                 type: string
                 unit: ''
-                description: Associated screenshot test title, redacted and possibly clipped, or Test not recorded; empty for Lighthouse reports.
+                description: Associated screenshot or trace test title, redacted and possibly clipped, or Test not recorded; empty for Lighthouse reports.
               - name: label
                 type: string
                 unit: ''
-                description: Screenshot or Lighthouse report.
+                description: Screenshot, Trace or Lighthouse report.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require

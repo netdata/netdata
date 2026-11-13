@@ -197,3 +197,104 @@ func TestLighthouseCaptureOmissionNeedsNoRuntimeFeature(t *testing.T) {
 	assert.Empty(t, ex.Run.Captures.Reporting)
 	assert.Equal(t, []synthetic.CaptureOmission{{ID: "lighthouse-report", Reason: "too_large"}}, ex.Run.Captures.Unpublished)
 }
+
+func TestTraceReportingThroughEnginePublication(t *testing.T) {
+	for _, mode := range []string{"selected", "old runtime", "declined", "malformed init", "invalid capture details", "oversize"} {
+		t.Run(mode, func(t *testing.T) {
+			e, h, store := testEngine(t)
+			e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
+				var req wireRequest
+				if err := json.Unmarshal(raw, &req); !assert.NoError(t, err) {
+					return ndexec.TreeResult{Drained: true, Err: err}
+				}
+				assert.Contains(t, req.Extensions, failureTraceFeature)
+				assert.Contains(t, req.Extensions, captureDetailsFeature)
+				if err := os.MkdirAll(filepath.Join(req.WorkDir, "output"), 0700); !assert.NoError(t, err) {
+					return ndexec.TreeResult{Drained: true, Err: err}
+				}
+				selection := `{"type":"extension_init","extension_init":{"selected":["capture_details.v1","failure_trace.v1"]}}`
+				if mode == "old runtime" {
+					selection = ""
+				}
+				if mode == "declined" {
+					selection = `{"type":"extension_init","extension_init":{"selected":["capture_details.v1"]}}`
+				}
+				if mode == "malformed init" {
+					selection = `{"type":"extension_init","extension_init":{"selected":null}}`
+				}
+				if selection != "" {
+					_, err := fmt.Fprintln(out, selection)
+					assert.NoError(t, err)
+				}
+				if mode != "old runtime" {
+					_, err := fmt.Fprintln(out, captureRecord(captureTest("t1", 1, 0)), "\n"+captureRecord(captureLink("screen", "t1")), "\n"+captureRecord(captureLink("trace1", "t1")))
+					assert.NoError(t, err)
+					if mode == "invalid capture details" {
+						_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "future"}))
+						assert.NoError(t, err)
+					}
+					_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "complete"}))
+					assert.NoError(t, err)
+				}
+				for path, body := range map[string][]byte{"output/screen.png": []byte("\x89PNG\r\n\x1a\nfixture"), "output/trace.zip": []byte("PK\x03\x04fixture")} {
+					if err := os.WriteFile(filepath.Join(req.WorkDir, path), body, 0600); !assert.NoError(t, err) {
+						return ndexec.TreeResult{Drained: true, Err: err}
+					}
+				}
+				if mode == "oversize" {
+					err := os.Truncate(filepath.Join(req.WorkDir, "output/trace.zip"), artifacts.FetchMaxBytes+1)
+					assert.NoError(t, err)
+				}
+				r := reporterResult{Status: synthetic.Failed, Tests: &synthetic.TestCounts{Declared: 1, Failed: 1}, CaptureState: "available", Artifacts: []synthetic.Capture{{ID: "screen", Kind: "screenshot", MIME: "image/png", Path: "output/screen.png"}, {ID: "trace1", Kind: "trace", MIME: "application/zip", Path: "output/trace.zip"}}}
+				if mode == "old runtime" {
+					r.Artifacts = r.Artifacts[:1]
+				}
+				return resultPayload(r)(ctx, args, raw, out, stderr)
+			})
+			req := journey()
+			req.Capture = true
+			req.Trace = true
+			ex := e.Execute(t.Context(), req, nil)
+			require.True(t, ex.Drained)
+			assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
+			require.NotNil(t, ex.Run.Captures)
+			want := "supported"
+			if mode == "old runtime" {
+				want = "negotiation_not_reported"
+			}
+			if mode == "declined" {
+				want = "unsupported"
+			}
+			if mode == "malformed init" {
+				want = "invalid"
+			}
+			assert.Equal(t, want, ex.Run.Captures.Trace)
+			assert.Equal(t, ex.Run.Captures, h.runs[len(h.runs)-1].Captures)
+			count := 2
+			if mode == "old runtime" {
+				count = 1
+				assert.Equal(t, "negotiation_not_reported", ex.Run.Captures.Reporting)
+				assert.Empty(t, ex.Run.Captures.Tests)
+			}
+			if mode == "oversize" {
+				count = 1
+				assert.Equal(t, []synthetic.CaptureOmission{{ID: "trace1", Reason: "too_large"}}, ex.Run.Captures.Unpublished)
+			}
+			require.Len(t, ex.Run.Artifacts, count)
+			if mode == "old runtime" {
+				assert.Equal(t, "screenshot", ex.Run.Artifacts[0].Kind)
+				assert.Empty(t, ex.Run.Artifacts[0].Test)
+			}
+			if mode != "old runtime" && mode != "malformed init" {
+				assert.Equal(t, int64(1), ex.Run.Captures.Tests[0].Accepted)
+				assert.Equal(t, "t1", ex.Run.Artifacts[0].Test.ID)
+			}
+			if count == 2 {
+				meta, body, err := store.Fetch(t.Context(), ex.Run.JobID, ex.Run.ID, "trace1")
+				require.NoError(t, err)
+				assert.Equal(t, "trace", meta.Kind)
+				assert.Equal(t, []byte("PK\x03\x04fixture"), body)
+			}
+		})
+	}
+}

@@ -829,12 +829,13 @@ jobs:
         await expect(page.getByRole('heading', {name: 'Checkout'})).toBeVisible();
       });
     screenshot_on_failure: true
+    trace_on_failure: false
 ```
 
 Native secret resolution accepts named `DEM_SECRET_` environment entries through `secrets` in the journey form.
 Secrets travel to the admitted runner through private stdin and its controlled environment. Text diagnosis redacts
-known secret values and common credential patterns. Screenshots and HTML reports may contain sensitive page data;
-there is no universal image/report sanitization guarantee.
+known secret values and common credential patterns. Screenshots, trace ZIPs and HTML reports may contain sensitive
+page data; ZIPs can retain raw resolved credentials. Text redaction does not sanitize artifact content.
 
 A journey succeeds only when all ordinary declared tests actually pass. Unexpected failure or timeout dominates
 incomplete coverage. Skipped, expected-failure, empty or incomplete suites are inconclusive unless there is a real
@@ -872,7 +873,7 @@ completion. Cleanup uncertainty preserves work and closes admission; it never au
 Use the journey configuration's **Test** action to execute an unsaved draft on the selected Agent with its resolved
 secrets and installed browser runtime. Test returns pass/fail; failed, skipped/incomplete, interrupted or unavailable
 execution is not success. It does not save the draft, change monitoring observations, publish metrics or alerts, or
-retain captures. `screenshot_on_failure` applies to monitoring only. Test actions against the website are real and
+retain captures. `screenshot_on_failure` and `trace_on_failure` apply to monitoring only. Test actions against the website are real and
 are not rolled back. Activation still checks runtime preparation without executing the workflow.
 
 Test shares the browser allowance with monitoring and may wait for another attempt or delay a later one. The caller's
@@ -923,12 +924,13 @@ Basic diagnosis includes bounded test, step, error, stdout and stderr events (50
 with dropped-event counts. Stdout/stderr use bounded stream redaction: lines longer than 2000 characters are omitted
 with a marker, and forced termination can lose buffered text. Structured test/step/error evidence remains incremental.
 Browser error summaries are separately opt-in with `browser_error_summary`; scripts can also forward diagnostics with
-Playwright APIs. Optional failure PNG screenshots and Lighthouse HTML reports are disabled by default. Enable
-`screenshot_on_failure` or `save_report` before an incident if these captures are needed. Forced browser termination
-can prevent capture. Trace, HAR, video and filmstrip are not initial capabilities.
+Playwright APIs. Optional failure PNG screenshots, trace ZIPs and Lighthouse HTML reports are disabled by default.
+Enable `screenshot_on_failure` or `save_report` before an incident; retaining traces requires both
+`trace_on_failure` and `screenshot_on_failure`. Forced browser termination can prevent capture. HAR, video and
+filmstrip are not supported.
 
 Captures live under `${NETDATA_LIB_DIR}/dem/artifacts` with one shared default allowance of seven days and 2 GiB
-for retained capture sets. Each set contains the screenshots or reports published for one run. The newest eligible
+for retained capture sets. Each set contains the screenshots, traces or reports published for one run. The newest eligible
 capture for each monitor is preferred under size pressure, then older captures are removed first if even those sets
 do not fit. Age still expires preferred captures; this does not guarantee one capture per monitor or a complete incident
 history. A later Lighthouse report can replace an earlier poor-score report; a journey recovery without a screenshot
@@ -945,11 +947,11 @@ Capture discovery and downloads remain available after run history expires and a
 Capture states distinguish disabled, not needed, unavailable and published evidence. Retained history may also outlive
 its files; absent recorded files mean “expired or unavailable”. Metadata presence alone does not verify file integrity;
 fetch verifies size and digest. Capture metadata requires member-equivalent permissions. Downloads require
-administrator-equivalent permissions and are limited to 5 MiB; HTML is returned as base64 data. Valid captures initially
+administrator-equivalent permissions and are limited to 5 MiB; file content is returned as base64 data. Valid captures initially
 larger than 5 MiB are omitted; the remaining files publish atomically without truncation. If all are omitted, capture
 state is unavailable. Invalid files, copy growth and I/O failures still fail publication of the whole set.
 
-`synthetics-artifact` adds a kind-derived label and the associated test title for screenshots reported by a supporting
+`synthetics-artifact` adds a kind-derived label and the associated test title for screenshots and traces reported by a supporting
 runtime. The association identifies a test, not a page, failing step or exact screenshot time. Test labels remain with
 retained captures after run history expires; older or omitted associations show `Test not recorded`. Lighthouse reports
 belong to their run and have no test.
@@ -962,14 +964,44 @@ On successful publication, Go reports `too_large` for each size omission without
 On a hard publication failure, it reports `publication_failed` for the set, except an identified size-error offender
 remains `too_large`; earlier size skips are not separately preserved. It reports `not_eligible` for an interrupted
 candidate rejected by stop policy, and `not_in_final_report` for metadata
-without an accepted final candidate. Without a final candidate report, earlier screenshots are not recovered.
+without an accepted final candidate. Without a final candidate report, earlier captures are not recovered.
 These are historical decisions, separate from current artifact availability. An absent `run.captures` means reporting
 was not recorded, not zero captures. Metadata may be partial, unsupported,
 invalid or truncated; none means zero captures. Labels use exact-secret redaction before clipping; this does not
-sanitize screenshot or report content.
+sanitize screenshot, trace or report content.
 
 The runner retains admission and private files until Linux supervision proves the entire child tree is reaped.
 Unverified completion stops further admission and exits the plugin without deleting shared state. Unexpected supervisor
 loss does not prove that survivors are gone or prevent an external service restart beside them. Unverified leftover
 work is retained for operator handling; PID/time heuristics never grant permission to delete it. Terminal/debug runs
 use private storage; verified completed work is cleaned after joined shutdown, while unverified work remains protected.
+
+### Optional journey failure traces
+
+Enable `trace_on_failure` together with `screenshot_on_failure` to retain native Playwright trace ZIPs for failing
+journeys. It is disabled by default. Traces add DOM snapshots, network data and a visual action timeline. They record
+on passing attempts too, although those ZIPs are discarded; enabling adds CPU, memory and temporary disk use.
+Under DEM's configured defaults, eligible unexpected failures, timeouts and interruptions can retain traces;
+expected failures produce no automatic trace, and DEM does not retain traces for unexpected passes.
+
+ZIPs can contain raw passwords from resolved `DEM_SECRET_*` values, cookies, form input, headers and request/response
+bodies. Text-summary redaction does not apply to ZIPs. DEM configures dedicated source files and attachments off;
+scripts can override this with `test.use({ trace: 'on' })`, invoke tracing APIs or supply their own trace attachments.
+Even without overrides, source fragments and credentials can remain. Treat downloaded or shared ZIPs as
+credential-bearing data.
+
+The same 5 MiB per-file limit applies: a valid ZIP already over the limit when publication starts is omitted with
+`too_large`, and valid screenshots remain. A hard publication error aborts the entire set, including its screenshots.
+Timeout capture is best effort; trace export can consume the reporting reserve and lose both the terminal report
+and screenshots. Traces do not extend the deadline or trigger retries. Configuration Test does not enable tracing
+or publish captures; the script can still direct its own recording.
+
+`synthetics-artifact` labels retained ZIPs `Trace` and includes their test title. Fetch and base64-decode the artifact
+bytes, save a `.zip` file, and open it with the standard local Playwright Trace Viewer. Byte access requires existing
+administrator-equivalent permissions. `synthetics-run` exposes `run.captures.trace` as `supported`, `unsupported`,
+`negotiation_not_reported` or `invalid` when requested. This reports runtime capability, not guaranteed trace retention;
+PNG accepted/unaccepted counts keep their screenshot-only meaning.
+
+Downgrading to an Agent without trace support makes mixed capture sets unreadable, including their screenshots.
+These sets become unclassified and are excluded from retention cleanup until re-upgrade. Preserved files become
+readable again afterward. The shared retention allowance and manifest version remain unchanged.

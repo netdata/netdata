@@ -13,6 +13,14 @@ func TestValidateRequest(t *testing.T) {
 		change func(*Request)
 		valid  bool
 	}{
+		"trace needs capture": {func(r *Request) { r.Trace = true }, false},
+		"trace enabled":       {func(r *Request) { r.Trace = true; r.Capture = true }, true},
+		"trace needs journey": {func(r *Request) {
+			r.Trace = true
+			r.Capture = true
+			r.Kind = Lighthouse
+			r.URL = "https://example.org/"
+		}, false},
 		"inline":             {func(*Request) {}, true},
 		"whitespace":         {func(r *Request) { r.Script = " \t\n" }, false},
 		"unicode whitespace": {func(r *Request) { r.Script = "\u0085\u00a0\u2003" }, false},

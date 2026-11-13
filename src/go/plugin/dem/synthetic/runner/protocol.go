@@ -98,6 +98,7 @@ type sink struct {
 	mu           sync.Mutex
 	kind         synthetic.Kind
 	capture      bool
+	trace        bool
 	redact       *textRedactor
 	events       []synthetic.Event
 	dropped      int
@@ -117,13 +118,14 @@ type sinkSnapshot struct {
 	partial  *synthetic.TestCounts
 }
 
-func newSink(kind synthetic.Kind, capture bool, redact *textRedactor, browser bool) *sink {
+func newSink(kind synthetic.Kind, capture bool, redact *textRedactor, browser, trace bool) *sink {
 	return &sink{
-		extensions:   newExtensions(kind, browser, capture),
+		extensions:   newExtensions(kind, browser, capture, trace),
 		streams:      make(map[string]*diagnosticStream),
 		streamEvents: make(map[string]synthetic.Event),
 		kind:         kind,
 		capture:      capture,
+		trace:        trace,
 		redact:       redact,
 		events:       []synthetic.Event{},
 		tests:        make(map[string]synthetic.Event),
@@ -183,7 +185,7 @@ func (s *sink) consume(reader io.Reader) error {
 			var result reporterResult
 			if err := decodeCore(record.Result, &result); err != nil {
 				protocolErr = err
-			} else if err := validateResult(s.kind, s.capture, &result); err != nil {
+			} else if err := validateResult(s.kind, s.capture, s.trace, &result); err != nil {
 				protocolErr = err
 			} else {
 				s.extensions.core()
@@ -359,7 +361,7 @@ func validateEvent(event synthetic.Event) error {
 	}
 	return nil
 }
-func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) error {
+func validateResult(kind synthetic.Kind, capture, trace bool, result *reporterResult) error {
 	switch result.Status {
 	case synthetic.Success,
 		synthetic.Failed,
@@ -454,12 +456,12 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 		}
 	}
 	for _, a := range result.InterruptedArtifacts {
-		if a.Kind != "screenshot" || a.MIME != "image/png" {
+		if !validJourneyCapture(a, trace) {
 			return errors.New("unsupported interrupted journey capture")
 		}
 	}
 	for _, a := range result.Artifacts {
-		if kind == synthetic.Journey && (a.Kind != "screenshot" || a.MIME != "image/png") {
+		if kind == synthetic.Journey && !validJourneyCapture(a, trace) {
 			return errors.New("unsupported journey capture")
 		}
 		if kind == synthetic.Lighthouse && (a.Kind != "report" || a.MIME != "text/html") {
@@ -467,6 +469,9 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 		}
 	}
 	return nil
+}
+func validJourneyCapture(a synthetic.Capture, trace bool) bool {
+	return a.Kind == "screenshot" && a.MIME == "image/png" || trace && a.Kind == "trace" && a.MIME == "application/zip"
 }
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 

@@ -150,7 +150,7 @@ func TestTerminalTerminationReasonsAndInterruptedCandidates(t *testing.T) {
 				r.InterruptedArtifacts = []synthetic.Capture{{ID: "screenshot", Path: "shot.png", Kind: "screenshot", MIME: "image/png"}}
 				r.CaptureState = "available"
 			}
-			err := validateResult(synthetic.Journey, true, &r)
+			err := validateResult(synthetic.Journey, true, false, &r)
 			if tc.valid {
 				assert.NoError(t, err)
 			} else {

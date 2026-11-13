@@ -5,9 +5,11 @@ import "slices"
 
 // CaptureReport describes observations and publication decisions, never file authority.
 // Reporting applies to journey metadata; an absent value means it was not recorded.
+// Trace describes requested runtime support and never grants capture authority.
 // Truncated marks omitted Tests/Associations detail due to the shared record budget
 // or an unrecordable test ID. It does not describe publication or limit Unpublished.
 type CaptureReport struct {
+	Trace        string               `json:"trace,omitempty"`
 	Reporting    string               `json:"reporting,omitempty"`
 	Truncated    bool                 `json:"truncated,omitempty"`
 	Tests        []CaptureTest        `json:"tests,omitempty"`

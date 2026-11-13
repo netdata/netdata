@@ -625,7 +625,7 @@ modules:
               dropped_events discloses omitted generic event detail. The run.vnode_guid field
               contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
               The run.captures field contains available publication decisions. For journeys, it can also contain
-              test associations, screenshot attachment counts, reporting status and detail truncation. An absent
+              test associations, screenshot attachment counts, trace support, reporting status and detail truncation. An absent
               field means reporting was not recorded, not zero captures.
             columns:
               - name: at_ms
@@ -677,7 +677,7 @@ modules:
         - id: synthetics-artifacts
           function_name: synthetics-artifacts
           name: Retained synthetic captures
-          description: Invoke `synthetics-artifacts` to find retained screenshot and report sets, newest publication
+          description: Invoke `synthetics-artifacts` to find retained screenshot, trace and report sets, newest publication
             first, even after run history expires or a monitor is disabled or deleted. Each set contains one run's
             captures. The shared default allowance is seven days and 2 GiB, preferring each monitor's newest
             eligible capture. Age and size pressure can still remove it; this is not complete incident history
@@ -768,7 +768,7 @@ modules:
           name: Synthetic capture detail
           description: Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run
             history retention; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent
-            permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files
+            permissions. Screenshots, raw trace ZIPs and HTML reports may contain sensitive content. Missing retained files
             are expired or unavailable; fetches are limited to 5 MiB. The test column identifies the associated test,
             not a page or failing step. Missing-capture observations and publication decisions are in `synthetics-run`
             while history remains.
@@ -828,11 +828,11 @@ modules:
               - name: test
                 type: string
                 unit: ''
-                description: Associated screenshot test title, redacted and possibly clipped, or Test not recorded; empty for Lighthouse reports.
+                description: Associated screenshot or trace test title, redacted and possibly clipped, or Test not recorded; empty for Lighthouse reports.
               - name: label
                 type: string
                 unit: ''
-                description: Screenshot or Lighthouse report.
+                description: Screenshot, Trace or Lighthouse report.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
