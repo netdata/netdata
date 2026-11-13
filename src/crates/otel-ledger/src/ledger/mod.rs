@@ -1,27 +1,16 @@
 //! Ledger actor.
 //!
-//! The `Ledger` is a content-agnostic shell: it owns the supervisor and
-//! writer IPC connections, the process cancellation token, the shared
-//! workers (cleaner, uploader), the shared chunk cache and upload-retry
-//! queue, the function-response funnel, and the `select!` run-loop that
-//! dispatches every event. Per-signal state — tenant registries, lifecycle
-//! config, the indexer and catalog-builder workers, and the query
-//! handler — lives in a [`Pipeline`] per signal (today logs + traces); the
-//! wire `pipeline_id` is decoded to a `Signal` at each boundary, after
-//! which routing is total. Adding a signal means adding a `Pipeline` (and
-//! widening `PerSignal`), not reworking the shell. One exception: the
-//! traces chunk indexer (`traces_chunk_indexer`) is traces-only state on
-//! the shell; it shares the traces WAL prefixes with the traces pipeline,
-//! and the ingestor and indexer handlers reach it by matching
-//! `Signal::Traces`.
-//!
-//! Routing:
-//! - writer events → `Signal::try_from(msg.event.pipeline_id())` →
-//!   `pipelines[signal]`;
-//! - shared-worker responses → the pipeline whose inline `pipeline_id` they carry;
-//! - per-pipeline worker responses → funneled into one merged channel, tagged
-//!   with the owning `Signal` by a forwarder;
-//! - function calls → the pipeline whose declared function name matches.
+//! The `Ledger` is the shell around the per-signal pipelines: it owns the
+//! supervisor and writer IPC connections, the process cancellation token,
+//! the shared workers (cleaner, uploader), the shared chunk cache and
+//! upload-retry queue, the function-response funnel, and the `select!`
+//! run-loop that dispatches every event. Per-signal state (tenant
+//! registries, lifecycle config, the indexer and catalog-builder workers,
+//! and the query handler) lives in a [`Pipeline`] per signal. Adding a
+//! signal means adding a `Pipeline` (and widening `PerSignal`), not
+//! reworking the shell. One exception: the traces chunk indexer
+//! (`traces_chunk_indexer`) is traces-only state on the shell. It shares
+//! the traces WAL prefixes with the traces pipeline.
 
 mod catalog_builder;
 mod chunk_indexer;
@@ -60,14 +49,13 @@ use file_lifecycle::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, Uplo
 use file_lifecycle::storage::OpendalStorage;
 use file_lifecycle::uploader::{Uploader, UploaderArgs};
 
-/// Byte budget for the query-time chunk cache (byte-weighted LRU above it).
+/// Byte budget for the query-time chunk cache.
 /// Shared by every pipeline; keys are `(global wal seq, chunk index)`.
 const CHUNK_CACHE_BYTES: u64 = 256 * 1024 * 1024;
-/// Maximum uploads in flight at once, across all pipelines. Bounds the recovery
-/// fan-out — which enqueues the whole un-uploaded backlog at once — so it can't
-/// spawn thousands of simultaneous file reads + PUTs (S3-503 storms,
-/// socket/memory spikes). A fixed default for now; promote to config with the
-/// rest of upload governance if tuning proves necessary.
+/// Maximum uploads in flight at once, across all pipelines. Recovery
+/// enqueues the whole un-uploaded backlog at once, and this bound keeps it
+/// from spawning thousands of simultaneous file reads + PUTs (S3-503 storms,
+/// socket/memory spikes).
 const UPLOAD_CONCURRENCY: usize = 8;
 
 /// A value held once per signal. The signal axis is a closed enum, so a fixed
@@ -88,8 +76,7 @@ impl<T> PerSignal<T> {
         }
     }
 
-    /// Both values, logs first. Used for the per-pipeline declaration scan and the
-    /// function-name dispatch lookup.
+    /// Both values, logs first.
     fn iter(&self) -> impl Iterator<Item = &T> {
         [&self.logs, &self.traces].into_iter()
     }
@@ -105,8 +92,7 @@ pub struct Ledger {
     /// handle). `None` when remote storage is disabled (`remote_storage.enabled =
     /// false`): the storage client and uploader are not constructed, so a
     /// malformed `remote_storage.uri` cannot abort startup for a local-only deployment.
-    /// Every send site is gated on storage being enabled, so a `None` uploader
-    /// is never asked to upload. Its responses carry the owning `pipeline_id`.
+    /// Its responses carry the owning `pipeline_id`.
     uploader: Option<ComponentHandle<UploaderRequest, UploaderResponse>>,
     /// Re-issue queue for failed uploads, drained by `periodic_timer`. Shared
     /// across pipelines (the uploader is shared); keyed by seq/remote-key, both
@@ -129,9 +115,9 @@ pub struct Ledger {
     traces_chunk_indexer: chunk_indexer::ChunkIndexer,
     pub(crate) cancel: CancellationToken,
 
-    /// Sender side of the outbound funnel. Spawned function-handler
-    /// tasks send `LedgerResponse` here; the run-loop forwards them
-    /// to `self.supervisor`.
+    /// Sender side of the outbound funnel. Spawned tasks send
+    /// `LedgerResponse` here; the run-loop forwards them to
+    /// `self.supervisor`.
     outbound_tx: mpsc::UnboundedSender<LedgerResponse>,
     /// Receiver side; consumed by the run-loop's `select!`.
     outbound_rx: mpsc::UnboundedReceiver<LedgerResponse>,
@@ -158,17 +144,13 @@ impl Ledger {
     /// Order: shared workers → build each pipeline (disk → registries →
     /// per-pipeline workers → per-tenant recovery → handler) → `Ready` →
     /// accept the ingestor writer connection. `Ready` is pinned between pipeline
-    /// construction (which sets up the handlers) and the ingestor accept: the
+    /// construction (which sets up the handlers) and the ingestor accept. The
     /// supervisor configures workers sequentially (`otel_bridge`, "Handshake
     /// protocol"), so the ingestor (which the ledger then waits for on
-    /// `writer_socket_path`) can't start until the supervisor has seen Ready
-    /// — moving Ready any later deadlocks every start. Ready here
-    /// is a report to the supervisor, not yet an advertisement: the supervisor
-    /// forwards these declarations to the agent only after the ingestor has
-    /// bound its gRPC endpoint (bind before declare), so a failure before Ready
-    /// or an ingestor bind failure both leave the plugin un-advertised. A
-    /// failure during `accept_writer` after Ready surfaces as a dropped
-    /// supervisor connection.
+    /// `writer_socket_path`) can't start until the supervisor has seen Ready.
+    /// Moving Ready any later deadlocks every start. A failure during
+    /// `accept_writer` after Ready surfaces as a dropped supervisor
+    /// connection.
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
         mut supervisor: Connection<LedgerResponse, LedgerRequest>,
@@ -180,17 +162,15 @@ impl Ledger {
         // Shared seq highwater file path (from `PluginConfig::seq_highwater_path`).
         // The startup catalog sync raises it to cover the remote max; the ingestor
         // (configured strictly later) reads it. Both signals' sync phases run
-        // SEQUENTIALLY below (`build_logs_pipeline().await?` then
+        // sequentially below (`build_logs_pipeline().await?` then
         // `build_traces_pipeline().await?`), so the read-modify-write is
-        // single-threaded — a future refactor that builds the pipelines
-        // concurrently MUST revisit that (the highwater would then race).
+        // single-threaded. Building the pipelines concurrently would make the
+        // highwater race.
         seq_highwater_path: &std::path::Path,
         lifecycle: &LifecycleConfig,
         // The traces pipeline's lifecycle config, derived by
         // `PluginConfig::lifecycle_for(Signal::Traces)` (its own
-        // `{base}/traces/...` dirs). The N-signal generalization (a signal
-        // list instead of two explicit args) is deliberately deferred until a
-        // third signal exists.
+        // `{base}/traces/...` dirs).
         traces_lifecycle: &LifecycleConfig,
         // Process-global remote storage (one backend for every signal). The shell
         // owns it: it builds the storage handle / uploader / read cache from this
@@ -208,8 +188,7 @@ impl Ledger {
         tracing::info!("cleaner spawned");
 
         // Build the shared remote-storage client, uploader and read cache —
-        // only when storage is enabled. `OpendalStorage::new` parses the URI
-        // (and applies the retry layer); see the `uploader` field doc for why
+        // only when storage is enabled. See the `uploader` field doc for why
         // a malformed URI must not abort a local-only deployment's startup.
         let (storage, mut uploader, read_cache) = if remote_storage_config.enabled {
             let storage = OpendalStorage::new(remote_storage_config.uri.as_str())?;
@@ -218,10 +197,10 @@ impl Ledger {
             // reachable and the credentials are accepted, logging a clear error
             // on misconfig instead of letting uploads fail silently in the
             // background. Spawned (not awaited) because the opendal retry layer
-            // can stall for minutes on an unreachable endpoint — awaiting here
-            // would re-introduce the `Ledger::new` stall noted in recovery/remote.rs.
+            // can stall for minutes on an unreachable endpoint, and awaiting here
+            // would stall `Ledger::new`.
             //
-            // Deliberately NOT wired to `cancel` (unlike the worker components):
+            // Deliberately not wired to `cancel` (unlike the worker components):
             // it is a read-only one-shot diagnostic holding only an Arc-backed
             // `Operator` clone, bounded by the retry layer. Tying it to the
             // shutdown token would merely suppress a useful "remote unreachable"
@@ -270,13 +249,8 @@ impl Ledger {
             (None, None, None)
         };
 
-        // Query-time chunk cache, shared between every pipeline's handler (which
-        // populates it) and its indexer-response path (which drops a WAL's
-        // chunks once the WAL's authoritative SFST registers). The budget and
-        // chunk size are fixed defaults for now; tuning is deferred with the
-        // rest of cache governance. The one budget serves BOTH signals'
-        // queries — logs and traces can evict each other's chunks under
-        // pressure — so re-evaluate it if either signal's query load grows.
+        // The one budget serves both signals' queries, so logs and traces can
+        // evict each other's chunks under pressure.
         let chunk_cache = Arc::new(ChunkCache::new(CHUNK_CACHE_BYTES));
 
         // Traces chunk boundaries, kept current across queries, and the
@@ -345,11 +319,10 @@ impl Ledger {
         .await?;
 
         // The pipelines, one per signal. `pipeline_id` is fixed and distinct per
-        // `Signal` (so the old duplicate-id check is structurally impossible), but
-        // the function name is the call-dispatch key (`rpc::dispatch`) and is set
-        // independently per handler — a clash there would route to whichever the
-        // scan yields first, so fail loudly at startup. Hardcoded by us, so a
-        // clash is a programming error.
+        // `Signal`, but the function name is the call-dispatch key
+        // (`rpc::dispatch`) and is set independently per handler. A clash there
+        // would route to whichever the scan yields first, so fail loudly at
+        // startup. Hardcoded by us, so a clash is a programming error.
         let pipelines = PerSignal { logs, traces };
         assert!(
             pipelines.logs.function_name() != pipelines.traces.function_name(),
@@ -358,9 +331,7 @@ impl Ledger {
         );
 
         // Signal Ready between pipeline construction and the ingestor accept;
-        // see the method docstring for the full ordering rationale. Both
-        // Functions are reported: `otel-logs` and `otel-traces`. The supervisor
-        // advertises them once the ingestor is bound.
+        // see the method docstring for the full ordering rationale.
         let declarations = vec![
             pipelines.logs.declaration().clone(),
             pipelines.traces.declaration().clone(),

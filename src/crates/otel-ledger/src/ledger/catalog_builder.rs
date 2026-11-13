@@ -1,15 +1,11 @@
 //! Catalog-builder response handling for the ledger's run loop, plus the
 //! clean-shutdown catalog flush.
 //!
-//! Responses arrive on the merged per-pipeline channel, tagged with the owning
-//! `Signal` by that pipeline's forwarder (`pipeline.rs` `spawn_forwarder`).
-//! On `Rotated` — a scope's entries are now a catalog file on local
-//! disk — this records the file in the tenant registry (query-time discovery
-//! + retention scan it), marks the covered SFST seqs locally cataloged
-//! (`mark_rotated_many`: reconciliation bookkeeping — eviction itself waits
-//! for the REMOTE confirmation set on `CatalogUploaded`), and queues
-//! `UploadCatalog` with the shared uploader (none when remote storage is
-//! disabled). The remaining variants only log.
+//! On `Rotated`, a scope's entries are now a catalog file on local disk. This
+//! records the file in the tenant registry, marks the covered SFST seqs
+//! locally cataloged (`mark_rotated_many`), and queues `UploadCatalog` with
+//! the shared uploader (none when remote storage is disabled). The remaining
+//! variants only log.
 
 use file_lifecycle::ipc::{CatalogBuilderRequest, CatalogBuilderResponse, UploaderRequest};
 use otel_bridge::signals::Signal;
@@ -49,9 +45,6 @@ impl Ledger {
                 let pipeline = self.pipelines.get(signal);
                 let registries = pipeline.registries().clone();
 
-                // Remote key mirrors the local `{date}/{tenant}/{filename}`
-                // layout (`remote_keys::catalog`): startup's catalog diff-sync
-                // LISTs the signal's catalog prefix and parses these keys back.
                 let remote_key = file_lifecycle::remote_keys::catalog(
                     pipeline.signal(),
                     date,
@@ -64,7 +57,7 @@ impl Ledger {
 
                 // Register the rotated file and mark its seqs locally
                 // cataloged. A tenant missing from the registry is skipped:
-                // entries only ever arrive for startup-discovered tenants, so
+                // every tenant gets a registry with its first WAL event, so
                 // the miss is defensive.
                 {
                     let mut registries = registries.write().await;
@@ -87,8 +80,7 @@ impl Ledger {
 
                 if let Some(uploader) = self.uploader.as_mut() {
                     // `identity`/`seqs` ride along so the `CatalogUploaded`
-                    // handler can mark the covered seqs remote-cataloged — the
-                    // stage the eviction gate actually waits for.
+                    // handler can mark the covered seqs remote-cataloged.
                     let req = UploaderRequest::UploadCatalog {
                         pipeline_id: signal.pipeline_id(),
                         local_path: path,
@@ -102,8 +94,7 @@ impl Ledger {
                 }
             }
             // The builder keeps a failed scope's accumulator, so the next
-            // trigger retries; at shutdown the scope's entries are lost and
-            // rebuilt next boot (see `flush_all` in the builder component).
+            // trigger retries.
             CatalogBuilderResponse::RotationFailed {
                 tenant_id,
                 max_seq,
@@ -116,9 +107,10 @@ impl Ledger {
                     "catalog rotation failed: {error}",
                 );
             }
-            // Only emitted in reply to a `Flush`, which is sent only by
-            // `flush_catalogs_on_shutdown` — which drains it directly. Reaching
-            // the steady-state run loop means an unpaired reply; log and ignore.
+            // Only emitted in reply to a `Flush`. Only
+            // `flush_catalogs_on_shutdown` sends one, and it drains the reply
+            // itself. Reaching the steady-state run loop means an unpaired
+            // reply.
             CatalogBuilderResponse::FlushComplete => {
                 tracing::debug!("unexpected FlushComplete outside shutdown flush");
             }
@@ -126,24 +118,20 @@ impl Ledger {
     }
 
     /// Clean-shutdown flush: rotate every catalog builder's in-flight
-    /// accumulators to local disk before exit — on a quiet host they would
+    /// accumulators to local disk before exit. On a quiet host they would
     /// otherwise wait indefinitely for the count/time trigger. Sends `Flush`
-    /// to each pipeline's builder (the closed logs+traces signal set), then
-    /// drains the merged worker channel until every builder reports
-    /// `FlushComplete` or the budget expires.
+    /// to each pipeline's builder, then drains the merged worker channel
+    /// until every builder reports `FlushComplete` or the budget expires.
     ///
-    /// The budget is the worker's stop budget (`otel_bridge::shutdown`).
-    /// Only the LOCAL writes matter here: each `Rotated` handled here still
+    /// Only the local writes matter here. Each `Rotated` handled here still
     /// registers the file and queues an upload, but the ledger leaves right
     /// after the flush and does not wait for uploads: against a real remote
     /// they do not finish. The next start's
-    /// `recovery::remote::reconcile_local_catalog_uploads` uploads every
-    /// local catalog that the remote does not have. The drain also
-    /// services `Indexer` responses (a late indexing operation still
-    /// registers its SFST and queues its WAL delete) and counts a
-    /// `WorkerGone` builder as done — unlike the run loop, where worker death
-    /// is fatal, the process is exiting anyway and a dead builder must not
-    /// hold the drain.
+    /// `recovery::remote::reconcile_local_catalog_uploads` uploads local
+    /// catalogs that the remote does not have. The drain also handles
+    /// `Indexer` responses, and counts a `WorkerGone` builder as done. Unlike
+    /// in the run loop, worker death is not fatal here: the process is
+    /// exiting anyway, and a dead builder must not hold the drain.
     pub(in crate::ledger) async fn flush_catalogs_on_shutdown(&mut self) {
         let mut pending = 0usize;
         for signal in [Signal::Logs, Signal::Traces] {
@@ -166,17 +154,13 @@ impl Ledger {
                 match self.pipeline_rx.recv().await {
                     None => break,
                     Some((signal, PipelineResp::CatalogBuilder(resp))) => match resp {
-                        // Saturating: a builder that emits FlushComplete and then
-                        // dies (WorkerGone) would otherwise decrement twice and
-                        // underflow — mirrors ComponentHandle::recv's guard.
                         CatalogBuilderResponse::FlushComplete => {
                             pending = pending.saturating_sub(1)
                         }
                         other => self.handle_catalog_builder_resp(signal, other).await,
                     },
                     // An indexing operation may still be completing; handle it
-                    // rather than drop it (it registers the SFST / queues its
-                    // WAL delete).
+                    // rather than drop it.
                     Some((signal, PipelineResp::Indexer(resp))) => {
                         self.handle_indexer_resp(signal, resp).await
                     }

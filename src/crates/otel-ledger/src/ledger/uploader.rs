@@ -1,18 +1,10 @@
 //! Uploader response handling and the upload-retry drain.
 //!
-//! The ledger side of the shared uploader's IPC — the transport itself is
-//! file-lifecycle's uploader.rs (semaphore-bounded PUTs). Responses arrive on
-//! the run loop's `UploaderResp` arm and echo the request's `pipeline_id`.
 //! `Uploaded` marks the seq uploaded on the tenant's registry and forwards a
-//! catalog `AddEntry` — the entry's summary fields come straight from the
-//! registry's `sfst::File`, no pending-metadata cache. `CatalogUploaded`
-//! marks the covered seqs remote-cataloged, the stage retention's
-//! SFST-eviction gate waits for (`ledger/retention.rs`
-//! `evaluate_retention`). `*Failed` responses are
-//! re-queued in the shared `upload_retry`
-//! (src/crates/file-lifecycle/src/upload_retry.rs) while their local file
-//! still exists; `handle_retry_tick` re-issues due entries with capped
-//! exponential backoff.
+//! catalog `AddEntry` built from the registry's `sfst::File`.
+//! `CatalogUploaded` marks the covered seqs remote-cataloged. `*Failed`
+//! responses are re-queued in the shared `upload_retry` while their local
+//! file still exists, and `handle_retry_tick` re-issues due entries.
 
 use file_registry::{SeqKey, TimestampNs};
 use otel_bridge::signals::Signal;
@@ -148,11 +140,11 @@ impl Ledger {
                 );
                 self.upload_retry.clear_catalog(&remote_key);
                 // The catalog is durably remote, so the SFSTs it covers become
-                // evictable — this mark is what retention's gate waits for
+                // evictable. This mark is what retention's gate waits for
                 // (`ledger/retention.rs` `evaluate_retention`). Route each seq
                 // separately: an already
                 // evicted sibling (its route is forgotten on eviction) must not
-                // block marking the rest. Key each mark by the catalog's OWN
+                // block marking the rest. Key each mark by the catalog's own
                 // echoed identity, not this process's.
                 if !seqs.is_empty() {
                     let mut registries = registries.write().await;
@@ -160,10 +152,10 @@ impl Ledger {
                         let key = SeqKey::new(identity, *seq);
                         if let Some((_tenant, registry)) = registries.for_seq_mut(*seq) {
                             // Marking under the catalog's own identity is always
-                            // correct: a prior-instance file still on disk at
-                            // that seq is exactly what the mark makes evictable;
-                            // with no matching local SFST the mark is inert,
-                            // bounded in-memory state (logged below). Deliberately
+                            // correct. A prior-instance file still on disk at
+                            // that seq is exactly what the mark makes evictable.
+                            // With no matching local SFST the mark is inert,
+                            // bounded in-memory state (logged below), so it is
                             // not gated on a local-SFST lookup.
                             if registry.sfst.get(*seq).map(|e| SeqKey::from(&e.id)) != Some(key) {
                                 tracing::debug!(
@@ -213,12 +205,10 @@ impl Ledger {
     }
 
     /// Re-issue failed uploads whose backoff has elapsed, then log the pending
-    /// backlog — `warn` normally, escalating to `error` once an item has been
-    /// retried `PERSISTENT_FAILURE_ATTEMPTS` times (the threshold constant in
-    /// `src/crates/file-lifecycle/src/upload_retry.rs`): the remote is then
+    /// backlog. The log is a `warn`, and becomes an `error` once an item has
+    /// been retried `PERSISTENT_FAILURE_ATTEMPTS` times: the remote is then
     /// treated as persistently unreachable and local files accumulate until it
-    /// recovers. Fired every 30s by the ledger's retry timer (created in
-    /// [`Ledger::new`](super::Ledger::new), missed ticks skipped).
+    /// recovers.
     pub(super) async fn handle_retry_tick(&mut self) {
         if self.upload_retry.is_empty() {
             return;

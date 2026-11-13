@@ -1,22 +1,12 @@
-//! Shared test fixtures for the crate's test modules: the logs handler tests
-//! (ledger/rpc/logs/handler/tests.rs), the traces fixtures
-//! (ledger/rpc/traces/fixtures.rs), and the traces handler remote tests
-//! (ledger/rpc/traces/handler/remote_tests.rs). Three groups: logs-stream
-//! identity ([`identity_for`], [`summary_for`]), the one-entry catalog
-//! installer ([`track_catalog_entry`]), and unix-only FIFO control for the
-//! two `catalogs_are_read_off_the_registry_lock` tests. Test-only
-//! (`#[cfg(test)]` at the module decl, lib.rs); unlike the content-agnostic
-//! twin (src/crates/file-lifecycle/src/test_helpers.rs), identity here comes
-//! from the real `otel-logs-identity` codecs.
+//! Shared test fixtures for the crate's test modules. Unlike the
+//! content-agnostic twin (src/crates/file-lifecycle/src/test_helpers.rs),
+//! identity here comes from the real `otel-logs-identity` codecs.
 
-/// The identity pair production stamps per logs stream — its `partition_key`
-/// (the `ns_hash`) and the opaque `content_meta` blob — from the real
-/// `otel-logs-identity` codecs, exactly as the ingestor does when writing a WAL
-/// header (`src/crates/otel-ingestor/src/logs_service.rs`
-/// `NetdataLogsService::export`). Returns `(partition_key, content_meta)`. The
-/// `.expect` covers the encoder's only failure (a field over its `u16` cap —
-/// production drops such records) and cannot fire for the short identities
-/// tests use.
+/// The identity pair of a logs stream, its `partition_key` (the `ns_hash`)
+/// and the opaque `content_meta` blob, from the real `otel-logs-identity`
+/// codecs. Returns `(partition_key, content_meta)`. The `.expect` covers the
+/// encoder's only failure (a field over its `u16` cap) and cannot fire for
+/// the short identities tests use.
 pub(crate) fn identity_for(stream: &otel_logs_identity::ServiceStream) -> (u64, Vec<u8>) {
     (
         otel_logs_identity::partition_key(stream),
@@ -26,12 +16,10 @@ pub(crate) fn identity_for(stream: &otel_logs_identity::ServiceStream) -> (u64, 
 }
 
 /// A `Summary` for `stream` with the given range and record count, deriving
-/// `content_meta` with the real encoder — the blob indexing stores in the
-/// summary verbatim from the WAL header (`src/crates/ng-index/src/indexing.rs`
-/// `index_logs_file`). The partition key is NOT in the summary — it lives only
-/// in the file's
-/// `FileId`; tests keep the pair consistent by using the same stream's
-/// `ns_hash` as the `FileId`'s `partition_key`.
+/// `content_meta` with the real encoder. The partition key is not in the
+/// summary: it lives only in the file's `FileId`. Tests keep the pair
+/// consistent by using the same stream's `ns_hash` as the `FileId`'s
+/// `partition_key`.
 pub(crate) fn summary_for(
     stream: &otel_logs_identity::ServiceStream,
     record_count: u32,
@@ -47,11 +35,9 @@ pub(crate) fn summary_for(
     }
 }
 
-/// Write a one-entry catalog file for `entry` under `tenant` and track it —
+/// Write a one-entry catalog file for `entry` under `tenant` and track it:
 /// the registry state production reaches once the entry's SFST has uploaded
-/// and the catalog builder rotates (ledger/catalog_builder.rs). A remote plan
-/// then selects the entry unless a local copy masks it: the remote-read tests
-/// build their evicted files on this. Shortcuts: the date is pinned to
+/// and the catalog builder rotates. Shortcuts: the date is pinned to
 /// 2026-04-17; identity and the filename's `(max_seq, min_s, max_s)` fold
 /// come from the single `entry`; the write is plain, not production's atomic
 /// tmp→rename. Returns the catalog file's path.

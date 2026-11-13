@@ -1,14 +1,8 @@
 //! Ledger-side handling of responses from the indexer component (sealed WALs).
 //!
-//! The indexing operation itself runs in `crate::indexer`
-//! (src/crates/otel-ledger/src/indexer.rs): one component per pipeline turns
-//! closed WAL files into SFSTs and replies with an `IndexerResponse`. This
-//! module is the reply's consumer — `handle_indexer_resp` registers the
-//! sealed SFST (or suppresses an empty one), drops the WAL's query-time
-//! chunks, queues the WAL delete, optionally queues an upload, and runs
-//! retention. Dispatched from the run loop ([`crate::Ledger::run`]) and from
-//! the shutdown flush drain (`Ledger::flush_catalogs_on_shutdown`), so an
-//! indexing operation completing during shutdown is still applied.
+//! `handle_indexer_resp` registers the sealed SFST (or suppresses an empty
+//! one), drops the WAL's query-time chunks, queues the WAL delete, optionally
+//! queues an upload, and runs retention.
 
 use std::path::PathBuf;
 
@@ -26,9 +20,7 @@ enum Indexed {
     /// the empty index file, so nothing is uploaded, cataloged, or
     /// re-discovered at the next restart. An empty file carries no queryable
     /// data; tracking it would only add a bogus `(0, 0)` timestamp range to
-    /// the inventory. A frame-less WAL reaches here after a crash/rotation
-    /// (startup recovery suppresses those the same way:
-    /// `recover_unindexed`, `file-lifecycle/src/recovery/local.rs`).
+    /// the inventory. A frame-less WAL reaches here after a crash/rotation.
     Empty {
         tenant_id: TenantId,
         file_id: FileId,
@@ -50,10 +42,8 @@ impl Ledger {
     pub(super) async fn handle_indexer_resp(&mut self, signal: Signal, resp: IndexerResponse) {
         let (file_id, summary, size) = match resp {
             IndexerResponse::IndexFailed { file_id, error } => {
-                // Intentional divergence from `recover_unindexed`: at runtime
-                // the entry stays tracked (and queryable as a WAL) until the
-                // next restart's recovery retries the indexing operation and
-                // orphans it.
+                // The entry stays tracked, and queryable as a WAL, until the
+                // next restart's recovery retries the indexing operation.
                 tracing::error!(seq = file_id.seq, "indexing failed: {error}");
                 return;
             }
@@ -100,12 +90,8 @@ impl Ledger {
                 }
             } else {
                 // Tracked under the WAL's own `FileId`, so the SFST inherits its
-                // `partition_key` — the partition key embedded in the filename, not a
-                // summary field — and the selector and the `files:true` inventory
-                // both read `id.partition_key` and cannot disagree. The summary's
-                // timestamps/record_count/content_meta land on the registry
-                // entry; the uploader response handler
-                // (`Ledger::handle_uploader_resp`) reads them back.
+                // `partition_key`, which is embedded in the filename and is not a
+                // summary field.
                 registry.sfst.track(file_id, size, summary);
 
                 let upload = if storage_enabled {

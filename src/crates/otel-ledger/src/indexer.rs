@@ -1,8 +1,6 @@
 //! The indexer component: turns closed WAL files into SFST index files.
 //!
-//! One component type serves both signals — each pipeline spawns its own
-//! [`Indexer`] for its signal (`ledger/pipeline.rs`,
-//! `ledger/traces_pipeline.rs`). Every indexing operation runs in a child
+//! Every indexing operation runs in a child
 //! process: this executable as `otel-plugin index` ([`crate::index_child`]),
 //! which picks the signal's `ng-index` indexing function. So the memory an
 //! operation needs goes back to the system when the operation ends, and an
@@ -26,13 +24,7 @@
 //! ratio that each indexer learns from the peaks its children report
 //! (`ExpectedMemory`).
 //!
-//! Requests arrive from the ingestor on a WAL `FileEvent::Closed`
-//! (`ledger/ingestor.rs`) and from startup recovery of unindexed WALs
-//! (`file_lifecycle::recovery::recover_unindexed`); responses go back to
-//! the ledger's `handle_indexer_resp` (`ledger/indexer.rs` — a different
-//! indexer.rs: the response handler, not this component) or to the recovery
-//! drains, in the order the operations finish. Chunk indexing for live
-//! queries (`ng_index::index_logs_range`) bypasses this component.
+//! Responses go back in the order the operations finish.
 //!
 //! Cancelling or closing the request channel exits the loop and kills the
 //! operations that still run. That loses nothing: an operation writes its index
@@ -499,8 +491,7 @@ impl RunningOperations {
     }
 }
 
-/// The indexer component: a unit struct — all state lives in
-/// `Component::run`'s locals; one instance per signal pipeline.
+/// The indexer component. All its state lives in `Component::run`'s locals.
 pub struct Indexer;
 
 impl Component for Indexer {

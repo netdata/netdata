@@ -86,10 +86,9 @@ impl WalPrefixes {
             .collect())
     }
 
-    /// Drop WAL `seq`'s entry — when its chunks are dropped, on rotation.
+    /// Drop WAL `seq`'s entry when its chunks are dropped, on rotation.
     /// A request racing the rotation can re-create it; that entry is a
-    /// few boundaries, kept until restart, like the chunk cache's own
-    /// rotation race.
+    /// few boundaries, kept until restart.
     pub(crate) fn forget(&self, seq: u64) {
         self.entries.lock().unwrap().remove(&seq);
     }
