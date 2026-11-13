@@ -51,14 +51,16 @@ This design philosophy enables Netdata to monitor infrastructure at unprecedente
 
 ### Agent Requirements (Per Node)
 
-Netdata Agent is designed to be lightweight, making it suitable for deployment across entire infrastructures. Even with Machine Learning enabled, Netdata Agents typically consume less than 5% CPU of a single core (see [CPU Requirements](/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md) for default-settings sizing guidance). The exact figures depend on the number of metrics collected per server.
+**Netdata uses under 5% of one CPU core and about 200 MB of RAM on a typical server.** That is with default settings: per-second collection of about 3,000 metrics, machine learning on every metric, three storage tiers and all stock alerts. Usage grows with the number of metrics collected. [Sizing](/docs/netdata-agent/sizing-netdata-agents/README.md) covers busy hosts and Parents.
+
+**On edge devices, Netdata runs in about 30 MiB.** A Raspberry Pi 3 B+ configured as a lightweight Child uses about 3% of one core at five-second collection, and under 1% at five-minute collection. See [edge devices](/docs/fleet-management/minimize-cpu-and-memory.md).
 
 When connected to a Netdata Parent (the agent is in `child` mode), these requirements can be significantly reduced and, in the case of storage, even eliminated (no data on local disk).
 
-| Type       | Metric/s | CPU                     | Memory        | Network  | Storage                   |
-|------------|----------|-------------------------|---------------|----------|---------------------------|
-| standalone | 3k - 10k | 4% - 20% of single core | 150 - 500 MiB | none     | varies based on retention |
-| child      | 3k - 10k | 2% - 10% of single core | 100 - 300 MiB | \<1 Mbps | none                      |
+| Type       | Metric/s | CPU                      | Memory      | Network  | Storage                          |
+|------------|----------|--------------------------|-------------|----------|----------------------------------|
+| standalone | about 3k | under 5% of a single core | about 200 MB | none     | about 4 GiB by default, configurable |
+| child      | 3k - 10k | 2% - 10% of a single core | 100 - 300 MiB | \<1 Mbps | none                             |
 
 For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
@@ -66,7 +68,7 @@ For more information and ways to further reduce Agent resource utilization, see 
 
 Parent nodes aggregate data from multiple child agents and require resources that scale with the volume of metrics collected and other deployment decisions (clustered parents, centralized machine learning, etc).
 
-The best practice is to have a cluster of Netdata Parents for every approximately 500 monitored nodes (2M metrics/second, see [Parent Sizing Guidelines](/docs/scalability.md#parent-sizing-guidelines) for the full 100/250/500-node breakdown), like this:
+Plan about one Netdata Parent, or Parent cluster, for every 500 monitored nodes (a planning unit for capacity, not a limit: 2M metrics/second, about 4,000 metrics/second per node, leaving headroom; see [Parent Sizing Guidelines](/docs/scalability.md#parent-sizing-guidelines) for the full 100/250/500-node breakdown), like this:
 
 | Monitored Nodes | Metric/s  | CPU Cores | Memory | Network  | Storage                   |
 |-----------------|-----------|-----------|--------|----------|---------------------------|
@@ -133,13 +135,11 @@ To control access to observability data, Netdata Cloud uses spaces and rooms to 
 
 ## Scalability
 
-Netdata scales horizontally. There is no limit on how large a Netdata monitored infrastructure can scale, although there are several practical usability limits when it comes to using the observability platform.
+Netdata scales out: you add capacity by adding Parents, and there is no limit on how large a monitored infrastructure can be.
 
 For data ingestion and storage, there is no limit, theoretical or practical. When using standalone agents, each agent is independent of the others. When using parent-child agents, each parent is sized independently of the others and the system scales by adding more parents.
 
-Practical limits exist when querying observability data, mainly due to the amount of information web browsers and aggregation points can reasonably handle at once. The system becomes slower depending on the amount of information queried at once (i.e. how many nodes, instances, time-series appear on the same chart or view), similar to all observability platforms (not Netdata specific).
-
-Due to the distributed nature of the architecture (parallel independent execution of smaller queries), Netdata responsiveness is usually significantly better compared to other monitoring solutions. Still, it is influenced by the amount of data queried at once.
+Queries run in parallel on the Agents and Parents that hold the data: each one aggregates its own nodes and Netdata Cloud merges the results, so adding Parents adds query capacity too. See [Fleet-wide queries](/docs/netdata-design.md#fleet-wide-queries).
 
 ## Impact on the Monitored Infrastructure
 
@@ -190,7 +190,7 @@ Netdata provides enterprise-grade security and compliance capabilities designed 
 Netdata maintains SOC 2 Type 2 certification, with ISO 27001 on the roadmap. The platform aligns with GDPR, CCPA, HIPAA (with BAA available), and PCI DSS requirements, making it suitable for financial services, healthcare, and government deployments.
 
 **Data Sovereignty Architecture:**
-The platform's architecture ensures complete data sovereignty - all metrics and logs remain on customer infrastructure. Only metadata (node names, chart titles, alert configurations) is synchronized to Netdata Cloud, with all data transmission protected by TLS encryption. Air-gapped deployment options are available for maximum security isolation.
+The platform's architecture ensures complete data sovereignty - all metrics, logs and traces remain on customer infrastructure. Only metadata (node names, chart titles, alert configurations) is stored in Netdata Cloud; metric, log and trace data passes through Cloud only to answer the queries users run, with all data transmission protected by TLS encryption. Air-gapped deployment options are available for maximum security isolation.
 
 **Enterprise Authentication:**
 Comprehensive SSO integration supports LDAP/AD group mapping through SCIM 2.0, enabling automatic role assignment based on organizational structure. Multi-factor authentication, IP whitelisting, and role-based access control provide granular security controls with comprehensive audit logging.
@@ -218,7 +218,7 @@ Proactive monitoring services provide health checks, performance reviews, capaci
 Netdata's flexible architecture supports extensive customization to meet specific organizational requirements while maintaining ease of use and operational simplicity.
 
 **Dashboard and Visualization:**
-The platform provides drag-and-drop dashboard creation with custom visualizations, shared dashboards, and template libraries. Over 30 chart types are available with custom color schemes, responsive layouts, and export capabilities.
+The platform provides drag-and-drop dashboard creation with custom visualizations, shared dashboards, and template libraries. More than a dozen chart types are available with custom color schemes, responsive layouts, and export capabilities.
 
 **Alert Management:**
 Comprehensive alert customization includes custom thresholds, complex conditions, ML-based alerts, and schedule-based rules. Pre-built and custom alert templates support bulk configuration with version control integration.

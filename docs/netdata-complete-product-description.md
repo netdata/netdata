@@ -53,8 +53,8 @@ Netdata is a distributed observability platform. Netdata Agents collect, store a
 
 **Scale and resources**
 - From single nodes to 100,000+ nodes; Netdata Cloud SaaS serves more than 100,000 reachable nodes
-- Parent sizing: about 500 nodes or 2 million metrics per second per Parent (each Parent in a cluster holds all data; about 20 CPU cores, 80 GB RAM); 100 nodes ≈ 0.5M metrics/s on 5 cores and 20 GB; 250 nodes ≈ 1M metrics/s on 10 cores and 40 GB
-- [Agent resource use](/docs/netdata-agent/sizing-netdata-agents/README.md): \<5% CPU and 150MB RAM (standalone, ML enabled); in detail, 1–5% CPU and 100–200 MB RAM on an idle system; 5–20% of one CPU core and 250–350 MB RAM in production workloads; machine learning and alerting can be offloaded to Parents, special tuning for IoT
+- Parent sizing: about 500 nodes or 2 million metrics per second per Parent, a planning unit, not a limit (each Parent in a cluster holds all data; about 20 CPU cores, 80 GB RAM); 100 nodes ≈ 0.5M metrics/s on 5 cores and 20 GB; 250 nodes ≈ 1M metrics/s on 10 cores and 40 GB
+- [Agent resource use](/docs/netdata-agent/sizing-netdata-agents/README.md): \<5% CPU and about 200 MB RAM (standalone, ML enabled); in detail, 1–5% CPU and 100–200 MB RAM on an idle system; 5–20% of one CPU core and 250–350 MB RAM in production workloads; machine learning and alerting can be offloaded to Parents, special tuning for IoT
 - [Netdata benchmark (2025)](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/), Netdata vs a Prometheus stack at 4.6 million metrics per second: 37% less CPU, 88% less RAM, 97% less disk I/O, 13% less bandwidth, 15× longer per-second retention (up to 40× in lower tiers), 22× faster on large queries, 100% sample completeness vs 93.7%
 
 **Value**
@@ -646,7 +646,7 @@ Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, s
 
 **[Traces](/docs/opentelemetry/trace-storage-and-retention.md)**
 - Span storage with field-level indexing, trace-ID index and bloom filter, span events and links; retention and offload as for logs
-- **Traces explorer** (Netdata Cloud; users turn it on in the Early Access panel):
+- **Traces explorer** (Netdata Cloud):
   - Trace list: heatmap (trace count × duration band, with errors), volume, error and percentile charts over time, trace duration scatter
   - Trace detail: waterfall, span tree, span details, missing-span markers
   - Filters: service, operation, status, duration range, any resource, span, scope, event or link attribute
@@ -800,7 +800,7 @@ Netdata evaluates alerts on every Agent and Parent, close to the data, with 1,10
 **Capabilities**
 
 **Alerts**
-- 1,184 stock alert definitions across 144 configuration files, covering systems, containers, applications, databases, network devices, cloud services and Netdata itself
+- 1,179 stock alert definitions across 142 configuration files, covering systems, containers, applications, databases, network devices, cloud services and Netdata itself
 - [Alert expressions](/src/health/REFERENCE.md): lookups over any time window (average, min, max, sum, percentiles and more), anomaly-rate lookups, calculations, warning and critical conditions with hysteresis, delays and repeat intervals, per-alert evaluation interval
 - Label-based targeting (host labels, chart labels) and templates applied to all matching instances
 - Alert states CLEAR, WARNING, CRITICAL (plus UNDEFINED, UNINITIALIZED, REMOVED); alert transitions history
@@ -853,7 +853,7 @@ Netdata dashboards are generated automatically from the collected metrics and or
 - Mobile app for notifications
 
 **Agent dashboards**
-- The same dashboard served locally by every Agent and Parent, for single nodes or a Parent's Children, usable without Netdata Cloud; the free tier's 5-node limit applies to it as it does to Netdata Cloud (see Pricing and Licensing)
+- The same dashboard served locally by every Agent and Parent, for single nodes or a Parent's Children, usable without Netdata Cloud; a single Agent's own dashboard has no node limit, and free open-source use limits only multi-node dashboards (see Pricing and Licensing)
 
 **Value**
 
@@ -911,7 +911,7 @@ Netdata keeps monitoring data on the customer's infrastructure: metric samples, 
 
 **Design**
 
-- **[Data stays at the edge](/docs/security-and-privacy-design/netdata-cloud-security.md).** Metric samples, logs, traces and database query text are stored on Agents and Parents (and the customer's own object storage, when configured); Netdata Cloud stores metadata (nodes, charts, alerts, users) and queries the data in real time when users view it.
+- **[Data stays at the edge](/docs/security-and-privacy-design/netdata-cloud-security.md).** Metric samples, logs, traces and database query text are stored on Agents and Parents, and logs and traces can also be offloaded to the customer's own object storage, when configured; Netdata Cloud stores metadata (nodes, charts, alerts, users) and queries the data in real time when users view it.
 - **[Outbound-only Cloud connection](/src/aclk/README.md).** Agents connect to Netdata Cloud over TLS-encrypted WebSockets (MQTT); no inbound ports are required. Proxy support (including SOCKS5).
 - **Sensitive data gated by permission.** Logs, query text, processes and connections are available only to signed-in Space members whose role grants permission to view sensitive data.
 - **[On-Prem for full control](https://www.netdata.cloud/product/cloud-on-premises/).** Enterprise On-Prem runs the complete Netdata Cloud on customer infrastructure, including air-gapped environments.
@@ -994,7 +994,7 @@ Netdata exchanges data with other systems through exporting connectors, Promethe
 | **Enterprise** | Custom | Fleets above 500 nodes, on-premise deployments at any size (air-gapped facilities, critical infrastructure) | Everything in Business; commitment and multi-year discounts; custom quotas for logs, traces, flows and AI; on-premise deployment; AI Co-SRE; priority support plans |
 | **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, no limit on metrics, local dashboards |
 
-Homelab is for personal, non-commercial use only. Beyond 5 nodes, freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up.
+Homelab is for personal, non-commercial use only. Beyond 5 nodes, freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up. As of November 2026, some recently released capabilities are in Early Access: you can use them free of charge for a limited time.
 
 ### Business products
 

@@ -3,7 +3,23 @@ sidebar:
   - meta:
       label: Welcome to Netdata
       edit_url: https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md
+      description: Start here. What it is like to work with Netdata, the principles behind it, who it is for, how Agents, Parents and Netdata Cloud fit together, how to get started and where to go next.
+      keywords:
+        - netdata
+        - observability platform
+        - getting started
+        - monitoring
     items:
+      - meta:
+          label: Netdata Design
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-design.md
+          description: Why Netdata is built the way it is. Metrics get their meaning at collection time, data stays where it is created, Parent clusters scale out, fleet-wide queries run on the Parents, missing data is shown as data, and the trade-offs are stated as design choices.
+          keywords:
+            - netdata design
+            - observability architecture
+            - distributed monitoring
+            - scale out
+            - high availability
       - meta:
           label: Complete Product Description
           edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-complete-product-description.md
