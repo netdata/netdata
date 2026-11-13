@@ -22,6 +22,9 @@ import (
 // outside the child's work folder durably records that permission. Failures before
 // publication clean drained work; an attempted publication stays protected until
 // both parent directories are synced or a later store owner reconciles disk.
+// On success, the returned artifacts contain every candidate except valid files
+// whose initial size exceeds FetchMaxBytes, in input order. Other failures abort
+// the set; no published artifacts are returned with an error.
 func (s *Store) Finalize(
 	ctx context.Context,
 	runID string,
@@ -114,9 +117,6 @@ func (s *Store) Finalize(
 		if err != nil {
 			return nil, errors.Join(err, source.Close())
 		}
-		if info.Size() > FetchMaxBytes {
-			return nil, &CaptureError{ID: capture.ID, Err: errors.Join(ErrTooLarge, source.Close())}
-		}
 		if capture.Kind == "screenshot" {
 			var header [8]byte
 			_, err = io.ReadFull(source, header[:])
@@ -130,6 +130,12 @@ func (s *Store) Finalize(
 				_ = source.Close()
 				return nil, fmt.Errorf("%w: invalid PNG", ErrInvalidCapture)
 			}
+		}
+		if info.Size() > FetchMaxBytes {
+			if err := source.Close(); err != nil {
+				return nil, &CaptureError{ID: capture.ID, Err: errors.Join(ErrTooLarge, err)}
+			}
+			continue
 		}
 		dest, err := s.root.OpenFile(stage+"/"+capture.ID, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 		if err != nil {
@@ -167,6 +173,12 @@ func (s *Store) Finalize(
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if len(m.Artifacts) == 0 {
+		if err := s.cleanupDrained(runID); err != nil {
+			s.recordCleanupError(err)
+		}
+		return nil, nil
 	}
 	raw, err := json.Marshal(m)
 	if err != nil {

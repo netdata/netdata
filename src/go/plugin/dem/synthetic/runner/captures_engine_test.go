@@ -15,13 +15,15 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCaptureReportingThroughEnginePublication(t *testing.T) {
-	for _, mode := range []string{"published", "missing terminal", "oversize", "invalid metadata", "unknown metadata ID", "unlabeled beyond cap"} {
+	for _, mode := range []string{"published", "missing terminal", "oversize", "oversize first", "all oversize", "invalid after oversize", "invalid metadata", "unknown metadata ID", "unlabeled beyond cap"} {
 		t.Run(mode, func(t *testing.T) {
 			e, h, store := testEngine(t)
 			e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
@@ -45,8 +47,12 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 					testID := fmt.Sprintf("t%d", i)
 					name := "output/" + id + ".png"
 					body := []byte("\x89PNG\r\n\x1a\nfixture")
-					if mode == "oversize" && i == 1 {
+					if mode == "oversize" && i == 1 || mode == "all oversize" ||
+						(mode == "oversize first" || mode == "invalid after oversize") && i == 0 {
 						body = append(body, []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes)))...)
+					}
+					if mode == "invalid after oversize" && i == 1 {
+						body = []byte("not a PNG")
 					}
 					if err := os.WriteFile(filepath.Join(req.WorkDir, name), body, 0600); !assert.NoError(t, err) {
 						return ndexec.TreeResult{Drained: true, Err: err}
@@ -91,11 +97,30 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 				assert.Empty(t, ex.Run.Artifacts)
 				assert.Equal(t, "partial", ex.Run.Captures.Reporting)
 				assert.Equal(t, []synthetic.CaptureOmission{{ID: "s0", Reason: "not_in_final_report"}, {ID: "s1", Reason: "not_in_final_report"}}, ex.Run.Captures.Unpublished)
-			case "oversize":
+			case "oversize", "oversize first":
+				publishedID, testID, skippedID := "s0", "t0", "s1"
+				if mode == "oversize first" {
+					publishedID, testID, skippedID = "s1", "t1", "s0"
+				}
 				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
+				assert.Equal(t, "assertion", ex.Run.Error)
+				assert.Equal(t, "available", ex.Run.CaptureState)
+				require.Len(t, ex.Run.Artifacts, 1)
+				assert.Equal(t, publishedID, ex.Run.Artifacts[0].ID)
+				assert.Equal(t, testID, ex.Run.Artifacts[0].Test.ID)
+				assert.Equal(t, []synthetic.CaptureOmission{{ID: skippedID, Reason: "too_large"}}, ex.Run.Captures.Unpublished)
+			case "all oversize":
+				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
+				assert.Equal(t, "assertion", ex.Run.Error)
 				assert.Empty(t, ex.Run.Artifacts)
 				assert.Equal(t, "unavailable", ex.Run.CaptureState)
-				assert.Equal(t, []synthetic.CaptureOmission{{ID: "s0", Reason: "publication_failed"}, {ID: "s1", Reason: "too_large"}}, ex.Run.Captures.Unpublished)
+				assert.Equal(t, []synthetic.CaptureOmission{{ID: "s0", Reason: "too_large"}, {ID: "s1", Reason: "too_large"}}, ex.Run.Captures.Unpublished)
+			case "invalid after oversize":
+				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
+				assert.Contains(t, ex.Run.Error, "artifact publication:")
+				assert.Empty(t, ex.Run.Artifacts)
+				assert.Equal(t, "unavailable", ex.Run.CaptureState)
+				assert.Equal(t, []synthetic.CaptureOmission{{ID: "s0", Reason: "publication_failed"}, {ID: "s1", Reason: "publication_failed"}}, ex.Run.Captures.Unpublished)
 			default:
 				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
 				require.NotEmpty(t, ex.Run.Artifacts)
@@ -114,6 +139,28 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 					assert.True(t, ex.Run.Captures.Truncated)
 					assert.Empty(t, ex.Run.Artifacts[149].Test.ID)
 				}
+			}
+			if strings.Contains(mode, "oversize") {
+				active := registry.New()
+				registration, err := active.Register(registry.Job{JobID: ex.Run.JobID, CadenceSeconds: 60})
+				require.NoError(t, err)
+				defer registration.Retire()
+				registration.Complete(ex.Run)
+				service := query.New(active, nil, store.Store, nil)
+				evidence, err := service.Evidence(t.Context(), ex.Run.JobID, ex.Run.ID, "")
+				require.NoError(t, err)
+				assert.Equal(t, ex.Run.CaptureState, evidence.CaptureState)
+				require.Len(t, evidence.Artifacts, len(ex.Run.Artifacts))
+				for i, a := range evidence.Artifacts {
+					assert.Equal(t, ex.Run.Artifacts[i], a.Artifact)
+				}
+				for _, omission := range ex.Run.Captures.Unpublished {
+					_, err = service.Evidence(t.Context(), ex.Run.JobID, ex.Run.ID, omission.ID)
+					assert.ErrorIs(t, err, query.ErrArtifactNotRecorded)
+				}
+				detail, err := service.Run(t.Context(), ex.Run.JobID, ex.Run.ID)
+				require.NoError(t, err)
+				assert.Equal(t, ex.Run.Captures, detail.Captures)
 			}
 		})
 	}
@@ -140,6 +187,10 @@ func TestLighthouseCaptureOmissionNeedsNoRuntimeFeature(t *testing.T) {
 	ex := e.Execute(t.Context(), synthetic.Request{Kind: synthetic.Lighthouse, Name: "audit", URL: "https://example.org", Capture: true, Timeout: time.Second}, nil)
 	require.True(t, ex.Drained)
 	assert.Equal(t, synthetic.Success, ex.Run.Outcome)
+	assert.Empty(t, ex.Run.Error)
+	require.NotNil(t, ex.Run.Metrics)
+	require.NotNil(t, ex.Run.Metrics.Performance)
+	assert.Equal(t, 90.0, *ex.Run.Metrics.Performance)
 	assert.Empty(t, ex.Run.Artifacts)
 	assert.Equal(t, "unavailable", ex.Run.CaptureState)
 	require.NotNil(t, ex.Run.Captures)

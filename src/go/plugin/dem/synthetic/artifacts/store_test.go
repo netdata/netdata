@@ -164,29 +164,111 @@ func TestPNGCapture(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, png, got)
 }
-func TestFetchBoundAndCorruption(t *testing.T) {
+func TestOversizedCapturesPreserveValidSiblings(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		order []string
+		want  []string
+	}{
+		{name: "small first", order: []string{"small", "large"}, want: []string{"small"}},
+		{name: "large first", order: []string{"large", "small"}, want: []string{"small"}},
+		{name: "several", order: []string{"large", "small", "large2", "small2"}, want: []string{"small", "small2"}},
+		{name: "all omitted", order: []string{"large", "large2"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, root := store(t)
+			work, err := s.Begin(run1, "journey:test", "")
+			require.NoError(t, err)
+			require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
+			label := synthetic.ArtifactTest{ID: "test", Title: "Checkout"}
+			var candidates []synthetic.Capture
+			for _, id := range tc.order {
+				name := "output/" + id + ".png"
+				require.NoError(t, os.WriteFile(filepath.Join(work, name), png, 0600))
+				if strings.HasPrefix(id, "large") {
+					require.NoError(t, os.Truncate(filepath.Join(work, name), artifacts.FetchMaxBytes+1))
+				}
+				candidates = append(candidates, synthetic.Capture{ID: id, Kind: "screenshot", MIME: "image/png", Path: name, Test: label})
+			}
+			published, err := s.Finalize(t.Context(), run1, candidates)
+			require.NoError(t, err)
+			var ids []string
+			for _, a := range published {
+				ids = append(ids, a.ID)
+			}
+			assert.Equal(t, tc.want, ids)
+			for _, dir := range []string{"work", "staging", "drained"} {
+				_, err = os.Lstat(filepath.Join(root, dir, run1))
+				assert.ErrorIs(t, err, os.ErrNotExist, dir)
+			}
+			_, err = os.Lstat(work)
+			assert.ErrorIs(t, err, os.ErrNotExist, "work alias removed")
+			assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
+			require.NoError(t, s.Close())
+			reopened, err := artifacts.Open(root)
+			require.NoError(t, err)
+			defer reopened.Close()
+			m, err := reopened.Manifest(t.Context(), "journey:test", run1)
+			if len(tc.want) == 0 {
+				assert.ErrorIs(t, err, artifacts.ErrNotFound)
+				_, err = os.Lstat(filepath.Join(root, "runs", run1))
+				assert.ErrorIs(t, err, os.ErrNotExist, "no empty manifest")
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, published, m.Artifacts)
+			}
+			for _, id := range tc.order {
+				a, body, err := reopened.Fetch(t.Context(), "journey:test", run1, id)
+				if strings.HasPrefix(id, "large") {
+					assert.ErrorIs(t, err, artifacts.ErrNotFound)
+				} else {
+					require.NoError(t, err)
+					assert.Equal(t, png, body)
+					assert.Equal(t, label, a.Test)
+				}
+			}
+		})
+	}
+}
+
+func TestOversizeDoesNotHideInvalidCaptures(t *testing.T) {
+	for _, which := range []string{"large invalid PNG", "duplicate skipped ID", "missing file"} {
+		t.Run(which, func(t *testing.T) {
+			s, root := store(t)
+			work, err := s.Begin(run1, "journey:test", "")
+			require.NoError(t, err)
+			require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
+			require.NoError(t, os.WriteFile(filepath.Join(work, "output/large.png"), png, 0600))
+			require.NoError(t, os.Truncate(filepath.Join(work, "output/large.png"), artifacts.FetchMaxBytes+1))
+			require.NoError(t, os.WriteFile(filepath.Join(work, "output/small.png"), png, 0600))
+			large := synthetic.Capture{ID: "large", Kind: "screenshot", MIME: "image/png", Path: "output/large.png"}
+			small := synthetic.Capture{ID: "small", Kind: "screenshot", MIME: "image/png", Path: "output/small.png"}
+			bad := synthetic.Capture{ID: "bad", Kind: "screenshot", MIME: "image/png", Path: "output/missing.png"}
+			switch which {
+			case "large invalid PNG":
+				bad.Path = "output/bad.png"
+				require.NoError(t, os.WriteFile(filepath.Join(work, bad.Path), []byte("not a PNG"), 0600))
+				require.NoError(t, os.Truncate(filepath.Join(work, bad.Path), artifacts.FetchMaxBytes+1))
+			case "duplicate skipped ID":
+				bad = large
+			}
+			published, err := s.Finalize(t.Context(), run1, []synthetic.Capture{large, small, bad})
+			require.ErrorIs(t, err, artifacts.ErrInvalidCapture)
+			assert.Empty(t, published)
+			for _, dir := range []string{"work", "staging", "drained", "runs"} {
+				_, err = os.Lstat(filepath.Join(root, dir, run1))
+				assert.ErrorIs(t, err, os.ErrNotExist, dir)
+			}
+			_, err = os.Lstat(work)
+			assert.ErrorIs(t, err, os.ErrNotExist)
+		})
+	}
+}
+
+func TestFetchRejectsCorruption(t *testing.T) {
 	s, root := store(t)
-	work, c := captured(t, s, run1, []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes+1))))
-	require.NoError(t, os.WriteFile(filepath.Join(work, "output", "small.html"), []byte("small"), 0600))
-	small := synthetic.Capture{
-		ID:   "small-report",
-		Kind: "report",
-		MIME: "text/html",
-		Path: "output/small.html",
-	}
-	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{small, c})
-	require.ErrorIs(t, err, artifacts.ErrTooLarge)
-	_, _, err = s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
-	assert.ErrorIs(t, err, artifacts.ErrNotFound)
-	assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
-	for _, dir := range []string{"work", "staging", "drained", "runs"} {
-		_, err = os.Lstat(filepath.Join(root, dir, run1))
-		assert.ErrorIs(t, err, os.ErrNotExist, dir)
-	}
-	_, err = os.Lstat(work)
-	assert.ErrorIs(t, err, os.ErrNotExist)
-	_, c = captured(t, s, run2, []byte("good"))
-	_, err = s.Finalize(context.Background(), run2, []synthetic.Capture{c})
+	_, c := captured(t, s, run2, []byte("good"))
+	_, err := s.Finalize(context.Background(), run2, []synthetic.Capture{c})
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(root, "runs", run2, c.ID), []byte("bad!"), 0600))
 	_, _, err = s.Fetch(context.Background(), "lighthouse:test", run2, c.ID)
@@ -488,7 +570,8 @@ type growBeforeReadContext struct {
 
 func (c *growBeforeReadContext) Err() error {
 	c.checks++
-	if c.checks == 3 {
+	// Admission, drainage and loop entry check cancellation before the copy.
+	if c.checks == 4 {
 		c.grow()
 	}
 	return c.Context.Err()

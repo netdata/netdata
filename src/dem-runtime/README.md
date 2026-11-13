@@ -465,8 +465,11 @@ report means not recorded. Lighthouse has Go publication dispositions but no jou
 Go joins labels only onto eligible terminal candidates. Metadata IDs never authorize files. A delivered association
 without an accepted final candidate is `not_in_final_report`; interrupted candidates visible to Go but rejected by
 its actual stop policy are `not_eligible`. Without terminal authority, earlier screenshots are not published even if
-their metadata arrived. Publication still requires verified drainage and rejects the entire set on any failure.
-An offending size-limit candidate is `too_large`, and other rejected candidates are `publication_failed`.
+their metadata arrived. Publication still requires verified drainage. Go skips valid candidates initially above
+5 MiB and publishes the retained subset atomically. Those omissions are `too_large`, without general run-error text;
+if all are omitted, capture state is `unavailable` and no empty manifest is created. Invalid input, copy growth and
+I/O failures still reject the entire set. An identified hard size-error offender is `too_large`; other candidates,
+including earlier size skips, are `publication_failed`.
 
 Published artifact association is retained in manifest version 2 and run history. Missing association means no label;
 Go-authored stored records use ordinary typed JSON decoding. Optional-wire validation remains isolated from core
