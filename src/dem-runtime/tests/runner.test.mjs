@@ -54,7 +54,8 @@ const prefix = "import {test, expect} from '@playwright/test';\n";
 test('unknown advisory request members preserve ordinary journey execution', async () => {
   const source = prefix + "test('pass',async()=>{console.log('workflow-executed');expect(2).toBe(2)});";
   const plain = await run(source);
-  const extended = await run(source, {future_advisory: {value: 'ignored-fixture'}});
+  const extended = await run(source, {extensions: ['fixture.future.v1'], future_advisory: {value: 'ignored-fixture'}});
+  assert.deepEqual(extended.optional, [{type: 'extension_init', extension_init: {selected: []}}]);
   assert.equal(extended.code, plain.code);
   assert.deepEqual(extended.result, plain.result);
   const output = extended.events.filter(event => event.kind === 'stdout').map(event => event.message).join('');
@@ -268,7 +269,8 @@ test('unknown advisory request members preserve Lighthouse measurements and capt
   const {fixture, closed}=await lighthouseFixture();
   const options={kind:'lighthouse',url:'http://fixture.invalid',capture:true};
   const plain=await run(undefined,options,fixture);
-  const extended=await run(undefined,{...options,future_advisory:{value:'ignored-fixture'}},fixture);
+  const extended=await run(undefined,{...options,extensions:['fixture.future.v1'],future_advisory:{value:'ignored-fixture'}},fixture);
+  assert.deepEqual(extended.optional, [{type: 'extension_init', extension_init: {selected: []}}]);
   assert.equal(extended.code,0);
   assert.deepEqual(extended.result,plain.result);
   assert.deepEqual(extended.result.metrics,{performance:88,lcp_ms:123});

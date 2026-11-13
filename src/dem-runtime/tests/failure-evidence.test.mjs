@@ -38,7 +38,8 @@ test('optional malformed bodies are nonfatal while mixed and unknown envelopes s
     assert.equal(extensions.optional(record, selected, true), true);
   }
   assert.equal(extensions.optional({type: 'extension', extension: {feature: 'future.v1', data: {}}}, selected, false), true);
-  for (const record of [{type: 'extension', extension: {}, result: {}}, {type: 'event', event: {}, extension: {}}, {type: 'unknown'}, null, []]) {
+  for (const record of [{type: 'extension', extension: {}, result: {}}, {type: 'event', event: {}, extension: {}}, {type: 'unknown'}, null, [],
+    ...['constructor', 'toString', '__proto__', ['extension'], ['extension_init'], ['event'], ['result']].map(type => ({type}))]) {
     assert.throws(() => extensions.optional(record, selected, false), /reporter record/);
   }
 });

@@ -121,3 +121,31 @@ func TestFailureSummaryDisclosesIncompletePath(t *testing.T) {
 	require.NoError(t, json.Unmarshal(encoded, &decoded))
 	assert.True(t, decoded.FirstFailure.PathIncomplete)
 }
+
+func TestCloneRunPreservesEmptyFailurePath(t *testing.T) {
+	for _, raw := range []string{`{"path":[]}`, `{"path":null}`} {
+		t.Run(raw, func(t *testing.T) {
+			var failure FailureDetail
+			require.NoError(t, json.Unmarshal([]byte(raw), &failure))
+			original := Run{FailureEvidence: &FailureEvidence{FirstFailure: &failure}}
+			cloned := CloneRun(original)
+			assert.Equal(t, original, cloned)
+			before, err := json.Marshal(original)
+			require.NoError(t, err)
+			after, err := json.Marshal(cloned)
+			require.NoError(t, err)
+			assert.JSONEq(t, string(before), string(after))
+		})
+	}
+}
+
+func TestFailureSummaryDisclosesInvalidEvidence(t *testing.T) {
+	evidence := &FailureEvidence{
+		Availability: "invalid",
+		FirstFailure: &FailureDetail{
+			Test:    EvidenceTest{Title: "checkout"},
+			Message: "receipt missing",
+		},
+	}
+	assert.Equal(t, "checkout: receipt missing [partial: evidence invalid]", evidence.FailureSummary())
+}

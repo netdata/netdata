@@ -240,9 +240,11 @@ test('parent refuses mixed families and duplicate results but never emits late o
   for (const records of [
     [{type: 'extension', extension: null, result: {}}, fakeResult],
     [fakeResult, fakeResult],
+    ...['constructor', 'toString', '__proto__', ['extension'], ['extension_init'], ['event'], ['result']].map(type => [{type}, fakeResult]),
   ]) {
     const actual = await runFake(fakeCLI(records), 10000, {extensions: ['failure_evidence.v1']});
     assert.equal(actual.result.status, 'error');
+    assert.match(actual.result.error, /invalid or (mixed|duplicate) reporter record/);
   }
   const actual = await runFake(fakeCLI([fakeResult, {type: 'extension', extension: {feature: 'failure_evidence.v1', data: {record: 'complete'}}}]), 10000,
     {extensions: ['failure_evidence.v1']});

@@ -4,6 +4,7 @@ package synthetic
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -79,7 +80,7 @@ func CloneFailureEvidence(in *FailureEvidence) *FailureEvidence {
 		f := *in.FirstFailure
 		cloneEvidenceTest(&f.Test)
 		f.Location = cloneEvidenceLocation(f.Location)
-		f.Path = append([]EvidenceStep(nil), f.Path...)
+		f.Path = slices.Clone(f.Path)
 		for i := range f.Path {
 			cloneEvidenceStep(&f.Path[i])
 		}
@@ -155,6 +156,9 @@ func (e *FailureEvidence) FailureSummary() string {
 	}
 	if f.Message != "" {
 		summary += ": " + f.Message
+	}
+	if e.Availability == "invalid" {
+		summary += " [partial: evidence invalid]"
 	}
 	if f.PathIncomplete {
 		summary += " [path incomplete]"

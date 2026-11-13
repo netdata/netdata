@@ -21,7 +21,9 @@ func TestEngineEvidenceSurvivesHardDeadlineBeforeTerminal(t *testing.T) {
 	engine, history, captures := testEngine(t)
 	engine.start = starter(t, func(ctx context.Context, _ []string, raw []byte, out, _ *os.File) ndexec.TreeResult {
 		var request wireRequest
-		require.NoError(t, json.Unmarshal(raw, &request))
+		if err := json.Unmarshal(raw, &request); !assert.NoError(t, err) {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
 		assert.Equal(t, []string{failureEvidenceFeature}, request.Extensions)
 		fmt.Fprintln(out, evidenceInit)
 		fmt.Fprintln(out, evidenceRecord("test", "test", evidenceStart("t1")))

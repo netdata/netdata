@@ -34,9 +34,13 @@ func TestRehearseUsesWireFailureEvidence(t *testing.T) {
 	e, history, _ := testEngine(t)
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		encoder := json.NewEncoder(out)
-		require.NoError(t, encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature}}}))
+		if err := encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature}}}); !assert.NoError(t, err) {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
 		failure := synthetic.FailureDetail{Test: synthetic.EvidenceTest{ID: "t", Title: "checkout", Status: "failed", ExpectedStatus: "passed", ReportingComplete: true}, Message: "receipt synthetic-secret missing", Location: &synthetic.EvidenceLocation{File: "checkout.spec.js", Line: 10, Column: 2}}
-		require.NoError(t, encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": map[string]any{"record": "failure", "failure": failure}}}))
+		if err := encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": map[string]any{"record": "failure", "failure": failure}}}); !assert.NoError(t, err) {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
 		return resultPayload(reporterResult{Status: synthetic.Failed, Tests: &synthetic.TestCounts{Declared: 1, Failed: 1}, Error: "core assertion", CaptureState: "disabled"})(ctx, args, raw, out, stderr)
 	})
 	request := journey()
@@ -52,8 +56,12 @@ func TestRehearseOptionalInvalidityPreservesSuccess(t *testing.T) {
 	e, history, _ := testEngine(t)
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		encoder := json.NewEncoder(out)
-		require.NoError(t, encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature}}}))
-		require.NoError(t, encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": map[string]any{"record": "invalid"}}}))
+		if err := encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature}}}); !assert.NoError(t, err) {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
+		if err := encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": map[string]any{"record": "invalid"}}}); !assert.NoError(t, err) {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
 	require.NoError(t, e.Rehearse(t.Context(), journey()))
