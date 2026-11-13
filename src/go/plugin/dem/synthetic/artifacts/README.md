@@ -103,19 +103,14 @@ Fetch retains its size guard for existing oversized captures.
 
 ## Journey trace ZIPs
 
-`trace_on_failure` is off by default and requires `screenshot_on_failure`. The runtime negotiates `failure_trace.v1`
-and supplies `trace` / `application/zip` candidates through the same normal/interrupted terminal lists. Go admits
-this kind only when requested; optional negotiation status cannot grant or remove candidate authority. A ZIP local
-file header (`PK\x03\x04`) is checked before the initial-size decision. This is a format signature check, not archive
-extraction or proof of every ZIP member. The store never rewrites or sanitizes ZIP content.
+Trace candidates use kind `trace` and MIME `application/zip`. The store checks a ZIP local-file header (`PK\x03\x04`)
+before the initial-size decision. This is a format signature check, not archive extraction or proof of every ZIP
+member. The store never rewrites or sanitizes ZIP content. The existing 5 MiB limit, per-item omissions, atomic set
+publication, administrator-equivalent byte access and shared retention apply.
 
-The existing 5 MiB limit, per-item omissions and atomic set publication apply. Recording/export cost is paid before
-publication, including on passing runs whose trace is discarded. Trace export can consume timeout reporting reserve
-and lose terminal authority, including screenshots. No deadline extension or early recovery is provided.
-
-Traces can contain raw resolved DEM secrets, cookies, form values, headers and request/response bodies. Disabling
-source files and attachments does not remove all credentials or source fragments. Existing administrator-equivalent
-byte access and shared retention apply; text redaction does not sanitize this artifact.
+See [Optional journey failure traces](../../README.md#optional-journey-failure-traces) for configuration, recording
+cost, timeout behavior and raw-content disclosures, and the [runtime contract](../../../../../dem-runtime/README.md#optional-journey-failure-traces)
+for negotiation and candidate eligibility.
 
 Manifest version stays 2. Readers without trace support reject the entire mixed set, so its PNGs cannot be fetched
 on downgrade either. These sets become unclassified and are outside age/size retention; they remain on disk and are

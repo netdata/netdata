@@ -150,7 +150,8 @@ not provided. Inline source is a generated TypeScript module; relative helper
 imports belong in file-based scripts.
 
 One Chromium project and worker run without retries or repetition. Script retry
-overrides are rejected before workers start. Tracing and video are disabled.
+overrides are rejected before workers start. DEM configures video off and enables
+tracing only when `failure_trace.v1` is selected; see [Optional journey failure traces](#optional-journey-failure-traces).
 Captured diagnostic events describe test/step phases, errors and worker stdio;
 the reporter does not promise browser console or network-event instrumentation.
 Only all declared ordinary tests passing is success. Skipped, expected-failure
@@ -481,14 +482,20 @@ metadata does not sanitize PNG, ZIP or HTML content.
 ## Optional journey failure traces
 
 `trace_on_failure` is off by default and requires `screenshot_on_failure`. Enabling the option requests
-`failure_trace.v1`; only a runtime selecting that feature records native Playwright Test traces. It adds no extension
-body records and does not change execution contract 2. Old Agent requests retain baseline output; an older runtime
-can decline the new feature without changing screenshot behavior. Core trace-kind admission depends on the Agent's
+`failure_trace.v1`; selecting it enables tracing in the generated Playwright configuration and allows the reporter
+to offer trace candidates. It adds no extension body records and does not change execution contract 2. Old Agent
+requests retain baseline output; an older runtime can decline the new feature without changing screenshot behavior.
+Core trace-kind admission depends on the Agent's
 request, never on optional `extension_init` validity.
 
-Selected configuration is `retain-on-failure`, snapshots/screenshots enabled, sources/attachments disabled. Existing
-failed/timedOut/interrupted attachment eligibility applies. Expected failures produce no automatic trace; unexpected
-passes may write a ZIP that DEM does not offer and drained workspace cleanup removes. One test can merge multiple
+DEM configures `retain-on-failure`, snapshots/screenshots enabled, sources/attachments disabled. Trusted scripts can
+override these settings with `test.use({ trace })`, invoke tracing APIs or supply their own trace attachments.
+Script-directed recording can occur even when DEM tracing is off or Configuration Test is used; DEM still publishes
+only requested, eligible captures.
+
+Existing failed/timedOut/interrupted attachment eligibility applies. Under the configured defaults, expected failures
+produce no automatic trace; unexpected passes may write a ZIP that DEM does not offer and drained workspace cleanup
+removes. One test can merge multiple
 browser contexts into its native ZIP. Missing attachment/export is best effort, not proof of a clean page.
 
 The reporter accepts attachments named `trace` with MIME `application/zip`, checks the same output-root/regular-file

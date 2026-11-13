@@ -54,7 +54,7 @@ func (e *extensions) init(raw json.RawMessage) {
 	var body struct {
 		Selected []string `json:"selected"`
 	}
-	if len(raw) > evidencePayloadLimit || decodeCore(raw, &body) != nil || body.Selected == nil || len(body.Selected) > 4 {
+	if len(raw) > evidencePayloadLimit || decodeCore(raw, &body) != nil || body.Selected == nil {
 		e.invalid("invalid_init")
 		return
 	}

@@ -293,7 +293,7 @@ test(
 );
 
 test(
-  "baseline requests keep trace off and discard script-requested trace attachments",
+  "baseline requests configure trace off and discard script-requested trace attachments",
   browser,
   async (t) => {
     const actual = await realRun(
@@ -303,6 +303,10 @@ test(
     );
     baselineRecords(actual.records.map(JSON.stringify).join("\n"));
     assert(actual.config.includes('"trace":"off"'));
+    const files = fs.readdirSync(path.join(actual.dir, "output"), {
+      recursive: true,
+    });
+    assert(files.some((file) => path.basename(file) === "trace.zip"));
     assert.deepEqual(
       actual.result.artifacts.map((a) => a.kind),
       ["screenshot"],

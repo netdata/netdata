@@ -156,6 +156,8 @@ func TestTraceSupportReporting(t *testing.T) {
 		"selected":                {trace: true, lines: []string{selected}, want: "supported"},
 		"invalid init":            {trace: true, lines: []string{`{"type":"extension_init","extension_init":{"selected":null}}`}, want: "invalid"},
 		"duplicate selection":     {trace: true, lines: []string{`{"type":"extension_init","extension_init":{"selected":["failure_trace.v1","failure_trace.v1"]}}`}, want: "invalid"},
+		"fifth duplicate":         {trace: true, lines: []string{strings.Replace(selected, `"failure_trace.v1"]`, `"failure_trace.v1","failure_trace.v1"]`, 1)}, want: "invalid"},
+		"fifth unknown":           {trace: true, lines: []string{strings.Replace(selected, `"failure_trace.v1"]`, `"failure_trace.v1","future.v1"]`, 1)}, want: "invalid"},
 		"duplicate init":          {trace: true, lines: []string{selected, selected}, want: "invalid"},
 		"invalid envelope":        {trace: true, lines: []string{selected, `{"type":"extension","extension":{"data":{}}}`}, want: "invalid"},
 		"invalid capture details": {trace: true, lines: []string{selected, captureRecord(map[string]any{"record": "future"})}, want: "supported"},

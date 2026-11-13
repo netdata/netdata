@@ -982,12 +982,15 @@ journeys. It is disabled by default. Traces add DOM snapshots, network data and 
 on passing attempts too, although those ZIPs are discarded; enabling adds CPU, memory and temporary disk use.
 
 ZIPs can contain raw passwords from resolved `DEM_SECRET_*` values, cookies, form input, headers and request/response
-bodies. Text-summary redaction does not apply to ZIPs. Dedicated source files and attachments are excluded, but source
-fragments and credentials can remain. Treat downloaded or shared ZIPs as credential-bearing data.
+bodies. Text-summary redaction does not apply to ZIPs. DEM configures dedicated source files and attachments off;
+scripts can override this with `test.use({ trace })`, invoke tracing APIs or supply their own trace attachments.
+Even without overrides, source fragments and credentials can remain. Treat downloaded or shared ZIPs as
+credential-bearing data.
 
 The same 5 MiB per-file limit applies: an oversized ZIP is omitted with `too_large`, and valid screenshots remain.
 Timeout capture is best effort; trace export can consume the reporting reserve and lose both the terminal report
-and screenshots. Traces do not extend the deadline or trigger retries. Configuration Test does not record traces.
+and screenshots. Traces do not extend the deadline or trigger retries. Configuration Test does not enable tracing
+or publish captures; the script can still direct its own recording.
 
 `synthetics-artifact` labels retained ZIPs `Trace` and includes their test title. Fetch and base64-decode the artifact
 bytes, save a `.zip` file, and open it with the standard local Playwright Trace Viewer. Byte access requires existing
