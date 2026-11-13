@@ -180,7 +180,7 @@ For systemd journal sources, standard systemd-journald practices apply. OpenTele
 
 For alert notifications, Netdata supports PagerDuty, Slack, Teams, email (SMTP), Discord, Telegram, Jira, ServiceNow, and custom webhooks.
 
-For AI and Large Language Models, Netdata supports Model Context Protocol (MCP) — available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source). Netdata supports AI DevOps/SRE Copilots like Claude Code and Gemini CLI, and provides an AI Chat application (requires access to a cloud LLM provider such as Google, OpenAI, Anthropic, or DeepSeek, or a self-hosted provider like Ollama).
+For AI and Large Language Models, Netdata supports Model Context Protocol (MCP) — available via Netdata Cloud for infrastructure-wide access and on every Agent/Parent for direct local access. Netdata supports AI DevOps/SRE Copilots like Claude Code and Gemini CLI, and provides an AI Chat application (requires access to a cloud LLM provider such as Google, OpenAI, Anthropic, or DeepSeek, or a self-hosted provider like Ollama).
 
 ## Compliance and Security
 
@@ -226,14 +226,8 @@ Comprehensive alert customization includes custom thresholds, complex conditions
 **Extensibility:**
 The plugin architecture supports custom collectors in multiple languages (Go recommended, Python, Bash, Node.js). Custom exporters offer format customization, filtering rules, transformation options, and batch processing. API extensions enable webhook development, custom endpoints, data processing, and event handling.
 
-## Licensing and Total Cost of Ownership
+## Total Cost of Ownership
 
-Netdata offers flexible licensing models designed to accommodate organizations of all sizes, from open-source deployments to enterprise on-premises installations.
-
-**Licensing Options:**
-The open-source Agent and Parents are free, with full functionality and no limit on metrics. The Netdata Cloud Business plan adds enterprise SSO, role-based access and centralized configuration management across the fleet. Enterprise adds On-Prem deployment and custom contracts.
-
-**Total Cost of Ownership:**
 A standalone node uses under 5% of one CPU core, about 200 MB of RAM and a few GB of disk; Parents need about 20 cores and 80 GB of RAM per 500 nodes (see the sizing above). There is no separate database to run, tune or back up, and dashboards and alerts come ready-made.
 
 **Return on Investment:**
