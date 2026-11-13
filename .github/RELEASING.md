@@ -34,7 +34,10 @@ atomically, so a failed push cannot publish only part of that update.
 - Preparation runs from `master`, generates the changelog and writes a version derived from the nearest tag and
   the number of commits since it, in the form `<tag>-<count-plus-one>-nightly`, with the count zero-padded to five
   digits (for example `00042`). When the nearest tag is a release candidate (first RCs are tagged on `master`), its
-  `-rcX` suffix is dropped, so `v2.13.0-rc1` yields `v2.13.0-<padded-count>-nightly`. The dispatch version remains `nightly`; downstream builds read the generated
+  `-rcX` suffix is dropped, so `v2.13.0-rc1` yields `v2.13.0-<padded-count>-nightly`. When the nearest tag is a
+  stable release, the suffix is `-post-nightly` instead, because that nightly follows the release.
+- Native package versions differ by base: RC-based nightlies use `~` (`2.13.0~00005.nightly`), sorting below
+  `2.13.0~rc1` and `2.13.0`; stable-based nightlies keep `.` (`2.12.0.00545.post`), sorting above `2.12.0`. The dispatch version remains `nightly`; downstream builds read the generated
   version from `packaging/version`.
 - Source, static installer and Windows artifacts go under the `nightly` artifact prefix, including `latest`.
   GitHub releases are published automatically in `netdata/netdata-nightlies`, rather than drafted in the main repository.

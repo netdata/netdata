@@ -10,13 +10,16 @@ repos_URL = {
     "nightly": "netdata/netdata-nightlies"
 }
 
+# Nightly counts are zero-padded; 'post' marks nightlies based on a stable tag.
+NIGHTLY_PATTERN = r'v(\d+)\.(\d+)\.(\d+)-(\d+)-(?:post-)?nightly'
+
 GH_TOKEN = os.getenv("GH_TOKEN")
 if GH_TOKEN is None or GH_TOKEN != "":
     print("Token is not defined or empty, continuing with limitation on requests per sec towards Github API")
 
 
 def identify_channel(_version):
-    nightly_pattern = r'v(\d+)\.(\d+)\.(\d+)-(\d+)-nightly'
+    nightly_pattern = NIGHTLY_PATTERN
     stable_pattern = r'v(\d+)\.(\d+)\.(\d+)'
     if re.match(nightly_pattern, _version):
         _channel = "nightly"
@@ -50,7 +53,7 @@ def extract_version(title):
 
 
 def get_release_path_and_filename(_version):
-    nightly_pattern = r'v(\d+)\.(\d+)\.(\d+)-(\d+)-nightly'
+    nightly_pattern = NIGHTLY_PATTERN
     stable_pattern = r'v(\d+)\.(\d+)\.(\d+)'
     if match := re.match(nightly_pattern, _version):
         msb = match.group(1)
@@ -121,8 +124,13 @@ def sort_and_grouby_major_agents_of_channel(channel):
         print(f"An unexpected error occurred: {e}")
         return None
 
-    extracted_titles = [extract_version(item.title) for item in releases if
-                        extract_version(item.title) is not None]
+    # Keep the published titles: nightly names cannot be rebuilt from the parsed numbers.
+    titles = {}
+    for item in releases:
+        version = extract_version(item.title)
+        if version is not None:
+            titles.setdefault(version, item.title)
+    extracted_titles = list(titles)
     # Necessary sorting for implement the group by
     extracted_titles.sort(key=lambda x: x[0])
     # Group titles by major version
@@ -136,6 +144,6 @@ def sort_and_grouby_major_agents_of_channel(channel):
         result_dict = {f"v{key}": [f"v{a}.{b}.{c}" for a, b, c in values] for key, values in
                        sorted_grouped_by_major.items()}
     else:
-        result_dict = {f"v{key}": [f"v{a}.{b}.{c}-{d}-nightly" for a, b, c, d in values] for key, values in
+        result_dict = {f"v{key}": [titles[value] for value in values] for key, values in
                        sorted_grouped_by_major.items()}
     return result_dict

@@ -71,7 +71,7 @@ set(CPACK_RPM_COMPONENT_INSTALL YES)
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 
 # RPM forbids dashes in Version, so the version is sanitized before use
-# (nightly 2.10.0-809-nightly becomes 2.10.0.809.nightly).
+# (nightly 2.10.0-00809-post-nightly becomes 2.10.0.00809.post).
 string(REPLACE "-" "." CPACK_RPM_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
 set(CPACK_RPM_PACKAGE_RELEASE 1)
 set(CPACK_RPM_PACKAGE_RELEASE_DIST ON)

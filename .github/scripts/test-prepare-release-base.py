@@ -203,6 +203,7 @@ class ReleasePreparationTest(unittest.TestCase):
         result, outputs = self.prepare('nightly', 'nightly')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(outputs['type'], 'nightly')
+        self.assertEqual((self.root / 'packaging/version').read_text(), 'v2.12.3-00001-post-nightly\n')
         self.write_version('v2.12.3-2-nightly')
         result, outputs = self.prepare('nightly', 'nightly', event='schedule')
         self.assertEqual(result.returncode, 0, result.stderr)

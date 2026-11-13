@@ -89,8 +89,14 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     LAST_TAG=$(git describe --abbrev=0 --tags)
     COMMITS_SINCE_RELEASE=$(git rev-list "${LAST_TAG}"..HEAD --count)
     # Release candidates are tagged on master; nightlies carry only the numeric core.
+    # A nightly after a stable tag follows that release, so mark it 'post' to keep it out of the
+    # pre-release (~) package ordering NetdataVersion.cmake applies to RC-based nightlies.
+    NIGHTLY_SUFFIX=post-nightly
+    case "${LAST_TAG}" in
+        *-rc*) NIGHTLY_SUFFIX=nightly ;;
+    esac
     # Zero-pad the count so nightly versions also sort correctly as text.
-    NEW_VERSION="${LAST_TAG%%-rc*}-$(printf '%05d' "$((COMMITS_SINCE_RELEASE + 1))")-nightly"
+    NEW_VERSION="${LAST_TAG%%-rc*}-$(printf '%05d' "$((COMMITS_SINCE_RELEASE + 1))")-${NIGHTLY_SUFFIX}"
     LAST_VERSION_COMMIT="$(git rev-list -1 HEAD packaging/version)"
     HEAD_COMMIT="$(git rev-parse HEAD)"
     if [ "${EVENT_NAME}" = 'schedule' ] && [ "${LAST_VERSION_COMMIT}" = "${HEAD_COMMIT}" ] && grep -qE '.*-nightly$' packaging/version; then
