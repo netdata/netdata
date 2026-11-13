@@ -54,6 +54,8 @@ module.exports = class FailureEvidence {
     this.otherSteps = 0;
     this.truncated = new Set();
     this.failure = false;
+    this.stopped = false;
+    this.pendingStop = undefined;
     this.finished = false;
   }
   send(data) {
@@ -243,12 +245,39 @@ module.exports = class FailureEvidence {
       return;
     this.failure = true;
     const error = result.errors?.[0];
+    const selection = this.matchingPath(
+      result.steps || [],
+      (step) => step.error && error && sameError(step.error, error),
+    );
+    const failure = {
+      test: this.testValue(test, result),
+      ...this.pathDetail(test, selection),
+    };
+    this.string(
+      error?.message || error?.value || "",
+      12002,
+      failure,
+      "message",
+      2000,
+    );
+    this.location(
+      error?.location || selection.matchedPath.at(-1)?.location,
+      failure,
+    );
+    if (
+      failure.path.some((node) => node.text_truncated) ||
+      failure.test.text_truncated
+    )
+      failure.text_truncated = true;
+    this.send({ record: "failure", failure });
+  }
+  matchingPath(steps, matches) {
     let matchedPath = [],
       ambiguous = false,
       pathIncomplete = false;
     // Bound temporary ancestry even for arbitrarily deep user-authored steps.
     // Skipping a deeper subtree is explicit; the actual first error survives.
-    const cursors = [{ steps: result.steps || [], index: 0 }];
+    const cursors = [{ steps: steps, index: 0 }];
     while (cursors.length) {
       const cursor = cursors.at(-1);
       if (cursor.index === cursor.steps.length) {
@@ -256,7 +285,7 @@ module.exports = class FailureEvidence {
         continue;
       }
       const step = cursor.steps[cursor.index++];
-      if (step.error && error && sameError(step.error, error)) {
+      if (matches(step)) {
         const candidate = cursors.map(
           (cursor) => cursor.steps[cursor.index - 1],
         );
@@ -282,6 +311,9 @@ module.exports = class FailureEvidence {
         else cursors.push({ steps: step.steps, index: 0 });
       }
     }
+    return { matchedPath, pathIncomplete };
+  }
+  pathDetail(test, { matchedPath, pathIncomplete }) {
     const first = [],
       last = [];
     let ancestors = 0;
@@ -296,7 +328,8 @@ module.exports = class FailureEvidence {
     }
     const nodes = [...first.reverse(), ...last.reverse()].map((step) => ({
       ...this.stepValue(test, step),
-      state: step.error ? "failed" : "passed",
+      state:
+        step.duration === -1 ? "running" : step.error ? "failed" : "passed",
     }));
     for (let i = 0; i < nodes.length; i++) {
       const previous = nodes[i - 1];
@@ -304,26 +337,53 @@ module.exports = class FailureEvidence {
         nodes[i].parent_omitted = true;
       else delete nodes[i].parent_omitted;
     }
-    const failure = {
-      test: this.testValue(test, result),
+    return {
       path: nodes,
       omitted_ancestors: Math.max(0, ancestors - nodes.length),
       ...(pathIncomplete ? { path_incomplete: true } : {}),
     };
-    this.string(
-      error?.message || error?.value || "",
-      12002,
-      failure,
-      "message",
-      2000,
-    );
-    this.location(error?.location || matched?.location, failure);
+  }
+  beforeCleanup(test, result, step) {
+    // Playwright 1.63 begins this root hook before user cleanup and fixture teardown.
+    // Its public result tree still includes pending steps omitted by our detail caps.
     if (
-      nodes.some((node) => node.text_truncated) ||
-      failure.test.text_truncated
+      this.stopped ||
+      step.parent ||
+      step.category !== "hook" ||
+      step.title !== "After Hooks"
     )
-      failure.text_truncated = true;
-    this.send({ record: "failure", failure });
+      return;
+    const selection = this.matchingPath(
+      result.steps || [],
+      (candidate) => candidate !== step && candidate.duration === -1,
+    );
+    if (!selection.matchedPath.length) selection.pathIncomplete = true;
+    this.pendingStop = { testID: test.id, ...this.pathDetail(test, selection) };
+  }
+  stopContext(test, result) {
+    const pending = this.pendingStop;
+    this.pendingStop = undefined;
+    if (this.stopped || !["timedOut", "interrupted"].includes(result.status))
+      return;
+    this.stopped = true;
+    const stop = {
+      test: this.testValue(test, result),
+      ...(pending?.testID === test.id
+        ? {
+            path: pending.path,
+            omitted_ancestors: pending.omitted_ancestors,
+            ...(pending.path_incomplete ? { path_incomplete: true } : {}),
+          }
+        : { path: [], omitted_ancestors: 0, path_incomplete: true }),
+      message: "",
+    };
+    if (
+      stop.test.text_truncated ||
+      stop.path.some((node) => node.text_truncated)
+    )
+      stop.text_truncated = true;
+    // This is an observation before cleanup, never an assertion about the stop cause.
+    this.send({ record: "stop", stop });
   }
   complete() {
     if (!this.finished) {

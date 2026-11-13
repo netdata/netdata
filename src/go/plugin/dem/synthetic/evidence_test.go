@@ -19,6 +19,7 @@ func TestCloneRunFailureEvidence(t *testing.T) {
 		Availability: "supported", Truncated: []string{"text"},
 		Tests: []EvidenceTest{test}, Steps: []EvidenceStep{step},
 		FirstFailure: &FailureDetail{Test: test, Path: []EvidenceStep{step}, Location: location, Message: "assertion"},
+		StopContext:  &FailureDetail{Test: test, Path: []EvidenceStep{step}, Location: location},
 	}}
 	before, err := json.Marshal(original)
 	require.NoError(t, err)
@@ -40,6 +41,12 @@ func TestCloneRunFailureEvidence(t *testing.T) {
 	evidence.FirstFailure.Path[0].Location.File = "changed"
 	*evidence.FirstFailure.Path[0].DurationMS = 5
 	evidence.FirstFailure.Path[0].Title = "changed"
+	evidence.StopContext.Test.Location.File = "changed"
+	*evidence.StopContext.Test.DurationMS = 6
+	evidence.StopContext.Path[0].Location.File = "changed"
+	*evidence.StopContext.Path[0].DurationMS = 7
+	evidence.StopContext.Path[0].Title = "changed"
+	evidence.StopContext.Location.File = "changed"
 	after, err := json.Marshal(original)
 	require.NoError(t, err)
 	assert.JSONEq(t, string(before), string(after))

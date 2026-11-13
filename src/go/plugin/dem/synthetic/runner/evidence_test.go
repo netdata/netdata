@@ -266,3 +266,55 @@ func TestEvidenceRedactionExpansionDisclosesAllClipping(t *testing.T) {
 	assert.Contains(t, s.snapshot().evidence.Truncated, "text")
 	assert.NotContains(t, got.Message, "token=a")
 }
+
+func TestStopContextIsProtectedAndIndependentOfFirstFailure(t *testing.T) {
+	failureTest := evidenceStart("earlier")
+	failureTest.Status, failureTest.ReportingComplete = "failed", true
+	failure := synthetic.FailureDetail{Test: failureTest, Message: "earlier assertion", Path: []synthetic.EvidenceStep{}}
+	stoppedTest := evidenceStart("t1")
+	stoppedTest.Status, stoppedTest.ReportingComplete = "interrupted", true
+	stop := synthetic.FailureDetail{Test: stoppedTest, Path: []synthetic.EvidenceStep{evidenceStep("late", "")}}
+	lines := []string{evidenceInit, evidenceRecord("failure", "failure", failure)}
+	for n := 0; n < evidenceUserStepLimit; n++ {
+		step := evidenceStep(fmt.Sprintf("s%d", n), "")
+		lines = append(lines, evidenceRecord("step", "step", step))
+	}
+	lines = append(lines, evidenceRecord("stop", "stop", stop), evidenceRecord("complete", "", nil))
+	e, _ := consumeEvidence(t, lines...)
+	require.Equal(t, "complete", e.ReportingStatus())
+	assert.Equal(t, &failure, e.FirstFailure)
+	assert.Equal(t, &stop, e.StopContext)
+	assert.Contains(t, e.StopSummary(), "Submit order")
+	for name, mutate := range map[string]func(*synthetic.FailureDetail){
+		"success":             func(f *synthetic.FailureDetail) { f.Test.Status = "passed" },
+		"invented cause":      func(f *synthetic.FailureDetail) { f.Message = "cleanup failed" },
+		"undisclosed absence": func(f *synthetic.FailureDetail) { f.Path = nil },
+	} {
+		t.Run(name, func(t *testing.T) {
+			bad := stop
+			mutate(&bad)
+			e, _ := consumeEvidence(t, evidenceInit, evidenceRecord("stop", "stop", bad))
+			assert.Equal(t, "invalid", e.ReportingStatus())
+			assert.Nil(t, e.StopContext)
+		})
+	}
+	e, _ = consumeEvidence(t, evidenceInit, evidenceRecord("stop", "stop", stop), evidenceRecord("stop", "stop", stop))
+	assert.Equal(t, "invalid", e.ReportingStatus())
+	assert.Contains(t, e.StopSummary(), "[partial: evidence invalid]")
+}
+
+func TestStopContextRedactionAndSnapshotOwnership(t *testing.T) {
+	test := evidenceStart("t1")
+	test.Status, test.ReportingComplete = "timedOut", true
+	step := evidenceStep("s", "")
+	step.Title = "secret-value"
+	stop := synthetic.FailureDetail{Test: test, Path: []synthetic.EvidenceStep{step}}
+	sink := newSink(synthetic.Journey, false, newRedactor(map[string]string{"DEM_SECRET_TOKEN": "secret-value"}))
+	require.NoError(t, sink.consume(strings.NewReader(evidenceInit+"\n"+evidenceRecord("stop", "stop", stop))))
+	snapshot := sink.snapshot()
+	encoded, err := json.Marshal(snapshot.evidence)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), "secret-value")
+	snapshot.evidence.StopContext.Path[0].Location.File = "changed"
+	assert.Equal(t, "journey.spec.ts", sink.snapshot().evidence.StopContext.Path[0].Location.File)
+}

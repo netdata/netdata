@@ -67,3 +67,13 @@ func TestRehearseOptionalInvalidityPreservesSuccess(t *testing.T) {
 	require.NoError(t, e.Rehearse(t.Context(), journey()))
 	assert.Empty(t, history.runs)
 }
+
+func TestRehearsalStopContextAndIdenticalErrorDeduplication(t *testing.T) {
+	evidence := &synthetic.FailureEvidence{
+		FirstFailure: &synthetic.FailureDetail{Test: synthetic.EvidenceTest{Title: "assertion"}, Message: "receipt missing"},
+		StopContext:  &synthetic.FailureDetail{Test: synthetic.EvidenceTest{Title: "later wait", Status: "interrupted", ExpectedStatus: "passed"}, PathIncomplete: true},
+	}
+	text := rehearsalFailureText(synthetic.Run{Error: "receipt missing", FailureEvidence: evidence})
+	assert.Equal(t, "First unexpected failure: assertion: receipt missing\nPending before cleanup: later wait [interrupted; expected passed] [path incomplete]", text)
+	assert.Contains(t, rehearsalFailureText(synthetic.Run{Error: "different core error", FailureEvidence: evidence}), "different core error\nFirst unexpected failure:")
+}

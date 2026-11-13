@@ -24,6 +24,11 @@ func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 	test := synthetic.EvidenceTest{ID: "t", Title: "checkout", Location: location, Status: "failed", ExpectedStatus: "passed", DurationMS: &duration, ReportingComplete: true}
 	step := synthetic.EvidenceStep{ID: "s1", TestID: "t", Title: "submit", Category: "test.step", Location: location, State: "running"}
 	evidence := &synthetic.FailureEvidence{Availability: "supported", ReporterComplete: false, Truncated: []string{"other_steps", "text"}, Tests: []synthetic.EvidenceTest{test}, Steps: []synthetic.EvidenceStep{step}, FirstFailure: &synthetic.FailureDetail{Test: test, Path: []synthetic.EvidenceStep{step}, Message: "expected receipt", Location: location, TextTruncated: true}}
+	stopped := test
+	stopped.ID, stopped.Status = "stopped", "interrupted"
+	pending := step
+	pending.TestID = stopped.ID
+	evidence.StopContext = &synthetic.FailureDetail{Test: stopped, Path: []synthetic.EvidenceStep{pending}, PathIncomplete: true}
 	runs := []synthetic.Run{
 		{ID: "old", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now, CompletedUS: now + 1, Outcome: synthetic.Failed},
 		{ID: "rich", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now + 2, CompletedUS: now + 3, Outcome: synthetic.Timeout, TerminationReason: synthetic.ExecutionBudget, FailureEvidence: evidence},

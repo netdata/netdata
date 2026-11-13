@@ -523,3 +523,47 @@ test('repeated same-source soft and caught errors do not invent first-failure at
     assert.match(failure.message, /expect/);
   }
 });
+
+test('native timeout keeps pending body context despite caught errors, saturation and cleanup failure', async () => {
+  const actual = await run(prefix + `
+    test.afterEach(async()=>{await test.step('cleanup failure',async()=>expect(1).toBe(2));});
+    test('timeout',async()=>{
+      test.setTimeout(1000);
+      try { await test.step('caught assertion',async()=>expect(1).toBe(2)); } catch {}
+      for(let n=0;n<200;n++) await test.step('noise '+n,async()=>{});
+      await test.step('Checkout',async()=>{await test.step('Submit',async()=>new Promise(()=>{}));});
+    });`, {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'timeout');
+  const records = actual.optional.filter(r => r.type === 'extension').map(r => r.extension.data);
+  const stop = records.find(r => r.record === 'stop').stop;
+  assert.equal(stop.test.status, 'timedOut');
+  assert.deepEqual(stop.path.map(s => s.title), ['Checkout', 'Submit']);
+  assert.ok(stop.path.every(s => s.state === 'running'));
+  assert.equal(stop.path.at(-1).location.file, 'journey.spec.ts');
+  assert.ok(records.some(r => r.record === 'truncated' && r.scope === 'user_steps'));
+});
+
+test('budget interruption retains pre-cleanup context alongside an earlier first failure', async () => {
+  const actual = await run(prefix + `
+    test('first failure',async()=>expect(1).toBe(2));
+    test('wait',async()=>{test.setTimeout(0);await test.step('Pending action',async()=>new Promise(()=>{}));});`,
+    {extensions: ['failure_evidence.v1'], stop_at_monotonic_ms: monotonicMilliseconds() + 6000});
+  assert.equal(actual.result.status, 'timeout');
+  assert.equal(actual.result.termination_reason, 'execution_budget');
+  const records = actual.optional.filter(r => r.type === 'extension').map(r => r.extension.data);
+  const stop = records.find(r => r.record === 'stop').stop;
+  assert.equal(stop.test.status, 'interrupted');
+  assert.deepEqual(stop.path.map(s => s.title), ['Pending action']);
+  assert.match(records.find(r => r.record === 'failure').failure.test.title, /first failure/);
+});
+
+test('cleanup-only timeouts disclose missing body context instead of blaming cleanup errors', async () => {
+  const actual = await run(prefix + `
+    test.afterEach(async()=>{await test.step('cleanup timeout',async()=>new Promise(()=>{}));});
+    test('body passed',async()=>{test.setTimeout(400);await test.step('completed body',async()=>{});});`,
+    {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'timeout');
+  const stop = actual.optional.find(r => r.type === 'extension' && r.extension.data.record === 'stop').extension.data.stop;
+  assert.deepEqual(stop.path, []);
+  assert.equal(stop.path_incomplete, true);
+});

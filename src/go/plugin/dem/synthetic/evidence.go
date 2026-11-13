@@ -18,6 +18,7 @@ type FailureEvidence struct {
 	Tests            []EvidenceTest `json:"tests,omitempty"`
 	Steps            []EvidenceStep `json:"steps,omitempty"`
 	FirstFailure     *FailureDetail `json:"first_failure,omitempty"`
+	StopContext      *FailureDetail `json:"stop_context,omitempty"`
 }
 
 type EvidenceTest struct {
@@ -76,15 +77,21 @@ func CloneFailureEvidence(in *FailureEvidence) *FailureEvidence {
 	for i := range out.Steps {
 		cloneEvidenceStep(&out.Steps[i])
 	}
-	if in.FirstFailure != nil {
-		f := *in.FirstFailure
-		cloneEvidenceTest(&f.Test)
-		f.Location = cloneEvidenceLocation(f.Location)
-		f.Path = slices.Clone(f.Path)
-		for i := range f.Path {
-			cloneEvidenceStep(&f.Path[i])
-		}
-		out.FirstFailure = &f
+	out.FirstFailure = cloneFailureDetail(in.FirstFailure)
+	out.StopContext = cloneFailureDetail(in.StopContext)
+	return &out
+}
+
+func cloneFailureDetail(in *FailureDetail) *FailureDetail {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	cloneEvidenceTest(&out.Test)
+	out.Location = cloneEvidenceLocation(in.Location)
+	out.Path = slices.Clone(in.Path)
+	for i := range out.Path {
+		cloneEvidenceStep(&out.Path[i])
 	}
 	return &out
 }
@@ -128,10 +135,25 @@ func (e *FailureEvidence) ReportingStatus() string {
 
 // FailureSummary is shared by the retained-run Function and synchronous rehearsal.
 func (e *FailureEvidence) FailureSummary() string {
-	if e == nil || e.FirstFailure == nil {
+	if e == nil {
 		return ""
 	}
-	f := e.FirstFailure
+	return e.detailSummary(e.FirstFailure)
+}
+
+// StopSummary describes pending activity observed before cleanup, not the cause
+// or exact location of a timeout. It is independent of the first failure.
+func (e *FailureEvidence) StopSummary() string {
+	if e == nil {
+		return ""
+	}
+	return e.detailSummary(e.StopContext)
+}
+
+func (e *FailureEvidence) detailSummary(f *FailureDetail) string {
+	if f == nil {
+		return ""
+	}
 	title := f.Test.Title
 	if f.Test.Status != "" && f.Test.ExpectedStatus != "" && f.Test.Status != f.Test.ExpectedStatus {
 		title += fmt.Sprintf(" [%s; expected %s]", f.Test.Status, f.Test.ExpectedStatus)

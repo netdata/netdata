@@ -51,6 +51,9 @@ func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error 
 // summaries shown in run history without assigning them outcome authority.
 func rehearsalFailureText(run synthetic.Run) string {
 	text := run.Error
+	if e := run.FailureEvidence; e != nil && e.FirstFailure != nil && e.FirstFailure.Message == text {
+		text = "" // The same core error is preserved in the contextual failure summary.
+	}
 	if failure := run.FailureEvidence.FailureSummary(); failure != "" {
 		if text != "" {
 			text += "\n"
@@ -62,6 +65,12 @@ func rehearsalFailureText(run synthetic.Run) string {
 			text += "\n"
 		}
 		text += "Last observed running step: " + step
+	}
+	if stop := run.FailureEvidence.StopSummary(); stop != "" {
+		if text != "" {
+			text += "\n"
+		}
+		text += "Pending before cleanup: " + stop
 	}
 	return text
 }

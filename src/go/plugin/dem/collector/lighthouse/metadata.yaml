@@ -571,6 +571,10 @@ modules:
                 type: string
                 unit: ''
                 description: Last retained running step observation; this does not imply the browser is still executing it.
+              - name: stop_context
+                type: string
+                unit: ''
+                description: Pending activity observed before cleanup in the first timed-out or interrupted test; this does not identify the cause of the stop.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require

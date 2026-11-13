@@ -22,6 +22,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 					Availability: "supported", Truncated: []string{"user_steps"},
 					Steps:        []model.EvidenceStep{{ID: "s1", TestID: "t", Title: "pending submit", State: "running"}},
 					FirstFailure: &model.FailureDetail{Test: model.EvidenceTest{ID: "t", Title: "checkout", Status: "failed", ExpectedStatus: "passed"}, Message: "expected receipt", PathIncomplete: true},
+					StopContext:  &model.FailureDetail{Test: model.EvidenceTest{ID: "later", Title: "login", Status: "interrupted", ExpectedStatus: "passed"}, PathIncomplete: true},
 				}
 			}
 			src := &source{history: map[string]model.Run{"journey:a/r": run}, page: synthetichistory.RunPage{Runs: []model.Run{run}}}
@@ -56,11 +57,13 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 				assert.Contains(t, values["first_failure"], "[path incomplete]")
 			}
 			assert.Equal(t, run.FailureEvidence.LastObservedStepSummary(), values["last_observed_step"])
+			assert.Equal(t, run.FailureEvidence.StopSummary(), values["stop_context"])
 			columns := listResponse.RawResponse["columns"].(map[string]any)
 			assert.Equal(t, 15, columns["termination_reason"].(map[string]any)["index"])
 			assert.Equal(t, 16, columns["failure_evidence_status"].(map[string]any)["index"])
 			assert.Equal(t, 17, columns["first_failure"].(map[string]any)["index"])
 			assert.Equal(t, 18, columns["last_observed_step"].(map[string]any)["index"])
+			assert.Equal(t, 19, columns["stop_context"].(map[string]any)["index"])
 			validate(t, listResponse)
 		})
 	}

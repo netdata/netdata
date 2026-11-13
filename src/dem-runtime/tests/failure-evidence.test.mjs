@@ -213,3 +213,68 @@ test('same-source errors in separate branches leave ambiguous ancestry incomplet
   assert.equal(failure.path_incomplete, true);
   assert.deepEqual(failure.path, []);
 });
+
+test('stopped tests retain a protected pre-cleanup snapshot independently of errors and detail caps', () => {
+  for (const status of ['interrupted', 'timedOut']) {
+    const {evidence, records} = fixture(), t = specimen();
+    const earlier = {message: 'earlier assertion', stack: 'earlier source'};
+    evidence.firstFailure(specimen('earlier'), result('failed', [earlier], [step('earlier', undefined, 'expect', earlier)]));
+    for (const category of ['test.step', 'pw:api']) {
+      for (let n = 0; n < 200; n++) evidence.step(t, step('noise', undefined, category));
+    }
+    const caught = step('caught', undefined, 'expect', {message: 'caught', stack: 'caught'});
+    const parent = step('Checkout'), child = step('Submit', parent), action = step('Click', child, 'pw:api');
+    for (const s of [parent, child, action]) s.duration = -1;
+    const cleanup = step('After Hooks', undefined, 'hook'); cleanup.duration = -1;
+    const r = result(status, [{message: 'generic timeout'}], [caught, parent, cleanup]);
+    evidence.beforeCleanup(t, r, cleanup);
+    for (const s of [parent, child, action]) { s.duration = 100; s.error = {message: 'Test ended'}; }
+    step('cleanup failure', cleanup, 'expect', {message: 'cleanup failure'});
+    evidence.stopContext(t, r);
+    evidence.stopContext(specimen('later'), result('timedOut'));
+    const stops = records.filter(r => r.record === 'stop');
+    assert.equal(stops.length, 1);
+    assert.deepEqual(stops[0].stop.path.map(s => s.title), ['Checkout', 'Submit', 'Click']);
+    assert.ok(stops[0].stop.path.every(s => s.state === 'running'));
+    assert.equal(stops[0].stop.path_incomplete, undefined);
+    assert.equal(stops[0].stop.test.status, status);
+    assert.equal(stops[0].stop.message, '');
+    assert.equal(records.find(r => r.record === 'failure').failure.message, 'earlier assertion');
+    assert.ok(Evidence.encoded(stops[0]) < 32768);
+    assert.ok(records.reduce((n, r) => n + Evidence.encoded(r), 0) < 1024 * 1024);
+  }
+});
+
+test('pre-cleanup context discloses concurrent, missing and deep observations without guessing', () => {
+  for (const mode of ['siblings', 'disjoint', 'no steps', 'no callback', 'deep']) {
+    const {evidence, records} = fixture(), t = specimen();
+    const root = step('Checkout'); root.duration = -1;
+    const left = step('left', root), right = step('right', mode === 'disjoint' ? undefined : root);
+    left.duration = right.duration = -1;
+    if (mode === 'deep') {
+      root.steps = []; let parent = root;
+      for (let n = 0; n < 80; n++) { parent = step('level ' + n, parent); parent.duration = -1; }
+    }
+    const cleanup = step('After Hooks', undefined, 'hook'); cleanup.duration = -1;
+    const roots = mode === 'no steps' ? [] : mode === 'disjoint' ? [root, right] : [root];
+    const r = result('timedOut', [], [...roots, cleanup]);
+    if (mode !== 'no callback') evidence.beforeCleanup(t, r, cleanup);
+    evidence.stopContext(t, r);
+    const stop = records.find(r => r.record === 'stop').stop;
+    assert.equal(stop.path_incomplete, true, mode);
+    assert.ok(stop.path.length <= 16);
+    if (mode === 'siblings') assert.deepEqual(stop.path.map(s => s.title), ['Checkout']);
+    else if (mode !== 'deep') assert.deepEqual(stop.path, [], mode);
+  }
+});
+
+test('successful tests release pending observations and do not claim stop context', () => {
+  const {evidence, records} = fixture(), t = specimen();
+  const pending = step('unawaited'); pending.duration = -1;
+  const cleanup = step('After Hooks', undefined, 'hook');
+  evidence.beforeCleanup(t, result('passed', [], [pending, cleanup]), cleanup);
+  evidence.stopContext(t, result('passed'));
+  assert.equal(records.some(r => r.record === 'stop'), false);
+  evidence.stopContext(specimen('next'), result('timedOut'));
+  assert.deepEqual(records.find(r => r.record === 'stop').stop.path, []);
+});

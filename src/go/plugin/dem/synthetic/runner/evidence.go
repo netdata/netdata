@@ -15,8 +15,8 @@ const failureEvidenceFeature = "failure_evidence.v1"
 
 // Diagnostic quotas bound arbitrary user-script detail independently of core
 // outcomes. Separate pools reserve test and user-step detail against API noise.
-// With the per-item limits below, retained data is <512 KiB and the producer's
-// begin/end records plus first failure emit <1 MiB. See the runtime wire policy.
+// With the per-item limits below, retained data is <544 KiB and the producer's
+// begin/end records plus failure/stop context emit <1 MiB. See the runtime wire policy.
 const (
 	evidenceTestLimit      = 64
 	evidenceUserStepLimit  = 128
@@ -128,6 +128,7 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 		Test    *synthetic.EvidenceTest  `json:"test"`
 		Step    *synthetic.EvidenceStep  `json:"step"`
 		Failure *synthetic.FailureDetail `json:"failure"`
+		Stop    *synthetic.FailureDetail `json:"stop"`
 		Scope   string                   `json:"scope"`
 	}
 	if json.Unmarshal(envelope.Data, &data) != nil {
@@ -137,7 +138,7 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 	valid := false
 	switch data.Record {
 	case "test":
-		if data.Test != nil && data.Step == nil && data.Failure == nil && data.Scope == "" && validEvidenceTest(*data.Test) {
+		if data.Test != nil && data.Step == nil && data.Failure == nil && data.Stop == nil && data.Scope == "" && validEvidenceTest(*data.Test) {
 			redactEvidenceTest(data.Test, redact)
 			if data.Test.TextTruncated {
 				e.truncate("text")
@@ -145,7 +146,7 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 			valid = e.test(*data.Test)
 		}
 	case "step":
-		if data.Step != nil && data.Test == nil && data.Failure == nil && data.Scope == "" && validEvidenceStep(*data.Step) {
+		if data.Step != nil && data.Test == nil && data.Failure == nil && data.Stop == nil && data.Scope == "" && validEvidenceStep(*data.Step) {
 			redactEvidenceStep(data.Step, redact)
 			if data.Step.TextTruncated {
 				e.truncate("text")
@@ -153,36 +154,46 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 			valid = e.step(*data.Step)
 		}
 	case "failure":
-		if data.Failure != nil && data.Test == nil && data.Step == nil && data.Scope == "" && validFailure(*data.Failure) && e.value.FirstFailure == nil {
-			redactEvidenceTest(&data.Failure.Test, redact)
-			data.Failure.TextTruncated = data.Failure.TextTruncated || data.Failure.Test.TextTruncated
-			for i := range data.Failure.Path {
-				redactEvidenceStep(&data.Failure.Path[i], redact)
-				data.Failure.TextTruncated = data.Failure.TextTruncated || data.Failure.Path[i].TextTruncated
-			}
-			var clipped bool
-			data.Failure.Message, clipped = evidenceText(data.Failure.Message, 12002, redact)
-			locationClipped := redactLocation(data.Failure.Location, redact)
-			data.Failure.TextTruncated = data.Failure.TextTruncated || clipped || locationClipped
-			if data.Failure.TextTruncated {
-				e.truncate("text")
-			}
+		if data.Failure != nil && data.Stop == nil && data.Test == nil && data.Step == nil && data.Scope == "" && validFailure(*data.Failure) && e.value.FirstFailure == nil {
+			e.redactDetail(data.Failure, redact)
 			e.value.FirstFailure = data.Failure
 			valid = true
 		}
+	case "stop":
+		if data.Stop != nil && data.Test == nil && data.Step == nil && data.Failure == nil && data.Scope == "" && validStop(*data.Stop) && e.value.StopContext == nil {
+			e.redactDetail(data.Stop, redact)
+			e.value.StopContext = data.Stop
+			valid = true
+		}
 	case "truncated":
-		if data.Test == nil && data.Step == nil && data.Failure == nil && slices.Contains([]string{"tests", "user_steps", "other_steps", "text"}, data.Scope) {
+		if data.Test == nil && data.Step == nil && data.Failure == nil && data.Stop == nil && slices.Contains([]string{"tests", "user_steps", "other_steps", "text"}, data.Scope) {
 			e.truncate(data.Scope)
 			valid = true
 		}
 	case "complete":
-		if data.Test == nil && data.Step == nil && data.Failure == nil && data.Scope == "" {
+		if data.Test == nil && data.Step == nil && data.Failure == nil && data.Stop == nil && data.Scope == "" {
 			e.value.ReporterComplete = true
 			valid = true
 		}
 	}
 	if !valid {
 		e.invalid("invalid_record")
+	}
+}
+
+func (e *evidenceState) redactDetail(detail *synthetic.FailureDetail, redact *textRedactor) {
+	redactEvidenceTest(&detail.Test, redact)
+	detail.TextTruncated = detail.TextTruncated || detail.Test.TextTruncated
+	for i := range detail.Path {
+		redactEvidenceStep(&detail.Path[i], redact)
+		detail.TextTruncated = detail.TextTruncated || detail.Path[i].TextTruncated
+	}
+	var clipped bool
+	detail.Message, clipped = evidenceText(detail.Message, 12002, redact)
+	locationClipped := redactLocation(detail.Location, redact)
+	detail.TextTruncated = detail.TextTruncated || clipped || locationClipped
+	if detail.TextTruncated {
+		e.truncate("text")
 	}
 }
 
@@ -194,6 +205,9 @@ func (e *evidenceState) test(value synthetic.EvidenceTest) bool {
 			e.value.Tests = slices.Delete(e.value.Tests, i, i+1)
 			if e.value.FirstFailure != nil && e.value.FirstFailure.Test.ID == value.ID {
 				e.value.FirstFailure = nil
+			}
+			if e.value.StopContext != nil && e.value.StopContext.Test.ID == value.ID {
+				e.value.StopContext = nil
 			}
 			return false
 		}
@@ -223,10 +237,13 @@ func (e *evidenceState) step(value synthetic.EvidenceStep) bool {
 					e.value.Steps[j].ParentOmitted = true
 				}
 			}
-			if f := e.value.FirstFailure; f != nil {
-				for _, step := range f.Path {
+			for _, detail := range []**synthetic.FailureDetail{&e.value.FirstFailure, &e.value.StopContext} {
+				if *detail == nil {
+					continue
+				}
+				for _, step := range (*detail).Path {
 					if step.ID == value.ID {
-						e.value.FirstFailure = nil
+						*detail = nil
 						break
 					}
 				}
@@ -316,8 +333,17 @@ func validEvidenceStep(s synthetic.EvidenceStep) bool {
 }
 
 func validFailure(f synthetic.FailureDetail) bool {
-	if !validEvidenceTest(f.Test) || !f.Test.ReportingComplete || !slices.Contains([]string{"failed", "timedOut", "passed"}, f.Test.Status) ||
-		f.Test.Status == f.Test.ExpectedStatus || f.Test.Status == "passed" && f.Test.ExpectedStatus != "failed" ||
+	return slices.Contains([]string{"failed", "timedOut", "passed"}, f.Test.Status) &&
+		f.Test.Status != f.Test.ExpectedStatus && (f.Test.Status != "passed" || f.Test.ExpectedStatus == "failed") && validDetail(f)
+}
+
+func validStop(f synthetic.FailureDetail) bool {
+	return slices.Contains([]string{"timedOut", "interrupted"}, f.Test.Status) && f.Message == "" &&
+		(len(f.Path) > 0 || f.PathIncomplete) && validDetail(f)
+}
+
+func validDetail(f synthetic.FailureDetail) bool {
+	if !validEvidenceTest(f.Test) || !f.Test.ReportingComplete ||
 		len(f.Path) > 16 || f.OmittedAncestors < 0 || int64(f.OmittedAncestors) > maxSafeInteger || !validLocation(f.Location) ||
 		utf8.RuneCountInString(f.Message) > TextLimit || !boundedJSON(f.Message, 12002) || !boundedJSON(f, evidencePayloadLimit) {
 		return false

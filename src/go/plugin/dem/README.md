@@ -89,11 +89,18 @@ receiver service and retention remain shared by the collecting Agent.
 
 ## Investigate journey failures
 
-`synthetics-runs` includes the first unexpected test failure and the last observed running step when the runtime
+`synthetics-runs` includes the first unexpected test failure, the last observed running step and pending-before-cleanup context when the runtime
 supports structured journey evidence. `synthetics-run` also returns `run.failure_evidence`: test observations,
 step identities and parent relationships, source locations, bounded error excerpts, and the first failure's step path.
 The overall outcome and termination reason remain separate. An earlier assertion can be retained even when a later
 test exhausts the execution budget. Failed configuration rehearsals use the same diagnostic summary.
+
+For the first timed-out or interrupted test, `run.failure_evidence.stop_context` preserves
+pending activity observed just before Playwright starts cleanup, even after ordinary step
+limits fill. The “Pending before cleanup” column describes that observation, not the cause or
+exact location of the timeout. Later cleanup errors do not replace it. Concurrent branches
+show their common ancestry and disclose incomplete detail; missing observations and
+cleanup-only timeouts can show only the test with an incomplete-path marker.
 
 Evidence status is `not_recorded` for older history or attempts without runtime evidence, `unavailable` when negotiation was not reported, `unsupported` when the
 runtime declined the feature, `partial` when reporting stopped, `complete` when its completion marker arrived,

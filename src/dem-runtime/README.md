@@ -277,6 +277,7 @@ extensions after its accepted core terminal, without claiming their completion.
 | `test` | `test`: `id`, `title`, optional `location`, `status`, `expected_status`, optional `duration_ms`, `reporting_complete`, optional `text_truncated`. Begin then end updates one retained test. Skipped tests may report end only. Dynamic `test.fail()` may change expected status at end. |
 | `step` | `step`: `id`, `test_id`, optional `parent_id`/`parent_omitted`, `title`, `category`, optional `location`, `state`, optional `duration_ms`/`message`/`text_truncated`. Begin/end update one retained identity; a step error alone does not establish an unexpected test failure. |
 | `failure` | `failure`: a self-contained completed `test`, `path` of step identities, `omitted_ancestors`, optional `path_incomplete`, first error `message`, optional error `location`/`text_truncated`. Emitted once for the first unexpected failed/timed-out test or unexpected pass. It has independent retention even when detail pools are full. |
+| `stop` | `stop`: the same bounded path/test shape as `failure`, with an empty message. Emitted once for the first `timedOut` or `interrupted` test. The path is pending activity observed before cleanup, independently reserved from the first failure and ordinary detail pools. |
 | `truncated` | `scope`: `tests`, `user_steps`, `other_steps` or `text`. A scope is emitted at most once. |
 | `complete` | Reporter finished this feature stream. Per-test completeness and truncation remain independent. Later feature records invalidate reporting. |
 
@@ -289,6 +290,16 @@ The first-failure path matches the actual first test error. When repeated errors
 message and stack, only their common ancestry is retained and `path_incomplete` is set;
 the runtime does not guess which sibling assertion was caught. Unexpected passes do not invent an error or failed step. Error messages may contain
 the public Playwright call-log excerpt; no private call-log API or raw stack is retained.
+
+The stop context snapshots public reporter steps whose duration is `-1` when the root
+`hook` named `After Hooks` begins. Playwright 1.63 reports this boundary before user cleanup
+and fixture teardown; real-runtime tests pin that ordering. The observation does not identify
+the cause or exact location of the eventual timeout: an unawaited body action may remain
+pending while cleanup itself times out. Caught, already-ended steps and later cleanup errors
+are not selected. Concurrent pending branches retain only common ancestry with `path_incomplete`.
+Missing boundary, no pending step, or depth uncertainty is explicitly incomplete; cleanup-only
+timeouts can have test-only context. Path states describe the observation before cleanup,
+even if those steps later complete. Test status describes the final reporter observation.
 
 ### Feature budgets
 
@@ -306,9 +317,11 @@ should retain. These are diagnostic quotas, not execution/test limits or journal
   and a 2000-character error excerpt. First-error search uses at most 64 ancestor cursors;
   deeper unexplored subtrees mark `path_incomplete`, without discarding the error.
   Ambiguous error matches also mark the retained path incomplete.
+- Stop context has its own single reserve with the same 16-node/64-depth path bounds.
+  Its message is empty; it cannot replace or change first-failure attribution.
 - Optional payloads are at most 32 KiB, far below the unchanged 4 MiB shared frame ceiling.
-  At most two records per retained test/step, one first failure and fixed loss/completion
-  markers bound ordinary feature emission below 1 MiB and retained typed data below 512 KiB.
+  At most two records per retained test/step, one first failure, one stop context and fixed loss/completion
+  markers bound ordinary feature emission below 1 MiB and retained typed data below 544 KiB.
 
 These quotas cover ordinary short journeys while reserving late failure evidence independently
 of preceding API noise. Deep or large scripts get explicitly incomplete detail, not fabricated

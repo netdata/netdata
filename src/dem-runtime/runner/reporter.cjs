@@ -73,6 +73,7 @@ module.exports = class DEMReporter {
     });
   }
   onStepBegin(test, result, step) {
+    this.evidence?.beforeCleanup(test, result, step);
     this.evidence?.step(test, step);
   }
   onStepEnd(test, result, step) {
@@ -103,6 +104,7 @@ module.exports = class DEMReporter {
   onTestEnd(test, result) {
     this.evidence?.test(test, result);
     this.evidence?.firstFailure(test, result);
+    this.evidence?.stopContext(test, result);
     this.tests.set(test.id, { test, result });
     const failureSteps = [];
     const visit = (steps) => {
