@@ -42,8 +42,9 @@ History is only a fallback explanation for an absent capture set, never byte acc
 Manifest version 2 also retains optional artifact `test` metadata (`id`, `title`,
 `text_truncated`) joined by Go from independently validated journey observations.
 It cannot authorize a file or change membership. Old readers ignore these fields;
-missing or incorrectly typed association means no label, without relaxing validation
-of ownership, membership, size or digest. Labels therefore survive history expiry.
+missing association means no label. Go-authored manifests and history use ordinary
+typed JSON decoding; incorrectly typed stored fields make the record unreadable.
+Ownership, membership, size and digest validation remain strict. Labels survive history expiry.
 Capture observations and unpublished-candidate reasons live only in run history;
 they do not create empty manifests or change current availability.
 

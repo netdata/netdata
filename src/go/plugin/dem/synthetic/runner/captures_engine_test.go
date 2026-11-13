@@ -74,6 +74,8 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 			})
 			req := journey()
 			req.Capture = true
+			// This test writes up to 150 files; deadline behavior is tested separately.
+			req.Timeout = 30 * time.Second
 			ex := e.Execute(t.Context(), req, nil)
 			require.True(t, ex.Drained)
 			require.NotNil(t, ex.Run.Captures)

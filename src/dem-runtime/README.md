@@ -468,8 +468,9 @@ its actual stop policy are `not_eligible`. Without terminal authority, earlier s
 their metadata arrived. Publication still requires verified drainage and rejects the entire set on any failure.
 An offending size-limit candidate is `too_large`, and other rejected candidates are `publication_failed`.
 
-Published artifact association is retained in manifest version 2 and run history. Optional malformed association is
-discarded without weakening authoritative manifest validation. Historical omissions remain in `run.captures`, never
-in empty manifests; current availability and byte access remain owned by the artifact store. Functions derive labels
+Published artifact association is retained in manifest version 2 and run history. Missing association means no label;
+Go-authored stored records use ordinary typed JSON decoding. Optional-wire validation remains isolated from core
+outcomes and publication. Historical omissions remain in `run.captures`, never in empty manifests; current availability
+and byte access remain owned by the artifact store. Functions derive labels
 from artifact kind and display test titles separately. Titles outlive history when their captures do; redaction of
 metadata does not sanitize PNG or HTML content.
