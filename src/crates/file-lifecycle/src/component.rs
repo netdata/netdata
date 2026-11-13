@@ -1,86 +1,36 @@
-//! The worker-actor substrate of the file-lifecycle stack: one [`Component`]
-//! trait and one [`ComponentHandle`] for every request/response worker.
+//! Worker tasks: one [`Component`] trait and one [`ComponentHandle`] for
+//! every request/response worker.
 //!
 //! A component is a self-contained tokio task running one event loop over two
 //! unbounded channels: it receives requests, emits responses, and exits when
 //! its cancellation token fires or every request sender is gone. The component
-//! type carries no state — it is a marker (stateless unit structs; the
-//! uploader names its storage backend through a phantom type) — and
-//! everything per-instance rides `Args`, moved into the task by
-//! [`ComponentHandle::spawn`]. This module owns only the plumbing: the message
-//! vocabulary is `crate::ipc`'s, and each worker's behavior contract lives in
-//! its own module ([`crate::cleaner`], [`crate::uploader`],
-//! [`crate::catalog_builder`]; otel-ledger's indexer is the fourth `Component`
-//! impl).
+//! type carries no state. Everything per-instance rides `Args`, which
+//! [`ComponentHandle::spawn`] moves into the task.
 //!
 //! # Contract
 //!
-//! - Trait shape: [`Component::run`] is an associated async fn, not a method,
-//!   because the impl type carries nothing — it takes the args, the request
-//!   receiver, the response sender and the cancellation token by value and
-//!   returns `()`. The component type, `Request`, `Response` and `Args` are
-//!   `Send + 'static`, which is exactly what makes `C::run(...)` a
-//!   `Send + 'static` future spawnable as a tokio task.
-//! - Spawn lifecycle: [`ComponentHandle::spawn`] pairs the channels, spawns
-//!   `run` as a detached tokio task (the `JoinHandle` is dropped, so a
-//!   panicking task is observed only through its channels closing) and
-//!   returns the handle with the in-flight counter at 0. The handle does not
-//!   own the cancellation token: shutdown stays with whoever created it (the
-//!   ledger's root token; each component gets a `child_token()` at its spawn
-//!   site, cancelled after the run loop exits — `otel-ledger/src/lib.rs`).
-//!   Cancellation is cooperative: the loop exits on its next `select!` arm
-//!   and never preempts in-flight work; what happens to unfinished work at
-//!   cancel is the component's own policy (the uploader's uploads in flight
-//!   are cut — see its module docs).
+//! - Trait shape: [`Component::run`] is an associated function, not a method,
+//!   because the impl type carries nothing. The `Send + 'static` bounds make
+//!   its future spawnable as a tokio task.
+//! - Spawn lifecycle: [`ComponentHandle::spawn`] spawns `run` as a detached
+//!   tokio task. A panicking task is observed only through its channels
+//!   closing. The handle does not own the cancellation token: shutdown stays
+//!   with whoever created it. Cancellation is cooperative. The loop finishes
+//!   the `select!` arm it is running and then exits. Each component decides
+//!   what happens to its unfinished work.
 //! - Handle/request pairing: `send` never blocks (unbounded channels). Any
-//!   backpressure — the indexer queueing requests at its concurrency limit,
-//!   the uploader's semaphore bounding uploads in flight — is the
-//!   component's internal policy, invisible to the sender. A `send` fails
-//!   only once the component task is gone.
+//!   backpressure is the component's internal policy, invisible to the
+//!   sender. A `send` fails only once the component task is gone.
 //! - In-flight counter: `send` increments it, `recv` decrements it
 //!   (saturating), so [`ComponentHandle::pending`] is a lower bound on the
 //!   responses still queued when a component also emits unsolicited
-//!   responses (the catalog builder's time-trigger and `Flush` rotations
-//!   each emit a `Rotated` with no preceding `AddEntry`). Production code
-//!   consults it only in the synchronous recovery drains — [`batch_recover`]
-//!   leaves it balanced, [`drain_pending`] drains it to zero — while
-//!   steady-state routing goes through [`ComponentHandle::into_parts`],
-//!   which drops it; recovery tests assert it to pin fire-and-forget request
-//!   counts. Nothing else observes backlog.
+//!   responses.
 //! - Single owner: the handle's mutating methods take `&mut self` and the
 //!   response channel is single-consumer, so a handle is driven by one task
-//!   at a time. The shared cleaner/uploader handles live on the ledger and are
-//!   polled by its run loop's `select!` (`Ledger::run`); per-pipeline indexer
-//!   and catalog-builder handles are born inside the ledger's pipeline
-//!   builders, driven by recovery through `&mut`, then split by
-//!   [`ComponentHandle::into_parts`] — the sender becomes the `Pipeline`'s
-//!   request sender and the receiver moves into a signal-tagging forwarder
-//!   task feeding the run loop's merged response channel.
+//!   at a time.
 //! - Error semantics: the machinery raises no errors of its own. A dead
-//!   component surfaces only as closed channels; [`batch_recover`] and
-//!   [`drain_pending`] translate that into the fatal `anyhow` errors that
-//!   fail startup, and the ledger's run loop exits its event loop when a
-//!   worker channel closes (cleaner, uploader, per-pipeline forwarder
-//!   alike).
-//!
-//! # Who spawns which component (grep-verified)
-//!
-//! - `otel-ledger/src/ledger/mod.rs` (`Ledger::new`), once per process:
-//!   [`crate::cleaner::Cleaner`] (shared, `Args = ()`) and, when remote
-//!   storage is enabled, [`crate::uploader::Uploader`] (shared, generic over
-//!   the storage backend).
-//! - `otel-ledger/src/ledger/pipeline.rs` and `traces_pipeline.rs`, one pair
-//!   per signal: otel-ledger's indexer (spawned by the per-signal build
-//!   functions, which pass it the signal) and
-//!   [`crate::catalog_builder::CatalogBuilder`] (spawned inside the shared
-//!   `build_pipeline`).
-//!
-//! [`crate::recovery`] replays startup work through these same handles via
-//! [`batch_recover`] / [`drain_pending`] so recovery and steady state share
-//! one code path; `recovery/remote.rs` deliberately sends fire-and-forget
-//! instead, never awaiting uploads during startup. Tests pin the machinery's
-//! behavior through custom `Component` impls (`recovery/tests.rs`) and by
-//! spawning the real workers (`catalog_builder/tests.rs`).
+//!   component surfaces only as closed channels. [`batch_recover`] and
+//!   [`drain_pending`] turn that into an `anyhow` error.
 
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -89,10 +39,8 @@ use tokio_util::sync::CancellationToken;
 ///
 /// The trait fixes only the loop's shape — the [`Component::run`] signature
 /// and the channel + cancellation wiring around it. Behavior, backpressure
-/// and shutdown-drain policy are each impl's own: compare the stateless
-/// recv-process-send [`crate::cleaner::Cleaner`] with the indexer's internal
-/// request queue or the uploader's semaphore. See the module docs for the
-/// full contract and the spawn map.
+/// and shutdown-drain policy are each impl's own. See the module docs for the
+/// full contract.
 pub trait Component: Send + 'static {
     type Request: Send + 'static;
     type Response: Send + 'static;
@@ -102,10 +50,9 @@ pub trait Component: Send + 'static {
     ///
     /// Receives requests on `rx`, sends responses on `tx`, and exits when
     /// `cancel` is triggered or `rx` is closed (every request sender
-    /// dropped). Sending on `tx` is best-effort: all four impls ignore a
-    /// failed send (`let _ = tx.send(...)`) and keep serving — a closed
-    /// response channel means the consuming side is already gone, not an
-    /// exit condition. `cancel` is observed between requests, on the loop's
+    /// dropped). Sending on `tx` is best-effort. A closed response channel
+    /// means the consuming side is already gone, and is not an exit
+    /// condition. `cancel` is observed between requests, on the loop's
     /// next `select!` arm; it does not preempt in-flight work. A component
     /// MAY emit responses with no matching request (see
     /// [`ComponentHandle::recv`]).
@@ -119,12 +66,6 @@ pub trait Component: Send + 'static {
 
 /// Handle for communicating with a spawned [`Component`]: the request
 /// sender, the response receiver, and the in-flight counter.
-///
-/// Exists only as [`ComponentHandle::spawn`]'s return value — the fields are
-/// private, so the channel pair cannot be rebuilt except through
-/// [`ComponentHandle::into_parts`]. The mutating methods take `&mut self`
-/// (`pending` only reads it, `into_parts` consumes the handle); a handle
-/// belongs to one driving task at a time.
 pub struct ComponentHandle<Req, Resp> {
     tx: mpsc::UnboundedSender<Req>,
     rx: mpsc::UnboundedReceiver<Resp>,
@@ -134,8 +75,7 @@ pub struct ComponentHandle<Req, Resp> {
 impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// Spawn `C`'s event loop as a new tokio task and return its handle.
     ///
-    /// Pairs the two unbounded channels around `C::run` and moves `args` and
-    /// `cancel` into the task. The `JoinHandle` is dropped: the task is
+    /// The `JoinHandle` is dropped: the task is
     /// detached, its only observable failure mode being the channels closing
     /// (see [`ComponentHandle::recv`]). Nothing here stops the component —
     /// cancellation stays with the token the caller passes in.
@@ -168,14 +108,8 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// Receive the next response from the component.
     ///
     /// The decrement saturates at zero: a component MAY emit unsolicited
-    /// responses with no matching request (the catalog builder's time-trigger
-    /// and `Flush` rotations each emit a `Rotated` with no preceding
-    /// `AddEntry`), so `pending` is a lower bound on the responses still
-    /// queued, not an exact send/recv balance. Production code consults the
-    /// counter in the synchronous recovery drains and, for the uploader, in
-    /// the ledger's upload chart: both run against 1:1 request/response
-    /// workers, where it is exact. The other steady-state routing goes
-    /// through [`ComponentHandle::into_parts`] and ignores it.
+    /// responses with no matching request, so `pending` is a lower bound on
+    /// the responses still queued, not an exact send/recv balance.
     ///
     /// Returns `None` once the component task is gone and the queue is
     /// drained — responses buffered before its exit are still delivered.
@@ -196,17 +130,7 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     /// Split into the raw request sender and response receiver, dropping the
     /// in-flight counter.
     ///
-    /// Used once per per-pipeline worker at the end of recovery
-    /// (`otel-ledger/src/ledger/pipeline.rs`): the owning `Pipeline` keeps
-    /// the sender for steady-state requests, while the receiver moves into a
-    /// forwarder task that tags each response with the signal and feeds the
-    /// run loop's single merged channel. Responses still queued on the
-    /// receiver — e.g. the `EntryAccepted`/`Rotated` answers to the
-    /// catalog-builder `AddEntry`s `reconcile_remote_uploads` enqueues
-    /// fire-and-forget — are preserved: the live receiver carries them into
-    /// the forwarder and on to the run loop. The dropped counter was only
-    /// ever consulted by the synchronous recovery drains (`batch_recover` /
-    /// `drain_pending`); steady-state routing ignores it.
+    /// Responses still queued on the receiver are preserved.
     pub fn into_parts(self) -> (mpsc::UnboundedSender<Req>, mpsc::UnboundedReceiver<Resp>) {
         (self.tx, self.rx)
     }
@@ -216,17 +140,14 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
 /// processing each one.
 ///
 /// Used to flush responses enqueued as side effects of another component's
-/// `batch_recover` — e.g. the WAL-delete requests `recover_unindexed` fires
-/// at the cleaner while its indexer responses are still streaming back.
+/// `batch_recover`.
 /// Precondition: every earlier request/response round on this handle was
 /// itself consumed 1:1 (a `batch_recover` recv-s exactly what it sent,
 /// rebalancing the counter), so the counter here counts only the
 /// fire-and-forget sends; a component that emits unsolicited responses could
 /// otherwise end the drain early. Each drained response must still answer
-/// exactly one such send (true of the cleaner, the sole production target —
-/// `recovery::local::drain_wal_deletes`). A closed response channel
-/// mid-drain means the component died with requests outstanding: fatal
-/// `anyhow` error, failing startup.
+/// exactly one such send. A closed response channel mid-drain means the
+/// component died with requests outstanding: an `anyhow` error.
 pub async fn drain_pending<Req: Send + 'static, Resp: Send + 'static>(
     handle: &mut ComponentHandle<Req, Resp>,
     mut process: impl FnMut(Resp),
@@ -244,21 +165,17 @@ pub async fn drain_pending<Req: Send + 'static, Resp: Send + 'static>(
 /// Send a batch of requests to a component and process every response.
 ///
 /// Recovery's replay primitive: pending work re-enters through the normal
-/// component path instead of duplicating its processing logic
-/// (`recovery::local` calls it on the indexer and the cleaner; an empty
-/// batch returns `Ok(())` without touching the component).
+/// component path instead of duplicating its processing logic.
 ///
 /// The two loops are decoupled on purpose: all requests go out first, then
 /// exactly `count` responses are consumed in arrival order and handed to
 /// `process` — which must pair by response content (each carries its
 /// seq/path), not by position. This requires a worker that answers every
-/// request with exactly one response; workers that also emit unsolicited
-/// responses (the catalog builder) are driven fire-and-forget instead
-/// (`recovery/remote.rs`). Because the loop recv-s exactly what it sent, the
-/// in-flight counter returns to its pre-call value — which is what lets a
-/// following [`drain_pending`] count only the fire-and-forget sends `process`
-/// makes. A dead component — a failed `send` or a `None` mid-batch — is a
-/// fatal `anyhow` error that fails startup.
+/// request with exactly one response. Because the loop recv-s exactly what
+/// it sent, the in-flight counter returns to its pre-call value — which is
+/// what lets a following [`drain_pending`] count only the fire-and-forget
+/// sends `process` makes. A dead component — a failed `send` or a `None`
+/// mid-batch — is an `anyhow` error.
 pub async fn batch_recover<Req: Send + 'static, Resp: Send + 'static>(
     requests: Vec<Req>,
     handle: &mut ComponentHandle<Req, Resp>,

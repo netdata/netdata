@@ -1,43 +1,6 @@
 //! Tests for the registry module: direct calls against real temp-dir
-//! registries (no tokio runtime, no content-plane identity codec — streams
-//! are the opaque `(namespace, name)` fixtures of `test_helpers`), pinning
-//! the parent module's contract.
-//!
-//! - The upload axis drives `unuploaded_ids`: an SFST is listed until
-//!   `mark_uploaded` marks it uploaded, and the list empties once every
-//!   tracked file is uploaded (the set recovery's remote reconciliation
-//!   queues for upload).
-//! - The `CatalogStage` axis: the derived `Ord` ranks
-//!   `NotRotated < RotatedLocal < Remote` — the `>=` accessors and
-//!   `mark_rotated`'s monotone guard depend on it (the parent pins the same
-//!   order with a compile-time assert); `Remote` subsumes `RotatedLocal`, so
-//!   `mark_remote_cataloged` alone reports `is_rotated` ("remote-cataloged
-//!   implies rotated" is structural); a stage never downgrades, so marking a
-//!   `Remote` seq rotated again — singly or batched — keeps it
-//!   remote-cataloged and the eviction gate cannot stall on it; and the
-//!   catalog marks never touch the independent upload axis.
-//! - `evict_seq` clears a key's whole per-seq state — the local SFST entry
-//!   plus both lifecycle axes — as the cleaner's delete-confirmation path
-//!   requires.
-//! - Lifecycle state is keyed by the full `SeqKey`: two identities sharing
-//!   machine and seq (the post-wipe reseed shape) never alias each other's
-//!   state, and evicting one leaves the other intact.
-//! - `TenantRegistries` seq routing round-trips: `route_seq_to` feeds both
-//!   `for_seq` and `for_seq_mut` — a mark made through the mutable view is
-//!   visible through the shared one — and `forget_seq` returns the tenant
-//!   and drops the route.
-//! - Queries are tenant-scoped, never a union: `query_snapshot` of a known
-//!   tenant returns only that tenant's SFST candidates (the WAL list is
-//!   empty here — no WALs are tracked), and an unknown tenant yields empty
-//!   lists, not a panic.
-//! - The local half of the stream selector (`Registry::local_streams`,
-//!   materialized through `with_catalog(&[])`): two SFSTs of one stream
-//!   aggregate into one `PartitionStat`; an SFST wins over its own WAL's
-//!   shadow (identity+seq key, the post-index/pre-delete window); a WAL-only
-//!   stream — created and synced, never closed — lists from its `Created`
-//!   content metadata and is sized by its `valid_up_to` durable prefix; WAL
-//!   nanosecond ranges convert to seconds; output sorts by `partition_key`; an
-//!   unknown tenant lists nothing.
+//! registries, with no tokio runtime. Streams are the opaque
+//! `(namespace, name)` fixtures of `test_helpers`.
 //!
 //! Not pinned here: `recover` (including its fatal WAL-scan panic),
 //! `apply_wal_event`'s route on an applied `Created` (only "a refused event
@@ -45,11 +8,8 @@
 //! `discover_tenants`, `get_or_create`'s directory layout and its
 //! no-recovery-on-create contract, `sfst_candidates` standalone, the WAL
 //! side of `query_snapshot` (SFST-wins dedup and the `valid_up_to == 0`
-//! exclusion — only tenant scoping is pinned above), `orphaned_wal_ids`, and
+//! exclusion — only tenant scoping is pinned), `orphaned_wal_ids`, and
 //! the zero-means-unknown bound handling in `PartitionStat::add`.
-//! `holds_seq` and `unindexed_ids` are pinned by recovery/tests.rs;
-//! `local_servable_seqs` and the selector's remote half (`with_catalog`
-//! over real catalog entries) by query/tests.rs.
 use super::*;
 use file_registry::ByteSize;
 use file_registry::{Identity, InstanceId, MachineId};
@@ -106,7 +66,7 @@ fn unuploaded_ids_is_empty_when_all_uploaded() {
 
 #[test]
 fn catalog_stage_axis_ordering_and_subsumption() {
-    // ORDER MATTERS: the derived Ord must rank the stages this way — the `>=`
+    // Order matters: the derived Ord must rank the stages this way — the `>=`
     // accessors (is_rotated / is_remote_cataloged) and the monotone guard in
     // mark_rotated all depend on it.
     assert!(CatalogStage::NotRotated < CatalogStage::RotatedLocal);
@@ -120,8 +80,8 @@ fn catalog_stage_axis_ordering_and_subsumption() {
     assert!(!reg.is_remote_cataloged(sk(1)));
     assert!(!reg.is_uploaded(sk(1)));
 
-    // mark_remote_cataloged ALONE (no prior mark_rotated) makes the seq both
-    // remote-cataloged AND rotated (Remote subsumes RotatedLocal) — the
+    // mark_remote_cataloged alone (no prior mark_rotated) makes the seq both
+    // remote-cataloged and rotated (Remote subsumes RotatedLocal) — the
     // "remote-cataloged implies rotated" invariant, structural rather than by
     // caller ordering. The independent upload axis stays untouched.
     reg.mark_remote_cataloged([sk(2)]);
@@ -136,7 +96,7 @@ fn catalog_stage_axis_ordering_and_subsumption() {
 #[test]
 fn catalog_stage_axis_is_monotone() {
     let mut reg = make_registry();
-    // mark_rotated after Remote must NOT downgrade the stage (else the eviction
+    // mark_rotated after Remote must not downgrade the stage (else the eviction
     // gate would defer forever for a re-rotated remote-cataloged seq).
     reg.mark_remote_cataloged([sk(1)]);
     reg.mark_rotated(sk(1));
@@ -170,7 +130,7 @@ fn evict_seq_clears_all_per_seq_state() {
 
 #[test]
 fn seqstate_is_isolated_per_identity() {
-    // Two identities sharing the SAME machine and seq but a different instance
+    // Two identities sharing the same machine and seq but a different instance
     // (the post-wipe reseed shape) must never alias each other's lifecycle state.
     let mut reg = make_registry();
     let a = sk(5);
@@ -341,7 +301,7 @@ fn local_streams_dedup_and_aggregate_sfst_and_unsealed_wal() {
         // An unsealed WAL-only stream — named from its `Created` content
         // metadata (the bytes the WAL writer stamps into the file header), so
         // it lists even with no SFST summary. Modeled as an active, synced
-        // WAL: `Synced` sets the durable byte count and the range but NOT
+        // WAL: `Synced` sets the durable byte count and the range but not
         // `File.size` (that lands on close), so this also exercises the
         // `valid_up_to` size proxy in `local_streams`.
         let db_id = FileId::new(Identity::new(mid, bid), 0, 3, pk(db));
@@ -365,7 +325,7 @@ fn local_streams_dedup_and_aggregate_sfst_and_unsealed_wal() {
             .unwrap();
         // A WAL shadow of SFST seq=1 (post-index/pre-delete window). The SFST
         // folds first and wins on the identity+seq key, so the shadow's huge
-        // size must NOT double-count.
+        // size must not double-count.
         let shadow = FileId::new(Identity::new(mid, bid), 0, 1, pk(api));
         let (_, api_content_meta) = crate::test_helpers::identity_for(api.0, api.1);
         r.wal
@@ -394,8 +354,8 @@ fn local_streams_dedup_and_aggregate_sfst_and_unsealed_wal() {
         time_range: 0..u32::MAX,
         partition_keys: Vec::new(),
     };
-    // The substrate yields neutral `PartitionStat`s ordered by opaque `partition_key`;
-    // decode + sort by `(namespace, name)` the way the rpc adapter does for display.
+    // Decode and sort by `(namespace, name)`; the order by `partition_key` is
+    // not checked here.
     let mut streams = tr.local_streams(&tenant, &full).with_catalog(&[]);
     let sid =
         |p: &crate::registry::PartitionStat| crate::test_helpers::decode_opaque(&p.content_meta);

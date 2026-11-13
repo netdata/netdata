@@ -1,8 +1,7 @@
-//! Shared, content-agnostic test fixtures for the crate's test modules
-//! (`catalog_builder`, `registry`, `query`, and `recovery` tests).
+//! Shared, content-agnostic test fixtures for the crate's test modules.
 //!
 //! `file-lifecycle` is signal-neutral, so its tests fabricate opaque partition
-//! keys and `content_meta` blobs directly — with NO dependency on any
+//! keys and `content_meta` blobs directly — with no dependency on any
 //! content-plane identity codec (e.g. `otel-logs-identity`). A logical stream
 //! is named by a `(namespace, name)` pair purely for test readability; the
 //! substrate treats `partition_key` as an opaque `u64` and `content_meta` as
@@ -25,7 +24,7 @@ pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {
 /// `u32`-LE length prefix + raw bytes for the namespace, then for the name.
 /// The substrate stores/forwards these verbatim; tests round-trip them via
 /// [`decode_opaque`] to assert identity survives the lifecycle. Local to the
-/// tests — NOT the production content codec.
+/// tests — not the production content codec.
 pub(crate) fn encode_opaque(namespace: &str, name: &str) -> Vec<u8> {
     let mut out = Vec::new();
     out.extend_from_slice(&(namespace.len() as u32).to_le_bytes());
@@ -66,7 +65,7 @@ pub(crate) fn identity_for(namespace: &str, name: &str) -> (u64, Vec<u8>) {
 }
 
 /// A `Summary` for the logical stream with the given range and record count.
-/// The partition key is NOT in the summary — partition matching keys off
+/// The partition key is not in the summary — partition matching keys off
 /// `id.partition_key` in the file's `FileId` (`Query::matches_partition`), so
 /// tests pass the key there via [`identity_for`] or [`opaque_partition_key`].
 pub(crate) fn summary_for(
@@ -84,8 +83,7 @@ pub(crate) fn summary_for(
     }
 }
 
-/// A zero-valued `Summary` with an empty identity. Used by registry/recovery
-/// tests that call `sfst::Registry::track` without caring about the contents.
+/// A zero-valued `Summary` with an empty identity.
 pub(crate) fn empty_summary() -> sfst::Summary {
     summary_for("", "", 0, 0, 0)
 }

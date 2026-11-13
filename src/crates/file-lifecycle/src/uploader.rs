@@ -1,8 +1,5 @@
 //! The uploader: copies index (SFST) and catalog files to remote object
-//! storage. One worker per ledger process, shared by every signal pipeline
-//! (like the cleaner): steady-state requests come from the indexer-response
-//! path and catalog rotations, and recovery queues every un-uploaded file at
-//! startup.
+//! storage. It is shared by every signal pipeline.
 //!
 //! Uploads run in spawned async tasks, but the number in flight at once is
 //! bounded by a [`Semaphore`]: the receive loop acquires a permit before
@@ -16,17 +13,9 @@
 //!
 //! Failure handling: a failed read/write is logged and returned as a
 //! `*Failed` response carrying the error string — there is no retry here.
-//! The caller records failures in the backoff queue (`crate::upload_retry`),
-//! which re-issues them with capped exponential backoff.
 //!
 //! The backend is abstracted behind [`Storage`]; the component is generic over
 //! it so production uses opendal and tests inject a mock.
-//!
-//! Consumers (grep-verified): spawned once by otel-ledger's `Ledger::new`
-//! (`ComponentHandle::spawn::<Uploader<OpendalStorage>>`, remote storage
-//! enabled only). Senders: `ledger/indexer.rs`, `ledger/catalog_builder.rs`,
-//! and `recovery/remote.rs`. Responses are handled by `ledger/uploader.rs`
-//! (`handle_uploader_resp`).
 
 use std::marker::PhantomData;
 use std::path::Path;
@@ -115,8 +104,7 @@ impl<S: Storage> Component for Uploader<S> {
 
 /// Read a local file, write it to `remote_key`, and verify its size — the
 /// shared body for both SFST and catalog uploads. Returns the [`WriteMeta`]
-/// (its ETag is recorded on SFST catalog entries) or a stringified error for
-/// the failure response.
+/// or a stringified error for the failure response.
 async fn put_file<S: Storage>(
     storage: &S,
     local_path: &Path,
