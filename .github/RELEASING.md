@@ -76,6 +76,9 @@ The [shared preview eligibility helper](scripts/modules/release_versions.py) own
 
 - Tags use `vMAJOR.MINOR.0-rcX`, where core numbers follow SemVer and `X` is a positive decimal integer without
   leading zeroes. Build metadata, other prerelease names and nonzero patch numbers are rejected.
+- The workflow also accepts the package-style form `vMAJOR.MINOR.0~rcX` and normalizes it to `-rcX`: Git tags and
+  Docker tags cannot contain `~`. Tags, `packaging/version`, artifact names and Docker tags use `-rcX`; native
+  package versions use `MAJOR.MINOR.0~rcX`, derived by the build system, so an RC sorts below its final release.
 - Each version starts at `rc1`. Subsequent RC numbers must exceed every existing RC number for that version;
   gaps are allowed. Existing tags cannot be reused.
 - An RC is rejected if a regular release of the same version already exists.

@@ -8,6 +8,12 @@ EVENT_TYPE="${3}"
 EVENT_VERSION="${4}"
 RELEASE_TEST="${5}"
 
+# Git refs cannot contain '~', so accept the package-style RC separator and store the tag form.
+# The build system maps '-rcN' back to '~rcN' for native package versions.
+case "${EVENT_VERSION}" in
+    *\~rc*) EVENT_VERSION="${EVENT_VERSION%%\~rc*}-rc${EVENT_VERSION#*\~rc}" ;;
+esac
+
 ##############################################################
 # Version validation functions
 

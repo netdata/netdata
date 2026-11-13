@@ -79,12 +79,20 @@ class ReleasePreparationTest(unittest.TestCase):
                 self.assertEqual(self.git('branch', '--list', outputs['new-branch']), '')
                 (self.root / 'packaging/version').write_text('v2.12.3-1-nightly\n')
 
+    def test_tilde_rc_input_is_normalized(self):
+        result, outputs = self.prepare('v2.13.0~rc1')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((outputs['ref'], outputs['version'], outputs['new-branch']),
+                         ('v2.13.0-rc1', '2.13.0-rc1', 'v2.13'))
+        self.assertEqual((self.root / 'packaging/version').read_text(), 'v2.13.0-rc1\n')
+
     def test_invalid_rc_versions(self):
         for version in ('v2.13.0', '2.13.0-rc1', 'v2.13.1-rc1', 'v2.13.0-rc0',
                         'v2.13.0-rc01', 'v2.13.0-rc-1', 'v2.13.0-rc.1',
                         'v02.13.0-rc1', 'v2.013.0-rc1', 'v2.13.00-rc1',
                         'v2.13.0-rc1+build.7', 'v2.13.0-beta1', 'v2.13.0-rc1.extra',
-                        'v2.13.0-rc1\nrun=true'):
+                        'v2.13.0-rc1\nrun=true', 'v2.13.0~rc0', 'v2.13.0~rc1~rc2',
+                        'v2.13.0~rc1+build.7', 'v2.13.1~rc1'):
             with self.subTest(version=version):
                 self.assert_rejected(version)
 

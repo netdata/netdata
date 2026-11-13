@@ -11,7 +11,7 @@ on:
         default: nightly
         required: true
       version:
-        description: Version Tag (vMAJOR.MINOR.PATCH or vMAJOR.MINOR.0-rcX)
+        description: Version Tag (vMAJOR.MINOR.PATCH or vMAJOR.MINOR.0-rcX; ~rcX is accepted)
         default: nightly
         required: true
 concurrency: # Serialize tag/branch validation and publication across dispatch refs.
