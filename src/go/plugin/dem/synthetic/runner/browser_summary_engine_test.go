@@ -22,13 +22,13 @@ func TestBrowserSummaryRequestSelectionAndOutcomeIndependence(t *testing.T) {
 			e, _, _ := testEngine(t)
 			e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 				var request wireRequest
-				require.NoError(t, json.Unmarshal(raw, &request))
-				require.Equal(t, SupportedContract, request.Version)
+				assert.NoError(t, json.Unmarshal(raw, &request))
+				assert.Equal(t, SupportedContract, request.Version)
 				assert.Equal(t, enabled, slices.Contains(request.Extensions, browserSummaryFeature))
 				encoder := json.NewEncoder(out)
-				require.NoError(t, encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": request.Extensions}}))
+				assert.NoError(t, encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": request.Extensions}}))
 				if enabled {
-					require.NoError(t, encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": browserSummaryFeature, "data": map[string]any{"record": "complete", "run": browserRun(1)}}}))
+					assert.NoError(t, encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": browserSummaryFeature, "data": map[string]any{"record": "complete", "run": browserRun(1)}}}))
 				}
 				return resultPayload(success())(ctx, args, raw, out, stderr)
 			})
@@ -53,8 +53,8 @@ func TestBrowserRehearsalEvidenceIsFailureOnly(t *testing.T) {
 			e, history, _ := testEngine(t)
 			e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 				encoder := json.NewEncoder(out)
-				require.NoError(t, encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature, browserSummaryFeature}}}))
-				require.NoError(t, encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": browserSummaryFeature, "data": map[string]any{"record": "complete", "run": browserRun(1)}}}))
+				assert.NoError(t, encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature, browserSummaryFeature}}}))
+				assert.NoError(t, encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": browserSummaryFeature, "data": map[string]any{"record": "complete", "run": browserRun(1)}}}))
 				result := success()
 				if failure {
 					result = reporterResult{Status: synthetic.Failed, Tests: &synthetic.TestCounts{Declared: 1, Failed: 1}, Error: "core assertion", CaptureState: "disabled"}

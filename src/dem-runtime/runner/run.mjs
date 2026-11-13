@@ -117,11 +117,17 @@ async function main() {
     const browserSummary = selected?.includes(BrowserSummary.FEATURE);
     if (browserSummary) {
       wrapper = path.join(r.work_dir, "browser-test.mjs");
-      const real = JSON.stringify(pathToFileURL(path.join(modules, "playwright/test.mjs")).href);
-      const observe = JSON.stringify(pathToFileURL(path.join(here, "browser-context.cjs")).href);
-      await fs.writeFile(wrapper,
+      const real = JSON.stringify(
+        pathToFileURL(path.join(modules, "playwright/test.mjs")).href,
+      );
+      const observe = JSON.stringify(
+        pathToFileURL(path.join(here, "browser-context.cjs")).href,
+      );
+      await fs.writeFile(
+        wrapper,
         `export * from ${real};\nimport { test as base } from ${real};\nimport observe from ${observe};\nexport const test = observe(base);\nexport default test;\n`,
-        { mode: 0o600 });
+        { mode: 0o600 },
+      );
     }
     const config = {
       testDir: path.dirname(entry),
@@ -142,7 +148,13 @@ async function main() {
             sourceDir,
             capture: r.capture,
             ...(selected?.length ? { extensions: selected } : {}),
-            ...(browserSummary ? { observerFile: await fs.realpath(path.join(here, "browser-sampler.cjs")) } : {}),
+            ...(browserSummary
+              ? {
+                  observerFile: await fs.realpath(
+                    path.join(here, "browser-sampler.cjs"),
+                  ),
+                }
+              : {}),
           },
         ],
       ],
@@ -185,7 +197,9 @@ async function main() {
             "@playwright/test": [
               wrapper || path.join(modules, "@playwright/test/index.mjs"),
             ],
-            "playwright/test": [wrapper || path.join(modules, "playwright/test.mjs")],
+            "playwright/test": [
+              wrapper || path.join(modules, "playwright/test.mjs"),
+            ],
             playwright: [path.join(modules, "playwright/index.mjs")],
           },
         },

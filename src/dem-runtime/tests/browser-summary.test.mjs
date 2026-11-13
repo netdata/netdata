@@ -240,6 +240,15 @@ test('missing, open, malformed and duplicate annotations remain distinct from pr
   assert.deepEqual(producer.data()[1], {record: 'invalid', reason: 'annotation_limit'});
 });
 
+test('malformed unrelated annotations do not interrupt browser reporting', () => {
+  const {feature, data} = reporter();
+  finishTest(feature, 'missing', null, undefined, 3, 'unrelated');
+  finishTest(feature, 'observed', null, annotation([uncaught('keep')]), {});
+  feature.complete();
+  assert.deepEqual(data().at(-1).run.tests, {observed: 1, incomplete: 0, invalid: 0, no_summary: 1});
+  assert.equal(data()[0].samples[0].message, 'keep');
+});
+
 test('malformed candidate shapes and unsafe numbers never enter aggregates', () => {
   const malformed = [
     annotation([consoleText('a'.repeat(511))]),

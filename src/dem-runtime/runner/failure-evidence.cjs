@@ -45,7 +45,8 @@ function sameError(left, right) {
 module.exports = class FailureEvidence {
   constructor(options, emit) {
     this.emit = emit;
-    this.view = options.stepView || require("./step-view.cjs")(options.observerFile);
+    this.view =
+      options.stepView || require("./step-view.cjs")(options.observerFile);
     this.sourceDir = options.sourceDir || options.workDir || process.cwd();
     this.tests = new Map();
     this.steps = new Map();
@@ -289,11 +290,9 @@ module.exports = class FailureEvidence {
         cursors.pop();
         continue;
       }
-      const step = cursor.step = next.value;
+      const step = (cursor.step = next.value);
       if (matches(step)) {
-        const candidate = cursors.map(
-          (cursor) => cursor.step,
-        );
+        const candidate = cursors.map((cursor) => cursor.step);
         let shared = 0;
         while (
           shared < matchedPath.length &&
@@ -313,7 +312,11 @@ module.exports = class FailureEvidence {
       }
       if (step.steps?.length) {
         if (cursors.length === 64) pathIncomplete = true;
-        else cursors.push({ iterator: this.view.children(step.steps), step: undefined });
+        else
+          cursors.push({
+            iterator: this.view.children(step.steps),
+            step: undefined,
+          });
       }
     }
     return { matchedPath, pathIncomplete };

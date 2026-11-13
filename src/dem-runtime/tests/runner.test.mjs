@@ -600,6 +600,20 @@ test('selected summary survives missing browser launch as no-summary, without ch
   assert.equal(browserRecords(actual).at(-1).run.tests.no_summary, 1);
 });
 
+test('malformed user annotations preserve core failure and Failure evidence with browser summary enabled', async () => {
+  const source = prefix + "test('malformed annotation',async({},info)=>{info.annotations.push(null)});";
+  const plain = await run(source, {extensions:['failure_evidence.v1']});
+  const selected = await run(source, {extensions:['failure_evidence.v1',browserFeature]});
+  assert.equal(plain.result.status, 'failed');
+  assert.deepEqual(selected.result, plain.result);
+  assert.deepEqual(selected.result.tests, counts({declared:1,failed:1}));
+  const evidence = selected.optional.filter(value=>value.extension?.feature==='failure_evidence.v1').map(value=>value.extension.data);
+  assert.ok(evidence.some(value=>value.record==='test' && value.test.status==='failed' && value.test.reporting_complete));
+  assert.equal(evidence.find(value=>value.record==='failure').failure.message, plain.result.error);
+  assert.equal(evidence.at(-1).record, 'complete');
+  assert.equal(browserRecords(selected).at(-1).run.tests.no_summary, 1);
+});
+
 test('real browser summary preserves user operations and records primitive fixture-context samples', {skip: !process.env.DEM_TEST_BROWSER && 'set DEM_TEST_BROWSER to the pinned sandbox browser'}, async () => {
   const fixture = await fixtureRuntime(dependencies, 'chrome');
   await fs.symlink(process.env.DEM_TEST_BROWSER, path.join(fixture, 'chrome'));

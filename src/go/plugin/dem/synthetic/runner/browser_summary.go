@@ -353,17 +353,7 @@ func validBrowserSample(s *synthetic.BrowserSample, r *textRedactor) bool {
 		s.Error, c = browserText(s.Error, 128, r)
 		s.TextTruncated = s.TextTruncated || c
 		if s.URL != nil {
-			v := r.redacted(*s.URL)
-			u, err := url.Parse(v)
-			if err != nil {
-				return false
-			}
-			u.User = nil
-			u.RawQuery = ""
-			u.ForceQuery = false
-			u.Fragment = ""
-			u.RawFragment = ""
-			v = u.String()
+			v := browserSafeURL(r.redacted(*s.URL))
 			if !boundedJSON(v, 256) {
 				s.URL = nil
 				s.URLOmitted = "too_long"
@@ -393,18 +383,28 @@ var browserURLText = regexp.MustCompile(`(?i)https?://[^\s<>"']+`)
 
 func browserSafeText(value string, r *textRedactor) string {
 	return browserURLText.ReplaceAllStringFunc(r.redacted(value), func(value string) string {
-		u, err := url.Parse(value)
-		if err != nil {
-			return "[unavailable]"
+		if safe := browserSafeURL(value); safe != "" {
+			return safe
 		}
-		u.User = nil
-		u.RawQuery = ""
-		u.ForceQuery = false
-		u.Fragment = ""
-		u.RawFragment = ""
-		return u.String()
+		return "[unavailable]"
 	})
 }
+
+func browserSafeURL(value string) string {
+	u, err := url.Parse(value)
+	if err != nil {
+		// WHATWG URLs can contain escapes rejected by net/url (for example %zz).
+		// Omit the unusable URL without discarding the remaining browser evidence.
+		return ""
+	}
+	u.User = nil
+	u.RawQuery = ""
+	u.ForceQuery = false
+	u.Fragment = ""
+	u.RawFragment = ""
+	return u.String()
+}
+
 func browserText(value string, limit int, r *textRedactor) (string, bool) {
 	return clippedEvidenceText(browserSafeText(value, r), limit)
 }

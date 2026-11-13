@@ -12,7 +12,9 @@ function selection(request) {
   )
     return undefined;
   return request.kind === "journey"
-    ? [FEATURE, BROWSER_SUMMARY].filter((feature) => request.extensions.includes(feature))
+    ? [FEATURE, BROWSER_SUMMARY].filter((feature) =>
+        request.extensions.includes(feature),
+      )
     : [];
 }
 function family(record) {
@@ -34,7 +36,8 @@ function optional(record, selected, terminal) {
   if (kind === "extension_init" && selected && !terminal) return record;
   if (kind === "extension" && selected?.length && !terminal) {
     const feature = record.extension?.feature;
-    if (selected.includes(feature) || typeof feature !== "string") return record;
+    if (selected.includes(feature) || typeof feature !== "string")
+      return record;
   }
   return true;
 }

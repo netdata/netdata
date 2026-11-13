@@ -105,6 +105,38 @@ func TestBrowserRedactionSamplesAndSnapshots(t *testing.T) {
 	assert.Contains(t, string(encoded), `{"omitted":"unrepresentable"}`)
 	assert.NotContains(t, string(encoded), "secret")
 }
+func TestBrowserUnusableURLPreservesEvidenceAndCompletion(t *testing.T) {
+	for _, category := range []string{"http_error", "transport"} {
+		t.Run(category, func(t *testing.T) {
+			counts := synthetic.BrowserCounts{HTTPError: 1}
+			if category == "transport" {
+				counts = synthetic.BrowserCounts{Transport: 1}
+			}
+			run := synthetic.BrowserAggregate{Tests: synthetic.BrowserTestCounts{Observed: 1}, Counts: counts}
+			sample := map[string]any{"id": 1, "test_id": "t", "category": category, "method": "GET", "url": "https://user:secret@example.com/%zz?private=secret#fragment"}
+			if category == "http_error" {
+				sample["status"] = 500
+			} else {
+				sample["error"] = "connection refused"
+			}
+			s := consumeBrowser(t, browserInit,
+				browserRecord(t, map[string]any{"record": "test", "run": run, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &counts, SampleIDs: []int{1}}, "samples": []any{sample}}),
+				browserRecord(t, map[string]any{"record": "complete", "run": run}), evidenceRecord("complete", "", nil))
+			require.Equal(t, "complete", s.browser.ReportingStatus())
+			assert.Equal(t, "complete", s.evidence.ReportingStatus())
+			assert.Equal(t, run, *s.browser.Run)
+			require.Len(t, s.browser.Samples, 1)
+			require.NotNil(t, s.browser.Samples[0].URL)
+			assert.Empty(t, *s.browser.Samples[0].URL)
+			assert.Empty(t, s.browser.Samples[0].URLOmitted)
+			raw, err := json.Marshal(s.browser)
+			require.NoError(t, err)
+			assert.NotContains(t, string(raw), "secret")
+			assert.NotContains(t, string(raw), "private=")
+		})
+	}
+}
+
 func TestBrowserRowsPoolAndLateSamples(t *testing.T) {
 	lines := []string{browserInit}
 	for n := int64(1); n <= 64; n++ {

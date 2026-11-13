@@ -23,7 +23,9 @@ module.exports = class DEMReporter {
     this.confirmedFailure = false;
     this.finished = false;
     this.evidence = options.extensions?.includes(FailureEvidence.FEATURE)
-      ? new FailureEvidence({...options, stepView: this.stepView}, (record) => write(3, record))
+      ? new FailureEvidence({ ...options, stepView: this.stepView }, (record) =>
+          write(3, record),
+        )
       : undefined;
     this.browserSummary = options.extensions?.includes(BrowserSummary.FEATURE)
       ? new BrowserSummary((record) => write(3, record))

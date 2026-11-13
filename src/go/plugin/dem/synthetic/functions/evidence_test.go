@@ -18,7 +18,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout, TerminationReason: model.ExecutionBudget, Error: "core error", Events: []model.Event{{Kind: "step_end", Title: "legacy event"}}}
 			if rich {
-				run.BrowserSummary = &model.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &model.BrowserAggregate{Counts: model.BrowserCounts{ConsoleError: 2}, Omissions: []string{"candidate_limit"}}}
+				run.BrowserSummary = &model.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &model.BrowserAggregate{Tests: model.BrowserTestCounts{Observed: 1}, Counts: model.BrowserCounts{ConsoleError: 2}, Omissions: []string{"candidate_limit"}}}
 				run.FailureEvidence = &model.FailureEvidence{
 					Availability: "supported", Truncated: []string{"user_steps"},
 					Steps:        []model.EvidenceStep{{ID: "s1", TestID: "t", Title: "pending submit", State: "running"}},
@@ -61,7 +61,13 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 			assert.Equal(t, run.FailureEvidence.LastObservedStepSummary(), values["last_observed_step"])
 			assert.Equal(t, run.FailureEvidence.StopSummary(), values["stop_context"])
 			assert.Equal(t, run.BrowserSummary.ReportingStatus(), values["browser_summary_status"])
-			assert.Equal(t, run.BrowserSummary.Summary(), values["browser_errors"])
+			if rich {
+				assert.Contains(t, values["browser_errors"], "tests: observed=1")
+				assert.Contains(t, values["browser_errors"], "console_error=2")
+				assert.Contains(t, values["browser_errors"], "[omissions: candidate_limit]")
+			} else {
+				assert.Equal(t, "", values["browser_errors"])
+			}
 			columns := listResponse.RawResponse["columns"].(map[string]any)
 			assert.Equal(t, 15, columns["termination_reason"].(map[string]any)["index"])
 			assert.Equal(t, 16, columns["failure_evidence_status"].(map[string]any)["index"])
