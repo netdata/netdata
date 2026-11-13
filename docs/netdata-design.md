@@ -34,9 +34,9 @@ The same idea applies to the whole stack: the [NIDL framework](/docs/NIDL-Framew
 
 ## Data stays where it is created
 
-**Your metrics stay on your own infrastructure, in your Agents and Parents.**
+**Instead of centralizing the data, Netdata distributes the monitoring code to each system, keeping data local while providing unified access.** This architecture enables linear scaling to millions of metrics per second and terabytes of logs, automated root cause analysis, a faster experience and significantly lower total cost of ownership.
 
-Netdata shines when your data is distributed. Agents collect and store metrics on every node. Parents receive streams from many Agents (Children), store their metrics, run machine learning and alerts for them, and answer queries for them.
+Your metrics stay on your own infrastructure, in your Agents and Parents. Netdata shines when your data is distributed. Agents collect and store metrics on every node. Parents receive streams from many Agents (Children), store their metrics, run machine learning and alerts for them, and answer queries for them.
 
 Netdata Cloud (SaaS or On-Prem, including air-gapped) is the orchestration layer: it routes each query to the Parents that hold the data and merges the results. Each Parent serves the complete view of all its own nodes on its own; the fleet-wide view across all Parents is what Netdata Cloud adds, and with On-Prem, including air-gapped, that view runs entirely inside your network.
 
