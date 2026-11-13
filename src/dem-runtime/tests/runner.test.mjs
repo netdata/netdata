@@ -38,11 +38,15 @@ async function run(source, options = {}, root = runtimeRoot) {
   child.stdin.end(JSON.stringify(request));
   const code = await new Promise((resolve, reject) => {child.on('error', reject); child.on('close', resolve);});
   assert.equal(err, '', 'bootstrap stderr is not an uncontrolled diagnostic path');
-  const records = baselineRecords(out);
+  const negotiated = Array.isArray(options.extensions) && options.extensions.every(value => typeof value === 'string' && value);
+  const records = negotiated ? out.trim().split('\n').map(line => JSON.parse(line)) : baselineRecords(out);
+  const optional = records.filter(record => record.type === 'extension' || record.type === 'extension_init');
+  if (negotiated) baselineRecords(records.filter(record => !['extension', 'extension_init'].includes(record.type)).map(record => JSON.stringify(record)).join('\n'));
+  else assert.equal(optional.length, 0, 'baseline request emitted optional output');
   const results = records.filter(r => r.type === 'result');
   assert.equal(results.length, 1, out);
-  assert.ok(records.every(r => ['event', 'result'].includes(r.type)));
-  return {code, result: results[0].result, events: records.filter(r => r.type === 'event').map(r => r.event), dir};
+  assert.ok(records.every(r => ['event', 'result', 'extension_init', 'extension'].includes(r.type)));
+  return {code, result: results[0].result, events: records.filter(r => r.type === 'event').map(r => r.event), optional, records, dir};
 }
 const counts = values => ({declared: 0, passed: 0, failed: 0, timed_out: 0, skipped: 0, expected_failure: 0, not_run: 0, ...values});
 const prefix = "import {test, expect} from '@playwright/test';\n";
@@ -51,6 +55,7 @@ test('unknown advisory request members preserve ordinary journey execution', asy
   const source = prefix + "test('pass',async()=>{console.log('workflow-executed');expect(2).toBe(2)});";
   const plain = await run(source);
   const extended = await run(source, {extensions: ['fixture.future.v1'], future_advisory: {value: 'ignored-fixture'}});
+  assert.deepEqual(extended.optional, [{type: 'extension_init', extension_init: {selected: []}}]);
   assert.equal(extended.code, plain.code);
   assert.deepEqual(extended.result, plain.result);
   const output = extended.events.filter(event => event.kind === 'stdout').map(event => event.message).join('');
@@ -265,6 +270,7 @@ test('unknown advisory request members preserve Lighthouse measurements and capt
   const options={kind:'lighthouse',url:'http://fixture.invalid',capture:true};
   const plain=await run(undefined,options,fixture);
   const extended=await run(undefined,{...options,extensions:['fixture.future.v1'],future_advisory:{value:'ignored-fixture'}},fixture);
+  assert.deepEqual(extended.optional, [{type: 'extension_init', extension_init: {selected: []}}]);
   assert.equal(extended.code,0);
   assert.deepEqual(extended.result,plain.result);
   assert.deepEqual(extended.result.metrics,{performance:88,lcp_ms:123});
@@ -407,4 +413,168 @@ test('self-check rejects missing private imports before invoking the browser', a
   assert.equal(actual.stdout,'');
   assert.match(JSON.parse(actual.stderr).error,/lr-desktop-config/);
   await assert.rejects(fs.access(path.join(root,'browser-called')));
+});
+
+test('gated real journey emits selected typed lifecycle and the actual failure path', async () => {
+  const actual = await run(prefix + `test('checkout', async()=>{
+    try { await test.step('caught earlier', async()=>expect(1).toBe(2)); } catch {}
+    await test.step('checkout', async()=>{await test.step('payment',async()=>expect(3).toBe(4));});
+  });`, {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'failed');
+  assert.deepEqual(actual.records[0], {type: 'extension_init', extension_init: {selected: ['failure_evidence.v1']}});
+  const rich = actual.optional.filter(record => record.type === 'extension').map(record => record.extension.data);
+  const tests = rich.filter(record => record.record === 'test').map(record => record.test);
+  assert.equal(tests.length, 2); assert.equal(tests[0].status, 'running'); assert.equal(tests[1].status, 'failed');
+  assert.equal(tests[0].reporting_complete, false); assert.equal(tests[1].reporting_complete, true);
+  assert.equal(tests[0].id, actual.events.find(event => event.kind === 'test').test_id);
+  const failure = rich.find(record => record.record === 'failure').failure;
+  assert.ok(failure.path.some(step => step.title === 'payment'));
+  assert.ok(!failure.path.some(step => step.title === 'caught earlier'));
+  assert.match(failure.message, /expect/);
+  assert.equal(failure.location.file, 'journey.spec.ts');
+  assert.equal(rich.at(-1).record, 'complete');
+  assert.equal(actual.records.at(-1).type, 'result');
+});
+
+test('gated dynamic expected failures retain first unexpected failure independently of earlier expected errors', async () => {
+  const actual = await run(prefix + `test('expected',async()=>{test.fail();expect(1).toBe(2)});
+    test('unexpected',async()=>{await test.step('actual failure',async()=>expect(3).toBe(4))});`, {extensions: ['failure_evidence.v1']});
+  const rich = actual.optional.filter(record => record.type === 'extension').map(record => record.extension.data);
+  const failure = rich.find(record => record.record === 'failure').failure;
+  assert.match(failure.test.title, /unexpected/);
+  const expected = rich.filter(record => record.record === 'test' && record.test.title.includes('expected') && !record.test.title.includes('unexpected'));
+  assert.deepEqual(expected.map(record => record.test.expected_status), ['passed', 'failed']);
+});
+
+test('malformed extension hints remain baseline and Lighthouse acknowledges no supported feature', async () => {
+  for (const extensions of ['failure_evidence.v1', [null], ['']]) {
+    const actual = await run(prefix + "test('pass',async()=>{});", {extensions});
+    assert.equal(actual.result.status, 'success'); assert.equal(actual.optional.length, 0);
+  }
+  const {fixture} = await lighthouseFixture();
+  const actual = await run(undefined, {kind: 'lighthouse', url: 'http://fixture.invalid', extensions: ['failure_evidence.v1']}, fixture);
+  assert.equal(actual.result.status, 'success');
+  assert.deepEqual(actual.optional, [{type: 'extension_init', extension_init: {selected: []}}]);
+});
+
+test('real late failure survives test and both step pools after generic event saturation', async () => {
+  const actual = await run(prefix + `
+    for(let n=0;n<66;n++) test('passing '+n,async()=>{});
+    test('late failure',async()=>{
+      for(let n=0;n<160;n++) await test.step('ordinary '+n,async()=>expect(1).toBe(1));
+      try { await test.step('caught after caps',async()=>expect(2).toBe(3)); } catch {}
+      await test.step('actual after caps',async()=>expect(4).toBe(5));
+    });`, {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'failed');
+  assert.ok(actual.events.length > 500);
+  const rich = actual.optional.filter(record => record.type === 'extension').map(record => record.extension.data);
+  assert.deepEqual(new Set(rich.filter(record => record.record === 'truncated').map(record => record.scope)), new Set(['tests', 'user_steps', 'other_steps']));
+  const failure = rich.find(record => record.record === 'failure').failure;
+  assert.match(failure.test.title, /late failure/);
+  assert.ok(failure.path.some(step => step.title === 'actual after caps'));
+  assert.ok(!failure.path.some(step => step.title === 'caught after caps'));
+  const steps = rich.filter(record => record.record === 'step').map(record => record.step);
+  assert.equal(steps.filter(step => step.state === 'running').length, 192);
+  assert.equal(steps.filter(step => step.state !== 'running').length, 192);
+});
+
+test('real concurrent siblings retain independent running and terminal step identities', async () => {
+  const actual = await run(prefix + `test('concurrent',async()=>{
+    await Promise.all([
+      test.step('long sibling',async()=>await new Promise(r=>setTimeout(r,40))),
+      test.step('short sibling',async()=>await new Promise(r=>setTimeout(r,5))),
+    ]);
+  });`, {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'success');
+  const steps = actual.optional.filter(record => record.type === 'extension' && record.extension.data.record === 'step')
+    .map(record => record.extension.data.step).filter(step => step.title.endsWith('sibling'));
+  assert.deepEqual(steps.map(step => [step.title, step.state]), [
+    ['long sibling', 'running'], ['short sibling', 'running'], ['short sibling', 'passed'], ['long sibling', 'passed'],
+  ]);
+  assert.equal(steps[0].id, steps[3].id); assert.equal(steps[1].id, steps[2].id);
+});
+
+test('gated evidence resolves the owned work alias before labelling source locations', async () => {
+  const physical = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'dem-source-location-')));
+  const alias = physical + '-alias';
+  await fs.symlink(physical, alias);
+  const actual = await run(prefix + "test('checkout',async()=>{await test.step('submit',async()=>expect(1).toBe(2));});",
+    {work_dir: alias, extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'failed');
+  const evidence = actual.optional.filter(r => r.type === 'extension').map(r => r.extension.data);
+  const failure = evidence.find(r => r.record === 'failure').failure;
+  assert.equal(failure.test.location.file, 'journey.spec.ts');
+  assert.equal(failure.location.file, 'journey.spec.ts');
+  assert.ok(failure.path.every(step => !step.location || step.location.file === 'journey.spec.ts'));
+});
+
+test('repeated same-source soft and caught errors do not invent first-failure attribution', async () => {
+  for (const softFirst of [true, false]) {
+    const actual = await run(prefix + `test('ambiguous assertion',async()=>{
+      for(let i=0;i<2;i++) await test.step(i ? 'second branch' : 'first branch',async()=>{
+        const check=(i===0)===${softFirst}?expect.soft:expect;
+        try {check(1).toBe(2)} catch {}
+      });
+    });`, {extensions:['failure_evidence.v1']});
+    assert.equal(actual.result.status, 'failed');
+    const failure = actual.optional.find(r => r.type === 'extension' && r.extension.data.record === 'failure').extension.data.failure;
+    assert.equal(failure.path_incomplete, true);
+    assert.deepEqual(failure.path, []);
+    assert.match(failure.message, /expect/);
+  }
+});
+
+test('native timeout keeps pending body context despite caught errors, saturation and cleanup failure', async () => {
+  const actual = await run(prefix + `
+    test.afterEach(async()=>{await test.step('cleanup failure',async()=>expect(1).toBe(2));});
+    test('timeout',async()=>{
+      test.setTimeout(1000);
+      try { await test.step('caught assertion',async()=>expect(1).toBe(2)); } catch {}
+      for(let n=0;n<200;n++) await test.step('noise '+n,async()=>{});
+      await test.step('Checkout',async()=>{await test.step('Submit',async()=>new Promise(()=>{}));});
+    });`, {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'timeout');
+  const records = actual.optional.filter(r => r.type === 'extension').map(r => r.extension.data);
+  const stop = records.find(r => r.record === 'stop').stop;
+  assert.equal(stop.test.status, 'timedOut');
+  assert.deepEqual(stop.path.map(s => s.title), ['Checkout', 'Submit']);
+  assert.ok(stop.path.every(s => s.state === 'running'));
+  assert.equal(stop.path.at(-1).location.file, 'journey.spec.ts');
+  assert.ok(records.some(r => r.record === 'truncated' && r.scope === 'user_steps'));
+});
+
+test('budget interruption retains pre-cleanup context alongside an earlier first failure', async () => {
+  const actual = await run(prefix + `
+    test('first failure',async()=>expect(1).toBe(2));
+    test('wait',async()=>{test.setTimeout(0);await test.step('Pending action',async()=>new Promise(()=>{}));});`,
+    {extensions: ['failure_evidence.v1'], stop_at_monotonic_ms: monotonicMilliseconds() + 6000});
+  assert.equal(actual.result.status, 'timeout');
+  assert.equal(actual.result.termination_reason, 'execution_budget');
+  const records = actual.optional.filter(r => r.type === 'extension').map(r => r.extension.data);
+  const stop = records.find(r => r.record === 'stop').stop;
+  assert.equal(stop.test.status, 'interrupted');
+  assert.deepEqual(stop.path.map(s => s.title), ['Pending action']);
+  assert.match(records.find(r => r.record === 'failure').failure.test.title, /first failure/);
+});
+
+test('cleanup-only timeouts disclose missing body context instead of blaming cleanup errors', async () => {
+  const actual = await run(prefix + `
+    test.afterEach(async()=>{await test.step('cleanup timeout',async()=>new Promise(()=>{}));});
+    test('body passed',async()=>{test.setTimeout(400);await test.step('completed body',async()=>{});});`,
+    {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'timeout');
+  const stop = actual.optional.find(r => r.type === 'extension' && r.extension.data.record === 'stop').extension.data.stop;
+  assert.deepEqual(stop.path, []);
+  assert.equal(stop.path_incomplete, true);
+});
+
+test('discarded stop candidates do not announce text loss in a successful real journey', async () => {
+  const actual = await run(prefix + `test('unawaited after cap',async()=>{
+    for(let n=0;n<130;n++) await test.step('ordinary '+n,async()=>{});
+    void test.step('unawaited '.repeat(100),async()=>new Promise(()=>{}));
+  });`, {extensions: ['failure_evidence.v1']});
+  assert.equal(actual.result.status, 'success');
+  const records = actual.optional.filter(r => r.type === 'extension').map(r => r.extension.data);
+  assert.equal(records.some(r => r.record === 'stop'), false);
+  assert.deepEqual(records.filter(r => r.record === 'truncated').map(r => r.scope), ['user_steps']);
 });

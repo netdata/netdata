@@ -87,6 +87,35 @@ a captured GUID stays unassigned; legacy `site_id` text is not mapped to a vnode
 Vnode placement does not combine RUM populations, change artifact ownership or increase browser capacity. Execution,
 receiver service and retention remain shared by the collecting Agent.
 
+## Investigate journey failures
+
+`synthetics-runs` includes the first unexpected test failure, the last observed running step and pending-before-cleanup context when the runtime
+supports structured journey evidence. `synthetics-run` also returns `run.failure_evidence`: test observations,
+step identities and parent relationships, source locations, bounded error excerpts, and the first failure's step path.
+The overall outcome and termination reason remain separate. An earlier assertion can be retained even when a later
+test exhausts the execution budget. Failed configuration rehearsals use the same diagnostic summary.
+
+For the first timed-out or interrupted test, `run.failure_evidence.stop_context` preserves
+pending activity observed just before Playwright starts cleanup, even after ordinary step
+limits fill. The “Pending before cleanup” column describes that observation, not the cause or
+exact location of the timeout. Later cleanup errors do not replace it. Concurrent branches
+show their common ancestry and disclose incomplete detail; missing observations and
+cleanup-only timeouts can show only the test with an incomplete-path marker. Source locations
+identify the displayed pending step, or the test declaration when no step is known; they do
+not identify where the timeout occurred.
+
+Evidence status is `not_recorded` for older history or attempts without runtime evidence, `unavailable` when negotiation was not reported, `unsupported` when the
+runtime declined the feature, `partial` when reporting stopped, `complete` when its completion marker arrived,
+and `invalid` when optional reporting was malformed. A test can have a complete report even when a later test is
+interrupted. Completion describes reporting; it does not prove that every test ran. Truncation is separate and can
+coexist with complete reporting. Missing evidence never means zero errors.
+
+Detail is bounded: up to 64 tests, 128 user steps and 64 other steps, with a separate first-failure reserve.
+Source labels are relative to the journey's directory; external locations are labelled `[external]`.
+Error excerpts can include Playwright's call log, but are redacted and clipped. Deep ancestry, unusually large text
+or exhausted detail budgets are explicitly marked. A last-observed step describes a received observation, not
+current browser activity. Captures keep their existing access rules and publication requirements.
+
 ## Receive browser reports
 
 Expose the receiver through HTTPS, configure its public URL and actual trusted proxy addresses, then install
