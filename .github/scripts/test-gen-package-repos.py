@@ -65,6 +65,7 @@ class PackageReposTest(unittest.TestCase):
             ('release', '2.12.1', 'netdata/netdata'),
             ('release', '2.12.2', 'netdata/netdata netdata/netdata-preview'),
             ('release', '2.12.3', 'netdata/netdata netdata/netdata-preview'),
+            ('release-candidate', '2.13.0-rc1', 'netdata/netdata-preview'),
             ('nightly', '2.12.2', 'netdata/netdata-edge'),
             ('devel', '2.12.2', 'netdata/netdata-devel'),
         ):
@@ -98,7 +99,8 @@ class PackageReposTest(unittest.TestCase):
     def test_both_hosts_and_formats(self):
         for host in ('packages.netdata.cloud', 'packages2.netdata.cloud'):
             for fmt in ('deb', 'rpm'):
-                for repos in ('netdata/netdata', 'netdata/netdata netdata/netdata-preview'):
+                for repos in ('netdata/netdata', 'netdata/netdata-preview',
+                              'netdata/netdata netdata/netdata-preview'):
                     with self.subTest(host=host, fmt=fmt, repos=repos):
                         script = step_script(f'Upload to {host}')
                         for key, value in (('repo_distro', 'test/distro'), ('arch', 'amd64'), ('format', fmt)):

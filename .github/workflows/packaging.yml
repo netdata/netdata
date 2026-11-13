@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       type:
-        description: Package build type
+        description: Package build type (devel, nightly, release, release-candidate)
         default: devel
         required: true
       version:
@@ -202,6 +202,11 @@ jobs:
                 repos="$(python3 .github/scripts/gen-package-repos.py "${RELEASE_VERSION}" "${REPO_PREFIX}")"
                 echo "repos=${repos}" >> "${GITHUB_OUTPUT}"
                 echo "version=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+                echo "retention=365" >> "${GITHUB_OUTPUT}"
+                ;;
+              "release-candidate")
+                echo "repos=${REPO_PREFIX}-preview" >> "${GITHUB_OUTPUT}"
+                echo "version=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
                 echo "retention=365" >> "${GITHUB_OUTPUT}"
                 ;;
               "nightly")

@@ -74,6 +74,7 @@ class DockerTagsTest(unittest.TestCase):
                     f'{repo}:{tag}' for repo in REPOS for tag in suffixes
                 ))
                 self.assertEqual(result['nightly'], '1' if version else '0')
+                self.assertEqual(result['prerelease'], 'false')
                 self.assertEqual(result['nightly_tag'], 'edge')
 
     def test_invalid_versions_fail(self):
@@ -84,6 +85,8 @@ class DockerTagsTest(unittest.TestCase):
 
     def test_prerelease_does_not_fetch(self):
         for version, suffixes in (
+            ('2.13.0-rc1', ['v2.13.0-rc1']),
+            ('3.0.0-rc12', ['v3.0.0-rc12']),
             ('2.12.2-rc1', ['v2.12.2-rc1']),
             ('2.12.2-rc.1', ['v2.12.2-rc.1']),
         ):
@@ -94,6 +97,22 @@ class DockerTagsTest(unittest.TestCase):
                     f'{repo}:{tag}' for repo in REPOS for tag in suffixes
                 ))
                 self.assertEqual(result['nightly'], '0')
+                self.assertEqual(result['prerelease'], 'true')
+
+    def test_stable_followups_skip_prereleases(self):
+        workflow = (SCRIPT.parent.parent / 'workflows/docker.yml').read_text()
+        self.assertIn('prerelease: ${{ steps.tag.outputs.prerelease }}', workflow)
+        for step_name in ('Trigger Helmchart PR', 'Trigger MSI build'):
+            step = workflow.split(f'      - name: {step_name}\n', 1)[1]
+            condition = step.split('        if: ', 1)[1].splitlines()[0]
+            for version, should_run in (('2.13.0', True), ('2.13.0-rc1', False), ('nightly', False)):
+                result, _ = self.generate(version)
+                expression = condition.replace('github.event_name', repr('workflow_dispatch'))
+                expression = expression.replace('github.event.inputs.version', repr(version))
+                expression = expression.replace('github.repository', repr('netdata/netdata'))
+                expression = expression.replace('needs.gen-tags.outputs.prerelease', repr(result['prerelease']))
+                with self.subTest(step=step_name, version=version):
+                    self.assertEqual(eval(expression.replace('&&', 'and'), {'__builtins__': {}}), should_run)
 
     def test_invalid_explicit_versions_fail(self):
         for version in ('garbage-rc', '2.12-rc.1', '2.12.2-01',

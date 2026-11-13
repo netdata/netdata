@@ -27,6 +27,7 @@ tags = {
 }
 
 nightly = False
+prerelease = False
 
 match version:
     case '':
@@ -40,6 +41,7 @@ match version:
     case _:
         version_core(version)
         if '-' in version.split('+', 1)[0]:
+            prerelease = True
             versions = [f'v{version}']
         else:
             v = f'v{version}'.split('.')
@@ -66,6 +68,7 @@ def write_output(name: str, value: str) -> None:
 
 write_output('tags', ','.join(all_tags))
 write_output('nightly', '1' if nightly else '0')
+write_output('prerelease', 'true' if prerelease else 'false')
 write_output('nightly_tag', NIGHTLY_TAG)
 
 for h in REPOS.keys():

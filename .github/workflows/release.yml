@@ -7,15 +7,15 @@ on:
   workflow_dispatch: # Dispatch runs build and validate, then push to the appropriate storage location.
     inputs:
       type:
-        description: Build Type
+        description: Build Type (nightly, major, minor, patch, release-candidate)
         default: nightly
         required: true
       version:
-        description: Version Tag
+        description: Version Tag (vMAJOR.MINOR.PATCH or vMAJOR.MINOR.0-rcX)
         default: nightly
         required: true
-concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
-  group: release-${{ github.ref }}-${{ github.event_name }}
+concurrency: # Serialize tag/branch validation and publication across dispatch refs.
+  group: release
   cancel-in-progress: false
 jobs:
   update-changelogs:
@@ -41,12 +41,12 @@ jobs:
         env:
           RELEASE_REPO: ${{ github.repository }}
           RELEASE_EVENT: ${{ github.event_name }}
-          RELEASE_TYPE: ${{ inputs.type }}
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_TYPE: ${{ github.event.inputs.type }}
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
           RELEASE_TEST: ${{ secrets.NETDATA_RELEASE_TEST }}
         run: |
-          .github/scripts/prepare-release-base.sh "$RELEASE_REPO" "$RELEASE_EVENT" \
-            "$RELEASE_TYPE" "$RELEASE_VERSION" "$RELEASE_TEST"
+          .github/scripts/prepare-release-base.sh \
+              "${RELEASE_REPO}" "${RELEASE_EVENT}" "${RELEASE_TYPE}" "${RELEASE_VERSION}" "${RELEASE_TEST}"
       - name: Set up git-cliff
         id: setup-git-cliff
         if: steps.target.outputs.run == 'true'
@@ -60,22 +60,27 @@ jobs:
         if: steps.target.outputs.run == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
+          RELEASE_MESSAGE: ${{ steps.target.outputs.message }}
+          RELEASE_TYPE: ${{ steps.target.outputs.type }}
+          RELEASE_TAG: ${{ steps.target.outputs.ref }}
+          RELEASE_BRANCH: ${{ steps.target.outputs.branch }}
+          RELEASE_NEW_BRANCH: ${{ steps.target.outputs.new-branch }}
         run: |
           git config user.name "netdatabot"
           git config user.email "bot@netdata.cloud"
           git add packaging/version CHANGELOG.md
-          git commit -m "[ci skip] ${{ steps.target.outputs.message }}"
+          git commit -m "[ci skip] ${RELEASE_MESSAGE}"
           echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          if [ "${{ steps.target.outputs.type }}" != "nightly" ]; then
-            git tag -a "${{ github.event.inputs.version }}" -m "${{ steps.target.outputs.message }}"
+          set -- "${RELEASE_BRANCH}"
+          if [ "${RELEASE_TYPE}" != "nightly" ]; then
+            git tag -a "${RELEASE_TAG}" -m "${RELEASE_MESSAGE}"
+            set -- "$@" "refs/tags/${RELEASE_TAG}"
           fi
-          if [ -n "${{ steps.target.outputs.new-branch }}" ]; then
-            git branch "${{ steps.target.outputs.new-branch }}"
+          if [ -n "${RELEASE_NEW_BRANCH}" ]; then
+            git branch "${RELEASE_NEW_BRANCH}"
+            set -- "$@" "${RELEASE_NEW_BRANCH}"
           fi
-          git push --tags origin "${{ steps.target.outputs.branch }}"
-          if [ -n "${{ steps.target.outputs.new-branch }}" ]; then
-            git push origin "${{ steps.target.outputs.new-branch }}"
-          fi
+          git push --atomic origin "$@"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:

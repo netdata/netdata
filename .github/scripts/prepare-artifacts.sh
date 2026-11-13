@@ -5,10 +5,12 @@ set -euo pipefail
 artifacts="$(realpath "${1}")"
 signing_key="${2:-}"
 event_type="${3:-}"
-build_type="${4:-nightly}"
+release_type="${4:-nightly}"
+build_type="${release_type}"
 
 case "${build_type}" in
     release) build_type='stable' ;;
+    release-candidate) build_type='preview' ;;
 esac
 
 TOP="$(pwd)"
@@ -79,40 +81,22 @@ create_manifest() {
 # Semantic equivalent to X >= Y for versions.
 # Release candidates always sort lower than non-release candidates of the same version.
 version_compare() {
-    local v1 v2
-    local IFS=.-
-
-    read -ra v1 <<< "${1#v}"
-    read -ra v2 <<< "${2#v}"
-
-    if (( 10#${v1[0]} > 10#${v2[0]} )); then return 0; fi
-    if (( 10#${v1[0]} < 10#${v2[0]} )); then return 1; fi
-
-    if (( 10#${v1[1]} > 10#${v2[1]} )); then return 0; fi
-    if (( 10#${v1[1]} < 10#${v2[1]} )); then return 1; fi
-
-    if (( 10#${v1[2]} > 10#${v2[2]} )); then return 0; fi
-    if (( 10#${v1[2]} < 10#${v2[2]} )); then return 1; fi
-
-    if [[ "${v1[3]:-0}" == rc* ]]; then
-        v1rc=1
-    else
-        v1rc=0
+    local v1="${1#v}" v2="${2#v}" core1 core2
+    # Ignore SemVer build metadata and compare decimal fields without machine-integer limits.
+    v1="${v1%%+*}"
+    v2="${v2%%+*}"
+    core1="${v1%%-*}"
+    core2="${v2%%-*}"
+    if [ "${core1}" != "${core2}" ]; then
+        [ "$(printf '%s\n' "${core1}" "${core2}" | sort -V | tail -n 1)" = "${core1}" ]
+        return
     fi
 
-    if [[ "${v2[3]:-0}" == rc* ]]; then
-        v2rc=1
-    else
-        v2rc=0
+    if [[ "${v1}" == *-rc* ]]; then
+        if [[ "${v2}" != *-rc* ]]; then return 1; fi
+        [ "$(printf '%s\n' "${v1##*-rc}" "${v2##*-rc}" | sort -V | tail -n 1)" = "${v1##*-rc}" ]
+        return
     fi
-
-    if [ "${v1rc}" -eq 1 ] && [ "${v2rc}" -eq 1 ]; then
-        if (( 10#${v1[3]#rc} > 10#${v2[3]#rc} )); then return 0; fi
-        if (( 10#${v1[3]#rc} < 10#${v2[3]#rc} )); then return 1; fi
-    fi
-
-    if [ "${v1rc}" -ne 1 ] && [ "${v2rc}" -eq 1 ]; then return 0; fi
-    if [ "${v1rc}" -eq 1 ] && [ "${v2rc}" -ne 1 ]; then return 1; fi
 
     return 0
 }
@@ -190,7 +174,7 @@ prepare_r2_artifacts() {
 
         rm -f Version
 
-        if [ "${build_type}" != "release-candidate" ]; then
+        if [ "${release_type}" != "release-candidate" ]; then
             major="$(echo "${VERSION}" | tr -d 'v' | cut -f 1 -d '.')"
             minor="$(echo "${VERSION}" | tr -d 'v' | cut -f 2 -d '.')"
             for t in "${major}" "${major}.${minor}" ; do

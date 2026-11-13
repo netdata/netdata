@@ -353,6 +353,7 @@ jobs:
     outputs:
       tags: ${{ steps.tag.outputs.tags }}
       nightly: ${{ steps.tag.outputs.nightly }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
       nightly_tag: ${{ steps.tag.outputs.nightly_tag }}
       docker_tags: ${{ steps.tag.outputs.docker_tags }}
       quay_tags: ${{ steps.tag.outputs.quay_tags }}
@@ -959,7 +960,7 @@ jobs:
           ref: ${{ inputs.source_sha || github.sha }}
           submodules: recursive
       - name: Trigger Helmchart PR
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && needs.gen-tags.outputs.prerelease != 'true' && github.repository == 'netdata/netdata'
         id: trigger-helmchart
         uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
         with:
@@ -969,7 +970,7 @@ jobs:
           ref: refs/heads/master
           inputs: '{"agent_version": "v${{ inputs.version }}"}'
       - name: Trigger MSI build
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && needs.gen-tags.outputs.prerelease != 'true' && github.repository == 'netdata/netdata'
         id: trigger-msi
         uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
         with:

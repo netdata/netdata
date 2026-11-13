@@ -9,7 +9,7 @@ on:
   workflow_dispatch: # Dispatch runs build and does limited validation, then pushes to the appropriate storage location.
     inputs:
       type:
-        description: Build Type
+        description: Build Type (nightly, release, release-candidate)
         default: nightly
         required: true
       version:
@@ -266,11 +266,15 @@ jobs:
         if: github.event_name != 'push' && needs.file-check.outputs.run == 'true'
         run: |
           git fetch --tags --force
-      - name: Mark Stable
+      - name: Set Release Channel
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly' && needs.file-check.outputs.run == 'true'
+        env:
+          RELEASE_TYPE: ${{ github.event.inputs.type }}
         run: |
-          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh
+          channel=stable
+          if [ "${RELEASE_TYPE}" = release-candidate ]; then channel=preview; fi
+          sed -i "s/^RELEASE_CHANNEL=\"nightly\"/RELEASE_CHANNEL=\"${channel}\"/" netdata-installer.sh
       - name: Build
         id: build
         if: needs.file-check.outputs.run == 'true'
@@ -296,7 +300,7 @@ jobs:
               ${{ github.repository }}: Failed to create source tarball for distribution.
               Checkout: ${{ steps.checkout.outcome }}
               Fix Tags: ${{ steps.fix-tags.outcome }}
-              Mark stable: ${{ steps.channel.outcome }}
+              Set release channel: ${{ steps.channel.outcome }}
               Build: ${{ steps.build.outcome }}
               Store: ${{ steps.store.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -466,11 +470,15 @@ jobs:
         if: github.event_name != 'push' && needs.file-check.outputs.run == 'true'
         run: |
           git fetch --tags --force
-      - name: Mark Stable
+      - name: Set Release Channel
         id: channel
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.type != 'nightly' && needs.file-check.outputs.run == 'true'
+        env:
+          RELEASE_TYPE: ${{ github.event.inputs.type }}
         run: |
-          sed -i 's/^RELEASE_CHANNEL="nightly"/RELEASE_CHANNEL="stable"/' netdata-installer.sh packaging/makeself/install-or-update.sh
+          channel=stable
+          if [ "${RELEASE_TYPE}" = release-candidate ]; then channel=preview; fi
+          sed -i "s/^RELEASE_CHANNEL=\"nightly\"/RELEASE_CHANNEL=\"${channel}\"/" netdata-installer.sh packaging/makeself/install-or-update.sh
       - name: Get Cache Key
         if: (github.event_name != 'pull_request' || ! contains(github.event.pull_request.labels.*.name, 'run-ci/no-cache')) && needs.file-check.outputs.run == 'true'
         id: cache-key
@@ -597,7 +605,7 @@ jobs:
               ${{ github.repository }}: Failed to create static installer archive for ${{ matrix.arch }}.
               Checkout: ${{ steps.checkout.outcome }}
               Fix Tags: ${{ steps.fix-tags.outcome }}
-              Mark stable: ${{ steps.channel.outcome }}
+              Set release channel: ${{ steps.channel.outcome }}
               Set up QEMU: ${{ steps.qemu.outcome }}
               Download topology stock payload: ${{ steps.fetch-topology-stock.outcome }}
               Build: ${{ steps.build.outcome }}
@@ -1320,17 +1328,19 @@ jobs:
   normalize-tag: # Fix the release tag if needed
     name: Normalize Release Tag
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release'
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.type == 'release' || github.event.inputs.type == 'release-candidate')
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
       - name: Normalize Tag
         id: tag
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if echo ${{ github.event.inputs.version }} | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
-            echo "tag=v${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+          if echo "${RELEASE_VERSION}" | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(-rc[1-9][0-9]*)?$'; then
+            echo "tag=v${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
           else
-            echo "tag=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+            echo "tag=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
           fi
 
   upload-release: # Create the draft release and upload the build artifacts.
@@ -1343,7 +1353,7 @@ jobs:
           && needs.windows-test.result == 'success'
           && needs.normalize-tag.result == 'success'
           && github.event_name == 'workflow_dispatch'
-          && github.event.inputs.type == 'release'
+          && (github.event.inputs.type == 'release' || github.event.inputs.type == 'release-candidate')
           && github.repository == 'netdata/netdata' }}
     needs:
       - artifact-verification-dist
@@ -1370,6 +1380,7 @@ jobs:
           artifactErrorsFailBuild: true
           artifacts: 'final-artifacts/*'
           draft: true
+          prerelease: ${{ github.event.inputs.type == 'release-candidate' }}
           tag: ${{ needs.normalize-tag.outputs.tag }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Failure Notification
@@ -1408,7 +1419,7 @@ jobs:
           }}
 
   publish-stable-artifacts:
-    name: Publish Stable Release Artifacts
+    name: Publish Release Artifacts
     runs-on: ubuntu-latest
     if: >-
       ${{ !failure() && !cancelled()
@@ -1417,7 +1428,7 @@ jobs:
           && needs.artifact-verification-dist.result == 'success'
           && needs.artifact-verification-static.result == 'success'
           && github.event_name == 'workflow_dispatch'
-          && github.event.inputs.type == 'release'
+          && (github.event.inputs.type == 'release' || github.event.inputs.type == 'release-candidate')
           && github.repository == 'netdata/netdata' }}
     needs:
       - prepare-upload
@@ -1434,7 +1445,12 @@ jobs:
         id: prefixes
         env:
           RELEASE_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TYPE: ${{ github.event.inputs.type }}
         run: |
+          if [ "${RELEASE_TYPE}" = release-candidate ]; then
+            echo "prefixes=preview" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
           preview="$(python3 .github/scripts/modules/release_versions.py "${RELEASE_VERSION}")"
           prefixes=stable
           if [ "${preview}" = true ]; then
@@ -1454,7 +1470,7 @@ jobs:
           path: artifacts
       - name: Retrieve Preview Artifacts
         id: fetch-preview
-        if: contains(steps.prefixes.outputs.prefixes, 'preview')
+        if: github.event.inputs.type == 'release' && contains(steps.prefixes.outputs.prefixes, 'preview')
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: r2-preview-artifacts
@@ -1463,6 +1479,7 @@ jobs:
         id: upload
         env:
           ARTIFACT_PREFIXES: ${{ steps.prefixes.outputs.prefixes }}
+          RELEASE_TYPE: ${{ github.event.inputs.type }}
           RCLONE_CONFIG_S3_TYPE: "s3"
           RCLONE_CONFIG_S3_PROVIDER: "Cloudflare"
           RCLONE_CONFIG_S3_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}"
@@ -1473,7 +1490,7 @@ jobs:
         run: |
           for prefix in ${ARTIFACT_PREFIXES}; do
             source_dir=.
-            if [ "${prefix}" = preview ]; then
+            if [ "${prefix}" = preview ] && [ "${RELEASE_TYPE}" != release-candidate ]; then
               source_dir=../preview-artifacts
             fi
             for dir in "${source_dir}"/*/ ; do
@@ -1487,10 +1504,10 @@ jobs:
           SLACK_COLOR: 'danger'
           SLACK_FOOTER: ''
           SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Failed to upload stable build artifacts:'
+          SLACK_TITLE: 'Failed to upload release build artifacts:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: Failed to upload stable build artifacts.
+              ${{ github.repository }}: Failed to upload release build artifacts.
               Checkout: ${{ steps.checkout.outcome }}
               Select artifact prefixes: ${{ steps.prefixes.outcome }}
               Fetch preview artifacts: ${{ steps.fetch-preview.outcome }}

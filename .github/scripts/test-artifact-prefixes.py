@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import re
 import subprocess
 import tempfile
 import unittest
@@ -34,7 +35,7 @@ class ArtifactPrefixesTest(unittest.TestCase):
             runpy.run_path(str(SCRIPTS / 'modules/release_versions.py'), run_name='__main__')
         return output.getvalue().strip()
 
-    def select(self, eligibility, exit_code=0):
+    def select(self, eligibility, exit_code=0, build_type="release"):
         script = step_script('Select Artifact Prefixes').replace(
             'python3 .github/scripts/modules/release_versions.py', 'lookup_preview',
         )
@@ -42,9 +43,58 @@ class ArtifactPrefixesTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / 'output'
             result = subprocess.run(['bash', '-eu', '-c', script], capture_output=True,
-                                    env={**os.environ, 'RELEASE_VERSION': '2.12.2',
+                                    env={**os.environ, 'RELEASE_VERSION': '2.12.2', 'RELEASE_TYPE': build_type,
                                          'GITHUB_OUTPUT': str(output)})
             return result.returncode, output.read_text() if output.exists() else ''
+
+    def test_github_tag_normalization(self):
+        step = WORKFLOW.split('      - name: Normalize Tag\n', 1)[1].split('  upload-release:', 1)[0]
+        script = '\n'.join(line[10:] for line in step.split('        run: |\n', 1)[1].splitlines())
+        for version in ('2.13.0', '2.13.0-rc1', 'v2.13.0', 'v2.13.0-rc1'):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / 'output'
+                subprocess.run(['bash', '-eu', '-c', script], check=True,
+                               env={**os.environ, 'RELEASE_VERSION': version, 'GITHUB_OUTPUT': str(output)})
+                self.assertEqual(output.read_text(), f'tag=v{version.removeprefix("v")}\n')
+
+    def test_installers_use_requested_channel(self):
+        steps = re.findall(r'      - name: (?:Mark Stable|Set Release Channel)\n(.*?)(?=      - name:)',
+                           WORKFLOW, re.S)
+        self.assertEqual(len(steps), 2)
+        for kind, expected in (('release', 'stable'), ('release-candidate', 'preview')):
+            for step in steps:
+                script = '\n'.join(line[10:] for line in step.split('        run: |\n', 1)[1].splitlines())
+                with self.subTest(kind=kind, script=script), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    (root / 'packaging/makeself').mkdir(parents=True)
+                    paths = [root / 'netdata-installer.sh', root / 'packaging/makeself/install-or-update.sh']
+                    for path in paths:
+                        path.write_text('RELEASE_CHANNEL="nightly"\n')
+                    subprocess.run(['bash', '-eu', '-c', script], cwd=root, check=True,
+                                   env={**os.environ, 'RELEASE_TYPE': kind})
+                    self.assertEqual(paths[0].read_text(), f'RELEASE_CHANNEL="{expected}"\n')
+                    if 'install-or-update.sh' in script:
+                        self.assertEqual(paths[1].read_text(), paths[0].read_text())
+
+    def test_rc_selects_preview_without_stable_lookup(self):
+        self.assertEqual(self.select('false', exit_code=1, build_type='release-candidate'),
+                         (0, 'prefixes=preview\n'))
+
+    def test_rc_uploads_only_preview(self):
+        script = step_script('Upload Artifacts')
+        stub = 'rclone() { printf "%s|%s\\n" "${7}" "${8}"; }\n'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ('v2.13.0-rc1', 'latest'):
+                (root / name).mkdir()
+            result = subprocess.run(['bash', '-eu', '-c', stub + script], cwd=root,
+                                    capture_output=True, text=True, check=True,
+                                    env={**os.environ, 'ARTIFACT_PREFIXES': 'preview',
+                                         'RELEASE_TYPE': 'release-candidate'})
+            self.assertCountEqual(result.stdout.splitlines(), [
+                f'./{name}/|s3:netdata-agent-artifacts/preview/{name}/'
+                for name in ('v2.13.0-rc1', 'latest')
+            ])
 
     def test_comparison_and_selection(self):
         for stable, preview, expected in (
@@ -100,27 +150,27 @@ class ArtifactPrefixesTest(unittest.TestCase):
                 with self.subTest(prefixes=prefixes):
                     result = subprocess.run(['bash', '-eu', '-c', stub + script],
                                             cwd=stable, capture_output=True, text=True, check=True,
-                                            env={**os.environ, 'ARTIFACT_PREFIXES': prefixes})
+                                            env={**os.environ, 'ARTIFACT_PREFIXES': prefixes, 'RELEASE_TYPE': 'release'})
                     self.assertCountEqual(result.stdout.splitlines(), [
                         f'{"./" if prefix == "stable" else "../preview-artifacts/"}{name}/|'
                         f's3:netdata-agent-artifacts/{prefix}/{name}/'
                         for prefix in prefixes.split() for name in trees[prefix][1]
                     ])
             failure = subprocess.run(['bash', '-eu', '-c', 'rclone() { return 1; }\n' + script],
-                                     cwd=stable, env={**os.environ, 'ARTIFACT_PREFIXES': 'stable preview'})
+                                     cwd=stable, env={**os.environ, 'ARTIFACT_PREFIXES': 'stable preview', 'RELEASE_TYPE': 'release'})
             self.assertNotEqual(failure.returncode, 0)
 
 
 class PrepareArtifactAliasesTest(unittest.TestCase):
-    def prepare(self, stable, preview, event='workflow_dispatch', build_type='release'):
+    def prepare(self, stable, preview, event='workflow_dispatch', build_type='release', version='v2.12.2'):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         root = Path(directory.name)
         (root / 'packaging').mkdir()
-        (root / 'packaging/version').write_text('v2.12.2')
+        (root / 'packaging/version').write_text(version)
         source = root / 'source'
         source.mkdir()
-        files = ['netdata-v2.12.2.tar.gz', 'netdata-v2.12.2.tar.zst', 'netdata-x64.msi']
+        files = [f'netdata-{version}.tar.gz', f'netdata-{version}.tar.zst', 'netdata-x64.msi']
         files += [f'netdata-{arch}-latest.gz.run'
                   for arch in ('x86_64', 'aarch64', 'armv6l', 'armv7l')]
         for name in files:
@@ -150,17 +200,30 @@ class PrepareArtifactAliasesTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return root
 
-    def assert_tree(self, root, tree, aliases):
+    def assert_tree(self, root, tree, aliases, version='v2.12.2'):
         directory = root / 'artifacts' / tree
-        self.assertCountEqual([p.name for p in directory.iterdir()], ['v2.12.2', *aliases])
+        self.assertCountEqual([p.name for p in directory.iterdir()], [version, *aliases])
         for target in directory.iterdir():
-            self.assertEqual((target / 'Version').read_text().strip(), 'v2.12.2')
+            self.assertEqual((target / 'Version').read_text().strip(), version)
             self.assertTrue((target / 'Manifest.sig').is_file())
             for line in (target / 'Manifest').read_text().splitlines():
                 name, size, digest = line.split()
                 data = (target / name).read_bytes()
                 self.assertEqual(len(data), int(size))
                 self.assertEqual(hashlib.sha256(data).hexdigest(), digest)
+
+    def test_rc_latest_handles_large_numbers(self):
+        version = 'v2.13.0-rc9223372036854775808'
+        root = self.prepare({}, {'latest': 'v2.13.0-rc9223372036854775807'},
+                            build_type='release-candidate', version=version)
+        self.assert_tree(root, 'r2', ['latest'], version=version)
+
+    def test_rc_artifacts_use_preview_metadata_only(self):
+        root = self.prepare({}, {}, build_type='release-candidate', version='v2.13.0-rc1')
+        self.assert_tree(root, 'r2', ['latest'], version='v2.13.0-rc1')
+        self.assertFalse((root / 'artifacts/r2-preview').exists())
+        lookups = (root / 'lookups').read_text().splitlines()
+        self.assertEqual(lookups, ['https://artifacts.netdata.cloud/preview/latest/Version'])
 
     def test_channels_select_aliases_independently(self):
         root = self.prepare(
