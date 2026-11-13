@@ -12,7 +12,10 @@
 #define PAGEFILE_NT_PREFIX "\\?" "?\\"
 
 struct paging_file {
+    // Presence marker for eviction: the file was enumerated in this cycle.
     usec_t last_collected;
+    // Deduplication marker: a valid sample was charted in this cycle.
+    usec_t last_sampled;
 
     RRDSET *st;
     RRDDIM *rd_free;
@@ -191,10 +194,12 @@ static void do_paging_files(PERF_DATA_BLOCK *pDataBlock, int update_every)
             continue;
         }
 
-        // Two instances normalizing to the same path: keep the first sample of this cycle.
-        if (pf->last_collected == now_ut)
-            continue;
         pf->last_collected = now_ut;
+
+        // Two instances normalizing to the same path: keep the first valid sample of this cycle, so an
+        // invalid first instance does not hide a valid second one.
+        if (pf->last_sampled == now_ut)
+            continue;
 
         // An unreadable or invalid sample leaves a gap instead of reporting zero.
         if (!perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &pf->usage) ||
@@ -207,6 +212,7 @@ static void do_paging_files(PERF_DATA_BLOCK *pDataBlock, int update_every)
         if (!size_pages || used_pages > size_pages)
             continue;
 
+        pf->last_sampled = now_ut;
         paging_file_chart(
             pf, path, used_pages * page_size, (size_pages - used_pages) * page_size, update_every);
     }
