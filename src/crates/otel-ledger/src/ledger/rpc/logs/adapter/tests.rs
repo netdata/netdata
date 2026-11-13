@@ -1,8 +1,7 @@
 //! Tests for the otel-logs wire adapter ([`super`]) — the pure
 //! mapping between the netdata function wire types and the
-//! `sfsq::logs` engine; `handler.rs` is its only consumer. Fixtures
-//! are synthetic `sfst` values and JSON request bodies; nothing here
-//! touches files or a runtime.
+//! `sfsq::logs` engine. Fixtures are synthetic `sfst` values and JSON
+//! request bodies; nothing here touches files or a runtime.
 //!
 //! Not pinned here: `effective_window`'s system-time fallback,
 //! `to_result` over a non-empty page (its converters are exercised
@@ -32,7 +31,7 @@ fn into_query_maps_histogram_and_anchor_forms() {
     assert!(matches!(q.anchor(), Some(Anchor::Timestamp(5_000_000))));
 
     // A malformed cursor string is dropped → no anchor (degrade, not
-    // fail — the query just starts at the page edge).
+    // fail).
     let req: OtelLogsRequest = serde_json::from_slice(br#"{"anchor":"not-a-cursor"}"#).unwrap();
     let q = req.into_query().unwrap();
     assert!(q.anchor().is_none());
@@ -49,8 +48,7 @@ fn into_query_wires_and_validates_full_text_query() {
     let req: OtelLogsRequest = serde_json::from_slice(br#"{}"#).unwrap();
     assert_eq!(req.into_query().unwrap().query(), None);
 
-    // A malformed query regex fails the whole request — validated once
-    // here at the boundary, not degraded per file.
+    // A malformed query regex fails the whole request at this boundary.
     let req: OtelLogsRequest = serde_json::from_slice(br#"{"query":"("}"#).unwrap();
     assert!(req.into_query().is_err());
 }
@@ -171,13 +169,10 @@ fn histogram_with_zero_buckets_still_well_formed() {
 
 #[test]
 fn empty_logs_data_shapes_a_full_zero_count_envelope() {
-    // The empty envelope every degenerate handler path returns (an
-    // empty source set via the engine's empty run; a cancelled remote
-    // fetch or failed blocking task via `LogsData::empty`) — always
-    // shaped by `to_result`, never hand-rolled. The chart contract
-    // must hold: real id/title, grid-derived bounds and update_every,
-    // the "(unset)" label invariant, one zero DataPoint per bucket,
-    // and the three fixed table columns.
+    // The empty envelope, shaped by `to_result` from `LogsData::empty`.
+    // The chart contract must hold: real id/title, grid-derived bounds
+    // and update_every, the "(unset)" label invariant, one zero
+    // DataPoint per bucket, and the three fixed table columns.
     let grid = sfst::Grid::new(1_700_000_000 * NS_PER_S, 15 * NS_PER_S, 4);
     let r = to_result(sfsq::logs::LogsData::empty("severity_text", grid), 200);
 
@@ -219,8 +214,7 @@ fn empty_logs_data_shapes_a_full_zero_count_envelope() {
 
 #[test]
 fn available_histograms_enumerates_fields_in_order() {
-    // The engine already excludes high-card fields, so the converter is
-    // a straight enumeration in field order.
+    // The converter is a straight enumeration in field order.
     let fields: sfst::FieldTable = vec![
         sfst::FieldEntry {
             name: "level".into(),
@@ -243,9 +237,7 @@ fn available_histograms_enumerates_fields_in_order() {
 
 /// Multi-valued fields (repeated keys on one row) join into a single cell
 /// in row order with duplicates skipped; the dedicated severity cell takes
-/// the last `severity_text` pair. Rows intern a record's scalars (incl.
-/// the projected severity) before its `attributes.*`, so on a name clash
-/// the attribute's value wins the cell.
+/// the last `severity_text` pair.
 #[test]
 fn build_table_joins_multivalued_fields_and_keeps_last_severity() {
     let cursor = sfsq::logs::Cursor {
@@ -347,7 +339,7 @@ fn take_partition_keys_decodes_hex_skips_garbage_and_removes_key() {
 #[test]
 fn take_partition_keys_absent_selection_is_all() {
     let mut req: OtelLogsRequest = serde_json::from_slice(br#"{}"#).unwrap();
-    // No selection → empty vec → Query reads it as "all streams".
+    // No selection → empty vec.
     assert!(req.take_partition_keys().is_empty());
 }
 
@@ -385,7 +377,7 @@ fn stream_required_params_builds_all_default_selected_selector() {
             assert_eq!(ms.options.len(), 2);
             // Options are sorted by (namespace, name): the absent-namespace
             // ("","") stream sorts before ("prod","api"). This guards the decode
-            // + sort the adapter performs over the substrate's partition_key-ordered fold.
+            // + sort the adapter performs.
             assert_eq!(ms.options[0].name, "(unattributed)");
             assert_eq!(ms.options[1].name, "prod/api");
             // Every option pre-selected so the default view spans all streams.

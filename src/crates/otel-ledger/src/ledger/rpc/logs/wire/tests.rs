@@ -5,8 +5,7 @@
 //! `Deserialize` impls on `DataPoint`.
 //!
 //! Fixtures are inline JSON literals driven straight through serde_json —
-//! no files, engine, or handler involved. These pin transport shapes only;
-//! the mapping onto the `sfsq::logs` engine is `adapter/tests.rs`.
+//! no files, engine, or handler involved.
 //!
 //! Not pinned here: `AnchorParam` serialization, rejection of an `anchor`
 //! that is neither string nor number, the timestamp-only bucket (an array

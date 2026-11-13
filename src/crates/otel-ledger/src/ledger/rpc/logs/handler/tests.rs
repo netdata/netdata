@@ -1,15 +1,11 @@
 //! Tests for the `otel-logs` Function handler as reached through
-//! `on_call`: the data/info/files wire responses, facet + histogram
-//! assembly, pagination, tenant scoping, and the remote-read path that
-//! fetches evicted SFSTs back from object storage.
+//! `on_call`.
 //!
 //! Fixtures are real SFST bytes written in memory by the production
 //! `sfst::ChunkWriter` and installed into a real `TenantRegistries`
 //! over throwaway temp dirs; WAL and catalog state is driven through
 //! the registry event APIs, and remote fixtures are real files behind
-//! an `fs://` storage backend. What the engine and adapter already pin
-//! (grid building, wire mapping, cursor ordering — `adapter/tests.rs`
-//! and the `sfsq` crates) is not re-tested here.
+//! an `fs://` storage backend.
 //!
 //! Not pinned here: the active-WAL query path (`resolve_wal`'s chunk
 //! indexing and tail scan — no test drives a WAL through a query),
@@ -355,15 +351,14 @@ async fn same_timestamp_rows_paginate_without_dup_or_skip() {
 }
 
 /// `files: true` inventory: SFST entries carry the tracked summary's
-/// fields and the registry's per-seq lifecycle flags — a snapshot built
-/// from registry state alone, never from the files on disk.
+/// fields and the registry's per-seq lifecycle flags.
 #[tokio::test]
 async fn files_request_returns_inventory_with_upload_state() {
     let mut tr = make_tenant_registries();
     install_sfst(&mut tr, "default", 1, 1_700_000_000);
     install_sfst(&mut tr, "default", 2, 1_700_000_100);
     // Mark seq 1's upload lifecycle so the response surfaces the registry's
-    // per-seq flags (the reason this goes to the plugin, not the filesystem).
+    // per-seq flags.
     {
         let reg = tr.get_or_create(&TenantId::from("default"));
         let key = file_registry::SeqKey::new(test_identity(), 1);
@@ -389,7 +384,7 @@ async fn files_request_returns_inventory_with_upload_state() {
     // sorted by seq
     assert_eq!(sfst[0]["seq"], 1);
     assert_eq!(sfst[1]["seq"], 2);
-    // summary + stream fields from the tracked summary, not the file
+    // summary + stream fields from the tracked summary
     assert_eq!(sfst[0]["total_logs"], 6);
     assert_eq!(sfst[0]["min_ts_s"], 1_700_000_000u64);
     assert_eq!(sfst[0]["stream"]["namespace"], "ns");
@@ -408,8 +403,7 @@ async fn files_request_returns_inventory_with_upload_state() {
 }
 
 /// `files: true` also lists WAL entries — status/entry-count/time-range
-/// as accumulated from the event stream — and tracked catalog files,
-/// both sorted for stable output.
+/// as accumulated from the event stream — and tracked catalog files.
 #[tokio::test]
 async fn files_request_includes_wal_and_catalog_entries() {
     use chrono::NaiveDate;
@@ -506,7 +500,7 @@ async fn files_request_includes_wal_and_catalog_entries() {
 }
 
 /// `info: true` returns the capability descriptor — accepted params
-/// advertised, no data keys — regardless of registered data.
+/// advertised, no data keys.
 #[tokio::test]
 async fn info_request_returns_capability_descriptor() {
     let h = make_handler(make_tenant_registries());
@@ -525,9 +519,8 @@ async fn info_request_returns_capability_descriptor() {
 
 #[tokio::test]
 async fn empty_payload_defaults_to_data_request() {
-    // Matches the legacy JournalRequest semantic: a POST body
-    // without an `info` field is a data request, not capability
-    // discovery. The UI's data POSTs rely on this.
+    // A POST body without an `info` field is a data request, not
+    // capability discovery.
     let req: OtelLogsRequest = serde_json::from_slice(b"{}").unwrap();
     assert!(!req.info);
     let h = make_handler(make_tenant_registries());
@@ -614,7 +607,7 @@ async fn populated_response_carries_facets_and_histogram() {
     // 6 logs spread across 6 seconds, all in-window.
     assert_eq!(v["items"]["matched"], 6);
 
-    // available_histograms drops high-card (none here) but lists both fields.
+    // available_histograms lists both fields.
     let avh = v["available_histograms"].as_array().unwrap();
     let avh_ids: Vec<&str> = avh.iter().map(|a| a["id"].as_str().unwrap()).collect();
     assert!(avh_ids.contains(&"service"));
@@ -703,7 +696,7 @@ async fn selection_filter_narrows_facet_counts_with_self_exclusion() {
 #[tokio::test]
 async fn only_overlapping_file_contributes() {
     // Two files in the same tenant; the window overlaps only the newer
-    // file's span, so the older file never becomes a query candidate.
+    // file's span.
     let mut tr = make_tenant_registries();
     install_sfst(&mut tr, "tenant-a", 1, 1_600_000_000);
     install_sfst(&mut tr, "tenant-a", 99, 1_700_000_000);
@@ -722,8 +715,7 @@ async fn only_overlapping_file_contributes() {
 #[tokio::test]
 async fn multiple_overlapping_files_merge_counts_and_facets() {
     // Two SFSTs in the same tenant whose spans both fall inside the
-    // request window. The planner returns both; the handler sums
-    // `matched` and unions facet counts.
+    // request window. The handler sums `matched` and unions facet counts.
     //
     // Each file has 6 logs (3 info, 3 error; 3 api, 3 worker), so the
     // merged response shows 12 logs total.
@@ -996,9 +988,8 @@ async fn histogram_click_numeric_anchor_navigates_to_time() {
 
 #[test]
 fn patched_args_payload_parses_as_a_logs_request() {
-    // The shim itself is tested in the parent rpc module; this pins
-    // that its synthesized payload deserializes into the LOGS request
-    // type with the window and info flag intact.
+    // Pins that the shim's synthesized payload deserializes into the
+    // logs request type with the window and info flag intact.
     let args = vec![
         "info".to_string(),
         "after:100".to_string(),
@@ -1065,7 +1056,7 @@ async fn tenant_scoping_isolates_unions_nothing_and_defaults() {
     let v = serde_json::to_value(&h.on_call(make_ctx("t1"), req).await.unwrap()).unwrap();
     assert_eq!(matched(&v), 6, "omitted tenant must read 'default' only");
 
-    // Unknown tenant: empty grid-aligned stub, not an error.
+    // Unknown tenant: an empty result, not an error.
     let req: OtelLogsRequest = serde_json::from_slice(
         format!(r#"{{"info":false,"tenant":"no-such-tenant",{win}}}"#).as_bytes(),
     )
@@ -1101,8 +1092,8 @@ fn track_remote_catalog(
     size: u64,
 ) -> std::path::PathBuf {
     let stream = ServiceStream::new("ns", "svc");
-    // Production `build_catalog_entry` copies both id and stream from one SFST, so
-    // the FileId's partition_key always matches the stream's ns_hash. Enforce it on the fixture.
+    // A production catalog entry pairs the FileId's partition_key with the
+    // stream's ns_hash. Enforce it on the fixture.
     assert_eq!(
         id.partition_key,
         stream.ns_hash(),
@@ -1132,8 +1123,8 @@ fn make_handler_with_remote(tr: TenantRegistries, remote: RemoteRead) -> OtelLog
     )
 }
 
-/// The id of stream `ns/svc`'s file of sequence `seq`; its ns_hash matches
-/// the stream, as production `build_catalog_entry` guarantees.
+/// The id of stream `ns/svc`'s file of sequence `seq`; its partition_key is
+/// the stream's ns_hash.
 fn stream_file_id(seq: u64) -> FileId {
     FileId::new(
         Identity::new(
@@ -1249,8 +1240,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
         "remote-only stream must appear in the selector: {v:#}"
     );
     // One remote-only SFST, no local sources: total = 0 local + 2*1 remote
-    // (one download unit + one scan unit). `done` reaches both — the fetch
-    // closure counted the download, the engine counted the scan. Without
+    // (one download unit + one scan unit). `done` reaches both. Without
     // fetch-phase progress, `done` would only reach 1.
     let (done, total) = progress.load();
     assert_eq!(total, 2, "fetch + scan phases sized into total");
@@ -1381,8 +1371,7 @@ async fn remote_fetch_failure_degrades() {
 
 /// The logs query reads catalog files only after releasing the registry
 /// read lock. A catalog that blocks its reader (a FIFO not yet written) must
-/// not keep the write lock — which the ledger loop takes on every WAL event —
-/// from being granted.
+/// not keep the write lock from being granted.
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn catalogs_are_read_off_the_registry_lock() {
