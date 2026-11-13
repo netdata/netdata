@@ -126,12 +126,12 @@ func TestEvidenceUpsertsAndPreservesFirstFailureAcrossLaterInterruption(t *testi
 	pending.Title = "Waiting for login"
 	e, _ := consumeEvidence(t, evidenceInit, evidenceRecord("test", "test", test), evidenceRecord("step", "step", step), evidenceRecord("step", "step", stepEnd), evidenceRecord("test", "test", end), evidenceRecord("failure", "failure", failure), evidenceRecord("test", "test", second), evidenceRecord("step", "step", pending))
 	require.Equal(t, "partial", e.ReportingStatus())
-	require.Len(t, e.Tests, 2)
-	require.Len(t, e.Steps, 2)
-	assert.True(t, e.Tests[0].ReportingComplete)
-	assert.False(t, e.Tests[1].ReportingComplete)
-	require.NotNil(t, e.FirstFailure)
-	assert.Equal(t, "t1", e.FirstFailure.Test.ID)
+	assert.Equal(t, &synthetic.FailureEvidence{
+		Availability: "supported",
+		Tests:        []synthetic.EvidenceTest{end, second},
+		Steps:        []synthetic.EvidenceStep{stepEnd, pending},
+		FirstFailure: &failure,
+	}, e)
 	assert.Contains(t, e.LastObservedStepSummary(), "Waiting for login")
 }
 

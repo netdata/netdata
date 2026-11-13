@@ -31,10 +31,20 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 			require.Len(t, rows, 1)
 			assert.Equal(t, "legacy event", rowValues(t, detailResponse, rows[0])["title"])
 			detail := detailResponse.RawResponse["run"].(map[string]any)
-			assert.Equal(t, run.FailureEvidence, detail["failure_evidence"])
-			assert.Equal(t, run.FailureEvidence.ReportingStatus(), detail["failure_evidence_status"])
-			assert.Equal(t, run.Outcome, detail["outcome"])
-			assert.Equal(t, run.Error, detail["error"])
+			status := "not_recorded"
+			if rich {
+				status = "partial"
+			}
+			assert.Equal(t, map[string]any{
+				"id": "r", "job_id": "journey:a", "kind": model.Journey,
+				"vnode_guid": "", "name": "", "target": "",
+				"started_us": nil, "scheduled_us": nil, "queued_us": nil, "completed_us": nil,
+				"duration_ms": nil, "outcome": model.Timeout, "termination_reason": model.ExecutionBudget,
+				"error": "core error", "tests": (*model.TestCounts)(nil),
+				"capture_state": "", "artifacts": []model.Artifact(nil), "history_error": "",
+				"dropped_events": 0, "metrics": nil, "runtime": (*model.RuntimeIdentity)(nil),
+				"failure_evidence": run.FailureEvidence, "failure_evidence_status": status,
+			}, detail)
 			validate(t, detailResponse)
 			listResponse := call(h, "synthetics-runs")
 			listRows := responseData(t, listResponse)

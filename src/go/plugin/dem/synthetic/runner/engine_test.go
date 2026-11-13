@@ -157,20 +157,6 @@ func journey() synthetic.Request {
 		Timeout: time.Second,
 	}
 }
-func emit(writer io.Writer, value any) {
-	raw, _ := json.Marshal(value)
-	_, _ = fmt.Fprintln(writer, string(raw))
-}
-func success() reporterResult {
-	return reporterResult{
-		Status: synthetic.Success,
-		Tests: &synthetic.TestCounts{
-			Declared: 1,
-			Passed:   1,
-		},
-		CaptureState: "disabled",
-	}
-}
 func resultPayload(result reporterResult) payload {
 	return func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
 		emit(out, frame{
