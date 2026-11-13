@@ -193,7 +193,7 @@ Everything that collects, stores, analyzes, alerts on, streams and queries your 
 
 **These are choices Netdata makes for you, each with what Netdata does instead.**
 
-- **No query language.** Netdata does not use a query language. Every chart is explored by grouping, filtering and aggregating nodes, instances, dimensions and labels with a click, one request to the data API returns the full analysis, and Netdata AI or any AI assistant answers plain-language questions across your infrastructure.
+- **No query language required.** Netdata has a structured query API, and people never have to write queries for it: the dashboard builds them from your clicks, AI assistants build them from your questions, and your scripts and tools can call it directly. Nobody on the team has to learn a query language, and nobody has to write one during a crisis, when every minute counts.
 - **Metrics live on your Agents and Parents.** Netdata has no object-storage tier for metrics. Retention is bounded by the disk you give your Parents, and it is configurable per tier.
 - **Parent clusters are shards.** They do not talk to each other. The view across all of them is what Netdata Cloud provides, as SaaS or On-Prem, including air-gapped.
 - **Netdata is opinionated.** It is built for teams that want monitoring that works from the start. Teams that want to hand-build dashboards, joins and recording rules over raw samples will find a different tool fits them better.
@@ -227,7 +227,7 @@ Per-second samples take about 0.6 bytes on disk, and the Agent footprint is stat
 
 ### How do I build dashboards without a query language?
 
-You do not need to: every metric arrives with a ready-made chart, and you slice it with a click. See [Dashboards that build themselves](#dashboards-that-build-themselves).
+Find the chart, slice and dice it, pick a visualization type, then resize it and move it into place. Done, with no query language: every metric arrives with a ready-made chart. See [Dashboards that build themselves](#dashboards-that-build-themselves).
 
 ### Where does my data live, and who can see it?
 
