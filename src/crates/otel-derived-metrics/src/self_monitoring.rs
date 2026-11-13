@@ -207,7 +207,7 @@ pub(crate) struct DerivationHealth {
     services: Gauge<Derivation>,
     expired: CumulativeCounter<Derivation>,
     adjusted_log_records: CumulativeCounter<Adjustment>,
-    adjusted_spans: CumulativeCounter<Adjustment>,
+    adjusted_requests: CumulativeCounter<Adjustment>,
 }
 
 impl DerivationHealth {
@@ -238,12 +238,13 @@ impl DerivationHealth {
             chart_type: ChartType::Line,
             priority: 150_012,
         })?;
-        let adjusted_spans = builder.cumulative_counter::<Adjustment>(ChartDescriptor {
-            title: "Adjusted spans".into(),
-            units: "spans/s".into(),
+        let adjusted_requests = builder.cumulative_counter::<Adjustment>(ChartDescriptor {
+            title: "Adjusted requests".into(),
+            units: "requests/s".into(),
             family: "derived metrics".into(),
-            context: "netdata.otel.derived_adjusted_spans".into(),
-            // One span can be both late and overflowed.
+            context: "netdata.otel.derived_adjusted_requests".into(),
+            // Requests only: the derivation reads no other span. One request
+            // can be both late and overflowed.
             chart_type: ChartType::Line,
             priority: 150_013,
         })?;
@@ -255,7 +256,7 @@ impl DerivationHealth {
             services,
             expired,
             adjusted_log_records,
-            adjusted_spans,
+            adjusted_requests,
         })
     }
 
@@ -274,7 +275,7 @@ impl DerivationHealth {
         for (signal, stats) in signal_stats {
             let (derivation, adjusted) = match signal {
                 Signal::Logs => (Derivation::Logs, self.adjusted_log_records),
-                Signal::Traces => (Derivation::Traces, self.adjusted_spans),
+                Signal::Traces => (Derivation::Traces, self.adjusted_requests),
             };
             measurements
                 .set_value(self.services, derivation, stats.entities as f64)
@@ -396,7 +397,7 @@ mod tests {
         assert!(!first.contains("CLABEL 'signal'"));
         // The first reading is the baseline.
         assert!(first.contains(
-            "BEGIN netdata.otel.derived_adjusted_spans 1000000\nSET late =\nSET future =\nSET overflowed =\n"
+            "BEGIN netdata.otel.derived_adjusted_requests 1000000\nSET late =\nSET future =\nSET overflowed =\n"
         ));
         assert!(second.contains(
             "BEGIN netdata.otel.derived_services 1000000\nSET logs = 0\nSET traces = 3\n"
@@ -405,7 +406,7 @@ mod tests {
             "BEGIN netdata.otel.derived_expired_services 1000000\nSET logs = 0\nSET traces = 1\n"
         ));
         assert!(second.contains(
-            "BEGIN netdata.otel.derived_adjusted_spans 1000000\nSET late = 2\nSET future = 1\nSET overflowed = 4\n"
+            "BEGIN netdata.otel.derived_adjusted_requests 1000000\nSET late = 2\nSET future = 1\nSET overflowed = 4\n"
         ));
         assert!(second.contains(
             "BEGIN netdata.otel.derived_adjusted_log_records 1000000\nSET late = 0\nSET future = 0\nSET overflowed = 0\n"
